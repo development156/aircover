@@ -1,2 +1,29 @@
-{ "currency_note": "credits; INR plans 499/1499/3999, USD 12/29/79; grants: free 100, starter 1500, growth 5000, agency 15000; rollover_cap_x": 2, "perf_reward": {"per_post": 2, "monthly_cap_pct": 10, "lifetime_milestone_cap": 20},
-  "actions": { "caption_rewrite": 1, "inbox_reply": 1, "post_variants": 3, "twin_preflight": 4, "image_standard": 6, "image_premium": 12, "carousel": 8, "video_script": 3, "site_edit": 3, "playbook_run": 2, "radar_scan": 5, "seo_article": 10, "remix_pack": 15, "loop_cycle": 20, "campaign_plan": 25, "brand_research": 50, "site_generate": 100, "voice_minute": 25 } }
+{
+  "currency_note": "credits; INR plans 499/1499/3999, USD 12/29/79; grants: free 100, starter 1500, growth 5000, agency 15000",
+  "rollover_cap_x": 2,
+  "perf_reward": {
+    "per_post": 2,
+    "monthly_cap_pct": 10,
+    "lifetime_milestone_cap": 20
+  },
+  "actions": {
+    "caption_rewrite": 1,
+    "inbox_reply": 1,
+    "post_variants": 3,
+    "twin_preflight": 4,
+    "image_standard": 6,
+    "image_premium": 12,
+    "carousel": 8,
+    "video_script": 3,
+    "site_edit": 3,
+    "playbook_run": 2,
+    "radar_scan": 5,
+    "seo_article": 10,
+    "remix_pack": 15,
+    "loop_cycle": 20,
+    "campaign_plan": 25,
+    "brand_research": 50,
+    "site_generate": 100,
+    "voice_minute": 25
+  }
+}

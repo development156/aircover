@@ -9,6 +9,9 @@ node_modules/
 # Claude Code worktrees (background-job isolation)
 .claude/worktrees/
 
+# Claude Code local, per-user settings (never commit)
+.claude/settings.local.json
+
 # Build / tooling caches & outputs
 .turbo/
 dist/
