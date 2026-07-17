@@ -1,0 +1,10 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Allow only these dependencies to run install/postinstall build scripts
+# (pnpm blocks build scripts by default). supabase downloads its CLI binary;
+# esbuild (via vitest) downloads its native binary.
+onlyBuiltDependencies:
+  - supabase
+  - esbuild
