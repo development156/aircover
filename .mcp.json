@@ -7,8 +7,12 @@
     },
     "supabase": {
       "command": "npx",
-      "args": ["-y", "@supabase/mcp-server-supabase",
-               "--read-only", "--project-ref=${SUPABASE_PROJECT_REF}"]
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase",
+        "--read-only",
+        "--project-ref=${SUPABASE_PROJECT_REF}"
+      ]
     },
     "github": { "type": "http", "url": "https://api.githubcopilot.com/mcp/" },
     "playwright": { "command": "npx", "args": ["-y", "@playwright/mcp@latest"] }
