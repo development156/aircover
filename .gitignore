@@ -1,0 +1,28 @@
+# Secrets / env — never commit real values; keep the template only
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Claude Code worktrees (background-job isolation)
+.claude/worktrees/
+
+# Build / tooling caches & outputs
+.turbo/
+dist/
+.next/
+
+# Logs
+*.log
+
+# OS junk
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
