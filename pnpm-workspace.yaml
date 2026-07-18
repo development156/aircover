@@ -2,9 +2,14 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+allowBuilds:
+  sharp: true
+
 # Allow only these dependencies to run install/postinstall build scripts
 # (pnpm blocks build scripts by default). supabase downloads its CLI binary;
-# esbuild (via vitest) downloads its native binary.
+# esbuild (via vitest) downloads its native binary; sharp (Next image
+# optimizer) builds its native binding.
 onlyBuiltDependencies:
   - supabase
   - esbuild
+  - sharp
