@@ -121,8 +121,9 @@ export type PublishMode = z.infer<typeof PublishModeSchema>
 export const PublishLogStatusSchema = z.enum(['succeeded', 'failed'])
 export type PublishLogStatus = z.infer<typeof PublishLogStatusSchema>
 
-/** Payment rail. Alpha uses Stripe (test mode); Razorpay is backlog #8. */
-export const BillingProviderSchema = z.enum(['stripe', 'razorpay'])
+/** Payment rail. Alpha uses Stripe (test mode); Razorpay is backlog #8. 'cashfree' is the
+ *  India rail; 'fixture' labels sandbox/test events (mirrors the DB provider CHECK). */
+export const BillingProviderSchema = z.enum(['stripe', 'razorpay', 'cashfree', 'fixture'])
 export type BillingProvider = z.infer<typeof BillingProviderSchema>
 
 export const WebhookEventStatusSchema = z.enum(['received', 'processed', 'failed'])
