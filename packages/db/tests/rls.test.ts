@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { hasRlsEnv } from './helpers/env'
 import { serviceClient, userClient, anonClient } from './helpers/db'
 
 // Cross-tenant isolation must hold from an anon-key client (SQL-editor checks are
 // banned as evidence). Skipped unless the anon/service keys + JWT secret are set.
 describe.skipIf(!hasRlsEnv)('RLS tenant isolation', () => {
-  const svc = serviceClient()
+  // lazy: creating the client at collection time would throw before skipIf applies
+  let svcMemo: SupabaseClient | undefined
+  const svc = () => (svcMemo ??= serviceClient())
   const run = Date.now()
   const userA = `user_rls_a_${run}`
   const userB = `user_rls_b_${run}`
@@ -14,23 +17,25 @@ describe.skipIf(!hasRlsEnv)('RLS tenant isolation', () => {
   let postA = ''
 
   beforeAll(async () => {
-    const a = await svc
+    const a = await svc()
       .from('workspaces')
       .insert({ name: 'A', slug: `rls-a-${run}`, created_by: userA })
       .select('id')
       .single()
-    const b = await svc
+    const b = await svc()
       .from('workspaces')
       .insert({ name: 'B', slug: `rls-b-${run}`, created_by: userB })
       .select('id')
       .single()
     wsA = a.data!.id
     wsB = b.data!.id
-    await svc.from('workspace_members').insert([
-      { workspace_id: wsA, user_id: userA, role: 'owner' },
-      { workspace_id: wsB, user_id: userB, role: 'owner' },
-    ])
-    const p = await svc
+    await svc()
+      .from('workspace_members')
+      .insert([
+        { workspace_id: wsA, user_id: userA, role: 'owner' },
+        { workspace_id: wsB, user_id: userB, role: 'owner' },
+      ])
+    const p = await svc()
       .from('posts')
       .insert({ workspace_id: wsA, created_by: userA, body: 'secret A' })
       .select('id')
@@ -39,8 +44,8 @@ describe.skipIf(!hasRlsEnv)('RLS tenant isolation', () => {
   })
 
   afterAll(async () => {
-    if (wsA) await svc.from('workspaces').delete().eq('id', wsA)
-    if (wsB) await svc.from('workspaces').delete().eq('id', wsB)
+    if (wsA) await svc().from('workspaces').delete().eq('id', wsA)
+    if (wsB) await svc().from('workspaces').delete().eq('id', wsB)
   })
 
   it('positive control: member A reads own-tenant posts', async () => {
@@ -81,7 +86,7 @@ describe.skipIf(!hasRlsEnv)('RLS tenant isolation', () => {
   })
 
   it('mixed-tenant parent attack: A cannot attach a variant to B’s post', async () => {
-    const pb = await svc
+    const pb = await svc()
       .from('posts')
       .insert({ workspace_id: wsB, created_by: userB, body: 'B' })
       .select('id')
