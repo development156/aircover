@@ -1,8 +1,11 @@
-// @sahoda/publishing — the Constraint Engine (declarative per-platform specs,
-// consumed by BOTH the editor and the adapters) plus one adapter per file
-// (x.ts, gbp.ts, fixture.ts) satisfying the single PublishAdapter contract, and
-// the AES-256-GCM token-vault helper. Owned by wt-pub.
+// @sahoda/publishing — the publish adapters (one file per platform, each satisfying the
+// frozen PublishAdapter contract) and the injectable HTTP transport they publish through.
 //
-// EncryptedToken shapes and token material stay server-internal to this package —
-// they never enter @sahoda/shared. Fixture results are always labeled mode:'fixture'.
+// The Constraint Engine is CONSUMED from @sahoda/shared, never redefined here.
+// The AES-256-GCM token vault (encryptToken/decryptToken, EncryptedToken) is deliberately
+// NOT exported — it and all token material stay server-internal to this package, and the
+// EncryptedToken envelope never enters @sahoda/shared (CLAUDE.md non-negotiable).
 export const PUBLISHING_PACKAGE = '@sahoda/publishing' as const
+
+// Publish adapters.
+export { createFixtureAdapter, type FixtureAdapterOptions } from './adapters/fixture'
