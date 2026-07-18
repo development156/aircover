@@ -16,5 +16,11 @@
   },
   "dependencies": {
     "@sahoda/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.110.7",
+    "@types/pg": "^8.20.0",
+    "dotenv": "^17.4.2",
+    "pg": "^8.22.0"
   }
 }
