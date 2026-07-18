@@ -1,24 +1,19 @@
 import { UserButton } from '@clerk/nextjs'
 
 import { CreditChip } from '@/components/shell/credit-chip'
+import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher'
+import { getActiveWorkspaceSlug, listWorkspaces, resolveActiveWorkspace } from '@/lib/workspaces'
 
-export function Topbar() {
+export async function Topbar() {
+  const [workspaces, activeSlug] = await Promise.all([listWorkspaces(), getActiveWorkspaceSlug()])
+  const active = resolveActiveWorkspace(workspaces, activeSlug)
+
   return (
     <header
       data-guide="topbar.root"
       className="sticky top-0 z-5 flex h-topbar items-center gap-3 border-b border-line bg-s1/90 px-page backdrop-blur-[6px] max-narrow:px-page-mobile"
     >
-      {/* Workspace switcher goes live with workspace bootstrap (wt-db RPC) */}
-      <button
-        type="button"
-        disabled
-        data-guide="topbar.workspace"
-        title="Workspaces arrive with the bootstrap flow"
-        className="flex items-center gap-2 rounded-input border border-line bg-bg px-3 py-[7px] font-semibold disabled:opacity-45"
-      >
-        <span aria-hidden className="size-[9px] rounded-pill bg-primary" />
-        <span className="text-muted">No workspace yet</span>
-      </button>
+      <WorkspaceSwitcher workspaces={workspaces} active={active} />
       <div className="ml-auto" />
       <CreditChip credits={null} />
       <div data-guide="topbar.avatar" className="grid size-8 place-items-center">

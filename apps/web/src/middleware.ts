@@ -6,9 +6,16 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 // stripe signature verification breaks behind a Clerk redirect.
 const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/api/webhooks(.*)'])
 
-export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) await auth.protect()
-})
+export default clerkMiddleware(
+  async (auth, req) => {
+    if (!isPublicRoute(req)) await auth.protect()
+  },
+  // `<ClerkProvider signInUrl>` only governs client components; auth.protect()
+  // resolves its redirect target from the MIDDLEWARE's signInUrl (or the
+  // NEXT_PUBLIC_CLERK_SIGN_IN_URL env). Without this it falls back to the
+  // hosted Account Portal — bypassing our themed in-app (auth) pages.
+  { signInUrl: '/sign-in', signUpUrl: '/sign-up' },
+)
 
 export const config = {
   matcher: [
