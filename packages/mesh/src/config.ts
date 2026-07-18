@@ -41,9 +41,22 @@ const ENV_VARS: readonly EnvVar[] = [
     read: (c, v) => ((c.openRouterKeys ??= {} as Record<KeyClass, string>).image = v),
   },
   { name: 'OPENAI_API_KEY', read: (c, v) => (c.openaiKey = v) },
-  { name: 'NEXT_PUBLIC_SUPABASE_URL', read: (c, v) => (c.supabaseUrl = v) },
+  { name: 'NEXT_PUBLIC_SUPABASE_URL', read: (c, v) => (c.supabaseUrl = toOrigin(v)) },
   { name: 'SUPABASE_SERVICE_ROLE_KEY', read: (c, v) => (c.supabaseServiceKey = v) },
 ] as const
+
+/**
+ * Reduce a Supabase URL to its origin so PostgREST paths (`${url}/rest/v1/...`)
+ * never double up. A pasted dashboard value sometimes carries `/rest/v1/`, which
+ * would otherwise 404 every telemetry write and brand-context fetch (PGRST125).
+ */
+function toOrigin(value: string): string {
+  try {
+    return new URL(value).origin
+  } catch {
+    return value
+  }
+}
 
 /**
  * Read + validate the Mesh environment. Fails fast, naming every missing variable

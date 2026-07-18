@@ -21,6 +21,14 @@ describe('loadMeshConfig', () => {
     expect(cfg.supabaseServiceKey).toBe('svc-role')
   })
 
+  it('normalizes a path-bearing Supabase URL to its origin (PostgREST-safe)', () => {
+    const cfg = loadMeshConfig({
+      ...fullEnv,
+      NEXT_PUBLIC_SUPABASE_URL: 'https://proj.supabase.co/rest/v1/',
+    })
+    expect(cfg.supabaseUrl).toBe('https://proj.supabase.co')
+  })
+
   it('fails fast listing every missing required var', () => {
     let msg = ''
     try {
