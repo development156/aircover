@@ -1,5 +1,6 @@
 'use client'
 
+import type { Route } from 'next'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -31,7 +32,8 @@ export function NavItem({
   icon,
   guide,
 }: {
-  href: '/home' | '/posts' | '/planner' | '/connections' | '/settings'
+  // typedRoutes' Route union — no hand-maintained href list to drift
+  href: Route
   label: string
   icon: NavIconName
   guide: string
@@ -46,7 +48,7 @@ export function NavItem({
       data-guide={guide}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex items-center gap-[11px] rounded-[10px] px-3 py-[9px] font-medium text-muted transition-micro',
+        'flex items-center gap-[11px] rounded-input px-3 py-[9px] font-medium text-muted transition-micro',
         'hover:bg-s2 hover:text-ink',
         'max-wide:justify-center max-wide:px-0',
         // dark: --t50 stays warm-light while --acc flips to Orange300 — pairing

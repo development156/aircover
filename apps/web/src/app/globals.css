@@ -108,6 +108,9 @@
   :focus-visible {
     outline: 2px solid var(--acc);
     outline-offset: 2px;
+    /* Deliberately off-scale: the ring hugs arbitrary shapes, so it sits
+       below the smallest shape token (--r-input 10px). docs/08 §8 specifies
+       only ring width/offset. */
     border-radius: 6px;
   }
 }

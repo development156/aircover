@@ -1,9 +1,11 @@
+import type { Route } from 'next'
+
 import { NavItem, type NavIconName } from '@/components/shell/nav-item'
 
 // Alpha nav subset only — every href has a real page (typedRoutes enforces it).
 // Full nav (Loop, Sites, Inbox, Measure, …) lands with its modules per docs/06 §3.
 const NAV: ReadonlyArray<{
-  href: '/home' | '/posts' | '/planner' | '/connections' | '/settings'
+  href: Route
   label: string
   icon: NavIconName
   guide: string

@@ -18,7 +18,8 @@ import { env } from '@/lib/env'
  */
 export function createServerSupabase(): SupabaseClient {
   return createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+    // With accessToken set, supabase-js never initializes GoTrue — auth
+    // options would be dead configuration, so none are passed.
     accessToken: async () => (await auth()).getToken(),
-    auth: { persistSession: false },
   })
 }

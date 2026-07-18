@@ -3,6 +3,9 @@ import type { Metadata } from 'next'
 import { JetBrains_Mono, Outfit } from 'next/font/google'
 
 import { clerkAppearance } from '@/lib/clerk-appearance'
+// Side-effect import: env validation actually fails fast at boot — without a
+// server-entrypoint import the guard never runs.
+import '@/lib/env'
 import './globals.css'
 
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit', display: 'swap' })

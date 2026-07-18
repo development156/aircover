@@ -15,6 +15,12 @@ describe('slugify', () => {
     expect(slugify('  -- Chai & Chapters!! ')).toBe('chai-chapters')
   })
 
+  test('pins the accepted limitation: non-decomposing letters vanish', () => {
+    // Ł/ł has no NFKD decomposition, so it is dropped rather than mapped to l.
+    // Accepted for Alpha — a future "fix" must change this test deliberately.
+    expect(slugify('Łódź')).toBe('odz')
+  })
+
   test('falls back to "workspace" when nothing usable remains', () => {
     expect(slugify('★☆♥')).toBe('workspace')
     expect(slugify('')).toBe('workspace')

@@ -5,7 +5,7 @@ import { CreditChip } from '@/components/shell/credit-chip'
 export function Topbar() {
   return (
     <header
-      data-guide="topbar"
+      data-guide="topbar.root"
       className="sticky top-0 z-5 flex h-topbar items-center gap-3 border-b border-line bg-s1/90 px-page backdrop-blur-[6px] max-narrow:px-page-mobile"
     >
       {/* Workspace switcher goes live with workspace bootstrap (wt-db RPC) */}
