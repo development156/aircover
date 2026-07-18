@@ -18,7 +18,7 @@ export interface WorkspaceOption {
 
 /**
  * Workspaces the signed-in user can see, RLS-scoped via the Clerk session JWT.
- * Empty until the wt-db `bootstrap_workspace` RPC lands (no INSERT path yet).
+ * Empty until the user bootstraps one (createWorkspace → bootstrap_workspace RPC).
  * Any read hiccup degrades to an empty switcher — the app shell never crashes.
  */
 export async function listWorkspaces(): Promise<WorkspaceOption[]> {

@@ -37,13 +37,16 @@ export function WorkspaceSwitcher({ workspaces, active }: WorkspaceSwitcherProps
   const menuId = useId()
   const labelId = useId()
 
-  // createWorkspace returns an honest typed error until the wt-db bootstrap RPC
-  // lands (never a fake success). State + toast live on the ALWAYS-mounted root
-  // so the toast still fires if the menu closes (e.g. an outside click) mid
-  // round-trip — the in-menu and empty-state buttons share this one action.
+  // createWorkspace calls the bootstrap_workspace RPC (atomic workspace + owner
+  // membership + profile + signup grant) and returns a typed result. State +
+  // toast live on the ALWAYS-mounted root so the toast still fires if the menu
+  // closes (e.g. an outside click) mid round-trip — the in-menu and empty-state
+  // buttons share this one action.
   const [createState, createAction, createPending] = useActionState(createWorkspace, null)
   useEffect(() => {
-    if (createState && !createState.ok) toast(createState.message)
+    if (!createState) return
+    if (createState.ok) toast(`${createState.replayed ? 'Opened' : 'Created'} ${createState.name}`)
+    else toast(createState.message)
   }, [createState])
 
   useEffect(() => {
@@ -140,18 +143,14 @@ export function WorkspaceSwitcher({ workspaces, active }: WorkspaceSwitcherProps
               </form>
             )
           })}
-          <div className="my-1.5 h-px bg-line" aria-hidden />
-          <form action={createAction}>
-            <button
-              type="submit"
-              disabled={createPending}
-              data-guide="topbar.workspace-create"
-              className="flex w-full items-center gap-2.5 rounded-input px-2.5 py-2 font-medium text-muted transition-micro hover:bg-s1 hover:text-ink disabled:opacity-45"
-            >
-              <Plus size={16} className="shrink-0" aria-hidden />
-              <span>{createPending ? 'Creating…' : CREATE_BUTTON_LABEL}</span>
-            </button>
-          </form>
+          {/*
+            No in-menu "Create workspace": bootstrap_workspace is the signup path
+            with an owner replay guard — a second call returns the EXISTING
+            workspace, it does not create another. Showing a create button here
+            would be a fake affordance. Creating additional workspaces needs a
+            separate flow (not in Alpha); the empty state below is the real
+            first-workspace path.
+          */}
         </div>
       ) : null}
     </div>
