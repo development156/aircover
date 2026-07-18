@@ -141,7 +141,7 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     }
   }
 
-  async function run<I, O>(
+  async function execute<I, O>(
     spec: MeshTaskSpec<I, O>,
     input: I,
     ctx: MeshContext,
@@ -243,6 +243,31 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
       ok: false,
       error: appError('PROVIDER_ERROR', 'model returned unparseable output', ctx.traceId),
       usage,
+    }
+  }
+
+  /**
+   * Public entry. `execute` already writes a row + returns a typed error for the
+   * known failure modes (no provider responded, unparseable output). This outer
+   * catch is the backstop for an UNEXPECTED throw — a bug in buildMessages /
+   * planAttempts / price, or a provider that threw something other than a
+   * ProviderCallError — so that path still yields exactly one ai_provider_logs row
+   * and a typed PROVIDER_ERROR, never a raw promise rejection. Keeps the frozen
+   * runner guarantees ('typed error' + 'a row on every path') true on all paths.
+   */
+  async function run<I, O>(
+    spec: MeshTaskSpec<I, O>,
+    input: I,
+    ctx: MeshContext,
+  ): Promise<MeshResult<O>> {
+    try {
+      return await execute(spec, input, ctx)
+    } catch {
+      await writeLog(toLogRow(spec.def, ctx, undefined, 'error', 'UNEXPECTED_ERROR'))
+      return {
+        ok: false,
+        error: appError('PROVIDER_ERROR', 'mesh task failed unexpectedly', ctx.traceId),
+      }
     }
   }
 

@@ -204,6 +204,25 @@ describe('createMeshRunner', () => {
     expect(rows[0]!.status).toBe('error')
   })
 
+  it('converts an unexpected non-ProviderCallError throw into a typed PROVIDER_ERROR with one telemetry row', async () => {
+    // A provider that throws a plain Error (not a ProviderCallError) stands in for a
+    // latent bug that bypassed the adapter's error normalization. It must never escape
+    // run() as a raw rejection: the frozen guarantees still require a typed error and
+    // an ai_provider_logs row on this path too.
+    const primary = scriptedProvider('openrouter', [new Error('kaboom')])
+    const { sink, rows } = capturingSink()
+    const runner = runnerWith([{ provider: primary, model: 'or-model' }], sink)
+
+    const result = await runner.run(spec(), { q: 'go' }, ctx)
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.status).toBe('error')
+    expect(rows[0]!.error_code).toBe('UNEXPECTED_ERROR')
+    expect(rows[0]!.task).toBe('test_task')
+  })
+
   it('never lets a telemetry write failure break the model result', async () => {
     const primary = scriptedProvider('openrouter', [resp('openrouter', '{"value":"ok"}')])
     const state = capturingSink()
