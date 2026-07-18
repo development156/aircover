@@ -158,6 +158,41 @@ describe('createOpenAiCompatibleProvider', () => {
     expect(res.usage.tokensOut).toBe(0)
     expect(res.usage.cachedTokens).toBe(0)
   })
+
+  it('throws ProviderCallError on a 200 with a non-JSON body (proxy/gateway HTML)', async () => {
+    const fetchImpl: FetchLike = async () =>
+      new Response('<html>502 Bad Gateway</html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      })
+    const provider = createOpenAiCompatibleProvider({
+      name: 'openrouter',
+      baseUrl: 'https://example.test/v1',
+      apiKey: 'do-not-leak',
+      fetchImpl,
+    })
+
+    let caught: unknown
+    try {
+      await provider.chat(req)
+    } catch (e) {
+      caught = e
+    }
+    expect(caught).toBeInstanceOf(ProviderCallError)
+    expect((caught as Error).message).not.toContain('do-not-leak')
+  })
+
+  it('throws ProviderCallError on a 200 with an empty body', async () => {
+    const fetchImpl: FetchLike = async () => new Response('', { status: 200 })
+    const provider = createOpenAiCompatibleProvider({
+      name: 'openai',
+      baseUrl: 'https://example.test/v1',
+      apiKey: 'k',
+      fetchImpl,
+    })
+
+    await expect(provider.chat(req)).rejects.toBeInstanceOf(ProviderCallError)
+  })
 })
 
 describe('createOpenRouterProvider', () => {

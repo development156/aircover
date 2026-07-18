@@ -67,7 +67,15 @@ export function createOpenAiCompatibleProvider(opts: OpenAiCompatibleOptions): P
         throw new ProviderCallError(opts.name, res.status, `provider returned HTTP ${res.status}`)
       }
 
-      const json = (await res.json()) as OpenAiChatCompletion
+      // A 200 with an empty/non-JSON body (truncated stream, proxy/gateway HTML)
+      // must normalize to ProviderCallError so the runner falls back + logs + returns
+      // a typed Result — never a raw SyntaxError that escapes run().
+      let json: OpenAiChatCompletion
+      try {
+        json = (await res.json()) as OpenAiChatCompletion
+      } catch {
+        throw new ProviderCallError(opts.name, res.status, 'provider returned a non-JSON body')
+      }
       return {
         text: json.choices?.[0]?.message?.content ?? '',
         usage: {
