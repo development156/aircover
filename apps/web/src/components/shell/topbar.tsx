@@ -1,3 +1,5 @@
+import { UserButton } from '@clerk/nextjs'
+
 import { CreditChip } from '@/components/shell/credit-chip'
 
 export function Topbar() {
@@ -19,13 +21,8 @@ export function Topbar() {
       </button>
       <div className="ml-auto" />
       <CreditChip credits={null} />
-      {/* CLERK SLOT (step 3): <UserButton /> replaces this placeholder */}
-      <div
-        data-guide="topbar.avatar"
-        aria-hidden
-        className="grid size-8 place-items-center rounded-pill bg-ink text-[13px] font-semibold text-white"
-      >
-        ·
+      <div data-guide="topbar.avatar" className="grid size-8 place-items-center">
+        <UserButton />
       </div>
     </header>
   )

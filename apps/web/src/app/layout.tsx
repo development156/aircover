@@ -1,6 +1,8 @@
+import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from 'next'
 import { JetBrains_Mono, Outfit } from 'next/font/google'
-// CLERK SLOT (step 3): import { ClerkProvider } from '@clerk/nextjs'
+
+import { clerkAppearance } from '@/lib/clerk-appearance'
 import './globals.css'
 
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit', display: 'swap' })
@@ -13,9 +15,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // CLERK SLOT (step 3): wrap <html> in <ClerkProvider appearance={clerkAppearance}>
-    <html lang="en" className={`${outfit.variable} ${jbMono.variable}`}>
-      <body>{children}</body>
-    </html>
+    <ClerkProvider appearance={clerkAppearance} signInUrl="/sign-in" signUpUrl="/sign-up">
+      <html lang="en" className={`${outfit.variable} ${jbMono.variable}`}>
+        <body>{children}</body>
+      </html>
+    </ClerkProvider>
   )
 }
