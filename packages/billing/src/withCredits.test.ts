@@ -14,6 +14,8 @@ class FakePort implements LedgerPort {
   latest: LatestHold | null = null
   holdOutcome: 'ok' | 'insufficient' = 'ok'
   releaseOutcome: 'ok' | 'throw' = 'ok'
+  debitOutcome: 'ok' | 'throw' = 'ok'
+  latestHoldOutcome: 'ok' | 'throw' = 'ok'
 
   private total: number
   private held = 0
@@ -34,6 +36,7 @@ class FakePort implements LedgerPort {
       return { entry: { id, balanceAfter: this.total - this.held }, replayed: false }
     }
     if (input.entryType === 'DEBIT') {
+      if (this.debitOutcome === 'throw') throw new Error('ledger: HOLD_ALREADY_SETTLED')
       this.total -= input.amount
       this.held -= this.holdAmounts.get(input.settlesEntryId ?? '') ?? 0
       return { entry: { id, balanceAfter: this.total }, replayed: false }
@@ -47,6 +50,7 @@ class FakePort implements LedgerPort {
   }
 
   async latestHold(): Promise<LatestHold | null> {
+    if (this.latestHoldOutcome === 'throw') throw new Error('ledger: latestHold read failed')
     return this.latest
   }
 
@@ -153,6 +157,37 @@ describe('withCredits — failure path (HOLD → RELEASE), user never pays', () 
     })
 
     expect(result.ok).toBe(false) // hold TTL is the backstop; caller still gets a clean error
+  })
+})
+
+describe('withCredits — never rejects (WithCreditsFn Result contract)', () => {
+  it('returns an err Result (does not reject) when the settling DEBIT throws after fn succeeded', async () => {
+    const port = new FakePort(100)
+    port.debitOutcome = 'throw' // e.g. hold TTL-expired / racing RELEASE → HOLD_ALREADY_SETTLED
+    const withCredits = createWithCredits(port, deps)
+
+    // Must RESOLVE to an err, not throw — a rejecting promise would violate the contract.
+    const result = await withCredits(OPTS, async () => 'generated')
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected err')
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(result.error.traceId).toBe('trace-fixed')
+    // fn ran (HOLD then the DEBIT attempt); the user is NOT charged (hold TTL releases).
+    expect(port.entryTypes()).toEqual(['HOLD', 'DEBIT'])
+  })
+
+  it('returns an err Result (does not reject) when the latestHold read throws', async () => {
+    const port = new FakePort(100)
+    port.latestHoldOutcome = 'throw'
+    const withCredits = createWithCredits(port, deps)
+
+    const result = await withCredits(OPTS, async () => 'x')
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected err')
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(port.entryTypes()).toEqual([]) // never reached the HOLD
   })
 })
 
