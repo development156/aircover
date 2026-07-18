@@ -50,20 +50,26 @@ export function createApplyPlanGrant(
     const amount = PLAN_CATALOG[event.planId].monthlyCredits
     const key = monthlyGrantKey(event.planId, event.period, event.workspaceId)
 
-    const res = await port.apply({
-      workspaceId: event.workspaceId,
-      entryType: 'GRANT',
-      amount,
-      idempotencyKey: key,
-      actor: `provider:${event.provider}`,
-      meta: {
-        eventId: event.eventId,
-        planId: event.planId,
-        period: event.period,
-        mode: event.mode,
-      },
-    })
-
-    return ok({ granted: amount, balanceAfter: res.entry.balanceAfter, replayed: res.replayed })
+    // Never reject on an infra failure — this returns a Result the webhook handler branches on
+    // (same contract as withCredits). The grant is idempotent by `key`, so a caller retry
+    // replays rather than double-granting. The message is fixed so no DB internals leak.
+    try {
+      const res = await port.apply({
+        workspaceId: event.workspaceId,
+        entryType: 'GRANT',
+        amount,
+        idempotencyKey: key,
+        actor: `provider:${event.provider}`,
+        meta: {
+          eventId: event.eventId,
+          planId: event.planId,
+          period: event.period,
+          mode: event.mode,
+        },
+      })
+      return ok({ granted: amount, balanceAfter: res.entry.balanceAfter, replayed: res.replayed })
+    } catch {
+      return err(appError('PROVIDER_ERROR', 'Could not apply plan grant', traceId))
+    }
   }
 }

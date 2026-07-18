@@ -12,7 +12,7 @@ import type { LedgerApplyResult, LedgerBalance, LedgerPort, LatestHold } from '.
 class FakePort implements LedgerPort {
   readonly calls: ApplyLedgerInput[] = []
   latest: LatestHold | null = null
-  holdOutcome: 'ok' | 'insufficient' = 'ok'
+  holdOutcome: 'ok' | 'insufficient' | 'throw' = 'ok'
   releaseOutcome: 'ok' | 'throw' = 'ok'
   debitOutcome: 'ok' | 'throw' = 'ok'
   latestHoldOutcome: 'ok' | 'throw' = 'ok'
@@ -31,6 +31,7 @@ class FakePort implements LedgerPort {
     const id = `entry-${++this.seq}`
     if (input.entryType === 'HOLD') {
       if (this.holdOutcome === 'insufficient') throw new Error('ledger: CREDIT_INSUFFICIENT')
+      if (this.holdOutcome === 'throw') throw new Error('ledger: connection reset')
       this.held += input.amount
       this.holdAmounts.set(id, input.amount)
       return { entry: { id, balanceAfter: this.total - this.held }, replayed: false }
@@ -188,6 +189,20 @@ describe('withCredits — never rejects (WithCreditsFn Result contract)', () => 
     if (result.ok) throw new Error('expected err')
     expect(result.error.code).toBe('PROVIDER_ERROR')
     expect(port.entryTypes()).toEqual([]) // never reached the HOLD
+  })
+
+  it('maps a HOLD infrastructure failure (not insufficient) to PROVIDER_ERROR, fn not called', async () => {
+    const port = new FakePort(100)
+    port.holdOutcome = 'throw'
+    const withCredits = createWithCredits(port, deps)
+    const fn = vi.fn(async () => 'should-not-run')
+
+    const result = await withCredits(OPTS, fn)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected err')
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(fn).not.toHaveBeenCalled()
   })
 })
 

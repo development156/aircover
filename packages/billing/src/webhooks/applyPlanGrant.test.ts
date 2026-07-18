@@ -68,6 +68,21 @@ describe('applyPlanGrant', () => {
     expect(port.calls).toHaveLength(0)
   })
 
+  it('returns an err Result (does not reject) when the GRANT write throws', async () => {
+    const port = new RecordingPort()
+    port.apply = async () => {
+      throw new Error('ledger: connection reset')
+    }
+    const applyPlanGrant = createApplyPlanGrant(port, deps)
+
+    const result = await applyPlanGrant(paidEvent())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected err')
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(result.error.traceId).toBe('trace-fixed')
+  })
+
   it('propagates the replayed flag from the ledger', async () => {
     const port = new RecordingPort()
     // Force a replayed response.
