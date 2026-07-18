@@ -13,10 +13,13 @@ create table connections (
   last_checked_at timestamptz,
   created_by text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (workspace_id, platform, (external_account ->> 'id'))
+  updated_at timestamptz not null default now()
 );
 create index on connections (workspace_id);
+-- one connection per (workspace, platform, external account id). The account id is a
+-- jsonb expression, so it must be a unique INDEX, not an inline table constraint.
+create unique index connections_ws_platform_account
+  on connections (workspace_id, platform, (external_account ->> 'id'));
 
 -- Token vault: RLS enabled, ZERO policies ⇒ only the service role can touch it.
 -- Tokens decrypt in job/server memory only, never logged or returned.

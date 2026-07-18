@@ -1,21 +1,46 @@
-import { Pool } from 'pg'
+import { Pool, type PoolConfig } from 'pg'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createHmac } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { ENV } from './env'
+
+/** supabase-js needs the bare project origin — strip any path/trailing slash a pasted URL may carry. */
+const BASE_URL = (() => {
+  try {
+    return new URL(ENV.supabaseUrl).origin
+  } catch {
+    return ENV.supabaseUrl
+  }
+})()
+
+/**
+ * TLS for the direct Postgres connection. Supabase's direct endpoint presents a
+ * private CA chain, so full chain verification requires that CA: set
+ * SUPABASE_DB_CA_CERT to its path to enforce verification (recommended). Absent a
+ * CA, the connection stays TLS-encrypted but skips chain verification for the known
+ * Supabase host only — this is test-harness code connecting to the developer's own
+ * project, never production.
+ */
+function pgSsl(): PoolConfig['ssl'] {
+  const caPath = process.env.SUPABASE_DB_CA_CERT
+  if (caPath) return { ca: readFileSync(caPath, 'utf8'), rejectUnauthorized: true }
+  if (/supabase\.(co|com|in|net)/.test(ENV.dbUrl)) return { rejectUnauthorized: false }
+  return undefined
+}
 
 /** Direct Postgres pool — used to call the service-only ledger function. */
 export function pgPool(): Pool {
-  return new Pool({ connectionString: ENV.dbUrl, max: 20 })
+  return new Pool({ connectionString: ENV.dbUrl, max: 20, ssl: pgSsl() })
 }
 
 /** Service-role client (bypasses RLS) — used only to set up test fixtures. */
 export function serviceClient(): SupabaseClient {
-  return createClient(ENV.supabaseUrl, ENV.serviceKey, { auth: { persistSession: false } })
+  return createClient(BASE_URL, ENV.serviceKey, { auth: { persistSession: false } })
 }
 
 /** Signed-out anon client. */
 export function anonClient(): SupabaseClient {
-  return createClient(ENV.supabaseUrl, ENV.anonKey, { auth: { persistSession: false } })
+  return createClient(BASE_URL, ENV.anonKey, { auth: { persistSession: false } })
 }
 
 const b64url = (s: string): string => Buffer.from(s).toString('base64url')
@@ -43,7 +68,7 @@ export function mintJwt(sub: string, ttlSec = 3600): string {
 
 /** Anon-key client carrying a minted member token (the RLS test subject). */
 export function userClient(sub: string): SupabaseClient {
-  return createClient(ENV.supabaseUrl, ENV.anonKey, {
+  return createClient(BASE_URL, ENV.anonKey, {
     auth: { persistSession: false },
     global: { headers: { Authorization: `Bearer ${mintJwt(sub)}` } },
   })
