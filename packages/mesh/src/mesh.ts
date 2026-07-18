@@ -5,6 +5,7 @@ import type { FetchLike, Provider, ProviderUsage } from './providers/types'
 import { createOpenRouterProvider } from './providers/openrouter'
 import { createOpenAIProvider } from './providers/openai'
 import { createPostgrestLogSink } from './telemetry'
+import { createPostgrestBrandContext } from './brand-context'
 import { createMeshRunner, type Attempt, type MeshResult, type MeshTaskSpec } from './engine'
 import { TIER_ROUTES } from './routing'
 import { brandGuidelinesTask } from './tasks/brand-guidelines'
@@ -62,11 +63,20 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
     fetchImpl: opts.fetchImpl,
   })
 
+  // Brand grounding for cachePrefix tasks — fetched via the service-role key,
+  // cached by Brain version. Server-only, like the log sink.
+  const brandContext = createPostgrestBrandContext({
+    supabaseUrl: cfg.supabaseUrl,
+    serviceKey: cfg.supabaseServiceKey,
+    fetchImpl: opts.fetchImpl,
+  })
+
   const runner = createMeshRunner({
     planAttempts,
     logSink,
     now: () => Date.now(),
     price: estimateCostUsd,
+    brandContext,
   })
 
   // Bind each wired task's run with its concrete generics captured here, then

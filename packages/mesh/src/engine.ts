@@ -10,6 +10,7 @@ import type {
 } from './providers/types'
 import { ProviderCallError } from './providers/types'
 import type { LogSink, ProviderLogRow } from './telemetry'
+import type { BrandContextProvider } from './brand-context'
 
 /** One ordered provider+model to try for a task (primary OpenRouter, then OpenAI). */
 export interface Attempt {
@@ -24,7 +25,12 @@ export interface Attempt {
  */
 export interface MeshTaskSpec<I, O> {
   def: MeshTaskDef<I, O>
-  buildMessages: (input: I, ctx: MeshContext) => ChatMessage[]
+  /**
+   * System contract first, the (optional) cache-controlled Brand Brain block next,
+   * user payload last. `brand` is supplied by the runner only for tasks whose def
+   * declares `cachePrefix: 'brand_context'`; brand-less tasks ignore it.
+   */
+  buildMessages: (input: I, ctx: MeshContext, brand?: ChatMessage) => ChatMessage[]
   /** brand_guidelines only — served (flagged) on a double JSON failure. */
   fallbackPayload?: (input: I) => O
 }
@@ -37,6 +43,8 @@ export interface MeshRunnerDeps {
   now: () => number
   /** USD cost from raw token usage — injected so pricing stays swappable. */
   price: (usage: ProviderUsage) => number
+  /** Resolves the Brand Brain prefix for `cachePrefix: 'brand_context'` tasks (best-effort). */
+  brandContext?: BrandContextProvider
 }
 
 export type MeshResult<O> = (
@@ -139,7 +147,20 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     ctx: MeshContext,
   ): Promise<MeshResult<O>> {
     const { def } = spec
-    const messages = spec.buildMessages(input, ctx)
+
+    // Brand grounding: fetch the cache-controlled Brand Brain prefix for tasks that
+    // ask for it. Best-effort — a brand-fetch hiccup must never fail the action (the
+    // model still returns real output, just less grounded).
+    let brand: ChatMessage | undefined
+    if (def.cachePrefix === 'brand_context' && deps.brandContext) {
+      try {
+        brand = (await deps.brandContext.get(ctx.workspaceId))?.message
+      } catch {
+        /* proceed brand-less */
+      }
+    }
+
+    const messages = spec.buildMessages(input, ctx, brand)
     const attempts = deps.planAttempts(def.tier)
 
     // 1) Fallback chain: try each provider until one responds.
