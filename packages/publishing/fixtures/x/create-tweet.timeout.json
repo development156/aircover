@@ -1,0 +1,10 @@
+{
+  "status": 408,
+  "headers": { "content-type": "application/problem+json" },
+  "body": {
+    "title": "Request Timeout",
+    "type": "about:blank",
+    "status": 408,
+    "detail": "Request Timeout"
+  }
+}

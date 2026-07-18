@@ -7,5 +7,16 @@
 // EncryptedToken envelope never enters @sahoda/shared (CLAUDE.md non-negotiable).
 export const PUBLISHING_PACKAGE = '@sahoda/publishing' as const
 
+// Injectable HTTP transport — production wires fetchTransport; tests/dev replay fixtures.
+export {
+  fetchTransport,
+  fixtureTransport,
+  type Transport,
+  type TransportRequest,
+  type TransportResponse,
+  type RecordedResponse,
+} from './transport'
+
 // Publish adapters.
 export { createFixtureAdapter, type FixtureAdapterOptions } from './adapters/fixture'
+export { createXAdapter, type XAdapterDeps } from './adapters/x'
