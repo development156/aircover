@@ -19,6 +19,8 @@ export { brandGuidelinesTask } from './tasks/brand-guidelines'
 export { captionRewriteTask } from './tasks/caption-rewrite'
 export { contentVariantsTask, ContentVariantsInputSchema } from './tasks/content-variants'
 export type { ContentVariantsInput } from './tasks/content-variants'
+export { planWeekTask, PlanWeekInputSchema } from './tasks/plan-week'
+export type { PlanWeekInput } from './tasks/plan-week'
 
 // Brand grounding (server-only) — the cache-controlled Brand Brain prefix.
 export { createPostgrestBrandContext, buildBrandMessage } from './brand-context'
