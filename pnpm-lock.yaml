@@ -29,6 +29,9 @@ importers:
 
   apps/jobs:
     dependencies:
+      '@sahoda/mesh':
+        specifier: workspace:*
+        version: link:../../packages/mesh
       '@sahoda/shared':
         specifier: workspace:*
         version: link:../../packages/shared
