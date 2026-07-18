@@ -152,7 +152,10 @@ describe('createMeshRunner', () => {
     )
 
     expect(result.ok).toBe(true)
-    if (result.ok) expect(result.data).toEqual({ value: 'DEMO' })
+    if (result.ok) {
+      expect(result.data).toEqual({ value: 'DEMO' })
+      expect(result.fallback).toBe(true)
+    }
     expect(rows[0]!.status).toBe('fallback')
   })
 

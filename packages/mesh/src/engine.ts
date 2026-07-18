@@ -40,7 +40,7 @@ export interface MeshRunnerDeps {
 }
 
 export type MeshResult<O> = (
-  { ok: true; data: O } | { ok: false; error: ReturnType<typeof appError> }
+  { ok: true; data: O; fallback?: true } | { ok: false; error: ReturnType<typeof appError> }
 ) & {
   usage?: MeshUsage
 }
@@ -214,7 +214,7 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     if (spec.fallbackPayload) {
       const data = spec.fallbackPayload(input)
       await writeLog(toLogRow(def, ctx, usage, 'fallback', REPAIR_CODE))
-      return { ok: true, data, usage }
+      return { ok: true, data, fallback: true, usage }
     }
 
     await writeLog(toLogRow(def, ctx, usage, 'error', REPAIR_CODE))
