@@ -12,6 +12,7 @@ import { brandGuidelinesTask } from './tasks/brand-guidelines'
 import { captionRewriteTask } from './tasks/caption-rewrite'
 import { contentVariantsTask } from './tasks/content-variants'
 import { planWeekTask } from './tasks/plan-week'
+import { siteGenerateTask } from './tasks/site-generate'
 
 /** Rough $/1M-token estimate for ai_provider_logs margin telemetry (not billing). */
 function estimateCostUsd(u: ProviderUsage): number {
@@ -91,6 +92,7 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
   register(captionRewriteTask)
   register(contentVariantsTask)
   register(planWeekTask)
+  register(siteGenerateTask)
 
   async function runTask<I, O>(
     def: MeshTaskDef<I, O>,
