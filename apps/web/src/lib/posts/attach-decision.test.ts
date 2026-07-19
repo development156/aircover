@@ -118,7 +118,6 @@ describe('decideAttach — the per-channel media count', () => {
   })
 })
 
-
 describe('decideAttach — nothing selected yet', () => {
   /**
    * Documented choice: an empty channel list accepts. There is no spec to
@@ -242,7 +241,14 @@ describe('the rejection message shown to the writer', () => {
 
     expect(decision.ok).toBe(false)
     if (decision.ok) return
-    for (const leak of ['constraint', 'PGRST', 'SQLSTATE', 'at Object.', 'storage/v1', 'undefined']) {
+    for (const leak of [
+      'constraint',
+      'PGRST',
+      'SQLSTATE',
+      'at Object.',
+      'storage/v1',
+      'undefined',
+    ]) {
       expect(decision.message.toLowerCase()).not.toContain(leak.toLowerCase())
     }
   })

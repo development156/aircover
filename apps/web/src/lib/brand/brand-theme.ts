@@ -21,6 +21,28 @@ const MAX_DARKEN_ITERATIONS = 32
 // fallback primary when no logo/colors were extracted yet.
 const DEFAULT_PRIMARY = parseOklch(rgbToOklch(255, 75, 0))
 
+/**
+ * The last-resort near-black both darkening loops fall back to.
+ *
+ * It drops CHROMA rather than carrying it through, because the fallback is only
+ * ever reached with a non-finite component. At lightness 0 every finite
+ * (chroma, hue) already clears 4.5:1 against white, so a finite colour returns
+ * from the loop early and never lands here — pinned by a test. The one way in is
+ * a NaN/Infinity component, and `NaN >= MIN_CONTRAST` is false forever, so the
+ * loop exhausts its budget and the old code handed the NaN straight back out as
+ * `oklch(0 NaN 20)`. That is invalid CSS: as a primary it threw when re-parsed,
+ * and as `--acc` — which nothing re-parses — it reached the stylesheet silently.
+ *
+ * Hue is neutralised for the same reason. At zero chroma it has no visual
+ * effect whatsoever, so pinning it costs nothing and closes the `oklch(0 0 NaN)`
+ * case that dropping chroma alone leaves open.
+ *
+ * Reported by wt-pub while porting this math; their port drops chroma.
+ */
+function readableBlack(): string {
+  return formatOklch(0, 0, 0)
+}
+
 export type BrandSkinVars = Record<
   '--p' | '--pfg' | '--pstrong' | '--acc' | '--t50' | '--t100' | '--t300',
   string
@@ -49,7 +71,7 @@ function guardPrimaryForeground(
   }
   // Exhausted the darkening budget on a pathological input — force a
   // near-black primary with white text, which always clears 4.5:1.
-  return { primary: formatOklch(0, c, h), foreground: 'white' }
+  return { primary: readableBlack(), foreground: 'white' }
 }
 
 /** Darken (l, c, h) until it reads at >=4.5:1 as TEXT on a white surface. */
@@ -60,7 +82,7 @@ function darkenForTextOnWhite(l: number, c: number, h: number): string {
     if (contrastRatio(rgb, WHITE_RGB) >= MIN_CONTRAST) return formatOklch(lightness, c, h)
     lightness = Math.max(0, lightness - DARKEN_STEP)
   }
-  return formatOklch(0, c, h)
+  return readableBlack()
 }
 
 /**

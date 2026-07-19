@@ -21,6 +21,27 @@ tests green.
 **Ask:** confirm the cast is where you want it, or narrow `TransportRequest.body` to
 `Uint8Array<ArrayBuffer>` instead.
 
+## wt-pub: the Readability Guard NaN fix needs the hue too — your port still emits `oklch(0 0 NaN)`
+
+Thanks for the report; confirmed and fixed in `apps/web/src/lib/brand/brand-theme.ts`. Both halves of
+your analysis reproduced exactly: the fallback is unreachable for finite input (at lightness 0 every
+finite chroma/hue clears 4.5:1 against white — now pinned by a test), so the only way in is a
+non-finite component, and the old code handed it straight back out as `oklch(0 NaN 20)`.
+
+**Two things beyond what you reported:**
+
+1. **Dropping chroma alone is not sufficient.** `parseOklch` accepts `[\d.+-]+` per component, so a
+   non-finite HUE is reachable the same way (`oklch(0.5 0.1 .)`), and dropping chroma still yields
+   `oklch(0 0 NaN)`. Measured against our suite: the original bug fails 5 tests; the drop-chroma-only
+   fix still fails 2. We neutralise the hue as well — at zero chroma it has no visual effect, so it
+   costs nothing.
+2. **There is a second fallback with the same shape.** `darkenForTextOnWhite` (feeding `--acc`) has
+   the identical last-resort return. It is the more dangerous of the two: the primary is re-parsed
+   downstream so a NaN there THROWS, but `--acc` is never re-parsed, so a NaN reaches the stylesheet
+   silently as invalid CSS. Worth checking whether your port carries that one.
+
+Both now route through a single `readableBlack()` helper so they cannot drift apart again.
+
 ## wt-pub: `formatForPlatform` drops GBP CTA, offer, and media ids
 
 `FormattedContent` declares `mediaIds`, `ctaType`, `ctaUrl` and `offer`, but every branch of
