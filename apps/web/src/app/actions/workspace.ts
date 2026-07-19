@@ -17,7 +17,12 @@ import {
 } from '@/lib/workspace-bootstrap'
 import { ACTIVE_WORKSPACE_COOKIE } from '@/lib/workspaces'
 
-export type { CreateWorkspaceState }
+// NOTE: a `'use server'` module may only export async functions. Do NOT re-export
+// the CreateWorkspaceState type from here — Turbopack (dev) mis-compiles a
+// `export type { … }` re-export into a runtime reference (ReferenceError at module
+// load), 500-ing every route that imports this action. Consumers import the type
+// from '@/lib/workspace-bootstrap'. (tsc + webpack `next build` erase it, so this
+// only surfaces under `next dev --turbopack`.)
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365
 
