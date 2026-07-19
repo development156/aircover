@@ -12,6 +12,9 @@ export const BILLING_PACKAGE = '@sahoda/billing' as const
 // Credit wrapper
 export * from './withCredits'
 
+// Billing period format contract (YYYY-MM) — the grant replay anchor
+export * from './period'
+
 // Ledger ports (interface + direct-Postgres implementation)
 export * from './ledger/port'
 export * from './ledger/pg'

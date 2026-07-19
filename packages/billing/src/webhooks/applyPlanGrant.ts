@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { appError, err, monthlyGrantKey, ok, PLAN_CATALOG, type Result } from '@sahoda/shared'
 import type { LedgerPort } from '../ledger/port'
+import { isPeriod } from '../period'
 import type { ParsedWebhookEvent } from '../providers/types'
 
 export interface PlanGrantResult {
@@ -47,7 +48,30 @@ export function createApplyPlanGrant(
       )
     }
 
-    const amount = PLAN_CATALOG[event.planId].monthlyCredits
+    // The period format contract is enforced HERE, not only at the providers: this is where
+    // monthlyGrantKey is built, so an unpadded '2026-7' reaching this point would mint a
+    // second idempotency key for a month already granted — a double-grant. Reject first.
+    if (!isPeriod(event.period)) {
+      return err(
+        appError(
+          'VALIDATION_ERROR',
+          `period must be a zero-padded YYYY-MM (got ${JSON.stringify(event.period)})`,
+          traceId,
+        ),
+      )
+    }
+
+    // planId indexes PLAN_CATALOG. It is typed PlanId, but a value that slipped past a
+    // provider's parse would throw a raw TypeError out of a function contracted never to
+    // reject (PR#1 advisory: "PLAN_CATALOG lookup outside try").
+    const plan = PLAN_CATALOG[event.planId]
+    if (!plan) {
+      return err(
+        appError('VALIDATION_ERROR', `unknown planId ${JSON.stringify(event.planId)}`, traceId),
+      )
+    }
+
+    const amount = plan.monthlyCredits
     const key = monthlyGrantKey(event.planId, event.period, event.workspaceId)
 
     // Never reject on an infra failure — this returns a Result the webhook handler branches on

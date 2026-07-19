@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 import { PlanIdSchema } from '@sahoda/shared'
+import { PeriodSchema } from '../period'
 import type {
   CheckoutSession,
   CreateCheckoutInput,
@@ -19,7 +20,7 @@ const FixturePayloadSchema = z.object({
   data: z.object({
     workspace_id: z.string().min(1),
     plan_id: PlanIdSchema,
-    period: z.string().min(1),
+    period: PeriodSchema,
   }),
 })
 type FixturePayload = z.infer<typeof FixturePayloadSchema>
