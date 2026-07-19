@@ -1,0 +1,120 @@
+import { describe, expect, test, vi } from 'vitest'
+
+import { bootstrapWithRetry, deriveWorkspaceName, mapBootstrapError } from './workspace-bootstrap'
+
+describe('deriveWorkspaceName', () => {
+  test('uses a valid provided name, trimmed', () => {
+    expect(deriveWorkspaceName('  Acme Co  ', {})).toBe('Acme Co')
+  })
+
+  test('falls back to a possessive of the first name when none is given', () => {
+    expect(deriveWorkspaceName('', { firstName: 'Divya' })).toBe("Divya's workspace")
+  })
+
+  test('prefers first name, then username, then the email local part', () => {
+    expect(deriveWorkspaceName(null, { username: 'neo' })).toBe("neo's workspace")
+    expect(deriveWorkspaceName(null, { email: 'trinity@zion.io' })).toBe("trinity's workspace")
+  })
+
+  test('ultimate fallback is a generic name', () => {
+    expect(deriveWorkspaceName(undefined, {})).toBe('My workspace')
+    expect(deriveWorkspaceName('   ', { firstName: '  ' })).toBe('My workspace')
+  })
+
+  test('caps an overlong provided name at 120 chars', () => {
+    expect(deriveWorkspaceName('a'.repeat(200), {})).toHaveLength(120)
+  })
+})
+
+describe('mapBootstrapError', () => {
+  test('SLUG_TAKEN → typed slug-taken message', () => {
+    const result = mapBootstrapError({ message: 'SLUG_TAKEN', code: 'P0001' })
+    expect(result).toMatchObject({ ok: false, code: 'SLUG_TAKEN' })
+    expect(result.message).toMatch(/taken/i)
+  })
+
+  test('INVALID_NAME → name error', () => {
+    expect(mapBootstrapError({ message: 'INVALID_NAME' })).toMatchObject({
+      ok: false,
+      code: 'INVALID_NAME',
+    })
+  })
+
+  test('INVALID_SLUG surfaces as a name error (the slug derives from the name)', () => {
+    expect(mapBootstrapError({ message: 'INVALID_SLUG' })).toMatchObject({
+      ok: false,
+      code: 'INVALID_NAME',
+    })
+  })
+
+  test('AUTH_REQUIRED / permission / unknown / null → generic ERROR', () => {
+    expect(mapBootstrapError({ message: 'permission denied', code: '42501' })).toMatchObject({
+      ok: false,
+      code: 'ERROR',
+    })
+    expect(mapBootstrapError({ message: 'AUTH_REQUIRED' })).toMatchObject({
+      ok: false,
+      code: 'ERROR',
+    })
+    expect(mapBootstrapError(null)).toMatchObject({ ok: false, code: 'ERROR' })
+  })
+
+  test('never leaks a raw database message into user-facing copy', () => {
+    const result = mapBootstrapError({
+      message: 'ERROR: null value in column "x" violates not-null constraint',
+    })
+    expect(result.message).not.toMatch(/null value|constraint|column/i)
+  })
+})
+
+describe('bootstrapWithRetry', () => {
+  const okResult = (slug: string) => ({
+    data: {
+      workspace: {
+        id: 'w1',
+        name: 'n',
+        slug,
+        created_by: 'u1',
+        settings: {},
+        created_at: 't',
+        updated_at: 't',
+      },
+      replayed: false,
+    },
+    error: null,
+  })
+
+  test('returns on first success — exactly one call, base slug', async () => {
+    const call = vi.fn(async (slug: string) => okResult(slug))
+    const res = await bootstrapWithRetry(call, 'acme')
+    expect(call).toHaveBeenCalledTimes(1)
+    expect(call).toHaveBeenCalledWith('acme')
+    expect(res.data?.workspace.slug).toBe('acme')
+  })
+
+  test('retries with a suffixed slug on SLUG_TAKEN, then succeeds', async () => {
+    const call = vi.fn(async (slug: string) =>
+      slug === 'acme' ? { data: null, error: { message: 'SLUG_TAKEN' } } : okResult(slug),
+    )
+    const res = await bootstrapWithRetry(call, 'acme')
+    expect(call).toHaveBeenCalledTimes(2)
+    expect(call).toHaveBeenNthCalledWith(2, 'acme-2')
+    expect(res.error).toBeNull()
+    expect(res.data?.workspace.slug).toBe('acme-2')
+  })
+
+  test('gives up after maxAttempts, returning the last SLUG_TAKEN error', async () => {
+    const call = vi.fn(async () => ({ data: null, error: { message: 'SLUG_TAKEN' } }))
+    const res = await bootstrapWithRetry(call, 'acme', 3)
+    expect(call).toHaveBeenCalledTimes(3)
+    expect(res.data).toBeNull()
+    expect(res.error?.message).toContain('SLUG_TAKEN')
+  })
+
+  test('does not retry a non-collision error', async () => {
+    const call = vi.fn(async () => ({ data: null, error: { message: 'INVALID_NAME' } }))
+    const res = await bootstrapWithRetry(call, 'acme', 5)
+    expect(call).toHaveBeenCalledTimes(1)
+    expect(res.error?.message).toContain('INVALID_NAME')
+  })
+})

@@ -1,0 +1,5 @@
+# incremental typecheck artifact
+*.tsbuildinfo
+
+# clerk configuration (can include secrets)
+/.clerk/

@@ -20,6 +20,7 @@ node_modules/
 .turbo/
 dist/
 .next/
+.playwright-mcp/
 
 # Logs
 *.log

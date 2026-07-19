@@ -1,0 +1,131 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@sahoda/shared/tokens.css';
+/* If the package-exports import ever fails to resolve under a bundler change,
+   fall back to: @import '../../../../../packages/shared/tokens.css'; */
+
+/* Bind next/font families to the canonical tokens (docs/08 §3: Outfit now;
+   Garet later via --ff-display after license — no font files in-repo).
+   next/font emits hashed family names, so the literal 'Outfit' in tokens.css
+   can never match; this override is the sanctioned runtime binding. */
+:root {
+  --ff: var(--font-outfit), Inter, system-ui, sans-serif;
+  --mono: var(--font-jbmono), ui-monospace, monospace;
+}
+
+/* dark:* utilities keyed to the canonical [data-theme] attribute (docs/08 §2),
+   not a .dark class. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+@theme {
+  /* Tokens-only enforcement (docs/08 §1–2): wipe the stock palette so raw
+     Tailwind colors (bg-red-500 …) do not compile at all. */
+  --color-*: initial;
+  /* SANCTIONED LITERAL — the only hex in app code. docs/08 §6 requires white
+     on --pstrong/--ink (buttons, toasts) and tokens.css has no --white token.
+     Follow-up filed with the shared owner: add --white via Readability Guard,
+     then replace this with var(--white). */
+  --color-white: #ffffff;
+
+  /* Two breakpoints only (docs/08 §4): 700 / 1180 */
+  --breakpoint-*: initial;
+  --breakpoint-narrow: 700px;
+  --breakpoint-wide: 1180px;
+
+  /* Shell dims (docs/08 §4) → w-rail, h-topbar, p-page, gap-grid, max-w-content */
+  --spacing-rail: 236px;
+  --spacing-rail-collapsed: 64px;
+  --spacing-topbar: 60px;
+  --spacing-page: 26px;
+  --spacing-page-mobile: 14px;
+  --spacing-grid: 18px;
+  --container-content: 1200px;
+}
+
+/* MUST be `inline`: every value below references a :root var from tokens.css;
+   plain @theme would double-indirect and break [data-theme] / Brand Skin
+   scoping (Tailwind docs: "Referencing other variables"). */
+@theme inline {
+  /* Brand — Brand Skin overrides exactly these seven upstream */
+  --color-primary: var(--p);
+  --color-primary-foreground: var(--pfg);
+  --color-primary-strong: var(--pstrong);
+  --color-accent: var(--acc);
+  --color-tint-50: var(--t50);
+  --color-tint-100: var(--t100);
+  --color-tint-300: var(--t300);
+  /* Neutrals */
+  --color-bg: var(--bg);
+  --color-s1: var(--s1);
+  --color-s2: var(--s2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  /* Semantic */
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-info: var(--info);
+  /* shadcn-compat aliases (restyle-on-vend policy — see components.json note):
+     vended `bg-accent`/`bg-muted` must be rewritten to bg-s2 by hand. */
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
+  --color-card: var(--bg);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--bg);
+  --color-popover-foreground: var(--ink);
+  --color-secondary: var(--s2);
+  --color-secondary-foreground: var(--ink);
+  --color-muted-foreground: var(--muted);
+  --color-destructive: var(--danger);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--acc);
+  /* Shape / elevation / type / motion */
+  --radius-input: var(--r-input);
+  --radius-card: var(--r-card);
+  --radius-pill: var(--r-pill);
+  --shadow-card: var(--sh-card);
+  --shadow-pop: var(--sh-pop);
+  --font-sans: var(--ff);
+  --font-mono: var(--mono);
+  --ease-brand: var(--ease);
+}
+
+@layer base {
+  /* Shell base per dashboard demo: body on --s1, cards on --bg. Body 15/22 (§3). */
+  body {
+    background: var(--s1);
+    color: var(--ink);
+    font: 400 15px/22px var(--ff);
+  }
+  /* A11y floor (docs/08 §8): 2px --acc ring, offset 2. Dark auto-corrects —
+     tokens.css swaps --acc to --t300 under [data-theme='dark']. */
+  :focus-visible {
+    outline: 2px solid var(--acc);
+    outline-offset: 2px;
+    /* Deliberately off-scale: the ring hugs arbitrary shapes, so it sits
+       below the smallest shape token (--r-input 10px). docs/08 §8 specifies
+       only ring width/offset. */
+    border-radius: 6px;
+  }
+}
+
+/* Motion tokens as utilities (docs/08 §5): micro = --dur-1, panels = --dur-2 */
+@utility transition-micro {
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+  transition-duration: var(--dur-1);
+  transition-timing-function: var(--ease);
+}
+@utility transition-panel {
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+  transition-duration: var(--dur-2);
+  transition-timing-function: var(--ease);
+}
+
+/* Z scale (docs/08 §4), used as z-<number> bare values:
+   content 0 · sticky 5 · popover 15 · mascot 20 · toast 30 · overlay/tour 40 · confetti 50 */
