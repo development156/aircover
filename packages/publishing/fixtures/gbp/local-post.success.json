@@ -1,0 +1,11 @@
+{
+  "status": 200,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "name": "accounts/108283981976/locations/40123456789/localPosts/98765",
+    "state": "LIVE",
+    "summary": "Fresh chai just dropped at Chai & Chapters this morning.",
+    "searchUrl": "https://local.google.com/place?id=12345&use=posts&lpsid=98765",
+    "createTime": "2026-07-19T12:00:01.000Z"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "status": 403,
+  "headers": { "content-type": "application/problem+json" },
+  "body": {
+    "title": "Forbidden",
+    "type": "about:blank",
+    "status": 403,
+    "detail": "You are not permitted to create this Tweet."
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "status": 200,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "accounts": [
+      {
+        "name": "accounts/108283981976",
+        "accountName": "Chai & Chapters",
+        "type": "PERSONAL"
+      }
+    ]
+  }
+}

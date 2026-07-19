@@ -1,0 +1,15 @@
+{
+  "status": 429,
+  "headers": {
+    "content-type": "application/problem+json",
+    "x-rate-limit-limit": "50",
+    "x-rate-limit-remaining": "0",
+    "x-rate-limit-reset": "1752883200"
+  },
+  "body": {
+    "title": "Too Many Requests",
+    "type": "about:blank",
+    "status": 429,
+    "detail": "Too Many Requests"
+  }
+}
