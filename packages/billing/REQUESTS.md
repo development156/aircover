@@ -63,3 +63,66 @@ mounts the payment-webhook route (apps/web) MUST:
 
 Billing keeps `mode` on every `CheckoutSession` / `ParsedWebhookEvent` precisely so the route can
 enforce this. (H19 hardening item.)
+
+## 4. Cashfree credentials in `.env` are misconfigured (→ repo owner, BLOCKING live verification)
+
+`CASHFREE_APP_ID` and `CASHFREE_SECRET_KEY` are set to the **same value**. Every Cashfree call
+returns `401 request_failed: authentication Failed`.
+
+Verified without printing either secret: both are 40 chars, ~72% digits, byte-identical, and
+neither carries the `cfsk_ma_test_` prefix a real sandbox secret key uses. The App ID appears to
+have been pasted into both slots.
+
+**Fix:** Cashfree dashboard → Developers → API Keys, with the environment toggle on **Sandbox**;
+set `CASHFREE_SECRET_KEY` to the secret value (distinct from the App ID).
+
+**Consequence until fixed:** `order_tags` echo is **UNVERIFIED**. It is the only carrier of
+workspace/plan/period from checkout into the webhook, and it is confirmed by Cashfree's own SDK
+types but by no published example. The `GET /orders/{order_id}` fallback (`resolveWebhookEvent`)
+means the rail works either way — that is why it was built rather than assumed — but the primary
+path stays unproven. Run `CASHFREE_LIVE=1 pnpm --filter @sahoda/billing test` once corrected.
+
+## 5. `.env.example` is missing every `CASHFREE_*` key (→ repo owner)
+
+`CASHFREE_APP_ID`, `CASHFREE_SECRET_KEY`, `CASHFREE_ENV` exist in `.env` but not in
+`.env.example`, so a fresh clone cannot configure the rail. Billing does not edit `.env*`
+(CLAUDE.md: do NOT touch), so it is specified here. Suggested entries, matching how
+`STRIPE_SECRET_KEY` is templated:
+
+```sh
+CASHFREE_APP_ID=
+CASHFREE_SECRET_KEY=
+CASHFREE_ENV=sandbox   # 'sandbox' | 'live' — REQUIRED, never defaulted (see below)
+```
+
+`CASHFREE_ENV` is deliberately required with no default: Cashfree's sandbox and production
+credentials are structurally identical, with no prefix distinguishing them, so nothing downstream
+can detect a production key aimed at the wrong host. The env var is the only available guard, and
+`baseUrl` is derived from it rather than configured so the two cannot disagree.
+
+## 6. Checkout bridge route (→ apps/web)
+
+`createCheckout` returns `CheckoutSession.url` pointing at `\${appBaseUrl}/billing/checkout/{orderId}`
+plus a `sessionId`. That route does not exist yet and apps/web must add it: a minimal page that
+loads `cashfree-js` and calls `cashfree.checkout({ paymentSessionId, redirectTarget: '_self' })`.
+
+Why a bridge rather than a direct redirect: Cashfree publishes **no documented hosted-checkout
+URL**. Create Order returns only a `payment_session_id` intended for the browser SDK. The
+`POST /pg/view/sessions/checkout` pattern that dominates search results appears in no official
+documentation (and is a form POST, not a redirect), so it is deliberately not used. Payment Links
+(`POST /pg/links`) do return a real `link_url`, but emit `PAYMENT_LINK_EVENT` with no
+`cf_payment_id`, no `order_tags`, and a Cashfree-generated `order_id` — a rewrite of the whole
+webhook→ledger pipeline in exchange for a URL. Orders + a bridge keeps the pipeline intact.
+
+The route must pass the webhook body as **raw text** (`await req.text()`) to
+`verifyWebhookSignature`, never a re-stringified parse: JSON round-tripping reorders keys and
+normalizes numbers (`1.80` → `1.8`), which silently breaks the HMAC.
+
+## 7. Promote billing-internal contracts to `@sahoda/shared` (post-Alpha, ruling #2)
+
+Billing-internal for Alpha, to be promoted alongside `PaymentProvider`:
+
+- `PeriodSchema` / `currentPeriod` (`src/period.ts`) — the `YYYY-MM` grant replay anchor.
+- `Transport` / `fixtureTransport` / `routedTransport` / `fetchTransport` (`src/transport.ts`) —
+  currently **duplicated** from `packages/publishing/src/transport.ts` by copy, because billing
+  depending on publishing would couple two unrelated domains for a ~40-line port.
