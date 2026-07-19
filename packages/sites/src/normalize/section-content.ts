@@ -6,22 +6,45 @@
  * renders without one, `items` arriving as a string becomes a one-item list, and unknown
  * keys are recorded in `dropped`, never fatal. Only a section with nothing renderable
  * left returns null.
+ *
+ * `dropped` reports LOST KEYS, not MODIFIED VALUES — see `section-coerce.ts`.
  */
 import type { SectionKind } from '@sahoda/shared'
-import { stripControl } from '../render/escape'
+import { cloneBag, recordUnknownKeys, text, toRecord } from './section-coerce'
+import {
+  collect,
+  faqItem,
+  featureItem,
+  testimonialItem,
+  type FaqItem,
+  type FeatureItem,
+  type TestimonialItem,
+} from './section-items'
 
-/** One bad generation must not balloon a page; extra entries are dropped by index. */
-export const MAX_ITEMS = 24
+export { MAX_ITEMS, itemsOverCap } from './section-items'
+export {
+  MAX_LABEL_TOKEN_LENGTH,
+  MAX_TEXT_LENGTH,
+  MAX_UNKNOWN_KEYS,
+  UNNAMEABLE_TOKEN,
+  labelToken,
+  labelTokenOverCap,
+  rawUnstorable,
+  unknownKeysOverCap,
+} from './section-coerce'
+export type { FaqItem, FeatureItem, TestimonialItem }
+
+/**
+ * Reported in `dropped` when `raw` itself was unusable — a scalar, an array, anything that
+ * cannot carry keys. The whole bag was discarded, so no per-key label could be produced.
+ */
+export const ROOT_DROPPED = '(root)'
 
 export interface HeroContent {
   headline: string
   subhead?: string
   ctaLabel?: string
   ctaHref?: string
-}
-export interface FeatureItem {
-  title: string
-  body?: string
 }
 export interface FeaturesContent {
   headline?: string
@@ -34,18 +57,9 @@ export interface OfferContent {
   ctaLabel?: string
   ctaHref?: string
 }
-export interface TestimonialItem {
-  quote: string
-  author?: string
-  role?: string
-}
 export interface TestimonialsContent {
   headline?: string
   items: TestimonialItem[]
-}
-export interface FaqItem {
-  q: string
-  a: string
 }
 export interface FaqContent {
   headline?: string
@@ -68,6 +82,7 @@ export type SectionContent =
 export interface NormalizedSection {
   section: SectionContent
   sort: number
+  /** A defensive copy of the model's bag — never the caller's object. See `cloneBag`. */
   raw: Record<string, unknown>
 }
 
@@ -81,100 +96,6 @@ const KNOWN_KEYS: Record<SectionKind, readonly string[]> = {
   contact: ['headline', 'body', 'submitLabel'],
 }
 
-const asRecord = (value: unknown): Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
-
-/** Strings win; finite numbers coerce; everything else is unusable. Blank counts as absent. */
-const coerceText = (value: unknown): string | undefined => {
-  if (typeof value === 'string') {
-    const trimmed = stripControl(value).trim()
-    return trimmed === '' ? undefined : trimmed
-  }
-  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
-  if (typeof value === 'bigint') return value.toString()
-  return undefined
-}
-
-/** Read a known key, recording it in `dropped` when it was present but unusable. */
-const text = (
-  record: Record<string, unknown>,
-  key: string,
-  dropped: string[],
-): string | undefined => {
-  if (!(key in record)) return undefined
-  const value = coerceText(record[key])
-  if (value === undefined) dropped.push(key)
-  return value
-}
-
-/** A single string (or number) is a one-item list; an object is a one-item list. */
-const toList = (value: unknown): unknown[] => {
-  if (Array.isArray(value)) return value
-  if (value === null || value === undefined) return []
-  if (typeof value === 'string') return coerceText(value) === undefined ? [] : [value]
-  if (typeof value === 'number' || typeof value === 'bigint') return [value]
-  if (typeof value === 'object') return [value]
-  return []
-}
-
-const collect = <T>(
-  record: Record<string, unknown>,
-  dropped: string[],
-  build: (entry: unknown) => T | null,
-): T[] => {
-  const list = toList(record.items)
-  if (list.length === 0) {
-    if ('items' in record) dropped.push('items')
-    return []
-  }
-  const items: T[] = []
-  list.forEach((entry, index) => {
-    if (items.length >= MAX_ITEMS) {
-      dropped.push(`items[${index}]`)
-      return
-    }
-    const item = build(entry)
-    if (item === null) {
-      dropped.push(`items[${index}]`)
-      return
-    }
-    items.push(item)
-  })
-  return items
-}
-
-const featureItem = (entry: unknown): FeatureItem | null => {
-  const bare = coerceText(entry)
-  if (bare !== undefined) return { title: bare }
-  const record = asRecord(entry)
-  const title = coerceText(record.title)
-  if (title === undefined) return null
-  const body = coerceText(record.body)
-  return { title, ...(body !== undefined && { body }) }
-}
-
-const testimonialItem = (entry: unknown): TestimonialItem | null => {
-  const bare = coerceText(entry)
-  if (bare !== undefined) return { quote: bare }
-  const record = asRecord(entry)
-  const quote = coerceText(record.quote)
-  if (quote === undefined) return null
-  const author = coerceText(record.author)
-  const role = coerceText(record.role)
-  return { quote, ...(author !== undefined && { author }), ...(role !== undefined && { role }) }
-}
-
-/** Both halves are required: a question with no answer renders nothing, so it is dropped. */
-const faqItem = (entry: unknown): FaqItem | null => {
-  const record = asRecord(entry)
-  const q = coerceText(record.q)
-  const a = coerceText(record.a)
-  if (q === undefined || a === undefined) return null
-  return { q, a }
-}
-
 const wrap = (
   section: SectionContent,
   sort: number,
@@ -185,18 +106,37 @@ const wrap = (
   dropped,
 })
 
-/** null ⇒ the section is unsalvageable and is dropped. */
+/**
+ * null ⇒ the section is unsalvageable and is dropped.
+ *
+ * `kind` is typed but arrives from `site_sections.kind`, a text column — an out-of-union
+ * value is a dropped section, never a thrown error that takes the whole draft down.
+ *
+ * The lookup is gated on {@link Object.hasOwn} rather than on the result being `undefined`:
+ * `'constructor'`, `'toString'`, `'__proto__'`, `'valueOf'` and `'hasOwnProperty'` all resolve
+ * to truthy non-arrays through the prototype chain, so an `=== undefined` guard would let them
+ * past and `known.includes` would throw — the exact whole-draft failure this contract forbids.
+ */
 export const normalizeSection = (
   kind: SectionKind,
   raw: unknown,
   sort: number,
 ): { section: NormalizedSection; dropped: string[] } | null => {
-  const record = asRecord(raw)
+  if (!Object.hasOwn(KNOWN_KEYS, kind)) return null
+  const known: readonly string[] = KNOWN_KEYS[kind]
+
+  const bag = toRecord(raw)
+  const record = bag ?? {}
   const dropped: string[] = []
-  const known = KNOWN_KEYS[kind]
-  for (const key of Object.keys(record)) {
-    if (!known.includes(key)) dropped.push(key)
-  }
+  if (bag === null && raw !== null && raw !== undefined) dropped.push(ROOT_DROPPED)
+  /*
+   * Reads run against the caller's bag — only strings ever leave them, so nothing is aliased —
+   * while `stored` is the copy that outlives the call on `NormalizedSection.raw`. Reading the
+   * copy instead would be quietly wrong: a key holding an unstorable value vanishes from the
+   * clone, and a vanished key is reported as absent rather than as present-but-unusable.
+   */
+  const stored = bag === null ? {} : cloneBag(bag, dropped)
+  recordUnknownKeys(record, known, dropped)
 
   switch (kind) {
     case 'hero': {
@@ -211,14 +151,14 @@ export const normalizeSection = (
         ...(ctaLabel !== undefined && { ctaLabel }),
         ...(ctaHref !== undefined && { ctaHref }),
       }
-      return wrap({ kind: 'hero', content }, sort, record, dropped)
+      return wrap({ kind: 'hero', content }, sort, stored, dropped)
     }
     case 'features': {
       const headline = text(record, 'headline', dropped)
       const items = collect(record, dropped, featureItem)
       if (items.length === 0) return null
       const content: FeaturesContent = { ...(headline !== undefined && { headline }), items }
-      return wrap({ kind: 'features', content }, sort, record, dropped)
+      return wrap({ kind: 'features', content }, sort, stored, dropped)
     }
     case 'offer': {
       const headline = text(record, 'headline', dropped)
@@ -234,21 +174,21 @@ export const normalizeSection = (
         ...(ctaLabel !== undefined && { ctaLabel }),
         ...(ctaHref !== undefined && { ctaHref }),
       }
-      return wrap({ kind: 'offer', content }, sort, record, dropped)
+      return wrap({ kind: 'offer', content }, sort, stored, dropped)
     }
     case 'testimonials': {
       const headline = text(record, 'headline', dropped)
       const items = collect(record, dropped, testimonialItem)
       if (items.length === 0) return null
       const content: TestimonialsContent = { ...(headline !== undefined && { headline }), items }
-      return wrap({ kind: 'testimonials', content }, sort, record, dropped)
+      return wrap({ kind: 'testimonials', content }, sort, stored, dropped)
     }
     case 'faq': {
       const headline = text(record, 'headline', dropped)
       const items = collect(record, dropped, faqItem)
       if (items.length === 0) return null
       const content: FaqContent = { ...(headline !== undefined && { headline }), items }
-      return wrap({ kind: 'faq', content }, sort, record, dropped)
+      return wrap({ kind: 'faq', content }, sort, stored, dropped)
     }
     case 'contact': {
       const headline = text(record, 'headline', dropped)
@@ -259,7 +199,9 @@ export const normalizeSection = (
         ...(body !== undefined && { body }),
         ...(submitLabel !== undefined && { submitLabel }),
       }
-      return wrap({ kind: 'contact', content }, sort, record, dropped)
+      return wrap({ kind: 'contact', content }, sort, stored, dropped)
     }
+    default:
+      return null
   }
 }
