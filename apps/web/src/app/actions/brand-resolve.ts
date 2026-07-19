@@ -12,6 +12,7 @@ import {
   type WithCreditsFn,
 } from '@sahoda/shared'
 
+import { pruneBlankListEntries } from '@/lib/brand/prune-blank-entries'
 import { newResolveObjectRef } from '@/lib/brand/resolve-object-ref'
 import { mapSaveBrandError } from '@/lib/brand/save-brand-error'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -65,10 +66,16 @@ export async function saveBrandMemory(brain: unknown): Promise<SaveBrandState> {
       return { ok: false, message: 'That Brand Brain is incomplete — check the cards and retry.' }
     }
 
+    // Prune AFTER validation: the schema pins the three fixed arrays at exactly 3,
+    // and pruning only shortens the two open lists (which have no minimum). Blank
+    // rows are cheap to create in the editor but permanent once saved — mesh
+    // prepends the active brain to every model call.
+    const payload = pruneBlankListEntries(parsed.data)
+
     const supabase = createServerSupabase()
     const { data, error } = await supabase.rpc('resolve_brand_memory', {
       p_workspace_id: workspace.id,
-      p_payload: parsed.data,
+      p_payload: payload,
       p_source: 'resolved',
     })
     if (error || !data) return { ok: false, message: mapSaveBrandError(error) }
