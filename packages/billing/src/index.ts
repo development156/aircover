@@ -22,6 +22,11 @@ export * from './ledger/pg'
 // Server-only env
 export * from './env'
 
+// Entitlements gate — called BEFORE withCredits at every AI entry point (owner ruling #5)
+export * from './entitlements/port'
+export * from './entitlements/pg'
+export * from './entitlements/checkEntitlement'
+
 // Payment-rail seam + fixture provider
 export * from './providers/types'
 export * from './providers/fixture'
