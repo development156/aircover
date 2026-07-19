@@ -5,9 +5,21 @@ import type { Pool, PoolConfig } from 'pg'
 // the password/user of the DSN can never trigger the relaxed-verification fallback.
 const SUPABASE_HOST = /(^|\.)supabase\.(co|com|in|net)$/
 
+/**
+ * The host `pg` will ACTUALLY connect to.
+ *
+ * A libpq-style DSN may carry a `?host=` query parameter, and pg-connection-string gives it
+ * precedence over the authority host. Reading only `new URL().hostname` therefore lets
+ * `postgres://…@db.abc.supabase.co:5432/postgres?host=evil.com` look like Supabase — relaxing
+ * TLS verification — while the socket goes to evil.com. That turns a connection-string
+ * injection into a working MITM, so the check must resolve the same host pg resolves.
+ */
 function pgHostname(connectionString: string): string | null {
   try {
-    return new URL(connectionString).hostname.toLowerCase()
+    const url = new URL(connectionString)
+    const override = url.searchParams.get('host')
+    const host = override && override.length > 0 ? override : url.hostname
+    return host.toLowerCase()
   } catch {
     return null
   }
