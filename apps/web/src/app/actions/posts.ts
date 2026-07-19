@@ -81,9 +81,24 @@ export async function savePost(postId: string, patch: unknown): Promise<SaveStat
     const workspace = await getActiveWorkspace()
     if (!workspace) return { ok: false, message: 'Create a workspace first.' }
 
-    // PostUpdateSchema is a deliberate allowlist — title/body/status/channels/
-    // scheduled_at only. Anything else in the payload is dropped, not trusted.
-    const parsedPatch = PostUpdateSchema.safeParse(patch)
+    // NARROWER than PostUpdateSchema on purpose. The shared schema also admits
+    // `status`, which would let a hand-rolled call to this action set
+    // `status: 'published'` — the exact fabricated success state that
+    // `simulatePublish` refuses to write, reachable by going around the editor.
+    // Publishing is apps/jobs' to record, so the editor never sends a status and
+    // this action will not accept one. `.strict()` rejects rather than silently
+    // stripping, so a caller that tries learns it did not work.
+    //
+    // Derived from the frozen schema, never restated — a new editable column
+    // shows up here as a type error rather than being quietly unsupported.
+    const parsedPatch = PostUpdateSchema.pick({
+      title: true,
+      body: true,
+      channels: true,
+      scheduled_at: true,
+    })
+      .strict()
+      .safeParse(patch)
     if (!parsedPatch.success) {
       return { ok: false, message: 'Those changes are not valid — reload and try again.' }
     }
