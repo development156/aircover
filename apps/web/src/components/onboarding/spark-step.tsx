@@ -85,7 +85,7 @@ export function SparkStep({
 
   return (
     <form action={formAction} onSubmit={onSubmitStart} className="flex flex-col gap-5">
-      <div>
+      <div data-guide="onboarding.start">
         <p className="text-[16px] font-bold text-ink">Give Sahoda a spark</p>
         <p className="mt-1 text-[13px] text-muted">
           Just the essentials — the Brand Brain infers the rest. Blank fields are fine, they never

@@ -48,7 +48,7 @@ export function CreatePostButton({ size = 'default', className }: CreatePostButt
         size={size}
         loading={pending}
         onClick={onCreate}
-        data-guide="posts.create"
+        data-guide="posts.new_button"
       >
         {pending ? null : <Plus size={16} strokeWidth={2} aria-hidden />}
         {/* Buttons keep their name through the flow — verb stays "create". */}

@@ -168,10 +168,11 @@ upstream; this function should be safe to call twice.
 `conn_select` / `conn_delete` policies, with the connect buttons disabled and an honest reason —
 the same `BOOTSTRAP_PENDING` / `SAVE_PENDING` pattern used twice already. No fake "connected" state.
 
-**Separately, for the owner:** `docs/05:65` assigns "packages/publishing + OAuth routes" to
-**wt-pub**, while `store.ts:5-7`, `x.ts:23-24`, `common.ts:10-11` and root `LEARNINGS.md:14` all say
-**wt-web** mounts them. The roadmap and the shipped code disagree about who owns the routes. We have
-assumed wt-web mounts them; if that is wrong, this request should be redirected rather than dropped.
+**Ownership — RULED 2026-07-19, no longer open.** `docs/05:65` assigns "packages/publishing + OAuth
+routes" to wt-pub, while `store.ts:5-7`, `x.ts:23-24`, `common.ts:10-11` and root `LEARNINGS.md:14`
+say wt-web mounts them. Owner ruling: **the shipped code is correct and the doc is stale** — wt-pub
+owns the framework-agnostic handlers, wt-web owns the Next.js route mounts. No code moves; `docs/05`
+should be corrected. So this request is correctly addressed to wt-db on wt-web's behalf.
 
 ## wt-db: apps/web cannot record a publish, simulated or real
 
