@@ -23,5 +23,8 @@ export * from './env'
 export * from './providers/types'
 export * from './providers/fixture'
 
-// Webhook → ledger
+// Webhook → ledger: idempotent event store + the process orchestrator + the grant
 export * from './webhooks/applyPlanGrant'
+export * from './webhooks/store'
+export * from './webhooks/pgStore'
+export * from './webhooks/processPaymentEvent'

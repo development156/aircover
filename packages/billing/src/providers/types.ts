@@ -1,4 +1,4 @@
-import type { PlanId } from '@sahoda/shared'
+import type { BillingProvider, PlanId } from '@sahoda/shared'
 
 /**
  * The payment-rail seam. Billing-INTERNAL for Alpha (owner ruling #2 — promote to
@@ -47,8 +47,8 @@ export interface CheckoutSession {
  * the (deferred) billing_webhook_events row can store the original payload.
  */
 export interface ParsedWebhookEvent {
-  /** Which provider produced it (billing-internal id). */
-  provider: string
+  /** Which provider produced it — the widened billing provider enum ('fixture'|'cashfree'|…). */
+  provider: BillingProvider
   /** Unique event id — the idempotency key for billing_webhook_events (provider, event_id). */
   eventId: string
   eventType: PaymentEventType
