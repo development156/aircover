@@ -1,0 +1,103 @@
+'use server'
+
+import { auth } from '@clerk/nextjs/server'
+import { createFixtureAdapter } from '@sahoda/publishing'
+import { CONSTRAINTS, formatForPlatform, type Channel } from '@sahoda/shared'
+
+import { getPost, listVariants } from '@/lib/posts/read'
+import { parseExtras } from '@/lib/posts/variant-extras'
+import type { PublishState, SimulatedPublish } from '@/lib/posts/state'
+import { getActiveWorkspace } from '@/lib/workspaces'
+
+/**
+ * SIMULATE a publish against the fixture adapter. Nothing is sent anywhere and
+ * nothing is recorded — this is a dry run whose only output is the labelled
+ * result the caller renders.
+ *
+ * Why simulation is the whole story for `apps/web`, not a placeholder for a real
+ * publish that lands later here:
+ *
+ *  - It CANNOT publish for real. `PublishRequest.auth` needs a plaintext
+ *    `accessToken`, and `decryptToken` is deliberately not exported from
+ *    `@sahoda/publishing` — vault material never reaches this process.
+ *  - It CANNOT record a publish. `post_publish_logs` is member-read with a
+ *    `block_mutations` trigger on update/delete and needs service-role to
+ *    insert; `apps/web` has no service-role client by design. And
+ *    `PostVariantUpdateSchema` deliberately excludes `publish_status`,
+ *    `platform_post_id`, `permalink` and `last_error` — those belong to the
+ *    publisher (apps/jobs).
+ *
+ * So this action deliberately writes NOTHING. Flipping `posts.status` to
+ * 'published' off the back of a fixture run would be a fabricated success state.
+ * The `mode` field is carried through untouched so the UI branches on it rather
+ * than sniffing the permalink; the `fixture://` permalink itself is never
+ * rendered as a link.
+ */
+export async function simulatePublish(postId: string): Promise<PublishState> {
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to preview publishing.' }
+
+    const workspace = await getActiveWorkspace()
+    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+
+    const post = await getPost(postId)
+    if (!post) return { ok: false, message: "You don't have access to this post." }
+
+    const variants = await listVariants(postId)
+    if (variants.length === 0) {
+      return { ok: false, message: 'Add at least one channel variant to preview publishing.' }
+    }
+
+    const simulated: SimulatedPublish[] = []
+    for (const variant of variants) {
+      const channel: Channel = variant.channel
+      const spec = CONSTRAINTS[channel]
+
+      // instagram is publishable:false in the frozen engine — simulating it
+      // would imply a path that does not exist on any adapter.
+      if (!spec.publishable) continue
+
+      const extras = parseExtras(variant.extras)
+      const content = formatForPlatform(spec, {
+        body: variant.body,
+        hashtags: extras.hashtags,
+      })
+
+      const result = await createFixtureAdapter(channel).publish({
+        workspaceId: workspace.id,
+        postId,
+        variantId: variant.id,
+        content,
+        media: [],
+        // The fixture adapter never reads auth; these are empty on purpose so no
+        // real credential can be mistaken for having been used.
+        auth: { connectionId: '', accessToken: '', externalAccountId: '' },
+      })
+
+      // Guard the label rather than trusting it: if a future adapter swap ever
+      // returned mode:'live' down this path, we must not render it as simulated.
+      if (result.mode !== 'fixture') {
+        return { ok: false, message: 'Preview is unavailable right now — try again.' }
+      }
+
+      simulated.push({
+        channel,
+        mode: 'fixture',
+        platformPostId: result.platformPostId,
+        publishedAt: result.publishedAt,
+      })
+    }
+
+    if (simulated.length === 0) {
+      return {
+        ok: false,
+        message: 'None of these channels can be published yet — Instagram is preview-only.',
+      }
+    }
+
+    return { ok: true, simulated }
+  } catch {
+    return { ok: false, message: 'Could not run the publish preview — try again.' }
+  }
+}
