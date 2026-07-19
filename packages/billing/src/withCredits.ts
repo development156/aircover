@@ -12,7 +12,17 @@ import {
 } from '@sahoda/shared'
 import type { LatestHold, LedgerPort } from './ledger/port'
 
-/** HOLD time-to-live. If a run dies between HOLD and settle, the ledger auto-releases (sahoda-ledger). */
+/**
+ * HOLD time-to-live. If a run dies between HOLD and settle, the hold is released by the
+ * expired-hold sweep — `holdSweepTask` in apps/jobs, which runs every 5 minutes and releases
+ * through `app.apply_ledger_entry()` with an `expiredReleaseKey`, so a repeat sweep is an
+ * idempotent replay rather than a double-release.
+ *
+ * The sweep waits a grace margin past expiry (`holdSweepGraceSeconds`, default 600s) before
+ * reaping, so a slow-but-alive run is not released mid-flight — its later DEBIT would raise
+ * HOLD_ALREADY_SETTLED and show the user a failure for work that succeeded. Net: stranded
+ * credits come back on the order of tens of minutes, not instantly.
+ */
 const DEFAULT_HOLD_TTL_SECONDS = 600
 
 /** User-facing failure copy. Fixed strings only — see `notifyError`. */
@@ -100,8 +110,9 @@ export function createWithCredits(port: LedgerPort, deps: WithCreditsDeps = {}):
       try {
         data = await fn({ actionType: action, creditsCharged: cost })
       } catch (runErr) {
-        // RELEASE: the user is not charged for a failed action. If the RELEASE write
-        // itself fails, the HOLD's TTL is the backstop — still return an honest error.
+        // RELEASE: the user is not charged for a failed action. If the RELEASE write itself
+        // fails, the expired-hold sweep in apps/jobs is the backstop — still return an honest
+        // error.
         try {
           await port.apply({
             workspaceId,
@@ -111,7 +122,7 @@ export function createWithCredits(port: LedgerPort, deps: WithCreditsDeps = {}):
             settlesEntryId: holdId,
           })
         } catch {
-          // swallowed: hold expires via TTL; the caller-facing error below is unchanged
+          // swallowed: the expired-hold sweep releases it; caller-facing error below unchanged
         }
         // Fixed copy: the caller's own throw is frequently a control-flow sentinel
         // (e.g. 'MESH_ERROR') and apps/web renders this message to the customer verbatim.

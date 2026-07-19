@@ -5,10 +5,27 @@ import type { PlanGrantResult } from './applyPlanGrant'
 import type { WebhookEventStore } from './store'
 
 export interface ProcessResult {
-  status: 'processed' | 'duplicate'
-  /** The grant applied this delivery, or null when the event was a skipped duplicate. */
+  /**
+   * `processed` — a grant was applied. `duplicate` — already-processed event, skipped.
+   * `ignored` — a real, correctly-handled delivery that grants nothing (a failed or dropped
+   * payment, or an event type we do not recognize).
+   *
+   * `ignored` is a distinction in this DTO only: the audit row is marked `processed`, because
+   * the event WAS handled and `billing_webhook_events.status` is constrained to
+   * ('received','processed','failed') — recording it as 'failed' would be a lie, and adding a
+   * fourth status needs a wt-db migration this package must not write.
+   */
+  status: 'processed' | 'duplicate' | 'ignored'
+  /** The grant applied this delivery; null for a skipped duplicate or an ignored event. */
   grant: PlanGrantResult | null
 }
+
+/**
+ * Events that mean "money arrived". Anything else is a legitimate delivery that grants nothing.
+ * Kept as a set so a new PaymentEventType has to be classified deliberately rather than falling
+ * into the grant path by default.
+ */
+const GRANTING_EVENT_TYPES = new Set<ParsedWebhookEvent['eventType']>(['payment_succeeded'])
 
 /** User-facing failure copy. Fixed so no store/DB internals reach a caller. */
 const GENERIC_FAILURE = 'Could not process the payment event'
@@ -52,6 +69,16 @@ export function createProcessPaymentEvent(
       // Already fully processed → skip. No re-grant, no double charge.
       if (claim.alreadyProcessed) {
         return ok({ status: 'duplicate', grant: null })
+      }
+
+      // A failed/dropped/unrecognized payment is routine traffic, NOT an error. Driving it into
+      // applyPlanGrant (which handles only payment_succeeded) returned VALIDATION_ERROR, marked
+      // the row 'failed' and answered !ok — so the provider redelivered, and because pgStore
+      // treats only 'processed' as terminal the row was re-driven forever. Terminate it here:
+      // the event was handled, it simply grants nothing.
+      if (!GRANTING_EVENT_TYPES.has(event.eventType)) {
+        await store.markProcessed(claim.id)
+        return ok({ status: 'ignored', grant: null })
       }
 
       const grant = await applyPlanGrant(event)

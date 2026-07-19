@@ -6,7 +6,10 @@ Users never pay for failures; partial batches charge completed units only.
 The entitlement gate (`checkEntitlement`) is a **separate helper called BEFORE `withCredits`** at
 each AI entry point (owner ruling #5) — deliberately NOT inside the wrapper. It takes
 `workspaceId` explicitly and reads no request-scoped context, because it must also run from
-apps/jobs (Trigger.dev — no Clerk `auth()`, no cookies).
+apps/jobs (Trigger.dev — no Clerk `auth()`, no cookies). It is **shipped but not yet mounted** —
+zero call sites today, so plan limits constrain nothing until apps/web wires it. It is also **not
+atomic**: it compares caller-supplied `currentUsage`, so callers must count inside the inserting
+transaction (REQUESTS §8).
 
 - Prices come ONLY from `pricing.config.json` via `creditCost()` (`@sahoda/shared`). Never
   hardcode a credit cost.

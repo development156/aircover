@@ -57,6 +57,11 @@ describe.skipIf(!DB_URL)('applyPlanGrant against the real ledger', () => {
     // — provider-level dedup — is deferred behind the enum widening.)
     const dup = await applyPlanGrant(paid({ eventId: 'evt-b' }))
     expect(dup.ok && dup.data.replayed).toBe(true)
+    if (!dup.ok) throw new Error('expected ok')
+    // Owner ruling, pinned: on replay these describe THE ORIGINAL ENTRY — the grant that stands
+    // for this period — not one applied by this delivery. Only meaningful read with `replayed`.
+    expect(dup.data.granted).toBe(1500)
+    expect(dup.data.balanceAfter).toBe(1500)
     expect(await port.balance(ws)).toEqual({ total: 1500, held: 0 }) // NOT 3000
 
     // A new billing period is a fresh grant.

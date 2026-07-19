@@ -46,6 +46,38 @@ describe('pgSsl — relaxed verification is Supabase-only', () => {
     expect(relaxes('postgres://u:p@db.abc.supabase.co:5432/postgres?host=')).toBe(true)
   })
 
+  /**
+   * A DSN may repeat `host=`. pg-connection-string keeps the LAST occurrence, so reading the
+   * first (URLSearchParams.get) let a Supabase-looking leading value authorize relaxed TLS while
+   * pg dialled the trailing attacker host — the exact MITM this module exists to prevent, merely
+   * moved one parameter to the right. Probed against the real parser (pg-connection-string
+   * 2.14.0): `host=a&host=b` → b, and a trailing EMPTY value falls back to the authority host
+   * rather than to the earlier non-empty one.
+   */
+  it('does NOT relax when a REPEATED ?host= ends on a non-Supabase host', () => {
+    expect(
+      relaxes(
+        'postgres://u:p@db.abc.supabase.co:5432/postgres?host=db.abc.supabase.co&host=evil.com',
+      ),
+    ).toBe(false)
+  })
+
+  it('relaxes when a repeated ?host= ends ON Supabase (pg uses the last)', () => {
+    expect(
+      relaxes('postgres://u:p@10.0.0.5:5432/postgres?host=evil.com&host=db.abc.supabase.co'),
+    ).toBe(true)
+  })
+
+  it('falls back to the authority host when the LAST repeated ?host= is empty', () => {
+    // pg: `host=evil.com&host=` resolves to the authority host, not to evil.com.
+    expect(relaxes('postgres://u:p@db.abc.supabase.co:5432/postgres?host=evil.com&host=')).toBe(
+      true,
+    )
+    expect(relaxes('postgres://u:p@evil.com:5432/postgres?host=db.abc.supabase.co&host=')).toBe(
+      false,
+    )
+  })
+
   it('does not relax for an unparseable connection string', () => {
     expect(relaxes('not a dsn at all')).toBe(false)
   })

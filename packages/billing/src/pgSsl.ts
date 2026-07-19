@@ -13,12 +13,20 @@ const SUPABASE_HOST = /(^|\.)supabase\.(co|com|in|net)$/
  * `postgres://…@db.abc.supabase.co:5432/postgres?host=evil.com` look like Supabase — relaxing
  * TLS verification — while the socket goes to evil.com. That turns a connection-string
  * injection into a working MITM, so the check must resolve the same host pg resolves.
+ *
+ * `host=` may also be REPEATED, and pg keeps the LAST occurrence — so reading the first
+ * (`searchParams.get`) reopened the same MITM one parameter to the right:
+ * `?host=db.abc.supabase.co&host=evil.com` authorized relaxed TLS for Supabase while pg dialled
+ * evil.com. Both rules below are probed against pg-connection-string 2.14.0 and pinned in
+ * pgSsl.test.ts: last occurrence wins, and a trailing EMPTY value falls back to the authority
+ * host (NOT to an earlier non-empty one).
  */
 function pgHostname(connectionString: string): string | null {
   try {
     const url = new URL(connectionString)
-    const override = url.searchParams.get('host')
-    const host = override && override.length > 0 ? override : url.hostname
+    const overrides = url.searchParams.getAll('host')
+    const last = overrides.length > 0 ? overrides[overrides.length - 1] : undefined
+    const host = last && last.length > 0 ? last : url.hostname
     return host.toLowerCase()
   } catch {
     return null

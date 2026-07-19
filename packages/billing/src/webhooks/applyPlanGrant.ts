@@ -4,11 +4,28 @@ import type { LedgerPort } from '../ledger/port'
 import { isPeriod } from '../period'
 import type { ParsedWebhookEvent } from '../providers/types'
 
+/**
+ * The grant that STANDS for this (workspace, plan, period) — not necessarily one applied by
+ * this delivery. Owner ruling: on a replay, `granted` and `balanceAfter` reflect THE ORIGINAL
+ * ENTRY, because the ledger returns that row rather than re-reading. Never read either field
+ * without `replayed`: `granted: 1500, replayed: true` means "1500 stand for this period, and
+ * this delivery added none of them", and `balanceAfter` is the balance as of that original
+ * grant, which may be arbitrarily stale.
+ *
+ * Pinned in webhooks.integration.test.ts and applyPlanGrant.integration.test.ts, which
+ * previously asserted `granted` on the first grant and dropped it on replay — leaving the one
+ * case where the reading is non-obvious decided by nothing.
+ */
 export interface PlanGrantResult {
-  /** Credits granted (the plan's monthly allotment). */
+  /** Credits the plan's monthly allotment grants for this period. See the caveat above. */
   granted: number
+  /** Balance after the entry that stands. On replay this is the ORIGINAL entry's balance. */
   balanceAfter: number
-  /** True when the ledger replayed this grant (a duplicate webhook) — no double-grant. */
+  /**
+   * True when the ledger replayed this grant — a redelivery, or a genuinely distinct second
+   * payment for the same plan+period. The latter means real money produced no credits, which
+   * the route MUST surface for refund/support (REQUESTS.md §6), not pass off as a success.
+   */
   replayed: boolean
 }
 

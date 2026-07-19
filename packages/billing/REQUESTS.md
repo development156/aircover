@@ -64,23 +64,38 @@ mounts the payment-webhook route (apps/web) MUST:
 Billing keeps `mode` on every `CheckoutSession` / `ParsedWebhookEvent` precisely so the route can
 enforce this. (H19 hardening item.)
 
-## 4. Cashfree credentials in `.env` are misconfigured (→ repo owner, BLOCKING live verification)
+## 4. Cashfree live verification is PARKED — the adapter ships UNVERIFIED (owner ruling)
 
-`CASHFREE_APP_ID` and `CASHFREE_SECRET_KEY` are set to the **same value**. Every Cashfree call
-returns `401 request_failed: authentication Failed`.
+**Status: parked indefinitely by the owner. Not a merge blocker. Read this before enabling the
+Cashfree rail in any environment.**
 
-Verified without printing either secret: both are 40 chars, ~72% digits, byte-identical, and
-neither carries the `cfsk_ma_test_` prefix a real sandbox secret key uses. The App ID appears to
-have been pasted into both slots.
+`CASHFREE_APP_ID` and `CASHFREE_SECRET_KEY` in `.env` are set to the **same value**, so every
+Cashfree call returns `401 request_failed: authentication Failed`. Verified twice without
+printing either secret: both are 40 chars, byte-identical (matching SHA-256) in both the repo
+root and the worktree `.env`, and neither carries the `cfsk_ma_test_` prefix a real sandbox
+secret key uses. The App ID appears to have been pasted into both slots. Re-confirmed against
+the live API on 2026-07-19: all 4 opt-in live tests fail on 401.
 
-**Fix:** Cashfree dashboard → Developers → API Keys, with the environment toggle on **Sandbox**;
-set `CASHFREE_SECRET_KEY` to the secret value (distinct from the App ID).
+**What this means for the merged code.** The Cashfree adapter is merged as **unverified code
+behind the `PaymentProvider` interface**. Checkout stays on the **fixture** provider. No path
+selects Cashfree by default — `CASHFREE_ENV` is required and never defaulted, and the webhook
+route that would mount it does not exist yet (§6). So the unverified code is inert, not live.
 
-**Consequence until fixed:** `order_tags` echo is **UNVERIFIED**. It is the only carrier of
-workspace/plan/period from checkout into the webhook, and it is confirmed by Cashfree's own SDK
-types but by no published example. The `GET /orders/{order_id}` fallback (`resolveWebhookEvent`)
-means the rail works either way — that is why it was built rather than assumed — but the primary
-path stays unproven. Run `CASHFREE_LIVE=1 pnpm --filter @sahoda/billing test` once corrected.
+**Specifically UNVERIFIED — do not treat as working:**
+
+- **The `order_tags` echo into the webhook.** It is the only carrier of workspace/plan/period
+  from checkout into the webhook. Confirmed by Cashfree's own SDK types but by **no published
+  example** (every sample shows `order_tags: null`). `resolveWebhookEvent` ships a
+  `GET /orders/{order_id}` fallback — which IS documented with examples — precisely because the
+  primary path is an assumption. The rail should work either way; neither path has met the real API.
+- Real create-order request/response shapes, the 409 duplicate-order behaviour, and live
+  signature verification against a genuine Cashfree-signed body.
+
+**To un-park:** Cashfree dashboard → Developers → API Keys, environment toggle on **Sandbox**;
+set `CASHFREE_SECRET_KEY` to the secret value (distinct from the App ID). Then run
+`CASHFREE_LIVE=1 pnpm --filter @sahoda/billing test` — 5 opt-in tests, gated so a broken
+credential never reddens the default suite. Until that passes, treat every claim in this section
+as unproven.
 
 ## 5. `.env.example` is missing every `CASHFREE_*` key (→ repo owner)
 
@@ -118,6 +133,13 @@ The route must pass the webhook body as **raw text** (`await req.text()`) to
 `verifyWebhookSignature`, never a re-stringified parse: JSON round-tripping reorders keys and
 normalizes numbers (`1.80` → `1.8`), which silently breaks the HMAC.
 
+**`ProcessResult.status` has three values — all three are 2xx.** `processed` (a grant was
+applied), `duplicate` (already-processed event, skipped), and `ignored` (a real, correctly
+handled delivery that grants nothing: a failed or dropped payment, or an unrecognized event
+type). Cashfree emits `PAYMENT_FAILED_WEBHOOK` / `PAYMENT_USER_DROPPED_WEBHOOK` as routine
+traffic, so answering non-2xx to those makes the provider redeliver forever. Only an `!ok`
+Result is a real failure and worth a non-2xx.
+
 **The route MUST act on `PlanGrantResult.replayed`.** Grants are idempotent per
 `(plan, period, workspace)` — that is deliberate and it is what stops a redelivered webhook
 double-granting. The flip side: if a customer genuinely pays **twice** for the same plan and
@@ -136,3 +158,25 @@ Billing-internal for Alpha, to be promoted alongside `PaymentProvider`:
 - `Transport` / `fixtureTransport` / `routedTransport` / `fetchTransport` (`src/transport.ts`) —
   currently **duplicated** from `packages/publishing/src/transport.ts` by copy, because billing
   depending on publishing would couple two unrelated domains for a ~40-line port.
+
+## 8. Entitlements gate is check-then-act — callers MUST make it atomic (→ apps/web, apps/jobs)
+
+`checkEntitlement` is a stateless calculator over the `currentUsage` the caller passes in. It
+counts nothing and takes no lock, so every countable dimension (`sites`, `channels`, `seats`) is
+check-then-act: two concurrent creates on a 3-site plan can both read 2, both pass, and both
+insert. No DB constraint backstops it — `subscriptions_one_live` bounds subscriptions, not
+resource counts.
+
+**Obligation on each call site:** count inside the SAME transaction that performs the insert, or
+add a per-workspace bounding constraint. Documented loudly on `createCheckEntitlement` and on
+`EntitlementCheckInput.currentUsage`.
+
+Not solvable inside billing: the gate has no transaction to join (it must run from apps/jobs as
+well as a server action) and only the caller knows the write it is about to make. Contrast
+`apply_ledger_entry`, which computes availability under the row lock — the check and the mutation
+are one statement. That is why credits get atomicity and limits do not.
+
+**Not Alpha-blocking** (owner ruling): the gate is currently mounted at **zero** entry points, so
+this is prospective. It is filed because "mount it" is recorded in-code at all three AI entry
+points while "make it atomic" was recorded nowhere — the exact thing a caller wires up wrong by
+default. If a bounding constraint is preferred over per-call transactions, that is a wt-db request.

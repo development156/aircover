@@ -35,6 +35,10 @@ export interface EntitlementCheckInput {
    * For countable dimensions: how many already exist (the caller is adding one more).
    * For level dimensions (`loopLevel`): the level being requested.
    * Omit to ask only whether the plan grants any of this dimension at all.
+   *
+   * ⚠ THE CALLER SUPPLIES THIS, SO THE CHECK IS NOT ATOMIC — see the CALLER OBLIGATION on
+   * `createCheckEntitlement`. This gate compares a number you read at some earlier moment; it
+   * counts nothing and takes no lock.
    */
   currentUsage?: number
 }
@@ -75,6 +79,24 @@ export type CheckEntitlementFn = (input: EntitlementCheckInput) => Promise<Resul
  * `getEntitlements`. The `plans.limits` jsonb column is a seeded fold of that same catalog
  * ("D7 fold … Alpha reads, never edits") and is typed as loose `JsonbSchema`, so reading the
  * catalog is both typed and one query cheaper. A real-DB drift test asserts the two agree.
+ *
+ * ⚠ CALLER OBLIGATION — THIS GATE IS NOT ATOMIC. It is a stateless calculator over the
+ * `currentUsage` YOU pass in: it never counts, and never takes a lock. Every countable
+ * dimension (`sites`, `channels`, `seats`) is therefore check-then-act, and an `allowed: true`
+ * is only as fresh as the read behind it. Two concurrent creates on a 3-site plan can both read
+ * 2, both pass, and both insert — 4 sites on a plan that allows 3.
+ *
+ * Callers MUST close that window themselves, by either:
+ *   1. counting inside the SAME transaction that performs the insert (`select … for update`,
+ *      or a count and insert in one statement), or
+ *   2. relying on a DB constraint that bounds the resource per workspace.
+ * No such constraint exists today — `subscriptions_one_live` bounds subscriptions, not resource
+ * counts — so option 1 is the only live remedy. Filed in REQUESTS.md §8.
+ *
+ * Deliberately NOT solved inside this package: the gate has no transaction to join (it must run
+ * from apps/jobs as well as a server action), and only the caller knows the write it is about to
+ * make. Contrast `apply_ledger_entry`, which CAN be atomic because the check and the mutation
+ * are the same statement — which is exactly why credits get that guarantee and limits do not.
  */
 export function createCheckEntitlement(
   port: PlanResolverPort,
