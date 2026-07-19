@@ -22,3 +22,19 @@ export {
 // Publish adapters.
 export { createFixtureAdapter, type FixtureAdapterOptions } from './adapters/fixture'
 export { createXAdapter, type XAdapterDeps } from './adapters/x'
+
+// OAuth handlers (framework-agnostic; wt-web mounts them as thin routes) + the
+// ConnectionStore port wt-web implements with the service-role client.
+export type {
+  ConnectionStore,
+  ConnectionUpsert,
+  ConnectionExternalAccount,
+  ConnectionSummary,
+} from './oauth/store'
+export type { OAuthHandlerDeps, OAuthCallbackParams } from './oauth/common'
+export {
+  createXOAuthHandlers,
+  type XOAuthHandlers,
+  type XAuthorizeStart,
+  type XCallbackArgs,
+} from './oauth/x'
