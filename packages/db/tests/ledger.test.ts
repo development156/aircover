@@ -16,11 +16,28 @@ type ApplyResult = { entry: LedgerRow; replayed: boolean }
 describe.skipIf(!hasLedgerEnv)('app.apply_ledger_entry', () => {
   let pool: Pool
   let ws: string
+  const created: string[] = []
 
-  beforeAll(() => {
+  beforeAll(async () => {
     pool = pgPool()
+    // Recovery sweep. credit_ledger.idempotency_key is GLOBALLY unique, and the dev DB is
+    // shared — so a run killed between beforeEach and afterEach used to strand rows that
+    // broke every later run forever. Keys are workspace-scoped now (see key() below), so
+    // strays can no longer collide; this just clears the litter they leave.
+    // The 1h floor is a heuristic, not a guarantee: it keeps a normally-paced concurrent
+    // run (whole suite ≈ 40s) well out of range, but a run parked at a breakpoint for over
+    // an hour would have its live workspace swept from under it. That trade is deliberate —
+    // the alternative, never sweeping, is what poisoned this DB in the first place.
+    await pool.query(
+      `delete from workspaces
+       where created_by = 'user_ledger' and created_at < now() - interval '1 hour'`,
+    )
   })
   afterAll(async () => {
+    // Safety net for anything afterEach missed (e.g. it threw mid-suite).
+    if (created.length > 0) {
+      await pool.query('delete from workspaces where id = any($1::uuid[])', [created])
+    }
     await pool.end()
   })
 
@@ -31,20 +48,48 @@ describe.skipIf(!hasLedgerEnv)('app.apply_ledger_entry', () => {
        returning id`,
     )
     ws = r.rows[0]!.id
+    created.push(ws)
   })
   afterEach(async () => {
     if (ws) await pool.query('delete from workspaces where id = $1', [ws])
+    // Clear it: a stale id here would silently scope the NEXT test's keys to a workspace
+    // that no longer exists if its beforeEach ever failed.
+    ws = ''
   })
+
+  /**
+   * Scope every idempotency key to the per-test workspace, mirroring how
+   * bootstrap_workspace builds its own ('grant:signup:' || v_ws_id). The column is unique
+   * across the WHOLE table, not per tenant, so a bare literal like 'grant:signup' is a
+   * one-shot resource on a shared DB: the first interrupted run claims it permanently.
+   * A fresh workspace uuid each test makes that impossible.
+   *
+   * The guard is the point, not defensiveness: without it a failed beforeEach leaves ws
+   * empty and every key silently reverts to a fixed literal ('grant:signup:undefined') —
+   * re-introducing the exact poisoning this scoping exists to prevent.
+   */
+  const key = (k: string): string => {
+    if (!ws) throw new Error(`no test workspace — refusing to build an unscoped key from "${k}"`)
+    return `${k}:${ws}`
+  }
 
   async function apply(
     type: string,
     amount: number,
-    key: string,
+    k: string,
     opts: { settles?: string; objectRef?: string; holdTtl?: string } = {},
   ): Promise<ApplyResult> {
     const r = await pool.query<{ res: ApplyResult }>(
       `select app.apply_ledger_entry($1,$2,$3,$4,null,$5,null,null,$6,$7,null,null) as res`,
-      [ws, type, amount, key, opts.objectRef ?? null, opts.settles ?? null, opts.holdTtl ?? null],
+      [
+        ws,
+        type,
+        amount,
+        key(k),
+        opts.objectRef ?? null,
+        opts.settles ?? null,
+        opts.holdTtl ?? null,
+      ],
     )
     return r.rows[0]!.res
   }
@@ -136,18 +181,24 @@ describe.skipIf(!hasLedgerEnv)('app.apply_ledger_entry', () => {
   })
 
   it('rejects a cross-workspace idempotency key reuse', async () => {
+    // The one test that reuses a key across tenants ON PURPOSE — so it passes the already
+    // scoped literal through verbatim rather than re-scoping to the second workspace.
+    // Still safe to interrupt: the key carries this run's workspace uuid, which is never
+    // minted again.
+    const shared = key('shared-key')
     await apply('GRANT', 10, 'shared-key')
     const r = await pool.query<{ id: string }>(
       `insert into workspaces (name, slug, created_by)
-       values ('other', 'oth-' || replace(gen_random_uuid()::text, '-', ''), 'u')
+       values ('other', 'oth-' || replace(gen_random_uuid()::text, '-', ''), 'user_ledger')
        returning id`,
     )
     const other = r.rows[0]!.id
+    created.push(other)
     try {
       await expect(
         pool.query(
-          `select app.apply_ledger_entry($1,'GRANT',10,'shared-key',null,null,null,null,null,null,null,null)`,
-          [other],
+          `select app.apply_ledger_entry($1,'GRANT',10,$2,null,null,null,null,null,null,null,null)`,
+          [other, shared],
         ),
       ).rejects.toThrow('IDEMPOTENCY_KEY_CONFLICT')
     } finally {
