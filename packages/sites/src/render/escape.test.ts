@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import { escapeHtml, escapeAttr, safeUrl, stripControl } from './escape'
 
@@ -5,6 +6,11 @@ interface StringCase {
   name: string
   input: string
   expected: string
+}
+
+interface NamedInput {
+  name: string
+  input: string
 }
 
 interface UnknownCase {
@@ -66,9 +72,7 @@ describe('escapeHtml - injection payloads cannot re-enter markup', () => {
   })
 
   it('neutralizes an img onerror payload placed in a text node', () => {
-    expect(escapeHtml('<img src=x onerror=alert(1)>')).toBe(
-      '&lt;img src=x onerror=alert(1)&gt;',
-    )
+    expect(escapeHtml('<img src=x onerror=alert(1)>')).toBe('&lt;img src=x onerror=alert(1)&gt;')
   })
 })
 
@@ -116,6 +120,16 @@ const ATTR_CASES: ReadonlyArray<StringCase> = [
     input: 'a\tb',
     expected: 'a&#9;b',
   },
+  {
+    name: 'a carriage return, which a parser also reads as attribute whitespace',
+    input: 'a\rb',
+    expected: 'a&#13;b',
+  },
+  {
+    name: 'a CRLF pair, the line ending model copy most often arrives with',
+    input: 'a\r\nb',
+    expected: 'a&#13;&#10;b',
+  },
 ]
 
 describe('escapeAttr - attribute context', () => {
@@ -130,6 +144,48 @@ describe('escapeAttr - attribute context', () => {
 
     expect(rendered).toBe('<img alt="&quot; onerror=&quot;alert(1)">')
     expect(rendered.includes('onerror="')).toBe(false)
+  })
+
+  it('leaves no raw carriage return that could start a new attribute', () => {
+    const rendered = `<img alt="${escapeAttr('x\ronerror=alert(1)')}">`
+
+    expect(rendered.includes('\r')).toBe(false)
+    expect(rendered).toBe('<img alt="x&#13;onerror=alert(1)">')
+  })
+})
+
+/**
+ * The exact contract, pinned so the 17 downstream tasks cannot assume more than it gives:
+ * escapeAttr does NOT escape space or `=`, and is safe only inside a quoted value.
+ */
+describe('escapeAttr - the output is safe only inside a quoted attribute value', () => {
+  it('is safe inside double quotes, the only attribute form this package emits', () => {
+    const rendered = `<div class="${escapeAttr('x" onmouseover="alert(1)')}"></div>`
+
+    expect(rendered).toBe('<div class="x&quot; onmouseover=&quot;alert(1)"></div>')
+    expect(rendered.includes('onmouseover="')).toBe(false)
+  })
+
+  it('is safe inside single quotes too, because the apostrophe is escaped', () => {
+    const rendered = `<div class='${escapeAttr("x' onmouseover='alert(1)")}'></div>`
+
+    expect(rendered).toBe(`<div class='x&#39; onmouseover=&#39;alert(1)'></div>`)
+  })
+
+  it('does not escape space, so class="hero cta" keeps working', () => {
+    expect(escapeAttr('hero cta')).toBe('hero cta')
+  })
+
+  it('does not escape the equals sign, so data-x="a=b" keeps working', () => {
+    expect(escapeAttr('a=b')).toBe('a=b')
+  })
+
+  it('does NOT cover an unquoted attribute, which is why callers must always quote', () => {
+    const unquoted = `<div class=${escapeAttr('x onmouseover=alert(1)')}></div>`
+
+    // A documented limit, not a passing behaviour: the value escaped fine, but with no quotes
+    // the space still starts a second attribute. Emit name="${escapeAttr(value)}" instead.
+    expect(unquoted).toBe('<div class=x onmouseover=alert(1)></div>')
   })
 })
 
@@ -153,15 +209,36 @@ const COERCE_CASES: ReadonlyArray<UnknownCase> = [
     expected: '',
   },
   { name: 'a bigint', input: 10n, expected: '10' },
+  { name: 'a function', input: () => 'x', expected: '' },
+  { name: 'a symbol, which String() alone would throw on', input: Symbol('x'), expected: '' },
 ]
 
-describe('escapeHtml / escapeAttr - non-string input is coerced, never thrown on', () => {
+describe('escapeHtml - non-string input is coerced, never thrown on', () => {
   for (const testCase of COERCE_CASES) {
-    it(`renders ${testCase.name} as ${JSON.stringify(testCase.expected)} in both contexts`, () => {
+    it(`renders ${testCase.name} as ${JSON.stringify(testCase.expected)}`, () => {
       expect(escapeHtml(testCase.input)).toBe(testCase.expected)
+    })
+  }
+})
+
+describe('escapeAttr - non-string input is coerced, never thrown on', () => {
+  for (const testCase of COERCE_CASES) {
+    it(`renders ${testCase.name} as ${JSON.stringify(testCase.expected)}`, () => {
       expect(escapeAttr(testCase.input)).toBe(testCase.expected)
     })
   }
+})
+
+describe('stripControl - non-string input is coerced, never thrown on', () => {
+  for (const testCase of COERCE_CASES) {
+    it(`renders ${testCase.name} as ${JSON.stringify(testCase.expected)}`, () => {
+      expect(stripControl(testCase.input)).toBe(testCase.expected)
+    })
+  }
+
+  it('does not throw on null, which it is public and so will eventually be handed', () => {
+    expect(() => stripControl(null)).not.toThrow()
+  })
 })
 
 // -- safeUrl --------------------------------------------------------------------
@@ -182,6 +259,11 @@ const URL_ACCEPTED: ReadonlyArray<UrlCase> = [
     input: 'HTTPS://Example.com',
     expected: 'HTTPS://Example.com',
   },
+  {
+    name: 'a url whose space is already percent-encoded',
+    input: 'https://ok.com/a%20b',
+    expected: 'https://ok.com/a%20b',
+  },
 ]
 
 describe('safeUrl - accepted', () => {
@@ -195,9 +277,21 @@ describe('safeUrl - accepted', () => {
 const URL_REJECTED: ReadonlyArray<UrlCase> = [
   { name: 'a javascript: url', input: 'javascript:alert(1)', expected: null },
   { name: 'a mixed-case JavaScript: url', input: 'JavaScript:alert(1)', expected: null },
-  { name: 'a tab-obfuscated javascript: url', input: 'java\tscript:alert(1)', expected: null },
-  { name: 'a newline-obfuscated javascript: url', input: 'java\nscript:alert(1)', expected: null },
-  { name: 'a NUL-obfuscated javascript: url', input: 'java\u0000script:alert(1)', expected: null },
+  {
+    name: 'a tab-obfuscated javascript: url',
+    input: 'java\tscript:alert(1)',
+    expected: null,
+  },
+  {
+    name: 'a newline-obfuscated javascript: url',
+    input: 'java\nscript:alert(1)',
+    expected: null,
+  },
+  {
+    name: 'a NUL-obfuscated javascript: url',
+    input: 'java\u0000script:alert(1)',
+    expected: null,
+  },
   { name: 'a leading-space javascript: url', input: '  javascript:alert(1)', expected: null },
   {
     name: 'a data: url carrying base64 html',
@@ -205,7 +299,6 @@ const URL_REJECTED: ReadonlyArray<UrlCase> = [
     expected: null,
   },
   { name: 'a vbscript: url', input: 'vbscript:msgbox(1)', expected: null },
-  { name: 'a protocol-relative url that would inherit the page scheme', input: '//evil.com/x', expected: null },
   { name: 'a file: url', input: 'file:///etc/passwd', expected: null },
   {
     name: 'a bare relative link, which resolves wrongly under /about/index.html',
@@ -229,6 +322,165 @@ describe('safeUrl - rejected, so the caller drops the link rather than emitting 
   }
 })
 
+/**
+ * WHATWG URL parsing treats a backslash as a slash in the authority position, so every one of
+ * these navigates a visitor off the tenant's live domain while reading like an internal path.
+ */
+const URL_OFF_ORIGIN: ReadonlyArray<NamedInput> = [
+  { name: 'two forward slashes', input: '//evil.com' },
+  { name: 'slash then backslash', input: '/\\evil.com' },
+  { name: 'backslash then slash', input: '\\/evil.com' },
+  { name: 'two backslashes', input: '\\\\evil.com' },
+  { name: 'two forward slashes with a path', input: '//evil.com/x' },
+  { name: 'slash-backslash with a path', input: '/\\evil.com/path' },
+  { name: 'slash-backslash-slash', input: '/\\/evil.com' },
+  { name: 'backslash-backslash with a path', input: '\\\\evil.com/x' },
+  { name: 'two forward slashes with a query', input: '//evil.com?x=1' },
+  { name: 'slash-backslash with credentials', input: '/\\user@evil.com' },
+]
+
+describe('safeUrl - protocol-relative, in every slash and backslash combination', () => {
+  for (const testCase of URL_OFF_ORIGIN) {
+    it(`rejects ${testCase.name}`, () => {
+      expect(safeUrl(testCase.input)).toBeNull()
+    })
+  }
+
+  it('proves every rejected form really does resolve off-origin in a real URL parser', () => {
+    const stillOnOrigin = URL_OFF_ORIGIN.filter(
+      (testCase) =>
+        new URL(testCase.input, 'https://tenant.sahoda.site/page').host === 'tenant.sahoda.site',
+    )
+
+    expect(stillOnOrigin).toEqual([])
+  })
+
+  it('still accepts an ordinary root-relative path', () => {
+    expect(safeUrl('/pricing')).toBe('/pricing')
+  })
+})
+
+/**
+ * Deny-by-default, asserted as a whole set rather than by enumerating a few denials: adding a
+ * scheme to ALLOWED_SCHEMES has to fail a test, not slip through because nobody listed it.
+ */
+const ACCEPTED_SCHEMES: ReadonlyArray<string> = ['http', 'https', 'mailto', 'tel']
+
+const PROBED_SCHEMES: ReadonlyArray<string> = [
+  ...ACCEPTED_SCHEMES,
+  'ftp',
+  'ftps',
+  'file',
+  'ws',
+  'wss',
+  'chrome',
+  'chrome-extension',
+  'blob',
+  'data',
+  'javascript',
+  'vbscript',
+  'view-source',
+  'sftp',
+  'ssh',
+  'smb',
+  'telnet',
+  'gopher',
+  'jar',
+  'intent',
+  'market',
+  'itms-apps',
+  'ms-msdt',
+  'callto',
+  'skype',
+  'feed',
+  'res',
+  'sms',
+  'geo',
+]
+
+describe('safeUrl - the scheme allowlist is deny-by-default', () => {
+  for (const scheme of PROBED_SCHEMES) {
+    const isAccepted = ACCEPTED_SCHEMES.includes(scheme)
+
+    it(`${isAccepted ? 'accepts' : 'rejects'} the ${scheme}: scheme`, () => {
+      const url = `${scheme}:example.com/x`
+
+      expect(safeUrl(url)).toBe(isAccepted ? url : null)
+    })
+  }
+
+  it('accepts exactly four schemes, so widening the allowlist breaks this test', () => {
+    const accepted = PROBED_SCHEMES.filter((scheme) => safeUrl(`${scheme}:example.com/x`) !== null)
+
+    expect(accepted).toEqual(ACCEPTED_SCHEMES)
+  })
+
+  it('rejects an unknown scheme nobody thought to enumerate', () => {
+    expect(safeUrl('sahoda-internal:secrets')).toBeNull()
+  })
+})
+
+describe('safeUrl - the 2048-character cap', () => {
+  const PREFIX = 'https://example.com/'
+  const atLimit = PREFIX + 'a'.repeat(2048 - PREFIX.length)
+  const overLimit = PREFIX + 'a'.repeat(2049 - PREFIX.length)
+
+  it('accepts a url of exactly 2048 characters', () => {
+    expect(atLimit.length).toBe(2048)
+    expect(safeUrl(atLimit)).toBe(atLimit)
+  })
+
+  it('rejects a url one character over the cap', () => {
+    expect(overLimit.length).toBe(2049)
+    expect(safeUrl(overLimit)).toBeNull()
+  })
+
+  it('rejects an inlined-asset-sized url far past the cap', () => {
+    expect(safeUrl(`${PREFIX}${'a'.repeat(50_000)}`)).toBeNull()
+  })
+
+  it('measures the cap after trimming, so surrounding whitespace does not consume budget', () => {
+    expect(safeUrl(`  ${atLimit}  `)).toBe(atLimit)
+  })
+})
+
+/**
+ * A URL carrying whitespace or an invisible character is rejected, never repaired: silently
+ * closing the gap in `https://ok.com/a b` produces a working link to a page nobody authored.
+ */
+describe('safeUrl - whitespace and invisible characters are rejected, not silently removed', () => {
+  const EMBEDDED: ReadonlyArray<NamedInput> = [
+    { name: 'a space', input: 'https://ok.com/a b' },
+    { name: 'a tab', input: 'https://ok.com/a\tb' },
+    { name: 'a newline', input: 'https://ok.com/a\nb' },
+    { name: 'a non-breaking space', input: 'https://ok.com/a\u00A0b' },
+    { name: 'a zero-width space', input: 'https://ok.com/a\u200Bb' },
+    { name: 'a zero-width joiner', input: 'https://ok.com/a\u200Db' },
+    { name: 'a right-to-left override', input: 'https://ok.com/a\u202Eb' },
+    { name: 'a byte-order mark', input: 'https://ok.com/a\uFEFFb' },
+    { name: 'a unicode tag character', input: 'https://ok.com/a\u{E0041}b' },
+    { name: 'a lone surrogate', input: 'https://ok.com/a\uD800b' },
+  ]
+
+  for (const testCase of EMBEDDED) {
+    it(`rejects a url containing ${testCase.name}`, () => {
+      expect(safeUrl(testCase.input)).toBeNull()
+    })
+  }
+
+  it('does not mangle a valid url into a different valid url', () => {
+    expect(safeUrl('https://ok.com/a b')).not.toBe('https://ok.com/ab')
+  })
+
+  it('trims surrounding whitespace, which cannot change where the url points', () => {
+    expect(safeUrl('  https://ok.com/a  ')).toBe('https://ok.com/a')
+  })
+
+  it('trims a surrounding newline left by model output', () => {
+    expect(safeUrl('\nhttps://ok.com/a\n')).toBe('https://ok.com/a')
+  })
+})
+
 // -- stripControl -----------------------------------------------------------------
 
 const STRIP_CASES: ReadonlyArray<StringCase> = [
@@ -236,7 +488,6 @@ const STRIP_CASES: ReadonlyArray<StringCase> = [
   { name: 'a left-to-right isolate pair', input: '\u2066abc\u2069', expected: 'abc' },
   { name: 'an arabic letter mark', input: 'a\u061Cb', expected: 'ab' },
   { name: 'a zero-width space', input: 'a\u200Bb', expected: 'ab' },
-  { name: 'a zero-width joiner', input: 'a\u200Db', expected: 'ab' },
   { name: 'a byte-order mark', input: 'a\uFEFFb', expected: 'ab' },
   { name: 'a NUL byte', input: 'a\u0000b', expected: 'ab' },
   { name: 'a bell character', input: 'a\u0007b', expected: 'ab' },
@@ -253,4 +504,206 @@ describe('stripControl', () => {
   it('keeps ordinary whitespace, which is legitimate in body copy', () => {
     expect(stripControl('one\ntwo\tthree\r\nfour')).toBe('one\ntwo\tthree\r\nfour')
   })
+})
+
+/**
+ * The control ranges are asserted exhaustively rather than by sampling, so turning any `-` in
+ * CONTROL_CHARS into a literal -- which drops a whole range -- fails a test.
+ */
+describe('stripControl - every control code point, not a sample', () => {
+  it('strips every C0 and C1 code point except tab, newline and carriage return', () => {
+    const survivors: string[] = []
+
+    for (let code = 0x00; code <= 0x9f; code += 1) {
+      const isKeptWhitespace = code === 0x09 || code === 0x0a || code === 0x0d
+      const isPrintableAscii = code >= 0x20 && code <= 0x7e
+      if (isKeptWhitespace || isPrintableAscii) continue
+
+      if (stripControl(`a${String.fromCharCode(code)}b`) !== 'ab') {
+        survivors.push(`U+${code.toString(16).toUpperCase().padStart(4, '0')}`)
+      }
+    }
+
+    expect(survivors).toEqual([])
+  })
+
+  it('keeps tab, newline and carriage return, which are legitimate in copy', () => {
+    for (const code of [0x09, 0x0a, 0x0d]) {
+      expect(stripControl(`a${String.fromCharCode(code)}b`)).toHaveLength(3)
+    }
+  })
+
+  it('keeps every printable ASCII character', () => {
+    const removed: string[] = []
+
+    for (let code = 0x20; code <= 0x7e; code += 1) {
+      const char = String.fromCharCode(code)
+      if (stripControl(char) !== char) removed.push(char)
+    }
+
+    expect(removed).toEqual([])
+  })
+})
+
+/**
+ * Invisible-text smuggling: characters that occupy no width but survive copy-paste, review and
+ * a diff. All of them are removed before copy reaches a customer's page.
+ */
+const INVISIBLE_CASES: ReadonlyArray<NamedInput> = [
+  { name: 'a zero-width space (U+200B)', input: 'a\u200Bb' },
+  { name: 'an arabic letter mark (U+061C)', input: 'a\u061Cb' },
+  { name: 'a left-to-right mark (U+200E)', input: 'a\u200Eb' },
+  { name: 'a right-to-left mark (U+200F)', input: 'a\u200Fb' },
+  { name: 'a left-to-right embedding (U+202A)', input: 'a\u202Ab' },
+  { name: 'a right-to-left embedding (U+202B)', input: 'a\u202Bb' },
+  { name: 'a pop directional formatting (U+202C)', input: 'a\u202Cb' },
+  { name: 'a left-to-right override (U+202D)', input: 'a\u202Db' },
+  { name: 'a right-to-left override (U+202E)', input: 'a\u202Eb' },
+  { name: 'a word joiner (U+2060)', input: 'a\u2060b' },
+  { name: 'an invisible times (U+2062)', input: 'a\u2062b' },
+  { name: 'an invisible plus (U+2064)', input: 'a\u2064b' },
+  { name: 'a left-to-right isolate (U+2066)', input: 'a\u2066b' },
+  { name: 'a right-to-left isolate (U+2067)', input: 'a\u2067b' },
+  { name: 'a first-strong isolate (U+2068)', input: 'a\u2068b' },
+  { name: 'a pop directional isolate (U+2069)', input: 'a\u2069b' },
+  { name: 'an inhibit symmetric swapping (U+206A)', input: 'a\u206Ab' },
+  { name: 'a nominal digit shapes (U+206F)', input: 'a\u206Fb' },
+  { name: 'a mongolian vowel separator (U+180E)', input: 'a\u180Eb' },
+  { name: 'an interlinear annotation anchor (U+FFF9)', input: 'a\uFFF9b' },
+  { name: 'an interlinear annotation terminator (U+FFFB)', input: 'a\uFFFBb' },
+  { name: 'a byte-order mark (U+FEFF)', input: 'a\uFEFFb' },
+  { name: 'a unicode tag space (U+E0020)', input: 'a\u{E0020}b' },
+  { name: 'a unicode tag letter (U+E0041)', input: 'a\u{E0041}b' },
+  { name: 'a unicode tag cancel (U+E007F)', input: 'a\u{E007F}b' },
+  { name: 'a unicode tag range start (U+E0000)', input: 'a\u{E0000}b' },
+]
+
+describe('stripControl - invisible-text smuggling', () => {
+  for (const testCase of INVISIBLE_CASES) {
+    it(`removes ${testCase.name}`, () => {
+      expect(stripControl(testCase.input)).toBe('ab')
+    })
+  }
+
+  it('removes a whole hidden message written in the unicode tag block', () => {
+    const hidden = 'Contact us\u{E0041}\u{E0042}\u{E0043}\u{E007F}'
+
+    expect(stripControl(hidden)).toBe('Contact us')
+  })
+})
+
+/**
+ * FOUNDER RULING: ZWJ and ZWNJ are letters, not decoration. Stripping them breaks emoji
+ * sequences and Devanagari/Urdu/Persian rendering, and Hindi copy is on the roadmap.
+ */
+const PRESERVED_CASES: ReadonlyArray<NamedInput> = [
+  {
+    name: 'a ZWJ family emoji sequence',
+    input: '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}',
+  },
+  { name: 'a ZWJ rainbow flag', input: '\u{1F3F3}\uFE0F\u200D\u{1F308}' },
+  { name: 'a ZWJ woman-scientist emoji', input: '\u{1F469}\u200D\u{1F52C}' },
+  {
+    name: 'a Devanagari half-form written with ZWNJ',
+    input: '\u0915\u094D\u200C\u0937',
+  },
+  {
+    name: 'a Persian word joined with ZWNJ',
+    input: '\u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u0645',
+  },
+  { name: 'an emoji with a variation selector', input: '\u2764\uFE0F' },
+  { name: 'plain Hindi copy', input: '\u0928\u092E\u0938\u094D\u0924\u0947' },
+]
+
+describe('stripControl - ZWJ and ZWNJ survive, because they are letters', () => {
+  for (const testCase of PRESERVED_CASES) {
+    it(`leaves ${testCase.name} intact`, () => {
+      expect(stripControl(testCase.input)).toBe(testCase.input)
+    })
+  }
+
+  it('keeps a bare zero-width joiner', () => {
+    expect(stripControl('a\u200Db')).toBe('a\u200Db')
+  })
+
+  it('keeps a bare zero-width non-joiner', () => {
+    expect(stripControl('a\u200Cb')).toBe('a\u200Cb')
+  })
+
+  it('removes a bidi override standing beside an emoji sequence it must not touch', () => {
+    const family = '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}'
+
+    expect(stripControl(`${family}\u202Egnp.exe`)).toBe(`${family}gnp.exe`)
+  })
+
+  it('carries the same preservation through escapeHtml and escapeAttr', () => {
+    const devanagari = '\u0915\u094D\u200C\u0937'
+
+    expect(escapeHtml(devanagari)).toBe(devanagari)
+    expect(escapeAttr(devanagari)).toBe(devanagari)
+  })
+})
+
+/**
+ * Lone surrogates have no UTF-8 encoding. Written into a page file they become U+FFFD, so they
+ * are removed here rather than allowed to corrupt a deployed document.
+ */
+describe('stripControl - unpaired surrogates', () => {
+  it('drops a lone high surrogate', () => {
+    expect(escapeHtml('a\uD800b')).toBe('ab')
+  })
+
+  it('drops a lone low surrogate', () => {
+    expect(escapeHtml('a\uDC00b')).toBe('ab')
+  })
+
+  it('drops a lone surrogate in attribute context too', () => {
+    expect(escapeAttr('a\uDBFFb')).toBe('ab')
+  })
+
+  it('keeps a well-formed surrogate pair, which is an ordinary emoji', () => {
+    expect(escapeHtml('a\u{1F600}b')).toBe('a\u{1F600}b')
+  })
+
+  it('keeps a pair that sits directly beside a lone surrogate', () => {
+    expect(escapeHtml('\uD800\u{1F600}')).toBe('\u{1F600}')
+  })
+
+  it('round-trips through UTF-8 unchanged, which the raw input would not', () => {
+    const escaped = escapeHtml('a\uD800b')
+
+    expect(Buffer.from(escaped, 'utf8').toString('utf8')).toBe(escaped)
+    expect(Buffer.from('a\uD800b', 'utf8').toString('utf8')).not.toBe('a\uD800b')
+  })
+})
+
+/**
+ * The source of the security gate is stored as pure ASCII escape-sequence text. A raw control
+ * byte makes git classify the blob as binary, which costs the team `git diff` and `git blame`
+ * on the one file where review matters most. That happened once; it fails a test now.
+ */
+describe('escape module source is text, not binary', () => {
+  const SOURCES: ReadonlyArray<string> = ['./escape.ts', './escape.test.ts']
+
+  for (const source of SOURCES) {
+    it(`stores ${source} as pure ASCII`, () => {
+      const contents = readFileSync(new URL(source, import.meta.url), 'utf8')
+      const offenders = [...contents]
+        .map((char, index) => ({ index, code: char.codePointAt(0) ?? 0 }))
+        .filter((entry) => entry.code > 0x7f)
+        .map((entry) => `U+${entry.code.toString(16).toUpperCase()} at ${entry.index}`)
+
+      expect(offenders).toEqual([])
+    })
+
+    it(`stores ${source} with no raw control byte git would read as binary`, () => {
+      const contents = readFileSync(new URL(source, import.meta.url), 'utf8')
+      const controls = [...contents].filter((char) => {
+        const code = char.codePointAt(0) ?? 0
+        return code < 0x20 && code !== 0x09 && code !== 0x0a
+      })
+
+      expect(controls).toEqual([])
+    })
+  }
 })

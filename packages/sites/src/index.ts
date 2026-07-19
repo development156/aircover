@@ -1,6 +1,9 @@
 /**
  * Public surface of @sahoda/sites. Explicit named re-exports only — no `export *`.
  *
+ * All four take `unknown` and coerce, so reaching any of them with raw model output degrades to
+ * empty copy rather than throwing out of a half-finished render.
+ *
  * NOT exported, deliberately:
  *   - the internal `coerce` helper in render/escape.ts: callers must pick a context-correct
  *     escaper, never a bare stringifier.
