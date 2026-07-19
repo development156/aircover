@@ -10,9 +10,13 @@
  *
  * ## The bundle contract
  *
- * Every accepted path maps to `<segments>/index.html`. The invariant this module guarantees is:
- * **no two distinct accepted paths may produce bundle entries that cannot both exist on a real
- * filesystem.** Two entries conflict only when one is a directory prefix of the other, and since
+ * Every path `normalizePath` accepts maps to `<segments>/index.html`. The invariant guaranteed
+ * **for `normalizePath` specifically** is: no two distinct accepted paths may produce bundle
+ * entries that cannot both exist on a real filesystem. Note the scope -- `isBundleFilePath`
+ * accepts a WIDER set (bare asset names, for which this proof does not run) and documents the
+ * narrower guarantee it gives; the cross-file half lives in `deploy/bundle-paths.ts`.
+ *
+ * Two entries conflict only when one is a directory prefix of the other, and since
  * every entry ends in `index.html`, entry A can prefix entry B only if some segment of B is
  * literally `index.html`. Concretely: `/` writes the *file* `index.html`, while `/index.html`
  * would want a *directory* named `index.html` to hold `index.html/index.html`. Both are valid
@@ -163,4 +167,71 @@ export const pathToFile = (path: string): string => {
   }
   if (path === ROOT_PATH) return INDEX_FILE
   return `${path.slice(1)}/${INDEX_FILE}`
+}
+
+/**
+ * True when `raw` is a bundle-relative FILE name a deployer may safely join onto a host
+ * directory. `normalizePath` describes a *page* (`/about`); this describes the *file* that page
+ * becomes (`about/index.html`) plus the non-page assets that ship beside it (`styles.css`).
+ *
+ * ## What this does NOT guarantee
+ *
+ * This is **not** the bundle contract stated at the top of this module, and an earlier version
+ * of this docblock wrongly claimed it was "the same guarantee `normalizePath` gives". That
+ * contract -- no two distinct accepted values may produce entries that cannot both exist on a
+ * real filesystem -- is proved for `normalizePath` by every accepted page mapping to a file
+ * ending in `index.html`, which makes `index.html` the only segment that can create a prefix
+ * relation, and that segment is rejected. The non-page arm below admits bare asset names, for
+ * which the proof simply does not run: `a` and `a/index.html` are BOTH accepted, and a bundle
+ * containing both asks the writer for a file `a` and a directory `a`.
+ *
+ * The guarantee this function actually gives is per-name and containment-shaped:
+ *
+ *  - the name is relative and cannot escape the directory it is joined onto (no `..`, no
+ *    leading slash, no backslash, no control byte, no over-long segment, no device name); and
+ *  - no two distinct accepted names COERCE onto one file, because nothing is coerced -- `A.css`
+ *    is rejected rather than folded to `a.css`, `/a.css` rejected rather than trimmed.
+ *
+ * Whether a SET of accepted names can coexist is not decidable per-path, and deliberately so
+ * (see `pathToFile`). `findBundlePathConflict` in `deploy/bundle-paths.ts` carries that half of
+ * the contract and rejects both shapes of collision before the first write.
+ *
+ * ## How the check itself works
+ *
+ * It is a round-trip check, not a second definition of "safe": a name is accepted only if
+ * `normalizePath` accepts the path it corresponds to AND returns it unchanged. So `..`,
+ * an absolute path, a backslash, a control byte, a Windows device name, a doubled slash
+ * and an over-long segment are all rejected here for exactly the reasons documented above,
+ * and any future tightening of `normalizePath` tightens this automatically.
+ *
+ * The `index.html` arm exists because `normalizePath` deliberately REJECTS a segment equal
+ * to `index.html` (see the bundle contract) while `pathToFile` deliberately EMITS one. The
+ * arm strips the emitted tail and re-validates the page underneath it, so the exemption is
+ * confined to the single trailing segment `pathToFile` is allowed to add.
+ *
+ * Nothing is coerced. A name with a leading slash is rejected rather than trimmed: `a.css`
+ * and `/a.css` would otherwise collapse onto one file and silently overwrite each other.
+ *
+ * `raw` is `unknown`, not `string`, for the same reason `normalizePath` above takes `unknown`:
+ * this is a TRUST BOUNDARY, and a type annotation is not a runtime guarantee. `BundleFile.path`
+ * is declared `string`, but `deploy/fixture.ts` states outright that these fields have "no
+ * enforced provenance" today, and a bundle round-tripped through `JSON.parse` carries whatever
+ * the json held. With a `string` parameter, `42` reached `raw.endsWith` and threw a `TypeError`
+ * that escaped `Deployer`'s `Promise<Result<SiteDeployState>>` entirely -- the same failure mode
+ * `slug.ts` funnels every `isTaken` call through `probeTaken` to prevent. A non-string is not a
+ * bundle file name, so it answers `false` and the caller reports it by position like any other
+ * rejected path.
+ */
+export const isBundleFilePath = (raw: unknown): boolean => {
+  if (typeof raw !== 'string') return false
+  if (raw.length === 0) return false
+  if (raw === INDEX_FILE) return true
+
+  const indexSuffix = `/${INDEX_FILE}`
+  if (raw.endsWith(indexSuffix)) {
+    const page = `/${raw.slice(0, raw.length - indexSuffix.length)}`
+    return normalizePath(page) === page && pathToFile(page) === raw
+  }
+
+  return normalizePath(`/${raw}`) === `/${raw}`
 }
