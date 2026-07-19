@@ -56,6 +56,16 @@
 
 const ROOT_PATH = '/'
 const INDEX_FILE = 'index.html'
+
+/**
+ * Caps the length of the value `normalizePath` *returns* -- the normalized output, leading slash
+ * included -- not the length of the argument as received. A slashless input needs a leading slash
+ * added, and repeated separators collapse away, so input length and output length can differ; the
+ * guarantee callers get is a bound on what comes back, since that is what lands in the bundle path
+ * and the database column. Checked once, last, against the assembled string, so a slashless
+ * 128-character input (which would need a 129-character output) is rejected rather than truncated
+ * or silently let through over the cap.
+ */
 const MAX_PATH_LENGTH = 128
 const MAX_SEGMENT_LENGTH = 64
 const MAX_SEGMENTS = 8
@@ -83,14 +93,17 @@ const SEGMENT_ALLOWED = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
  */
 const SEGMENT_TRAILING = /[. ]$/
 
+/** Windows reserves exactly this many numbered serial (COM) and parallel (LPT) device names. */
+const WINDOWS_NUMBERED_DEVICE_COUNT = 9
+
 /** Windows device names. Reserved with or without an extension -- `nul.html` is still `NUL`. */
 const WINDOWS_DEVICE_NAMES: ReadonlySet<string> = new Set([
   'con',
   'prn',
   'aux',
   'nul',
-  ...Array.from({ length: 9 }, (_unused, index) => `com${index + 1}`),
-  ...Array.from({ length: 9 }, (_unused, index) => `lpt${index + 1}`),
+  ...Array.from({ length: WINDOWS_NUMBERED_DEVICE_COUNT }, (_unused, index) => `com${index + 1}`),
+  ...Array.from({ length: WINDOWS_NUMBERED_DEVICE_COUNT }, (_unused, index) => `lpt${index + 1}`),
 ])
 
 /** Windows resolves a device name by the part before the first dot, so compare on that. */
@@ -105,7 +118,6 @@ export const normalizePath = (raw: unknown): string | null => {
 
   const trimmed = raw.trim()
   if (trimmed.length === 0) return ROOT_PATH
-  if (trimmed.length > MAX_PATH_LENGTH) return null
   if (CONTROL_CHARS.test(trimmed)) return null
   if (trimmed.includes(BACKSLASH)) return null
 
@@ -127,7 +139,10 @@ export const normalizePath = (raw: unknown): string | null => {
     canonical.push(folded)
   }
 
-  return `/${canonical.join('/')}`
+  const normalized = `/${canonical.join('/')}`
+  if (normalized.length > MAX_PATH_LENGTH) return null
+
+  return normalized
 }
 
 /**
