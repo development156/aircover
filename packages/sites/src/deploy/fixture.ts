@@ -86,6 +86,15 @@ const joinPath = (dir: string, child: string): string => `${dir.replace(/\/+$/, 
 const isValidSlug = (slug: string): boolean =>
   slug.length <= SLUG_MAX_LENGTH && VALID_SLUG.test(slug)
 
+/**
+ * A bundle entry is safe only once it is an OBJECT carrying a path `isBundleFilePath` accepts.
+ * The object check is what stops `file.path` throwing on a `null`/`undefined` element;
+ * `isBundleFilePath` itself already refuses a non-string path, so a path-less object is rejected
+ * without a separate branch.
+ */
+const isValidBundleFile = (file: unknown): boolean =>
+  typeof file === 'object' && file !== null && isBundleFilePath((file as { path?: unknown }).path)
+
 const PATH_SEPARATOR = '/'
 
 /** `.` and `..` are the two segments that make an absolute path stop meaning where it points. */
@@ -169,12 +178,23 @@ export const createFixtureDeployer = (deps: FixtureDeployerDeps): Deployer => {
   }
 
   return async (bundle: SiteBundle, ctx: DeployContext): Promise<Result<SiteDeployState>> => {
-    // Runs FIRST because it is the only guard that can see whether `bundle.files` is a list at
-    // all; every check below iterates it. See `fixture-input.ts` for why the values it covers
-    // are checked before the write rather than after.
+    // Resolved WITHOUT touching `ctx` as an object: when `ctx` is itself null/undefined/a
+    // primitive, reading `ctx.traceId` to build the very error that reports it would throw the
+    // leak we are closing. A missing trace degrades to '' rather than crashing the report.
+    const traceId =
+      typeof ctx === 'object' &&
+      ctx !== null &&
+      typeof (ctx as { traceId?: unknown }).traceId === 'string'
+        ? (ctx as DeployContext).traceId
+        : ''
+
+    // Runs FIRST because it is the only guard that can see whether `bundle`/`ctx` are objects and
+    // whether `bundle.files` is a list at all; every check below iterates it. See
+    // `fixture-input.ts` for why the values it covers are checked before the write rather than
+    // after.
     const problem = checkPersistableInputs(bundle, ctx)
     if (problem !== null) {
-      return err(appError('VALIDATION_ERROR', problem.message, ctx.traceId, problem.details))
+      return err(appError('VALIDATION_ERROR', problem.message, traceId, problem.details))
     }
 
     if (typeof ctx.slug !== 'string' || !isValidSlug(ctx.slug)) {
@@ -189,7 +209,11 @@ export const createFixtureDeployer = (deps: FixtureDeployerDeps): Deployer => {
       )
     }
 
-    const badPathIndex = bundle.files.findIndex((file) => !isBundleFilePath(file.path))
+    // `file.path` on a `null`/`undefined` element threw out of the Promise; establish the OBJECT
+    // before the read. A string/number/boolean/array/path-less element reads `.path` as
+    // `undefined`, which `isBundleFilePath` already rejects, so those stay honest errs. The
+    // position is reported, the value never echoed.
+    const badPathIndex = bundle.files.findIndex((file) => !isValidBundleFile(file))
     if (badPathIndex !== -1) {
       // The offending path is NOT echoed, for the same reason the slug is not: it is
       // untrusted, it reaches the UI and the logs, and it may be a host path. The position

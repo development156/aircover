@@ -62,6 +62,19 @@ export const checkPersistableInputs = (
   bundle: SiteBundle,
   ctx: DeployContext,
 ): DeployInputProblem | null => {
+  // Both parameters are typed but hand-wired by a caller (Task 14/17 unlanded), so `deployer(null,
+  // ctx)` and `deployer(bundle, null)` reach here as non-objects. Establish each is an object
+  // BEFORE any property read: `null.files`/`null.previous` throw out of the Result envelope
+  // otherwise. An array passes `typeof 'object'` and is left to the `Array.isArray` checks below,
+  // which reject it honestly (`[].files`/`[].previous` are `undefined`).
+  if (typeof bundle !== 'object' || bundle === null) {
+    return { message: 'Bundle must be an object with a files array.', details: {} }
+  }
+
+  if (typeof ctx !== 'object' || ctx === null) {
+    return { message: 'Deploy context must be an object.', details: {} }
+  }
+
   if (!Array.isArray(bundle.files)) {
     return { message: 'Bundle files must be an array of entries.', details: {} }
   }

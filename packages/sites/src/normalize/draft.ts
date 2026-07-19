@@ -66,6 +66,14 @@ const HOME_PATH = '/'
 const MIN_PAGES = 1
 const EMPTY_PAGES_MESSAGE = 'The site generator returned no pages.'
 const NO_USABLE_PAGES_MESSAGE = 'No page from the site generator survived normalization.'
+const PAGES_NOT_ARRAY_MESSAGE =
+  'The site generator output has no pages array, so there is nothing to normalize.'
+
+/** Stands in for a page element that was not an object, so it carried no path to read. */
+export const invalidPage = (index: number): string => `invalid-page:pages[${index}]`
+
+/** Stands in for a page whose `sections` field was not a list; nothing on it could be scanned. */
+export const invalidSections = (path: string): string => `invalid-sections:${path}`
 
 /** Last-resort `<title>`, used only when `options.name` is itself unusable. Never blank. */
 export const UNTITLED_SITE = 'Untitled site'
@@ -199,9 +207,24 @@ const normalizePage = (
   siteName: string,
   taken: ReadonlySet<string>,
 ): PageOutcome => {
+  // The page element is the untrusted boundary too: a `null`/`undefined` entry threw at
+  // `entry.path`, and a string/number/boolean/array read `.path` as `undefined`, which
+  // `normalizePath` already refuses. Establishing the OBJECT first turns the throwing shapes
+  // into the same honest drop the missing-path ones already took.
+  if (typeof entry !== 'object' || entry === null) {
+    return { page: null, dropped: [invalidPage(index)] }
+  }
+
   const path = normalizePath(entry.path)
   if (path === null) return { page: null, dropped: [`invalid-path:pages[${index}]`] }
   if (taken.has(path)) return { page: null, dropped: [`duplicate-path:${path}`] }
+
+  // `Array.isArray`, not a null check: `entry.sections` typed `[]` still arrives as anything, and
+  // a string survives a null check only to die at `.forEach`. A non-list `sections` is a page
+  // that could render nothing, so it is dropped and named -- the same fate as an empty page.
+  if (!Array.isArray(entry.sections)) {
+    return { page: null, dropped: [invalidSections(path)] }
+  }
 
   const dropped: string[] = []
   const sections = normalizeSections(entry.sections, path, dropped)
@@ -233,6 +256,19 @@ export const normalizeDraft = (
   const dropped: string[] = []
   const siteName = usable(options.name, dropped, UNUSABLE_NAME) ?? UNTITLED_SITE
   const goal = usable(options.goal, dropped, UNUSABLE_GOAL) ?? null
+
+  // `output` is typed `SiteGenerateOutput` but arrives from the model unvalidated: `Schema` is a
+  // reader's schema the producer never runs. `{pages:null}` threw at `.length`, and `{pages:'abc'}`
+  // read a length of 3 and sliced to a string before dying at `.forEach` -- which is why the guard
+  // is `Array.isArray`, not a null check. A bad shape is DATA here, so it takes the same Result
+  // return the empty case does, still carrying the gated name/goal labels.
+  const rawPages: unknown =
+    typeof output === 'object' && output !== null
+      ? (output as { pages?: unknown }).pages
+      : undefined
+  if (!Array.isArray(rawPages)) {
+    return err(appError('VALIDATION_ERROR', PAGES_NOT_ARRAY_MESSAGE, options.traceId, { dropped }))
+  }
 
   if (output.pages.length === 0) {
     return err(appError('VALIDATION_ERROR', EMPTY_PAGES_MESSAGE, options.traceId, { dropped }))
