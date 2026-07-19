@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { PostInsertSchema, LedgerEntrySchema } from './index'
-import { PostStatusSchema } from '../enums'
+import { PostStatusSchema, BillingProviderSchema } from '../enums'
 
 const UUID = '00000000-0000-0000-0000-000000000000'
 
@@ -15,6 +15,13 @@ describe('db row schemas', () => {
   it('post status vocabulary rejects unknown values', () => {
     expect(PostStatusSchema.safeParse('published').success).toBe(true)
     expect(PostStatusSchema.safeParse('nonsense').success).toBe(false)
+  })
+
+  it('billing provider vocabulary includes cashfree + fixture, rejects unknowns', () => {
+    for (const p of ['stripe', 'razorpay', 'cashfree', 'fixture']) {
+      expect(BillingProviderSchema.safeParse(p).success).toBe(true)
+    }
+    expect(BillingProviderSchema.safeParse('paypal').success).toBe(false)
   })
 
   it('LedgerEntry accepts numeric cogs as string (PostgREST) or number', () => {
