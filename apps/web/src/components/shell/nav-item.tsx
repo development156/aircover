@@ -9,6 +9,7 @@ import {
   Link2,
   SlidersHorizontal,
   SquarePen,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -21,6 +22,7 @@ const ICONS = {
   'square-pen': SquarePen,
   'calendar-days': CalendarDays,
   'link-2': Link2,
+  wallet: Wallet,
   'sliders-horizontal': SlidersHorizontal,
 } satisfies Record<string, LucideIcon>
 

@@ -2,10 +2,16 @@ import { UserButton } from '@clerk/nextjs'
 
 import { CreditChip } from '@/components/shell/credit-chip'
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher'
+import { readAvailableCredits } from '@/lib/wallet/read'
 import { getActiveWorkspaceSlug, listWorkspaces, resolveActiveWorkspace } from '@/lib/workspaces'
 
 export async function Topbar() {
-  const [workspaces, activeSlug] = await Promise.all([listWorkspaces(), getActiveWorkspaceSlug()])
+  const [workspaces, activeSlug, credits] = await Promise.all([
+    listWorkspaces(),
+    getActiveWorkspaceSlug(),
+    // Available (total − held), or null when unreadable — never a placeholder 0.
+    readAvailableCredits(),
+  ])
   const active = resolveActiveWorkspace(workspaces, activeSlug)
 
   return (
@@ -15,7 +21,7 @@ export async function Topbar() {
     >
       <WorkspaceSwitcher workspaces={workspaces} active={active} />
       <div className="ml-auto" />
-      <CreditChip credits={null} />
+      <CreditChip credits={credits} />
       <div data-guide="topbar.avatar" className="grid size-8 place-items-center">
         <UserButton />
       </div>

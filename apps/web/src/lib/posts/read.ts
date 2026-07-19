@@ -21,7 +21,12 @@ import { createServerSupabase } from '@/lib/supabase/server'
  * per-row so one malformed row cannot take down a list.
  */
 
-const LIST_LIMIT = 100
+/**
+ * Hard cap on `listPosts`. Exported because the list screen must be able to SAY
+ * it is capped — a truncated list rendered as if it were the whole set is a lie
+ * about the workspace's contents.
+ */
+export const LIST_LIMIT = 100
 
 export async function listPosts(): Promise<Post[]> {
   try {

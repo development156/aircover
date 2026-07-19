@@ -14,14 +14,15 @@ import { parseEntries, type ParsedLedger } from './parse-entries'
  * derived in `toBalance` via `availableCredits()` from @sahoda/shared.
  */
 
-const HISTORY_LIMIT = 50
+/** Row cap for the history read. Exported so the UI can state the window it is showing. */
+export const HISTORY_LIMIT = 50
 
 /**
  * A workspace with no ledger activity has NO `credit_balances` row at all — the
  * row is materialised lazily by the first `apply_ledger_entry`. That is a real
  * zero balance, not an error, and `toBalance(null)` renders it as such.
  */
-export async function readBalance(): Promise<WalletBalance> {
+export async function readBalance(): Promise<WalletBalance | null> {
   try {
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -29,15 +30,31 @@ export async function readBalance(): Promise<WalletBalance> {
       .select('workspace_id, balance_total, balance_held, updated_at')
       .maybeSingle()
 
+    // NULL means "we could not read your balance", which is a different claim
+    // from "your balance is zero" — and only one of them is recoverable by
+    // topping up. `toBalance` collapses both to zero by design (it is a pure
+    // row mapper), so the distinction has to be drawn here, at the I/O edge.
     if (error) {
       console.error('[wallet] balance read failed', error.code, error.message)
-      return toBalance(null)
+      return null
     }
+    // No row is a genuine zero: the row is materialised lazily by the first
+    // `apply_ledger_entry`, so a workspace that has never spent has none.
     return toBalance(data)
   } catch (error) {
     console.error('[wallet] balance read threw', error instanceof Error ? error.message : 'unknown')
-    return toBalance(null)
+    return null
   }
+}
+
+/**
+ * Available credits for the topbar chip, or `null` when the balance could not be
+ * read. The chip renders `null` as an em dash rather than a zero for the same
+ * reason `readBalance` returns it.
+ */
+export async function readAvailableCredits(): Promise<number | null> {
+  const balance = await readBalance()
+  return balance?.available ?? null
 }
 
 /**

@@ -31,7 +31,11 @@ export type BrandSkinVars = Record<
  * 4.5:1 against it, then pick whichever passes with the higher contrast.
  * Required Readability Guard: NEVER returns a --p/--pfg pair below 4.5:1.
  */
-function guardPrimaryForeground(l: number, c: number, h: number): { primary: string; foreground: string } {
+function guardPrimaryForeground(
+  l: number,
+  c: number,
+  h: number,
+): { primary: string; foreground: string } {
   let lightness = l
   for (let step = 0; step <= MAX_DARKEN_ITERATIONS; step += 1) {
     const rgb = oklchToRgb(lightness, c, h)
@@ -68,7 +72,11 @@ function darkenForTextOnWhite(l: number, c: number, h: number): string {
  */
 export function brandSkinVars(colors: string[]): BrandSkinVars {
   const primaryInput = colors[0] ? parseOklch(colors[0]) : DEFAULT_PRIMARY
-  const { primary, foreground } = guardPrimaryForeground(primaryInput.l, primaryInput.c, primaryInput.h)
+  const { primary, foreground } = guardPrimaryForeground(
+    primaryInput.l,
+    primaryInput.c,
+    primaryInput.h,
+  )
   const { l, c, h } = parseOklch(primary)
 
   const pstrong = formatOklch(Math.max(0, l - 0.1), c, h)

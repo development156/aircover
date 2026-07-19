@@ -33,8 +33,14 @@ const zeroBalance = (): WalletBalance => ({
   heldNote: null,
 })
 
-/** Explicit locale so the grouping is deterministic across server and client renders. */
-const formatCredits = (value: number): string => new Intl.NumberFormat('en-US').format(value)
+/**
+ * Explicit locale so the grouping is deterministic across server and client
+ * renders. `en-IN` specifically: the whole wallet screen is pinned to it (the
+ * ledger table, the plan prices), and lakh grouping differs from `en-US` from
+ * 100,000 up — mixing the two would print "1,00,000" in the hero directly above
+ * "100,000 credits held" in this note, for one balance.
+ */
+const formatCredits = (value: number): string => new Intl.NumberFormat('en-IN').format(value)
 
 /**
  * Build the wallet balance from a raw `credit_balances` row.
