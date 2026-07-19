@@ -30,9 +30,16 @@ export interface RpcEnvelope<T> {
   error: { message?: string | null; code?: string | null } | null
 }
 
-export type CreateWorkspaceState =
-  | { ok: true; slug: string; name: string; replayed: boolean }
-  | { ok: false; code: 'INVALID_NAME' | 'SLUG_TAKEN' | 'ERROR'; message: string }
+/**
+ * Failure-only by construction: `createWorkspace` redirects into onboarding on
+ * success, so it never returns a success state. Modelling an `ok:true` arm would
+ * advertise an outcome the action cannot produce.
+ */
+export type CreateWorkspaceState = {
+  ok: false
+  code: 'INVALID_NAME' | 'SLUG_TAKEN' | 'ERROR'
+  message: string
+}
 
 /**
  * Choose the workspace name: a non-blank provided name wins (capped); otherwise a
@@ -81,7 +88,7 @@ export async function bootstrapWithRetry(
  */
 export function mapBootstrapError(
   error: { message?: string | null; code?: string | null } | null | undefined,
-): Extract<CreateWorkspaceState, { ok: false }> {
+): CreateWorkspaceState {
   const message = error?.message ?? ''
   if (message.includes('SLUG_TAKEN')) {
     return { ok: false, code: 'SLUG_TAKEN', message: 'That name is taken — try a different one.' }

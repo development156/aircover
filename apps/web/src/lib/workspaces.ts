@@ -35,7 +35,7 @@ export async function listWorkspaces(): Promise<WorkspaceOption[]> {
     }
     return data as WorkspaceOption[]
   } catch (error) {
-    console.error('[workspaces] read threw', error)
+    console.error('[workspaces] read threw', error instanceof Error ? error.message : 'unknown')
     return []
   }
 }

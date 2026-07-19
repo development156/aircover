@@ -17,8 +17,8 @@ export interface BrandCardProps {
 /**
  * Shared shell for every Refine card (Voice, Brand persona, Customer persona,
  * Hook, Taboo, Signal Lock). There's no per-field regenerate endpoint — every
- * card's Regenerate re-runs the whole resolve with a fresh objectRef (a new,
- * visible charge), which is why the affordance is identical everywhere.
+ * card's Regenerate re-runs the whole resolve, which the server charges as a new,
+ * visible spend, which is why the affordance is identical everywhere.
  */
 export function BrandCard({
   title,

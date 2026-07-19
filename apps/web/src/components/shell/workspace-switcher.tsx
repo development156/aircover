@@ -45,8 +45,8 @@ export function WorkspaceSwitcher({ workspaces, active }: WorkspaceSwitcherProps
   const [createState, createAction, createPending] = useActionState(createWorkspace, null)
   useEffect(() => {
     if (!createState) return
-    if (createState.ok) toast(`${createState.replayed ? 'Opened' : 'Created'} ${createState.name}`)
-    else toast(createState.message)
+    // Success redirects into onboarding, so only failures ever land here.
+    toast(createState.message)
   }, [createState])
 
   useEffect(() => {

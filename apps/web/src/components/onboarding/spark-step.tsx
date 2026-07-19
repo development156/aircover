@@ -29,7 +29,6 @@ export interface SparkStepProps {
   onSparkChange: (patch: Partial<SparkValues>) => void
   logo: LogoValue | null
   onLogoChange: (logo: LogoValue | null) => void
-  objectRef: string
   generateCost: number
 }
 
@@ -61,9 +60,9 @@ function useCyclingStatus(active: boolean): string {
 
 /**
  * Step 1 (Spark) + step 2 (Generate) live on one screen: the fields never
- * unmount mid-attempt, so a Retry resubmits the SAME <form> — same values,
- * same hidden objectRef — which is exactly what "stable per generate intent,
- * no double-charge on retry" requires.
+ * unmount mid-attempt, so a Retry resubmits the SAME <form> with the same values.
+ * The ledger key is derived SERVER-side (never sent from here) — a client-supplied
+ * one could replay a spent key and re-run the paid resolve for free.
  */
 export function SparkStep({
   formAction,
@@ -74,7 +73,6 @@ export function SparkStep({
   onSparkChange,
   logo,
   onLogoChange,
-  objectRef,
   generateCost,
 }: SparkStepProps) {
   const status = useCyclingStatus(isPending)
@@ -152,8 +150,6 @@ export function SparkStep({
           <LogoDrop value={logo} onChange={onLogoChange} guide="onboarding.logo-upload" />
         </div>
       </div>
-
-      <input type="hidden" name="objectRef" value={objectRef} />
 
       <div className="flex flex-col gap-2 border-t border-line pt-4">
         <Button

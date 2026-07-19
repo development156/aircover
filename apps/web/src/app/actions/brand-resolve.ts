@@ -6,6 +6,7 @@ import { brandGuidelinesTask, createMesh, type Mesh } from '@sahoda/mesh'
 import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
 import { creditCost, type CreditInsufficientDetails, type WithCreditsFn } from '@sahoda/shared'
 
+import { newResolveObjectRef } from '@/lib/brand/resolve-object-ref'
 import {
   mapResolveOutcome,
   type CreditsOutcome,
@@ -66,17 +67,22 @@ export async function resolveBrand(
     }
     const input = sparkToResolveInput(spark)
 
-    // Exactly-once per attempt: a client-supplied objectRef makes a lost-ack retry
-    // replay the same charge; a fresh one (regenerate) is a new, intended charge.
-    const objectRef = field(formData, 'objectRef') || randomUUID()
+    // SERVER-DERIVED ledger key + trace id — never from the request body. A
+    // client-supplied objectRef could replay a spent key: withCredits would replay
+    // the HOLD+DEBIT (no new charge) while still running the paid model call.
+    const objectRef = newResolveObjectRef(workspace.id)
+    const traceId = randomUUID()
 
+    // TODO(owner ruling #5): entitlements are a SEPARATE gate called BEFORE
+    // withCredits at every AI entry point. Mount it here once @sahoda/billing
+    // ships the gate helper — today only the credit balance limits this action.
     let meshOutcome: MeshResolveOutcome | null = null
     const credits = await getWithCredits()(
       { workspaceId: workspace.id, action: 'brand_research', objectRef },
       async (ctx) => {
         const result = await getMesh().runTask(brandGuidelinesTask.def, input, {
           workspaceId: workspace.id,
-          traceId: objectRef,
+          traceId,
           userId,
           actionType: ctx.actionType,
           creditsCharged: ctx.creditsCharged,

@@ -21,13 +21,12 @@ const RESOLVE_COST = creditCost('brand_research')
 const DEFAULT_TAGLINE = 'A living Brand Brain shapes every caption, campaign and reply.'
 const EMPTY_SPARK: SparkValues = { name: '', category: '', website: '', instagram: '' }
 
-function buildResolveFormData(spark: SparkValues, objectRef: string): FormData {
+function buildResolveFormData(spark: SparkValues): FormData {
   const data = new FormData()
   data.set('name', spark.name)
   data.set('category', spark.category)
   data.set('website', spark.website)
   data.set('instagram', spark.instagram)
-  data.set('objectRef', objectRef)
   return data
 }
 
@@ -51,7 +50,6 @@ export function OnboardingFlow() {
   const [screen, setScreen] = useState<Screen>('spark')
   const [spark, setSpark] = useState<SparkValues>(EMPTY_SPARK)
   const [logo, setLogo] = useState<LogoValue | null>(null)
-  const [objectRef] = useState(() => crypto.randomUUID())
   const [attemptError, setAttemptError] = useState<SparkAttemptError | null>(null)
   const [brain, setBrain] = useState<BrandMemoryPayload | null>(null)
   const [balanceAfter, setBalanceAfter] = useState<number | null>(null)
@@ -94,7 +92,7 @@ export function OnboardingFlow() {
   }, [state])
 
   function handleRegenerate() {
-    formAction(buildResolveFormData(spark, crypto.randomUUID()))
+    formAction(buildResolveFormData(spark))
   }
 
   const brandName = spark.name.trim()
@@ -143,7 +141,6 @@ export function OnboardingFlow() {
                 onSparkChange={(patch) => setSpark((current) => ({ ...current, ...patch }))}
                 logo={logo}
                 onLogoChange={setLogo}
-                objectRef={objectRef}
                 generateCost={RESOLVE_COST}
               />
             ) : null}
