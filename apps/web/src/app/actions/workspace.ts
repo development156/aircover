@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { z } from 'zod'
 
@@ -93,9 +94,10 @@ export async function createWorkspace(
     path: '/',
     maxAge: ONE_YEAR_SECONDS,
   })
-  revalidatePath('/', 'layout')
-
-  return { ok: true, slug: data.workspace.slug, name: data.workspace.name, replayed: data.replayed }
+  // New workspace (or an owner replay) → straight into onboarding to resolve the
+  // Brand Brain. redirect() throws NEXT_REDIRECT, so this never falls through; the
+  // fresh navigation re-reads the cookie, so no revalidatePath is needed here.
+  redirect('/onboarding')
 }
 
 /** Point the UI at a workspace the user belongs to. Cookie only; RLS still rules. */
