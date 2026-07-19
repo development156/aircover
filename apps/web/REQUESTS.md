@@ -4,7 +4,18 @@ Requests from the web lane to other worktrees. Mirrors `packages/billing/REQUEST
 
 ---
 
-## [OPEN] wt-db: `public.resolve_brand_memory` — the Brand Brain write RPC
+## [CLOSED — shipped in 658b4c8] wt-db: `public.resolve_brand_memory` — the Brand Brain write RPC
+
+**Resolved 2026-07-19.** wt-db shipped `20260719094548_resolve_brand_memory.sql` with live tests.
+The delivered function is a superset of this request: it adds an optimistic `p_expected_version`
+(CAS) 4th argument, a role allowlist (`FORBIDDEN_ROLE`), a no-existence-oracle `NOT_A_MEMBER`, and
+payload guards (32 KB; `banned_phrases`/`red_lines` ≤ 40; fixed arrays exactly 3; `signal_lock`
+enum). apps/web now calls it from `saveBrandMemory` with **three** arguments — omitting the CAS so a
+rage-click on Finish replays the active payload as a success instead of `VERSION_CONFLICT` — and the
+Refine editors cap the two open lists at 40 (`lib/brand/limits.ts`) so Finish can't fail
+`INVALID_PAYLOAD`. Result is zod-parsed against `ResolveBrandMemoryResultSchema`.
+
+**Original request follows.**
 
 **Why:** Brand Resolve (FSD M1) produces a `BrandMemoryPayload` (via the `brand_guidelines`
 mesh task) that must persist as a `brand_memory` version. `brand_memory` has RLS **read-only**

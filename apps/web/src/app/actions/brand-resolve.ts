@@ -4,9 +4,17 @@ import { randomUUID } from 'node:crypto'
 import { auth } from '@clerk/nextjs/server'
 import { brandGuidelinesTask, createMesh, type Mesh } from '@sahoda/mesh'
 import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
-import { creditCost, type CreditInsufficientDetails, type WithCreditsFn } from '@sahoda/shared'
+import {
+  BrandMemoryPayloadSchema,
+  ResolveBrandMemoryResultSchema,
+  creditCost,
+  type CreditInsufficientDetails,
+  type WithCreditsFn,
+} from '@sahoda/shared'
 
 import { newResolveObjectRef } from '@/lib/brand/resolve-object-ref'
+import { mapSaveBrandError } from '@/lib/brand/save-brand-error'
+import { createServerSupabase } from '@/lib/supabase/server'
 import {
   mapResolveOutcome,
   type CreditsOutcome,
@@ -30,6 +38,49 @@ function getWithCredits(): WithCreditsFn {
   const { databaseUrl } = loadBillingEnv()
   withCreditsSingleton = createWithCredits(createPgLedgerPort({ connectionString: databaseUrl }))
   return withCreditsSingleton
+}
+
+export type SaveBrandState =
+  { ok: true; version: number; replayed: boolean } | { ok: false; message: string }
+
+/**
+ * Persist the (possibly hand-edited) Brand Brain via `public.resolve_brand_memory`
+ * — the one client-reachable write into `brand_memory` (the table is read-only
+ * under RLS). Called with THREE arguments on purpose: omitting the optimistic
+ * `p_expected_version` skips the compare-and-set, so a rage-click on Finish
+ * replays the already-active payload as a success instead of raising
+ * VERSION_CONFLICT. Identity and membership are derived from the JWT inside the
+ * function; we still zod-parse both directions at this boundary.
+ */
+export async function saveBrandMemory(brain: unknown): Promise<SaveBrandState> {
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to save your Brand Brain.' }
+
+    const workspace = await getActiveWorkspace()
+    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+
+    const parsed = BrandMemoryPayloadSchema.safeParse(brain)
+    if (!parsed.success) {
+      return { ok: false, message: 'That Brand Brain is incomplete — check the cards and retry.' }
+    }
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase.rpc('resolve_brand_memory', {
+      p_workspace_id: workspace.id,
+      p_payload: parsed.data,
+      p_source: 'resolved',
+    })
+    if (error || !data) return { ok: false, message: mapSaveBrandError(error) }
+
+    const result = ResolveBrandMemoryResultSchema.safeParse(data)
+    if (!result.success) {
+      return { ok: false, message: 'Saved, but the response was unreadable — reload to confirm.' }
+    }
+    return { ok: true, version: result.data.version, replayed: result.data.replayed }
+  } catch {
+    return { ok: false, message: 'Could not save your Brand Brain — try again.' }
+  }
 }
 
 function field(formData: FormData, key: string): string {

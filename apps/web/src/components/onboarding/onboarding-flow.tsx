@@ -1,11 +1,11 @@
 'use client'
 
-import { useActionState, useEffect, useState, type CSSProperties } from 'react'
+import { useActionState, useEffect, useState, useTransition, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { creditCost, type BrandMemoryPayload } from '@sahoda/shared'
 import { toast } from 'sonner'
 
-import { resolveBrand } from '@/app/actions/brand-resolve'
+import { resolveBrand, saveBrandMemory, type SaveBrandState } from '@/app/actions/brand-resolve'
 import { brandSkinVars } from '@/lib/brand/brand-theme'
 
 import type { LogoValue } from './logo-drop'
@@ -55,7 +55,8 @@ export function OnboardingFlow() {
   const [balanceAfter, setBalanceAfter] = useState<number | null>(null)
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null)
   const [colors, setColors] = useState<string[] | null>(null)
-  const [finished, setFinished] = useState(false)
+  const [isSaving, startSaving] = useTransition()
+  const [saveState, setSaveState] = useState<SaveBrandState | null>(null)
 
   useEffect(() => {
     if (!state) return
@@ -90,6 +91,14 @@ export function OnboardingFlow() {
     // `screen` is read, not depended on — only a genuinely NEW result should re-run this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
+
+  // Finish persists the (hand-edited) brain via the resolve_brand_memory RPC.
+  // Three-argument call — no expected-version precondition — so a rage-click
+  // replays the active payload as a success instead of a VERSION_CONFLICT.
+  function handleFinish() {
+    if (!brain) return
+    startSaving(async () => setSaveState(await saveBrandMemory(brain)))
+  }
 
   function handleRegenerate() {
     formAction(buildResolveFormData(spark))
@@ -166,8 +175,9 @@ export function OnboardingFlow() {
                 onLogoChange={setLogo}
                 colors={colors}
                 onColorsChange={setColors}
-                onFinish={() => setFinished(true)}
-                finished={finished}
+                onFinish={handleFinish}
+                saving={isSaving}
+                saveState={saveState}
               />
             ) : null}
           </div>

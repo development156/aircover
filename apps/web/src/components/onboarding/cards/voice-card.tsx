@@ -3,6 +3,7 @@ import type { BrandMemoryPayload } from '@sahoda/shared'
 import { BrandCard } from '@/components/onboarding/brand-card'
 import { EditableField } from '@/components/onboarding/editable-field'
 import { EditableList } from '@/components/onboarding/editable-list'
+import { MAX_OPEN_LIST_ENTRIES } from '@/lib/brand/limits'
 
 export interface VoiceCardProps {
   value: BrandMemoryPayload['voice']
@@ -46,6 +47,7 @@ export function VoiceCard({
       />
       <EditableList
         label="Never say"
+        maxItems={MAX_OPEN_LIST_ENTRIES}
         items={value.banned_phrases}
         onChange={(banned_phrases) => onChange({ ...value, banned_phrases })}
       />

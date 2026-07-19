@@ -2,6 +2,7 @@ import type { BrandMemoryPayload } from '@sahoda/shared'
 
 import { BrandCard } from '@/components/onboarding/brand-card'
 import { EditableList } from '@/components/onboarding/editable-list'
+import { MAX_OPEN_LIST_ENTRIES } from '@/lib/brand/limits'
 
 export interface TabooCardProps {
   value: BrandMemoryPayload['taboo']
@@ -29,6 +30,7 @@ export function TabooCard({
     >
       <EditableList
         label="Red lines"
+        maxItems={MAX_OPEN_LIST_ENTRIES}
         items={value.red_lines}
         onChange={(red_lines) => onChange({ red_lines })}
       />

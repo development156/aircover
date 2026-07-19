@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Check, Palette, RotateCcw, Sparkles } from 'lucide-react'
 
+import type { SaveBrandState } from '@/app/actions/brand-resolve'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/empty-state'
 import { extractPalette } from '@/lib/brand/color-extract'
@@ -17,19 +18,22 @@ export interface ThemeStepProps {
   colors: string[] | null
   onColorsChange: (colors: string[] | null) => void
   onFinish: () => void
-  finished: boolean
+  saving: boolean
+  /** null until Finish has been attempted. */
+  saveState: SaveBrandState | null
 }
 
-function FinishedPanel() {
+function SavedPanel({ version, replayed }: { version: number; replayed: boolean }) {
   return (
     <div className="flex flex-col items-center gap-3 py-8 text-center">
       <span className="grid size-12 place-items-center rounded-pill bg-ok-bg text-ok">
         <Check size={22} strokeWidth={1.7} aria-hidden />
       </span>
-      <h2 className="text-[18px] font-bold text-ink">Your Brand Brain is ready</h2>
-      <p className="max-w-[42ch] text-[13.5px] text-muted">
-        Saving to your workspace turns on shortly — for now it's held in this session, and every
-        edit you made is right here when it lands.
+      <h2 className="text-[18px] font-bold text-ink">Your Brand Brain is live</h2>
+      <p className="max-w-[44ch] text-[13.5px] text-muted">
+        {replayed ? 'Already saved as' : 'Saved to your workspace as'} version{' '}
+        <span className="font-semibold tabular-nums text-ink">{version}</span> — every post, plan
+        and reply Sahoda writes from now on uses this voice.
       </p>
       <Link
         href="/home"
@@ -45,8 +49,9 @@ function FinishedPanel() {
 /**
  * Step 4 (Theme): extract dominant colors from the uploaded logo client-side.
  * The parent applies `colors` to the preview panel via `brandSkinVars` — this
- * component only reads/writes the logo + extracted palette. Nothing here
- * persists (SAVE_PENDING) — Finish is honest about that.
+ * component only reads/writes the logo + extracted palette; Finish hands the
+ * edited brain to `saveBrandMemory` (resolve_brand_memory RPC) and reports the
+ * real outcome — a failure keeps the user here with their edits intact.
  */
 export function ThemeStep({
   logo,
@@ -54,7 +59,8 @@ export function ThemeStep({
   colors,
   onColorsChange,
   onFinish,
-  finished,
+  saving,
+  saveState,
 }: ThemeStepProps) {
   const [extracting, setExtracting] = useState(false)
   const [accepted, setAccepted] = useState(false)
@@ -84,7 +90,7 @@ export function ThemeStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logo])
 
-  if (finished) return <FinishedPanel />
+  if (saveState?.ok) return <SavedPanel version={saveState.version} replayed={saveState.replayed} />
 
   const themed = Boolean(colors && colors.length > 0)
 
@@ -162,9 +168,15 @@ export function ThemeStep({
         </div>
       )}
 
+      {saveState && !saveState.ok ? (
+        <p role="alert" className="text-[13px] font-medium text-danger">
+          {saveState.message}
+        </p>
+      ) : null}
+
       <div className="flex justify-end border-t border-line pt-4">
-        <Button type="button" data-guide="onboarding.finish" onClick={onFinish}>
-          Finish setup
+        <Button type="button" data-guide="onboarding.finish" onClick={onFinish} disabled={saving}>
+          {saving ? 'Saving…' : 'Finish setup'}
         </Button>
       </div>
     </div>
