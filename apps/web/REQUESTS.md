@@ -74,6 +74,105 @@ claim authorship or overwrite direction the data cannot support.
 
 **Ask:** a `p_expected_version`-style CAS on the post update, or a version column on `posts`.
 
+## wt-db: `public.upsert_connection` — apps/web cannot write `connections` or `connection_secrets`
+
+**Blocks the Alpha gate's biggest checkbox** (post published to real X and real GBP). Nothing about
+Connections beyond read + disconnect can ship until this exists.
+
+### Why apps/web cannot do this itself
+
+`packages/publishing/src/oauth/store.ts:5-7` instructs wt-web to implement `ConnectionStore` "with
+the service-role Supabase client". `apps/web/src/lib/supabase/server.ts:17` forbids exactly that —
+"No service-role client in apps/web — RLS is the security boundary." Verified against the schema:
+
+- `connections` has `conn_select` / `conn_update` / `conn_delete` only. The migration says it
+  outright at line 37: "insert server-side (OAuth callback)."
+- `connection_secrets` has RLS enabled and **zero policies on purpose** — service-role only.
+- `grep -rn "SERVICE_ROLE\|serviceRole" apps/web/src` → 0 hits, and `env-schema.ts` validates only
+  the four Clerk/Supabase public vars.
+
+So this is not a coding task on our side — it is a contradiction between the mount contract and the
+app's security rule. We are asking for the same shape that resolved it twice before
+(`bootstrap_workspace`, `resolve_brand_memory`): a `SECURITY DEFINER` RPC, so apps/web stays
+service-role-free and RLS remains the boundary.
+
+### THE RULING WE NEED FIRST — one sealed envelope vs two columns
+
+This is wt-pub's open review finding #1, and this request is where it gets settled. There are **two**
+mismatches, not one:
+
+|       | Port (`ConnectionUpsert`)                                                    | Table (`connection_secrets`)                         |
+| ----- | ---------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Count | ONE `encryptedSecret` — "opaque vault-sealed token bundle", persist verbatim | TWO columns: `access_token_enc`, `refresh_token_enc` |
+| Type  | `string`                                                                     | `jsonb` (`access_token_enc` is **NOT NULL**)         |
+
+The port forbids parsing the envelope (`store.ts:9-11`), so the RPC splitting it is **not an option**
+— only `@sahoda/publishing` may look inside. That leaves two:
+
+**(A) — our recommendation. wt-pub seals twice; the port carries two blobs.**
+`ConnectionUpsert` becomes `accessTokenEnc: string` + `refreshTokenEnc: string | null`. Each column
+then holds what its name says, `refresh_token_enc` is meaningfully null when a platform issues no
+refresh token, and nothing has to parse anything. Costs a small change to a wt-pub interface that
+has no production caller yet — apps/web is its only intended consumer and has not mounted it.
+
+**(B) — no port change. One envelope stored whole.**
+The RPC takes the single envelope and writes it verbatim into `access_token_enc` (as a jsonb string
+via `to_jsonb($1::text)`), leaving `refresh_token_enc` NULL forever. Works, but `access_token_enc`
+would then hold the access AND refresh material, so the column name actively lies about its
+contents — and a future reader who trusts it will be wrong. If (B) is chosen, please rename the
+column or add a comment in the same migration.
+
+**We recommend (A).** The signature below assumes it; say the word and we will re-file for (B).
+
+### Requested function
+
+```sql
+create or replace function public.upsert_connection(
+  p_workspace_id      uuid,
+  p_platform          text,        -- 'x' | 'gbp' | 'linkedin'
+  p_external_account  jsonb,       -- { id, name?, handle? } — `id` is the platform-native id
+  p_scopes            text[],
+  p_expires_at        timestamptz, -- null when the platform reported no expiry
+  p_access_token_enc  jsonb,       -- sealed; OPAQUE to this function, never parsed or logged
+  p_refresh_token_enc jsonb default null,
+  p_token_type        text default null
+) returns jsonb                    -- { "connection_id": "<uuid>" } — metadata only, never tokens
+language plpgsql security definer set search_path = public
+```
+
+**Required semantics** (mirroring `resolve_brand_memory`):
+
+1. Identity from `auth.jwt() ->> 'sub'` **only**, never an argument; null/empty → `AUTH_REQUIRED`.
+2. Caller must be a `workspace_members` row for `p_workspace_id`; else `NOT_A_MEMBER`. Must read
+   identically to a non-existent workspace — no existence oracle.
+3. Role allowlist if connecting a channel is not a viewer action → `FORBIDDEN_ROLE`. Your call
+   which roles; we will surface whatever you raise.
+4. `p_platform` must satisfy the table CHECK → `INVALID_PLATFORM`. Note this is
+   `ConnectionPlatformSchema` (`x|gbp|linkedin`), which is deliberately NOT the same set as
+   `Channel` (which includes `instagram`).
+5. `p_external_account ->> 'id'` must be present and non-empty → `INVALID_ACCOUNT`. It is the third
+   term of the `connections_ws_platform_account` unique index, so a null there would silently
+   create duplicate connections rather than refreshing one.
+6. Upsert `connections` on that unique index — a re-auth of the same account must REFRESH
+   (scopes, expires_at, status back to 'active', `updated_at`), not insert a second row.
+7. Upsert `connection_secrets` on `connection_id`. Tokens are written verbatim and never read back.
+8. Return only `{ connection_id }`. **Never** return, log, or `raise` anything containing token
+   material — including in error paths.
+9. Grants: `revoke all from public, anon; grant execute to authenticated, service_role;`
+
+**Idempotency:** a repeated callback for the same `(workspace, platform, account)` should refresh in
+place and return the same `connection_id`, not raise. The OAuth `state` nonce is the replay guard
+upstream; this function should be safe to call twice.
+
+**Until this lands:** the Connections screen ships read + disconnect against the existing
+`conn_select` / `conn_delete` policies, with the connect buttons disabled and an honest reason —
+the same `BOOTSTRAP_PENDING` / `SAVE_PENDING` pattern used twice already. No fake "connected" state.
+
+**Separately, for the owner:** `docs/05:65` assigns "packages/publishing + OAuth routes" to
+**wt-pub**, while `store.ts:5-7`, `x.ts:23-24`, `common.ts:10-11` and root `LEARNINGS.md:14` all say
+**wt-web** mounts them. The roadmap and the shipped code disagree about who owns the routes. We have
+assumed wt-web mounts them; if that is wrong, this request should be redirected rather than dropped.
+
 ## wt-db: apps/web cannot record a publish, simulated or real
 
 `post_publish_logs` is member-read with a `block_mutations` trigger and needs service-role to insert;

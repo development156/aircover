@@ -8,6 +8,7 @@ import {
   House,
   Link2,
   SlidersHorizontal,
+  Globe,
   SquarePen,
   Wallet,
   type LucideIcon,
@@ -22,6 +23,7 @@ const ICONS = {
   'square-pen': SquarePen,
   'calendar-days': CalendarDays,
   'link-2': Link2,
+  globe: Globe,
   wallet: Wallet,
   'sliders-horizontal': SlidersHorizontal,
 } satisfies Record<string, LucideIcon>
