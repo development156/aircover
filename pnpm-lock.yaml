@@ -50,6 +50,9 @@ importers:
       '@sahoda/mesh':
         specifier: workspace:*
         version: link:../../packages/mesh
+      '@sahoda/publishing':
+        specifier: workspace:*
+        version: link:../../packages/publishing
       '@sahoda/shared':
         specifier: workspace:*
         version: link:../../packages/shared
