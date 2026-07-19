@@ -27,6 +27,9 @@ export * from './entitlements/port'
 export * from './entitlements/pg'
 export * from './entitlements/checkEntitlement'
 
+// HTTP port for payment adapters (fixture replay in tests, global fetch in prod)
+export * from './transport'
+
 // Payment-rail seam + fixture provider
 export * from './providers/types'
 export * from './providers/fixture'
