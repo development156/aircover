@@ -347,3 +347,45 @@ describe('fetchOrder', () => {
     await expect(p.fetchOrder('missing')).rejects.toThrow(/order_not_found/)
   })
 })
+
+/**
+ * `raw` becomes the billing_webhook_events audit payload. On the fallback path it must record
+ * what Cashfree actually delivered, not our tag-injected reconstruction — an audit row that
+ * shows tags the provider never sent is a lie about the event.
+ */
+describe('resolveWebhookEvent — audit payload honesty', () => {
+  const getOrderWithTags = {
+    match: { method: 'GET', urlIncludes: '/pg/orders/' },
+    response: {
+      status: 200,
+      body: { order_id: 'sah_fixed-id', order_status: 'PAID', order_tags: TAGS },
+    },
+  }
+
+  it('keeps the delivered body verbatim and annotates the out-of-band resolution', async () => {
+    const p = build([getOrderWithTags])
+    const delivered = webhookBody(null)
+
+    const event = await p.resolveWebhookEvent(delivered)
+    const raw = event.raw as {
+      data: { order: { order_tags: unknown } }
+      _sahoda?: { orderTagsResolvedVia: string; resolvedTags: unknown }
+    }
+
+    // The order as Cashfree sent it — still tagless.
+    expect(raw.data.order.order_tags).toBeNull()
+    // The resolution recorded explicitly rather than smuggled into the order.
+    expect(raw._sahoda?.orderTagsResolvedVia).toContain('GET /orders/sah_fixed-id')
+    expect(raw._sahoda?.resolvedTags).toEqual(TAGS)
+    // The derived fields are still correct.
+    expect(event.workspaceId).toBe('ws-1')
+  })
+
+  it('leaves raw unannotated when tags arrived normally', async () => {
+    const p = build([getOrderWithTags])
+
+    const event = await p.resolveWebhookEvent(webhookBody(TAGS))
+
+    expect((event.raw as { _sahoda?: unknown })._sahoda).toBeUndefined()
+  })
+})

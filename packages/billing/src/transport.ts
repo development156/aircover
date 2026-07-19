@@ -67,13 +67,30 @@ export function routedTransport(routes: FixtureRoute[]): Transport {
   }
 }
 
-/** Production transport backed by the platform's global `fetch`. */
-export function fetchTransport(fetchImpl: typeof fetch = fetch): Transport {
+/**
+ * Node's global `fetch` has NO default timeout, so a stalled upstream hangs forever. Without a
+ * deadline a webhook handler holding an open socket is killed by the platform, Cashfree marks
+ * the delivery failed and redelivers, and each redelivery opens another hanging socket.
+ */
+const DEFAULT_TIMEOUT_MS = 15_000
+
+export interface FetchTransportOptions {
+  fetchImpl?: typeof fetch
+  timeoutMs?: number
+}
+
+/** Production transport backed by the platform's global `fetch`, with a hard deadline. */
+export function fetchTransport(opts: FetchTransportOptions | typeof fetch = {}): Transport {
+  // Accept a bare fetch for backward compatibility with the publishing-style call shape.
+  const { fetchImpl = fetch, timeoutMs = DEFAULT_TIMEOUT_MS } =
+    typeof opts === 'function' ? { fetchImpl: opts } : opts
+
   return async (req) => {
     const res = await fetchImpl(req.url, {
       method: req.method,
       headers: req.headers,
       body: req.body,
+      signal: AbortSignal.timeout(timeoutMs),
     })
     const headers: Record<string, string> = {}
     res.headers.forEach((value, key) => {

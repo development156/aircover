@@ -191,7 +191,18 @@ export function createCashfreeProvider(opts: CashfreeProviderOptions): CashfreeP
         plan_id: fields.planId,
         period: fields.period,
       })
-      return parseCashfreeWebhook(withTags, { mode })
+      const event = parseCashfreeWebhook(withTags, { mode })
+
+      // `raw` becomes the billing_webhook_events audit payload, so it must record what Cashfree
+      // ACTUALLY sent — not our tag-injected reconstruction. Keep the delivered body verbatim
+      // and annotate the out-of-band resolution under a namespaced key instead.
+      return {
+        ...event,
+        raw: {
+          ...(JSON.parse(rawBody) as object),
+          _sahoda: { orderTagsResolvedVia: `GET /orders/${e.orderId}`, resolvedTags: order.tags },
+        },
+      }
     }
   }
 

@@ -109,3 +109,42 @@ describe('fetchTransport', () => {
     expect(res.status).toBe(409)
   })
 })
+
+/**
+ * Node's global fetch has NO default timeout. Without a deadline, a stalled Cashfree upstream
+ * leaves a webhook handler holding an open socket until the platform kills it — and every
+ * Cashfree redelivery opens another one.
+ */
+describe('fetchTransport — deadline', () => {
+  it('passes an AbortSignal on every request', async () => {
+    let seen: RequestInit | undefined
+    const fake: typeof fetch = async (_u, init) => {
+      seen = init as RequestInit
+      return new Response('{}', { status: 200 })
+    }
+
+    await fetchTransport({ fetchImpl: fake })({ method: 'GET', url: 'https://x/pg/orders/o1' })
+
+    expect(seen?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('aborts a request that outlives the timeout', async () => {
+    const stalled: typeof fetch = (_u, init) =>
+      new Promise((_resolve, reject) => {
+        ;(init as RequestInit).signal?.addEventListener('abort', () => reject(new Error('aborted')))
+      })
+
+    await expect(
+      fetchTransport({ fetchImpl: stalled, timeoutMs: 20 })({
+        method: 'GET',
+        url: 'https://x/pg/orders/o1',
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('still accepts a bare fetch impl', async () => {
+    const fake: typeof fetch = async () => new Response('{"ok":1}', { status: 200 })
+
+    expect((await fetchTransport(fake)({ method: 'GET', url: 'https://x' })).status).toBe(200)
+  })
+})

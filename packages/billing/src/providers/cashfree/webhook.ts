@@ -93,7 +93,8 @@ export function parseCashfreeWebhook(
   rawBody: string,
   opts: ParseCashfreeWebhookOptions = {},
 ): ParsedWebhookEvent {
-  const payload = WebhookSchema.parse(JSON.parse(rawBody))
+  const delivered: unknown = JSON.parse(rawBody)
+  const payload = WebhookSchema.parse(delivered)
   const { order, payment } = payload.data
 
   const tags = order.order_tags
@@ -118,7 +119,11 @@ export function parseCashfreeWebhook(
     planId: fields.planId,
     period: fields.period,
     mode: opts.mode ?? 'sandbox',
-    raw: payload,
+    // The DELIVERED payload, not the zod-parsed one. WebhookSchema is non-strict, so parsing
+    // strips everything billing does not read — bank_reference, payment_time, payment_method,
+    // customer_details. Those are exactly the fields needed to reconcile a disputed charge from
+    // the billing_webhook_events audit row, so the row must keep the body Cashfree actually sent.
+    raw: delivered,
   }
 }
 
@@ -135,8 +140,15 @@ function assertOrderMatchesPlan(order: z.infer<typeof OrderSchema>, planId: Plan
     throw new Error(`cashfree order currency ${currency} is not ${EXPECTED_CURRENCY}`)
   }
 
+  // Fail CLOSED on omission. A check that is skipped whenever the field is absent is not
+  // defence in depth — it is a check an attacker (or a schema change) can turn off by leaving
+  // the field out. A success webhook we act on must state its amount.
+  if (order.order_amount === undefined) {
+    throw new Error(`cashfree success webhook for order ${order.order_id} carried no order_amount`)
+  }
+
   const expected = PLAN_CATALOG[planId].priceInr
-  if (order.order_amount !== undefined && order.order_amount !== expected) {
+  if (order.order_amount !== expected) {
     throw new Error(
       `cashfree order amount ${order.order_amount} does not match the ${planId} plan amount ${expected}`,
     )

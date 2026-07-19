@@ -252,3 +252,69 @@ describe('tagsToEventFields', () => {
     expect(() => tagsToEventFields({ workspace_id: 'ws-1' })).toThrow()
   })
 })
+
+/**
+ * `raw` lands in billing_webhook_events.payload. WebhookSchema is non-strict, so a zod-parsed
+ * payload silently drops every field billing does not read — which are exactly the fields needed
+ * to reconcile a disputed charge months later.
+ */
+describe('parseCashfreeWebhook — audit payload completeness', () => {
+  it('retains provider fields billing does not itself read', () => {
+    const body = JSON.stringify({
+      data: {
+        order: {
+          order_id: 'o1',
+          order_amount: PLAN_CATALOG.starter.priceInr,
+          order_currency: 'INR',
+          order_tags: TAGS,
+        },
+        payment: {
+          cf_payment_id: '1453002795',
+          payment_status: 'SUCCESS',
+          bank_reference: '234928698581',
+          payment_time: '2026-07-19T12:20:29+05:30',
+          payment_method: { upi: { upi_id: 'rishab@ybl' } },
+        },
+        customer_details: { customer_id: 'ws-1', customer_phone: '9908734801' },
+      },
+      type: 'PAYMENT_SUCCESS_WEBHOOK',
+      event_time: '2026-07-19T11:16:10+05:30',
+    })
+
+    const raw = parseCashfreeWebhook(body).raw as {
+      data: {
+        payment: { bank_reference?: string; payment_time?: string; payment_method?: unknown }
+        customer_details?: { customer_phone?: string }
+      }
+    }
+
+    expect(raw.data.payment.bank_reference).toBe('234928698581')
+    expect(raw.data.payment.payment_time).toBe('2026-07-19T12:20:29+05:30')
+    expect(raw.data.payment.payment_method).toEqual({ upi: { upi_id: 'rishab@ybl' } })
+    expect(raw.data.customer_details?.customer_phone).toBe('9908734801')
+  })
+})
+
+describe('parseCashfreeWebhook — the amount check fails closed', () => {
+  /**
+   * A reconciliation that is skipped whenever the field happens to be absent is not defence in
+   * depth — it is a check that can be turned off by omission.
+   */
+  it('rejects a success webhook that states no order_amount', () => {
+    const body = successBody({
+      order: { order_id: 'o1', order_currency: 'INR', order_tags: TAGS },
+    })
+
+    expect(() => parseCashfreeWebhook(body)).toThrow(/no order_amount/)
+  })
+
+  it('still tolerates a missing amount on a failed payment', () => {
+    const body = successBody({
+      type: 'PAYMENT_FAILED_WEBHOOK',
+      order: { order_id: 'o1', order_tags: TAGS },
+      payment: { cf_payment_id: '1', payment_status: 'FAILED' },
+    })
+
+    expect(() => parseCashfreeWebhook(body)).not.toThrow()
+  })
+})

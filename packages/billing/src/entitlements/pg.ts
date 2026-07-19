@@ -1,7 +1,7 @@
 import { Pool } from 'pg'
 import { PlanIdSchema, type PlanId } from '@sahoda/shared'
 import { assertServerOnly } from '../env'
-import { pgSsl } from '../pgSsl'
+import { guardPoolErrors, pgSsl } from '../pgSsl'
 import type { PlanResolverPort } from './port'
 
 /** A workspace with no live subscription is on Free (the schema's own rule). */
@@ -22,6 +22,8 @@ export interface PgPlanResolverOptions {
   connectionString: string
   /** Inject a pre-built pool (tests / connection reuse); otherwise one is created. */
   pool?: Pool
+  /** Observe idle-client pool errors without this package taking a logger dependency. */
+  onPoolError?: (cause: unknown) => void
 }
 
 export type PgPlanResolver = PlanResolverPort & { pool: Pool; close(): Promise<void> }
@@ -32,13 +34,16 @@ export type PgPlanResolver = PlanResolverPort & { pool: Pool; close(): Promise<v
  */
 export function createPgPlanResolver(opts: PgPlanResolverOptions): PgPlanResolver {
   assertServerOnly()
-  const pool =
+  const ownsPool = opts.pool === undefined
+  const pool = guardPoolErrors(
     opts.pool ??
-    new Pool({
-      connectionString: opts.connectionString,
-      max: 10,
-      ssl: pgSsl(opts.connectionString),
-    })
+      new Pool({
+        connectionString: opts.connectionString,
+        max: 10,
+        ssl: pgSsl(opts.connectionString),
+      }),
+    opts.onPoolError,
+  )
 
   async function resolvePlanId(workspaceId: string): Promise<PlanId> {
     const r = await pool.query<{ plan_id: string }>(
@@ -58,5 +63,12 @@ export function createPgPlanResolver(opts: PgPlanResolverOptions): PgPlanResolve
     return PlanIdSchema.parse(raw)
   }
 
-  return { resolvePlanId, pool, close: () => pool.end() }
+  // Only end a pool we created — see PgLedgerPort.close.
+  return {
+    resolvePlanId,
+    pool,
+    close: async () => {
+      if (ownsPool) await pool.end()
+    },
+  }
 }
