@@ -101,3 +101,8 @@ export { themeCss } from './theme/css'
 // against a globally unique column. `IsSlugTaken` is the seam it asks. ─────────────────────
 export { slugify, resolveSlug, RESERVED_SLUGS } from './slug'
 export type { IsSlugTaken, ResolveSlugDeps } from './slug'
+
+// ── The mount-point contract. wt-web implements `SiteStore` with the service-role client;
+// nothing inside this package imports it. Type-only — its runtime pin `SITE_STORE_METHODS`
+// stays internal (a test seam, not public surface). ─────────────────────────────────────
+export type { SiteStore } from './store'

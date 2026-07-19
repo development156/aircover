@@ -18,6 +18,11 @@
 import { describe, it, expect } from 'vitest'
 import type { Result } from '@sahoda/shared'
 import * as index from './index'
+// The mount-point contract. `SiteStore` is a TYPE, so it erases before `Object.keys` runs and
+// cannot live in PUBLIC_SURFACE below -- it is pinned at the type level: this import fails
+// `tsc --noEmit` the moment the barrel drops it. Its runtime companion `SITE_STORE_METHODS` is
+// a test pin on the port width and must stay OFF the surface (asserted in the describe block).
+import type { SiteStore } from './index'
 import * as escape from './render/escape'
 import * as draftModule from './normalize/draft'
 import * as toRowsModule from './map/to-rows'
@@ -35,6 +40,22 @@ const expectOk = <T>(result: Result<T>): T => {
   }
   return result.data
 }
+
+/**
+ * Compile-time pin on the mount-point contract: the barrel must export `SiteStore` with
+ * exactly the three-verb shape wt-web mounts. Widening or dropping a method fails `tsc`
+ * here rather than silently at wt-web's implementation. Value-level, `SiteStore` erases, so
+ * the runtime companion `SITE_STORE_METHODS` must NOT be on the surface -- checked below.
+ */
+type _SiteStoreIsExported = SiteStore extends {
+  isSlugTaken(slug: string): Promise<boolean>
+  createSite(rows: never): Promise<{ siteId: string }>
+  recordDeploy(siteId: string, state: never): Promise<void>
+}
+  ? true
+  : never
+const _siteStoreContract: _SiteStoreIsExported = true
+void _siteStoreContract
 
 /**
  * The complete, intended VALUE export list. Adding a name here is a deliberate API decision.
@@ -180,6 +201,13 @@ describe('@sahoda/sites public surface', () => {
     // Anchored to the start of a line so the prose in this file's own header -- which names
     // the forbidden form in backticks -- is not what makes the test pass.
     expect(source).not.toMatch(/^[ \t]*export[ \t]+\*/m)
+  })
+
+  it('does not export SITE_STORE_METHODS -- it pins the port width for store.test.ts, not public surface', () => {
+    // SiteStore (the type) is the mount contract; SITE_STORE_METHODS is the runtime pin that
+    // keeps store.test.ts honest. Re-exporting it would hand a consumer the verb list as data
+    // and invite a hand-rolled store keyed off it instead of the typed interface.
+    expect(Object.hasOwn(index, 'SITE_STORE_METHODS')).toBe(false)
   })
 
   it('does not leak the internal coerce helper, which would let a caller skip the escapers', () => {
