@@ -27,7 +27,10 @@ describe('newResolveObjectRef', () => {
  * no amount of mocking can prove.
  */
 describe('resolve action ledger key provenance', () => {
-  const source = readFileSync(new URL('../../app/actions/brand-resolve.ts', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../app/actions/brand-resolve.ts', import.meta.url),
+    'utf8',
+  )
 
   test('never reads objectRef (or a trace id) from formData', () => {
     expect(source).not.toMatch(/objectRef['"]\s*\)/) // e.g. field(formData, 'objectRef')

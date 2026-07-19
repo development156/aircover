@@ -71,7 +71,19 @@ export function fetchTransport(fetchImpl: typeof fetch = fetch): Transport {
     const res = await fetchImpl(req.url, {
       method: req.method,
       headers: req.headers,
-      body: req.body,
+      // Multipart bodies (X media) are raw bytes. TS 5.7+ types those as
+      // `Uint8Array<ArrayBufferLike>`, which DOM's `BodyInit` rejects because
+      // ArrayBufferLike admits SharedArrayBuffer-backed views. This package
+      // typechecks clean on its own (`types: ["node"]`), but any DOM-lib
+      // consumer — apps/web, which this barrel is written to be mounted by —
+      // fails on this line without the cast. Runtime behaviour is unchanged:
+      // undici and every browser accept a Uint8Array body.
+      //
+      // The target type is derived from `fetchImpl` rather than named directly:
+      // `BodyInit` is a DOM global that does not exist under this package's own
+      // `types: ["node"]` config, so spelling it out would fix the consumer and
+      // break the package.
+      body: req.body as NonNullable<Parameters<typeof fetchImpl>[1]>['body'],
     })
     const headers: Record<string, string> = {}
     res.headers.forEach((value, key) => {
