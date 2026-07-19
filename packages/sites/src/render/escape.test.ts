@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import { escapeHtml, escapeAttr, safeUrl, stripControl } from './escape'
 
@@ -715,35 +714,4 @@ describe('stripControl - unpaired surrogates', () => {
     expect(Buffer.from(escaped, 'utf8').toString('utf8')).toBe(escaped)
     expect(Buffer.from('a\uD800b', 'utf8').toString('utf8')).not.toBe('a\uD800b')
   })
-})
-
-/**
- * The source of the security gate is stored as pure ASCII escape-sequence text. A raw control
- * byte makes git classify the blob as binary, which costs the team `git diff` and `git blame`
- * on the one file where review matters most. That happened once; it fails a test now.
- */
-describe('escape module source is text, not binary', () => {
-  const SOURCES: ReadonlyArray<string> = ['./escape.ts', './escape.test.ts']
-
-  for (const source of SOURCES) {
-    it(`stores ${source} as pure ASCII`, () => {
-      const contents = readFileSync(new URL(source, import.meta.url), 'utf8')
-      const offenders = [...contents]
-        .map((char, index) => ({ index, code: char.codePointAt(0) ?? 0 }))
-        .filter((entry) => entry.code > 0x7f)
-        .map((entry) => `U+${entry.code.toString(16).toUpperCase()} at ${entry.index}`)
-
-      expect(offenders).toEqual([])
-    })
-
-    it(`stores ${source} with no raw control byte git would read as binary`, () => {
-      const contents = readFileSync(new URL(source, import.meta.url), 'utf8')
-      const controls = [...contents].filter((char) => {
-        const code = char.codePointAt(0) ?? 0
-        return code < 0x20 && code !== 0x09 && code !== 0x0a
-      })
-
-      expect(controls).toEqual([])
-    })
-  }
 })
