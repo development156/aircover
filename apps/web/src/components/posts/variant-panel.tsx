@@ -19,6 +19,8 @@ export interface VariantPanelProps {
   channel: Channel
   state: VariantState
   canonicalBody: string
+  /** Files attached to this post — scored against this channel's `maxMediaCount`. */
+  mediaCount: number
   onBodyChange: (body: string) => void
   onExtrasChange: (patch: { gbpCta?: string; hashtags?: string[] }) => void
   onSave: () => void
@@ -32,6 +34,10 @@ const MAX_TRIM_PASSES = 200
  * Not a plain `slice(0, maxChars)`: on X a link counts as a fixed 23 characters
  * whatever its real length, so the character budget and the string length are
  * different numbers. Each pass removes at least one character, so this ends.
+ *
+ * Scores the character budget only, so it passes no `mediaCount`: `meter.over`
+ * is set by `charCount > maxChars` alone, and trimming text cannot clear a
+ * media-count violation anyway.
  */
 function trimToFit(channel: Channel, body: string, hashtags: string[] | undefined): string {
   let next = body
@@ -48,14 +54,24 @@ export function VariantPanel({
   channel,
   state,
   canonicalBody,
+  mediaCount,
   onBodyChange,
   onExtrasChange,
   onSave,
 }: VariantPanelProps) {
   const spec = CONSTRAINTS[channel]
   const hashtags = state.extras.hashtags
-  const meter = meterFor(channel, { body: state.body, hashtags, hasLink: hasLink(state.body) })
+  const meter = meterFor(channel, {
+    body: state.body,
+    hashtags,
+    hasLink: hasLink(state.body),
+    mediaCount,
+  })
 
+  // MAX_MEDIA_COUNT deliberately gets no entry here. Media lives on the post and
+  // this panel has no way to detach a file, so a "Remove extra media" button
+  // would do nothing; `ChannelMeterView` renders the label as plain text when no
+  // handler exists, which states the problem without faking an affordance.
   const fixes: Partial<Record<string, () => void>> = {
     MAX_CHARS: () => onBodyChange(trimToFit(channel, state.body, hashtags)),
   }

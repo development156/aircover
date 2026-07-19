@@ -58,25 +58,32 @@ export function PostEditor({ post, variants, media }: PostEditorProps): React.JS
 
   return (
     <div className="space-y-grid" data-guide="post-editor">
-      {autosave.conflict !== null ? (
+      {/* The row moved somewhere other than this editor. We deliberately do NOT
+          say who overwrote whom: every `updated_at` we see is a post-write one,
+          so that ordering is unknowable here (see `use-autosave.ts`). Both
+          buttons are real choices — one loads the other version, the other
+          writes the local draft over it. */}
+      {autosave.divergence !== null ? (
         <div
           role="alert"
           className="flex flex-wrap items-center gap-3 rounded-input border border-warn bg-warn-bg px-3 py-2.5 text-[13px] text-warn"
         >
-          <span className="grow">{autosave.conflict.message}</span>
+          <span className="grow">
+            {autosave.divergence.message} Both versions are still here — choose which one to keep.
+          </span>
           <button
             type="button"
-            onClick={autosave.restore}
+            onClick={autosave.loadTheirs}
             className="rounded-pill border border-warn px-2.5 py-1 text-[12px] font-semibold transition-micro hover:bg-warn hover:text-white"
           >
-            Restore that version
+            Load that version
           </button>
           <button
             type="button"
-            onClick={autosave.dismissConflict}
+            onClick={autosave.keepMine}
             className="rounded-pill px-2.5 py-1 text-[12px] font-semibold underline underline-offset-2 transition-micro hover:opacity-80"
           >
-            Keep mine
+            Keep mine and save
           </button>
         </div>
       ) : null}
@@ -140,15 +147,36 @@ export function PostEditor({ post, variants, media }: PostEditorProps): React.JS
             }}
           />
 
+          {/* The retry button matters: a writer who has stopped typing has no
+              other way back: the debounced save only re-fires on the next edit,
+              so without this the last words written before a dropped connection
+              would need a fake keystroke to reach the server. */}
           {autosave.error !== null ? (
-            <InlineError>
-              {autosave.error} Your text is still here — keep editing and I&rsquo;ll retry on the
-              next change.
+            <InlineError className="flex flex-wrap items-center gap-3">
+              <span className="grow">
+                {autosave.error} Your text is still here — retry now, or keep editing and I&rsquo;ll
+                retry on the next change.
+              </span>
+              <button
+                type="button"
+                onClick={() => void autosave.flush()}
+                className="rounded-pill border border-danger px-2.5 py-1 text-[12px] font-semibold transition-micro hover:bg-danger hover:text-white"
+              >
+                Retry save
+              </button>
             </InlineError>
           ) : null}
         </section>
 
-        <VariantTabs channels={draft.channels} canonicalBody={draft.body} variants={variantsApi} />
+        {/* The meters score the post's REAL attachment count, so a channel's
+            `maxMediaCount` (GBP allows 1) can actually fire. `media` is the same
+            list `MediaPane` renders, so the two panes cannot disagree. */}
+        <VariantTabs
+          channels={draft.channels}
+          canonicalBody={draft.body}
+          variants={variantsApi}
+          mediaCount={media.length}
+        />
       </div>
 
       <BottomBar

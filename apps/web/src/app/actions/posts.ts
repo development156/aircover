@@ -185,8 +185,23 @@ export async function deletePost(postId: string): Promise<DeleteState> {
 
     const supabase = createServerSupabase()
     // post_variants / post_media cascade from posts (on delete cascade).
-    const { error } = await supabase.from('posts').delete().eq('id', postId)
+    // `.select()` is not cosmetic: a delete matching ZERO rows is NOT an error in
+    // PostgREST, so without the returned row this reports a successful deletion
+    // for a post that is still on screen (already deleted in another tab, or RLS
+    // filtered it out after a membership change).
+    const { data, error } = await supabase
+      .from('posts')
+      .delete()
+      .eq('id', postId)
+      .select('id')
+      .maybeSingle()
+
     if (error) return { ok: false, message: mapPostError(error) }
+
+    // Nothing was deleted. Routed through mapPostError's PGRST116 branch so this
+    // reads IDENTICALLY to an RLS refusal — distinguishing "gone" from "not
+    // yours" would turn this action into an existence oracle for post ids.
+    if (!data) return { ok: false, message: mapPostError({ code: 'PGRST116' }) }
 
     revalidatePath('/posts')
     return { ok: true }

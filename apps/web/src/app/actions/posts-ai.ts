@@ -16,10 +16,10 @@ import {
   charCountFor,
   creditCost,
   MESH_TASK_ACTION,
-  type CreditInsufficientDetails,
   type WithCreditsFn,
 } from '@sahoda/shared'
 
+import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
 import { hasLink } from '@/lib/posts/detect-link'
 import { getPost } from '@/lib/posts/read'
 import { filterVariants } from '@/lib/posts/filter-variants'
@@ -46,8 +46,10 @@ function getWithCredits(): WithCreditsFn {
 /**
  * Generate per-channel variants from the canonical body. `withCredits` reserves
  * the 3 credits, runs `content_variants`, and DEBITs only on a real result —
- * any failure throws inside the wrapper so the HOLD is RELEASED and the user is
- * not charged.
+ * a failure thrown inside the callback RELEASES the HOLD, so the user is not
+ * charged. `delivered` records whether the callback got that far: once it
+ * returns, a later wrapper failure may still have charged, and only the caller
+ * knows the difference (see lib/posts/charge-failure.ts).
  *
  * The action string comes from `MESH_TASK_ACTION`, not a literal: the mesh task
  * is `content_variants` but the pricing/ledger action is `post_variants`, and
@@ -97,6 +99,7 @@ export async function generateVariants(postId: string, channels: unknown): Promi
     // withCredits at every AI entry point. Mount it here once @sahoda/billing
     // ships the gate helper — today only the credit balance limits this action.
     let failure: string | null = null
+    let delivered = false
     let generated: GeneratedVariant[] = []
     let missing: ReturnType<typeof filterVariants>['missing'] = []
 
@@ -111,7 +114,8 @@ export async function generateVariants(postId: string, channels: unknown): Promi
           creditsCharged: ctx.creditsCharged,
         })
         if (!result.ok) {
-          failure = result.error.message
+          // Our own copy, never `result.error.message` — that can carry provider text.
+          failure = FAILURE_REASON.MESH_ERROR
           throw new Error('MESH_ERROR') // → RELEASE, no charge
         }
 
@@ -119,7 +123,7 @@ export async function generateVariants(postId: string, channels: unknown): Promi
         // parses clean. Filter to what was asked for and surface any gap honestly.
         const filtered = filterVariants(requested, result.data)
         if (filtered.variants.length === 0) {
-          failure = 'The model returned no usable variants.'
+          failure = FAILURE_REASON.NO_VARIANTS
           throw new Error('MESH_EMPTY') // → RELEASE: nothing usable is not a delivery
         }
 
@@ -133,11 +137,16 @@ export async function generateVariants(postId: string, channels: unknown): Promi
           }),
         }))
         missing = filtered.missing
+        // Last statement before the return: from here on the wrapper owns the
+        // outcome, and any failure it reports may still have debited.
+        delivered = true
         return filtered
       },
     )
 
-    if (!credits.ok) return chargeFailure(credits.error, action, failure)
+    if (!credits.ok) {
+      return chargeFailureState({ error: credits.error, action, delivered, reason: failure })
+    }
 
     return {
       ok: true,
@@ -189,6 +198,7 @@ export async function rewriteCaption(
 
     // TODO(owner ruling #5): entitlement gate goes here, before withCredits.
     let failure: string | null = null
+    let delivered = false
     let rewritten = ''
 
     const credits = await getWithCredits()(
@@ -202,19 +212,23 @@ export async function rewriteCaption(
           creditsCharged: ctx.creditsCharged,
         })
         if (!result.ok) {
-          failure = result.error.message
+          // Our own copy, never `result.error.message` — that can carry provider text.
+          failure = FAILURE_REASON.MESH_ERROR
           throw new Error('MESH_ERROR') // → RELEASE, no charge
         }
         if (result.data.text.trim() === '') {
-          failure = 'The model returned an empty rewrite.'
+          failure = FAILURE_REASON.EMPTY_REWRITE
           throw new Error('MESH_EMPTY') // → RELEASE: empty is not a rewrite
         }
         rewritten = result.data.text
+        delivered = true
         return result.data
       },
     )
 
-    if (!credits.ok) return chargeFailure(credits.error, action, failure)
+    if (!credits.ok) {
+      return chargeFailureState({ error: credits.error, action, delivered, reason: failure })
+    }
 
     return {
       ok: true,
@@ -228,39 +242,5 @@ export async function rewriteCaption(
       insufficient: false,
       message: 'Could not rewrite this caption — try again.',
     }
-  }
-}
-
-/**
- * Shared failure mapping. An insufficient balance is the one expected rejection
- * and gets the top-up path; every other failure carries the honest reason the
- * callback stashed (which survives the RELEASE) and states no charge was made.
- */
-function chargeFailure(
-  error: { code: string; message: string; details?: unknown },
-  action: Parameters<typeof creditCost>[0],
-  failure: string | null,
-):
-  | { ok: false; insufficient: true; required: number; available: number }
-  | {
-      ok: false
-      insufficient: false
-      message: string
-    } {
-  if (error.code === 'CREDIT_INSUFFICIENT') {
-    const details = error.details as CreditInsufficientDetails | undefined
-    return {
-      ok: false,
-      insufficient: true,
-      required: details?.required ?? creditCost(action),
-      available: details?.available ?? 0,
-    }
-  }
-  return {
-    ok: false,
-    insufficient: false,
-    message: failure
-      ? "That didn't work, so you were not charged — try again."
-      : 'Could not complete this action — you were not charged.',
   }
 }

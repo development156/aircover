@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { FlaskConical, PlayCircle } from 'lucide-react'
+import { Ban, EyeOff, FlaskConical, PlayCircle } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { simulatePublish } from '@/app/actions/posts-publish'
-import type { SimulatedPublish } from '@/lib/posts/state'
+import type { PublishReport } from '@/lib/posts/state'
+import { describeViolation } from '@/lib/posts/violation-copy'
 
 import { CHANNEL_LABELS } from './channel-label'
 import { InlineError } from './inline-error'
@@ -13,7 +14,7 @@ import { PendingLines } from './pending-lines'
 
 const PENDING_LINES = [
   'Reading the saved variants…',
-  'Running them through the fixture adapter…',
+  'Checking each one against the channel rules…',
   'Nothing is being sent to any platform.',
 ] as const
 
@@ -22,23 +23,27 @@ export interface PublishPreviewProps {
 }
 
 /**
- * Dry run against the fixture adapter. This is NOT a publish and must never read
- * as one: `apps/web` cannot reach a real token (vault-only) and cannot write
- * `post_publish_logs` (service-role + `block_mutations`), so `simulatePublish`
- * persists nothing at all.
+ * Dry run against the Constraint Engine, then the fixture adapter. This is NOT a
+ * publish and must never read as one: `apps/web` cannot reach a real token
+ * (vault-only) and cannot write `post_publish_logs` (service-role +
+ * `block_mutations`), so `simulatePublish` persists nothing at all.
  *
- * Results branch on `result.mode === 'fixture'`, never on the permalink string,
- * and the `fixture://` permalink is deliberately never rendered — not as text
- * and certainly not as an anchor.
+ * Three outcomes are rendered separately and are never merged: blocked by a
+ * channel rule, skipped because the channel is not publishable, and
+ * simulated-OK — which still means nothing was posted.
+ *
+ * Simulated results branch on `result.mode === 'fixture'`, never on the
+ * permalink string, and the `fixture://` permalink is deliberately never
+ * rendered — not as text and certainly not as an anchor.
  */
 export function PublishPreview({ postId }: PublishPreviewProps) {
   const [pending, startTransition] = useTransition()
-  const [results, setResults] = useState<SimulatedPublish[] | null>(null)
+  const [report, setReport] = useState<PublishReport | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   function run() {
     setError(null)
-    setResults(null)
+    setReport(null)
     startTransition(async () => {
       const state = await simulatePublish(postId)
       if (!state.ok) {
@@ -46,16 +51,21 @@ export function PublishPreview({ postId }: PublishPreviewProps) {
         return
       }
       // Branch on the adapter's own label, never on the permalink string. If a
-      // future adapter swap ever returned a non-fixture mode down this path we
-      // must not render it under the "simulated" banner.
+      // future adapter swap ever returned a non-fixture mode down this path, the
+      // whole run is suspect — drop it rather than render the survivors under a
+      // "simulated" banner that would then be describing something else.
       const fixtures = state.simulated.filter((item) => item.mode === 'fixture')
-      // Everything got filtered out: report that plainly instead of rendering an
-      // empty "Simulated" banner, which reads as a run that succeeded silently.
-      if (fixtures.length === 0) {
+      if (fixtures.length !== state.simulated.length) {
         setError('Preview is unavailable right now — try again.')
         return
       }
-      setResults(fixtures)
+      // Nothing to say at all: report that plainly instead of rendering empty
+      // banners, which read as a run that succeeded silently.
+      if (fixtures.length === 0 && state.blocked.length === 0 && state.skipped.length === 0) {
+        setError('Preview is unavailable right now — try again.')
+        return
+      }
+      setReport({ simulated: fixtures, blocked: state.blocked, skipped: state.skipped })
     })
   }
 
@@ -75,24 +85,76 @@ export function PublishPreview({ postId }: PublishPreviewProps) {
 
       {error !== null ? <InlineError>{error}</InlineError> : null}
 
-      {results !== null ? (
-        <div className="space-y-2 rounded-input border border-warn bg-warn-bg p-3">
-          <p className="flex items-center gap-1.5 text-[12.5px] font-bold tracking-[0.06em] text-warn uppercase">
-            <FlaskConical size={13} aria-hidden />
-            Simulated — nothing was posted
-          </p>
-          <ul className="space-y-1.5">
-            {results.map((result) => (
-              <li key={result.channel} className="text-[13px] text-warn">
-                <span className="font-semibold">{CHANNEL_LABELS[result.channel]}</span> — would have
-                been accepted. This is a fixture result, not a real post, and no publish was
-                recorded.
-              </li>
-            ))}
-          </ul>
-          <p className="text-[12px] text-warn opacity-80">
-            Connect a channel and publish from the scheduler to post for real.
-          </p>
+      {report !== null ? (
+        <div className="space-y-2">
+          {report.blocked.length > 0 ? (
+            <div
+              role="alert"
+              className="space-y-2 rounded-input border border-danger-bg bg-danger-bg p-3"
+            >
+              <p className="flex items-center gap-1.5 text-[12.5px] font-bold tracking-[0.06em] text-danger uppercase">
+                <Ban size={13} aria-hidden />
+                Blocked by channel rules
+              </p>
+              <ul className="space-y-1.5">
+                {report.blocked.map((item) => (
+                  <li key={item.channel} className="text-[13px] text-danger">
+                    <span className="font-semibold">{CHANNEL_LABELS[item.channel]}</span> — would be
+                    rejected. Fix this before publishing:
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {item.violations.map((violation, index) => {
+                        const display = describeViolation(violation)
+                        return (
+                          <li key={`${display.code}-${index}`} className="tabular-nums">
+                            {display.message}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {report.simulated.length > 0 ? (
+            <div className="space-y-2 rounded-input border border-warn bg-warn-bg p-3">
+              <p className="flex items-center gap-1.5 text-[12.5px] font-bold tracking-[0.06em] text-warn uppercase">
+                <FlaskConical size={13} aria-hidden />
+                Simulated — nothing was posted
+              </p>
+              <ul className="space-y-1.5">
+                {report.simulated.map((result) => (
+                  <li key={result.channel} className="text-[13px] text-warn">
+                    <span className="font-semibold">{CHANNEL_LABELS[result.channel]}</span> — passes
+                    the channel rules we check. This is a fixture result, not a real post, and no
+                    publish was recorded.
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[12px] text-warn opacity-80">
+                Connect a channel and publish from the scheduler to post for real.
+              </p>
+            </div>
+          ) : null}
+
+          {report.skipped.length > 0 ? (
+            <div className="space-y-1.5 rounded-input bg-s1 p-3">
+              <p className="flex items-center gap-1.5 text-[12.5px] font-bold tracking-[0.06em] text-muted uppercase">
+                <EyeOff size={13} aria-hidden />
+                Not checked
+              </p>
+              <ul className="space-y-1">
+                {report.skipped.map((item) => (
+                  <li key={item.channel} className="text-[13px] text-muted">
+                    <span className="font-semibold">{CHANNEL_LABELS[item.channel]}</span> — preview
+                    only for now, so there is nothing to simulate. Copy it across by hand to post
+                    it.
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

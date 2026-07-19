@@ -145,7 +145,10 @@ export function InlineRewrite({ body, selection, onReplace }: InlineRewriteProps
               </Link>
             </>
           ) : (
-            <>{failure.message} Try the rewrite again.</>
+            // Verbatim: the action owns the charge statement and the retry
+            // prompt. Appending our own gave the reader two of each, and would
+            // contradict the action outright when it cannot confirm the charge.
+            failure.message
           )}
         </InlineError>
       ) : null}

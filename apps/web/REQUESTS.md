@@ -38,6 +38,21 @@ No such env var, config key or column exists anywhere.
 **Meanwhile:** apps/web calls `createFixtureAdapter` from an explicitly labelled _preview_ action and
 treats the absent flag as a wt-web-local decision, not a lookup.
 
+## wt-db: `posts` has no optimistic-concurrency check (CAS)
+
+`resolve_brand_memory` takes `p_expected_version` and can reject a stale write outright. A post
+update has no equivalent, and `posts` has no version column — only an `updated_at` trigger.
+
+Consequence: with only post-write timestamps, no client can determine WHO overwrote WHOM. The case
+"someone else writes the row, then we save over it without ever re-rendering in between" is
+invisible to any client, so the editor cannot honestly warn about it.
+
+**Meanwhile:** the editor detects and announces DIVERGENCE — the row changed outside this editor —
+and offers the writer the real choice (load theirs, or keep and save mine). It deliberately does not
+claim authorship or overwrite direction the data cannot support.
+
+**Ask:** a `p_expected_version`-style CAS on the post update, or a version column on `posts`.
+
 ## wt-db: apps/web cannot record a publish, simulated or real
 
 `post_publish_logs` is member-read with a `block_mutations` trigger and needs service-role to insert;

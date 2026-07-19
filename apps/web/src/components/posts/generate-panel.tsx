@@ -52,9 +52,14 @@ export function GeneratePanel({ postId, channels, flush, onGenerated }: Generate
     startTransition(async () => {
       const saved = await flush()
       if (!saved) {
+        // Component-owned copy, and the one failure where this side can speak to
+        // the charge: we never reached the action, so nothing was spent. It
+        // carries its own retry prompt because the shared branch below no longer
+        // appends one.
         setOutcome({
           kind: 'failed',
-          message: 'Your post body could not be saved, so nothing was generated.',
+          message:
+            'Your post body could not be saved, so nothing was generated and no credits were charged — try again.',
         })
         return
       }
@@ -127,9 +132,12 @@ export function GeneratePanel({ postId, channels, flush, onGenerated }: Generate
         </InlineError>
       ) : null}
 
-      {outcome?.kind === 'failed' ? (
-        <InlineError>{outcome.message} No credits were charged. Try generating again.</InlineError>
-      ) : null}
+      {/* The charge statement has exactly ONE owner: whoever produced the message.
+          The action already says whether you were charged, and it is the only
+          side that KNOWS — a lost acknowledgement means it cannot confirm the
+          charge, and an unconditional "No credits were charged." here would
+          overwrite that truth with a guess. Rendered verbatim for that reason. */}
+      {outcome?.kind === 'failed' ? <InlineError>{outcome.message}</InlineError> : null}
     </div>
   )
 }

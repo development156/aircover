@@ -1,6 +1,9 @@
 import 'server-only'
 
+import { cache } from 'react'
+
 import { createServerSupabase } from '@/lib/supabase/server'
+import { getActiveWorkspace } from '@/lib/workspaces'
 
 import { toBalance, type WalletBalance } from './balance'
 import { parseEntries, type ParsedLedger } from './parse-entries'
@@ -12,7 +15,27 @@ import { parseEntries, type ParsedLedger } from './parse-entries'
  *
  * There is no `available` column, no view and no wallet RPC — available is
  * derived in `toBalance` via `availableCredits()` from @sahoda/shared.
+ *
+ * Every read here is filtered to the ACTIVE workspace. RLS remains the security
+ * boundary and this filter is NOT an authorization check — the cookie behind the
+ * active workspace is not a grant (see `lib/workspaces.ts`). It is a CORRECTNESS
+ * filter: the member policy is
+ * `workspace_id in (select app.member_workspace_ids())`, which admits EVERY
+ * workspace the user belongs to, so a second membership would otherwise fold two
+ * tenants' rows into one answer. `credit_balances` is keyed one row per
+ * workspace, so `.maybeSingle()` would then see two rows and fail with PGRST116 —
+ * a wallet that reads as permanently unreadable, with no reload that fixes it.
  */
+
+/**
+ * Memoised per request so the three wallet reads on `/wallet` share one
+ * workspace lookup instead of issuing three. Falls back to an extra round trip
+ * if a caller runs outside a request scope — no correctness impact either way.
+ */
+const activeWorkspaceId = cache(async (): Promise<string | null> => {
+  const workspace = await getActiveWorkspace()
+  return workspace?.id ?? null
+})
 
 /** Row cap for the history read. Exported so the UI can state the window it is showing. */
 export const HISTORY_LIMIT = 50
@@ -24,10 +47,17 @@ export const HISTORY_LIMIT = 50
  */
 export async function readBalance(): Promise<WalletBalance | null> {
   try {
+    // No active workspace means we never looked at a balance. That is the
+    // unreadable case, not a zero one — reporting "0 credits" here would tell
+    // someone with a full wallet that they cannot afford to work.
+    const workspaceId = await activeWorkspaceId()
+    if (workspaceId === null) return null
+
     const supabase = createServerSupabase()
     const { data, error } = await supabase
       .from('credit_balances')
       .select('workspace_id, balance_total, balance_held, updated_at')
+      .eq('workspace_id', workspaceId)
       .maybeSingle()
 
     // NULL means "we could not read your balance", which is a different claim
@@ -65,10 +95,14 @@ export async function readAvailableCredits(): Promise<number | null> {
  */
 export async function readLedger(limit = HISTORY_LIMIT): Promise<ParsedLedger> {
   try {
+    const workspaceId = await activeWorkspaceId()
+    if (workspaceId === null) return { entries: [], skipped: 0 }
+
     const supabase = createServerSupabase()
     const { data, error } = await supabase
       .from('credit_ledger')
       .select('*')
+      .eq('workspace_id', workspaceId)
       .order('seq', { ascending: false })
       .limit(limit)
 
@@ -91,6 +125,9 @@ export async function readLedger(limit = HISTORY_LIMIT): Promise<ParsedLedger> {
  */
 export async function readOpenHolds(): Promise<{ hold_expires_at: string | null }[]> {
   try {
+    const workspaceId = await activeWorkspaceId()
+    if (workspaceId === null) return []
+
     const supabase = createServerSupabase()
 
     // A HOLD keeps its `hold_expires_at` after it settles, so the column alone
@@ -98,16 +135,23 @@ export async function readOpenHolds(): Promise<{ hold_expires_at: string | null 
     // stuck credits. Openness is the ABSENCE of a settling entry, which
     // PostgREST cannot express as an anti-join, so we read both sides and
     // subtract here. `settles_entry_id` is unique, so at most one settles each.
+    //
+    // Both sides carry the same workspace filter. Scoping only one would compare
+    // one tenant's holds against another's settlements; and because each side is
+    // capped, a second workspace's rows could push a settling entry out of the
+    // window and report a settled hold as stuck credits.
     const [holds, settlements] = await Promise.all([
       supabase
         .from('credit_ledger')
         .select('id, hold_expires_at')
+        .eq('workspace_id', workspaceId)
         .eq('entry_type', 'HOLD')
         .order('seq', { ascending: false })
         .limit(HISTORY_LIMIT),
       supabase
         .from('credit_ledger')
         .select('settles_entry_id')
+        .eq('workspace_id', workspaceId)
         .not('settles_entry_id', 'is', null)
         .order('seq', { ascending: false })
         .limit(HISTORY_LIMIT * 2),
