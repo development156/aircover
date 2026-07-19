@@ -34,8 +34,7 @@ const expectProviderError = <T>(result: Result<T>): AppError => {
 }
 
 /** Answers a non-boolean, which the type signature forbids but a JS caller can still do. */
-const answering = (value: unknown): IsSlugTaken =>
-  (async () => value) as unknown as IsSlugTaken
+const answering = (value: unknown): IsSlugTaken => (async () => value) as unknown as IsSlugTaken
 
 describe('resolveSlug -- a predicate that fails is a Result, not an unhandled rejection', () => {
   it('converts a synchronous throw into a typed PROVIDER_ERROR', async () => {
