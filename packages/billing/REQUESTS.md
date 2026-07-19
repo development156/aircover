@@ -118,6 +118,16 @@ The route must pass the webhook body as **raw text** (`await req.text()`) to
 `verifyWebhookSignature`, never a re-stringified parse: JSON round-tripping reorders keys and
 normalizes numbers (`1.80` → `1.8`), which silently breaks the HMAC.
 
+**The route MUST act on `PlanGrantResult.replayed`.** Grants are idempotent per
+`(plan, period, workspace)` — that is deliberate and it is what stops a redelivered webhook
+double-granting. The flip side: if a customer genuinely pays **twice** for the same plan and
+period (re-subscribing after a mid-month cancel, or a duplicate checkout), the second payment
+replays and grants **nothing**. Billing reports this honestly — `replayed: true` alongside a
+freshly-claimed `billing_webhook_events` row means _a distinct payment produced no credits_ —
+but billing cannot decide the remedy. The route must surface it for refund or support rather
+than letting it pass as a normal success. Raised and adjudicated during the phase-2 adversarial
+review: not a defect in this package, but an obligation on its caller.
+
 ## 7. Promote billing-internal contracts to `@sahoda/shared` (post-Alpha, ruling #2)
 
 Billing-internal for Alpha, to be promoted alongside `PaymentProvider`:
