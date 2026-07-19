@@ -26,8 +26,6 @@
 export const PENDING_ANCHORS: Readonly<Record<string, string>> = {
   'connections.connect_x':
     'Connecting is blocked, not merely unbuilt: `connections` has no INSERT policy and apps/web has no service-role client (see REQUESTS.md, upsert_connection). A "connect" anchor would imply an action that cannot complete.',
-  'sites.generate':
-    "The /sites route exists as a mount point only; there is no generator. packages/sites is wt-pub's and the deploy half is unowned, so nothing here can generate or publish a site.",
 }
 
 /** Anchors this app renders. Kept sorted; the test derives the real set from the markup. */

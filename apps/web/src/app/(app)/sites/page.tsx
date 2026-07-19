@@ -1,41 +1,102 @@
 import { Globe } from 'lucide-react'
+import { normalizeDraft, renderBundle } from '@sahoda/sites'
 
 import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
+import { GenerateSitePanel } from '@/components/sites/generate-site-panel'
+import { SitePreview } from '@/components/sites/site-preview'
+import { siteTreeToOutput } from '@/lib/sites/from-rows'
+import { toPreviewPages, type PreviewPage } from '@/lib/sites/preview'
+import { readSiteTree, recentSites } from '@/lib/sites/read'
+import { sharedTokensCss } from '@/lib/sites/tokens-css'
 
 export const metadata = { title: 'Sites' }
 
 /**
- * Sites — MOUNT POINT ONLY, deliberately.
+ * Sites — generate + IN-APP PREVIEW. The rows round-trip through the same
+ * `@sahoda/sites` pipeline that wrote them (`siteTreeToOutput → normalizeDraft
+ * → renderBundle`), so preview markup re-earns every escaping/path guard on
+ * every render. `theme: null` is honest — `workspace_themes` has no persisted
+ * rows yet — and `formAction: null` renders the contact section formless (no
+ * lead route is mounted, and a form that discards leads is worse than none).
  *
- * This route exists so the seeded Guide tour that navigates to `/sites` stops
- * landing on a 404. There is nothing behind it on purpose: `packages/sites` is
- * wt-pub's, actively being built, and it defines the `SiteStore` / `Deployer`
- * ports apps/web is meant to mount. Building a generator or a section renderer
- * here would collide with those ports at integration.
- *
- * The deploy half is not merely unbuilt, it is UNOWNED — no lane in the roadmap
- * carries it, and there is no Cloudflare client or wrangler config anywhere in
- * the repo. So a site could be generated but never actually published, and
- * writing `status = 'published'` off the back of that would be precisely the
- * fabricated success state the honesty rule forbids.
- *
- * Note on the tour anchor: this page deliberately does NOT carry
- * `data-guide="sites.generate"`. There is no generate button, and hanging that
- * anchor on a placeholder would make the tour step appear to work over a feature
- * that does not exist. A missing anchor auto-skips (FSD M14), which is the
- * honest behaviour until the real control lands.
+ * The DEPLOY half stays deferred and unowned: no Cloudflare client exists,
+ * `sites.status` never leaves 'draft' from here, and every copy string says
+ * "preview". A published-looking state without a real address would be the
+ * fabricated success the honesty rule forbids.
  */
-export default function SitesPage() {
+
+type Preview = { siteName: string; pages: PreviewPage[] } | 'unreadable' | 'read-failed' | null
+
+/**
+ * Walks the recent sites (newest first) until one renders. A newest row with
+ * zero pages — the mid-way-cleanup-failed orphan — must not shadow the older,
+ * healthy, paid site beneath it (review HIGH). 'read-failed' is kept distinct
+ * from both 'no sites' and 'unreadable': each earns different copy, and only
+ * one of them may honestly suggest generating.
+ */
+async function buildPreview(): Promise<Preview> {
+  const sites = await recentSites()
+  if (sites === null) return 'read-failed'
+  if (sites.length === 0) return null
+
+  for (const site of sites) {
+    const tree = await readSiteTree(site.id)
+    if (!tree || tree.pages.length === 0) continue
+
+    const output = siteTreeToOutput(tree.pages, tree.sections)
+    if (!output) continue
+
+    const normalized = normalizeDraft(output, {
+      name: site.name,
+      goal: site.goal,
+      maxPages: 5,
+      traceId: `preview-${site.id}`,
+    })
+    if (!normalized.ok || normalized.data.draft.pages.length === 0) continue
+
+    const bundle = renderBundle(normalized.data.draft, {
+      siteName: site.name,
+      tokensCss: sharedTokensCss(),
+      theme: null,
+      formAction: null,
+      canonicalOrigin: null,
+    })
+    return { siteName: site.name, pages: toPreviewPages(bundle) }
+  }
+
+  return 'unreadable'
+}
+
+export default async function SitesPage() {
+  const preview = await buildPreview()
+
   return (
     <div className="space-y-grid">
       <PageTitle>Sites</PageTitle>
-      <EmptyState
-        icon={Globe}
-        title="Sites aren't building yet"
-        body="Generating a site and publishing it to a real address are still being built. I'd rather show you nothing here than a page that can't go live."
-        tip="Your posts and wallet are ready to use in the meantime."
-      />
+
+      <GenerateSitePanel />
+
+      {preview === null ? (
+        <EmptyState
+          icon={Globe}
+          title="Your site shows up here"
+          body="Generate a one-page draft above and preview it right here. Publishing to a real address is still being built."
+          tip="Resolve your Brand Brain first — the site is written in whatever voice it finds."
+        />
+      ) : preview === 'read-failed' ? (
+        <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
+          Couldn&rsquo;t check your sites just now — reload before generating. You may already have
+          a site, and generating again costs credits.
+        </p>
+      ) : preview === 'unreadable' ? (
+        <p className="rounded-input bg-danger-bg px-3 py-2.5 text-[13px] text-danger">
+          Your recent site drafts could not be read back. Reload first; if this persists, generate
+          again — you were only ever charged for drafts that saved.
+        </p>
+      ) : (
+        <SitePreview siteName={preview.siteName} pages={preview.pages} />
+      )}
     </div>
   )
 }

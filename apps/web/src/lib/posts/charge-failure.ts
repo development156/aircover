@@ -33,6 +33,8 @@ export const FAILURE_REASON = {
   EMPTY_REWRITE: 'The model returned an empty rewrite.',
   NO_PLAN: 'The model returned no usable plan.',
   SAVE_FAILED: 'The plan could not be saved.',
+  NO_SITE: 'The model returned no usable site.',
+  SITE_SAVE_FAILED: 'The site could not be saved.',
 } as const
 
 export type FailureReason = (typeof FAILURE_REASON)[keyof typeof FAILURE_REASON]

@@ -56,6 +56,9 @@ importers:
       '@sahoda/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@sahoda/sites':
+        specifier: workspace:*
+        version: link:../../packages/sites
       '@supabase/supabase-js':
         specifier: ^2.110.7
         version: 2.110.7
