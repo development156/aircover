@@ -41,9 +41,6 @@ importers:
       '@sahoda/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@supabase/supabase-js':
-        specifier: ^2.110.7
-        version: 2.110.7
       '@trigger.dev/sdk':
         specifier: ^4.5.4
         version: 4.5.4(react@19.2.7)(zod@4.4.3)
