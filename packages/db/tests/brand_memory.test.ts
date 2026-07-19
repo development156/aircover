@@ -1,8 +1,9 @@
-import { describe, it, expect, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ResolveBrandMemoryResultSchema, type BrandMemoryPayload } from '@sahoda/shared'
 import { hasRlsEnv } from './helpers/env'
 import { serviceClient, userClient, anonClient } from './helpers/db'
+import { sweepStaleFixtures } from './helpers/sweep'
 import { brandPayload, withSection } from './helpers/brand'
 
 // public.resolve_brand_memory is the ONE client-reachable write into brand_memory
@@ -65,6 +66,12 @@ describe.skipIf(!hasRlsEnv)('public.resolve_brand_memory', () => {
       created_by: string | null
     }>
   }
+
+  // afterAll-only cleanup: an interrupted run strands every freshWorkspace() it
+  // made, plus the brand_memory versions cascading off them. See helpers/sweep.ts.
+  beforeAll(async () => {
+    await sweepStaleFixtures(svc(), 'user_brain_')
+  })
 
   afterAll(async () => {
     for (const id of [...new Set(workspaces)]) {

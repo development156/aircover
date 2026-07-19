@@ -1,7 +1,8 @@
-import { describe, it, expect, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { hasRlsEnv } from './helpers/env'
 import { serviceClient, userClient, anonClient } from './helpers/db'
+import { sweepStaleFixtures } from './helpers/sweep'
 
 type Workspace = { id: string; name: string; slug: string; created_by: string }
 type BootstrapResult = { workspace: Workspace; replayed: boolean }
@@ -36,6 +37,13 @@ describe.skipIf(!hasRlsEnv)('public.bootstrap_workspace', () => {
     if (data?.workspace?.id) workspaces.push(data.workspace.id)
     return { data, error }
   }
+
+  // This suite strands MORE than workspaces: bootstrap_workspace also writes
+  // users_profile, which has no FK to workspaces and so survives the workspace
+  // cascade. sweepStaleFixtures clears both. See helpers/sweep.ts.
+  beforeAll(async () => {
+    await sweepStaleFixtures(svc(), 'user_boot_')
+  })
 
   afterAll(async () => {
     for (const id of [...new Set(workspaces)]) {

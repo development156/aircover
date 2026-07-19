@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { hasRlsEnv } from './helpers/env'
 import { serviceClient, userClient, anonClient } from './helpers/db'
+import { sweepStaleFixtures } from './helpers/sweep'
 
 type UpsertResult = { connection_id: string }
 
@@ -52,6 +53,10 @@ describe.skipIf(!hasRlsEnv)('public.upsert_connection', () => {
   }
 
   beforeAll(async () => {
+    // afterAll-only cleanup: an interrupted run strands both workspaces and the
+    // connections + sealed secrets hanging off them. See helpers/sweep.ts.
+    await sweepStaleFixtures(svc(), 'user_conn_')
+
     const a = await svc()
       .from('workspaces')
       .insert({ name: 'Conn A', slug: `conn-a-${run}`, created_by: owner })
