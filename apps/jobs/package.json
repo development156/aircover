@@ -9,7 +9,18 @@
     "lint": "exit 0"
   },
   "dependencies": {
+    "@sahoda/billing": "workspace:*",
     "@sahoda/mesh": "workspace:*",
-    "@sahoda/shared": "workspace:*"
+    "@sahoda/publishing": "workspace:*",
+    "@sahoda/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.110.7",
+    "@trigger.dev/sdk": "^4.5.4",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/pg": "^8.20.0",
+    "dotenv": "^17.4.2",
+    "vitest": "^4.1.10"
   }
 }
