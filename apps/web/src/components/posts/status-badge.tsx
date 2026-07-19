@@ -15,7 +15,7 @@ interface StatusStyle {
   className: string
 }
 
-const STATUS_STYLES = {
+export const STATUS_STYLES = {
   idea: { label: 'Idea', className: 'bg-s2 text-muted' },
   draft: { label: 'Draft', className: 'bg-s2 text-muted' },
   // Sitting with a human: same grey surface as draft, but full-strength ink so

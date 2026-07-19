@@ -24,8 +24,6 @@
  * the other in either direction.
  */
 export const PENDING_ANCHORS: Readonly<Record<string, string>> = {
-  'planner.approve':
-    'The planner is a stub — there is no approve control to point at. Anchor lands with the Planner screen.',
   'connections.connect_x':
     'Connecting is blocked, not merely unbuilt: `connections` has no INSERT policy and apps/web has no service-role client (see REQUESTS.md, upsert_connection). A "connect" anchor would imply an action that cannot complete.',
   'sites.generate':

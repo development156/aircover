@@ -311,3 +311,36 @@ exists.
 **Contract note:** naming drift to reconcile — `BrandMemorySourceSchema` uses `resolved|manual|system`
 while an earlier TSD §5 draft referenced `created_by ∈ [user|system]`. The frozen shared schema
 (`packages/shared/src/db/brand.ts`) is authoritative: `source` enum + a nullable text `created_by`.
+
+## wt-mesh: `PlanWeekInputSchema.channels` needs `.max()` + de-dupe
+
+`packages/mesh/src/tasks/plan-week.ts:10-13` bounds `channels` with `.min(1)` only, and the array
+is joined verbatim into the paid prompt (`:41`). apps/web's `planMyWeek` de-dupes before calling
+(`[...new Set(...)]`), so the amplification is closed at OUR boundary — but the schema itself
+still accepts `Array(500_000).fill('x')` from any other caller under the 12MB server-action body
+limit. A flat 20-credit charge against an arbitrarily inflated provider prompt is a
+cost-amplification vector against Sahoda's own spend.
+
+**Ask:** add `.max(8)` (or de-dupe via transform) to the schema so every caller is bounded.
+
+## wt-db/shared: model-written `title`/`body` have no `.max()` anywhere in the chain
+
+`PlanWeekOutputSchema.briefs[].title/.body` (shared/mesh/tasks.ts), `PostInsertSchema.title/.body`
+(shared/db/content.ts) and the `posts` columns are all unbounded. `plan_week` is the first path
+inserting five rows of MODEL text per click; apps/web caps at its boundary
+(`lib/planner/briefs.ts`: 160/4000 code points) but the contract should carry the bound.
+
+**Ask:** `.max()` on the shared schemas (owner to pick the numbers; ours are a stopgap).
+
+## wt-db or owner ruling: `savePost` accepts any parseable `scheduled_at` — lead check is client-only
+
+`PostUpdateSchema.scheduled_at` is a bare nullable string and `savePost` never calls
+`validateScheduleLead` — any authenticated member can set a past date or one inside a channel's
+`scheduleMinLeadMinutes` by posting the action directly. Pre-existing (the editor has the same
+server gap); the planner's reschedule now exercises it from a second surface and its docstring
+says so honestly. Widening `savePost` touches the editor's autosave path (client-validated values
+
+- clock skew), so this wants a deliberate ruling, not a drive-by fix.
+
+**Ask:** decide where the server-side schedule floor lives (savePost, a DB CHECK, or publish-time
+only) and we'll wire the web side accordingly.

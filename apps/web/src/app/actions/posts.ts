@@ -62,6 +62,7 @@ export async function createPost(title: string): Promise<SaveState> {
     }
 
     revalidatePath('/posts')
+    revalidatePath('/planner')
     return { ok: true, postId: parsed.data.id, updatedAt: parsed.data.updated_at }
   } catch {
     return { ok: false, message: 'Could not create this post — try again.' }
@@ -119,6 +120,7 @@ export async function savePost(postId: string, patch: unknown): Promise<SaveStat
     }
 
     revalidatePath('/posts')
+    revalidatePath('/planner')
     return { ok: true, postId: parsed.data.id, updatedAt: parsed.data.updated_at }
   } catch {
     return { ok: false, message: 'Could not save this post — try again.' }
@@ -179,6 +181,7 @@ export async function saveVariant(
     if (error || !data) return { ok: false, message: mapPostError(error) }
 
     revalidatePath('/posts')
+    revalidatePath('/planner')
     const updatedAt = (data as { updated_at?: unknown }).updated_at
     return {
       ok: true,
@@ -219,6 +222,7 @@ export async function deletePost(postId: string): Promise<DeleteState> {
     if (!data) return { ok: false, message: mapPostError({ code: 'PGRST116' }) }
 
     revalidatePath('/posts')
+    revalidatePath('/planner')
     return { ok: true }
   } catch {
     return { ok: false, message: 'Could not delete this post — try again.' }

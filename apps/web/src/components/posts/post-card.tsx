@@ -6,35 +6,13 @@ import { CHANNEL_SHORT } from '@/components/posts/channel-label'
 import { DeletePostButton } from '@/components/posts/delete-post-button'
 import { StatusBadge } from '@/components/posts/status-badge'
 import { Card } from '@/components/ui/card'
+import { formatScheduledAt } from '@/lib/posts/schedule-format'
 import { cn } from '@/lib/utils'
 
 /**
  * One post in the list. Server component — the only client island inside it is
  * the delete control, so the card itself costs no JS.
  */
-
-/**
- * `scheduled_at` is stored as a timestamptz string. We render it in IST and SAY
- * so — formatting a stored instant in an unlabelled zone is how a schedule time
- * silently becomes a wrong number.
- */
-const SCHEDULE_FORMAT = new Intl.DateTimeFormat('en-IN', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: true,
-  timeZone: 'Asia/Kolkata',
-})
-
-function formatScheduledAt(value: string | null): string | null {
-  if (!value) return null
-  const parsed = new Date(value)
-  // An unparseable timestamp renders nothing rather than "Invalid Date".
-  if (Number.isNaN(parsed.getTime())) return null
-  return `${SCHEDULE_FORMAT.format(parsed)} IST`
-}
 
 const EXCERPT_MAX_CHARS = 220
 

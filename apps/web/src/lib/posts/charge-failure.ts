@@ -31,6 +31,8 @@ export const FAILURE_REASON = {
   MESH_ERROR: 'The model could not complete this.',
   NO_VARIANTS: 'The model returned no usable variants.',
   EMPTY_REWRITE: 'The model returned an empty rewrite.',
+  NO_PLAN: 'The model returned no usable plan.',
+  SAVE_FAILED: 'The plan could not be saved.',
 } as const
 
 export type FailureReason = (typeof FAILURE_REASON)[keyof typeof FAILURE_REASON]
