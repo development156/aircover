@@ -22,6 +22,8 @@ const generateVariants = vi.fn()
 const savePost = vi.fn()
 const saveVariant = vi.fn()
 const simulatePublish = vi.fn()
+const attachMedia = vi.fn()
+const detachMedia = vi.fn()
 
 vi.mock('@/app/actions/posts-ai', () => ({
   rewriteCaption: (...args: unknown[]) => rewriteCaption(...args),
@@ -33,6 +35,16 @@ vi.mock('@/app/actions/posts', () => ({
 }))
 vi.mock('@/app/actions/posts-publish', () => ({
   simulatePublish: (...args: unknown[]) => simulatePublish(...args),
+}))
+// The media pane refreshes the server render after an attach/detach. There is
+// no app-router context in jsdom, so `useRouter` needs a stand-in.
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
+// The media pane now calls real server actions. `posts-media` reaches
+// `lib/posts/read`, which is `server-only` — Next replaces a 'use server'
+// module with an RPC stub on the client, but vitest resolves the real one.
+vi.mock('@/app/actions/posts-media', () => ({
+  attachMedia: (...args: unknown[]) => attachMedia(...args),
+  detachMedia: (...args: unknown[]) => detachMedia(...args),
 }))
 
 const { PostEditor } = await import('./post-editor')

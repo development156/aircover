@@ -7,6 +7,7 @@ import { CardLabel } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import type { MediaPreview } from '@/lib/posts/media-url'
 import { selectedText, spliceSelection, type SelectionRange } from '@/lib/posts/splice-selection'
 
 import { BottomBar } from './bottom-bar'
@@ -21,6 +22,12 @@ export interface PostEditorProps {
   post: Post
   variants: PostVariant[]
   media: PostMedia[]
+  /**
+   * Signed preview URLs for `media`, minted server-side — the bucket is
+   * private, so the client cannot sign its own. Optional: with none, every row
+   * still lists, showing its "preview unavailable" placeholder.
+   */
+  previews?: MediaPreview[]
 }
 
 const STATUS_COPY: Readonly<Record<AutosaveStatus, string>> = {
@@ -40,7 +47,12 @@ const STATUS_COPY: Readonly<Record<AutosaveStatus, string>> = {
  * because editing one unlinks it from the canonical body server-side and that
  * is not something to do behind the writer's back.
  */
-export function PostEditor({ post, variants, media }: PostEditorProps): React.JSX.Element {
+export function PostEditor({
+  post,
+  variants,
+  media,
+  previews,
+}: PostEditorProps): React.JSX.Element {
   const autosave = useAutosave(post.id, post)
   const variantsApi = useVariants(post.id, variants)
   const [selection, setSelection] = useState<SelectionRange | null>(null)
@@ -89,7 +101,7 @@ export function PostEditor({ post, variants, media }: PostEditorProps): React.JS
       ) : null}
 
       <div className="grid gap-grid wide:grid-cols-[minmax(0,230px)_minmax(0,1fr)_minmax(0,370px)]">
-        <MediaPane media={media} channels={draft.channels} />
+        <MediaPane media={media} channels={draft.channels} postId={post.id} previews={previews} />
 
         <section className="space-y-3" data-guide="post-body">
           <div className="flex items-center justify-between gap-2">

@@ -1,19 +1,27 @@
 'use client'
 
-import { AlertTriangle, ImageOff, Paperclip } from 'lucide-react'
+import { AlertTriangle, ImageOff } from 'lucide-react'
 import type { Channel, PostMedia } from '@sahoda/shared'
 
-import { Button } from '@/components/ui/button'
 import { CardLabel } from '@/components/ui/card'
-import { describeViolation } from '@/lib/posts/violation-copy'
+import type { MediaPreview } from '@/lib/posts/media-url'
 import { toAttachment, unverifiableRows, validateAttachments } from '@/lib/posts/to-attachment'
 
-import { CHANNEL_LABELS } from './channel-label'
+import { ChannelObjections } from './channel-objections'
 import { InlineNote } from './inline-error'
+import { MediaAttach } from './media-attach'
+import { MediaRemoveButton } from './media-remove-button'
 
 export interface MediaPaneProps {
   media: PostMedia[]
   channels: Channel[]
+  postId: string
+  /**
+   * Signed preview URLs from the server, one per row. Optional because a
+   * caller with nothing signed is a legitimate state — every row then renders
+   * its honest "preview unavailable" placeholder rather than a broken image.
+   */
+  previews?: MediaPreview[]
 }
 
 const BYTES_PER_KB = 1024
@@ -33,11 +41,52 @@ function formatBytes(bytes: number): string {
   return `${bytes} B`
 }
 
-function MediaRow({ row, unverifiable }: { row: PostMedia; unverifiable: boolean }) {
+/**
+ * Alt text for the preview. Falls back to naming the file rather than
+ * describing it — this component has never seen the image and inventing a
+ * description would be worse than admitting there is none.
+ */
+function altTextFor(row: PostMedia, fileName: string): string {
+  const alt = row.alt
+  if (alt !== null && alt.trim() !== '') return alt
+  return `Attached image with no alt text — ${fileName}`
+}
+
+interface MediaRowProps {
+  row: PostMedia
+  unverifiable: boolean
+  /** null means the URL could not be signed. The FILE still exists. */
+  previewUrl: string | null
+}
+
+function MediaRow({ row, unverifiable, previewUrl }: MediaRowProps) {
   const result = toAttachment(row)
+  const fileName = fileNameOf(row)
+
   return (
     <li className="rounded-input border border-line bg-s1 p-3">
-      <p className="truncate text-[13px] font-semibold text-ink">{fileNameOf(row)}</p>
+      {previewUrl !== null ? (
+        // Signed Supabase URL on a private bucket, short-lived and per-request:
+        // next/image would need it in remotePatterns and would cache a link
+        // that expires within the hour.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={previewUrl}
+          alt={altTextFor(row, fileName)}
+          loading="lazy"
+          className="mb-2 max-w-full rounded-input border border-line bg-bg object-contain"
+        />
+      ) : (
+        /* The row is NEVER hidden for want of a preview. The file is on the
+           post, it counts against every channel's media cap, and it is the
+           writer's only handle for removing it. */
+        <p className="mb-2 flex items-center gap-2 rounded-input border border-dashed border-line bg-bg px-3 py-4 text-[12.5px] text-muted">
+          <ImageOff size={15} strokeWidth={1.7} className="shrink-0 text-faint" aria-hidden />
+          <span>Preview unavailable — the file is still attached to this post.</span>
+        </p>
+      )}
+
+      <p className="truncate text-[13px] font-semibold text-ink">{fileName}</p>
       <p className="mt-0.5 truncate text-[12.5px] text-muted">
         {row.alt !== null && row.alt !== '' ? row.alt : 'No alt text on this file'}
       </p>
@@ -67,24 +116,33 @@ function MediaRow({ row, unverifiable }: { row: PostMedia; unverifiable: boolean
           </span>
         </p>
       ) : null}
+
+      <MediaRemoveButton mediaId={row.id} fileName={fileName} />
     </li>
   )
 }
 
 /**
- * Media attached to THIS post. There is no workspace media library table and
- * `post_media.post_id` is NOT NULL, so no picker is offered — the add
- * affordance is rendered disabled and labelled as pending rather than faked.
+ * Media attached to THIS post.
+ *
+ * `post_media.post_id` is NOT NULL and there is no workspace asset library
+ * table, so the only affordance is uploading a NEW file — reusing one from
+ * another post is not something this schema can express yet, and the note says
+ * so rather than offering a picker that cannot work.
  *
  * A row the Constraint Engine cannot judge (null mime/bytes) is flagged as
  * unverified, never as valid: `validateAttachments` returns an empty
  * `violations` list for such rows precisely because it was handed nothing to
  * check.
  */
-export function MediaPane({ media, channels }: MediaPaneProps) {
+export function MediaPane({ media, channels, postId, previews = [] }: MediaPaneProps) {
   const unverifiableIds = new Set(unverifiableRows(media).map((row) => row.id))
   const verdicts = channels.length > 0 ? validateAttachments(channels, media) : []
   const flagged = verdicts.filter((verdict) => verdict.violations.length > 0)
+  // Keyed by row id, not position: the two lists are signed together but a
+  // caller could pass a stale or partial set, and a positional read would then
+  // hang one row's preview on another row.
+  const previewById = new Map(previews.map((preview) => [preview.id, preview.url]))
 
   return (
     <section className="space-y-3" data-guide="post-media">
@@ -109,41 +167,28 @@ export function MediaPane({ media, channels }: MediaPaneProps) {
       ) : (
         <ul className="space-y-2">
           {media.map((row) => (
-            <MediaRow key={row.id} row={row} unverifiable={unverifiableIds.has(row.id)} />
+            <MediaRow
+              key={row.id}
+              row={row}
+              unverifiable={unverifiableIds.has(row.id)}
+              previewUrl={previewById.get(row.id) ?? null}
+            />
           ))}
         </ul>
       )}
 
       {flagged.length > 0 ? (
-        <div className="space-y-2">
-          {flagged.map((verdict) => (
-            <div
-              key={verdict.channel}
-              role="alert"
-              className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
-            >
-              <p className="font-semibold">{CHANNEL_LABELS[verdict.channel]}</p>
-              <ul className="mt-1 space-y-0.5">
-                {verdict.violations.map((violation) => (
-                  <li key={`${violation.code}-${violation.message}`}>
-                    {describeViolation(violation).message}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+        <div role="alert">
+          <ChannelObjections objections={flagged} tone="danger" />
         </div>
       ) : null}
 
-      <div className="space-y-2 border-t border-line pt-3">
-        <Button variant="secondary" size="sm" disabled className="w-full">
-          <Paperclip size={13} aria-hidden />
-          Add media
-        </Button>
-        <InlineNote>
-          Uploading from the editor is not built yet — this button does nothing today.
-        </InlineNote>
-      </div>
+      <MediaAttach postId={postId} channels={channels} />
+
+      <InlineNote>
+        There is no workspace media library yet — you can upload a new file here, but not reuse one
+        already attached to another post.
+      </InlineNote>
     </section>
   )
 }
