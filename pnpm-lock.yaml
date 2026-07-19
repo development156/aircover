@@ -171,6 +171,15 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  packages/sites:
+    dependencies:
+      '@sahoda/shared':
+        specifier: workspace:*
+        version: link:../shared
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+
 packages:
 
   '@alloc/quick-lru@5.2.0':
