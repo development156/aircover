@@ -12,16 +12,40 @@ export const BILLING_PACKAGE = '@sahoda/billing' as const
 // Credit wrapper
 export * from './withCredits'
 
+// Billing period format contract (YYYY-MM) — the grant replay anchor
+export * from './period'
+
 // Ledger ports (interface + direct-Postgres implementation)
 export * from './ledger/port'
 export * from './ledger/pg'
 
+// Direct-pg TLS decision + the mandatory pool error guard. Exported because ANY process that
+// builds its own Pool must reuse this rule rather than re-deriving it: the host a DSN really
+// dials is not `new URL().hostname` (`?host=` overrides it, and a repeated `?host=` keeps the
+// LAST), so an independent re-implementation silently relaxes certificate verification against
+// an attacker-controlled host. apps/jobs had exactly that drift.
+export * from './pgSsl'
+
 // Server-only env
 export * from './env'
+
+// Entitlements gate — called BEFORE withCredits at every AI entry point (owner ruling #5)
+export * from './entitlements/port'
+export * from './entitlements/pg'
+export * from './entitlements/checkEntitlement'
+
+// HTTP port for payment adapters (fixture replay in tests, global fetch in prod)
+export * from './transport'
 
 // Payment-rail seam + fixture provider
 export * from './providers/types'
 export * from './providers/fixture'
+
+// Cashfree (India) rail — sandbox now, live behind CASHFREE_ENV
+export * from './providers/cashfree/env'
+export * from './providers/cashfree/signature'
+export * from './providers/cashfree/webhook'
+export * from './providers/cashfree'
 
 // Webhook → ledger: idempotent event store + the process orchestrator + the grant
 export * from './webhooks/applyPlanGrant'

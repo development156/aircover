@@ -1,7 +1,7 @@
-import { Pool, type PoolConfig } from 'pg'
-import { readFileSync } from 'node:fs'
+import { Pool } from 'pg'
 import type { ApplyLedgerInput } from '@sahoda/shared'
 import { assertServerOnly } from '../env'
+import { guardPoolErrors, pgSsl } from '../pgSsl'
 import type {
   HoldLookup,
   HoldSettlement,
@@ -10,32 +10,6 @@ import type {
   LedgerBalance,
   LedgerPort,
 } from './port'
-
-// Anchored to a full hostname label so a look-alike (evil-supabase.com) or a substring in
-// the password/user of the DSN can never trigger the relaxed-verification fallback.
-const SUPABASE_HOST = /(^|\.)supabase\.(co|com|in|net)$/
-
-function pgHostname(connectionString: string): string | null {
-  try {
-    return new URL(connectionString).hostname.toLowerCase()
-  } catch {
-    return null
-  }
-}
-
-/**
- * TLS for the direct Postgres connection (mirrors packages/db test harness). Supabase's
- * direct endpoint presents a private CA chain; set SUPABASE_DB_CA_CERT to enforce full
- * verification (recommended in prod — H19 hardening). Absent a CA, the connection stays
- * TLS-encrypted but skips chain verification for a genuine Supabase host ONLY.
- */
-function pgSsl(connectionString: string): PoolConfig['ssl'] {
-  const caPath = process.env.SUPABASE_DB_CA_CERT
-  if (caPath) return { ca: readFileSync(caPath, 'utf8'), rejectUnauthorized: true }
-  const host = pgHostname(connectionString)
-  if (host && SUPABASE_HOST.test(host)) return { rejectUnauthorized: false }
-  return undefined
-}
 
 /** The raw JSON `app.apply_ledger_entry()` returns (snake_case columns from the row). */
 interface RawApplyResult {
@@ -47,6 +21,8 @@ export interface PgLedgerPortOptions {
   connectionString: string
   /** Inject a pre-built pool (tests / connection reuse); otherwise one is created. */
   pool?: Pool
+  /** Observe idle-client pool errors without this package taking a logger dependency. */
+  onPoolError?: (cause: unknown) => void
 }
 
 /** The port plus its pool + close hook, so tests and long-lived servers can manage the connection. */
@@ -61,13 +37,16 @@ export type PgLedgerPort = LedgerPort & { pool: Pool; close(): Promise<void> }
  */
 export function createPgLedgerPort(opts: PgLedgerPortOptions): PgLedgerPort {
   assertServerOnly()
-  const pool =
+  const ownsPool = opts.pool === undefined
+  const pool = guardPoolErrors(
     opts.pool ??
-    new Pool({
-      connectionString: opts.connectionString,
-      max: 10,
-      ssl: pgSsl(opts.connectionString),
-    })
+      new Pool({
+        connectionString: opts.connectionString,
+        max: 10,
+        ssl: pgSsl(opts.connectionString),
+      }),
+    opts.onPoolError,
+  )
 
   async function apply(input: ApplyLedgerInput): Promise<LedgerApplyResult> {
     const r = await pool.query<{ res: RawApplyResult }>(
@@ -127,7 +106,17 @@ export function createPgLedgerPort(opts: PgLedgerPortOptions): PgLedgerPort {
     return { attempt, settledBy: toSettlement(row.settled_by) }
   }
 
-  return { apply, balance, latestHold, pool, close: () => pool.end() }
+  // Only end a pool we created. Ending an INJECTED pool would take down every other port
+  // sharing it — the exact "connection reuse" the `pool` option invites.
+  return {
+    apply,
+    balance,
+    latestHold,
+    pool,
+    close: async () => {
+      if (ownsPool) await pool.end()
+    },
+  }
 }
 
 /** Map the settling entry's ledger type to the settlement the attempt logic cares about. */

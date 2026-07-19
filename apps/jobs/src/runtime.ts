@@ -1,6 +1,11 @@
-import { Pool, type PoolConfig } from 'pg'
-import { readFileSync } from 'node:fs'
-import { createPgLedgerPort, createWithCredits, type PgLedgerPort } from '@sahoda/billing'
+import { Pool } from 'pg'
+import {
+  createPgLedgerPort,
+  createWithCredits,
+  guardPoolErrors,
+  pgSsl,
+  type PgLedgerPort,
+} from '@sahoda/billing'
 import { fetchTransport } from '@sahoda/publishing'
 import { loadJobsEnv, type JobsEnv } from './env'
 import { createPublishStore } from './publish/store'
@@ -13,28 +18,12 @@ import type { HoldSweepDeps } from './holds/sweep'
 import type { PlanWeekJobDeps } from './ai/plan-week-job'
 import { runPlanWeek } from './ai/plan-week'
 
-// Anchored to a full hostname label so a look-alike host, or a substring sitting in the
-// DSN's user/password, can never trigger the relaxed-verification path.
-const SUPABASE_HOST = /(^|\.)supabase\.(co|com|in|net)$/
-
-/**
- * TLS for the direct Postgres connection, matching packages/billing/src/ledger/pg.ts.
- * SET SUPABASE_DB_CA_CERT IN PRODUCTION: Supabase's direct endpoint presents a private CA
- * chain, so full verification needs that CA on disk. Without it the connection is still
- * encrypted but the chain is unverified — acceptable for a developer's own project, NOT
- * for prod, where an unverified chain is MITM-able. Tracked as H19 hardening.
- */
-function pgSsl(connectionString: string): PoolConfig['ssl'] {
-  const caPath = process.env.SUPABASE_DB_CA_CERT
-  if (caPath) return { ca: readFileSync(caPath, 'utf8'), rejectUnauthorized: true }
-  try {
-    const host = new URL(connectionString).hostname.toLowerCase()
-    if (SUPABASE_HOST.test(host)) return { rejectUnauthorized: false }
-  } catch {
-    /* fall through to default TLS handling */
-  }
-  return undefined
-}
+// `pgSsl` is imported from @sahoda/billing rather than re-derived here. The local copy this
+// replaces read `new URL(connectionString).hostname`, which is NOT the host pg dials: a
+// `?host=` query parameter overrides the authority host, and a REPEATED `?host=` keeps the
+// LAST. So `…@db.abc.supabase.co/postgres?host=evil.com` relaxed certificate verification
+// while this service-role pool connected to evil.com. Same rule, one definition, one place
+// where it is tested. SET SUPABASE_DB_CA_CERT IN PRODUCTION for full chain verification.
 
 interface Runtime {
   env: JobsEnv
@@ -51,11 +40,18 @@ let cached: Runtime | undefined
 export function getRuntime(): Runtime {
   if (cached) return cached
   const env = loadJobsEnv()
-  const pool = new Pool({
-    connectionString: env.databaseUrl,
-    max: 10,
-    ssl: pgSsl(env.databaseUrl),
-  })
+  // guardPoolErrors is mandatory on a module-level singleton: node-postgres emits 'error' on the
+  // Pool when an IDLE client fails (pooler idle timeout, failover, maintenance restart), and with
+  // no listener Node treats that as an uncaught exception and kills the process — a Trigger.dev
+  // worker would die at 3am from a routine connection recycle. The pool discards the broken
+  // client and carries on, so swallowing is correct; the next query gets a fresh connection.
+  const pool = guardPoolErrors(
+    new Pool({
+      connectionString: env.databaseUrl,
+      max: 10,
+      ssl: pgSsl(env.databaseUrl),
+    }),
+  )
   cached = { env, pool, ledger: createPgLedgerPort({ connectionString: env.databaseUrl, pool }) }
   return cached
 }
