@@ -15,7 +15,12 @@ import { defineConfig } from 'vitest/config'
  * and BOTH passed typecheck, 461 unit tests and a production build. Behaviour
  * that only exists in the browser needs a test that runs in one.
  */
-const alias = { '@': fileURLToPath(new URL('./src', import.meta.url)) }
+const alias = {
+  '@': fileURLToPath(new URL('./src', import.meta.url)),
+  // `server-only` throws outside a React Server context. Tests import server
+  // modules (env.ts) in plain node, so point the poison-pill at an inert stub.
+  'server-only': fileURLToPath(new URL('./vitest.server-only-stub.ts', import.meta.url)),
+}
 
 export default defineConfig({
   test: {
