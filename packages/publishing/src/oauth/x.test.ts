@@ -249,3 +249,135 @@ describe('X OAuth — handleCallback', () => {
     ).toThrow()
   })
 })
+
+describe('X OAuth — hardening (review batch)', () => {
+  it('requests the media.write scope needed for the media upload sub-step', () => {
+    const { store } = fakeStore()
+    const start = handlers(happyTransport(), store).beginAuthorize()
+    expect(new URL(start.url).searchParams.get('scope')).toContain('media.write')
+  })
+
+  it('maps a store failure to PROVIDER_ERROR instead of a raw rejection', async () => {
+    const store: ConnectionStore = {
+      upsertConnection: async () => {
+        throw new Error('supabase exploded')
+      },
+    }
+
+    const result = await handlers(happyTransport(), store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(JSON.stringify(result)).not.toContain('x-access-token-fixture-value')
+  })
+
+  it('maps a transport throw during token exchange to PROVIDER_ERROR', async () => {
+    const { store } = fakeStore()
+    const transport: Transport = async () => {
+      throw new Error('ECONNRESET')
+    }
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+  })
+
+  it('handles a token response without expires_in/scope: null expiry + fallback scopes', async () => {
+    const { store, calls } = fakeStore()
+    const minimalToken = { status: 200, body: { access_token: 'x-access-token-fixture-value' } }
+    const transport = routedTransport([
+      { match: { method: 'POST', urlIncludes: '/2/oauth2/token' }, response: minimalToken },
+      { match: { method: 'GET', urlIncludes: '/2/users/me' }, response: meSuccess as never },
+    ])
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.expiresAt).toBeNull()
+    expect(result.data.scopes).toEqual([
+      'tweet.read',
+      'tweet.write',
+      'users.read',
+      'offline.access',
+      'media.write',
+    ])
+    expect(calls[0]?.expiresAt).toBeNull()
+  })
+
+  it('rejects a non-positive expires_in as an unexpected token response', async () => {
+    const { store } = fakeStore()
+    const badToken = { status: 200, body: { access_token: 't', expires_in: -5 } }
+    const transport = routedTransport([
+      { match: { method: 'POST', urlIncludes: '/2/oauth2/token' }, response: badToken },
+      { match: { method: 'GET', urlIncludes: '/2/users/me' }, response: meSuccess as never },
+    ])
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+  })
+
+  it('strips control/bidi characters and caps provider display strings', async () => {
+    const { store, calls } = fakeStore()
+    const spoofedMe = {
+      status: 200,
+      body: {
+        data: {
+          id: '2244994945',
+          name: 'Chai‮ & Chapters\n' + 'x'.repeat(400),
+          username: 'chai​chapters',
+        },
+      },
+    }
+    const transport = routedTransport([
+      {
+        match: { method: 'POST', urlIncludes: '/2/oauth2/token' },
+        response: tokenSuccess as never,
+      },
+      { match: { method: 'GET', urlIncludes: '/2/users/me' }, response: spoofedMe },
+    ])
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const name = result.data.externalAccount.name ?? ''
+    expect(name).not.toMatch(/[‮​\n]/)
+    expect(name.length).toBeLessThanOrEqual(200)
+    expect(result.data.externalAccount.handle).toBe('chaichapters')
+    expect(calls[0]?.externalAccount.name).not.toMatch(/[‮\n]/)
+  })
+
+  it('checks state BEFORE the provider error param — every branch is CSRF-guarded', async () => {
+    const { store } = fakeStore()
+
+    const result = await handlers(happyTransport(), store).handleCallback(
+      callbackArgs({ params: { error: 'access_denied', state: 'evil-state' } }),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('VALIDATION_ERROR')
+  })
+
+  it('collapses a malformed provider error code to unknown_error', async () => {
+    const { store } = fakeStore()
+
+    const result = await handlers(happyTransport(), store).handleCallback(
+      callbackArgs({
+        params: { error: '<img src=x onerror=alert(1)>', state: 'expected-state' },
+      }),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.message).toContain('unknown_error')
+    expect(result.error.message).not.toContain('<img')
+  })
+})

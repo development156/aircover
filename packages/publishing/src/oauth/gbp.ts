@@ -3,15 +3,20 @@ import { ok, type Result } from '@sahoda/shared'
 import type { Transport, TransportResponse } from '../transport'
 import type { ConnectionStore, ConnectionSummary } from './store'
 import {
+  callProvider,
+  cleanDisplay,
+  computeExpiresAt,
   defaultRandomString,
   defaultSeal,
   defaultUnseal,
+  guardCallback,
   newTraceId,
   parseJson,
+  parseScopes,
   providerErr,
   requireOAuthConfig,
-  sanitizeOAuthErrorCode,
   validationErr,
+  OAuthTokenResponseSchema,
   type OAuthCallbackParams,
   type OAuthHandlerDeps,
 } from './common'
@@ -23,6 +28,11 @@ import {
  * location → auto-connect. Several → a `choose_location` outcome carrying a vault-sealed
  * resume token (wt-web never holds plaintext tokens) that `completeConnection()` redeems
  * within a short TTL. Zero → an honest error, never a fake connect.
+ *
+ * Resume tokens are workspace-bound: redemption under a different workspaceId is
+ * rejected. They are stateless (no server-side consumed marker), so redemption is
+ * repeatable within the TTL for the SAME workspace — an accepted trade-off; the token
+ * only ever transits as an httpOnly-cookie-scoped value in wt-web.
  */
 const GBP_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GBP_TOKEN_URL = 'https://oauth2.googleapis.com/token'
@@ -35,13 +45,6 @@ const RESUME_TTL_MS = 10 * 60 * 1000
 /** Only a well-formed API resource name may be embedded into a request URL. */
 const ACCOUNT_NAME_RE = /^accounts\/[A-Za-z0-9_-]+$/
 const LOCATION_NAME_RE = /^locations\/[A-Za-z0-9_-]+$/
-
-const GoogleTokenResponseSchema = z.object({
-  access_token: z.string().min(1),
-  refresh_token: z.string().optional(),
-  expires_in: z.number().optional(),
-  scope: z.string().optional(),
-})
 
 const AccountsResponseSchema = z.object({
   accounts: z.array(z.object({ name: z.string(), accountName: z.string().optional() })).optional(),
@@ -59,6 +62,7 @@ const GbpLocationChoiceSchema = z.object({
 
 /** Sealed into the resume token — server-internal shape, opaque outside this package. */
 const ResumePayloadSchema = z.object({
+  workspaceId: z.string(),
   issuedAt: z.iso.datetime(),
   accessToken: z.string(),
   refreshToken: z.string().nullable(),
@@ -108,8 +112,9 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
   const unseal = deps.unseal ?? defaultUnseal
 
   async function persist(args: {
+    traceId: string
     workspaceId: string
-    createdBy?: string
+    createdBy: string | null
     location: GbpLocationChoice
     scopes: string[]
     expiresAt: string | null
@@ -120,24 +125,30 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
       id: `${args.location.accountName}/${args.location.name}`,
       name: args.location.title,
     }
-    const { connectionId } = await deps.store.upsertConnection({
-      workspaceId: args.workspaceId,
-      platform: 'gbp',
-      externalAccount,
-      scopes: args.scopes,
-      expiresAt: args.expiresAt,
-      createdBy: args.createdBy ?? null,
-      encryptedSecret: seal(
-        JSON.stringify({ accessToken: args.accessToken, refreshToken: args.refreshToken }),
-      ),
-    })
-    return ok({
-      connectionId,
-      platform: 'gbp' as const,
-      externalAccount,
-      scopes: args.scopes,
-      expiresAt: args.expiresAt,
-    })
+    try {
+      const { connectionId } = await deps.store.upsertConnection({
+        workspaceId: args.workspaceId,
+        platform: 'gbp',
+        externalAccount,
+        scopes: args.scopes,
+        expiresAt: args.expiresAt,
+        createdBy: args.createdBy,
+        encryptedSecret: seal(
+          JSON.stringify({ accessToken: args.accessToken, refreshToken: args.refreshToken }),
+        ),
+      })
+      return ok({
+        connectionId,
+        platform: 'gbp' as const,
+        externalAccount,
+        scopes: args.scopes,
+        expiresAt: args.expiresAt,
+      })
+    } catch {
+      // Seal/store failures must surface as a Result; raw error text (token-adjacent)
+      // must never escape to the caller.
+      return providerErr(args.traceId, 'Could not save the connection — try again.')
+    }
   }
 
   return {
@@ -158,56 +169,44 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
     async handleCallback(args: GbpCallbackArgs): Promise<Result<GbpCallbackOutcome>> {
       const traceId = args.traceId ?? newTraceId()
 
-      if (args.params.error) {
-        return providerErr(
-          traceId,
-          `Google authorization was declined (${sanitizeOAuthErrorCode(args.params.error)}).`,
-        )
-      }
-      if (!args.params.state || args.params.state !== args.expectedState) {
-        return validationErr(traceId, 'OAuth state mismatch — restart the connect flow.')
-      }
-      if (!args.params.code) {
-        return validationErr(traceId, 'Missing authorization code — restart the connect flow.')
-      }
+      const guarded = guardCallback(args.params, args.expectedState, traceId, 'Google')
+      if (guarded) return guarded
 
-      let tokenRes: TransportResponse
-      try {
-        tokenRes = await deps.transport({
+      const tokenRes = await callProvider(
+        deps.transport,
+        {
           method: 'POST',
           url: GBP_TOKEN_URL,
           headers: { 'content-type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
             grant_type: 'authorization_code',
-            code: args.params.code,
+            code: args.params.code ?? '',
             client_id: deps.clientId,
             client_secret: deps.clientSecret,
             redirect_uri: deps.redirectUri,
           }).toString(),
-        })
-      } catch {
-        return providerErr(traceId, 'Could not reach Google to exchange the authorization code.')
-      }
-      if (tokenRes.status !== 200) {
-        return providerErr(traceId, `Google token exchange failed (HTTP ${tokenRes.status}).`, {
-          status: tokenRes.status,
-        })
-      }
-      const token = GoogleTokenResponseSchema.safeParse(parseJson(tokenRes.body))
+        },
+        traceId,
+        {
+          unreachable: 'Could not reach Google to exchange the authorization code.',
+          failed: 'Google token exchange failed',
+        },
+      )
+      if (!tokenRes.ok) return tokenRes
+      const token = OAuthTokenResponseSchema.safeParse(parseJson(tokenRes.data.body))
       if (!token.success) {
         return providerErr(traceId, 'Google returned an unexpected token response.')
       }
       const accessToken = token.data.access_token
       const refreshToken = token.data.refresh_token ?? null
-      const scopes = token.data.scope ? token.data.scope.split(' ').filter(Boolean) : [GBP_SCOPE]
-      const expiresAt =
-        token.data.expires_in !== undefined
-          ? new Date(now().getTime() + token.data.expires_in * 1000).toISOString()
-          : null
+      const scopes = parseScopes(token.data.scope, [GBP_SCOPE])
+      const expiresAt = computeExpiresAt(now(), token.data.expires_in)
 
       const locations = await discoverLocations(deps.transport, accessToken)
       if (locations === undefined) {
-        return providerErr(traceId, 'Could not list Google Business Profile accounts.')
+        // Discovery could not COMPLETE (accounts or any locations call failed) — never
+        // report that as "zero locations exist" (honesty rule).
+        return providerErr(traceId, 'Could not list Google Business Profile locations.')
       }
       if (locations.length === 0) {
         return providerErr(
@@ -218,8 +217,9 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
 
       if (locations.length === 1) {
         const connected = await persist({
+          traceId,
           workspaceId: args.workspaceId,
-          ...(args.createdBy !== undefined ? { createdBy: args.createdBy } : {}),
+          createdBy: args.createdBy ?? null,
           location: locations[0]!,
           scopes,
           expiresAt,
@@ -232,6 +232,7 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
 
       const resumeToken = seal(
         JSON.stringify({
+          workspaceId: args.workspaceId,
           issuedAt: now().toISOString(),
           accessToken,
           refreshToken,
@@ -257,6 +258,11 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
         return validationErr(traceId, 'Invalid resume token — restart the connect flow.')
       }
 
+      if (payload.workspaceId !== args.workspaceId) {
+        // The token was minted for a different workspace — never let a leaked token
+        // attach someone else's OAuth grant elsewhere.
+        return validationErr(traceId, 'That connect flow belongs to a different workspace.')
+      }
       if (now().getTime() - Date.parse(payload.issuedAt) > RESUME_TTL_MS) {
         return validationErr(traceId, 'The location choice expired — restart the connect flow.')
       }
@@ -266,8 +272,9 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
       }
 
       return persist({
+        traceId,
         workspaceId: args.workspaceId,
-        ...(args.createdBy !== undefined ? { createdBy: args.createdBy } : {}),
+        createdBy: args.createdBy ?? null,
         location,
         scopes: payload.scopes,
         expiresAt: payload.expiresAt,
@@ -279,8 +286,11 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
 }
 
 /**
- * Accounts → locations discovery. Returns undefined when the accounts call itself fails;
- * an account whose resource name is malformed is SKIPPED (never embedded into a URL).
+ * Accounts → locations discovery (page 1 only — fine for Alpha's single test account;
+ * pagination is a known limitation). Returns undefined when discovery could not
+ * COMPLETE: the accounts call failed, or any per-account locations call failed —
+ * a partial result must never masquerade as "these are all the locations". An account
+ * whose resource name is malformed is SKIPPED (never embedded into a URL).
  */
 async function discoverLocations(
   transport: Transport,
@@ -303,7 +313,7 @@ async function discoverLocations(
   const validAccounts = (accounts.data.accounts ?? []).filter((a) => ACCOUNT_NAME_RE.test(a.name))
 
   const perAccount = await Promise.all(
-    validAccounts.map(async (account): Promise<GbpLocationChoice[]> => {
+    validAccounts.map(async (account): Promise<GbpLocationChoice[] | undefined> => {
       let res: TransportResponse
       try {
         res = await transport({
@@ -312,15 +322,20 @@ async function discoverLocations(
           headers: { Authorization: `Bearer ${accessToken}` },
         })
       } catch {
-        return []
+        return undefined
       }
-      if (res.status !== 200) return []
+      if (res.status !== 200) return undefined
       const parsed = LocationsResponseSchema.safeParse(parseJson(res.body))
-      if (!parsed.success) return []
+      if (!parsed.success) return undefined
       return (parsed.data.locations ?? [])
         .filter((l) => LOCATION_NAME_RE.test(l.name))
-        .map((l) => ({ name: l.name, title: l.title ?? l.name, accountName: account.name }))
+        .map((l) => ({
+          name: l.name,
+          title: cleanDisplay(l.title ?? '') || l.name,
+          accountName: account.name,
+        }))
     }),
   )
-  return perAccount.flat()
+  if (perAccount.some((r) => r === undefined)) return undefined
+  return perAccount.flatMap((r) => r ?? [])
 }

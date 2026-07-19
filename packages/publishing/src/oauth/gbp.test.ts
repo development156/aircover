@@ -336,3 +336,135 @@ describe('GBP OAuth — handleCallback', () => {
     expect(result.ok).toBe(false)
   })
 })
+
+describe('GBP OAuth — hardening (review batch)', () => {
+  it('binds the resume token to the workspace: cross-workspace redemption is rejected', async () => {
+    const { store, calls } = fakeStore()
+    const h = handlers(transportWith(locationsMulti), store)
+    const cb = await h.handleCallback(callbackArgs({ workspaceId: 'ws-victim' }))
+    if (!cb.ok || cb.data.kind !== 'choose_location') throw new Error('expected choose_location')
+
+    const result = await h.completeConnection({
+      resumeToken: cb.data.resumeToken,
+      locationName: 'locations/40987654321',
+      workspaceId: 'ws-attacker',
+    })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('VALIDATION_ERROR')
+    expect(calls).toHaveLength(0)
+  })
+
+  it('maps a store failure to PROVIDER_ERROR instead of a raw rejection', async () => {
+    const store: ConnectionStore = {
+      upsertConnection: async () => {
+        throw new Error('supabase exploded')
+      },
+    }
+
+    const result = await handlers(transportWith(locationsSingle), store).handleCallback(
+      callbackArgs(),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(JSON.stringify(result)).not.toContain('gbp-access-token-fixture-value')
+  })
+
+  it('reports a failed locations fetch as "could not list", never as zero locations', async () => {
+    const { store } = fakeStore()
+    const transport = routedTransport([
+      {
+        match: { method: 'POST', urlIncludes: 'oauth2.googleapis.com/token' },
+        response: tokenSuccess as never,
+      },
+      {
+        match: { method: 'GET', urlIncludes: 'mybusinessaccountmanagement' },
+        response: accounts as never,
+      },
+      {
+        match: { method: 'GET', urlIncludes: 'mybusinessbusinessinformation' },
+        response: { status: 503, body: {} },
+      },
+    ])
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(result.error.message.toLowerCase()).toContain('could not list')
+    expect(result.error.message.toLowerCase()).not.toContain('no google business profile location')
+  })
+
+  it('handles a token response without expires_in: null expiry persisted', async () => {
+    const { store, calls } = fakeStore()
+    const minimalToken = { status: 200, body: { access_token: 'gbp-access-token-fixture-value' } }
+    const transport = routedTransport([
+      {
+        match: { method: 'POST', urlIncludes: 'oauth2.googleapis.com/token' },
+        response: minimalToken,
+      },
+      {
+        match: { method: 'GET', urlIncludes: 'mybusinessaccountmanagement' },
+        response: accounts as never,
+      },
+      {
+        match: { method: 'GET', urlIncludes: 'mybusinessbusinessinformation' },
+        response: locationsSingle as never,
+      },
+    ])
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.kind).toBe('connected')
+    expect(calls[0]?.expiresAt).toBeNull()
+  })
+
+  it('strips control/bidi characters from location titles', async () => {
+    const { store } = fakeStore()
+    const spoofedLocations = {
+      status: 200,
+      body: {
+        locations: [{ name: 'locations/40123456789', title: 'Chai‮ Evil \n Cafe' }],
+      },
+    }
+    const transport = routedTransport([
+      {
+        match: { method: 'POST', urlIncludes: 'oauth2.googleapis.com/token' },
+        response: tokenSuccess as never,
+      },
+      {
+        match: { method: 'GET', urlIncludes: 'mybusinessaccountmanagement' },
+        response: accounts as never,
+      },
+      {
+        match: { method: 'GET', urlIncludes: 'mybusinessbusinessinformation' },
+        response: spoofedLocations,
+      },
+    ])
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    if (result.data.kind !== 'connected') throw new Error('expected connected')
+    expect(result.data.connection.externalAccount.name).not.toMatch(/[‮\n]/)
+  })
+
+  it('checks state BEFORE the provider error param', async () => {
+    const { store } = fakeStore()
+
+    const result = await handlers(transportWith(locationsSingle), store).handleCallback(
+      callbackArgs({ params: { error: 'access_denied', state: 'evil' } }),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('VALIDATION_ERROR')
+  })
+})

@@ -30,7 +30,11 @@ export interface ConnectionUpsert {
 }
 
 export interface ConnectionStore {
-  /** Insert or refresh the (workspace, platform, external account) connection; returns its row id. */
+  /**
+   * Insert or refresh the (workspace, platform, external account) connection; returns
+   * its row id. Reject/throw on failure — the OAuth handlers catch and map it to a
+   * PROVIDER_ERROR Result, so implementations should NOT swallow errors themselves.
+   */
   upsertConnection(record: ConnectionUpsert): Promise<{ connectionId: string }>
 }
 

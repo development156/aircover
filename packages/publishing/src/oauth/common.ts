@@ -1,6 +1,7 @@
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
+import { z } from 'zod'
 import { appError, err, type Result } from '@sahoda/shared'
-import type { Transport } from '../transport'
+import type { Transport, TransportRequest, TransportResponse } from '../transport'
 import { createTokenVault, keyringFromEnv } from '../vault/token-vault'
 import type { ConnectionStore } from './store'
 
@@ -65,4 +66,88 @@ export const parseJson = (body: string): unknown => {
   } catch {
     return undefined
   }
+}
+
+/** RFC 6749 token response — one schema for X and Google; both are spec-shaped. */
+export const OAuthTokenResponseSchema = z.object({
+  // Printable ASCII only: the value is interpolated into an Authorization header.
+  access_token: z
+    .string()
+    .min(1)
+    .regex(/^[\x21-\x7e]+$/),
+  refresh_token: z.string().optional(),
+  expires_in: z.number().positive().optional(),
+  scope: z.string().optional(),
+})
+
+/** Constant-time state comparison (over digests, so length differences leak nothing). */
+export const stateMatches = (expected: string, actual: string): boolean =>
+  timingSafeEqual(
+    createHash('sha256').update(expected).digest(),
+    createHash('sha256').update(actual).digest(),
+  )
+
+/**
+ * The shared callback guard, in trust order: CSRF state FIRST (every branch of the
+ * callback is state-checked, even pure error mapping), then the provider's error param,
+ * then the code. Returns the failure Result, or undefined to proceed.
+ */
+export function guardCallback(
+  params: OAuthCallbackParams,
+  expectedState: string,
+  traceId: string,
+  providerLabel: string,
+): Result<never> | undefined {
+  if (!params.state || !stateMatches(expectedState, params.state)) {
+    return validationErr(traceId, 'OAuth state mismatch — restart the connect flow.')
+  }
+  if (params.error) {
+    return providerErr(
+      traceId,
+      `${providerLabel} authorization was declined (${sanitizeOAuthErrorCode(params.error)}).`,
+    )
+  }
+  if (!params.code) {
+    return validationErr(traceId, 'Missing authorization code — restart the connect flow.')
+  }
+  return undefined
+}
+
+/**
+ * Provider display strings (names, handles, titles) are third-party-controlled: strip
+ * control characters and bidi/zero-width overrides (display spoofing) and cap length
+ * before they enter a ConnectionSummary, the store, or a resume payload.
+ */
+export const cleanDisplay = (value: string): string =>
+  value
+    .replace(/[\p{Cc}\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/gu, '')
+    .trim()
+    .slice(0, 200)
+
+export const computeExpiresAt = (now: Date, expiresIn: number | undefined): string | null =>
+  expiresIn !== undefined ? new Date(now.getTime() + expiresIn * 1000).toISOString() : null
+
+export const parseScopes = (scope: string | undefined, fallback: string[]): string[] =>
+  scope ? scope.split(' ').filter(Boolean) : fallback
+
+/**
+ * One guarded provider call: a transport throw or non-200 becomes a PROVIDER_ERROR
+ * Result (raw exception text never escapes — it could echo request headers).
+ */
+export async function callProvider(
+  transport: Transport,
+  req: TransportRequest,
+  traceId: string,
+  labels: { unreachable: string; failed: string },
+): Promise<Result<TransportResponse>> {
+  let res: TransportResponse
+  try {
+    res = await transport(req)
+  } catch {
+    return providerErr(traceId, labels.unreachable)
+  }
+  if (res.status !== 200) {
+    return providerErr(traceId, `${labels.failed} (HTTP ${res.status}).`, { status: res.status })
+  }
+  return { ok: true, data: res }
 }

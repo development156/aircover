@@ -1,17 +1,20 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { ok, type Result } from '@sahoda/shared'
-import type { TransportResponse } from '../transport'
 import type { ConnectionExternalAccount, ConnectionSummary } from './store'
 import {
+  callProvider,
+  cleanDisplay,
+  computeExpiresAt,
   defaultRandomString,
   defaultSeal,
+  guardCallback,
   newTraceId,
   parseJson,
+  parseScopes,
   providerErr,
   requireOAuthConfig,
-  sanitizeOAuthErrorCode,
-  validationErr,
+  OAuthTokenResponseSchema,
   type OAuthCallbackParams,
   type OAuthHandlerDeps,
 } from './common'
@@ -26,17 +29,10 @@ import {
 const X_AUTHORIZE_URL = 'https://x.com/i/oauth2/authorize'
 const X_TOKEN_URL = 'https://api.twitter.com/2/oauth2/token'
 const X_ME_URL = 'https://api.twitter.com/2/users/me'
-/** tweet.write to publish; offline.access for the refresh token the expiry sweep needs. */
-const X_SCOPES = ['tweet.read', 'tweet.write', 'users.read', 'offline.access']
+/** tweet.write to publish; media.write for media upload; offline.access for refresh. */
+const X_SCOPES = ['tweet.read', 'tweet.write', 'users.read', 'offline.access', 'media.write']
 const STATE_BYTES = 16
 const VERIFIER_BYTES = 32 // → 43 base64url chars, the PKCE minimum
-
-const XTokenResponseSchema = z.object({
-  access_token: z.string().min(1),
-  refresh_token: z.string().optional(),
-  expires_in: z.number().optional(),
-  scope: z.string().optional(),
-})
 
 const XMeResponseSchema = z.object({
   data: z.object({
@@ -92,22 +88,12 @@ export function createXOAuthHandlers(deps: OAuthHandlerDeps): XOAuthHandlers {
     async handleCallback(args: XCallbackArgs): Promise<Result<ConnectionSummary>> {
       const traceId = args.traceId ?? newTraceId()
 
-      if (args.params.error) {
-        return providerErr(
-          traceId,
-          `X authorization was declined (${sanitizeOAuthErrorCode(args.params.error)}).`,
-        )
-      }
-      if (!args.params.state || args.params.state !== args.expectedState) {
-        return validationErr(traceId, 'OAuth state mismatch — restart the connect flow.')
-      }
-      if (!args.params.code) {
-        return validationErr(traceId, 'Missing authorization code — restart the connect flow.')
-      }
+      const guarded = guardCallback(args.params, args.expectedState, traceId, 'X')
+      if (guarded) return guarded
 
-      let tokenRes: TransportResponse
-      try {
-        tokenRes = await deps.transport({
+      const tokenRes = await callProvider(
+        deps.transport,
+        {
           method: 'POST',
           url: X_TOKEN_URL,
           headers: {
@@ -116,71 +102,74 @@ export function createXOAuthHandlers(deps: OAuthHandlerDeps): XOAuthHandlers {
           },
           body: new URLSearchParams({
             grant_type: 'authorization_code',
-            code: args.params.code,
+            code: args.params.code ?? '',
             redirect_uri: deps.redirectUri,
             code_verifier: args.codeVerifier,
           }).toString(),
-        })
-      } catch {
-        return providerErr(traceId, 'Could not reach X to exchange the authorization code.')
-      }
-      if (tokenRes.status !== 200) {
-        return providerErr(traceId, `X token exchange failed (HTTP ${tokenRes.status}).`, {
-          status: tokenRes.status,
-        })
-      }
-      const token = XTokenResponseSchema.safeParse(parseJson(tokenRes.body))
+        },
+        traceId,
+        {
+          unreachable: 'Could not reach X to exchange the authorization code.',
+          failed: 'X token exchange failed',
+        },
+      )
+      if (!tokenRes.ok) return tokenRes
+      const token = OAuthTokenResponseSchema.safeParse(parseJson(tokenRes.data.body))
       if (!token.success) {
         return providerErr(traceId, 'X returned an unexpected token response.')
       }
 
-      let meRes: TransportResponse
-      try {
-        meRes = await deps.transport({
+      const meRes = await callProvider(
+        deps.transport,
+        {
           method: 'GET',
           url: X_ME_URL,
           headers: { Authorization: `Bearer ${token.data.access_token}` },
-        })
-      } catch {
-        return providerErr(traceId, 'Could not reach X to verify the connected account.')
-      }
-      if (meRes.status !== 200) {
-        return providerErr(traceId, `X profile check failed (HTTP ${meRes.status}).`, {
-          status: meRes.status,
-        })
-      }
-      const me = XMeResponseSchema.safeParse(parseJson(meRes.body))
+        },
+        traceId,
+        {
+          unreachable: 'Could not reach X to verify the connected account.',
+          failed: 'X profile check failed',
+        },
+      )
+      if (!meRes.ok) return meRes
+      const me = XMeResponseSchema.safeParse(parseJson(meRes.data.body))
       if (!me.success) {
         return providerErr(traceId, 'X returned an unexpected profile response.')
       }
 
-      const expiresAt =
-        token.data.expires_in !== undefined
-          ? new Date(now().getTime() + token.data.expires_in * 1000).toISOString()
-          : null
-      const scopes = token.data.scope ? token.data.scope.split(' ').filter(Boolean) : X_SCOPES
+      const expiresAt = computeExpiresAt(now(), token.data.expires_in)
+      const scopes = parseScopes(token.data.scope, X_SCOPES)
+      const handle =
+        me.data.data.username !== undefined ? cleanDisplay(me.data.data.username) : undefined
+      const name = me.data.data.name !== undefined ? cleanDisplay(me.data.data.name) : undefined
       const externalAccount: ConnectionExternalAccount = {
         id: me.data.data.id,
-        ...(me.data.data.username !== undefined ? { handle: me.data.data.username } : {}),
-        ...(me.data.data.name !== undefined ? { name: me.data.data.name } : {}),
+        ...(handle !== undefined ? { handle } : {}),
+        ...(name !== undefined ? { name } : {}),
       }
 
-      const { connectionId } = await deps.store.upsertConnection({
-        workspaceId: args.workspaceId,
-        platform: 'x',
-        externalAccount,
-        scopes,
-        expiresAt,
-        createdBy: args.createdBy ?? null,
-        encryptedSecret: seal(
-          JSON.stringify({
-            accessToken: token.data.access_token,
-            refreshToken: token.data.refresh_token ?? null,
-          }),
-        ),
-      })
-
-      return ok({ connectionId, platform: 'x' as const, externalAccount, scopes, expiresAt })
+      try {
+        const { connectionId } = await deps.store.upsertConnection({
+          workspaceId: args.workspaceId,
+          platform: 'x',
+          externalAccount,
+          scopes,
+          expiresAt,
+          createdBy: args.createdBy ?? null,
+          encryptedSecret: seal(
+            JSON.stringify({
+              accessToken: token.data.access_token,
+              refreshToken: token.data.refresh_token ?? null,
+            }),
+          ),
+        })
+        return ok({ connectionId, platform: 'x' as const, externalAccount, scopes, expiresAt })
+      } catch {
+        // Seal/store failures must surface as a Result, and their raw error text (which
+        // handled token material moments earlier) must never escape to the caller.
+        return providerErr(traceId, 'Could not save the connection — try again.')
+      }
     },
   }
 }
