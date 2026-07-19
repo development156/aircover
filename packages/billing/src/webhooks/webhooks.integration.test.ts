@@ -107,6 +107,23 @@ describe.skipIf(!DB_URL)(
 
     it('records a new audit row for a different event_id but the grant replays (two-layer idempotency)', async () => {
       await process(build('evt-a'))
+
+      // Spend 400 before the replay, so `balanceAfter` below can discriminate: with the live
+      // balance still at 1500 the assertion cannot tell the original entry from a fresh read.
+      const hold = await ledger.apply({
+        workspaceId: ws,
+        entryType: 'HOLD',
+        amount: 400,
+        idempotencyKey: 'wh-spend:1',
+      })
+      await ledger.apply({
+        workspaceId: ws,
+        entryType: 'DEBIT',
+        amount: 400,
+        idempotencyKey: 'wh-spend:1:debit',
+        settlesEntryId: hold.entry.id,
+      })
+
       const second = await process(build('evt-b')) // different provider event id, same plan + period
 
       expect(second.ok).toBe(true)
@@ -115,13 +132,12 @@ describe.skipIf(!DB_URL)(
       // The events table let it through (new row), but the ledger's monthlyGrantKey replayed —
       // so the grant is applied exactly once even across distinct provider event ids.
       expect(second.data.grant?.replayed).toBe(true)
-      // Owner ruling: on replay, `granted`/`balanceAfter` REFLECT THE ORIGINAL ENTRY — they
-      // describe the grant that stands for this (plan, period, workspace), not a second one.
-      // Pinned explicitly because the ledger returns the original row and nothing asserted it,
-      // leaving the contract decided by nobody. Read them WITH `replayed`, never alone.
+      // Owner ruling: on replay these describe the ORIGINAL grant, not a second one. Note
+      // balanceAfter is 1500 — the balance as of that original entry — while the live balance is
+      // 1100. It is deliberately STALE; read it only alongside `replayed`.
       expect(second.data.grant?.granted).toBe(1500)
       expect(second.data.grant?.balanceAfter).toBe(1500)
-      expect(await ledger.balance(ws)).toEqual({ total: 1500, held: 0 })
+      expect(await ledger.balance(ws)).toEqual({ total: 1100, held: 0 })
 
       const count = await ledger.pool.query<{ n: number }>(
         `select count(*)::int as n from billing_webhook_events where event_id like $1`,

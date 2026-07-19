@@ -74,7 +74,9 @@ Cashfree call returns `401 request_failed: authentication Failed`. Verified twic
 printing either secret: both are 40 chars, byte-identical (matching SHA-256) in both the repo
 root and the worktree `.env`, and neither carries the `cfsk_ma_test_` prefix a real sandbox
 secret key uses. The App ID appears to have been pasted into both slots. Re-confirmed against
-the live API on 2026-07-19: all 4 opt-in live tests fail on 401.
+the live API on 2026-07-19: of the 5 opt-in live tests, 4 fail on 401 and the 5th
+("rejects a bad secret rather than silently succeeding") passes VACUOUSLY — with both keys
+identical every request is rejected, so that negative test cannot fail.
 
 **What this means for the merged code.** The Cashfree adapter is merged as **unverified code
 behind the `PaymentProvider` interface**. Checkout stays on the **fixture** provider. No path

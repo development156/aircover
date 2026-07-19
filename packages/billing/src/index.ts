@@ -19,6 +19,13 @@ export * from './period'
 export * from './ledger/port'
 export * from './ledger/pg'
 
+// Direct-pg TLS decision + the mandatory pool error guard. Exported because ANY process that
+// builds its own Pool must reuse this rule rather than re-deriving it: the host a DSN really
+// dials is not `new URL().hostname` (`?host=` overrides it, and a repeated `?host=` keeps the
+// LAST), so an independent re-implementation silently relaxes certificate verification against
+// an attacker-controlled host. apps/jobs had exactly that drift.
+export * from './pgSsl'
+
 // Server-only env
 export * from './env'
 

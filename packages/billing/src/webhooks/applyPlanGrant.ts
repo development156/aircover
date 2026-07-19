@@ -6,15 +6,20 @@ import type { ParsedWebhookEvent } from '../providers/types'
 
 /**
  * The grant that STANDS for this (workspace, plan, period) — not necessarily one applied by
- * this delivery. Owner ruling: on a replay, `granted` and `balanceAfter` reflect THE ORIGINAL
- * ENTRY, because the ledger returns that row rather than re-reading. Never read either field
- * without `replayed`: `granted: 1500, replayed: true` means "1500 stand for this period, and
- * this delivery added none of them", and `balanceAfter` is the balance as of that original
- * grant, which may be arbitrarily stale.
+ * this delivery. Owner ruling: on a replay this describes the ORIGINAL grant, not a second one.
+ * Never read `granted`/`balanceAfter` without `replayed`: `granted: 1500, replayed: true` means
+ * "1500 stand for this period, and this delivery added none of them".
  *
- * Pinned in webhooks.integration.test.ts and applyPlanGrant.integration.test.ts, which
- * previously asserted `granted` on the first grant and dropped it on replay — leaving the one
- * case where the reading is non-obvious decided by nothing.
+ * The two fields get there by DIFFERENT routes, which matters:
+ *   - `balanceAfter` comes from the ledger's returned row (`res.entry.balanceAfter`), so on a
+ *     replay it is the balance as of the ORIGINAL grant and may be arbitrarily stale — later
+ *     DEBITs are not reflected. Pinned by an intervening-DEBIT case in the integration tests.
+ *   - `granted` is re-read from `PLAN_CATALOG` on THIS call, not recovered from the original
+ *     entry. `monthlyGrantKey` is (plan, period, workspace) with no amount in it, so if a plan's
+ *     `monthlyCredits` changes mid-period the key still replays while `granted` reports today's
+ *     catalog value against a ledger row holding the old one. Treat it as "what this plan grants
+ *     for this period now", never as an audit of what was actually credited — for that, read the
+ *     ledger.
  */
 export interface PlanGrantResult {
   /** Credits the plan's monthly allotment grants for this period. See the caveat above. */
