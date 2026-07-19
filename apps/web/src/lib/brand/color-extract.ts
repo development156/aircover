@@ -60,7 +60,13 @@ export function quantize(pixels: ArrayLike<number>): string[] {
   return [...buckets.values()]
     .sort((left, right) => right.count - left.count)
     .slice(0, MAX_COLORS)
-    .map((bucket) => rgbToOklch(bucket.rSum / bucket.count, bucket.gSum / bucket.count, bucket.bSum / bucket.count))
+    .map((bucket) =>
+      rgbToOklch(
+        bucket.rSum / bucket.count,
+        bucket.gSum / bucket.count,
+        bucket.bSum / bucket.count,
+      ),
+    )
 }
 
 /** Downscale the image onto a small canvas, then quantize its pixels. Client-only. */

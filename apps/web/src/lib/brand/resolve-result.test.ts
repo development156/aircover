@@ -1,11 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { DEMO_FALLBACK_PAYLOAD } from '@sahoda/shared'
 
-import {
-  mapResolveOutcome,
-  type CreditsOutcome,
-  type MeshResolveOutcome,
-} from './resolve-result'
+import { mapResolveOutcome, type CreditsOutcome, type MeshResolveOutcome } from './resolve-result'
 
 const REAL: MeshResolveOutcome = { kind: 'real', brain: { ...DEMO_FALLBACK_PAYLOAD } }
 const FALLBACK: MeshResolveOutcome = { kind: 'fallback', brain: DEMO_FALLBACK_PAYLOAD }

@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'vitest'
 
-import { contrastRatio, formatOklch, oklchToRgb, parseOklch, relativeLuminance, rgbToOklch } from './oklch'
+import {
+  contrastRatio,
+  formatOklch,
+  oklchToRgb,
+  parseOklch,
+  relativeLuminance,
+  rgbToOklch,
+} from './oklch'
 
 describe('rgbToOklch', () => {
   test('formats a valid oklch() string', () => {

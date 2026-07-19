@@ -197,12 +197,23 @@ function formatSignedAmount(direction: Direction, amount: number): string {
   return `${magnitude}`
 }
 
-function formatCogs(value: number): string {
+/**
+ * Render a USD cost without ever rounding a real amount down to `$0.0000`.
+ *
+ * Exported because the wallet's additive footer sums the same values and must
+ * apply the same floor — a total of `0.00002` printed as `~$0.0000` would state
+ * a zero cost that was actually incurred. One owner for the threshold.
+ */
+export function formatUsdAmount(value: number): string {
   if (value > 0 && value < MIN_DISPLAYED_USD) {
-    return `under $${MIN_DISPLAYED_USD.toFixed(4)} provider cost`
+    return `under $${MIN_DISPLAYED_USD.toFixed(4)}`
   }
 
-  return `~$${value.toFixed(4)} provider cost`
+  return `~$${value.toFixed(4)}`
+}
+
+function formatCogs(value: number): string {
+  return `${formatUsdAmount(value)} provider cost`
 }
 
 function formatObjectRef(objectRef: string): string | null {

@@ -15,6 +15,7 @@ const NAV: ReadonlyArray<{
   { href: '/posts', label: 'Posts', icon: 'square-pen', guide: 'nav.posts', section: 'Create' },
   { href: '/planner', label: 'Planner', icon: 'calendar-days', guide: 'nav.planner' },
   { href: '/connections', label: 'Connections', icon: 'link-2', guide: 'nav.connections' },
+  { href: '/wallet', label: 'Wallet', icon: 'wallet', guide: 'nav.wallet' },
   { href: '/settings', label: 'Settings', icon: 'sliders-horizontal', guide: 'nav.settings' },
 ]
 

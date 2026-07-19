@@ -1,0 +1,98 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import type { Channel } from '@sahoda/shared'
+
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { earliestScheduleAt, validateScheduleLead } from '@/lib/posts/schedule'
+
+export interface ScheduleFieldProps {
+  channels: Channel[]
+  /** ISO string from `posts.scheduled_at`, or null for "no schedule". */
+  value: string | null
+  onChange: (iso: string | null) => void
+}
+
+const CLOCK_REFRESH_MS = 30_000
+
+const pad = (value: number): string => String(value).padStart(2, '0')
+
+/** `datetime-local` wants wall-clock time, so never `toISOString()` here. */
+function toLocalInput(date: Date): string {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`
+}
+
+function fromStored(iso: string | null): string {
+  if (iso === null) return ''
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime()) ? '' : toLocalInput(date)
+}
+
+/**
+ * Plain schedule picker. There is no "best time" backend, so no suggestion chip
+ * is offered — the only guidance shown is the channels' own minimum lead, read
+ * from the Constraint Engine via `earliestScheduleAt`.
+ *
+ * The clock is set after mount: rendering `new Date()` during SSR would hydrate
+ * against a different instant, and validating against a server clock would give
+ * the user a verdict about a timezone they are not in.
+ */
+export function ScheduleField({ channels, value, onChange }: ScheduleFieldProps) {
+  const [draft, setDraft] = useState<string>(() => fromStored(value))
+  const [now, setNow] = useState<Date | null>(null)
+
+  useEffect(() => {
+    setNow(new Date())
+    const timer = setInterval(() => setNow(new Date()), CLOCK_REFRESH_MS)
+    return () => clearInterval(timer)
+  }, [])
+
+  const parsed = draft === '' ? null : new Date(draft)
+  const check = now === null ? null : validateScheduleLead(channels, parsed, now)
+  const earliest = now === null ? null : earliestScheduleAt(channels, now)
+
+  function handleChange(next: string) {
+    setDraft(next)
+    if (next === '') {
+      onChange(null)
+      return
+    }
+    const date = new Date(next)
+    if (Number.isNaN(date.getTime())) return
+    if (now !== null && !validateScheduleLead(channels, date, now).ok) return
+    onChange(date.toISOString())
+  }
+
+  return (
+    <div className="space-y-1.5" data-guide="post-schedule">
+      <Label htmlFor="post-schedule">Schedule</Label>
+      <Input
+        id="post-schedule"
+        type="datetime-local"
+        value={draft}
+        error={check !== null && !check.ok}
+        min={earliest !== null ? toLocalInput(earliest) : undefined}
+        onChange={(event) => handleChange(event.target.value)}
+      />
+      {check !== null && !check.ok && check.message !== undefined ? (
+        <p role="alert" className="text-[12.5px] text-danger">
+          {check.message} Nothing was saved.
+        </p>
+      ) : (
+        <p className="text-[12px] text-faint">
+          {draft === ''
+            ? 'No schedule set — this post stays a draft.'
+            : earliest !== null
+              ? `Earliest for these channels: ${earliest.toLocaleString('en-IN', {
+                  dateStyle: 'medium',
+                  timeStyle: 'short',
+                })}`
+              : 'Checking the schedule against the channel lead times…'}
+        </p>
+      )}
+    </div>
+  )
+}
