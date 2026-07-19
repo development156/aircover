@@ -26,7 +26,9 @@ export { type ReadMedia } from './adapters/x-media'
 export { createGbpAdapter, type GbpAdapterDeps } from './adapters/gbp'
 
 // OAuth handlers (framework-agnostic; wt-web mounts them as thin routes) + the
-// ConnectionStore port wt-web implements with the service-role client.
+// ConnectionStore port wt-web implements with the service-role client. A ConnectionUpsert
+// carries TWO opaque sealed blobs — `accessTokenEnc` / `refreshTokenEnc` — one per
+// connection_secrets column; see ./oauth/store for the exact column mapping.
 export type {
   ConnectionStore,
   ConnectionUpsert,

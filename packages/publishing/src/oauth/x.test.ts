@@ -29,18 +29,43 @@ function fakeStore(): { store: ConnectionStore; calls: ConnectionUpsert[] } {
   }
 }
 
-function handlers(transport: Transport, store: ConnectionStore) {
+const ACCESS_PLAINTEXT = 'x-access-token-fixture-value'
+const REFRESH_PLAINTEXT = 'x-refresh-token-fixture-value'
+
+function handlers(
+  transport: Transport,
+  store: ConnectionStore,
+  overrides: { seal?: (plaintext: string) => string } = {},
+) {
   return createXOAuthHandlers({
     clientId: 'x-client-id',
     clientSecret: 'x-client-secret',
     redirectUri: 'https://app.example/api/oauth/x/callback',
     transport,
     store,
-    seal: (s) => JSON.stringify(TEST_VAULT.encrypt(s)),
+    seal: overrides.seal ?? ((s) => JSON.stringify(TEST_VAULT.encrypt(s))),
     unseal: (s) => TEST_VAULT.decrypt(JSON.parse(s)),
     now: () => FIXED_NOW,
   })
 }
+
+/** A token response with the refresh field under test — everything else fixture-shaped. */
+const tokenResponseWithRefresh = (refresh: string | undefined) => ({
+  status: 200,
+  body: {
+    token_type: 'bearer',
+    expires_in: 7200,
+    access_token: ACCESS_PLAINTEXT,
+    scope: 'tweet.read tweet.write users.read',
+    ...(refresh !== undefined ? { refresh_token: refresh } : {}),
+  },
+})
+
+const transportWithToken = (token: unknown) =>
+  routedTransport([
+    { match: { method: 'POST', urlIncludes: '/2/oauth2/token' }, response: token as never },
+    { match: { method: 'GET', urlIncludes: '/2/users/me' }, response: meSuccess as never },
+  ])
 
 const happyTransport = () =>
   routedTransport([
@@ -115,7 +140,7 @@ describe('X OAuth — handleCallback', () => {
     expect(JSON.stringify(result)).not.toContain('x-refresh-token-fixture-value')
   })
 
-  it('persists a sealed token bundle the vault can round-trip — never plaintext', async () => {
+  it('seals the access and refresh tokens as TWO independent envelopes', async () => {
     const { store, calls } = fakeStore()
     const h = handlers(happyTransport(), store)
 
@@ -127,10 +152,44 @@ describe('X OAuth — handleCallback', () => {
     expect(record.platform).toBe('x')
     expect(record.createdBy).toBe('user-1')
     expect(record.externalAccount.id).toBe('2244994945')
-    expect(record.encryptedSecret).not.toContain('x-access-token-fixture-value')
-    const bundle = JSON.parse(TEST_VAULT.decrypt(JSON.parse(record.encryptedSecret)))
-    expect(bundle.accessToken).toBe('x-access-token-fixture-value')
-    expect(bundle.refreshToken).toBe('x-refresh-token-fixture-value')
+    // Each field is a lone envelope over ONE token — not a bundle, not the same blob twice.
+    expect(record.refreshTokenEnc).not.toBeNull()
+    expect(record.accessTokenEnc).not.toBe(record.refreshTokenEnc)
+    expect(TEST_VAULT.decrypt(JSON.parse(record.accessTokenEnc))).toBe(ACCESS_PLAINTEXT)
+    expect(TEST_VAULT.decrypt(JSON.parse(record.refreshTokenEnc!))).toBe(REFRESH_PLAINTEXT)
+  })
+
+  it('leaks neither plaintext token anywhere in the persisted record', async () => {
+    const { store, calls } = fakeStore()
+
+    await handlers(happyTransport(), store).handleCallback(callbackArgs())
+
+    const serialized = JSON.stringify(calls[0])
+    expect(serialized).not.toContain(ACCESS_PLAINTEXT)
+    expect(serialized).not.toContain(REFRESH_PLAINTEXT)
+  })
+
+  it('stores refreshTokenEnc as null when X issues no refresh token', async () => {
+    const { store, calls } = fakeStore()
+    const transport = transportWithToken(tokenResponseWithRefresh(undefined))
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(true)
+    const record = calls[0]!
+    // Absent refresh token is NORMAL: null, never a seal of '' and never an error.
+    expect(record.refreshTokenEnc).toBeNull()
+    expect(TEST_VAULT.decrypt(JSON.parse(record.accessTokenEnc))).toBe(ACCESS_PLAINTEXT)
+  })
+
+  it('treats an empty-string refresh token as absent, not as a credential', async () => {
+    const { store, calls } = fakeStore()
+    const transport = transportWithToken(tokenResponseWithRefresh(''))
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(true)
+    expect(calls[0]?.refreshTokenEnc).toBeNull()
   })
 
   it('sends the token exchange as form-encoded with Basic client auth and the verifier', async () => {
@@ -269,7 +328,48 @@ describe('X OAuth — hardening (review batch)', () => {
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.error.code).toBe('PROVIDER_ERROR')
-    expect(JSON.stringify(result)).not.toContain('x-access-token-fixture-value')
+    expect(JSON.stringify(result)).not.toContain(ACCESS_PLAINTEXT)
+    expect(JSON.stringify(result)).not.toContain(REFRESH_PLAINTEXT)
+  })
+
+  it('maps a vault seal failure to PROVIDER_ERROR instead of a raw rejection', async () => {
+    const { store, calls } = fakeStore()
+    const failingSeal = () => {
+      throw new Error(`token vault: TOKEN_VAULT_KEY is not set (${ACCESS_PLAINTEXT})`)
+    }
+
+    const result = await handlers(happyTransport(), store, { seal: failingSeal }).handleCallback(
+      callbackArgs(),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    // Nothing persisted, and the thrown text (token-adjacent) never reaches the caller.
+    expect(calls).toHaveLength(0)
+    expect(JSON.stringify(result)).not.toContain(ACCESS_PLAINTEXT)
+    expect(JSON.stringify(result)).not.toContain('TOKEN_VAULT_KEY')
+  })
+
+  it('maps a failure of the SECOND (refresh) seal to PROVIDER_ERROR', async () => {
+    const { store, calls } = fakeStore()
+    let sealCalls = 0
+    const sealFailingOnRefresh = (plaintext: string) => {
+      sealCalls += 1
+      if (sealCalls > 1) throw new Error(`vault died on ${REFRESH_PLAINTEXT}`)
+      return JSON.stringify(TEST_VAULT.encrypt(plaintext))
+    }
+
+    const result = await handlers(happyTransport(), store, {
+      seal: sealFailingOnRefresh,
+    }).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(sealCalls).toBe(2) // proves each token is sealed by its own call
+    expect(calls).toHaveLength(0)
+    expect(JSON.stringify(result)).not.toContain(REFRESH_PLAINTEXT)
   })
 
   it('maps a transport throw during token exchange to PROVIDER_ERROR', async () => {

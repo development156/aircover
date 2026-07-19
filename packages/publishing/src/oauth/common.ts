@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
-import { appError, err, type Result } from '@sahoda/shared'
+import { appError, err, ok, type Result } from '@sahoda/shared'
 import type { Transport, TransportRequest, TransportResponse } from '../transport'
 import { createTokenVault, keyringFromEnv } from '../vault/token-vault'
 import type { ConnectionStore } from './store'
@@ -47,6 +47,9 @@ export const defaultSeal = (plaintext: string): string =>
 
 export const defaultUnseal = (sealed: string): string =>
   createTokenVault(keyringFromEnv()).decrypt(JSON.parse(sealed))
+
+/** The single user-facing message for any failure on the persist path. */
+export const CONNECT_SAVE_FAILED = 'Could not save the connection — try again.'
 
 export const newTraceId = (): string => randomUUID()
 
@@ -129,6 +132,48 @@ export const computeExpiresAt = (now: Date, expiresIn: number | undefined): stri
 
 export const parseScopes = (scope: string | undefined, fallback: string[]): string[] =>
   scope ? scope.split(' ').filter(Boolean) : fallback
+
+/**
+ * A provider may issue NO refresh token — normal for grants without offline access.
+ * Absent (and an empty string, which is not a credential) collapses to null so the
+ * caller stores SQL NULL rather than sealing ''.
+ */
+export const normalizeOptionalToken = (value: string | undefined): string | null =>
+  value !== undefined && value !== '' ? value : null
+
+/**
+ * Seal ONE secret behind a Result guard. EVERY seal() call site in this package goes
+ * through here or through {@link sealOptionalSecret}: a vault misconfiguration (missing
+ * or malformed TOKEN_VAULT_KEY) must surface as a typed PROVIDER_ERROR, never as a raw
+ * rejection. The thrown error is swallowed — it is token-adjacent and its text must
+ * never reach a caller.
+ */
+export function sealSecret(
+  seal: (plaintext: string) => string,
+  plaintext: string,
+  traceId: string,
+  message: string,
+): Result<string> {
+  try {
+    return ok(seal(plaintext))
+  } catch {
+    return providerErr(traceId, message)
+  }
+}
+
+/**
+ * Seal an OPTIONAL secret. A null plaintext yields `ok(null)` — NOT a seal of the empty
+ * string, and not an error: "this grant has no refresh token" is a legitimate outcome.
+ */
+export function sealOptionalSecret(
+  seal: (plaintext: string) => string,
+  plaintext: string | null,
+  traceId: string,
+  message: string,
+): Result<string | null> {
+  if (plaintext === null) return ok(null)
+  return sealSecret(seal, plaintext, traceId, message)
+}
 
 /**
  * One guarded provider call: a transport throw or non-200 becomes a PROVIDER_ERROR
