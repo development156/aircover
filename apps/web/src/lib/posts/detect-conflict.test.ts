@@ -101,17 +101,27 @@ describe('detectConflict', () => {
     expect(result).toEqual({ conflict: true, message: expect.any(String), theirsUpdatedAt: LATER })
   })
 
-  test('offers to restore the other version in verb-first sentence-case copy', () => {
+  test('states the divergence in sentence-case copy', () => {
     const result = detectConflict(UTC_Z, LATER)
     if (!result.conflict) throw new Error('expected a conflict')
-    expect(result.message).toMatch(/restore/i)
+    expect(result.message).toMatch(/changed/i)
     expect(result.message).toMatch(/^[A-Z][a-z]/)
+  })
+
+  // Every timestamp this module sees is a POST-write one, so it cannot know
+  // whether our write landed before or after the other. Saying we "saved over a
+  // newer version" was a guess presented as fact — and it fired on re-renders
+  // where `savePost` had not been called at all.
+  test('claims neither that a save happened nor that anything was overwritten', () => {
+    const result = detectConflict(UTC_Z, LATER)
+    if (!result.conflict) throw new Error('expected a conflict')
+    expect(result.message).not.toMatch(/saved|saving|overwrote|overwritten|over a newer|replaced/i)
   })
 
   // `posts` records `created_by` but nothing records who last UPDATED a row, so
   // authorship is unknowable here — and the same user in a second tab is the
   // commonest autosave collision. Naming a culprit would be inventing a fact.
-  test('makes no claim about who made the edit it overwrote', () => {
+  test('makes no claim about who made the other edit', () => {
     const result = detectConflict(UTC_Z, LATER)
     if (!result.conflict) throw new Error('expected a conflict')
     expect(result.message).not.toMatch(/someone|somebody|else|teammate|another user|they|their/i)

@@ -2,11 +2,17 @@
 
 import { auth } from '@clerk/nextjs/server'
 import { createFixtureAdapter } from '@sahoda/publishing'
-import { CONSTRAINTS, formatForPlatform, type Channel } from '@sahoda/shared'
+import { CONSTRAINTS, formatForPlatform, validateVariant, type Channel } from '@sahoda/shared'
 
+import { hasLink } from '@/lib/posts/detect-link'
 import { getPost, listVariants } from '@/lib/posts/read'
 import { parseExtras } from '@/lib/posts/variant-extras'
-import type { PublishState, SimulatedPublish } from '@/lib/posts/state'
+import type {
+  BlockedPublish,
+  PublishState,
+  SimulatedPublish,
+  SkippedPublish,
+} from '@/lib/posts/state'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
 /**
@@ -32,6 +38,14 @@ import { getActiveWorkspace } from '@/lib/workspaces'
  * The `mode` field is carried through untouched so the UI branches on it rather
  * than sniffing the permalink; the `fixture://` permalink itself is never
  * rendered as a link.
+ *
+ * The Constraint Engine gates the fixture, not the other way round. The fixture
+ * adapter performs NO validation — it returns success unconditionally — so
+ * handing it a 600-character X variant would report "would have been accepted"
+ * for a post X rejects at 280, directly contradicting the red MAX_CHARS meter on
+ * the same screen. Every variant therefore goes through `validateVariant` FIRST,
+ * built from the same three fields the live meter uses (`variant-panel.tsx`:
+ * body, hashtags, hasLink) so the preview and the meter cannot drift apart.
  */
 export async function simulatePublish(postId: string): Promise<PublishState> {
   try {
@@ -44,25 +58,50 @@ export async function simulatePublish(postId: string): Promise<PublishState> {
     const post = await getPost(postId)
     if (!post) return { ok: false, message: "You don't have access to this post." }
 
-    const variants = await listVariants(postId)
-    if (variants.length === 0) {
+    const stored = await listVariants(postId)
+    if (stored.length === 0) {
       return { ok: false, message: 'Add at least one channel variant to preview publishing.' }
     }
 
+    // `listVariants` returns rows for channels the writer may have since
+    // DESELECTED — the row survives the deselect. Previewing those would report
+    // on content that is no longer part of the post.
+    const selected = new Set<Channel>(post.channels)
+    const variants = stored.filter((variant) => selected.has(variant.channel))
+    if (variants.length === 0) {
+      return { ok: false, message: 'Select at least one channel to preview publishing.' }
+    }
+
     const simulated: SimulatedPublish[] = []
+    const blocked: BlockedPublish[] = []
+    const skipped: SkippedPublish[] = []
+
     for (const variant of variants) {
       const channel: Channel = variant.channel
       const spec = CONSTRAINTS[channel]
 
       // instagram is publishable:false in the frozen engine — simulating it
       // would imply a path that does not exist on any adapter.
-      if (!spec.publishable) continue
+      if (!spec.publishable) {
+        skipped.push({ channel, reason: 'not-publishable' })
+        continue
+      }
 
       const extras = parseExtras(variant.extras)
-      const content = formatForPlatform(spec, {
+      const draft = {
         body: variant.body,
         hashtags: extras.hashtags,
-      })
+        hasLink: hasLink(variant.body),
+      }
+
+      // The real gate. Must run BEFORE the fixture, which accepts anything.
+      const { violations } = validateVariant(spec, draft)
+      if (violations.length > 0) {
+        blocked.push({ channel, violations })
+        continue
+      }
+
+      const content = formatForPlatform(spec, draft)
 
       const result = await createFixtureAdapter(channel).publish({
         workspaceId: workspace.id,
@@ -89,14 +128,17 @@ export async function simulatePublish(postId: string): Promise<PublishState> {
       })
     }
 
-    if (simulated.length === 0) {
+    // Blocked channels are a RESULT, not an error: the writer needs to see which
+    // rule each one broke. Only a run with nothing to say at all falls back to a
+    // message.
+    if (simulated.length === 0 && blocked.length === 0) {
       return {
         ok: false,
         message: 'None of these channels can be published yet — Instagram is preview-only.',
       }
     }
 
-    return { ok: true, simulated }
+    return { ok: true, simulated, blocked, skipped }
   } catch {
     return { ok: false, message: 'Could not run the publish preview — try again.' }
   }

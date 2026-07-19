@@ -1,4 +1,4 @@
-import type { Channel } from '@sahoda/shared'
+import type { Channel, ConstraintViolation } from '@sahoda/shared'
 
 /**
  * Action state types live here, not in the `'use server'` modules that return
@@ -42,6 +42,11 @@ export type RewriteState =
  * deliberately no `'live'` path here: `apps/web` cannot publish for real (tokens
  * are vault-only) and cannot record a publish at all (`post_publish_logs` is
  * member-read with a `block_mutations` trigger). Nothing is persisted.
+ *
+ * A channel only reaches this shape after `validateVariant` returned zero
+ * violations. The fixture adapter validates NOTHING — it is an unconditional
+ * success — so "the fixture accepted it" is not evidence of anything and must
+ * never be the reason a channel is reported as passing.
  */
 export interface SimulatedPublish {
   channel: Channel
@@ -50,5 +55,34 @@ export interface SimulatedPublish {
   publishedAt: string
 }
 
-export type PublishState =
-  { ok: true; simulated: SimulatedPublish[] } | { ok: false; message: string }
+/**
+ * A variant the frozen Constraint Engine REJECTS. It is never handed to the
+ * fixture adapter, because a fixture success would contradict the red meter the
+ * writer is already looking at on the same screen.
+ */
+export interface BlockedPublish {
+  channel: Channel
+  /** Straight from `validateVariant`; render via `describeViolation`, never raw. */
+  violations: ConstraintViolation[]
+}
+
+/**
+ * A channel the engine marks `publishable: false` (Instagram in Alpha). Neither
+ * a pass nor a failure — there is simply no adapter path to simulate.
+ */
+export interface SkippedPublish {
+  channel: Channel
+  reason: 'not-publishable'
+}
+
+/**
+ * Three outcomes, kept separate on purpose: a blocked channel must never be
+ * countable as a simulated one, and a skipped channel must never read as either.
+ */
+export interface PublishReport {
+  simulated: SimulatedPublish[]
+  blocked: BlockedPublish[]
+  skipped: SkippedPublish[]
+}
+
+export type PublishState = ({ ok: true } & PublishReport) | { ok: false; message: string }

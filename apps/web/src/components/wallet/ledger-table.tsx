@@ -49,7 +49,13 @@ const CELL = 'px-3 py-3 align-top'
 export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
   // A full page means the window cut the history off. There is no pagination to
   // offer yet, so this states the limit rather than implying a "load more".
-  const isWindowed = entries.length >= limit
+  //
+  // The signal is the row count the QUERY returned, not the count that survived
+  // parsing — `entries` is post-filter, so a full page of `limit` rows with any
+  // of them dropped by `parseEntries` would otherwise render a truncated history
+  // as a complete one, hiding the notice exactly when rows went missing.
+  const returned = entries.length + skipped
+  const isWindowed = returned >= limit
 
   // Per-row provider cost is already inside `describeEntry(...).why` (it is
   // appended there only when `cogsUsd` is non-null), so it is deliberately NOT

@@ -16,6 +16,12 @@ export interface VariantTabsProps {
   channels: Channel[]
   canonicalBody: string
   variants: VariantsApi
+  /**
+   * How many files are attached to this post. Media attaches to the POST
+   * (`post_media.post_id`), not to a variant, so every channel is scored against
+   * the same count — what differs is each spec's `maxMediaCount`.
+   */
+  mediaCount: number
 }
 
 /**
@@ -25,7 +31,7 @@ export interface VariantTabsProps {
  * Blocking is strictly per channel: `blockingChannels` marks only the tabs whose
  * own draft violates its own spec, so an over-limit X post never blocks GBP.
  */
-export function VariantTabs({ channels, canonicalBody, variants }: VariantTabsProps) {
+export function VariantTabs({ channels, canonicalBody, variants, mediaCount }: VariantTabsProps) {
   const [requested, setRequested] = useState<Channel | null>(null)
 
   const active = requested !== null && channels.includes(requested) ? requested : channels[0]
@@ -36,6 +42,7 @@ export function VariantTabs({ channels, canonicalBody, variants }: VariantTabsPr
       body: state.body,
       hashtags: state.extras.hashtags,
       hasLink: hasLink(state.body),
+      mediaCount,
     })
   })
   const blocked = new Set(blockingChannels(meters))
@@ -124,6 +131,7 @@ export function VariantTabs({ channels, canonicalBody, variants }: VariantTabsPr
           channel={active}
           state={variants.states[active]}
           canonicalBody={canonicalBody}
+          mediaCount={mediaCount}
           onBodyChange={(body) => variants.setBody(active, body)}
           onExtrasChange={(patch) => variants.setExtras(active, patch)}
           onSave={() => variants.save(active)}
