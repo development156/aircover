@@ -481,6 +481,46 @@ describe('safeUrl - whitespace and invisible characters are rejected, not silent
   })
 })
 
+/**
+ * India-market phone formatting and multi-word mail subjects both rely on a bare space, so
+ * `mailto:` and `tel:` are the one carve-out from "no whitespace in a URL". `http:`/`https:`
+ * keep the strict rule -- a space there resolves to a different page under RFC 3986 -- and the
+ * carve-out is scoped by scheme, not by content: it only ever applies once the scheme has
+ * already been matched to exactly `mailto:` or `tel:`, so a scheme-laundering payload can never
+ * reach it.
+ */
+describe('safeUrl - mailto: and tel: permit a bare space; http/https do not', () => {
+  it('accepts a tel: link formatted with spaces, the norm for Indian phone numbers', () => {
+    expect(safeUrl('tel:+91 98765 43210')).toBe('tel:+91 98765 43210')
+  })
+
+  it('accepts a mailto: link with a multi-word subject in the query string', () => {
+    expect(safeUrl('mailto:hi@sahoda.com?subject=Hello there')).toBe(
+      'mailto:hi@sahoda.com?subject=Hello there',
+    )
+  })
+
+  it('still rejects a space in an http: url', () => {
+    expect(safeUrl('http://example.com/a b')).toBeNull()
+  })
+
+  it('still rejects a space in an https: url', () => {
+    expect(safeUrl('https://example.com/a b')).toBeNull()
+  })
+
+  it('still rejects the tab-obfuscated javascript: url', () => {
+    expect(safeUrl('java\tscript:alert(1)')).toBeNull()
+  })
+
+  it('still rejects a space-obfuscated javascript: url', () => {
+    expect(safeUrl('java script:alert(1)')).toBeNull()
+  })
+
+  it('still rejects a zero-width-space-obfuscated javascript: url', () => {
+    expect(safeUrl('java\u200Bscript:alert(1)')).toBeNull()
+  })
+})
+
 // -- stripControl -----------------------------------------------------------------
 
 const STRIP_CASES: ReadonlyArray<StringCase> = [

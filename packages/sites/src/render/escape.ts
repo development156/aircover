@@ -77,6 +77,24 @@ const URL_FORBIDDEN =
   /[\u0000-\u0020\u007F-\u00A0\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u206A-\u206F\uFEFF\uFFF9-\uFFFB\u{E0000}-\u{E007F}\uD800-\uDFFF]/u
 
 /**
+ * The same forbidden set as {@link URL_FORBIDDEN}, minus the bare space (U+0020) -- every other
+ * C0 control (tab, newline, CR, ...), every C1 control, NBSP and the full invisible-character
+ * set stay forbidden. Used only once the scheme has already been matched to exactly `mailto:`
+ * or `tel:`, because India-market phone formatting (`tel:+91 98765 43210`) and multi-word mail
+ * subjects (`mailto:hi@sahoda.com?subject=Hello there`) both rely on an unescaped space.
+ *
+ * This does not reopen the `java<TAB>script:` / `java<SPACE>script:` / `java<ZWSP>script:`
+ * laundering path: {@link URL_SCHEME} requires the scheme's own characters to run straight into
+ * the colon with nothing else between them, so any of those three payloads fails scheme
+ * extraction entirely (the offending character sits *inside* the alleged scheme, before its
+ * colon) and falls through to the schemeless branch below, which rejects anything not starting
+ * with `/` or `#`. This relaxed regex is only ever consulted once a real `mailto:`/`tel:`
+ * scheme has already been confirmed, so it never sees those payloads.
+ */
+const URL_FORBIDDEN_ALLOW_SPACE =
+  /[\u0000-\u001F\u007F-\u00A0\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u206A-\u206F\uFEFF\uFFF9-\uFFFB\u{E0000}-\u{E007F}\uD800-\uDFFF]/u
+
+/**
  * Two authority-position slashes, in any combination of `/` and `\`. WHATWG URL parsing
  * treats a backslash as a slash there, so `/\evil.com`, `\/evil.com` and
  * `\\evil.com` all resolve to `https://evil.com/` exactly as `//evil.com` does -- while
@@ -140,18 +158,30 @@ export const escapeAttr = (raw: unknown): string =>
  * would launder `java<TAB>script:` into a clean `javascript:` that then has to be caught by the
  * allowlist -- one check deep instead of two. Only surrounding whitespace is trimmed, which
  * cannot change where a URL points.
+ *
+ * The one exception is a bare space, and only once the scheme is confirmed to be exactly
+ * `mailto:` or `tel:` -- see {@link URL_FORBIDDEN_ALLOW_SPACE}. India-market phone numbers are
+ * conventionally spaced (`tel:+91 98765 43210`) and mail subjects are often multiple words
+ * (`mailto:hi@sahoda.com?subject=Hello there`); neither scheme has an authority component for a
+ * space to redirect, so passing it through is inert. `http:`/`https:` keep the strict rule.
  */
 export const safeUrl = (raw: unknown): string | null => {
   if (typeof raw !== 'string') return null
 
   const url = raw.trim()
   if (url.length === 0 || url.length > MAX_URL_LENGTH) return null
-  if (URL_FORBIDDEN.test(url)) return null
+
+  // Scheme is extracted before the forbidden-character check purely to decide which check to
+  // run -- see URL_FORBIDDEN_ALLOW_SPACE's doc comment for why this cannot be laundered.
+  const scheme = URL_SCHEME.exec(url)?.[1]
+  const schemeLower = scheme?.toLowerCase()
+  const permitsSpace = schemeLower === 'mailto' || schemeLower === 'tel'
+
+  if (permitsSpace ? URL_FORBIDDEN_ALLOW_SPACE.test(url) : URL_FORBIDDEN.test(url)) return null
   if (URL_AUTHORITY_SLASHES.test(url)) return null
 
-  const scheme = URL_SCHEME.exec(url)?.[1]
-  if (scheme !== undefined) {
-    return ALLOWED_SCHEMES.has(scheme.toLowerCase()) ? url : null
+  if (schemeLower !== undefined) {
+    return ALLOWED_SCHEMES.has(schemeLower) ? url : null
   }
 
   if (url.startsWith('/') || url.startsWith('#')) return url
