@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Append-only log: keep both sides' lines on merge instead of conflicting
+LEARNINGS.md merge=union
