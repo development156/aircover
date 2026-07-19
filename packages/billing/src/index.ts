@@ -34,6 +34,12 @@ export * from './transport'
 export * from './providers/types'
 export * from './providers/fixture'
 
+// Cashfree (India) rail — sandbox now, live behind CASHFREE_ENV
+export * from './providers/cashfree/env'
+export * from './providers/cashfree/signature'
+export * from './providers/cashfree/webhook'
+export * from './providers/cashfree'
+
 // Webhook → ledger: idempotent event store + the process orchestrator + the grant
 export * from './webhooks/applyPlanGrant'
 export * from './webhooks/store'
