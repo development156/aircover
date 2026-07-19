@@ -38,6 +38,32 @@ export function fixtureTransport(recorded: RecordedResponse): Transport {
   })
 }
 
+/** A single route for {@link routedTransport}: match by method and/or URL substring. */
+export interface FixtureRoute {
+  match: { method?: string; urlIncludes: string }
+  response: RecordedResponse
+}
+
+/**
+ * Route each request to a recorded response — required for multi-call flows (OAuth
+ * token exchange + profile fetch, GBP account/location discovery) where the blind
+ * single-response {@link fixtureTransport} would silently replay the wrong fixture.
+ * An unmatched request throws so a missing fixture fails loudly, never confusingly.
+ */
+export function routedTransport(routes: FixtureRoute[]): Transport {
+  return async (req) => {
+    const route = routes.find(
+      (r) =>
+        (r.match.method === undefined || r.match.method === req.method) &&
+        req.url.includes(r.match.urlIncludes),
+    )
+    if (!route) {
+      throw new Error(`no fixture route matched ${req.method} ${req.url}`)
+    }
+    return fixtureTransport(route.response)(req)
+  }
+}
+
 /** Production transport backed by the platform's global `fetch`. */
 export function fetchTransport(fetchImpl: typeof fetch = fetch): Transport {
   return async (req) => {

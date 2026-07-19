@@ -11,6 +11,8 @@ export const PUBLISHING_PACKAGE = '@sahoda/publishing' as const
 export {
   fetchTransport,
   fixtureTransport,
+  routedTransport,
+  type FixtureRoute,
   type Transport,
   type TransportRequest,
   type TransportResponse,
