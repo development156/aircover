@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { hasRlsEnv } from './helpers/env'
 import { serviceClient, userClient, anonClient } from './helpers/db'
+import { sweepStaleFixtures } from './helpers/sweep'
 
 // Cross-tenant isolation must hold from an anon-key client (SQL-editor checks are
 // banned as evidence). Skipped unless the anon/service keys + JWT secret are set.
@@ -29,22 +30,9 @@ describe.skipIf(!hasRlsEnv)('RLS tenant isolation', () => {
   let themeA = ''
 
   beforeAll(async () => {
-    // Recovery sweep, same pattern as ledger.test.ts. Cleanup here is afterAll-only, so
-    // a run killed mid-suite strands its two workspaces (plus every site/page/section/
-    // lead/theme hanging off them) forever. Nothing here can POISON a later run the way
-    // a fixed idempotency key did — every slug and user id is run-scoped — so this
-    // clears litter rather than repairing breakage.
-    //
-    // The selector is a LIKE, not the fixed `created_by` the ledger sweep could use,
-    // because these ids embed `run`. It stays anchored to the `user_rls_` prefix so it
-    // can never reach a real user or another suite's fixtures. The 1h floor is the same
-    // heuristic and the same trade: a normally-paced run (~13s) is nowhere near it, but
-    // a run parked at a breakpoint past an hour would have its live workspaces swept.
-    await svc()
-      .from('workspaces')
-      .delete()
-      .like('created_by', 'user_rls_%')
-      .lt('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+    // Cleanup here is afterAll-only, so an interrupted run strands both workspaces and
+    // everything hanging off them. See helpers/sweep.ts for the safety properties.
+    await sweepStaleFixtures(svc(), 'user_rls_')
 
     const a = await svc()
       .from('workspaces')
