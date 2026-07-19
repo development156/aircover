@@ -77,15 +77,27 @@ in `dropped` (`invalid-path:`, `duplicate-path:`, `dropped-section:`, `empty-pag
 becomes unfalsifiable — producing that list honestly is the entire reason the normalize layer
 exists. A caller that ignores it converts silent data loss into a mystery.
 
-## Task 9 stub
+## Brand Skin (`src/theme/`)
 
-`src/theme/css.ts` is deliberately partial: `themeCss` takes `null` and **throws** on a populated
-theme (returning `''` would silently discard the workspace brand skin). Brand-skin derivation needs
-Tasks 7 (oklch) and 8 (readability guard), which have not landed, so **every generated site renders
-in the default token palette** from `packages/shared/tokens.css`. The `null` narrowing is enforced
-only by `tsc --noEmit` — vitest strips types and stays green through a widening. Do not read a green
-`vitest run` as evidence it still holds. To widen: implement the derivation and delete the runtime
-guard in the same change.
+`themeCss(tokens: ThemeTokens | null)` is landed (Tasks 7/8/9). `null` — the common path, since
+`workspace_themes` is never seeded — yields `''` and the site keeps the inlined `tokens.css`
+defaults. A populated theme emits **exactly** the seven themeable vars (`--p --pfg --pstrong --acc
+--t50 --t100 --t300`) as a `:root{}` override; neutrals and semantics are fixed and never appear.
+
+Two properties are load-bearing, do not regress them:
+
+- **CSS-injection defense.** `ColorToken` is a bare `z.string()`, so a stored token can legally be
+  `oklch(0.5 0.1 20); }</style>…`. Every emitted colour is `parseOklch → (Guard) → formatOklch` —
+  machine-built numeric `oklch(L C H)`, structurally incapable of carrying `;`, `}`, `<` or `url(`.
+  An unparseable **required** token (the primary) omits the WHOLE block (`''`), never a partial or
+  raw one. `isEmittable` re-validates every value at the output boundary, so a weakened input guard
+  still cannot ship `NaN`/`{` into a live stylesheet.
+- **The Readability Guard adjusts the PRIMARY, not the stored foreground.** `tokens.primaryFg` is
+  **deliberately not consumed** — a bare-string foreground can't be trusted. The Guard darkens the
+  primary's lightness (hue/chroma fixed) until either `white` or `var(--ink)` clears WCAG AA 4.5:1,
+  then emits that literal as `--pfg`. So a workspace brands its primary + tints; the text colour on
+  the primary is auto-selected from two safe literals, never a chosen colour. This diverges from the
+  skill's "adjust foreground lightness only" wording and is the plan's deliberate safety trade.
 
 ## Source bytes
 

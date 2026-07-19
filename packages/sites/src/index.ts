@@ -38,9 +38,13 @@
  *       value is checked against.
  *
  * NOT YET EXPORTABLE — the module does not exist on disk this wave, so there is nothing to
- * re-export: `createCloudflareDeployer`, the transports, and the theme derivation
- * (`parseOklch`, `formatOklch`, `guardPrimaryForeground`, `BRAND_VAR_NAMES`, `brandSkinVars`).
- * `themeCss` below is Task 9's null-only stub.
+ * re-export: `createCloudflareDeployer` and the transports.
+ *
+ * DELIBERATELY NOT EXPORTED — the theme derivation internals (`parseOklch`, `formatOklch`,
+ * `guardPrimaryForeground`, `BRAND_VAR_NAMES`, `brandSkinVars`). `themeCss` is the one public
+ * theme entry: it owns the null path, the strict-parse fallback and the output-side gate, so a
+ * consumer never needs to touch a raw colour value. Exposing the parts hands a caller a way to
+ * emit an unguarded token string — the exact write-through the strict parse exists to prevent.
  */
 export const SITES_PACKAGE = '@sahoda/sites' as const
 
@@ -83,10 +87,12 @@ export type {
 } from './deploy/port'
 
 /**
- * Task 9's stub: typed `(tokens: null)` and it THROWS on anything else, so a populated theme
- * cannot be silently discarded. Exported anyway because the caller needs the null path to
- * assemble the head's theme block, and because a consumer hand-rolling `''` in its place would
- * lose the throw that makes the missing derivation visible.
+ * `themeCss(tokens: ThemeTokens | null): string` — the Brand Skin derivation. `null` (the
+ * common path — `workspace_themes` is never seeded) and any theme whose primary fails the
+ * strict OKLCH parse both yield `''`, so the head falls back to the inlined tokens.css defaults
+ * rather than a partial or unsafe `:root{}`. A populated, parseable theme emits exactly the
+ * seven themeable vars (`--p --pfg --pstrong --acc --t50 --t100 --t300`), every colour
+ * round-tripped through `formatOklch` so no stored string is ever written verbatim.
  */
 export { themeCss } from './theme/css'
 

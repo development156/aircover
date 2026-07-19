@@ -38,16 +38,6 @@ const THEME: ThemeTokens = {
   fontBody: 'Outfit',
 } as unknown as ThemeTokens
 
-/**
- * `RenderContext.theme` is narrowed to `null` for this wave (see `context.ts`), so a populated
- * theme cannot be assigned without a cast. The cast is the point, exactly as in
- * `theme/css.test.ts`: it simulates the widening, so the font guard is exercised for real today
- * instead of being pinned only by a comment. `renderStylesheet` never calls `themeCss`, so this
- * does not smuggle a populated theme past the Task 9 runtime guard — `renderDocument` still
- * throws on one, which is pinned below.
- */
-const asNarrowedTheme = (theme: ThemeTokens): null => theme as unknown as null
-
 const buildCtx = (overrides: Partial<RenderContext> = {}): RenderContext => ({
   siteName: 'Sharma Dental',
   tokensCss: TOKENS_CSS,
@@ -155,23 +145,21 @@ describe('renderDocument — head shell', () => {
     expect(html).not.toContain('--pstrong')
   })
 
-  /**
-   * UNSKIP WHEN TASKS 7-9 LAND. `themeCss` is a stub that throws on a populated theme and
-   * `RenderContext.theme` is typed `null`, so this cannot pass today. It is skipped rather than
-   * deleted: deleting it ships the brand-override behaviour unpinned forever once the real
-   * derivation arrives. The `asNarrowedTheme` cast comes out at the same time.
-   */
-  it.skip('emits the derived brand override block when an active theme is present', () => {
-    const html = renderDocument(buildPage(), buildCtx({ theme: asNarrowedTheme(THEME) }))
+  it('emits the derived brand override block when an active theme is present', () => {
+    const html = renderDocument(buildPage(), buildCtx({ theme: THEME }))
 
     expect(html).toContain('--pstrong')
     expect(html).toContain('--t300')
   })
 
-  it('throws rather than rendering a page that silently drops a populated brand theme', () => {
-    expect(() => renderDocument(buildPage(), buildCtx({ theme: asNarrowedTheme(THEME) }))).toThrow(
-      /unimplemented/i,
-    )
+  it('shifts --p to the workspace brand primary, so a populated theme changes the palette', () => {
+    // The tiny fixture tokensCss defines no --p, so a themed render adds `--p:oklch(…)` that a
+    // null-theme render does not — proof the derivation reaches the document, not just css.ts.
+    const themed = renderDocument(buildPage(), buildCtx({ theme: THEME }))
+    const unthemed = renderDocument(buildPage(), buildCtx({ theme: null }))
+
+    expect(themed).toContain('--p:oklch(')
+    expect(unthemed).not.toContain('--p:oklch(')
   })
 
   it('emits a viewport meta so generated sites are responsive always (docs/06 §4.6)', () => {
@@ -405,7 +393,7 @@ describe('renderStylesheet — layout sheet, font names allowlisted', () => {
   it('uses the theme font names when they are plain alphanumeric', () => {
     const css = renderStylesheet(
       buildCtx({
-        theme: asNarrowedTheme({ ...THEME, fontHeading: 'Playfair Display', fontBody: 'Inter' }),
+        theme: { ...THEME, fontHeading: 'Playfair Display', fontBody: 'Inter' },
       }),
     )
 
@@ -415,7 +403,7 @@ describe('renderStylesheet — layout sheet, font names allowlisted', () => {
 
   it('falls back to Outfit when a font name carries CSS-breaking characters, so it cannot inject a rule', () => {
     const css = renderStylesheet(
-      buildCtx({ theme: asNarrowedTheme({ ...THEME, fontBody: "x';}body{display:none}'" }) }),
+      buildCtx({ theme: { ...THEME, fontBody: "x';}body{display:none}'" } }),
     )
 
     expect(css).not.toContain('display:none')
@@ -463,7 +451,7 @@ describe('renderStylesheet — layout sheet, font names allowlisted', () => {
     }
   })
 
-  it('injects no generated content, so a separator cannot reappear beside the renderer\'s', () => {
+  it("injects no generated content, so a separator cannot reappear beside the renderer's", () => {
     // The attribution separator lived here as `.role::before{content:", "}` and printed a comma
     // for a role with no author in front of it — CSS cannot see the missing author. It now lives
     // in `renderTestimonials`, which can. Re-adding a `content:` here would not resurrect the

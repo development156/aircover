@@ -295,12 +295,20 @@ describe('@sahoda/sites public surface', () => {
     ).toBe(false)
   })
 
-  it('exposes the theme stub that throws rather than silently dropping a brand skin', () => {
+  it('exposes themeCss: null and unusable themes yield no block, a parseable theme a :root override', () => {
     expect(index.themeCss(null)).toBe('')
-    // The runtime guard is the half that survives a type widening, so it is what gets pinned.
-    expect(() => index.themeCss({ primary: 'oklch(0.5 0.1 30)' } as unknown as null)).toThrow(
-      /unimplemented/,
-    )
+    // An unparseable primary omits the block (the security fallback), not a partial one.
+    expect(
+      index.themeCss({ primary: '#ff4b00' } as unknown as Parameters<typeof index.themeCss>[0]),
+    ).toBe('')
+    // A parseable theme emits the seven derived vars, every colour machine-formatted.
+    const css = index.themeCss({
+      primary: 'oklch(0.62 0.14 250)',
+      accent: 'oklch(0.55 0.16 30)',
+    } as unknown as Parameters<typeof index.themeCss>[0])
+    expect(css).toContain(':root{')
+    expect(css).toContain('--p:oklch(')
+    expect(css).toContain('--t300:oklch(')
   })
 
   it('exposes a slugify that folds and collapses rather than passing text through', () => {

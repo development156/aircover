@@ -1,3 +1,5 @@
+import type { ThemeTokens } from '@sahoda/shared'
+
 /**
  * Everything a renderer is allowed to know — in a module of its own so that no `sections/*.ts`
  * file ever imports a type from the module that imports its values. Nothing here is read from
@@ -9,14 +11,13 @@ export interface RenderContext {
   siteName: string
   tokensCss: string
   /**
-   * Deliberately narrowed to `null` for this wave: the `themeCss` stub discards its argument,
-   * so a `ThemeTokens | null` field would let a caller build a real theme, render, and get a
-   * `live` bundle with the brand skin silently dropped. Typing it `null` means the only way to
-   * reach the stub with a real theme is a deliberate widening a reviewer sees.
-   * Task 9 HAS landed, as a narrow stub — see `src/theme/css.ts`. Widen this to
-   * `ThemeTokens | null` only when Tasks 7 and 8 land and `themeCss` itself widens.
+   * The active Brand Skin, or `null` when the workspace has no theme row — the common case,
+   * since `workspace_themes` is never seeded. `themeCss` derives the seven themeable vars from
+   * a populated value and returns `''` for `null` OR for a theme whose primary fails the strict
+   * OKLCH parse, so an unusable theme degrades to the inlined tokens.css defaults rather than
+   * emitting a partial or unsafe `:root{}` block.
    */
-  theme: null
+  theme: ThemeTokens | null
   /**
    * The endpoint the lead form POSTs to. `null` ⇒ the contact section renders without a form.
    *

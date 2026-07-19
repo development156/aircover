@@ -130,10 +130,10 @@ export const safeFontName = (raw: unknown): string => {
 }
 
 /**
- * `ctx.theme` is narrowed to `null` for this wave (see `context.ts`), so this reads through
- * `unknown` rather than through the declared type: when the field widens to `ThemeTokens |
- * null`, this keeps working unchanged and the guard above keeps applying. A declared type is
- * not a runtime guarantee at a boundary the database feeds.
+ * `ctx.theme` is `ThemeTokens | null` (see `context.ts`), but this reads through `unknown`
+ * rather than the declared type on purpose: the theme row is fed by a jsonb column, so a
+ * declared type is not a runtime guarantee here. `safeFontName` re-checks every family name
+ * against `FONT_NAME_PATTERN` regardless of what the type claims.
  */
 const themeFontName = (ctx: RenderContext, key: 'fontHeading' | 'fontBody'): string => {
   const theme: unknown = ctx.theme
@@ -178,8 +178,11 @@ const pageUrl = (origin: string | null, path: string): string | null => {
 }
 
 /**
- * tokens.css baseline + the derived brand vars. Both are trusted, non-model strings, and CSS
- * cannot be HTML-escaped without corrupting it — so instead of escaping, the one sequence that
+ * tokens.css baseline + the derived brand vars. `themeCss`'s output is already structurally
+ * incapable of closing the block — every value it emits is machine-built `oklch(L C H)` or a
+ * fixed foreground literal — so in practice only the caller-injected `tokensCss` can carry a
+ * `</style`. Both halves are trusted, non-model strings, and CSS cannot be HTML-escaped without
+ * corrupting it, so instead of escaping, the CONCATENATION is checked and the one sequence that
  * would break out of the block is rejected outright. A caller injecting that has a bug; failing
  * loudly beats emitting a document whose head silently ends early.
  */
@@ -187,7 +190,9 @@ const headStyle = (ctx: RenderContext): string => {
   const css = `${ctx.tokensCss}${themeCss(ctx.theme)}`
   if (STYLE_CLOSER.test(css)) {
     throw new Error(
-      'renderDocument: injected tokensCss closes the <style> block; refusing to emit it.',
+      'renderDocument: the injected tokensCss closes the <style> block; refusing to emit it. ' +
+        "(themeCss's own output is machine-built and cannot close the block, so the sequence " +
+        'came from tokensCss.)',
     )
   }
   return css
