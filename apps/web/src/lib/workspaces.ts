@@ -30,7 +30,7 @@ export async function listWorkspaces(): Promise<WorkspaceOption[]> {
       .order('created_at', { ascending: true })
 
     if (error || !data) {
-      if (error) console.error('[workspaces] read failed', error.message)
+      if (error) console.error('[workspaces] read failed', error.code, error.message)
       return []
     }
     return data as WorkspaceOption[]

@@ -15,3 +15,17 @@ const clerkWarning = clerkKeyWarning({
   nodeEnv: process.env.NODE_ENV,
 })
 if (clerkWarning) console.warn(`[env] ${clerkWarning}`)
+
+// Surface (don't just silently fix) a NEXT_PUBLIC_SUPABASE_URL that carried a path —
+// the schema normalized it to the origin, but the .env should hold the bare URL.
+try {
+  const rawPath = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL as string).pathname
+  if (rawPath && rawPath !== '/') {
+    console.warn(
+      `[env] NEXT_PUBLIC_SUPABASE_URL contained a path ("${rawPath}") — normalized to ` +
+        `${env.NEXT_PUBLIC_SUPABASE_URL}. Set it to the bare project URL (no /rest/v1).`,
+    )
+  }
+} catch {
+  // parseEnv already validated the URL; a throw here is not worth failing boot over.
+}

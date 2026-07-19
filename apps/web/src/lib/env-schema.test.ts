@@ -35,6 +35,24 @@ describe('parseEnv', () => {
     )
   })
 
+  test('normalizes the supabase url to its origin (supabase-js appends /rest/v1 itself)', () => {
+    // A pasted dashboard REST URL with the /rest/v1 path would otherwise double up
+    // to /rest/v1//rest/v1/<table> → PGRST125 "Invalid path specified in request URL".
+    expect(
+      parseEnv({ ...VALID, NEXT_PUBLIC_SUPABASE_URL: 'https://abc.supabase.co/rest/v1/' })
+        .NEXT_PUBLIC_SUPABASE_URL,
+    ).toBe('https://abc.supabase.co')
+    expect(
+      parseEnv({ ...VALID, NEXT_PUBLIC_SUPABASE_URL: 'https://abc.supabase.co/' })
+        .NEXT_PUBLIC_SUPABASE_URL,
+    ).toBe('https://abc.supabase.co')
+    // a clean origin is left untouched (no trailing slash)
+    expect(
+      parseEnv({ ...VALID, NEXT_PUBLIC_SUPABASE_URL: 'https://abc.supabase.co' })
+        .NEXT_PUBLIC_SUPABASE_URL,
+    ).toBe('https://abc.supabase.co')
+  })
+
   test('never echoes secret values in the error message', () => {
     // Arrange: valid secret present but another var missing → error mentions
     // names only, not values.
