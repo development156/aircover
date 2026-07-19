@@ -52,7 +52,15 @@ export function InlineRewrite({ body, selection, onReplace }: InlineRewriteProps
   const [stranded, setStranded] = useState<string | null>(null)
 
   const fragment = selection === null ? '' : selectedText(body, selection)
-  if (fragment.trim() === '') return null
+  const hasSelection = fragment.trim() !== ''
+
+  // The OFFER is gated on a selection. Everything that reports on a rewrite the
+  // user has ALREADY paid for is not: this component used to `return null` the
+  // moment the selection collapsed, and the caret collapses on any click in the
+  // textarea. So clicking away during a rewrite hid the pending lines, and then
+  // hid the `stranded` box too — the credit was spent, the model output was
+  // sitting in state, and the user saw nothing at all.
+  if (!hasSelection && !pending && stranded === null && failure === null) return null
 
   const cost = creditCost('caption_rewrite')
 
@@ -91,21 +99,27 @@ export function InlineRewrite({ body, selection, onReplace }: InlineRewriteProps
       className="space-y-2 rounded-input border border-line bg-s1 p-3"
       data-guide="post-inline-ai"
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink">
-          <Sparkles size={13} className="text-accent" aria-hidden />
-          <span className="tabular-nums">{fragment.length.toLocaleString('en-IN')}</span>
-          {' characters selected'}
-        </span>
-        <span className="text-[12px] text-faint">
-          Uses <span className="tabular-nums">{cost}</span> credit
-          {cost === 1 ? '' : 's'} each
-        </span>
-      </div>
+      {hasSelection ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink">
+            <Sparkles size={13} className="text-accent" aria-hidden />
+            {/* Code points, not UTF-16 units — the count the engine uses, so an
+                emoji selection does not read as two characters here and one there. */}
+            <span className="tabular-nums">
+              {Array.from(fragment).length.toLocaleString('en-IN')}
+            </span>
+            {' characters selected'}
+          </span>
+          <span className="text-[12px] text-faint">
+            Uses <span className="tabular-nums">{cost}</span> credit
+            {cost === 1 ? '' : 's'} each
+          </span>
+        </div>
+      ) : null}
 
-      {pending ? (
-        <PendingLines lines={PENDING_LINES} />
-      ) : (
+      {pending ? <PendingLines lines={PENDING_LINES} /> : null}
+
+      {hasSelection && !pending ? (
         <div className="flex flex-wrap gap-1.5">
           {INSTRUCTIONS.map((instruction) => (
             <Button
@@ -118,7 +132,7 @@ export function InlineRewrite({ body, selection, onReplace }: InlineRewriteProps
             </Button>
           ))}
         </div>
-      )}
+      ) : null}
 
       {stranded !== null ? (
         <div
@@ -130,6 +144,11 @@ export function InlineRewrite({ body, selection, onReplace }: InlineRewriteProps
             was still charged — here it is to place yourself.
           </p>
           <p className="rounded-input bg-s1 px-2.5 py-2 text-ink">{stranded}</p>
+          {/* Stays until it is dismissed on purpose. It disappeared on its own
+              before, which meant a charged result could vanish unread. */}
+          <Button variant="ghost" size="sm" onClick={() => setStranded(null)}>
+            Discard this rewrite
+          </Button>
         </div>
       ) : null}
 

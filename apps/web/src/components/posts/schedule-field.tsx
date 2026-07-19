@@ -44,6 +44,22 @@ export function ScheduleField({ channels, value, onChange }: ScheduleFieldProps)
   const [draft, setDraft] = useState<string>(() => fromStored(value))
   const [now, setNow] = useState<Date | null>(null)
 
+  // Re-sync when the stored value changes underneath us — restoring the other
+  // version after a divergence replaces `scheduled_at`, and without this the
+  // field kept displaying the pre-restore time while the draft held the new one.
+  //
+  // Keyed on the VALUE prop changing, not on a draft/value mismatch: while the
+  // user is typing an incomplete or too-soon datetime, `handleChange`
+  // deliberately withholds `onChange`, so the two legitimately disagree and
+  // resetting then would eat every keystroke. A committed edit round-trips
+  // exactly (both sides are minute-precision wall clock), so this is a no-op for
+  // the user's own changes.
+  const [syncedValue, setSyncedValue] = useState<string | null>(value)
+  if (value !== syncedValue) {
+    setSyncedValue(value)
+    setDraft(fromStored(value))
+  }
+
   useEffect(() => {
     setNow(new Date())
     const timer = setInterval(() => setNow(new Date()), CLOCK_REFRESH_MS)
