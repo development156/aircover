@@ -1,0 +1,11 @@
+{
+  "status": 200,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "access_token": "gbp-access-token-fixture-value",
+    "expires_in": 3599,
+    "refresh_token": "gbp-refresh-token-fixture-value",
+    "scope": "https://www.googleapis.com/auth/business.manage",
+    "token_type": "Bearer"
+  }
+}
