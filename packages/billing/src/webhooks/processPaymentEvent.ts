@@ -10,10 +10,18 @@ export interface ProcessResult {
   grant: PlanGrantResult | null
 }
 
+/** User-facing failure copy. Fixed so no store/DB internals reach a caller. */
+const GENERIC_FAILURE = 'Could not process the payment event'
+
 export interface ProcessPaymentEventDeps {
   store: WebhookEventStore
   applyPlanGrant: (event: ParsedWebhookEvent) => Promise<Result<PlanGrantResult>>
   newTraceId?: () => string
+  /**
+   * Server-side observability hook. The raw cause goes here, never onto the Result.
+   * Default is a no-op — no logger dependency, no console.
+   */
+  onError?: (cause: unknown, traceId: string) => void
 }
 
 /**
@@ -60,11 +68,12 @@ export function createProcessPaymentEvent(
       await store.markProcessed(claim.id)
       return ok({ status: 'processed', grant: grant.data })
     } catch (unexpected) {
-      return err(appError('PROVIDER_ERROR', messageOf(unexpected), traceId))
+      try {
+        deps.onError?.(unexpected, traceId)
+      } catch {
+        // a broken logger must not turn a typed error into a rejection
+      }
+      return err(appError('PROVIDER_ERROR', GENERIC_FAILURE, traceId))
     }
   }
-}
-
-function messageOf(e: unknown): string {
-  return e instanceof Error ? e.message : String(e)
 }
