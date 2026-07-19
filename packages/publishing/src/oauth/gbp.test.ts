@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { routedTransport, type Transport } from '../transport'
+import { routedTransport, type Transport, type TransportRequest } from '../transport'
 import { createTokenVault, type TokenVault } from '../vault/token-vault'
 import { createGbpOAuthHandlers } from './gbp'
 import type { ConnectionStore, ConnectionUpsert } from './store'
@@ -8,6 +8,8 @@ import tokenError from '../../fixtures/gbp/oauth-token.error.json'
 import accounts from '../../fixtures/gbp/accounts.success.json'
 import locationsSingle from '../../fixtures/gbp/locations.single.json'
 import locationsMulti from '../../fixtures/gbp/locations.multi.json'
+
+const bodyText = (b: string | Uint8Array | undefined): string => (typeof b === 'string' ? b : '')
 
 const FIXED_NOW = new Date('2026-07-19T12:00:00.000Z')
 const ELEVEN_MINUTES_LATER = new Date('2026-07-19T12:11:00.000Z')
@@ -125,7 +127,7 @@ describe('GBP OAuth — handleCallback', () => {
 
   it('sends a Google-style form token exchange (credentials in the body, no Basic header)', async () => {
     const { store } = fakeStore()
-    let tokenReq: { headers?: Record<string, string>; body?: string } | undefined
+    let tokenReq: TransportRequest | undefined
     const transport: Transport = async (req) => {
       if (req.url.includes('oauth2.googleapis.com/token')) tokenReq = req
       return transportWith(locationsSingle)(req)
@@ -134,7 +136,7 @@ describe('GBP OAuth — handleCallback', () => {
     await handlers(transport, store).handleCallback(callbackArgs())
 
     expect(tokenReq?.headers?.['Authorization']).toBeUndefined()
-    const body = new URLSearchParams(tokenReq?.body ?? '')
+    const body = new URLSearchParams(bodyText(tokenReq?.body))
     expect(body.get('grant_type')).toBe('authorization_code')
     expect(body.get('code')).toBe('gbp-code-1')
     expect(body.get('client_id')).toBe('g-client-id')

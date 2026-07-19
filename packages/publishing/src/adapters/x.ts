@@ -1,10 +1,13 @@
 import {
   AdapterError,
+  CONSTRAINTS,
   type PublishAdapter,
   type PublishRequest,
   type PublishSuccess,
 } from '@sahoda/shared'
 import type { Transport, TransportResponse } from '../transport'
+import { classifyXHttpError } from './x-http'
+import { uploadXMedia, type ReadMedia } from './x-media'
 
 /** X API v2 create-post endpoint. Real network I/O is injected via {@link Transport}. */
 const CREATE_TWEET_URL = 'https://api.twitter.com/2/tweets'
@@ -13,16 +16,20 @@ export interface XAdapterDeps {
   transport: Transport
   /** Injectable clock — deterministic in tests, real wall-clock in production. */
   now?: () => Date
+  /** Resolves a storage path to raw bytes for upload. Media without this is rejected, never dropped. */
+  readMedia?: ReadMedia
 }
 
 /**
  * The X publish adapter. It translates the frozen `FormattedContent` (already shaped by
- * the shared Constraint Engine) into the X wire payload, posts it via the injected
- * transport, and returns a `PublishSuccess`. It NEVER retries — a transient
- * {@link AdapterError} tells the durable job to retry; a permanent one drives a reconnect CTA.
+ * the shared Constraint Engine) into the X wire payload, uploads any attached media
+ * first (v2 media upload), posts via the injected transport, and returns a
+ * `PublishSuccess`. It NEVER retries — a transient {@link AdapterError} tells the
+ * durable job to retry; a permanent one drives a reconnect CTA.
  */
 export function createXAdapter(deps: XAdapterDeps): PublishAdapter {
   const now = deps.now ?? (() => new Date())
+  const spec = CONSTRAINTS.x
 
   return {
     channel: 'x',
@@ -38,9 +45,38 @@ export function createXAdapter(deps: XAdapterDeps): PublishAdapter {
         })
       }
 
+      const preSupplied = req.content.mediaIds ?? []
+      let mediaIds = preSupplied
+      if (req.media.length > 0) {
+        if (req.media.length + preSupplied.length > spec.maxMediaCount) {
+          throw new AdapterError({
+            message: `X allows ${spec.maxMediaCount} media items.`,
+            code: 'INVALID_CONTENT',
+            classification: 'permanent',
+            channel: 'x',
+          })
+        }
+        if (!deps.readMedia) {
+          // Honesty rule: dropping attached media would present a partial publish as success.
+          throw new AdapterError({
+            message: 'X media publishing is not wired on this path yet.',
+            code: 'MEDIA_UNSUPPORTED',
+            classification: 'permanent',
+            channel: 'x',
+          })
+        }
+        const uploaded = await uploadXMedia(
+          deps.transport,
+          req.auth.accessToken,
+          req.media,
+          deps.readMedia,
+        )
+        mediaIds = [...uploaded, ...preSupplied]
+      }
+
       const payload: { text: string; media?: { media_ids: string[] } } = { text: req.content.text }
-      if (req.content.mediaIds && req.content.mediaIds.length > 0) {
-        payload.media = { media_ids: req.content.mediaIds }
+      if (mediaIds.length > 0) {
+        payload.media = { media_ids: mediaIds }
       }
       // Serialize BEFORE the try so a payload-construction bug surfaces as itself, not as a
       // "transient" network error the durable job would pointlessly retry.
@@ -89,7 +125,7 @@ export function createXAdapter(deps: XAdapterDeps): PublishAdapter {
         }
       }
 
-      throw classifyHttpError(res)
+      throw classifyXHttpError(res)
     },
   }
 }
@@ -101,45 +137,6 @@ function parseTweetId(body: string): string | undefined {
     // Tweet ids are numeric snowflakes — reject anything else so a hostile/garbled response
     // can never reach the stored permalink (would be a stored-XSS primitive downstream).
     return typeof id === 'string' && /^\d+$/.test(id) ? id : undefined
-  } catch {
-    return undefined
-  }
-}
-
-/** Map an HTTP failure to a classified AdapterError. `raw` carries only status + X's own detail. */
-function classifyHttpError(res: TransportResponse): AdapterError {
-  // Transient = worth retrying: rate limit, request timeout, or a server-side error. Everything
-  // else (401/403/400/404/422 …) is permanent → the job stops and shows a reconnect/fix CTA.
-  const isTransient = res.status === 408 || res.status === 429 || res.status >= 500
-  return new AdapterError({
-    message: `X publish failed with HTTP ${res.status}`,
-    code: httpErrorCode(res.status),
-    classification: isTransient ? 'transient' : 'permanent',
-    channel: 'x',
-    raw: { status: res.status, detail: safeDetail(res.body) },
-  })
-}
-
-function httpErrorCode(status: number): string {
-  if (status === 401) return 'UNAUTHORIZED'
-  if (status === 403) return 'FORBIDDEN'
-  if (status === 408) return 'TIMEOUT'
-  if (status === 429) return 'RATE_LIMITED'
-  if (status >= 500) return 'SERVER_ERROR'
-  return 'HTTP_ERROR'
-}
-
-/** Pull X's own error text (title/detail) for the reconnect CTA — never our request/token. */
-function safeDetail(body: string): string | undefined {
-  try {
-    const parsed = JSON.parse(body) as { detail?: unknown; title?: unknown }
-    const detail =
-      typeof parsed.detail === 'string'
-        ? parsed.detail
-        : typeof parsed.title === 'string'
-          ? parsed.title
-          : undefined
-    return detail?.slice(0, 300)
   } catch {
     return undefined
   }

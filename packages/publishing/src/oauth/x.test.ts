@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { createHash } from 'node:crypto'
-import { routedTransport, type Transport } from '../transport'
+import { routedTransport, type Transport, type TransportRequest } from '../transport'
 import { createTokenVault, type TokenVault } from '../vault/token-vault'
 import { createXOAuthHandlers } from './x'
 import type { ConnectionStore, ConnectionUpsert } from './store'
 import tokenSuccess from '../../fixtures/x/oauth-token.success.json'
 import tokenError from '../../fixtures/x/oauth-token.error.json'
 import meSuccess from '../../fixtures/x/users-me.success.json'
+
+const bodyText = (b: string | Uint8Array | undefined): string => (typeof b === 'string' ? b : '')
 
 const FIXED_NOW = new Date('2026-07-19T12:00:00.000Z')
 const TEST_VAULT: TokenVault = createTokenVault({
@@ -133,7 +135,7 @@ describe('X OAuth — handleCallback', () => {
 
   it('sends the token exchange as form-encoded with Basic client auth and the verifier', async () => {
     const { store } = fakeStore()
-    let tokenReq: { headers?: Record<string, string>; body?: string } | undefined
+    let tokenReq: TransportRequest | undefined
     const transport: Transport = async (req) => {
       if (req.url.includes('/2/oauth2/token')) tokenReq = req
       return happyTransport()(req)
@@ -144,7 +146,7 @@ describe('X OAuth — handleCallback', () => {
     const expectedBasic = Buffer.from('x-client-id:x-client-secret').toString('base64')
     expect(tokenReq?.headers?.['Authorization']).toBe(`Basic ${expectedBasic}`)
     expect(tokenReq?.headers?.['content-type']).toBe('application/x-www-form-urlencoded')
-    const body = new URLSearchParams(tokenReq?.body ?? '')
+    const body = new URLSearchParams(bodyText(tokenReq?.body))
     expect(body.get('grant_type')).toBe('authorization_code')
     expect(body.get('code')).toBe('auth-code-1')
     expect(body.get('code_verifier')).toBe('verifier-value-verifier-value-verifier-value')

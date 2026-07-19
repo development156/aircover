@@ -7,7 +7,8 @@ export interface TransportRequest {
   method: string
   url: string
   headers?: Record<string, string>
-  body?: string
+  /** JSON/form bodies are strings; multipart uploads (X media) are raw bytes. */
+  body?: string | Uint8Array
 }
 
 export interface TransportResponse {

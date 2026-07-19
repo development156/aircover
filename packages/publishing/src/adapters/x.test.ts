@@ -10,6 +10,8 @@ import serverError from '../../fixtures/x/create-tweet.server-error.json'
 import badId from '../../fixtures/x/create-tweet.bad-id.json'
 import timeout from '../../fixtures/x/create-tweet.timeout.json'
 
+const bodyText = (b: string | Uint8Array | undefined): string => (typeof b === 'string' ? b : '')
+
 const FIXED_NOW = new Date('2026-07-19T00:00:00.000Z')
 
 function xRequest(overrides: Partial<PublishRequest> = {}): PublishRequest {
@@ -67,7 +69,7 @@ describe('X adapter — publish against recorded fixtures', () => {
     expect(req?.method).toBe('POST')
     expect(req?.url).toContain('/2/tweets')
     expect(req?.headers?.['Authorization']).toBe('Bearer secret-token')
-    expect(JSON.parse(req?.body ?? '{}').text).toBe('hello ☕')
+    expect(JSON.parse(bodyText(req?.body) || '{}').text).toBe('hello ☕')
   })
 
   it('attaches pre-uploaded media_ids only when present', async () => {
@@ -75,17 +77,19 @@ describe('X adapter — publish against recorded fixtures', () => {
     await createXAdapter({ transport: withMedia.transport }).publish(
       xRequest({ content: { channel: 'x', text: 't', mediaIds: ['m1', 'm2'] } }),
     )
-    expect(JSON.parse(withMedia.last()?.body ?? '{}').media).toEqual({ media_ids: ['m1', 'm2'] })
+    expect(JSON.parse(bodyText(withMedia.last()?.body) || '{}').media).toEqual({
+      media_ids: ['m1', 'm2'],
+    })
 
     const noMedia = capturing(success)
     await createXAdapter({ transport: noMedia.transport }).publish(xRequest())
-    expect(JSON.parse(noMedia.last()?.body ?? '{}').media).toBeUndefined()
+    expect(JSON.parse(bodyText(noMedia.last()?.body) || '{}').media).toBeUndefined()
   })
 
   it('never leaks the access token into the outbound body', async () => {
     const { transport, last } = capturing(success)
     await createXAdapter({ transport }).publish(xRequest())
-    expect(last()?.body ?? '').not.toContain('secret-token')
+    expect(bodyText(last()?.body)).not.toContain('secret-token')
   })
 
   it('classifies 401 as a PERMANENT AdapterError (revoked token → reconnect CTA)', async () => {

@@ -22,6 +22,7 @@ export {
 // Publish adapters.
 export { createFixtureAdapter, type FixtureAdapterOptions } from './adapters/fixture'
 export { createXAdapter, type XAdapterDeps } from './adapters/x'
+export { type ReadMedia } from './adapters/x-media'
 export { createGbpAdapter, type GbpAdapterDeps } from './adapters/gbp'
 
 // OAuth handlers (framework-agnostic; wt-web mounts them as thin routes) + the

@@ -10,6 +10,8 @@ import rateLimited from '../../fixtures/gbp/local-post.rate-limited.json'
 import serverError from '../../fixtures/gbp/local-post.server-error.json'
 import badName from '../../fixtures/gbp/local-post.bad-name.json'
 
+const bodyText = (b: string | Uint8Array | undefined): string => (typeof b === 'string' ? b : '')
+
 const FIXED_NOW = new Date('2026-07-19T12:00:00.000Z')
 const LOCATION = 'accounts/108283981976/locations/40123456789'
 
@@ -66,7 +68,7 @@ describe('GBP adapter — publish against recorded fixtures', () => {
     expect(req?.method).toBe('POST')
     expect(req?.url).toBe(`https://mybusiness.googleapis.com/v4/${LOCATION}/localPosts`)
     expect(req?.headers?.['Authorization']).toBe('Bearer gbp-secret-token')
-    const body = JSON.parse(req?.body ?? '{}')
+    const body = JSON.parse(bodyText(req?.body) || '{}')
     expect(body.summary).toBe('Fresh chai just dropped at Chai & Chapters.')
     expect(body.topicType).toBe('STANDARD')
     expect(body.languageCode).toBe('en')
@@ -86,7 +88,7 @@ describe('GBP adapter — publish against recorded fixtures', () => {
       }),
     )
 
-    expect(JSON.parse(last()?.body ?? '{}').callToAction).toEqual({
+    expect(JSON.parse(bodyText(last()?.body) || '{}').callToAction).toEqual({
       actionType: 'ORDER',
       url: 'https://chaichapters.example/order',
     })
@@ -127,7 +129,7 @@ describe('GBP adapter — publish against recorded fixtures', () => {
       }),
     )
 
-    const body = JSON.parse(last()?.body ?? '{}')
+    const body = JSON.parse(bodyText(last()?.body) || '{}')
     expect(body.topicType).toBe('OFFER')
     expect(body.event.title).toBe('20% off all chai')
     expect(body.offer.termsConditions).toBe('Till Sunday. In-store only.')
@@ -144,7 +146,7 @@ describe('GBP adapter — publish against recorded fixtures', () => {
       gbpRequest({ media: [{ storagePath: 'ws-1/img.jpg', mime: 'image/jpeg', bytes: 1000 }] }),
     )
 
-    expect(JSON.parse(last()?.body ?? '{}').media).toEqual([
+    expect(JSON.parse(bodyText(last()?.body) || '{}').media).toEqual([
       { mediaFormat: 'PHOTO', sourceUrl: 'https://cdn.example/ws-1/img.jpg' },
     ])
   })
