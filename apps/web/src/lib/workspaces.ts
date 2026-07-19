@@ -58,3 +58,9 @@ export function resolveActiveWorkspace(
   const chosen = activeSlug ? workspaces.find((w) => w.slug === activeSlug) : undefined
   return chosen ?? first
 }
+
+/** The active workspace for the current request (RLS-scoped list + cookie pointer). */
+export async function getActiveWorkspace(): Promise<WorkspaceOption | null> {
+  const [workspaces, activeSlug] = await Promise.all([listWorkspaces(), getActiveWorkspaceSlug()])
+  return resolveActiveWorkspace(workspaces, activeSlug)
+}
