@@ -8,7 +8,7 @@ pnpm+Turborepo · apps/web Next.js 15 App Router+TS+Tailwind+shadcn · apps/jobs
 
 ## Commands
 
-pnpm install · pnpm dev · turbo typecheck lint test · supabase migration new <name> (db push = ASK) · pnpm playwright test --grep @smoke
+pnpm install · pnpm dev · turbo typecheck lint test · supabase migration new <name> (db push = ASK) · pnpm test:smoke
 
 ## Non-negotiables
 

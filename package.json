@@ -2,7 +2,7 @@
   "name": "sahoda",
   "private": true,
   "version": "0.1.0-alpha.0",
-  "description": "SAHODA LABS — AI Marketing OS (monorepo)",
+  "description": "SAHODA LABS \u2014 AI Marketing OS (monorepo)",
   "packageManager": "pnpm@11.3.0",
   "engines": {
     "node": ">=20"
@@ -14,6 +14,8 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "test:e2e": "pnpm --filter @sahoda/web test:e2e",
+    "test:smoke": "pnpm --filter @sahoda/web test:smoke",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:new": "supabase --workdir packages/db migration new",

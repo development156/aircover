@@ -16,6 +16,8 @@
   },
   // vitest.setup.ts is in the program so `@testing-library/jest-dom/vitest`'s
   // module augmentation (toBeInTheDocument, toHaveFocus, …) is visible to tsc.
-  "include": ["next-env.d.ts", "src", ".next/types/**/*.ts", "vitest.config.ts", "vitest.setup.ts"],
+  "include": ["next-env.d.ts", "src", ".next/types/**/*.ts", "vitest.config.ts", "vitest.setup.ts",
+    "e2e",
+    "playwright.config.ts"],
   "exclude": ["node_modules"]
 }
