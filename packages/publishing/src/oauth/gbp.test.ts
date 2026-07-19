@@ -31,18 +31,54 @@ function fakeStore(): { store: ConnectionStore; calls: ConnectionUpsert[] } {
   }
 }
 
-function handlers(transport: Transport, store: ConnectionStore, now: () => Date = () => FIXED_NOW) {
+const ACCESS_PLAINTEXT = 'gbp-access-token-fixture-value'
+const REFRESH_PLAINTEXT = 'gbp-refresh-token-fixture-value'
+
+function handlers(
+  transport: Transport,
+  store: ConnectionStore,
+  now: () => Date = () => FIXED_NOW,
+  overrides: { seal?: (plaintext: string) => string } = {},
+) {
   return createGbpOAuthHandlers({
     clientId: 'g-client-id',
     clientSecret: 'g-client-secret',
     redirectUri: 'https://app.example/api/oauth/gbp/callback',
     transport,
     store,
-    seal: (s) => JSON.stringify(TEST_VAULT.encrypt(s)),
+    seal: overrides.seal ?? ((s) => JSON.stringify(TEST_VAULT.encrypt(s))),
     unseal: (s) => TEST_VAULT.decrypt(JSON.parse(s)),
     now,
   })
 }
+
+/** A Google token response with the refresh field under test. */
+const tokenResponseWithRefresh = (refresh: string | undefined) => ({
+  status: 200,
+  body: {
+    access_token: ACCESS_PLAINTEXT,
+    expires_in: 3599,
+    scope: 'https://www.googleapis.com/auth/business.manage',
+    token_type: 'Bearer',
+    ...(refresh !== undefined ? { refresh_token: refresh } : {}),
+  },
+})
+
+const transportWithTokenAnd = (token: unknown, locations: unknown) =>
+  routedTransport([
+    {
+      match: { method: 'POST', urlIncludes: 'oauth2.googleapis.com/token' },
+      response: token as never,
+    },
+    {
+      match: { method: 'GET', urlIncludes: 'mybusinessaccountmanagement' },
+      response: accounts as never,
+    },
+    {
+      match: { method: 'GET', urlIncludes: 'mybusinessbusinessinformation' },
+      response: locations as never,
+    },
+  ])
 
 const transportWith = (locations: unknown) =>
   routedTransport([
@@ -113,16 +149,57 @@ describe('GBP OAuth — handleCallback', () => {
     expect(calls[0]?.platform).toBe('gbp')
   })
 
-  it('persists a sealed token bundle that round-trips — never plaintext', async () => {
+  it('seals the access and refresh tokens as TWO independent envelopes', async () => {
     const { store, calls } = fakeStore()
 
     await handlers(transportWith(locationsSingle), store).handleCallback(callbackArgs())
 
     const record = calls[0]!
-    expect(record.encryptedSecret).not.toContain('gbp-access-token-fixture-value')
-    const bundle = JSON.parse(TEST_VAULT.decrypt(JSON.parse(record.encryptedSecret)))
-    expect(bundle.accessToken).toBe('gbp-access-token-fixture-value')
-    expect(bundle.refreshToken).toBe('gbp-refresh-token-fixture-value')
+    // Each field is a lone envelope over ONE token — not a bundle, not the same blob twice.
+    expect(record.refreshTokenEnc).not.toBeNull()
+    expect(record.accessTokenEnc).not.toBe(record.refreshTokenEnc)
+    expect(TEST_VAULT.decrypt(JSON.parse(record.accessTokenEnc))).toBe(ACCESS_PLAINTEXT)
+    expect(TEST_VAULT.decrypt(JSON.parse(record.refreshTokenEnc!))).toBe(REFRESH_PLAINTEXT)
+  })
+
+  it('leaks neither plaintext token anywhere in the persisted record', async () => {
+    const { store, calls } = fakeStore()
+
+    await handlers(transportWith(locationsSingle), store).handleCallback(callbackArgs())
+
+    const serialized = JSON.stringify(calls[0])
+    expect(serialized).not.toContain(ACCESS_PLAINTEXT)
+    expect(serialized).not.toContain(REFRESH_PLAINTEXT)
+  })
+
+  it('stores refreshTokenEnc as null when Google issues no refresh token', async () => {
+    const { store, calls } = fakeStore()
+    const transport = transportWithTokenAnd(tokenResponseWithRefresh(undefined), locationsSingle)
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(true)
+    const record = calls[0]!
+    // Absent refresh token is NORMAL: null, never a seal of '' and never an error.
+    expect(record.refreshTokenEnc).toBeNull()
+    expect(TEST_VAULT.decrypt(JSON.parse(record.accessTokenEnc))).toBe(ACCESS_PLAINTEXT)
+  })
+
+  it('carries a null refresh token through the resume-token round trip as null', async () => {
+    const { store, calls } = fakeStore()
+    const transport = transportWithTokenAnd(tokenResponseWithRefresh(undefined), locationsMulti)
+    const h = handlers(transport, store)
+    const cb = await h.handleCallback(callbackArgs())
+    if (!cb.ok || cb.data.kind !== 'choose_location') throw new Error('expected choose_location')
+
+    const result = await h.completeConnection({
+      resumeToken: cb.data.resumeToken,
+      locationName: 'locations/40987654321',
+      workspaceId: 'ws-1',
+    })
+
+    expect(result.ok).toBe(true)
+    expect(calls[0]?.refreshTokenEnc).toBeNull()
   })
 
   it('sends a Google-style form token exchange (credentials in the body, no Basic header)', async () => {
@@ -370,7 +447,66 @@ describe('GBP OAuth — hardening (review batch)', () => {
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.error.code).toBe('PROVIDER_ERROR')
-    expect(JSON.stringify(result)).not.toContain('gbp-access-token-fixture-value')
+    expect(JSON.stringify(result)).not.toContain(ACCESS_PLAINTEXT)
+    expect(JSON.stringify(result)).not.toContain(REFRESH_PLAINTEXT)
+  })
+
+  it('maps a vault seal failure on the persist path to PROVIDER_ERROR, not a throw', async () => {
+    const { store, calls } = fakeStore()
+    const failingSeal = () => {
+      throw new Error(`token vault: TOKEN_VAULT_KEY is not set (${ACCESS_PLAINTEXT})`)
+    }
+
+    const result = await handlers(transportWith(locationsSingle), store, undefined, {
+      seal: failingSeal,
+    }).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(calls).toHaveLength(0)
+    expect(JSON.stringify(result)).not.toContain(ACCESS_PLAINTEXT)
+    expect(JSON.stringify(result)).not.toContain('TOKEN_VAULT_KEY')
+  })
+
+  it('maps a failure of the SECOND (refresh) seal to PROVIDER_ERROR', async () => {
+    const { store, calls } = fakeStore()
+    let sealCalls = 0
+    const sealFailingOnRefresh = (plaintext: string) => {
+      sealCalls += 1
+      if (sealCalls > 1) throw new Error(`vault died on ${REFRESH_PLAINTEXT}`)
+      return JSON.stringify(TEST_VAULT.encrypt(plaintext))
+    }
+
+    const result = await handlers(transportWith(locationsSingle), store, undefined, {
+      seal: sealFailingOnRefresh,
+    }).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(sealCalls).toBe(2) // proves each token is sealed by its own call
+    expect(calls).toHaveLength(0)
+    expect(JSON.stringify(result)).not.toContain(REFRESH_PLAINTEXT)
+  })
+
+  it('maps a seal failure on the MULTI-LOCATION resume path to PROVIDER_ERROR, not a throw', async () => {
+    const { store, calls } = fakeStore()
+    const failingSeal = () => {
+      throw new Error(`token vault: TOKEN_VAULT_KEY is not set (${REFRESH_PLAINTEXT})`)
+    }
+
+    // This is the branch whose seal was historically unguarded — it must not raw-reject.
+    const result = await handlers(transportWith(locationsMulti), store, undefined, {
+      seal: failingSeal,
+    }).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(calls).toHaveLength(0)
+    expect(JSON.stringify(result)).not.toContain(ACCESS_PLAINTEXT)
+    expect(JSON.stringify(result)).not.toContain(REFRESH_PLAINTEXT)
   })
 
   it('reports a failed locations fetch as "could not list", never as zero locations', async () => {

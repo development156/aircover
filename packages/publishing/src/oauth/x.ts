@@ -10,10 +10,14 @@ import {
   defaultSeal,
   guardCallback,
   newTraceId,
+  normalizeOptionalToken,
   parseJson,
   parseScopes,
   providerErr,
   requireOAuthConfig,
+  sealOptionalSecret,
+  sealSecret,
+  CONNECT_SAVE_FAILED,
   OAuthTokenResponseSchema,
   type OAuthCallbackParams,
   type OAuthHandlerDeps,
@@ -149,6 +153,18 @@ export function createXOAuthHandlers(deps: OAuthHandlerDeps): XOAuthHandlers {
         ...(name !== undefined ? { name } : {}),
       }
 
+      // One seal per token — each envelope lands in its own connection_secrets column.
+      // Both are guarded: a vault misconfiguration becomes a Result, never a throw.
+      const accessTokenEnc = sealSecret(seal, token.data.access_token, traceId, CONNECT_SAVE_FAILED)
+      if (!accessTokenEnc.ok) return accessTokenEnc
+      const refreshTokenEnc = sealOptionalSecret(
+        seal,
+        normalizeOptionalToken(token.data.refresh_token),
+        traceId,
+        CONNECT_SAVE_FAILED,
+      )
+      if (!refreshTokenEnc.ok) return refreshTokenEnc
+
       try {
         const { connectionId } = await deps.store.upsertConnection({
           workspaceId: args.workspaceId,
@@ -157,18 +173,14 @@ export function createXOAuthHandlers(deps: OAuthHandlerDeps): XOAuthHandlers {
           scopes,
           expiresAt,
           createdBy: args.createdBy ?? null,
-          encryptedSecret: seal(
-            JSON.stringify({
-              accessToken: token.data.access_token,
-              refreshToken: token.data.refresh_token ?? null,
-            }),
-          ),
+          accessTokenEnc: accessTokenEnc.data,
+          refreshTokenEnc: refreshTokenEnc.data,
         })
         return ok({ connectionId, platform: 'x' as const, externalAccount, scopes, expiresAt })
       } catch {
-        // Seal/store failures must surface as a Result, and their raw error text (which
-        // handled token material moments earlier) must never escape to the caller.
-        return providerErr(traceId, 'Could not save the connection — try again.')
+        // Store failures must surface as a Result, and their raw error text (the record
+        // held sealed material moments earlier) must never escape to the caller.
+        return providerErr(traceId, CONNECT_SAVE_FAILED)
       }
     },
   }

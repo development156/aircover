@@ -11,11 +11,15 @@ import {
   defaultUnseal,
   guardCallback,
   newTraceId,
+  normalizeOptionalToken,
   parseJson,
   parseScopes,
   providerErr,
   requireOAuthConfig,
+  sealOptionalSecret,
+  sealSecret,
   validationErr,
+  CONNECT_SAVE_FAILED,
   OAuthTokenResponseSchema,
   type OAuthCallbackParams,
   type OAuthHandlerDeps,
@@ -125,6 +129,19 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
       id: `${args.location.accountName}/${args.location.name}`,
       name: args.location.title,
     }
+
+    // One seal per token — each envelope lands in its own connection_secrets column.
+    // Both are guarded: a vault misconfiguration becomes a Result, never a throw.
+    const accessTokenEnc = sealSecret(seal, args.accessToken, args.traceId, CONNECT_SAVE_FAILED)
+    if (!accessTokenEnc.ok) return accessTokenEnc
+    const refreshTokenEnc = sealOptionalSecret(
+      seal,
+      args.refreshToken,
+      args.traceId,
+      CONNECT_SAVE_FAILED,
+    )
+    if (!refreshTokenEnc.ok) return refreshTokenEnc
+
     try {
       const { connectionId } = await deps.store.upsertConnection({
         workspaceId: args.workspaceId,
@@ -133,9 +150,8 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
         scopes: args.scopes,
         expiresAt: args.expiresAt,
         createdBy: args.createdBy,
-        encryptedSecret: seal(
-          JSON.stringify({ accessToken: args.accessToken, refreshToken: args.refreshToken }),
-        ),
+        accessTokenEnc: accessTokenEnc.data,
+        refreshTokenEnc: refreshTokenEnc.data,
       })
       return ok({
         connectionId,
@@ -145,9 +161,9 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
         expiresAt: args.expiresAt,
       })
     } catch {
-      // Seal/store failures must surface as a Result; raw error text (token-adjacent)
-      // must never escape to the caller.
-      return providerErr(args.traceId, 'Could not save the connection — try again.')
+      // Store failures must surface as a Result; raw error text (token-adjacent) must
+      // never escape to the caller.
+      return providerErr(args.traceId, CONNECT_SAVE_FAILED)
     }
   }
 
@@ -198,7 +214,7 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
         return providerErr(traceId, 'Google returned an unexpected token response.')
       }
       const accessToken = token.data.access_token
-      const refreshToken = token.data.refresh_token ?? null
+      const refreshToken = normalizeOptionalToken(token.data.refresh_token)
       const scopes = parseScopes(token.data.scope, [GBP_SCOPE])
       const expiresAt = computeExpiresAt(now(), token.data.expires_in)
 
@@ -230,7 +246,10 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
         return ok({ kind: 'connected' as const, connection: connected.data })
       }
 
-      const resumeToken = seal(
+      // Guarded like every other seal: a vault misconfiguration on the multi-location
+      // path must return a Result, not raw-reject out of the handler.
+      const resumeToken = sealSecret(
+        seal,
         JSON.stringify({
           workspaceId: args.workspaceId,
           issuedAt: now().toISOString(),
@@ -240,8 +259,11 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
           scopes,
           locations,
         }),
+        traceId,
+        'Could not prepare the location choice — try again.',
       )
-      return ok({ kind: 'choose_location' as const, locations, resumeToken })
+      if (!resumeToken.ok) return resumeToken
+      return ok({ kind: 'choose_location' as const, locations, resumeToken: resumeToken.data })
     },
 
     async completeConnection(args: GbpCompleteArgs): Promise<Result<ConnectionSummary>> {
