@@ -2,7 +2,14 @@ import { Pool, type PoolConfig } from 'pg'
 import { readFileSync } from 'node:fs'
 import type { ApplyLedgerInput } from '@sahoda/shared'
 import { assertServerOnly } from '../env'
-import type { HoldLookup, LatestHold, LedgerApplyResult, LedgerBalance, LedgerPort } from './port'
+import type {
+  HoldLookup,
+  HoldSettlement,
+  LatestHold,
+  LedgerApplyResult,
+  LedgerBalance,
+  LedgerPort,
+} from './port'
 
 // Anchored to a full hostname label so a look-alike (evil-supabase.com) or a substring in
 // the password/user of the DSN can never trigger the relaxed-verification fallback.
@@ -100,9 +107,12 @@ export function createPgLedgerPort(opts: PgLedgerPortOptions): PgLedgerPort {
   async function latestHold(ref: HoldLookup): Promise<LatestHold | null> {
     // Match the structured action_type + object_ref columns (which withCredits always sets on
     // its HOLDs) — exact, and free of the ':' / LIKE-metachar ambiguity a key-pattern match has.
-    const r = await pool.query<{ key: string; settled: boolean }>(
+    // The settling entry's type (settles_entry_id is unique, so at most one) tells us WHETHER
+    // this hold already charged (DEBIT) or was refunded (RELEASE) — the attempt-derivation
+    // decision that keeps a lost-ack retry from double-charging.
+    const r = await pool.query<{ key: string; settled_by: string | null }>(
       `select h.idempotency_key as key,
-              exists(select 1 from credit_ledger s where s.settles_entry_id = h.id) as settled
+              (select s.entry_type from credit_ledger s where s.settles_entry_id = h.id limit 1) as settled_by
        from credit_ledger h
        where h.workspace_id = $1 and h.entry_type = 'HOLD' and h.action_type = $2 and h.object_ref = $3
        order by h.seq desc
@@ -114,8 +124,15 @@ export function createPgLedgerPort(opts: PgLedgerPortOptions): PgLedgerPort {
     // holdKey = `${action}:${objectRef}:${attempt}` — attempt is always the final segment.
     const attempt = Number(row.key.slice(row.key.lastIndexOf(':') + 1))
     if (!Number.isInteger(attempt)) return null
-    return { attempt, settled: row.settled }
+    return { attempt, settledBy: toSettlement(row.settled_by) }
   }
 
   return { apply, balance, latestHold, pool, close: () => pool.end() }
+}
+
+/** Map the settling entry's ledger type to the settlement the attempt logic cares about. */
+function toSettlement(entryType: string | null): HoldSettlement {
+  if (entryType === 'DEBIT') return 'debit'
+  if (entryType === 'RELEASE') return 'release'
+  return null // open, or settled by some other type — conservatively treat as not-advanceable
 }

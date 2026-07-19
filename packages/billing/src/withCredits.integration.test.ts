@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import { config as loadEnv } from 'dotenv'
 import { resolve } from 'node:path'
-import { availableCredits, holdKey } from '@sahoda/shared'
+import { availableCredits, holdKey, releaseKey } from '@sahoda/shared'
 import { createPgLedgerPort, type PgLedgerPort } from './ledger/pg'
 import { createWithCredits } from './withCredits'
 
@@ -99,16 +99,50 @@ describe.skipIf(!DB_URL)('withCredits against the real ledger', () => {
     expect(await port.balance(ws)).toEqual({ total: 5, held: 0 })
   })
 
-  it('advances the attempt on a retry after a settled run (fresh hold, charged again)', async () => {
+  it('charges EXACTLY ONCE for a repeat call on the same objectRef (lost-ack DEBIT is replay-safe)', async () => {
     await grant(100)
     const withCredits = createWithCredits(port)
     const opts = { workspaceId: ws, action: 'caption_rewrite' as const, objectRef: 'c1' }
 
+    // A second call on the same (action, objectRef) models a caller that retried after a
+    // committed-but-lost-ack DEBIT. The hold is settled-by-DEBIT, so the retry REUSES the
+    // attempt → the DEBIT replays idempotently rather than charging a second time.
     const first = await withCredits(opts, async () => 'a')
     const second = await withCredits(opts, async () => 'b')
 
     expect(first.ok && second.ok).toBe(true)
-    expect(await port.balance(ws)).toEqual({ total: 98, held: 0 }) // two caption_rewrite @1
+    expect(await port.balance(ws)).toEqual({ total: 99, held: 0 }) // caption_rewrite(1), charged ONCE
+  })
+
+  it('advances to a fresh attempt after a RELEASED hold (a genuine retry after failure charges)', async () => {
+    await grant(100)
+    // A prior attempt that HELD then was RELEASED (failed + refunded).
+    const h = await port.apply({
+      workspaceId: ws,
+      entryType: 'HOLD',
+      amount: 1,
+      idempotencyKey: holdKey('caption_rewrite', 'c2', 1),
+      actionType: 'caption_rewrite',
+      objectRef: 'c2',
+      holdTtlSeconds: 600,
+    })
+    await port.apply({
+      workspaceId: ws,
+      entryType: 'RELEASE',
+      amount: 1,
+      idempotencyKey: releaseKey(holdKey('caption_rewrite', 'c2', 1)),
+      settlesEntryId: h.entry.id,
+    })
+    expect(await port.balance(ws)).toEqual({ total: 100, held: 0 }) // refunded, nothing charged
+
+    const withCredits = createWithCredits(port)
+    const result = await withCredits(
+      { workspaceId: ws, action: 'caption_rewrite', objectRef: 'c2' },
+      async () => 'x',
+    )
+
+    expect(result.ok).toBe(true)
+    expect(await port.balance(ws)).toEqual({ total: 99, held: 0 }) // fresh attempt 2, charged once
   })
 
   it('resumes an unsettled hold (crash recovery) instead of double-holding', async () => {

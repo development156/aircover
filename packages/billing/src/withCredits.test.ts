@@ -237,21 +237,34 @@ describe('withCredits — attempt derivation (server-side, never caller-supplied
 
   it('resumes the same attempt when the latest hold is still unsettled (crash recovery)', async () => {
     const port = new FakePort(100)
-    port.latest = { attempt: 2, settled: false }
+    port.latest = { attempt: 2, settledBy: null }
     const withCredits = createWithCredits(port, deps)
     await withCredits(OPTS, async () => 'x')
     expect(port.call('HOLD')?.idempotencyKey).toBe(holdKey('post_variants', 'post-42', 2))
   })
 
-  it('advances to a fresh attempt when the latest hold was already settled (retry after a prior run)', async () => {
+  it('advances to a fresh attempt when the latest hold was settled by a RELEASE (refunded — genuine retry)', async () => {
     const port = new FakePort(100)
-    port.latest = { attempt: 2, settled: true }
+    port.latest = { attempt: 2, settledBy: 'release' }
     const withCredits = createWithCredits(port, deps)
     await withCredits(OPTS, async () => 'x')
     expect(port.call('HOLD')?.idempotencyKey).toBe(holdKey('post_variants', 'post-42', 3))
-    // and the RELEASE/DEBIT keys must hang off the fresh hold key
+    // and the DEBIT key must hang off the fresh hold key
     const hKey = holdKey('post_variants', 'post-42', 3)
     expect(port.call('DEBIT')?.idempotencyKey).toBe(debitKey(hKey))
+  })
+
+  it('REUSES the attempt when the latest hold was settled by a DEBIT (lost-ack retry replays, never re-charges)', async () => {
+    const port = new FakePort(100)
+    port.latest = { attempt: 2, settledBy: 'debit' }
+    const withCredits = createWithCredits(port, deps)
+    await withCredits(OPTS, async () => 'x')
+    // Attempt 2 is reused (NOT advanced to 3) → on the real ledger the DEBIT replays under the
+    // same key rather than charging a second time. Advancing here was the double-charge bug.
+    expect(port.call('HOLD')?.idempotencyKey).toBe(holdKey('post_variants', 'post-42', 2))
+    expect(port.call('DEBIT')?.idempotencyKey).toBe(
+      debitKey(holdKey('post_variants', 'post-42', 2)),
+    )
   })
 })
 

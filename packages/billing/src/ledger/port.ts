@@ -33,8 +33,17 @@ export interface HoldLookup {
   objectRef: string
 }
 
-/** The attempt number of the latest hold + whether a DEBIT/RELEASE has settled it. */
+/**
+ * How the latest hold was settled — the distinction is money-critical:
+ *  - 'debit'   → the operation ALREADY charged; a retry must REUSE the attempt so the DEBIT
+ *               replays idempotently (never double-charge on a committed-but-lost-ack DEBIT).
+ *  - 'release' → the prior attempt was refunded; a retry is safe to ADVANCE to a fresh hold.
+ *  - null      → still open (crash between HOLD and settle) → resume the same attempt.
+ */
+export type HoldSettlement = 'debit' | 'release' | null
+
+/** The attempt number of the latest hold + how (if at all) it has been settled. */
 export interface LatestHold {
   attempt: number
-  settled: boolean
+  settledBy: HoldSettlement
 }

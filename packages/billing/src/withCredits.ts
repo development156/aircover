@@ -99,10 +99,12 @@ export function createWithCredits(port: LedgerPort, deps: WithCreditsDeps = {}):
       }
 
       // DEBIT: settle the hold for the exact cost. model_tier / cogs stay null for now
-      // (owner ruling #3 — enriched via the mesh seam later). If this settle throws — a
-      // transient DB error, or the hold was already settled by the TTL reaper / a racing
-      // RELEASE — it flows to the outer backstop as a PROVIDER_ERROR Result: the user is
-      // NOT charged (the hold releases), and a retry replays debitKey(hKey) idempotently.
+      // (owner ruling #3 — enriched via the mesh seam later). If this settle throws it flows
+      // to the outer backstop as PROVIDER_ERROR. Two retry cases, both exactly-once:
+      //  - the DEBIT never committed → the hold is still open → the retry resumes the same
+      //    attempt and DEBITs (first real charge);
+      //  - the DEBIT committed but the ack was lost → the hold is settled-by-DEBIT → the retry
+      //    REUSES the attempt (see nextAttempt) so this same debitKey REPLAYS — charged once.
       const debit = await port.apply({
         workspaceId,
         entryType: 'DEBIT',
@@ -123,13 +125,17 @@ export function createWithCredits(port: LedgerPort, deps: WithCreditsDeps = {}):
 }
 
 /**
- * Next hold attempt: resume an unsettled hold (crash recovery replays the same key),
- * otherwise advance past the last settled attempt so a retry after a prior run gets a
- * fresh hold instead of colliding with an already-settled one.
+ * Next hold attempt. Advance ONLY when the last hold was RELEASED (the prior attempt was
+ * refunded, so a fresh hold is safe and correct). In every other case REUSE the attempt:
+ *  - unsettled     → resume (crash recovery replays the same key);
+ *  - settled-by-DEBIT → the operation already charged; reusing the attempt makes the retry's
+ *    DEBIT REPLAY idempotently instead of charging a second time (a committed-but-lost-ack
+ *    DEBIT surfaced as PROVIDER_ERROR must not double-charge on retry). Exactly-once charge
+ *    per (action, objectRef) — to charge again, the caller passes a fresh objectRef.
  */
 function nextAttempt(latest: LatestHold | null): number {
   if (!latest) return 1
-  return latest.settled ? latest.attempt + 1 : latest.attempt
+  return latest.settledBy === 'release' ? latest.attempt + 1 : latest.attempt
 }
 
 function isCreditInsufficient(e: unknown): boolean {
