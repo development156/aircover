@@ -1,0 +1,9 @@
+{
+  "status": 200,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "name": "accounts/108283981976/locations/40123456789/localPosts/98766",
+    "state": "LIVE",
+    "summary": "Weekend reading list is up."
+  }
+}

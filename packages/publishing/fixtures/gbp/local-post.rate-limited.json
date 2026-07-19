@@ -1,0 +1,11 @@
+{
+  "status": 429,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "error": {
+      "code": 429,
+      "message": "Quota exceeded for quota metric 'Requests' of service 'mybusiness.googleapis.com'.",
+      "status": "RESOURCE_EXHAUSTED"
+    }
+  }
+}
