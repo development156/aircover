@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server'
 import { createFixtureAdapter } from '@sahoda/publishing'
 import { CONSTRAINTS, formatForPlatform, validateVariant, type Channel } from '@sahoda/shared'
 
+import { reportServerError } from '@/lib/observability/report'
 import { hasLink } from '@/lib/posts/detect-link'
 import { getPost, listVariants } from '@/lib/posts/read'
 import { parseExtras } from '@/lib/posts/variant-extras'
@@ -48,12 +49,15 @@ import { getActiveWorkspace } from '@/lib/workspaces'
  * body, hashtags, hasLink) so the preview and the meter cannot drift apart.
  */
 export async function simulatePublish(postId: string): Promise<PublishState> {
+  // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to preview publishing.' }
 
     const workspace = await getActiveWorkspace()
     if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    workspaceId = workspace.id
 
     const post = await getPost(postId)
     if (!post) return { ok: false, message: "You don't have access to this post." }
@@ -139,7 +143,8 @@ export async function simulatePublish(postId: string): Promise<PublishState> {
     }
 
     return { ok: true, simulated, blocked, skipped }
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'simulatePublish', workspaceId })
     return { ok: false, message: 'Could not run the publish preview — try again.' }
   }
 }

@@ -8,6 +8,7 @@ import { createMesh, siteGenerateTask, SiteGenerateInputSchema, type Mesh } from
 import { normalizeDraft, toRows } from '@sahoda/sites'
 import { creditCost, MESH_TASK_ACTION, type WithCreditsFn } from '@sahoda/shared'
 
+import { reportServerError } from '@/lib/observability/report'
 import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
 import { newSiteGenerateRef } from '@/lib/sites/object-ref'
 import { draftSlug } from '@/lib/sites/slug'
@@ -51,6 +52,9 @@ function getWithCredits(): WithCreditsFn {
  */
 export async function generateSite(name: unknown, goal: unknown): Promise<GenerateSiteState> {
   const action = MESH_TASK_ACTION['site_generate']
+  // Hoisted so the outer catch can tag the tenant — see lib/observability/report.ts.
+  // The two INNER catches sit inside the try and already have `workspace` in scope.
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, insufficient: false, message: 'Sign in to generate a site.' }
@@ -59,6 +63,7 @@ export async function generateSite(name: unknown, goal: unknown): Promise<Genera
     if (!workspace) {
       return { ok: false, insufficient: false, message: 'Create a workspace first.' }
     }
+    workspaceId = workspace.id
 
     // Parse BEFORE the callback — never reserve credits for garbage.
     const parsedInput = SiteGenerateInputSchema.safeParse({
@@ -160,11 +165,28 @@ export async function generateSite(name: unknown, goal: unknown): Promise<Genera
             }
           }
         } catch (insertError) {
+          // Reported HERE and not left to the outer catch, which never sees this:
+          // the re-throw below lands inside the withCredits callback, so the
+          // wrapper converts it into a Result and `chargeFailureState` returns a
+          // calm message. Without this call a three-table write failing halfway
+          // through is completely silent.
+          reportServerError(insertError, { action: 'generateSite:siteRowsInsert', workspaceId })
+
           // Delete the site row; pages/sections cascade. Best-effort — see doc.
           try {
             await supabase.from('sites').delete().eq('id', siteId)
-          } catch {
-            // The orphan is unpaid; the RELEASE below is what matters.
+          } catch (cleanupError) {
+            // THE MOST IMPORTANT REPORT IN THIS FILE. This is a COMPENSATING
+            // TRANSACTION that itself failed: the inserts did not complete and
+            // the undo did not either, so a half-built site row is now stranded
+            // in the database with nothing left to reconcile it. The re-throw
+            // below still RELEASES the hold, so the row is unpaid — but it is
+            // also invisible, and nobody finds an orphan by staring at a Result
+            // envelope. This is the one failure here that needs a human.
+            reportServerError(cleanupError, {
+              action: 'generateSite:orphanCleanupFailed',
+              workspaceId,
+            })
           }
           throw insertError // → RELEASE, no charge
         }
@@ -191,7 +213,8 @@ export async function generateSite(name: unknown, goal: unknown): Promise<Genera
       balanceAfter: credits.data.balanceAfter,
       creditsCharged: creditCost(action),
     }
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'generateSite', workspaceId })
     return { ok: false, insufficient: false, message: 'Could not generate the site — try again.' }
   }
 }

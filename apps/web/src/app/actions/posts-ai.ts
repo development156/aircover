@@ -19,6 +19,7 @@ import {
   type WithCreditsFn,
 } from '@sahoda/shared'
 
+import { reportServerError } from '@/lib/observability/report'
 import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
 import { hasLink } from '@/lib/posts/detect-link'
 import { getPost } from '@/lib/posts/read'
@@ -57,6 +58,8 @@ function getWithCredits(): WithCreditsFn {
  */
 export async function generateVariants(postId: string, channels: unknown): Promise<GenerateState> {
   const action = MESH_TASK_ACTION['content_variants']
+  // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) {
@@ -67,6 +70,7 @@ export async function generateVariants(postId: string, channels: unknown): Promi
     if (!workspace) {
       return { ok: false, insufficient: false, message: 'Create a workspace first.' }
     }
+    workspaceId = workspace.id
 
     const post = await getPost(postId)
     if (!post) {
@@ -155,7 +159,11 @@ export async function generateVariants(postId: string, channels: unknown): Promi
       balanceAfter: credits.data.balanceAfter,
       creditsCharged: creditCost(action),
     }
-  } catch {
+  } catch (error) {
+    // The tag is the SERVER ACTION name, deliberately not the local `action`
+    // const — that one is the ledger/pricing key (`post_variants`), and tagging
+    // by it would merge two different code paths under one billing label.
+    reportServerError(error, { action: 'generateVariants', workspaceId })
     return { ok: false, insufficient: false, message: 'Could not generate variants — try again.' }
   }
 }
@@ -171,6 +179,7 @@ export async function rewriteCaption(
   selection?: string,
 ): Promise<RewriteState> {
   const action = MESH_TASK_ACTION['caption_rewrite']
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) {
@@ -181,6 +190,7 @@ export async function rewriteCaption(
     if (!workspace) {
       return { ok: false, insufficient: false, message: 'Create a workspace first.' }
     }
+    workspaceId = workspace.id
 
     // captionRewriteTask's schemas are not re-exported from @sahoda/mesh — the
     // contract lives in @sahoda/shared. Parse before spending anything.
@@ -236,7 +246,8 @@ export async function rewriteCaption(
       balanceAfter: credits.data.balanceAfter,
       creditsCharged: creditCost(action),
     }
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'rewriteCaption', workspaceId })
     return {
       ok: false,
       insufficient: false,

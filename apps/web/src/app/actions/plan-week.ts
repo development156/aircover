@@ -13,6 +13,7 @@ import {
   clampBriefText,
   clampChannels,
 } from '@/lib/planner/briefs'
+import { reportServerError } from '@/lib/observability/report'
 import { newPlanWeekRef } from '@/lib/planner/object-ref'
 import { normalizeSlot } from '@/lib/planner/slots'
 import type { PlanWeekState } from '@/lib/planner/state'
@@ -50,6 +51,8 @@ function getWithCredits(): WithCreditsFn {
  */
 export async function planMyWeek(goals: unknown, channels: unknown): Promise<PlanWeekState> {
   const action = MESH_TASK_ACTION['plan_week']
+  // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, insufficient: false, message: 'Sign in to plan your week.' }
@@ -58,6 +61,7 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
     if (!workspace) {
       return { ok: false, insufficient: false, message: 'Create a workspace first.' }
     }
+    workspaceId = workspace.id
 
     // Parse BEFORE the withCredits callback: runTask does not validate input,
     // and reserving credits for garbage would burn a paid provider call.
@@ -172,7 +176,8 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
       balanceAfter: credits.data.balanceAfter,
       creditsCharged: creditCost(action),
     }
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'planMyWeek', workspaceId })
     return { ok: false, insufficient: false, message: 'Could not plan your week — try again.' }
   }
 }

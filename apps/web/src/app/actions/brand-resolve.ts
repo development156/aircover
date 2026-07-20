@@ -12,6 +12,7 @@ import {
   type WithCreditsFn,
 } from '@sahoda/shared'
 
+import { reportServerError } from '@/lib/observability/report'
 import { pruneBlankListEntries } from '@/lib/brand/prune-blank-entries'
 import { newResolveObjectRef } from '@/lib/brand/resolve-object-ref'
 import { mapSaveBrandError } from '@/lib/brand/save-brand-error'
@@ -54,12 +55,15 @@ export type SaveBrandState =
  * function; we still zod-parse both directions at this boundary.
  */
 export async function saveBrandMemory(brain: unknown): Promise<SaveBrandState> {
+  // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to save your Brand Brain.' }
 
     const workspace = await getActiveWorkspace()
     if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    workspaceId = workspace.id
 
     const parsed = BrandMemoryPayloadSchema.safeParse(brain)
     if (!parsed.success) {
@@ -85,7 +89,8 @@ export async function saveBrandMemory(brain: unknown): Promise<SaveBrandState> {
       return { ok: false, message: 'Saved, but the response was unreadable — reload to confirm.' }
     }
     return { ok: true, version: result.data.version, replayed: result.data.replayed }
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'saveBrandMemory', workspaceId })
     return { ok: false, message: 'Could not save your Brand Brain — try again.' }
   }
 }
@@ -106,6 +111,7 @@ export async function resolveBrand(
   _prev: ResolveActionState | null,
   formData: FormData,
 ): Promise<ResolveActionState> {
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId)
@@ -113,6 +119,7 @@ export async function resolveBrand(
 
     const workspace = await getActiveWorkspace()
     if (!workspace) return { ok: false, kind: 'error', message: 'Create a workspace first.' }
+    workspaceId = workspace.id
 
     const name = field(formData, 'name')
     if (!name) return { ok: false, kind: 'error', message: 'Enter your business name.' }
@@ -174,7 +181,8 @@ export async function resolveBrand(
         : { ok: false, insufficient: false, message: credits.error.message }
 
     return mapResolveOutcome(meshOutcome, creditsOutcome)
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'resolveBrand', workspaceId })
     return { ok: false, kind: 'error', message: 'Could not resolve your Brand Brain — try again.' }
   }
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@clerk/nextjs/server'
 import { PostSchema } from '@sahoda/shared'
 
+import { reportServerError } from '@/lib/observability/report'
 import { APPROVABLE_FROM } from '@/lib/planner/transitions'
 import type { ApproveState } from '@/lib/planner/state'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -21,12 +22,15 @@ const CANNOT_APPROVE = "Can't approve this post from its current state — reloa
  * (PostgREST returns no error for an empty match — the deletePost lesson).
  */
 export async function approvePost(postId: string): Promise<ApproveState> {
+  // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to approve this post.' }
 
     const workspace = await getActiveWorkspace()
     if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    workspaceId = workspace.id
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -51,7 +55,8 @@ export async function approvePost(postId: string): Promise<ApproveState> {
     revalidatePath('/planner')
     revalidatePath('/posts')
     return { ok: true, status: parsed.data.status }
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'approvePost', workspaceId })
     return { ok: false, message: 'Could not approve this post — try again.' }
   }
 }

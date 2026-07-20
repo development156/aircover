@@ -3,6 +3,13 @@ packages:
   - 'packages/*'
 
 allowBuilds:
+  # Declined, and safe to decline: @sentry/cli ships its binary as a prebuilt
+  # optional dependency (@sentry/cli-linux-x64 and friends), so the install is
+  # already complete without running the script. The postinstall is only a
+  # fallback that downloads the binary over the network for platforms with no
+  # prebuilt package — allowing it would add a CDN fetch to every install for a
+  # file we already have. Source-map upload still works when it is configured.
+  '@sentry/cli': false
   sharp: true
 
 # Allow only these dependencies to run install/postinstall build scripts
