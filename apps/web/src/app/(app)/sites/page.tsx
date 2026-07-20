@@ -9,6 +9,7 @@ import { siteTreeToOutput } from '@/lib/sites/from-rows'
 import { toPreviewPages, type PreviewPage } from '@/lib/sites/preview'
 import { activeThemeTokens } from '@/lib/brand/read-theme'
 import { readSiteTree, recentSites } from '@/lib/sites/read'
+import { renderPreviewSafely } from '@/lib/sites/safe-preview'
 import { sharedTokensCss } from '@/lib/sites/tokens-css'
 
 export const metadata = { title: 'Sites' }
@@ -62,14 +63,22 @@ async function buildPreview(): Promise<Preview> {
     })
     if (!normalized.ok || normalized.data.draft.pages.length === 0) continue
 
-    const bundle = renderBundle(normalized.data.draft, {
-      siteName: site.name,
-      tokensCss: sharedTokensCss(),
-      theme,
-      formAction: null,
-      canonicalOrigin: null,
+    // `renderBundle` throws by design on an unsafe stylesheet and
+    // `sharedTokensCss` reads from disk — a throw here used to 500 the whole
+    // page for a site the founder had already paid 100 credits for.
+    const preview = renderPreviewSafely(site.id, () => {
+      const bundle = renderBundle(normalized.data.draft, {
+        siteName: site.name,
+        tokensCss: sharedTokensCss(),
+        theme,
+        formAction: null,
+        canonicalOrigin: null,
+      })
+      return { siteName: site.name, pages: toPreviewPages(bundle) }
     })
-    return { siteName: site.name, pages: toPreviewPages(bundle) }
+    if (preview === null) continue
+
+    return preview
   }
 
   return 'unreadable'
