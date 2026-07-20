@@ -1,43 +1,25 @@
 import 'server-only'
 
-import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { TOKENS_CSS } from './tokens-css-inline'
 
 /**
  * The raw bytes of `@sahoda/shared/tokens.css`, for injection into
  * `renderBundle`'s RenderContext (the package never touches the filesystem —
- * the caller supplies the baseline). Resolved through the package's own
- * `exports` map so the path survives layout changes, and read once per
- * process. `next.config.ts` carries an `outputFileTracingIncludes` entry so
- * Vercel's function bundle ships the file.
+ * the caller supplies the baseline).
  *
- * This is the ONLY runtime I/O on the /sites render path, and both of its
- * steps can fail in a bundled serverless function in ways they never do in dev
- * — `createRequire`/`require.resolve` depend on the emitted module's own
- * location and on the shared package.json being present, and `readFileSync`
- * depends on the traced file actually shipping. A failure here must therefore
- * degrade, not throw: an empty baseline renders a valid but unstyled document,
- * which is far better than no preview at all for a site the founder paid 100
- * credits to generate.
+ * This used to be `readFileSync(require.resolve('@sahoda/shared/tokens.css'))`.
+ * That works in dev and FAILS in the deployed Vercel function — pnpm links
+ * `node_modules/@sahoda/shared` as a symlink the serverless bundle does not
+ * recreate, so `require.resolve` throws MODULE_NOT_FOUND. The throw escaped and
+ * 500'd the whole /sites route the moment the first real site existed; made
+ * fail-safe, it instead returned `''` and rendered the paid-for preview
+ * completely unstyled. Both were observed live on 2026-07-20.
  *
- * The failure is logged with its real message so the cause is visible in the
- * function logs; `''` is cached like a success so one bad resolve does not
- * retry the same I/O on every render.
+ * The stylesheet is 1.7 KB of static design tokens, so it is inlined at build
+ * time instead: no filesystem, no module resolution, no file-tracing config,
+ * and identical behaviour under Turbopack (dev) and webpack (build).
+ * `tokens-css-inline.test.ts` fails if the inline copy drifts from the file.
  */
-const require = createRequire(import.meta.url)
-
-let cached: string | undefined
-
 export function sharedTokensCss(): string {
-  if (cached !== undefined) return cached
-
-  try {
-    cached = readFileSync(require.resolve('@sahoda/shared/tokens.css'), 'utf8')
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.error(`[sites] tokens.css unavailable, rendering without the baseline: ${message}`)
-    cached = ''
-  }
-
-  return cached
+  return TOKENS_CSS
 }

@@ -10,10 +10,6 @@ const nextConfig: NextConfig = {
   // traced into Vercel's serverless output instead of inferred from whichever
   // lockfile Next finds first.
   outputFileTracingRoot: path.resolve(import.meta.dirname, '../..'),
-  // The /sites preview reads tokens.css off disk at request time
-  // (lib/sites/tokens-css.ts) — the require.resolve is traceable, but ship the
-  // file explicitly so a tracer miss cannot 500 the preview on Vercel.
-  outputFileTracingIncludes: { '/sites': ['../../packages/shared/tokens.css'] },
   // @sahoda/shared ships raw TS via package exports — webpack `next build`
   // needs it transpiled (Turbopack dev handles workspace packages natively).
   // Grow this list only when web actually imports another @sahoda package.
