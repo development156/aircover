@@ -48,11 +48,15 @@ const ACTION_LABELS: Record<ActionType, string> = {
   carousel: 'Carousel',
   video_script: 'Video script',
   site_edit: 'Site edit',
+  // Named for the button the user actually pressed. 'loop_cycle' is the
+  // internal action id (the weekly Loop's seed); a wallet row reading "Loop
+  // cycle" leaves someone who clicked "Plan my week" unable to match the
+  // charge to what they did.
+  loop_cycle: 'Plan my week',
   playbook_run: 'Playbook run',
   radar_scan: 'Radar scan',
   seo_article: 'SEO article',
   remix_pack: 'Remix pack',
-  loop_cycle: 'Loop cycle',
   campaign_plan: 'Campaign plan',
   brand_research: 'Brand research',
   site_generate: 'Site generation',

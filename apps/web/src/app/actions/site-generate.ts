@@ -13,6 +13,7 @@ import {
   isDeploymentConfigCause,
   reportPaidActionFailure,
 } from '@/lib/actions/paid-failure'
+import { revalidateBalance } from '@/lib/actions/revalidate-balance'
 import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
 import { newSiteGenerateRef } from '@/lib/sites/object-ref'
 import { draftSlug } from '@/lib/sites/slug'
@@ -185,6 +186,9 @@ export async function generateSite(name: unknown, goal: unknown): Promise<Genera
     // (see plan-week.ts: a stale page under an unconfirmed-charge warning
     // invites the retry that double-charges).
     if (delivered) revalidatePath('/sites')
+    // The credit chip lives in the layout, which a page-scoped revalidate
+    // never reaches.
+    if (credits.ok || delivered) revalidateBalance()
 
     if (!credits.ok) {
       reportPaidActionFailure('site-generate', credits.error)

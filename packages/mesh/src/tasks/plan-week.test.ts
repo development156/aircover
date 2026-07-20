@@ -57,6 +57,47 @@ describe('planWeekTask', () => {
     expect(last.content).toContain('gbp')
   })
 
+  // Without a stated "now", the model cannot know what "this coming week" means
+  // in wall-clock terms, so every `suggestedSlot` it invents falls outside
+  // [earliest .. now+14d] and `normalizeSlot` discards ALL five — observed live
+  // on 2026-07-20: "5 suggested times were unusable and moved to sensible
+  // future slots". The plan then degrades to a fixed one-per-day ladder and the
+  // tokens spent generating slots are wasted.
+  it('tells the model the current date so its slots can land in the valid window', () => {
+    const dated = PlanWeekInputSchema.parse({
+      goals: 'more weekend footfall',
+      channels: ['x'],
+      nowIso: '2026-07-20T13:37:00.000Z',
+    })
+
+    const content = planWeekTask.buildMessages(dated, ctx).at(-1)!.content
+
+    expect(content).toContain('2026-07-20')
+  })
+
+  it('states the schedulable window, not just the date', () => {
+    const dated = PlanWeekInputSchema.parse({
+      goals: '',
+      channels: ['x'],
+      nowIso: '2026-07-20T13:37:00.000Z',
+    })
+
+    const content = planWeekTask.buildMessages(dated, ctx).at(-1)!.content
+
+    // The horizon the caller enforces (SLOT_HORIZON_DAYS = 14) — the model must
+    // be told the boundary it is being judged against, or "sensible times" is
+    // an instruction it cannot satisfy.
+    expect(content).toMatch(/2026-08-03/)
+  })
+
+  it('omits the date line entirely when no clock is supplied', () => {
+    // Never invent a date: a wrong "today" is worse than no "today", and
+    // buildMessages must stay pure (no Date.now()) so runs are reproducible.
+    const content = planWeekTask.buildMessages(input, ctx).at(-1)!.content
+
+    expect(content).not.toMatch(/today/i)
+  })
+
   it('resolves a valid 5-brief response', async () => {
     const result = await runnerFor(fixedProvider([briefsJson(5)])).run(planWeekTask, input, ctx)
     expect(result.ok).toBe(true)

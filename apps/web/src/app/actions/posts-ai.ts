@@ -24,6 +24,7 @@ import {
   isDeploymentConfigCause,
   reportPaidActionFailure,
 } from '@/lib/actions/paid-failure'
+import { revalidateBalance } from '@/lib/actions/revalidate-balance'
 import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
 import { hasLink } from '@/lib/posts/detect-link'
 import { getPost } from '@/lib/posts/read'
@@ -149,6 +150,9 @@ export async function generateVariants(postId: string, channels: unknown): Promi
       },
     )
 
+    // The balance moved (or may have, on the delivered-but-failed path).
+    if (credits.ok || delivered) revalidateBalance()
+
     if (!credits.ok) {
       reportPaidActionFailure('posts-ai.generateVariants', credits.error)
       // A mesh config throw inside the callback released the hold, so the
@@ -243,6 +247,9 @@ export async function rewriteCaption(
         return result.data
       },
     )
+
+    // The balance moved (or may have, on the delivered-but-failed path).
+    if (credits.ok || delivered) revalidateBalance()
 
     if (!credits.ok) {
       reportPaidActionFailure('posts-ai.rewriteCaption', credits.error)

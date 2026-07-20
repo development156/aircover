@@ -6,6 +6,7 @@ import { creditCost, type BrandMemoryPayload } from '@sahoda/shared'
 import { toast } from 'sonner'
 
 import { resolveBrand, saveBrandMemory, type SaveBrandState } from '@/app/actions/brand-resolve'
+import { saveWorkspaceTheme } from '@/app/actions/theme'
 import { brandSkinVars } from '@/lib/brand/brand-theme'
 
 import type { LogoValue } from './logo-drop'
@@ -95,9 +96,20 @@ export function OnboardingFlow() {
   // Finish persists the (hand-edited) brain via the resolve_brand_memory RPC.
   // Three-argument call — no expected-version precondition — so a rage-click
   // replays the active payload as a success instead of a VERSION_CONFLICT.
+  // Finish persists BOTH halves of what the user approved: the brain, and the
+  // Brand Skin extracted from their logo. The theme is saved first and only its
+  // failure is surfaced as a toast — losing a theme is recoverable (re-upload),
+  // losing the brain is not, so the brain's outcome owns `saveState` and the
+  // success panel. A theme failure never turns into a false "saved" claim.
   function handleFinish() {
     if (!brain) return
-    startSaving(async () => setSaveState(await saveBrandMemory(brain)))
+    startSaving(async () => {
+      if (colors && colors.length > 0) {
+        const themeState = await saveWorkspaceTheme(colors)
+        if (!themeState.ok) toast(themeState.message)
+      }
+      setSaveState(await saveBrandMemory(brain))
+    })
   }
 
   function handleRegenerate() {

@@ -7,6 +7,7 @@ import { GenerateSitePanel } from '@/components/sites/generate-site-panel'
 import { SitePreview } from '@/components/sites/site-preview'
 import { siteTreeToOutput } from '@/lib/sites/from-rows'
 import { toPreviewPages, type PreviewPage } from '@/lib/sites/preview'
+import { activeThemeTokens } from '@/lib/brand/read-theme'
 import { readSiteTree, recentSites } from '@/lib/sites/read'
 import { sharedTokensCss } from '@/lib/sites/tokens-css'
 
@@ -16,9 +17,11 @@ export const metadata = { title: 'Sites' }
  * Sites — generate + IN-APP PREVIEW. The rows round-trip through the same
  * `@sahoda/sites` pipeline that wrote them (`siteTreeToOutput → normalizeDraft
  * → renderBundle`), so preview markup re-earns every escaping/path guard on
- * every render. `theme: null` is honest — `workspace_themes` has no persisted
- * rows yet — and `formAction: null` renders the contact section formless (no
- * lead route is mounted, and a form that discards leads is worse than none).
+ * every render. The preview wears the workspace's accepted Brand Skin
+ * (`activeThemeTokens`); `null` there means no logo was ever uploaded and
+ * `themeCss` falls back to the tokens.css defaults. `formAction: null` renders
+ * the contact section formless (no lead route is mounted, and a form that
+ * discards leads is worse than none).
  *
  * The DEPLOY half stays deferred and unowned: no Cloudflare client exists,
  * `sites.status` never leaves 'draft' from here, and every copy string says
@@ -40,6 +43,10 @@ async function buildPreview(): Promise<Preview> {
   if (sites === null) return 'read-failed'
   if (sites.length === 0) return null
 
+  // The workspace's accepted Brand Skin. `null` when no logo was ever uploaded,
+  // which `themeCss` renders as the tokens.css defaults.
+  const theme = await activeThemeTokens()
+
   for (const site of sites) {
     const tree = await readSiteTree(site.id)
     if (!tree || tree.pages.length === 0) continue
@@ -58,7 +65,7 @@ async function buildPreview(): Promise<Preview> {
     const bundle = renderBundle(normalized.data.draft, {
       siteName: site.name,
       tokensCss: sharedTokensCss(),
-      theme: null,
+      theme,
       formAction: null,
       canonicalOrigin: null,
     })

@@ -103,9 +103,12 @@ export function ThemeStep({
     <div className="flex flex-col gap-5">
       <div>
         <p className="text-[16px] font-bold text-ink">Theme it from your logo</p>
+        {/* "on the right" only on `wide` — the preview panel is `hidden
+            wide:block`, so below 1180px it points at nothing. */}
         <p className="mt-1 text-[13px] text-muted">
-          Upload your logo and Sahoda re-colors the live preview on the right — nothing here is
-          saved until you accept it.
+          Upload your logo and Sahoda re-colors the live preview
+          <span className="max-wide:hidden"> on the right</span> — it is saved to your workspace
+          when you finish setup.
         </p>
       </div>
 
@@ -113,7 +116,7 @@ export function ThemeStep({
         <EmptyState
           icon={Palette}
           title="Add a logo to theme your preview"
-          body="Sahoda reads its dominant colors and re-themes the preview live — entirely on this device."
+          body="Sahoda reads its dominant colors in your browser and re-themes the preview live. Nothing is saved until you finish setup."
           action={
             <LogoDrop value={logo} onChange={onLogoChange} guide="onboarding.theme-logo-upload" />
           }
@@ -145,9 +148,12 @@ export function ThemeStep({
           ) : null}
 
           <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
+            {/* "Kept" not "applied": the preview re-colors the moment the
+                palette is extracted, and the write happens at Finish. Saying
+                "applied" here claimed a persistence step that had not run. */}
             {accepted ? (
               <span className="inline-flex items-center gap-1.5 rounded-pill bg-ok-bg px-3 py-1.5 text-[13px] font-semibold text-ok">
-                <Check size={14} aria-hidden /> Theme applied
+                <Check size={14} aria-hidden /> Theme kept — saves when you finish
               </span>
             ) : (
               <Button

@@ -17,6 +17,7 @@ import {
   isDeploymentConfigCause,
   reportPaidActionFailure,
 } from '@/lib/actions/paid-failure'
+import { revalidateBalance } from '@/lib/actions/revalidate-balance'
 import { pruneBlankListEntries } from '@/lib/brand/prune-blank-entries'
 import { newResolveObjectRef } from '@/lib/brand/resolve-object-ref'
 import { mapSaveBrandError } from '@/lib/brand/save-brand-error'
@@ -164,6 +165,10 @@ export async function resolveBrand(
         return result.data // → DEBIT (the only charged path)
       },
     )
+
+    // The balance moved (or may have, when the model delivered but the wrapper
+    // still failed). The chip lives in the layout, so a page revalidate misses it.
+    if (credits.ok || meshOutcome !== null) revalidateBalance()
 
     if (!credits.ok) {
       reportPaidActionFailure('brand-resolve', credits.error)

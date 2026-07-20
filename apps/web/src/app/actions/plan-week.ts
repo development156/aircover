@@ -18,6 +18,7 @@ import {
   isDeploymentConfigCause,
   reportPaidActionFailure,
 } from '@/lib/actions/paid-failure'
+import { revalidateBalance } from '@/lib/actions/revalidate-balance'
 import { newPlanWeekRef } from '@/lib/planner/object-ref'
 import { normalizeSlot } from '@/lib/planner/slots'
 import type { PlanWeekState } from '@/lib/planner/state'
@@ -69,6 +70,11 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
     const parsedInput = PlanWeekInputSchema.safeParse({
       goals: typeof goals === 'string' ? goals.trim().slice(0, GOALS_MAX_CHARS) : goals,
       channels,
+      // Anchor the model in real time. Without it every suggested slot lands
+      // outside [earliest .. horizon] and `normalizeSlot` clamps all five to
+      // the fallback ladder — the plan reads as "5 suggested times were
+      // unusable" every single run.
+      nowIso: new Date().toISOString(),
     })
     if (!parsedInput.success) {
       return { ok: false, insufficient: false, message: 'Pick at least one channel first.' }
@@ -165,6 +171,9 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
       revalidatePath('/planner')
       revalidatePath('/posts')
     }
+    // The credit chip lives in the layout, which a page-scoped revalidate
+    // never reaches.
+    if (credits.ok || delivered) revalidateBalance()
 
     if (!credits.ok) {
       reportPaidActionFailure('plan-week', credits.error)
