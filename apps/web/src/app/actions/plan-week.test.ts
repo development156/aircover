@@ -84,8 +84,19 @@ vi.mock('@sahoda/billing', () => ({
       }
       try {
         await callback({ actionType: config.action, creditsCharged: 20 })
-        // Lost ack: the DEBIT may have committed but the wrapper reports failure.
-        if (state.lostAck) return { ok: false, error: { code: 'PROVIDER_ERROR' } }
+        // Lost ack: the DEBIT may have committed but the wrapper reports
+        // failure. The error deliberately wears a config-prefixed message: the
+        // action's `!delivered` guard must keep the unconfirmed-charge warning
+        // in front of it — deleting that guard fails the lost-ack test.
+        if (state.lostAck) {
+          return {
+            ok: false,
+            error: {
+              code: 'PROVIDER_ERROR',
+              message: '@sahoda/billing: missing required env — SUPABASE_DB_URL',
+            },
+          }
+        }
         return { ok: true, data: { balanceAfter: 80 } }
       } catch (thrown) {
         // Real withCredits RELEASES the hold when the callback throws, and its
@@ -262,9 +273,13 @@ describe('planMyWeek', () => {
 
     const result = await planMyWeek('', ['x'])
 
-    expect(result.ok).toBe(false)
+    // The narrowing guard cannot skip silently: this pins the exact arm first.
+    expect(result).toMatchObject({ ok: false, insufficient: false })
     if (!result.ok && !result.insufficient) {
       expect(result.message).toMatch(/could not confirm/i)
+      // Delivered runs keep the warning even when the failure LOOKS like a
+      // config error — the mock's lost-ack message is config-prefixed.
+      expect(result.message).not.toMatch(/not fully configured/i)
     }
     // The user must SEE the five drafts under the warning — a stale page invites
     // a retry, and a retry with a fresh objectRef is a second charge.
@@ -295,7 +310,7 @@ describe('planMyWeek — deployment config failures', () => {
     const fresh = await import('./plan-week')
     const result = await fresh.planMyWeek('', ['x'])
 
-    expect(result.ok).toBe(false)
+    expect(result).toMatchObject({ ok: false, insufficient: false })
     if (!result.ok && !result.insufficient) {
       expect(result.message).toMatch(/not fully configured/i)
       expect(result.message).toMatch(/not charged/i)
@@ -315,7 +330,7 @@ describe('planMyWeek — deployment config failures', () => {
     const fresh = await import('./plan-week')
     const result = await fresh.planMyWeek('', ['x'])
 
-    expect(result.ok).toBe(false)
+    expect(result).toMatchObject({ ok: false, insufficient: false })
     if (!result.ok && !result.insufficient) {
       expect(result.message).toMatch(/not fully configured/i)
       expect(result.message).toMatch(/not charged/i)

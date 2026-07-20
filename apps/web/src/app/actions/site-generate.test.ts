@@ -35,6 +35,10 @@ const state = vi.hoisted(() => ({
   insufficient: false,
   lostAck: false,
   deleteThrows: false,
+  /** `loadBillingEnv` throws its fail-fast error (SUPABASE_DB_URL unset on the deployment). */
+  billingEnvMissing: false,
+  /** `createMesh` throws its fail-fast error (a mesh key unset on the deployment). */
+  meshEnvMissing: false,
   calls: {
     configs: [] as WithCreditsConfig[],
     siteRows: [] as Array<Record<string, unknown>>,
@@ -66,7 +70,12 @@ vi.mock('@/lib/workspaces', () => ({
 }))
 
 vi.mock('@sahoda/billing', () => ({
-  loadBillingEnv: () => ({ databaseUrl: 'postgres://test' }),
+  loadBillingEnv: () => {
+    if (state.billingEnvMissing) {
+      throw new Error('@sahoda/billing: missing required env — SUPABASE_DB_URL')
+    }
+    return { databaseUrl: 'postgres://test' }
+  },
   createPgLedgerPort: () => ({}),
   createWithCredits:
     () => async (config: WithCreditsConfig, callback: (ctx: unknown) => Promise<unknown>) => {
@@ -79,10 +88,24 @@ vi.mock('@sahoda/billing', () => ({
       }
       try {
         await callback({ actionType: config.action, creditsCharged: 100 })
-        if (state.lostAck) return { ok: false, error: { code: 'PROVIDER_ERROR' } }
+        // The lost-ack error deliberately wears a config-prefixed message: the
+        // action's `!delivered` guard must keep the unconfirmed-charge warning
+        // in front of it. Deleting that guard turns this into the config copy
+        // and fails the lost-ack test below.
+        if (state.lostAck) {
+          return {
+            ok: false,
+            error: {
+              code: 'PROVIDER_ERROR',
+              message: '@sahoda/billing: missing required env — SUPABASE_DB_URL',
+            },
+          }
+        }
         return { ok: true, data: { balanceAfter: 400 } }
-      } catch {
-        return { ok: false, error: { code: 'PROVIDER_ERROR' } }
+      } catch (thrown) {
+        // Real withCredits RELEASES the hold and carries `messageOf(runErr)`.
+        const message = thrown instanceof Error ? thrown.message : String(thrown)
+        return { ok: false, error: { code: 'PROVIDER_ERROR', message } }
       }
     },
 }))
@@ -91,12 +114,17 @@ vi.mock('@sahoda/mesh', async (importOriginal) => {
   const original = await importOriginal<typeof import('@sahoda/mesh')>()
   return {
     ...original,
-    createMesh: () => ({
-      runTask: () => {
-        state.calls.meshRuns += 1
-        return Promise.resolve(state.meshResult)
-      },
-    }),
+    createMesh: () => {
+      if (state.meshEnvMissing) {
+        throw new Error('@sahoda/mesh: missing required env var(s): OPENAI_API_KEY')
+      }
+      return {
+        runTask: () => {
+          state.calls.meshRuns += 1
+          return Promise.resolve(state.meshResult)
+        },
+      }
+    },
   }
 })
 
@@ -149,6 +177,8 @@ beforeEach(async () => {
   state.insufficient = false
   state.lostAck = false
   state.deleteThrows = false
+  state.billingEnvMissing = false
+  state.meshEnvMissing = false
   state.calls = {
     configs: [],
     siteRows: [],
@@ -231,7 +261,15 @@ describe('generateSite', () => {
 
     const result = await generateSite('A', '')
 
-    expect(result.ok).toBe(false)
+    // The narrowing guard cannot skip silently: this pins the exact arm first.
+    expect(result).toMatchObject({ ok: false, insufficient: false })
+    // The mock's lost-ack error wears a config-prefixed message on purpose:
+    // delivered runs must keep the unconfirmed-charge warning even when the
+    // failure LOOKS like a config error (pins the `!delivered` guard).
+    if (!result.ok && !result.insufficient) {
+      expect(result.message).toMatch(/could not confirm/i)
+      expect(result.message).not.toMatch(/not fully configured/i)
+    }
     const { revalidatePath } = await import('next/cache')
     expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith('/sites')
   })
@@ -255,5 +293,49 @@ describe('generateSite', () => {
 
     expect(result.ok).toBe(false)
     expect(state.calls.configs).toHaveLength(0)
+  })
+})
+
+describe('generateSite — deployment config failures', () => {
+  // Both tests re-import the action: its billing/mesh singletons are memoized
+  // module-level, so the already-imported instance would never re-run the env
+  // loaders after earlier tests built them.
+
+  test('missing billing env → honest config copy, cause logged server-side', async () => {
+    state.billingEnvMissing = true
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    vi.resetModules()
+    const fresh = await import('./site-generate')
+    const result = await fresh.generateSite('Marigold', '')
+
+    expect(result).toMatchObject({ ok: false, insufficient: false })
+    if (!result.ok && !result.insufficient) {
+      expect(result.message).toMatch(/not fully configured/i)
+      expect(result.message).toMatch(/not charged/i)
+    }
+    expect(errorSpy.mock.calls.map((call) => String(call[0])).join('\n')).toContain(
+      'SUPABASE_DB_URL',
+    )
+    errorSpy.mockRestore()
+  })
+
+  test('missing mesh env inside the callback → hold released, honest config copy', async () => {
+    state.meshEnvMissing = true
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    vi.resetModules()
+    const fresh = await import('./site-generate')
+    const result = await fresh.generateSite('Marigold', '')
+
+    expect(result).toMatchObject({ ok: false, insufficient: false })
+    if (!result.ok && !result.insufficient) {
+      expect(result.message).toMatch(/not fully configured/i)
+      expect(result.message).toMatch(/not charged/i)
+    }
+    expect(errorSpy.mock.calls.map((call) => String(call[0])).join('\n')).toContain(
+      '@sahoda/mesh: missing required env',
+    )
+    errorSpy.mockRestore()
   })
 })
