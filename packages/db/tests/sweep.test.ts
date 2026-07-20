@@ -135,8 +135,17 @@ describe.skipIf(!hasRlsEnv)('sweepStaleFixtures', () => {
       .from('workspaces')
       .select('id')
       .not('created_by', 'like', 'user\\_%')
-    expect(realAfter.data?.map((r) => r.id).sort()).toEqual(
-      realBefore.data?.map((r) => r.id).sort(),
-    )
+
+    // Survival, not set equality. What the sweep must never do is DELETE a workspace
+    // outside its fixture namespace; it has no opinion on rows that APPEAR. Vitest runs
+    // test files in parallel against this one shared dev project, so a sibling suite
+    // committing a workspace between these two reads is normal — seed_demo.test.ts does
+    // exactly that, and its `demo_seed_…` created_by is (by design) not `user_`-prefixed,
+    // so it lands in both snapshots' scope. Asserting equality made this suite fail on a
+    // concurrent INSERT, which is not the property under test.
+    const before = new Set((realBefore.data ?? []).map((r) => r.id))
+    const after = new Set((realAfter.data ?? []).map((r) => r.id))
+    const deleted = [...before].filter((id) => !after.has(id))
+    expect(deleted, 'the sweep deleted a workspace outside its fixture namespace').toEqual([])
   })
 })

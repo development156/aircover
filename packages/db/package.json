@@ -12,7 +12,9 @@
     "test": "vitest run --passWithNoTests",
     "lint": "exit 0",
     "migration:new": "supabase --workdir . migration new",
-    "db:push": "supabase --workdir . db push"
+    "db:push": "supabase --workdir . db push",
+    "seed:demo": "tsx seeds/demo/index.ts",
+    "seed:demo:destroy": "tsx seeds/demo/destroy.ts"
   },
   "dependencies": {
     "@sahoda/shared": "workspace:*"
@@ -21,6 +23,7 @@
     "@supabase/supabase-js": "^2.110.7",
     "@types/pg": "^8.20.0",
     "dotenv": "^17.4.2",
-    "pg": "^8.22.0"
+    "pg": "^8.22.0",
+    "tsx": "^4.23.1"
   }
 }

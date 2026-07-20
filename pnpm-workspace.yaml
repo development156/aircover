@@ -3,6 +3,7 @@ packages:
   - 'packages/*'
 
 allowBuilds:
+  esbuild: true
   sharp: true
 
 # Allow only these dependencies to run install/postinstall build scripts
