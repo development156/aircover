@@ -83,14 +83,32 @@ const LIVE_THEME = {
   fontHeading: 'Outfit',
 }
 
-const PAGES = [{ id: 'page-1', path: '/', title: 'Home', sort: 0 }]
+/** Verbatim `site_pages` row from the live generate (row_to_json). */
+const PAGES = [
+  {
+    id: '69519705-343d-4aa8-bf8c-4678ea0b4eb9',
+    workspace_id: '083ab0ae-9d22-4c3f-9014-56038adcf7bc',
+    site_id: 'd5125e5e-c9d8-4dda-a641-08be73e88947',
+    path: '/',
+    title: 'Marigold Coffee Roasters — Small Batch, Big Flavor',
+    sort: 0,
+    seo: {
+      description:
+        'Small-batch coffee roasted with intention. Marigold Coffee Roasters turns your everyday cup into a golden moment of care.',
+    },
+    created_at: '2026-07-20T14:10:38.155378+00:00',
+    updated_at: '2026-07-20T14:10:38.155378+00:00',
+  },
+]
+
+const REAL_PAGE_ID = '69519705-343d-4aa8-bf8c-4678ea0b4eb9'
 
 function buildBundle(theme: unknown) {
   const output = siteTreeToOutput(
     PAGES as never,
-    SECTIONS.map((s) => ({ ...s, page_id: 'page-1' })) as never,
+    SECTIONS.map((s) => ({ ...s, page_id: REAL_PAGE_ID })) as never,
   )
-  expect(output).not.toBeNull()
+  expect(output, 'siteTreeToOutput returned null for the live rows').not.toBeNull()
 
   const normalized = normalizeDraft(output!, {
     name: 'Marigold Coffee Roasters',
@@ -109,6 +127,42 @@ function buildBundle(theme: unknown) {
     canonicalOrigin: null,
   })
 }
+
+describe('readSiteTree row parsing — the live rows must survive the schemas', () => {
+  // `readSiteTree` drops any row that fails these, and zero surviving pages
+  // makes buildPreview `continue` → the honest 'unreadable' state, with no
+  // throw. That is indistinguishable in the UI from a render failure, so pin
+  // it explicitly against the real rows.
+  test('the live site_pages row parses', async () => {
+    const { SitePageSchema } = await import('@sahoda/shared')
+
+    const parsed = SitePageSchema.safeParse(PAGES[0])
+
+    expect(parsed.success, JSON.stringify(parsed.error?.issues ?? [], null, 1)).toBe(true)
+  })
+
+  test('every live site_sections row parses', async () => {
+    const { SiteSectionSchema } = await import('@sahoda/shared')
+
+    for (const section of SECTIONS) {
+      const row = {
+        id: '00000000-0000-4000-8000-000000000001',
+        workspace_id: '083ab0ae-9d22-4c3f-9014-56038adcf7bc',
+        page_id: REAL_PAGE_ID,
+        kind: section.kind,
+        sort: section.sort,
+        content: section.content,
+        created_at: '2026-07-20T14:10:38.155378+00:00',
+        updated_at: '2026-07-20T14:10:38.155378+00:00',
+      }
+      const parsed = SiteSectionSchema.safeParse(row)
+
+      expect(parsed.success, `${section.kind}: ${JSON.stringify(parsed.error?.issues ?? [])}`).toBe(
+        true,
+      )
+    }
+  })
+})
 
 describe('live site render — the rows the first real generate produced', () => {
   test('renders with theme: null (the pre-change path)', () => {
