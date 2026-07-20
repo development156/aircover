@@ -22,8 +22,20 @@ pnpm install · pnpm dev · turbo typecheck lint test · supabase migration new 
 
 ## Do NOT touch
 
-.env*, secrets/, applied migrations, pnpm-lock.yaml by hand, prod resources. Only wt-db edits packages/db/migrations.
+.env*, secrets/, applied migrations, pnpm-lock.yaml by hand, prod resources. Only wt-db edits packages/db/supabase/migrations.
 
 ## Loop
 
 /worktree-kickoff at session start · /plan-feature before building · /review then /ship to finish · one LEARNINGS.md line per PR; recurring rules get promoted into the relevant CLAUDE.md.
+
+## Team bug-fix sessions (Claude Code on the web)
+
+Rules for teammates fixing bugs in cloud sessions at claude.ai/code. Type `/fix <issue number>` to start. Full walkthrough: docs/TEAM_ONBOARDING.md. In these sessions `/fix` replaces the Loop above — no worktree-kickoff, no /ship.
+
+- **Bug fixes only**, against an assigned GitHub issue. No new features, no refactors, no dependency changes.
+- **Never modify:** `packages/shared` (frozen contracts), `packages/db/supabase/migrations` (applied migrations are immutable), anything matching `.env*`, `pricing.config.json`, `.github`, `.claude/settings.json`.
+- **Never push to main.** Always work on a branch and open a pull request. Never merge your own pull request.
+- **Reproduce the bug with a failing test first.** Then fix it, then confirm that same test passes.
+- **Agents:** use `reviewer` (on the diff, before opening the PR), `test-writer`, and `debug-agent`. Do NOT use `db-migration-agent`, `sites-agent`, or any agent that writes migrations.
+- **The cloud sandbox has no `.env`.** Live-database tests skip automatically and the app cannot be run locally — that is normal, not something to fix. Visual checks happen on the Vercel preview URL that builds automatically for the PR.
+- **If the fix would need a schema change, a shared-contract change, or another package's internals: STOP.** Say exactly that in the PR description instead of doing it.
