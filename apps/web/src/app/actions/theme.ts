@@ -56,6 +56,21 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
 
     const supabase = createServerSupabase()
 
+    // `version` is NOT NULL with NO default and carries UNIQUE
+    // (workspace_id, version) — omitting it fails the insert outright (found
+    // the hard way: the first cut silently toasted "could not save" on every
+    // Finish). Read the current max and take the next.
+    const { data: latest, error: versionError } = await supabase
+      .from('workspace_themes')
+      .select('version')
+      .order('version', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (versionError) {
+      return { ok: false, message: 'Could not save your theme — try again.' }
+    }
+    const nextVersion = ((latest as { version?: number } | null)?.version ?? 0) + 1
+
     // Archive the current active row FIRST. If the insert then fails the
     // workspace falls back to the tokens.css defaults — visibly un-themed,
     // which is honest — rather than keeping two active rows and letting the
@@ -71,6 +86,7 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
 
     const { error } = await supabase.from('workspace_themes').insert({
       workspace_id: workspace.id,
+      version: nextVersion,
       tokens: tokens.data,
       source: 'extracted',
       status: 'active',

@@ -24,6 +24,8 @@ interface UpdateCall {
 const state = vi.hoisted(() => ({
   insertError: null as { code: string; message: string } | null,
   updateError: null as { code: string; message: string } | null,
+  /** Highest existing theme version for the workspace; null = never themed. */
+  latestVersion: null as number | null,
   // Inlined, not WS_ID: vi.hoisted runs before the module consts initialize.
   workspace: { id: '22222222-2222-4222-8222-222222222222' } as { id: string } | null,
   userId: 'user_abc' as string | null,
@@ -49,6 +51,19 @@ vi.mock('@/lib/supabase/server', () => ({
       insert: (row: Record<string, unknown>) => {
         state.calls.inserted.push({ ...row, __table: table })
         return Promise.resolve({ error: state.insertError })
+      },
+      // The version lookup: .select().order().limit().maybeSingle()
+      select: () => {
+        const chain = {
+          order: () => chain,
+          limit: () => chain,
+          maybeSingle: () =>
+            Promise.resolve({
+              data: state.latestVersion === null ? null : { version: state.latestVersion },
+              error: null,
+            }),
+        }
+        return chain
       },
       update: (patch: Record<string, unknown>) => {
         const call: UpdateCall = { table, patch, eqs: [] }
@@ -80,6 +95,7 @@ const COLORS = ['oklch(0.42 0.06 210)', 'oklch(0.52 0.19 350)']
 beforeEach(() => {
   state.insertError = null
   state.updateError = null
+  state.latestVersion = null
   state.workspace = { id: WS_ID }
   state.userId = 'user_abc'
   state.calls = { inserted: [], updates: [] }
@@ -97,6 +113,39 @@ describe('saveWorkspaceTheme', () => {
     expect(row?.source).toBe('extracted')
     expect(row?.status).toBe('active')
     expect(row?.created_by).toBe('user_abc')
+  })
+
+  /**
+   * Every column that is NOT NULL with NO default in `workspace_themes`.
+   * Omitting one fails the real insert while a hand-written mock happily
+   * accepts it — which is exactly what happened: the first cut left out
+   * `version` and every live Finish silently toasted "could not save".
+   * Derived from the schema, so this stays the DB's contract, not my guess.
+   */
+  test('supplies every NOT NULL column that has no database default', async () => {
+    await saveWorkspaceTheme(COLORS)
+
+    const row = state.calls.inserted[0] ?? {}
+    for (const column of ['workspace_id', 'version', 'tokens', 'source', 'status']) {
+      expect(row[column], `missing NOT NULL column '${column}'`).toBeDefined()
+      expect(row[column], `null NOT NULL column '${column}'`).not.toBeNull()
+    }
+  })
+
+  test('takes the next version, respecting UNIQUE (workspace_id, version)', async () => {
+    state.latestVersion = 7
+
+    await saveWorkspaceTheme(COLORS)
+
+    expect(state.calls.inserted[0]?.version).toBe(8)
+  })
+
+  test('starts at version 1 for a workspace that has never had a theme', async () => {
+    state.latestVersion = null
+
+    await saveWorkspaceTheme(COLORS)
+
+    expect(state.calls.inserted[0]?.version).toBe(1)
   })
 
   test('the persisted tokens are a valid ThemeTokens payload', async () => {
