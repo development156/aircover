@@ -74,6 +74,31 @@ describe('describeEntry — direction comes from entry_type, never from the amou
     expect(display.signedAmount).toBe('+50')
   })
 
+  test('labels the signup grant as welcome credits, never as plan credits', () => {
+    // `bootstrap_workspace` writes the 100-credit signup grant with
+    // `action_type: 'signup_grant'`. A fresh user has no plan, so "Included
+    // with your plan" would be a false claim on the very first wallet row.
+    const display = describeEntry(
+      entry({ entry_type: 'GRANT', amount: 100, action_type: 'signup_grant', object_ref: null }),
+    )
+
+    expect(display.label).toBe('Welcome credits')
+    expect(display.why).toBe('Included free when you signed up.')
+    expect(display.direction).toBe('credit')
+    expect(display.signedAmount).toBe('+100')
+  })
+
+  test('keeps the plan copy for a GRANT without a signup action_type', () => {
+    // `applyPlanGrant` writes plan grants with a null action_type — those ARE
+    // plan credits, and the existing copy stays true for them.
+    const display = describeEntry(
+      entry({ entry_type: 'GRANT', amount: 1500, action_type: null, object_ref: null }),
+    )
+
+    expect(display.label).toBe('Plan credits')
+    expect(display.why).toBe('Included with your plan.')
+  })
+
   test('renders a TOPUP as a positive credit', () => {
     const display = describeEntry(entry({ entry_type: 'TOPUP', amount: 500, action_type: null }))
 

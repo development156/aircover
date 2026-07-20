@@ -12,6 +12,11 @@ import {
   type WithCreditsFn,
 } from '@sahoda/shared'
 
+import {
+  DEPLOYMENT_CONFIG_MESSAGE,
+  isDeploymentConfigCause,
+  reportPaidActionFailure,
+} from '@/lib/actions/paid-failure'
 import { pruneBlankListEntries } from '@/lib/brand/prune-blank-entries'
 import { newResolveObjectRef } from '@/lib/brand/resolve-object-ref'
 import { mapSaveBrandError } from '@/lib/brand/save-brand-error'
@@ -160,6 +165,16 @@ export async function resolveBrand(
       },
     )
 
+    if (!credits.ok) {
+      reportPaidActionFailure('brand-resolve', credits.error)
+      // A mesh config throw inside the callback released the hold (meshOutcome
+      // is still null there — getMesh() failed before runTask could stash one),
+      // so the not-charged claim is verifiable and a retry cannot fix it.
+      if (meshOutcome === null && isDeploymentConfigCause(credits.error)) {
+        return { ok: false, kind: 'error', message: DEPLOYMENT_CONFIG_MESSAGE }
+      }
+    }
+
     const creditsOutcome: CreditsOutcome = credits.ok
       ? { ok: true, balanceAfter: credits.data.balanceAfter }
       : credits.error.code === 'CREDIT_INSUFFICIENT'
@@ -174,7 +189,13 @@ export async function resolveBrand(
         : { ok: false, insufficient: false, message: credits.error.message }
 
     return mapResolveOutcome(meshOutcome, creditsOutcome)
-  } catch {
+  } catch (error) {
+    reportPaidActionFailure('brand-resolve', error)
+    // The billing env loader throws before any HOLD exists — config failures
+    // caught here are verifiably uncharged, and a retry cannot fix them.
+    if (isDeploymentConfigCause(error)) {
+      return { ok: false, kind: 'error', message: DEPLOYMENT_CONFIG_MESSAGE }
+    }
     return { ok: false, kind: 'error', message: 'Could not resolve your Brand Brain — try again.' }
   }
 }

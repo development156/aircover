@@ -8,6 +8,11 @@ import { createMesh, siteGenerateTask, SiteGenerateInputSchema, type Mesh } from
 import { normalizeDraft, toRows } from '@sahoda/sites'
 import { creditCost, MESH_TASK_ACTION, type WithCreditsFn } from '@sahoda/shared'
 
+import {
+  DEPLOYMENT_CONFIG_MESSAGE,
+  isDeploymentConfigCause,
+  reportPaidActionFailure,
+} from '@/lib/actions/paid-failure'
 import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
 import { newSiteGenerateRef } from '@/lib/sites/object-ref'
 import { draftSlug } from '@/lib/sites/slug'
@@ -182,6 +187,13 @@ export async function generateSite(name: unknown, goal: unknown): Promise<Genera
     if (delivered) revalidatePath('/sites')
 
     if (!credits.ok) {
+      reportPaidActionFailure('site-generate', credits.error)
+      // A mesh config throw inside the callback released the hold, so the
+      // not-charged claim is verifiable. Never on the delivered path — there
+      // the unconfirmed-charge warning must survive.
+      if (!delivered && isDeploymentConfigCause(credits.error)) {
+        return { ok: false, insufficient: false, message: DEPLOYMENT_CONFIG_MESSAGE }
+      }
       return chargeFailureState({ error: credits.error, action, delivered, reason: failure })
     }
 
@@ -191,7 +203,13 @@ export async function generateSite(name: unknown, goal: unknown): Promise<Genera
       balanceAfter: credits.data.balanceAfter,
       creditsCharged: creditCost(action),
     }
-  } catch {
+  } catch (error) {
+    reportPaidActionFailure('site-generate', error)
+    // The billing env loader throws before any HOLD exists — config failures
+    // caught here are verifiably uncharged, and a retry cannot fix them.
+    if (isDeploymentConfigCause(error)) {
+      return { ok: false, insufficient: false, message: DEPLOYMENT_CONFIG_MESSAGE }
+    }
     return { ok: false, insufficient: false, message: 'Could not generate the site — try again.' }
   }
 }

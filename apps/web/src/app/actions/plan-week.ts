@@ -13,6 +13,11 @@ import {
   clampBriefText,
   clampChannels,
 } from '@/lib/planner/briefs'
+import {
+  DEPLOYMENT_CONFIG_MESSAGE,
+  isDeploymentConfigCause,
+  reportPaidActionFailure,
+} from '@/lib/actions/paid-failure'
 import { newPlanWeekRef } from '@/lib/planner/object-ref'
 import { normalizeSlot } from '@/lib/planner/slots'
 import type { PlanWeekState } from '@/lib/planner/state'
@@ -162,6 +167,13 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
     }
 
     if (!credits.ok) {
+      reportPaidActionFailure('plan-week', credits.error)
+      // A mesh config throw inside the callback released the hold, so the
+      // not-charged claim is verifiable. Never on the delivered path — there
+      // the unconfirmed-charge warning must survive.
+      if (!delivered && isDeploymentConfigCause(credits.error)) {
+        return { ok: false, insufficient: false, message: DEPLOYMENT_CONFIG_MESSAGE }
+      }
       return chargeFailureState({ error: credits.error, action, delivered, reason: failure })
     }
 
@@ -172,7 +184,13 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
       balanceAfter: credits.data.balanceAfter,
       creditsCharged: creditCost(action),
     }
-  } catch {
+  } catch (error) {
+    reportPaidActionFailure('plan-week', error)
+    // The billing env loader throws before any HOLD exists — config failures
+    // caught here are verifiably uncharged, and a retry cannot fix them.
+    if (isDeploymentConfigCause(error)) {
+      return { ok: false, insufficient: false, message: DEPLOYMENT_CONFIG_MESSAGE }
+    }
     return { ok: false, insufficient: false, message: 'Could not plan your week — try again.' }
   }
 }

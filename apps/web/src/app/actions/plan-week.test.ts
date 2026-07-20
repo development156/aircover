@@ -30,6 +30,10 @@ const state = vi.hoisted(() => ({
   insufficient: false,
   /** Callback runs to completion, then the wrapper still reports failure (lost ack). */
   lostAck: false,
+  /** `loadBillingEnv` throws its fail-fast error (SUPABASE_DB_URL unset on the deployment). */
+  billingEnvMissing: false,
+  /** `createMesh` throws its fail-fast error (a mesh key unset on the deployment). */
+  meshEnvMissing: false,
   calls: {
     configs: [] as WithCreditsConfig[],
     insertedRows: null as Array<Record<string, unknown>> | null,
@@ -62,7 +66,12 @@ vi.mock('@/lib/workspaces', () => ({
 }))
 
 vi.mock('@sahoda/billing', () => ({
-  loadBillingEnv: () => ({ databaseUrl: 'postgres://test' }),
+  loadBillingEnv: () => {
+    if (state.billingEnvMissing) {
+      throw new Error('@sahoda/billing: missing required env — SUPABASE_DB_URL')
+    }
+    return { databaseUrl: 'postgres://test' }
+  },
   createPgLedgerPort: () => ({}),
   createWithCredits:
     () => async (config: WithCreditsConfig, callback: (ctx: unknown) => Promise<unknown>) => {
@@ -78,9 +87,12 @@ vi.mock('@sahoda/billing', () => ({
         // Lost ack: the DEBIT may have committed but the wrapper reports failure.
         if (state.lostAck) return { ok: false, error: { code: 'PROVIDER_ERROR' } }
         return { ok: true, data: { balanceAfter: 80 } }
-      } catch {
-        // Real withCredits RELEASES the hold when the callback throws.
-        return { ok: false, error: { code: 'PROVIDER_ERROR' } }
+      } catch (thrown) {
+        // Real withCredits RELEASES the hold when the callback throws, and its
+        // PROVIDER_ERROR carries `messageOf(runErr)` — mirrored here so the
+        // config-classification seam sees the same shape it does in prod.
+        const message = thrown instanceof Error ? thrown.message : String(thrown)
+        return { ok: false, error: { code: 'PROVIDER_ERROR', message } }
       }
     },
 }))
@@ -89,13 +101,18 @@ vi.mock('@sahoda/mesh', async (importOriginal) => {
   const original = await importOriginal<typeof import('@sahoda/mesh')>()
   return {
     ...original,
-    createMesh: () => ({
-      runTask: (_def: unknown, input: { goals: string; channels: string[] }) => {
-        state.calls.meshRuns += 1
-        state.calls.meshInput = input
-        return Promise.resolve(state.meshResult)
-      },
-    }),
+    createMesh: () => {
+      if (state.meshEnvMissing) {
+        throw new Error('@sahoda/mesh: missing required env var(s): OPENAI_API_KEY')
+      }
+      return {
+        runTask: (_def: unknown, input: { goals: string; channels: string[] }) => {
+          state.calls.meshRuns += 1
+          state.calls.meshInput = input
+          return Promise.resolve(state.meshResult)
+        },
+      }
+    },
   }
 })
 
@@ -117,6 +134,8 @@ beforeEach(async () => {
   state.insertResult = { data: FIVE_IDS, error: null }
   state.insufficient = false
   state.lostAck = false
+  state.billingEnvMissing = false
+  state.meshEnvMissing = false
   state.calls = { configs: [], insertedRows: null, meshRuns: 0, meshInput: null }
   vi.mocked((await import('next/cache')).revalidatePath).mockClear()
 })
@@ -260,5 +279,50 @@ describe('planMyWeek', () => {
 
     const { revalidatePath } = await import('next/cache')
     expect(vi.mocked(revalidatePath)).not.toHaveBeenCalled()
+  })
+})
+
+describe('planMyWeek — deployment config failures', () => {
+  // Both tests re-import the action: its billing/mesh singletons are memoized
+  // module-level, so the already-imported instance would never re-run the env
+  // loaders after the happy-path tests built them.
+
+  test('missing billing env → honest config copy, cause logged server-side', async () => {
+    state.billingEnvMissing = true
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    vi.resetModules()
+    const fresh = await import('./plan-week')
+    const result = await fresh.planMyWeek('', ['x'])
+
+    expect(result.ok).toBe(false)
+    if (!result.ok && !result.insufficient) {
+      expect(result.message).toMatch(/not fully configured/i)
+      expect(result.message).toMatch(/not charged/i)
+      expect(result.message).not.toMatch(/try again/i)
+    }
+    expect(errorSpy.mock.calls.map((call) => String(call[0])).join('\n')).toContain(
+      'SUPABASE_DB_URL',
+    )
+    errorSpy.mockRestore()
+  })
+
+  test('missing mesh env inside the callback → hold released, honest config copy', async () => {
+    state.meshEnvMissing = true
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    vi.resetModules()
+    const fresh = await import('./plan-week')
+    const result = await fresh.planMyWeek('', ['x'])
+
+    expect(result.ok).toBe(false)
+    if (!result.ok && !result.insufficient) {
+      expect(result.message).toMatch(/not fully configured/i)
+      expect(result.message).toMatch(/not charged/i)
+    }
+    expect(errorSpy.mock.calls.map((call) => String(call[0])).join('\n')).toContain(
+      '@sahoda/mesh: missing required env',
+    )
+    errorSpy.mockRestore()
   })
 })

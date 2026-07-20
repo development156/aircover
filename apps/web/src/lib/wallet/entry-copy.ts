@@ -86,6 +86,21 @@ const ENTRY_TYPE_LABELS: Record<LedgerEntryType, string | null> = {
 }
 
 /**
+ * GRANT rows carry their origin in `action_type`: `bootstrap_workspace` writes
+ * the signup grant as `signup_grant`, while `applyPlanGrant` writes plan grants
+ * with a null `action_type`. The signup grant must not claim "your plan" — a
+ * fresh user has none. Unknown origins fall back to the plan copy, which is the
+ * only other GRANT writer today.
+ */
+const GRANT_SOURCE_LABELS: Readonly<Record<string, string>> = {
+  signup_grant: 'Welcome credits',
+}
+
+const GRANT_SOURCE_WHY: Readonly<Record<string, string>> = {
+  signup_grant: 'Included free when you signed up.',
+}
+
+/**
  * The static half of the why-line, per entry type. These state only what the
  * entry type itself guarantees — nothing is inferred from `meta` or `actor`.
  */
@@ -256,7 +271,10 @@ function buildWhy(entry: LedgerEntry): string | null {
   // it has no tier yet — "not recorded" there would imply lost data.
   const isCharge = entry.entry_type === 'DEBIT'
 
-  const staticWhy = ENTRY_TYPE_WHY[entry.entry_type]
+  const staticWhy =
+    entry.entry_type === 'GRANT'
+      ? (GRANT_SOURCE_WHY[entry.action_type ?? ''] ?? ENTRY_TYPE_WHY.GRANT)
+      : ENTRY_TYPE_WHY[entry.entry_type]
 
   if (staticWhy !== null) {
     parts.push(staticWhy)
@@ -292,7 +310,10 @@ function buildWhy(entry: LedgerEntry): string | null {
  */
 export function describeEntry(entry: LedgerEntry): EntryDisplay {
   const direction = directionOf(entry.entry_type, entry.amount)
-  const typeLabel = ENTRY_TYPE_LABELS[entry.entry_type]
+  const typeLabel =
+    entry.entry_type === 'GRANT'
+      ? (GRANT_SOURCE_LABELS[entry.action_type ?? ''] ?? ENTRY_TYPE_LABELS.GRANT)
+      : ENTRY_TYPE_LABELS[entry.entry_type]
 
   return {
     label: typeLabel ?? actionLabel(entry.action_type),

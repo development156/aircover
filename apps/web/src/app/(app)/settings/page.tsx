@@ -11,8 +11,8 @@ export default function SettingsPage() {
       <PageTitle>Settings</PageTitle>
       <EmptyState
         icon={SlidersHorizontal}
-        title="Settings arrive with workspaces"
-        body="Workspace and profile settings land with the bootstrap flow."
+        title="Nothing to configure yet"
+        body="Workspace and profile settings are still being built — nothing here is hidden behind a setting in the meantime."
       />
     </div>
   )

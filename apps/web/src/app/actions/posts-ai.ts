@@ -19,6 +19,11 @@ import {
   type WithCreditsFn,
 } from '@sahoda/shared'
 
+import {
+  DEPLOYMENT_CONFIG_MESSAGE,
+  isDeploymentConfigCause,
+  reportPaidActionFailure,
+} from '@/lib/actions/paid-failure'
 import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
 import { hasLink } from '@/lib/posts/detect-link'
 import { getPost } from '@/lib/posts/read'
@@ -145,6 +150,13 @@ export async function generateVariants(postId: string, channels: unknown): Promi
     )
 
     if (!credits.ok) {
+      reportPaidActionFailure('posts-ai.generateVariants', credits.error)
+      // A mesh config throw inside the callback released the hold, so the
+      // not-charged claim is verifiable. Never on the delivered path — there
+      // the unconfirmed-charge warning must survive.
+      if (!delivered && isDeploymentConfigCause(credits.error)) {
+        return { ok: false, insufficient: false, message: DEPLOYMENT_CONFIG_MESSAGE }
+      }
       return chargeFailureState({ error: credits.error, action, delivered, reason: failure })
     }
 
@@ -155,7 +167,13 @@ export async function generateVariants(postId: string, channels: unknown): Promi
       balanceAfter: credits.data.balanceAfter,
       creditsCharged: creditCost(action),
     }
-  } catch {
+  } catch (error) {
+    reportPaidActionFailure('posts-ai.generateVariants', error)
+    // The billing env loader throws before any HOLD exists — config failures
+    // caught here are verifiably uncharged, and a retry cannot fix them.
+    if (isDeploymentConfigCause(error)) {
+      return { ok: false, insufficient: false, message: DEPLOYMENT_CONFIG_MESSAGE }
+    }
     return { ok: false, insufficient: false, message: 'Could not generate variants — try again.' }
   }
 }
@@ -227,6 +245,10 @@ export async function rewriteCaption(
     )
 
     if (!credits.ok) {
+      reportPaidActionFailure('posts-ai.rewriteCaption', credits.error)
+      if (!delivered && isDeploymentConfigCause(credits.error)) {
+        return { ok: false, insufficient: false, message: DEPLOYMENT_CONFIG_MESSAGE }
+      }
       return chargeFailureState({ error: credits.error, action, delivered, reason: failure })
     }
 
@@ -236,7 +258,11 @@ export async function rewriteCaption(
       balanceAfter: credits.data.balanceAfter,
       creditsCharged: creditCost(action),
     }
-  } catch {
+  } catch (error) {
+    reportPaidActionFailure('posts-ai.rewriteCaption', error)
+    if (isDeploymentConfigCause(error)) {
+      return { ok: false, insufficient: false, message: DEPLOYMENT_CONFIG_MESSAGE }
+    }
     return {
       ok: false,
       insufficient: false,
