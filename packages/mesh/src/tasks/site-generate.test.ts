@@ -69,6 +69,26 @@ describe('siteGenerateTask', () => {
     expect(last.content).toContain('Chai & Chapters')
   })
 
+  // The renderer paints the Brand Skin primary onto ONE thing: the CTA
+  // (`renderCta` → `.cta { background: var(--p) }`). It returns '' when
+  // `ctaLabel` is absent, and the prompt never asked for one — so every
+  // generated site shipped with no element using a brand colour at all.
+  // Verified live 2026-07-20: the tokens were correctly injected into :root and
+  // nothing on the page consumed them.
+  it('asks for a CTA label, the only element that carries the brand colour', () => {
+    const system = siteGenerateTask.buildMessages(input, ctx)[0]!.content
+
+    expect(system).toContain('ctaLabel')
+  })
+
+  it('does not ask for a ctaHref — there is no real address to link to yet', () => {
+    // Sites deploy is deferred; a fabricated href would ship a dead link.
+    // `renderCta` renders label-without-href as an inert, brand-tinted pill.
+    const system = siteGenerateTask.buildMessages(input, ctx)[0]!.content
+
+    expect(system).not.toContain('ctaHref')
+  })
+
   it('resolves a valid page/section tree', async () => {
     const result = await runnerFor(fixedProvider([validOut])).run(siteGenerateTask, input, ctx)
     expect(result.ok).toBe(true)

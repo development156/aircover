@@ -21,7 +21,9 @@ Output ONLY a JSON object matching:
   "sections": [ { "kind": "hero"|"features"|"offer"|"testimonials"|"faq"|"contact",
                   "content": object } ] } ] }
 Rules: use ONLY those six section kinds; the homepage ("/") always leads with a hero;
-each section's "content" holds its copy (e.g. headline, subhead, body, items); ground
+each section's "content" holds its copy (e.g. headline, subhead, body, items); the hero
+and offer sections MUST each carry a short "ctaLabel" (2-4 words, e.g. "Shop the roast")
+— it is the page's call to action and the only element that wears the brand colour; ground
 every line in the brand and the goal. No markdown, no commentary.`
 
 const def: MeshTaskDef<SiteGenerateInput, SiteGenerateOutput> = {
