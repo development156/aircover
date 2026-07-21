@@ -86,5 +86,18 @@ export default withSentryConfig(nextConfig, {
 
   // Strips Sentry's own debug logging out of the client bundle. Pure size win —
   // those logs only fire when `debug: true`, which we never set.
-  disableLogger: true,
+  //
+  // This is the `webpack.treeshake` form, not the older top-level `disableLogger`:
+  // that one is deprecated in 10.x and prints a DEPRECATION WARNING on every dev
+  // boot. Note the treeshake options apply to the WEBPACK production build only —
+  // `next dev --turbopack` ignores them, so the win shows up in `next build`, not
+  // in dev bundle size.
+  //
+  // `treeshake.removeTracing` is deliberately NOT set even though
+  // `tracesSampleRate` is 0 and it would strip more code: it would silently make
+  // a future `tracesSampleRate` change a no-op, and a performance option that
+  // reads as enabled while doing nothing is exactly the kind of quiet lie this
+  // codebase avoids. Turn it on in the same commit that decides we will never
+  // trace, not before.
+  webpack: { treeshake: { removeDebugLogging: true } },
 })
