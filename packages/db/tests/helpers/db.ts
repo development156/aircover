@@ -46,6 +46,20 @@ export function anonClient(): SupabaseClient {
 const b64url = (s: string): string => Buffer.from(s).toString('base64url')
 
 /**
+ * How far back to date `iat`. PostgREST allows a FIXED 30s of clock skew and answers
+ * PGRST303 "JWT issued at future" past it (measured against this project: iat = now+30s
+ * passes, now+31s fails). Minting at exactly `now` therefore spends the entire allowance
+ * on whatever skew exists between this machine and the edge at that instant — which is
+ * how a single bootstrap test failed while the rest of the same run passed.
+ *
+ * 300s is chosen to clear that 30s window by a wide margin, not to shave it. It is also
+ * the more production-faithful shape: a real Clerk token is routinely minutes old by the
+ * time it is presented, so a freshly-minted `iat` is the unrealistic case, not this one.
+ * Do NOT "simplify" this toward the 30s boundary — anything inside it re-opens the flake.
+ */
+const IAT_BACKDATE_SEC = 300
+
+/**
  * Mint an HS256 token with a chosen Clerk-style subject, signed with the project
  * JWT secret. RLS policies read auth.jwt()->>'sub' from it. This is how we test
  * tenant isolation from an anon-key client authenticated "as" a member.
@@ -58,7 +72,8 @@ export function mintJwt(sub: string, ttlSec = 3600): string {
       sub,
       role: 'authenticated',
       aud: 'authenticated',
-      iat: now,
+      iat: now - IAT_BACKDATE_SEC,
+      // exp stays anchored to now: the token still lives ttlSec from mint time.
       exp: now + ttlSec,
     }),
   )

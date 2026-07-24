@@ -55,15 +55,42 @@ describe.skipIf(!DB_URL)('applyPlanGrant against the real ledger', () => {
     // Same plan+period+workspace but a DIFFERENT provider event id → the ledger's
     // monthlyGrantKey still replays. (This is the safety net while billing_webhook_events
     // — provider-level dedup — is deferred behind the enum widening.)
+    // Spend some of it FIRST, so the assertions below can actually discriminate. Asserting
+    // balanceAfter === 1500 while the live balance is also 1500 pins nothing — it cannot tell
+    // "the original entry's balance" from "a fresh read". After a HOLD+DEBIT of 400 the live
+    // balance is 1100, so a stale 1500 is only explicable as the original row.
+    const hold = await port.apply({
+      workspaceId: ws,
+      entryType: 'HOLD',
+      amount: 400,
+      idempotencyKey: 'spend:1',
+    })
+    await port.apply({
+      workspaceId: ws,
+      entryType: 'DEBIT',
+      amount: 400,
+      idempotencyKey: 'spend:1:debit',
+      settlesEntryId: hold.entry.id,
+    })
+    expect(await port.balance(ws)).toEqual({ total: 1100, held: 0 })
+
     const dup = await applyPlanGrant(paid({ eventId: 'evt-b' }))
     expect(dup.ok && dup.data.replayed).toBe(true)
-    expect(await port.balance(ws)).toEqual({ total: 1500, held: 0 }) // NOT 3000
+    if (!dup.ok) throw new Error('expected ok')
+    // Owner ruling, pinned: on replay these describe the ORIGINAL grant, not one applied by this
+    // delivery. balanceAfter is the ORIGINAL entry's balance — deliberately STALE, 1500 not the
+    // current 1100. Only meaningful read alongside `replayed`.
+    expect(dup.data.granted).toBe(1500)
+    expect(dup.data.balanceAfter).toBe(1500)
+    expect(await port.balance(ws)).toEqual({ total: 1100, held: 0 }) // no second grant
 
     // A new billing period is a fresh grant.
     const next = await applyPlanGrant(paid({ eventId: 'evt-c', period: '2026-08' }))
     expect(next.ok).toBe(true)
     if (!next.ok) throw new Error('expected ok')
     expect(next.data.replayed).toBe(false)
-    expect(await port.balance(ws)).toEqual({ total: 3000, held: 0 })
+    // 1100 carried forward + 1500 for the new period (the 400 spent above stays spent).
+    expect(next.data.balanceAfter).toBe(2600)
+    expect(await port.balance(ws)).toEqual({ total: 2600, held: 0 })
   })
 })

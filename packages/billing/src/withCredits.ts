@@ -12,13 +12,32 @@ import {
 } from '@sahoda/shared'
 import type { LatestHold, LedgerPort } from './ledger/port'
 
-/** HOLD time-to-live. If a run dies between HOLD and settle, the ledger auto-releases (sahoda-ledger). */
+/**
+ * HOLD time-to-live. If a run dies between HOLD and settle, the hold is released by the
+ * expired-hold sweep — `holdSweepTask` in apps/jobs, which runs every 5 minutes and releases
+ * through `app.apply_ledger_entry()` with an `expiredReleaseKey`, so a repeat sweep is an
+ * idempotent replay rather than a double-release.
+ *
+ * The sweep waits a grace margin past expiry (`holdSweepGraceSeconds`, default 600s) before
+ * reaping, so a slow-but-alive run is not released mid-flight — its later DEBIT would raise
+ * HOLD_ALREADY_SETTLED and show the user a failure for work that succeeded. Net: stranded
+ * credits come back on the order of tens of minutes, not instantly.
+ */
 const DEFAULT_HOLD_TTL_SECONDS = 600
+
+/** User-facing failure copy. Fixed strings only — see `notifyError`. */
+const GENERIC_FAILURE = 'Could not complete the action'
 
 export interface WithCreditsDeps {
   /** Injected for deterministic traceIds in tests; defaults to a random UUID. */
   newTraceId?: () => string
   holdTtlSeconds?: number
+  /**
+   * Server-side observability hook. The raw cause is handed here and NEVER placed on the
+   * returned Result, so an operator keeps the detail while the customer sees fixed copy.
+   * Correlate via `traceId`. Default is a no-op — no logger dependency, no console.
+   */
+  onError?: (cause: unknown, traceId: string) => void
 }
 
 /**
@@ -32,6 +51,15 @@ export interface WithCreditsDeps {
 export function createWithCredits(port: LedgerPort, deps: WithCreditsDeps = {}): WithCreditsFn {
   const newTraceId = deps.newTraceId ?? (() => randomUUID())
   const holdTtlSeconds = deps.holdTtlSeconds ?? DEFAULT_HOLD_TTL_SECONDS
+
+  /** Report to the operator without ever letting a logger failure corrupt the result path. */
+  const notifyError = (cause: unknown, traceId: string): void => {
+    try {
+      deps.onError?.(cause, traceId)
+    } catch {
+      // a broken logger must not turn a typed error into a rejection
+    }
+  }
 
   const withCredits: WithCreditsFn = async (opts, fn) => {
     const traceId = newTraceId()
@@ -82,8 +110,9 @@ export function createWithCredits(port: LedgerPort, deps: WithCreditsDeps = {}):
       try {
         data = await fn({ actionType: action, creditsCharged: cost })
       } catch (runErr) {
-        // RELEASE: the user is not charged for a failed action. If the RELEASE write
-        // itself fails, the HOLD's TTL is the backstop — still return an honest error.
+        // RELEASE: the user is not charged for a failed action. If the RELEASE write itself
+        // fails, the expired-hold sweep in apps/jobs is the backstop — still return an honest
+        // error.
         try {
           await port.apply({
             workspaceId,
@@ -93,9 +122,12 @@ export function createWithCredits(port: LedgerPort, deps: WithCreditsDeps = {}):
             settlesEntryId: holdId,
           })
         } catch {
-          // swallowed: hold expires via TTL; the caller-facing error below is unchanged
+          // swallowed: the expired-hold sweep releases it; caller-facing error below unchanged
         }
-        return err(appError('PROVIDER_ERROR', messageOf(runErr), traceId))
+        // Fixed copy: the caller's own throw is frequently a control-flow sentinel
+        // (e.g. 'MESH_ERROR') and apps/web renders this message to the customer verbatim.
+        notifyError(runErr, traceId)
+        return err(appError('PROVIDER_ERROR', GENERIC_FAILURE, traceId))
       }
 
       // DEBIT: settle the hold for the exact cost. model_tier / cogs stay null for now
@@ -117,7 +149,8 @@ export function createWithCredits(port: LedgerPort, deps: WithCreditsDeps = {}):
 
       return ok({ data, balanceAfter: debit.entry.balanceAfter })
     } catch (unexpected) {
-      return err(appError('PROVIDER_ERROR', messageOf(unexpected), traceId))
+      notifyError(unexpected, traceId)
+      return err(appError('PROVIDER_ERROR', GENERIC_FAILURE, traceId))
     }
   }
 
