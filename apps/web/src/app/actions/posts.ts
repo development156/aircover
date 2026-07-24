@@ -11,6 +11,7 @@ import {
   CONSTRAINTS,
 } from '@sahoda/shared'
 
+import { reportServerError } from '@/lib/observability/report'
 import { mapPostError } from '@/lib/posts/post-error'
 import { hasLink } from '@/lib/posts/detect-link'
 import { parseExtras } from '@/lib/posts/variant-extras'
@@ -30,12 +31,15 @@ import { getActiveWorkspace } from '@/lib/workspaces'
  */
 
 export async function createPost(title: string): Promise<SaveState> {
+  // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to create a post.' }
 
     const workspace = await getActiveWorkspace()
     if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    workspaceId = workspace.id
 
     const trimmed = title.trim()
 
@@ -64,7 +68,8 @@ export async function createPost(title: string): Promise<SaveState> {
     revalidatePath('/posts')
     revalidatePath('/planner')
     return { ok: true, postId: parsed.data.id, updatedAt: parsed.data.updated_at }
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'createPost', workspaceId })
     return { ok: false, message: 'Could not create this post — try again.' }
   }
 }
@@ -75,12 +80,14 @@ export async function createPost(title: string): Promise<SaveState> {
  * so last-write-wins plus this timestamp is the whole concurrency story.
  */
 export async function savePost(postId: string, patch: unknown): Promise<SaveState> {
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to save this post.' }
 
     const workspace = await getActiveWorkspace()
     if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    workspaceId = workspace.id
 
     // NARROWER than PostUpdateSchema on purpose. The shared schema also admits
     // `status`, which would let a hand-rolled call to this action set
@@ -122,7 +129,8 @@ export async function savePost(postId: string, patch: unknown): Promise<SaveStat
     revalidatePath('/posts')
     revalidatePath('/planner')
     return { ok: true, postId: parsed.data.id, updatedAt: parsed.data.updated_at }
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'savePost', workspaceId })
     return { ok: false, message: 'Could not save this post — try again.' }
   }
 }
@@ -139,12 +147,14 @@ export async function saveVariant(
   body: string,
   extras: unknown,
 ): Promise<SaveState> {
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to save this variant.' }
 
     const workspace = await getActiveWorkspace()
     if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    workspaceId = workspace.id
 
     const parsedChannel = ChannelSchema.safeParse(channel)
     if (!parsedChannel.success) {
@@ -188,18 +198,21 @@ export async function saveVariant(
       postId,
       updatedAt: typeof updatedAt === 'string' ? updatedAt : '',
     }
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'saveVariant', workspaceId })
     return { ok: false, message: 'Could not save this variant — try again.' }
   }
 }
 
 export async function deletePost(postId: string): Promise<DeleteState> {
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to delete this post.' }
 
     const workspace = await getActiveWorkspace()
     if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    workspaceId = workspace.id
 
     const supabase = createServerSupabase()
     // post_variants / post_media cascade from posts (on delete cascade).
@@ -224,7 +237,8 @@ export async function deletePost(postId: string): Promise<DeleteState> {
     revalidatePath('/posts')
     revalidatePath('/planner')
     return { ok: true }
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'deletePost', workspaceId })
     return { ok: false, message: 'Could not delete this post — try again.' }
   }
 }

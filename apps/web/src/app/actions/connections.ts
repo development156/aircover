@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { auth } from '@clerk/nextjs/server'
 
+import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
@@ -22,12 +23,15 @@ const NO_ACCESS = "Couldn't disconnect this account — reload and try again."
  * returns no error — zero rows is a refusal, not a success (deletePost lesson).
  */
 export async function disconnectConnection(connectionId: string): Promise<DisconnectState> {
+  // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to disconnect this account.' }
 
     const workspace = await getActiveWorkspace()
     if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    workspaceId = workspace.id
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -42,7 +46,8 @@ export async function disconnectConnection(connectionId: string): Promise<Discon
 
     revalidatePath('/connections')
     return { ok: true }
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'disconnectConnection', workspaceId })
     return { ok: false, message: 'Could not disconnect — try again.' }
   }
 }

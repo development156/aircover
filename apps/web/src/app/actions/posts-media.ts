@@ -5,6 +5,7 @@ import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
 import { PostMediaSchema } from '@sahoda/shared'
 
+import { reportServerError } from '@/lib/observability/report'
 import { decideAttach } from '@/lib/posts/attach-decision'
 import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
 import { mediaObjectPath } from '@/lib/posts/media-path'
@@ -31,6 +32,8 @@ import { getActiveWorkspace } from '@/lib/workspaces'
  * leaves no orphan object behind.
  */
 export async function attachMedia(postId: string, formData: FormData): Promise<AttachMediaState> {
+  // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
+  let workspaceId: string | undefined
   let uploadedPath: string | null = null
   const supabase = createServerSupabase()
 
@@ -40,6 +43,8 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
 
     const workspace = await getActiveWorkspace()
     if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    workspaceId = workspace.id
+    workspaceId = workspace.id
 
     const post = await getPost(postId)
     if (!post) return { ok: false, message: "You don't have access to this post." }
@@ -133,6 +138,7 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     return { ok: true, media: parsed.data, warnings: decision.warnings }
   } catch (error) {
     console.error('[media] attach threw', error instanceof Error ? error.message : 'unknown')
+    reportServerError(error, { action: 'attachMedia', workspaceId })
     // A throw after the upload would otherwise strand the object.
     if (uploadedPath !== null) await removeObject(supabase, uploadedPath)
     return { ok: false, message: 'Could not attach that file — try again.' }
@@ -146,6 +152,7 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
  * image the user cannot remove.
  */
 export async function detachMedia(mediaId: string): Promise<DetachMediaState> {
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to remove media.' }
@@ -171,7 +178,8 @@ export async function detachMedia(mediaId: string): Promise<DetachMediaState> {
 
     revalidatePath('/posts')
     return { ok: true }
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'detachMedia', workspaceId })
     return { ok: false, message: 'Could not remove that file — try again.' }
   }
 }
@@ -184,7 +192,12 @@ async function removeObject(
   try {
     const { error } = await supabase.storage.from(MEDIA_BUCKET).remove([objectPath])
     if (error) console.error('[media] orphan object left behind', error.message)
-  } catch {
+  } catch (error) {
+    // No workspaceId: this helper is handed a path, not a workspace, and the
+    // rule is that reporting never costs a lookup. An orphaned object is waste
+    // rather than a user-facing failure — which is exactly why it needs to be
+    // reported: nothing else in the system will ever mention it again.
     console.error('[media] orphan object left behind')
+    reportServerError(error, { action: 'removeObject' })
   }
 }

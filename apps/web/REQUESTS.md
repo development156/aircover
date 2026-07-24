@@ -242,6 +242,26 @@ implements no provider.
 provider by environment, inject the real secret from env, and reject `event.mode === 'fixture'` when
 `NODE_ENV === 'production'`. apps/web has not mounted such a route.
 
+## apps/web (self, POST-DEMO): Sentry redaction is UNVERIFIED against a stored event
+
+Sentry error reporting is merged and live — client, server (`onRequestError` +
+`reportServerError`), and the scrubber are all wired and unit-tested. What has **not** been
+proven end-to-end is that a secret sent through the real pipeline is redacted in **what Sentry
+actually stores**. The parked step:
+
+1. Add `SENTRY_AUTH_TOKEN` (event:read + project:read) to `apps/web/.env.local`.
+2. Hit `/api/debug/sentry?kind=secret` while signed in (throws with fake credentials in the
+   message — `lib/observability/debug-fixtures.ts`, never a real secret).
+3. Read the stored event back via the Sentry API (`apps/web/scripts/verify-sentry.mjs`) and
+   confirm BOTH: the event arrived AND the fake token is `[redacted]`, not present.
+
+Why parked (owner ruling, 2026-07-24): error reporting working is worth more than proving
+redaction on demo night. The scrubber is proven in isolation (`scrub.test.ts`,
+`init-attachment.test.ts` — the options object `Sentry.init` receives is asserted and
+mutation-tested); the only unproven link is arrival + redaction in Sentry's own storage.
+`flush()` returning true is NOT arrival — a 403 drains identically. Close this before relying on
+Sentry to be secret-safe in production.
+
 ---
 
 ## [CLOSED — shipped in 658b4c8] wt-db: `public.resolve_brand_memory` — the Brand Brain write RPC

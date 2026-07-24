@@ -11,6 +11,20 @@ const EnvSchema = z.object({
   // would double up and 404 with PGRST125 "Invalid path specified in request URL".
   NEXT_PUBLIC_SUPABASE_URL: z.url().transform((value) => new URL(value).origin),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  // Sentry is observability, not a dependency — the app boots and serves without it.
+  // Optional is load-bearing: a build box with no env at all (the Vercel failure in
+  // b133a68) must still compile, and an optional var must never surface in the
+  // missing-vars error, which developers read as "here is what you must set".
+  // Optional is NOT unvalidated, though: a typo'd DSN swallows events silently for
+  // weeks, so a *present* value still has to parse as a URL and fails the boot loudly.
+  SENTRY_DSN: z.url().optional(),
+  // The public twin exists because these are two different transports, not one var
+  // read twice. Server code reads SENTRY_DSN at runtime; browser code cannot read
+  // process.env at all, so Next.js inlines NEXT_PUBLIC_* into the client bundle at
+  // BUILD time. That inlining is a literal text substitution on `process.env.NEXT_PUBLIC_SENTRY_DSN`
+  // — routing it through this schema (or any computed/destructured key) makes the
+  // inliner miss it and ships `undefined` to the browser. See ./env.ts.
+  NEXT_PUBLIC_SENTRY_DSN: z.url().optional(),
 })
 
 export type WebEnv = z.infer<typeof EnvSchema>

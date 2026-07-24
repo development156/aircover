@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "exit 0",
+    "verify:sentry": "node ./scripts/verify-sentry.mjs",
     "test:e2e": "playwright test",
     "test:smoke": "playwright test --grep @smoke"
   },
@@ -21,6 +22,7 @@
     "@sahoda/publishing": "workspace:*",
     "@sahoda/shared": "workspace:*",
     "@sahoda/sites": "workspace:*",
+    "@sentry/nextjs": "^10.66.0",
     "@supabase/supabase-js": "^2.110.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

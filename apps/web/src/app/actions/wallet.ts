@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server'
 import { createFixtureProvider, type PaymentProvider } from '@sahoda/billing'
 import { PlanIdSchema } from '@sahoda/shared'
 
+import { reportServerError } from '@/lib/observability/report'
 import { getActiveWorkspace } from '@/lib/workspaces'
 import type { CheckoutState } from '@/lib/wallet/checkout-state'
 import { currentBillingPeriod } from '@/lib/wallet/checkout-state'
@@ -25,12 +26,15 @@ function provider(): PaymentProvider {
 }
 
 export async function startCheckout(planId: unknown): Promise<CheckoutState> {
+  // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to top up credits.' }
 
     const workspace = await getActiveWorkspace()
     if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    workspaceId = workspace.id
 
     const parsedPlan = PlanIdSchema.safeParse(planId)
     if (!parsedPlan.success) return { ok: false, message: 'Pick a plan to continue.' }
@@ -59,7 +63,8 @@ export async function startCheckout(planId: unknown): Promise<CheckoutState> {
     }
 
     return { ok: true, simulated: false, mode: 'live', sessionId: session.id, url: session.url }
-  } catch {
+  } catch (error) {
+    reportServerError(error, { action: 'startCheckout', workspaceId })
     return { ok: false, message: 'Could not start a top-up — try again.' }
   }
 }

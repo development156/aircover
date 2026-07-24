@@ -74,4 +74,107 @@ describe('parseEnv', () => {
   test('treats empty strings as missing', () => {
     expect(() => parseEnv({ ...VALID, CLERK_SECRET_KEY: '' })).toThrowError(/CLERK_SECRET_KEY/)
   })
+
+  test('still requires all four core vars, collected into ONE error', () => {
+    // Regression guard for the Sentry work below: adding OPTIONAL vars to the
+    // schema must not accidentally relax the vars the app genuinely cannot boot
+    // without. One throw, one message, every missing name in it.
+    // Arrange
+    const empty = {}
+
+    // Act
+    let message = ''
+    try {
+      parseEnv(empty)
+    } catch (e) {
+      message = e instanceof Error ? e.message : String(e)
+    }
+
+    // Assert
+    expect(message).toContain('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY')
+    expect(message).toContain('CLERK_SECRET_KEY')
+    expect(message).toContain('NEXT_PUBLIC_SUPABASE_URL')
+    expect(message).toContain('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  })
+})
+
+describe('parseEnv — Sentry configuration', () => {
+  // Sentry is observability, not a dependency. Commit b133a68 fixed a Vercel build
+  // that died because the build box had no env at all; if a missing DSN became a
+  // hard failure we would re-break exactly that. Optional means optional: no throw,
+  // and — just as important — the DSN must never be named in the missing-vars
+  // error, because that message is the checklist a developer works through.
+
+  test('parses without SENTRY_DSN — apps/web must boot with no Sentry configured', () => {
+    // Arrange + Act
+    const env = parseEnv(VALID)
+
+    // Assert
+    expect(env.SENTRY_DSN).toBeUndefined()
+  })
+
+  test('parses without NEXT_PUBLIC_SENTRY_DSN — the client bundle builds unconfigured', () => {
+    // Arrange + Act
+    const env = parseEnv(VALID)
+
+    // Assert
+    expect(env.NEXT_PUBLIC_SENTRY_DSN).toBeUndefined()
+  })
+
+  test('omits both Sentry DSNs from the missing-vars error', () => {
+    // A developer reads that error as "here is what you must set". Listing an
+    // optional var there sends them hunting for a Sentry project they do not need.
+    // Arrange
+    const empty = {}
+
+    // Act
+    let message = ''
+    try {
+      parseEnv(empty)
+    } catch (e) {
+      message = e instanceof Error ? e.message : String(e)
+    }
+
+    // Assert
+    expect(message).not.toContain('SENTRY_DSN')
+    expect(message).not.toContain('NEXT_PUBLIC_SENTRY_DSN')
+  })
+
+  test('returns a present, valid SENTRY_DSN unchanged', () => {
+    // Arrange
+    const dsn = 'https://abc123def456@o0.ingest.sentry.io/1234567'
+
+    // Act
+    const env = parseEnv({ ...VALID, SENTRY_DSN: dsn })
+
+    // Assert
+    expect(env.SENTRY_DSN).toBe(dsn)
+  })
+
+  test('throws naming SENTRY_DSN when it is present but not a valid URL', () => {
+    // Optional does not mean unvalidated. A typo'd DSN fails silently at runtime —
+    // events vanish and nobody notices for weeks. Fail at boot instead.
+    // Arrange + Act + Assert
+    expect(() => parseEnv({ ...VALID, SENTRY_DSN: 'not-a-dsn' })).toThrowError(/SENTRY_DSN/)
+  })
+
+  test('never echoes the DSN value when rejecting an invalid SENTRY_DSN', () => {
+    // A DSN embeds its public key. "Name names, never values" applies here exactly
+    // as it does to CLERK_SECRET_KEY — error messages land in build logs.
+    // Arrange
+    const leakyDsn = 'o0.ingest.sentry.io/abc123def456'
+
+    // Act
+    let message = ''
+    try {
+      parseEnv({ ...VALID, SENTRY_DSN: leakyDsn })
+    } catch (e) {
+      message = e instanceof Error ? e.message : String(e)
+    }
+
+    // Assert
+    expect(message).not.toContain(leakyDsn)
+    expect(message).not.toContain('abc123def456')
+    expect(message).toContain('SENTRY_DSN')
+  })
 })
