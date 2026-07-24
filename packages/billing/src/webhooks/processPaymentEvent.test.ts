@@ -99,6 +99,62 @@ describe('processPaymentEvent — idempotent webhook processing', () => {
     expect(d.store.processedIds).toEqual([])
   })
 
+  /**
+   * A failed or dropped payment is ROUTINE traffic, not an error. Cashfree emits
+   * PAYMENT_FAILED_WEBHOOK / PAYMENT_USER_DROPPED_WEBHOOK and the adapter normalizes both to
+   * `payment_failed`. Driving those into applyPlanGrant (which only handles payment_succeeded)
+   * produced a VALIDATION_ERROR, marked the audit row 'failed', and returned !ok — so the route
+   * answered non-2xx, the provider redelivered, and pgStore re-drove the row because it treats
+   * only 'processed' as terminal. An infinite redelivery loop, plus an audit trail that records
+   * a failure where nothing failed.
+   */
+  describe.each([
+    ['a failed payment', 'payment_failed' as const],
+    ['an unrecognized event', 'unknown' as const],
+  ])('%s is handled, not failed', (_label, eventType) => {
+    it('grants nothing, marks the row processed, and reports ok', async () => {
+      const d = deps()
+      const process = createProcessPaymentEvent(d)
+
+      const result = await process({ ...event, eventType })
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) throw new Error('expected ok')
+      expect(result.data.status).toBe('ignored')
+      expect(result.data.grant).toBeNull()
+      // Never reaches the grant — that is what produced the VALIDATION_ERROR.
+      expect(d.applyPlanGrant).not.toHaveBeenCalled()
+      // Terminal state: pgStore only skips rows marked 'processed', so this ends redelivery.
+      expect(d.store.processedIds).toEqual(['row-1'])
+      // The audit row must NOT claim a failure — nothing failed.
+      expect(d.store.failed).toEqual([])
+    })
+
+    it('is still recorded in the audit trail with its real event type', async () => {
+      const d = deps()
+      const process = createProcessPaymentEvent(d)
+
+      await process({ ...event, eventType })
+
+      expect(d.store.claimed).toEqual([
+        { provider: 'fixture', eventId: 'evt-1', eventType, payload: { hi: 'there' } },
+      ])
+    })
+
+    it('is skipped as a duplicate on redelivery rather than re-driven', async () => {
+      const d = deps()
+      d.store.claimResult = { id: 'row-1', alreadyProcessed: true }
+      const process = createProcessPaymentEvent(d)
+
+      const result = await process({ ...event, eventType })
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) throw new Error('expected ok')
+      expect(result.data.status).toBe('duplicate')
+      expect(d.applyPlanGrant).not.toHaveBeenCalled()
+    })
+  })
+
   it('returns an err Result (does not reject) when the claim insert throws', async () => {
     const d = deps()
     d.store.claimThrows = true

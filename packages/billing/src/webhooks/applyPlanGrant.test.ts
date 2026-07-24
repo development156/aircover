@@ -92,3 +92,56 @@ describe('applyPlanGrant', () => {
     expect(result.ok && result.data.replayed).toBe(true)
   })
 })
+
+/**
+ * The grant boundary is where the period format contract actually has to hold. Providers
+ * validate their own wire shapes, but `monthlyGrantKey` is built HERE — so an unpadded or
+ * malformed period reaching this point would mint a second idempotency key for a month
+ * already granted. Reject before the ledger is touched.
+ */
+describe('applyPlanGrant — period format contract', () => {
+  it.each([
+    ['an unpadded month', '2026-7'],
+    ['month 13', '2026-13'],
+    ['a full date', '2026-07-01'],
+    ['an empty period', ''],
+  ])('rejects %s with VALIDATION_ERROR and never touches the ledger', async (_l, period) => {
+    const port = new RecordingPort()
+    const applyPlanGrant = createApplyPlanGrant(port, deps)
+
+    const result = await applyPlanGrant(paidEvent({ period }))
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected err')
+    expect(result.error.code).toBe('VALIDATION_ERROR')
+    expect(port.calls).toHaveLength(0)
+  })
+
+  it('still accepts a well-formed period', async () => {
+    const port = new RecordingPort()
+    const applyPlanGrant = createApplyPlanGrant(port, deps)
+
+    const result = await applyPlanGrant(paidEvent({ period: '2026-01' }))
+
+    expect(result.ok).toBe(true)
+    expect(port.calls[0]?.idempotencyKey).toBe(monthlyGrantKey('starter', '2026-01', 'ws-1'))
+  })
+
+  /**
+   * planId indexes PLAN_CATALOG. It is typed PlanId, but the lookup sits outside the try
+   * block, so a value that slipped past a provider's parse would throw a raw TypeError out
+   * of a function contracted never to reject (PR#1 advisory).
+   */
+  it('returns a typed error rather than rejecting on an unknown planId', async () => {
+    const port = new RecordingPort()
+    const applyPlanGrant = createApplyPlanGrant(port, deps)
+
+    const bogus = paidEvent({ planId: 'enterprise' as ParsedWebhookEvent['planId'] })
+    const result = await applyPlanGrant(bogus)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected err')
+    expect(result.error.code).toBe('VALIDATION_ERROR')
+    expect(port.calls).toHaveLength(0)
+  })
+})

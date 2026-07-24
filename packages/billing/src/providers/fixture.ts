@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 import { PlanIdSchema } from '@sahoda/shared'
+import { PeriodSchema } from '../period'
 import type {
   CheckoutSession,
   CreateCheckoutInput,
@@ -19,7 +20,7 @@ const FixturePayloadSchema = z.object({
   data: z.object({
     workspace_id: z.string().min(1),
     plan_id: PlanIdSchema,
-    period: z.string().min(1),
+    period: PeriodSchema,
   }),
 })
 type FixturePayload = z.infer<typeof FixturePayloadSchema>
@@ -36,12 +37,38 @@ export interface EmitPaidEventInput {
   eventId: string
 }
 
+/**
+ * Wire `type` values this double can mint, keyed by the normalized event they produce.
+ * `unknown` uses a type the normalizer deliberately does not recognize, standing in for a
+ * provider shipping a new event we have never seen.
+ */
+const EMITTABLE_TYPES = {
+  payment_succeeded: 'payment.succeeded',
+  payment_failed: 'payment.failed',
+  unknown: 'payment.pending',
+} as const satisfies Record<PaymentEventType, string>
+
+export interface EmitEventInput extends EmitPaidEventInput {
+  /** Which event to mint. Defaults to `payment_succeeded`. */
+  eventType?: PaymentEventType
+}
+
 /** The fixture provider plus test/demo-only helpers to mint signed webhook bodies. */
 export type FixtureProvider = PaymentProvider & {
   /** HMAC-sign a raw body exactly as a real provider webhook would be signed. */
   sign(rawBody: string): string
   /** Build a signed "customer paid" webhook (the demo/test simulator for an inbound event). */
   emitPaidEvent(input: EmitPaidEventInput): { rawBody: string; signature: string }
+  /**
+   * Build ANY signed webhook, including the non-succeeded ones.
+   *
+   * Exists because this double previously offered only `emitPaidEvent`, so no integration test
+   * could produce a `payment_failed` delivery — and a defect where every failed payment was
+   * driven into applyPlanGrant, recorded as 'failed' and redelivered forever went unnoticed
+   * through a green suite. A test double that can only express the happy path hides exactly
+   * the class of bug that lives off it.
+   */
+  emitEvent(input: EmitEventInput): { rawBody: string; signature: string }
 }
 
 /**
@@ -98,14 +125,20 @@ export function createFixtureProvider(opts: FixtureProviderOptions = {}): Fixtur
     sign,
 
     emitPaidEvent(input: EmitPaidEventInput): { rawBody: string; signature: string } {
-      const payload: FixturePayload = {
-        id: input.eventId,
-        type: 'payment.succeeded',
-        data: { workspace_id: input.workspaceId, plan_id: input.planId, period: input.period },
-      }
-      const rawBody = JSON.stringify(payload)
-      return { rawBody, signature: sign(rawBody) }
+      return emitEvent(input)
     },
+
+    emitEvent,
+  }
+
+  function emitEvent(input: EmitEventInput): { rawBody: string; signature: string } {
+    const payload: FixturePayload = {
+      id: input.eventId,
+      type: EMITTABLE_TYPES[input.eventType ?? 'payment_succeeded'],
+      data: { workspace_id: input.workspaceId, plan_id: input.planId, period: input.period },
+    }
+    const rawBody = JSON.stringify(payload)
+    return { rawBody, signature: sign(rawBody) }
   }
 }
 

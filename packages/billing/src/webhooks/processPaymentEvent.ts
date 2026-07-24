@@ -5,15 +5,40 @@ import type { PlanGrantResult } from './applyPlanGrant'
 import type { WebhookEventStore } from './store'
 
 export interface ProcessResult {
-  status: 'processed' | 'duplicate'
-  /** The grant applied this delivery, or null when the event was a skipped duplicate. */
+  /**
+   * `processed` — a grant was applied. `duplicate` — already-processed event, skipped.
+   * `ignored` — a real, correctly-handled delivery that grants nothing (a failed or dropped
+   * payment, or an event type we do not recognize).
+   *
+   * `ignored` is a distinction in this DTO only: the audit row is marked `processed`, because
+   * the event WAS handled and `billing_webhook_events.status` is constrained to
+   * ('received','processed','failed') — recording it as 'failed' would be a lie, and adding a
+   * fourth status needs a wt-db migration this package must not write.
+   */
+  status: 'processed' | 'duplicate' | 'ignored'
+  /** The grant applied this delivery; null for a skipped duplicate or an ignored event. */
   grant: PlanGrantResult | null
 }
+
+/**
+ * Events that mean "money arrived". Anything else is a legitimate delivery that grants nothing.
+ * Kept as a set so a new PaymentEventType has to be classified deliberately rather than falling
+ * into the grant path by default.
+ */
+const GRANTING_EVENT_TYPES = new Set<ParsedWebhookEvent['eventType']>(['payment_succeeded'])
+
+/** User-facing failure copy. Fixed so no store/DB internals reach a caller. */
+const GENERIC_FAILURE = 'Could not process the payment event'
 
 export interface ProcessPaymentEventDeps {
   store: WebhookEventStore
   applyPlanGrant: (event: ParsedWebhookEvent) => Promise<Result<PlanGrantResult>>
   newTraceId?: () => string
+  /**
+   * Server-side observability hook. The raw cause goes here, never onto the Result.
+   * Default is a no-op — no logger dependency, no console.
+   */
+  onError?: (cause: unknown, traceId: string) => void
 }
 
 /**
@@ -46,6 +71,16 @@ export function createProcessPaymentEvent(
         return ok({ status: 'duplicate', grant: null })
       }
 
+      // A failed/dropped/unrecognized payment is routine traffic, NOT an error. Driving it into
+      // applyPlanGrant (which handles only payment_succeeded) returned VALIDATION_ERROR, marked
+      // the row 'failed' and answered !ok — so the provider redelivered, and because pgStore
+      // treats only 'processed' as terminal the row was re-driven forever. Terminate it here:
+      // the event was handled, it simply grants nothing.
+      if (!GRANTING_EVENT_TYPES.has(event.eventType)) {
+        await store.markProcessed(claim.id)
+        return ok({ status: 'ignored', grant: null })
+      }
+
       const grant = await applyPlanGrant(event)
       if (!grant.ok) {
         // Best-effort audit; failing to record the failure must not mask the real error.
@@ -60,11 +95,12 @@ export function createProcessPaymentEvent(
       await store.markProcessed(claim.id)
       return ok({ status: 'processed', grant: grant.data })
     } catch (unexpected) {
-      return err(appError('PROVIDER_ERROR', messageOf(unexpected), traceId))
+      try {
+        deps.onError?.(unexpected, traceId)
+      } catch {
+        // a broken logger must not turn a typed error into a rejection
+      }
+      return err(appError('PROVIDER_ERROR', GENERIC_FAILURE, traceId))
     }
   }
-}
-
-function messageOf(e: unknown): string {
-  return e instanceof Error ? e.message : String(e)
 }
