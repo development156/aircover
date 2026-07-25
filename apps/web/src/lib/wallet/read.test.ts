@@ -27,6 +27,8 @@ const state = vi.hoisted(() => ({
   queries: [] as { table: string; filters: Filter[] }[],
   workspace: null as { id: string } | null,
   rows: null as unknown,
+  /** PostgREST error to hand back, or null for a clean read. */
+  error: null as { code: string; message: string } | null,
 }))
 
 // `server-only` throws outside a React Server Component graph.
@@ -41,17 +43,18 @@ vi.mock('@/lib/supabase/server', () => ({
     from(table: string) {
       const record = { table, filters: [] as Filter[] }
       state.queries.push(record)
+      const result = () => ({ data: state.error ? null : state.rows, error: state.error })
       const builder = {
         select: () => builder,
         order: () => builder,
-        limit: () => Promise.resolve({ data: state.rows, error: null }),
+        limit: () => Promise.resolve(result()),
         not: () => builder,
         eq: (column: string, value: unknown) => {
           record.filters.push({ column, value })
           return builder
         },
-        maybeSingle: () => Promise.resolve({ data: state.rows, error: null }),
-        then: (resolve: (v: unknown) => unknown) => resolve({ data: state.rows, error: null }),
+        maybeSingle: () => Promise.resolve(result()),
+        then: (resolve: (v: unknown) => unknown) => resolve(result()),
       }
       return builder
     },
@@ -67,6 +70,7 @@ beforeEach(() => {
   state.queries = []
   state.workspace = { id: WORKSPACE }
   state.rows = null
+  state.error = null
 })
 
 describe('wallet reads are scoped to the active workspace', () => {
@@ -76,6 +80,16 @@ describe('wallet reads are scoped to the active workspace', () => {
     expect(state.queries).toHaveLength(1)
     expect(state.queries[0]?.table).toBe('credit_balances')
     expect(scopedTo(state.queries[0]!)).toBe(true)
+  })
+
+  test('a workspace with no ledger row reads as a real zero, not a failure', async () => {
+    // The row is materialised lazily by the first `apply_ledger_entry`, so a
+    // workspace that has never spent has none. That is zero credits, and the
+    // page must render the hero rather than an error.
+    await expect(readBalance()).resolves.toEqual({
+      status: 'ok',
+      balance: { total: 0, held: 0, available: 0, hasHold: false, heldNote: null },
+    })
   })
 
   test('readLedger filters credit_ledger by workspace', async () => {
@@ -101,9 +115,15 @@ describe('wallet reads with no active workspace', () => {
     state.workspace = null
   })
 
-  test('readBalance reports unreadable rather than issuing an unscoped query', async () => {
-    // Zero would tell someone with a full wallet they cannot afford to work.
-    await expect(readBalance()).resolves.toBeNull()
+  // UPDATED: this test used to assert readBalance() === null here, which pinned
+  // "you have no workspace" and "we could not read your balance" to the SAME
+  // value — so /wallet answered a signed-in first-run user with a red error and
+  // a remedy ("reload to try again") that could never work. No reload creates a
+  // workspace. The two cases are now distinct at the I/O edge.
+  test('readBalance reports no-workspace, NOT unreadable, and issues no query', async () => {
+    // Still never zero: zero would tell someone with a full wallet they cannot
+    // afford to work. `no-workspace` is a third answer, not a softer failure.
+    await expect(readBalance()).resolves.toEqual({ status: 'no-workspace' })
     expect(state.queries).toEqual([])
   })
 
@@ -119,5 +139,25 @@ describe('wallet reads with no active workspace', () => {
   test('readOpenHolds returns empty without querying', async () => {
     await expect(readOpenHolds()).resolves.toEqual([])
     expect(state.queries).toEqual([])
+  })
+})
+
+describe('a balance that genuinely could not be read stays unreadable', () => {
+  test('a PostgREST error is unreadable, not a first run', async () => {
+    // The whole point of the split: offering "Create workspace" to a member
+    // whose balance read hiccuped would be the mirror-image false remedy.
+    state.error = { code: 'PGRST116', message: 'multiple rows returned' }
+
+    await expect(readBalance()).resolves.toEqual({ status: 'unreadable' })
+  })
+
+  test('a thrown read is unreadable too', async () => {
+    state.workspace = {
+      get id(): string {
+        throw new Error('cookies() outside a request')
+      },
+    }
+
+    await expect(readBalance()).resolves.toEqual({ status: 'unreadable' })
   })
 })

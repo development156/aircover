@@ -41,17 +41,38 @@ const activeWorkspaceId = cache(async (): Promise<string | null> => {
 export const HISTORY_LIMIT = 50
 
 /**
+ * Why this is a three-way answer and not `WalletBalance | null`.
+ *
+ * There are three distinct things that can be true of a wallet read, and each
+ * one implies a DIFFERENT remedy:
+ *
+ *  - `ok`           — we read it. Includes a genuine zero.
+ *  - `no-workspace` — the user has no workspace, so there is no wallet to read.
+ *                     The remedy is to create one, and no amount of reloading
+ *                     will do it.
+ *  - `unreadable`   — the read itself failed. The remedy IS to reload.
+ *
+ * Collapsing the last two into `null` is what put "Could not read your credit
+ * balance — reload to try again" in front of every signed-in first-run user: a
+ * false diagnosis attached to a remedy that could not work. Zero is not an
+ * option for either failure — reporting "0 credits" would tell someone with a
+ * full wallet that they cannot afford to work.
+ */
+export type BalanceRead =
+  { status: 'ok'; balance: WalletBalance } | { status: 'no-workspace' } | { status: 'unreadable' }
+
+/**
  * A workspace with no ledger activity has NO `credit_balances` row at all — the
  * row is materialised lazily by the first `apply_ledger_entry`. That is a real
  * zero balance, not an error, and `toBalance(null)` renders it as such.
  */
-export async function readBalance(): Promise<WalletBalance | null> {
+export async function readBalance(): Promise<BalanceRead> {
   try {
-    // No active workspace means we never looked at a balance. That is the
-    // unreadable case, not a zero one — reporting "0 credits" here would tell
-    // someone with a full wallet that they cannot afford to work.
+    // No active workspace means there is no wallet yet — a first run, not a
+    // fault. Callers branch on this to offer "Create workspace" instead of a
+    // reload that cannot help.
     const workspaceId = await activeWorkspaceId()
-    if (workspaceId === null) return null
+    if (workspaceId === null) return { status: 'no-workspace' }
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -60,31 +81,36 @@ export async function readBalance(): Promise<WalletBalance | null> {
       .eq('workspace_id', workspaceId)
       .maybeSingle()
 
-    // NULL means "we could not read your balance", which is a different claim
-    // from "your balance is zero" — and only one of them is recoverable by
-    // topping up. `toBalance` collapses both to zero by design (it is a pure
-    // row mapper), so the distinction has to be drawn here, at the I/O edge.
+    // "We could not read your balance" is a different claim from "your balance
+    // is zero" — and only one of them is recoverable by topping up. `toBalance`
+    // collapses both to zero by design (it is a pure row mapper), so the
+    // distinction has to be drawn here, at the I/O edge.
     if (error) {
       console.error('[wallet] balance read failed', error.code, error.message)
-      return null
+      return { status: 'unreadable' }
     }
     // No row is a genuine zero: the row is materialised lazily by the first
     // `apply_ledger_entry`, so a workspace that has never spent has none.
-    return toBalance(data)
+    return { status: 'ok', balance: toBalance(data) }
   } catch (error) {
     console.error('[wallet] balance read threw', error instanceof Error ? error.message : 'unknown')
-    return null
+    return { status: 'unreadable' }
   }
 }
 
 /**
- * Available credits for the topbar chip, or `null` when the balance could not be
- * read. The chip renders `null` as an em dash rather than a zero for the same
- * reason `readBalance` returns it.
+ * Available credits for the topbar chip, or `null` when there is no number to
+ * show. The chip renders `null` as an em dash rather than a zero for the same
+ * reason `readBalance` refuses to.
+ *
+ * `no-workspace` and `unreadable` both flatten to `null` here on purpose: the
+ * chip is one glyph wide and cannot carry the distinction, and the topbar
+ * beside it already renders "Create workspace" for the workspace-less case, so
+ * the remedy is on screen either way. /wallet is where the two must diverge.
  */
 export async function readAvailableCredits(): Promise<number | null> {
-  const balance = await readBalance()
-  return balance?.available ?? null
+  const read = await readBalance()
+  return read.status === 'ok' ? read.balance.available : null
 }
 
 /**

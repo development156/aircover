@@ -1,10 +1,10 @@
 'use client'
 
-import { useActionState, useEffect, useId, useRef, useState } from 'react'
-import { Check, ChevronsUpDown, Plus } from 'lucide-react'
-import { toast } from 'sonner'
+import { useEffect, useId, useRef, useState } from 'react'
+import { Check, ChevronsUpDown } from 'lucide-react'
 
-import { createWorkspace, setActiveWorkspace } from '@/app/actions/workspace'
+import { setActiveWorkspace } from '@/app/actions/workspace'
+import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { cn } from '@/lib/utils'
 import type { WorkspaceOption } from '@/lib/workspaces'
 
@@ -28,26 +28,12 @@ function WorkspaceBadge({ name }: { name: string }) {
   )
 }
 
-const CREATE_BUTTON_LABEL = 'Create workspace'
-
 export function WorkspaceSwitcher({ workspaces, active }: WorkspaceSwitcherProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuId = useId()
   const labelId = useId()
-
-  // createWorkspace calls the bootstrap_workspace RPC (atomic workspace + owner
-  // membership + profile + signup grant) and returns a typed result. State +
-  // toast live on the ALWAYS-mounted root so the toast still fires if the menu
-  // closes (e.g. an outside click) mid round-trip — the in-menu and empty-state
-  // buttons share this one action.
-  const [createState, createAction, createPending] = useActionState(createWorkspace, null)
-  useEffect(() => {
-    if (!createState) return
-    // Success redirects into onboarding, so only failures ever land here.
-    toast(createState.message)
-  }, [createState])
 
   useEffect(() => {
     if (!open) return
@@ -75,21 +61,11 @@ export function WorkspaceSwitcher({ workspaces, active }: WorkspaceSwitcherProps
   }
 
   // Honest empty state: no memberships yet (bootstrap pending) → a real create
-  // affordance, not a disabled placeholder.
+  // affordance, not a disabled placeholder. The action, its pending label and
+  // its failure toast live in CreateWorkspaceButton, which /wallet's first-run
+  // state renders too — one offer, one behaviour, in both places.
   if (workspaces.length === 0 || !active) {
-    return (
-      <form action={createAction}>
-        <button
-          type="submit"
-          disabled={createPending}
-          data-guide="topbar.workspace-create"
-          className="flex items-center gap-2 rounded-input border border-line bg-bg px-3 py-[7px] font-semibold text-muted transition-micro hover:bg-s1 hover:text-ink disabled:opacity-45"
-        >
-          <Plus size={16} className="shrink-0" aria-hidden />
-          <span>{createPending ? 'Creating…' : CREATE_BUTTON_LABEL}</span>
-        </button>
-      </form>
-    )
+    return <CreateWorkspaceButton guideAnchor="topbar.workspace-create" />
   }
 
   return (
