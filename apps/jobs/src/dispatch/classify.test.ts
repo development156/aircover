@@ -203,7 +203,53 @@ describe('classifyCandidate — fan-in', () => {
 
     expect(d.kind).toBe('hold')
     if (d.kind !== 'hold') return
-    expect(d.reason).toBe('all-skipped')
+    expect(d.reason).toBe('nothing-attemptable')
+  })
+
+  it('expires a past-grace post where nothing was ever attemptable', () => {
+    // Holding this forever would strand the row. Its time passed and nothing went out,
+    // which is exactly what `expired` means.
+    expect(decide(candidate(120, [variant('x', 'skipped')])).kind).toBe('expire')
+  })
+})
+
+/**
+ * Instagram is `publishable: false` in this release (CONSTRAINTS) — it exists for caption
+ * rules, not posting. Production has instagram variants sitting `pending` right now, so
+ * this is live data, not a hypothetical.
+ */
+describe('classifyCandidate — channels this release cannot publish', () => {
+  it('does not dispatch a channel the release cannot publish', () => {
+    // Enqueueing it would buy a guaranteed CHANNEL_NOT_PUBLISHABLE failure and nothing else.
+    const d = decide(candidate(10, [variant('x', 'pending'), variant('instagram', 'pending')]))
+
+    expect(d.kind).toBe('dispatch')
+    if (d.kind !== 'dispatch') return
+    expect(d.variants.map((v) => v.channel)).toEqual(['x'])
+  })
+
+  it('does not let an unpublishable channel hold a post back from published', () => {
+    // Otherwise every post carrying an instagram variant becomes a permanent partial and
+    // is held forever — the post went out everywhere this release can send it.
+    const d = decide(
+      candidate(10, [variant('x', 'published', 'live'), variant('instagram', 'pending')]),
+    )
+
+    expect(d.kind).toBe('settle')
+    if (d.kind !== 'settle') return
+    expect(d.status).toBe('published')
+  })
+
+  it('holds a still-fresh post whose only channel cannot be published', () => {
+    const d = decide(candidate(10, [variant('instagram', 'pending')]))
+
+    expect(d.kind).toBe('hold')
+    if (d.kind !== 'hold') return
+    expect(d.reason).toBe('nothing-attemptable')
+  })
+
+  it('expires it once the window has passed', () => {
+    expect(decide(candidate(120, [variant('instagram', 'pending')])).kind).toBe('expire')
   })
 
   /** Ruling 2's conditional: apps/web has no per-channel surface, so partials wait. */
