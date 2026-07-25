@@ -82,6 +82,63 @@ ready: `triggerPlanWeek(payload)` with `PlanWeekJobPayloadSchema` from `@sahoda/
 
 **Ask:** wire the planner's "Plan my week" action to that helper.
 
+## wt-web: a `failed` post needs per-channel state — fan-in for partials is HELD on this
+
+Owner ruling: a partially published post settles to `failed`, **conditional** on the status
+surface saying which channel went out and which did not ("went out on X, did not go out on
+Google"). If the UI cannot express that, hold fan-in for partials only and file this. It cannot,
+so partials are held. Full-publish fan-in proceeds and is unaffected.
+
+What exists today:
+
+- `components/posts/status-badge.tsx:18` — `STATUS_STYLES` is the ONLY `posts.status` renderer:
+  one chip, one label. `failed` renders as a single red "Failed" over the whole post.
+- Consumed at `post-card.tsx:65` and `planner-row.tsx:42`; `week-grid.tsx:27` uses the colour only.
+- `posts/[id]/page.tsx` → `PostEditor` renders **no** post status chip at all.
+- Nothing anywhere reads `post_variants.publish_status`. `listVariants` already does `select('*')`
+  (`lib/posts/read.ts:101`), so the field is on the wire and discarded.
+
+Why this blocks the write rather than just looking thin: a post that really did go out on X, shown
+under one red "Failed" chip, tells the owner of that content it never published — while it is live
+on the platform. That is the same class of lie as the "Scheduled" badge this sprint just fixed,
+pointing the other way, and the job would be the thing writing it.
+
+**Ask:** a per-channel outcome surface wherever post status renders. Minimum viable is the
+existing channel pills (`post-card.tsx:79-89`, `planner-row.tsx:45-55`) carrying variant state
+instead of being uniformly grey — they are already per-channel and already rendered. The data
+needs no query change.
+
+`publish-preview.tsx:88-158` is the closest existing pattern (per-channel groups with honest
+"Simulated — nothing was posted" wording), but it is an ephemeral dry-run and deliberately never
+reflects persisted state, so it is a model to copy rather than a component to reuse.
+
+**Meanwhile:** `classifyCandidate` returns `hold` with reason `partial-needs-per-channel-ui`, and
+carries `publishedChannels` / `unpublishedChannels` so the held set is reviewable in report mode.
+Nothing is written. When the surface lands, the hold becomes `settle('failed')` — one branch.
+
+**Not urgent on today's data.** All three production posts carrying published variants are
+`mode: 'fixture'`, so they are held by ruling 3 (`fixture-publish`) before the partial rule is ever
+reached. The partial hold currently fires on zero rows.
+
+## wt-web: `autoPublishTruth` and the dispatch gate must not drift
+
+`lib/posts/schedule-status.ts` labels only `status === 'scheduled'`, and its doc comment states
+that scheduled auto-publish does not exist. Both facts are about to change, and the gate is now
+written down once in `@sahoda/shared`:
+
+```ts
+import { isDispatchable, DISPATCHABLE_STATUSES } from '@sahoda/shared'
+```
+
+`isDispatchable(status, scheduledAt)` is exactly `status IN ('approved','scheduled') AND
+scheduled_at IS NOT NULL` (plus rejecting an unparseable date). Please consume it rather than
+re-deriving the predicate — the whole point of lifting it into shared was that the badge and the
+dispatcher cannot disagree about which posts are waiting to go out.
+
+Note the asymmetry that makes this matter: in production **10 of 10** past-due gated posts are
+`approved`, not `scheduled`. A UI that keys auto-publish copy on `'scheduled'` alone describes
+none of the real ones.
+
 ## Open question for whoever owns the spec: the reaper's grace margin
 
 The HOLD TTL is 10 minutes (`DEFAULT_HOLD_TTL_SECONDS`, and the ledger's own
