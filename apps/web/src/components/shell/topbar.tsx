@@ -3,7 +3,7 @@ import * as Sentry from '@sentry/nextjs'
 
 import { CreditChip } from '@/components/shell/credit-chip'
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher'
-import { readAvailableCredits } from '@/lib/wallet/read'
+import { readBalance, type BalanceRead } from '@/lib/wallet/read'
 import {
   getActiveWorkspaceSlug,
   listWorkspaces,
@@ -25,7 +25,7 @@ import {
  * value in one chip, with the rest of the shell still on screen and navigable.
  *
  * Two of the three reads below already guard themselves (`listWorkspaces` and
- * `readAvailableCredits` both catch internally and return an empty/null value),
+ * `readBalance` both catch internally and return an empty/unreadable value),
  * so today this wrapper is load-bearing for exactly one — `getActiveWorkspaceSlug`,
  * whose `cookies()` call throws when invoked outside a request scope. It wraps
  * all three anyway so the guarantee belongs to the SHELL rather than to the
@@ -49,11 +49,13 @@ export async function Topbar() {
   // Promise.all: `Promise.all` rejects the moment ANY input rejects, so a single
   // failing read would throw away the two that succeeded and blank the whole
   // topbar over one bad row.
-  const [workspaces, activeSlug, credits] = await Promise.all([
+  const [workspaces, activeSlug, balance] = await Promise.all([
     softRead<WorkspaceOption[]>('workspaces', listWorkspaces, []),
     softRead<string | null>('active_workspace_slug', getActiveWorkspaceSlug, null),
-    // Available (total − held), or null when unreadable — never a placeholder 0.
-    softRead<number | null>('available_credits', readAvailableCredits, null),
+    // The same three-way answer /wallet renders, so the chip and the page
+    // cannot disagree. A throw here is `unreadable` — the honest fallback,
+    // since a read that blew up is exactly that, and never a placeholder 0.
+    softRead<BalanceRead>('available_credits', readBalance, { status: 'unreadable' }),
   ])
   const active = resolveActiveWorkspace(workspaces, activeSlug)
 
@@ -64,7 +66,7 @@ export async function Topbar() {
     >
       <WorkspaceSwitcher workspaces={workspaces} active={active} />
       <div className="ml-auto" />
-      <CreditChip credits={credits} />
+      <CreditChip balance={balance} />
       <div data-guide="topbar.avatar" className="grid size-8 place-items-center">
         <UserButton />
       </div>

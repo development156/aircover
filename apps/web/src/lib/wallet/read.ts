@@ -98,20 +98,14 @@ export async function readBalance(): Promise<BalanceRead> {
   }
 }
 
-/**
- * Available credits for the topbar chip, or `null` when there is no number to
- * show. The chip renders `null` as an em dash rather than a zero for the same
- * reason `readBalance` refuses to.
- *
- * `no-workspace` and `unreadable` both flatten to `null` here on purpose: the
- * chip is one glyph wide and cannot carry the distinction, and the topbar
- * beside it already renders "Create workspace" for the workspace-less case, so
- * the remedy is on screen either way. /wallet is where the two must diverge.
+/*
+ * There is deliberately no `readAvailableCredits(): number | null` helper any
+ * more. It existed for the topbar chip and flattened `no-workspace` and
+ * `unreadable` into one `null`, which is the exact conflation this union was
+ * introduced to end — the chip then labelled a workspace-less user's wallet
+ * "Credit balance unavailable". The chip consumes `BalanceRead` directly, so
+ * there is no longer a second, lossier way to ask the same question.
  */
-export async function readAvailableCredits(): Promise<number | null> {
-  const read = await readBalance()
-  return read.status === 'ok' ? read.balance.available : null
-}
 
 /**
  * Ledger history, newest first. Sorted by `seq` (the int8 identity) rather than
