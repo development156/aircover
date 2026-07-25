@@ -21,7 +21,7 @@ const EARLIER = '2026-07-25T11:59:00.000Z'
 const LATER = '2026-07-25T12:01:00.000Z'
 
 describe('posts that make no auto-publish promise', () => {
-  test.each(['idea', 'draft', 'review', 'approved', 'published', 'failed', 'expired'] as const)(
+  test.each(['idea', 'draft', 'review', 'published', 'failed', 'expired'] as const)(
     '%s says nothing, even with a date on it',
     (status) => {
       // A dated draft promises nothing — the date is a plan, not a commitment.
@@ -30,6 +30,31 @@ describe('posts that make no auto-publish promise', () => {
       expect(autoPublishTruth(status, EARLIER, NOW)).toBe('none')
     },
   )
+
+  test('an approved post with no date on it says nothing', () => {
+    // Approval commits to the CONTENT, not to a time. Nothing on the card
+    // implies a publish, so there is no promise here to correct.
+    expect(autoPublishTruth('approved', null, NOW)).toBe('none')
+  })
+})
+
+/**
+ * `approved` + a date IS the scheduled post of this product.
+ *
+ * The gate used to read `status === 'scheduled'`, which apps/web never writes —
+ * `approvePost` is the one sanctioned status write and it writes `approved`. So
+ * the labelling was unreachable and nobody ever saw it. The card renders the
+ * date whenever `scheduled_at` is set, so that is where the promise is made.
+ * See `schedule-status-reachability.test.ts`, which fails if this drifts back.
+ */
+describe('an approved post carrying a date — what the app actually writes', () => {
+  test('is told it will not post itself', () => {
+    expect(autoPublishTruth('approved', LATER, NOW)).toBe('awaiting')
+  })
+
+  test('gets the stronger claim once its time has passed', () => {
+    expect(autoPublishTruth('approved', EARLIER, NOW)).toBe('overdue')
+  })
 })
 
 describe('a scheduled post whose time has not come', () => {

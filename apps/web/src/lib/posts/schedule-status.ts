@@ -61,21 +61,41 @@ export const SCHEDULE_FIELD_NOTE =
 const isValidDate = (date: Date): boolean => !Number.isNaN(date.getTime())
 
 /**
- * Only `scheduled` is labelled.
+ * What a scheduled post looks like HERE, which is not what the name suggests.
  *
- * A dated draft is a plan, not a commitment, and labelling every dated post
- * would train users to ignore the label — which costs us the past-due case that
- * actually matters. `publishing` is deliberately absent for a different reason:
- * apps/web cannot write it (`savePost` refuses `status` outright and
- * `approvePost` only ever writes `approved`), so it is unreachable here and a
- * branch for it would be untested code guarding nothing.
+ * This gate read `status === 'scheduled'` until it was found to be dead code:
+ * apps/web has never written that status. `approvePost` is the one sanctioned
+ * status write and it writes `approved`; inserts write `draft`; `savePost`
+ * refuses `status` outright. The labelling was therefore unreachable — it
+ * rendered for nobody while every unit test passed, because each one handed the
+ * function a status by hand that no code path could produce.
+ *
+ * So a committed post is `approved` (or `scheduled`, kept for the day a real
+ * schedule action lands) and the promise is made by the DATE: `post-card` and
+ * `planner-row` render the time whenever `scheduled_at` is set, and a time
+ * beside a post reads as "this goes out then". An approved post with no date
+ * commits to the content only and has nothing to correct.
+ *
+ * `scheduled` is the exception that needs no date, because `status-badge`
+ * renders the literal word "Scheduled" — that badge makes the promise on its
+ * own, with or without a time.
+ *
+ * A dated DRAFT is still silent: a plan, not a commitment. Labelling every
+ * dated post would train users to ignore the label, which costs us the past-due
+ * case that actually matters. `publishing` is absent for the original reason —
+ * apps/web cannot write it, so a branch for it would guard nothing.
+ *
+ * `schedule-status-reachability.test.ts` reads the statuses this app writes out
+ * of the source and fails if this gate stops matching any of them.
  */
 export function autoPublishTruth(
   status: PostStatus,
   scheduledAt: string | null,
   now: Date,
 ): AutoPublishTruth {
-  if (status !== 'scheduled') return 'none'
+  const promisesAutoPublish =
+    status === 'scheduled' || (status === 'approved' && scheduledAt !== null)
+  if (!promisesAutoPublish) return 'none'
 
   // "It will not post itself" is true regardless of the time, so it is the
   // floor. Everything below can only ever upgrade to the stronger claim.
