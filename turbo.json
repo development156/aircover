@@ -50,7 +50,12 @@
         "SENTRY_DSN",
         "TOKEN_VAULT_KEY",
         "JOB_SIGNING_SECRET",
-        "CONTEXT7_API_KEY"
+        "CONTEXT7_API_KEY",
+        "DEVOPS_INGEST_TOKEN",
+        "ADMIN_BOOTSTRAP_EMAILS",
+        "OPS_ALLOW_SELF_APPROVE",
+        "OPS_INGEST_URL",
+        "TURNSTILE_SECRET_KEY"
       ]
     },
     "dev": {

@@ -25,6 +25,28 @@ const EnvSchema = z.object({
   // — routing it through this schema (or any computed/destructured key) makes the
   // inliner miss it and ships `undefined` to the browser. See ./env.ts.
   NEXT_PUBLIC_SENTRY_DSN: z.url().optional(),
+
+  // ── Admin Ops (doc 13 §19) ─────────────────────────────────────────────────
+  // All optional, because /admin is additive: without them the app boots and
+  // serves exactly as before, the console 404s, and the public form and the
+  // ingest endpoint fail closed. Optional is not unvalidated, though — a present
+  // value that is wrong is a boot failure, not a silent degradation.
+  //
+  // Doc 13 §16 requires ≥32 bytes of randomness on the ops token. A short one is
+  // a real defect (it is the only thing between a stranger and fake board rows),
+  // so it fails the boot loudly rather than being accepted and quietly weak.
+  DEVOPS_INGEST_TOKEN: z.string().min(32).optional(),
+  /** Comma-separated. Seeds the first owner seats; read by scripts/ops-seed.mjs. */
+  ADMIN_BOOTSTRAP_EMAILS: z.string().optional(),
+  /** Dev-only escape hatch for the maker-checker rule. Anything but 'true' is false. */
+  OPS_ALLOW_SELF_APPROVE: z.enum(['true', 'false']).optional(),
+  // Not provisioned yet (tracked in the handoff). While it is missing,
+  // /api/public/beta-apply rejects every submission: an unprovisioned captcha
+  // that degrades to accepting everything is an open public insert endpoint.
+  TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().min(1).optional(),
+  /** Delivers the two-admin OTP. Absent → creating a credit request fails honestly. */
+  RESEND_API_KEY: z.string().min(1).optional(),
 })
 
 export type WebEnv = z.infer<typeof EnvSchema>
