@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { CalendarClock } from 'lucide-react'
 import type { Post } from '@sahoda/shared'
 
+import { AutoPublishNote } from '@/components/posts/auto-publish-note'
 import { CHANNEL_SHORT } from '@/components/posts/channel-label'
 import { DeletePostButton } from '@/components/posts/delete-post-button'
 import { StatusBadge } from '@/components/posts/status-badge'
@@ -29,9 +30,11 @@ function excerptOf(body: string | null): string | null {
 
 export interface PostCardProps {
   post: Post
+  /** One instant for the whole list, read on the server. See `AutoPublishNote`. */
+  now: Date
 }
 
-export function PostCard({ post }: PostCardProps) {
+export function PostCard({ post, now }: PostCardProps) {
   const title = post.title?.trim()
   const displayTitle = title || 'Untitled post'
   const excerpt = excerptOf(post.body)
@@ -91,6 +94,15 @@ export function PostCard({ post }: PostCardProps) {
             </span>
           ) : null}
         </div>
+
+        {/* Directly under the badge and the time it qualifies — the two things
+            that together read as "this goes out on its own". */}
+        <AutoPublishNote
+          status={post.status}
+          scheduledAt={post.scheduled_at}
+          now={now}
+          className="mt-2"
+        />
       </Link>
 
       <div className="mt-4 flex justify-end border-t border-line pt-3">

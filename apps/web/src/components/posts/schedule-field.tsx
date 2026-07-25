@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { FlaskConical } from 'lucide-react'
 import type { Channel } from '@sahoda/shared'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { earliestScheduleAt, validateScheduleLead } from '@/lib/posts/schedule'
+import { SCHEDULE_FIELD_NOTE } from '@/lib/posts/schedule-status'
 
 export interface ScheduleFieldProps {
   channels: Channel[]
@@ -107,6 +109,15 @@ export function ScheduleField({ channels, value, onChange }: ScheduleFieldProps)
                   timeStyle: 'short',
                 })}`
               : 'Checking the schedule against the channel lead times…'}
+        </p>
+      )}
+
+      {/* Only once a time is set: with an empty field there is no promise to
+          correct, and the line above already says the post stays a draft. */}
+      {draft === '' ? null : (
+        <p className="flex items-start gap-1.5 text-[12px] text-warn">
+          <FlaskConical size={13} strokeWidth={2} className="mt-[2px] shrink-0" aria-hidden />
+          <span>{SCHEDULE_FIELD_NOTE}</span>
         </p>
       )}
     </div>

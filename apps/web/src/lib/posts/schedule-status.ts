@@ -50,6 +50,14 @@ export const AUTO_PUBLISH_COPY = {
   },
 } as const satisfies Record<Exclude<AutoPublishTruth, 'none'>, AutoPublishCopy>
 
+/**
+ * The same correction at the point the belief forms — the composer's schedule
+ * picker. It is stated as soon as a time is set, because that is the moment the
+ * writer decides they are done with the post.
+ */
+export const SCHEDULE_FIELD_NOTE =
+  "Setting a time doesn't publish it — scheduled auto-publish isn't live yet. Copy it across at that time to post it."
+
 const isValidDate = (date: Date): boolean => !Number.isNaN(date.getTime())
 
 /**

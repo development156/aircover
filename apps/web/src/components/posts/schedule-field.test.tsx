@@ -86,3 +86,34 @@ describe('ScheduleField', () => {
     expect(input().value).toBe(typed)
   })
 })
+
+/**
+ * Picking a time is the moment the writer forms the belief "this will go out
+ * then". Nothing dispatches a scheduled publish — no cron, no trigger, no
+ * dependency on @sahoda/jobs from apps/web — so the belief has to be corrected
+ * where it is formed, not only later on the list screens.
+ */
+describe('what setting a time actually does', () => {
+  const NOT_LIVE = /auto-publish isn't live yet/i
+
+  test('says a time does not publish the post', async () => {
+    const user = userEvent.setup()
+    render(<ScheduleField channels={['x']} value={null} onChange={vi.fn()} />)
+
+    await user.type(input(), '2030-01-01T10:30')
+
+    expect(screen.getByText(NOT_LIVE)).toBeInTheDocument()
+  })
+
+  test('says it for a time restored from the server too', () => {
+    render(<ScheduleField channels={['x']} value={future(86_400_000)} onChange={vi.fn()} />)
+
+    expect(screen.getByText(NOT_LIVE)).toBeInTheDocument()
+  })
+
+  test('stays quiet when no time is set — there is no promise to correct', () => {
+    render(<ScheduleField channels={['x']} value={null} onChange={vi.fn()} />)
+
+    expect(screen.queryByText(NOT_LIVE)).not.toBeInTheDocument()
+  })
+})

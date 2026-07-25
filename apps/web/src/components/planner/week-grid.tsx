@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { Post } from '@sahoda/shared'
 
 import { PlannerRow } from '@/components/planner/planner-row'
+import { AutoPublishNote } from '@/components/posts/auto-publish-note'
 import { STATUS_STYLES } from '@/components/posts/status-badge'
 import { formatScheduledTime } from '@/lib/posts/schedule-format'
 import type { WeekBuckets } from '@/lib/planner/week'
@@ -15,7 +16,7 @@ const DAY_LABEL = new Intl.DateTimeFormat('en-IN', {
   month: 'short',
 })
 
-function DayChip({ post }: { post: Post }) {
+function DayChip({ post, now }: { post: Post; now: Date }) {
   const time = formatScheduledTime(post.scheduled_at)
   return (
     <Link
@@ -30,12 +31,23 @@ function DayChip({ post }: { post: Post }) {
         {post.title?.trim() || 'Untitled post'}
       </span>
       {time ? <span className="block text-[11.5px] tabular-nums opacity-80">{time}</span> : null}
+      {/* A time in a calendar cell is the strongest auto-publish signal on any
+          screen. The cell has no room for the sentence, so it abbreviates —
+          and carries the full one for screen readers. */}
+      <AutoPublishNote
+        status={post.status}
+        scheduledAt={post.scheduled_at}
+        now={now}
+        variant="compact"
+      />
     </Link>
   )
 }
 
 export interface WeekGridProps {
   buckets: WeekBuckets
+  /** One instant for the whole grid — the same one `bucketWeek` was given. */
+  now: Date
 }
 
 /**
@@ -43,7 +55,7 @@ export interface WeekGridProps {
  * fit the window render below it — `bucketWeek` never drops a post, and neither
  * does this component.
  */
-export function WeekGrid({ buckets }: WeekGridProps) {
+export function WeekGrid({ buckets, now }: WeekGridProps) {
   return (
     <div className="space-y-grid">
       <div className="overflow-x-auto">
@@ -63,7 +75,7 @@ export function WeekGrid({ buckets }: WeekGridProps) {
                 {index === 0 ? ' · Today' : ''}
               </p>
               {day.posts.map((post) => (
-                <DayChip key={post.id} post={post} />
+                <DayChip key={post.id} post={post} now={now} />
               ))}
             </li>
           ))}
@@ -74,7 +86,7 @@ export function WeekGrid({ buckets }: WeekGridProps) {
         <section className="space-y-2">
           <h2 className="text-[13px] font-semibold text-muted">Unscheduled</h2>
           {buckets.unscheduled.map((post) => (
-            <PlannerRow key={post.id} post={post} />
+            <PlannerRow key={post.id} post={post} now={now} />
           ))}
         </section>
       ) : null}
@@ -83,7 +95,7 @@ export function WeekGrid({ buckets }: WeekGridProps) {
         <section className="space-y-2">
           <h2 className="text-[13px] font-semibold text-muted">Outside this week</h2>
           {buckets.outside.map((post) => (
-            <PlannerRow key={post.id} post={post} />
+            <PlannerRow key={post.id} post={post} now={now} />
           ))}
         </section>
       ) : null}
