@@ -34,21 +34,23 @@ export const OpsTaskCodeSchema = z.string().regex(/^SL-\d{1,4}$/, 'Task codes lo
 export const OpsClientIdSchema = z.string().min(8).max(64)
 
 // ── board.json ───────────────────────────────────────────────────────────────
-export const OpsStateTaskSchema = z.object({
-  code: OpsTaskCodeSchema,
-  title: z.string().trim().min(1).max(200),
-  detail: z.string().max(2000).nullish(),
-  doc_ref: z.string().max(200).nullish(),
-  roadmap_code: z.string().max(40).nullish(),
-  board_column: OpsTaskColumnSchema,
-  assignee: OpsAssigneeSchema.default('claude'),
-  blocked: z.boolean().default(false),
-  blocked_reason: z.string().max(500).nullish(),
-  archived: z.boolean().default(false),
-  pr_ref: z.string().max(200).nullish(),
-  commit_sha: z.string().max(64).nullish(),
-  sort: z.int().default(0),
-})
+export const OpsStateTaskSchema = z
+  .object({
+    code: OpsTaskCodeSchema,
+    title: z.string().trim().min(1).max(200),
+    detail: z.string().max(2000).nullish(),
+    doc_ref: z.string().max(200).nullish(),
+    roadmap_code: z.string().max(40).nullish(),
+    board_column: OpsTaskColumnSchema,
+    assignee: OpsAssigneeSchema.default('claude'),
+    blocked: z.boolean().default(false),
+    blocked_reason: z.string().max(500).nullish(),
+    archived: z.boolean().default(false),
+    pr_ref: z.string().max(200).nullish(),
+    commit_sha: z.string().max(64).nullish(),
+    sort: z.int().default(0),
+  })
+  .strict()
 export type OpsStateTask = z.infer<typeof OpsStateTaskSchema>
 
 export const OpsBoardStateSchema = z.object({
@@ -58,15 +60,17 @@ export const OpsBoardStateSchema = z.object({
 export type OpsBoardState = z.infer<typeof OpsBoardStateSchema>
 
 // ── roadmap.json ─────────────────────────────────────────────────────────────
-export const OpsStateRoadmapItemSchema = z.object({
-  code: z.string().trim().min(1).max(40),
-  stage: z.string().trim().min(1).max(40),
-  title: z.string().trim().min(1).max(200),
-  weight: z.int().min(1).max(100).default(1),
-  status: z.enum(['todo', 'active', 'done', 'cut']).default('todo'),
-  target_date: z.string().nullish(),
-  sort: z.int().default(0),
-})
+export const OpsStateRoadmapItemSchema = z
+  .object({
+    code: z.string().trim().min(1).max(40),
+    stage: z.string().trim().min(1).max(40),
+    title: z.string().trim().min(1).max(200),
+    weight: z.int().min(1).max(100).default(1),
+    status: z.enum(['todo', 'active', 'done', 'cut']).default('todo'),
+    target_date: z.string().nullish(),
+    sort: z.int().default(0),
+  })
+  .strict()
 export type OpsStateRoadmapItem = z.infer<typeof OpsStateRoadmapItemSchema>
 
 export const OpsRoadmapStateSchema = z.object({
@@ -76,21 +80,23 @@ export const OpsRoadmapStateSchema = z.object({
 export type OpsRoadmapState = z.infer<typeof OpsRoadmapStateSchema>
 
 // ── changelog.pending.json ───────────────────────────────────────────────────
-export const OpsStateChangelogEntrySchema = z.object({
-  client_id: OpsClientIdSchema,
-  title: z.string().trim().min(1).max(80),
-  /**
-   * Mandatory and non-technical (doc 13 §8). The length floor is the only thing
-   * a schema can enforce; "no jargon, no file paths" is the skill's job and the
-   * reviewer's.
-   */
-  summary_plain: z.string().trim().min(10).max(600),
-  details_tech: z.string().max(4000).nullish(),
-  kind: OpsChangelogKindSchema.default('changed'),
-  task_codes: z.array(OpsTaskCodeSchema).max(20).default([]),
-  tourable: z.boolean().default(false),
-  happened_at: z.string().nullish(),
-})
+export const OpsStateChangelogEntrySchema = z
+  .object({
+    client_id: OpsClientIdSchema,
+    title: z.string().trim().min(1).max(80),
+    /**
+     * Mandatory and non-technical (doc 13 §8). The length floor is the only thing
+     * a schema can enforce; "no jargon, no file paths" is the skill's job and the
+     * reviewer's.
+     */
+    summary_plain: z.string().trim().min(10).max(600),
+    details_tech: z.string().max(4000).nullish(),
+    kind: OpsChangelogKindSchema.default('changed'),
+    task_codes: z.array(OpsTaskCodeSchema).max(20).default([]),
+    tourable: z.boolean().default(false),
+    happened_at: z.string().nullish(),
+  })
+  .strict()
 export type OpsStateChangelogEntry = z.infer<typeof OpsStateChangelogEntrySchema>
 
 export const OpsChangelogPendingSchema = z.object({
@@ -100,19 +106,21 @@ export const OpsChangelogPendingSchema = z.object({
 export type OpsChangelogPending = z.infer<typeof OpsChangelogPendingSchema>
 
 // ── qa.pending.json ──────────────────────────────────────────────────────────
-export const OpsStateQaRunSchema = z.object({
-  client_id: OpsClientIdSchema,
-  task_code: OpsTaskCodeSchema.nullish(),
-  kind: OpsQaKindSchema.default('auto'),
-  suite: OpsQaSuiteSchema,
-  status: OpsQaStatusSchema,
-  summary_plain: z.string().max(600).nullish(),
-  details: z.string().max(20000).nullish(),
-  actor: z.string().max(80).default('claude'),
-  duration_ms: z.int().min(0).nullish(),
-  started_at: z.string().nullish(),
-  finished_at: z.string().nullish(),
-})
+export const OpsStateQaRunSchema = z
+  .object({
+    client_id: OpsClientIdSchema,
+    task_code: OpsTaskCodeSchema.nullish(),
+    kind: OpsQaKindSchema.default('auto'),
+    suite: OpsQaSuiteSchema,
+    status: OpsQaStatusSchema,
+    summary_plain: z.string().max(600).nullish(),
+    details: z.string().max(20000).nullish(),
+    actor: z.string().max(80).default('claude'),
+    duration_ms: z.int().min(0).nullish(),
+    started_at: z.string().nullish(),
+    finished_at: z.string().nullish(),
+  })
+  .strict()
 export type OpsStateQaRun = z.infer<typeof OpsStateQaRunSchema>
 
 export const OpsQaPendingSchema = z.object({
@@ -122,12 +130,14 @@ export const OpsQaPendingSchema = z.object({
 export type OpsQaPending = z.infer<typeof OpsQaPendingSchema>
 
 // ── the ingest payload ───────────────────────────────────────────────────────
-export const OpsIngestSessionSchema = z.object({
-  session_id: z.string().min(1).max(120),
-  label: z.string().max(120).nullish(),
-  tasks_touched: z.array(OpsTaskCodeSchema).max(100).default([]),
-  status: OpsSessionStatusSchema,
-})
+export const OpsIngestSessionSchema = z
+  .object({
+    session_id: z.string().min(1).max(120),
+    label: z.string().max(120).nullish(),
+    tasks_touched: z.array(OpsTaskCodeSchema).max(100).default([]),
+    status: OpsSessionStatusSchema,
+  })
+  .strict()
 export type OpsIngestSession = z.infer<typeof OpsIngestSessionSchema>
 
 /**

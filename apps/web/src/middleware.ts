@@ -75,13 +75,22 @@ export default clerkMiddleware(
   async (auth, req) => {
     const csp = cspFor(req.nextUrl.pathname)
 
-    if (isAdminRoute(req)) {
+    // Public is tested FIRST and that ordering is load-bearing, not stylistic.
+    // `/api/admin/devops/ingest` matches the admin matcher by prefix but
+    // authenticates a token rather than a session, so evaluating the admin
+    // branch first 404s every sync — which is exactly what it did until an
+    // end-to-end run caught it. Route-handler unit tests could not: they call
+    // POST directly and never traverse middleware.
+    if (isPublicRoute(req)) {
+      // Nothing to enforce here; each of these routes verifies its own
+      // credential in-route (Turnstile, ops token, Clerk webhook signature).
+    } else if (isAdminRoute(req)) {
       // Deliberately NOT auth.protect(): that redirects to /sign-in, which tells
       // an anonymous scanner that /admin exists and is worth coming back to.
       // Signed out and signed-in-but-not-an-admin get the identical empty 404.
       const { userId, getToken } = await auth()
       if (!userId || !(await isActiveOpsAdmin(await getToken()))) return notFound(csp)
-    } else if (!isPublicRoute(req)) {
+    } else {
       await auth.protect()
     }
 
