@@ -13,8 +13,10 @@ import { createPostsStore } from './ai/postsStore'
 import { createAdapterSelector } from './publish/adapters'
 import { createConnectionResolver } from './publish/tokens'
 import { createExpiredHoldSource } from './holds/pgHolds'
+import { createDispatchStore } from './dispatch/pgDispatch'
 import type { PublishPostDeps } from './publish/runPublishPost'
 import type { HoldSweepDeps } from './holds/sweep'
+import type { DispatchSweepDeps } from './dispatch/sweep'
 import type { PlanWeekJobDeps } from './ai/plan-week-job'
 import { runPlanWeek } from './ai/plan-week'
 
@@ -71,6 +73,26 @@ export function publishPostDeps(): PublishPostDeps {
     writeLog: store.writeLog,
     markVariant: store.markVariant,
     markConnection: store.markConnection,
+  }
+}
+
+/**
+ * Dependencies for one scheduled-publish sweep, minus the enqueue.
+ *
+ * `enqueuePublish` is supplied by the trigger wrapper instead: publishPost's trigger helper
+ * imports `publishPostDeps` from this module, so wiring it here would close a require cycle
+ * — and it would drag the Trigger.dev SDK into the module the SDK-free cores depend on.
+ */
+export function dispatchSweepDeps(): Omit<DispatchSweepDeps, 'enqueuePublish'> {
+  const { env, pool } = getRuntime()
+  const store = createDispatchStore({ pool })
+
+  return {
+    mode: env.dispatchMode,
+    graceSeconds: env.dispatchGraceSeconds,
+    listCandidates: store.listCandidates,
+    expirePost: store.expirePost,
+    settlePost: store.settlePost,
   }
 }
 
