@@ -1,0 +1,317 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "code": "A1",
+      "stage": "alpha",
+      "title": "Monorepo + packages/shared zod contracts",
+      "weight": 1,
+      "status": "todo",
+      "sort": 1
+    },
+    {
+      "code": "A2",
+      "stage": "alpha",
+      "title": "Supabase core schema, RLS on every table, apply_ledger_entry(), seed script",
+      "weight": 1,
+      "status": "todo",
+      "sort": 2
+    },
+    {
+      "code": "A3",
+      "stage": "alpha",
+      "title": "Clerk auth → workspaces + members; workspace switcher",
+      "weight": 1,
+      "status": "todo",
+      "sort": 3
+    },
+    {
+      "code": "A4",
+      "stage": "alpha",
+      "title": "Onboarding — Signal Resolution Console → brand_memory v1",
+      "weight": 1,
+      "status": "todo",
+      "sort": 4
+    },
+    {
+      "code": "A5",
+      "stage": "alpha",
+      "title": "Look & Feel — 4 default themes, colour extraction, Readability Guard",
+      "weight": 1,
+      "status": "todo",
+      "sort": 5
+    },
+    {
+      "code": "A6",
+      "stage": "alpha",
+      "title": "Posts editor with per-platform variants + AI rewrite",
+      "weight": 1,
+      "status": "todo",
+      "sort": 6
+    },
+    {
+      "code": "A7",
+      "stage": "alpha",
+      "title": "Planner — list + week calendar, statuses, reschedule",
+      "weight": 1,
+      "status": "todo",
+      "sort": 7
+    },
+    {
+      "code": "A8",
+      "stage": "alpha",
+      "title": "Real publishing to X and Google Business Profile",
+      "weight": 1,
+      "status": "todo",
+      "sort": 8
+    },
+    {
+      "code": "A9",
+      "stage": "alpha",
+      "title": "Scheduled publish via Trigger.dev (idempotent, retries)",
+      "weight": 1,
+      "status": "todo",
+      "sort": 9
+    },
+    {
+      "code": "A10",
+      "stage": "alpha",
+      "title": "Credit ledger live — grants, HOLD→DEBIT, wallet UI, Stripe test checkout",
+      "weight": 1,
+      "status": "todo",
+      "sort": 10
+    },
+    {
+      "code": "A11",
+      "stage": "alpha",
+      "title": "\"Plan my week\" v0 — five Brand-Brain-grounded drafts",
+      "weight": 1,
+      "status": "todo",
+      "sort": 11
+    },
+    {
+      "code": "A12",
+      "stage": "alpha",
+      "title": "Sites v0 — prompt → sections → real deploy → contact form → leads",
+      "weight": 1,
+      "status": "todo",
+      "sort": 12
+    },
+    {
+      "code": "A13",
+      "stage": "alpha",
+      "title": "Dashboard — CMO card, credit chip, empty states",
+      "weight": 1,
+      "status": "todo",
+      "sort": 13
+    },
+    {
+      "code": "A14",
+      "stage": "alpha",
+      "title": "Sahoda Guide v0 — mascot + 6 tours + sandbox seed brand",
+      "weight": 1,
+      "status": "todo",
+      "sort": 14
+    },
+    {
+      "code": "AO1",
+      "stage": "admin-ops",
+      "title": "Foundations — ops tables, RLS, shared contracts, /admin gate",
+      "weight": 3,
+      "status": "todo",
+      "sort": 20
+    },
+    {
+      "code": "AO2",
+      "stage": "admin-ops",
+      "title": "Sync protocol — ingest API, state files, hooks, skill, commands",
+      "weight": 3,
+      "status": "todo",
+      "sort": 21
+    },
+    {
+      "code": "AO3",
+      "stage": "admin-ops",
+      "title": "DevOps dashboard — roadmap card, scrum board, changelog, QA console",
+      "weight": 6,
+      "status": "todo",
+      "sort": 22
+    },
+    {
+      "code": "AO4",
+      "stage": "admin-ops",
+      "title": "Admin half — beta form, inbox, invitations, credit OTP, team",
+      "weight": 6,
+      "status": "todo",
+      "sort": 23
+    },
+    {
+      "code": "AO5",
+      "stage": "admin-ops",
+      "title": "Acceptance gate — doc 13 §17, security review, handoff",
+      "weight": 2,
+      "status": "todo",
+      "sort": 24
+    },
+    {
+      "code": "B1",
+      "stage": "backlog-1",
+      "title": "Scheduled Loop cycles + Monday CMO report",
+      "weight": 1,
+      "status": "todo",
+      "sort": 100
+    },
+    {
+      "code": "B2",
+      "stage": "backlog-2",
+      "title": "Approval flows L2 (in-app, email, WhatsApp when verified)",
+      "weight": 1,
+      "status": "todo",
+      "sort": 110
+    },
+    {
+      "code": "B3",
+      "stage": "backlog-3",
+      "title": "Analytics ingestion X/GBP → normalized",
+      "weight": 1,
+      "status": "todo",
+      "sort": 120
+    },
+    {
+      "code": "B4",
+      "stage": "backlog-4",
+      "title": "Audience Twin v0 + inline scores",
+      "weight": 1,
+      "status": "todo",
+      "sort": 130
+    },
+    {
+      "code": "B5",
+      "stage": "backlog-5",
+      "title": "Campaigns full (tabs + add-to-planner)",
+      "weight": 1,
+      "status": "todo",
+      "sort": 140
+    },
+    {
+      "code": "B6",
+      "stage": "backlog-6",
+      "title": "Meta publish + Instagram variants",
+      "weight": 1,
+      "status": "todo",
+      "sort": 150
+    },
+    {
+      "code": "B7",
+      "stage": "backlog-7",
+      "title": "Studio renderer (zero-COGS exports)",
+      "weight": 1,
+      "status": "todo",
+      "sort": 160
+    },
+    {
+      "code": "B8",
+      "stage": "backlog-8",
+      "title": "Razorpay UPI AutoPay",
+      "weight": 1,
+      "status": "todo",
+      "sort": 170
+    },
+    {
+      "code": "B9",
+      "stage": "backlog-9",
+      "title": "Inbox v0 — X mentions + GBP reviews",
+      "weight": 1,
+      "status": "todo",
+      "sort": 180
+    },
+    {
+      "code": "B10",
+      "stage": "backlog-10",
+      "title": "Guideline-PDF Brand Skin extraction",
+      "weight": 1,
+      "status": "todo",
+      "sort": 190
+    },
+    {
+      "code": "B11",
+      "stage": "backlog-11",
+      "title": "Custom domains (SSL-for-SaaS)",
+      "weight": 1,
+      "status": "todo",
+      "sort": 200
+    },
+    {
+      "code": "B12",
+      "stage": "backlog-12",
+      "title": "Playbooks ×3",
+      "weight": 1,
+      "status": "todo",
+      "sort": 210
+    },
+    {
+      "code": "B13",
+      "stage": "backlog-13",
+      "title": "Remix",
+      "weight": 1,
+      "status": "todo",
+      "sort": 220
+    },
+    {
+      "code": "B14",
+      "stage": "backlog-14",
+      "title": "Radar",
+      "weight": 1,
+      "status": "todo",
+      "sort": 230
+    },
+    {
+      "code": "B15",
+      "stage": "backlog-15",
+      "title": "DIFM + stuck-detect",
+      "weight": 1,
+      "status": "todo",
+      "sort": 240
+    },
+    {
+      "code": "B16",
+      "stage": "backlog-16",
+      "title": "Hindi",
+      "weight": 1,
+      "status": "todo",
+      "sort": 250
+    },
+    {
+      "code": "B17",
+      "stage": "backlog-17",
+      "title": "Agency tier + white-label",
+      "weight": 1,
+      "status": "todo",
+      "sort": 260
+    },
+    {
+      "code": "B18",
+      "stage": "backlog-18",
+      "title": "Public API + MCP",
+      "weight": 1,
+      "status": "todo",
+      "sort": 270
+    },
+    {
+      "code": "B19",
+      "stage": "backlog-19",
+      "title": "Pinterest / Threads / Shorts / Shopify",
+      "weight": 1,
+      "status": "todo",
+      "sort": 280
+    },
+    {
+      "code": "B20",
+      "stage": "backlog-20",
+      "title": "Loop L3",
+      "weight": 1,
+      "status": "todo",
+      "sort": 290
+    }
+  ]
+}

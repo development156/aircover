@@ -45,6 +45,19 @@
           {
             "type": "command",
             "command": "npx eslint --fix \"$CLAUDE_TOOL_INPUT_FILE_PATH\" 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/ops-sync.mjs --hook-write 2>/dev/null || true"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/ops-hook-bash.mjs 2>/dev/null || true"
           }
         ]
       }
@@ -74,7 +87,21 @@
         "hooks": [
           {
             "type": "command",
-            "command": "INPUT=$(cat); [ \"$(echo $INPUT | jq -r '.stop_hook_active')\" = 'true' ] && exit 0; pnpm turbo run typecheck test --filter=\"...[origin/main]\" || { echo 'Gates failing — fix before stopping' >&2; exit 2; }"
+            "command": "INPUT=$(cat); [ \"$(echo $INPUT | jq -r '.stop_hook_active')\" = 'true' ] && exit 0; pnpm turbo run typecheck test --filter=\"...[origin/main]\" || { echo 'Gates failing \u2014 fix before stopping' >&2; exit 2; }"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/ops-sync.mjs --heartbeat stop 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/ops-sync.mjs --heartbeat start 2>/dev/null || true"
           }
         ]
       }

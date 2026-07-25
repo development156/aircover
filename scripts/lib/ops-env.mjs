@@ -79,7 +79,16 @@ export function loadEnv() {
       .map((e) => e.trim().toLowerCase())
       .filter(Boolean),
     ingestToken: read('DEVOPS_INGEST_TOKEN'),
-    ingestUrl: read('OPS_INGEST_URL') || read('NEXT_PUBLIC_APP_URL') || 'http://localhost:3000',
+    /**
+     * OPS_INGEST_URL only — deliberately NOT falling back to NEXT_PUBLIC_APP_URL.
+     *
+     * That fallback existed for one commit and was wrong: NEXT_PUBLIC_APP_URL is
+     * https://app.sahodalabs.com, so every PostToolUse hook on a developer's
+     * laptop would have POSTed local board state to production. Syncing to
+     * prod has to be something someone typed on purpose, not the default that
+     * happens when a var is unset.
+     */
+    ingestUrl: read('OPS_INGEST_URL') || 'http://localhost:3000',
   }
   return cache
 }

@@ -1,0 +1,331 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "code": "SL-001",
+      "title": "ops_* migrations + RLS + is_ops_admin()",
+      "detail": null,
+      "roadmap_code": "AO1",
+      "board_column": "done",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 10,
+      "commit_sha": "27399b72fa029f6706396579c6e257d6f948b951"
+    },
+    {
+      "code": "SL-002",
+      "title": "Anon-client RLS suite for all ten ops tables",
+      "detail": null,
+      "roadmap_code": "AO1",
+      "board_column": "done",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 20,
+      "commit_sha": "27399b72fa029f6706396579c6e257d6f948b951"
+    },
+    {
+      "code": "SL-003",
+      "title": "Shared ops enums + row schemas in packages/shared",
+      "detail": null,
+      "roadmap_code": "AO1",
+      "board_column": "done",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 30,
+      "commit_sha": "27399b72fa029f6706396579c6e257d6f948b951"
+    },
+    {
+      "code": "SL-004",
+      "title": "/admin middleware gate, requireOpsAdmin, first CSP",
+      "detail": null,
+      "roadmap_code": "AO1",
+      "board_column": "done",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 40,
+      "commit_sha": "57109327861f58a961ef1b44e53b443a580910d2"
+    },
+    {
+      "code": "SL-005",
+      "title": "Seed script, qa-artifacts bucket, env and turbo wiring",
+      "detail": null,
+      "roadmap_code": "AO1",
+      "board_column": "done",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 50,
+      "commit_sha": "4411dfdcb01602340bb503c7674144e13fefdae4"
+    },
+    {
+      "code": "SL-006",
+      "title": "sahoda-db skill amendment for platform-scope tables",
+      "detail": null,
+      "roadmap_code": "AO1",
+      "board_column": "done",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 60,
+      "commit_sha": "4411dfdcb01602340bb503c7674144e13fefdae4"
+    },
+    {
+      "code": "SL-007",
+      "title": "Ingest RPC and route with idempotency tests",
+      "detail": null,
+      "roadmap_code": "AO2",
+      "board_column": "in_progress",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 70
+    },
+    {
+      "code": "SL-008",
+      "title": "ops/state seeds and scripts/ops-sync.mjs",
+      "detail": null,
+      "roadmap_code": "AO2",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 80
+    },
+    {
+      "code": "SL-009",
+      "title": "scripts/ops-hook-bash.mjs — auto QA runs and commit → done",
+      "detail": null,
+      "roadmap_code": "AO2",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 90
+    },
+    {
+      "code": "SL-010",
+      "title": "settings.json hook entries + sahoda-devops skill",
+      "detail": null,
+      "roadmap_code": "AO2",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 100
+    },
+    {
+      "code": "SL-011",
+      "title": "/task, /qa-log, /log-change commands + /ship refusal",
+      "detail": null,
+      "roadmap_code": "AO2",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 110
+    },
+    {
+      "code": "SL-012",
+      "title": "End-to-end dogfood verification against the live board",
+      "detail": null,
+      "roadmap_code": "AO2",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 120
+    },
+    {
+      "code": "SL-013",
+      "title": "/admin shell, sub-nav, rail item",
+      "detail": null,
+      "roadmap_code": "AO3",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 130
+    },
+    {
+      "code": "SL-014",
+      "title": "Roadmap progress card with \"To reach Done\"",
+      "detail": null,
+      "roadmap_code": "AO3",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 140
+    },
+    {
+      "code": "SL-015",
+      "title": "Session pulse and gates strips",
+      "detail": null,
+      "roadmap_code": "AO3",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 150
+    },
+    {
+      "code": "SL-016",
+      "title": "Scrum board — four columns, drag, filters",
+      "detail": null,
+      "roadmap_code": "AO3",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 160
+    },
+    {
+      "code": "SL-017",
+      "title": "Changelog rail with copy affordances",
+      "detail": null,
+      "roadmap_code": "AO3",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 170
+    },
+    {
+      "code": "SL-018",
+      "title": "QA console feed and filters",
+      "detail": null,
+      "roadmap_code": "AO3",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 180
+    },
+    {
+      "code": "SL-019",
+      "title": "Manual QA composer — paste/drop screenshots, autosave",
+      "detail": null,
+      "roadmap_code": "AO3",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 190
+    },
+    {
+      "code": "SL-020",
+      "title": "QA JSON export and import (sahoda_qa_v1)",
+      "detail": null,
+      "roadmap_code": "AO3",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 200
+    },
+    {
+      "code": "SL-021",
+      "title": "Live updates so cards move while Claude works",
+      "detail": null,
+      "roadmap_code": "AO3",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 210
+    },
+    {
+      "code": "SL-022",
+      "title": "Raw-hex guard test (doc 08 has no ESLint behind it)",
+      "detail": null,
+      "roadmap_code": "AO3",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 220
+    },
+    {
+      "code": "SL-023",
+      "title": "/embed/beta public form",
+      "detail": null,
+      "roadmap_code": "AO4",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 230
+    },
+    {
+      "code": "SL-024",
+      "title": "Beta-apply hardening — Turnstile, rate limit, honeypot",
+      "detail": null,
+      "roadmap_code": "AO4",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 240
+    },
+    {
+      "code": "SL-025",
+      "title": "Applications inbox with CSV export",
+      "detail": null,
+      "roadmap_code": "AO4",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 250
+    },
+    {
+      "code": "SL-026",
+      "title": "Clerk invitations and user.created webhook",
+      "detail": null,
+      "roadmap_code": "AO4",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 260
+    },
+    {
+      "code": "SL-027",
+      "title": "Credit request with two-admin OTP",
+      "detail": null,
+      "roadmap_code": "AO4",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 270
+    },
+    {
+      "code": "SL-028",
+      "title": "Grant through apply_ledger_entry + replay proof",
+      "detail": "Contract (GRANT_ORIGIN + adminGrantKey) landed in 6880bb6; the grant itself lands in P3.",
+      "roadmap_code": "AO4",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 280
+    },
+    {
+      "code": "SL-029",
+      "title": "/admin/team roles with last-owner guard",
+      "detail": null,
+      "roadmap_code": "AO4",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 290
+    },
+    {
+      "code": "SL-030",
+      "title": "Audit log on every admin mutation",
+      "detail": null,
+      "roadmap_code": "AO4",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 300
+    },
+    {
+      "code": "SL-031",
+      "title": "Acceptance gate, security review, changelog, handoff",
+      "detail": null,
+      "roadmap_code": "AO5",
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 310
+    },
+    {
+      "code": "SL-032",
+      "title": "Constrain credit_ledger.action_type instead of parsing grant keys",
+      "detail": "GRANT rows carry their origin in action_type, which is plain text with no enum and no CHECK. GRANT_ORIGIN in @sahoda/shared plus a migration-scanning contract test keep producer and consumer honest, but nothing stops a new writer inventing a value — it renders as \"Included with your plan\", which is wrong for every grant that did not come from a plan. Replace the convention with a real grant_origin column or structured meta, backfill, then delete the string matching in lib/wallet/entry-copy.ts.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": null,
+      "sort": 320
+    }
+  ]
+}
