@@ -20,7 +20,8 @@
     "format:check": "prettier --check .",
     "db:new": "supabase --workdir packages/db migration new",
     "db:push": "supabase --workdir packages/db db push",
-    "db:link": "supabase --workdir packages/db link"
+    "db:link": "supabase --workdir packages/db link",
+    "ops:seed": "node scripts/ops-seed.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
