@@ -15,11 +15,7 @@ describe('secretValuesFrom', () => {
     const values = secretValuesFrom(env)
 
     // Assert
-    expect(values).toEqual([
-      'sk_test_clerk_value',
-      'service-role-value',
-      'sb_publishable_value',
-    ])
+    expect(values).toEqual(['sk_test_clerk_value', 'service-role-value', 'sb_publishable_value'])
   })
 
   it('omits vars that are unset rather than emitting undefined', () => {
