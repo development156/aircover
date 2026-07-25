@@ -108,10 +108,8 @@ const GRANT_SOURCE_LABELS: Readonly<Record<string, string>> = {
 
 const GRANT_SOURCE_WHY: Readonly<Record<string, string>> = {
   [GRANT_ORIGIN.signup]: 'Included free when you signed up.',
-  // Verbatim from doc 13 §6, which fixes this exact string. It carries no full
-  // stop while its neighbours do; the doc is law on the wording, so the
-  // inconsistency stays until the doc changes.
-  [GRANT_ORIGIN.admin]: 'Credits added by Sahoda Labs team',
+  // Verbatim from doc 13 §6, which fixes this exact string.
+  [GRANT_ORIGIN.admin]: 'Credits added by Sahoda Labs team.',
 }
 
 /**
