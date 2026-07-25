@@ -125,16 +125,32 @@ const TASKS = [
   ['AO4', '/admin/team roles with last-owner guard'],
   ['AO4', 'Audit log on every admin mutation'],
   ['AO5', 'Acceptance gate, security review, changelog, handoff'],
+
+  // Technical debt found while wiring the admin grant, not part of doc 13's plan.
+  // roadmap_code is null deliberately: docs/05 §6 is the founder's ordered
+  // backlog and inserting a 21st item would misrepresent that ordering.
+  [
+    null,
+    'Constrain credit_ledger.action_type instead of parsing grant keys',
+    'GRANT rows carry their origin in action_type, which is plain text with no ' +
+      'enum and no CHECK. GRANT_ORIGIN in @sahoda/shared plus a migration-scanning ' +
+      'contract test keep producer and consumer honest, but nothing stops a new ' +
+      'writer inventing a value — it renders as "Included with your plan", which ' +
+      'is wrong for every grant that did not come from a plan. Replace the ' +
+      'convention with a real grant_origin column or structured meta, backfill, ' +
+      'then delete the string matching in lib/wallet/entry-copy.ts.',
+  ],
 ]
 
 export function tasks() {
-  return TASKS.map(([roadmapCode, title], i) => ({
+  return TASKS.map(([roadmapCode, title, detail], i) => ({
     code: `SL-${String(i + 1).padStart(3, '0')}`,
     title,
+    detail: detail ?? null,
     roadmap_code: roadmapCode,
     board_column: 'todo',
     assignee: 'claude',
-    doc_ref: 'docs/13_Admin_Ops_SAHODA_LABS.md §18',
+    doc_ref: roadmapCode ? 'docs/13_Admin_Ops_SAHODA_LABS.md §18' : null,
     sort: (i + 1) * 10,
   }))
 }

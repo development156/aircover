@@ -1,3 +1,4 @@
+import { GRANT_ORIGIN } from '@sahoda/shared'
 import type { ActionType, LedgerEntry, LedgerEntryType, ModelTier } from '@sahoda/shared'
 
 import { cogsUsd } from './parse-entries'
@@ -90,18 +91,27 @@ const ENTRY_TYPE_LABELS: Record<LedgerEntryType, string | null> = {
 }
 
 /**
- * GRANT rows carry their origin in `action_type`: `bootstrap_workspace` writes
- * the signup grant as `signup_grant`, while `applyPlanGrant` writes plan grants
- * with a null `action_type`. The signup grant must not claim "your plan" — a
- * fresh user has none. Unknown origins fall back to the plan copy, which is the
- * only other GRANT writer today.
+ * GRANT rows carry their origin in `action_type`, and the keys below come from
+ * `GRANT_ORIGIN` in @sahoda/shared rather than being spelled out here. They used
+ * to be bare literals, which meant this classifier and the SQL that writes the
+ * rows agreed only by coincidence — rename one and grants silently fall through
+ * to the plan copy below, telling a brand-new user that free credits came with a
+ * plan they have not bought.
+ *
+ * `applyPlanGrant` still writes plan grants with a null `action_type`, so the
+ * fallback is the plan copy and that is correct for it.
  */
 const GRANT_SOURCE_LABELS: Readonly<Record<string, string>> = {
-  signup_grant: 'Welcome credits',
+  [GRANT_ORIGIN.signup]: 'Welcome credits',
+  [GRANT_ORIGIN.admin]: 'Added by Sahoda Labs',
 }
 
 const GRANT_SOURCE_WHY: Readonly<Record<string, string>> = {
-  signup_grant: 'Included free when you signed up.',
+  [GRANT_ORIGIN.signup]: 'Included free when you signed up.',
+  // Verbatim from doc 13 §6, which fixes this exact string. It carries no full
+  // stop while its neighbours do; the doc is law on the wording, so the
+  // inconsistency stays until the doc changes.
+  [GRANT_ORIGIN.admin]: 'Credits added by Sahoda Labs team',
 }
 
 /**
