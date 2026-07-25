@@ -8,7 +8,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 10,
       "commit_sha": "27399b72fa029f6706396579c6e257d6f948b951"
     },
@@ -19,7 +19,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 20,
       "commit_sha": "27399b72fa029f6706396579c6e257d6f948b951"
     },
@@ -30,7 +30,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 30,
       "commit_sha": "27399b72fa029f6706396579c6e257d6f948b951"
     },
@@ -41,7 +41,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 40,
       "commit_sha": "57109327861f58a961ef1b44e53b443a580910d2"
     },
@@ -52,7 +52,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 50,
       "commit_sha": "4411dfdcb01602340bb503c7674144e13fefdae4"
     },
@@ -63,7 +63,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 60,
       "commit_sha": "4411dfdcb01602340bb503c7674144e13fefdae4"
     },
@@ -72,49 +72,53 @@
       "title": "Ingest RPC and route with idempotency tests",
       "detail": null,
       "roadmap_code": "AO2",
-      "board_column": "in_progress",
+      "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 70
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "sort": 70,
+      "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
     {
       "code": "SL-008",
       "title": "ops/state seeds and scripts/ops-sync.mjs",
       "detail": null,
       "roadmap_code": "AO2",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 80
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "sort": 80,
+      "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
     {
       "code": "SL-009",
-      "title": "scripts/ops-hook-bash.mjs — auto QA runs and commit → done",
+      "title": "scripts/ops-hook-bash.mjs \u2014 auto QA runs and commit \u2192 done",
       "detail": null,
       "roadmap_code": "AO2",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 90
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "sort": 90,
+      "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
     {
       "code": "SL-010",
       "title": "settings.json hook entries + sahoda-devops skill",
       "detail": null,
       "roadmap_code": "AO2",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 100
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "sort": 100,
+      "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
     {
       "code": "SL-011",
       "title": "/task, /qa-log, /log-change commands + /ship refusal",
       "detail": null,
       "roadmap_code": "AO2",
-      "board_column": "todo",
+      "board_column": "in_progress",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 110
     },
     {
@@ -122,10 +126,11 @@
       "title": "End-to-end dogfood verification against the live board",
       "detail": null,
       "roadmap_code": "AO2",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 120
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "sort": 120,
+      "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
     {
       "code": "SL-013",
@@ -134,7 +139,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 130
     },
     {
@@ -144,7 +149,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 140
     },
     {
@@ -154,17 +159,17 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 150
     },
     {
       "code": "SL-016",
-      "title": "Scrum board — four columns, drag, filters",
+      "title": "Scrum board \u2014 four columns, drag, filters",
       "detail": null,
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 160
     },
     {
@@ -174,7 +179,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 170
     },
     {
@@ -184,17 +189,17 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 180
     },
     {
       "code": "SL-019",
-      "title": "Manual QA composer — paste/drop screenshots, autosave",
+      "title": "Manual QA composer \u2014 paste/drop screenshots, autosave",
       "detail": null,
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 190
     },
     {
@@ -204,7 +209,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 200
     },
     {
@@ -214,7 +219,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 210
     },
     {
@@ -224,7 +229,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 220
     },
     {
@@ -234,17 +239,17 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 230
     },
     {
       "code": "SL-024",
-      "title": "Beta-apply hardening — Turnstile, rate limit, honeypot",
+      "title": "Beta-apply hardening \u2014 Turnstile, rate limit, honeypot",
       "detail": null,
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 240
     },
     {
@@ -254,7 +259,7 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 250
     },
     {
@@ -264,7 +269,7 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 260
     },
     {
@@ -274,7 +279,7 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 270
     },
     {
@@ -284,7 +289,7 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 280
     },
     {
@@ -294,7 +299,7 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 290
     },
     {
@@ -304,7 +309,7 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 300
     },
     {
@@ -314,13 +319,13 @@
       "roadmap_code": "AO5",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 310
     },
     {
       "code": "SL-032",
       "title": "Constrain credit_ledger.action_type instead of parsing grant keys",
-      "detail": "GRANT rows carry their origin in action_type, which is plain text with no enum and no CHECK. GRANT_ORIGIN in @sahoda/shared plus a migration-scanning contract test keep producer and consumer honest, but nothing stops a new writer inventing a value — it renders as \"Included with your plan\", which is wrong for every grant that did not come from a plan. Replace the convention with a real grant_origin column or structured meta, backfill, then delete the string matching in lib/wallet/entry-copy.ts.",
+      "detail": "GRANT rows carry their origin in action_type, which is plain text with no enum and no CHECK. GRANT_ORIGIN in @sahoda/shared plus a migration-scanning contract test keep producer and consumer honest, but nothing stops a new writer inventing a value \u2014 it renders as \"Included with your plan\", which is wrong for every grant that did not come from a plan. Replace the convention with a real grant_origin column or structured meta, backfill, then delete the string matching in lib/wallet/entry-copy.ts.",
       "roadmap_code": null,
       "board_column": "todo",
       "assignee": "claude",
