@@ -4,12 +4,13 @@ import { LedgerEntryTypeSchema, ModelTierSchema, type LedgerEntry } from '@sahod
 import { describeEntry } from './entry-copy'
 
 const IDEMPOTENCY_KEY = 'post_variants:8f3a-0001:1:debit'
+const WORKSPACE = '22222222-2222-4222-8222-222222222222'
 
 /** A row shaped exactly as PostgREST returns it from `credit_ledger`. */
 function entry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
   return {
     id: '11111111-1111-4111-8111-111111111111',
-    workspace_id: '22222222-2222-4222-8222-222222222222',
+    workspace_id: WORKSPACE,
     seq: 1,
     entry_type: 'DEBIT',
     amount: 3,
@@ -74,12 +75,22 @@ describe('describeEntry — direction comes from entry_type, never from the amou
     expect(display.signedAmount).toBe('+50')
   })
 
+  // UPDATED: this used to classify the signup grant from `action_type` alone.
+  // `action_type` is free text with no CHECK behind it, and real data proved it
+  // unreliable — ledger seq 5374 is an engineer's manual top-up wearing
+  // `signup_grant`, and the wallet told the owner it came free with signup. The
+  // proof is now the unique key `bootstrap_workspace` writes.
   test('labels the signup grant as welcome credits, never as plan credits', () => {
-    // `bootstrap_workspace` writes the 100-credit signup grant with
-    // `action_type: 'signup_grant'`. A fresh user has no plan, so "Included
-    // with your plan" would be a false claim on the very first wallet row.
+    // A fresh user has no plan, so "Included with your plan" would be a false
+    // claim on the very first wallet row.
     const display = describeEntry(
-      entry({ entry_type: 'GRANT', amount: 100, action_type: 'signup_grant', object_ref: null }),
+      entry({
+        entry_type: 'GRANT',
+        amount: 100,
+        action_type: 'signup_grant',
+        object_ref: null,
+        idempotency_key: `grant:signup:${WORKSPACE}`,
+      }),
     )
 
     expect(display.label).toBe('Welcome credits')
@@ -88,15 +99,105 @@ describe('describeEntry — direction comes from entry_type, never from the amou
     expect(display.signedAmount).toBe('+100')
   })
 
-  test('keeps the plan copy for a GRANT without a signup action_type', () => {
-    // `applyPlanGrant` writes plan grants with a null action_type — those ARE
-    // plan credits, and the existing copy stays true for them.
+  // UPDATED: this test used to assert that ANY GRANT without a signup
+  // action_type was plan credits — it pinned the false claim as correct. A
+  // plan grant now has to prove itself with the key and actor `applyPlanGrant`
+  // writes; everything else gets copy that claims less.
+  test('keeps the plan copy for a GRANT that proves it came from a plan', () => {
     const display = describeEntry(
-      entry({ entry_type: 'GRANT', amount: 1500, action_type: null, object_ref: null }),
+      entry({
+        entry_type: 'GRANT',
+        amount: 1500,
+        action_type: null,
+        object_ref: null,
+        idempotency_key: `grant:starter:2026-07:${WORKSPACE}`,
+        actor: 'provider:cashfree',
+      }),
     )
 
     expect(display.label).toBe('Plan credits')
     expect(display.why).toBe('Included with your plan.')
+  })
+
+  test('never claims a plan for a grant that cannot prove one', () => {
+    // Ledger seq 5374, as actually stored: an engineer's manual top-up during a
+    // verification run. It is real credit the user has — the amount and the
+    // direction stay exactly as they were — but nothing about a plan or a
+    // signup is true of it.
+    const display = describeEntry(
+      entry({
+        entry_type: 'GRANT',
+        amount: 100,
+        action_type: 'signup_grant',
+        object_ref: null,
+        idempotency_key: 'manual-verify-topup:c12b271a:20260724-1',
+        actor: 'claude-verification',
+      }),
+    )
+
+    expect(display.label).toBe('Credits added by Sahoda')
+    expect(display.why).toBe('Added by Sahoda, not by a plan or a payment.')
+    expect(display.direction).toBe('credit')
+    expect(display.signedAmount).toBe('+100')
+  })
+
+  test('claims nothing at all about a grant with no recorded origin', () => {
+    const display = describeEntry(
+      entry({
+        entry_type: 'GRANT',
+        amount: 40,
+        action_type: null,
+        object_ref: null,
+        idempotency_key: 'imported:legacy:0001',
+        actor: null,
+      }),
+    )
+
+    expect(display.label).toBe('Credits added')
+    expect(display.why).toBe('Added to your wallet. Where these came from was not recorded.')
+  })
+
+  test('names a grant that is part of a correction as one', () => {
+    const display = describeEntry(
+      entry({
+        entry_type: 'GRANT',
+        amount: 100,
+        action_type: null,
+        object_ref: null,
+        idempotency_key: 'ledger-correction:2026-07-25:relabel:reissue',
+        actor: 'claude-ledger-correction',
+        meta: { correction: '2026-07-25-relabel-manual-grant', replaces_seq: 5374 },
+      }),
+    )
+
+    expect(display.label).toBe('Correction')
+    expect(display.why).toBe('Issued to correct an earlier entry.')
+  })
+
+  test('no GRANT copy mentions a plan unless the plan is proven', () => {
+    // The backstop for the whole class: whatever a GRANT looks like, the word
+    // "plan" may only appear when `applyPlanGrant` demonstrably wrote it.
+    const suspects = [
+      entry({ entry_type: 'GRANT', idempotency_key: 'manual:1', actor: 'ops_jane' }),
+      entry({ entry_type: 'GRANT', idempotency_key: 'manual:2', actor: null }),
+      entry({
+        entry_type: 'GRANT',
+        idempotency_key: `grant:starter:2026-07:${WORKSPACE}`,
+        actor: null,
+      }),
+      entry({ entry_type: 'GRANT', idempotency_key: `grant:signup:${WORKSPACE}` }),
+      entry({ entry_type: 'GRANT', idempotency_key: 'x', meta: { correction: 'c-1' } }),
+    ]
+
+    for (const suspect of suspects) {
+      const display = describeEntry(suspect)
+
+      // Targets the CLAIM, not the word: "Added by Sahoda, not by a plan or a
+      // payment" is the honest wording for a manual grant and has to stay
+      // legal. What may never appear is the assertion that a plan supplied it.
+      expect(display.label).not.toBe('Plan credits')
+      expect(display.why ?? '').not.toMatch(/included with your plan|from your plan/i)
+    }
   })
 
   test('renders a TOPUP as a positive credit', () => {
