@@ -25,6 +25,9 @@ export default async function PlannerPage({
   // reachability decides whether a tour actually shows.
   const view: PlannerView = rawView === 'week' ? 'week' : 'list'
   const posts = await listPosts()
+  // One instant for the whole screen: the week buckets and the past-due notes
+  // must not be computed against two different clocks.
+  const now = new Date()
 
   return (
     <div className="space-y-grid">
@@ -43,12 +46,12 @@ export default async function PlannerPage({
           tip="Add goals first if you have a push this week — the plan bends toward them."
         />
       ) : view === 'week' ? (
-        <WeekGrid buckets={bucketWeek(posts, new Date())} />
+        <WeekGrid buckets={bucketWeek(posts, now)} now={now} />
       ) : (
         <ul className="space-y-2" data-guide="planner.list">
           {posts.map((post) => (
             <li key={post.id}>
-              <PlannerRow post={post} />
+              <PlannerRow post={post} now={now} />
             </li>
           ))}
         </ul>

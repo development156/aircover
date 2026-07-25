@@ -10,6 +10,9 @@ export const metadata = { title: 'Posts' }
 
 export default async function PostsPage() {
   const posts = await listPosts()
+  // Read the clock once and pass it down, so every card on the page agrees on
+  // which scheduled posts are past due. See `AutoPublishNote`.
+  const now = new Date()
 
   return (
     <div className="space-y-grid">
@@ -33,7 +36,7 @@ export default async function PostsPage() {
           <ul className="space-y-grid" data-guide="posts.list">
             {posts.map((post) => (
               <li key={post.id}>
-                <PostCard post={post} />
+                <PostCard post={post} now={now} />
               </li>
             ))}
           </ul>
