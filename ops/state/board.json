@@ -8,7 +8,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 10,
       "commit_sha": "27399b72fa029f6706396579c6e257d6f948b951"
     },
@@ -19,7 +19,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 20,
       "commit_sha": "27399b72fa029f6706396579c6e257d6f948b951"
     },
@@ -30,7 +30,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 30,
       "commit_sha": "27399b72fa029f6706396579c6e257d6f948b951"
     },
@@ -41,7 +41,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 40,
       "commit_sha": "57109327861f58a961ef1b44e53b443a580910d2"
     },
@@ -52,7 +52,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 50,
       "commit_sha": "4411dfdcb01602340bb503c7674144e13fefdae4"
     },
@@ -63,7 +63,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 60,
       "commit_sha": "4411dfdcb01602340bb503c7674144e13fefdae4"
     },
@@ -74,7 +74,7 @@
       "roadmap_code": "AO2",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 70,
       "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
@@ -85,18 +85,18 @@
       "roadmap_code": "AO2",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 80,
       "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
     {
       "code": "SL-009",
-      "title": "scripts/ops-hook-bash.mjs \u2014 auto QA runs and commit \u2192 done",
+      "title": "scripts/ops-hook-bash.mjs — auto QA runs and commit → done",
       "detail": null,
       "roadmap_code": "AO2",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 90,
       "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
@@ -107,7 +107,7 @@
       "roadmap_code": "AO2",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 100,
       "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
@@ -116,10 +116,12 @@
       "title": "/task, /qa-log, /log-change commands + /ship refusal",
       "detail": null,
       "roadmap_code": "AO2",
-      "board_column": "in_progress",
+      "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
-      "sort": 110
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "sort": 110,
+      "blocked": false,
+      "blocked_reason": null
     },
     {
       "code": "SL-012",
@@ -128,7 +130,7 @@
       "roadmap_code": "AO2",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 120,
       "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
@@ -139,7 +141,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 130
     },
     {
@@ -149,7 +151,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 140
     },
     {
@@ -159,17 +161,17 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 150
     },
     {
       "code": "SL-016",
-      "title": "Scrum board \u2014 four columns, drag, filters",
+      "title": "Scrum board — four columns, drag, filters",
       "detail": null,
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 160
     },
     {
@@ -179,7 +181,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 170
     },
     {
@@ -189,17 +191,17 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 180
     },
     {
       "code": "SL-019",
-      "title": "Manual QA composer \u2014 paste/drop screenshots, autosave",
+      "title": "Manual QA composer — paste/drop screenshots, autosave",
       "detail": null,
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 190
     },
     {
@@ -209,7 +211,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 200
     },
     {
@@ -219,7 +221,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 210
     },
     {
@@ -229,7 +231,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 220
     },
     {
@@ -239,17 +241,17 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 230
     },
     {
       "code": "SL-024",
-      "title": "Beta-apply hardening \u2014 Turnstile, rate limit, honeypot",
+      "title": "Beta-apply hardening — Turnstile, rate limit, honeypot",
       "detail": null,
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 240
     },
     {
@@ -259,7 +261,7 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 250
     },
     {
@@ -269,7 +271,7 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 260
     },
     {
@@ -279,7 +281,7 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 270
     },
     {
@@ -289,7 +291,7 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 280
     },
     {
@@ -299,7 +301,7 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 290
     },
     {
@@ -309,7 +311,7 @@
       "roadmap_code": "AO4",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 300
     },
     {
@@ -319,18 +321,48 @@
       "roadmap_code": "AO5",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 310
     },
     {
       "code": "SL-032",
       "title": "Constrain credit_ledger.action_type instead of parsing grant keys",
-      "detail": "GRANT rows carry their origin in action_type, which is plain text with no enum and no CHECK. GRANT_ORIGIN in @sahoda/shared plus a migration-scanning contract test keep producer and consumer honest, but nothing stops a new writer inventing a value \u2014 it renders as \"Included with your plan\", which is wrong for every grant that did not come from a plan. Replace the convention with a real grant_origin column or structured meta, backfill, then delete the string matching in lib/wallet/entry-copy.ts.",
+      "detail": "GRANT rows carry their origin in action_type, which is plain text with no enum and no CHECK. GRANT_ORIGIN in @sahoda/shared plus a migration-scanning contract test keep producer and consumer honest, but nothing stops a new writer inventing a value — it renders as \"Included with your plan\", which is wrong for every grant that did not come from a plan. Replace the convention with a real grant_origin column or structured meta, backfill, then delete the string matching in lib/wallet/entry-copy.ts.",
       "roadmap_code": null,
       "board_column": "todo",
       "assignee": "claude",
       "doc_ref": null,
       "sort": 320
+    },
+    {
+      "code": "SL-033",
+      "title": "Add CI: run the gate and smoke on every pull request",
+      "detail": "There is no CI at all — .github holds one issue template, and the Stop hook is the only thing standing between a broken commit and main. Smoke cannot go in the Stop hook: Playwright boots its own dev server (~8s cold) and global-setup fetches a Clerk testing token, so it would add 60-120s to every stop AND hard-fail the credential-free cloud sandbox that teammates use, where a non-technical user cannot recover. A workflow file runs the same checks once per PR instead of once per stop. Needs Clerk test and Supabase secrets in GitHub; gate the live-DB suites on their env flags so a fork PR without secrets still reports honestly rather than red.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": null,
+      "sort": 330
+    },
+    {
+      "code": "SL-034",
+      "title": "Fix the flaky brand-resolve deployment-config test",
+      "detail": "apps/web/src/app/actions/brand-resolve.test.ts > \"resolveBrand — deployment config failures\" > \"missing billing env → honest config copy, cause logged server-side\" failed 2 of 5 full-suite runs on 2026-07-26 and passes every time in isolation. It is NOT a logic race: the captured failure is \"Test timed out in 5000ms\". The test calls loadResolveBrand(), which resets modules and dynamically re-imports the action; in a full run the import phase alone takes ~156s across 92 files, so under that contention the import exceeds the 5s default. Fix by giving this test an explicit timeout, or by hoisting the dynamic import out of the timed body — not by raising testTimeout globally, which would hide slow tests everywhere. Owner: whoever owns brand-resolve; found by the Admin-Ops lane.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": null,
+      "sort": 340
+    },
+    {
+      "code": "SL-035",
+      "title": "Guard against a migration that records success without applying",
+      "detail": "On 2026-07-25 migration 20260725182153_ops_ingest.sql was written to schema_migrations while the file was 0 bytes: a first push timed out before the content was copied in, and the retry applied an empty file. History said applied, the schema had neither the function nor the columns, and every layer downstream reported success — supabase db push exited 0, the app returned a clean 502, and a future push would skip the version forever. Nothing in the stack compares what a migration CLAIMS to create against what exists afterwards. Cheapest useful guard: refuse to apply an empty migration file, then a post-push check that parses CREATE TABLE/FUNCTION/INDEX/POLICY names out of the applied files and asserts each object exists in the catalog. Run it in the CI card above.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": null,
+      "sort": 350
     }
   ]
 }

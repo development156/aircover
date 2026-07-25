@@ -140,6 +140,52 @@ const TASKS = [
       'convention with a real grant_origin column or structured meta, backfill, ' +
       'then delete the string matching in lib/wallet/entry-copy.ts.',
   ],
+
+  // Process and reliability debt found while building P1. None of it is doc 13
+  // scope, so roadmap_code stays null for the same reason SL-032 does.
+  [
+    null,
+    'Add CI: run the gate and smoke on every pull request',
+    'There is no CI at all — .github holds one issue template, and the Stop hook ' +
+      'is the only thing standing between a broken commit and main. Smoke cannot ' +
+      'go in the Stop hook: Playwright boots its own dev server (~8s cold) and ' +
+      'global-setup fetches a Clerk testing token, so it would add 60-120s to ' +
+      'every stop AND hard-fail the credential-free cloud sandbox that teammates ' +
+      'use, where a non-technical user cannot recover. A workflow file runs the ' +
+      'same checks once per PR instead of once per stop. Needs Clerk test and ' +
+      'Supabase secrets in GitHub; gate the live-DB suites on their env flags so ' +
+      'a fork PR without secrets still reports honestly rather than red.',
+  ],
+  [
+    null,
+    'Fix the flaky brand-resolve deployment-config test',
+    'apps/web/src/app/actions/brand-resolve.test.ts > "resolveBrand — deployment ' +
+      'config failures" > "missing billing env → honest config copy, cause logged ' +
+      'server-side" failed 2 of 5 full-suite runs on 2026-07-26 and passes every ' +
+      'time in isolation. It is NOT a logic race: the captured failure is "Test ' +
+      'timed out in 5000ms". The test calls loadResolveBrand(), which resets ' +
+      'modules and dynamically re-imports the action; in a full run the import ' +
+      'phase alone takes ~156s across 92 files, so under that contention the ' +
+      'import exceeds the 5s default. Fix by giving this test an explicit ' +
+      'timeout, or by hoisting the dynamic import out of the timed body — not by ' +
+      'raising testTimeout globally, which would hide slow tests everywhere. ' +
+      'Owner: whoever owns brand-resolve; found by the Admin-Ops lane.',
+  ],
+  [
+    null,
+    'Guard against a migration that records success without applying',
+    'On 2026-07-25 migration 20260725182153_ops_ingest.sql was written to ' +
+      'schema_migrations while the file was 0 bytes: a first push timed out ' +
+      'before the content was copied in, and the retry applied an empty file. ' +
+      'History said applied, the schema had neither the function nor the columns, ' +
+      'and every layer downstream reported success — supabase db push exited 0, ' +
+      'the app returned a clean 502, and a future push would skip the version ' +
+      'forever. Nothing in the stack compares what a migration CLAIMS to create ' +
+      'against what exists afterwards. Cheapest useful guard: refuse to apply an ' +
+      'empty migration file, then a post-push check that parses CREATE ' +
+      'TABLE/FUNCTION/INDEX/POLICY names out of the applied files and asserts ' +
+      'each object exists in the catalog. Run it in the CI card above.',
+  ],
 ]
 
 export function tasks() {

@@ -23,7 +23,8 @@
     "db:link": "supabase --workdir packages/db link",
     "ops:seed": "node scripts/ops-seed.mjs",
     "ops:sync": "node scripts/ops-sync.mjs",
-    "test:ops": "vitest run"
+    "test:ops": "vitest run",
+    "ops:ship-check": "node scripts/ops-card.mjs ship-check"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
