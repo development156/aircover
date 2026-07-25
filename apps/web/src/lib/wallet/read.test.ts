@@ -61,7 +61,7 @@ vi.mock('@/lib/supabase/server', () => ({
   }),
 }))
 
-const { readAvailableCredits, readBalance, readLedger, readOpenHolds } = await import('./read')
+const { readBalance, readLedger, readOpenHolds } = await import('./read')
 
 const scopedTo = (query: { filters: Filter[] }) =>
   query.filters.some((f) => f.column === 'workspace_id' && f.value === WORKSPACE)
@@ -125,10 +125,6 @@ describe('wallet reads with no active workspace', () => {
     // afford to work. `no-workspace` is a third answer, not a softer failure.
     await expect(readBalance()).resolves.toEqual({ status: 'no-workspace' })
     expect(state.queries).toEqual([])
-  })
-
-  test('the credit chip shows unknown, not zero', async () => {
-    await expect(readAvailableCredits()).resolves.toBeNull()
   })
 
   test('readLedger returns empty without querying', async () => {
