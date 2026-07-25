@@ -96,6 +96,36 @@ pinned by tests. Flagging it because the "every 5 min, past `hold_expires_at`" w
 `packages/shared/src/jobs/payloads.ts` cites a §3.6 that does not appear to exist in /docs — if
 there is a real spec, it should win over this ruling.
 
+## wt-web/infra: `TRIGGER_PROJECT_REF` vs `TRIGGER_PROJECT_ID` — the deploy targets no project
+
+Two names for one value, and nothing reconciles them:
+
+- `apps/jobs/trigger.config.ts:13` reads `process.env.TRIGGER_PROJECT_REF ?? ''`.
+- `turbo.json:43` allowlists `TRIGGER_PROJECT_ID` (not `..._REF`).
+- `docs/12_Build_Companion_SAHODA_LABS.md:113` also documents `TRIGGER_PROJECT_ID`.
+
+So whichever name is actually set in the environment, exactly one of these is wrong. If the env
+holds `TRIGGER_PROJECT_ID`, `trigger.config.ts` falls through its `?? ''` and configures
+`project: ''`. That is the failure the config's own comment says it wants to avoid — the
+`?? ''` fallback makes a missing ref a **silent empty string** rather than a loud throw, so the
+"deploys fail loudly rather than silently targeting the wrong project" promise on line 4-5 does
+not hold as written.
+
+**Ask:** pick one name, then align all three sites. Two sub-decisions for whoever owns infra:
+
+1. Trigger.dev's own config key is `project` and its docs call the value a _project ref_
+   (`proj_...`), so `TRIGGER_PROJECT_REF` is the truer name — but `TRIGGER_PROJECT_ID` is the one
+   already in `turbo.json` and the build companion, and is presumably what is set in Vercel. The
+   cheaper fix is renaming the config read; the more correct one is renaming the other two.
+2. Whichever wins, `TRIGGER_PROJECT_REF`/`_ID` must be in the `turbo.json` build env allowlist
+   under the name the code actually reads, or turbo will not pass it through.
+
+**Also ask:** replace `?? ''` with a throw (or a startup assert) so a missing ref fails at deploy
+time with a named error instead of producing an empty project string.
+
+Not blocking today — no `deploy` has been run from this repo yet (see the next item), so this has
+never been exercised. It will bite on the first deploy attempt.
+
 ## Untested: Trigger.dev against raw-TS workspace packages
 
 Every workspace package ships `"exports": "./src/index.ts"` with **no build step**, and apps/jobs
