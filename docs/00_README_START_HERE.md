@@ -25,6 +25,11 @@
 | 10 | Plugins/Commands/Subagents | Installs + paste-ready commands & agents | Day-0 setup |
 | 11 | MCP | `.mcp.json`, add-ons, security rules | Day-0 setup |
 | 12 | **Build Companion** | Kickoff prompt, CLAUDE.md, settings/hooks, .env, pricing.json, checklists, glossary | Day-0 + Hour-0 |
+| 13 | **Admin Ops** | /admin panel + Claude-Code-fed dev dashboard | Before building /admin |
+
+
+
+
 | — | **agents/** (16 files) | Installable subagent roster → copy into `.claude/agents/` | Day-0 setup |
 | — | sahoda_dashboard_demo.html | Living UI reference: Home/CMO screen | UI canon |
 | — | sahoda_brand_brain_demo.html | Living UI reference: onboarding Signal Console | UI canon |
