@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
+import { provesOpsAdmin } from '@/lib/ops/gate-decision'
 import { cspFor } from '@/lib/security/csp'
 
 // Inverted model: everything is protected except this list. Route groups
@@ -59,8 +60,7 @@ async function isActiveOpsAdmin(token: string | null): Promise<boolean> {
       { headers: { apikey: anonKey, Authorization: `Bearer ${token}` }, cache: 'no-store' },
     )
     if (!response.ok) return false
-    const rows: unknown = await response.json()
-    return Array.isArray(rows) && rows.length > 0
+    return provesOpsAdmin(await response.json())
   } catch {
     return false
   }
