@@ -1,4 +1,5 @@
 import {
+  CONSTRAINTS,
   isDispatchable,
   type Channel,
   type PostStatus,
@@ -50,7 +51,7 @@ export type HoldReason =
   | 'not-yet-due'
   | 'in-flight'
   | 'no-variants'
-  | 'all-skipped'
+  | 'nothing-attemptable'
   | 'partial-needs-per-channel-ui'
   | 'fixture-publish'
   | 'unknown-publish-mode'
@@ -72,7 +73,19 @@ export type DispatchDecision =
     })
 
 /** Variant states that still have work left to do. */
-const PUBLISHABLE: readonly VariantPublishStatus[] = ['pending', 'scheduled']
+const PENDING_STATES: readonly VariantPublishStatus[] = ['pending', 'scheduled']
+
+/**
+ * Whether this release can actually post to the variant's channel. Instagram is
+ * `publishable: false` in CONSTRAINTS — it exists for caption rules, not posting — and
+ * production carries instagram variants sitting `pending` right now.
+ *
+ * Such a variant is excluded from BOTH ends: it is never dispatched, because that buys a
+ * guaranteed CHANNEL_NOT_PUBLISHABLE failure and nothing else, and it never counts against
+ * a post reaching `published`, because otherwise every post carrying one becomes a
+ * permanent partial and is held forever.
+ */
+const canAttempt = (v: CandidateVariant): boolean => CONSTRAINTS[v.channel]?.publishable === true
 
 /**
  * Decide what should happen to one due post. Pure: no clock, no database, no side effects
@@ -94,9 +107,10 @@ export function classifyCandidate(
 
   const published = variants.filter((v) => v.publishStatus === 'published')
   const failed = variants.filter((v) => v.publishStatus === 'failed')
-  const skipped = variants.filter((v) => v.publishStatus === 'skipped')
   const inFlight = variants.filter((v) => v.publishStatus === 'publishing')
-  const publishable = variants.filter((v) => PUBLISHABLE.includes(v.publishStatus))
+  const publishable = variants.filter(
+    (v) => PENDING_STATES.includes(v.publishStatus) && canAttempt(v),
+  )
 
   const hold = (reason: HoldReason): DispatchDecision => ({
     ...base,
@@ -151,10 +165,15 @@ export function classifyCandidate(
   }
 
   if (published.length === 0) {
-    // Only skipped channels means nothing was ever attempted. Calling that "failed" would
-    // invent an error that never happened.
-    if (failed.length === 0 && skipped.length > 0) return hold('all-skipped')
-    return { ...base, kind: 'settle', status: 'failed' }
+    if (failed.length > 0) return { ...base, kind: 'settle', status: 'failed' }
+
+    // Nothing was ever attempted — every channel was skipped, or none of them is one this
+    // release can post to. "Failed" would invent an error that never happened. Inside the
+    // window it waits; past it, its time came and nothing went out, which is what
+    // `expired` means. Holding forever would strand the row.
+    return withinGrace
+      ? hold('nothing-attemptable')
+      : { ...base, kind: 'expire', reason: 'past-grace' }
   }
 
   // Something published. Before promoting the post, the mode has to hold up: a fixture run
