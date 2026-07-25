@@ -226,6 +226,25 @@ function directionOf(entryType: LedgerEntryType, amount: number): Direction {
 }
 
 /**
+ * How many credits this row moved the wallet total, signed.
+ *
+ * Exported so anything summing entries — the correction groups — agrees with
+ * the amount column instead of re-deriving the sign. Summing `amount` directly
+ * would make a +30 DEBIT and a +30 GRANT agree when they point opposite ways,
+ * and would count a HOLD and its RELEASE as credits moved when neither touches
+ * `balance_total`.
+ */
+export function signedEffect(entry: Pick<LedgerEntry, 'entry_type' | 'amount'>): number {
+  const direction = directionOf(entry.entry_type, entry.amount)
+  const magnitude = Math.abs(entry.amount)
+
+  if (direction === 'credit') return magnitude
+  if (direction === 'debit') return -magnitude
+
+  return 0
+}
+
+/**
  * Render the sign from the *direction*, never from the stored amount.
  *
  * `amount` is always positive in the DB except on ADJUST, so the magnitude is
