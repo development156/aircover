@@ -250,7 +250,10 @@ function scrubValue(
   }
 }
 
-function omitKeys(source: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+function omitKeys(
+  source: Record<string, unknown>,
+  keys: readonly string[],
+): Record<string, unknown> {
   const next: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(source)) {
     if (!keys.includes(key)) next[key] = value

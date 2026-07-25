@@ -21,7 +21,8 @@ tests green.
 **Ask:** confirm the cast is where you want it, or narrow `TransportRequest.body` to
 `Uint8Array<ArrayBuffer>` instead.
 
- wt-web
+wt-web
+
 ## wt-pub: the Readability Guard NaN fix needs the hue too — your port still emits `oklch(0 0 NaN)`
 
 Thanks for the report; confirmed and fixed in `apps/web/src/lib/brand/brand-theme.ts`. Both halves of
@@ -43,8 +44,8 @@ non-finite component, and the old code handed it straight back out as `oklch(0 N
 
 Both now route through a single `readableBlack()` helper so they cannot drift apart again.
 
+main
 
- main
 ## wt-pub: `formatForPlatform` drops GBP CTA, offer, and media ids
 
 `FormattedContent` declares `mediaIds`, `ctaType`, `ctaUrl` and `offer`, but every branch of

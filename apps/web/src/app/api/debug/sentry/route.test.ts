@@ -49,17 +49,20 @@ afterEach(() => {
 })
 
 describe('GET /api/debug/sentry — production guard', () => {
-  it.each(ALL_KINDS)('returns 404 and never runs the branch for kind=%s in production', async (kind) => {
-    // Arrange — a DSN is set, so nothing here is failing for want of config.
-    vi.stubEnv('NODE_ENV', 'production')
-    vi.stubEnv('SENTRY_DSN', 'https://public@o0.ingest.sentry.io/1')
+  it.each(ALL_KINDS)(
+    'returns 404 and never runs the branch for kind=%s in production',
+    async (kind) => {
+      // Arrange — a DSN is set, so nothing here is failing for want of config.
+      vi.stubEnv('NODE_ENV', 'production')
+      vi.stubEnv('SENTRY_DSN', 'https://public@o0.ingest.sentry.io/1')
 
-    // Act — must resolve. A rejection means a throwing branch ran in production.
-    const response = await GET(requestFor(kind))
+      // Act — must resolve. A rejection means a throwing branch ran in production.
+      const response = await GET(requestFor(kind))
 
-    // Assert
-    expect(response.status).toBe(404)
-  })
+      // Assert
+      expect(response.status).toBe(404)
+    },
+  )
 
   it('touches no Sentry API at all in production, for any kind', async () => {
     // Arrange
