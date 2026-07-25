@@ -75,4 +75,48 @@ describe('loadJobsEnv', () => {
       /SAHODA_HOLD_SWEEP_GRACE_SECONDS/,
     )
   })
+
+  it('defaults the dispatch mode to off, so deploying the sweep changes nothing', () => {
+    // The whole point of shipping this dark: landing the code must not start mutating
+    // post rows. Only an explicit opt-in flips it.
+    expect(loadJobsEnv(complete).dispatchMode).toBe('off')
+  })
+
+  it('accepts each of the three dispatch modes', () => {
+    for (const mode of ['off', 'report', 'on'] as const) {
+      expect(loadJobsEnv({ ...complete, SAHODA_PUBLISH_DISPATCH_MODE: mode }).dispatchMode).toBe(
+        mode,
+      )
+    }
+  })
+
+  it('rejects an unrecognized dispatch mode instead of falling back', () => {
+    // Falling back to a default here is the dangerous shape: a typo like "ON" or "true"
+    // must not silently resolve to either extreme. Name it and refuse to start.
+    expect(() => loadJobsEnv({ ...complete, SAHODA_PUBLISH_DISPATCH_MODE: 'true' })).toThrow(
+      /SAHODA_PUBLISH_DISPATCH_MODE/,
+    )
+  })
+
+  it('does not treat an empty dispatch mode as off', () => {
+    // An empty string usually means "the var is set but the value did not make it", which
+    // is a deploy mistake worth surfacing rather than absorbing into the safe default.
+    expect(() => loadJobsEnv({ ...complete, SAHODA_PUBLISH_DISPATCH_MODE: '' })).toThrow(
+      /SAHODA_PUBLISH_DISPATCH_MODE/,
+    )
+  })
+
+  it('defaults the dispatch grace to sixty minutes and accepts an override', () => {
+    expect(loadJobsEnv(complete).dispatchGraceSeconds).toBe(3600)
+    expect(
+      loadJobsEnv({ ...complete, SAHODA_PUBLISH_DISPATCH_GRACE_SECONDS: '900' })
+        .dispatchGraceSeconds,
+    ).toBe(900)
+  })
+
+  it('rejects a negative dispatch grace, which would expire posts that are not yet due', () => {
+    expect(() => loadJobsEnv({ ...complete, SAHODA_PUBLISH_DISPATCH_GRACE_SECONDS: '-1' })).toThrow(
+      /SAHODA_PUBLISH_DISPATCH_GRACE_SECONDS/,
+    )
+  })
 })
