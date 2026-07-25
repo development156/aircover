@@ -36,6 +36,13 @@ const EnvSchema = z.object({
   // a real defect (it is the only thing between a stranger and fake board rows),
   // so it fails the boot loudly rather than being accepted and quietly weak.
   DEVOPS_INGEST_TOKEN: z.string().min(32).optional(),
+  /**
+   * Read by exactly one module — lib/ops/service-rpc.ts — for the two endpoints
+   * that have no user to act as. Optional so a build box without it still
+   * compiles; absent at runtime means those endpoints answer "unavailable"
+   * rather than pretending to have written something.
+   */
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   /** Comma-separated. Seeds the first owner seats; read by scripts/ops-seed.mjs. */
   ADMIN_BOOTSTRAP_EMAILS: z.string().optional(),
   /** Dev-only escape hatch for the maker-checker rule. Anything but 'true' is false. */
