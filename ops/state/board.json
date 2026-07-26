@@ -140,22 +140,25 @@
       "title": "/admin shell, sub-nav, rail item",
       "detail": "Shell, sub-nav and rail item render; typecheck+lint green",
       "roadmap_code": "AO3",
-      "board_column": "review",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 130,
       "blocked": false,
-      "blocked_reason": null
+      "blocked_reason": null,
+      "commit_sha": "aa265994335912f65994c52390c24a5945e39dbd"
     },
     {
       "code": "SL-014",
       "title": "Roadmap progress card with \"To reach Done\"",
-      "detail": null,
+      "detail": "Roadmap card renders live: Admin Ops 30%, 3 open items",
       "roadmap_code": "AO3",
-      "board_column": "todo",
+      "board_column": "review",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 140
+      "sort": 140,
+      "blocked": false,
+      "blocked_reason": null
     },
     {
       "code": "SL-015",

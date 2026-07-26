@@ -1,4 +1,5 @@
 import { PendingRegion } from '@/components/admin/pending-region'
+import { RoadmapCard } from '@/components/admin/roadmap-card'
 import { PageTitle } from '@/components/page-title'
 
 export const metadata = { title: 'Dev' }
@@ -16,11 +17,7 @@ export default function AdminDevPage() {
     <div className="space-y-grid">
       <PageTitle>Dev</PageTitle>
 
-      <PendingRegion
-        title="Roadmap progress"
-        card="SL-014"
-        builds="Stage, percent complete by weight, days remaining, and the “To reach Done” checklist."
-      />
+      <RoadmapCard />
 
       <PendingRegion
         title="Session and gates"
