@@ -56,10 +56,11 @@ export function correctionMeta(entry: Pick<LedgerEntry, 'meta'>): CorrectionMeta
     return null
   }
 
-  const { correction, reverses_seq: reverses, replaces_seq: replaces } = meta as Record<
-    string,
-    unknown
-  >
+  const {
+    correction,
+    reverses_seq: reverses,
+    replaces_seq: replaces,
+  } = meta as Record<string, unknown>
 
   if (typeof correction !== 'string') {
     return null
