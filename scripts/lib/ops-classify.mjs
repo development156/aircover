@@ -206,12 +206,28 @@ export function classifyBashRuns({ command, output, exitCode, durationMs }) {
  *
  * Merge commits have no scope, which is correct: a merge completes nothing.
  */
-const CONVENTIONAL_SCOPE =
-  /\b(?:feat|fix|chore|docs|refactor|test|perf|ci|style|build|revert)\(([^)]*)\)/g
+/** A subject line, anchored: `type(scope): summary`. Not a pattern found mid-prose. */
+const CONVENTIONAL_SUBJECT =
+  /^(?:feat|fix|chore|docs|refactor|test|perf|ci|style|build|revert)\(([^)]*)\)!?:\s/
 
 export function closingTaskCodes(message) {
-  const scopes = [...String(message ?? '').matchAll(CONVENTIONAL_SCOPE)].map((m) => m[1])
-  return taskCodesIn(scopes.join(' '))
+  // SUBJECT LINE ONLY. Scanning the whole message for a scope pattern is barely
+  // better than scanning it for codes: this very commit's body quotes
+  // `feat(SL-011):` as an example of the convention, and that was read as a
+  // claim. A commit has exactly one subject and exactly one scope.
+  //
+  // The command string arrives wrapped in shell — `git commit -F - <<'MSG'` and
+  // a heredoc — so the subject is the first line that LOOKS like one, not
+  // literally line 0.
+  const text = String(message ?? '')
+  const subject = text
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => CONVENTIONAL_SUBJECT.test(line))
+
+  if (!subject) return []
+  const scope = CONVENTIONAL_SUBJECT.exec(subject)?.[1] ?? ''
+  return taskCodesIn(scope)
 }
 
 /** `SL-7` and `SL-007` are the same card; the board stores the padded form. */
