@@ -1,4 +1,94 @@
 {
   "version": 1,
-  "runs": []
+  "runs": [
+    {
+      "client_id": "qa-ms1qdq2t-efb68d8e",
+      "task_code": "SL-018",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-07-26T11:44:52.036Z",
+      "finished_at": "2026-07-26T11:44:52.036Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (22 passed, 1 failed).",
+      "details": "  [\n    \"a\",\n+   \"c\",\n  ]\n\n ❯ src/lib/ops/qa-console.test.ts:141:34\n    139|   ])('filters by %o', (patch, expected) => {\n    140|     const got = applyQaFilters(runs, { ...NO_QA_FILTERS, ...patch }, N…\n    141|     expect(got.map((r) => r.id)).toEqual(expected)\n       |                                  ^\n    142|   })\n    143|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 22 passed (23)\n   Start at  17:14:51\n   Duration  174ms (transform 27ms, setup 0ms, import 41ms, tests 12ms, environment 0ms)\n\nundefined\n/home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-admin/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/lib/ops/qa-console.test.ts",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-ms1qe6r7-17028f04",
+      "task_code": "SL-018",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-07-26T11:45:13.651Z",
+      "finished_at": "2026-07-26T11:45:13.651Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed (23 passed).",
+      "details": " RUN  v4.1.10 /home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-admin/apps/web\n\n\n Test Files  1 passed (1)\n      Tests  23 passed (23)\n   Start at  17:15:13\n   Duration  137ms (transform 24ms, setup 0ms, import 36ms, tests 6ms, environment 0ms)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-ms1qfyrd-a8ae16c9",
+      "task_code": "SL-018",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-07-26T11:46:36.600Z",
+      "finished_at": "2026-07-26T11:46:36.600Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The typecheck, unit checks ran together and something failed (153 passed).",
+      "details": "ok\nsrc/components/admin/sub-nav.tsx(24,18): error TS2820: Type '\"/admin/qa\"' is not assignable to type 'Route | undefined'. Did you mean '\"/admin\"'?\nundefined\n/home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-admin/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 2: tsc --noEmit\nTS done\n\n Test Files  10 passed (10)\n      Tests  153 passed (153)\n   Start at  17:16:35\n   Duration  1.24s (transform 554ms, setup 340ms, import 899ms, tests 763ms, environment 1.70s)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-ms1qgl89-daf2b1b0",
+      "task_code": "SL-018",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-07-26T11:47:05.721Z",
+      "finished_at": "2026-07-26T11:47:05.721Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran and everything passed.",
+      "details": " Tasks:    24 successful, 24 total\nCached:    21 cached, 24 total\n  Time:    10.818s ",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-ms1qgl89-83d77a78",
+      "task_code": "SL-018",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-07-26T11:47:05.721Z",
+      "finished_at": "2026-07-26T11:47:05.721Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran and everything passed.",
+      "details": " Tasks:    24 successful, 24 total\nCached:    21 cached, 24 total\n  Time:    10.818s ",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-ms1qgl89-11237c8f",
+      "task_code": "SL-018",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-07-26T11:47:05.721Z",
+      "finished_at": "2026-07-26T11:47:05.721Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed.",
+      "details": " Tasks:    24 successful, 24 total\nCached:    21 cached, 24 total\n  Time:    10.818s ",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-ms1qguhr-c82b0019",
+      "task_code": "SL-018",
+      "kind": "manual",
+      "suite": "manual",
+      "status": "pass",
+      "summary_plain": "The QA console lists every recorded run with filters for suite, status, person, card and date, and pins a failure at the top until the same check on the same card is run again.",
+      "actor": "claude",
+      "started_at": "2026-07-26T11:47:17.727Z",
+      "finished_at": "2026-07-26T11:47:17.727Z"
+    }
+  ]
 }

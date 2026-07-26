@@ -21,7 +21,7 @@ type Section =
 
 const SECTIONS: readonly Section[] = [
   { label: 'Dev', href: '/admin/dev' },
-  { label: 'QA', pending: 'SL-018' },
+  { label: 'QA', href: '/admin/qa' },
   { label: 'Applications', pending: 'SL-025' },
   { label: 'Credits', pending: 'SL-027' },
   { label: 'Team', pending: 'SL-029' },

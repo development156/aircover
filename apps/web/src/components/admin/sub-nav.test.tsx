@@ -21,7 +21,7 @@ describe('AdminSubNav', () => {
     // item that 404s. A section nobody can open must not look openable.
     render(<AdminSubNav />)
 
-    for (const label of ['QA', 'Applications', 'Credits', 'Team']) {
+    for (const label of ['Applications', 'Credits', 'Team']) {
       expect(screen.queryByRole('link', { name: label })).toBeNull()
       expect(screen.getByText(label)).toHaveAttribute('aria-disabled', 'true')
     }
@@ -29,6 +29,14 @@ describe('AdminSubNav', () => {
 
   it('says which card builds an unbuilt section', () => {
     render(<AdminSubNav />)
-    expect(screen.getByText('QA')).toHaveAttribute('title', expect.stringContaining('SL-018'))
+    expect(screen.getByText('Applications')).toHaveAttribute(
+      'title',
+      expect.stringContaining('SL-025'),
+    )
+  })
+
+  it('links QA now that the console exists', () => {
+    render(<AdminSubNav />)
+    expect(screen.getByRole('link', { name: 'QA' })).toHaveAttribute('href', '/admin/qa')
   })
 })
