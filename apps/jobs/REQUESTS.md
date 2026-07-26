@@ -183,6 +183,67 @@ time with a named error instead of producing an empty project string.
 Not blocking today — no `deploy` has been run from this repo yet (see the next item), so this has
 never been exercised. It will bite on the first deploy attempt.
 
+## wt-web + wt-shared: `publishable` says LinkedIn can post; no LinkedIn adapter exists — BLOCKS live mode
+
+Three facts that cannot all be true:
+
+- `packages/shared/src/publishing/constraints.ts:89` — linkedin is `publishable: true`.
+- `apps/jobs/src/publish/adapters.ts` — the live selector's `switch` handles `x` and `gbp` only.
+  Everything else hits `default` and throws `AdapterError` `NO_ADAPTER`, classification
+  **permanent**. Its own comment already admits the contradiction.
+- `apps/jobs/src/dispatch/classify.ts:88` — the dispatcher's `canAttempt` guard reads exactly that
+  flag. LinkedIn clears it, so a pending linkedin variant inside grace **is** dispatched.
+
+Consequence in live mode: dispatch → `NO_ADAPTER` permanent → variant `failed` with an honest
+failed log → the post is now a partial → held on `partial-needs-per-channel-ui` forever, or
+settled `failed` once that lands, which is also a lie about the content. Every LinkedIn post
+fails on its first attempt, permanently, for as long as the flag and the registry disagree.
+
+Real exposure: production post `c36d3757` (workspace `8073bf58`) carried `linkedin:pending`. It
+expired in the 2026-07-26 batch, so no live failure has happened yet — `SAHODA_PUBLISH_MODE` is
+still `fixture`, where the selector returns a fixture adapter and LinkedIn silently "succeeds".
+That is precisely why this has stayed invisible.
+
+**Ask:** derive publishability from adapter existence, not from a hand-maintained boolean that can
+disagree with the code. Either shape is acceptable:
+
+1. Export a registry from `packages/publishing` (`ADAPTERS: Partial<Record<Channel, Factory>>`) and
+   compute `publishable` from `channel in ADAPTERS`. One fact, one place, cannot drift.
+2. Keep the flag and add a test asserting `CONSTRAINTS[c].publishable === adapterExists(c)` for
+   every channel in `CHANNELS`.
+
+(1) is right; (2) is the cheap version and would have caught this. Note the flag currently means
+two different things — "we can post here" AND "show this as preview only"
+(`channel-picker.tsx:53`, `variant-panel.tsx:88`, `posts-publish.ts:89`). If those ever need to
+diverge, split the field rather than overloading it further.
+
+**Must be fixed before `SAHODA_PUBLISH_MODE=live`.** Harmless while fixture.
+
+## wt-web: the scheduler accepts a post that no channel can publish
+
+`apps/web/src/lib/posts/schedule.ts` validates lead time only. `leadMinutesFor` walks the selected
+channels and reads `scheduleMinLeadMinutes`, but never asks whether any of them can actually
+publish — so an instagram-only post (`publishable: false`) passes the guard and is scheduled.
+
+Evidence from production: post `46f8ac9a` (workspace `5b9cd464`) was scheduled for
+2026-07-23 15:33Z with exactly one variant, `instagram:pending`. It could never have gone out. The
+dispatcher expired it in the 2026-07-26 batch — correct behaviour, but the user watched a
+"scheduled" post for four days and then silently got `expired`. The honest place to refuse that is
+at schedule time, not three days later in a sweep.
+
+**Ask:** refuse the schedule when no selected channel is attemptable. The module already imports
+`CONSTRAINTS`, so no new dependency:
+
+- `validateScheduleLead` returns not-ok with copy along the lines of "Pick at least one channel
+  that can publish — Instagram is preview only in this release."
+- Enforce it in the server action as well, not just `schedule-field.tsx:72`. The lead guard today
+  is client-side only, so a schedule written through the action path is unvalidated.
+
+One boundary to keep: a MIXED selection (instagram + x) must stay allowed — instagram is
+legitimately preview-only alongside a real channel. The rule is "at least one attemptable", not
+"all attemptable", which matches what the dispatcher already does: unattemptable and `skipped`
+variants are excluded from the success denominator rather than making the post a partial.
+
 ## Untested: Trigger.dev against raw-TS workspace packages
 
 Every workspace package ships `"exports": "./src/index.ts"` with **no build step**, and apps/jobs
