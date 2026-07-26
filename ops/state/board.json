@@ -192,12 +192,13 @@
       "title": "Changelog rail with copy affordances",
       "detail": "Changelog rail live with per-entry and per-day copy",
       "roadmap_code": "AO3",
-      "board_column": "review",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 170,
       "blocked": false,
-      "blocked_reason": null
+      "blocked_reason": null,
+      "commit_sha": "32ab4761f46b2985a2fe398f53e6fc7d3a866b8d"
     },
     {
       "code": "SL-018",
@@ -366,7 +367,7 @@
       "title": "Fix the flaky brand-resolve deployment-config test",
       "detail": "apps/web/src/app/actions/brand-resolve.test.ts > \"resolveBrand — deployment config failures\" > \"missing billing env → honest config copy, cause logged server-side\" failed 2 of 5 full-suite runs on 2026-07-26 and passes every time in isolation. It is NOT a logic race: the captured failure is \"Test timed out in 5000ms\". The test calls loadResolveBrand(), which resets modules and dynamically re-imports the action; in a full run the import phase alone takes ~156s across 92 files, so under that contention the import exceeds the 5s default. Fix by giving this test an explicit timeout, or by hoisting the dynamic import out of the timed body — not by raising testTimeout globally, which would hide slow tests everywhere. Owner: whoever owns brand-resolve; found by the Admin-Ops lane.",
       "roadmap_code": null,
-      "board_column": "todo",
+      "board_column": "review",
       "assignee": "claude",
       "doc_ref": null,
       "sort": 340
