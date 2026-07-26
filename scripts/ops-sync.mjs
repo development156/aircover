@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process'
 import { loadEnv, warn } from './lib/ops-env.mjs'
 import { readState, clearPending, STATE_DIR } from './lib/ops-state.mjs'
+import { ingestVerdict, formatPermanent } from './lib/ops-ingest-verdict.mjs'
 
 /**
  * Mirror ops/state into the dashboard (doc 13 §9.2).
@@ -135,7 +136,16 @@ async function post(payload) {
     })
     const text = await response.text()
     if (!response.ok) {
-      warn(`ingest ${response.status} at ${url} — ${text.slice(0, 200)}`)
+      const verdict = ingestVerdict({ status: response.status, body: text, url })
+      if (verdict.permanent) {
+        // Loud, and non-zero when a human asked for this sync. Hooks still exit
+        // 0 (doc 13 §9.2 — a hook must never block work), but they print the
+        // same block, so the misconfiguration is visible either way.
+        console.error(formatPermanent(verdict))
+        if (!FLAGS.hookWrite && !FLAGS.heartbeat) process.exitCode = 1
+      } else {
+        warn(`${verdict.headline} — will replay on the next sync.`)
+      }
       return null
     }
     return JSON.parse(text)
