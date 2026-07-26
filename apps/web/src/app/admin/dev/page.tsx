@@ -1,5 +1,6 @@
 import { PendingRegion } from '@/components/admin/pending-region'
 import { RoadmapCard } from '@/components/admin/roadmap-card'
+import { HeaderStrips } from '@/components/admin/strips'
 import { PageTitle } from '@/components/page-title'
 
 export const metadata = { title: 'Dev' }
@@ -19,11 +20,7 @@ export default function AdminDevPage() {
 
       <RoadmapCard />
 
-      <PendingRegion
-        title="Session and gates"
-        card="SL-015"
-        builds="Whether a Claude session is working right now, and the latest verdict per test suite."
-      />
+      <HeaderStrips />
 
       <div className="grid gap-grid wide:grid-cols-[1fr_380px]">
         <PendingRegion

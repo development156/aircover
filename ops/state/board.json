@@ -159,17 +159,19 @@
       "sort": 140,
       "blocked": false,
       "blocked_reason": null,
-      "commit_sha": "f2ab3b92fdd37bdb0f1f7b4e1e17214257066a32"
+      "commit_sha": "bedc8494e362766914c2d78fbd18ff8310e72c78"
     },
     {
       "code": "SL-015",
       "title": "Session pulse and gates strips",
-      "detail": null,
+      "detail": "Strips render live: working pulse + 5 gate chips",
       "roadmap_code": "AO3",
-      "board_column": "todo",
+      "board_column": "review",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 150
+      "sort": 150,
+      "blocked": false,
+      "blocked_reason": null
     },
     {
       "code": "SL-016",
