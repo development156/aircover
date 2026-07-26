@@ -57,11 +57,11 @@ export function CreditChip({ balance }: { balance: BalanceRead }) {
       aria-label={content.label}
       className="flex items-center gap-[7px] rounded-pill border-[1.5px] border-primary bg-bg px-[13px] py-1.5 font-semibold transition-micro hover:bg-tint-50 active:scale-[.97] dark:hover:bg-s2"
     >
-      {/* tabular-nums only where there is a number to align. */}
+      {/* `.num` (tokens.css v3: mono + tabular-nums) only where there is a
+          number to align — v3 puts mono in exactly three places and the topbar
+          credit pill is one of them. "No wallet yet" is prose, so it stays sans. */}
       <span
-        className={
-          balance.status === 'ok' || balance.status === 'unreadable' ? 'tabular-nums' : undefined
-        }
+        className={balance.status === 'ok' || balance.status === 'unreadable' ? 'num' : undefined}
       >
         {content.text}
       </span>

@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en" data-brand="sahoda">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sahoda Labs — Design System v3 · The Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   SAHODA DESIGN SYSTEM v3 — "The Ledger"
+   Thesis: structure carries meaning, color carries identity.
+   Every state below must survive recolor, greyscale, and dark.
+   ============================================================ */
+
+/* ---- TENANT BRAND (the 7 vars the theming engine writes) ---- */
+[data-brand="sahoda"] { --p:#FF4B00; --pfg:#131313; --pstrong:#D73F00; --acc:#BA3700; --t50:#FFF2ED; --t100:#FFE4D9; --t300:#FFA580; }
+[data-brand="indigo"] { --p:#4F46E5; --pfg:#FFFFFF; --pstrong:#4338CA; --acc:#4338CA; --t50:#EEF2FF; --t100:#E0E7FF; --t300:#A5B4FC; }
+[data-brand="forest"] { --p:#15803D; --pfg:#FFFFFF; --pstrong:#166534; --acc:#166534; --t50:#F0FDF4; --t100:#DCFCE7; --t300:#86EFAC; }
+[data-brand="crimson"]{ --p:#DC2626; --pfg:#FFFFFF; --pstrong:#B91C1C; --acc:#B91C1C; --t50:#FEF2F2; --t100:#FEE2E2; --t300:#FCA5A5; }
+
+:root {
+  /* ---- Readable aliases (what components consume) ---- */
+  --brand:      var(--p);
+  --brand-ink:  var(--pfg);
+  --brand-deep: var(--pstrong);
+  --brand-text: var(--acc);
+  --brand-wash: var(--t50);
+  --brand-tint: var(--t100);
+  --brand-lift: var(--t300);
+
+  /* ---- Warm neutrals: harmonise across the widest tenant range ---- */
+  --canvas:    #FBFAF9;
+  --surface:   #FFFFFF;
+  --surface-2: #F5F4F2;
+  --line:      #E7E5E3;
+  --line-firm: #D6D3D0;
+  --ink:       #171514;
+  --ink-body:  #3D3936;
+  --ink-mute:  #6B6560;
+  --ink-faint: #A8A29E;   /* decorative + disabled ONLY — fails 4.5:1 */
+
+  /* ---- Semantic: strokes, icons, text. NEVER large fills. ---- */
+  --ok:     #15803D;
+  --warn:   #B45309;
+  --danger: #C81E1E;
+  --info:   #1D4ED8;
+
+  /* ---- Certainty: the signature. Structural, not chromatic. ---- */
+  --hatch: rgba(23,21,20,.16);
+
+  /* ---- Type: short scale, big jumps ---- */
+  --sans: 'Outfit', system-ui, 'Noto Sans Devanagari', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --t-display: 700 32px/38px var(--sans);
+  --t-h1:      700 24px/30px var(--sans);
+  --t-h2:      600 16px/22px var(--sans);
+  --t-body:    400 14px/22px var(--sans);
+  --t-sm:      400 13px/19px var(--sans);
+  --t-eyebrow: 600 11px/14px var(--mono);
+
+  /* ---- 4pt space ---- */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px; --s8:32px; --s10:40px;
+
+  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-full:999px;
+  --sh-card:0 1px 2px rgba(23,21,20,.05);
+  --sh-pop:0 6px 20px rgba(23,21,20,.10);
+  --dur:180ms; --ease:cubic-bezier(.2,0,0,1);
+}
+
+[data-theme="dark"] {
+  --canvas:#141210; --surface:#1D1A18; --surface-2:#262220;
+  --line:#332E2B; --line-firm:#4A433F;
+  --ink:#F7F5F3; --ink-body:#D8D3CF; --ink-mute:#A8A29E; --ink-faint:#6B6560;
+  --ok:#4ADE80; --warn:#FBBF24; --danger:#F87171; --info:#93C5FD;
+  --hatch:rgba(247,245,243,.20);
+  --brand-text:var(--t300);
+  --sh-card:0 1px 2px rgba(0,0,0,.5); --sh-pop:0 6px 20px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--ink-body);font:var(--t-body);
+     -webkit-font-smoothing:antialiased;transition:background var(--dur) var(--ease)}
+h1,h2,h3{color:var(--ink);margin:0}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--brand-text);outline-offset:2px;border-radius:var(--r-sm)}
+
+/* ---- The blade: marks agency. Sahoda acted, not you. ---- */
+.blade{display:inline-block;width:9px;height:15px;background:var(--brand);
+       border-radius:100% 0 100% 0;flex:none;transition:background var(--dur) var(--ease)}
+
+.wrap{max-width:920px;margin:0 auto;padding:var(--s8) var(--s6) var(--s10)}
+.eyebrow{font:var(--t-eyebrow);letter-spacing:.14em;text-transform:uppercase;
+         color:var(--brand-text);display:flex;align-items:center;gap:var(--s2);margin-bottom:var(--s3)}
+section{padding:var(--s8) 0;border-top:1px solid var(--line)}
+section > p.lede{color:var(--ink-mute);max-width:60ch;margin:var(--s2) 0 var(--s6)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+      padding:var(--s5);box-shadow:var(--sh-card)}
+.row{display:flex;gap:var(--s3);flex-wrap:wrap;align-items:center}
+.grid{display:grid;gap:var(--s4)}
+
+/* ================= HEADER + SWITCHERS ================= */
+header{padding-bottom:var(--s6)}
+header h1{font:var(--t-display);letter-spacing:-.02em}
+header .sub{color:var(--ink-mute);margin-top:var(--s2)}
+.switchbar{display:flex;gap:var(--s4);flex-wrap:wrap;margin-top:var(--s6);
+           padding:var(--s3) var(--s4);background:var(--surface);border:1px solid var(--line);
+           border-radius:var(--r-lg);align-items:center}
+.switchbar .label{font:var(--t-eyebrow);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-mute)}
+.swatch{width:26px;height:26px;border-radius:var(--r-full);border:2px solid transparent;
+        cursor:pointer;padding:0;transition:transform var(--dur) var(--ease)}
+.swatch[aria-pressed="true"]{border-color:var(--ink);transform:scale(1.12)}
+.toggle{margin-left:auto;border:1px solid var(--line-firm);background:var(--surface);
+        color:var(--ink-body);border-radius:var(--r-full);padding:var(--s2) var(--s4);
+        font:var(--t-sm);cursor:pointer}
+
+/* ================= THE CERTAINTY SYSTEM ================= */
+.chip{display:inline-flex;align-items:center;gap:var(--s2);padding:var(--s2) var(--s3);
+      border-radius:var(--r-md);font:600 13px/18px var(--sans);border:1px solid transparent}
+
+/* REAL — it happened. Solid, settled, no border. */
+.chip.real{background:var(--brand);color:var(--brand-ink)}
+
+/* COMMITTED — it will happen. Hairline + tint. */
+.chip.committed{background:var(--brand-wash);color:var(--brand-text);border-color:var(--brand-tint)}
+
+/* PROPOSED — Sahoda suggests. Dashed = provisional. */
+.chip.proposed{background:transparent;color:var(--ink-mute);
+               border:1px dashed var(--line-firm)}
+
+/* SIMULATED — not real. Hatched + always labelled. */
+.chip.simulated{background:transparent;color:var(--ink-mute);border:1px solid var(--line-firm);
+  background-image:repeating-linear-gradient(-45deg,transparent 0 5px,var(--hatch) 5px 6px)}
+.chip.simulated .tag{font:var(--t-eyebrow);letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--line-firm);border-radius:var(--r-sm);padding:1px 4px;color:var(--ink-mute)}
+
+.certgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:var(--s4)}
+.certgrid .cell{padding:var(--s4);border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface)}
+.certgrid .cell h3{font:var(--t-h2);margin-bottom:var(--s1)}
+.certgrid .cell p{font:var(--t-sm);color:var(--ink-mute);margin:var(--s3) 0 var(--s4)}
+
+/* ================= BUTTONS + COST GRAMMAR ================= */
+.btn{display:inline-flex;align-items:center;gap:var(--s2);border:1px solid transparent;
+     border-radius:var(--r-md);padding:var(--s3) var(--s4);font:600 14px/18px var(--sans);
+     cursor:pointer;transition:background var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:var(--brand);color:var(--brand-ink)}
+.btn-primary:hover{background:var(--brand-deep);color:#fff}
+.btn-quiet{background:var(--surface);color:var(--ink);border-color:var(--line-firm)}
+.btn-quiet:hover{background:var(--surface-2)}
+.btn:disabled{background:var(--surface-2);color:var(--ink-faint);border-color:var(--line);cursor:not-allowed}
+/* Cost lives IN the button, never in a tooltip. Mono = you're accountable for it. */
+.cost{font-family:var(--mono);font-size:12px;font-weight:500;opacity:.75;
+      padding-left:var(--s2);border-left:1px solid currentColor}
+
+/* ================= LEDGER ROWS ================= */
+.ledger{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.lrow{display:grid;grid-template-columns:20px 1fr auto;gap:var(--s3);align-items:center;
+      padding:var(--s3) var(--s4);border-bottom:1px solid var(--line)}
+.lrow:last-child{border-bottom:0}
+.lrow .what{font:var(--t-body);color:var(--ink)}
+.lrow .why{font:var(--t-sm);color:var(--ink-mute);margin-top:2px}
+.lrow .amt{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500;font-size:14px}
+.amt.debit{color:var(--ink)}
+.amt.credit{color:var(--ok)}
+.amt.held{color:var(--ink-mute)}
+
+/* ================= WEEK STRIP (certainty at a glance) ================= */
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--s2)}
+.day{border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);
+     padding:var(--s3) var(--s2);min-height:96px;display:flex;flex-direction:column;gap:var(--s2)}
+.day .dnum{font:var(--t-eyebrow);letter-spacing:.1em;color:var(--ink-mute);text-transform:uppercase}
+.pill{border-radius:var(--r-sm);padding:3px var(--s2);font:500 11px/15px var(--sans);
+      display:flex;align-items:center;gap:4px}
+.pill.real{background:var(--brand);color:var(--brand-ink)}
+.pill.committed{background:var(--brand-wash);color:var(--brand-text);border:1px solid var(--brand-tint)}
+.pill.proposed{border:1px dashed var(--line-firm);color:var(--ink-mute)}
+.pill.simulated{border:1px solid var(--line-firm);color:var(--ink-mute);
+  background-image:repeating-linear-gradient(-45deg,transparent 0 4px,var(--hatch) 4px 5px)}
+.pill .blade{width:6px;height:10px}
+
+/* ================= TYPE SPECIMEN ================= */
+.spec{display:grid;gap:var(--s4)}
+.spec div{display:flex;align-items:baseline;gap:var(--s4);flex-wrap:wrap}
+.spec .tag{font:var(--t-eyebrow);letter-spacing:.1em;text-transform:uppercase;
+           color:var(--ink-faint);width:88px;flex:none}
+
+/* ================= SEMANTIC STROKES ================= */
+.note{display:flex;gap:var(--s3);padding:var(--s3) var(--s4);border-radius:var(--r-md);
+      background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--line-firm)}
+.note.ok{border-left-color:var(--ok)} .note.warn{border-left-color:var(--warn)}
+.note.danger{border-left-color:var(--danger)} .note.info{border-left-color:var(--info)}
+.note b{color:var(--ink);font-weight:600}
+
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+@media (max-width:700px){.week{grid-template-columns:repeat(3,1fr)} .wrap{padding:var(--s5) var(--s4)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow"><span class="blade"></span> Design System v3 · The Ledger</div>
+  <h1>Structure carries meaning.<br>Color carries identity.</h1>
+  <p class="sub">The app wears each customer's brand, so nothing may depend on color to be understood.
+     Change the palette below — every state stays readable.</p>
+
+  <div class="switchbar">
+    <span class="label">Tenant brand</span>
+    <button class="swatch" style="background:#FF4B00" data-set="sahoda" aria-pressed="true" aria-label="Sahoda orange"></button>
+    <button class="swatch" style="background:#4F46E5" data-set="indigo" aria-pressed="false" aria-label="Indigo"></button>
+    <button class="swatch" style="background:#15803D" data-set="forest" aria-pressed="false" aria-label="Forest"></button>
+    <button class="swatch" style="background:#DC2626" data-set="crimson" aria-pressed="false" aria-label="Crimson"></button>
+    <button class="toggle" id="dark">Dark mode</button>
+  </div>
+</header>
+
+<section>
+  <div class="eyebrow"><span class="blade"></span> The signature</div>
+  <h2 style="font:var(--t-h1)">The Certainty System</h2>
+  <p class="lede">Four levels of how real a thing is. Each has a structural signature that survives
+     any palette, greyscale, and colorblindness. This is the honesty rule made physical —
+     you would have to work to violate it.</p>
+
+  <div class="certgrid">
+    <div class="cell">
+      <h3>Real</h3>
+      <p>It happened. Solid fill, no border — settled.</p>
+      <span class="chip real">Published · 2:14 pm</span>
+    </div>
+    <div class="cell">
+      <h3>Committed</h3>
+      <p>You approved it. Hairline and tint — locked in.</p>
+      <span class="chip committed">Scheduled · Tue 9:00</span>
+    </div>
+    <div class="cell">
+      <h3>Proposed</h3>
+      <p>Sahoda suggests. Dashed — visibly provisional.</p>
+      <span class="chip proposed"><span class="blade"></span> Draft for Thursday</span>
+    </div>
+    <div class="cell">
+      <h3>Simulated</h3>
+      <p>Not real. Hatched and always labelled.</p>
+      <span class="chip simulated">Posted to X <span class="tag">Simulated</span></span>
+    </div>
+  </div>
+
+  <div class="note info" style="margin-top:var(--s5)">
+    <div><b>Why dashed matters.</b> Approving a post turns the dash solid. Approval stops being a
+    state change in a database and becomes something you watch happen.</div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="blade"></span> At a glance</div>
+  <h2 style="font:var(--t-h1)">A week, read without reading</h2>
+  <p class="lede">The blade marks agency — Sahoda acted, rather than you. Squint: you can still tell
+     what is done, what is coming, and what is only proposed.</p>
+
+  <div class="week">
+    <div class="day"><span class="dnum">Mon 20</span><span class="pill real">Published</span></div>
+    <div class="day"><span class="dnum">Tue 21</span><span class="pill real">Published</span><span class="pill simulated">X · sim</span></div>
+    <div class="day"><span class="dnum">Wed 22</span><span class="pill committed">9:00 GBP</span></div>
+    <div class="day"><span class="dnum">Thu 23</span><span class="pill proposed"><span class="blade"></span>Draft</span></div>
+    <div class="day"><span class="dnum">Fri 24</span><span class="pill proposed"><span class="blade"></span>Draft</span></div>
+    <div class="day"><span class="dnum">Sat 25</span></div>
+    <div class="day"><span class="dnum">Sun 26</span><span class="pill proposed"><span class="blade"></span>Draft</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="blade"></span> Spend grammar</div>
+  <h2 style="font:var(--t-h1)">The cost is in the button</h2>
+  <p class="lede">Never a tooltip, never a surprise. Monospace signals a quantity you are accountable
+     for — the same treatment as the ledger and the balance.</p>
+
+  <div class="row">
+    <button class="btn btn-primary">Rewrite <span class="cost">1 cr</span></button>
+    <button class="btn btn-primary">Make variants <span class="cost">3 cr</span></button>
+    <button class="btn btn-quiet">Plan my week <span class="cost">20 cr</span></button>
+    <button class="btn btn-quiet" disabled>Generate site <span class="cost">100 cr</span></button>
+  </div>
+  <p style="font:var(--t-sm);color:var(--ink-mute);margin-top:var(--s3)">
+    Disabled above because the balance is short — the shortfall is named on hover, never discovered on click.</p>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="blade"></span> The metaphor</div>
+  <h2 style="font:var(--t-h1)">It should feel like a ledger</h2>
+  <p class="lede">Not a dashboard. Dashboards perform; ledgers account. Every entry says what it was
+     and why it was.</p>
+
+  <div class="ledger">
+    <div class="lrow"><span class="blade"></span>
+      <div><div class="what">Plan my week</div><div class="why">5 drafts · Sahoda acted · standard tier</div></div>
+      <span class="amt debit">−20</span></div>
+    <div class="lrow"><span></span>
+      <div><div class="what">Variants · 4 platforms</div><div class="why">Diwali offer post</div></div>
+      <span class="amt debit">−3</span></div>
+    <div class="lrow"><span></span>
+      <div><div class="what">Rewrite — failed</div><div class="why">Provider timeout · you were not charged</div></div>
+      <span class="amt credit">+1</span></div>
+    <div class="lrow"><span></span>
+      <div><div class="what">Site generation</div><div class="why">Held while running</div></div>
+      <span class="amt held">100 held</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="blade"></span> Semantics</div>
+  <h2 style="font:var(--t-h1)">Meaning colors stroke, brand colors fill</h2>
+  <p class="lede">This resolves a collision nobody has hit yet: what happens when a customer's brand
+     colour <em>is</em> red. Switch the palette to crimson above — danger still reads, because danger
+     never competes for a fill.</p>
+
+  <div class="grid">
+    <div class="note ok"><div><b>Published to Google Business.</b> Live at 2:14 pm.</div></div>
+    <div class="note warn"><div><b>12 credits left.</b> This week's plan needs 60. Top up, or trim the plan.</div></div>
+    <div class="note danger"><div><b>X rejected the video size.</b> Resized and not charged — approve the retry?</div></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="blade"></span> Type</div>
+  <h2 style="font:var(--t-h1)">Short scale, big jumps</h2>
+  <p class="lede">Eight barely-different sizes is what you get when colour was carrying the hierarchy.
+     Five steps, clearly separated, plus mono for anything countable.</p>
+
+  <div class="spec">
+    <div><span class="tag">Display</span><span style="font:var(--t-display)">Good morning, Priya</span></div>
+    <div><span class="tag">H1</span><span style="font:var(--t-h1);color:var(--ink)">Your credit balance</span></div>
+    <div><span class="tag">H2</span><span style="font:var(--t-h2);color:var(--ink)">Usage breakdown</span></div>
+    <div><span class="tag">Body</span><span style="font:var(--t-body)">Sahoda drafted five posts grounded in your brand.</span></div>
+    <div><span class="tag">Small</span><span style="font:var(--t-sm);color:var(--ink-mute)">Predicted score 74 · not a guarantee</span></div>
+    <div><span class="tag">Mono</span><span class="num" style="font-size:24px;font-weight:600;color:var(--ink)">4,215 credits</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow"><span class="blade"></span> Proof</div>
+  <h2 style="font:var(--t-h1)">The greyscale test</h2>
+  <p class="lede">Every state above must survive this. If a chip only means "published" because it is
+     green, the system is broken — so the system does not rely on green.</p>
+  <div class="row" style="filter:grayscale(1);gap:var(--s3)">
+    <span class="chip real">Published</span>
+    <span class="chip committed">Scheduled</span>
+    <span class="chip proposed"><span class="blade"></span> Proposed</span>
+    <span class="chip simulated">Posted <span class="tag">Simulated</span></span>
+  </div>
+</section>
+
+</div>
+
+<script>
+  const root = document.documentElement;
+  document.querySelectorAll('.swatch').forEach(b => {
+    b.addEventListener('click', () => {
+      root.setAttribute('data-brand', b.dataset.set);
+      document.querySelectorAll('.swatch').forEach(o =>
+        o.setAttribute('aria-pressed', String(o === b)));
+    });
+  });
+  document.getElementById('dark').addEventListener('click', e => {
+    const on = root.getAttribute('data-theme') === 'dark';
+    root.setAttribute('data-theme', on ? 'light' : 'dark');
+    e.target.textContent = on ? 'Dark mode' : 'Light mode';
+  });
+</script>
+</body>
+</html>

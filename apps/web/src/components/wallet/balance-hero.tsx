@@ -32,7 +32,10 @@ export function BalanceHero({ balance, staleNote }: BalanceHeroProps) {
 
       {/* docs/08 §8: a credit change must be announced, not merely repainted. */}
       <p aria-live="polite" className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-[44px] leading-[52px] font-extrabold tabular-nums">
+        {/* `.num` from tokens.css v3 — mono + tabular. The Credits balance is
+            one of the three places v3 allows mono; the total/held line below
+            stays sans and only aligns its digits. */}
+        <span className="num text-[44px] leading-[52px] font-extrabold">
           {formatCredits(balance.available)}
         </span>
         <span className="text-muted">
