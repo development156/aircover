@@ -244,6 +244,55 @@ legitimately preview-only alongside a real channel. The rule is "at least one at
 "all attemptable", which matches what the dispatcher already does: unattemptable and `skipped`
 variants are excluded from the success denominator rather than making the post a partial.
 
+## wt-pub: publishing needs a CAS claim before any non-Trigger.dev runner may publish
+
+`runPublishPost` never claims the variant it is about to publish. The only UPDATE against
+`post_variants` in the repo is `publish/store.ts:81`, which writes the OUTCOME
+(`published`/`failed`) and carries no status predicate at all — a blind write, not a
+compare-and-swap. `publish_status = 'publishing'` is read by `dispatch/classify.ts:110` and
+**written by nobody**. There is no unique index standing in for it either: `post_publish_logs`
+has only a primary key on `id`.
+
+So duplicate-suppression today is entirely Trigger.dev's `idempotencyKey`, applied at
+`.trigger()`. `publishIdempotencyKey` is a string handed to that queue and used nowhere else.
+Take the queue away — as the Vercel-cron runner does — and it drops to zero.
+
+**Ask:** add a claim before the attempt, and only then let a runner publish inline.
+
+```sql
+update post_variants set publish_status = 'publishing'
+ where id = $1 and workspace_id = $2
+   and publish_status in ('pending','scheduled')
+returning id
+```
+
+`rowCount = 0` means someone else owns the attempt. No schema change is needed: `'publishing'`
+is already permitted by `post_variants_publish_status_check`, and `post_variants.updated_at`
+already has a `set_updated_at` trigger, so a stale claim can be reclaimed on age.
+
+Two things the claim must come with, or it trades a double-post for a permanent stall:
+
+1. **A reclaim rule.** A run that dies after claiming leaves the variant `publishing`, and the
+   classifier holds that post as `in-flight` forever. Reclaim on `updated_at` older than the
+   runner's own maximum duration.
+2. **A release on terminal failure.** `runPublishPost` already writes `failed`, which clears
+   the claim; the transient path rethrows and deliberately leaves the variant mid-flight, so
+   the reclaim rule above is what covers it.
+
+**Meanwhile:** the cron route's `enqueuePublish` throws `PublishQueueUnavailableError` and the
+post is left untouched, so nothing is published and nothing is lost — the next tick sees the
+post again. Due posts therefore expire at their grace boundary rather than going out.
+
+## wt-web/infra: `JOB_SIGNING_SECRET` is allowlisted and used by nothing — delete it
+
+`turbo.json` lists `JOB_SIGNING_SECRET` in the `@sahoda/web#build` env allowlist. Nothing in
+`apps/**` or `packages/**` reads it. The cron route consolidates on `CRON_SECRET`, which Vercel
+sends automatically as an `Authorization` header when it invokes a cron job — and which serves
+any other caller (QStash, a workflow) that can present the same value.
+
+**Ask:** remove `JOB_SIGNING_SECRET` from `turbo.json` and from the Vercel project env. Two
+names for one job is how an endpoint ends up checking the one that was never set.
+
 ## Untested: Trigger.dev against raw-TS workspace packages
 
 Every workspace package ships `"exports": "./src/index.ts"` with **no build step**, and apps/jobs
