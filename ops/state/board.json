@@ -153,12 +153,13 @@
       "title": "Roadmap progress card with \"To reach Done\"",
       "detail": "Roadmap card renders live: Admin Ops 30%, 3 open items",
       "roadmap_code": "AO3",
-      "board_column": "review",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 140,
       "blocked": false,
-      "blocked_reason": null
+      "blocked_reason": null,
+      "commit_sha": "f2ab3b92fdd37bdb0f1f7b4e1e17214257066a32"
     },
     {
       "code": "SL-015",
@@ -391,6 +392,16 @@
       "assignee": "claude",
       "doc_ref": null,
       "sort": 370
+    },
+    {
+      "code": "SL-038",
+      "title": "Sweep the repo for `as` casts in test helpers and factories",
+      "detail": "On 2026-07-26 a test factory ended `} as OpsRoadmapItem`, and the cast let four call sites pass status:\"in_progress\" — a value the enum does not have and the CHECK constraint rejects. Twenty-five tests were green against a status that cannot exist; the live ingest caught it, not the suite. The cast is the defect, not the value: a factory is exactly where the type system should be strictest, because everything downstream trusts the shape it produces. Sweep every `as <RowType>` and `as any` in *.test.ts / *.test.tsx / test factories and fixtures across apps and packages; replace each with an annotated return type so the fields are checked at the call site. Where a cast is genuinely needed (a deliberately malformed row proving a parser rejects it) keep it and write the reason on the line above — an explained cast is a test, an unexplained one is a hole. Related: the earlier finding that a green suite can pin a defect as correct.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": null,
+      "sort": 380
     }
   ]
 }

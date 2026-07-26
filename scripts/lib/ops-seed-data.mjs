@@ -237,6 +237,24 @@ const TASKS = [
       'since isActiveOpsAdmin() swallows every error into false and a broken ' +
       'query currently looks exactly like a revoked seat.',
   ],
+  [
+    null,
+    'Sweep the repo for `as` casts in test helpers and factories',
+    'On 2026-07-26 a test factory ended `} as OpsRoadmapItem`, and the cast let ' +
+      'four call sites pass status:"in_progress" — a value the enum does not ' +
+      'have and the CHECK constraint rejects. Twenty-five tests were green ' +
+      'against a status that cannot exist; the live ingest caught it, not the ' +
+      'suite. The cast is the defect, not the value: a factory is exactly where ' +
+      'the type system should be strictest, because everything downstream ' +
+      'trusts the shape it produces. Sweep every `as <RowType>` and `as any` in ' +
+      '*.test.ts / *.test.tsx / test factories and fixtures across apps and ' +
+      'packages; replace each with an annotated return type so the fields are ' +
+      'checked at the call site. Where a cast is genuinely needed (a ' +
+      'deliberately malformed row proving a parser rejects it) keep it and ' +
+      'write the reason on the line above — an explained cast is a test, an ' +
+      'unexplained one is a hole. Related: the earlier finding that a green ' +
+      'suite can pin a defect as correct.',
+  ],
 ]
 
 export function tasks() {

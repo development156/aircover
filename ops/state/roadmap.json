@@ -119,7 +119,8 @@
       "title": "Foundations — ops tables, RLS, shared contracts, /admin gate",
       "weight": 3,
       "status": "done",
-      "sort": 20
+      "sort": 20,
+      "target_date": "2026-07-26"
     },
     {
       "code": "AO2",
@@ -127,7 +128,8 @@
       "title": "Sync protocol — ingest API, state files, hooks, skill, commands",
       "weight": 3,
       "status": "done",
-      "sort": 21
+      "sort": 21,
+      "target_date": "2026-07-26"
     },
     {
       "code": "AO3",
@@ -135,7 +137,8 @@
       "title": "DevOps dashboard — roadmap card, scrum board, changelog, QA console",
       "weight": 6,
       "status": "active",
-      "sort": 22
+      "sort": 22,
+      "target_date": "2026-07-26"
     },
     {
       "code": "AO4",
@@ -143,7 +146,8 @@
       "title": "Admin half — beta form, inbox, invitations, credit OTP, team",
       "weight": 6,
       "status": "todo",
-      "sort": 23
+      "sort": 23,
+      "target_date": "2026-07-26"
     },
     {
       "code": "AO5",
@@ -151,7 +155,8 @@
       "title": "Acceptance gate — doc 13 §17, security review, handoff",
       "weight": 2,
       "status": "todo",
-      "sort": 24
+      "sort": 24,
+      "target_date": "2026-07-26"
     },
     {
       "code": "B1",
