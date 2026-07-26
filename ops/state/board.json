@@ -166,24 +166,26 @@
       "title": "Session pulse and gates strips",
       "detail": "Strips render live: working pulse + 5 gate chips",
       "roadmap_code": "AO3",
-      "board_column": "review",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 150,
       "blocked": false,
-      "blocked_reason": null
+      "blocked_reason": null,
+      "commit_sha": "f5b4995e24147a54b0eee051efde32bb066340be"
     },
     {
       "code": "SL-016",
       "title": "Scrum board — four columns, drag, filters",
       "detail": "Board renders 39 cards in four columns with filters and QA dots",
       "roadmap_code": "AO3",
-      "board_column": "review",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 160,
       "blocked": false,
-      "blocked_reason": null
+      "blocked_reason": null,
+      "commit_sha": "e47401bd1c42710c09bb9d8279dace87a660b7c2"
     },
     {
       "code": "SL-017",

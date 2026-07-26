@@ -7,6 +7,7 @@ import {
   stripAnsi,
   suiteFor,
   closingTaskCodes,
+  invokesOpsScript,
   suitesFor,
   taskCodesIn,
   verdictFor,
@@ -266,4 +267,34 @@ describe('isGitCommit', () => {
       expect(isGitCommit(command)).toBe(command.startsWith('git commit'))
     },
   )
+})
+
+describe('invokesOpsScript', () => {
+  it.each([
+    'node scripts/ops-sync.mjs',
+    'node /abs/path/scripts/ops-sync.mjs --full',
+    'OPS_INGEST_URL=http://localhost:3002 node scripts/ops-sync.mjs',
+    'pnpm test && node scripts/ops-hook-bash.mjs',
+  ])('recognises %s as a run', (command) => {
+    expect(invokesOpsScript(command)).toBe(true)
+  })
+
+  it('does NOT treat staging the file as running it', () => {
+    // The real failure, verbatim in shape. The old guard matched the filename
+    // anywhere in the command, so this commit closed nothing: SL-015 sat in For
+    // Review with no sha while its work was committed and pushed.
+    const command = "git add scripts/ops-sync.mjs && git commit -q -F - <<'MSG'\nfeat(SL-015): x\nMSG"
+
+    expect(invokesOpsScript(command)).toBe(false)
+    expect(isGitCommit(command)).toBe(true)
+    expect(closingTaskCodes(command)).toEqual(['SL-015'])
+  })
+
+  it.each([
+    'cat scripts/ops-sync.mjs',
+    'rm -f scripts/ops-hook-bash.mjs',
+    'git diff scripts/ops-sync.mjs',
+  ])('does not treat %j as a run', (command) => {
+    expect(invokesOpsScript(command)).toBe(false)
+  })
 })
