@@ -1,5 +1,6 @@
 import { AlertTriangle, CircleDot, ListChecks } from 'lucide-react'
 
+import { AlphaReadiness } from '@/components/admin/alpha-readiness'
 import { readGateRuns, readRoadmapItems, readTasks } from '@/lib/ops/read'
 import {
   currentStage,
@@ -147,7 +148,10 @@ export async function RoadmapCard() {
       .map((item) => item.target_date)
       .filter((date): date is string => Boolean(date))
       .sort()[0] ?? null
-  const days = daysRemaining(target, new Date())
+  // One clock for the whole card: the deadline and the gate age must not be
+  // read a few milliseconds apart and disagree about what day it is.
+  const now = new Date()
+  const days = daysRemaining(target, now)
 
   // A failed tasks/gates read must not blank the card — the progress bar above
   // is still true. It DOES mean the checklist below is incomplete, and that is
@@ -170,6 +174,13 @@ export async function RoadmapCard() {
 
   return (
     <Shell>
+      {/* Leads the card. This is the number that decides whether anything else
+          on this page matters, and it was previously findable only by reading a
+          comment in the seed script. */}
+      <div className="mb-4">
+        <AlphaReadiness items={items.data} today={now} />
+      </div>
+
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 id="roadmap-heading" className="text-[15px] font-bold tracking-[-0.01em]">
           {stage ? stage.label : 'Roadmap'}
