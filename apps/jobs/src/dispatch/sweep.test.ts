@@ -3,6 +3,7 @@ import type { Channel, VariantPublishStatus } from '@sahoda/shared'
 import type { PublishMode } from '../publish/runPublishPost'
 import type { CandidateVariant, DispatchCandidate } from './classify'
 import { runDispatchSweep, type DispatchSweepDeps } from './sweep'
+import { PublishQueueUnavailableError } from './queue'
 
 const NOW = new Date('2026-07-25T12:00:00Z')
 
@@ -241,5 +242,92 @@ describe('runDispatchSweep — resilience', () => {
     await runDispatchSweep(d)
 
     expect(now).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('runDispatchSweep — a deployment with no publish queue', () => {
+  it('counts a refused enqueue separately from a failure', async () => {
+    // v1 of the cron route cannot publish: there is no queue behind it, and no CAS claim
+    // to make an inline publish safe under overlap. The enqueue refuses in the open, and
+    // that refusal must not read as "the publish failed" - nothing was attempted.
+    const d = deps({
+      listCandidates: async () => [candidate('p1', 10, [variant('x', 'pending')])],
+      enqueuePublish: async () => {
+        throw new PublishQueueUnavailableError()
+      },
+    })
+
+    const report = await runDispatchSweep(d)
+
+    expect(report.wouldDispatch).toBe(1)
+    expect(report.enqueued).toBe(0)
+    expect(report.queueUnavailable).toBe(1)
+    expect(report.failed).toBe(0)
+  })
+
+  it('still counts a real enqueue error as a failure', async () => {
+    const d = deps({
+      listCandidates: async () => [candidate('p1', 10, [variant('x', 'pending')])],
+      enqueuePublish: async () => {
+        throw new Error('connection terminated')
+      },
+    })
+
+    const report = await runDispatchSweep(d)
+
+    expect(report.failed).toBe(1)
+    expect(report.queueUnavailable).toBe(0)
+  })
+
+  it('counts one refusal per variant, not per post', async () => {
+    const d = deps({
+      listCandidates: async () => [
+        candidate('p1', 10, [variant('x', 'pending'), variant('gbp', 'pending')]),
+      ],
+      enqueuePublish: async () => {
+        throw new PublishQueueUnavailableError()
+      },
+    })
+
+    const report = await runDispatchSweep(d)
+
+    expect(report.queueUnavailable).toBe(2)
+  })
+
+  it('a refused enqueue leaves the post untouched, so the next tick sees it again', async () => {
+    // The dangerous shape would be marking the post somehow on refusal. It stays exactly
+    // where it was: still approved, still in the gate, still due.
+    const expirePost = vi.fn(async () => true)
+    const settlePost = vi.fn(async () => true)
+    const d = deps({
+      listCandidates: async () => [candidate('p1', 10, [variant('x', 'pending')])],
+      enqueuePublish: async () => {
+        throw new PublishQueueUnavailableError()
+      },
+      expirePost,
+      settlePost,
+    })
+
+    await runDispatchSweep(d)
+
+    expect(expirePost).not.toHaveBeenCalled()
+    expect(settlePost).not.toHaveBeenCalled()
+  })
+
+  it('never refuses in report mode, because report mode never enqueues', async () => {
+    const enqueuePublish = vi.fn(async () => {
+      throw new PublishQueueUnavailableError()
+    })
+    const d = deps({
+      mode: 'report',
+      listCandidates: async () => [candidate('p1', 10, [variant('x', 'pending')])],
+      enqueuePublish,
+    })
+
+    const report = await runDispatchSweep(d)
+
+    expect(enqueuePublish).not.toHaveBeenCalled()
+    expect(report.queueUnavailable).toBe(0)
+    expect(report.wouldDispatch).toBe(1)
   })
 })

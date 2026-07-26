@@ -27,6 +27,16 @@ import { runPlanWeek } from './ai/plan-week'
 // while this service-role pool connected to evil.com. Same rule, one definition, one place
 // where it is tested. SET SUPABASE_DB_CA_CERT IN PRODUCTION for full chain verification.
 
+/**
+ * How much work one sweep may take on. The caller sets it because the ceiling belongs to
+ * the RUNNER, not the job: a durable worker can afford a large batch, while a serverless
+ * request has a hard wall (Vercel's function limit) and must stay far inside it. Backlogs
+ * drain across ticks in both cases — every candidate query is oldest-first.
+ */
+export interface SweepBatchOptions {
+  limit?: number
+}
+
 interface Runtime {
   env: JobsEnv
   pool: Pool
@@ -83,9 +93,11 @@ export function publishPostDeps(): PublishPostDeps {
  * imports `publishPostDeps` from this module, so wiring it here would close a require cycle
  * — and it would drag the Trigger.dev SDK into the module the SDK-free cores depend on.
  */
-export function dispatchSweepDeps(): Omit<DispatchSweepDeps, 'enqueuePublish'> {
+export function dispatchSweepDeps(
+  opts: SweepBatchOptions = {},
+): Omit<DispatchSweepDeps, 'enqueuePublish'> {
   const { env, pool } = getRuntime()
-  const store = createDispatchStore({ pool })
+  const store = createDispatchStore({ pool, limit: opts.limit })
 
   return {
     mode: env.dispatchMode,
@@ -97,13 +109,14 @@ export function dispatchSweepDeps(): Omit<DispatchSweepDeps, 'enqueuePublish'> {
 }
 
 /** Dependencies for one expired-hold sweep. */
-export function holdSweepDeps(): HoldSweepDeps {
+export function holdSweepDeps(opts: SweepBatchOptions = {}): HoldSweepDeps {
   const { env, pool, ledger } = getRuntime()
   return {
     mode: env.holdSweepMode,
     listExpiredHolds: createExpiredHoldSource({
       pool,
       graceSeconds: env.holdSweepGraceSeconds,
+      limit: opts.limit,
     }),
     apply: ledger.apply,
   }
