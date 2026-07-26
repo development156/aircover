@@ -80,12 +80,26 @@ vi.mock('@sahoda/mesh', async (importOriginal) => {
   }
 })
 
-/** The action memoizes billing/mesh singletons — every test gets a fresh module. */
-async function loadResolveBrand() {
-  vi.resetModules()
-  const mod = await import('./brand-resolve')
-  return mod.resolveBrand
-}
+/**
+ * The action memoizes billing/mesh singletons, so every test needs a fresh
+ * module — and that reload is why this file was flaky.
+ *
+ * `vi.resetModules()` drops the whole registry, so re-importing this action
+ * re-evaluates its entire transitive graph (Clerk, Supabase, mesh, billing,
+ * zod). Done INSIDE a test body it competed with 90-odd other files for CPU and
+ * blew the 5s testTimeout on roughly two runs in five — "Test timed out in
+ * 5000ms", never an assertion failure. An intermittently red gate is worse than
+ * an honestly failing one: it teaches you to re-run instead of look.
+ *
+ * The reload now happens in `beforeEach`, which has its own budget, raised
+ * explicitly below. testTimeout stays at the default everywhere, so a genuinely
+ * slow ASSERTION still fails fast.
+ *
+ * Safe because every mock in this file reads `state` LAZILY, inside the factory
+ * it returns, and both singletons are built on first call (`??=`), not at import
+ * — so a flag set in the test body still lands before the action reads it.
+ */
+let resolveBrand: typeof import('./brand-resolve').resolveBrand
 
 function sparkForm(): FormData {
   const form = new FormData()
@@ -95,19 +109,28 @@ function sparkForm(): FormData {
 
 const BRAIN = { placeholder: 'brain' }
 
-beforeEach(() => {
+/**
+ * Budget for the module reload only — generous because it is contending with a
+ * whole worker pool, and narrow because it covers one import and nothing else.
+ * A real hang still fails here rather than hanging the suite.
+ */
+const MODULE_RELOAD_BUDGET_MS = 30_000
+
+beforeEach(async () => {
   state.meshResult = { ok: true, data: BRAIN }
   state.billingEnvMissing = false
   state.meshEnvMissing = false
   state.lostAck = false
-})
+
+  vi.resetModules()
+  resolveBrand = (await import('./brand-resolve')).resolveBrand
+}, MODULE_RELOAD_BUDGET_MS)
 
 describe('resolveBrand — deployment config failures', () => {
   test('missing billing env → honest config copy, cause logged server-side', async () => {
     state.billingEnvMissing = true
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    const resolveBrand = await loadResolveBrand()
     const result = await resolveBrand(null, sparkForm())
 
     expect(result).toMatchObject({ ok: false, kind: 'error' })
@@ -125,7 +148,6 @@ describe('resolveBrand — deployment config failures', () => {
     state.meshEnvMissing = true
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    const resolveBrand = await loadResolveBrand()
     const result = await resolveBrand(null, sparkForm())
 
     expect(result).toMatchObject({ ok: false, kind: 'error' })
@@ -147,7 +169,6 @@ describe('resolveBrand — deployment config failures', () => {
     state.lostAck = true
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    const resolveBrand = await loadResolveBrand()
     const result = await resolveBrand(null, sparkForm())
 
     expect(result).toMatchObject({ ok: false, kind: 'error' })
@@ -158,7 +179,6 @@ describe('resolveBrand — deployment config failures', () => {
   })
 
   test('happy path still resolves — the config seam adds no false positives', async () => {
-    const resolveBrand = await loadResolveBrand()
     const result = await resolveBrand(null, sparkForm())
 
     expect(result).toMatchObject({ ok: true, kind: 'resolved', balanceAfter: 50 })
