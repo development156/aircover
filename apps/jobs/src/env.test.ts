@@ -119,4 +119,48 @@ describe('loadJobsEnv', () => {
       /SAHODA_PUBLISH_DISPATCH_GRACE_SECONDS/,
     )
   })
+
+  it('defaults the hold sweep to off', () => {
+    // Same rule as the dispatcher: deploying the sweep must not, by itself, start
+    // moving credits. Only the flag grants that.
+    expect(loadJobsEnv(complete).holdSweepMode).toBe('off')
+  })
+
+  it('accepts each of the three hold sweep modes', () => {
+    for (const mode of ['off', 'report', 'on'] as const) {
+      expect(loadJobsEnv({ ...complete, SAHODA_HOLD_SWEEP_MODE: mode }).holdSweepMode).toBe(mode)
+    }
+  })
+
+  it('rejects an unrecognized hold sweep mode instead of falling back', () => {
+    expect(() => loadJobsEnv({ ...complete, SAHODA_HOLD_SWEEP_MODE: 'ON' })).toThrow(
+      /SAHODA_HOLD_SWEEP_MODE/,
+    )
+  })
+
+  it('does not treat an empty hold sweep mode as off', () => {
+    expect(() => loadJobsEnv({ ...complete, SAHODA_HOLD_SWEEP_MODE: '' })).toThrow(
+      /SAHODA_HOLD_SWEEP_MODE/,
+    )
+  })
+
+  it('names every bad key at once rather than failing on the first', () => {
+    // Two flags now share one validator. A loader that threw on the first would hide the
+    // second, and the operator would fix one, redeploy, and fail again on the other.
+    const err = (): unknown => {
+      try {
+        loadJobsEnv({
+          ...complete,
+          SAHODA_HOLD_SWEEP_MODE: 'yes',
+          SAHODA_PUBLISH_DISPATCH_MODE: 'no',
+        })
+      } catch (e) {
+        return e
+      }
+      return null
+    }
+    const message = String((err() as Error).message)
+    expect(message).toContain('SAHODA_HOLD_SWEEP_MODE')
+    expect(message).toContain('SAHODA_PUBLISH_DISPATCH_MODE')
+  })
 })
