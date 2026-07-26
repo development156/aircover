@@ -84,6 +84,28 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
       return { ok: false, message: 'Could not save your theme — try again.' }
     }
 
+    // A NULL ERROR ON AN UPDATE DOES NOT MEAN THE WRITE HAPPENED.
+    //
+    // With no matching UPDATE policy the row is simply not visible to update, so
+    // PostgREST affects zero rows and returns no error at all — a denied write
+    // and a successful one are indistinguishable from the response. (INSERT is
+    // different: its WITH CHECK fails loudly. Proven on 2026-07-26 against the
+    // ops_* tables, which carry SELECT policies only.)
+    //
+    // Trusting `supersedeError` alone here meant the insert below could add a
+    // second `status: 'active'` row — precisely the "two active rows, reader
+    // picks one arbitrarily" state the comment above says this ordering exists
+    // to prevent. So the postcondition is asserted, not assumed.
+    const { data: stillActive, error: verifyError } = await supabase
+      .from('workspace_themes')
+      .select('id')
+      .eq('workspace_id', workspace.id)
+      .eq('status', 'active')
+      .limit(1)
+    if (verifyError || (stillActive?.length ?? 0) > 0) {
+      return { ok: false, message: 'Could not save your theme — try again.' }
+    }
+
     const { error } = await supabase.from('workspace_themes').insert({
       workspace_id: workspace.id,
       version: nextVersion,
