@@ -2,7 +2,7 @@ import { task } from '@trigger.dev/sdk'
 import { PublishPostPayloadSchema, publishIdempotencyKey } from '@sahoda/shared'
 import type { PublishPostPayload } from '@sahoda/shared'
 import { runPublishPost, type PublishOutcome } from '../publish/runPublishPost'
-import { publishPostDeps } from '../runtime'
+import { publishPostDeps } from '../publish/deps'
 
 export const PUBLISH_POST_TASK_ID = 'publish-post'
 

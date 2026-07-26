@@ -1,24 +1,10 @@
 import { Pool } from 'pg'
-import {
-  createPgLedgerPort,
-  createWithCredits,
-  guardPoolErrors,
-  pgSsl,
-  type PgLedgerPort,
-} from '@sahoda/billing'
-import { fetchTransport } from '@sahoda/publishing'
+import { createPgLedgerPort, guardPoolErrors, pgSsl, type PgLedgerPort } from '@sahoda/billing'
 import { loadJobsEnv, type JobsEnv } from './env'
-import { createPublishStore } from './publish/store'
-import { createPostsStore } from './ai/postsStore'
-import { createAdapterSelector } from './publish/adapters'
-import { createConnectionResolver } from './publish/tokens'
 import { createExpiredHoldSource } from './holds/pgHolds'
 import { createDispatchStore } from './dispatch/pgDispatch'
-import type { PublishPostDeps } from './publish/runPublishPost'
 import type { HoldSweepDeps } from './holds/sweep'
 import type { DispatchSweepDeps } from './dispatch/sweep'
-import type { PlanWeekJobDeps } from './ai/plan-week-job'
-import { runPlanWeek } from './ai/plan-week'
 
 // `pgSsl` is imported from @sahoda/billing rather than re-derived here. The local copy this
 // replaces read `new URL(connectionString).hostname`, which is NOT the host pg dials: a
@@ -48,6 +34,12 @@ let cached: Runtime | undefined
 /**
  * Process-wide runtime: one env read, one connection pool, one ledger port. Server-only —
  * it holds the service-role database URL and must never be imported from client code.
+ *
+ * This module deliberately imports NOTHING from ./publish or ./ai. Those graphs reach
+ * @sahoda/publishing and @sahoda/mesh, and the sweeps are consumed from apps/web through
+ * the ./sweeps entry point — a transitive import here would pull two large packages, and
+ * a model client, into a serverless route that only ever runs SQL. Each job family owns
+ * its own deps module instead: publish/deps.ts, ai/deps.ts.
  */
 export function getRuntime(): Runtime {
   if (cached) return cached
@@ -66,24 +58,6 @@ export function getRuntime(): Runtime {
   )
   cached = { env, pool, ledger: createPgLedgerPort({ connectionString: env.databaseUrl, pool }) }
   return cached
-}
-
-/** Dependencies for one publishPost attempt. */
-export function publishPostDeps(): PublishPostDeps {
-  const { env, pool } = getRuntime()
-  const store = createPublishStore({ pool })
-
-  return {
-    mode: env.publishMode,
-    loadVariant: store.loadVariant,
-    // openSecret is intentionally unwired: packages/publishing exports no vault opener,
-    // so a live publish fails honestly instead of inventing a token (see REQUESTS.md).
-    resolveConnection: createConnectionResolver({ loadConnection: store.loadConnection }),
-    adapterFor: createAdapterSelector({ mode: env.publishMode, transport: fetchTransport() }),
-    writeLog: store.writeLog,
-    markVariant: store.markVariant,
-    markConnection: store.markConnection,
-  }
 }
 
 /**
@@ -119,16 +93,5 @@ export function holdSweepDeps(opts: SweepBatchOptions = {}): HoldSweepDeps {
       limit: opts.limit,
     }),
     apply: ledger.apply,
-  }
-}
-
-/** Dependencies for one plan-week run. */
-export function planWeekDeps(): PlanWeekJobDeps {
-  const { pool, ledger } = getRuntime()
-  const posts = createPostsStore({ pool })
-  return {
-    withCredits: createWithCredits(ledger),
-    runPlanWeek: (input, ctx) => runPlanWeek(input, ctx),
-    insertBriefs: posts.insertBriefs,
   }
 }

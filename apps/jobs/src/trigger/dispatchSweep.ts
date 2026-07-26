@@ -13,7 +13,7 @@ export const DISPATCH_SWEEP_TASK_ID = 'dispatch-sweep'
  * changes nothing until someone sets the flag deliberately.
  *
  * The enqueue is wired here rather than in `runtime.ts` on purpose. publishPost's trigger
- * helper already imports `publishPostDeps` from the runtime, so building it there would
+ * helper already imports the runtime's pool, so building it there would
  * close a require cycle between the two modules — and it would pull the Trigger.dev SDK
  * into the layer the SDK-free cores share.
  *
