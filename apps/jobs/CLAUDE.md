@@ -21,6 +21,12 @@ Every 5 min. Finds posts inside the shared gate (`isDispatchable` — `approved|
 - Neither belongs in `turbo.json` — that env list is `@sahoda/web#build`, and these are read at
   runtime by the jobs worker. They are also NOT in `.env.example` (`.env*` is do-not-touch).
 
+**The expiry reason is not persisted.** `expirePost` runs one `update posts set status='expired'`
+and writes nothing else; `post_publish_logs` cannot hold it (`channel` and `mode` are NOT NULL, and
+a no-variants expiry has neither), and `posts` has no reason column. `past-grace` vs
+`no-variants-past-grace` lives only in the sweep's return value — the task run output. Anyone
+auditing why a post expired reads the run, not the row.
+
 Three rules that must not be relaxed:
 
 1. **Never expire a post with a published variant.** Enforced twice — the classifier cannot emit
