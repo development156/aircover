@@ -12,7 +12,14 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 //     well-known, so honouring it on a public endpoint is a credit-forgery path;
 //   · never echo a raw provider/DB error into the response envelope.
 // Failing closed (a missed entry breaks the webhook) is the safe direction.
-const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)'])
+// `/api/cron/sweeps` is listed as an EXACT path, per the rule above — no `(.*)`, so
+// nothing else under /api/cron is exposed by adding it. It must be public because Vercel
+// invokes it with no user session: `auth.protect()` would answer a redirect to /sign-in,
+// and Vercel cron does not follow redirects, so the sweep would report a green run every
+// five minutes while doing nothing at all. The route authenticates itself instead —
+// `isAuthorizedCronRequest` is its first statement, comparing a bearer secret in constant
+// time and failing closed when CRON_SECRET is unset.
+const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/api/cron/sweeps'])
 
 export default clerkMiddleware(
   async (auth, req) => {
