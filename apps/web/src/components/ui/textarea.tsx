@@ -17,7 +17,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(fun
       ref={ref}
       aria-invalid={error || undefined}
       className={cn(
-        'min-h-[74px] w-full resize-y rounded-input border bg-s1 px-3 py-2.5 text-[14px] text-ink transition-micro placeholder:text-faint',
+        'min-h-[74px] w-full resize-y rounded-input border bg-s1 px-3 py-2.5 text-[14px] text-ink transition-micro placeholder:text-muted',
         'focus:bg-bg focus:outline-none',
         'disabled:opacity-50',
         error ? 'border-danger' : 'border-line',

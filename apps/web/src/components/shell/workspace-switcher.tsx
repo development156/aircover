@@ -92,7 +92,7 @@ export function WorkspaceSwitcher({ workspaces, active }: WorkspaceSwitcherProps
         >
           <p
             id={labelId}
-            className="px-2.5 py-1.5 text-[11px] font-semibold tracking-[0.08em] text-faint uppercase"
+            className="px-2.5 py-1.5 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase"
           >
             Workspaces
           </p>

@@ -110,7 +110,7 @@ export function InlineRewrite({ body, selection, onReplace }: InlineRewriteProps
             </span>
             {' characters selected'}
           </span>
-          <span className="text-[12px] text-faint">
+          <span className="text-[12px] text-muted">
             Uses <span className="tabular-nums">{cost}</span> credit
             {cost === 1 ? '' : 's'} each
           </span>

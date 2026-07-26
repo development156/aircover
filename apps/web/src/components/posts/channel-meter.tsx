@@ -22,7 +22,7 @@ export function ChannelMeterView({ meter, fixes }: ChannelMeterViewProps) {
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[12px] text-faint">Characters</span>
+        <span className="text-[12px] text-muted">Characters</span>
         <span
           className={cn('text-[12.5px] font-semibold', meter.over ? 'text-danger' : 'text-muted')}
         >

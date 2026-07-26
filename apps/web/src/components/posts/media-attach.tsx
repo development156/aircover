@@ -101,7 +101,7 @@ export function MediaAttach({ postId, channels }: MediaAttachProps) {
 
   return (
     <div className="space-y-2 border-t border-line pt-3">
-      <p id={limitsId} className="text-[12px] text-faint">
+      <p id={limitsId} className="text-[12px] text-muted">
         Images only, up to <span className="tabular-nums">{capMbForChannels(channels)} MB</span>.
         Attaching spends no credits.
       </p>

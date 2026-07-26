@@ -90,7 +90,7 @@ function MediaRow({ row, unverifiable, previewUrl }: MediaRowProps) {
       <p className="mt-0.5 truncate text-[12.5px] text-muted">
         {row.alt !== null && row.alt !== '' ? row.alt : 'No alt text on this file'}
       </p>
-      <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-faint">
+      <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted">
         <span>{row.mime ?? 'Type unknown'}</span>
         <span aria-hidden>·</span>
         <span className="tabular-nums">
@@ -148,7 +148,7 @@ export function MediaPane({ media, channels, postId, previews = [] }: MediaPaneP
     <section className="space-y-3" data-guide="post-media">
       <div className="flex items-center justify-between gap-2">
         <CardLabel className="mb-0">Media</CardLabel>
-        <span className="tabular-nums text-[12px] text-faint">{media.length}</span>
+        <span className="tabular-nums text-[12px] text-muted">{media.length}</span>
       </div>
 
       {media.length === 0 ? (
@@ -160,7 +160,7 @@ export function MediaPane({ media, channels, postId, previews = [] }: MediaPaneP
           <p className="mt-1 text-[12.5px] text-muted">
             Channel limits still apply to text-only posts.
           </p>
-          <p className="mt-2 text-[12px] text-faint">
+          <p className="mt-2 text-[12px] text-muted">
             Sahoda: I check every file against each channel before you publish.
           </p>
         </div>

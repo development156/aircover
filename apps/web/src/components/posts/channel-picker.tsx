@@ -58,7 +58,7 @@ export function ChannelPicker({ selected, onChange, disabled }: ChannelPickerPro
         })}
       </div>
       {selected.length === 0 ? (
-        <p className="text-[12.5px] text-faint">
+        <p className="text-[12.5px] text-muted">
           Pick at least one channel before generating variants or previewing a publish.
         </p>
       ) : null}

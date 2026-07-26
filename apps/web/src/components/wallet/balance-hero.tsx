@@ -32,10 +32,12 @@ export function BalanceHero({ balance, staleNote }: BalanceHeroProps) {
 
       {/* docs/08 §8: a credit change must be announced, not merely repainted. */}
       <p aria-live="polite" className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        {/* `.num` from tokens.css v3 — mono + tabular. The Credits balance is
-            one of the three places v3 allows mono; the total/held line below
-            stays sans and only aligns its digits. */}
-        <span className="num text-[44px] leading-[52px] font-extrabold">
+        {/* Display treatment. `.num` from tokens.css v3 is mono + tabular — the
+            Credits balance is one of the three places v3 allows mono, and the
+            total/held line below stays sans and only aligns its digits.
+            `text-ink` is load-bearing: without it the figure inherits --ink-body
+            from <body> and lands at the same weight as the label beside it. */}
+        <span className="num text-ink text-[44px] leading-[52px] font-extrabold">
           {formatCredits(balance.available)}
         </span>
         <span className="text-muted">
@@ -43,7 +45,7 @@ export function BalanceHero({ balance, staleNote }: BalanceHeroProps) {
         </span>
       </p>
 
-      <p className="text-[13px] text-faint">
+      <p className="text-[13px] text-muted">
         <span className="tabular-nums">{formatCredits(balance.total)}</span> total ·{' '}
         <span className="tabular-nums">{formatCredits(balance.held)}</span> held
       </p>

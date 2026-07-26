@@ -58,7 +58,7 @@ export function PlannerRow({ post, now }: PlannerRowProps) {
               <span className="tabular-nums">{scheduledAt}</span>
             </span>
           ) : (
-            <span className="text-[12.5px] text-faint">Not scheduled</span>
+            <span className="text-[12.5px] text-muted">Not scheduled</span>
           )}
         </div>
 

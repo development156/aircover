@@ -96,7 +96,7 @@ export function TopUpPanel() {
       </Button>
 
       {/* Pending is never a bare spinner — say what is happening. */}
-      <p aria-live="polite" className="min-h-[18px] text-[13px] text-faint">
+      <p aria-live="polite" className="min-h-[18px] text-[13px] text-muted">
         {pending ? 'Starting a checkout session…' : ''}
       </p>
 
@@ -140,11 +140,11 @@ function CheckoutResult({ result, onRetry }: { result: CheckoutState; onRetry: (
           returns while billing is being wired.
         </p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-[12px]">
-          <dt className="text-faint">mode</dt>
+          <dt className="text-muted">mode</dt>
           <dd className="break-all">{result.mode}</dd>
-          <dt className="text-faint">session</dt>
+          <dt className="text-muted">session</dt>
           <dd className="break-all">{result.sessionId}</dd>
-          <dt className="text-faint">plan</dt>
+          <dt className="text-muted">plan</dt>
           <dd className="break-all">{result.planId}</dd>
         </dl>
       </div>

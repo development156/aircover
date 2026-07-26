@@ -68,7 +68,7 @@ export function PostCard({ post, now }: PostCardProps) {
         {excerpt ? (
           <p className="mt-2 line-clamp-2 text-[14px] text-muted">{excerpt}</p>
         ) : (
-          <p className="mt-2 text-[14px] text-faint">No content written yet.</p>
+          <p className="mt-2 text-[14px] text-muted">No content written yet.</p>
         )}
 
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-[12.5px]">
@@ -84,7 +84,7 @@ export function PostCard({ post, now }: PostCardProps) {
               ))}
             </ul>
           ) : (
-            <span className="text-faint">No channels picked yet</span>
+            <span className="text-muted">No channels picked yet</span>
           )}
 
           {scheduledAt ? (

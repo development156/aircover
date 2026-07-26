@@ -108,7 +108,7 @@ export function SparkStep({
         </div>
         <div className="flex flex-col gap-1.5 sm:col-span-2">
           <Label htmlFor="spark-category">
-            Category <span className="font-normal text-faint">(optional)</span>
+            Category <span className="font-normal text-muted">(optional)</span>
           </Label>
           <Input
             id="spark-category"
@@ -121,7 +121,7 @@ export function SparkStep({
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="spark-website">
-            Website <span className="font-normal text-faint">(optional)</span>
+            Website <span className="font-normal text-muted">(optional)</span>
           </Label>
           <Input
             id="spark-website"
@@ -135,7 +135,7 @@ export function SparkStep({
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="spark-instagram">
-            Instagram handle <span className="font-normal text-faint">(optional)</span>
+            Instagram handle <span className="font-normal text-muted">(optional)</span>
           </Label>
           <Input
             id="spark-instagram"

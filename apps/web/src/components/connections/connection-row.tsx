@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 const STATUS_STYLES = {
   active: { label: 'Active', className: 'bg-ok-bg text-ok' },
   expired: { label: 'Expired', className: 'bg-warn-bg text-warn' },
-  revoked: { label: 'Revoked', className: 'bg-s2 text-faint' },
+  revoked: { label: 'Revoked', className: 'bg-s2 text-muted' },
   error: { label: 'Error', className: 'bg-danger-bg text-danger' },
 } satisfies Record<ConnectionStatus, { label: string; className: string }>
 

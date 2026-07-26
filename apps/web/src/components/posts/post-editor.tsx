@@ -109,7 +109,7 @@ export function PostEditor({
             <span
               aria-live="polite"
               className={
-                autosave.status === 'error' ? 'text-[12px] text-danger' : 'text-[12px] text-faint'
+                autosave.status === 'error' ? 'text-[12px] text-danger' : 'text-[12px] text-muted'
               }
             >
               {STATUS_COPY[autosave.status]}
@@ -136,7 +136,7 @@ export function PostEditor({
               onChange={(event) => autosave.update({ body: event.target.value })}
               onSelect={captureSelection}
             />
-            <p className="text-[12px] text-faint">
+            <p className="text-[12px] text-muted">
               Select any part of the body to rewrite just that piece.
             </p>
           </div>

@@ -76,7 +76,7 @@ function EntryRow({ entry, corrected }: { entry: LedgerEntry; corrected: boolean
     <tr className="border-b border-line last:border-b-0">
       <td className={cn(CELL, 'text-[13px] whitespace-nowrap text-muted')}>
         {when === null ? (
-          <span className="text-faint">Date not recorded</span>
+          <span className="text-muted">Date not recorded</span>
         ) : (
           <time dateTime={entry.created_at} className="tabular-nums">
             {when}
@@ -206,7 +206,7 @@ export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
               : 'Credit activity, newest first'}
           </caption>
           <thead>
-            <tr className="border-b border-line text-[12px] text-faint">
+            <tr className="border-b border-line text-[12px] text-muted">
               <th scope="col" className={cn(CELL, 'font-semibold')}>
                 When
               </th>
@@ -231,14 +231,14 @@ export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
       </div>
 
       {isWindowed ? (
-        <p className="text-[13px] text-faint">
+        <p className="text-[13px] text-muted">
           Showing the <span className="tabular-nums">{limit}</span> most recent entries. Older
           activity is not listed here.
         </p>
       ) : null}
 
       {recorded.length > 0 ? (
-        <p className="text-[13px] text-faint">
+        <p className="text-[13px] text-muted">
           Provider cost recorded on <span className="tabular-nums">{recorded.length}</span> of these{' '}
           <span className="tabular-nums">{entries.length}</span> entries:{' '}
           {/* Floored, not rounded: a real sub-cent total must not print as $0.0000. */}

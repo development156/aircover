@@ -71,7 +71,7 @@ export function EditableList({
             )}
           </div>
         ))}
-        {items.length === 0 ? <p className="text-[13px] text-faint">None yet.</p> : null}
+        {items.length === 0 ? <p className="text-[13px] text-muted">None yet.</p> : null}
       </div>
       {fixedLength ? null : (
         <div className="flex items-center gap-2">

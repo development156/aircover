@@ -27,7 +27,7 @@ export function SitePreview({ siteName, pages }: SitePreviewProps) {
     <section className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[15px] font-bold">{siteName}</h2>
-        <p className="text-[12.5px] text-faint">Draft preview · not published anywhere yet</p>
+        <p className="text-[12.5px] text-muted">Draft preview · not published anywhere yet</p>
       </div>
 
       {pages.length > 1 ? (
