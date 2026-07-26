@@ -1,5 +1,6 @@
 import type { Channel } from '@sahoda/shared'
 import type { DispatchMode } from '../env'
+import { isPublishQueueUnavailable } from './queue'
 import {
   classifyCandidate,
   type DispatchCandidate,
@@ -58,6 +59,11 @@ export interface DispatchSweepReport {
   holdsByReason: Partial<Record<HoldReason, number>>
   /** A guarded write the database declined because the row had moved. */
   blockedByGuard: number
+  /**
+   * A dispatch this deployment had nowhere to send. NOT a failed publish: nothing was
+   * attempted and the post is left exactly as it was, so the next tick sees it again.
+   */
+  queueUnavailable: number
   failed: number
   decisions: DecisionSummary[]
 }
@@ -92,6 +98,7 @@ export async function runDispatchSweep(deps: DispatchSweepDeps): Promise<Dispatc
     held: 0,
     holdsByReason: {},
     blockedByGuard: 0,
+    queueUnavailable: 0,
     failed: 0,
     decisions: [],
   }
@@ -153,8 +160,9 @@ export async function runDispatchSweep(deps: DispatchSweepDeps): Promise<Dispatc
           scheduledAt: v.scheduledAt,
         })
         report.enqueued += 1
-      } catch {
-        report.failed += 1
+      } catch (e) {
+        if (isPublishQueueUnavailable(e)) report.queueUnavailable += 1
+        else report.failed += 1
       }
     }
   }
