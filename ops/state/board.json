@@ -289,11 +289,11 @@
       "title": "Grant through apply_ledger_entry + replay proof",
       "detail": "Also owns the why-line. wt-web rewrote the wallet GRANT copy to classify from the idempotency key and actor rather than action_type, and the admin why-line went with it — so doc 13 §6's \"Credits added by Sahoda Labs team.\" currently has no implementation. Add it as an `admin` origin in lib/wallet/grant-origin.ts, PROVEN from adminGrantKey() the way signup and plan are proven, not by matching action_type: that field is free text with no CHECK and the classifier deliberately stopped trusting it (see SL-032). Until then the doc is ahead of the code, which is the safe direction.",
       "roadmap_code": "AO4",
-      "board_column": "done",
+      "board_column": "todo",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 280,
-      "commit_sha": "8f379e9464823935413cfad77940632724dce62a"
+      "commit_sha": null
     },
     {
       "code": "SL-029",
@@ -330,11 +330,11 @@
       "title": "Constrain credit_ledger.action_type instead of parsing grant keys",
       "detail": "GRANT rows carry their origin in action_type, which is plain text with no enum and no CHECK. GRANT_ORIGIN in @sahoda/shared plus a migration-scanning contract test keep producer and consumer honest, but nothing stops a new writer inventing a value — it renders as \"Included with your plan\", which is wrong for every grant that did not come from a plan. Replace the convention with a real grant_origin column or structured meta, backfill, then delete the string matching in lib/wallet/entry-copy.ts.",
       "roadmap_code": null,
-      "board_column": "done",
+      "board_column": "todo",
       "assignee": "claude",
       "doc_ref": null,
       "sort": 320,
-      "commit_sha": "8f379e9464823935413cfad77940632724dce62a"
+      "commit_sha": null
     },
     {
       "code": "SL-033",
@@ -365,6 +365,16 @@
       "assignee": "claude",
       "doc_ref": null,
       "sort": 350
+    },
+    {
+      "code": "SL-036",
+      "title": "Clear lifecycle stamps when a card moves backward",
+      "detail": "public.ops_ingest only ever coalesces started_at / review_at / done_at, so a stamp survives a card moving back a column. Proven on 2026-07-26: the commit hook wrongly closed SL-028 and SL-032, and after reverting them to todo both still carried a done_at — the rows were repaired by hand. Nothing reads those columns yet, which is the only reason this is not already visible; the P2 board shows \"age in column\" and would read them. Fix in the RPC: null the stamps that the incoming column does not justify (done_at only when board_column = done, review_at only at review or beyond) rather than coalescing unconditionally.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": null,
+      "sort": 360
     }
   ]
 }

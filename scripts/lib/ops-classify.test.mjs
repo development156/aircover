@@ -6,6 +6,7 @@ import {
   isGitCommit,
   stripAnsi,
   suiteFor,
+  closingTaskCodes,
   suitesFor,
   taskCodesIn,
   verdictFor,
@@ -190,6 +191,42 @@ describe('taskCodesIn', () => {
 
   it('finds nothing in a message with no codes', () => {
     expect(taskCodesIn('chore: tidy up')).toEqual([])
+  })
+})
+
+describe('closingTaskCodes', () => {
+  it('closes only what the conventional-commit scope claims', () => {
+    expect(closingTaskCodes('feat(SL-011,SL-033): the sync commands')).toEqual(['SL-011', 'SL-033'])
+  })
+
+  it('does NOT close a card merely discussed in the body', () => {
+    // The real failure, verbatim. Commit 8f379e9 said SL-028 was still To Do and
+    // the hook marked it Done — the board contradicting the commit that fed it.
+    const message = [
+      'merge: bring wt-web into wt-admin, resolving the grant why-line in their favour',
+      '',
+      'the weakness SL-032 was carded for ... the admin grant does not exist yet',
+      '(SL-028 is still To Do, the grant lands in P3).',
+    ].join('\n')
+
+    expect(closingTaskCodes(message)).toEqual([])
+    // The general extractor still SEES them — that distinction is the fix.
+    expect(taskCodesIn(message)).toEqual(['SL-032', 'SL-028'])
+  })
+
+  it('closes nothing for a merge commit, which completes nothing', () => {
+    expect(closingTaskCodes('merge: bring wt-web into wt-admin')).toEqual([])
+  })
+
+  it('ignores a scope that is not a card', () => {
+    expect(closingTaskCodes('fix(repo): repair the lockfile')).toEqual([])
+    expect(closingTaskCodes('feat(web): stop implying auto-publish works')).toEqual([])
+  })
+
+  it('reads every conventional type the repo uses', () => {
+    for (const type of ['feat', 'fix', 'chore', 'docs', 'test', 'refactor']) {
+      expect(closingTaskCodes(`${type}(SL-7): x`)).toEqual(['SL-007'])
+    }
   })
 })
 

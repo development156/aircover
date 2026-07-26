@@ -92,7 +92,16 @@ export function roadmapItems() {
   return items
 }
 
-/** doc 13 §18 → the 31 SL tasks for this build, the board's first content. */
+/**
+ * doc 13 §18 → the SL tasks for this build, the board's first content.
+ *
+ * APPEND ONLY. The code is this array's INDEX — `SL-${i + 1}` — so inserting an
+ * entry in the middle renumbers every card after it, and the board, the git
+ * history and the QA rows all keep pointing at the old numbers. That happened
+ * once: a card added before the last entry gave two different cards the same
+ * title and left a third with no home. New work goes at the END, always, even
+ * when it belongs next to something else conceptually.
+ */
 const TASKS = [
   ['AO1', 'ops_* migrations + RLS + is_ops_admin()'],
   ['AO1', 'Anon-client RLS suite for all ten ops tables'],
@@ -196,6 +205,19 @@ const TASKS = [
       'empty migration file, then a post-push check that parses CREATE ' +
       'TABLE/FUNCTION/INDEX/POLICY names out of the applied files and asserts ' +
       'each object exists in the catalog. Run it in the CI card above.',
+  ],
+  [
+    null,
+    'Clear lifecycle stamps when a card moves backward',
+    'public.ops_ingest only ever coalesces started_at / review_at / done_at, so ' +
+      'a stamp survives a card moving back a column. Proven on 2026-07-26: the ' +
+      'commit hook wrongly closed SL-028 and SL-032, and after reverting them to ' +
+      'todo both still carried a done_at — the rows were repaired by hand. ' +
+      'Nothing reads those columns yet, which is the only reason this is not ' +
+      'already visible; the P2 board shows "age in column" and would read them. ' +
+      'Fix in the RPC: null the stamps that the incoming column does not justify ' +
+      '(done_at only when board_column = done, review_at only at review or ' +
+      'beyond) rather than coalescing unconditionally.',
   ],
 ]
 
