@@ -5,7 +5,7 @@ import * as Sentry from '@sentry/nextjs'
 
 import { Topbar } from './topbar'
 import { listWorkspaces, getActiveWorkspaceSlug } from '@/lib/workspaces'
-import { readAvailableCredits } from '@/lib/wallet/read'
+import { readBalance } from '@/lib/wallet/read'
 
 // The topbar renders OUTSIDE every scoped error.tsx — (app)/error.tsx is a
 // sibling of the layout that renders this component, and a React boundary does
@@ -35,7 +35,7 @@ vi.mock('@/lib/workspaces', async (importActual) => ({
 }))
 
 vi.mock('@/lib/wallet/read', () => ({
-  readAvailableCredits: vi.fn(),
+  readBalance: vi.fn(),
 }))
 
 const WORKSPACES = [
@@ -46,7 +46,7 @@ const WORKSPACES = [
 const mocked = {
   listWorkspaces: vi.mocked(listWorkspaces),
   getActiveWorkspaceSlug: vi.mocked(getActiveWorkspaceSlug),
-  readAvailableCredits: vi.mocked(readAvailableCredits),
+  readBalance: vi.mocked(readBalance),
   captureException: vi.mocked(Sentry.captureException),
 }
 
@@ -54,7 +54,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocked.listWorkspaces.mockResolvedValue(WORKSPACES)
   mocked.getActiveWorkspaceSlug.mockResolvedValue('sahoda-labs')
-  mocked.readAvailableCredits.mockResolvedValue(4200)
+  mocked.readBalance.mockResolvedValue({
+    status: 'ok',
+    balance: { total: 4200, held: 0, available: 4200, hasHold: false, heldNote: null },
+  })
 })
 
 describe('Topbar', () => {
@@ -120,7 +123,7 @@ describe('Topbar', () => {
   test('renders a degraded but usable shell when every read rejects', async () => {
     mocked.listWorkspaces.mockRejectedValue(new Error('down'))
     mocked.getActiveWorkspaceSlug.mockRejectedValue(new Error('down'))
-    mocked.readAvailableCredits.mockRejectedValue(new Error('down'))
+    mocked.readBalance.mockRejectedValue(new Error('down'))
 
     render(await Topbar())
 

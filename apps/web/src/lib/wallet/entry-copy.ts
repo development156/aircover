@@ -1,6 +1,6 @@
-import { GRANT_ORIGIN } from '@sahoda/shared'
 import type { ActionType, LedgerEntry, LedgerEntryType, ModelTier } from '@sahoda/shared'
 
+import { grantOrigin, type GrantOrigin } from './grant-origin'
 import { cogsUsd } from './parse-entries'
 
 /**
@@ -80,7 +80,7 @@ const TIER_LABELS: Record<ModelTier, string> = {
  * (DEBIT/HOLD) take their label from `action_type` instead.
  */
 const ENTRY_TYPE_LABELS: Record<LedgerEntryType, string | null> = {
-  GRANT: 'Plan credits',
+  GRANT: null, // from grantOrigin — see GRANT_COPY
   TOPUP: 'Credits purchased',
   PERF_REWARD: 'Performance reward',
   RELEASE: 'Credits returned',
@@ -91,25 +91,42 @@ const ENTRY_TYPE_LABELS: Record<LedgerEntryType, string | null> = {
 }
 
 /**
- * GRANT rows carry their origin in `action_type`, and the keys below come from
- * `GRANT_ORIGIN` in @sahoda/shared rather than being spelled out here. They used
- * to be bare literals, which meant this classifier and the SQL that writes the
- * rows agreed only by coincidence — rename one and grants silently fall through
- * to the plan copy below, telling a brand-new user that free credits came with a
- * plan they have not bought.
+ * Copy per GRANT origin, strongest claim first.
  *
- * `applyPlanGrant` still writes plan grants with a null `action_type`, so the
- * fallback is the plan copy and that is correct for it.
+ * This used to be keyed on `action_type`, with everything unrecognised falling
+ * back to the plan copy — so a manual top-up, an admin make-good and a
+ * correction all told the user "Included with your plan." The fallback is now
+ * the WEAKEST statement, not the strongest: `grantOrigin` has to prove a plan
+ * before this map is allowed to mention one.
+ *
+ * `manual` covers both a person and an internal job, because only service-role
+ * callers can write the ledger — either way Sahoda put the credits there. It
+ * says so without naming the actor, which stays internal.
  */
-const GRANT_SOURCE_LABELS: Readonly<Record<string, string>> = {
-  [GRANT_ORIGIN.signup]: 'Welcome credits',
-  [GRANT_ORIGIN.admin]: 'Added by Sahoda Labs',
-}
-
-const GRANT_SOURCE_WHY: Readonly<Record<string, string>> = {
-  [GRANT_ORIGIN.signup]: 'Included free when you signed up.',
-  // Verbatim from doc 13 §6, which fixes this exact string.
-  [GRANT_ORIGIN.admin]: 'Credits added by Sahoda Labs team.',
+const GRANT_COPY: Record<GrantOrigin, { label: string; why: string }> = {
+  signup: {
+    label: 'Welcome credits',
+    why: 'Included free when you signed up.',
+  },
+  plan: {
+    label: 'Plan credits',
+    why: 'Included with your plan.',
+  },
+  correction: {
+    label: 'Correction',
+    why: 'Issued to correct an earlier entry.',
+  },
+  manual: {
+    label: 'Credits added by Sahoda',
+    why: 'Added by Sahoda, not by a plan or a payment.',
+  },
+  unknown: {
+    label: 'Credits added',
+    // Says only what the row itself proves: the credits are in the wallet. It
+    // does not guess at a source, and it does not imply anything is wrong —
+    // the credits are real and spendable either way.
+    why: 'Added to your wallet. Where these came from was not recorded.',
+  },
 }
 
 /**
@@ -117,7 +134,7 @@ const GRANT_SOURCE_WHY: Readonly<Record<string, string>> = {
  * entry type itself guarantees — nothing is inferred from `meta` or `actor`.
  */
 const ENTRY_TYPE_WHY: Record<LedgerEntryType, string | null> = {
-  GRANT: 'Included with your plan.',
+  GRANT: null, // from grantOrigin — see GRANT_COPY
   TOPUP: 'Added from a credit purchase.',
   PERF_REWARD: 'Earned from post performance.',
   HOLD: 'Reserved while this action runs — returned in full if it does not complete.',
@@ -209,6 +226,25 @@ function directionOf(entryType: LedgerEntryType, amount: number): Direction {
 }
 
 /**
+ * How many credits this row moved the wallet total, signed.
+ *
+ * Exported so anything summing entries — the correction groups — agrees with
+ * the amount column instead of re-deriving the sign. Summing `amount` directly
+ * would make a +30 DEBIT and a +30 GRANT agree when they point opposite ways,
+ * and would count a HOLD and its RELEASE as credits moved when neither touches
+ * `balance_total`.
+ */
+export function signedEffect(entry: Pick<LedgerEntry, 'entry_type' | 'amount'>): number {
+  const direction = directionOf(entry.entry_type, entry.amount)
+  const magnitude = Math.abs(entry.amount)
+
+  if (direction === 'credit') return magnitude
+  if (direction === 'debit') return -magnitude
+
+  return 0
+}
+
+/**
  * Render the sign from the *direction*, never from the stored amount.
  *
  * `amount` is always positive in the DB except on ADJUST, so the magnitude is
@@ -285,7 +321,7 @@ function buildWhy(entry: LedgerEntry): string | null {
 
   const staticWhy =
     entry.entry_type === 'GRANT'
-      ? (GRANT_SOURCE_WHY[entry.action_type ?? ''] ?? ENTRY_TYPE_WHY.GRANT)
+      ? GRANT_COPY[grantOrigin(entry)].why
       : ENTRY_TYPE_WHY[entry.entry_type]
 
   if (staticWhy !== null) {
@@ -324,7 +360,7 @@ export function describeEntry(entry: LedgerEntry): EntryDisplay {
   const direction = directionOf(entry.entry_type, entry.amount)
   const typeLabel =
     entry.entry_type === 'GRANT'
-      ? (GRANT_SOURCE_LABELS[entry.action_type ?? ''] ?? ENTRY_TYPE_LABELS.GRANT)
+      ? GRANT_COPY[grantOrigin(entry)].label
       : ENTRY_TYPE_LABELS[entry.entry_type]
 
   return {

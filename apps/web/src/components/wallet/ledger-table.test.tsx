@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 import { LedgerEntrySchema, type LedgerEntry } from '@sahoda/shared'
 
@@ -64,5 +64,97 @@ describe('LedgerTable truncation notice', () => {
     render(<LedgerTable entries={entries(1)} skipped={2} limit={3} />)
 
     expect(screen.getByText(/could not be displayed/)).toBeInTheDocument()
+  })
+})
+
+/**
+ * A correction is three correct rows that read as a clawback.
+ *
+ * seq 5374 was a manual GRANT the wallet mislabelled. credit_ledger is
+ * append-only, so it was fixed by writing seq 5597 (-100, reversing it) and
+ * seq 5596 (+100, re-issuing it). Newest-first that puts "-100 Manual
+ * adjustment" at the top of the user's history with its matching +100 below it
+ * and the entry they fix scrolled away — 100 credits apparently taken, with
+ * nothing on screen saying they came straight back.
+ */
+const CORRECTION_ID = '2026-07-25-relabel-manual-grant'
+
+/** `entry()` builds its id from the seq, which stops being a uuid past one digit. */
+const idFor = (seq: number): string => `${String(seq).padStart(8, '0')}-1111-4111-8111-111111111111`
+
+function correctionRow(seq: number, amount: number, link: Record<string, number>): LedgerEntry {
+  return LedgerEntrySchema.parse({
+    ...entry(1),
+    id: idFor(seq),
+    seq,
+    entry_type: 'ADJUST',
+    amount,
+    action_type: 'manual_adjustment',
+    actor: 'claude-ledger-correction',
+    meta: { correction: CORRECTION_ID, ...link },
+  })
+}
+
+const REVERSAL = correctionRow(5597, -100, { reverses_seq: 5374 })
+const REISSUE = correctionRow(5596, 100, { replaces_seq: 5374 })
+const ORIGINAL = LedgerEntrySchema.parse({
+  ...entry(1),
+  id: idFor(5374),
+  seq: 5374,
+  entry_type: 'GRANT',
+  amount: 100,
+  action_type: 'signup_grant',
+  idempotency_key: 'manual-verify-topup:c12b271a:20260724-1',
+  actor: 'claude-verification',
+})
+
+describe('LedgerTable correction grouping', () => {
+  test('presents the pair as one correction rather than two adjustments', () => {
+    render(<LedgerTable entries={[REVERSAL, REISSUE, ORIGINAL]} skipped={0} limit={50} />)
+
+    expect(screen.getByRole('rowgroup', { name: /correction/i })).toBeInTheDocument()
+  })
+
+  test('says outright that nothing changed, which is the whole worry', () => {
+    render(<LedgerTable entries={[REVERSAL, REISSUE, ORIGINAL]} skipped={0} limit={50} />)
+
+    expect(screen.getByText(/no change to your balance/i)).toBeInTheDocument()
+  })
+
+  test('still shows both rows — grouping explains the ledger, it does not hide it', () => {
+    render(<LedgerTable entries={[REVERSAL, REISSUE, ORIGINAL]} skipped={0} limit={50} />)
+
+    // Scoped to the group: the original grant is a third +100 elsewhere in the
+    // table, and it is meant to still be there.
+    const group = within(screen.getByRole('rowgroup', { name: /correction/i }))
+
+    expect(group.getByText('-100')).toBeInTheDocument()
+    expect(group.getByText('+100')).toBeInTheDocument()
+    // Both halves, still individually auditable — an append-only ledger that
+    // hid rows behind a summary would be worse than the confusing version.
+    expect(group.getAllByRole('row')).toHaveLength(3)
+  })
+
+  test('marks the entry that was corrected so it does not read as still standing', () => {
+    render(<LedgerTable entries={[REVERSAL, REISSUE, ORIGINAL]} skipped={0} limit={50} />)
+
+    expect(screen.getByText(/corrected by a later entry/i)).toBeInTheDocument()
+  })
+
+  test('states the movement when a correction is not net zero', () => {
+    const partial = correctionRow(5596, 60, { replaces_seq: 5374 })
+
+    render(<LedgerTable entries={[REVERSAL, partial]} skipped={0} limit={50} />)
+
+    // -100 then +60. Claiming "no change" here would be the same class of lie
+    // as the labels this correction was written to fix.
+    expect(screen.queryByText(/no change to your balance/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/-40 credits/i)).toBeInTheDocument()
+  })
+
+  test('leaves an ordinary ledger ungrouped', () => {
+    render(<LedgerTable entries={entries(3)} skipped={0} limit={50} />)
+
+    expect(screen.queryByRole('rowgroup', { name: /correction/i })).not.toBeInTheDocument()
   })
 })
