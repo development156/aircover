@@ -48,6 +48,9 @@
         "CLOUDFLARE_ZONE_ID",
         "RESEND_API_KEY",
         "SENTRY_DSN",
+        "SENTRY_ORG",
+        "SENTRY_PROJECT",
+        "SENTRY_AUTH_TOKEN",
         "TOKEN_VAULT_KEY",
         "JOB_SIGNING_SECRET",
         "CONTEXT7_API_KEY"
