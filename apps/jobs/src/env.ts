@@ -8,6 +8,31 @@ import type { PublishMode } from './publish/runPublishPost'
  */
 const DEFAULT_HOLD_SWEEP_GRACE_SECONDS = 600
 
+/**
+ * How late a post may be and still be worth publishing. Past this, sending it would put
+ * out content whose moment has gone — a 9am offer landing at 6pm — so the dispatcher
+ * expires it instead. Sixty minutes is the owner's ruling.
+ */
+const DEFAULT_DISPATCH_GRACE_SECONDS = 3600
+
+/**
+ * What a scheduled sweep is allowed to do.
+ *
+ * - `off`    — do not even read candidates. The sweep is a no-op.
+ * - `report` — read and decide, returning the decisions, mutating NOTHING.
+ * - `on`     — execute those decisions.
+ *
+ * `report` exists so a sweep's decisions can be reviewed against real production rows
+ * before anything writes. There is no default-on path: see `loadJobsEnv`.
+ */
+export type SweepMode = 'off' | 'report' | 'on'
+
+/** The scheduled-publish dispatcher's mode. */
+export type DispatchMode = SweepMode
+
+/** The expired-hold reaper's mode. Same three states, same safe default. */
+export type HoldSweepMode = SweepMode
+
 export interface JobsEnv {
   /**
    * Which publish rail this process is on. Defaults to `fixture` deliberately: no
@@ -19,6 +44,17 @@ export interface JobsEnv {
   serviceRoleKey: string
   databaseUrl: string
   holdSweepGraceSeconds: number
+  /**
+   * Defaults to `off`. Deploying the reaper must not, by itself, start moving credits —
+   * the flag is the only thing that grants that.
+   */
+  holdSweepMode: HoldSweepMode
+  /**
+   * Defaults to `off`. Deploying the dispatcher must not, by itself, start changing post
+   * rows — the flag is the only thing that grants that.
+   */
+  dispatchMode: DispatchMode
+  dispatchGraceSeconds: number
 }
 
 /**
@@ -55,6 +91,19 @@ export function loadJobsEnv(source: NodeJS.ProcessEnv = process.env): JobsEnv {
     else holdSweepGraceSeconds = parsed
   }
 
+  const dispatchMode = readMode(source, 'SAHODA_PUBLISH_DISPATCH_MODE', invalid)
+  const holdSweepMode = readMode(source, 'SAHODA_HOLD_SWEEP_MODE', invalid)
+
+  const rawDispatchGrace = source.SAHODA_PUBLISH_DISPATCH_GRACE_SECONDS
+  let dispatchGraceSeconds = DEFAULT_DISPATCH_GRACE_SECONDS
+  if (rawDispatchGrace !== undefined) {
+    const parsed = Number(rawDispatchGrace)
+    // A negative grace inverts the window: posts not yet due would fall past it and expire.
+    if (!Number.isFinite(parsed) || parsed < 0)
+      invalid.push('SAHODA_PUBLISH_DISPATCH_GRACE_SECONDS')
+    else dispatchGraceSeconds = parsed
+  }
+
   if (missing.length > 0 || invalid.length > 0) {
     const parts = [
       missing.length > 0 ? `missing ${missing.join(', ')}` : '',
@@ -69,11 +118,38 @@ export function loadJobsEnv(source: NodeJS.ProcessEnv = process.env): JobsEnv {
     serviceRoleKey,
     databaseUrl,
     holdSweepGraceSeconds,
+    holdSweepMode,
+    dispatchMode,
+    dispatchGraceSeconds,
   }
 }
 
 function isPublishMode(value: string): value is PublishMode {
   return value === 'live' || value === 'fixture'
+}
+
+function isSweepMode(value: string): value is SweepMode {
+  return value === 'off' || value === 'report' || value === 'on'
+}
+
+/**
+ * Read one sweep-mode flag, defaulting to `off` when it is absent entirely.
+ *
+ * There is deliberately no `?? 'off'` fallback on a SET-but-unparseable value. "ON",
+ * "true", "1" and "" are all plausible things to find in a dashboard env var, and each of
+ * them means someone tried to say something. Absorbing them into the safe default would
+ * hide an intent to let a sweep write just as readily as it would hide a typo, so a
+ * present-but-invalid value refuses to start.
+ *
+ * The key is recorded in `invalid` rather than thrown on the spot: with two flags sharing
+ * this reader, throwing here would hide the second bad value behind the first.
+ */
+function readMode(source: NodeJS.ProcessEnv, key: string, invalid: string[]): SweepMode {
+  const raw = source[key]
+  if (raw === undefined) return 'off'
+  if (isSweepMode(raw)) return raw
+  invalid.push(key)
+  return 'off'
 }
 
 /**

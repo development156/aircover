@@ -1,22 +1,10 @@
 import { Pool } from 'pg'
-import {
-  createPgLedgerPort,
-  createWithCredits,
-  guardPoolErrors,
-  pgSsl,
-  type PgLedgerPort,
-} from '@sahoda/billing'
-import { fetchTransport } from '@sahoda/publishing'
+import { createPgLedgerPort, guardPoolErrors, pgSsl, type PgLedgerPort } from '@sahoda/billing'
 import { loadJobsEnv, type JobsEnv } from './env'
-import { createPublishStore } from './publish/store'
-import { createPostsStore } from './ai/postsStore'
-import { createAdapterSelector } from './publish/adapters'
-import { createConnectionResolver } from './publish/tokens'
 import { createExpiredHoldSource } from './holds/pgHolds'
-import type { PublishPostDeps } from './publish/runPublishPost'
+import { createDispatchStore } from './dispatch/pgDispatch'
 import type { HoldSweepDeps } from './holds/sweep'
-import type { PlanWeekJobDeps } from './ai/plan-week-job'
-import { runPlanWeek } from './ai/plan-week'
+import type { DispatchSweepDeps } from './dispatch/sweep'
 
 // `pgSsl` is imported from @sahoda/billing rather than re-derived here. The local copy this
 // replaces read `new URL(connectionString).hostname`, which is NOT the host pg dials: a
@@ -24,6 +12,16 @@ import { runPlanWeek } from './ai/plan-week'
 // LAST. So `…@db.abc.supabase.co/postgres?host=evil.com` relaxed certificate verification
 // while this service-role pool connected to evil.com. Same rule, one definition, one place
 // where it is tested. SET SUPABASE_DB_CA_CERT IN PRODUCTION for full chain verification.
+
+/**
+ * How much work one sweep may take on. The caller sets it because the ceiling belongs to
+ * the RUNNER, not the job: a durable worker can afford a large batch, while a serverless
+ * request has a hard wall (Vercel's function limit) and must stay far inside it. Backlogs
+ * drain across ticks in both cases — every candidate query is oldest-first.
+ */
+export interface SweepBatchOptions {
+  limit?: number
+}
 
 interface Runtime {
   env: JobsEnv
@@ -36,6 +34,12 @@ let cached: Runtime | undefined
 /**
  * Process-wide runtime: one env read, one connection pool, one ledger port. Server-only —
  * it holds the service-role database URL and must never be imported from client code.
+ *
+ * This module deliberately imports NOTHING from ./publish or ./ai. Those graphs reach
+ * @sahoda/publishing and @sahoda/mesh, and the sweeps are consumed from apps/web through
+ * the ./sweeps entry point — a transitive import here would pull two large packages, and
+ * a model client, into a serverless route that only ever runs SQL. Each job family owns
+ * its own deps module instead: publish/deps.ts, ai/deps.ts.
  */
 export function getRuntime(): Runtime {
   if (cached) return cached
@@ -56,43 +60,38 @@ export function getRuntime(): Runtime {
   return cached
 }
 
-/** Dependencies for one publishPost attempt. */
-export function publishPostDeps(): PublishPostDeps {
+/**
+ * Dependencies for one scheduled-publish sweep, minus the enqueue.
+ *
+ * `enqueuePublish` is supplied by the trigger wrapper instead: publishPost's trigger helper
+ * imports `publishPostDeps` from this module, so wiring it here would close a require cycle
+ * — and it would drag the Trigger.dev SDK into the module the SDK-free cores depend on.
+ */
+export function dispatchSweepDeps(
+  opts: SweepBatchOptions = {},
+): Omit<DispatchSweepDeps, 'enqueuePublish'> {
   const { env, pool } = getRuntime()
-  const store = createPublishStore({ pool })
+  const store = createDispatchStore({ pool, limit: opts.limit })
 
   return {
-    mode: env.publishMode,
-    loadVariant: store.loadVariant,
-    // openSecret is intentionally unwired: packages/publishing exports no vault opener,
-    // so a live publish fails honestly instead of inventing a token (see REQUESTS.md).
-    resolveConnection: createConnectionResolver({ loadConnection: store.loadConnection }),
-    adapterFor: createAdapterSelector({ mode: env.publishMode, transport: fetchTransport() }),
-    writeLog: store.writeLog,
-    markVariant: store.markVariant,
-    markConnection: store.markConnection,
+    mode: env.dispatchMode,
+    graceSeconds: env.dispatchGraceSeconds,
+    listCandidates: store.listCandidates,
+    expirePost: store.expirePost,
+    settlePost: store.settlePost,
   }
 }
 
 /** Dependencies for one expired-hold sweep. */
-export function holdSweepDeps(): HoldSweepDeps {
+export function holdSweepDeps(opts: SweepBatchOptions = {}): HoldSweepDeps {
   const { env, pool, ledger } = getRuntime()
   return {
+    mode: env.holdSweepMode,
     listExpiredHolds: createExpiredHoldSource({
       pool,
       graceSeconds: env.holdSweepGraceSeconds,
+      limit: opts.limit,
     }),
     apply: ledger.apply,
-  }
-}
-
-/** Dependencies for one plan-week run. */
-export function planWeekDeps(): PlanWeekJobDeps {
-  const { pool, ledger } = getRuntime()
-  const posts = createPostsStore({ pool })
-  return {
-    withCredits: createWithCredits(ledger),
-    runPlanWeek: (input, ctx) => runPlanWeek(input, ctx),
-    insertBriefs: posts.insertBriefs,
   }
 }
