@@ -2,7 +2,12 @@
 import { execFileSync, execFileSync as run } from 'node:child_process'
 import { warn } from './lib/ops-env.mjs'
 import { readState, writeState, clientId } from './lib/ops-state.mjs'
-import { classifyBashRuns, closingTaskCodes, isGitCommit } from './lib/ops-classify.mjs'
+import {
+  classifyBashRuns,
+  closingTaskCodes,
+  invokesOpsScript,
+  isGitCommit,
+} from './lib/ops-classify.mjs'
 
 /**
  * PostToolUse(Bash) → the QA feed and the board (doc 13 §9.3).
@@ -132,7 +137,8 @@ async function main() {
   if (typeof command !== 'string' || command.trim() === '') return
 
   // Never let the sync script's own invocations recurse into more syncs.
-  if (/ops-sync\.mjs|ops-hook-bash\.mjs/.test(command)) return
+  // RUNS one, not MENTIONS one — `git add scripts/ops-sync.mjs` is a commit.
+  if (invokesOpsScript(command)) return
 
   if (isGitCommit(command)) {
     const codes = closingTaskCodes(command)

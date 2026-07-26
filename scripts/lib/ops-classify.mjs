@@ -230,6 +230,29 @@ export function closingTaskCodes(message) {
   return taskCodesIn(scope)
 }
 
+/**
+ * Does this command RUN a sync script, as opposed to merely naming one?
+ *
+ * The recursion guard used to be `/ops-sync\.mjs|ops-hook-bash\.mjs/` over the
+ * whole command, which is the same class of mistake as scanning a commit body
+ * for task codes: it matched the string wherever it appeared. So
+ * `git add scripts/ops-sync.mjs && git commit -m 'feat(SL-015): …'` looked like
+ * a sync invocation, the hook returned early, and SL-015 sat in For Review with
+ * no sha while its work was committed and pushed. Silent, and only visible
+ * because the board it built rendered the card.
+ *
+ * A script is RUN when it is the executable of a segment — optionally via node,
+ * optionally with leading env assignments. As an argument to git, cat or rm it
+ * is just a path.
+ */
+const RUNS_OPS_SCRIPT =
+  /^\s*(?:\w+=\S*\s+)*(?:(?:\S*\/)?node\s+)?(?:\S*\/)?ops-(?:sync|hook-bash)\.mjs\b/
+
+export function invokesOpsScript(command) {
+  if (typeof command !== 'string') return false
+  return command.split(/&&|\|\||[;\n|]/).some((segment) => RUNS_OPS_SCRIPT.test(segment))
+}
+
 /** `SL-7` and `SL-007` are the same card; the board stores the padded form. */
 export function taskCodesIn(text) {
   const found = new Set()
