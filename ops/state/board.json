@@ -190,12 +190,14 @@
     {
       "code": "SL-017",
       "title": "Changelog rail with copy affordances",
-      "detail": null,
+      "detail": "Changelog rail live with per-entry and per-day copy",
       "roadmap_code": "AO3",
-      "board_column": "todo",
+      "board_column": "review",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 170
+      "sort": 170,
+      "blocked": false,
+      "blocked_reason": null
     },
     {
       "code": "SL-018",
