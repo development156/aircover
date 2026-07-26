@@ -218,6 +218,26 @@ describe('closingTaskCodes', () => {
     expect(closingTaskCodes('merge: bring wt-web into wt-admin')).toEqual([])
   })
 
+  it('does not treat a scope QUOTED IN THE BODY as a claim', () => {
+    // Caught on the very commit that introduced the scope rule: its body
+    // explained the convention by quoting `feat(SL-011):`, and the first
+    // implementation read that as closing SL-011. A commit has one subject.
+    const message = [
+      'fix(ops): a commit closes only what its scope claims',
+      '',
+      'Writing `feat(SL-011):` is a deliberate claim that this commit is that',
+      "card's work. Body prose is discussion.",
+    ].join('\n')
+
+    expect(closingTaskCodes(message)).toEqual([])
+  })
+
+  it('reads the subject even when it arrives wrapped in shell', () => {
+    // The hook sees the whole command, heredoc and all — not a bare message.
+    const command = ["git commit -q -F - <<'MSG'", 'feat(SL-012): x', '', 'body', 'MSG'].join('\n')
+    expect(closingTaskCodes(command)).toEqual(['SL-012'])
+  })
+
   it('ignores a scope that is not a card', () => {
     expect(closingTaskCodes('fix(repo): repair the lockfile')).toEqual([])
     expect(closingTaskCodes('feat(web): stop implying auto-publish works')).toEqual([])
