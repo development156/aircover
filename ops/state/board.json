@@ -138,12 +138,14 @@
     {
       "code": "SL-013",
       "title": "/admin shell, sub-nav, rail item",
-      "detail": null,
+      "detail": "Shell, sub-nav and rail item render; typecheck+lint green",
       "roadmap_code": "AO3",
-      "board_column": "todo",
+      "board_column": "review",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 130
+      "sort": 130,
+      "blocked": false,
+      "blocked_reason": null
     },
     {
       "code": "SL-014",
@@ -376,6 +378,16 @@
       "assignee": "claude",
       "doc_ref": null,
       "sort": 360
+    },
+    {
+      "code": "SL-037",
+      "title": "Say WHY /admin denied, in the server log only",
+      "detail": "Doc 13 §2 requires /admin to 404 identically for \"no such route\" and \"not an admin\", and that is right — a distinguishable response tells a stranger the console exists. But it is indistinguishable to the OWNER too: on 2026-07-26 a signed-in owner hit /admin, got a 404, and spent a detour working out whether the route was missing or the seat was. Both were true at once, which is exactly the case the identical response hides. Fix in middleware.ts: when NODE_ENV !== production, console.info a single line naming the reason — `[admin] denied: no ops_admin seat` / `no session` / `ops_admins query failed` — and keep the RESPONSE byte-identical in every case. Never in production, never in a header, never in the body: the log is for the operator at the terminal, not for the client. Include the reason for a failed check too, since isActiveOpsAdmin() swallows every error into false and a broken query currently looks exactly like a revoked seat.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": null,
+      "sort": 370
     }
   ]
 }

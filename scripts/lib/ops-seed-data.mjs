@@ -219,6 +219,24 @@ const TASKS = [
       '(done_at only when board_column = done, review_at only at review or ' +
       'beyond) rather than coalescing unconditionally.',
   ],
+  [
+    null,
+    'Say WHY /admin denied, in the server log only',
+    'Doc 13 §2 requires /admin to 404 identically for "no such route" and "not ' +
+      'an admin", and that is right — a distinguishable response tells a ' +
+      'stranger the console exists. But it is indistinguishable to the OWNER ' +
+      'too: on 2026-07-26 a signed-in owner hit /admin, got a 404, and spent a ' +
+      'detour working out whether the route was missing or the seat was. Both ' +
+      'were true at once, which is exactly the case the identical response ' +
+      'hides. Fix in middleware.ts: when NODE_ENV !== production, ' +
+      'console.info a single line naming the reason — `[admin] denied: no ' +
+      'ops_admin seat` / `no session` / `ops_admins query failed` — and keep ' +
+      'the RESPONSE byte-identical in every case. Never in production, never ' +
+      'in a header, never in the body: the log is for the operator at the ' +
+      'terminal, not for the client. Include the reason for a failed check too, ' +
+      'since isActiveOpsAdmin() swallows every error into false and a broken ' +
+      'query currently looks exactly like a revoked seat.',
+  ],
 ]
 
 export function tasks() {

@@ -9,6 +9,7 @@ import {
   Link2,
   SlidersHorizontal,
   Globe,
+  Shield,
   SquarePen,
   Wallet,
   type LucideIcon,
@@ -26,6 +27,7 @@ const ICONS = {
   globe: Globe,
   wallet: Wallet,
   'sliders-horizontal': SlidersHorizontal,
+  shield: Shield,
 } satisfies Record<string, LucideIcon>
 
 export type NavIconName = keyof typeof ICONS

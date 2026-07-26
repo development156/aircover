@@ -34,3 +34,6 @@ dist/
 ehthumbs.db
 Thumbs.db
 Desktop.ini
+
+# Per-worktree ops overrides (see scripts/lib/ops-env.mjs)
+ops/.local.env

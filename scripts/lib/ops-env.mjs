@@ -36,8 +36,15 @@ export function loadEnv() {
   if (cache) return cache
 
   const parsed = {}
-  try {
-    const raw = readFileSync(resolve(REPO_ROOT, '.env'), 'utf8')
+
+  function loadFile(path) {
+    let raw
+    try {
+      raw = readFileSync(path, 'utf8')
+    } catch {
+      // Absent is fine — a cloud sandbox supplies the environment directly.
+      return
+    }
     for (const line of raw.split('\n')) {
       const trimmed = line.trim()
       if (trimmed === '' || trimmed.startsWith('#')) continue
@@ -53,9 +60,21 @@ export function loadEnv() {
       }
       parsed[key] = value
     }
-  } catch {
-    // Absent is fine — a cloud sandbox supplies the environment directly.
   }
+
+  loadFile(resolve(REPO_ROOT, '.env'))
+
+  /**
+   * Per-WORKTREE overrides, loaded second so they win over the shared `.env`.
+   *
+   * Every worktree symlinks the one root `.env`, but they do not all run on one
+   * port: three dev servers were live at once here, and the sync script POSTed
+   * its board updates at :3000 — a *different* worktree, which returned a clean
+   * 404 because it has no ingest route. Nothing failed loudly; the board simply
+   * stopped moving. `ops/.local.env` is gitignored and holds exactly the things
+   * that are true of this checkout and no other (`OPS_INGEST_URL`).
+   */
+  loadFile(resolve(REPO_ROOT, 'ops/.local.env'))
 
   const read = (key) => {
     const value = process.env[key] ?? parsed[key] ?? ''
