@@ -6,9 +6,11 @@ import { z } from 'zod'
 import {
   OpsQaRunSchema,
   OpsRoadmapItemSchema,
+  OpsSessionSchema,
   OpsTaskSchema,
   type OpsQaRun,
   type OpsRoadmapItem,
+  type OpsSession,
   type OpsTask,
 } from '@sahoda/shared'
 
@@ -93,6 +95,23 @@ export const readTasks = cache(async (): Promise<OpsRead<OpsTask[]>> => {
       .eq('archived', false)
       .order('sort', { ascending: true })
       .limit(2000),
+  )
+})
+
+/**
+ * Recent sessions, newest heartbeat first.
+ *
+ * A window rather than "the working one": deciding what counts as live is
+ * `pulseOf`'s job, and it needs the runners-up to answer "idle since when".
+ */
+export const readSessions = cache(async (): Promise<OpsRead<OpsSession[]>> => {
+  const supabase = createServerSupabase()
+  return readAll('sessions', z.array(OpsSessionSchema), () =>
+    supabase
+      .from('ops_sessions')
+      .select('*')
+      .order('last_heartbeat_at', { ascending: false })
+      .limit(20),
   )
 })
 

@@ -165,11 +165,21 @@ async function main() {
   if (FLAGS.hookWrite && !hookTouchedState(hookJson)) return
 
   const board = readState('board')
+
+  // WORK IN FLIGHT, not "everything that is not To Do".
+  //
+  // The old filter was `!== 'todo'`, which swept in every DONE card — so the
+  // session strip announced "Claude is working · SL-001 SL-002 SL-003" while
+  // the actual work was SL-015. Those three were finished hours earlier by
+  // another session. A strip that names the wrong cards is worse than one that
+  // names none: it sends a reader to a card nobody is touching.
   const touched = Array.isArray(board.tasks)
     ? board.tasks
-        .filter((t) => t && t.board_column && t.board_column !== 'todo' && !t.archived)
+        .filter(
+          (t) => (t?.board_column === 'in_progress' || t?.board_column === 'review') && !t.archived,
+        )
         .map((t) => t.code)
-        .slice(0, 100)
+        .slice(0, 20)
     : []
 
   const statusFor = { start: 'working', stop: 'idle', idle: 'idle', end: 'ended' }

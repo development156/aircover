@@ -1,7 +1,8 @@
 import { AlertTriangle, CircleDot, ListChecks } from 'lucide-react'
 
 import { AlphaReadiness } from '@/components/admin/alpha-readiness'
-import { readGateRuns, readRoadmapItems, readTasks } from '@/lib/ops/read'
+import { GATE_SUITES, readGateRuns, readRoadmapItems, readTasks } from '@/lib/ops/read'
+import { gateChips, redSuitesFrom } from '@/lib/ops/session-pulse'
 import {
   currentStage,
   daysRemaining,
@@ -163,12 +164,11 @@ export async function RoadmapCard() {
           .filter((task) => task.blocked)
           .map(({ code, title, blocked_reason }) => ({ code, title, blocked_reason }))
       : []
+  // Same definition of "red" the gates strip uses, from the same function. Two
+  // places deciding independently what counts as a failing suite is how the
+  // strip and the checklist end up disagreeing on screen.
   const redSuites =
-    gates.status === 'ok'
-      ? Object.entries(gates.data)
-          .filter(([, run]) => run?.status === 'fail')
-          .map(([suite]) => suite)
-      : []
+    gates.status === 'ok' ? redSuitesFrom(gateChips([...GATE_SUITES], gates.data)) : []
 
   const entries = toReachDone({ stage, blockedTasks, redSuites })
 
