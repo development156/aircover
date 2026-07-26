@@ -149,8 +149,16 @@ describe.skipIf(!hasLedgerEnv)('expired-hold reaper (live ledger)', () => {
     await sleep(1200)
     const source = createExpiredHoldSource({ pool, graceSeconds: 0, workspaceId: ws })
 
-    const first = await sweepExpiredHolds({ mode: 'on', listExpiredHolds: source, apply: ledger.apply })
-    const second = await sweepExpiredHolds({ mode: 'on', listExpiredHolds: source, apply: ledger.apply })
+    const first = await sweepExpiredHolds({
+      mode: 'on',
+      listExpiredHolds: source,
+      apply: ledger.apply,
+    })
+    const second = await sweepExpiredHolds({
+      mode: 'on',
+      listExpiredHolds: source,
+      apply: ledger.apply,
+    })
 
     expect(first.released).toBe(1)
     // The hold is settled now, so it is no longer a candidate at all.

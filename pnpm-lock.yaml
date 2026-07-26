@@ -72,6 +72,9 @@ importers:
       '@sahoda/billing':
         specifier: workspace:*
         version: link:../../packages/billing
+      '@sahoda/jobs':
+        specifier: workspace:*
+        version: link:../jobs
       '@sahoda/mesh':
         specifier: workspace:*
         version: link:../../packages/mesh
