@@ -118,7 +118,7 @@
       "stage": "admin-ops",
       "title": "Foundations — ops tables, RLS, shared contracts, /admin gate",
       "weight": 3,
-      "status": "todo",
+      "status": "done",
       "sort": 20
     },
     {
@@ -126,7 +126,7 @@
       "stage": "admin-ops",
       "title": "Sync protocol — ingest API, state files, hooks, skill, commands",
       "weight": 3,
-      "status": "todo",
+      "status": "done",
       "sort": 21
     },
     {
@@ -134,7 +134,7 @@
       "stage": "admin-ops",
       "title": "DevOps dashboard — roadmap card, scrum board, changelog, QA console",
       "weight": 6,
-      "status": "todo",
+      "status": "active",
       "sort": 22
     },
     {
