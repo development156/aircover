@@ -121,7 +121,8 @@
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 110,
       "blocked": false,
-      "blocked_reason": null
+      "blocked_reason": null,
+      "commit_sha": "44e95ddb3766c10582834ac2a7691efecadc1c6a"
     },
     {
       "code": "SL-012",
