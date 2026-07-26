@@ -79,7 +79,7 @@ export function PublishPreview({ postId }: PublishPreviewProps) {
           Preview publish
         </Button>
       )}
-      <p className="text-[12px] text-faint">
+      <p className="text-[12px] text-muted">
         A dry run over your saved variants. Nothing is posted and nothing is recorded.
       </p>
 

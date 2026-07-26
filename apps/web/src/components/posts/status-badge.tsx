@@ -28,7 +28,7 @@ export const STATUS_STYLES = {
   publishing: { label: 'Publishing', className: 'bg-warn-bg text-warn' },
   published: { label: 'Published', className: 'bg-ok-bg text-ok' },
   failed: { label: 'Failed', className: 'bg-danger-bg text-danger' },
-  expired: { label: 'Expired', className: 'bg-s2 text-faint' },
+  expired: { label: 'Expired', className: 'bg-s2 text-muted' },
 } satisfies Record<PostStatus, StatusStyle>
 
 export interface StatusBadgeProps {

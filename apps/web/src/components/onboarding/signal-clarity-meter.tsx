@@ -20,7 +20,7 @@ export function SignalClarityMeter({ percent }: SignalClarityMeterProps) {
       data-guide="onboarding.signal-clarity"
       className="rounded-card border border-line bg-bg p-4 shadow-card"
     >
-      <div className="mb-2 flex items-center justify-between font-mono text-[10.5px] font-semibold tracking-[0.12em] text-faint uppercase">
+      <div className="mb-2 flex items-center justify-between font-mono text-[10.5px] font-semibold tracking-[0.12em] text-muted uppercase">
         <span>Fields filled</span>
         <span className="text-accent tabular-nums">{percent}%</span>
       </div>

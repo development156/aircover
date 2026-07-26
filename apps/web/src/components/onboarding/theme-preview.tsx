@@ -18,7 +18,7 @@ export interface ThemePreviewProps {
 export function ThemePreview({ style, brandName, tagline, chips }: ThemePreviewProps) {
   return (
     <div data-guide="onboarding.preview" className="sticky top-6 flex flex-col gap-3">
-      <h2 className="font-mono text-[11px] font-semibold tracking-[0.16em] text-faint uppercase">
+      <h2 className="font-mono text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
         Live preview
       </h2>
       <div

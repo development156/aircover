@@ -30,7 +30,7 @@ export function CardLabel({ className, ...props }: React.HTMLAttributes<HTMLPara
   return (
     <p
       className={cn(
-        'mb-2 flex items-center gap-2 font-mono text-[10.5px] font-semibold tracking-[0.14em] text-faint uppercase',
+        'mb-2 flex items-center gap-2 font-mono text-[10.5px] font-semibold tracking-[0.14em] text-muted uppercase',
         className,
       )}
       {...props}

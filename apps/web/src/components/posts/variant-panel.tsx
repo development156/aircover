@@ -108,7 +108,7 @@ export function VariantPanel({
       </div>
 
       {state.body === '' ? (
-        <p className="text-[12.5px] text-faint">
+        <p className="text-[12.5px] text-muted">
           Nothing drafted for this channel yet.{' '}
           {canonicalBody.trim() !== '' ? (
             <button
@@ -179,7 +179,7 @@ export function VariantPanel({
           {state.saving ? 'Saving' : state.dirty ? 'Save variant' : 'Saved'}
         </Button>
         {state.dirty && !state.saving ? (
-          <span className="text-[12px] text-faint">Not saved yet</span>
+          <span className="text-[12px] text-muted">Not saved yet</span>
         ) : null}
       </div>
     </div>

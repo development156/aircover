@@ -65,7 +65,7 @@ export function ErrorFallback({
           user is going to read this aloud or copy it character by character,
           and proportional digits make that materially harder. */}
       {eventId ? (
-        <p className="mt-1 text-[13px] text-faint">
+        <p className="mt-1 text-[13px] text-muted">
           Reference: <span className="tabular-nums">{eventId}</span>
         </p>
       ) : null}

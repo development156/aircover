@@ -25,7 +25,7 @@ export function EmptyState({
       <h2 className="text-[18px] leading-[26px] font-bold">{title}</h2>
       <p className="max-w-[42ch] text-muted">{body}</p>
       {action ? <div className="mt-2">{action}</div> : null}
-      {tip ? <p className="mt-1 text-[13px] text-faint">Sahoda: {tip}</p> : null}
+      {tip ? <p className="mt-1 text-[13px] text-muted">Sahoda: {tip}</p> : null}
     </section>
   )
 }

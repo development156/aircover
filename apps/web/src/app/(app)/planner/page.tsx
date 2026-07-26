@@ -58,7 +58,7 @@ export default async function PlannerPage({
       )}
 
       {posts.length === LIST_LIMIT ? (
-        <p className="text-[13px] tabular-nums text-faint">
+        <p className="text-[13px] tabular-nums text-muted">
           Showing the {LIST_LIMIT} most recently updated posts — older ones may not be on this page.
         </p>
       ) : null}

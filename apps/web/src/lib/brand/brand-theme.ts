@@ -3,15 +3,27 @@ import type { ThemeTokens } from '@sahoda/shared'
 import { contrastRatio, formatOklch, oklchToRgb, parseOklch, rgbToOklch, type Rgb } from './oklch'
 
 // Pure "colors extracted from a logo" -> Brand Skin mapper (docs/superpowers
-// spec, "4. Theme"; Design System §2 Brand Skin contract: a workspace theme
-// replaces exactly --p/--pfg/--pstrong/--acc/--t50/--t100/--t300 — neutrals
-// and semantics are fixed). Every value here is computed math, never a hex
-// literal (docs/08 §1).
+// spec, "4. Theme"; Brand Skin contract: a workspace theme replaces exactly
+// --p/--pfg/--pstrong/--acc/--t50/--t100/--t300 — neutrals and semantics are
+// fixed). Every value here is computed math, never a hex literal (docs/08 §1).
+//
+// The decimal constants below MIRROR packages/shared/tokens.css, because this
+// module cannot read CSS. `guard-neutrals.test.ts` reads the real token file and
+// fails if any of them drift — they silently held the v2 cool greys through the
+// v3 swap, which had the Guard grading tenant brands against surfaces the app
+// had stopped painting.
 
+/** The literal `white` keyword, used as a TEXT colour on a brand fill. */
 export const WHITE_RGB: Rgb = { r: 255, g: 255, b: 255 }
-// docs/08 §2 --ink:#131313 -> rgb(19,19,19). A decimal constant, not a hex
-// literal, kept here purely so the guard can compute real WCAG contrast.
-export const INK_RGB: Rgb = { r: 19, g: 19, b: 19 }
+/**
+ * The card SURFACE accent text is graded against — tokens.css `--surface`.
+ * Numerically equal to WHITE_RGB today but a different thing: one is ink, the
+ * other is paper. --surface is the lighter of the two light surfaces, so it is
+ * also the stricter of the two to read against.
+ */
+export const SURFACE_RGB: Rgb = { r: 255, g: 255, b: 255 }
+/** tokens.css `--ink` (#171514) — headings, and the dark option for --pfg. */
+export const INK_RGB: Rgb = { r: 23, g: 21, b: 20 }
 
 const MIN_CONTRAST = 4.5
 const DARKEN_STEP = 0.03
@@ -74,12 +86,18 @@ function guardPrimaryForeground(
   return { primary: readableBlack(), foreground: 'white' }
 }
 
-/** Darken (l, c, h) until it reads at >=4.5:1 as TEXT on a white surface. */
-function darkenForTextOnWhite(l: number, c: number, h: number): string {
+/**
+ * Darken (l, c, h) until it reads at >=4.5:1 as TEXT on the card surface.
+ *
+ * Graded against SURFACE_RGB rather than a bare white: --acc is link and
+ * accent-text colour, and the surfaces it lands on are --surface and --canvas.
+ * --surface is the lighter of the two, so clearing it clears both.
+ */
+function darkenForTextOnSurface(l: number, c: number, h: number): string {
   let lightness = l
   for (let step = 0; step <= MAX_DARKEN_ITERATIONS; step += 1) {
     const rgb = oklchToRgb(lightness, c, h)
-    if (contrastRatio(rgb, WHITE_RGB) >= MIN_CONTRAST) return formatOklch(lightness, c, h)
+    if (contrastRatio(rgb, SURFACE_RGB) >= MIN_CONTRAST) return formatOklch(lightness, c, h)
     lightness = Math.max(0, lightness - DARKEN_STEP)
   }
   return readableBlack()
@@ -104,7 +122,7 @@ export function brandSkinVars(colors: string[]): BrandSkinVars {
   const pstrong = formatOklch(Math.max(0, l - 0.1), c, h)
 
   const accentInput = colors[1] ? parseOklch(colors[1]) : { l, c, h }
-  const acc = darkenForTextOnWhite(accentInput.l, accentInput.c, accentInput.h)
+  const acc = darkenForTextOnSurface(accentInput.l, accentInput.c, accentInput.h)
 
   const t50 = formatOklch(0.97, Math.min(c, 0.02), h)
   const t100 = formatOklch(0.93, Math.min(c, 0.05), h)
@@ -121,19 +139,21 @@ export function brandSkinVars(colors: string[]): BrandSkinVars {
   }
 }
 
-// docs/08 §2 canonical neutral/semantic hex, converted once to decimal RGB —
-// never re-themed by Brand Skin, so these stay fixed regardless of `colors`.
-const NEUTRAL_RGB = {
-  bg: { r: 255, g: 255, b: 255 }, // --bg
-  s1: { r: 250, g: 250, b: 249 }, // --s1
-  s2: { r: 244, g: 244, b: 243 }, // --s2
-  line: { r: 229, g: 229, b: 228 }, // --line
-  ink: { r: 19, g: 19, b: 19 }, // --ink
-  muted: { r: 82, g: 82, b: 82 }, // --muted
-  faint: { r: 163, g: 163, b: 162 }, // --faint
-  ok: { r: 21, g: 128, b: 61 }, // --ok
-  warn: { r: 180, g: 83, b: 9 }, // --warn
-  danger: { r: 200, g: 30, b: 30 }, // --danger
+// tokens.css v3 neutral/semantic hex, converted once to decimal RGB — never
+// re-themed by Brand Skin, so these stay fixed regardless of `colors`. Keys keep
+// their legacy names (`s1`, `muted`) while the values track the v3 tokens; the
+// comment on each line is the mirror `guard-neutrals.test.ts` enforces.
+export const NEUTRAL_RGB = {
+  bg: { r: 255, g: 255, b: 255 }, // --surface  #ffffff
+  s1: { r: 251, g: 250, b: 249 }, // --canvas   #fbfaf9
+  s2: { r: 245, g: 244, b: 242 }, // --surface-2 #f5f4f2
+  line: { r: 231, g: 229, b: 227 }, // --line   #e7e5e3
+  ink: { r: 23, g: 21, b: 20 }, // --ink        #171514
+  muted: { r: 107, g: 101, b: 96 }, // --ink-mute  #6b6560
+  faint: { r: 168, g: 162, b: 158 }, // --ink-faint #a8a29e
+  ok: { r: 21, g: 128, b: 61 }, // --ok         #15803d
+  warn: { r: 180, g: 83, b: 9 }, // --warn      #b45309
+  danger: { r: 200, g: 30, b: 30 }, // --danger #c81e1e
 } as const satisfies Record<string, Rgb>
 
 function oklchOf(rgb: Rgb): string {
@@ -165,7 +185,8 @@ export function themeTokensFrom(colors: string[]): ThemeTokens {
     success: oklchOf(NEUTRAL_RGB.ok),
     warning: oklchOf(NEUTRAL_RGB.warn),
     danger: oklchOf(NEUTRAL_RGB.danger),
-    radius: '12px',
+    // tokens.css --r-lg (cards, nav items, wells). Pinned by guard-neutrals.test.ts.
+    radius: '14px',
     fontHeading: 'Outfit',
     fontBody: 'Outfit',
   }

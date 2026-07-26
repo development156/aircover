@@ -60,7 +60,7 @@ export function LogoDrop({ value, onChange, guide, className }: LogoDropProps) {
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       <label htmlFor={inputId} className="text-[12.5px] font-semibold text-ink">
-        Logo <span className="font-normal text-faint">(optional)</span>
+        Logo <span className="font-normal text-muted">(optional)</span>
       </label>
 
       {value ? (

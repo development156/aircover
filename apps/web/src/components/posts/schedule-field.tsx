@@ -100,7 +100,7 @@ export function ScheduleField({ channels, value, onChange }: ScheduleFieldProps)
           {check.message} Nothing was saved.
         </p>
       ) : (
-        <p className="text-[12px] text-faint">
+        <p className="text-[12px] text-muted">
           {draft === ''
             ? 'No schedule set — this post stays a draft.'
             : earliest !== null
