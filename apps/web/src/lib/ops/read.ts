@@ -99,6 +99,18 @@ export const readTasks = cache(async (): Promise<OpsRead<OpsTask[]>> => {
 })
 
 /**
+ * Recent QA runs across every suite, newest first — the board's QA dots and,
+ * later, the QA console feed. Bounded: the dot only needs the newest run per
+ * card, and an unbounded select would grow without limit as hooks fire.
+ */
+export const readRecentQaRuns = cache(async (): Promise<OpsRead<OpsQaRun[]>> => {
+  const supabase = createServerSupabase()
+  return readAll('qa_runs', z.array(OpsQaRunSchema), () =>
+    supabase.from('ops_qa_runs').select('*').order('started_at', { ascending: false }).limit(500),
+  )
+})
+
+/**
  * Recent sessions, newest heartbeat first.
  *
  * A window rather than "the working one": deciding what counts as live is

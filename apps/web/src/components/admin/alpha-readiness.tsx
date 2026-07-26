@@ -87,6 +87,18 @@ export function AlphaReadiness({
             </p>
           ) : null}
 
+          {/* The other half of the truth, and it is not a footnote. Counting six
+              failures invites the reader to assume the rest passed. The eleven
+              behavioural checks of docs/05 §5 are a DIFFERENT list and nobody
+              has run them, so their state is unknown — which is neither a pass
+              nor a failure, and saying nothing would let it read as a pass. */}
+          <p className="mt-2 text-[13px] text-ink">
+            Separately, the{' '}
+            <span className="font-semibold tabular-nums">11 behavioural checks</span> of the Alpha
+            Gate (docs/05 §5) are <span className="font-semibold">unverified, not failed</span> —
+            that gate has never been run.
+          </p>
+
           {/* Provenance, always. This is a transcription of somebody's judgement
               on a date, not a live check, and it must never read as one. */}
           <p className="mt-2 text-[12px] text-muted">

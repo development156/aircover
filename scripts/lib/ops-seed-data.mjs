@@ -255,6 +255,28 @@ const TASKS = [
       'unexplained one is a hole. Related: the earlier finding that a green ' +
       'suite can pin a defect as correct.',
   ],
+  [
+    null,
+    'Audit where the dashboard INFERS state it could record',
+    'Two instances found on 2026-07-26, both wrong in the same way. (1) The ' +
+      'heartbeat derived tasks_touched from "board_column !== todo", so it ' +
+      'named every DONE card and announced Claude was working on SL-001–003 ' +
+      'while the real work was SL-015 — the session never recorded what it ' +
+      'actually touched, so the strip guessed. (2) Roadmap item statuses are ' +
+      'flipped by hand when their SL cards finish; nothing derives or records ' +
+      'the link, so AO1/AO2 sat at todo while all twelve of their cards were ' +
+      'done with shas. A third is already in the code: the auto-QA hook ' +
+      'attributes every run to whichever card happens to be in_progress ' +
+      '(currentTaskCode in ops-hook-bash.mjs) rather than to what was actually ' +
+      'tested. Sweep the whole surface for the pattern — a value the dashboard ' +
+      'COMPUTES from a proxy when the producer could have RECORDED the fact — ' +
+      'and for each one decide: record it at the source, or label it on screen ' +
+      'as derived. The rule to apply: infer only what cannot be recorded, and ' +
+      'say so where it shows. Candidates to check: tasks_touched, roadmap ' +
+      'status, QA run attribution, "age in column" (derived from ' +
+      'started_at/review_at/done_at, which SL-036 shows are themselves ' +
+      'unreliable on a backward move), and the changelog task_codes link.',
+  ],
 ]
 
 export function tasks() {
