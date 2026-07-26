@@ -53,7 +53,12 @@
         "SENTRY_AUTH_TOKEN",
         "TOKEN_VAULT_KEY",
         "JOB_SIGNING_SECRET",
-        "CONTEXT7_API_KEY"
+        "CONTEXT7_API_KEY",
+        "CRON_SECRET",
+        "SAHODA_PUBLISH_DISPATCH_MODE",
+        "SAHODA_PUBLISH_DISPATCH_GRACE_SECONDS",
+        "SAHODA_HOLD_SWEEP_MODE",
+        "SAHODA_HOLD_SWEEP_GRACE_SECONDS"
       ]
     },
     "dev": {

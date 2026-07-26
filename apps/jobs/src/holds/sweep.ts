@@ -1,5 +1,6 @@
 import { expiredReleaseKey } from '@sahoda/shared'
 import type { LedgerPort } from '@sahoda/billing'
+import type { HoldSweepMode } from '../env'
 
 /** An unsettled HOLD past its expiry — the sweep's unit of work. */
 export interface ExpiredHold {
@@ -14,14 +15,20 @@ export interface ExpiredHold {
 }
 
 export interface HoldSweepDeps {
+  /** `off` reads nothing, `report` writes nothing, only `on` releases (see env.ts). */
+  mode: HoldSweepMode
   listExpiredHolds(): Promise<ExpiredHold[]>
   /** The ONLY ledger write path: `app.apply_ledger_entry()` via the billing port. */
   apply: LedgerPort['apply']
 }
 
 export interface HoldSweepReport {
+  mode: HoldSweepMode
   scanned: number
+  /** Executed count. Zero in `off` and `report`. */
   released: number
+  /** Intent count, populated in every mode so a report predicts what `on` will do. */
+  wouldRelease: number
   /** Lost the settlement race to a DEBIT (or a normal RELEASE) — a correct no-op. */
   alreadySettled: number
   failed: number
@@ -41,15 +48,30 @@ export interface HoldSweepReport {
  *
  * One hold's failure never aborts the sweep: a poison row would otherwise strand every
  * later workspace's credits until someone intervened.
+ *
+ * `mode` is the safety story, mirroring the dispatcher: `off` does not even read
+ * candidates, `report` lists what it would release and writes nothing, only `on` applies.
+ * Deploying the reaper must not, by itself, start moving credits.
  */
 export async function sweepExpiredHolds(deps: HoldSweepDeps): Promise<HoldSweepReport> {
-  const holds = await deps.listExpiredHolds()
   const report: HoldSweepReport = {
-    scanned: holds.length,
+    mode: deps.mode,
+    scanned: 0,
     released: 0,
+    wouldRelease: 0,
     alreadySettled: 0,
     failed: 0,
   }
+
+  if (deps.mode === 'off') return report
+
+  const holds = await deps.listExpiredHolds()
+  report.scanned = holds.length
+  // Every listed hold is one this sweep would release: the candidate query IS the
+  // decision here, unlike the dispatcher where a classifier stands between the two.
+  report.wouldRelease = holds.length
+
+  if (deps.mode === 'report') return report
 
   for (const hold of holds) {
     try {

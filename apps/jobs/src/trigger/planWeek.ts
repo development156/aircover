@@ -1,7 +1,7 @@
 import { task } from '@trigger.dev/sdk'
 import { PlanWeekJobPayloadSchema, type PlanWeekJobPayload } from '@sahoda/shared'
 import { runPlanWeekJob } from '../ai/plan-week-job'
-import { planWeekDeps } from '../runtime'
+import { planWeekDeps } from '../ai/deps'
 
 export const PLAN_WEEK_TASK_ID = 'plan-week'
 
