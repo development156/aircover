@@ -16,7 +16,10 @@ const ALL_INPUT_SHAPES = [
   ['a dsn with environment', { dsn: DSN, environment: 'production' }],
   ['a dsn with release', { dsn: DSN, release: 'web@1.2.3' }],
   ['a dsn with secrets', { dsn: DSN, secretValues: [SECRET] }],
-  ['everything at once', { dsn: DSN, environment: 'preview', release: 'web@0.1.0', secretValues: [SECRET] }],
+  [
+    'everything at once',
+    { dsn: DSN, environment: 'preview', release: 'web@0.1.0', secretValues: [SECRET] },
+  ],
 ] as const
 
 describe('buildSentryOptions — enablement', () => {

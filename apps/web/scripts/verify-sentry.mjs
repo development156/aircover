@@ -121,7 +121,9 @@ async function probe({ kind, label, proves, expectError }) {
   if (response.status === 404) {
     console.log('  404 — the route did not run. Any of:')
     console.log('    · NODE_ENV is production, so the guard disabled the endpoint (correct);')
-    console.log('    · Clerk blocked the request — set SENTRY_VERIFY_COOKIE to a signed-in session;')
+    console.log(
+      '    · Clerk blocked the request — set SENTRY_VERIFY_COOKIE to a signed-in session;',
+    )
     console.log('    · the route is not present in this build.')
     return { ok: false, blocked: true }
   }
@@ -188,7 +190,9 @@ async function main() {
   }
 
   if (results.every((result) => result.blocked)) {
-    console.error('\nFailed: every probe was blocked before the route ran, so nothing was verified.')
+    console.error(
+      '\nFailed: every probe was blocked before the route ran, so nothing was verified.',
+    )
     process.exit(1)
   }
 
@@ -198,9 +202,15 @@ async function main() {
     process.exit(1)
   }
 
-  console.log('\nAll probes behaved as expected: the SDK is initialised and events left the process.')
-  console.log('One step remains that no local probe can take — a drained queue is not a stored event,')
-  console.log('because a rejected envelope drains exactly like a good one. Open Sentry and confirm:')
+  console.log(
+    '\nAll probes behaved as expected: the SDK is initialised and events left the process.',
+  )
+  console.log(
+    'One step remains that no local probe can take — a drained queue is not a stored event,',
+  )
+  console.log(
+    'because a rejected envelope drains exactly like a good one. Open Sentry and confirm:',
+  )
   console.log('  · the events are there (a missing event means the DSN points somewhere wrong);')
   console.log('  · the fake token reads [redacted], not the literal value.')
 }
