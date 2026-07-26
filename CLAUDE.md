@@ -2,6 +2,8 @@
 
 Docs are law: /docs 00_README → canon order. Sprint = docs/05 (2-day Alpha). Behavior = 02_FSD. Architecture = 03_TSD. Tokens/components = 08_Design_System (no raw hex anywhere). Demos sahoda_dashboard_demo.html + sahoda_brand_brain_demo.html = canonical UI reference.
 
+UI work: read docs/design2.0/UI_RULES_v3.md first.
+
 ## Stack
 
 pnpm+Turborepo · apps/web Next.js 15 App Router+TS+Tailwind+shadcn · apps/jobs Trigger.dev · packages: db(Supabase+RLS+pgvector) shared(zod SOURCE OF TRUTH) mesh publishing billing render · Clerk · Upstash · Cloudflare(sites) · Resend · Sentry.

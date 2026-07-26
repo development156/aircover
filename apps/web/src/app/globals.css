@@ -4,13 +4,19 @@
 /* If the package-exports import ever fails to resolve under a bundler change,
    fall back to: @import '../../../../../packages/shared/tokens.css'; */
 
-/* Bind next/font families to the canonical tokens (docs/08 §3: Outfit now;
-   Garet later via --ff-display after license — no font files in-repo).
-   next/font emits hashed family names, so the literal 'Outfit' in tokens.css
-   can never match; this override is the sanctioned runtime binding. */
+/* Bind next/font families to the canonical tokens (docs/design2.0/UI_RULES_v3.md;
+   Outfit now, Garet later via a display token after license — no font files
+   in-repo). next/font emits hashed family names, so the literal 'Outfit' /
+   'JetBrains Mono' in tokens.css can never match; this override is the
+   sanctioned runtime binding.
+
+   v3 makes --sans/--mono the SOURCES and --ff a legacy alias of --sans, so the
+   binding lands on --sans: the type shorthands (--t-body, --t-h1 …) read --sans
+   directly and would otherwise keep the unhashed family. --ff follows for free,
+   because var() resolves against the final cascade value. */
 :root {
-  --ff: var(--font-outfit), Inter, system-ui, sans-serif;
-  --mono: var(--font-jbmono), ui-monospace, monospace;
+  --sans: var(--font-outfit), Inter, system-ui, 'Noto Sans Devanagari', sans-serif;
+  --mono: var(--font-jbmono), 'SF Mono', ui-monospace, monospace;
 }
 
 /* dark:* utilities keyed to the canonical [data-theme] attribute (docs/08 §2),
@@ -22,31 +28,34 @@
      Tailwind colors (bg-red-500 …) do not compile at all. */
   --color-*: initial;
   /* SANCTIONED LITERAL — the only hex in app code. docs/08 §6 requires white
-     on --pstrong/--ink (buttons, toasts) and tokens.css has no --white token.
-     Follow-up filed with the shared owner: add --white via Readability Guard,
-     then replace this with var(--white). */
+     on --brand-deep/--ink (buttons, toasts) and tokens.css v3 still has no
+     --white token. Follow-up filed with the shared owner: add --white via the
+     Readability Guard, then replace this with var(--white). */
   --color-white: #ffffff;
 
-  /* Two breakpoints only (docs/08 §4): 700 / 1180 */
+  /* Two breakpoints only (docs/08 §4): 700 / 1180. 1180 is also where v3
+     collapses the sidebar to --spacing-rail-collapsed. */
   --breakpoint-*: initial;
   --breakpoint-narrow: 700px;
   --breakpoint-wide: 1180px;
 
-  /* Shell dims (docs/08 §4) → w-rail, h-topbar, p-page, gap-grid, max-w-content */
-  --spacing-rail: 236px;
+  /* No v3 token — kept as literals until the shell spec names them. */
   --spacing-rail-collapsed: 64px;
-  --spacing-topbar: 60px;
-  --spacing-page: 26px;
   --spacing-page-mobile: 14px;
   --spacing-grid: 18px;
-  --container-content: 1200px;
 }
 
 /* MUST be `inline`: every value below references a :root var from tokens.css;
    plain @theme would double-indirect and break [data-theme] / Brand Skin
-   scoping (Tailwind docs: "Referencing other variables"). */
+   scoping (Tailwind docs: "Referencing other variables").
+
+   L1/L2/L3 mirrors the token file. Utilities are named for the v3 (L2) tokens;
+   the legacy utility names below them are kept pointing at the L3 aliases so
+   every existing class in apps/web keeps rendering. Delete a legacy line only
+   when nothing references it. */
 @theme inline {
-  /* Brand — Brand Skin overrides exactly these seven upstream */
+  /* ---- L1 · Brand Skin sources — the theming engine overrides exactly these
+     seven upstream, so every utility built on them re-themes live. ---- */
   --color-primary: var(--p);
   --color-primary-foreground: var(--pfg);
   --color-primary-strong: var(--pstrong);
@@ -54,15 +63,29 @@
   --color-tint-50: var(--t50);
   --color-tint-100: var(--t100);
   --color-tint-300: var(--t300);
-  /* Neutrals */
-  --color-bg: var(--bg);
-  --color-s1: var(--s1);
-  --color-s2: var(--s2);
-  --color-ink: var(--ink);
-  --color-muted: var(--muted);
-  --color-faint: var(--faint);
+
+  /* ---- L2 · brand (v3 names; alias into L1, so equally re-theme-safe) ---- */
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-text: var(--brand-text);
+  --color-brand-wash: var(--brand-wash);
+  --color-brand-tint: var(--brand-tint);
+  --color-brand-lift: var(--brand-lift);
+
+  /* ---- L2 · warm neutrals ---- */
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-line: var(--line);
-  /* Semantic */
+  --color-line-firm: var(--line-firm);
+  --color-ink: var(--ink);
+  --color-ink-body: var(--ink-body);
+  --color-ink-mute: var(--ink-mute);
+  /* Disabled + decorative only — fails 4.5:1, never content text. */
+  --color-ink-faint: var(--ink-faint);
+
+  /* ---- L2 · semantic (strokes, icons, text — never large fills) ---- */
   --color-ok: var(--ok);
   --color-ok-bg: var(--ok-bg);
   --color-warn: var(--warn);
@@ -70,6 +93,24 @@
   --color-danger: var(--danger);
   --color-danger-bg: var(--danger-bg);
   --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+
+  /* ---- L2 · channel accents (platform-owned; chips only) ---- */
+  --color-channel-instagram: var(--channel-instagram);
+  --color-channel-google: var(--channel-google);
+  --color-channel-whatsapp: var(--channel-whatsapp);
+  --color-channel-x: var(--channel-x);
+  --color-channel-linkedin: var(--channel-linkedin);
+
+  /* ---- L3 · legacy colour utilities — existing components only ----
+     bg-bg / bg-s1 / bg-s2 / text-muted / text-faint still resolve, now through
+     the v3 aliases. NOTE --s1/--s2 are SURFACE COLOURS, not spacing. */
+  --color-bg: var(--bg);
+  --color-s1: var(--s1);
+  --color-s2: var(--s2);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+
   /* shadcn-compat aliases (restyle-on-vend policy — see components.json note):
      vended `bg-accent`/`bg-muted` must be rewritten to bg-s2 by hand. */
   --color-background: var(--bg);
@@ -85,37 +126,87 @@
   --color-border: var(--line);
   --color-input: var(--line);
   --color-ring: var(--acc);
-  /* Shape / elevation / type / motion */
+
+  /* ---- Shape — v3 names, plus the legacy trio pointing at the same steps ---- */
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-full: var(--r-full);
   --radius-input: var(--r-input);
   --radius-card: var(--r-card);
   --radius-pill: var(--r-pill);
+
+  /* ---- Elevation ---- */
   --shadow-card: var(--sh-card);
   --shadow-pop: var(--sh-pop);
-  --font-sans: var(--ff);
+  /* Credits balance hero only; color-mix keeps it following the tenant brand. */
+  --shadow-brand: var(--sh-brand);
+
+  /* ---- Type ---- */
+  --font-sans: var(--sans);
   --font-mono: var(--mono);
+
+  /* ---- Shell dims (v3 §layout) → w-rail, h-topbar, p-page, max-w-content ---- */
+  --spacing-rail: var(--sidebar-w);
+  --spacing-topbar: var(--topbar-h);
+  --spacing-page: var(--content-pad);
+  --spacing-home-rail: var(--rail-w);
+  --container-content: var(--content-max);
+
+  /* ---- Motion ----
+     No `--duration-*` entries: Tailwind v4 has no duration theme namespace
+     (verified — `duration-fast` generates nothing), so mapping the v3 duration
+     tokens here would be dead config. Durations reach components through the
+     transition-micro / transition-panel utilities below instead. */
   --ease-brand: var(--ease);
+  --ease-sweep: var(--ease-sweep);
 }
 
 @layer base {
-  /* Shell base per dashboard demo: body on --s1, cards on --bg. Body 15/22 (§3). */
+  /* v3 base scale, matching sahoda_design_system_v3.html: canvas background,
+     --ink-body for body copy, --ink reserved for headings. Body type is the
+     --t-body shorthand rather than a hand-written font declaration. */
   body {
-    background: var(--s1);
+    background: var(--canvas);
+    color: var(--ink-body);
+    font: var(--t-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
     color: var(--ink);
-    font: 400 15px/22px var(--ff);
   }
-  /* A11y floor (docs/08 §8): 2px --acc ring, offset 2. Dark auto-corrects —
-     tokens.css swaps --acc to --t300 under [data-theme='dark']. */
-  :focus-visible {
-    outline: 2px solid var(--acc);
-    outline-offset: 2px;
-    /* Deliberately off-scale: the ring hugs arbitrary shapes, so it sits
-       below the smallest shape token (--r-input 10px). docs/08 §8 specifies
-       only ring width/offset. */
-    border-radius: 6px;
-  }
+  /* :focus-visible is NOT declared here. tokens.css v3 ships the single global
+     focus treatment (2px --brand-text, offset 2, --r-sm radius) unlayered, so it
+     already outranks anything in @layer base — a copy here would be dead code
+     that drifts. One treatment, no per-component overrides. */
 }
 
-/* Motion tokens as utilities (docs/08 §5): micro = --dur-1, panels = --dur-2 */
+/* v3 type scale as utilities, so components never hand-write a font shorthand. */
+@utility type-display {
+  font: var(--t-display);
+}
+@utility type-h1 {
+  font: var(--t-h1);
+}
+@utility type-h2 {
+  font: var(--t-h2);
+}
+@utility type-body {
+  font: var(--t-body);
+}
+@utility type-sm {
+  font: var(--t-sm);
+}
+@utility type-eyebrow {
+  font: var(--t-eyebrow);
+  letter-spacing: var(--t-eyebrow-ls);
+  text-transform: uppercase;
+}
+
+/* Motion tokens as utilities (docs/08 §5): micro = --dur-1, panels = --dur-2.
+   Both now alias the v3 --dur-fast / --dur-base. */
 @utility transition-micro {
   transition-property: color, background-color, border-color, opacity, box-shadow, transform;
   transition-duration: var(--dur-1);
