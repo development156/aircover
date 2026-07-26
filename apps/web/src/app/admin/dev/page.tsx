@@ -1,3 +1,4 @@
+import { Board } from '@/components/admin/board'
 import { PendingRegion } from '@/components/admin/pending-region'
 import { RoadmapCard } from '@/components/admin/roadmap-card'
 import { HeaderStrips } from '@/components/admin/strips'
@@ -23,11 +24,7 @@ export default function AdminDevPage() {
       <HeaderStrips />
 
       <div className="grid gap-grid wide:grid-cols-[1fr_380px]">
-        <PendingRegion
-          title="Scrum board"
-          card="SL-016"
-          builds="To Do · In Progress · For Review · Done, drag between any two, filters and counts."
-        />
+        <Board />
         <PendingRegion
           title="Changelog"
           card="SL-017"
