@@ -121,7 +121,18 @@ const TASKS = [
   ['AO4', 'Applications inbox with CSV export'],
   ['AO4', 'Clerk invitations and user.created webhook'],
   ['AO4', 'Credit request with two-admin OTP'],
-  ['AO4', 'Grant through apply_ledger_entry + replay proof'],
+  [
+    'AO4',
+    'Grant through apply_ledger_entry + replay proof',
+    'Also owns the why-line. wt-web rewrote the wallet GRANT copy to classify ' +
+      'from the idempotency key and actor rather than action_type, and the admin ' +
+      'why-line went with it — so doc 13 §6\'s "Credits added by Sahoda Labs ' +
+      'team." currently has no implementation. Add it as an `admin` origin in ' +
+      'lib/wallet/grant-origin.ts, PROVEN from adminGrantKey() the way signup and ' +
+      'plan are proven, not by matching action_type: that field is free text with ' +
+      'no CHECK and the classifier deliberately stopped trusting it (see SL-032). ' +
+      'Until then the doc is ahead of the code, which is the safe direction.',
+  ],
   ['AO4', '/admin/team roles with last-owner guard'],
   ['AO4', 'Audit log on every admin mutation'],
   ['AO5', 'Acceptance gate, security review, changelog, handoff'],
