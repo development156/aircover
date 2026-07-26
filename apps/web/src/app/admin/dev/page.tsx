@@ -1,5 +1,5 @@
 import { Board } from '@/components/admin/board'
-import { PendingRegion } from '@/components/admin/pending-region'
+import { Changelog } from '@/components/admin/changelog'
 import { RoadmapCard } from '@/components/admin/roadmap-card'
 import { HeaderStrips } from '@/components/admin/strips'
 import { PageTitle } from '@/components/page-title'
@@ -25,11 +25,7 @@ export default function AdminDevPage() {
 
       <div className="grid gap-grid wide:grid-cols-[1fr_380px]">
         <Board />
-        <PendingRegion
-          title="Changelog"
-          card="SL-017"
-          builds="Plain-English entries with copy buttons, newest first."
-        />
+        <Changelog />
       </div>
     </div>
   )

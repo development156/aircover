@@ -4,10 +4,12 @@ import { cache } from 'react'
 import * as Sentry from '@sentry/nextjs'
 import { z } from 'zod'
 import {
+  OpsChangelogEntrySchema,
   OpsQaRunSchema,
   OpsRoadmapItemSchema,
   OpsSessionSchema,
   OpsTaskSchema,
+  type OpsChangelogEntry,
   type OpsQaRun,
   type OpsRoadmapItem,
   type OpsSession,
@@ -95,6 +97,17 @@ export const readTasks = cache(async (): Promise<OpsRead<OpsTask[]>> => {
       .eq('archived', false)
       .order('sort', { ascending: true })
       .limit(2000),
+  )
+})
+
+/**
+ * Changelog entries, newest first. Bounded — the rail shows recent history, and
+ * the full record belongs in an export rather than in one scrolling column.
+ */
+export const readChangelog = cache(async (): Promise<OpsRead<OpsChangelogEntry[]>> => {
+  const supabase = createServerSupabase()
+  return readAll('changelog', z.array(OpsChangelogEntrySchema), () =>
+    supabase.from('ops_changelog').select('*').order('seq', { ascending: false }).limit(100),
   )
 })
 
