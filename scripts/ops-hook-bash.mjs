@@ -2,7 +2,7 @@
 import { execFileSync, execFileSync as run } from 'node:child_process'
 import { warn } from './lib/ops-env.mjs'
 import { readState, writeState, clientId } from './lib/ops-state.mjs'
-import { classifyBashRuns, isGitCommit, taskCodesIn } from './lib/ops-classify.mjs'
+import { classifyBashRuns, closingTaskCodes, isGitCommit } from './lib/ops-classify.mjs'
 
 /**
  * PostToolUse(Bash) → the QA feed and the board (doc 13 §9.3).
@@ -135,7 +135,7 @@ async function main() {
   if (/ops-sync\.mjs|ops-hook-bash\.mjs/.test(command)) return
 
   if (isGitCommit(command)) {
-    const codes = taskCodesIn(command)
+    const codes = closingTaskCodes(command)
     if (markCommitted(codes)) {
       console.log(`ops: ${codes.join(', ')} → done`)
       sync()

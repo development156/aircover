@@ -192,6 +192,28 @@ export function classifyBashRuns({ command, output, exitCode, durationMs }) {
   }))
 }
 
+/**
+ * Which cards a commit CLOSES — read from the conventional-commit scope only.
+ *
+ * Doc 13 §9.3 says "scan the message for SL-### codes", and scanning the whole
+ * message is what this did until it closed two cards that were not done. Commit
+ * 8f379e9's body contains the sentence "SL-028 is still To Do"; the hook read it
+ * and moved SL-028 to Done. The board contradicted the very commit that fed it.
+ *
+ * A scope is a deliberate claim — writing `feat(SL-011):` asserts this commit is
+ * that card's work. Body prose is discussion: it names cards to explain
+ * decisions, defer them, or say why they are NOT finished. Only the scope closes.
+ *
+ * Merge commits have no scope, which is correct: a merge completes nothing.
+ */
+const CONVENTIONAL_SCOPE =
+  /\b(?:feat|fix|chore|docs|refactor|test|perf|ci|style|build|revert)\(([^)]*)\)/g
+
+export function closingTaskCodes(message) {
+  const scopes = [...String(message ?? '').matchAll(CONVENTIONAL_SCOPE)].map((m) => m[1])
+  return taskCodesIn(scopes.join(' '))
+}
+
 /** `SL-7` and `SL-007` are the same card; the board stores the padded form. */
 export function taskCodesIn(text) {
   const found = new Set()
