@@ -100,6 +100,7 @@ export function dispatchSweepDeps(): Omit<DispatchSweepDeps, 'enqueuePublish'> {
 export function holdSweepDeps(): HoldSweepDeps {
   const { env, pool, ledger } = getRuntime()
   return {
+    mode: env.holdSweepMode,
     listExpiredHolds: createExpiredHoldSource({
       pool,
       graceSeconds: env.holdSweepGraceSeconds,

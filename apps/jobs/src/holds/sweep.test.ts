@@ -23,6 +23,7 @@ describe('sweepExpiredHolds', () => {
     const calls: ApplyLedgerInput[] = []
 
     const report = await sweepExpiredHolds({
+      mode: 'on',
       listExpiredHolds: async () => [h],
       apply: async (input) => {
         calls.push(input)
@@ -45,6 +46,7 @@ describe('sweepExpiredHolds', () => {
     // A late DEBIT beat the sweep to the hold. The user was charged for real work;
     // the sweep losing that race is the correct outcome, not an error.
     const report = await sweepExpiredHolds({
+      mode: 'on',
       listExpiredHolds: async () => [hold()],
       apply: async () => {
         throw new Error('HOLD_ALREADY_SETTLED')
@@ -60,6 +62,7 @@ describe('sweepExpiredHolds', () => {
     const released: string[] = []
 
     const report = await sweepExpiredHolds({
+      mode: 'on',
       listExpiredHolds: async () => [bad, good],
       apply: async (input) => {
         if (input.settlesEntryId === bad.id) throw new Error('connection terminated')
@@ -75,6 +78,7 @@ describe('sweepExpiredHolds', () => {
   it('writes nothing when no holds have expired', async () => {
     let applyCalls = 0
     const report = await sweepExpiredHolds({
+      mode: 'on',
       listExpiredHolds: async () => [],
       apply: async () => {
         applyCalls += 1
@@ -84,5 +88,61 @@ describe('sweepExpiredHolds', () => {
 
     expect(applyCalls).toBe(0)
     expect(report).toMatchObject({ scanned: 0, released: 0, alreadySettled: 0, failed: 0 })
+  })
+
+  it('reads nothing at all when off', async () => {
+    // `off` must be cheaper than an empty sweep: deploying the reaper somewhere new must
+    // not even query the ledger until someone grants it that.
+    let listCalls = 0
+    const report = await sweepExpiredHolds({
+      mode: 'off',
+      listExpiredHolds: async () => {
+        listCalls += 1
+        return [hold()]
+      },
+      apply: async () => {
+        throw new Error('off mode must not apply')
+      },
+    })
+
+    expect(listCalls).toBe(0)
+    expect(report).toMatchObject({ mode: 'off', scanned: 0, released: 0, wouldRelease: 0 })
+  })
+
+  it('counts what it would release without applying anything in report mode', async () => {
+    const report = await sweepExpiredHolds({
+      mode: 'report',
+      listExpiredHolds: async () => [hold(), hold({ id: '55555555-5555-4555-8555-555555555555' })],
+      apply: async () => {
+        throw new Error('report mode must not apply')
+      },
+    })
+
+    expect(report).toMatchObject({
+      mode: 'report',
+      scanned: 2,
+      wouldRelease: 2,
+      released: 0,
+      failed: 0,
+    })
+  })
+
+  it('reports the same intent count in report mode as it executes in on mode', async () => {
+    // The point of report mode is that its numbers predict what `on` will do. If the two
+    // are computed from different things, reviewing a report proves nothing.
+    const holds = [hold(), hold({ id: '66666666-6666-4666-8666-666666666666' })]
+    const dry = await sweepExpiredHolds({
+      mode: 'report',
+      listExpiredHolds: async () => holds,
+      apply: async () => applied(),
+    })
+    const wet = await sweepExpiredHolds({
+      mode: 'on',
+      listExpiredHolds: async () => holds,
+      apply: async () => applied(),
+    })
+
+    expect(dry.wouldRelease).toBe(wet.wouldRelease)
+    expect(wet.released).toBe(dry.wouldRelease)
   })
 })
