@@ -1,5 +1,6 @@
 import { BoardView } from '@/components/admin/board-view'
 import { toCards } from '@/lib/ops/board'
+import { canWrite, getOpsAdmin } from '@/lib/ops/guard'
 import { readRecentQaRuns, readTasks } from '@/lib/ops/read'
 
 /**
@@ -7,7 +8,7 @@ import { readRecentQaRuns, readTasks } from '@/lib/ops/read'
  * the client view that owns the filters.
  */
 export async function Board() {
-  const [tasks, runs] = await Promise.all([readTasks(), readRecentQaRuns()])
+  const [tasks, runs, admin] = await Promise.all([readTasks(), readRecentQaRuns(), getOpsAdmin()])
 
   if (tasks.status !== 'ok') {
     return (
@@ -31,5 +32,7 @@ export async function Board() {
   // same thing it would mean if the runs genuinely were not there.
   const cards = toCards(tasks.data, runs.status === 'ok' ? runs.data : [], new Date())
 
-  return <BoardView cards={cards} />
+  // A viewer never receives the write controls. The RPCs refuse them anyway;
+  // this keeps the page from offering something it knows will be refused.
+  return <BoardView cards={cards} canWrite={admin ? canWrite(admin) : false} />
 }
