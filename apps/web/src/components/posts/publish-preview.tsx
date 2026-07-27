@@ -92,7 +92,7 @@ export function PublishPreview({ postId }: PublishPreviewProps) {
               role="alert"
               className="space-y-2 rounded-input border border-danger-bg bg-danger-bg p-3"
             >
-              <p className="flex items-center gap-1.5 text-[12.5px] font-bold tracking-[0.06em] text-danger uppercase">
+              <p className="type-eyebrow flex items-center gap-1.5 text-danger">
                 <Ban size={13} aria-hidden />
                 Blocked by channel rules
               </p>
@@ -119,7 +119,7 @@ export function PublishPreview({ postId }: PublishPreviewProps) {
 
           {report.simulated.length > 0 ? (
             <div className="space-y-2 rounded-input border border-warn bg-warn-bg p-3">
-              <p className="flex items-center gap-1.5 text-[12.5px] font-bold tracking-[0.06em] text-warn uppercase">
+              <p className="type-eyebrow flex items-center gap-1.5 text-warn">
                 <FlaskConical size={13} aria-hidden />
                 Simulated — nothing was posted
               </p>
@@ -140,7 +140,7 @@ export function PublishPreview({ postId }: PublishPreviewProps) {
 
           {report.skipped.length > 0 ? (
             <div className="space-y-1.5 rounded-input bg-s1 p-3">
-              <p className="flex items-center gap-1.5 text-[12.5px] font-bold tracking-[0.06em] text-muted uppercase">
+              <p className="type-eyebrow flex items-center gap-1.5 text-muted">
                 <EyeOff size={13} aria-hidden />
                 Not checked
               </p>

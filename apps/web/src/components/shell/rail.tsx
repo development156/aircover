@@ -37,7 +37,7 @@ export function Rail() {
         {NAV.map((item) => (
           <div key={item.href}>
             {item.section ? (
-              <div className="mt-3 mb-1 px-3 font-mono text-[11px] font-semibold tracking-[0.14em] text-accent uppercase max-wide:hidden">
+              <div className="type-eyebrow mt-3 mb-1 px-3 text-accent max-wide:hidden">
                 {item.section}
               </div>
             ) : null}

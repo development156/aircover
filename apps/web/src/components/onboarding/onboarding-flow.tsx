@@ -130,9 +130,7 @@ export function OnboardingFlow() {
     <div className="mx-auto max-w-content p-page max-narrow:p-page-mobile">
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <span className="font-mono text-[11px] font-semibold tracking-[0.16em] text-accent uppercase">
-            Brand Brain
-          </span>
+          <span className="type-eyebrow text-accent">Brand Brain</span>
           <h1 className="mt-1 text-[25px] font-extrabold text-ink">Set up your Brand Brain</h1>
           <p className="mt-1 text-[13.5px] text-muted">
             Approve, don't author — give Sahoda a spark and refine what it resolves.

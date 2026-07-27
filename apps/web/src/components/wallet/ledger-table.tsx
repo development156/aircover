@@ -2,6 +2,7 @@ import { Undo2 } from 'lucide-react'
 import type { LedgerEntry } from '@sahoda/shared'
 
 import { describeEntry, formatUsdAmount, type Direction } from '@/lib/wallet/entry-copy'
+import { isSahodaActor } from '@/lib/wallet/actor'
 import { isOpenHold, settledHoldIds } from '@/lib/wallet/hold-settlement'
 import { groupCorrections, type LedgerRow } from '@/lib/wallet/group-entries'
 import { cogsUsd } from '@/lib/wallet/parse-entries'
@@ -83,7 +84,16 @@ function EntryRow({
   const when = formatWhen(entry.created_at)
 
   return (
-    <tr className="border-b border-line last:border-b-0">
+    <tr
+      data-testid={`ledger-row-${entry.seq}`}
+      // A ledger row RECORDS something that already happened, so `real` is the
+      // baseline and only unresolved money needs marking. Painting every settled
+      // row with a solid fill would be noise saying one thing. `simulated` and
+      // `proposed` never occur here: both describe things that have not
+      // happened, and every row is a fact.
+      data-certainty={open ? 'committed' : 'real'}
+      className="border-b border-line last:border-b-0"
+    >
       <td className={cn(CELL, 'text-[13px] whitespace-nowrap text-muted')}>
         {when === null ? (
           <span className="text-muted">Date not recorded</span>
@@ -96,6 +106,9 @@ function EntryRow({
 
       <td className={CELL}>
         <span className="flex flex-wrap items-center gap-2">
+          {isSahodaActor(entry.actor) ? (
+            <span className="blade" role="img" aria-label="Sahoda did this on its own" />
+          ) : null}
           <span className="text-[14px] font-semibold">{display.label}</span>
           {open ? (
             // Credits reserved and not yet resolved: committed, not real. Only
@@ -105,7 +118,12 @@ function EntryRow({
           ) : null}
         </span>
         {display.why !== null ? (
-          <span className="mt-1 block text-[13px] text-muted">{display.why}</span>
+          <span
+            data-testid={`ledger-why-${entry.seq}`}
+            className="mt-1 block text-[13px] text-muted"
+          >
+            {display.why}
+          </span>
         ) : null}
         {corrected ? (
           // Left in place, never rewritten: the ledger is append-only and this
@@ -118,9 +136,13 @@ function EntryRow({
       </td>
 
       <td
+        data-testid={`ledger-amount-${entry.seq}`}
         className={cn(
           CELL,
-          'text-right text-[14px] font-semibold tabular-nums',
+          // `.num` is the token-file class: mono + tabular-nums. Amounts are the
+          // one column that must align down the page for the ledger to be
+          // readable as a ledger.
+          'num text-right text-[14px] font-semibold',
           AMOUNT_TONE[display.direction],
         )}
       >
@@ -154,6 +176,9 @@ function CorrectionGroup({
   // client. Entry ids are uuids, so the first member's id is unique per group
   // and safe as an HTML id, and a group always has at least one member.
   const headingId = `correction-${row.entries[0]?.id ?? row.id}`
+  // Ascending and de-duplicated by `groupCorrections`; may legitimately be empty
+  // when neither half recorded a reference.
+  const corrects = row.corrects
 
   return (
     <tbody aria-labelledby={headingId} className="border-b border-line last:border-b-0">
@@ -174,6 +199,25 @@ function CorrectionGroup({
               ? 'Part of a correction to an earlier entry. Its other half is outside the entries shown here.'
               : 'These entries were written together to correct an earlier one. Nothing was charged for them.'}
           </span>
+          {/* Name the entry this corrects, from the RECORDED linkage only.
+              `corrects` comes from `meta.reverses_seq` / `meta.replaces_seq`;
+              the entry itself is very often scrolled off the page, and going to
+              fetch it — or reconstructing a label for it — would be inventing
+              detail the correction never recorded. A bare seq is verifiable: the
+              user can scroll to it. When nothing was recorded, this says
+              nothing rather than guessing. */}
+          {corrects.length > 0 ? (
+            <span className="mt-1 block text-[13px] text-muted">
+              {corrects.length === 1 ? 'Corrects entry ' : 'Corrects entries '}
+              {corrects.map((seq, index) => (
+                <span key={seq}>
+                  {index > 0 ? ', ' : ''}
+                  <span className="num">#{seq}</span>
+                </span>
+              ))}
+              .
+            </span>
+          ) : null}
         </td>
       </tr>
       {row.entries.map((entry) => (
@@ -243,7 +287,12 @@ export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
           </thead>
           {rows.map((row) =>
             row.kind === 'correction' ? (
-              <CorrectionGroup key={row.id} row={row} correctedSeqs={correctedSeqs} settled={settled} />
+              <CorrectionGroup
+                key={row.id}
+                row={row}
+                correctedSeqs={correctedSeqs}
+                settled={settled}
+              />
             ) : (
               <tbody key={row.entry.id}>
                 <EntryRow

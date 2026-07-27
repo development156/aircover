@@ -144,7 +144,10 @@ const ENTRY_TYPE_WHY: Record<LedgerEntryType, string | null> = {
   TOPUP: 'Added from a credit purchase.',
   PERF_REWARD: 'Earned from post performance.',
   HOLD: 'Reserved while this action runs — returned in full if it does not complete.',
-  RELEASE: 'Returned because the action did not complete. You were not charged.',
+  // Money first. A refund that opens on the failure reads like being told off
+  // for a mistake the user did not make — and the reaper writes this same row
+  // for a hold that simply outlived its action.
+  RELEASE: 'Returned in full. The action did not complete, so you were not charged.',
   EXPIRE: 'Unused credits expired.',
   ADJUST: 'Adjusted by Sahoda support.',
   DEBIT: null, // the DEBIT why-line is built from action/tier/cost
