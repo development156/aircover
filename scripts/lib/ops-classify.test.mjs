@@ -283,7 +283,8 @@ describe('invokesOpsScript', () => {
     // The real failure, verbatim in shape. The old guard matched the filename
     // anywhere in the command, so this commit closed nothing: SL-015 sat in For
     // Review with no sha while its work was committed and pushed.
-    const command = "git add scripts/ops-sync.mjs && git commit -q -F - <<'MSG'\nfeat(SL-015): x\nMSG"
+    const command =
+      "git add scripts/ops-sync.mjs && git commit -q -F - <<'MSG'\nfeat(SL-015): x\nMSG"
 
     expect(invokesOpsScript(command)).toBe(false)
     expect(isGitCommit(command)).toBe(true)

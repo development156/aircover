@@ -185,7 +185,7 @@
       "sort": 160,
       "blocked": false,
       "blocked_reason": null,
-      "commit_sha": "e47401bd1c42710c09bb9d8279dace87a660b7c2"
+      "commit_sha": "f7ba9b88c0835fa854e8c68f66bf34ae28dfa61b"
     },
     {
       "code": "SL-017",
@@ -205,12 +205,13 @@
       "title": "QA console feed and filters",
       "detail": "QA console live at /admin/qa with filters and standing-failure pinning",
       "roadmap_code": "AO3",
-      "board_column": "review",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 180,
       "blocked": false,
-      "blocked_reason": null
+      "blocked_reason": null,
+      "commit_sha": "90bdc1698c352a7228dee8ffbd9bb8d95792e703"
     },
     {
       "code": "SL-019",
@@ -257,20 +258,22 @@
       "title": "/embed/beta public form",
       "detail": null,
       "roadmap_code": "AO4",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 230
+      "sort": 230,
+      "commit_sha": "6301cb4a8aa822417e5b7ea15fc4ce92552e8863"
     },
     {
       "code": "SL-024",
       "title": "Beta-apply hardening — Turnstile, rate limit, honeypot",
       "detail": null,
       "roadmap_code": "AO4",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 240
+      "sort": 240,
+      "commit_sha": "6301cb4a8aa822417e5b7ea15fc4ce92552e8863"
     },
     {
       "code": "SL-025",
@@ -287,31 +290,33 @@
       "title": "Clerk invitations and user.created webhook",
       "detail": null,
       "roadmap_code": "AO4",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 260
+      "sort": 260,
+      "commit_sha": "6301cb4a8aa822417e5b7ea15fc4ce92552e8863"
     },
     {
       "code": "SL-027",
       "title": "Credit request with two-admin OTP",
       "detail": null,
       "roadmap_code": "AO4",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 270
+      "sort": 270,
+      "commit_sha": "3fd92071e3a05b2364cea6f63b5c38cea6aa636a"
     },
     {
       "code": "SL-028",
       "title": "Grant through apply_ledger_entry + replay proof",
       "detail": "Also owns the why-line. wt-web rewrote the wallet GRANT copy to classify from the idempotency key and actor rather than action_type, and the admin why-line went with it — so doc 13 §6's \"Credits added by Sahoda Labs team.\" currently has no implementation. Add it as an `admin` origin in lib/wallet/grant-origin.ts, PROVEN from adminGrantKey() the way signup and plan are proven, not by matching action_type: that field is free text with no CHECK and the classifier deliberately stopped trusting it (see SL-032). Until then the doc is ahead of the code, which is the safe direction.",
       "roadmap_code": "AO4",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 280,
-      "commit_sha": null
+      "commit_sha": "3fd92071e3a05b2364cea6f63b5c38cea6aa636a"
     },
     {
       "code": "SL-029",
@@ -380,10 +385,11 @@
       "title": "Guard against a migration that records success without applying",
       "detail": "On 2026-07-25 migration 20260725182153_ops_ingest.sql was written to schema_migrations while the file was 0 bytes: a first push timed out before the content was copied in, and the retry applied an empty file. History said applied, the schema had neither the function nor the columns, and every layer downstream reported success — supabase db push exited 0, the app returned a clean 502, and a future push would skip the version forever. Nothing in the stack compares what a migration CLAIMS to create against what exists afterwards. Cheapest useful guard: refuse to apply an empty migration file, then a post-push check that parses CREATE TABLE/FUNCTION/INDEX/POLICY names out of the applied files and asserts each object exists in the catalog. Run it in the CI card above.",
       "roadmap_code": null,
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": null,
-      "sort": 350
+      "sort": 350,
+      "commit_sha": "214ef091fbcad52a5c7b1e0e34ebcef49b3ccf1d"
     },
     {
       "code": "SL-036",
