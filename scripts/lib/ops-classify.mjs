@@ -208,7 +208,30 @@ export function classifyBashRuns({ command, output, exitCode, durationMs }) {
  */
 /** A subject line, anchored: `type(scope): summary`. Not a pattern found mid-prose. */
 const CONVENTIONAL_SUBJECT =
-  /^(?:feat|fix|chore|docs|refactor|test|perf|ci|style|build|revert)\(([^)]*)\)!?:\s/
+  /^(feat|fix|chore|docs|refactor|test|perf|ci|style|build|revert)\(([^)]*)\)!?:\s/
+
+/**
+ * Which conventional-commit TYPES finish work.
+ *
+ * Scope-only fixed the false positives from body prose, and then a new one
+ * arrived through the front door: `docs(SL-040): card the eight-step
+ * walkthrough` was the commit that CREATED that card, and the hook read the
+ * scope as a claim of completion and moved it to Done. The board then said the
+ * user had walked a walkthrough that nobody has walked — which is precisely the
+ * drift-toward-looking-finished the board exists to prevent.
+ *
+ * So the scope says WHICH card and the type says WHETHER it is finished. Only
+ * `feat` and `fix` complete. Carding something (`chore`), describing it
+ * (`docs`), writing its tests (`test`), or tidying it (`refactor`) are all real
+ * work on a card that is demonstrably not done, because if it were done the
+ * commit would have been a feat or a fix.
+ *
+ * Deliberately asymmetric: a missed auto-close costs one `ops-card task X done`,
+ * while a false close puts a lie on the board and needs someone to notice it
+ * first. A docs-only card is the one case that now needs closing by hand, and
+ * that is the cheaper mistake.
+ */
+const COMPLETING_TYPES = new Set(['feat', 'fix'])
 
 export function closingTaskCodes(message) {
   // SUBJECT LINE ONLY. Scanning the whole message for a scope pattern is barely
@@ -226,8 +249,13 @@ export function closingTaskCodes(message) {
     .find((line) => CONVENTIONAL_SUBJECT.test(line))
 
   if (!subject) return []
-  const scope = CONVENTIONAL_SUBJECT.exec(subject)?.[1] ?? ''
-  return taskCodesIn(scope)
+  const match = CONVENTIONAL_SUBJECT.exec(subject)
+  if (!match) return []
+
+  // The type decides whether this is a completion at all.
+  if (!COMPLETING_TYPES.has(match[1])) return []
+
+  return taskCodesIn(match[2] ?? '')
 }
 
 /**
