@@ -121,20 +121,25 @@ describe('self-approval', () => {
     expect(state.calls).toEqual([])
   })
 
-  it('passes the dev escape hatch through only when it is exactly "true"', async () => {
+  it('sends NO self-approval flag, whatever the environment says', async () => {
+    // This test used to assert the opposite — that OPS_ALLOW_SELF_APPROVE was
+    // faithfully forwarded as p_allow_self. It passed, and it was pinning a
+    // vulnerability: the parameter was on a function granted to `authenticated`,
+    // so forwarding it correctly was irrelevant. Anyone could send their own.
+    //
+    // The property now is that the app has no say in it at all. If a
+    // p_allow_self ever reappears in this call, the parameter is back on the
+    // client-callable signature and the approver check is optional again.
     state.rpc = { data: { ok: true, amount: 5 }, error: null }
 
-    state.env.OPS_ALLOW_SELF_APPROVE = 'false'
-    await verifyCreditOtp({ requestId: REQ_ID, code: '123456' })
-    expect(state.calls.at(-1)!.args.p_allow_self).toBe(false)
+    for (const value of ['false', undefined, 'true']) {
+      state.env.OPS_ALLOW_SELF_APPROVE = value
+      await verifyCreditOtp({ requestId: REQ_ID, code: '123456' })
 
-    state.env.OPS_ALLOW_SELF_APPROVE = undefined
-    await verifyCreditOtp({ requestId: REQ_ID, code: '123456' })
-    expect(state.calls.at(-1)!.args.p_allow_self).toBe(false)
-
-    state.env.OPS_ALLOW_SELF_APPROVE = 'true'
-    await verifyCreditOtp({ requestId: REQ_ID, code: '123456' })
-    expect(state.calls.at(-1)!.args.p_allow_self).toBe(true)
+      const args = state.calls.at(-1)!.args
+      expect(args).not.toHaveProperty('p_allow_self')
+      expect(Object.keys(args).sort()).toEqual(['p_otp_hash', 'p_request_id'])
+    }
   })
 })
 

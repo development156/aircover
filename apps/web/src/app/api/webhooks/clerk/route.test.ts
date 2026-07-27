@@ -51,8 +51,8 @@ const USER_CREATED = JSON.stringify({
     id: 'user_2abc',
     primary_email_address_id: 'idn_2',
     email_addresses: [
-      { id: 'idn_1', email_address: 'old@example.com' },
-      { id: 'idn_2', email_address: 'primary@example.com' },
+      { id: 'idn_1', email_address: 'old@example.com', verification: { status: 'verified' } },
+      { id: 'idn_2', email_address: 'primary@example.com', verification: { status: 'verified' } },
     ],
   },
 })
@@ -141,6 +141,29 @@ describe('verified events we do not act on', () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ ignored: 'session.created' })
+    expect(state.links).toEqual([])
+  })
+
+  it('links NOTHING when the primary email is not verified', async () => {
+    // A seat seeded from ADMIN_BOOTSTRAP_EMAILS sits active with user_id null,
+    // waiting for its owner to sign up. Binding it on an unverified address
+    // would hand the console to whoever registered that string first.
+    const unverified = JSON.stringify({
+      type: 'user.created',
+      data: {
+        id: 'user_impostor',
+        primary_email_address_id: 'idn_1',
+        email_addresses: [
+          { id: 'idn_1', email_address: 'primary@example.com', verification: { status: 'unverified' } },
+        ],
+      },
+    })
+
+    const response = await POST(signed(unverified))
+
+    // 200, because a webhook that is genuine but not actionable must not be
+    // retried forever by Clerk. Accepted and ignored is the honest answer.
+    expect(response.status).toBe(200)
     expect(state.links).toEqual([])
   })
 

@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache'
 import { OpsCreditRequestCreateSchema, OpsCreditOtpVerifySchema } from '@sahoda/shared'
 
-import { env } from '@/lib/env'
 import {
   CREDIT_FAILED,
   type CreditCreateState,
@@ -29,10 +28,19 @@ import { createServerSupabase } from '@/lib/supabase/server'
  * value, not to a log, not into an error.
  */
 
-/** Dev-only, and it still has to be spelled exactly. */
-function selfApprovalAllowed(): boolean {
-  return env.OPS_ALLOW_SELF_APPROVE === 'true'
-}
+/*
+ * There is deliberately NO self-approval flag here any more.
+ *
+ * There used to be: `env.OPS_ALLOW_SELF_APPROVE === 'true'`, passed to the RPC
+ * as `p_allow_self`. That read as a server-side gate and was not one — the
+ * function is granted to `authenticated`, so the parameter belonged to whoever
+ * called it, and a direct supabase.rpc() from any writer-role admin set it
+ * themselves and skipped the approver check entirely. An env var cannot gate a
+ * decision the client gets to make.
+ *
+ * The escape hatch now lives in the database as `sahoda.allow_self_approve`,
+ * which a PostgREST caller has no way to set. See migration 16.
+ */
 
 export async function searchWorkspaces(query: string): Promise<WorkspaceHit[]> {
   try {
@@ -161,7 +169,6 @@ export async function verifyCreditOtp(input: {
     const { data, error } = await supabase.rpc('ops_credit_request_verify', {
       p_request_id: parsed.data.request_id,
       p_otp_hash: hashOtp(parsed.data.code),
-      p_allow_self: selfApprovalAllowed(),
     })
 
     if (error) {
