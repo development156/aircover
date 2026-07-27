@@ -27,7 +27,11 @@ import { env } from '@/lib/env'
  */
 
 /** Named once so the test can assert the whole allowlist from the source. */
-export const SERVICE_RPCS = ['ops_ingest'] as const
+export const SERVICE_RPCS = [
+  'ops_ingest',
+  'ops_application_submit',
+  'ops_application_link_user',
+] as const
 
 function serviceClient() {
   // Constructed per call, not at module scope: this file is imported by route
@@ -64,4 +68,77 @@ export async function ingestOps(payload: OpsIngestPayload): Promise<IngestOutcom
     return { ok: false, reason: 'unavailable' }
   }
   return { ok: true, ack: (data ?? {}) as Record<string, unknown> }
+}
+
+export type SubmitOutcome =
+  { ok: true; id: string; merged: boolean } | { ok: false; reason: 'unavailable' }
+
+/**
+ * The public beta form's only write (doc 13 §5).
+ *
+ * Service-role because there is no user: the caller is a stranger who has just
+ * passed a captcha. `ops_application_submit` is revoked from `authenticated`
+ * precisely so a signed-in caller cannot reach it and post as if they were the
+ * form.
+ *
+ * A repeat submission from the same address MERGES into the live application
+ * rather than erroring, so a visitor who submits twice is not told they are a
+ * duplicate — they are simply recorded once.
+ */
+export async function submitBetaApplication(input: {
+  name: string
+  businessName: string
+  email: string
+  phone: string
+  sourceUrl?: string | null
+}): Promise<SubmitOutcome> {
+  const client = serviceClient()
+  if (!client) {
+    console.error('[beta-apply] no service-role key configured; nothing was written')
+    return { ok: false, reason: 'unavailable' }
+  }
+
+  const { data, error } = await client.rpc('ops_application_submit', {
+    p_name: input.name,
+    p_business_name: input.businessName,
+    p_email: input.email,
+    p_phone: input.phone,
+    p_source_url: input.sourceUrl ?? null,
+  })
+
+  if (error) {
+    console.error('[beta-apply] rpc failed:', error.message)
+    return { ok: false, reason: 'unavailable' }
+  }
+
+  const row = (data ?? {}) as { id?: string; merged?: boolean }
+  if (!row.id) return { ok: false, reason: 'unavailable' }
+  return { ok: true, id: row.id, merged: Boolean(row.merged) }
+}
+
+export type LinkOutcome = { ok: true; linkedSeat: boolean } | { ok: false; reason: 'unavailable' }
+
+/**
+ * Clerk `user.created` (doc 13 §4). Marks the application joined and activates
+ * a seeded admin seat whose user_id was still null.
+ *
+ * Service-role, and the email comes from a signature-verified Clerk payload —
+ * never from a caller. Binding a Clerk id to an admin seat on someone's word
+ * would be a way to hand out the console.
+ */
+export async function linkClerkUser(email: string, clerkUserId: string): Promise<LinkOutcome> {
+  const client = serviceClient()
+  if (!client) return { ok: false, reason: 'unavailable' }
+
+  const { data, error } = await client.rpc('ops_application_link_user', {
+    p_email: email,
+    p_clerk_user_id: clerkUserId,
+  })
+  if (error) {
+    console.error('[clerk-webhook] link failed:', error.message)
+    return { ok: false, reason: 'unavailable' }
+  }
+
+  const row = (data ?? {}) as { admin_seat?: string | null }
+  return { ok: true, linkedSeat: Boolean(row.admin_seat) }
 }
