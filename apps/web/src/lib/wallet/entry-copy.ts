@@ -203,7 +203,7 @@ function humaniseToken(token: string): string | null {
  * well-formed tokens are humanised (still useful, still not a raw dump); and
  * anything malformed, hostile or overlong degrades to a safe generic label.
  */
-function actionLabel(actionType: string | null): string {
+export function actionLabel(actionType: string | null): string {
   if (actionType === null) {
     return GENERIC_ACTION_LABEL
   }
