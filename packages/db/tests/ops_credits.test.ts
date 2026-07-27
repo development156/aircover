@@ -174,7 +174,7 @@ describe.skipIf(!hasRlsEnv)('ops credit maker-checker', () => {
     const client = await pgPool().connect()
     try {
       await client.query('begin')
-      await client.query("set local role authenticated")
+      await client.query('set local role authenticated')
       await client.query('select set_config($1, $2, true)', [
         'request.jwt.claims',
         JSON.stringify({ sub: requesterSub, role: 'authenticated' }),
@@ -332,6 +332,96 @@ describe.skipIf(!hasRlsEnv)('ops credit maker-checker', () => {
       approver_id: approverEmail,
       ledger_idempotency_key: `admin_grant:${requestId}`,
     })
+  })
+
+  it('a THIRD PARTY cannot deny a request they are no part of', async () => {
+    // The mirror of the verify bug. deny() gated on app.ops_writer() and nothing
+    // else, so any admin could kill any pending request — and the update wrote
+    // `approver_id = caller`, naming them as the person who decided. No credits
+    // move, so it is not the same severity; it is the same SHAPE. It also burns
+    // the OTP, so a colleague can be kept starting over indefinitely.
+    const requestId = await newRequest()
+
+    const { error } = await userClient(strangerSub).rpc('ops_credit_request_deny', {
+      p_request_id: requestId,
+      p_reason: 'not mine to deny',
+    })
+    expect(error?.message ?? '').toContain('OPS_CREDIT_NOT_YOURS')
+
+    // Still pending, and the code still works — the attempt cost the requester
+    // nothing.
+    const { data: row } = await svc()
+      .from('ops_credit_requests')
+      .select('status,otp_hash,approver_id')
+      .eq('id', requestId)
+      .single()
+    expect(row).toMatchObject({
+      status: 'pending',
+      otp_hash: GOOD_HASH,
+      approver_id: approverEmail,
+    })
+  })
+
+  it('lets the REQUESTER withdraw without being recorded as the approver', async () => {
+    // Cancelling your own request is legitimate. Being written into the record
+    // as the person who reviewed it is not.
+    const requestId = await newRequest()
+
+    const { error } = await userClient(requesterSub).rpc('ops_credit_request_deny', {
+      p_request_id: requestId,
+      p_reason: 'asked for the wrong workspace',
+    })
+    expect(error).toBeNull()
+
+    const { data: row } = await svc()
+      .from('ops_credit_requests')
+      .select('status,approver_id')
+      .eq('id', requestId)
+      .single()
+    expect(row).toMatchObject({ status: 'denied', approver_id: approverEmail })
+  })
+
+  it('lets the named approver deny, and burns the code when they do', async () => {
+    const requestId = await newRequest()
+
+    const { error } = await userClient(approverSub).rpc('ops_credit_request_deny', {
+      p_request_id: requestId,
+      p_reason: 'not justified',
+    })
+    expect(error).toBeNull()
+
+    const { data: row } = await svc()
+      .from('ops_credit_requests')
+      .select('status,otp_hash,approver_id')
+      .eq('id', requestId)
+      .single()
+    expect(row).toMatchObject({ status: 'denied', otp_hash: null, approver_id: approverEmail })
+  })
+
+  it('caps a caller-supplied code lifetime instead of trusting it', async () => {
+    // p_ttl_seconds was uncapped. The app passes OTP_TTL_SECONDS, but the app is
+    // not the only caller — a direct RPC could turn a time-boxed code into a
+    // permanent one. Expiry is a security control; its bound is not the
+    // caller's to choose.
+    const { data } = await userClient(requesterSub).rpc('ops_credit_request_create', {
+      p_workspace_id: workspaceId,
+      p_amount: 10,
+      p_reason: 'ten years please',
+      p_approver_email: approverEmail,
+      p_otp_hash: GOOD_HASH,
+      p_ttl_seconds: 315_360_000,
+    })
+
+    const { data: row } = await svc()
+      .from('ops_credit_requests')
+      .select('otp_expires_at')
+      .eq('id', (data as { id: string }).id)
+      .single()
+
+    const ttlSeconds =
+      (new Date((row as { otp_expires_at: string }).otp_expires_at).getTime() - Date.now()) / 1000
+    expect(ttlSeconds).toBeLessThanOrEqual(3600)
+    expect(ttlSeconds).toBeGreaterThan(0)
   })
 
   it('caps a single request at 10,000 credits', async () => {
