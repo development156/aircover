@@ -105,3 +105,47 @@ describe('BoardView', () => {
     expect(screen.getByText('No QA run recorded')).toBeInTheDocument()
   })
 })
+
+describe('write controls appear only for a seat that may write', () => {
+  it('gives a viewer no move control, no archive and no add', () => {
+    // The rule: never ship a control that silently does nothing. A viewer's
+    // write would be refused by app.ops_writer() with 42501, so the control is
+    // absent rather than present-and-doomed.
+    render(<BoardView cards={CARDS} canWrite={false} />)
+
+    expect(screen.queryByLabelText(/Move SL-016 to another column/)).toBeNull()
+    expect(screen.queryByLabelText(/Archive SL-016/)).toBeNull()
+    expect(screen.queryByRole('button', { name: /Add a card/ })).toBeNull()
+  })
+
+  it('gives a writer all three', () => {
+    render(<BoardView cards={CARDS} canWrite />)
+
+    expect(screen.getByLabelText(/Move SL-016 to another column/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Archive SL-016/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Add a card/ })).toBeInTheDocument()
+  })
+
+  it('makes cards draggable only for a writer', () => {
+    const { rerender, container } = render(<BoardView cards={CARDS} canWrite={false} />)
+    expect(container.querySelectorAll('[draggable="true"]')).toHaveLength(0)
+
+    rerender(<BoardView cards={CARDS} canWrite />)
+    expect(container.querySelectorAll('[draggable="true"]')).toHaveLength(CARDS.length)
+  })
+
+  it('offers every column as a move target, including the one it is in', () => {
+    // The current column stays selectable so the select reads as state, not as
+    // a list of "somewhere else". Choosing it is a no-op that never posts.
+    render(<BoardView cards={CARDS} canWrite />)
+
+    const select = screen.getByLabelText(/Move SL-016 to another column/)
+    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'To Do',
+      'In Progress',
+      'For Review',
+      'Done',
+    ])
+    expect((select as HTMLSelectElement).value).toBe('in_progress')
+  })
+})

@@ -2,6 +2,8 @@ import { UserButton } from '@clerk/nextjs'
 
 import { AdminSubNav } from '@/components/admin/sub-nav'
 import { Rail } from '@/components/shell/rail'
+import { Toaster } from 'sonner'
+
 import { requireOpsAdmin } from '@/lib/ops/guard'
 
 export const metadata = { title: { template: '%s · Admin', default: 'Admin' } }
@@ -51,6 +53,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {children}
         </main>
       </div>
+      {/* /admin is its own route group; the (app) Toaster does not reach it. */}
+      <Toaster position="bottom-left" />
     </div>
   )
 }

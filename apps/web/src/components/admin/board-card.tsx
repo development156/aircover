@@ -1,5 +1,6 @@
 import { GitCommitHorizontal } from 'lucide-react'
 
+import { CardControls } from '@/components/admin/card-controls'
 import { shortAge, type BoardCard as Card, type QaDot } from '@/lib/ops/board'
 import { cn } from '@/lib/utils'
 
@@ -25,16 +26,33 @@ const QA_TITLE: Record<QaDot, string> = {
   none: 'No QA run recorded',
 }
 
-export function BoardCardTile({ card }: { card: Card }) {
+export function BoardCardTile({
+  card,
+  canWrite = false,
+  onDragStart,
+}: {
+  card: Card
+  canWrite?: boolean
+  onDragStart?: (code: string) => void
+}) {
   const age = shortAge(card.ageMs)
 
   return (
     // The anchor the roadmap card's "To reach Done" list links to.
     <article
       id={`task-${card.code}`}
+      // Draggable only for a seat that may write. A card that lifts under the
+      // cursor and then refuses on drop would be a control that does nothing.
+      draggable={canWrite}
+      onDragStart={(event) => {
+        event.dataTransfer.setData('text/plain', card.code)
+        event.dataTransfer.effectAllowed = 'move'
+        onDragStart?.(card.code)
+      }}
       className={cn(
         'scroll-mt-24 rounded-input border bg-bg p-3 shadow-card transition-micro',
         card.blocked ? 'border-danger' : 'border-line',
+        canWrite && 'cursor-grab active:cursor-grabbing',
       )}
     >
       {card.blocked ? (
@@ -80,6 +98,8 @@ export function BoardCardTile({ card }: { card: Card }) {
           </span>
         ) : null}
       </div>
+
+      {canWrite ? <CardControls card={card} /> : null}
     </article>
   )
 }

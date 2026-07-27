@@ -1,7 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
+import { toast } from 'sonner'
 
+import { moveTask } from '@/app/actions/ops-board'
+import { AddCard } from '@/components/admin/add-card'
 import { BoardCardTile } from '@/components/admin/board-card'
 import {
   applyFilters,
@@ -13,19 +16,21 @@ import {
   WIP_NUDGE_AT,
   type BoardCard,
   type BoardFilters,
+  type Column,
 } from '@/lib/ops/board'
 import { cn } from '@/lib/utils'
 
 /**
- * D3 · Scrum board (doc 13 §10) — read-only in this card.
+ * D3 · Scrum board (doc 13 §10).
  *
- * DRAG, INLINE EDIT AND ARCHIVE ARE NOT HERE, and their absence is deliberate
- * rather than forgotten. Every one of them is a WRITE to `ops_tasks`, and the
- * tables carry no write policies at all by design — mutations go through
- * `public.ops_*` SECURITY DEFINER functions, of which exactly one exists today
- * (`ops_ingest`, token-authed, agent-only). Adding human writes needs a new
- * migration plus server actions, and applying a migration needs an explicit ask.
- * A drag handle that silently did nothing would be worse than no drag handle.
+ * Writes go through `public.ops_task_*` SECURITY DEFINER functions, which call
+ * `app.ops_writer()` and raise 42501 unless the caller is an active owner or
+ * admin. `canWrite` here only decides what to RENDER — a viewer gets no drag, no
+ * select and no buttons, because a control that lifts under the cursor and then
+ * refuses is worse than no control. The database is what actually says no.
+ *
+ * Drop targets are the columns themselves. A drop onto the column a card is
+ * already in is a no-op that never reaches the server.
  *
  * Filters are client state, not URL state: they are a way of looking at the
  * board for a moment, not a place to link someone to.
@@ -83,8 +88,32 @@ function FilterGroup<T extends string>({
   )
 }
 
-export function BoardView({ cards }: { cards: readonly BoardCard[] }) {
+export function BoardView({
+  cards,
+  canWrite = false,
+}: {
+  cards: readonly BoardCard[]
+  canWrite?: boolean
+}) {
   const [filters, setFilters] = useState<BoardFilters>(NO_FILTERS)
+  const [dragging, setDragging] = useState<string | null>(null)
+  const [over, setOver] = useState<Column | null>(null)
+  const [, startTransition] = useTransition()
+
+  function drop(column: Column, code: string) {
+    setDragging(null)
+    setOver(null)
+
+    const card = cards.find((candidate) => candidate.code === code)
+    // Already there, or not a card we know: nothing to say and nothing to send.
+    if (!card || card.column === column) return
+
+    startTransition(async () => {
+      const result = await moveTask({ code, column })
+      if (result.ok) toast.success(`${code} → ${COLUMN_LABEL[column]}`)
+      else toast.error(result.message)
+    })
+  }
 
   const stages = useMemo(() => stagesOn(cards), [cards])
   const assignees = useMemo(() => [...new Set(cards.map((card) => card.assignee))].sort(), [cards])
@@ -146,7 +175,25 @@ export function BoardView({ cards }: { cards: readonly BoardCard[] }) {
           const nudge = column === 'in_progress' && columnCards.length > WIP_NUDGE_AT
 
           return (
-            <div key={column} className="flex min-w-0 flex-col gap-2">
+            <div
+              key={column}
+              onDragOver={(event) => {
+                if (!canWrite || !dragging) return
+                event.preventDefault()
+                event.dataTransfer.dropEffect = 'move'
+                setOver(column)
+              }}
+              onDragLeave={() => setOver((current) => (current === column ? null : current))}
+              onDrop={(event) => {
+                if (!canWrite) return
+                event.preventDefault()
+                drop(column, event.dataTransfer.getData('text/plain'))
+              }}
+              className={cn(
+                'flex min-w-0 flex-col gap-2 rounded-card p-1 transition-micro',
+                over === column ? 'bg-tint-50 dark:bg-s2' : 'bg-transparent',
+              )}
+            >
               <div className="flex items-baseline gap-2">
                 <h3 className="text-[13px] font-semibold">{COLUMN_LABEL[column]}</h3>
                 <span className="text-[12px] text-muted tabular-nums">{columnCards.length}</span>
@@ -165,8 +212,17 @@ export function BoardView({ cards }: { cards: readonly BoardCard[] }) {
                   {filtered ? 'Nothing here matches the filters' : 'Nothing here'}
                 </p>
               ) : (
-                columnCards.map((card) => <BoardCardTile key={card.code} card={card} />)
+                columnCards.map((card) => (
+                  <BoardCardTile
+                    key={card.code}
+                    card={card}
+                    canWrite={canWrite}
+                    onDragStart={setDragging}
+                  />
+                ))
               )}
+
+              {canWrite && column === 'todo' ? <AddCard /> : null}
             </div>
           )
         })}
