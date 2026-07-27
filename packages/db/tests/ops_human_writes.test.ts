@@ -291,7 +291,15 @@ describe.skipIf(!hasLedgerEnv)('human write path cannot reach credits', () => {
         and p.proname = any (app.ops_human_write_functions())
     `)
 
-    expect(rows.length).toBe(5)
+    // Non-vacuity, tied to the registry rather than to a number. A literal
+    // count was here and went stale the moment the list grew from 5 to 15 —
+    // which made a real guard fail for a bookkeeping reason and taught nobody
+    // anything. What matters is that EVERY registered function was scanned.
+    const { rows: registry } = await pool.query<{ names: string[] }>(
+      'select app.ops_human_write_functions() as names',
+    )
+    expect(rows.map((r) => r.name).sort()).toEqual([...registry[0]!.names].sort())
+    expect(rows.length).toBeGreaterThan(10)
 
     for (const { name, body } of rows) {
       for (const identifier of FORBIDDEN) {
@@ -313,8 +321,26 @@ describe.skipIf(!hasLedgerEnv)('human write path cannot reach credits', () => {
         and p.proname like 'ops\\_%'
         and p.proname <> 'ops_ingest'
         and not (p.proname = any (app.ops_human_write_functions()))
+        and not (p.proname = any (app.ops_credit_functions()))
     `)
 
     expect(rows.map((r) => r.name)).toEqual([])
+  })
+
+  it('keeps the credits list short enough that a fifth entry is a decision', async () => {
+    // The human-write list is guarded by "mentions no credit table anywhere".
+    // This is the list that is allowed to, so it is enumerated rather than
+    // described — growing it should be a diff somebody has to justify, not a
+    // side effect of adding a function.
+    const { rows } = await pool.query<{ names: string[] }>(
+      'select app.ops_credit_functions() as names',
+    )
+
+    expect([...rows[0]!.names].sort()).toEqual([
+      'ops_credit_request_create',
+      'ops_credit_request_deny',
+      'ops_credit_request_verify',
+      'ops_workspace_search',
+    ])
   })
 })
