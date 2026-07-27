@@ -158,3 +158,68 @@ describe('LedgerTable correction grouping', () => {
     expect(screen.queryByRole('rowgroup', { name: /correction/i })).not.toBeInTheDocument()
   })
 })
+
+/**
+ * The "Reserved" pill is a claim about money RIGHT NOW: these credits are
+ * frozen. It shipped derived from `entry_type === 'HOLD'`, so every completed
+ * charge rendered the hold row as though the freeze were still in force —
+ * `Reserved 3` sitting above the `-3` that had already charged it, sometimes
+ * months later. These pin the claim to the settlement, not to the row type.
+ */
+describe('Reserved means frozen right now, not "was once a hold"', () => {
+  const HOLD_ID = '11111111-1111-4111-8111-111111111111'
+
+  const hold = (over: Partial<LedgerEntry> = {}): LedgerEntry => ({
+    ...entry(1),
+    id: HOLD_ID,
+    seq: 10,
+    entry_type: 'HOLD',
+    ...over,
+  })
+
+  const settlement = (type: 'DEBIT' | 'RELEASE'): LedgerEntry => ({
+    ...entry(2),
+    seq: 11,
+    entry_type: type,
+    settles_entry_id: HOLD_ID,
+  })
+
+  test('an OPEN hold says Reserved', () => {
+    render(<LedgerTable entries={[hold()]} skipped={0} limit={50} />)
+
+    expect(screen.getByText('Reserved')).toBeInTheDocument()
+  })
+
+  test('a hold settled by a DEBIT does NOT say Reserved — this was the lie', () => {
+    render(<LedgerTable entries={[settlement('DEBIT'), hold()]} skipped={0} limit={50} />)
+
+    expect(screen.queryByText('Reserved')).not.toBeInTheDocument()
+  })
+
+  test('a hold settled by a RELEASE does NOT say Reserved either', () => {
+    // The credits came back rather than being spent, but the hold is closed
+    // just the same — nothing is frozen.
+    render(<LedgerTable entries={[settlement('RELEASE'), hold()]} skipped={0} limit={50} />)
+
+    expect(screen.queryByText('Reserved')).not.toBeInTheDocument()
+  })
+
+  test('an expiry timestamp on a settled hold does not resurrect the claim', () => {
+    // `hold_expires_at` survives settlement, which is why it can never be the
+    // signal: using it would report every past charge as stuck credits.
+    const expired = hold({ hold_expires_at: '2026-07-01T00:00:00.000Z' })
+    render(<LedgerTable entries={[settlement('DEBIT'), expired]} skipped={0} limit={50} />)
+
+    expect(screen.queryByText('Reserved')).not.toBeInTheDocument()
+  })
+
+  test('one settled hold does not silence another open one', () => {
+    const OTHER = '11111112-1111-4111-8111-111111111111'
+    const openHold = hold({ id: OTHER, seq: 12 })
+    render(
+      <LedgerTable entries={[openHold, settlement('DEBIT'), hold()]} skipped={0} limit={50} />,
+    )
+
+    expect(screen.getAllByText('Reserved')).toHaveLength(1)
+  })
+})

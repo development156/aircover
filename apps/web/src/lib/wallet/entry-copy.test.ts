@@ -39,7 +39,6 @@ describe('describeEntry — coverage of the ledger vocabulary', () => {
     expect(display.label).not.toMatch(/unknown|undefined|null/i)
     expect(display.signedAmount).toMatch(/^[+-]?\d+$/)
     expect(['credit', 'debit', 'neutral']).toContain(display.direction)
-    expect(typeof display.pending).toBe('boolean')
   })
 
   test.each(LedgerEntryTypeSchema.options)(
@@ -277,17 +276,8 @@ describe('describeEntry — ADJUST is the only type whose sign follows the amoun
 })
 
 describe('describeEntry — a HOLD is reserved, not spent', () => {
-  test('marks a HOLD as pending', () => {
-    const display = describeEntry(entry({ entry_type: 'HOLD', amount: 3 }))
-
-    expect(display.pending).toBe(true)
-  })
-
-  test('does not mark a settled DEBIT as pending', () => {
-    const display = describeEntry(entry({ entry_type: 'DEBIT', amount: 3 }))
-
-    expect(display.pending).toBe(false)
-  })
+  // Openness moved to `hold-settlement.test.ts`: it needs the entries AROUND a
+  // hold, which `describeEntry` never had.
 
   test('reads differently from a DEBIT: no minus sign and a reserved explanation', () => {
     const hold = describeEntry(entry({ entry_type: 'HOLD', amount: 3 }))

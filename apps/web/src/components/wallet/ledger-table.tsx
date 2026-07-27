@@ -2,6 +2,7 @@ import { Undo2 } from 'lucide-react'
 import type { LedgerEntry } from '@sahoda/shared'
 
 import { describeEntry, formatUsdAmount, type Direction } from '@/lib/wallet/entry-copy'
+import { isOpenHold, settledHoldIds } from '@/lib/wallet/hold-settlement'
 import { groupCorrections, type LedgerRow } from '@/lib/wallet/group-entries'
 import { cogsUsd } from '@/lib/wallet/parse-entries'
 import { cn } from '@/lib/utils'
@@ -68,7 +69,16 @@ function netEffectCopy(net: number): string {
  * One ledger row. Shared by ungrouped entries and by correction members so the
  * two can never drift into rendering the same data differently.
  */
-function EntryRow({ entry, corrected }: { entry: LedgerEntry; corrected: boolean }) {
+function EntryRow({
+  entry,
+  corrected,
+  open,
+}: {
+  entry: LedgerEntry
+  corrected: boolean
+  /** Credits frozen RIGHT NOW — a HOLD with no settling entry on the page. */
+  open: boolean
+}) {
   const display = describeEntry(entry)
   const when = formatWhen(entry.created_at)
 
@@ -87,11 +97,11 @@ function EntryRow({ entry, corrected }: { entry: LedgerEntry; corrected: boolean
       <td className={CELL}>
         <span className="flex flex-wrap items-center gap-2">
           <span className="text-[14px] font-semibold">{display.label}</span>
-          {display.pending ? (
-            // A HOLD is reserved, not spent — it must not read like a charge.
-            <span className="rounded-pill bg-s2 px-2 py-0.5 text-[11px] font-semibold text-muted">
-              Reserved
-            </span>
+          {open ? (
+            // Credits reserved and not yet resolved: committed, not real. Only
+            // an UNSETTLED hold earns this — a settled one is history, and
+            // saying "Reserved" over it claims money is frozen that is not.
+            <span className="is-committed type-eyebrow rounded-pill px-2 py-0.5">Reserved</span>
           ) : null}
         </span>
         {display.why !== null ? (
@@ -132,9 +142,12 @@ function EntryRow({ entry, corrected }: { entry: LedgerEntry; corrected: boolean
 function CorrectionGroup({
   row,
   correctedSeqs,
+  settled,
 }: {
   row: Extract<LedgerRow, { kind: 'correction' }>
   correctedSeqs: ReadonlySet<number>
+  /** Ids of holds closed by an entry on this page — see hold-settlement.ts. */
+  settled: ReadonlySet<string>
 }) {
   // Derived, not `useId`: this is a Server Component and hooks are unavailable
   // here — `useId` only appeared to work because the tests render it on the
@@ -164,7 +177,12 @@ function CorrectionGroup({
         </td>
       </tr>
       {row.entries.map((entry) => (
-        <EntryRow key={entry.id} entry={entry} corrected={correctedSeqs.has(entry.seq)} />
+        <EntryRow
+          key={entry.id}
+          entry={entry}
+          corrected={correctedSeqs.has(entry.seq)}
+          open={isOpenHold(entry, settled)}
+        />
       ))}
     </tbody>
   )
@@ -195,6 +213,11 @@ export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
   // clawback; grouped, they read as the one event they are.
   const { rows, correctedSeqs } = groupCorrections(entries)
 
+  // Derived once for the page, not per row. Safe to read from this page alone:
+  // a settling entry always has a higher `seq` than its hold, and the page is
+  // the top N by `seq DESC`, so any visible hold has its settlement visible too.
+  const settled = settledHoldIds(entries)
+
   return (
     <div className="space-y-3">
       {/* The page body must never scroll horizontally — the table does instead. */}
@@ -220,10 +243,14 @@ export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
           </thead>
           {rows.map((row) =>
             row.kind === 'correction' ? (
-              <CorrectionGroup key={row.id} row={row} correctedSeqs={correctedSeqs} />
+              <CorrectionGroup key={row.id} row={row} correctedSeqs={correctedSeqs} settled={settled} />
             ) : (
               <tbody key={row.entry.id}>
-                <EntryRow entry={row.entry} corrected={correctedSeqs.has(row.entry.seq)} />
+                <EntryRow
+                  entry={row.entry}
+                  corrected={correctedSeqs.has(row.entry.seq)}
+                  open={isOpenHold(row.entry, settled)}
+                />
               </tbody>
             ),
           )}
