@@ -277,6 +277,26 @@ const TASKS = [
       'started_at/review_at/done_at, which SL-036 shows are themselves ' +
       'unreliable on a backward move), and the changelog task_codes link.',
   ],
+  [
+    null,
+    'Walk the eight-step admin click-through',
+    'Doc 13 section 17 has four partial items that are unit-proven but never ' +
+      'exercised by a person: the /admin 404 for a non-admin, Restricted signup ' +
+      'through to a joined row, a real cross-origin embed submission, and the ' +
+      'roadmap card recomputing. They stay partial until someone walks them. ' +
+      'Steps, in order: (1) /admin/team, add a second admin, confirm the seat ' +
+      'reads "not signed in yet". (2) Confirm the last owner has no role select ' +
+      'and no Revoke. (3) /admin/dev, drag a card between columns, confirm it ' +
+      'survives a reload. (4) Block a card, confirm it refuses with no reason ' +
+      'then accepts one. (5) /admin/applications shows the empty state. ' +
+      '(6) /embed/beta inside an iframe on a FOREIGN origin renders, and any ' +
+      'other route refuses framing. (7) Submit the form, it lands as new, then ' +
+      'Approve and invite sends a real Clerk invitation. (8) The credit flow ' +
+      'end to end: request, wrong code counts down, right code grants, SAME ' +
+      'code again says already approved and /wallet shows ONE entry. ' +
+      'Needs Clerk Restricted mode on, plus TURNSTILE and CLERK_WEBHOOK_SECRET ' +
+      'in .env. Blocked so it stays in To reach Done rather than looking optional.',
+  ],
 ]
 
 export function tasks() {
