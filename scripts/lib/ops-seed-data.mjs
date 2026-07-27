@@ -297,6 +297,23 @@ const TASKS = [
       'Needs Clerk Restricted mode on, plus TURNSTILE and CLERK_WEBHOOK_SECRET ' +
       'in .env. Blocked so it stays in To reach Done rather than looking optional.',
   ],
+  [
+    'admin-ops',
+    'Close the maker-checker bypass found by /security-review',
+    'p_allow_self was a boolean parameter on ops_credit_request_verify, a ' +
+      'function granted to authenticated — so the caller set it, and setting it ' +
+      'true skipped the approver check as well as self-approval. A third ' +
+      'active admin with a valid code was granted 250 credits in a test written ' +
+      'to check the finding rather than take it on trust. Migration 16 drops ' +
+      'the three-argument overload, makes not_the_approver unconditional, and ' +
+      'moves the dev escape hatch to sahoda.allow_self_approve, a database ' +
+      'setting no PostgREST client can write. Also: Clerk user.created now ' +
+      'requires a VERIFIED primary email before binding a seat; ' +
+      'ops_qa_artifact_add requires the run to be the caller\'s own and still ' +
+      'open; service-rpc.test.ts written, since the module header claimed it ' +
+      'existed. Done when migration 16 is applied and packages/db ops_credits ' +
+      'is green.',
+  ],
 ]
 
 export function tasks() {
