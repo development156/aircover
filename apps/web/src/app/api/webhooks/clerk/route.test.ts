@@ -7,11 +7,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const state = vi.hoisted(() => {
   const secret = `whsec_${Buffer.from('a-test-signing-key-32-bytes-long').toString('base64')}`
   return {
-  secret,
-  env: { CLERK_WEBHOOK_SECRET: secret as string | undefined },
-  links: [] as { email: string; userId: string }[],
-  linkResult: { ok: true, linkedSeat: false } as
-    { ok: true; linkedSeat: boolean } | { ok: false; reason: 'unavailable' },
+    secret,
+    env: { CLERK_WEBHOOK_SECRET: secret as string | undefined },
+    links: [] as { email: string; userId: string }[],
+    linkResult: { ok: true, linkedSeat: false } as
+      { ok: true; linkedSeat: boolean } | { ok: false; reason: 'unavailable' },
   }
 })
 

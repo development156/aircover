@@ -15,28 +15,33 @@ describe('AdminSubNav', () => {
     expect(dev).toHaveAttribute('aria-current', 'page')
   })
 
-  it('renders an unbuilt section as disabled text, never as a link', () => {
-    // The bug this pins: typedRoutes rejects a Link to a route that does not
-    // exist, so the tempting workaround is a bare <a href> — which ships a nav
-    // item that 404s. A section nobody can open must not look openable.
-    render(<AdminSubNav />)
-
-    for (const label of ['Applications', 'Credits', 'Team']) {
-      expect(screen.queryByRole('link', { name: label })).toBeNull()
-      expect(screen.getByText(label)).toHaveAttribute('aria-disabled', 'true')
-    }
-  })
-
-  it('says which card builds an unbuilt section', () => {
-    render(<AdminSubNav />)
-    expect(screen.getByText('Applications')).toHaveAttribute(
-      'title',
-      expect.stringContaining('SL-025'),
-    )
-  })
-
   it('links QA now that the console exists', () => {
     render(<AdminSubNav />)
     expect(screen.getByRole('link', { name: 'QA' })).toHaveAttribute('href', '/admin/qa')
+  })
+})
+
+describe('the nav does not lie about where it can take you', () => {
+  it('ships all five sections as real links', () => {
+    render(<AdminSubNav />)
+
+    for (const label of ['Dev', 'QA', 'Applications', 'Credits', 'Team']) {
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
+    }
+  })
+
+  it('still renders an unbuilt section as disabled text rather than a link', () => {
+    // No live example any more — passed in explicitly so the guarantee stays
+    // covered instead of rotting into dead code.
+    render(<AdminSubNav sections={[{ label: 'Later', pending: 'SL-099' }]} />)
+
+    expect(screen.queryByRole('link', { name: /Later/ })).toBeNull()
+    expect(screen.getByText(/Later/)).toBeInTheDocument()
+  })
+
+  it('names the card that builds an unbuilt section', () => {
+    render(<AdminSubNav sections={[{ label: 'Later', pending: 'SL-099' }]} />)
+
+    expect(screen.getByTitle(/SL-099/)).toBeInTheDocument()
   })
 })

@@ -140,12 +140,11 @@ describe('write controls appear only for a seat that may write', () => {
     render(<BoardView cards={CARDS} canWrite />)
 
     const select = screen.getByLabelText(/Move SL-016 to another column/)
-    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual([
-      'To Do',
-      'In Progress',
-      'For Review',
-      'Done',
-    ])
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['To Do', 'In Progress', 'For Review', 'Done'])
     expect((select as HTMLSelectElement).value).toBe('in_progress')
   })
 })
