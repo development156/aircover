@@ -4,12 +4,15 @@ import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { CreatePostButton } from '@/components/posts/create-post-button'
 import { PostCard } from '@/components/posts/post-card'
-import { listPosts, LIST_LIMIT } from '@/lib/posts/read'
+import { listPosts, listPublishModes, LIST_LIMIT } from '@/lib/posts/read'
 
 export const metadata = { title: 'Posts' }
 
 export default async function PostsPage() {
   const posts = await listPosts()
+  // The evidence behind any "it happened" claim. Fails safe to an empty map, in
+  // which case every chip renders the weaker claim rather than a solid publish.
+  const modes = await listPublishModes(posts.map((post) => post.id))
   // Read the clock once and pass it down, so every card on the page agrees on
   // which scheduled posts are past due. See `AutoPublishNote`.
   const now = new Date()
@@ -36,7 +39,7 @@ export default async function PostsPage() {
           <ul className="space-y-grid" data-guide="posts.list">
             {posts.map((post) => (
               <li key={post.id}>
-                <PostCard post={post} now={now} />
+                <PostCard post={post} now={now} mode={modes.get(post.id) ?? null} />
               </li>
             ))}
           </ul>

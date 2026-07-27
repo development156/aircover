@@ -2,11 +2,13 @@ import Link from 'next/link'
 import { CalendarClock } from 'lucide-react'
 import type { Post } from '@sahoda/shared'
 
+import { AgencyBlade } from '@/components/posts/agency-blade'
 import { AutoPublishNote } from '@/components/posts/auto-publish-note'
 import { CHANNEL_SHORT } from '@/components/posts/channel-label'
 import { DeletePostButton } from '@/components/posts/delete-post-button'
 import { StatusBadge } from '@/components/posts/status-badge'
 import { Card } from '@/components/ui/card'
+import type { PostPublishMode } from '@/lib/posts/certainty'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
 import { cn } from '@/lib/utils'
 
@@ -32,9 +34,14 @@ export interface PostCardProps {
   post: Post
   /** One instant for the whole list, read on the server. See `AutoPublishNote`. */
   now: Date
+  /**
+   * What the publish logs prove about this post. Required, and `null` when
+   * unknown — the chip then renders the weaker claim rather than "it happened".
+   */
+  mode: PostPublishMode
 }
 
-export function PostCard({ post, now }: PostCardProps) {
+export function PostCard({ post, now, mode }: PostCardProps) {
   const title = post.title?.trim()
   const displayTitle = title || 'Untitled post'
   const excerpt = excerptOf(post.body)
@@ -54,15 +61,19 @@ export function PostCard({ post, now }: PostCardProps) {
     <Card interactive className="group hover:shadow-pop active:translate-y-0">
       <Link href={`/posts/${post.id}`} data-guide="posts.card" className="block rounded-input">
         <div className="flex items-start justify-between gap-3">
+          {/* The blade sits with the TITLE, never with the status chip: it says
+              Sahoda drafted this post, and placing it beside a publish claim
+              would read as "Sahoda published it" — which no column records. */}
           <h2
             className={cn(
-              'text-[17px] leading-6 font-bold transition-micro group-hover:text-accent',
+              'flex items-center gap-2 text-[17px] leading-6 font-bold transition-micro group-hover:text-accent',
               !title && 'font-semibold text-muted',
             )}
           >
+            <AgencyBlade origin={post.origin} />
             {displayTitle}
           </h2>
-          <StatusBadge status={post.status} />
+          <StatusBadge status={post.status} mode={mode} />
         </div>
 
         {excerpt ? (

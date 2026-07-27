@@ -42,7 +42,11 @@ export function BrandCard({
           className="shrink-0"
         >
           <RefreshCw size={13} aria-hidden />
-          Regenerate · Uses <span className="tabular-nums">{regenerateCost}</span> credits
+          {/* One span = one flex item, so the button's gap-2 applies once
+              (icon | label) instead of around every fragment of the sentence. */}
+          <span>
+            Regenerate · Uses <span className="tabular-nums">{regenerateCost}</span> credits
+          </span>
         </Button>
       </div>
       {children}

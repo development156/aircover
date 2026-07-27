@@ -7,6 +7,7 @@ import { Sparkles } from 'lucide-react'
 import { creditCost, type Channel } from '@sahoda/shared'
 
 import { Button } from '@/components/ui/button'
+import { CostLabel } from '@/components/ui/cost-label'
 import { generateVariants } from '@/app/actions/posts-ai'
 import type { GeneratedVariant } from '@/lib/posts/state'
 
@@ -113,7 +114,7 @@ export function GeneratePanel({ postId, channels, flush, onGenerated }: Generate
                   onClick={() => run([channel])}
                   className="rounded-pill border border-warn px-2.5 py-1 text-[12px] font-semibold transition-micro hover:bg-warn hover:text-white"
                 >
-                  Retry this channel · <span className="tabular-nums">{cost}</span> credits
+                  <CostLabel action="Retry this channel" cost={cost} />
                 </button>
               </li>
             ))}

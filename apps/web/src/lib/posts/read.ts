@@ -4,6 +4,7 @@ import {
   PostMediaSchema,
   PostSchema,
   PostVariantSchema,
+  PublishModeSchema,
   type Post,
   type PostMedia,
   type PostVariant,
@@ -11,6 +12,7 @@ import {
 
 import { cache } from 'react'
 
+import { collapseModes, type PostPublishMode } from '@/lib/posts/certainty'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
@@ -115,6 +117,86 @@ export async function listVariants(postId: string): Promise<PostVariant[]> {
     })
   } catch {
     return []
+  }
+}
+
+/**
+ * Cap on the publish-log read. A post publishes to at most a handful of channels
+ * and retries are bounded, so this is far above any real post's log count; it
+ * exists so a pathological row explosion cannot stall a list render.
+ */
+const PUBLISH_LOG_LIMIT = 500
+
+/** A row shape loose enough to survive an unexpected column, strict where it counts. */
+interface PublishLogRow {
+  post_id: unknown
+  mode: unknown
+  status: unknown
+}
+
+/**
+ * What the publish logs say about each of these posts: 'live', 'fixture',
+ * 'mixed', or absent (unknown).
+ *
+ * This is the evidence behind `.is-real`. `post_publish_logs` is member-readable
+ * (`apply_tenant_read_policy`) but is written only by the publisher with a
+ * service-role client, so apps/web reads it and never writes it.
+ *
+ * EVERY failure path resolves to unknown, never to a mode:
+ *   - no active workspace, or an empty id list → no query at all
+ *   - a PostgREST error, or a thrown/timed-out fetch → an empty map
+ *   - a row whose mode is not in `PublishModeSchema` → that row is dropped
+ *
+ * The direction matters. A missing log is not evidence of a live publish, so the
+ * caller must fall back to the weaker claim (`certaintyFor` does). Returning an
+ * optimistic or partial answer here would paint a solid "it happened" chip on a
+ * post that nothing ever published — the exact fabricated success state the
+ * publish action refuses to write in the first place.
+ *
+ * Only `status = 'succeeded'` rows count: a failed attempt against the live
+ * adapter is not a publish.
+ */
+export async function listPublishModes(postIds: string[]): Promise<Map<string, PostPublishMode>> {
+  const modes = new Map<string, PostPublishMode>()
+  if (postIds.length === 0) return modes
+
+  try {
+    const workspaceId = await activeWorkspaceId()
+    if (workspaceId === null) return modes
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('post_publish_logs')
+      .select('post_id, mode, status')
+      .eq('workspace_id', workspaceId)
+      .in('post_id', postIds)
+      .limit(PUBLISH_LOG_LIMIT)
+
+    if (error || !data) {
+      if (error) console.error('[posts] publish-log read failed', error.code, error.message)
+      return modes
+    }
+
+    const byPost = new Map<string, Array<'live' | 'fixture'>>()
+    for (const row of data as PublishLogRow[]) {
+      if (row.status !== 'succeeded') continue
+      if (typeof row.post_id !== 'string') continue
+      const mode = PublishModeSchema.safeParse(row.mode)
+      if (!mode.success) continue
+      byPost.set(row.post_id, [...(byPost.get(row.post_id) ?? []), mode.data])
+    }
+
+    for (const [postId, found] of byPost) {
+      const collapsed = collapseModes(found)
+      if (collapsed !== null) modes.set(postId, collapsed)
+    }
+    return modes
+  } catch (error) {
+    console.error(
+      '[posts] publish-log read threw',
+      error instanceof Error ? error.message : 'unknown',
+    )
+    return modes
   }
 }
 
