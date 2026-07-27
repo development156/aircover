@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { hasRlsEnv } from './helpers/env'
-import { serviceClient, userClient } from './helpers/db'
+import { pgPool, serviceClient, userClient } from './helpers/db'
 
 /**
  * The maker-checker credit grant (doc 13 §6).
@@ -155,6 +155,61 @@ describe.skipIf(!hasRlsEnv)('ops credit maker-checker', () => {
     })
     expect(plain).toMatchObject({ ok: false, reason: 'not_the_approver' })
     expect(await available()).toBe(before)
+  })
+
+  it('the dev escape hatch still WORKS when the database sets it', async () => {
+    // Migration 16 moved this flag out of the caller's hands and, in doing so,
+    // very nearly killed it: with `not_the_approver` checked unconditionally the
+    // self-approval branch behind it was unreachable, so the hatch doc 13 §6
+    // asks for would have been a control that silently did nothing. Migration 17
+    // put both checks back behind the flag. This test is why that is not just a
+    // claim.
+    //
+    // `set local` inside a rolled-back transaction, so the hatch is exercised
+    // for real without leaving it on for anyone else and without keeping the
+    // credits it grants.
+    const requestId = await newRequest(75)
+    const before = await available()
+
+    const client = await pgPool().connect()
+    try {
+      await client.query('begin')
+      await client.query("set local role authenticated")
+      await client.query('select set_config($1, $2, true)', [
+        'request.jwt.claims',
+        JSON.stringify({ sub: requesterSub, role: 'authenticated' }),
+      ])
+      await client.query('select set_config($1, $2, true)', ['sahoda.allow_self_approve', 'true'])
+
+      const { rows } = await client.query(
+        'select public.ops_credit_request_verify($1, $2) as result',
+        [requestId, GOOD_HASH],
+      )
+
+      // The requester approving their own request — refused a moment ago,
+      // permitted here, and ONLY because the server said so.
+      expect(rows[0].result).toMatchObject({ ok: true, amount: 75 })
+
+      const { rows: stamped } = await client.query(
+        'select self_approved from ops_credit_requests where id = $1',
+        [requestId],
+      )
+      // Stamped, so an audit can tell a dev shortcut from a real approval.
+      expect(stamped[0].self_approved).toBe(true)
+
+      await client.query('rollback')
+    } finally {
+      client.release()
+    }
+
+    // Nothing survived the rollback: no credits, and the request is pending again.
+    expect(await available()).toBe(before)
+    const { data: row } = await svc()
+      .from('ops_credit_requests')
+      .select('status')
+      .eq('id', requestId)
+      .single()
+    expect(row).toMatchObject({ status: 'pending' })
   })
 
   it('the requester cannot approve their own request even with the code', async () => {
