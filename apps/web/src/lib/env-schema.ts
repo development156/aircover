@@ -43,6 +43,12 @@ const EnvSchema = z.object({
    * rather than pretending to have written something.
    */
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  /**
+   * Svix signing secret for the Clerk webhook. Optional so a build without it
+   * still compiles; absent at runtime means the webhook answers 503 rather than
+   * accepting unverified events.
+   */
+  CLERK_WEBHOOK_SECRET: z.string().min(1).optional(),
   /** Comma-separated. Seeds the first owner seats; read by scripts/ops-seed.mjs. */
   ADMIN_BOOTSTRAP_EMAILS: z.string().optional(),
   /** Dev-only escape hatch for the maker-checker rule. Anything but 'true' is false. */

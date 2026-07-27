@@ -8,12 +8,18 @@ import {
   OpsQaRunSchema,
   OpsRoadmapItemSchema,
   OpsSessionSchema,
+  OpsCreditRequestSchema,
+  OpsAdminSchema,
+  OpsBetaApplicationSchema,
   OpsTaskSchema,
   type OpsChangelogEntry,
   type OpsQaRun,
   type OpsRoadmapItem,
   type OpsSession,
   type OpsTask,
+  type OpsCreditRequest,
+  type OpsAdmin,
+  type OpsBetaApplication,
 } from '@sahoda/shared'
 
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -171,3 +177,45 @@ export const readGateRuns = cache(
     return { status: 'ok', data: latest }
   },
 )
+
+/**
+ * Credit requests, newest first.
+ *
+ * `otp_hash` is absent from OpsCreditRequestSchema on purpose, and selecting *
+ * would therefore fail the parse if the column ever came back — which is the
+ * point. A hashed one-time code has no business travelling to a browser, so the
+ * columns are named rather than starred.
+ */
+export const readCreditRequests = cache(async (): Promise<OpsRead<OpsCreditRequest[]>> => {
+  const supabase = createServerSupabase()
+  return readAll('credit_requests', z.array(OpsCreditRequestSchema), () =>
+    supabase
+      .from('ops_credit_requests')
+      .select(
+        'id,workspace_id,workspace_label,amount,reason,requested_by,approver_id,attempts,' +
+          'self_approved,status,denied_reason,ledger_idempotency_key,decided_at,created_at,updated_at',
+      )
+      .order('created_at', { ascending: false })
+      .limit(50),
+  )
+})
+
+/** Every seat, for the team screen and the approver picker. */
+export const readOpsAdmins = cache(async (): Promise<OpsRead<OpsAdmin[]>> => {
+  const supabase = createServerSupabase()
+  return readAll('ops_admins', z.array(OpsAdminSchema), () =>
+    supabase.from('ops_admins').select('*').order('email', { ascending: true }),
+  )
+})
+
+/** The applications inbox, newest first. */
+export const readApplications = cache(async (): Promise<OpsRead<OpsBetaApplication[]>> => {
+  const supabase = createServerSupabase()
+  return readAll('beta_applications', z.array(OpsBetaApplicationSchema), () =>
+    supabase
+      .from('ops_beta_applications')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200),
+  )
+})
