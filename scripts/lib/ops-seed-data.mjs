@@ -309,10 +309,25 @@ const TASKS = [
       'moves the dev escape hatch to sahoda.allow_self_approve, a database ' +
       'setting no PostgREST client can write. Also: Clerk user.created now ' +
       'requires a VERIFIED primary email before binding a seat; ' +
-      'ops_qa_artifact_add requires the run to be the caller\'s own and still ' +
+      "ops_qa_artifact_add requires the run to be the caller's own and still " +
       'open; service-rpc.test.ts written, since the module header claimed it ' +
       'existed. Done when migration 16 is applied and packages/db ops_credits ' +
       'is green.',
+  ],
+  [
+    'admin-ops',
+    'Two charts below the board: cumulative flow and gate health',
+    'Recharts, doc 08 tokens only, crimson for failures, tabular-nums. ' +
+      '(1) Cumulative flow — To Do / In Progress / For Review / Done over ' +
+      'time, reconstructed from ops_tasks timestamps. (2) Gate health — ' +
+      'pass/fail per suite over time from ops_qa_runs. Honesty rules are part ' +
+      'of the card, not polish: state the window explicitly on the chart, draw ' +
+      'no trend through fewer than five points, and render a gap in the data as ' +
+      'a GAP rather than a straight line between the two known points either ' +
+      'side of it. No velocity chart until there is enough history for one to ' +
+      'mean anything. Note: gate-health data comes from ops_qa_runs, whose ' +
+      'authorship was forgeable until SL-042 — the chart is only as honest as ' +
+      'that table, which is why the import path was fixed first.',
   ],
 ]
 
