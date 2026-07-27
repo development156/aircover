@@ -18,9 +18,15 @@ export interface EntryDisplay {
   signedAmount: string
   /** Honest detail line, or `null` when there is nothing truthful to add. */
   why: string | null
-  /** A HOLD is credits reserved, not credits spent. */
-  pending: boolean
 }
+
+/*
+ * There is deliberately no `pending` here. Whether a HOLD is still reserved is
+ * not a property of the row — a settled hold and an open one are byte-identical
+ * except for an entry ELSEWHERE that names it. Deriving it from
+ * `entry_type === 'HOLD'` was how every completed charge came to render as
+ * frozen credits. See `hold-settlement.ts`.
+ */
 
 /** Generic label used whenever we cannot name the action safely. */
 const GENERIC_ACTION_LABEL = 'AI action'
@@ -368,6 +374,5 @@ export function describeEntry(entry: LedgerEntry): EntryDisplay {
     direction,
     signedAmount: formatSignedAmount(direction, entry.amount),
     why: buildWhy(entry),
-    pending: entry.entry_type === 'HOLD',
   }
 }
