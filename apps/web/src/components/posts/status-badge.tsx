@@ -1,5 +1,6 @@
 import type { PostStatus } from '@sahoda/shared'
 
+import { certaintyFor, type CertaintyLevel, type PostPublishMode } from '@/lib/posts/certainty'
 import { cn } from '@/lib/utils'
 
 /**
@@ -31,24 +32,63 @@ export const STATUS_STYLES = {
   expired: { label: 'Expired', className: 'bg-s2 text-muted' },
 } satisfies Record<PostStatus, StatusStyle>
 
+/**
+ * Certainty level → the structural signature from tokens.css.
+ *
+ * These carry the meaning. `.is-real` is a solid fill, `.is-committed` a
+ * hairline and tint, `.is-proposed` a dash, `.is-simulated` a hatch — each
+ * survives recolour, greyscale and colour blindness, which the old
+ * colour-only chips did not.
+ *
+ * `failed` is deliberately NOT one of them: a danger stroke on a transparent
+ * surface, because failure is a different axis from how-real-a-thing-is.
+ * `neutral` is the terminal/no-claim case.
+ */
+const CERTAINTY_CLASS: Record<CertaintyLevel, string> = {
+  real: 'is-real',
+  committed: 'is-committed',
+  proposed: 'is-proposed',
+  simulated: 'is-simulated',
+  failed: 'border border-danger bg-transparent text-danger',
+  neutral: 'border border-line bg-transparent text-muted',
+}
+
 export interface StatusBadgeProps {
   status: PostStatus
+  /**
+   * What the publish logs prove. REQUIRED — not optional — so a call site cannot
+   * forget it and silently get the wrong certainty. Pass `null` when unknown;
+   * `certaintyFor` then renders the weaker claim.
+   */
+  mode: PostPublishMode
   className?: string
 }
 
-export function StatusBadge({ status, className }: StatusBadgeProps) {
+export function StatusBadge({ status, mode, className }: StatusBadgeProps) {
   const style = STATUS_STYLES[status]
+  const certainty = certaintyFor(status, mode)
 
   return (
     <span
+      data-testid="status-chip"
       data-status={status}
+      data-certainty={certainty.level}
       className={cn(
-        'inline-flex shrink-0 items-center rounded-pill px-2.5 py-[3px] text-[12px] leading-[18px] font-semibold',
-        style.className,
+        'inline-flex shrink-0 items-center gap-1.5 rounded-pill px-2.5 py-[3px] text-[12px] leading-[18px] font-semibold',
+        CERTAINTY_CLASS[certainty.level],
         className,
       )}
     >
       {style.label}
+      {/* UI_RULES_v3: `.is-simulated` ALWAYS carries a visible text label. The
+          label comes from the mapping rather than from this call site, so it
+          cannot be forgotten — and it is rendered text, not a title attribute,
+          because the hatch alone is not a claim. */}
+      {certainty.label !== null ? (
+        <span className="type-eyebrow rounded-sm bg-surface px-1 py-px text-ink-mute">
+          {certainty.label}
+        </span>
+      ) : null}
     </span>
   )
 }

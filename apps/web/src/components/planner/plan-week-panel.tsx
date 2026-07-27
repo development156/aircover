@@ -13,6 +13,7 @@ import { PendingLines } from '@/components/posts/pending-lines'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { CostLabel } from '@/components/ui/cost-label'
 
 const PENDING = [
   'Reading your Brand Brain…',
@@ -107,7 +108,7 @@ export function PlanWeekPanel() {
       ) : (
         <Button onClick={run} disabled={channels.length === 0} className="w-full">
           <CalendarRange size={14} aria-hidden />
-          Plan my week · <span className="tabular-nums">{cost}</span> credits
+          <CostLabel action="Plan my week" cost={cost} />
         </Button>
       )}
 

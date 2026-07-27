@@ -3,7 +3,8 @@ import type { Post } from '@sahoda/shared'
 
 import { PlannerRow } from '@/components/planner/planner-row'
 import { AutoPublishNote } from '@/components/posts/auto-publish-note'
-import { STATUS_STYLES } from '@/components/posts/status-badge'
+import { AgencyBlade } from '@/components/posts/agency-blade'
+import { certaintyFor, type PostPublishMode } from '@/lib/posts/certainty'
 import { formatScheduledTime } from '@/lib/posts/schedule-format'
 import type { WeekBuckets } from '@/lib/planner/week'
 import { cn } from '@/lib/utils'
@@ -16,20 +17,42 @@ const DAY_LABEL = new Intl.DateTimeFormat('en-IN', {
   month: 'short',
 })
 
-function DayChip({ post, now }: { post: Post; now: Date }) {
+/**
+ * Certainty level -> the same structural signature the chip uses. The week grid
+ * is the surface the system has to work on AT A GLANCE, so a cell carries the
+ * dash/hairline/hatch itself rather than only a colour: seven columns of pills
+ * distinguished by hue alone are unreadable the moment a tenant re-themes.
+ */
+const CELL_CERTAINTY: Record<string, string> = {
+  real: 'is-real',
+  committed: 'is-committed',
+  proposed: 'is-proposed',
+  simulated: 'is-simulated',
+  failed: 'border border-danger bg-transparent text-danger',
+  neutral: 'border border-line bg-transparent text-muted',
+}
+
+function DayChip({ post, now, mode }: { post: Post; now: Date; mode: PostPublishMode }) {
   const time = formatScheduledTime(post.scheduled_at)
+  const certainty = certaintyFor(post.status, mode)
   return (
     <Link
       href={`/posts/${post.id}`}
-      // UXUI 4.4: chips are colored by status — same token pairs as StatusBadge.
+      data-certainty={certainty.level}
       className={cn(
         'block space-y-0.5 rounded-input px-2 py-1.5 transition-micro hover:brightness-95',
-        STATUS_STYLES[post.status].className,
+        CELL_CERTAINTY[certainty.level],
       )}
     >
-      <span className="block truncate text-[12.5px] leading-4 font-semibold">
+      <span className="flex items-center gap-1.5 truncate text-[12.5px] leading-4 font-semibold">
+        <AgencyBlade origin={post.origin} />
         {post.title?.trim() || 'Untitled post'}
       </span>
+      {/* The hatch alone is not a claim — a simulated cell says so in words,
+          even here where space is tightest. */}
+      {certainty.label !== null ? (
+        <span className="type-eyebrow block text-ink-mute">{certainty.label}</span>
+      ) : null}
       {time ? <span className="block text-[11.5px] tabular-nums opacity-80">{time}</span> : null}
       {/* A time in a calendar cell is the strongest auto-publish signal on any
           screen. The cell has no room for the sentence, so it abbreviates —
@@ -48,6 +71,8 @@ export interface WeekGridProps {
   buckets: WeekBuckets
   /** One instant for the whole grid — the same one `bucketWeek` was given. */
   now: Date
+  /** post id -> what the publish logs prove. Absent means unknown, never live. */
+  modes: ReadonlyMap<string, PostPublishMode>
 }
 
 /**
@@ -55,7 +80,7 @@ export interface WeekGridProps {
  * fit the window render below it — `bucketWeek` never drops a post, and neither
  * does this component.
  */
-export function WeekGrid({ buckets, now }: WeekGridProps) {
+export function WeekGrid({ buckets, now, modes }: WeekGridProps) {
   return (
     <div className="space-y-grid">
       <div className="overflow-x-auto">
@@ -75,7 +100,7 @@ export function WeekGrid({ buckets, now }: WeekGridProps) {
                 {index === 0 ? ' · Today' : ''}
               </p>
               {day.posts.map((post) => (
-                <DayChip key={post.id} post={post} now={now} />
+                <DayChip key={post.id} post={post} now={now} mode={modes.get(post.id) ?? null} />
               ))}
             </li>
           ))}
@@ -86,7 +111,7 @@ export function WeekGrid({ buckets, now }: WeekGridProps) {
         <section className="space-y-2">
           <h2 className="text-[13px] font-semibold text-muted">Unscheduled</h2>
           {buckets.unscheduled.map((post) => (
-            <PlannerRow key={post.id} post={post} now={now} />
+            <PlannerRow key={post.id} post={post} now={now} mode={modes.get(post.id) ?? null} />
           ))}
         </section>
       ) : null}
@@ -95,7 +120,7 @@ export function WeekGrid({ buckets, now }: WeekGridProps) {
         <section className="space-y-2">
           <h2 className="text-[13px] font-semibold text-muted">Outside this week</h2>
           {buckets.outside.map((post) => (
-            <PlannerRow key={post.id} post={post} now={now} />
+            <PlannerRow key={post.id} post={post} now={now} mode={modes.get(post.id) ?? null} />
           ))}
         </section>
       ) : null}

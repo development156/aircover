@@ -7,7 +7,7 @@ import { PlannerRow } from '@/components/planner/planner-row'
 import { ViewToggle, type PlannerView } from '@/components/planner/view-toggle'
 import { WeekGrid } from '@/components/planner/week-grid'
 import { bucketWeek } from '@/lib/planner/week'
-import { listPosts, LIST_LIMIT } from '@/lib/posts/read'
+import { listPosts, listPublishModes, LIST_LIMIT } from '@/lib/posts/read'
 
 export const metadata = { title: 'Planner' }
 
@@ -25,6 +25,9 @@ export default async function PlannerPage({
   // reachability decides whether a tour actually shows.
   const view: PlannerView = rawView === 'week' ? 'week' : 'list'
   const posts = await listPosts()
+  // The evidence behind any "it happened" claim. Fails safe to an empty map, in
+  // which case every chip renders the weaker claim rather than a solid publish.
+  const modes = await listPublishModes(posts.map((post) => post.id))
   // One instant for the whole screen: the week buckets and the past-due notes
   // must not be computed against two different clocks.
   const now = new Date()
@@ -46,12 +49,12 @@ export default async function PlannerPage({
           tip="Add goals first if you have a push this week — the plan bends toward them."
         />
       ) : view === 'week' ? (
-        <WeekGrid buckets={bucketWeek(posts, now)} now={now} />
+        <WeekGrid buckets={bucketWeek(posts, now)} now={now} modes={modes} />
       ) : (
         <ul className="space-y-2" data-guide="planner.list">
           {posts.map((post) => (
             <li key={post.id}>
-              <PlannerRow post={post} now={now} />
+              <PlannerRow post={post} now={now} mode={modes.get(post.id) ?? null} />
             </li>
           ))}
         </ul>

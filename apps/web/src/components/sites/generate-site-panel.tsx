@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { CostLabel } from '@/components/ui/cost-label'
 
 const PENDING = [
   'Reading your Brand Brain…',
@@ -116,7 +117,7 @@ export function GenerateSitePanel() {
       ) : (
         <Button onClick={run} disabled={name.trim() === ''} className="w-full">
           <Globe size={14} aria-hidden />
-          Generate site · <span className="tabular-nums">{cost}</span> credits
+          <CostLabel action="Generate site" cost={cost} />
         </Button>
       )}
 

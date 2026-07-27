@@ -62,9 +62,14 @@ export async function Topbar() {
   return (
     <header
       data-guide="topbar.root"
-      className="sticky top-0 z-5 flex h-topbar items-center gap-3 border-b border-line bg-s1/90 px-page backdrop-blur-[6px] max-narrow:px-page-mobile"
+      className="sticky top-0 z-5 flex h-topbar items-center gap-3 border-b border-line bg-s1/90 px-page backdrop-blur-[6px] max-narrow:gap-2 max-narrow:px-page-mobile"
     >
-      <WorkspaceSwitcher workspaces={workspaces} active={active} />
+      {/* min-w-0 is load-bearing: a flex item defaults to min-width:auto and
+          refuses to shrink below its content, so without it the switcher pushed
+          the credit pill and avatar off the right edge at 375px. */}
+      <div className="min-w-0">
+        <WorkspaceSwitcher workspaces={workspaces} active={active} />
+      </div>
       <div className="ml-auto" />
       <CreditChip balance={balance} />
       <div data-guide="topbar.avatar" className="grid size-8 place-items-center">

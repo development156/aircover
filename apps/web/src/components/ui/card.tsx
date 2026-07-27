@@ -30,7 +30,10 @@ export function CardLabel({ className, ...props }: React.HTMLAttributes<HTMLPara
   return (
     <p
       className={cn(
-        'mb-2 flex items-center gap-2 font-mono text-[10.5px] font-semibold tracking-[0.14em] text-muted uppercase',
+        // `type-eyebrow` IS the v3 eyebrow: --t-eyebrow (600 11px/14px mono) plus
+        // --t-eyebrow-ls tracking and uppercase. The previous hand-rolled copy
+        // duplicated all four and sat at 10.5px, off the type scale entirely.
+        'type-eyebrow mb-2 flex items-center gap-2 text-muted',
         className,
       )}
       {...props}

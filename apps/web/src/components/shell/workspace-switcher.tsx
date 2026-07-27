@@ -69,7 +69,7 @@ export function WorkspaceSwitcher({ workspaces, active }: WorkspaceSwitcherProps
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative min-w-0">
       <button
         ref={triggerRef}
         type="button"
@@ -77,10 +77,10 @@ export function WorkspaceSwitcher({ workspaces, active }: WorkspaceSwitcherProps
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-2 rounded-input border border-line bg-bg px-3 py-[7px] font-semibold transition-micro hover:bg-s1"
+        className="flex min-w-0 items-center gap-2 rounded-input border border-line bg-bg px-3 py-[7px] font-semibold transition-micro hover:bg-s1 max-narrow:px-2"
       >
         <WorkspaceBadge name={active.name} />
-        <span className="max-w-[16ch] truncate">{active.name}</span>
+        <span className="max-w-[16ch] truncate max-narrow:max-w-[7ch]">{active.name}</span>
         <ChevronsUpDown size={15} className="shrink-0 text-muted" aria-hidden />
       </button>
 

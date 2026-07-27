@@ -79,19 +79,19 @@ describe('AutoPublishNote', () => {
 
 describe('the posts list', () => {
   test('labels a past-due scheduled post', () => {
-    render(<PostCard post={post({ scheduled_at: PAST })} now={NOW} />)
+    render(<PostCard post={post({ scheduled_at: PAST })} now={NOW} mode={null} />)
 
     expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
   })
 
   test('labels an upcoming scheduled post too', () => {
-    render(<PostCard post={post()} now={NOW} />)
+    render(<PostCard post={post()} now={NOW} mode={null} />)
 
     expect(screen.getByText(NOT_LIVE)).toBeInTheDocument()
   })
 
   test('leaves a dated draft alone', () => {
-    render(<PostCard post={post({ status: 'draft', scheduled_at: PAST })} now={NOW} />)
+    render(<PostCard post={post({ status: 'draft', scheduled_at: PAST })} now={NOW} mode={null} />)
 
     expect(screen.queryByText(NOT_LIVE)).not.toBeInTheDocument()
   })
@@ -99,13 +99,15 @@ describe('the posts list', () => {
 
 describe('the planner list', () => {
   test('labels a past-due scheduled post', () => {
-    render(<PlannerRow post={post({ scheduled_at: PAST })} now={NOW} />)
+    render(<PlannerRow post={post({ scheduled_at: PAST })} now={NOW} mode={null} />)
 
     expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
   })
 
   test('leaves a dated draft alone', () => {
-    render(<PlannerRow post={post({ status: 'draft', scheduled_at: PAST })} now={NOW} />)
+    render(
+      <PlannerRow post={post({ status: 'draft', scheduled_at: PAST })} now={NOW} mode={null} />,
+    )
 
     expect(screen.queryByText(NOT_LIVE)).not.toBeInTheDocument()
   })
@@ -118,7 +120,7 @@ describe('the planner week grid', () => {
     const earlierToday = '2026-07-25T03:00:00.000Z'
     const buckets = bucketWeek([post({ scheduled_at: earlierToday })], NOW)
 
-    render(<WeekGrid buckets={buckets} now={NOW} />)
+    render(<WeekGrid buckets={buckets} now={NOW} modes={new Map()} />)
 
     expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
   })
@@ -128,7 +130,7 @@ describe('the planner week grid', () => {
     // was due last month is the most misleading one on the screen.
     const buckets = bucketWeek([post({ scheduled_at: '2026-06-01T12:00:00.000Z' })], NOW)
 
-    render(<WeekGrid buckets={buckets} now={NOW} />)
+    render(<WeekGrid buckets={buckets} now={NOW} modes={new Map()} />)
 
     expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
   })
