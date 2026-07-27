@@ -117,7 +117,17 @@ export function primaryEmailFrom(payload: unknown): string | null {
 
   const primary = addresses.find(
     (entry) => (entry as { id?: unknown } | null)?.id === primaryId,
-  ) as { email_address?: unknown } | undefined
+  ) as { email_address?: unknown; verification?: { status?: unknown } } | undefined
+
+  // VERIFIED, not merely primary. This address is about to be bound to an
+  // ops_admins seat that may already be an active owner with user_id NULL —
+  // seeded from ADMIN_BOOTSTRAP_EMAILS before that person ever signed up. The
+  // only thing standing between "anyone who can create a Clerk account with
+  // that string" and full console access was Clerk's Restricted mode, which is
+  // a dashboard toggle this code cannot see or enforce. Requiring Clerk's own
+  // verification verdict is the layer that does not depend on a setting
+  // drifting.
+  if (primary?.verification?.status !== 'verified') return null
 
   const value = primary?.email_address
   return typeof value === 'string' && value.includes('@') ? value : null

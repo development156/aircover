@@ -105,7 +105,6 @@ describe.skipIf(!hasRlsEnv)('ops credit maker-checker', () => {
     const { data, error } = await userClient(strangerSub).rpc('ops_credit_request_verify', {
       p_request_id: requestId,
       p_otp_hash: GOOD_HASH,
-      p_allow_self: false,
     })
 
     expect(error).toBeNull()
@@ -122,6 +121,42 @@ describe.skipIf(!hasRlsEnv)('ops credit maker-checker', () => {
     expect(row).toMatchObject({ status: 'pending', attempts: 0 })
   })
 
+  it('a THIRD PARTY cannot bypass the approver check by asking it to be skipped', async () => {
+    // The exploit, run exactly as it succeeded before migration 16.
+    //
+    // `p_allow_self` was a plain boolean on a function granted to
+    // `authenticated`, so it was the CALLER'S to set: the app-layer
+    // OPS_ALLOW_SELF_APPROVE env gate was bypassed by calling the RPC directly.
+    // Setting it true skipped `not_the_approver` as well as self-approval, so
+    // knowing any valid code was enough for any writer-role admin, and
+    // maker-checker was one factor wearing two coats.
+    //
+    // This asserted `{ ok: false }` and got `{ ok: true, amount: 250 }`.
+    const requestId = await newRequest()
+    const before = await available()
+
+    const { data, error } = await userClient(strangerSub).rpc('ops_credit_request_verify', {
+      p_request_id: requestId,
+      p_otp_hash: GOOD_HASH,
+      p_allow_self: true,
+    })
+
+    // The three-argument overload is gone, so PostgREST cannot resolve this
+    // call at all. Either way the only acceptable outcome is: no grant.
+    expect(data === null || (data as { ok?: boolean }).ok !== true).toBe(true)
+    if (error) expect(error.code).toBe('PGRST202')
+    expect(await available()).toBe(before)
+
+    // And the supported two-argument form still refuses the wrong hands, so the
+    // fix is a closed door rather than a moved one.
+    const { data: plain } = await userClient(strangerSub).rpc('ops_credit_request_verify', {
+      p_request_id: requestId,
+      p_otp_hash: GOOD_HASH,
+    })
+    expect(plain).toMatchObject({ ok: false, reason: 'not_the_approver' })
+    expect(await available()).toBe(before)
+  })
+
   it('the requester cannot approve their own request even with the code', async () => {
     const requestId = await newRequest()
     const before = await available()
@@ -129,7 +164,6 @@ describe.skipIf(!hasRlsEnv)('ops credit maker-checker', () => {
     const { data } = await userClient(requesterSub).rpc('ops_credit_request_verify', {
       p_request_id: requestId,
       p_otp_hash: GOOD_HASH,
-      p_allow_self: false,
     })
 
     expect(data).toMatchObject({ ok: false, reason: 'self_approval_blocked' })
@@ -142,7 +176,6 @@ describe.skipIf(!hasRlsEnv)('ops credit maker-checker', () => {
     const { error } = await userClient(viewerSub).rpc('ops_credit_request_verify', {
       p_request_id: requestId,
       p_otp_hash: GOOD_HASH,
-      p_allow_self: false,
     })
 
     // app.ops_writer() raises 42501 before any request state is read.
@@ -170,19 +203,16 @@ describe.skipIf(!hasRlsEnv)('ops credit maker-checker', () => {
     const first = await userClient(approverSub).rpc('ops_credit_request_verify', {
       p_request_id: requestId,
       p_otp_hash: wrong,
-      p_allow_self: false,
     })
     expect(first.data).toMatchObject({ ok: false, reason: 'wrong_code', attempts_left: 2 })
 
     await userClient(approverSub).rpc('ops_credit_request_verify', {
       p_request_id: requestId,
       p_otp_hash: wrong,
-      p_allow_self: false,
     })
     const third = await userClient(approverSub).rpc('ops_credit_request_verify', {
       p_request_id: requestId,
       p_otp_hash: wrong,
-      p_allow_self: false,
     })
     expect(third.data).toMatchObject({ ok: false })
 
@@ -190,7 +220,6 @@ describe.skipIf(!hasRlsEnv)('ops credit maker-checker', () => {
     const after = await userClient(approverSub).rpc('ops_credit_request_verify', {
       p_request_id: requestId,
       p_otp_hash: GOOD_HASH,
-      p_allow_self: false,
     })
     expect(after.data).toMatchObject({ ok: false })
     expect((after.data as { reason: string }).reason).not.toBe('wrong_code')
@@ -203,7 +232,6 @@ describe.skipIf(!hasRlsEnv)('ops credit maker-checker', () => {
     const first = await userClient(approverSub).rpc('ops_credit_request_verify', {
       p_request_id: requestId,
       p_otp_hash: GOOD_HASH,
-      p_allow_self: false,
     })
     expect(first.error).toBeNull()
     expect(first.data).toMatchObject({ ok: true, amount: 250 })
@@ -217,7 +245,6 @@ describe.skipIf(!hasRlsEnv)('ops credit maker-checker', () => {
     const replay = await userClient(approverSub).rpc('ops_credit_request_verify', {
       p_request_id: requestId,
       p_otp_hash: GOOD_HASH,
-      p_allow_self: false,
     })
     expect(replay.data).toMatchObject({ ok: true, replayed: true })
     expect(await available()).toBe(afterGrant)
@@ -236,7 +263,6 @@ describe.skipIf(!hasRlsEnv)('ops credit maker-checker', () => {
     await userClient(approverSub).rpc('ops_credit_request_verify', {
       p_request_id: requestId,
       p_otp_hash: GOOD_HASH,
-      p_allow_self: false,
     })
 
     const { data } = await svc()
@@ -270,7 +296,6 @@ describe.skipIf(!hasRlsEnv)('ops credit maker-checker', () => {
     await userClient(approverSub).rpc('ops_credit_request_verify', {
       p_request_id: requestId,
       p_otp_hash: GOOD_HASH,
-      p_allow_self: false,
     })
 
     const { data } = await svc()

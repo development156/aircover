@@ -173,8 +173,8 @@ describe('reading the payload', () => {
       id: 'user_2abc',
       primary_email_address_id: 'idn_2',
       email_addresses: [
-        { id: 'idn_1', email_address: 'old@example.com' },
-        { id: 'idn_2', email_address: 'primary@example.com' },
+        { id: 'idn_1', email_address: 'old@example.com', verification: { status: 'verified' } },
+        { id: 'idn_2', email_address: 'primary@example.com', verification: { status: 'verified' } },
       ],
     },
   }
@@ -183,6 +183,39 @@ describe('reading the payload', () => {
     // Taking the first is how an account with two addresses gets linked to the
     // wrong admin seat.
     expect(primaryEmailFrom(payload)).toBe('primary@example.com')
+  })
+
+  it('refuses an UNVERIFIED primary address', () => {
+    // The seat this would bind is potentially an active owner seeded from
+    // ADMIN_BOOTSTRAP_EMAILS with user_id NULL. Clerk's Restricted mode is the
+    // only other thing stopping a stranger who registers that address, and it
+    // is a dashboard toggle this code cannot see. So the verdict Clerk DOES
+    // send is checked.
+    const unverified = {
+      data: {
+        ...payload.data,
+        email_addresses: [
+          {
+            id: 'idn_2',
+            email_address: 'primary@example.com',
+            verification: { status: 'unverified' },
+          },
+        ],
+      },
+    }
+
+    expect(primaryEmailFrom(unverified)).toBeNull()
+  })
+
+  it('refuses when the payload carries no verification verdict at all', () => {
+    const missing = {
+      data: {
+        ...payload.data,
+        email_addresses: [{ id: 'idn_2', email_address: 'primary@example.com' }],
+      },
+    }
+
+    expect(primaryEmailFrom(missing)).toBeNull()
   })
 
   it('returns null rather than guessing when the primary is not present', () => {

@@ -52,7 +52,6 @@ const EnvSchema = z.object({
   /** Comma-separated. Seeds the first owner seats; read by scripts/ops-seed.mjs. */
   ADMIN_BOOTSTRAP_EMAILS: z.string().optional(),
   /** Dev-only escape hatch for the maker-checker rule. Anything but 'true' is false. */
-  OPS_ALLOW_SELF_APPROVE: z.enum(['true', 'false']).optional(),
   // Not provisioned yet (tracked in the handoff). While it is missing,
   // /api/public/beta-apply rejects every submission: an unprovisioned captcha
   // that degrades to accepting everything is an open public insert endpoint.
