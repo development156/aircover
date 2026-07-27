@@ -90,10 +90,7 @@ export function WorkspaceSwitcher({ workspaces, active }: WorkspaceSwitcherProps
           aria-labelledby={labelId}
           className="absolute top-[calc(100%+6px)] left-0 z-15 min-w-[240px] overflow-hidden rounded-card border border-line bg-bg p-1.5 shadow-pop"
         >
-          <p
-            id={labelId}
-            className="px-2.5 py-1.5 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase"
-          >
+          <p id={labelId} className="type-eyebrow px-2.5 py-1.5 text-muted">
             Workspaces
           </p>
           {workspaces.map((ws) => {

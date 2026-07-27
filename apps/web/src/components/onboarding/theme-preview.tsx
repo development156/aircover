@@ -18,17 +18,13 @@ export interface ThemePreviewProps {
 export function ThemePreview({ style, brandName, tagline, chips }: ThemePreviewProps) {
   return (
     <div data-guide="onboarding.preview" className="sticky top-6 flex flex-col gap-3">
-      <h2 className="font-mono text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-        Live preview
-      </h2>
+      <h2 className="type-eyebrow text-muted">Live preview</h2>
       <div
         style={style}
         aria-hidden
         className="rounded-card border border-line bg-bg p-5 shadow-card transition-panel"
       >
-        <p className="font-mono text-[10.5px] font-semibold tracking-[0.14em] text-accent uppercase">
-          {brandName || 'Your brand'}
-        </p>
+        <p className="type-eyebrow text-accent">{brandName || 'Your brand'}</p>
         <h3 className="mt-1 text-[18px] leading-[26px] font-bold text-ink">This week's post</h3>
         <p className="mt-1.5 text-[13.5px] text-muted">{tagline}</p>
         <button

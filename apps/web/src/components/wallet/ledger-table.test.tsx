@@ -216,9 +216,7 @@ describe('Reserved means frozen right now, not "was once a hold"', () => {
   test('one settled hold does not silence another open one', () => {
     const OTHER = '11111112-1111-4111-8111-111111111111'
     const openHold = hold({ id: OTHER, seq: 12 })
-    render(
-      <LedgerTable entries={[openHold, settlement('DEBIT'), hold()]} skipped={0} limit={50} />,
-    )
+    render(<LedgerTable entries={[openHold, settlement('DEBIT'), hold()]} skipped={0} limit={50} />)
 
     expect(screen.getAllByText('Reserved')).toHaveLength(1)
   })

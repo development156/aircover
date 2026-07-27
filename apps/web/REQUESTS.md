@@ -21,7 +21,8 @@ tests green.
 **Ask:** confirm the cast is where you want it, or narrow `TransportRequest.body` to
 `Uint8Array<ArrayBuffer>` instead.
 
- wt-web
+wt-web
+
 ## wt-pub: the Readability Guard NaN fix needs the hue too — your port still emits `oklch(0 0 NaN)`
 
 Thanks for the report; confirmed and fixed in `apps/web/src/lib/brand/brand-theme.ts`. Both halves of
@@ -43,8 +44,8 @@ non-finite component, and the old code handed it straight back out as `oklch(0 N
 
 Both now route through a single `readableBlack()` helper so they cannot drift apart again.
 
+main
 
- main
 ## wt-pub: `formatForPlatform` drops GBP CTA, offer, and media ids
 
 `FormattedContent` declares `mediaIds`, `ctaType`, `ctaUrl` and `offer`, but every branch of
@@ -367,3 +368,24 @@ says so honestly. Widening `savePost` touches the editor's autosave path (client
 
 **Ask:** decide where the server-side schedule floor lives (savePost, a DB CHECK, or publish-time
 only) and we'll wire the web side accordingly.
+
+## packages/billing: `withCredits` should accept and forward an `actor`
+
+`credit_ledger.actor` exists, is in `LedgerEntrySchema`, and `ApplyLedgerInputSchema` already
+declares `actor: z.string().optional()`. Two writers populate it — `apps/jobs/holds/sweep.ts`
+(`job:hold_sweep`) and `webhooks/applyPlanGrant.ts` (`provider:cashfree`). **`withCredits` does
+not**, so every HOLD/DEBIT/RELEASE from a paid AI action lands with `actor = null`.
+
+The consequence in the wallet: a plan-week charge that Sahoda ran under autopilot and a rewrite
+the user clicked are byte-identical in the ledger. The v3 Certainty System marks Sahoda's own
+actions with `.blade`, and apps/web can only honestly blade `actor LIKE 'job:%'` today — the
+reaper returning stranded credits. Autopilot spend, which is the case a user most needs to see
+attributed, cannot be marked at all.
+
+apps/web will not infer it from `action_type`: `plan_week` is written for BOTH a manual "Plan my
+week" click and an autonomous run, so blading on the action would claim Sahoda acted every time
+the user pressed the button — the exact false claim the blade exists to prevent.
+
+**Ask:** let `withCredits` take an optional `actor` and pass it through to `apply_ledger_entry`,
+so the caller that knows whether a human clicked can say so. Callers that do not know keep
+passing nothing and stay `null`, which stays unbladed.
