@@ -216,7 +216,7 @@
     {
       "code": "SL-019",
       "title": "Manual QA composer — paste/drop screenshots, autosave",
-      "detail": null,
+      "detail": "Cut per doc 13 §18 — announced. The QA console feed, filters and standing-failure pinning are live (SL-018); the composer, screenshots and autosave are not.",
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
@@ -226,7 +226,7 @@
     {
       "code": "SL-020",
       "title": "QA JSON export and import (sahoda_qa_v1)",
-      "detail": null,
+      "detail": "Cut per doc 13 §18 — announced. sahoda_qa_v1 export/import; the RPC ops_qa_import exists and is granted, the UI does not.",
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
@@ -262,7 +262,7 @@
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 230,
-      "commit_sha": "6301cb4a8aa822417e5b7ea15fc4ce92552e8863"
+      "commit_sha": "6301cb4"
     },
     {
       "code": "SL-024",
@@ -273,17 +273,18 @@
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 240,
-      "commit_sha": "6301cb4a8aa822417e5b7ea15fc4ce92552e8863"
+      "commit_sha": "6301cb4"
     },
     {
       "code": "SL-025",
       "title": "Applications inbox with CSV export",
       "detail": null,
       "roadmap_code": "AO4",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 250
+      "sort": 250,
+      "commit_sha": "76dbe25"
     },
     {
       "code": "SL-026",
@@ -294,7 +295,7 @@
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 260,
-      "commit_sha": "6301cb4a8aa822417e5b7ea15fc4ce92552e8863"
+      "commit_sha": "6301cb4"
     },
     {
       "code": "SL-027",
@@ -305,7 +306,7 @@
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 270,
-      "commit_sha": "3fd92071e3a05b2364cea6f63b5c38cea6aa636a"
+      "commit_sha": "3fd9207"
     },
     {
       "code": "SL-028",
@@ -316,27 +317,29 @@
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 280,
-      "commit_sha": "3fd92071e3a05b2364cea6f63b5c38cea6aa636a"
+      "commit_sha": "3fd9207"
     },
     {
       "code": "SL-029",
       "title": "/admin/team roles with last-owner guard",
       "detail": null,
       "roadmap_code": "AO4",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 290
+      "sort": 290,
+      "commit_sha": "76dbe25"
     },
     {
       "code": "SL-030",
       "title": "Audit log on every admin mutation",
       "detail": null,
       "roadmap_code": "AO4",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 300
+      "sort": 300,
+      "commit_sha": "183bf6a"
     },
     {
       "code": "SL-031",
@@ -389,7 +392,7 @@
       "assignee": "claude",
       "doc_ref": null,
       "sort": 350,
-      "commit_sha": "214ef091fbcad52a5c7b1e0e34ebcef49b3ccf1d"
+      "commit_sha": "214ef09"
     },
     {
       "code": "SL-036",
