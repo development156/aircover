@@ -145,7 +145,7 @@
       "stage": "admin-ops",
       "title": "Admin half — beta form, inbox, invitations, credit OTP, team",
       "weight": 6,
-      "status": "todo",
+      "status": "done",
       "sort": 23,
       "target_date": "2026-07-26"
     },
