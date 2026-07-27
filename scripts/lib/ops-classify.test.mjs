@@ -244,10 +244,13 @@ describe('closingTaskCodes', () => {
     expect(closingTaskCodes('feat(web): stop implying auto-publish works')).toEqual([])
   })
 
-  it('reads every conventional type the repo uses', () => {
-    for (const type of ['feat', 'fix', 'chore', 'docs', 'test', 'refactor']) {
-      expect(closingTaskCodes(`${type}(SL-7): x`)).toEqual(['SL-007'])
-    }
+  it('normalises a short code from the scope', () => {
+    // What this test was really protecting — SL-7 and SL-007 are the same card.
+    // It used to assert that EVERY conventional type closes, which is the rule
+    // that let `docs(SL-040): card the walkthrough` mark the walkthrough walked.
+    // Completion by type now has its own describe block below.
+    expect(closingTaskCodes('feat(SL-7): x')).toEqual(['SL-007'])
+    expect(closingTaskCodes('fix(SL-007): x')).toEqual(['SL-007'])
   })
 })
 
@@ -297,5 +300,36 @@ describe('invokesOpsScript', () => {
     'git diff scripts/ops-sync.mjs',
   ])('does not treat %j as a run', (command) => {
     expect(invokesOpsScript(command)).toBe(false)
+  })
+})
+
+describe('only feat and fix CLOSE a card', () => {
+  // The regression this prevents: `docs(SL-040): card the eight-step
+  // walkthrough` was the commit that CREATED that card, and the hook read its
+  // scope as a claim of completion. The board then reported a walkthrough as
+  // walked that nobody had walked.
+  it('does not close on the commit that merely cards the work', () => {
+    expect(closingTaskCodes('docs(SL-040): card the eight-step walkthrough')).toEqual([])
+  })
+
+  it.each(['docs', 'chore', 'test', 'refactor', 'perf', 'ci', 'style', 'build', 'revert'])(
+    '%s touches a card without finishing it',
+    (type) => {
+      expect(closingTaskCodes(`${type}(SL-011): something`)).toEqual([])
+    },
+  )
+
+  it.each(['feat', 'fix'])('%s does close', (type) => {
+    expect(closingTaskCodes(`${type}(SL-011): something`)).toEqual(['SL-011'])
+  })
+
+  it('still closes several cards from one scope', () => {
+    expect(closingTaskCodes('fix(SL-011,SL-012): both')).toEqual(['SL-011', 'SL-012'])
+  })
+
+  it('a heredoc commit still finds its subject', () => {
+    expect(
+      closingTaskCodes("git commit -F - <<'MSG'\nfix(SL-016): the board writes\n\nbody\nMSG"),
+    ).toEqual(['SL-016'])
   })
 })
