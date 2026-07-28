@@ -1,19 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { config as loadEnv } from 'dotenv'
-import { resolve } from 'node:path'
+import { LIVE_DB_URL } from '../test-helpers/live-env'
 import { createPgLedgerPort, type PgLedgerPort } from '../ledger/pg'
 import { createApplyPlanGrant } from './applyPlanGrant'
 import type { ParsedWebhookEvent } from '../providers/types'
 
-loadEnv({ path: resolve(import.meta.dirname, '../../../../.env'), quiet: true })
-const DB_URL = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? ''
 
-describe.skipIf(!DB_URL)('applyPlanGrant against the real ledger', () => {
+describe.skipIf(!LIVE_DB_URL)('applyPlanGrant against the real ledger', () => {
   let port: PgLedgerPort
   let ws: string
 
   beforeAll(() => {
-    port = createPgLedgerPort({ connectionString: DB_URL })
+    port = createPgLedgerPort({ connectionString: LIVE_DB_URL })
   })
   afterAll(async () => {
     await port.close()

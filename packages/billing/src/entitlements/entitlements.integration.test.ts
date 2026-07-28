@@ -1,19 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { config as loadEnv } from 'dotenv'
-import { resolve } from 'node:path'
+import { LIVE_DB_URL } from '../test-helpers/live-env'
 import { PLAN_CATALOG, PlanLimitsSchema, type PlanId } from '@sahoda/shared'
 import { createPgPlanResolver, type PgPlanResolver } from './pg'
 import { createCheckEntitlement } from './checkEntitlement'
 
-loadEnv({ path: resolve(import.meta.dirname, '../../../../.env'), quiet: true })
-const DB_URL = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? ''
 
-describe.skipIf(!DB_URL)('entitlements against the real database', () => {
+describe.skipIf(!LIVE_DB_URL)('entitlements against the real database', () => {
   let resolver: PgPlanResolver
   let ws: string
 
   beforeAll(() => {
-    resolver = createPgPlanResolver({ connectionString: DB_URL })
+    resolver = createPgPlanResolver({ connectionString: LIVE_DB_URL })
   })
   afterAll(async () => {
     await resolver.close()
@@ -118,11 +115,11 @@ describe.skipIf(!DB_URL)('entitlements against the real database', () => {
  * so a hand-edited row or a stale seed could silently make the DB and the product disagree
  * about what a customer paid for. This test is what makes reading the catalog honest.
  */
-describe.skipIf(!DB_URL)('plans table matches PLAN_CATALOG', () => {
+describe.skipIf(!LIVE_DB_URL)('plans table matches PLAN_CATALOG', () => {
   let resolver: PgPlanResolver
 
   beforeAll(() => {
-    resolver = createPgPlanResolver({ connectionString: DB_URL })
+    resolver = createPgPlanResolver({ connectionString: LIVE_DB_URL })
   })
   afterAll(async () => {
     await resolver.close()

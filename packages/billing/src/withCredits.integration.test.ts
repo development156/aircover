@@ -1,21 +1,17 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { config as loadEnv } from 'dotenv'
-import { resolve } from 'node:path'
+import { LIVE_DB_URL } from './test-helpers/live-env'
 import { availableCredits, holdKey, releaseKey } from '@sahoda/shared'
 import { createPgLedgerPort, type PgLedgerPort } from './ledger/pg'
 import { createWithCredits } from './withCredits'
 
-// Secrets live in the repo-root .env; dotenv reads it at runtime (fs, not the Read tool).
-loadEnv({ path: resolve(import.meta.dirname, '../../../.env'), quiet: true })
-const DB_URL = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? ''
 
 // Real-DB tests against the live ledger function — skipped when no DB URL is present.
-describe.skipIf(!DB_URL)('withCredits against the real ledger', () => {
+describe.skipIf(!LIVE_DB_URL)('withCredits against the real ledger', () => {
   let port: PgLedgerPort
   let ws: string
 
   beforeAll(() => {
-    port = createPgLedgerPort({ connectionString: DB_URL })
+    port = createPgLedgerPort({ connectionString: LIVE_DB_URL })
   })
   afterAll(async () => {
     await port.close()

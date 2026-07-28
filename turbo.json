@@ -7,7 +7,8 @@
     },
     "lint": {},
     "test": {
-      "dependsOn": ["^typecheck"]
+      "dependsOn": ["^typecheck"],
+      "env": ["SAHODA_ALLOW_LIVE_TESTS"]
     },
     "build": {
       "dependsOn": ["^build"],
