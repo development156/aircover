@@ -1,4 +1,5 @@
 import { Board } from '@/components/admin/board'
+import { AdminCharts } from '@/components/admin/charts'
 import { Changelog } from '@/components/admin/changelog'
 import { RoadmapCard } from '@/components/admin/roadmap-card'
 import { HeaderStrips } from '@/components/admin/strips'
@@ -27,6 +28,8 @@ export default function AdminDevPage() {
         <Board />
         <Changelog />
       </div>
+
+      <AdminCharts />
     </div>
   )
 }
