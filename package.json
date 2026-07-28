@@ -13,14 +13,18 @@
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
-    "test": "turbo run test",
+    "test": "turbo run test && vitest run",
     "test:e2e": "pnpm --filter @sahoda/web test:e2e",
     "test:smoke": "pnpm --filter @sahoda/web test:smoke",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:new": "supabase --workdir packages/db migration new",
     "db:push": "supabase --workdir packages/db db push",
-    "db:link": "supabase --workdir packages/db link"
+    "db:link": "supabase --workdir packages/db link",
+    "ops:seed": "node scripts/ops-seed.mjs",
+    "ops:sync": "node scripts/ops-sync.mjs",
+    "test:ops": "vitest run",
+    "ops:ship-check": "node scripts/ops-card.mjs ship-check"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

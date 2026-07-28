@@ -57,6 +57,18 @@ export const SECRET_ENV_VARS = [
   // `sb_publishable_…`, which no pattern here matches. Naming the var means the
   // redaction does not quietly stop working the day a project rotates formats.
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  // Writes the ops board, changelog and QA console. Worst case on a leak is fake
+  // dashboard rows — no tenant data, no credits path — but it is an opaque random
+  // string with no recognisable shape, so no rule in scrub.ts will ever see it.
+  // Naming it here is the only coverage it can get (doc 13 §16).
+  'DEVOPS_INGEST_TOKEN',
+  // Verifies the public beta form's captcha. Same story: an opaque secret whose
+  // format no shape rule matches, and one that arrives inside outbound-request
+  // context that Sentry is happy to attach to a breadcrumb.
+  'TURNSTILE_SECRET_KEY',
+  // Sends the two-admin OTP mail. `re_…` is close enough to ordinary text that
+  // no pattern should be trusted with it, and it can send mail as us.
+  'RESEND_API_KEY',
 ] as const
 
 /**

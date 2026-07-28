@@ -26,3 +26,6 @@ export * from './publishing/adapter'
 export * from './publishing/schedule'
 export * from './mesh/runner'
 export * from './mesh/tasks'
+
+// Admin Ops — /admin surface + the Claude↔dashboard sync protocol (doc 13)
+export * from './ops/state'
