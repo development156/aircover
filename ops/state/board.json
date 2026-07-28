@@ -521,6 +521,28 @@
       "doc_ref": "docs/audit/2026-07-27/05-branch-reconciliation.md (Phase 3 probe matrix)",
       "sort": 470,
       "commit_sha": null
+    },
+    {
+      "code": "SL-048",
+      "title": "OPS_INGEST_URL absent from Vercel \u2014 ops sync route ships non-functional",
+      "detail": "Found 2026-07-28 during the Phase 3 pre-flight. The wt-admin merge added OPS_INGEST_URL to turbo.json's @sahoda/web#build env allowlist, but the variable does not exist in ANY Vercel environment (verified: vercel env ls shows 46 vars, this is not among them). The ops sync path reads it, so that path is deployed and non-functional. Not launch-blocking \u2014 the ops console is frozen scope and the sync is an internal convenience \u2014 but it is a declared dependency with no value behind it, which is the same class of half-landed change as SENTRY_ORG/PROJECT/AUTH_TOKEN (declared in turbo by ba32a3f, never set in Vercel, so production stack traces are still minified and no build complains). FIX: set the value in Vercel, or delete it from the allowlist so the declaration stops asserting a dependency that is not real. Do it AFTER the Phase 3 soak, one variable at a time.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/audit/2026-07-27/05-branch-reconciliation.md (Phase 3 pre-flight)",
+      "sort": 480,
+      "commit_sha": null
+    },
+    {
+      "code": "SL-049",
+      "title": "DANGER: preview deployments write to the PRODUCTION database, and onboarding tells teammates to click them",
+      "detail": "Verified 2026-07-28 by vercel env ls: every Supabase variable (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_DB_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_JWT_SECRET, SUPABASE_PROJECT_REF) exists as exactly ONE row scoped 'Preview, Production' \u2014 a single shared value, no preview override. There is also only one Supabase project in the account (rloztdhzfliyvpvxsgjl), so there is nothing else a preview could point at. Every preview deployment therefore reads and WRITES the live database holding 26 real workspaces and 17 real users. The harm is not theoretical: docs/TEAM_ONBOARDING.md instructs non-technical teammates that 'visual checks happen on the Vercel preview URL', and CLAUDE.md repeats it for cloud bug-fix sessions. A teammate clicking through a preview to check a fix can spend real credits (credit_ledger is append-only \u2014 those debits are permanent), create real posts, sites and themes, and mutate a paying customer's workspace. Note the irony recorded in the same session: the R-01 forbidden-target guard now REFUSES to let an automated test touch this database, while a human is actively directed at it through a preview. FIX (two parts, both needed): (1) create a preview-scoped Supabase project or branch and re-scope the five variables so Preview and Production no longer share values; (2) until (1) lands, add an explicit warning line to TEAM_ONBOARDING.md and apps/web CLAUDE.md stating that preview writes to live customer data and that teammates must not perform credit-spending or content-creating actions there.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/TEAM_ONBOARDING.md",
+      "sort": 490,
+      "commit_sha": null
     }
   ]
 }
