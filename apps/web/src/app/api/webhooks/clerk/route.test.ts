@@ -154,7 +154,11 @@ describe('verified events we do not act on', () => {
         id: 'user_impostor',
         primary_email_address_id: 'idn_1',
         email_addresses: [
-          { id: 'idn_1', email_address: 'primary@example.com', verification: { status: 'unverified' } },
+          {
+            id: 'idn_1',
+            email_address: 'primary@example.com',
+            verification: { status: 'unverified' },
+          },
         ],
       },
     })
