@@ -350,10 +350,11 @@
       "title": "Acceptance gate, security review, changelog, handoff",
       "detail": null,
       "roadmap_code": "AO5",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
-      "sort": 310
+      "sort": 310,
+      "commit_sha": "e086f6e404f39cc6c1669c7fed9ce72e343b8cef"
     },
     {
       "code": "SL-032",
