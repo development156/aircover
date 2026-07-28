@@ -8,7 +8,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 10,
       "commit_sha": "27399b72fa029f6706396579c6e257d6f948b951"
     },
@@ -19,7 +19,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 20,
       "commit_sha": "27399b72fa029f6706396579c6e257d6f948b951"
     },
@@ -30,7 +30,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 30,
       "commit_sha": "27399b72fa029f6706396579c6e257d6f948b951"
     },
@@ -41,7 +41,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 40,
       "commit_sha": "57109327861f58a961ef1b44e53b443a580910d2"
     },
@@ -52,7 +52,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 50,
       "commit_sha": "4411dfdcb01602340bb503c7674144e13fefdae4"
     },
@@ -63,7 +63,7 @@
       "roadmap_code": "AO1",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 60,
       "commit_sha": "4411dfdcb01602340bb503c7674144e13fefdae4"
     },
@@ -74,7 +74,7 @@
       "roadmap_code": "AO2",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 70,
       "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
@@ -85,18 +85,18 @@
       "roadmap_code": "AO2",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 80,
       "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
     {
       "code": "SL-009",
-      "title": "scripts/ops-hook-bash.mjs — auto QA runs and commit → done",
+      "title": "scripts/ops-hook-bash.mjs \u2014 auto QA runs and commit \u2192 done",
       "detail": null,
       "roadmap_code": "AO2",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 90,
       "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
@@ -107,7 +107,7 @@
       "roadmap_code": "AO2",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 100,
       "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
@@ -118,7 +118,7 @@
       "roadmap_code": "AO2",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 110,
       "blocked": false,
       "blocked_reason": null,
@@ -131,7 +131,7 @@
       "roadmap_code": "AO2",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 120,
       "commit_sha": "27110b9163d5261f01bf2bf362c85872e97790d1"
     },
@@ -142,7 +142,7 @@
       "roadmap_code": "AO3",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 130,
       "blocked": false,
       "blocked_reason": null,
@@ -155,7 +155,7 @@
       "roadmap_code": "AO3",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 140,
       "blocked": false,
       "blocked_reason": null,
@@ -168,7 +168,7 @@
       "roadmap_code": "AO3",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 150,
       "blocked": false,
       "blocked_reason": null,
@@ -176,12 +176,12 @@
     },
     {
       "code": "SL-016",
-      "title": "Scrum board — four columns, drag, filters",
+      "title": "Scrum board \u2014 four columns, drag, filters",
       "detail": "Board renders 39 cards in four columns with filters and QA dots",
       "roadmap_code": "AO3",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 160,
       "blocked": false,
       "blocked_reason": null,
@@ -194,7 +194,7 @@
       "roadmap_code": "AO3",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 170,
       "blocked": false,
       "blocked_reason": null,
@@ -207,7 +207,7 @@
       "roadmap_code": "AO3",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 180,
       "blocked": false,
       "blocked_reason": null,
@@ -215,27 +215,27 @@
     },
     {
       "code": "SL-019",
-      "title": "Manual QA composer — paste/drop screenshots, autosave",
-      "detail": "Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label — this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open.",
+      "title": "Manual QA composer \u2014 paste/drop screenshots, autosave",
+      "detail": "Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label \u2014 this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open.",
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 190,
       "blocked": true,
-      "blocked_reason": "Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label — this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open."
+      "blocked_reason": "Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label \u2014 this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open."
     },
     {
       "code": "SL-020",
       "title": "QA JSON export and import (sahoda_qa_v1)",
-      "detail": "Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label — this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open.",
+      "detail": "Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label \u2014 this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open.",
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 200,
       "blocked": true,
-      "blocked_reason": "Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label — this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open."
+      "blocked_reason": "Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label \u2014 this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open."
     },
     {
       "code": "SL-021",
@@ -244,7 +244,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 210
     },
     {
@@ -254,7 +254,7 @@
       "roadmap_code": "AO3",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 220
     },
     {
@@ -264,18 +264,18 @@
       "roadmap_code": "AO4",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 230,
       "commit_sha": "6301cb4"
     },
     {
       "code": "SL-024",
-      "title": "Beta-apply hardening — Turnstile, rate limit, honeypot",
+      "title": "Beta-apply hardening \u2014 Turnstile, rate limit, honeypot",
       "detail": null,
       "roadmap_code": "AO4",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 240,
       "commit_sha": "6301cb4"
     },
@@ -286,7 +286,7 @@
       "roadmap_code": "AO4",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 250,
       "commit_sha": "76dbe25"
     },
@@ -297,7 +297,7 @@
       "roadmap_code": "AO4",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 260,
       "commit_sha": "6301cb4"
     },
@@ -308,18 +308,18 @@
       "roadmap_code": "AO4",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 270,
       "commit_sha": "3fd9207"
     },
     {
       "code": "SL-028",
       "title": "Grant through apply_ledger_entry + replay proof",
-      "detail": "Also owns the why-line. wt-web rewrote the wallet GRANT copy to classify from the idempotency key and actor rather than action_type, and the admin why-line went with it — so doc 13 §6's \"Credits added by Sahoda Labs team.\" currently has no implementation. Add it as an `admin` origin in lib/wallet/grant-origin.ts, PROVEN from adminGrantKey() the way signup and plan are proven, not by matching action_type: that field is free text with no CHECK and the classifier deliberately stopped trusting it (see SL-032). Until then the doc is ahead of the code, which is the safe direction.",
+      "detail": "Also owns the why-line. wt-web rewrote the wallet GRANT copy to classify from the idempotency key and actor rather than action_type, and the admin why-line went with it \u2014 so doc 13 \u00a76's \"Credits added by Sahoda Labs team.\" currently has no implementation. Add it as an `admin` origin in lib/wallet/grant-origin.ts, PROVEN from adminGrantKey() the way signup and plan are proven, not by matching action_type: that field is free text with no CHECK and the classifier deliberately stopped trusting it (see SL-032). Until then the doc is ahead of the code, which is the safe direction.",
       "roadmap_code": "AO4",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 280,
       "commit_sha": "3fd9207"
     },
@@ -330,7 +330,7 @@
       "roadmap_code": "AO4",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 290,
       "commit_sha": "76dbe25"
     },
@@ -341,7 +341,7 @@
       "roadmap_code": "AO4",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 300,
       "commit_sha": "183bf6a"
     },
@@ -352,14 +352,14 @@
       "roadmap_code": "AO5",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 310,
       "commit_sha": "e086f6e404f39cc6c1669c7fed9ce72e343b8cef"
     },
     {
       "code": "SL-032",
       "title": "Constrain credit_ledger.action_type instead of parsing grant keys",
-      "detail": "GRANT rows carry their origin in action_type, which is plain text with no enum and no CHECK. GRANT_ORIGIN in @sahoda/shared plus a migration-scanning contract test keep producer and consumer honest, but nothing stops a new writer inventing a value — it renders as \"Included with your plan\", which is wrong for every grant that did not come from a plan. Replace the convention with a real grant_origin column or structured meta, backfill, then delete the string matching in lib/wallet/entry-copy.ts.",
+      "detail": "GRANT rows carry their origin in action_type, which is plain text with no enum and no CHECK. GRANT_ORIGIN in @sahoda/shared plus a migration-scanning contract test keep producer and consumer honest, but nothing stops a new writer inventing a value \u2014 it renders as \"Included with your plan\", which is wrong for every grant that did not come from a plan. Replace the convention with a real grant_origin column or structured meta, backfill, then delete the string matching in lib/wallet/entry-copy.ts.",
       "roadmap_code": null,
       "board_column": "todo",
       "assignee": "claude",
@@ -370,7 +370,7 @@
     {
       "code": "SL-033",
       "title": "Add CI: run the gate and smoke on every pull request",
-      "detail": "There is no CI at all — .github holds one issue template, and the Stop hook is the only thing standing between a broken commit and main. Smoke cannot go in the Stop hook: Playwright boots its own dev server (~8s cold) and global-setup fetches a Clerk testing token, so it would add 60-120s to every stop AND hard-fail the credential-free cloud sandbox that teammates use, where a non-technical user cannot recover. A workflow file runs the same checks once per PR instead of once per stop. Needs Clerk test and Supabase secrets in GitHub; gate the live-DB suites on their env flags so a fork PR without secrets still reports honestly rather than red.",
+      "detail": "There is no CI at all \u2014 .github holds one issue template, and the Stop hook is the only thing standing between a broken commit and main. Smoke cannot go in the Stop hook: Playwright boots its own dev server (~8s cold) and global-setup fetches a Clerk testing token, so it would add 60-120s to every stop AND hard-fail the credential-free cloud sandbox that teammates use, where a non-technical user cannot recover. A workflow file runs the same checks once per PR instead of once per stop. Needs Clerk test and Supabase secrets in GitHub; gate the live-DB suites on their env flags so a fork PR without secrets still reports honestly rather than red.",
       "roadmap_code": null,
       "board_column": "todo",
       "assignee": "claude",
@@ -380,7 +380,7 @@
     {
       "code": "SL-034",
       "title": "Fix the flaky brand-resolve deployment-config test",
-      "detail": "apps/web/src/app/actions/brand-resolve.test.ts > \"resolveBrand — deployment config failures\" > \"missing billing env → honest config copy, cause logged server-side\" failed 2 of 5 full-suite runs on 2026-07-26 and passes every time in isolation. It is NOT a logic race: the captured failure is \"Test timed out in 5000ms\". The test calls loadResolveBrand(), which resets modules and dynamically re-imports the action; in a full run the import phase alone takes ~156s across 92 files, so under that contention the import exceeds the 5s default. Fix by giving this test an explicit timeout, or by hoisting the dynamic import out of the timed body — not by raising testTimeout globally, which would hide slow tests everywhere. Owner: whoever owns brand-resolve; found by the Admin-Ops lane.",
+      "detail": "apps/web/src/app/actions/brand-resolve.test.ts > \"resolveBrand \u2014 deployment config failures\" > \"missing billing env \u2192 honest config copy, cause logged server-side\" failed 2 of 5 full-suite runs on 2026-07-26 and passes every time in isolation. It is NOT a logic race: the captured failure is \"Test timed out in 5000ms\". The test calls loadResolveBrand(), which resets modules and dynamically re-imports the action; in a full run the import phase alone takes ~156s across 92 files, so under that contention the import exceeds the 5s default. Fix by giving this test an explicit timeout, or by hoisting the dynamic import out of the timed body \u2014 not by raising testTimeout globally, which would hide slow tests everywhere. Owner: whoever owns brand-resolve; found by the Admin-Ops lane.",
       "roadmap_code": null,
       "board_column": "done",
       "assignee": "claude",
@@ -391,7 +391,7 @@
     {
       "code": "SL-035",
       "title": "Guard against a migration that records success without applying",
-      "detail": "On 2026-07-25 migration 20260725182153_ops_ingest.sql was written to schema_migrations while the file was 0 bytes: a first push timed out before the content was copied in, and the retry applied an empty file. History said applied, the schema had neither the function nor the columns, and every layer downstream reported success — supabase db push exited 0, the app returned a clean 502, and a future push would skip the version forever. Nothing in the stack compares what a migration CLAIMS to create against what exists afterwards. Cheapest useful guard: refuse to apply an empty migration file, then a post-push check that parses CREATE TABLE/FUNCTION/INDEX/POLICY names out of the applied files and asserts each object exists in the catalog. Run it in the CI card above.",
+      "detail": "On 2026-07-25 migration 20260725182153_ops_ingest.sql was written to schema_migrations while the file was 0 bytes: a first push timed out before the content was copied in, and the retry applied an empty file. History said applied, the schema had neither the function nor the columns, and every layer downstream reported success \u2014 supabase db push exited 0, the app returned a clean 502, and a future push would skip the version forever. Nothing in the stack compares what a migration CLAIMS to create against what exists afterwards. Cheapest useful guard: refuse to apply an empty migration file, then a post-push check that parses CREATE TABLE/FUNCTION/INDEX/POLICY names out of the applied files and asserts each object exists in the catalog. Run it in the CI card above.",
       "roadmap_code": null,
       "board_column": "done",
       "assignee": "claude",
@@ -402,7 +402,7 @@
     {
       "code": "SL-036",
       "title": "Clear lifecycle stamps when a card moves backward",
-      "detail": "public.ops_ingest only ever coalesces started_at / review_at / done_at, so a stamp survives a card moving back a column. Proven on 2026-07-26: the commit hook wrongly closed SL-028 and SL-032, and after reverting them to todo both still carried a done_at — the rows were repaired by hand. Nothing reads those columns yet, which is the only reason this is not already visible; the P2 board shows \"age in column\" and would read them. Fix in the RPC: null the stamps that the incoming column does not justify (done_at only when board_column = done, review_at only at review or beyond) rather than coalescing unconditionally.",
+      "detail": "public.ops_ingest only ever coalesces started_at / review_at / done_at, so a stamp survives a card moving back a column. Proven on 2026-07-26: the commit hook wrongly closed SL-028 and SL-032, and after reverting them to todo both still carried a done_at \u2014 the rows were repaired by hand. Nothing reads those columns yet, which is the only reason this is not already visible; the P2 board shows \"age in column\" and would read them. Fix in the RPC: null the stamps that the incoming column does not justify (done_at only when board_column = done, review_at only at review or beyond) rather than coalescing unconditionally.",
       "roadmap_code": null,
       "board_column": "todo",
       "assignee": "claude",
@@ -412,7 +412,7 @@
     {
       "code": "SL-037",
       "title": "Say WHY /admin denied, in the server log only",
-      "detail": "Doc 13 §2 requires /admin to 404 identically for \"no such route\" and \"not an admin\", and that is right — a distinguishable response tells a stranger the console exists. But it is indistinguishable to the OWNER too: on 2026-07-26 a signed-in owner hit /admin, got a 404, and spent a detour working out whether the route was missing or the seat was. Both were true at once, which is exactly the case the identical response hides. Fix in middleware.ts: when NODE_ENV !== production, console.info a single line naming the reason — `[admin] denied: no ops_admin seat` / `no session` / `ops_admins query failed` — and keep the RESPONSE byte-identical in every case. Never in production, never in a header, never in the body: the log is for the operator at the terminal, not for the client. Include the reason for a failed check too, since isActiveOpsAdmin() swallows every error into false and a broken query currently looks exactly like a revoked seat.",
+      "detail": "Doc 13 \u00a72 requires /admin to 404 identically for \"no such route\" and \"not an admin\", and that is right \u2014 a distinguishable response tells a stranger the console exists. But it is indistinguishable to the OWNER too: on 2026-07-26 a signed-in owner hit /admin, got a 404, and spent a detour working out whether the route was missing or the seat was. Both were true at once, which is exactly the case the identical response hides. Fix in middleware.ts: when NODE_ENV !== production, console.info a single line naming the reason \u2014 `[admin] denied: no ops_admin seat` / `no session` / `ops_admins query failed` \u2014 and keep the RESPONSE byte-identical in every case. Never in production, never in a header, never in the body: the log is for the operator at the terminal, not for the client. Include the reason for a failed check too, since isActiveOpsAdmin() swallows every error into false and a broken query currently looks exactly like a revoked seat.",
       "roadmap_code": null,
       "board_column": "todo",
       "assignee": "claude",
@@ -422,7 +422,7 @@
     {
       "code": "SL-038",
       "title": "Sweep the repo for `as` casts in test helpers and factories",
-      "detail": "On 2026-07-26 a test factory ended `} as OpsRoadmapItem`, and the cast let four call sites pass status:\"in_progress\" — a value the enum does not have and the CHECK constraint rejects. Twenty-five tests were green against a status that cannot exist; the live ingest caught it, not the suite. The cast is the defect, not the value: a factory is exactly where the type system should be strictest, because everything downstream trusts the shape it produces. Sweep every `as <RowType>` and `as any` in *.test.ts / *.test.tsx / test factories and fixtures across apps and packages; replace each with an annotated return type so the fields are checked at the call site. Where a cast is genuinely needed (a deliberately malformed row proving a parser rejects it) keep it and write the reason on the line above — an explained cast is a test, an unexplained one is a hole. Related: the earlier finding that a green suite can pin a defect as correct.",
+      "detail": "On 2026-07-26 a test factory ended `} as OpsRoadmapItem`, and the cast let four call sites pass status:\"in_progress\" \u2014 a value the enum does not have and the CHECK constraint rejects. Twenty-five tests were green against a status that cannot exist; the live ingest caught it, not the suite. The cast is the defect, not the value: a factory is exactly where the type system should be strictest, because everything downstream trusts the shape it produces. Sweep every `as <RowType>` and `as any` in *.test.ts / *.test.tsx / test factories and fixtures across apps and packages; replace each with an annotated return type so the fields are checked at the call site. Where a cast is genuinely needed (a deliberately malformed row proving a parser rejects it) keep it and write the reason on the line above \u2014 an explained cast is a test, an unexplained one is a hole. Related: the earlier finding that a green suite can pin a defect as correct.",
       "roadmap_code": null,
       "board_column": "todo",
       "assignee": "claude",
@@ -432,7 +432,7 @@
     {
       "code": "SL-039",
       "title": "Audit where the dashboard INFERS state it could record",
-      "detail": "Two instances found on 2026-07-26, both wrong in the same way. (1) The heartbeat derived tasks_touched from \"board_column !== todo\", so it named every DONE card and announced Claude was working on SL-001–003 while the real work was SL-015 — the session never recorded what it actually touched, so the strip guessed. (2) Roadmap item statuses are flipped by hand when their SL cards finish; nothing derives or records the link, so AO1/AO2 sat at todo while all twelve of their cards were done with shas. A third is already in the code: the auto-QA hook attributes every run to whichever card happens to be in_progress (currentTaskCode in ops-hook-bash.mjs) rather than to what was actually tested. Sweep the whole surface for the pattern — a value the dashboard COMPUTES from a proxy when the producer could have RECORDED the fact — and for each one decide: record it at the source, or label it on screen as derived. The rule to apply: infer only what cannot be recorded, and say so where it shows. Candidates to check: tasks_touched, roadmap status, QA run attribution, \"age in column\" (derived from started_at/review_at/done_at, which SL-036 shows are themselves unreliable on a backward move), and the changelog task_codes link.",
+      "detail": "Two instances found on 2026-07-26, both wrong in the same way. (1) The heartbeat derived tasks_touched from \"board_column !== todo\", so it named every DONE card and announced Claude was working on SL-001\u2013003 while the real work was SL-015 \u2014 the session never recorded what it actually touched, so the strip guessed. (2) Roadmap item statuses are flipped by hand when their SL cards finish; nothing derives or records the link, so AO1/AO2 sat at todo while all twelve of their cards were done with shas. A third is already in the code: the auto-QA hook attributes every run to whichever card happens to be in_progress (currentTaskCode in ops-hook-bash.mjs) rather than to what was actually tested. Sweep the whole surface for the pattern \u2014 a value the dashboard COMPUTES from a proxy when the producer could have RECORDED the fact \u2014 and for each one decide: record it at the source, or label it on screen as derived. The rule to apply: infer only what cannot be recorded, and say so where it shows. Candidates to check: tasks_touched, roadmap status, QA run attribution, \"age in column\" (derived from started_at/review_at/done_at, which SL-036 shows are themselves unreliable on a backward move), and the changelog task_codes link.",
       "roadmap_code": null,
       "board_column": "todo",
       "assignee": "claude",
@@ -449,17 +449,17 @@
       "doc_ref": null,
       "sort": 400,
       "blocked": true,
-      "blocked_reason": "Owed. Nobody has walked these eight steps — a docs commit scoped to this card closed it by mistake (fixed in ops-classify). P4 does not close over it.",
+      "blocked_reason": "Owed. Nobody has walked these eight steps \u2014 a docs commit scoped to this card closed it by mistake (fixed in ops-classify). P4 does not close over it.",
       "commit_sha": "63dd0f3881fda2e041409fff39fb7f80db5ed63a"
     },
     {
       "code": "SL-041",
       "title": "Close the maker-checker bypass found by /security-review",
-      "detail": "p_allow_self was a boolean parameter on ops_credit_request_verify, a function granted to authenticated — so the caller set it, and setting it true skipped the approver check as well as self-approval. A third active admin with a valid code was granted 250 credits in a test written to check the finding rather than take it on trust. Migration 16 drops the three-argument overload, makes not_the_approver unconditional, and moves the dev escape hatch to sahoda.allow_self_approve, a database setting no PostgREST client can write. Also: Clerk user.created now requires a VERIFIED primary email before binding a seat; ops_qa_artifact_add requires the run to be the caller's own and still open; service-rpc.test.ts written, since the module header claimed it existed. Done when migration 16 is applied and packages/db ops_credits is green.",
+      "detail": "p_allow_self was a boolean parameter on ops_credit_request_verify, a function granted to authenticated \u2014 so the caller set it, and setting it true skipped the approver check as well as self-approval. A third active admin with a valid code was granted 250 credits in a test written to check the finding rather than take it on trust. Migration 16 drops the three-argument overload, makes not_the_approver unconditional, and moves the dev escape hatch to sahoda.allow_self_approve, a database setting no PostgREST client can write. Also: Clerk user.created now requires a VERIFIED primary email before binding a seat; ops_qa_artifact_add requires the run to be the caller's own and still open; service-rpc.test.ts written, since the module header claimed it existed. Done when migration 16 is applied and packages/db ops_credits is green.",
       "roadmap_code": "admin-ops",
       "board_column": "done",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 410,
       "blocked": false,
       "blocked_reason": null,
@@ -468,15 +468,37 @@
     {
       "code": "SL-042",
       "title": "Two charts below the board: cumulative flow and gate health",
-      "detail": "Recharts, doc 08 tokens only, crimson for failures, tabular-nums. (1) Cumulative flow — To Do / In Progress / For Review / Done over time, reconstructed from ops_tasks timestamps. (2) Gate health — pass/fail per suite over time from ops_qa_runs. Honesty rules are part of the card, not polish: state the window explicitly on the chart, draw no trend through fewer than five points, and render a gap in the data as a GAP rather than a straight line between the two known points either side of it. No velocity chart until there is enough history for one to mean anything. Note: gate-health data comes from ops_qa_runs, whose authorship was forgeable until SL-042 — the chart is only as honest as that table, which is why the import path was fixed first.",
+      "detail": "Recharts, doc 08 tokens only, crimson for failures, tabular-nums. (1) Cumulative flow \u2014 To Do / In Progress / For Review / Done over time, reconstructed from ops_tasks timestamps. (2) Gate health \u2014 pass/fail per suite over time from ops_qa_runs. Honesty rules are part of the card, not polish: state the window explicitly on the chart, draw no trend through fewer than five points, and render a gap in the data as a GAP rather than a straight line between the two known points either side of it. No velocity chart until there is enough history for one to mean anything. Note: gate-health data comes from ops_qa_runs, whose authorship was forgeable until SL-042 \u2014 the chart is only as honest as that table, which is why the import path was fixed first.",
       "roadmap_code": "admin-ops",
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
+      "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md \u00a718",
       "sort": 420,
       "blocked": false,
       "blocked_reason": null,
       "commit_sha": "c529dcbd25976138ada73950e1218f4f0f28031a"
+    },
+    {
+      "code": "SL-044",
+      "title": "Admin console design-guard drift \u2014 16 contrast + 4 eyebrow files",
+      "detail": "wt-admin branched before the v3 readability/typography guards landed on wt-web (8ea9155) and was never run against them; the 2026-07-28 trunk merge is the first time they met. 16 files paint content text with --ink-faint (~2.5:1 against a 4.5:1 floor) and 4 hand-roll an eyebrow instead of type-eyebrow. Recorded as debt in apps/web/src/lib/design/{ink-faint,eyebrow}-exceptions.ts with per-file counts, dates and this card; debt-ratchet.test.ts caps the registers so they can only shrink. Fix = text-faint -> text-muted, hand-rolled eyebrow -> type-eyebrow, then DELETE each entry and lower the ratchet baseline. Week 1 chore, not launch scope (docs/audit/2026-07-27/03-30-day-plan.md 7).",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/audit/2026-07-27/05-branch-reconciliation.md",
+      "sort": 440,
+      "commit_sha": null
+    },
+    {
+      "code": "SL-045",
+      "title": "Quarantined flaky test \u2014 media-pane focus restoration",
+      "detail": "INTERMITTENT, not consistent: passes 15/15 alone, failed 1 of 3 full apps/web runs (1,816 tests) on the trunk merge. Untouched by the merge (empty diff vs 88b081a), so pre-existing flake surfaced by the larger merged suite. Assertion is toHaveFocus() after an async in-flight disable; under parallel load the restore-focus effect can land after the assertion. Skipped with test.skip and a QUARANTINED-FLAKY label so it stays VISIBLE in run output \u2014 this suite is about to become a required CI status check and a silently-inherited flake makes the signal untrustworthy. Fix = await the focus restoration deterministically, or fix the component if the race is real, then un-skip.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "apps/web/src/components/posts/media-pane.test.tsx",
+      "sort": 450,
+      "commit_sha": null
     }
   ]
 }
