@@ -287,3 +287,15 @@ export async function signQaArtifactViews(
   }
   return urls
 }
+
+/** Artifact metadata for the export (doc 13 §11). Bounded, like every read here. */
+export async function readAllQaArtifacts(): Promise<OpsRead<OpsQaArtifact[]>> {
+  const supabase = createServerSupabase()
+  return readAll('qa_artifacts_all', z.array(OpsQaArtifactSchema), () =>
+    supabase
+      .from('ops_qa_artifacts')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5000),
+  )
+}

@@ -1,5 +1,6 @@
 import { QaComposer } from '@/components/admin/qa-composer'
 import { QaConsoleView } from '@/components/admin/qa-console-view'
+import { QaTransfer } from '@/components/admin/qa-transfer'
 import type { QaThumb } from '@/components/admin/qa-screenshots'
 import { PageTitle } from '@/components/page-title'
 import { requireOpsAdmin } from '@/lib/ops/guard'
@@ -57,6 +58,8 @@ export default async function AdminQaPage() {
           reload rather than starting a second.
         </p>
       ) : null}
+
+      <QaTransfer />
 
       {runs.status === 'ok' ? (
         <QaConsoleView runs={runs.data} />

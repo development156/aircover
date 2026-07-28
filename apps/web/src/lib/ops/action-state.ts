@@ -63,3 +63,14 @@ export const QA_NOT_PERMITTED = 'That was not saved — your account cannot writ
 export const QA_WRITE_FAILED = 'That was not saved. Nothing was recorded.'
 export const QA_DRAFT_CLOSED =
   'This run is already finished, so it cannot be changed. Start a new one.'
+
+/**
+ * QA JSON transfer (doc 13 §11). Here rather than beside the actions for the
+ * same reason as everything above: a `'use server'` module may export only
+ * async functions.
+ */
+export type QaExportState =
+  { ok: true; filename: string; json: string; truncated: boolean } | { ok: false; message: string }
+
+export type QaImportState =
+  { ok: true; summary: import('./qa-transfer').ImportSummary } | { ok: false; message: string }
