@@ -49,13 +49,25 @@ describe('cron wiring', () => {
     // A `/api/cron(.*)` entry would make every future route under that prefix public the
     // moment it lands - the standing hole the middleware's own comment warns about.
     const publicList = middleware.match(/createRouteMatcher\(\[([^\]]*)\]\)/)?.[1] ?? ''
-    const cronEntries = publicList
+    const apiEntries = publicList
       .split(',')
       .map((entry) => entry.trim().replace(/^['"]|['"]$/g, ''))
       .filter((entry) => entry.startsWith('/api'))
 
-    expect(cronEntries).toEqual(['/api/cron/sweeps'])
-    for (const entry of cronEntries) expect(entry).not.toContain('(.*)')
+    // Pinned as a SET, not a count. Widened on 2026-07-28 when the wt-admin merge brought
+    // three more public /api routes, each authenticating itself in-route (Turnstile on the
+    // beta form, a constant-time x-ops-token compare on ingest, the Clerk webhook
+    // signature). The guard's teeth are unchanged: adding a public /api route still fails
+    // here first, so it stays a deliberate act rather than a quiet one.
+    expect(new Set(apiEntries)).toEqual(
+      new Set([
+        '/api/cron/sweeps',
+        '/api/public/beta-apply',
+        '/api/admin/devops/ingest',
+        '/api/webhooks/clerk',
+      ]),
+    )
+    for (const entry of apiEntries) expect(entry).not.toContain('(.*)')
   })
 
   it('the route checks the shared secret before anything else', () => {

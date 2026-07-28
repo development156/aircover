@@ -8,7 +8,6 @@ import { createFixtureProvider } from '../providers/fixture'
 import type { Result } from '@sahoda/shared'
 import type { ParsedWebhookEvent, PaymentEventType } from '../providers/types'
 
-
 describe.skipIf(!LIVE_DB_URL)(
   'webhook processing against the real billing_webhook_events + ledger',
   () => {
