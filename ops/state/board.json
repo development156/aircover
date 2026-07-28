@@ -218,24 +218,24 @@
       "title": "Manual QA composer — paste/drop screenshots, autosave",
       "detail": "Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label — this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open.",
       "roadmap_code": "AO3",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 190,
-      "blocked": true,
-      "blocked_reason": "Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label — this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open."
+      "blocked": false,
+      "blocked_reason": null
     },
     {
       "code": "SL-020",
       "title": "QA JSON export and import (sahoda_qa_v1)",
       "detail": "Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label — this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open.",
       "roadmap_code": "AO3",
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/13_Admin_Ops_SAHODA_LABS.md §18",
       "sort": 200,
-      "blocked": true,
-      "blocked_reason": "Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label — this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open."
+      "blocked": false,
+      "blocked_reason": null
     },
     {
       "code": "SL-021",
