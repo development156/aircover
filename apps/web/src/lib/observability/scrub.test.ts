@@ -326,7 +326,11 @@ describe('redactText — token-bearing query parameters', () => {
 
 describe('redactText — credentials embedded in a URI', () => {
   test.each([
-    ['a dotless localhost host', 'postgresql://postgres:MySecretPw@localhost:5432/postgres', 'MySecretPw'],
+    [
+      'a dotless localhost host',
+      'postgresql://postgres:MySecretPw@localhost:5432/postgres',
+      'MySecretPw',
+    ],
     ['a docker service name', 'postgres://admin:TopSecret123@db:5432/app', 'TopSecret123'],
     ['a bare ip address', 'redis://default:R3disPassw0rd@10.0.0.5:6379', 'R3disPassw0rd'],
   ])('redacts the password in a connection URI with %s', (_label, uri, password) => {
@@ -378,7 +382,11 @@ describe('redactText — credential keys in a JSON payload', () => {
   test.each([
     ['password', '{"email":"a@example.com","password":"hunter2hunter2"}', 'hunter2hunter2'],
     ['apiKey', '{"apiKey":"abcdefghijklmnop1234"}', 'abcdefghijklmnop1234'],
-    ['access_token', '{"access_token":"ya29.A0AfB_FAKEopaqueGOOGLEtoken"}', 'ya29.A0AfB_FAKEopaqueGOOGLEtoken'],
+    [
+      'access_token',
+      '{"access_token":"ya29.A0AfB_FAKEopaqueGOOGLEtoken"}',
+      'ya29.A0AfB_FAKEopaqueGOOGLEtoken',
+    ],
   ])('redacts the %s value in a stringified body', (_label, body, value) => {
     // A request body that was already serialised before it reached the event is
     // a plain string, so the object walk never sees its keys. The name has to
