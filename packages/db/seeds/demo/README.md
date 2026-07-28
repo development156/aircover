@@ -32,7 +32,7 @@ closing assertion and rolls back — working all month, then breaking permanentl
 keeps the mutable tables in step with the four append-only ones (`credit_ledger`,
 `post_publish_logs`, `audit_logs`, `ai_provider_logs`), which are `do nothing` on conflict.
 
-The cost is that the demo's relative timing ages: "published 3 days ago" was true on the
+The cost is that the demo's relative timing ages: "approved 3 days ago" was true on the
 day of the first seeding and drifts a day further into the past every day after. The seed
 prints how old the pinned clock is on every run. To reset the story to today:
 
@@ -50,16 +50,16 @@ Nothing is corrupted and no real data is touched; the operator is simply misinfo
 
 ## What it seeds
 
-| area        | rows                                                                             |
-| ----------- | -------------------------------------------------------------------------------- |
-| workspace   | workspace, members, owner profile, subscription, Brand Skin theme, tour progress |
-| brand       | 2 `brand_memory` versions (v2 active), 2 writeback `memory_events`               |
-| content     | 8 posts, 17 variants, 2 media, 6 publish logs                                    |
-| site        | 1 site, 2 pages, 9 sections, 3 leads                                             |
-| connections | 2 connections (X, GBP)                                                           |
-| planner     | 9 events, 3 soft-linked to posts                                                 |
-| wallet      | 22 `credit_ledger` entries, 1 balance                                            |
-| ops         | 10 audit logs, 7 AI provider logs                                                |
+| area        | rows                                                               |
+| ----------- | ------------------------------------------------------------------ |
+| workspace   | workspace, members, owner profile, subscription, Brand Skin theme  |
+| brand       | 2 `brand_memory` versions (v2 active), 2 writeback `memory_events` |
+| content     | 8 posts, 17 variants, 2 media, 6 publish logs                      |
+| site        | 1 site, 2 pages, 9 sections, 3 leads                               |
+| connections | 2 connections (X, GBP)                                             |
+| planner     | 9 events, 3 soft-linked to posts                                   |
+| wallet      | 22 `credit_ledger` entries, 1 balance                              |
+| ops         | 10 audit logs, 7 AI provider logs                                  |
 
 The wallet ends at **1388 credits available, 0 held**. The ledger module computes that from
 `PRICING` / `PLAN_CATALOG` and throws if the numbers disagree — a wallet demo showing a
@@ -72,9 +72,9 @@ will ever match, and RLS reads `workspace_members` — so a real signed-in user 
 unless they are a member. Set `SEED_DEMO_MEMBER_IDS` in the repo-root `.env` to a
 comma-separated list of real Clerk subjects (`user_2abc...,user_2def...`) and re-run.
 
-Each is added as an `owner` and gets every Alpha tour marked completed, so no onboarding
-spotlight fires mid-walkthrough. Their `users_profile` rows are never written or deleted by
-this seed — those belong to real people.
+Each is added as an `owner`. Nothing else about them is written: no `tour_progress`, and
+their `users_profile` rows are never touched — those belong to real people. Expect the real
+onboarding spotlights on first sign-in; dismissing them once is what marks them done.
 
 ## `--namespace`
 
@@ -120,8 +120,23 @@ The demo is allowed to be rich. It is not allowed to lie about what the product 
   tokens at all — not fake, not real — so there is nothing to expire. An `expires_at` 45
   days out fabricates a property of a credential that does not exist, and "X, active,
   expires in 45 days" sends a presenter into a publish that dies on an empty vault.
+- **No post is `status = 'published'`.** The three posts that went through a simulated
+  publish are `approved` and carry `simulatedPublish: true` in the frozen catalog. The green
+  "Published" chip in `apps/web` reads `posts.status`, and the app's own publish action
+  refuses to write that value off a fixture run because it "would be a fabricated success
+  state" — so the seed must not write it either.
 - **Every `post_publish_logs` row is `mode = 'fixture'`.** Nothing was ever published;
   the honesty flag says so on every row.
+- **Publish ids and permalinks use the fixture adapter's own shape.** `platform_post_id` is
+  `fixture-<postId>-<variantId>` and `permalink` is `fixture://<channel>/<id>`, byte-for-byte
+  what `createFixtureAdapter` produces. These columns previously held
+  `https://x.com/chaiandchapters/status/demo-x-1963444` — a URL indistinguishable from a real
+  post, for content that has never left this database.
+- **No `tour_progress` rows at all.** The seed writes none and deletes any it finds in the
+  demo workspace. It used to insert six `completed` rows per member, including for real Clerk
+  subjects listed in `SEED_DEMO_MEMBER_IDS` — a completion record asserting that a named
+  person had finished onboarding they had never opened. The cost of removing them is that a
+  presenter now gets the real spotlights; dismissing them once writes the row honestly.
 - **Instagram variants are `skipped`, not `published`.** Instagram is `publishable: false`
   in Alpha (`CONSTRAINTS` in `@sahoda/shared`), so publishing one would be a fabricated
   success. They carry composed copy and a computed `char_count`, and stop there.

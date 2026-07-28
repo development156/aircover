@@ -56,6 +56,15 @@ function postFor(labelTail: string): DemoPost {
   return post
 }
 
+/**
+ * The fixture platform id for one variant, built from the same two uuids the fixture
+ * adapter would use. Defined here because posts.publish.ts is a leaf and cannot import the
+ * id builders above without closing a cycle.
+ */
+function fixtureIdFor(ctx: Pick<SeedCtx, 'id'>, labelTail: string, channel: Channel): string {
+  return platformIdFor(postId(ctx, labelTail), variantId(ctx, labelTail, channel))
+}
+
 const hashtagsOf = (variant: DemoVariant): string[] => (variant.tags ? variant.tags.split(' ') : [])
 
 /** Instagram parks its hashtags in a closing block; X trails them on the same line. */
@@ -165,10 +174,11 @@ async function insertVariants(ctx: SeedCtx): Promise<number> {
   for (const variant of DEMO_VARIANTS) {
     const post = postFor(variant.post)
     const body = composeBody(variant)
-    const publishStatus = publishStatusFor(post.status, variant.channel)
-    // A permalink on anything but a published variant would claim a post that never went out.
+    const publishStatus = publishStatusFor(post, variant.channel)
+    // Only a variant the simulation ran for gets an id/permalink at all, and both carry the
+    // fixture shape — nothing here ever reached a real timeline.
     const platformPostId =
-      publishStatus === 'published' ? platformIdFor(variant.post, variant.channel) : null
+      publishStatus === 'published' ? fixtureIdFor(ctx, variant.post, variant.channel) : null
     const row = {
       id: variantId(ctx, variant.post, variant.channel),
       workspace_id: ctx.workspaceId,
@@ -216,12 +226,13 @@ interface LogAttempt {
 }
 
 /**
- * One log per variant that actually went out, plus the extra failed first attempt on the book
- * club's GBP post. Skipped variants get none: nothing was ever attempted for them.
+ * One log per variant the simulation ran for, plus the extra failed first attempt on the book
+ * club's GBP post. Skipped variants get none: nothing was ever attempted for them. Every log
+ * is `mode='fixture'` — see insertPublishLogs.
  */
 function logAttempts(): readonly LogAttempt[] {
   return DEMO_VARIANTS.flatMap((variant) => {
-    const status = publishStatusFor(postFor(variant.post).status, variant.channel)
+    const status = publishStatusFor(postFor(variant.post), variant.channel)
     if (status !== 'published') return []
     return variant.post === RETRY_POST && variant.channel === RETRY_CHANNEL
       ? [
@@ -241,7 +252,7 @@ async function insertPublishLogs(ctx: SeedCtx): Promise<number> {
       attempt * 4 - 3,
     )
     const succeeded = status === 'succeeded'
-    const platformPostId = succeeded ? platformIdFor(variant.post, channel) : null
+    const platformPostId = succeeded ? fixtureIdFor(ctx, variant.post, channel) : null
     const row = {
       id: ctx.id(`publog.${variant.post}.${channel}.${attempt}`),
       workspace_id: ctx.workspaceId,
@@ -274,7 +285,7 @@ async function insertPublishLogs(ctx: SeedCtx): Promise<number> {
 }
 
 export const seedPosts: SeedModule = async (ctx): Promise<readonly SeedTableResult[]> => {
-  assertPlatformIdsDistinct()
+  assertPlatformIdsDistinct((labelTail, channel) => fixtureIdFor(ctx, labelTail, channel))
   const posts = await insertPosts(ctx)
   const variants = await insertVariants(ctx)
   const media = await insertMedia(ctx)

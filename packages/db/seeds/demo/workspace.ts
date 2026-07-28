@@ -7,22 +7,20 @@ import {
   type ThemeSource,
   type ThemeStatus,
   type ThemeTokens,
-  type TourProgressStatus,
 } from '@sahoda/shared'
 import { DEMO_MARKER, type SeedCtx, type SeedModule, type SeedTableResult } from './context'
-import { extraMembers, seedMembers } from './members'
+import { seedMembers } from './members'
 import { monthStart, nextMonthStart } from './time'
 
 /**
  * Tier 1 of the demo seed: the workspace row every other module hangs off, its
- * membership (./members.ts), the presenter's profile, the plan it bills on, its Brand
- * Skin, and the tour state that keeps onboarding spotlights out of a live walkthrough.
+ * membership (./members.ts), the presenter's profile, the plan it bills on, and its Brand
+ * Skin. Tour state is deliberately NOT seeded — see `pruneFabricatedTours`.
  */
 
 const SUBSCRIPTION_STATUS: SubscriptionStatus = 'active'
 const THEME_SOURCE: ThemeSource = 'extracted'
 const THEME_STATUS: ThemeStatus = 'active'
-const TOUR_STATUS: TourProgressStatus = 'completed'
 
 /**
  * 'fixture' is in the CHECK since 20260718193834_widen_billing_provider.sql. It is the
@@ -30,16 +28,6 @@ const TOUR_STATUS: TourProgressStatus = 'completed'
  * calling it 'stripe' would put a fake real-rail row in front of a viewer.
  */
 const SUBSCRIPTION_PROVIDER: BillingProvider = 'fixture'
-
-/** The six Alpha tours from 20260718000010_seed.sql. */
-const TOUR_SLUGS = [
-  'onboarding.first_tour',
-  'posts.first_tour',
-  'approve.first_tour',
-  'connect.first_tour',
-  'wallet.first_tour',
-  'site.first_tour',
-] as const
 
 /**
  * Chai and paper: roasted-chai brown, cardamom green, turmeric accent on warm paper
@@ -212,28 +200,31 @@ async function seedTheme(ctx: SeedCtx): Promise<number> {
 }
 
 /**
- * Every tour completed, for the owner and for each real presenter subject. A spotlight
- * firing over the wallet mid-demo reads as a bug to the room, not as onboarding.
+ * The seed writes NO tour_progress, and removes any it finds in this workspace.
  *
- * The PK is (user_id, workspace_id, tour_slug), so there is no surrogate id to conflict on.
+ * It used to insert `status='completed'` for all six Alpha tours, for the synthetic owner
+ * AND for every real Clerk subject in SEED_DEMO_MEMBER_IDS — twelve rows on the live demo
+ * workspace. The stated reason was presentation ("a spotlight firing over the wallet
+ * mid-demo reads as a bug to the room"), and the cost was a completion record asserting
+ * that a named, real person had finished onboarding they had never opened. tour_progress
+ * is user state, not demo furniture; nothing else in this seed claims something on a real
+ * user's behalf, and this must not either.
+ *
+ * The delete (rather than a plain no-write) is what makes a re-seed the removal path for
+ * rows already in the database, mirroring how seedMembers de-provisions unlisted members.
+ * Scoped to this one uuidv5-derived workspace, so it can never reach another tenant.
+ *
+ * Consequence, on purpose: a presenter signing in gets the real onboarding spotlights. The
+ * honest way to have them not fire is to click through or dismiss them once, which writes
+ * the row for real.
  */
-async function seedTours(ctx: SeedCtx): Promise<number> {
-  const userIds = [ctx.ownerId, ...extraMembers(ctx).map((row) => row.userId)]
-
-  for (const userId of userIds) {
-    for (const slug of TOUR_SLUGS) {
-      await ctx.sql(
-        `insert into tour_progress (user_id, workspace_id, tour_slug, version, step, status)
-         values ($1, $2, $3, $4, $5, $6)
-         on conflict (user_id, workspace_id, tour_slug) do update set
-           version = excluded.version,
-           step = excluded.step,
-           status = excluded.status`,
-        [userId, ctx.workspaceId, slug, 1, 0, TOUR_STATUS],
-      )
-    }
-  }
-  return userIds.length * TOUR_SLUGS.length
+async function pruneFabricatedTours(ctx: SeedCtx): Promise<number> {
+  const removed = await ctx.sql(
+    'delete from tour_progress where workspace_id = $1 returning user_id',
+    [ctx.workspaceId],
+  )
+  if (removed.length > 0) ctx.log(`removed ${removed.length} fabricated tour_progress row(s)`)
+  return 0
 }
 
 export const seedWorkspace: SeedModule = async (ctx): Promise<readonly SeedTableResult[]> => {
@@ -243,7 +234,7 @@ export const seedWorkspace: SeedModule = async (ctx): Promise<readonly SeedTable
     { table: 'users_profile', rows: await seedProfile(ctx) },
     { table: 'subscriptions', rows: await seedSubscription(ctx) },
     { table: 'workspace_themes', rows: await seedTheme(ctx) },
-    { table: 'tour_progress', rows: await seedTours(ctx) },
+    { table: 'tour_progress', rows: await pruneFabricatedTours(ctx) },
   ]
 
   ctx.log(`workspace ${ctx.slug} ready (${ctx.memberIds.length} presenter member(s))`)

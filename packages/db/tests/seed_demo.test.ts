@@ -103,8 +103,11 @@ describe.skipIf(!hasLedgerEnv || !hasRlsEnv)('seeds/demo — Chai & Chapters', (
    * pinning them here is what keeps the README from quietly becoming fiction — a module
    * that drops a row still seeds "something" and would pass a non-empty check.
    *
-   * `workspace_members` is 1 and `tour_progress` is 6 because SEED_DEMO_MEMBER_IDS is unset
-   * in test runs; both scale with that list, so they are derived rather than literal.
+   * `workspace_members` is 1 because SEED_DEMO_MEMBER_IDS is unset in test runs; it scales
+   * with that list, so it is derived rather than literal. `tour_progress` is 0 and does NOT
+   * scale: the seed writes no tour state at all and deletes any it finds (see
+   * `pruneFabricatedTours`), so a non-zero count here means the fabricated completions are
+   * back.
    */
   it('seeds exactly the rows its README advertises', async () => {
     const memberCount =
@@ -113,7 +116,7 @@ describe.skipIf(!hasLedgerEnv || !hasRlsEnv)('seeds/demo — Chai & Chapters', (
       workspace_members: memberCount,
       workspace_themes: 1,
       subscriptions: 1,
-      tour_progress: 6 * memberCount,
+      tour_progress: 0,
       brand_memory: 2,
       memory_events: 2,
       posts: 8,
@@ -305,6 +308,51 @@ describe.skipIf(!hasLedgerEnv || !hasRlsEnv)('seeds/demo — Chai & Chapters', (
       .select('mode')
       .eq('workspace_id', workspaceId)
     expect(logs!.every((log) => log.mode === 'fixture')).toBe(true)
+  })
+
+  /**
+   * The green "Published" chip in `apps/web` is driven by `posts.status`, and the app's own
+   * publish action refuses to write that value off a fixture run because it "would be a
+   * fabricated success state". Nothing in this workspace has ever been published anywhere,
+   * so no post may carry it either.
+   */
+  it('claims no post is published, because none of them are', async () => {
+    const { data, error } = await svc()
+      .from('posts')
+      .select('title, status')
+      .eq('workspace_id', workspaceId)
+    expect(error).toBeNull()
+    expect(data!.length).toBeGreaterThan(0)
+    expect(data!.filter((post) => post.status === 'published')).toEqual([])
+  })
+
+  /**
+   * Every publish artifact must carry the fixture adapter's own shape — `fixture-…` ids and
+   * `fixture://` permalinks. The regression this pins is specific: these columns used to
+   * hold `https://x.com/chaiandchapters/status/demo-x-1963444`, a URL indistinguishable
+   * from a real post for content that has never left this database.
+   */
+  it('writes only fixture-shaped publish ids and permalinks', async () => {
+    const [variants, logs] = await Promise.all([
+      svc()
+        .from('post_variants')
+        .select('channel, platform_post_id, permalink')
+        .eq('workspace_id', workspaceId),
+      svc()
+        .from('post_publish_logs')
+        .select('channel, platform_post_id, permalink')
+        .eq('workspace_id', workspaceId),
+    ])
+
+    const rows = [...variants.data!, ...logs.data!].filter((row) => row.permalink !== null)
+    expect(rows.length).toBeGreaterThan(0)
+
+    for (const row of rows) {
+      expect(row.permalink).toBe(`fixture://${row.channel}/${row.platform_post_id}`)
+      expect(row.platform_post_id!.startsWith('fixture-')).toBe(true)
+      // The thing that must never come back: an http(s) URL on a simulated publish.
+      expect(row.permalink!).not.toMatch(/^https?:/)
+    }
   })
 
   it('plants no OAuth token for its demo connections', async () => {

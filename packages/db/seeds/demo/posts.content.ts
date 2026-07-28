@@ -15,6 +15,19 @@ export interface DemoPost {
   origin: PostOrigin
   dayOffset: number | null
   timeOfDay: string | null
+  /**
+   * True when this post went through a SIMULATED publish — the fixture adapter, no network
+   * I/O, nothing on any timeline. Omitted = false.
+   *
+   * Deliberately a separate flag rather than `status: 'published'`. `apps/web`'s own publish
+   * action refuses to flip a post to 'published' off a fixture run and names the reason
+   * ("would be a fabricated success state"); a seed that writes it anyway hands the room a
+   * green Published chip for a post that was never published anywhere. The honest lifecycle
+   * value for content that cleared review and never went out is 'approved', and the
+   * simulation shows up where the app puts it: `mode='fixture'` publish logs and
+   * `fixture://` permalinks.
+   */
+  simulatedPublish?: boolean
 }
 
 /** The frozen catalog. ledger/planner/ops read post labels from here, never re-type them. */
@@ -23,7 +36,8 @@ export const DEMO_POSTS: readonly DemoPost[] = [
     labelTail: 'monsoon-reading-list',
     title: 'Monsoon reading list',
     body: 'The monsoon table is up: ten slow reads for wet Cuttack afternoons, chai at ₹20, and the window seat while it pours.',
-    status: 'published',
+    status: 'approved',
+    simulatedPublish: true,
     channels: ['x', 'gbp', 'instagram'],
     origin: 'plan_week',
     dayOffset: -3,
@@ -33,7 +47,8 @@ export const DEMO_POSTS: readonly DemoPost[] = [
     labelTail: 'new-arrival-odia-poetry',
     title: 'New Odia poetry on the shelf',
     body: 'Fresh Odia poetry arrived this week, including Ramakanta Rath and two younger Cuttack poets. ₹150 to ₹320.',
-    status: 'published',
+    status: 'approved',
+    simulatedPublish: true,
     channels: ['x', 'instagram'],
     origin: 'manual',
     dayOffset: -6,
@@ -43,7 +58,8 @@ export const DEMO_POSTS: readonly DemoPost[] = [
     labelTail: 'saturday-book-club',
     title: 'Saturday book club, 5pm',
     body: 'Book club meets upstairs every Saturday at 5pm. July book is Gopinath Mohanty. Free to join, chai at ₹20.',
-    status: 'published',
+    status: 'approved',
+    simulatedPublish: true,
     channels: ['gbp', 'x'],
     origin: 'manual',
     dayOffset: -9,
