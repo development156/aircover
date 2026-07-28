@@ -77,7 +77,7 @@ export const SECRET_ENV_VARS = [
 export function secretValuesFrom(
   env: Readonly<Record<string, string | undefined>>,
 ): readonly string[] {
-  return SECRET_ENV_VARS.map((name) => env[name]?.trim()).filter(
-    (value): value is string => Boolean(value),
+  return SECRET_ENV_VARS.map((name) => env[name]?.trim()).filter((value): value is string =>
+    Boolean(value),
   )
 }
