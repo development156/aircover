@@ -1,6 +1,8 @@
 import { config as loadEnv } from 'dotenv'
 import { resolve } from 'node:path'
 
+import { assertTargetIsNotProduction } from './forbidden-target'
+
 /**
  * Shared opt-in gate for this package's live-database integration suites.
  *
@@ -20,6 +22,7 @@ const LIVE = process.env.SAHODA_ALLOW_LIVE_TESTS === '1'
 
 if (LIVE) {
   loadEnv({ path: resolve(import.meta.dirname, '../../../../.env'), quiet: true })
+  assertTargetIsNotProduction()
 }
 
 /** Did the operator ask for live tests at all? */

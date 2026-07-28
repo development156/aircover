@@ -370,7 +370,7 @@
     {
       "code": "SL-033",
       "title": "Add CI: run the gate and smoke on every pull request",
-      "detail": "There is no CI at all \u2014 .github holds one issue template, and the Stop hook is the only thing standing between a broken commit and main. Smoke cannot go in the Stop hook: Playwright boots its own dev server (~8s cold) and global-setup fetches a Clerk testing token, so it would add 60-120s to every stop AND hard-fail the credential-free cloud sandbox that teammates use, where a non-technical user cannot recover. A workflow file runs the same checks once per PR instead of once per stop. Needs Clerk test and Supabase secrets in GitHub; gate the live-DB suites on their env flags so a fork PR without secrets still reports honestly rather than red.",
+      "detail": "There is no CI at all \u2014 .github holds one issue template, and the Stop hook is the only thing standing between a broken commit and main. Smoke cannot go in the Stop hook: Playwright boots its own dev server (~8s cold) and global-setup fetches a Clerk testing token, so it would add 60-120s to every stop AND hard-fail the credential-free cloud sandbox that teammates use, where a non-technical user cannot recover. A workflow file runs the same checks once per PR instead of once per stop. Needs Clerk test and Supabase secrets in GitHub; gate the live-DB suites on their env flags so a fork PR without secrets still reports honestly rather than red. MUST ALSO HANDLE SL-046: turbo typecheck does not depend on build, so on a fresh CI checkout (no .next) typedRoutes validation is meaningless \u2014 the CI config has to build before typecheck or it inherits the trap. See also SL-047 (/ returns 404) for the smoke matrix.",
       "roadmap_code": null,
       "board_column": "todo",
       "assignee": "claude",
@@ -498,6 +498,28 @@
       "assignee": "claude",
       "doc_ref": "apps/web/src/components/posts/media-pane.test.tsx",
       "sort": 450,
+      "commit_sha": null
+    },
+    {
+      "code": "SL-046",
+      "title": "CI must not typecheck against stale build artifacts",
+      "detail": "turbo.json's `typecheck` task declares dependsOn ['^typecheck'] only \u2014 it does NOT depend on `build`. apps/web sets typedRoutes:true, so Next generates .next/types/routes.d.ts at BUILD time; typecheck therefore validates against whatever artifacts happen to be on disk. Observed 2026-07-28: immediately after the wt-admin merge, typecheck reported 7 RouteImpl errors on /admin/* purely because the route manifest predated those routes; `turbo run build --force` regenerated it and typecheck went green with zero code changes. A fresh CI checkout has NO .next at all, so CI will either fail spuriously or \u2014 worse \u2014 pass while validating nothing. FIX: make the gate run build before typecheck (or add dependsOn ['^build'] to the typecheck task) and prove it on a clean clone. MUST be handled in the CI config or CI inherits the trap. Blocks//informs SL-033.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/audit/2026-07-27/00-state-of-the-repo.md \u00a73.4 (minimum CI)",
+      "sort": 460,
+      "commit_sha": null
+    },
+    {
+      "code": "SL-047",
+      "title": "LAUNCH-BLOCKING: / returns 404 in production \u2014 bare domain has no landing or sign-in",
+      "detail": "Measured 2026-07-28: https://sahodalabs.vercel.app/ -> 404, and the same on the trunk preview, so it is PRE-EXISTING and not caused by the wt-admin merge. apps/web/src/app has route groups (app)/(auth)/(onboarding) but no root page.tsx, so Next serves its default 404 to anyone typing the bare domain. /sign-in returns 200, so the app works \u2014 you just cannot arrive at it. Out of Phase 2 scope (reconciliation), but launch-blocking: the first thing a design partner or a payment provider's reviewer does is open the domain. FIX: a root page that redirects signed-out visitors to /sign-in and signed-in ones to /home, or a real landing page. Also add a probe for / to the CI smoke matrix so it cannot regress silently.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/audit/2026-07-27/05-branch-reconciliation.md (Phase 3 probe matrix)",
+      "sort": 470,
       "commit_sha": null
     }
   ]
