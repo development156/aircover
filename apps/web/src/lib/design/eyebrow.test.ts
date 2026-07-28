@@ -1,7 +1,9 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
+
+import { EYEBROW_EXCEPTIONS } from './eyebrow-exceptions'
 
 /**
  * There is one eyebrow, and it is `--t-eyebrow`.
@@ -67,19 +69,48 @@ function handRolledEyebrows(source: string): string[] {
 
 describe('the eyebrow is a token, not a recipe', () => {
   test('no component hand-rolls one', () => {
-    const offenders: string[] = []
+    const undeclared: string[] = []
     for (const file of sourceFiles(WEB_SRC)) {
       const rel = relative(WEB_SRC, file).split('\\').join('/')
+      if (rel in EYEBROW_EXCEPTIONS) continue
       for (const classes of handRolledEyebrows(readFileSync(file, 'utf8'))) {
-        offenders.push(`${rel}: ${classes.slice(0, 80)}`)
+        undeclared.push(`${rel}: ${classes.slice(0, 80)}`)
       }
     }
 
     expect(
-      offenders.sort(),
+      undeclared.sort(),
       'Use `type-eyebrow` (--t-eyebrow + --t-eyebrow-ls + uppercase) and keep only the ' +
-        'layout and colour classes. Hand-rolling it cannot follow the token when it moves.',
+        'layout and colour classes. Hand-rolling it cannot follow the token when it moves. ' +
+        'If it genuinely cannot be fixed yet, declare it in eyebrow-exceptions.ts with a ' +
+        'reason and a card — and note the ratchet only lets that register shrink.',
     ).toEqual([])
+  })
+
+  test('declared exceptions hand-roll exactly as many as they claim', () => {
+    // Pinning the count, not just the filename: otherwise a second hand-rolled eyebrow
+    // rides into an already-listed file for free — the way the original set accumulated.
+    const drift = Object.entries(EYEBROW_EXCEPTIONS)
+      .map(([rel, exception]) => {
+        const full = join(WEB_SRC, rel)
+        const actual = existsSync(full) ? handRolledEyebrows(readFileSync(full, 'utf8')).length : 0
+        return { file: rel, declared: exception.uses, actual }
+      })
+      .filter((row) => row.declared !== row.actual)
+
+    expect(
+      drift,
+      'An allowlisted file changed its hand-rolled-eyebrow count. Fix it to type-eyebrow ' +
+        '(and delete the entry) rather than raising the number.',
+    ).toEqual([])
+  })
+
+  test('every exception states a reason and names a card', () => {
+    for (const [file, exception] of Object.entries(EYEBROW_EXCEPTIONS)) {
+      expect(exception.reason.trim().length, `${file} has an empty reason`).toBeGreaterThan(20)
+      expect(exception.card, `${file} names no card`).toMatch(/^SL-\d+$/)
+      expect(exception.since, `${file} has no date`).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    }
   })
 
   test('the detector fires on the real shapes and not on display headings', () => {
