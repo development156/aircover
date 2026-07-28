@@ -1,6 +1,8 @@
 import type { Route } from 'next'
+import * as Sentry from '@sentry/nextjs'
 
 import { NavItem, type NavIconName } from '@/components/shell/nav-item'
+import { getOpsAdmin } from '@/lib/ops/guard'
 
 // Alpha nav subset only — every href has a real page (typedRoutes enforces it).
 // Full nav (Loop, Sites, Inbox, Measure, …) lands with its modules per docs/06 §3.
@@ -20,7 +22,29 @@ const NAV: ReadonlyArray<{
   { href: '/settings', label: 'Settings', icon: 'sliders-horizontal', guide: 'nav.settings' },
 ]
 
-export function Rail() {
+/**
+ * Is this viewer an ops admin? Never a reason to break the shell.
+ *
+ * The rail renders on every page in the app, so a failed ops_admins read must
+ * cost one nav item and nothing else. Same lesson as Topbar's softRead: a
+ * layout's throw does not reach the segment error boundary, it reaches
+ * global-error and replaces the document. Falling back to `false` hides the
+ * Admin item, which is the safe direction — the link is a convenience, and
+ * `/admin` is gated by middleware and by the layout regardless of whether
+ * anything links to it.
+ */
+async function showsAdminItem(): Promise<boolean> {
+  try {
+    return (await getOpsAdmin()) !== null
+  } catch (error) {
+    Sentry.captureException(error, { tags: { shell_read: 'ops_admin' } })
+    return false
+  }
+}
+
+export async function Rail() {
+  const isOpsAdmin = await showsAdminItem()
+
   return (
     <aside
       data-guide="nav.rail"
@@ -44,6 +68,13 @@ export function Rail() {
             <NavItem href={item.href} label={item.label} icon={item.icon} guide={item.guide} />
           </div>
         ))}
+        {/* doc 13 §14: visible only to ops admins. Absence is the point — a
+            greyed-out Admin item would tell every tenant the console exists. */}
+        {isOpsAdmin ? (
+          <div className="mt-3 border-t border-line pt-3">
+            <NavItem href="/admin/dev" label="Admin" icon="shield" guide="nav.admin" />
+          </div>
+        ) : null}
       </nav>
     </aside>
   )

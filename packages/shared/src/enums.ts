@@ -157,3 +157,87 @@ export type AiLogStatus = z.infer<typeof AiLogStatusSchema>
 /** Signal Lock verdict from the Brand Brain resolve (FSD M1). */
 export const SignalLockSchema = z.enum(['strong', 'moderate', 'weak'])
 export type SignalLock = z.infer<typeof SignalLockSchema>
+
+// ── Admin Ops (doc 13) ───────────────────────────────────────────────────────
+// Platform-scope vocabularies for the ten ops_* tables. Same rule as above: these
+// are the single source and the migration CHECKs mirror them exactly.
+
+/** `/admin` seat level. owner also manages admins; viewer never approves or grants. */
+export const OpsRoleSchema = z.enum(['owner', 'admin', 'viewer'])
+export type OpsRole = z.infer<typeof OpsRoleSchema>
+
+export const OpsAdminStatusSchema = z.enum(['active', 'revoked'])
+export type OpsAdminStatus = z.infer<typeof OpsAdminStatusSchema>
+
+/** Beta application lifecycle (doc 13 §4). */
+export const OpsApplicationStatusSchema = z.enum([
+  'new',
+  'contacted',
+  'invited',
+  'joined',
+  'rejected',
+])
+export type OpsApplicationStatus = z.infer<typeof OpsApplicationStatusSchema>
+
+/** Maker-checker credit request lifecycle (doc 13 §6). */
+export const OpsCreditRequestStatusSchema = z.enum(['pending', 'approved', 'denied', 'expired'])
+export type OpsCreditRequestStatus = z.infer<typeof OpsCreditRequestStatusSchema>
+
+export const OpsRoadmapStatusSchema = z.enum(['todo', 'active', 'done', 'cut'])
+export type OpsRoadmapStatus = z.infer<typeof OpsRoadmapStatusSchema>
+
+/**
+ * The four fixed scrum columns (doc 13 §10). Named board_column on the row
+ * because `column` is a reserved word in Postgres.
+ */
+export const OpsTaskColumnSchema = z.enum(['todo', 'in_progress', 'review', 'done'])
+export type OpsTaskColumn = z.infer<typeof OpsTaskColumnSchema>
+
+export const OpsAssigneeSchema = z.enum(['claude', 'divas', 'girija', 'both'])
+export type OpsAssignee = z.infer<typeof OpsAssigneeSchema>
+
+/** Who moved a card. Automation defaults; a human drag stamps 'human' (doc 13 §10). */
+export const OpsMovedBySchema = z.enum(['claude', 'human'])
+export type OpsMovedBy = z.infer<typeof OpsMovedBySchema>
+
+export const OpsChangelogKindSchema = z.enum([
+  'added',
+  'changed',
+  'fixed',
+  'removed',
+  'security',
+  'docs',
+])
+export type OpsChangelogKind = z.infer<typeof OpsChangelogKindSchema>
+
+/**
+ * The fixed trio (doc 13 §8). Assigned server-side from the changelog sequence —
+ * never set by a client, so this schema exists to read rows, not to write them.
+ */
+export const OpsChangelogAuthorSchema = z.enum(['DIVAS', 'GIRIJA', 'DIVAS AND GIRIJA'])
+export type OpsChangelogAuthor = z.infer<typeof OpsChangelogAuthorSchema>
+
+export const OpsQaKindSchema = z.enum(['auto', 'manual'])
+export type OpsQaKind = z.infer<typeof OpsQaKindSchema>
+
+export const OpsQaSuiteSchema = z.enum([
+  'typecheck',
+  'lint',
+  'unit',
+  'rls',
+  'smoke',
+  'e2e',
+  'manual',
+])
+export type OpsQaSuite = z.infer<typeof OpsQaSuiteSchema>
+
+/** 'running' is also the manual composer's autosaved draft state (doc 13 §11). */
+export const OpsQaStatusSchema = z.enum(['pass', 'fail', 'blocked', 'running'])
+export type OpsQaStatus = z.infer<typeof OpsQaStatusSchema>
+
+export const OpsSessionStatusSchema = z.enum(['working', 'idle', 'ended'])
+export type OpsSessionStatus = z.infer<typeof OpsSessionStatusSchema>
+
+/** Screenshot formats the qa-artifacts bucket accepts (doc 13 §3). */
+export const OpsArtifactMimeSchema = z.enum(['image/png', 'image/jpeg', 'image/webp'])
+export type OpsArtifactMime = z.infer<typeof OpsArtifactMimeSchema>

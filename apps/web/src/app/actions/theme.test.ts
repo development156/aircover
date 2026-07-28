@@ -26,6 +26,15 @@ const state = vi.hoisted(() => ({
   updateError: null as { code: string; message: string } | null,
   /** Highest existing theme version for the workspace; null = never themed. */
   latestVersion: null as number | null,
+  /**
+   * Rows still `status: 'active'` AFTER the supersede update.
+   *
+   * Non-empty means the archive did not land. RLS denies an UPDATE by making
+   * the row invisible, not by raising, so PostgREST returns no error and this
+   * is the ONLY way the action can tell.
+   */
+  activeAfterSupersede: [] as Array<{ id: string }>,
+  verifyError: null as { code: string; message: string } | null,
   // Inlined, not WS_ID: vi.hoisted runs before the module consts initialize.
   workspace: { id: '22222222-2222-4222-8222-222222222222' } as { id: string } | null,
   userId: 'user_abc' as string | null,
@@ -52,16 +61,24 @@ vi.mock('@/lib/supabase/server', () => ({
         state.calls.inserted.push({ ...row, __table: table })
         return Promise.resolve({ error: state.insertError })
       },
-      // The version lookup: .select().order().limit().maybeSingle()
+      // Two shapes share this: the version lookup
+      // (.select().order().limit().maybeSingle()) and the postcondition check
+      // (.select().eq().eq().limit() — awaited directly, no maybeSingle).
       select: () => {
         const chain = {
           order: () => chain,
           limit: () => chain,
+          eq: () => chain,
           maybeSingle: () =>
             Promise.resolve({
               data: state.latestVersion === null ? null : { version: state.latestVersion },
               error: null,
             }),
+          then: (resolve: (v: unknown) => unknown) =>
+            Promise.resolve({
+              data: state.activeAfterSupersede,
+              error: state.verifyError,
+            }).then(resolve),
         }
         return chain
       },
@@ -96,6 +113,8 @@ beforeEach(() => {
   state.insertError = null
   state.updateError = null
   state.latestVersion = null
+  state.activeAfterSupersede = []
+  state.verifyError = null
   state.workspace = { id: WS_ID }
   state.userId = 'user_abc'
   state.calls = { inserted: [], updates: [] }
@@ -166,6 +185,25 @@ describe('saveWorkspaceTheme', () => {
     const hue = Number(/oklch\([^)]*\s([\d.]+)\)/.exec(tokens.primary)?.[1] ?? NaN)
     expect(Number.isNaN(hue)).toBe(false)
     expect(Math.abs(hue - 40)).toBeGreaterThan(60)
+  })
+
+  test('refuses when the supersede silently affected no rows', async () => {
+    // THE BUG THIS PINS, and it is not hypothetical: the action branched on
+    // `supersedeError` alone. RLS denies an UPDATE by making the row invisible
+    // — zero rows affected, NO error — so a denied archive read as a successful
+    // one and the insert below added a SECOND active row. That is exactly the
+    // "two active rows, reader picks one arbitrarily" state the archive-first
+    // ordering exists to prevent. (INSERT is different: its WITH CHECK raises.)
+    //
+    // The sibling test below asserts the update was CALLED with the right
+    // filters, which stayed green through all of it — a call is not an outcome.
+    state.activeAfterSupersede = [{ id: 'still-active' }]
+
+    const result = await saveWorkspaceTheme(COLORS)
+
+    expect(result.ok).toBe(false)
+    // And critically: nothing was written on top of the un-archived row.
+    expect(state.calls.inserted).toHaveLength(0)
   })
 
   test('supersedes the previous active theme so exactly one stays active', async () => {
