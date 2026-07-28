@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { config as loadEnv } from 'dotenv'
-import { resolve } from 'node:path'
+import { LIVE_DB_URL } from '../test-helpers/live-env'
 import { createPgLedgerPort, type PgLedgerPort } from '../ledger/pg'
 import { createApplyPlanGrant } from './applyPlanGrant'
 import { createProcessPaymentEvent, type ProcessResult } from './processPaymentEvent'
@@ -9,10 +8,8 @@ import { createFixtureProvider } from '../providers/fixture'
 import type { Result } from '@sahoda/shared'
 import type { ParsedWebhookEvent, PaymentEventType } from '../providers/types'
 
-loadEnv({ path: resolve(import.meta.dirname, '../../../../.env'), quiet: true })
-const DB_URL = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? ''
 
-describe.skipIf(!DB_URL)(
+describe.skipIf(!LIVE_DB_URL)(
   'webhook processing against the real billing_webhook_events + ledger',
   () => {
     let ledger: PgLedgerPort
@@ -21,7 +18,7 @@ describe.skipIf(!DB_URL)(
     const provider = createFixtureProvider()
 
     beforeAll(() => {
-      ledger = createPgLedgerPort({ connectionString: DB_URL })
+      ledger = createPgLedgerPort({ connectionString: LIVE_DB_URL })
       const store = createPgWebhookEventStore(ledger.pool)
       const applyPlanGrant = createApplyPlanGrant(ledger)
       process = createProcessPaymentEvent({ store, applyPlanGrant })
