@@ -6,6 +6,7 @@ import { z } from 'zod'
 import {
   OpsChangelogEntrySchema,
   OpsQaRunSchema,
+  OpsQaArtifactSchema,
   OpsRoadmapItemSchema,
   OpsSessionSchema,
   OpsCreditRequestSchema,
@@ -14,6 +15,7 @@ import {
   OpsTaskSchema,
   type OpsChangelogEntry,
   type OpsQaRun,
+  type OpsQaArtifact,
   type OpsRoadmapItem,
   type OpsSession,
   type OpsTask,
@@ -219,3 +221,69 @@ export const readApplications = cache(async (): Promise<OpsRead<OpsBetaApplicati
       .limit(200),
   )
 })
+
+/**
+ * The caller's own open draft, if they left one behind (doc 13 §11).
+ *
+ * Scoped to `actor` as well as `status`, and that is not belt-and-braces: RLS on
+ * `ops_qa_runs` admits every ops admin to every row, because the console is a
+ * shared record. So "the open draft" without an actor filter would hand one
+ * person another's half-written notes — and `ops_qa_draft_save` would then
+ * refuse every autosave against it, leaving them typing into a form that can
+ * never save.
+ *
+ * Not `cache`d across requests on purpose: this is the one read whose staleness
+ * a person would notice immediately, because they are the one who changed it.
+ */
+export async function readMyOpenQaDraft(actor: string): Promise<OpsRead<OpsQaRun | null>> {
+  const supabase = createServerSupabase()
+  return readAll('qa_open_draft', OpsQaRunSchema.nullable(), () =>
+    supabase
+      .from('ops_qa_runs')
+      .select('*')
+      .eq('status', 'running')
+      .eq('kind', 'manual')
+      .ilike('actor', actor)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  )
+}
+
+/** Artifact rows for one run. Paths only — the URLs are signed separately. */
+export async function readQaArtifacts(runId: string): Promise<OpsRead<OpsQaArtifact[]>> {
+  const supabase = createServerSupabase()
+  return readAll('qa_artifacts', z.array(OpsQaArtifactSchema), () =>
+    supabase
+      .from('ops_qa_artifacts')
+      .select('*')
+      .eq('run_id', runId)
+      .order('created_at', { ascending: true }),
+  )
+}
+
+/**
+ * Signed READ urls for thumbnails. §3: private bucket, 10-minute TTL.
+ *
+ * Returns a map rather than an array so a path that fails to sign simply has no
+ * entry, and the caller renders a placeholder for that one instead of losing
+ * the whole strip.
+ */
+export async function signQaArtifactViews(
+  paths: readonly string[],
+): Promise<Record<string, string>> {
+  if (paths.length === 0) return {}
+
+  const supabase = createServerSupabase()
+  const { data, error } = await supabase.storage
+    .from('qa-artifacts')
+    .createSignedUrls([...paths], 600)
+
+  if (error || !data) return {}
+
+  const urls: Record<string, string> = {}
+  for (const entry of data) {
+    if (entry.signedUrl && entry.path) urls[entry.path] = entry.signedUrl
+  }
+  return urls
+}
