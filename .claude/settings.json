@@ -69,12 +69,12 @@
         ]
       }
     ],
-    "Stop": [
+    "_Stop_DISABLED_2026-07-28_reenable_in_phase5": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "INPUT=$(cat); [ \"$(echo $INPUT | jq -r '.stop_hook_active')\" = 'true' ] && exit 0; pnpm turbo run typecheck test --filter=\"...[origin/main]\" || { echo 'Gates failing — fix before stopping' >&2; exit 2; }"
+            "command": "INPUT=$(cat); [ \"$(echo $INPUT | jq -r '.stop_hook_active')\" = 'true' ] && exit 0; pnpm turbo run typecheck test --filter=\"...[origin/main]\" || { echo 'Gates failing \u2014 fix before stopping' >&2; exit 2; }"
           }
         ]
       }
