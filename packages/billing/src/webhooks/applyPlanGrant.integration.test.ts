@@ -4,7 +4,6 @@ import { createPgLedgerPort, type PgLedgerPort } from '../ledger/pg'
 import { createApplyPlanGrant } from './applyPlanGrant'
 import type { ParsedWebhookEvent } from '../providers/types'
 
-
 describe.skipIf(!LIVE_DB_URL)('applyPlanGrant against the real ledger', () => {
   let port: PgLedgerPort
   let ws: string

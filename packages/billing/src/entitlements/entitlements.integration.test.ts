@@ -4,7 +4,6 @@ import { PLAN_CATALOG, PlanLimitsSchema, type PlanId } from '@sahoda/shared'
 import { createPgPlanResolver, type PgPlanResolver } from './pg'
 import { createCheckEntitlement } from './checkEntitlement'
 
-
 describe.skipIf(!LIVE_DB_URL)('entitlements against the real database', () => {
   let resolver: PgPlanResolver
   let ws: string

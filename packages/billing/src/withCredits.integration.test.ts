@@ -4,7 +4,6 @@ import { availableCredits, holdKey, releaseKey } from '@sahoda/shared'
 import { createPgLedgerPort, type PgLedgerPort } from './ledger/pg'
 import { createWithCredits } from './withCredits'
 
-
 // Real-DB tests against the live ledger function — skipped when no DB URL is present.
 describe.skipIf(!LIVE_DB_URL)('withCredits against the real ledger', () => {
   let port: PgLedgerPort
