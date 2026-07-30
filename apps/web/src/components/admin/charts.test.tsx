@@ -134,7 +134,9 @@ describe('GateChart', () => {
     // Scoped to one suite: every suite has a cell for every day, so these
     // titles legitimately repeat across rows.
     const unitRow = screen.getByLabelText('unit by day')
-    const titles = Array.from(unitRow.querySelectorAll('li')).map((cell) => cell.getAttribute('title'))
+    const titles = Array.from(unitRow.querySelectorAll('li')).map((cell) =>
+      cell.getAttribute('title'),
+    )
 
     expect(titles).toEqual(['2026-07-27 — did not run', '2026-07-28 — passing'])
   })
