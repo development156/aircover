@@ -317,6 +317,7 @@ const TASKS = [
   [
     'admin-ops',
     'Two charts below the board: cumulative flow and gate health',
+    'Recharts was the ORIGINAL ASK and was deliberately NOT used — see the card detail on the board for the reasoning; do not reinstate it. ' +
     'Recharts, doc 08 tokens only, crimson for failures, tabular-nums. ' +
       '(1) Cumulative flow — To Do / In Progress / For Review / Done over ' +
       'time, reconstructed from ops_tasks timestamps. (2) Gate health — ' +

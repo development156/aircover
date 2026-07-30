@@ -1,4 +1,44 @@
 {
   "version": 1,
-  "runs": []
+  "runs": [
+    {
+      "client_id": "qa-ms7fln7x-56acf227",
+      "task_code": null,
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-07-30T11:29:42.861Z",
+      "finished_at": "2026-07-30T11:29:42.861Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran and everything passed (2014 passed).",
+      "details": "@sahoda/web:test:       Tests  1936 passed | 1 skipped (1937)\n Tasks:    9 successful, 9 total\n=== ops state tests ===\n      Tests  78 passed (78)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-ms7fln7x-99ddb2cb",
+      "task_code": null,
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-07-30T11:29:42.861Z",
+      "finished_at": "2026-07-30T11:29:42.861Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran and everything passed (2014 passed).",
+      "details": "@sahoda/web:test:       Tests  1936 passed | 1 skipped (1937)\n Tasks:    9 successful, 9 total\n=== ops state tests ===\n      Tests  78 passed (78)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-ms7fln7x-3a67199",
+      "task_code": null,
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-07-30T11:29:42.861Z",
+      "finished_at": "2026-07-30T11:29:42.861Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed (2014 passed).",
+      "details": "@sahoda/web:test:       Tests  1936 passed | 1 skipped (1937)\n Tasks:    9 successful, 9 total\n=== ops state tests ===\n      Tests  78 passed (78)",
+      "duration_ms": null
+    }
+  ]
 }
