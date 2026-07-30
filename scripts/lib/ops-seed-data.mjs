@@ -329,6 +329,25 @@ const TASKS = [
       'authorship was forgeable until SL-042 — the chart is only as honest as ' +
       'that table, which is why the import path was fixed first.',
   ],
+  [
+    null,
+    'Stand up a separate staging Supabase project before real customers',
+    'There is exactly ONE Supabase project (sahodalabs, ap-south-1). Dev and ' +
+      'production are the same database, which nobody had noticed until the ' +
+      'maker-checker post-mortem asked whether the vulnerable function had ever ' +
+      'been on production. It had: live for 3h03m, reachable through PostgREST ' +
+      'by any JWT matching an active writer seat, independent of what the ' +
+      'deployed app served. Nothing was exploited — zero real credit requests ' +
+      'have ever existed and all 290 credit audit rows carry @example.test ' +
+      'actors — but the reason was luck of timing, not isolation. Consequences ' +
+      'today: every test run writes to the customer database, every migration ' +
+      'is a production migration with no rehearsal, and a destructive seed has ' +
+      'nothing between it and real rows. Not blocking before customers exist; ' +
+      'blocking the moment one does. Scope: second project, migrations applied ' +
+      'from the same history, SUPABASE_* split per Vercel environment, ' +
+      'packages/db tests pointed at staging, and a check that fails loudly if ' +
+      'the test DSN and the production DSN are ever the same host.',
+  ],
 ]
 
 export function tasks() {

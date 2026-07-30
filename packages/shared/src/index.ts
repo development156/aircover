@@ -29,3 +29,4 @@ export * from './mesh/tasks'
 
 // Admin Ops — /admin surface + the Claude↔dashboard sync protocol (doc 13)
 export * from './ops/state'
+export * from './ops/qa-export'
