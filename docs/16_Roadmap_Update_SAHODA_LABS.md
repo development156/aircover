@@ -4,7 +4,7 @@
 **Amends:** `15_Beta_Launch_Plan_SAHODA_LABS.md` §4, §12 and §14. Doc 15
 otherwise stands.
 **Companion:** `13_Zernio_Integration_SAHODA_LABS.md`, unchanged.
-**Board:** 49 cards today → **58** once §4 is applied.
+**Board:** 49 cards today → **59** once §4 is applied.
 
 This document exists because the world moved between doc 15 being written and
 today, and because nine defects found since then have no cards. It is both a
@@ -16,7 +16,7 @@ readable roadmap and the source text for the board update in §4.
 
 | | |
 |---|---|
-| **Production** | **DOWN** since 30 July ~19:29 IST. Every route on every domain returns `text/plain` `DEPLOYMENT_NOT_FOUND` |
+| **Production** | ~~**DOWN** since 30 July ~19:29 IST. Every route on every domain returns `text/plain` `DEPLOYMENT_NOT_FOUND`~~ **Superseded — see §1a.** Partly a measurement error: the host measured was never attached to this project. As of 31 July 22:15 IST the site serves, `/sign-in` renders, and four routes 404. |
 | Trunk | `wt-web` @ `8f9a0db`, pushed, local and origin identical |
 | Repository | `development156/sahodalabs` — **public**, default branch now `wt-web`, 0 forks, 0 stars |
 | Vercel project | `prj_L4IDks4bMlBwObyKcHzej6lVqm9D` — builds `main`, three deployments, all `ERROR` |
@@ -91,10 +91,82 @@ closing, no longer an emergency. The `.gitignore` discipline bought that.
 > repository, the Supabase project — is founder-approval-only. No exceptions.
 > The approval is an explicit message, never an assumption.**
 
+> **And: production actions run in ONE NAMED SESSION AT A TIME.** On 31 July a
+> second Claude Code session ran `vercel --prod` at 17:47 IST, ten minutes
+> before P0 was assigned to this one. Nothing broke, but for twenty minutes two
+> sessions held contradictory beliefs about whether production had been
+> deployed, and the P0 diagnosis was written against a surface that a *different*
+> session had already fixed. Concurrency did not cause the outage; it made the
+> outage impossible to reason about. Whoever holds production says so, and
+> nobody else touches it until they hand it back.
+
 Deleting and recreating the Vercel project and the repository is the most
 irreversible action available in this stack. It destroyed the rollback target
 for every merge in flight and cost a day of uptime for 17 users. This goes
 alongside the existing non-negotiables in doc 15 §2.
+
+---
+
+## 1a. Corrections to §0 and §1 (31 July, 22:15 IST)
+
+Doc 16 is law, and §0/§1 as written describe an outage that was **partly a
+measurement error**. Three corrections, each measured rather than reasoned.
+
+**1. `sahodalabs.vercel.app` was never attached to this project.** That is the
+host §0 measured returning `text/plain` `DEPLOYMENT_NOT_FOUND`, and it would
+have returned that forever regardless of the branch setting — it was absent from
+the project's domain list. The project's own hosts were
+`sahodalabs-development-4417s-projects.vercel.app` and
+`sahodalabs-git-main-…`. This is a **fifth** instance of the §1 lesson, and the
+sharpest: the body was read correctly, but the *target* was wrong, so a correct
+reading of the wrong surface produced a confident wrong conclusion. Reading
+bodies is necessary and not sufficient — confirm the surface belongs to the
+system under test.
+
+**2. A correct production deployment already existed.** `dpl_4MgVUFzh…`, READY,
+built from `wt-web` @ `8f9a0db2` via `source: cli`, created **31 July 17:47
+IST** by another Claude Code session — the §3 fallback route, already run,
+roughly ten minutes before P0 was assigned. Its build emitted a **complete
+25-route manifest**, so §1's root cause ("no route manifest is emitted") had
+already stopped applying. Nobody knew, because the surface being measured was
+the unattached host.
+
+**3. The blocker was `ssoProtection`, not an errored build.** The project had
+Vercel Authentication enabled at `all_except_custom_domains`, so every
+`*.vercel.app` URL answered `302` + `text/plain` "Redirecting…". §1 read that
+302 correctly as "exists, behind auth" but attributed it to *an errored build*
+behind a gate. The build was fine; the gate was the whole problem. Disabling it
+was one reversible API call and is what made the site reachable.
+
+**Also corrected:** §2 asserts push-to-deploy is broken until Vercel's
+production branch is fixed (SL-058). A push to `wt-web` on 31 July produced
+`dpl_EB5EmZ5J…`, `source: git`, `target: production`, which claimed
+`sahodalabs.vercel.app`. **Push-to-deploy from `wt-web` works today.** SL-058's
+remaining value is confirming *why* — whether Settings → Git already reads "the
+repository's default branch" — not restoring the behaviour.
+
+### What is still broken, and what is NOT yet proven
+
+`/`, `/home`, `/wallet` and `/posts` return `404` with `x-matched-path: /404`
+raised in **edge middleware**, for signed-out visitors, with **zero runtime
+errors**. `/sign-in` renders (200, ~12.9 kB). `/admin`'s empty 404 is correct by
+design (doc 13 §2). `/` redirects to `/home`, so this is **one defect, not
+four**. Reproduced identically from bare curl and from a browser-shaped client
+with a cookie jar, so it is not a client artefact.
+
+**Measured:** production serves Clerk **development** keys —
+`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` begins `pk_test_bGVh`, frontend API
+`leading-hyena-7.clerk.accounts.dev`. Read from the served HTML, where the
+publishable key is public by design.
+
+**NOT proven:** that the key environment *causes* the 404. `middleware.ts:103`
+calls `auth.protect()`, which should answer `307`, and
+`middleware.test.ts:78` asserts exactly that. Production answers `404` with no
+error logged. Vercel runtime logs show `GET / 307` at 16:17 UTC on
+`dpl_7CBNK9Yk…` — so a redirect **did** occur under some condition — while the
+same URL answers 404 now. That inconsistency is unexplained and the causal
+link is unestablished. **Do not treat a Clerk instance migration as a
+guaranteed fix for this 404** — see §7 for what it costs if it is not.
 
 ---
 
@@ -190,7 +262,7 @@ build days and are tracked outside this roadmap.
 
 ## 4. New board cards
 
-Nine cards. **Board goes 49 → 58.**
+Nine cards, plus **SL-059** added 31 July. **Board goes 49 → 59.**
 
 `roadmap_code` and `board_column` are deliberately left as instructions rather
 than values: read the distinct values already present in `ops/state/board.json`
@@ -338,12 +410,51 @@ custom branch — and new projects default to `main` where it exists. Selecting
 
 ---
 
+**SL-059** · sort `10` · column: *todo*
+**Title:** The middleware layer has never been tested against a running server
+
+`middleware.test.ts:78` asserts `/`, `/home`, `/wallet`, `/planner`, `/posts`
+and `/connections` are protected — meaning `auth.protect()` answers a redirect.
+Production answers **404**. The test passes; the behaviour it describes does not
+happen. 17/17 green, mutation-tested on 28 July, and it did not catch a total
+auth-routing failure on the six most important routes in the product.
+
+The reason is structural, not sloppiness: that suite **reads the source and
+asserts on its shape** (`expect(code).toContain('return notFound(csp)')`). It
+can prove the code says the right thing. It cannot prove the code *does* the
+right thing, because no server ever runs. The middleware gap documented on
+26 July was theoretical; on 31 July it shipped.
+
+What it would take, cheapest first:
+
+1. **A post-deploy smoke probe** (hours). Assert `GET /home` → `307` with
+   `location` containing `/sign-in`, against the real deployment, in CI after
+   every production deploy. This alone would have caught this exact defect the
+   moment it shipped. Assert on the redirect target, not the status class —
+   §1's lesson, and note that a 404 and a 307 are both "not 200".
+2. **`next build && next start` integration tests** (1–2 days). Boot the real
+   server in CI and drive it with `fetch`. Catches middleware + routing +
+   route-group composition together. Needs a test env with Clerk test keys,
+   which is why it has not happened.
+3. **Playwright against a preview deployment** (2–3 days, needs SL-043 first).
+   The only tier that exercises real Clerk, real cookies and a real browser —
+   and the only one that would have caught the dev-instance question. Blocked
+   on staging, because today a preview writes to the production database
+   (SL-049).
+
+Tier 1 is the one to do now. Tiers 2 and 3 are the real answer and neither is
+free. **Do not close this by adding another source-assertion test** — the
+existing one is correct and proved nothing.
+
+
+---
+
 ## 5. Assertions for the board update
 
 Run these or the update is unverified:
 
-1. Card count is **exactly 58** after the write.
-2. The ID set equals the previous 49 plus exactly `SL-050` … `SL-058`.
+1. Card count is **exactly 59** after the write (58 from the original nine, plus SL-059).
+2. The ID set equals the previous 49 plus exactly `SL-050` … `SL-059`.
 3. No existing card's `title` or `detail` changed. Diff only shows additions.
 4. `SL-043` remains at `sort: 10`. Nothing displaces it except `SL-054` at 5.
 5. Encoding is raw UTF-8 throughout — 0 `\uXXXX` escapes.
@@ -370,3 +481,91 @@ past halfway. By *can a real customer complete a journey and pay for it*, closer
 to a quarter — and the remaining quarter contains every hard part. The progress
 card should reflect the second number, not the first. Showing the first would be
 a fake success state, and doc 15 §2 rule 3 forbids it.
+
+---
+
+## 7. Clerk key swap — steps, and what breaks between them
+
+**Founder-owned.** Written here so the cost is visible before it is paid.
+
+### Read this first
+
+**The key environment is measured; its link to the 404 is not.** Production
+serves `pk_test_bGVh…` against `leading-hyena-7.clerk.accounts.dev` — certain,
+read from the served HTML. That production runs a *development* auth instance is
+independently worth fixing: dev instances cap at 100 users, carry no uptime
+guarantee, and are not intended to hold real accounts. **But nothing here proves
+it is what returns the 404.** `middleware.ts:103` calls `auth.protect()`, which
+should answer 307; production answers 404 with no error logged; and the runtime
+log shows a 307 on the same URL at 16:17 UTC. If the migration below is
+performed and the 404 survives, the cost in §7.3 has been paid for a defect that
+was somewhere else. Prove the causal link on a preview first.
+
+### 7.1 The dependency nobody has costed
+
+**A Clerk production instance requires a custom domain.** It cannot run on
+`*.vercel.app`. The project has no custom domain attached today. So the real
+first step is not a key swap — it is acquiring `app.sahodalabs.com` (or
+equivalent), pointing it at Vercel, and adding the CNAME records Clerk issues
+(`clerk.`, `clkmail.`, `clk._domainkey…`) plus DNS propagation time.
+
+A custom domain also incidentally fixes the SSO question: deployment protection
+was set to `all_except_custom_domains`, so a custom domain would have bypassed
+it without disabling protection at all.
+
+### 7.2 Order
+
+1. Attach the custom domain to the Vercel project; verify it serves.
+2. Create the Clerk **production** instance for that domain; add its DNS records.
+3. Wait for Clerk to verify the domain.
+4. Decide the user question in §7.3 **before** touching env vars.
+5. In Vercel, replace `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
+   and `CLERK_WEBHOOK_SECRET` with the production instance's values — and scope
+   them **Production only**, splitting today's single `Production, Preview` row.
+   All three are currently one shared row each, the same shape as the Supabase
+   variables in SL-049.
+6. Re-register the `user.created` webhook against the production instance; the
+   signing secret is new, so `CLERK_WEBHOOK_SECRET` must change with it.
+7. Redeploy, then re-run the §3 P0 gate against the custom domain.
+8. Remap the database (§7.3) before telling anyone the site is back.
+
+### 7.3 What happens to the 17 users — the expensive part
+
+**Clerk development and production instances are separate user directories.
+The 17 people do not carry over.** They exist only in
+`leading-hyena-7.clerk.accounts.dev`. In the new instance they do not exist at
+all.
+
+That matters far beyond "everyone gets logged out", which is merely true:
+session cookies are signed by the old instance and all become invalid the
+moment the keys change.
+
+The real problem is **identity continuity**. This database keys authorisation on
+the Clerk subject: RLS reads `auth.jwt() ->> 'sub'`, `ops_admins.user_id` holds
+a Clerk `user_…` id, and `workspaces.created_by` holds another. A new instance
+issues **new** user ids for the same humans. So on the first sign-in after the
+swap, every one of them is a stranger:
+
+- their workspaces are invisible — RLS matches nothing, so the app looks empty
+  rather than broken, which is the worse failure;
+- `/admin` 404s for every admin, because `ops_admins.user_id` points at a
+  subject that no longer exists;
+- any pending Clerk invitations are stranded in the old instance.
+
+So the swap is a **user-directory migration**, not a configuration change:
+export the users, import them into the production instance (Clerk's Backend API
+supports import), build an `old_sub → new_sub` map keyed by email, and update
+every column holding a Clerk subject inside one transaction. Between step 5 and
+that remap, the site is authenticated but useless — signed in, and nothing
+belongs to you.
+
+**The cheaper alternative, worth considering seriously:** 17 people is a small
+enough number to re-invite rather than migrate. That still needs the remap —
+`ops_admins` seats are matched on `lower(email)` and relink through the
+`user.created` webhook, so admin access self-heals, but `workspaces.created_by`
+does not. Either way the remap is unavoidable; the question is only whether the
+accounts are imported or recreated.
+
+**Do this against staging first (SL-043).** Rehearsing a subject remap on the
+only database that exists, holding 26 real workspaces, is precisely the risk
+that card was promoted to the top of the board to remove.
