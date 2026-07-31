@@ -37,3 +37,5 @@ Desktop.ini
 
 # Per-worktree ops overrides (see scripts/lib/ops-env.mjs)
 ops/.local.env
+.vercel
+.env*
