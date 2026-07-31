@@ -24,7 +24,8 @@
     "ops:seed": "node scripts/ops-seed.mjs",
     "ops:sync": "node scripts/ops-sync.mjs",
     "test:ops": "vitest run",
-    "ops:ship-check": "node scripts/ops-card.mjs ship-check"
+    "ops:ship-check": "node scripts/ops-card.mjs ship-check",
+    "probe:prod": "node scripts/probe-production.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
