@@ -49,9 +49,10 @@ commit `ba32a3f`. Its `turbo.json` has **zero** entries in the
 `@sahoda/web#build` env allowlist against **46** on `wt-web`.
 
 Turborepo 2 defaults to strict mode and strips every undeclared variable, so
-`CLERK_SECRET_KEY` never reaches the build. Compilation succeeds, then page-data
-collection throws, and **no route manifest is emitted**. The same build on
-`wt-web` locally emits 25 routes.
+`CLERK_SECRET_KEY` never reaches the build. ~~Compilation succeeds, then
+page-data collection throws, and **no route manifest is emitted**.~~
+**Corrected 1 Aug — see §1b: the build FAILED outright.** The same build on
+`wt-web` emits 25 routes.
 
 **The secrets are set. The branch is too old to pass them through.**
 
@@ -170,6 +171,68 @@ guaranteed fix for this 404** — see §7 for what it costs if it is not.
 
 ---
 
+## 1b. Root cause, re-verified (1 August)
+
+§1's mechanism was written when every measurement behind it had a flaw. It has
+now been proved **independently of any of them**, from `main` itself and from
+Vercel's own build log — and it is right, with one correction that matters.
+
+### The evidence
+
+| # | Claim | How it was checked |
+|---|---|---|
+| 1 | `main` declares no build env | `git show origin/main:turbo.json` — there is **no `@sahoda/web#build` task at all**, and `globalEnv` is `[]`. Stronger than §1's "zero entries". |
+| 2 | Strict mode strips the server vars | The failed build's own log lists ~36 `[warn] - VAR` lines — `CLERK_SECRET_KEY`, `SUPABASE_*`, `TOKEN_VAULT_KEY`, every one — as set on the project but absent from `turbo.json`. |
+| 3 | The build fails | `Tasks: 0 successful, 1 total` · `Failed: @sahoda/web#build` · `exited (1)`. |
+| 4 | It failed every time | All three `main` deployments (`dpl_2MnWmPN8`, `dpl_5CDdW9AV`, `dpl_DQTf21wx`) are `state: ERROR`. |
+| 5 | Nothing was ever served | Runtime logs grouped by `deploymentId` over three days name only the four **wt-web** deployments. Not one request reached a `main` build. |
+
+### The correction
+
+§1 says compilation succeeds and no route manifest is emitted — describing a
+deployment that **serves but has no routes**. That is not what happened. The
+build **failed**, so the deployment never existed at all.
+
+The distinction is not pedantic; the two have different symptoms and different
+fixes. A routeless deployment answers `404` from *your app*. A failed build
+leaves the project with no production deployment, so Vercel's edge answers
+`DEPLOYMENT_NOT_FOUND` before any of your code runs — which is exactly what was
+observed, and is why no amount of reading the app's behaviour would ever have
+explained it.
+
+`NEXT_PUBLIC_*` is untouched by this: Turborepo **framework-infers** it for
+Next.js packages, which `apps/web/src/lib/turbo-env-wiring.test.ts` already
+documents and deliberately excludes from the allowlist requirement. So the
+46-entry list protects **server variables only** — correct, known, and tested
+since 27 July. It is not a second gap.
+
+---
+
+## 1c. The outage window
+
+§0 asserts "DOWN since 30 July ~19:29 IST" without support. What is now
+supportable:
+
+| Boundary | When | Confidence |
+|---|---|---|
+| Outage begins | Between **30 Jul 19:01 and 19:29 IST** — when the old Vercel project was destroyed | **Bounded, not pinned.** The old project is gone, so its last served request is unrecoverable. |
+| New project's first failure | 30 Jul **19:29:43 IST**, four seconds after the project was created | Exact |
+| Last failed `main` build | 30 Jul **21:35:35 IST** | Exact |
+| First deployment that served | 31 Jul **17:47:43 IST** (`dpl_4MgVUFzh`, CLI, `wt-web`) | Exact |
+| Reachable without a Vercel login | 31 Jul **~18:05 IST**, when `ssoProtection` was disabled | ±few minutes |
+
+**Nothing was deployed for 22 h 18 min** (30 Jul 19:29:43 → 31 Jul 17:47:43),
+and zero requests were served in that window — the ERROR deployments have no
+runtime logs at all. Add roughly twenty minutes behind the Vercel auth gate
+before the site was reachable by anyone without a Vercel account.
+
+**Answer for the 17 users: approximately 22 hours 40 minutes**, beginning
+somewhere in the 19:01–19:29 window on 30 July. The lower bound is honest — the
+exact start died with the old project, which is itself an argument for §1's
+rollback-durability finding.
+
+---
+
 ## 2. Corrections to doc 15
 
 **§4 task 0.2 — no longer cosmetic, and half-done.** Doc 15 deferred "`main`
@@ -271,20 +334,34 @@ and map to an existing one. Do not invent a new enum value.
 ---
 
 **SL-054** · sort `5` · column: *in progress*
-**Title:** Production is down — Vercel builds the stale `main` branch
+**Title:** Production was down 22h40m — the recreated Vercel project could not build `main`
 
-Since 30 July ~19:29 IST every route on every domain returns `text/plain`
-`DEPLOYMENT_NOT_FOUND`. The Vercel project was recreated and points at `main`,
-which on the new remote is a single "Initial commit" of 490 files predating
-`ba32a3f`. Its `turbo.json` has 0 entries in the `@sahoda/web#build` env
-allowlist against 46 on `wt-web`; Turborepo 2 strict mode strips
-`CLERK_SECRET_KEY`, page-data collection throws, no route manifest is emitted.
-Secrets are set correctly — the branch is too old to pass them through. Fix:
-point production at `wt-web` (`8f9a0db`) or deploy via CLI. Gate: six
-unauthenticated GETs returning `text/html` with rendered markup, route count 25
-before promotion. 26 workspaces and 17 users are affected. Rollback is
-impossible — `dpl_8te1K3q…` (`ef50fb6`) returns 410 GONE, destroyed with the old
-project.
+**Rewritten 1 Aug against verified evidence only.** The original detail was
+inferred from measurements that have all since been withdrawn (wrong host, an
+SSO gate mistaken for a broken build, and probes sent with `Accept: */*`).
+
+What is proved: the recreated Vercel project built `main`, which on the new
+remote is a single "Initial commit" of 490 files. Its `turbo.json` has **no
+`@sahoda/web#build` task at all** and an empty `globalEnv`, so Turborepo 2's
+strict mode declared nothing and stripped ~36 server variables —
+`CLERK_SECRET_KEY`, every `SUPABASE_*`, `TOKEN_VAULT_KEY`. The build **failed**
+(`Tasks: 0 successful` · `exited (1)`), all three attempts ERRORed, and **not
+one request ever reached a `main` build** — the runtime logs contain none.
+
+So there was no production deployment at all, and Vercel's edge answered
+`DEPLOYMENT_NOT_FOUND` before any application code ran. Secrets were set
+correctly throughout; the branch was too old to declare them.
+
+Down from between 19:01 and 19:29 IST on 30 July (when the old project was
+destroyed — the exact moment died with it) until ~18:05 IST on 31 July, when
+`ssoProtection` was disabled on a working `wt-web` deployment. **≈22 h 40 min**,
+26 workspaces and 17 users affected. Rollback was impossible: `dpl_8te1K3q…`
+returns 410 GONE.
+
+Fixed by a CLI deploy from `wt-web` at 17:47 IST plus disabling deployment
+protection. Push-to-deploy from `wt-web` has since been confirmed twice.
+Gate: `pnpm probe:prod` (SL-059) — six routes, browser headers, judged on where
+the redirect chain ends.
 
 ---
 
