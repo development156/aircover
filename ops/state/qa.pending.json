@@ -2,42 +2,16 @@
   "version": 1,
   "runs": [
     {
-      "client_id": "qa-ms7fln7x-56acf227",
-      "task_code": null,
+      "client_id": "qa-msacea38-5b7c1efc",
+      "task_code": "SL-054",
       "kind": "auto",
       "actor": "claude",
-      "started_at": "2026-07-30T11:29:42.861Z",
-      "finished_at": "2026-07-30T11:29:42.861Z",
-      "suite": "typecheck",
-      "status": "pass",
-      "summary_plain": "The typecheck checks ran and everything passed (2014 passed).",
-      "details": "@sahoda/web:test:       Tests  1936 passed | 1 skipped (1937)\n Tasks:    9 successful, 9 total\n=== ops state tests ===\n      Tests  78 passed (78)",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-ms7fln7x-99ddb2cb",
-      "task_code": null,
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-07-30T11:29:42.861Z",
-      "finished_at": "2026-07-30T11:29:42.861Z",
-      "suite": "lint",
-      "status": "pass",
-      "summary_plain": "The lint checks ran and everything passed (2014 passed).",
-      "details": "@sahoda/web:test:       Tests  1936 passed | 1 skipped (1937)\n Tasks:    9 successful, 9 total\n=== ops state tests ===\n      Tests  78 passed (78)",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-ms7fln7x-3a67199",
-      "task_code": null,
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-07-30T11:29:42.861Z",
-      "finished_at": "2026-07-30T11:29:42.861Z",
+      "started_at": "2026-08-01T12:23:18.931Z",
+      "finished_at": "2026-08-01T12:23:18.931Z",
       "suite": "unit",
-      "status": "pass",
-      "summary_plain": "The unit checks ran and everything passed (2014 passed).",
-      "details": "@sahoda/web:test:       Tests  1936 passed | 1 skipped (1937)\n Tasks:    9 successful, 9 total\n=== ops state tests ===\n      Tests  78 passed (78)",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed.",
+      "details": "════ can the new suite run here? (no flag — the ported guard now applies) ════\n RUN  v4.1.10 /home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-db/packages/db\n\n\n Test Files  1 skipped (1)\n      Tests  8 skipped (8)\n   Start at  17:53:17\n   Duration  272ms (transform 60ms, setup 0ms, import 140ms, tests 0ms, environment 0ms)\n\n=== exit=0 ===\n\n════ and with the flag, against the only database available ════\n  REFUSED: a test run is pointed at the PRODUCTION database.\n    SUPABASE_DB_URL names project ref rloztdhzfliyvpvxsgjl (sahodalabs, ap-south-1) —\n Test Files  1 failed (1)\n      Tests  no tests\n\nShell cwd was reset to /home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-web",
       "duration_ms": null
     }
   ]
