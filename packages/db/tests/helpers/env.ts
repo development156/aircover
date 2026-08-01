@@ -1,6 +1,8 @@
 import { config as loadEnv } from 'dotenv'
 import { resolve } from 'node:path'
 
+import { assertTargetIsNotProduction } from './forbidden-target'
+
 /**
  * Live suites here talk to the ONE Supabase project, which is also production (26 real
  * workspaces, 17 real users). They are OFF unless explicitly opted in.
@@ -25,6 +27,9 @@ const LIVE = process.env.SAHODA_ALLOW_LIVE_TESTS === '1'
 
 if (LIVE) {
   loadEnv({ path: resolve(import.meta.dirname, '../../../../.env'), quiet: true })
+  // The flag opened the door; this refuses the destination. Runs AFTER loadEnv so it sees
+  // exactly what the suites will connect to, including anything dotenv just supplied.
+  assertTargetIsNotProduction()
 }
 
 export const ENV = {
