@@ -317,6 +317,60 @@
       "weight": 1,
       "status": "todo",
       "sort": 290
+    },
+    {
+      "code": "P0",
+      "stage": "beta-path",
+      "title": "P0 · Restore production — in progress; gate green, founder sign-in outstanding",
+      "weight": 6,
+      "status": "active",
+      "target_date": null,
+      "sort": 1
+    },
+    {
+      "code": "P1",
+      "stage": "beta-path",
+      "title": "P1 · Prove the publishing rail — unblocked, not started; needs no repo, deploy or database",
+      "weight": 3,
+      "status": "todo",
+      "target_date": null,
+      "sort": 2
+    },
+    {
+      "code": "P2",
+      "stage": "beta-path",
+      "title": "P2 · Test integrity (SL-050, real CI) — blocked on P0",
+      "weight": 6,
+      "status": "todo",
+      "target_date": null,
+      "sort": 3
+    },
+    {
+      "code": "P3A",
+      "stage": "beta-path",
+      "title": "P3 Slice A · Money — blocked on SL-050; 19 billing test files have never run",
+      "weight": 6,
+      "status": "todo",
+      "target_date": null,
+      "sort": 4
+    },
+    {
+      "code": "P3BE",
+      "stage": "beta-path",
+      "title": "P3 Slices B–E · Connect and publish — blocked on P2",
+      "weight": 6,
+      "status": "todo",
+      "target_date": null,
+      "sort": 5
+    },
+    {
+      "code": "BETA",
+      "stage": "beta-path",
+      "title": "Beta capability · 24–40 working days FROM the day production is green — clock has not started, so no date is shown",
+      "weight": 1,
+      "status": "todo",
+      "target_date": null,
+      "sort": 6
     }
   ]
 }

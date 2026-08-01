@@ -487,7 +487,7 @@ custom branch — and new projects default to `main` where it exists. Selecting
 
 ---
 
-**SL-059** · sort `10` · column: *todo*
+**SL-059** · sort `12` · column: *todo*
 **Title:** The middleware layer has never been tested against a running server
 
 `middleware.test.ts:78` asserts `/`, `/home`, `/wallet`, `/planner`, `/posts`
@@ -533,7 +533,7 @@ Run these or the update is unverified:
 1. Card count is **exactly 59** after the write (58 from the original nine, plus SL-059).
 2. The ID set equals the previous 49 plus exactly `SL-050` … `SL-059`.
 3. No existing card's `title` or `detail` changed. Diff only shows additions.
-4. `SL-043` remains at `sort: 10`. Nothing displaces it except `SL-054` at 5.
+4. `SL-043` remains at `sort: 10`. Nothing displaces it except `SL-054` at 5. (`SL-059` sits at 12, not 10, so it does not tie with SL-043 — corrected 1 Aug.)
 5. Encoding is raw UTF-8 throughout — 0 `\uXXXX` escapes.
 6. Every `roadmap_code` and `board_column` value already exists elsewhere in the
    file. No new enum values.

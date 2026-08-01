@@ -8,6 +8,7 @@ import {
   summarise,
   toReachDone,
   urgencyOf,
+  journeyPercent,
 } from './roadmap-progress'
 
 /**
@@ -203,5 +204,48 @@ describe('stageLabel', () => {
     ['backlog-3', 'Backlog 3'],
   ])('%s → %s', (stage, expected) => {
     expect(stageLabel(stage)).toBe(expected)
+  })
+})
+
+describe('journeyPercent — the headline number (doc 16 §6)', () => {
+  const item = (status: string, weight = 1) =>
+    ({ status, weight, code: 'X', stage: 's', title: 't', sort: 0 }) as never
+
+  it('measures the WHOLE roadmap, not the active stage', () => {
+    // The regression: on 1 Aug the card headlined 60% (the admin-ops stage at
+    // 12/20 of its own weight) while the roadmap stood at 22%. A reader takes a
+    // number that size as "the product is 60% done" — doc 15 §2 rule 3.
+    const items = [item('done', 12), item('todo', 8), item('todo', 34)]
+    expect(journeyPercent(items)).toBe(22)
+  })
+
+  it('floors rather than rounds, so it never flatters', () => {
+    expect(journeyPercent([item('done', 229), item('todo', 771)])).toBe(22)
+  })
+
+  it('is 0 when nothing is done, and 100 only when everything is', () => {
+    expect(journeyPercent([item('todo'), item('todo')])).toBe(0)
+    expect(journeyPercent([item('done'), item('done')])).toBe(100)
+  })
+
+  it('counts only done — active and cut are not progress', () => {
+    expect(journeyPercent([item('done'), item('active'), item('cut'), item('todo')])).toBe(25)
+  })
+
+  it('does not divide by zero on an empty roadmap', () => {
+    expect(journeyPercent([])).toBe(0)
+  })
+})
+
+describe('journeyPercent excludes the status-only stage', () => {
+  const item = (status: string, weight = 1, stage = 'alpha') =>
+    ({ status, weight, stage, code: 'X', title: 't', sort: 0 }) as never
+
+  it('does not let §6 phase markers dilute the denominator', () => {
+    // They mirror work counted elsewhere; counting both understates progress.
+    const product = [item('done', 12), item('todo', 42)]
+    const withPhases = [...product, item('active', 6, 'beta-path'), item('todo', 22, 'beta-path')]
+    expect(journeyPercent(product)).toBe(22)
+    expect(journeyPercent(withPhases)).toBe(22)
   })
 })

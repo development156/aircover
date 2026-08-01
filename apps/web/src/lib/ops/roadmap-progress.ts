@@ -171,3 +171,41 @@ export function toReachDone({
     })),
   ]
 }
+
+/**
+ * The number the card headline shows (doc 16 §6).
+ *
+ * Weighted completion across the WHOLE roadmap, not the current stage.
+ *
+ * The card used to headline `summarise(...).percent` for the active stage. On
+ * 1 Aug that read **60%** — the admin-ops stage being 12/20 of its own weight —
+ * while the whole roadmap stood at 22%. Nobody reads a number that size on a
+ * roadmap card as "we are 60% through this stage"; they read it as "the product
+ * is 60% done". Doc 16 §6 is explicit that the card must answer *can a real
+ * customer complete a journey and pay for it*, and that by that measure the
+ * answer is nearer a quarter. A bar past halfway when the answer is a quarter is
+ * a fake success state, which doc 15 §2 rule 3 forbids.
+ *
+ * Per-stage percentages are still correct and still shown — as stage detail,
+ * where the denominator is visible and cannot be mistaken for the product.
+ */
+export const STATUS_ONLY_STAGE = 'beta-path'
+
+export function journeyPercent(items: readonly OpsRoadmapItem[]): number {
+  // `beta-path` holds doc 16 §6's five phases. They are a STATUS VIEW of work
+  // already counted under the product stages, not extra work — counting both
+  // double-fills the denominator and *understates* progress. Including them
+  // moved the headline from 22% to 14%, which is wrong in the flattering-free
+  // direction but still wrong.
+  const counted = items.filter((item) => item.stage !== STATUS_ONLY_STAGE)
+  const total = counted.reduce((sum, item) => sum + item.weight, 0)
+  if (total === 0) return 0
+  const done = counted
+    .filter((item) => item.status === 'done')
+    .reduce((sum, item) => sum + item.weight, 0)
+  // Floor, never round: 22.9% must not present itself as 23%.
+  return Math.floor((done / total) * 100)
+}
+
+/** What the headline number is measuring. Shown next to it, never implied. */
+export const JOURNEY_LABEL = 'of the way to a customer completing a journey and paying'

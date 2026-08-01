@@ -1,6 +1,7 @@
 import { AlertTriangle, CircleDot, ListChecks } from 'lucide-react'
 
 import { AlphaReadiness } from '@/components/admin/alpha-readiness'
+import { JOURNEY_LABEL, journeyPercent } from '@/lib/ops/roadmap-progress'
 import { GATE_SUITES, readGateRuns, readRoadmapItems, readTasks } from '@/lib/ops/read'
 import { gateChips, redSuitesFrom } from '@/lib/ops/session-pulse'
 import {
@@ -141,6 +142,7 @@ export async function RoadmapCard() {
   const stages = summarise(items.data)
   const currentCode = currentStage(items.data)
   const stage = stages.find((entry) => entry.stage === currentCode) ?? null
+  const journey = journeyPercent(items.data)
 
   // The nearest deadline in the current stage. Items carry their own targets and
   // most carry none; the soonest is the one that bites first.
@@ -195,24 +197,32 @@ export async function RoadmapCard() {
 
       {stage ? (
         <>
+          {/* Doc 16 §6: the headline answers "can a customer complete a
+              journey and pay", so it is the WHOLE roadmap, not this stage. It
+              used to be stage.percent, which read 60% while the roadmap stood
+              at 22% — a bar past halfway when the answer is a quarter, which
+              doc 15 §2 rule 3 forbids. The stage figure is still shown below,
+              where its denominator is visible. */}
           <div className="mt-3 flex items-center gap-3">
             <div
               role="progressbar"
-              aria-valuenow={stage.percent}
+              aria-valuenow={journey}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label={`${stage.label} progress`}
+              aria-label={`${journey}% ${JOURNEY_LABEL}`}
               className="h-2 min-w-0 flex-1 overflow-hidden rounded-pill bg-s2"
             >
               <div
                 className="h-full rounded-pill bg-primary transition-micro"
-                style={{ width: `${stage.percent}%` }}
+                style={{ width: `${journey}%` }}
               />
             </div>
-            <span className="text-[13px] font-semibold tabular-nums">{stage.percent}%</span>
+            <span className="text-[13px] font-semibold tabular-nums">{journey}%</span>
           </div>
+          <p className="mt-1 text-[12px] text-muted">{JOURNEY_LABEL}</p>
           <p className="mt-1.5 text-[12px] text-muted tabular-nums">
-            {stage.doneWeight} of {stage.totalWeight} by weight · {stage.openItems.length} item
+            {stage.label} stage: {stage.percent}% · {stage.doneWeight} of {stage.totalWeight} by
+            weight · {stage.openItems.length} item
             {stage.openItems.length === 1 ? '' : 's'} open
           </p>
         </>
