@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   classifyBashRuns,
   countsFor,
+  coverageFor,
   isGitCommit,
   stripAnsi,
   suiteFor,
@@ -363,6 +364,44 @@ describe('SL-051 — a skipped test is not a passed test', () => {
     const rows = classifyBashRuns({
       command: 'pnpm turbo run test',
       output: 'Tests  273 passed (273)',
+      exitCode: 0,
+    })
+    expect(rows[0].summary_plain).toMatch(/everything passed/)
+  })
+})
+
+describe('a filtered run must not record as a whole-workspace pass', () => {
+  it('extracts the packages a --filter run covered', () => {
+    expect(coverageFor('pnpm turbo run test --filter=@sahoda/web')).toEqual(['@sahoda/web'])
+    expect(coverageFor('turbo test --filter @sahoda/db --filter=@sahoda/jobs')).toEqual([
+      '@sahoda/db',
+      '@sahoda/jobs',
+    ])
+  })
+
+  it('returns null for an unfiltered run, which really did cover everything', () => {
+    expect(coverageFor('pnpm turbo run test')).toBeNull()
+  })
+
+  it('says ONLY, and names the scope, instead of claiming a clean pass', () => {
+    // The mechanism behind 38 false greens: --filter=@sahoda/web recorded as a
+    // bare `unit` pass, which the gates strip renders as the suite being green.
+    const rows = classifyBashRuns({
+      command: 'pnpm turbo run test --filter=@sahoda/web',
+      output: 'Tests  1947 passed (1947)',
+      exitCode: 0,
+    })
+    for (const row of rows) {
+      expect(row.summary_plain).toMatch(/@sahoda\/web ONLY/)
+      expect(row.summary_plain).toMatch(/does not cover the workspace/)
+      expect(row.summary_plain).not.toMatch(/everything passed/)
+    }
+  })
+
+  it('still claims a clean pass when nothing was filtered', () => {
+    const rows = classifyBashRuns({
+      command: 'pnpm turbo run test',
+      output: 'Tests  1947 passed (1947)',
       exitCode: 0,
     })
     expect(rows[0].summary_plain).toMatch(/everything passed/)

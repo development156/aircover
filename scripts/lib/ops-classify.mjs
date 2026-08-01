@@ -110,6 +110,22 @@ export function stripAnsi(text) {
  * passed" for a run of 1296 — a number that was real, attached to the wrong
  * thing, and lower than the truth. A count in a QA record has to be the count.
  */
+/**
+ * Which packages a command actually covered (SL-051 follow-up).
+ *
+ * 44 of 50 recorded "unit passed" runs never executed packages/db, and 38 of
+ * those were `--filter=@sahoda/web` runs recorded as a bare `unit` pass. The
+ * gates strip then renders that as the unit suite being green. A run's scope
+ * has to survive into its record, or the record claims more than the run did.
+ *
+ * Returns null for an unfiltered run — that genuinely covered the workspace.
+ */
+export function coverageFor(command) {
+  if (typeof command !== 'string') return null
+  const found = [...command.matchAll(/--filter[= ]([^\s]+)/g)].map((m) => m[1].replace(/^['"]|['"]$/g, ''))
+  return found.length === 0 ? null : [...new Set(found)]
+}
+
 export function countsFor(output) {
   const text = stripAnsi(output)
 
@@ -164,6 +180,7 @@ export function classifyBashRuns({ command, output, exitCode, durationMs }) {
   if (!status) return []
 
   const { passed, failed, skipped } = countsFor(output)
+  const coverage = coverageFor(command)
   const detail =
     passed === null && failed === null
       ? ''
@@ -204,7 +221,9 @@ export function classifyBashRuns({ command, output, exitCode, durationMs }) {
         ? `The ${suite} checks ran${detail}, but ${skipped} test${
             skipped === 1 ? '' : 's'
           } did NOT run — this does not prove the suite passes.`
-        : `The ${suite} checks ran and everything passed${detail}.`,
+        : coverage
+          ? `The ${suite} checks passed${detail} for ${coverage.join(', ')} ONLY — this run was filtered and does not cover the workspace.`
+          : `The ${suite} checks ran and everything passed${detail}.`,
     details,
     duration_ms,
   }))
