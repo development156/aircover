@@ -132,6 +132,15 @@ export function countsFor(output) {
   return {
     passed: sum(/(\d+)\s+passed/i),
     failed: sum(/(\d+)\s+failed/i),
+    // SL-051. This function was hardened three times against UNDERSTATING
+    // success — the comment above still says understatement "is its own kind of
+    // dishonesty" — and nobody asked the opposite question: should a test that
+    // never ran count as one that passed? Vitest prints
+    // `Tests 71 passed | 202 skipped (273)` and the 202 was invisible, so a run
+    // where the entire database suite was skipped recorded as "the checks ran
+    // and everything passed". A skip is not a pass. It is not a failure either;
+    // it is an absence, and the summary has to say so.
+    skipped: sum(/(\d+)\s+skipped/i),
   }
 }
 
@@ -154,7 +163,7 @@ export function classifyBashRuns({ command, output, exitCode, durationMs }) {
   const status = verdictFor({ output, exitCode })
   if (!status) return []
 
-  const { passed, failed } = countsFor(output)
+  const { passed, failed, skipped } = countsFor(output)
   const detail =
     passed === null && failed === null
       ? ''
@@ -186,7 +195,16 @@ export function classifyBashRuns({ command, output, exitCode, durationMs }) {
   return suites.map((suite) => ({
     suite,
     status,
-    summary_plain: `The ${suite} checks ran and everything passed${detail}.`,
+    // "everything passed" is only sayable when nothing was skipped. With skips
+    // present the sentence names them, because the difference between "247
+    // tests passed" and "45 passed and 202 never ran" is the whole point of
+    // recording a QA run at all.
+    summary_plain:
+      skipped !== null && skipped > 0
+        ? `The ${suite} checks ran${detail}, but ${skipped} test${
+            skipped === 1 ? '' : 's'
+          } did NOT run — this does not prove the suite passes.`
+        : `The ${suite} checks ran and everything passed${detail}.`,
     details,
     duration_ms,
   }))

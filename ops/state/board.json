@@ -575,7 +575,7 @@
       "title": "The QA evidence hook counts skipped tests as passed",
       "detail": "`scripts/lib/ops-classify.mjs:132-135` — `countsFor()` has a regex for `passed` and one for `failed` and NONE for `skipped`. Vitest prints `Tests 71 passed | 202 skipped (273)`; the 202 is invisible. A run where 202 database tests never executed was recorded as \"the checks ran and everything passed.\" Contributing factor at `:166`: `stripAnsi(output).slice(-4000)` keeps only the tail, so the skip lines never reach the classifier and `apps/web`'s count gets attributed to a suite labelled typecheck. Fix: add `skipped: sum(/(\\d+)\\s+skipped/i)` and make the summary sentence at `:189` conditional on it being zero. Note the shape of the bug — the function was hardened three times against UNDERSTATING success, with a comment at `:43-44` saying understatement \"is its own kind of dishonesty,\" and nobody asked whether a test that never ran should count as one that passed. Direct violation of doc 15 §2 rule 3.",
       "roadmap_code": null,
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "docs/16_Roadmap_Update_SAHODA_LABS.md §4",
       "sort": 30,

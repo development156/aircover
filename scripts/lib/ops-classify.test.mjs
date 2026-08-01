@@ -93,7 +93,7 @@ describe('countsFor', () => {
   })
 
   it('returns nulls when the runner said nothing countable', () => {
-    expect(countsFor('')).toEqual({ passed: null, failed: null })
+    expect(countsFor('')).toEqual({ passed: null, failed: null, skipped: null })
   })
 
   it('sums every package summary in a turbo run rather than taking the first', () => {
@@ -119,7 +119,7 @@ describe('countsFor', () => {
       '@sahoda/shared:test: Tests  55 passed (55)',
     ].join('\n')
 
-    expect(countsFor(output)).toEqual({ passed: 167 + 1295 + 55, failed: 1 })
+    expect(countsFor(output)).toEqual({ passed: 167 + 1295 + 55, failed: 1, skipped: null })
   })
 })
 
@@ -331,5 +331,40 @@ describe('only feat and fix CLOSE a card', () => {
     expect(
       closingTaskCodes("git commit -F - <<'MSG'\nfix(SL-016): the board writes\n\nbody\nMSG"),
     ).toEqual(['SL-016'])
+  })
+})
+
+describe('SL-051 — a skipped test is not a passed test', () => {
+  const VITEST_SKIPS = 'Tests  71 passed | 202 skipped (273)'
+
+  it('counts skips, which were previously invisible', () => {
+    expect(countsFor(VITEST_SKIPS)).toMatchObject({ passed: 71, skipped: 202 })
+  })
+
+  it('reports zero-ish rather than inventing a count when there are none', () => {
+    expect(countsFor('Tests  71 passed (71)').skipped).toBeNull()
+  })
+
+  it('refuses to say "everything passed" when tests did not run', () => {
+    // The exact sentence that recorded a run where 202 database tests never
+    // executed as a clean pass.
+    const rows = classifyBashRuns({
+      command: 'pnpm turbo run test',
+      output: VITEST_SKIPS,
+      exitCode: 0,
+    })
+    for (const row of rows) {
+      expect(row.summary_plain).not.toMatch(/everything passed/)
+      expect(row.summary_plain).toMatch(/202 tests did NOT run/)
+    }
+  })
+
+  it('still says everything passed when nothing was skipped', () => {
+    const rows = classifyBashRuns({
+      command: 'pnpm turbo run test',
+      output: 'Tests  273 passed (273)',
+      exitCode: 0,
+    })
+    expect(rows[0].summary_plain).toMatch(/everything passed/)
   })
 })
