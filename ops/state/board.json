@@ -686,6 +686,19 @@
       "commit_sha": null,
       "blocked": false,
       "blocked_reason": null
+    },
+    {
+      "code": "SL-060",
+      "title": "The seed had silently stopped matching the board — guard it on every commit",
+      "detail": "Found 1 Aug while applying doc 16 §4: `scripts/lib/ops-seed-data.mjs` was SEVENTEEN cards behind `ops/state/board.json`. SL-044…049 were never added, and eleven more (SL-013…020, 033, 042, 043) carried stale or empty details. A fresh seed would have produced a board missing ten cards and stripped of the Recharts ruling (SL-042), the staging plan (SL-043) and the SL-019/020 blocked rationale — silently, with no error. Nothing was broken in production, which is the danger: this is the DISASTER-RECOVERY path, and it had been rotting for weeks with no symptom. It surfaced only because doc 16 §5.7 happened to include an assertion nobody had thought to write before — and that assertion was ALREADY FAILING the first time it ran. A recovery path checked only when someone remembers is one you discover during the recovery. FIXED: seed backfilled and repaired by index (preserving the array's roadmap_code comments), and `apps/web/src/lib/ops/seed-parity.test.ts` now asserts on every commit that a fresh seed reproduces the committed board — same codes, same titles, same details, contiguous numbering (the seed derives SL-### from array position, so a gap silently renumbers everything after it). Placed in apps/web, not beside the seed, because the Stop hook gates on turbo's `test` task and the root vitest suite is not part of it — the same reason turbo-env-wiring.test.ts reads the root turbo.json from there. Same class as the migration-integrity guard: a cheap automatic check against a claim everything downstream assumes. 2 mutants killed (dropped card, altered title).",
+      "roadmap_code": null,
+      "board_column": "done",
+      "assignee": "claude",
+      "doc_ref": "apps/web/src/lib/ops/seed-parity.test.ts",
+      "sort": 55,
+      "commit_sha": null,
+      "blocked": false,
+      "blocked_reason": null
     }
   ]
 }
