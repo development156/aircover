@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { DOCUMENT_HEADERS, EXPECTED_ROUTES, judge, summarise } from './probe-routes.mjs'
 
 const HOST = 'https://sahodalabs.vercel.app'
-const html = '<!doctype html><html><head><title>Sign in · Sahoda</title></head><body>x</body></html>'
+const html =
+  '<!doctype html><html><head><title>Sign in · Sahoda</title></head><body>x</body></html>'
 
 const ok = (over = {}) => ({
   status: 200,
@@ -13,8 +14,7 @@ const ok = (over = {}) => ({
   ...over,
 })
 
-const signInFor = (path) =>
-  `${HOST}/sign-in?redirect_url=${encodeURIComponent(`${HOST}${path}`)}`
+const signInFor = (path) => `${HOST}/sign-in?redirect_url=${encodeURIComponent(`${HOST}${path}`)}`
 
 describe('the probe measures like a browser, not like curl', () => {
   it('sends navigation headers', () => {
@@ -105,7 +105,12 @@ describe('the gated route', () => {
 
   it('fails if it starts rendering a body', () => {
     expect(
-      judge(route, { status: 404, contentType: 'text/html', body: html, finalUrl: `${HOST}/admin` }),
+      judge(route, {
+        status: 404,
+        contentType: 'text/html',
+        body: html,
+        finalUrl: `${HOST}/admin`,
+      }),
     ).toMatchObject({ ok: false })
   })
 

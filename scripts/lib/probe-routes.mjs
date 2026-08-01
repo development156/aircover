@@ -99,5 +99,10 @@ export function judge(route, result) {
 
 export function summarise(verdicts) {
   const failed = verdicts.filter((v) => !v.ok)
-  return { ok: failed.length === 0, passed: verdicts.length - failed.length, total: verdicts.length, failed }
+  return {
+    ok: failed.length === 0,
+    passed: verdicts.length - failed.length,
+    total: verdicts.length,
+    failed,
+  }
 }
