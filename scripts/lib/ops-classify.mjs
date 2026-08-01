@@ -122,7 +122,9 @@ export function stripAnsi(text) {
  */
 export function coverageFor(command) {
   if (typeof command !== 'string') return null
-  const found = [...command.matchAll(/--filter[= ]([^\s]+)/g)].map((m) => m[1].replace(/^['"]|['"]$/g, ''))
+  const found = [...command.matchAll(/--filter[= ]([^\s]+)/g)].map((m) =>
+    m[1].replace(/^['"]|['"]$/g, ''),
+  )
   return found.length === 0 ? null : [...new Set(found)]
 }
 
