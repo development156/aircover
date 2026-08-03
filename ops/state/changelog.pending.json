@@ -1,4 +1,13 @@
 {
   "version": 1,
-  "entries": []
+  "entries": [
+    {
+      "client_id": "cl-msaetxy1-a163bc84",
+      "title": "The dev dashboard now reads in plain English",
+      "summary_plain": "Every card on the board has been rewritten for someone who does not read code - what it does and why it matters, with the technical detail tucked behind a click. Progress now leads the page: how far along we are, what shipped this week, what is stuck and who we are waiting on. Everything else starts folded away, and the page remembers what you left open. Two things it will never hide: anything blocked, and anything failing. The Alpha warning is smaller but still red and still there. The board also now says how long ago it was last updated, because a dashboard that is quietly out of date is worse than no dashboard.",
+      "kind": "changed",
+      "task_codes": [],
+      "happened_at": "2026-08-01T13:31:28.921Z"
+    }
+  ]
 }

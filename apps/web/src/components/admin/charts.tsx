@@ -20,11 +20,12 @@ export async function AdminCharts() {
   const now = new Date()
 
   return (
+    /* Side by side from the wide breakpoint (SL-062 §4). Below it they stack,
+       because two charts squeezed into half a narrow screen are two charts
+       nobody can read. The shadow is gone: the collapsible region around this
+       is already a card, and a card inside a card reads as a mistake. */
     <div className="grid gap-grid wide:grid-cols-2">
-      <section
-        aria-labelledby="flow-heading"
-        className="rounded-card border border-line bg-bg p-5 shadow-card"
-      >
+      <section aria-labelledby="flow-heading" className="rounded-card border border-line bg-bg p-4">
         <h2 id="flow-heading" className="text-[15px] font-bold tracking-[-0.01em]">
           Cumulative flow
         </h2>
@@ -40,10 +41,7 @@ export async function AdminCharts() {
         )}
       </section>
 
-      <section
-        aria-labelledby="gate-heading"
-        className="rounded-card border border-line bg-bg p-5 shadow-card"
-      >
+      <section aria-labelledby="gate-heading" className="rounded-card border border-line bg-bg p-4">
         <h2 id="gate-heading" className="text-[15px] font-bold tracking-[-0.01em]">
           Gate health
         </h2>

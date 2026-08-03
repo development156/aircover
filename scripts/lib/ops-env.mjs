@@ -98,18 +98,71 @@ export function loadEnv() {
       .map((e) => e.trim().toLowerCase())
       .filter(Boolean),
     ingestToken: read('DEVOPS_INGEST_TOKEN'),
-    /**
-     * OPS_INGEST_URL only — deliberately NOT falling back to NEXT_PUBLIC_APP_URL.
-     *
-     * That fallback existed for one commit and was wrong: NEXT_PUBLIC_APP_URL is
-     * https://app.sahodalabs.com, so every PostToolUse hook on a developer's
-     * laptop would have POSTed local board state to production. Syncing to
-     * prod has to be something someone typed on purpose, not the default that
-     * happens when a var is unset.
-     */
-    ingestUrl: read('OPS_INGEST_URL') || 'http://localhost:3000',
+    ...resolveIngestUrl(read('OPS_INGEST_URL')),
   }
   return cache
+}
+
+/**
+ * Where the board is published. The deployed console.
+ *
+ * Hardcoded rather than read from NEXT_PUBLIC_APP_URL, which `.env.example`
+ * ships as `http://localhost:3000` — a "production default" that resolves to a
+ * laptop on any fresh checkout would be the same silence this card is about,
+ * one layer along.
+ */
+export const PRODUCTION_INGEST_URL = 'https://app.sahodalabs.com'
+
+/**
+ * THE DEFAULT TARGET IS PRODUCTION. Reversed 2026-08-01 (SL-061 Tier 2).
+ *
+ * ── THIS REVERSES AN EARLIER, DELIBERATE DECISION. READ BEFORE CHANGING IT ──
+ * The default used to be `http://localhost:3000`, and that was not an oversight:
+ * an earlier build fell back to NEXT_PUBLIC_APP_URL, so a PostToolUse hook on a
+ * developer's laptop POSTed local board state straight to production. Defaulting
+ * to localhost was the fix, and the reasoning — "syncing to prod has to be
+ * something someone typed on purpose" — was sound.
+ *
+ * It also produced the failure that replaced it. With localhost as the default,
+ * a sync with no dev server running queued the update, printed "will replay on
+ * the next sync", and EXITED SUCCESSFULLY. That promise is only kept if a sync
+ * ever runs. For 30 hours none did, and the deployed board sat 30 hours behind
+ * showing 49 cards when the repo held 60, with nothing on the page saying so.
+ *
+ * Both defaults are wrong in one direction each. The judgement recorded on the
+ * card is that a board nobody can trust is worse than an early publish of state
+ * that is, in any case, committed to the repository and reviewed like code —
+ * and that the earlier hazard is better addressed by being LOUD than by aiming
+ * somewhere harmless. So:
+ *
+ *   · unset            → production. The board publishes by default.
+ *   · OPS_INGEST_URL   → whatever it says. A developer machine is now the
+ *                        explicit opt-in, in gitignored `ops/.local.env`.
+ *
+ * And the other half of the reversal, without which this would be worse than
+ * what it replaced: an unreachable endpoint is no longer a silent queue. See
+ * `ops-sync.mjs` — it prints the target on every run, and exits non-zero when a
+ * person asked for the sync.
+ *
+ * @param {string} explicit the value of OPS_INGEST_URL, '' when unset
+ */
+export function resolveIngestUrl(explicit) {
+  const url = explicit || PRODUCTION_INGEST_URL
+  let isProduction = false
+  try {
+    isProduction = new URL(url).origin === new URL(PRODUCTION_INGEST_URL).origin
+  } catch {
+    // An unparseable value is not production, and the sync will fail loudly on
+    // it — better than quietly treating a typo as a local address.
+    isProduction = false
+  }
+
+  return {
+    ingestUrl: url,
+    /** Named so the sync can print WHERE it published, every time. */
+    ingestUrlSource: explicit ? 'OPS_INGEST_URL' : 'default',
+    ingestUrlIsProduction: isProduction,
+  }
 }
 
 /** One warning line, never a stack trace — these scripts must not become the story. */

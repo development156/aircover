@@ -161,6 +161,54 @@ export function shortAge(ms: number | null): string | null {
   return `${days} ${days === 1 ? 'day' : 'days'}`
 }
 
+/**
+ * How many Done cards the column shows before it offers the rest (SL-062 §4).
+ *
+ * Done is 35 of the board's 62 cards and grows forever, so an uncapped column
+ * pushes To Do and In Progress — the columns anybody is actually looking at —
+ * off the bottom of the screen.
+ */
+export const DONE_COLUMN_CAP = 8
+
+export interface CappedColumn {
+  shown: BoardCard[]
+  /** How many are held back. Zero when nothing is hidden. */
+  hidden: number
+}
+
+/**
+ * Cap a column WITHOUT ever hiding something red (SL-062 §5).
+ *
+ * Red cards are taken first and are never truncated, however many there are —
+ * a cap that could bury a blocked or failing card behind "show 27 more" would
+ * be exactly the rule this whole rebuild exists to keep. The cap applies to
+ * the remainder, so a column of 30 with 12 red shows all 12 red and fills the
+ * rest of its allowance from the others.
+ *
+ * Board order is preserved in the output, so the visible cards read in the same
+ * sequence they would if nothing were capped.
+ */
+export function capColumn(cards: readonly BoardCard[], cap = DONE_COLUMN_CAP): CappedColumn {
+  if (cards.length <= cap) return { shown: [...cards], hidden: 0 }
+
+  const red = new Set(cards.filter((card) => card.blocked || card.qa === 'fail'))
+  // Whatever allowance is left after the red cards have taken theirs. Never
+  // negative: red always wins, and a column can exceed the cap because of it.
+  const room = Math.max(0, cap - red.size)
+
+  let taken = 0
+  const shown = cards.filter((card) => {
+    if (red.has(card)) return true
+    if (taken < room) {
+      taken += 1
+      return true
+    }
+    return false
+  })
+
+  return { shown, hidden: cards.length - shown.length }
+}
+
 /** The distinct roadmap stage prefixes present on the board, for the filter. */
 export function stagesOn(cards: readonly BoardCard[]): string[] {
   const prefixes = new Set<string>()

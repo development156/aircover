@@ -93,7 +93,34 @@ async function cmdTask() {
     task.board_column = COLUMN[action]
     task.blocked = false
     task.blocked_reason = null
-    if (note) task.detail = note
+
+    /**
+     * A MOVE NOTE NO LONGER OVERWRITES THE CARD. Fixed 2026-08-01 (SL-063).
+     *
+     * This line used to read `if (note) task.detail = note`, which REPLACED the
+     * card's entire detail with one sentence about the move. That is how
+     * SL-013…018 came to be described as "Shell, sub-nav and rail item render;
+     * typecheck+lint green" — a note from a move, standing where the card's
+     * reasoning used to be. SL-060 recorded eleven cards "carrying stale or
+     * empty details" and read it as seed drift; for at least six of them this
+     * command is the mechanism, and it destroyed the text silently, with an
+     * exit 0 and a cheerful arrow.
+     *
+     * `detail` is now owned by `scripts/lib/ops-cards.mjs` and written by
+     * `ops-cards-write.mjs`, so clobbering it here would also be overwritten
+     * back — the note would be lost twice over.
+     *
+     * The note is not silently dropped either; it is printed with the one line
+     * saying where a durable note actually belongs. There is no per-move note
+     * column, and inventing one out of a content field is what caused this.
+     */
+    if (note) {
+      console.log(`ops: note — ${note}`)
+      console.log(
+        'ops: notes are not stored on the card. Use /log-change for anything a reader ' +
+          'should see, or /qa-log to record what you verified.',
+      )
+    }
   } else {
     die(`unknown action "${action}". Use start, review, done or block.`)
   }

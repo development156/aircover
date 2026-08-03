@@ -84,20 +84,24 @@ export function ChangelogRail({ entries }: { entries: readonly OpsChangelogEntry
   const days = groupByDay(entries)
 
   return (
-    <section
-      aria-labelledby="changelog-heading"
-      className="rounded-card border border-line bg-bg p-4 shadow-card"
-    >
-      <h2 id="changelog-heading" className="text-[15px] font-bold tracking-[-0.01em]">
-        Changelog
-      </h2>
-
+    /**
+     * No card chrome and no heading of its own: the collapsible region around
+     * this on `/admin/dev` supplies both, and two nested headings reading
+     * "Changelog" is how a page starts to look like it was assembled rather
+     * than designed.
+     *
+     * SCROLLS IN ITS OWN HEIGHT (SL-062 §4). The rail is bounded and scrolls
+     * internally, so a hundred entries cannot stretch the page and push the
+     * board off the bottom of it. `overscroll-contain` keeps a scroll that
+     * reaches the end of the rail from carrying on down the page.
+     */
+    <section aria-label="Changelog entries">
       {days.length === 0 ? (
-        <p className="mt-3 text-[13px] text-muted">
+        <p className="text-[13px] text-muted">
           No entries yet. One gets written at every ship and any user-visible change.
         </p>
       ) : (
-        <div className="mt-3 space-y-5">
+        <div className="max-h-[32rem] space-y-5 overflow-y-auto overscroll-contain pr-2">
           {days.map((day) => (
             <div key={day.key}>
               <div className="mb-2 flex items-baseline gap-2">

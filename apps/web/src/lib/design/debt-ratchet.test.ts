@@ -31,7 +31,11 @@ import { INK_FAINT_EXCEPTIONS } from './ink-faint-exceptions'
  */
 
 /** ink-faint: 3 legitimate files (4 uses) + 16 admin debt files (24 uses). */
-const INK_FAINT_BASELINE = Object.freeze({ files: 19, uses: 28, debtFiles: 16, debtUses: 24 })
+// Lowered 2026-08-01 (SL-062): `roadmap-card.tsx` was replaced by `hero-card.tsx`,
+// which paints no content with --ink-faint, so its 1 debt use is gone rather than
+// moved. Deleting an entry without lowering the baseline would leave headroom for
+// the next regression to slip into for free — the ratchet only works if it tightens.
+const INK_FAINT_BASELINE = Object.freeze({ files: 18, uses: 27, debtFiles: 15, debtUses: 23 })
 
 /** eyebrow: 0 legitimate + 4 admin debt files (5 uses — qa-console-view has two). */
 const EYEBROW_BASELINE = Object.freeze({ files: 4, uses: 5, debtFiles: 4, debtUses: 5 })

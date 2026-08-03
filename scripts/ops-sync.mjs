@@ -150,9 +150,26 @@ async function post(payload) {
     }
     return JSON.parse(text)
   } catch (error) {
-    warn(
-      `ingest unreachable at ${url} (${error?.name === 'AbortError' ? 'timeout' : 'offline'}) — will replay on the next sync.`,
+    // NOT a silent queue any more (SL-061 Tier 2). "Will replay on the next
+    // sync" is a promise that is only kept if a sync ever runs — and for 30
+    // hours none did, which is how the board fell 30 hours behind while every
+    // run reported success. The queue still holds the update, because losing it
+    // would be worse; what changed is that nobody is told it went out when it
+    // did not.
+    const why = error?.name === 'AbortError' ? 'timeout' : 'offline'
+    console.error(
+      [
+        `ops: THE BOARD WAS NOT UPDATED — ingest unreachable at ${url} (${why}).`,
+        `     The update is queued on disk and will go out on the next sync THAT REACHES A SERVER.`,
+        `     Until then the deployed board is behind, and it does not know it.`,
+        env.ingestUrlIsProduction
+          ? `     Target was production, by default. If you meant a local server, set OPS_INGEST_URL in ops/.local.env.`
+          : `     Target came from OPS_INGEST_URL. Unset it to publish to production instead.`,
+      ].join('\n'),
     )
+    // Hooks still exit 0 — doc 13 §9.2, a hook must never block work — but they
+    // print the same block, so the failure is visible either way.
+    if (!FLAGS.hookWrite && !FLAGS.heartbeat) process.exitCode = 1
     return null
   } finally {
     clearTimeout(timer)
@@ -208,7 +225,14 @@ async function main() {
   const parts = ['roadmap', 'tasks', 'changelog', 'qa']
     .map((k) => `${k} ${ack[k] ?? 0}`)
     .join(' · ')
-  console.log(`ops: synced — ${parts}${ack.archived ? ` · archived ${ack.archived}` : ''}`)
+  // The TARGET is printed on every successful sync, not only on failure. The
+  // default now publishes to production (SL-061 Tier 2), and "where did that
+  // go" must be answerable from the scrollback rather than by reading env files.
+  const env = loadEnv()
+  console.log(
+    `ops: synced → ${env.ingestUrl} (${env.ingestUrlSource}) — ${parts}` +
+      `${ack.archived ? ` · archived ${ack.archived}` : ''}`,
+  )
 }
 
 main().catch((error) => {

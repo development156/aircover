@@ -24,6 +24,7 @@ import {
   type OpsBetaApplication,
 } from '@sahoda/shared'
 
+import { newestOf } from '@/lib/ops/freshness'
 import { createServerSupabase } from '@/lib/supabase/server'
 
 /**
@@ -179,6 +180,60 @@ export const readGateRuns = cache(
     return { status: 'ok', data: latest }
   },
 )
+
+/**
+ * The tables a sync writes to. Their newest `updated_at` IS the freshness
+ * figure — see `lib/ops/freshness.ts` for why it must be read from here rather
+ * than reported by the syncer.
+ */
+const SYNCED_TABLES = [
+  'ops_tasks',
+  'ops_changelog',
+  'ops_qa_runs',
+  'ops_roadmap_items',
+  'ops_sessions',
+] as const
+
+/**
+ * `max(updated_at)` across the synced tables (SL-061, Tier 1).
+ *
+ * Returns the timestamp, or null when nothing has ever been written. A FAILED
+ * read also returns `unreadable` rather than null, because "we could not ask"
+ * and "nothing has ever arrived" are different sentences and the card says both
+ * differently — collapsing them would let a broken read render as a fresh board.
+ *
+ * One row per table, five tiny queries in parallel. Not a view or an RPC: this
+ * must keep working when a table is added or dropped, and a missing table here
+ * costs one input to a max rather than the whole figure.
+ */
+export const readLastSyncedAt = cache(async (): Promise<OpsRead<string | null>> => {
+  const supabase = createServerSupabase()
+
+  const results = await Promise.all(
+    SYNCED_TABLES.map((table) =>
+      readAll(`freshness:${table}`, z.object({ updated_at: z.string() }).nullable(), () =>
+        supabase
+          .from(table)
+          .select('updated_at')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ),
+    ),
+  )
+
+  // Every table failing means we genuinely cannot tell. SOME failing still
+  // yields a lower bound, and a lower bound on freshness is safe in the honest
+  // direction: it can only make the board look older than it is.
+  if (results.every((result) => result.status !== 'ok')) {
+    return { status: 'unreadable' }
+  }
+
+  const stamps = results.map((result) =>
+    result.status === 'ok' ? (result.data?.updated_at ?? null) : null,
+  )
+  return { status: 'ok', data: newestOf(stamps) }
+})
 
 /**
  * Credit requests, newest first.

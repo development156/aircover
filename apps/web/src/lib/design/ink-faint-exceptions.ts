@@ -179,14 +179,6 @@ export const INK_FAINT_EXCEPTIONS: Readonly<Record<string, InkFaintException>> =
     reason:
       'Run timestamp at ~2.5:1. Content, not decoration. Pre-dates the v3 readability guards.',
   },
-  'src/components/admin/roadmap-card.tsx': {
-    uses: 1,
-    kind: 'debt',
-    since: '2026-07-28',
-    card: 'SL-044',
-    reason:
-      'Progress meta at ~2.5:1. Content, not decoration. Pre-dates the v3 readability guards.',
-  },
   'src/components/admin/strips.tsx': {
     uses: 1,
     kind: 'debt',

@@ -87,6 +87,12 @@ Rules: approver must be a different active `admin`/`owner` than the requester (*
 - **Copy affordances:** per-entry copy (plain + markdown) · "Copy day" · "Copy since last copy" (watermark stored per admin) — clipboard-first because these get pasted into WhatsApp/investor notes.
 - **Feeds:** Claude writes an entry at every `/ship` and any user-visible change (§9); humans can add entries in a 3-field sheet. Entries flagged `tourable` are the future M15 release-tour source — flag exists now, engine later.
 
+**EXTENDED 2026-08-01 (SL-062) — this section now governs the BOARD as well as the changelog.** The `summary_plain` rule above was written for changelog entries only, and the board was left to accumulate titles like `ops_* migrations + RLS + is_ops_admin()`. The result was a console the founder could not read: 62 cards written by the engineer who found each problem, for the engineer who would fix it. The rule is now the same on both surfaces — **a card's `title` is plain English with no path, function name, line number or table name in it, and its `detail` opens with two or three sentences saying what it does and why it matters, before any engineering.** Both halves live in one `detail` string separated by the sentinel `\n\nTechnical detail — `, because `ops_tasks` has no third text field and only `wt-db` may add one; `apps/web/src/lib/ops/card-copy.ts` splits them and renders the second collapsed.
+
+Nothing is deleted by a rewrite. Every path, sha, measurement and ruling that was on a card is still on it, one disclosure away — losing the Recharts decision (§SL-042) or the staging plan (§SL-043) would cost far more than the readability it bought.
+
+Card text has ONE source: `scripts/lib/ops-cards.mjs`. `ops/state/board.json` is written from it by `scripts/ops-cards-write.mjs` and `scripts/lib/ops-seed-data.mjs` imports from it, so the seed and the board cannot drift the way they did in SL-060. Editing a title directly in `board.json` is out of contract — the next writer overwrites it.
+
 ## 9. D3+D4+D1 feeder · The Claude Code ↔ Dashboard sync protocol ⚙️ (the core of this doc)
 **Principle:** the repo is the source of truth; the dashboard mirrors it in near-realtime. Claude never "remembers to update the dashboard" — hooks make it a side-effect.
 

@@ -39,3 +39,5 @@ Desktop.ini
 ops/.local.env
 .vercel
 .env*
+# Supabase CLI scratch (written by the CLI on link; not ours to commit)
+supabase/.temp/

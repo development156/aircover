@@ -127,7 +127,7 @@ describe('ChangelogRail', () => {
 
   it('says an empty changelog is empty, and what fills it', () => {
     render(<ChangelogRail entries={[]} />)
-    const section = screen.getByRole('region', { name: 'Changelog' })
+    const section = screen.getByRole('region', { name: 'Changelog entries' })
 
     expect(within(section).getByText(/No entries yet/)).toBeInTheDocument()
   })

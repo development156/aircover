@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { OpsQaRun, OpsTask } from '@sahoda/shared'
 
+import type { BoardCard } from './board'
 import {
   applyFilters,
+  capColumn,
   columnEnteredAt,
   groupByColumn,
   NO_FILTERS,
@@ -224,5 +226,83 @@ describe('stagesOn', () => {
     )
 
     expect(stagesOn(cards)).toEqual(['A', 'AO'])
+  })
+})
+
+describe('capColumn — the Done column is capped, but never over something red', () => {
+  function c(over: Partial<BoardCard> & { code: string }): BoardCard {
+    return {
+      code: over.code,
+      title: over.title ?? over.code,
+      detail: null,
+      roadmapCode: null,
+      assignee: 'claude',
+      column: over.column ?? 'done',
+      blocked: over.blocked ?? false,
+      blockedReason: null,
+      commitSha: null,
+      prRef: null,
+      qa: over.qa ?? 'none',
+      ageMs: null,
+      movedBy: 'claude',
+    }
+  }
+
+  const many = (n: number) => Array.from({ length: n }, (_, i) => c({ code: `SL-${i}` }))
+
+  it('shows everything when the column is under the cap', () => {
+    expect(capColumn(many(5), 8)).toEqual({ shown: many(5), hidden: 0 })
+  })
+
+  it('holds the rest back and says how many', () => {
+    const capped = capColumn(many(30), 8)
+    expect(capped.shown).toHaveLength(8)
+    expect(capped.hidden).toBe(22)
+  })
+
+  it('NEVER hides a blocked card, wherever it sits in the column', () => {
+    // The rule that outranks the rest. A blocked card at position 25 of 30 must
+    // survive a cap of 8 — burying it behind "show 22 more" is exactly the
+    // failure this rebuild exists to prevent.
+    const cards = [...many(29), c({ code: 'SL-BLOCKED', blocked: true })]
+    const capped = capColumn(cards, 8)
+
+    expect(capped.shown.map((x) => x.code)).toContain('SL-BLOCKED')
+  })
+
+  it('never hides a card whose tests failed', () => {
+    const cards = [...many(29), c({ code: 'SL-FAILING', qa: 'fail' })]
+    expect(capColumn(cards, 8).shown.map((x) => x.code)).toContain('SL-FAILING')
+  })
+
+  it('lets red exceed the cap rather than dropping any of it', () => {
+    const cards = Array.from({ length: 12 }, (_, i) => c({ code: `SL-R${i}`, blocked: true }))
+    const capped = capColumn(cards, 8)
+
+    expect(capped.shown).toHaveLength(12)
+    expect(capped.hidden).toBe(0)
+  })
+
+  it('gives red its share first, then fills the remainder', () => {
+    const cards = [c({ code: 'SL-R', blocked: true }), ...many(20)]
+    const capped = capColumn(cards, 8)
+
+    expect(capped.shown).toHaveLength(8)
+    expect(capped.shown[0]!.code).toBe('SL-R')
+    expect(capped.hidden).toBe(13)
+  })
+
+  it('keeps board order among the cards it shows', () => {
+    // Distinct codes on both sides of the red card, so "same order" is a real
+    // assertion rather than one that duplicate codes could satisfy by accident.
+    const before = Array.from({ length: 3 }, (_, i) => c({ code: `SL-A${i}` }))
+    const after = Array.from({ length: 10 }, (_, i) => c({ code: `SL-B${i}` }))
+    const cards = [...before, c({ code: 'SL-RED', blocked: true }), ...after]
+
+    const shown = capColumn(cards, 5).shown.map((x) => x.code)
+    const order = (code: string) => cards.findIndex((x) => x.code === code)
+
+    expect(shown.indexOf('SL-RED')).toBe(3)
+    expect(shown).toEqual([...shown].sort((a, b) => order(a) - order(b)))
   })
 })

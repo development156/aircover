@@ -7,14 +7,9 @@ export async function Changelog() {
 
   if (entries.status !== 'ok') {
     return (
-      <section
-        aria-labelledby="changelog-heading"
-        className="rounded-card border border-line bg-bg p-4 shadow-card"
-      >
-        <h2 id="changelog-heading" className="text-[15px] font-bold tracking-[-0.01em]">
-          Changelog
-        </h2>
-        <p className="mt-2 text-[13px] text-muted">
+      // The region around this supplies the card and the heading.
+      <section aria-label="Changelog entries">
+        <p className="text-[13px] text-muted">
           We couldn&apos;t read the changelog just now. The entries are safe — this is our read
           failing. Reload to try again.
         </p>
