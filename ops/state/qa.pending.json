@@ -267,6 +267,30 @@
       "summary_plain": "The unit checks ran (2073 passed), but 1 test did NOT run — this does not prove the suite passes.",
       "details": "      Tests  2073 passed | 1 skipped (2074)\n   Start at  10:43:29\n   Duration  11.14s (transform 9.53s, setup 6.47s, import 34.20s, tests 19.13s, environment 29.19s)\n\nops-cards-write: board already matches the source list.",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mscs0w2d-5e30b8e8",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-03T05:16:20.436Z",
+      "finished_at": "2026-08-03T05:16:20.436Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed (23 passed).",
+      "details": "npm warn Unknown project config \"public-hoist-pattern\". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.\n\n RUN  v4.1.10 /home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-web\n\n\n Test Files  1 passed (1)\n      Tests  23 passed (23)\n   Start at  10:46:20\n   Duration  133ms (transform 22ms, setup 0ms, import 36ms, tests 13ms, environment 0ms)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mscs56fw-742f3469",
+      "task_code": "SL-064",
+      "kind": "manual",
+      "suite": "manual",
+      "status": "pass",
+      "summary_plain": "Reproduced the original failure end to end: with the backup folder missing, the new tool now creates it, proves it is writable, and completes with every file restored. 23 tests cover the guards, and the six red-rule checks re-run in one command.",
+      "actor": "claude",
+      "started_at": "2026-08-03T05:19:40.508Z",
+      "finished_at": "2026-08-03T05:19:40.508Z"
     }
   ]
 }

@@ -41,3 +41,7 @@ ops/.local.env
 .env*
 # Supabase CLI scratch (written by the CLI on link; not ours to commit)
 supabase/.temp/
+
+# Mutation-check backups (scripts/mutation-check.mjs); kept on disk only so a
+# failed restore can be recovered by hand.
+.mutation-backups/
