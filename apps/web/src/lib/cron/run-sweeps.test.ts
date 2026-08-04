@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { DispatchSweepReport, HoldSweepReport } from '@sahoda/jobs/sweeps'
+import type { ReconcileReport } from '@sahoda/jobs/publish'
 import { runCronSweeps } from './run-sweeps'
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
@@ -24,6 +25,19 @@ function dispatchReport(over: Partial<DispatchSweepReport> = {}): DispatchSweepR
   }
 }
 
+function reconcileReport(over: Partial<ReconcileReport> = {}): ReconcileReport {
+  return {
+    mode: 'on',
+    connectionsChecked: 0,
+    connectionsUpdated: 0,
+    publishesChecked: 0,
+    publishesResolved: 0,
+    stillPending: 0,
+    failed: 0,
+    ...over,
+  }
+}
+
 function holdReport(over: Partial<HoldSweepReport> = {}): HoldSweepReport {
   return {
     mode: 'on',
@@ -41,6 +55,7 @@ describe('runCronSweeps', () => {
     const outcome = await runCronSweeps({
       runDispatch: async () => dispatchReport({ scanned: 4, expired: 3, queueUnavailable: 1 }),
       runHolds: async () => holdReport({ scanned: 2, released: 2 }),
+      runReconcile: async () => reconcileReport(),
     })
 
     expect(outcome.status).toBe(200)
@@ -69,6 +84,7 @@ describe('runCronSweeps', () => {
           ],
         }),
       runHolds: async () => holdReport(),
+      runReconcile: async () => reconcileReport(),
     })
 
     const serialized = JSON.stringify(outcome.body)
@@ -87,6 +103,7 @@ describe('runCronSweeps', () => {
         throw new Error('boom')
       },
       runHolds,
+      runReconcile: async () => reconcileReport(),
     })
 
     expect(runHolds).toHaveBeenCalledOnce()
@@ -99,12 +116,14 @@ describe('runCronSweeps', () => {
         throw new Error('boom')
       },
       runHolds: async () => holdReport(),
+      runReconcile: async () => reconcileReport(),
     })
     const holdsFailed = await runCronSweeps({
       runDispatch: async () => dispatchReport(),
       runHolds: async () => {
         throw new Error('boom')
       },
+      runReconcile: async () => reconcileReport(),
     })
 
     expect(dispatchFailed.status).toBe(500)
@@ -120,6 +139,7 @@ describe('runCronSweeps', () => {
         throw new Error('connect ECONNREFUSED postgres://u:hunter2@db.internal:5432')
       },
       runHolds: async () => holdReport(),
+      runReconcile: async () => reconcileReport(),
     })
 
     const serialized = JSON.stringify(outcome.body)
@@ -138,17 +158,21 @@ describe('runCronSweeps', () => {
         throw boom
       },
       runHolds: async () => holdReport(),
+      runReconcile: async () => reconcileReport(),
       onError,
     })
 
     expect(onError).toHaveBeenCalledWith('dispatch', boom)
   })
 
-  it('is an all-zero no-op when both flags are off', async () => {
+  it('is an all-zero no-op when every flag is off', async () => {
     // The deploy-changes-nothing property, at the layer the route actually returns.
+    // Three sweeps now, and the property must hold for all of them: the reconcile
+    // pass flips connections to `expired`, so deploying it must not start doing so.
     const outcome = await runCronSweeps({
       runDispatch: async () => dispatchReport({ mode: 'off' }),
       runHolds: async () => holdReport({ mode: 'off' }),
+      runReconcile: async () => reconcileReport({ mode: 'off' }),
     })
 
     expect(outcome.status).toBe(200)
@@ -175,6 +199,15 @@ describe('runCronSweeps', () => {
         released: 0,
         wouldRelease: 0,
         alreadySettled: 0,
+        failed: 0,
+      },
+      reconcile: {
+        mode: 'off',
+        connectionsChecked: 0,
+        connectionsUpdated: 0,
+        publishesChecked: 0,
+        publishesResolved: 0,
+        stillPending: 0,
         failed: 0,
       },
     })

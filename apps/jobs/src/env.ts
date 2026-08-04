@@ -61,6 +61,12 @@ export interface JobsEnv {
    */
   dispatchMode: DispatchMode
   dispatchGraceSeconds: number
+  /**
+   * The reconciliation pass that asks Zernio what it would have told us by
+   * webhook. Defaults to `off` like every other sweep: deploying it must not, by
+   * itself, start flipping connections to `expired`.
+   */
+  reconcileMode: SweepMode
 }
 
 /**
@@ -106,6 +112,7 @@ export function loadJobsEnv(source: NodeJS.ProcessEnv = process.env): JobsEnv {
 
   const dispatchMode = readMode(source, 'SAHODA_PUBLISH_DISPATCH_MODE', invalid)
   const holdSweepMode = readMode(source, 'SAHODA_HOLD_SWEEP_MODE', invalid)
+  const reconcileMode = readMode(source, 'SAHODA_RECONCILE_MODE', invalid)
 
   const rawDispatchGrace = source.SAHODA_PUBLISH_DISPATCH_GRACE_SECONDS
   let dispatchGraceSeconds = DEFAULT_DISPATCH_GRACE_SECONDS
@@ -135,6 +142,7 @@ export function loadJobsEnv(source: NodeJS.ProcessEnv = process.env): JobsEnv {
     holdSweepMode,
     dispatchMode,
     dispatchGraceSeconds,
+    reconcileMode,
   }
 }
 

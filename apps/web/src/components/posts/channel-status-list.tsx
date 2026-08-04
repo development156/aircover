@@ -28,10 +28,7 @@ const STATUS_META = {
   published: { label: 'Live', icon: CheckCircle2, tone: 'text-ok' },
   failed: { label: 'Did not go out', icon: AlertCircle, tone: 'text-danger' },
   skipped: { label: 'Skipped', icon: MinusCircle, tone: 'text-muted' },
-} satisfies Record<
-  VariantPublishStatus,
-  { label: string; icon: typeof Clock; tone: string }
->
+} satisfies Record<VariantPublishStatus, { label: string; icon: typeof Clock; tone: string }>
 
 export interface ChannelStatusListProps {
   rows: readonly VariantStatusRow[]

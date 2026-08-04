@@ -4,7 +4,13 @@ import {
   runDispatchSweep,
   sweepExpiredHolds,
 } from '@sahoda/jobs/sweeps'
-import { publishPostDeps, runClaimedPublish } from '@sahoda/jobs/publish'
+import {
+  publishPostDeps,
+  reconcileSweepDeps,
+  runClaimedPublish,
+  runReconcileSweep,
+} from '@sahoda/jobs/publish'
+import { loadJobsEnv } from '@sahoda/jobs/sweeps'
 
 import { isAuthorizedCronRequest } from '@/lib/cron/authorize'
 import { runCronSweeps } from '@/lib/cron/run-sweeps'
@@ -79,6 +85,13 @@ const HOLD_BATCH = 50
  */
 const PUBLISH_BATCH = 4
 
+/**
+ * How many rows the reconciliation pass re-checks per tick. Each one is a Zernio
+ * request, so this is a request budget as much as a row budget. Oldest-checked
+ * first, so a backlog drains across ticks rather than being attempted at once.
+ */
+const RECONCILE_BATCH = 15
+
 export async function GET(request: Request): Promise<Response> {
   // FIRST STATEMENT IN THE HANDLER, AND IT MUST STAY FIRST. This route is excluded from
   // Clerk's middleware — it has to be, since an unauthenticated cron request would
@@ -122,6 +135,15 @@ export async function GET(request: Request): Promise<Response> {
         return { ...report, published, deferred }
       })(),
     runHolds: () => sweepExpiredHolds(holdSweepDeps({ limit: HOLD_BATCH })),
+    // Asks Zernio what a webhook would have told us: which accounts have quietly
+    // stopped working, and how a post that was still processing actually ended.
+    // No receiver is built — doc 13's open question 6 (the signing scheme) is
+    // still open, and an endpoint that cannot verify what it is sent would let
+    // anyone who guesses the URL mark another customer's post published.
+    runReconcile: () =>
+      runReconcileSweep(
+        reconcileSweepDeps({ mode: loadJobsEnv().reconcileMode, limit: RECONCILE_BATCH }),
+      ),
     // The real error goes to Sentry; the response says only which sweep failed, because
     // a database error message can carry a connection string, a host or a query.
     onError: (scope, error) => reportServerError(error, { action: `cron:${scope}-sweep` }),

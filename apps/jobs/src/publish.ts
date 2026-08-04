@@ -36,3 +36,19 @@ export { publishPostDeps } from './publish/deps'
 
 export { createStorageReader, createZernioMediaHost, StorageReadError } from './publish/media'
 export type { HostMedia, ReadStorageObject, StorageReaderOptions } from './publish/media'
+
+// The polling reconciliation that stands in for webhooks we cannot verify. It lives
+// on this entry point rather than ./sweeps because it needs the Zernio client, and
+// ./sweeps is deliberately kept free of @sahoda/publishing.
+export { runReconcileSweep } from './reconcile/sweep'
+export type {
+  AccountFacts,
+  ConnectionToCheck,
+  PublishResolution,
+  ReconcileMode,
+  ReconcileReport,
+  ReconcileSweepDeps,
+  UnresolvedPublish,
+} from './reconcile/sweep'
+export { reconcileSweepDeps } from './reconcile/deps'
+export type { ReconcileDepsOptions } from './reconcile/deps'

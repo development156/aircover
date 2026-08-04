@@ -248,9 +248,22 @@ export async function runPublishPost(
     const code = adapterError?.code ?? 'ADAPTER_ERROR'
     const error: PublishLogError = { code, classification, message: messageOf(e) }
 
-    // `raw` is deliberately dropped: it is adapter-controlled and may echo request material.
+    // `raw` is deliberately dropped — it is adapter-controlled and may echo request
+    // material — with ONE exception, pulled out by shape rather than passed through.
+    //
+    // When Instagram is still in its container flow the adapter gives up with
+    // STILL_PROCESSING, and the post may yet go live. Without the platform's id for
+    // it, nobody can ever ask how it ended: the variant sits unresolved and the
+    // customer's feed and our record disagree forever. Recording the id is what
+    // makes that recoverable, and an id is not free-text — it is validated below.
+    const platformPostId = platformPostIdFrom(adapterError)
+
     await deps.writeLog(
-      logRow(payload, ctx, deps.mode, 'failed', { error, connectionId: connection.connectionId }),
+      logRow(payload, ctx, deps.mode, 'failed', {
+        error,
+        connectionId: connection.connectionId,
+        ...(platformPostId ? { platformPostId } : {}),
+      }),
     )
 
     if (classification === 'transient') {
@@ -308,4 +321,20 @@ export async function runPublishPost(
 
 function messageOf(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
+}
+
+/** Zernio ids are 24-char lowercase hex. Anything else is not an id and is dropped. */
+const PLATFORM_ID_RE = /^[0-9a-f]{24}$/
+
+/**
+ * The platform's own id for a post that was accepted but has not finished.
+ *
+ * Read off `AdapterError.raw` by SHAPE — a string field named postId that matches
+ * the id format — never by trusting the object. `raw` is adapter-controlled, so
+ * everything else in it stays dropped.
+ */
+function platformPostIdFrom(error: AdapterError | null): string | null {
+  if (!error || typeof error.raw !== 'object' || error.raw === null) return null
+  const value = (error.raw as Record<string, unknown>).postId
+  return typeof value === 'string' && PLATFORM_ID_RE.test(value) ? value : null
 }

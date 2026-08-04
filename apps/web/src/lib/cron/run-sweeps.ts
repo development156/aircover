@@ -1,9 +1,10 @@
 import 'server-only'
 import type { DispatchSweepReport, HoldSweepReport } from '@sahoda/jobs/sweeps'
+import type { ReconcileReport } from '@sahoda/jobs/publish'
 
 /** What went wrong, named but never described — the detail goes to the log, not the wire. */
 interface SweepError {
-  error: 'dispatch-sweep-failed' | 'hold-sweep-failed'
+  error: 'dispatch-sweep-failed' | 'hold-sweep-failed' | 'reconcile-sweep-failed'
 }
 
 /** The dispatch report minus `decisions`, which carries post and workspace ids. */
@@ -13,6 +14,8 @@ export interface CronSweepBody {
   ok: boolean
   dispatch: DispatchCounters | SweepError
   holds: HoldSweepReport | SweepError
+  /** The polling stand-in for webhooks. Counters only, same as the others. */
+  reconcile: ReconcileReport | SweepError
 }
 
 export interface CronSweepOutcome {
@@ -23,8 +26,17 @@ export interface CronSweepOutcome {
 export interface CronSweepRunners {
   runDispatch(): Promise<DispatchSweepReport>
   runHolds(): Promise<HoldSweepReport>
+  runReconcile(): Promise<ReconcileReport>
   /** Receives the real error so the route can log it. Never reached by the response. */
-  onError?(scope: 'dispatch' | 'holds', error: unknown): void
+  onError?(scope: SweepScope, error: unknown): void
+}
+
+type SweepScope = 'dispatch' | 'holds' | 'reconcile'
+
+const ERROR_FOR: Record<SweepScope, SweepError['error']> = {
+  dispatch: 'dispatch-sweep-failed',
+  holds: 'hold-sweep-failed',
+  reconcile: 'reconcile-sweep-failed',
 }
 
 /**
@@ -44,8 +56,11 @@ export interface CronSweepRunners {
 export async function runCronSweeps(runners: CronSweepRunners): Promise<CronSweepOutcome> {
   const dispatch = await attempt('dispatch', runners.runDispatch, runners.onError)
   const holds = await attempt('holds', runners.runHolds, runners.onError)
+  // Last on purpose: it is the only one that can wait. A tick that runs out of
+  // wall-clock should lose the reconciliation pass, not the publishing.
+  const reconcile = await attempt('reconcile', runners.runReconcile, runners.onError)
 
-  const ok = !isError(dispatch) && !isError(holds)
+  const ok = !isError(dispatch) && !isError(holds) && !isError(reconcile)
 
   return {
     status: ok ? 200 : 500,
@@ -53,12 +68,13 @@ export async function runCronSweeps(runners: CronSweepRunners): Promise<CronSwee
       ok,
       dispatch: isError(dispatch) ? dispatch : stripDecisions(dispatch),
       holds,
+      reconcile,
     },
   }
 }
 
 async function attempt<T>(
-  scope: 'dispatch' | 'holds',
+  scope: SweepScope,
   run: () => Promise<T>,
   onError: CronSweepRunners['onError'],
 ): Promise<T | SweepError> {
@@ -66,7 +82,7 @@ async function attempt<T>(
     return await run()
   } catch (e) {
     onError?.(scope, e)
-    return { error: scope === 'dispatch' ? 'dispatch-sweep-failed' : 'hold-sweep-failed' }
+    return { error: ERROR_FOR[scope] }
   }
 }
 
