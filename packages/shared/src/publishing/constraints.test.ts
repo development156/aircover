@@ -37,23 +37,23 @@ describe('constraint engine v0', () => {
   })
 
   it('instagram refuses a portrait phone photo on aspect ratio', () => {
-    const [res] = validateMedia([CONSTRAINTS.instagram], {
+    const res = validateMedia([CONSTRAINTS.instagram], {
       mime: 'image/jpeg',
       bytes: 1_000_000,
       width: 1080,
       height: 1920, // 0.56 — outside the 0.8–1.91 feed range
     })
-    expect(res.violations.some((v) => v.code === 'MEDIA_ASPECT')).toBe(true)
+    expect(res[0]!.violations.some((v) => v.code === 'MEDIA_ASPECT')).toBe(true)
   })
 
   it('instagram refuses a non-JPEG/PNG at compose time', () => {
-    const [res] = validateMedia([CONSTRAINTS.instagram], {
+    const res = validateMedia([CONSTRAINTS.instagram], {
       mime: 'image/webp',
       bytes: 1000,
       width: 1080,
       height: 1080,
     })
-    expect(res.violations.some((v) => v.code === 'MEDIA_TYPE')).toBe(true)
+    expect(res[0]!.violations.some((v) => v.code === 'MEDIA_TYPE')).toBe(true)
   })
 
   it('formatForPlatform carries media into the instagram payload', () => {

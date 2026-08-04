@@ -51,3 +51,45 @@ export {
   type GbpCompleteArgs,
   type GbpLocationChoice,
 } from './oauth/gbp'
+
+// ── Zernio rail (Instagram, and the aggregator path for everything after it) ──
+// Zernio holds the platform OAuth token; we hold a REFERENCE to an account. That is
+// why these do not touch the vault and why an instagram `connections` row has no
+// `connection_secrets` sibling.
+export {
+  createZernioClient,
+  ZernioError,
+  ZERNIO_BASE_URL,
+  ZERNIO_ID_RE,
+  BROWSER_UA,
+  type ZernioClient,
+  type ZernioClientDeps,
+  type ZernioAccount,
+  type ZernioProfile,
+  type ZernioPost,
+  type ZernioPlatformResult,
+  type ZernioPresign,
+  type ZernioCreatePostInput,
+  type ZernioCreatePostResponse,
+  type ZernioMediaItemInput,
+  type ZernioHeadResult,
+  type ZernioRateLimit,
+} from './zernio/client'
+
+export {
+  ensureZernioProfile,
+  reconcileAccounts,
+  profileNameForWorkspace,
+  ZERNIO_DEFAULT_PROFILE_ID,
+  type ReconciledAccount,
+} from './zernio/connect'
+
+export {
+  uploadMediaToZernio,
+  decodeBase64Image,
+  sniffMime,
+  type UploadedMedia,
+  type UploadMediaInput,
+} from './zernio/media'
+
+export { createInstagramAdapter, type InstagramAdapterDeps } from './adapters/instagram'
