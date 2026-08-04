@@ -1,6 +1,11 @@
 import 'server-only'
 
-import { InboxMessageSchema, InboxThreadSchema, type InboxMessage, type InboxThread } from '@sahoda/shared'
+import {
+  InboxMessageSchema,
+  InboxThreadSchema,
+  type InboxMessage,
+  type InboxThread,
+} from '@sahoda/shared'
 
 import { cache } from 'react'
 

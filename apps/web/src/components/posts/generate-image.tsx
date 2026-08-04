@@ -79,8 +79,8 @@ export function GenerateImage({ postId, disabled }: { postId: string; disabled?:
         </>
       )}
       <p className="text-[12px] text-muted">
-        Square by default, which fits every channel. If the picture doesn&rsquo;t suit the
-        channels you picked, it isn&rsquo;t attached and you aren&rsquo;t charged.
+        Square by default, which fits every channel. If the picture doesn&rsquo;t suit the channels
+        you picked, it isn&rsquo;t attached and you aren&rsquo;t charged.
       </p>
       {error !== null ? <InlineError>{error}</InlineError> : null}
     </div>

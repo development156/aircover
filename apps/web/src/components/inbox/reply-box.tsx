@@ -69,8 +69,8 @@ export function ReplyBox({ threadId, permalink }: { threadId: string; permalink:
         ) : null}
       </div>
       <p className="text-[12px] text-muted">
-        Saving keeps your reply here. Posting it still happens on the platform — we can&rsquo;t
-        send replies for this channel yet, and we won&rsquo;t pretend to.
+        Saving keeps your reply here. Posting it still happens on the platform — we can&rsquo;t send
+        replies for this channel yet, and we won&rsquo;t pretend to.
       </p>
       {error !== null ? <InlineError>{error}</InlineError> : null}
       {saved ? (

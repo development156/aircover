@@ -133,7 +133,8 @@ export function PublishPreview({ postId }: PublishPreviewProps) {
                 ))}
               </ul>
               <p className="text-[12px] text-warn opacity-80">
-                Connect a channel, then use Publish below — or set a time and let it go out on its own.
+                Connect a channel, then use Publish below — or set a time and let it go out on its
+                own.
               </p>
             </div>
           ) : null}
@@ -148,8 +149,7 @@ export function PublishPreview({ postId }: PublishPreviewProps) {
                 {report.skipped.map((item) => (
                   <li key={item.channel} className="text-[13px] text-muted">
                     <span className="font-semibold">{CHANNEL_LABELS[item.channel]}</span> — preview
-                    isn&rsquo;t something this release can post to, so there is nothing to
-                    simulate.
+                    isn&rsquo;t something this release can post to, so there is nothing to simulate.
                   </li>
                 ))}
               </ul>

@@ -57,7 +57,11 @@ export function ThreadCard({
                 : 'bg-warn-bg text-warn',
           )}
         >
-          {thread.status === 'resolved' ? 'Replied' : thread.status === 'snoozed' ? 'Later' : 'Open'}
+          {thread.status === 'resolved'
+            ? 'Replied'
+            : thread.status === 'snoozed'
+              ? 'Later'
+              : 'Open'}
         </span>
       </header>
 
@@ -68,15 +72,8 @@ export function ThreadCard({
           {replies.map((reply) => (
             <li key={reply.id} className="space-y-0.5">
               <p className="text-[13px] whitespace-pre-wrap">{reply.body}</p>
-              <p
-                className={cn(
-                  'text-[12px]',
-                  isSentMessage(reply) ? 'text-ok' : 'text-warn',
-                )}
-              >
-                {isSentMessage(reply)
-                  ? 'Posted on the platform.'
-                  : 'Saved here — not posted yet.'}
+              <p className={cn('text-[12px]', isSentMessage(reply) ? 'text-ok' : 'text-warn')}>
+                {isSentMessage(reply) ? 'Posted on the platform.' : 'Saved here — not posted yet.'}
               </p>
             </li>
           ))}

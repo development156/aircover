@@ -1,4 +1,8 @@
-import { ImageGenerateInputSchema, ImageGenerateOutputSchema, type MeshTaskDef } from '@sahoda/shared'
+import {
+  ImageGenerateInputSchema,
+  ImageGenerateOutputSchema,
+  type MeshTaskDef,
+} from '@sahoda/shared'
 import type { ImageGenerateInput, ImageGenerateOutput } from '@sahoda/shared'
 
 /**

@@ -46,10 +46,7 @@ export interface Mesh {
    * Generate an image. Separate from `runTask` because the answer is bytes, not a
    * zod-parsed object — see the note on the runner's `runImage`.
    */
-  runImage(
-    input: ImageGenerateInput,
-    ctx: MeshContext,
-  ): Promise<MeshResult<ImageGenerateOutput>>
+  runImage(input: ImageGenerateInput, ctx: MeshContext): Promise<MeshResult<ImageGenerateOutput>>
 }
 
 /** A task's run bound to its concrete input/output types, with the generics erased at the boundary. */
