@@ -79,8 +79,13 @@ describe('constraint engine v0', () => {
   it('formatForPlatform emits channel-tagged payloads', () => {
     expect(formatForPlatform(CONSTRAINTS.gbp, { body: 'Hello' })).toEqual({
       channel: 'gbp',
+      media: [],
       summary: 'Hello',
     })
-    expect(formatForPlatform(CONSTRAINTS.x, { body: 'Hi' })).toEqual({ channel: 'x', text: 'Hi' })
+    expect(formatForPlatform(CONSTRAINTS.x, { body: 'Hi' })).toEqual({
+      channel: 'x',
+      text: 'Hi',
+      media: [],
+    })
   })
 })

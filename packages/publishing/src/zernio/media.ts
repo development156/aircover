@@ -24,8 +24,12 @@ import { ZernioError, type ZernioClient } from './client'
  * Meta actually sends. The client sends BROWSER_UA for exactly this reason.
  */
 
-/** Instagram accepts these and nothing else (doc 13 §6). */
-const INSTAGRAM_MIME = new Set(['image/jpeg', 'image/png'])
+/**
+ * Instagram accepts these and nothing else (doc 13 §6), and it is the strictest of
+ * the four, so it is the default. X also takes webp and gif; passing the channel's
+ * own `spec.mediaTypes` widens it where the platform genuinely allows more.
+ */
+const INSTAGRAM_MIME = ['image/jpeg', 'image/png']
 
 export interface UploadedMedia extends MediaRef {
   /** Zernio's storage key, kept for a future retention/cleanup job. */
@@ -37,6 +41,14 @@ export interface UploadMediaInput {
   mime: string
   filename: string
   altText?: string
+  /**
+   * What this channel actually accepts — normally `CONSTRAINTS[channel].mediaTypes`.
+   *
+   * Defaults to Instagram's JPEG/PNG, the strictest set, so a caller that forgets it
+   * gets the safe answer rather than uploading a gif that the platform will refuse
+   * after we have already paid to host it.
+   */
+  allowedMime?: readonly string[]
 }
 
 /**
@@ -49,12 +61,13 @@ export async function uploadMediaToZernio(
   client: ZernioClient,
   input: UploadMediaInput,
 ): Promise<UploadedMedia> {
-  if (!INSTAGRAM_MIME.has(input.mime)) {
+  const allowed = input.allowedMime ?? INSTAGRAM_MIME
+  if (!allowed.includes(input.mime)) {
     // Rejected HERE as well as at compose time. The Constraint Engine catches the
     // user's file; this catches anything we generate ourselves — the image model
     // returning WebP, say — which never passes through the editor's validation.
     throw new ZernioError({
-      message: `Instagram accepts JPEG and PNG only; got ${input.mime}.`,
+      message: `This channel accepts ${allowed.join(' and ')}; got ${input.mime}.`,
       status: 0,
       code: 'MEDIA_TYPE',
       type: 'client_error',

@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
  * Nothing is deleted first. A disconnect-then-reconnect would leave the workspace
  * with no connection at all if the user abandoned the consent screen halfway.
  */
-export function ReconnectButton({ label }: { label: string }) {
+export function ReconnectButton({ platform, label }: { platform: string; label: string }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -28,6 +28,7 @@ export function ReconnectButton({ label }: { label: string }) {
         const res = await fetch('/api/oauth/zernio/start', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ platform }),
         })
         const body = (await res.json()) as { ok?: boolean; authUrl?: string; message?: string }
         if (!res.ok || body.ok !== true || !body.authUrl) {

@@ -27,11 +27,15 @@ export const metadata = { title: 'Connections' }
  */
 
 /**
- * Instagram is live on the Zernio rail. X and GBP hold their own OAuth grants and
- * still need the vault write, so they stay disabled with the reason attached.
+ * All four connect for real now, all through Zernio.
+ *
+ * x, gbp and linkedin were disabled because their NATIVE flow needs the vault write
+ * that is still unbuilt. Routing them through Zernio removes that dependency
+ * entirely — Zernio holds the credential, exactly as it does for instagram — so the
+ * buttons can finally do what they say.
  */
-const CONNECTABLE: ConnectionPlatform[] = ['instagram', 'x', 'gbp']
-const LIVE_VIA_ZERNIO = new Set<ConnectionPlatform>(['instagram'])
+const CONNECTABLE: ConnectionPlatform[] = ['instagram', 'x', 'gbp', 'linkedin']
+const LIVE_VIA_ZERNIO = new Set<ConnectionPlatform>(['instagram', 'x', 'gbp', 'linkedin'])
 
 export default async function ConnectionsPage() {
   const connections = await listConnections()
@@ -71,8 +75,8 @@ export default async function ConnectionsPage() {
         <div>
           <h2 className="text-[15px] leading-5 font-bold">Connect a channel</h2>
           <p className="text-[13px] text-muted">
-            Instagram connects now. X and Google Business need their secure token flow finished
-            first — those buttons stay off until they work.
+            Each of these connects through our publishing partner, so you approve access once
+            on the platform&rsquo;s own screen and nothing of yours is stored here.
           </p>
         </div>
         <div className="flex flex-wrap items-start gap-3">

@@ -7,7 +7,7 @@ function fakeRequest(overrides: Partial<PublishRequest> = {}): PublishRequest {
     workspaceId: 'ws-1',
     postId: 'post-1',
     variantId: 'var-1',
-    content: { channel: 'x', text: 'hello world' },
+    content: { channel: 'x', text: 'hello world', media: [] },
     media: [],
     auth: { connectionId: 'conn-1', accessToken: 'tok', externalAccountId: 'acct-1' },
     ...overrides,
@@ -36,7 +36,7 @@ describe('fixture adapter — the honest labelled path', () => {
     const adapter = createFixtureAdapter('gbp')
 
     const result = await adapter.publish(
-      fakeRequest({ content: { channel: 'gbp', summary: 'hi' } }),
+      fakeRequest({ content: { channel: 'gbp', summary: 'hi', media: [] } }),
     )
 
     expect(result.permalink.startsWith('fixture://')).toBe(true)

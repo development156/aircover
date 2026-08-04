@@ -30,6 +30,12 @@ export interface ResolvedConnection {
   connectionId: string
   externalAccountId: string
   accessToken: string
+  /**
+   * Whether this connection publishes through Zernio rather than an OAuth grant of
+   * ours. Decided by the row, so it must travel WITH the resolved connection —
+   * the channel alone cannot answer it for x, gbp or linkedin.
+   */
+  viaZernio?: boolean
 }
 
 /** One immutable post_publish_logs row. The table is append-only — insert once, terminally. */
@@ -69,7 +75,7 @@ export interface PublishPostDeps {
   mode: PublishMode
   loadVariant(payload: PublishPostPayload): Promise<PublishVariant | null>
   resolveConnection(payload: PublishPostPayload): Promise<ResolvedConnection>
-  adapterFor(channel: Channel): PublishAdapter
+  adapterFor(channel: Channel, viaZernio: boolean): PublishAdapter
   /**
    * Turn `post_media` attachments into URLs the platform can fetch.
    *
@@ -216,7 +222,9 @@ export async function runPublishPost(
       idempotencyKey: publishIdempotencyKey(payload.postId, payload.channel, payload.scheduledAt),
     }
 
-    const result = await deps.adapterFor(payload.channel).publish(request)
+    const result = await deps
+      .adapterFor(payload.channel, connection.viaZernio === true)
+      .publish(request)
 
     // The adapter's own mode is authoritative: a fixture result is recorded as a fixture
     // even when this run believed it was live (CLAUDE.md honesty rule).

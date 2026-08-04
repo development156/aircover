@@ -20,7 +20,7 @@ function gbpRequest(overrides: Partial<PublishRequest> = {}): PublishRequest {
     workspaceId: 'ws-1',
     postId: 'post-1',
     variantId: 'var-1',
-    content: { channel: 'gbp', summary: 'Fresh chai just dropped at Chai & Chapters.' },
+    content: { channel: 'gbp', summary: 'Fresh chai just dropped at Chai & Chapters.', media: [] },
     media: [],
     auth: { connectionId: 'conn-1', accessToken: 'gbp-secret-token', externalAccountId: LOCATION },
     ...overrides,
@@ -81,6 +81,7 @@ describe('GBP adapter — publish against recorded fixtures', () => {
       gbpRequest({
         content: {
           channel: 'gbp',
+          media: [],
           summary: 'Order ahead for the weekend.',
           ctaType: 'ORDER',
           ctaUrl: 'https://chaichapters.example/order',
@@ -106,6 +107,7 @@ describe('GBP adapter — publish against recorded fixtures', () => {
         gbpRequest({
           content: {
             channel: 'gbp',
+            media: [],
             summary: 's',
             ctaType: 'SMASH_THAT_BELL',
             ctaUrl: 'https://x.example',
@@ -123,6 +125,7 @@ describe('GBP adapter — publish against recorded fixtures', () => {
       gbpRequest({
         content: {
           channel: 'gbp',
+          media: [],
           summary: 'Monsoon offer!',
           offer: { title: '20% off all chai', terms: 'Till Sunday. In-store only.' },
         },
@@ -193,7 +196,7 @@ describe('GBP adapter — publish against recorded fixtures', () => {
 
     await expect(
       createGbpAdapter({ transport }).publish(
-        gbpRequest({ content: { channel: 'x', text: 'wrong' } }),
+        gbpRequest({ content: { channel: 'x', text: 'wrong', media: [] } }),
       ),
     ).rejects.toBeInstanceOf(AdapterError)
     expect(called).toBe(false)

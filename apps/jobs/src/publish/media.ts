@@ -1,5 +1,11 @@
 import { ZernioError, uploadMediaToZernio, type ZernioClient } from '@sahoda/publishing'
-import { AdapterError, type Channel, type MediaRef, type PublishRequestMedia } from '@sahoda/shared'
+import {
+  AdapterError,
+  CONSTRAINTS,
+  type Channel,
+  type MediaRef,
+  type PublishRequestMedia,
+} from '@sahoda/shared'
 
 /**
  * Turn the post's attachments into URLs the platform will actually fetch.
@@ -35,11 +41,20 @@ const MEDIA_BUCKET = 'media'
 const MAX_MEDIA_BYTES = 12_000_000
 
 /**
- * The channels whose media must be re-hosted before publish. Everything else takes
- * its bytes to the platform directly (X uploads them over its own media endpoint) and
- * must not be charged an upload it has no use for.
+ * The channels whose media must be re-hosted before publish.
+ *
+ * All four, now that x, gbp and linkedin can publish through Zernio: the rail takes
+ * a public URL and fetches it, exactly as instagram does. The NATIVE x adapter
+ * still uploads bytes over its own media endpoint and reads `req.media` storage
+ * paths, so it ignores these — the cost of hosting for a native publish is one
+ * upload, and the native path cannot publish at all today (no vault opener).
+ *
+ * Gating this per-connection rather than per-channel would be tighter. It is not
+ * worth the seam: `hostMedia` is handed a channel, not a connection, and threading
+ * the rail through it to save an upload on a path that cannot run is complexity
+ * bought with nothing.
  */
-const REHOSTED_CHANNELS = new Set<string>(['instagram'])
+const REHOSTED_CHANNELS = new Set<string>(['instagram', 'x', 'gbp', 'linkedin'])
 
 /** Fetch a private storage object's bytes, given its `post_media.storage_path`. */
 export type ReadStorageObject = (storagePath: string) => Promise<Uint8Array>
@@ -163,6 +178,10 @@ export function createZernioMediaHost(deps: ZernioMediaHostDeps): HostMedia {
           bytes,
           mime: item.mime,
           filename: filenameFor(item.storagePath),
+          // The channel's own list, from the one source that owns it. X takes webp
+          // and gif; instagram does not, and hard-coding instagram's pair here would
+          // reject a perfectly legal tweet image.
+          allowedMime: CONSTRAINTS[channel].mediaTypes,
         })
         hosted.push({ url: uploaded.url, mime: uploaded.mime, bytes: uploaded.bytes })
       } catch (err) {

@@ -118,7 +118,7 @@ export function PostCard({ autoPublish = false, post, now, mode }: PostCardProps
           status={post.status}
           scheduledAt={post.scheduled_at}
           now={now}
-        autoPublish={autoPublish}
+          autoPublish={autoPublish}
           className="mt-2"
         />
       </Link>

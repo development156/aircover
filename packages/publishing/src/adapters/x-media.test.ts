@@ -17,7 +17,7 @@ function xRequest(overrides: Partial<PublishRequest> = {}): PublishRequest {
     workspaceId: 'ws-1',
     postId: 'post-1',
     variantId: 'var-1',
-    content: { channel: 'x', text: 'chai time ☕' },
+    content: { channel: 'x', text: 'chai time ☕', media: [] },
     media: [],
     auth: { connectionId: 'conn-1', accessToken: 'secret-token', externalAccountId: '99' },
     ...overrides,
@@ -83,7 +83,7 @@ describe('X adapter — media upload sub-step', () => {
     await adapter(transport).publish(
       xRequest({
         media: [media('ws-1/a.jpg')],
-        content: { channel: 'x', text: 't', mediaIds: ['pre-existing-1'] },
+        content: { channel: 'x', text: 't', mediaIds: ['pre-existing-1'], media: [] },
       }),
     )
 
@@ -120,7 +120,7 @@ describe('X adapter — media upload sub-step', () => {
       adapter(transport).publish(
         xRequest({
           media: [media('a.jpg'), media('b.jpg')],
-          content: { channel: 'x', text: 't', mediaIds: ['p1', 'p2', 'p3'] },
+          content: { channel: 'x', text: 't', mediaIds: ['p1', 'p2', 'p3'], media: [] },
         }),
       ),
     ).rejects.toMatchObject({ classification: 'permanent', code: 'INVALID_CONTENT' })

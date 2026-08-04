@@ -199,7 +199,16 @@ export function createPublishStore(opts: PublishStoreOptions) {
    * belongs to both. The payload's workspaceId becomes decoration on that path.
    */
   async function loadConnection(payload: PublishPostPayload): Promise<StoredConnection | null> {
-    if (payload.channel === 'instagram') return loadZernioConnection(payload)
+    // ── WHICH RAIL, DECIDED BY THE ROW AND NOT BY THE CHANNEL ─────────────────
+    // A Zernio connection is one whose external_account carries a `profileId`,
+    // written by `upsert_zernio_connection` from the workspace's MAPPING. That is
+    // the only honest test: instagram is always Zernio, but x, gbp and linkedin can
+    // be either, and a workspace holding its own X grant must keep using it.
+    //
+    // Asked before the token read, because the Zernio path must never touch
+    // connection_secrets — there is no secret to find and a LEFT JOIN returning
+    // null would look identical to a broken vault.
+    if (await isZernioConnection(payload)) return loadZernioConnection(payload)
 
     const r = await pool.query<{
       id: string
@@ -240,16 +249,36 @@ export function createPublishStore(opts: PublishStoreOptions) {
    * No `connection_secrets` read: a Zernio connection has no sealed token, because
    * Zernio holds the Meta credential and we never see one.
    */
+  /**
+   * Whether this channel's active connection is a Zernio-fronted one.
+   *
+   * Keyed on `external_account ->> 'profileId'`, which only
+   * `upsert_zernio_connection` ever writes and which it takes from the workspace's
+   * mapping rather than from its own argument. A native OAuth connection has no
+   * such field.
+   */
+  async function isZernioConnection(payload: PublishPostPayload): Promise<boolean> {
+    const r = await pool.query<{ ok: boolean }>(
+      `select (c.external_account ->> 'profileId') is not null as ok
+         from connections c
+        where c.workspace_id = $1 and c.platform = $2 and c.status = 'active'
+        order by c.updated_at desc
+        limit 1`,
+      [payload.workspaceId, payload.channel],
+    )
+    return r.rows[0]?.ok === true
+  }
+
   async function loadZernioConnection(
     payload: PublishPostPayload,
   ): Promise<StoredConnection | null> {
     const candidate = await pool.query<{ id: string; external_account_id: string | null }>(
       `select c.id, c.external_account ->> 'id' as external_account_id
          from connections c
-        where c.workspace_id = $1 and c.platform = 'instagram' and c.status = 'active'
+        where c.workspace_id = $1 and c.platform = $2 and c.status = 'active'
         order by c.updated_at desc
         limit 1`,
-      [payload.workspaceId],
+      [payload.workspaceId, payload.channel],
     )
     const row = candidate.rows[0]
     if (!row?.external_account_id) return null
@@ -268,10 +297,12 @@ export function createPublishStore(opts: PublishStoreOptions) {
       externalAccountId: accountId,
       status: 'active',
       sealedAccessToken: null,
+      viaZernio: true,
     }
   }
 
   return {
+    isZernioConnection,
     loadVariant,
     claimVariant,
     releaseVariant,

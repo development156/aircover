@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { reconcileAccounts } from '@sahoda/publishing'
+import { ZERNIO_PLATFORMS } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -25,8 +26,6 @@ import { zernioClient } from '@/lib/zernio/server'
  * workspace — finds nothing new — and nothing is written.
  */
 export const dynamic = 'force-dynamic'
-
-const PLATFORM = 'instagram'
 
 /**
  * Back to /connections with a short status the page can render.
@@ -78,14 +77,28 @@ export async function GET(request: Request): Promise<Response> {
       return back('nothing', 'no-profile')
     }
 
-    const accounts = await reconcileAccounts(client, { profileId, platform: PLATFORM })
+    // EVERY platform, not the one the redirect claims. The query string is
+    // attacker-influenceable and is ignored wholesale; asking Zernio for each
+    // platform under our own profile costs a few reads and cannot be steered.
+    // It also self-heals: a connection that failed to record on an earlier pass is
+    // picked up by the next return trip, whatever the user just connected.
+    const accounts = (
+      await Promise.all(
+        ZERNIO_PLATFORMS.map(async (platform) =>
+          (await reconcileAccounts(client, { profileId, platform })).map((a) => ({
+            ...a,
+            platform,
+          })),
+        ),
+      )
+    ).flat()
     if (accounts.length === 0) return back('nothing')
 
     let written = 0
     for (const account of accounts) {
       const { error } = await supabase.rpc('upsert_zernio_connection', {
         p_workspace_id: workspace.id,
-        p_platform: PLATFORM,
+        p_platform: account.platform,
         p_external_account: {
           id: account.accountId,
           profileId: account.profileId,

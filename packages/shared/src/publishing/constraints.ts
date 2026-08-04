@@ -38,17 +38,28 @@ export interface MediaRef {
   altText?: string
 }
 
+/**
+ * `media` is on EVERY arm, not just instagram.
+ *
+ * It began instagram-only because instagram was the only channel that could not
+ * accept text alone (doc 13 §6). Once x, gbp and linkedin also publish through
+ * Zernio they receive media the same way — as a public URL the platform fetches —
+ * so the field belongs to the shape rather than to one channel. It is `[]` for a
+ * text-only post, which is a legal state everywhere except instagram, and that
+ * one difference is expressed by `requiresMedia` on the spec rather than by the
+ * type.
+ */
 export type FormattedContent =
-  | { channel: 'x'; text: string; mediaIds?: string[] }
+  | { channel: 'x'; text: string; media: MediaRef[]; mediaIds?: string[] }
   | {
       channel: 'gbp'
       summary: string
+      media: MediaRef[]
       ctaType?: string
       ctaUrl?: string
       offer?: { title: string; terms?: string }
     }
-  | { channel: 'linkedin'; text: string }
-  /** `media` is present because Instagram cannot accept a caption alone (doc 13 §6). */
+  | { channel: 'linkedin'; text: string; media: MediaRef[] }
   | { channel: 'instagram'; caption: string; media: MediaRef[] }
 
 export interface ConstraintViolation {
@@ -312,11 +323,11 @@ export function formatForPlatform(
 
   switch (spec.channel) {
     case 'x':
-      return { channel: 'x', text: body }
+      return { channel: 'x', text: body, media }
     case 'gbp':
-      return { channel: 'gbp', summary: body }
+      return { channel: 'gbp', summary: body, media }
     case 'linkedin':
-      return { channel: 'linkedin', text: body }
+      return { channel: 'linkedin', text: body, media }
     case 'instagram':
       return { channel: 'instagram', caption: body, media }
   }

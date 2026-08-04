@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { ensureZernioProfile } from '@sahoda/publishing'
+import { isZernioPlatform, type ZernioPlatform } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -26,17 +27,31 @@ import { zernioClient, zernioReturnUrl } from '@/lib/zernio/server'
  */
 export const dynamic = 'force-dynamic'
 
-const PLATFORM = 'instagram'
-
 function fail(message: string, status: number): Response {
   return Response.json({ ok: false, message }, { status, headers: { 'cache-control': 'no-store' } })
 }
 
-export async function POST(): Promise<Response> {
+export async function POST(request: Request): Promise<Response> {
   let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return fail('Sign in to connect an account.', 401)
+
+    // Validated against the shared allowlist, never passed through: an arbitrary
+    // string here would send a customer to a Zernio consent screen for a platform
+    // no adapter can publish, producing a connection that looks live and is not.
+    // Defaults to instagram so the existing caller keeps working unchanged.
+    let platform: ZernioPlatform = 'instagram'
+    try {
+      const body: unknown = await request.json()
+      const asked = (body as { platform?: unknown } | null)?.platform
+      if (asked !== undefined) {
+        if (!isZernioPlatform(asked)) return fail('That channel cannot be connected here.', 400)
+        platform = asked
+      }
+    } catch {
+      // No body at all is fine — instagram is the default.
+    }
 
     const client = zernioClient()
     if (!client) {
@@ -74,7 +89,7 @@ export async function POST(): Promise<Response> {
       return fail('Couldn’t start the connection — try again.', 500)
     }
 
-    const authUrl = await client.connectUrl(PLATFORM, profileId, zernioReturnUrl())
+    const authUrl = await client.connectUrl(platform, profileId, zernioReturnUrl())
     return Response.json(
       { ok: true, authUrl },
       { status: 200, headers: { 'cache-control': 'no-store' } },

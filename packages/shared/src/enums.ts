@@ -268,3 +268,19 @@ export type OpsSessionStatus = z.infer<typeof OpsSessionStatusSchema>
 /** Screenshot formats the qa-artifacts bucket accepts (doc 13 §3). */
 export const OpsArtifactMimeSchema = z.enum(['image/png', 'image/jpeg', 'image/webp'])
 export type OpsArtifactMime = z.infer<typeof OpsArtifactMimeSchema>
+
+/**
+ * The platforms Zernio fronts for us — the ones `upsert_zernio_connection` and
+ * `assert_account_for_scheduled_post` admit.
+ *
+ * Kept beside the enums because three layers must agree on it: the connect route
+ * that asks Zernio for an auth URL, the RPC allowlist in Postgres, and the adapter
+ * selector. A platform in one and not the others produces a connection row that
+ * looks live and can never publish.
+ */
+export const ZERNIO_PLATFORMS = ['instagram', 'x', 'gbp', 'linkedin'] as const
+export type ZernioPlatform = (typeof ZERNIO_PLATFORMS)[number]
+
+export function isZernioPlatform(value: unknown): value is ZernioPlatform {
+  return typeof value === 'string' && (ZERNIO_PLATFORMS as readonly string[]).includes(value)
+}

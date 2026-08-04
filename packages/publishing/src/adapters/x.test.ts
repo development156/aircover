@@ -19,7 +19,7 @@ function xRequest(overrides: Partial<PublishRequest> = {}): PublishRequest {
     workspaceId: 'ws-1',
     postId: 'post-1',
     variantId: 'var-1',
-    content: { channel: 'x', text: 'Fresh chai just dropped.' },
+    content: { channel: 'x', text: 'Fresh chai just dropped.', media: [] },
     media: [],
     auth: { connectionId: 'conn-1', accessToken: 'secret-token', externalAccountId: '99' },
     ...overrides,
@@ -63,7 +63,7 @@ describe('X adapter — publish against recorded fixtures', () => {
     const { transport, last } = capturing(success)
     const adapter = createXAdapter({ transport })
 
-    await adapter.publish(xRequest({ content: { channel: 'x', text: 'hello ☕' } }))
+    await adapter.publish(xRequest({ content: { channel: 'x', text: 'hello ☕', media: [] } }))
 
     const req = last()
     expect(req?.method).toBe('POST')
@@ -75,7 +75,7 @@ describe('X adapter — publish against recorded fixtures', () => {
   it('attaches pre-uploaded media_ids only when present', async () => {
     const withMedia = capturing(success)
     await createXAdapter({ transport: withMedia.transport }).publish(
-      xRequest({ content: { channel: 'x', text: 't', mediaIds: ['m1', 'm2'] } }),
+      xRequest({ content: { channel: 'x', text: 't', mediaIds: ['m1', 'm2'], media: [] } }),
     )
     expect(JSON.parse(bodyText(withMedia.last()?.body) || '{}').media).toEqual({
       media_ids: ['m1', 'm2'],
@@ -165,7 +165,7 @@ describe('X adapter — publish against recorded fixtures', () => {
     const adapter = createXAdapter({ transport })
 
     await expect(
-      adapter.publish(xRequest({ content: { channel: 'gbp', summary: 'wrong' } })),
+      adapter.publish(xRequest({ content: { channel: 'gbp', summary: 'wrong', media: [] } })),
     ).rejects.toBeInstanceOf(AdapterError)
     expect(called).toBe(false)
   })

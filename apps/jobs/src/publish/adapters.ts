@@ -2,7 +2,7 @@ import { AdapterError, type Channel, type PublishAdapter } from '@sahoda/shared'
 import {
   createFixtureAdapter,
   createGbpAdapter,
-  createInstagramAdapter,
+  createZernioAdapter,
   createXAdapter,
   createZernioClient,
   type ReadMedia,
@@ -21,11 +21,12 @@ export interface AdapterSelectorDeps {
    */
   publicMediaUrl?: (storagePath: string) => string
   /**
-   * Zernio API key. Absent ⇒ instagram throws NO_ADAPTER like any other channel we
-   * cannot really publish — never a fixture, which would be mock-success in a
-   * production path.
+   * Zernio API key. Absent ⇒ the Zernio rail throws NO_ADAPTER like any other
+   * channel we cannot really publish — never a fixture, which would be
+   * mock-success in a production path.
    */
   zernioApiKey?: string
+
   now?: () => Date
 }
 
@@ -37,9 +38,27 @@ export interface AdapterSelectorDeps {
  * fixture: the Constraint Engine marks linkedin publishable but no linkedin adapter ships,
  * and silently simulating it would be mock-success in a production path (CLAUDE.md).
  */
-export function createAdapterSelector(deps: AdapterSelectorDeps): (c: Channel) => PublishAdapter {
-  return (channel: Channel): PublishAdapter => {
+/**
+ * `viaZernio` is an ARGUMENT rather than a dep because it is a property of the
+ * connection this attempt resolved, not of the process. A workspace holding its own
+ * X grant publishes through the native adapter; one that connected X through Zernio
+ * publishes through the rail. Same channel, same deployment, different answer.
+ */
+export function createAdapterSelector(
+  deps: AdapterSelectorDeps,
+): (c: Channel, viaZernio: boolean) => PublishAdapter {
+  return (channel: Channel, viaZernio: boolean): PublishAdapter => {
     if (deps.mode === 'fixture') return createFixtureAdapter(channel, { now: deps.now })
+
+    // The rail first, when the resolved connection is one of Zernio's. Checked
+    // before the native adapters because a workspace can legitimately have both
+    // kinds of row and the connection that was actually resolved is the answer.
+    if (viaZernio && deps.zernioApiKey) {
+      return createZernioAdapter(channel, {
+        client: createZernioClient({ transport: deps.transport, apiKey: deps.zernioApiKey }),
+        now: deps.now,
+      })
+    }
 
     switch (channel) {
       case 'x':
@@ -54,17 +73,16 @@ export function createAdapterSelector(deps: AdapterSelectorDeps): (c: Channel) =
           publicMediaUrl: deps.publicMediaUrl,
           now: deps.now,
         })
-      case 'instagram': {
-        // Zernio holds the Meta credential; the adapter needs OUR key to reach
-        // Zernio, not a per-connection token. Without it there is no rail — and
-        // falling through to the fixture would report a post as published that
-        // was never sent.
-        if (!deps.zernioApiKey) break
-        return createInstagramAdapter({
-          client: createZernioClient({ transport: deps.transport, apiKey: deps.zernioApiKey }),
-          now: deps.now,
-        })
-      }
+      case 'instagram':
+        // Instagram has no native adapter — Zernio holds the Meta credential and we
+        // file no app review. If the rail above did not take it, there is nothing
+        // else to try, and falling through to the fixture would report a post as
+        // published that was never sent.
+        break
+      case 'linkedin':
+        // No native adapter either. Reached only when the connection is not a
+        // Zernio one, i.e. there is no way to publish it.
+        break
     }
 
     throw new AdapterError({

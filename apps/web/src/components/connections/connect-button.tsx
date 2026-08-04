@@ -34,6 +34,9 @@ export function ConnectButton({
         const res = await fetch('/api/oauth/zernio/start', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
+          // The route validates this against the shared allowlist — it is a request,
+          // not an instruction.
+          body: JSON.stringify({ platform }),
         })
         const body = (await res.json()) as { ok?: boolean; authUrl?: string; message?: string }
         if (!res.ok || !body.ok || !body.authUrl) {

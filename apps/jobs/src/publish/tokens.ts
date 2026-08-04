@@ -14,6 +14,12 @@ export interface StoredConnection {
    * `connection_secrets` to read and nothing to open (doc 13 §7).
    */
   sealedAccessToken: unknown
+  /**
+   * True when this row is a Zernio-fronted account rather than an OAuth grant of
+   * ours. Determined by the STORE, from `external_account->>'profileId'`, because
+   * only the row can answer it: x, gbp and linkedin exist in both shapes.
+   */
+  viaZernio?: boolean
 }
 
 /**
@@ -23,6 +29,13 @@ export interface StoredConnection {
  * place it changes behaviour: these have no sealed token BY DESIGN, and demanding one
  * would fail every scheduled Instagram publish with a vault error that has nothing to
  * do with the vault.
+ */
+/**
+ * Instagram is ALWAYS aggregator-fronted — we hold no Meta credential and file no
+ * app review, so there is no other shape it could take. x, gbp and linkedin can be
+ * either, and for those the answer comes from the row (`StoredConnection.viaZernio`)
+ * rather than from this set. Membership here means "never has a secret of ours",
+ * not "uses Zernio".
  */
 const AGGREGATOR_FRONTED = new Set<string>(['instagram'])
 
@@ -62,7 +75,7 @@ export function createConnectionResolver(
     // Zernio-fronted channels carry no secret of ours. The adapter authenticates to
     // Zernio with OUR API key; the per-connection token is Meta's and Zernio's, and we
     // never see it. So the vault is not consulted, and its absence is not an error.
-    if (AGGREGATOR_FRONTED.has(payload.channel)) {
+    if (AGGREGATOR_FRONTED.has(payload.channel) || connection.viaZernio === true) {
       if (!connection.externalAccountId) {
         throw new Error('CONNECTION_NOT_FOUND: connection carries no external account id')
       }

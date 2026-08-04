@@ -1,0 +1,260 @@
+import {
+  AdapterError,
+  CONSTRAINTS,
+  type Channel,
+  type FormattedContent,
+  type PublishAdapter,
+  type PublishRequest,
+  type PublishSuccess,
+} from '@sahoda/shared'
+
+import {
+  ZernioError,
+  ZERNIO_ID_RE,
+  type ZernioClient,
+  type ZernioMediaItemInput,
+  type ZernioPlatformResult,
+  type ZernioPost,
+} from '../zernio/client'
+
+/**
+ * The Zernio rail, for every channel it fronts.
+ *
+ * ── WHY ONE ADAPTER AND NOT FOUR ─────────────────────────────────────────────
+ * Zernio's publish call is the same for x, gbp, linkedin and instagram: one POST
+ * to /v1/posts naming a platform and an accountId. What differs between them is
+ * held in `CONSTRAINTS` already — the character cap, whether media is mandatory,
+ * how many items are allowed — and the Constraint Engine has validated all of it
+ * before an adapter is ever reached. There is nothing per-channel left for four
+ * separate adapters to do except repeat each other.
+ *
+ * The native x and gbp adapters are NOT retired. They speak to those platforms
+ * with OUR OAuth grant and remain the right path for a workspace that holds one;
+ * the store picks between them by looking at what the connection row actually is.
+ * What changed is that the Zernio path now exists for them at all, which matters
+ * because the native path has never published anything — `openSecret` is unwired,
+ * so it ends at CONNECTION_UNAVAILABLE every time.
+ *
+ * ── THE TWO-PHASE RULE APPLIES TO ALL OF THEM ────────────────────────────────
+ * Instagram's publish returns 201 with `status: processing` and no URL, and the
+ * post goes live ~14s later (observed [LIVE] 2026-07-31). The other channels are
+ * usually immediate — but "usually" is not a contract, and the polling loop costs
+ * one extra read when the URL is already there. So every channel polls, and every
+ * channel reports success on exactly one condition: a `platformPostUrl` came back.
+ *
+ * That is doc 13 §5's rule and it is the whole point of this file. A post is real
+ * when there is a link to it on the internet. Not when the status field says
+ * published, not when the HTTP code was 201.
+ */
+
+export interface ZernioAdapterDeps {
+  client: ZernioClient
+  /** Injected so a caller can bound total wall-clock; defaults suit a serverless job. */
+  poll?: { attempts?: number; intervalMs?: number }
+  sleep?: (ms: number) => Promise<void>
+  now?: () => Date
+}
+
+const DEFAULT_ATTEMPTS = 12
+const DEFAULT_INTERVAL_MS = 3000
+
+/** Zernio's platform name for one of our channels. */
+const ZERNIO_PLATFORM: Record<Channel, string> = {
+  x: 'x',
+  gbp: 'google',
+  linkedin: 'linkedin',
+  instagram: 'instagram',
+}
+
+/**
+ * The text that goes out, pulled from whichever field this channel's formatted
+ * content uses. Exhaustive over the union, so a new channel is a compile error
+ * here rather than an empty post.
+ */
+function bodyOf(content: FormattedContent): string {
+  switch (content.channel) {
+    case 'x':
+      return content.text
+    case 'linkedin':
+      return content.text
+    case 'gbp':
+      return content.summary
+    case 'instagram':
+      return content.caption
+  }
+}
+
+function accountIdOf(p: ZernioPlatformResult): string | undefined {
+  const a = p.accountId
+  if (typeof a === 'string') return a
+  return a?._id
+}
+
+export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): PublishAdapter {
+  const attempts = deps.poll?.attempts ?? DEFAULT_ATTEMPTS
+  const intervalMs = deps.poll?.intervalMs ?? DEFAULT_INTERVAL_MS
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
+  const now = deps.now ?? (() => new Date())
+  const platform = ZERNIO_PLATFORM[channel]
+  const spec = CONSTRAINTS[channel]
+
+  const fail = (
+    message: string,
+    code: string,
+    classification: 'transient' | 'permanent',
+    raw?: unknown,
+  ) => new AdapterError({ message, code, classification, channel, raw })
+
+  const legOf = (post: ZernioPost | undefined): ZernioPlatformResult | undefined =>
+    post?.platforms?.find((p) => p.platform === platform)
+
+  /** Poll until this channel's leg carries a URL, or fails, or we give up. */
+  const waitForUrl = async (initial: ZernioPost): Promise<ZernioPost> => {
+    let current = initial
+    for (let i = 0; i < attempts; i += 1) {
+      const leg = legOf(current)
+      if (leg?.platformPostUrl) return current
+      if (leg?.status === 'failed') return current
+      await sleep(intervalMs)
+      try {
+        current = await deps.client.getPost(current._id)
+      } catch (err) {
+        // A read failure mid-poll is not a publish failure — keep the last state
+        // and let the loop decide. Never downgrade "unknown" to "failed".
+        if (!(err instanceof ZernioError) || err.classification === 'permanent') throw err
+      }
+    }
+    return current
+  }
+
+  return {
+    channel,
+
+    async publish(req: PublishRequest): Promise<PublishSuccess> {
+      if (req.content.channel !== channel) {
+        throw fail(
+          `${channel} adapter received ${req.content.channel} content.`,
+          'CHANNEL_MISMATCH',
+          'permanent',
+        )
+      }
+
+      const accountId = req.auth.externalAccountId
+      if (!ZERNIO_ID_RE.test(accountId)) {
+        // The account id must have come from a workspace-scoped lookup. A malformed
+        // one means the caller assembled it rather than resolving it.
+        throw fail(
+          `${channel} on Zernio needs a 24-char account id.`,
+          'INVALID_ACCOUNT_ID',
+          'permanent',
+        )
+      }
+
+      const media = req.content.media
+      if (spec.requiresMedia === true && media.length === 0) {
+        // Belt and braces with the Constraint Engine's MEDIA_REQUIRED. Reaching the
+        // network to be told so wastes an attempt against a per-day cap.
+        throw fail(
+          `${channel} needs at least one photo — there is no text-only post.`,
+          'MEDIA_REQUIRED',
+          'permanent',
+        )
+      }
+      if (media.length > spec.maxMediaCount) {
+        throw fail(
+          `${channel} allows ${spec.maxMediaCount} media items.`,
+          'MAX_MEDIA_COUNT',
+          'permanent',
+        )
+      }
+
+      const mediaItems: ZernioMediaItemInput[] = media.map((m) => ({
+        type: 'image',
+        url: m.url,
+        mimeType: m.mime,
+        ...(m.altText ? { altText: m.altText } : {}),
+      }))
+
+      // From the caller, never assembled here — two workers racing on one post must
+      // mint the SAME key. See publishIdempotencyKey.
+      const requestId = req.idempotencyKey ?? `sahoda:${req.variantId}:${accountId}`
+
+      let created
+      try {
+        created = await deps.client.createPost(
+          {
+            content: bodyOf(req.content),
+            mediaItems,
+            platforms: [{ platform, accountId }],
+            publishNow: true,
+            timezone: 'UTC',
+          },
+          requestId,
+        )
+      } catch (err) {
+        if (err instanceof ZernioError) {
+          throw fail(err.message, err.code, err.classification, { status: err.status })
+        }
+        throw err
+      }
+
+      // A duplicate inside the idempotency window comes back as `existingPost` with
+      // HTTP 200 — not an error. Unwrap it; the post it names is ours.
+      const post = created.post ?? created.existingPost
+      if (!post?._id) {
+        throw fail(
+          'Zernio accepted the post but returned no post id.',
+          'NO_POST_ID',
+          'transient',
+          created.message,
+        )
+      }
+
+      const settled = await waitForUrl(post)
+      const leg = legOf(settled)
+      const url = leg?.platformPostUrl ?? null
+
+      if (!url) {
+        const reason = leg?.error ?? leg?.errorMessage
+        if (leg?.status === 'failed') {
+          throw fail(
+            reason ? `${channel} refused this post: ${reason}` : `${channel} refused this post.`,
+            'PLATFORM_REJECTED',
+            'permanent',
+            leg,
+          )
+        }
+        // Still processing when we ran out of patience. Transient by construction:
+        // the post may yet go live, so a retry must not assume it did not. The
+        // platform post id rides on `raw` so the reconcile sweep can ask later.
+        throw fail(
+          `${channel} is still processing this post — no live link yet.`,
+          'STILL_PROCESSING',
+          'transient',
+          { postId: post._id, status: leg?.status },
+        )
+      }
+
+      const boundAccount = leg ? accountIdOf(leg) : undefined
+      if (boundAccount && boundAccount !== accountId) {
+        // Zernio validates accountId against the whole TEAM, not the profile in the
+        // request — a wrong id publishes successfully to another customer's account
+        // and returns 200 (doc 13 §3). If the URL we are about to record came back
+        // bound to a different account, say so loudly rather than storing it.
+        throw fail(
+          'Zernio published to a different account than the one requested.',
+          'ACCOUNT_MISMATCH',
+          'permanent',
+          { requested: accountId, published: boundAccount },
+        )
+      }
+
+      return {
+        platformPostId: leg?.platformPostId ?? post._id,
+        permalink: url,
+        publishedAt: now().toISOString(),
+        mode: 'live',
+      }
+    },
+  }
+}
