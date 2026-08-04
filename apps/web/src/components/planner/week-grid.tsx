@@ -3,6 +3,7 @@ import type { Post } from '@sahoda/shared'
 
 import { PlannerRow } from '@/components/planner/planner-row'
 import { AutoPublishNote } from '@/components/posts/auto-publish-note'
+import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { AgencyBlade } from '@/components/posts/agency-blade'
 import { certaintyFor, type PostPublishMode } from '@/lib/posts/certainty'
 import { formatScheduledTime } from '@/lib/posts/schedule-format'
@@ -85,6 +86,8 @@ export interface WeekGridProps {
    * rather than claiming an auto-publish that will not happen.
    */
   autoPublish?: boolean
+  /** Per-channel publish state by post id, batched for the whole page. */
+  variantStates?: ReadonlyMap<string, readonly VariantStatusRow[]>
   buckets: WeekBuckets
   /** One instant for the whole grid — the same one `bucketWeek` was given. */
   now: Date
@@ -97,7 +100,13 @@ export interface WeekGridProps {
  * fit the window render below it — `bucketWeek` never drops a post, and neither
  * does this component.
  */
-export function WeekGrid({ autoPublish = false, buckets, now, modes }: WeekGridProps) {
+export function WeekGrid({
+  autoPublish = false,
+  variantStates,
+  buckets,
+  now,
+  modes,
+}: WeekGridProps) {
   return (
     <div className="space-y-grid">
       <div className="overflow-x-auto">
@@ -140,6 +149,7 @@ export function WeekGrid({ autoPublish = false, buckets, now, modes }: WeekGridP
               now={now}
               mode={modes.get(post.id) ?? null}
               autoPublish={autoPublish}
+              variantStates={variantStates?.get(post.id)}
             />
           ))}
         </section>
@@ -155,6 +165,7 @@ export function WeekGrid({ autoPublish = false, buckets, now, modes }: WeekGridP
               now={now}
               mode={modes.get(post.id) ?? null}
               autoPublish={autoPublish}
+              variantStates={variantStates?.get(post.id)}
             />
           ))}
         </section>

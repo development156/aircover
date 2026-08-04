@@ -7,7 +7,7 @@ import { PlannerRow } from '@/components/planner/planner-row'
 import { ViewToggle, type PlannerView } from '@/components/planner/view-toggle'
 import { WeekGrid } from '@/components/planner/week-grid'
 import { bucketWeek } from '@/lib/planner/week'
-import { listPosts, listPublishModes, LIST_LIMIT } from '@/lib/posts/read'
+import { listPosts, listPublishModes, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
 import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
 
 export const metadata = { title: 'Planner' }
@@ -28,7 +28,12 @@ export default async function PlannerPage({
   const posts = await listPosts()
   // The evidence behind any "it happened" claim. Fails safe to an empty map, in
   // which case every chip renders the weaker claim rather than a solid publish.
-  const modes = await listPublishModes(posts.map((post) => post.id))
+  const postIds = posts.map((post) => post.id)
+  // Batched for the whole week: one query, not one per row.
+  const [modes, variantStates] = await Promise.all([
+    listPublishModes(postIds),
+    listVariantStates(postIds),
+  ])
   // One instant for the whole screen: the week buckets and the past-due notes
   // must not be computed against two different clocks.
   const autoPublish = autoPublishEnabled()
@@ -55,6 +60,7 @@ export default async function PlannerPage({
           buckets={bucketWeek(posts, now)}
           now={now}
           modes={modes}
+          variantStates={variantStates}
           autoPublish={autoPublish}
         />
       ) : (

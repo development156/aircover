@@ -4,7 +4,8 @@ import type { Post } from '@sahoda/shared'
 
 import { AgencyBlade } from '@/components/posts/agency-blade'
 import { AutoPublishNote } from '@/components/posts/auto-publish-note'
-import { CHANNEL_SHORT } from '@/components/posts/channel-label'
+import { ChannelChip } from '@/components/posts/channel-chip'
+import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { DeletePostButton } from '@/components/posts/delete-post-button'
 import { StatusBadge } from '@/components/posts/status-badge'
 import { Card } from '@/components/ui/card'
@@ -38,6 +39,11 @@ export interface PostCardProps {
    */
   autoPublish?: boolean
   post: Post
+  /**
+   * Per-channel publish state, batched for the whole page by `listVariantStates`.
+   * Absent is a legitimate state — a channel picked with nothing written yet.
+   */
+  variantStates?: readonly VariantStatusRow[]
   /** One instant for the whole list, read on the server. See `AutoPublishNote`. */
   now: Date
   /**
@@ -47,7 +53,13 @@ export interface PostCardProps {
   mode: PostPublishMode
 }
 
-export function PostCard({ autoPublish = false, post, now, mode }: PostCardProps) {
+export function PostCard({
+  autoPublish = false,
+  post,
+  now,
+  mode,
+  variantStates,
+}: PostCardProps) {
   const title = post.title?.trim()
   const displayTitle = title || 'Untitled post'
   const excerpt = excerptOf(post.body)
@@ -56,6 +68,7 @@ export function PostCard({ autoPublish = false, post, now, mode }: PostCardProps
   // value is storable. De-dupe for render: it keeps React keys unique and stops
   // the same channel showing twice, which would read as two destinations.
   const channels = [...new Set(post.channels)]
+  const stateByChannel = new Map((variantStates ?? []).map((row) => [row.channel, row]))
 
   return (
     // `group` drives the title hover. The focus ring is deliberately left to the
@@ -92,11 +105,8 @@ export function PostCard({ autoPublish = false, post, now, mode }: PostCardProps
           {channels.length > 0 ? (
             <ul className="flex flex-wrap items-center gap-1.5">
               {channels.map((channel) => (
-                <li
-                  key={channel}
-                  className="rounded-pill bg-s2 px-2 py-[2px] font-medium text-muted"
-                >
-                  {CHANNEL_SHORT[channel]}
+                <li key={channel}>
+                  <ChannelChip channel={channel} state={stateByChannel.get(channel)} />
                 </li>
               ))}
             </ul>

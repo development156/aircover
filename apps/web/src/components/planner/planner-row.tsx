@@ -5,7 +5,8 @@ import type { Post } from '@sahoda/shared'
 import { ApproveButton } from '@/components/planner/approve-button'
 import { PlannerReschedule } from '@/components/planner/planner-reschedule'
 import { AutoPublishNote } from '@/components/posts/auto-publish-note'
-import { CHANNEL_SHORT } from '@/components/posts/channel-label'
+import { ChannelChip } from '@/components/posts/channel-chip'
+import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { AgencyBlade } from '@/components/posts/agency-blade'
 import { StatusBadge } from '@/components/posts/status-badge'
 import type { PostPublishMode } from '@/lib/posts/certainty'
@@ -19,6 +20,8 @@ export interface PlannerRowProps {
    * rather than claiming an auto-publish that will not happen.
    */
   autoPublish?: boolean
+  /** Per-channel publish state, batched for the whole page by listVariantStates. */
+  variantStates?: readonly VariantStatusRow[]
   post: Post
   /** One instant for the whole list, read on the server. See `AutoPublishNote`. */
   now: Date
@@ -34,10 +37,17 @@ export interface PlannerRowProps {
  * delete) because this screen is about states and times, not content. Server
  * component; the approve and reschedule controls are the client islands.
  */
-export function PlannerRow({ autoPublish = false, post, now, mode }: PlannerRowProps) {
+export function PlannerRow({
+  autoPublish = false,
+  variantStates,
+  post,
+  now,
+  mode,
+}: PlannerRowProps) {
   const title = post.title?.trim()
   const scheduledAt = formatScheduledAt(post.scheduled_at)
   const channels = [...new Set(post.channels)]
+  const stateByChannel = new Map((variantStates ?? []).map((row) => [row.channel, row]))
 
   return (
     <div className="rounded-card border border-line bg-bg px-4 py-3 shadow-card">
@@ -57,11 +67,8 @@ export function PlannerRow({ autoPublish = false, post, now, mode }: PlannerRowP
           {channels.length > 0 ? (
             <ul className="flex flex-wrap items-center gap-1.5 text-[12.5px]">
               {channels.map((channel) => (
-                <li
-                  key={channel}
-                  className="rounded-pill bg-s2 px-2 py-[2px] font-medium text-muted"
-                >
-                  {CHANNEL_SHORT[channel]}
+                <li key={channel}>
+                  <ChannelChip channel={channel} state={stateByChannel.get(channel)} />
                 </li>
               ))}
             </ul>

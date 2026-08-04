@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import type { Channel } from '@sahoda/shared'
 
-import { savePost } from '@/app/actions/posts'
+import { cancelSchedule, schedulePost } from '@/app/actions/posts-schedule'
 import { ScheduleField } from '@/components/posts/schedule-field'
 import { Button } from '@/components/ui/button'
 
@@ -16,12 +16,22 @@ export interface PlannerRescheduleProps {
 }
 
 /**
- * Collapsed by default — a datetime input on every row is noise. Saves go
- * through `savePost`, the same single-field patch the editor uses, so the
- * planner does not invent a second scheduling rulebook. Honest scope: the
- * lead/future check lives in `ScheduleField` (CLIENT-side only) — `savePost`
- * accepts any parseable timestamptz, past dates included. Server-side lead
- * validation is a filed ask (REQUESTS.md), not something this wrapper claims.
+ * Collapsed by default — a datetime input on every row is noise.
+ *
+ * ── WHY THIS NO LONGER GOES THROUGH savePost ─────────────────────────────────
+ * It used to, and that was a silent no-op. `savePost` writes `scheduled_at` and
+ * deliberately refuses `status`, so a post scheduled from this row kept
+ * `status = 'draft'` — outside DISPATCHABLE_STATUSES — and would never have been
+ * picked up. The editor was fixed to use the scheduling RPCs; this row was not,
+ * which left the bug alive on the screen most likely to be used for scheduling in
+ * the first place.
+ *
+ * Now it calls exactly what the editor calls, so there is one scheduling rulebook
+ * rather than two that disagree. The RPCs also enforce the role and refuse a post
+ * that is already going out — neither of which savePost ever checked.
+ *
+ * Honest scope, unchanged: the lead/future check lives in `ScheduleField`
+ * (CLIENT-side only). Server-side lead validation is still a filed ask.
  */
 export function PlannerReschedule({ postId, channels, value }: PlannerRescheduleProps) {
   const [open, setOpen] = useState(false)
@@ -33,9 +43,13 @@ export function PlannerReschedule({ postId, channels, value }: PlannerReschedule
     // out of order, leaving the field showing one time and the DB holding another.
     if (pending || iso === current) return
     startTransition(async () => {
-      const result = await savePost(postId, { scheduled_at: iso })
+      // `current !== null` tells the action whether this is a first arming or a
+      // move: release_post_for_publish coalesces and will not shift an existing
+      // time, and reschedule_post is the one that overwrites.
+      const result =
+        iso === null ? await cancelSchedule(postId) : await schedulePost(postId, iso, current !== null)
       if (result.ok) {
-        setCurrent(iso)
+        setCurrent(result.scheduledAt)
         toast.success(iso ? 'Rescheduled' : 'Schedule cleared')
       } else {
         toast.error(result.message)

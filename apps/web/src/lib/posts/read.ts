@@ -14,6 +14,7 @@ import { cache } from 'react'
 
 import { collapseModes, type PostPublishMode } from '@/lib/posts/certainty'
 import { createServerSupabase } from '@/lib/supabase/server'
+import { variantStatusRow, type VariantStatusRow } from '@/lib/posts/variant-status'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
 /**
@@ -226,5 +227,50 @@ export async function listMedia(postId: string): Promise<PostMedia[]> {
     })
   } catch {
     return []
+  }
+}
+
+/**
+ * Per-channel publish state for a page of posts, in one query.
+ *
+ * ── WHY THE LIST NEEDS THIS ──────────────────────────────────────────────────
+ * The posts list showed which channels a post TARGETS and one badge for the post
+ * as a whole. Neither answers the question a shop owner actually has, which is
+ * "did it go out?" — and for a `partial` post the single badge cannot answer it
+ * even in principle, because the honest answer is different per channel.
+ *
+ * One query for the whole page rather than one per card: a 50-post list would
+ * otherwise be 50 round-trips, and the list is the screen people leave open.
+ */
+export async function listVariantStates(
+  postIds: string[],
+): Promise<Map<string, VariantStatusRow[]>> {
+  const byPost = new Map<string, VariantStatusRow[]>()
+  if (postIds.length === 0) return byPost
+
+  try {
+    const workspaceId = await activeWorkspaceId()
+    if (workspaceId === null) return byPost
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('post_variants')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .in('post_id', postIds)
+      .order('channel', { ascending: true })
+
+    if (error || !data) return byPost
+
+    for (const row of data) {
+      const parsed = PostVariantSchema.safeParse(row)
+      if (!parsed.success) continue
+      const list = byPost.get(parsed.data.post_id) ?? []
+      list.push(variantStatusRow(parsed.data))
+      byPost.set(parsed.data.post_id, list)
+    }
+    return byPost
+  } catch {
+    return byPost
   }
 }
