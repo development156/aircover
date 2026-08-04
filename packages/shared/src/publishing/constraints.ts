@@ -16,11 +16,26 @@ export interface PlatformSpec {
   mediaTypes: string[]
   maxMediaMB: number
   maxMediaCount: number
+  /**
+   * Media is MANDATORY on this channel — there is no text-only post (doc 13 §6:
+   * Instagram). Previously the engine only ever capped media with an upper bound,
+   * so a caption-only Instagram variant returned `violations: []` and the editor
+   * showed green on a post that cannot exist.
+   */
+  requiresMedia?: boolean
   imageDims?: { minW: number; minH: number; aspectRange?: [number, number] }
   gbp?: { ctaTypes: string[]; supportsOffer: boolean }
   surchargeAction?: ActionType
   perDayCap: number
   scheduleMinLeadMinutes: number
+}
+
+/** A media item as the adapter will send it — a public URL plus what the platform needs. */
+export interface MediaRef {
+  url: string
+  mime: string
+  bytes?: number
+  altText?: string
 }
 
 export type FormattedContent =
@@ -33,7 +48,8 @@ export type FormattedContent =
       offer?: { title: string; terms?: string }
     }
   | { channel: 'linkedin'; text: string }
-  | { channel: 'instagram'; caption: string }
+  /** `media` is present because Instagram cannot accept a caption alone (doc 13 §6). */
+  | { channel: 'instagram'; caption: string; media: MediaRef[] }
 
 export interface ConstraintViolation {
   code: string
@@ -101,13 +117,23 @@ export const CONSTRAINTS: Record<Channel, PlatformSpec> = {
   },
   instagram: {
     channel: 'instagram',
-    publishable: false, // Alpha: text/caption rules only, no real publish
+    // Publishable via the Zernio rail — our app holds no Meta credential and files
+    // no Meta app review; Zernio owns both (doc 13 §7, confirmed [LIVE]).
+    publishable: true,
     maxChars: 2200,
     linkPolicy: 'discouraged',
     maxHashtags: 30,
     mediaTypes: ['image/jpeg', 'image/png'],
     maxMediaMB: 8,
     maxMediaCount: 10,
+    // There is no text-only Instagram post. Without this the editor showed green
+    // on a caption-only variant that Meta rejects at publish time.
+    requiresMedia: true,
+    // Instagram was the ONLY channel with no imageDims, so `validateMedia`'s
+    // `if (spec.imageDims && …)` guard skipped it entirely and `aspectRange` — a
+    // field PlatformSpec already declared — was never read for the one channel
+    // that needs it. A 1080×1920 phone photo (0.56) used to pass.
+    imageDims: { minW: 320, minH: 320, aspectRange: [0.8, 1.91] },
     perDayCap: 25,
     scheduleMinLeadMinutes: SCHEDULE_MIN_LEAD_MINUTES,
   },
@@ -150,6 +176,15 @@ export function validateVariant(
       field: 'media',
     })
   }
+  // The lower bound. Until this existed the only media check was a CAP, so zero
+  // media passed on a channel where zero media is unpublishable.
+  if (spec.requiresMedia === true && (draft.mediaCount ?? 0) < 1) {
+    violations.push({
+      code: 'MEDIA_REQUIRED',
+      message: `${spec.channel} needs at least one photo — there is no text-only post.`,
+      field: 'media',
+    })
+  }
   return { violations, charCount }
 }
 
@@ -182,13 +217,38 @@ export function validateMedia(
           field: 'dimensions',
         })
       }
+      // Aspect ratio. `aspectRange` was declared on PlatformSpec from the start and
+      // read by nothing — the check that would have caught a portrait phone photo
+      // on the one channel that rejects them.
+      const range = spec.imageDims.aspectRange
+      if (range && media.height > 0) {
+        const aspect = media.width / media.height
+        if (aspect < range[0] || aspect > range[1]) {
+          violations.push({
+            code: 'MEDIA_ASPECT',
+            message: `${spec.channel} feed photos must be between ${range[0]}:1 and ${range[1]}:1 — this one is ${aspect.toFixed(2)}:1.`,
+            field: 'dimensions',
+          })
+        }
+      }
     }
     return { channel: spec.channel, violations }
   })
 }
 
-/** Format a validated variant into the exact per-platform payload the adapter sends. */
-export function formatForPlatform(spec: PlatformSpec, variant: VariantDraft): FormattedContent {
+/**
+ * Format a validated variant into the exact per-platform payload the adapter sends.
+ *
+ * `media` is threaded through because `formatForPlatform` previously returned
+ * `{ channel:'instagram', caption }` — one field, no media — so even a variant WITH
+ * photos lost them here. The formatter structurally could not express a legal
+ * Instagram post; that is why this takes media rather than the adapter re-fetching it.
+ */
+export function formatForPlatform(
+  spec: PlatformSpec,
+  variant: VariantDraft,
+  media: MediaRef[] = [],
+): FormattedContent {
   switch (spec.channel) {
     case 'x':
       return { channel: 'x', text: variant.body }
@@ -197,6 +257,6 @@ export function formatForPlatform(spec: PlatformSpec, variant: VariantDraft): Fo
     case 'linkedin':
       return { channel: 'linkedin', text: variant.body }
     case 'instagram':
-      return { channel: 'instagram', caption: variant.body }
+      return { channel: 'instagram', caption: variant.body, media }
   }
 }

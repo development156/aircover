@@ -16,14 +16,52 @@ describe('constraint engine v0', () => {
     expect(withLink.violations.some((v) => v.code === 'MAX_CHARS')).toBe(true)
   })
 
-  it('instagram is not publishable and caps hashtags at 30', () => {
-    expect(CONSTRAINTS.instagram.publishable).toBe(false)
+  // CONTRACT CHANGE 2026-08-04: instagram is publishable via the Zernio rail. Our app
+  // holds no Meta credential and filed no Meta app review — Zernio owns both, confirmed
+  // [LIVE] from the authUrl's client_id (doc 13 §7).
+  it('instagram is publishable via Zernio and caps hashtags at 30', () => {
+    expect(CONSTRAINTS.instagram.publishable).toBe(true)
     const many = Array(31).fill('#x')
     expect(
-      validateVariant(CONSTRAINTS.instagram, { body: 'hi', hashtags: many }).violations.some(
-        (v) => v.code === 'MAX_HASHTAGS',
-      ),
+      validateVariant(CONSTRAINTS.instagram, {
+        body: 'hi',
+        hashtags: many,
+        mediaCount: 1,
+      }).violations.some((v) => v.code === 'MAX_HASHTAGS'),
     ).toBe(true)
+  })
+
+  it('instagram refuses a caption-only variant — there is no text-only post', () => {
+    const { violations } = validateVariant(CONSTRAINTS.instagram, { body: 'hi' })
+    expect(violations.some((v) => v.code === 'MEDIA_REQUIRED')).toBe(true)
+  })
+
+  it('instagram refuses a portrait phone photo on aspect ratio', () => {
+    const [res] = validateMedia([CONSTRAINTS.instagram], {
+      mime: 'image/jpeg',
+      bytes: 1_000_000,
+      width: 1080,
+      height: 1920, // 0.56 — outside the 0.8–1.91 feed range
+    })
+    expect(res.violations.some((v) => v.code === 'MEDIA_ASPECT')).toBe(true)
+  })
+
+  it('instagram refuses a non-JPEG/PNG at compose time', () => {
+    const [res] = validateMedia([CONSTRAINTS.instagram], {
+      mime: 'image/webp',
+      bytes: 1000,
+      width: 1080,
+      height: 1080,
+    })
+    expect(res.violations.some((v) => v.code === 'MEDIA_TYPE')).toBe(true)
+  })
+
+  it('formatForPlatform carries media into the instagram payload', () => {
+    const out = formatForPlatform(CONSTRAINTS.instagram, { body: 'caption', mediaCount: 1 }, [
+      { url: 'https://media.zernio.com/x.jpg', mime: 'image/jpeg' },
+    ])
+    expect(out).toMatchObject({ channel: 'instagram', caption: 'caption' })
+    expect(out.channel === 'instagram' && out.media).toHaveLength(1)
   })
 
   it('validateMedia flags wrong type + too-small dims per channel', () => {
