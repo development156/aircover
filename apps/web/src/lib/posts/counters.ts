@@ -25,7 +25,7 @@ export interface ChannelMeter {
   /** True only when the character budget is blown — other violations do not set this. */
   over: boolean
   violations: ConstraintViolation[]
-  /** From the spec. Instagram is preview-only in Alpha; this is not a violation. */
+  /** From the spec. A channel the engine cannot format is not a violation. */
   publishable: boolean
 }
 

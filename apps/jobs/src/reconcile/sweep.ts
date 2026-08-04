@@ -41,6 +41,8 @@ export interface ConnectionToCheck {
   workspaceId: string
   profileId: string
   accountId: string
+  /** Which channel this connection is for — all four ride the same rail now. */
+  platform: string
 }
 
 /** One variant that was accepted by the platform but never resolved here. */

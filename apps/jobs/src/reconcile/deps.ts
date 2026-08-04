@@ -1,4 +1,9 @@
-import { createZernioClient, fetchTransport, type ZernioClient } from '@sahoda/publishing'
+import {
+  ZERNIO_PLATFORM_NAME,
+  createZernioClient,
+  fetchTransport,
+  type ZernioClient,
+} from '@sahoda/publishing'
 import type { Channel } from '@sahoda/shared'
 
 import { getRuntime } from '../runtime'
@@ -61,18 +66,25 @@ export function reconcileSweepDeps(opts: ReconcileDepsOptions = {}): ReconcileSw
      * boundary instead of trusting a jsonb field.
      */
     async listConnectionsToCheck(): Promise<ConnectionToCheck[]> {
+      // EVERY Zernio-fronted connection, not just instagram. A connection is one
+      // of Zernio's when `external_account` carries the profileId that
+      // upsert_zernio_connection wrote from the workspace's mapping; a native OAuth
+      // row has no such field and is not ours to ask Zernio about.
       const r = await pool.query<{
         id: string
         workspace_id: string
         profile_id: string
         account_id: string
+        platform: string
       }>(
-        `select c.id, c.workspace_id, zp.profile_id, c.external_account ->> 'id' as account_id
+        `select c.id, c.workspace_id, zp.profile_id,
+                c.external_account ->> 'id' as account_id,
+                c.platform
            from connections c
            join zernio_profiles zp on zp.workspace_id = c.workspace_id
-          where c.platform = 'instagram'
-            and c.status = 'active'
+          where c.status = 'active'
             and c.external_account ->> 'id' is not null
+            and c.external_account ->> 'profileId' is not null
           order by c.last_checked_at nulls first, c.created_at
           limit $1`,
         [limit],
@@ -82,6 +94,7 @@ export function reconcileSweepDeps(opts: ReconcileDepsOptions = {}): ReconcileSw
         workspaceId: row.workspace_id,
         profileId: row.profile_id,
         accountId: row.account_id,
+        platform: row.platform,
       }))
     },
 
@@ -107,8 +120,10 @@ export function reconcileSweepDeps(opts: ReconcileDepsOptions = {}): ReconcileSw
                 l.variant_id, l.workspace_id, l.post_id, l.channel, l.platform_post_id
            from post_publish_logs l
            join post_variants v on v.id = l.variant_id
-          where l.channel = 'instagram'
-            and l.platform_post_id is not null
+          -- Every channel on the rail. The two-phase wait is instagram's most
+          -- visible symptom but the others go through the same Zernio post object,
+          -- so the same "accepted, never resolved" gap exists for all of them.
+          where l.platform_post_id is not null
             and l.created_at < now() - make_interval(secs => $2::int)
             and v.permalink is null
             and v.publish_status <> 'published'
@@ -145,7 +160,10 @@ export function reconcileSweepDeps(opts: ReconcileDepsOptions = {}): ReconcileSw
      */
     async readPublish(item: UnresolvedPublish): Promise<PublishResolution> {
       const post = await needClient().getPost(item.platformPostId)
-      const leg = post.platforms?.find((p) => p.platform === 'instagram')
+      // Zernio names GBP `google`; the rest match our channel names. One mapping,
+      // shared with the adapter, so a rename cannot make this silently find nothing.
+      const wanted = ZERNIO_PLATFORM_NAME[item.channel]
+      const leg = post.platforms?.find((p) => p.platform === wanted)
       if (leg?.platformPostUrl) {
         return {
           kind: 'published',

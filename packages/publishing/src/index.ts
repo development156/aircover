@@ -93,4 +93,8 @@ export {
 } from './zernio/media'
 
 export { createInstagramAdapter, type InstagramAdapterDeps } from './adapters/instagram'
-export { createZernioAdapter, type ZernioAdapterDeps } from './adapters/zernio'
+export {
+  createZernioAdapter,
+  ZERNIO_PLATFORM_NAME,
+  type ZernioAdapterDeps,
+} from './adapters/zernio'

@@ -143,7 +143,7 @@ export async function simulatePublish(postId: string): Promise<PublishState> {
     if (simulated.length === 0 && blocked.length === 0) {
       return {
         ok: false,
-        message: 'None of these channels can be published yet — Instagram is preview-only.',
+        message: 'Add a channel variant to preview what would go out.',
       }
     }
 

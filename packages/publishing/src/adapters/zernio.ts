@@ -58,8 +58,15 @@ export interface ZernioAdapterDeps {
 const DEFAULT_ATTEMPTS = 12
 const DEFAULT_INTERVAL_MS = 3000
 
-/** Zernio's platform name for one of our channels. */
-const ZERNIO_PLATFORM: Record<Channel, string> = {
+/**
+ * Zernio's platform name for one of our channels.
+ *
+ * Exported because the reconcile sweep must look for the SAME leg in a post it
+ * reads back. Two copies of this map would diverge on the one entry that is not an
+ * identity — gbp is `google` — and the sweep would silently find no leg and report
+ * every GBP post as still pending forever.
+ */
+export const ZERNIO_PLATFORM_NAME: Record<Channel, string> = {
   x: 'x',
   gbp: 'google',
   linkedin: 'linkedin',
@@ -95,7 +102,7 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
   const intervalMs = deps.poll?.intervalMs ?? DEFAULT_INTERVAL_MS
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
   const now = deps.now ?? (() => new Date())
-  const platform = ZERNIO_PLATFORM[channel]
+  const platform = ZERNIO_PLATFORM_NAME[channel]
   const spec = CONSTRAINTS[channel]
 
   const fail = (
