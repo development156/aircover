@@ -1,13 +1,22 @@
 import { appError } from '@sahoda/shared'
-import type { MeshContext, MeshTaskDef, ModelTier, RunTask } from '@sahoda/shared'
+import type {
+  ImageGenerateInput,
+  ImageGenerateOutput,
+  MeshContext,
+  MeshTaskDef,
+  ModelTier,
+  RunTask,
+} from '@sahoda/shared'
+import { IMAGE_SIZES, ImageGenerateInputSchema } from '@sahoda/shared'
 import { keyClassForTier, loadMeshConfig, type KeyClass } from './config'
+import { imageGenerateDef } from './tasks/image-generate'
 import type { FetchLike, Provider, ProviderUsage } from './providers/types'
 import { createOpenRouterProvider } from './providers/openrouter'
 import { createOpenAIProvider } from './providers/openai'
 import { createPostgrestLogSink } from './telemetry'
 import { createPostgrestBrandContext } from './brand-context'
 import { createMeshRunner, type Attempt, type MeshResult, type MeshTaskSpec } from './engine'
-import { TIER_ROUTES } from './routing'
+import { TIER_ROUTES, imageModelForTier } from './routing'
 import { brandGuidelinesTask } from './tasks/brand-guidelines'
 import { captionRewriteTask } from './tasks/caption-rewrite'
 import { contentVariantsTask } from './tasks/content-variants'
@@ -33,6 +42,14 @@ export interface CreateMeshOptions {
 
 export interface Mesh {
   runTask: RunTask
+  /**
+   * Generate an image. Separate from `runTask` because the answer is bytes, not a
+   * zod-parsed object — see the note on the runner's `runImage`.
+   */
+  runImage(
+    input: ImageGenerateInput,
+    ctx: MeshContext,
+  ): Promise<MeshResult<ImageGenerateOutput>>
 }
 
 /** A task's run bound to its concrete input/output types, with the generics erased at the boundary. */
@@ -51,6 +68,22 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
     image: createOpenRouterProvider(cfg.openRouterKeys.image, opts.fetchImpl),
   }
   const openai = createOpenAIProvider(cfg.openaiKey, opts.fetchImpl)
+
+  /**
+   * The image plan: the IMAGE key class, not the tier's.
+   *
+   * `keyClassForTier` sends every non-research tier to TEXT, which is right for
+   * chat and wrong here — OPENROUTER_API_KEY_IMAGE exists precisely so image spend
+   * is cost-isolated from text spend (TSD §4), and routing images through the text
+   * key would merge the two budgets the split was created to keep apart.
+   *
+   * Undefined when the tier has no image model, which is how `runImage` learns to
+   * refuse rather than guess.
+   */
+  const planImage = (tier: ModelTier): { provider: Provider; model: string } | undefined => {
+    const model = imageModelForTier(tier)
+    return model === undefined ? undefined : { provider: openRouterByClass.image, model }
+  }
 
   const planAttempts = (tier: ModelTier): Attempt[] => {
     const route = TIER_ROUTES[tier]
@@ -80,6 +113,7 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
     now: () => Date.now(),
     price: estimateCostUsd,
     brandContext,
+    planImage,
   })
 
   // Bind each wired task's run with its concrete generics captured here, then
@@ -109,5 +143,32 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
     return (await run(input, ctx)) as MeshResult<O>
   }
 
-  return { runTask }
+  async function runImage(
+    input: ImageGenerateInput,
+    ctx: MeshContext,
+  ): Promise<MeshResult<ImageGenerateOutput>> {
+    const parsed = ImageGenerateInputSchema.safeParse(input)
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: appError('VALIDATION_ERROR', 'invalid image prompt', ctx.traceId),
+      }
+    }
+    const size = IMAGE_SIZES[parsed.data.size]
+    return runner.runImage(
+      imageGenerateDef,
+      // The size rides in the prompt as well as the structured field: not every
+      // image model on OpenRouter honours the hint, and a 1024×1280 request that
+      // silently returns 512×512 fails instagram's minimum dimensions later, far
+      // from here.
+      {
+        prompt: `${parsed.data.prompt}\n\nRender at ${size.width}x${size.height} pixels.`,
+        width: size.width,
+        height: size.height,
+      },
+      ctx,
+    )
+  }
+
+  return { runTask, runImage }
 }

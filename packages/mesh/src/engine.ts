@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   ChatRequest,
   ChatResponse,
+  ImageRequest,
   Provider,
   ProviderUsage,
 } from './providers/types'
@@ -45,6 +46,12 @@ export interface MeshRunnerDeps {
   price: (usage: ProviderUsage) => number
   /** Resolves the Brand Brain prefix for `cachePrefix: 'brand_context'` tasks (best-effort). */
   brandContext?: BrandContextProvider
+  /**
+   * The one image-capable provider and the model to ask. Undefined when the rail
+   * is not configured, and `runImage` then fails honestly rather than reaching for
+   * a text model that would return a paragraph describing a picture.
+   */
+  planImage?: (tier: ModelTier) => { provider: Provider; model: string } | undefined
 }
 
 export type MeshResult<O> = (
@@ -271,5 +278,57 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     }
   }
 
-  return { run }
+  /**
+   * Generate one image.
+   *
+   * Deliberately NOT `execute` with a flag. That function's body is entirely about
+   * text: it builds a message list, asks for JSON mode, parses and repairs the
+   * answer against a zod schema, and can serve a fallback payload. An image call
+   * shares none of it, and threading a branch through all four stages would put
+   * image concerns in the path every text task takes. What the two DO share is
+   * telemetry, and that is shared here.
+   *
+   * There is no fallback chain. One provider; if it fails, the task fails and the
+   * caller releases its credit hold. See IMAGE_ROUTES for why falling back to a
+   * text model — which would return a paragraph DESCRIBING a picture — is worse
+   * than an honest failure.
+   */
+  async function runImage(
+    def: MeshTaskDef<unknown, unknown>,
+    req: Omit<ImageRequest, 'model'>,
+    ctx: MeshContext,
+  ): Promise<MeshResult<{ base64: string; mime: string }>> {
+    const planned = deps.planImage?.(def.tier)
+    if (!planned?.provider.image) {
+      await writeLog(toLogRow(def, ctx, undefined, 'error', 'NO_IMAGE_PROVIDER'))
+      return {
+        ok: false,
+        error: appError('PROVIDER_ERROR', 'no image-capable provider is configured', ctx.traceId),
+      }
+    }
+
+    const started = deps.now()
+    try {
+      const result = await planned.provider.image({ ...req, model: planned.model })
+      const usage: MeshUsage = {
+        ...result.usage,
+        costUsd: deps.price(result.usage),
+        latencyMs: deps.now() - started,
+      }
+      await writeLog(toLogRow(def, ctx, usage, 'ok', null))
+      return { ok: true, data: { base64: result.base64, mime: result.mime }, usage }
+    } catch (e) {
+      const status = e instanceof ProviderCallError ? e.status : null
+      await writeLog(
+        toLogRow(def, ctx, undefined, 'error', status === null ? 'NETWORK' : `HTTP_${status}`),
+      )
+      // Our own message — a provider error can echo the prompt back.
+      return {
+        ok: false,
+        error: appError('PROVIDER_ERROR', 'image generation failed', ctx.traceId),
+      }
+    }
+  }
+
+  return { run, runImage }
 }

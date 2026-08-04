@@ -10,6 +10,7 @@ export const MeshTaskNameSchema = z.enum([
   'caption_rewrite',
   'plan_week',
   'site_generate',
+  'image_generate',
 ])
 export type MeshTaskName = z.infer<typeof MeshTaskNameSchema>
 
@@ -90,4 +91,50 @@ export const MESH_TASK_ACTION: Record<MeshTaskName, ActionType> = {
   content_variants: 'post_variants',
   plan_week: 'loop_cycle',
   site_generate: 'site_generate',
+  // pricing.config.json carries BOTH `image_standard` (6) and `image_premium`
+  // (12), and this map is one-to-one, so the task name has to pick. It picks the
+  // cheaper: a customer who asked for "an image" and is charged 12 credits for a
+  // tier they never chose has been overcharged, and the reverse never happens.
+  // A premium task is a SECOND MeshTaskName when a UI exists to choose it —
+  // not a runtime branch inside this one, which would make the price depend on
+  // something the caller cannot see before spending.
+  image_generate: 'image_standard',
 }
+
+// ── image_generate ────────────────────────────────────────────────────────────
+
+/**
+ * Feed images default to 1:1.
+ *
+ * Instagram's accepted aspect range is 0.8–1.91 and a square sits comfortably
+ * inside it, so a default that is square is a default that passes everywhere. The
+ * generator is asked for a size, not merely a ratio, because an image below
+ * 320×320 fails `imageDims` no matter how correct its shape is.
+ */
+export const IMAGE_SIZES = {
+  square: { width: 1024, height: 1024 },
+  portrait: { width: 1024, height: 1280 },
+  landscape: { width: 1280, height: 1024 },
+} as const
+export type ImageSizeName = keyof typeof IMAGE_SIZES
+
+export const ImageGenerateInputSchema = z.object({
+  prompt: z.string().min(3).max(1000),
+  /** Square by default — see IMAGE_SIZES. */
+  size: z.enum(['square', 'portrait', 'landscape']).default('square'),
+})
+export type ImageGenerateInput = z.infer<typeof ImageGenerateInputSchema>
+
+/**
+ * What the model gave back.
+ *
+ * `mime` is what the BYTES are, sniffed from their magic numbers rather than
+ * taken from the model's word for it — a generator that says PNG and returns
+ * WebP is exactly how an unusable file reaches Instagram.
+ */
+export const ImageGenerateOutputSchema = z.object({
+  /** Raw base64, no data-URL prefix. */
+  base64: z.string().min(1),
+  mime: z.string(),
+})
+export type ImageGenerateOutput = z.infer<typeof ImageGenerateOutputSchema>

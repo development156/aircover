@@ -8,6 +8,7 @@ import type { MediaPreview } from '@/lib/posts/media-url'
 import { toAttachment, unverifiableRows, validateAttachments } from '@/lib/posts/to-attachment'
 
 import { ChannelObjections } from './channel-objections'
+import { GenerateImage } from './generate-image'
 import { InlineNote } from './inline-error'
 import { MediaAttach } from './media-attach'
 import { MediaRemoveButton } from './media-remove-button'
@@ -184,6 +185,10 @@ export function MediaPane({ media, channels, postId, previews = [] }: MediaPaneP
       ) : null}
 
       <MediaAttach postId={postId} channels={channels} />
+
+      {/* Below the uploader on purpose: bringing your own photo is the ordinary
+          path and costs nothing; generating one is the paid alternative. */}
+      <GenerateImage postId={postId} />
 
       <InlineNote>
         There is no workspace media library yet — you can upload a new file here, but not reuse one

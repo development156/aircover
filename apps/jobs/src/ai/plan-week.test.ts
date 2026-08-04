@@ -16,6 +16,12 @@ describe('runPlanWeek', () => {
         seenName = def.name
         return { ok: false, error: appError('VALIDATION_ERROR', 'stub', c.traceId) }
       },
+      // Present so the stub satisfies the interface. plan-week never generates an
+      // image, and a stub that quietly returned success here would let a future
+      // change call it without a test noticing.
+      async runImage() {
+        throw new Error('plan-week must not generate images')
+      },
     }
     const r = await runPlanWeek(input, ctx, stub)
     expect(seenName).toBe('plan_week')

@@ -28,9 +28,39 @@ export interface ChatResponse {
   usage: ProviderUsage
 }
 
+/**
+ * An image generation call.
+ *
+ * Separate from ChatRequest because it is not a chat: there is no message list,
+ * no JSON mode, no token budget that means anything, and the answer is bytes.
+ * Modelling it as a chat with a special flag would put four fields on every text
+ * call that only ever apply to one.
+ */
+export interface ImageRequest {
+  model: string
+  prompt: string
+  width: number
+  height: number
+}
+
+export interface ImageResponse {
+  /** Raw base64, no data-URL prefix — the caller decides what to do with bytes. */
+  base64: string
+  /** What the provider CLAIMED. The caller sniffs the bytes and may disagree. */
+  mime: string
+  usage: ProviderUsage
+}
+
 export interface Provider {
   readonly name: string
   chat(req: ChatRequest): Promise<ChatResponse>
+  /**
+   * OPTIONAL, and its absence is meaningful: most providers here are text-only,
+   * and a runner that finds no image-capable provider must fail honestly rather
+   * than fall back to a text model that would return a paragraph describing a
+   * picture. Only the OpenRouter client implements it.
+   */
+  image?(req: ImageRequest): Promise<ImageResponse>
 }
 
 /** Injectable transport (defaults to global fetch) so provider clients test without a network. */

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { MeshTaskNameSchema, ModelTierSchema } from '@sahoda/shared'
-import { TIER_ROUTES, TASK_TIER, routeForTier } from './routing'
+import { TIER_ROUTES, TASK_TIER, routeForTier, imageModelForTier } from './routing'
 import { keyClassForTier } from './config'
 
 describe('tier routing', () => {
@@ -26,7 +26,9 @@ describe('tier routing', () => {
 describe('task → tier map', () => {
   it('assigns a tier to every Alpha mesh task, resolvable to a route and key class', () => {
     const names = MeshTaskNameSchema.options
-    expect(names.length).toBe(5)
+    // Count guard: a new mesh task must be a deliberate decision here, not a
+    // silent addition. image_generate brought it to 6.
+    expect(names.length).toBe(6)
     for (const name of names) {
       const tier = TASK_TIER[name]
       expect(ModelTierSchema.options, name).toContain(tier)
@@ -41,5 +43,13 @@ describe('task → tier map', () => {
     expect(TASK_TIER.content_variants).toBe('economy')
     expect(TASK_TIER.plan_week).toBe('standard')
     expect(TASK_TIER.site_generate).toBe('premium')
+  })
+
+  it('routes image_generate to an image model and the IMAGE key class', () => {
+    // Its TIER_ROUTES entry exists (every tier has one) but is a CHAT pair and is
+    // never used for this task — the model comes from IMAGE_ROUTES, and the key
+    // from the image class, so image spend stays isolated from text spend.
+    expect(TASK_TIER.image_generate).toBe('standard')
+    expect(imageModelForTier(TASK_TIER.image_generate)).toBeTruthy()
   })
 })
