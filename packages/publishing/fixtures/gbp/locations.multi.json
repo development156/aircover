@@ -1,0 +1,16 @@
+{
+  "status": 200,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "locations": [
+      {
+        "name": "locations/40123456789",
+        "title": "Chai & Chapters — Indiranagar"
+      },
+      {
+        "name": "locations/40987654321",
+        "title": "Chai & Chapters — Koramangala"
+      }
+    ]
+  }
+}

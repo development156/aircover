@@ -1,0 +1,135 @@
+import { render, screen } from '@testing-library/react'
+import { describe, expect, test, vi } from 'vitest'
+import type { Post } from '@sahoda/shared'
+
+import { AutoPublishNote } from '@/components/posts/auto-publish-note'
+import { PostCard } from '@/components/posts/post-card'
+import { PlannerRow } from '@/components/planner/planner-row'
+import { WeekGrid } from '@/components/planner/week-grid'
+import { bucketWeek } from '@/lib/planner/week'
+
+/**
+ * The note, and every surface that owes it.
+ *
+ * A "Scheduled" chip next to a date and time is read as "this goes out on its
+ * own". Nothing publishes it — no cron, no dispatch, no dependency on
+ * @sahoda/jobs from apps/web at all — so for a past-due post that reading is
+ * provably false: the time came and went in silence. An investor or customer
+ * looking at that screen concludes auto-publish works.
+ *
+ * These pin the note onto every surface that shows a scheduled post, because a
+ * surface that quietly omits it is exactly where the false impression survives.
+ */
+
+// The planner row's controls are client islands over server actions; they reach
+// Clerk on import and are not what this file is about.
+vi.mock('@/app/actions/planner', () => ({ approvePost: vi.fn() }))
+vi.mock('@/app/actions/posts', () => ({ savePost: vi.fn(), deletePost: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
+
+const NOW = new Date('2026-07-25T12:00:00.000Z')
+const PAST = '2026-07-24T12:00:00.000Z'
+const FUTURE = '2026-07-26T12:00:00.000Z'
+
+const post = (overrides: Partial<Post> = {}): Post => ({
+  id: '11111111-1111-4111-8111-111111111111',
+  workspace_id: '22222222-2222-4222-8222-222222222222',
+  title: 'Diwali teaser',
+  body: 'Lights on.',
+  status: 'scheduled',
+  channels: ['x'],
+  scheduled_at: FUTURE,
+  origin: 'manual',
+  created_by: 'user_1',
+  created_at: '2026-07-20T10:00:00.000Z',
+  updated_at: '2026-07-20T10:00:00.000Z',
+  ...overrides,
+})
+
+const NOT_LIVE = /auto-publish isn't live yet/i
+const NOTHING_PUBLISHED = /nothing was published/i
+
+describe('AutoPublishNote', () => {
+  test('says a scheduled post will not post itself', () => {
+    render(<AutoPublishNote status="scheduled" scheduledAt={FUTURE} now={NOW} />)
+
+    expect(screen.getByText(NOT_LIVE)).toBeInTheDocument()
+  })
+
+  test('says outright that a past-due one did not publish', () => {
+    render(<AutoPublishNote status="scheduled" scheduledAt={PAST} now={NOW} />)
+
+    expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
+  })
+
+  test('stays silent on a post that promises nothing', () => {
+    const { container } = render(<AutoPublishNote status="draft" scheduledAt={PAST} now={NOW} />)
+
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  test('the compact form still carries the full sentence for screen readers', () => {
+    // The week grid abbreviates for space. Sighted users get "Missed · not
+    // posted"; anyone on a screen reader must not get LESS of the truth.
+    render(<AutoPublishNote status="scheduled" scheduledAt={PAST} now={NOW} variant="compact" />)
+
+    expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
+  })
+})
+
+describe('the posts list', () => {
+  test('labels a past-due scheduled post', () => {
+    render(<PostCard post={post({ scheduled_at: PAST })} now={NOW} />)
+
+    expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
+  })
+
+  test('labels an upcoming scheduled post too', () => {
+    render(<PostCard post={post()} now={NOW} />)
+
+    expect(screen.getByText(NOT_LIVE)).toBeInTheDocument()
+  })
+
+  test('leaves a dated draft alone', () => {
+    render(<PostCard post={post({ status: 'draft', scheduled_at: PAST })} now={NOW} />)
+
+    expect(screen.queryByText(NOT_LIVE)).not.toBeInTheDocument()
+  })
+})
+
+describe('the planner list', () => {
+  test('labels a past-due scheduled post', () => {
+    render(<PlannerRow post={post({ scheduled_at: PAST })} now={NOW} />)
+
+    expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
+  })
+
+  test('leaves a dated draft alone', () => {
+    render(<PlannerRow post={post({ status: 'draft', scheduled_at: PAST })} now={NOW} />)
+
+    expect(screen.queryByText(NOT_LIVE)).not.toBeInTheDocument()
+  })
+})
+
+describe('the planner week grid', () => {
+  test('marks a past-due scheduled post inside its day cell', () => {
+    // Today's column, earlier in the day: the exact cell that reads as "this
+    // went out this morning".
+    const earlierToday = '2026-07-25T03:00:00.000Z'
+    const buckets = bucketWeek([post({ scheduled_at: earlierToday })], NOW)
+
+    render(<WeekGrid buckets={buckets} now={NOW} />)
+
+    expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
+  })
+
+  test('carries the note into its overflow rows as well', () => {
+    // Posts outside the 7-day window fall through to PlannerRow. A post that
+    // was due last month is the most misleading one on the screen.
+    const buckets = bucketWeek([post({ scheduled_at: '2026-06-01T12:00:00.000Z' })], NOW)
+
+    render(<WeekGrid buckets={buckets} now={NOW} />)
+
+    expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
+  })
+})

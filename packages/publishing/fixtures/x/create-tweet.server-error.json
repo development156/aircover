@@ -1,0 +1,9 @@
+{
+  "status": 500,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "title": "Internal Server Error",
+    "type": "about:blank",
+    "status": 500
+  }
+}

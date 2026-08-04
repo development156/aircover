@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sahoda Labs — Brand Brain · Signal Resolution Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --p:#FF4B00;--pstrong:#D73F00;--acc:#BA3700;--t50:#FFF2ED;--t100:#FFE4D9;--t300:#FFA580;
+    --bg:#FFFFFF;--s1:#FAFAF9;--s2:#F4F4F3;--ink:#131313;--muted:#525252;--faint:#A3A3A2;--line:#E5E5E4;
+    --ok:#15803D;--warn:#B45309;--danger:#C81E1E;
+    --r:12px;--shadow:0 1px 2px rgba(19,19,19,.06);--pop:0 8px 24px rgba(19,19,19,.12);
+    --sans:'Outfit',Inter,system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--s1);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;padding:30px 18px 90px}
+  :focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+  .wrap{max-width:900px;margin:0 auto}
+  .blade{display:inline-block;background:var(--p);-webkit-mask:var(--bl) center/contain no-repeat;mask:var(--bl) center/contain no-repeat}
+
+  header.hd{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+  .mono{font-family:var(--mono)}
+  .eyebrow{font:600 11px var(--mono);letter-spacing:.16em;color:var(--acc);text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  .eyebrow .blade{width:9px;height:14px}
+  h1{margin:6px 0 2px;font-size:25px;font-weight:800;letter-spacing:-.01em}
+  .sub{margin:0;color:var(--muted);font-size:13.5px}
+  .hd .acts{display:flex;gap:8px;flex-wrap:wrap}
+  button{font-family:var(--sans);cursor:pointer;border:0;background:none;color:inherit;font-size:14px}
+  .btn{border-radius:999px;font-weight:600;padding:9px 16px;transition:transform .1s}
+  .btn:active{transform:scale(.97)}
+  .btn.primary{background:var(--p);color:var(--ink)}
+  .btn.primary:hover{background:var(--pstrong);color:#fff}
+  .btn.ghost{color:var(--muted)} .btn.ghost:hover{background:var(--s2);color:var(--ink)}
+  .btn.line{border:1.5px solid var(--ink)} .btn.line:hover{background:var(--ink);color:#fff}
+  .btn.sm{padding:6px 12px;font-size:13px}
+  .btn[disabled]{opacity:.45;cursor:not-allowed;transform:none}
+
+  /* Signal strip */
+  .strip{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:12px 16px 8px;margin-bottom:18px}
+  .strip .head{display:flex;justify-content:space-between;font:600 10.5px var(--mono);letter-spacing:.12em;color:var(--faint);text-transform:uppercase;margin-bottom:4px}
+  .strip .head b{color:var(--acc)}
+  #wave{width:100%;height:58px;display:block}
+
+  /* Tabs */
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .tab{display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 13px;font-weight:600;font-size:13px;color:var(--muted)}
+  .tab .idx{font:600 10px var(--mono);color:var(--faint)}
+  .tab:hover{border-color:var(--faint);color:var(--ink)}
+  .tab.on{background:var(--t50);border-color:var(--t300);color:var(--acc)}
+  .tab.on .idx{color:var(--acc)}
+  .tab.done .idx{color:var(--ok)}
+
+  .panel{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:22px 24px}
+  .stephead{margin-bottom:14px}
+  .stephead .t{margin:0;font-weight:700;font-size:16px}
+  .stephead .h{margin:3px 0 0;color:var(--muted);font-size:13px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .f{display:flex;flex-direction:column;gap:6px}
+  .f.full{grid-column:1/-1}
+  .f label{font-size:12.5px;font-weight:600}
+  .f label .opt{color:var(--faint);font-weight:400}
+  input[type=text],textarea,select{font:14px var(--sans);color:var(--ink);background:var(--s1);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+  input:focus,textarea:focus,select:focus{outline:2px solid var(--acc);outline-offset:1px;background:var(--bg)}
+  textarea{min-height:74px;resize:vertical}
+  .slider{display:flex;align-items:center;gap:12px}
+  .slider input[type=range]{flex:1;accent-color:var(--p)}
+  .slider .lab{font:600 11px var(--mono);color:var(--muted);width:88px}
+
+  .navrow{display:flex;align-items:center;justify-content:space-between;margin-top:16px}
+  .count{font:600 11px var(--mono);letter-spacing:.1em;color:var(--faint)}
+
+  .resolveBox{text-align:center;padding:14px 0 4px}
+  .resolveBox p{color:var(--muted);max-width:520px;margin:0 auto 16px}
+  .status{display:block;margin-top:12px;font:600 12px var(--mono);color:var(--acc);min-height:16px}
+  .err{color:var(--danger);font-size:13px;margin-top:10px;min-height:16px}
+
+  /* Results */
+  .rhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 14px}
+  .vbadge{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:#fff;border-radius:999px;padding:6px 14px;font-weight:600;font-size:13px}
+  .vbadge i{width:8px;height:8px;border-radius:50%;background:var(--p)}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px}
+  .card.full{grid-column:1/-1}
+  .card .lab{font:600 10.5px var(--mono);letter-spacing:.14em;color:var(--faint);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .lock{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .note{color:var(--muted);font-size:13px;margin:8px 0 0}
+  .pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .pill{font-size:12px;font-weight:600;border-radius:999px;padding:4px 11px;background:var(--s2);color:var(--ink)}
+  .pill.or{background:var(--t100);color:var(--acc)}
+  .pill.no{background:#FDECEC;color:var(--danger);text-decoration:line-through}
+  .kv{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;padding:5px 0;border-bottom:1px dashed var(--line)}
+  .kv:last-of-type{border-bottom:0}
+  .kv .k{color:var(--muted)} .kv .v{font-weight:600;text-align:right}
+  .hookline{background:var(--s1);border-left:3px solid var(--p);border-radius:0 8px 8px 0;padding:8px 12px;margin-top:8px;font-size:13.5px;font-weight:500}
+
+  /* Learnings */
+  .learn{border:1px solid var(--t300);background:var(--t50)}
+  .ev{display:flex;gap:12px;align-items:center;padding:10px 0;flex-wrap:wrap}
+  .ev+.ev{border-top:1px dashed var(--t300)}
+  .ev p{margin:0;flex:1;min-width:220px;font-size:13.5px}
+  .ev small{display:block;color:var(--muted)}
+  details{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:12px 16px;margin-top:14px}
+  summary{cursor:pointer;font-weight:600;font-size:13.5px}
+  pre{background:var(--ink);color:#EDEDEC;border-radius:10px;padding:14px;font:12px/1.55 var(--mono);overflow:auto;margin:12px 0 0}
+  .toast{position:fixed;left:22px;bottom:22px;z-index:30;background:var(--ink);color:#fff;border-radius:10px;padding:12px 16px;font-size:14px;box-shadow:var(--pop);opacity:0;transform:translateY(8px);transition:.25s;pointer-events:none;max-width:340px}
+  .toast.show{opacity:1;transform:none}
+  @media(max-width:680px){.grid,.cards{grid-template-columns:1fr}body{padding:18px 12px 90px}}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hd">
+    <div>
+      <span class="eyebrow"><span class="blade"></span>Brand Brain</span>
+      <h1>Signal Resolution Console</h1>
+      <p class="sub">Raw brand input in. A living Brand Brain out — voice, personas, hooks and red lines that learn from results.</p>
+    </div>
+    <div class="acts">
+      <button class="btn ghost sm" id="sampleBtn">Load “Chai &amp; Chapters” sample</button>
+      <button class="btn ghost sm" id="clearBtn">Clear all</button>
+    </div>
+  </header>
+
+  <div class="strip">
+    <div class="head"><span>SIGNAL CLARITY</span><b class="mono" id="clarity">0%</b></div>
+    <canvas id="wave" aria-hidden="true"></canvas>
+  </div>
+
+  <!-- ============ WIZARD ============ -->
+  <div id="wizard">
+    <nav class="tabs" aria-label="Brand Brain channels">
+      <button class="tab" data-s="0"><span class="idx">SRC</span>Source</button>
+      <button class="tab" data-s="1"><span class="idx">01</span>Customer</button>
+      <button class="tab" data-s="2"><span class="idx">02</span>Brand</button>
+      <button class="tab" data-s="3"><span class="idx">03</span>Hook</button>
+      <button class="tab" data-s="4"><span class="idx">04</span>Voice</button>
+      <button class="tab" data-s="5"><span class="idx">05</span>Taboo</button>
+      <button class="tab" data-s="6"><span class="idx">→</span>Resolve</button>
+    </nav>
+
+    <div class="panel">
+      <section id="st0">
+        <div class="stephead"><p class="t">Source</p><p class="h">Tell Sahoda what the business is, in plain words. Blank fields are fine — the Brain infers, it never blocks.</p></div>
+        <div class="grid">
+          <div class="f full"><label for="f-name">Business name</label><input type="text" id="f-name" data-track placeholder="e.g. Chai & Chapters"></div>
+          <div class="f full"><label for="f-oneLiner">What it is, in one line</label><input type="text" id="f-oneLiner" data-track placeholder="e.g. A neighbourhood bookshop-café for serious readers"></div>
+          <div class="f full"><label for="f-category">Category</label><input type="text" id="f-category" data-track placeholder="e.g. Retail — books & specialty café"></div>
+        </div>
+      </section>
+
+      <section id="st1" hidden>
+        <div class="stephead"><p class="t">Ch.01 · Customer persona</p><p class="h">Who this is for — the deeper this goes, the sharper every future caption.</p></div>
+        <div class="grid">
+          <div class="f full"><label for="f-custDesc">Ideal customer</label><textarea id="f-custDesc" data-track placeholder="e.g. 24–45 urban readers who buy two books a month and are tired of loud cafés"></textarea></div>
+          <div class="f full"><label for="f-custPain">What keeps them up at night</label><input type="text" id="f-custPain" data-track placeholder="e.g. No quiet third place to actually read"></div>
+          <div class="f"><label for="f-custFear">What they're afraid of</label><input type="text" id="f-custFear" data-track placeholder="e.g. Becoming someone who 'used to read'"></div>
+          <div class="f"><label for="f-custIdentity">Who they want to become</label><input type="text" id="f-custIdentity" data-track placeholder="e.g. A person with a reading life, not a reading list"></div>
+        </div>
+      </section>
+
+      <section id="st2" hidden>
+        <div class="stephead"><p class="t">Ch.02 · Brand persona</p><p class="h">Who the brand is, if it were a person in the room.</p></div>
+        <div class="grid">
+          <div class="f full"><label for="f-mission">Why the brand exists</label><input type="text" id="f-mission" data-track placeholder="e.g. Give the city a quiet room where books and chai get equal respect"></div>
+          <div class="f full"><label for="f-values">Top 3 values <span class="opt">(comma separated)</span></label><input type="text" id="f-values" data-track placeholder="e.g. Curation over catalogue, slowness, warm honesty"></div>
+          <div class="f full"><label for="f-personaLine">The brand as a person</label><input type="text" id="f-personaLine" data-track placeholder="e.g. A well-read friend who remembers what you loved last time"></div>
+          <div class="f"><label for="f-archetype">Archetype</label>
+            <select id="f-archetype" data-track><option value="">Choose…</option><option>Sage</option><option>Caregiver</option><option>Creator</option><option>Explorer</option><option>Hero</option><option>Everyperson</option><option>Rebel</option><option>Magician</option><option>Lover</option><option>Jester</option><option>Ruler</option><option>Innocent</option></select></div>
+        </div>
+      </section>
+
+      <section id="st3" hidden>
+        <div class="stephead"><p class="t">Ch.03 · Hook</p><p class="h">The promise that stops the scroll.</p></div>
+        <div class="grid">
+          <div class="f full"><label for="f-hookSentence">“We help ___ achieve ___ without ___”</label><input type="text" id="f-hookSentence" data-track placeholder="e.g. We help busy readers finish more books without giving their evenings to screens"></div>
+          <div class="f full"><label for="f-proofPoint">Most surprising proof point</label><input type="text" id="f-proofPoint" data-track placeholder="e.g. 41 of our 60 seats have no power sockets — on purpose"></div>
+          <div class="f"><label for="f-hookLever">Primary hook lever</label>
+            <select id="f-hookLever" data-track><option value="">Choose…</option><option>Trust</option><option>Belonging</option><option>Relief</option><option>Curiosity</option><option>Status</option></select></div>
+        </div>
+      </section>
+
+      <section id="st4" hidden>
+        <div class="stephead"><p class="t">Ch.04 · Voice</p><p class="h">How every caption, reply and page should sound.</p></div>
+        <div class="grid">
+          <div class="f full"><label for="f-voiceWords">Three words for how the brand sounds</label><input type="text" id="f-voiceWords" data-track placeholder="e.g. Warm, unhurried, quietly witty"></div>
+          <div class="f full"><label>Formality</label><div class="slider"><span class="lab" id="formLab">NEUTRAL</span><input type="range" id="f-formality" min="1" max="5" value="3"></div></div>
+          <div class="f full"><label>Energy</label><div class="slider"><span class="lab" id="enLab">MODERATE</span><input type="range" id="f-energy" min="1" max="5" value="3"></div></div>
+          <div class="f full"><label for="f-neverUse">Phrases to never use</label><input type="text" id="f-neverUse" data-track placeholder="e.g. bookworm clichés, hustle language, emoji walls"></div>
+        </div>
+      </section>
+
+      <section id="st5" hidden>
+        <div class="stephead"><p class="t">Ch.05 · Taboo</p><p class="h">Hard limits. The Loop and every AI reply will refuse to cross these.</p></div>
+        <div class="grid">
+          <div class="f full"><label for="f-legalRedlines">Legally off-limits claims or words</label><input type="text" id="f-legalRedlines" data-track placeholder="e.g. No health claims about chai, no 'lowest price' claims"></div>
+          <div class="f full"><label for="f-avoidTopics">Topics to always avoid</label><input type="text" id="f-avoidTopics" data-track placeholder="e.g. Never shame screen time or other cafés"></div>
+          <div class="f full"><label for="f-toneLines">Tone lines never to cross</label><input type="text" id="f-toneLines" data-track placeholder="e.g. No FOMO countdowns, no guilt about unread piles"></div>
+        </div>
+      </section>
+
+      <section id="st6" hidden>
+        <div class="stephead"><p class="t">Resolve</p></div>
+        <div class="resolveBox">
+          <p>Sahoda will synthesise these channels into <b>Brand Brain v1</b> — a structured decision system every caption, campaign, site and reply is grounded in. Blanks are inferred sensibly; nothing is invented.</p>
+          <button class="btn primary" id="goBtn">Resolve Brand Brain →</button>
+          <span class="status" id="status" aria-live="polite"></span>
+          <div class="err" id="err"></div>
+        </div>
+      </section>
+
+      <div class="navrow">
+        <button class="btn ghost sm" id="back">← Back</button>
+        <span class="count" id="count">SOURCE / 7</span>
+        <button class="btn ghost sm" id="next">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ RESULTS ============ -->
+  <div id="results" hidden>
+    <div class="rhead">
+      <span class="vbadge"><i></i><span id="vlabel">Brand Brain v1 · resolved just now</span></span>
+      <div class="acts">
+        <button class="btn ghost sm" id="copyBtn">Copy JSON</button>
+        <button class="btn line sm" id="adjustBtn">Adjust inputs</button>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card full">
+        <div class="lab">SIGNAL LOCK</div>
+        <div class="lock"><span class="dot" id="lockDot"></span><span id="lockLabel">—</span></div>
+        <p class="note" id="lockNote"></p>
+      </div>
+
+      <div class="card">
+        <div class="lab">VOICE</div>
+        <p id="voiceDesc" style="margin:0;font-weight:600">—</p>
+        <div class="kv"><span class="k">Register</span><span class="v" id="voiceForm">—</span></div>
+        <div class="pills" id="voiceSig"></div>
+        <div class="pills" id="voiceBan"></div>
+      </div>
+
+      <div class="card">
+        <div class="lab">BRAND PERSONA</div>
+        <div class="pills" style="margin:0 0 8px"><span class="pill or" id="arch">—</span></div>
+        <p id="brandLine" style="margin:0">—</p>
+        <div class="pills" id="valuesOut"></div>
+      </div>
+
+      <div class="card">
+        <div class="lab">CUSTOMER PERSONA</div>
+        <p id="custLine" style="margin:0 0 6px">—</p>
+        <div class="kv"><span class="k">Pain point</span><span class="v" id="painOut">—</span></div>
+        <div class="kv"><span class="k">Fear</span><span class="v" id="fearOut">—</span></div>
+        <div class="kv"><span class="k">Wants to become</span><span class="v" id="identOut">—</span></div>
+      </div>
+
+      <div class="card">
+        <div class="lab">HOOK SYSTEM</div>
+        <p id="promise" style="margin:0;font-weight:700">—</p>
+        <div class="kv"><span class="k">Primary emotion</span><span class="v" id="emotion">—</span></div>
+        <div id="hooks"></div>
+      </div>
+
+      <div class="card full">
+        <div class="lab">RED LINES — the Loop will refuse these</div>
+        <div class="pills" id="taboos"></div>
+      </div>
+
+      <div class="card full learn">
+        <div class="lab" style="color:var(--acc)"><span class="blade" style="width:9px;height:14px"></span>PENDING LEARNINGS — this is what makes it a *living* Brain</div>
+        <div id="events">
+          <div class="ev" data-add="Quote a passage" data-target="voiceSig">
+            <p><b>Carousels quoting a book passage earn 2.1× saves.</b><small>Evidence: Thursday's “Monsoon reading list” · 2,340 reach</small></p>
+            <button class="btn primary sm evyes">Add to Brain</button><button class="btn ghost sm evno">Dismiss</button>
+          </div>
+          <div class="ev" data-add="Lead with the rain" data-target="hooks" data-hook="1">
+            <p><b>Posts that mention rain outperform by 60% in monsoon weeks.</b><small>Evidence: 6 posts, Jun–Jul</small></p>
+            <button class="btn primary sm evyes">Add to Brain</button><button class="btn ghost sm evno">Dismiss</button>
+          </div>
+        </div>
+        <p class="note">In the product these arrive weekly from Measure. Accepting one writes a new Brain version — every future caption uses it automatically.</p>
+      </div>
+    </div>
+
+    <details><summary>View raw JSON (the exact `brand_memory.payload` contract)</summary><pre id="json"></pre></details>
+    <details><summary>Implementation note for the build</summary>
+      <pre>UI  → server action  actions/brand-brain.ts  (never call the model from the browser in prod)
+    → Model Mesh task "brand_guidelines" (Standard tier + prompt-cached context)
+    → zod-validate this exact JSON schema (1 repair retry)
+    → INSERT brand_memory (workspace_id, version, payload, source='resolved')
+Learnings: Measure insights → memory_events(diff, evidence) → Accept ⇒ new version + cache bust.
+This demo calls the API directly only because artifacts allow it; the schema is identical.</pre>
+    </details>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+"use strict";
+var RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- toast ---------- */
+var tt;function toast(m){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(function(){t.classList.remove('show')},3400);}
+
+/* ---------- waveform (adopted from the founder demo; recolored to brand) ---------- */
+var cv=document.getElementById('wave'),cx=cv.getContext('2d'),clarity=0;
+function size(){var d=devicePixelRatio||1,r=cv.getBoundingClientRect();cv.width=r.width*d;cv.height=r.height*d;cx.setTransform(d,0,0,d,0,0);}
+function mix(a,b,t){return [Math.round(a[0]+(b[0]-a[0])*t),Math.round(a[1]+(b[1]-a[1])*t),Math.round(a[2]+(b[2]-a[2])*t)];}
+function draw(t){var r=cv.getBoundingClientRect(),w=r.width,h=r.height;if(w<=0)return;cx.clearRect(0,0,w,h);
+  var mid=h/2,n=1-clarity,amp=h*.27,varAmp=amp*n*.9,f=.018+n*.03,sp=RM?0:t*.0014;cx.beginPath();
+  for(var x=0;x<=w;x+=2){var s=Math.sin(x*f*.5+sp)*amp*.55,j=0;
+    if(n>.01)j=Math.sin(x*f*3.6+sp*2.2)*varAmp*.5+Math.sin(x*.11+t*.002+x*.017)*varAmp*.5;
+    var y=mid+s+j;x===0?cx.moveTo(x,y):cx.lineTo(x,y);}
+  var c=mix([163,163,162],[255,75,0],clarity);
+  cx.strokeStyle='rgb('+c[0]+','+c[1]+','+c[2]+')';cx.lineWidth=1.8;
+  cx.shadowColor='rgba(255,75,0,'+(.28*clarity)+')';cx.shadowBlur=8*clarity;cx.stroke();}
+function loop(t){draw(t||0);if(!RM)requestAnimationFrame(loop);}
+addEventListener('resize',function(){size();draw(performance.now());});
+function computeClarity(){var f=document.querySelectorAll('[data-track]'),n=0;f.forEach(function(x){if(x.value&&x.value.trim())n++;});return f.length?n/f.length:0;}
+function refresh(){clarity=computeClarity();document.getElementById('clarity').textContent=Math.round(clarity*100)+'%';draw(performance.now());}
+document.addEventListener('input',function(e){if(e.target.matches&&e.target.matches('[data-track]'))refresh();});
+
+/* ---------- sliders ---------- */
+var FORM={1:'VERY CASUAL',2:'CASUAL',3:'NEUTRAL',4:'FORMAL',5:'VERY FORMAL'},EN={1:'VERY CALM',2:'CALM',3:'MODERATE',4:'HIGH',5:'VERY HIGH'};
+document.getElementById('f-formality').addEventListener('input',function(){document.getElementById('formLab').textContent=FORM[this.value];});
+document.getElementById('f-energy').addEventListener('input',function(){document.getElementById('enLab').textContent=EN[this.value];});
+
+/* ---------- wizard nav ---------- */
+var LAB=['SOURCE','CUSTOMER','BRAND','HOOK','VOICE','TABOO','RESOLVE'],step=0;
+function show(i){step=Math.max(0,Math.min(6,i));
+  for(var k=0;k<7;k++)document.getElementById('st'+k).hidden=k!==step;
+  document.querySelectorAll('.tab').forEach(function(tb){var s=+tb.dataset.s;tb.classList.toggle('on',s===step);});
+  document.getElementById('back').disabled=step===0;
+  var nx=document.getElementById('next');nx.hidden=step===6;nx.textContent=step===5?'Review →':'Next →';
+  document.getElementById('count').textContent=LAB[step]+' / 7';
+  scrollTo({top:0,behavior:RM?'auto':'smooth'});}
+document.getElementById('back').onclick=function(){show(step-1)};
+document.getElementById('next').onclick=function(){show(step+1)};
+document.querySelectorAll('.tab').forEach(function(tb){tb.onclick=function(){show(+tb.dataset.s)};});
+
+/* ---------- sample / clear ---------- */
+var IDS=['name','oneLiner','category','custDesc','custPain','custFear','custIdentity','mission','values','personaLine','archetype','hookSentence','proofPoint','hookLever','voiceWords','formality','energy','neverUse','legalRedlines','avoidTopics','toneLines'];
+var SAMPLE={name:'Chai & Chapters',oneLiner:'A neighbourhood bookshop-café where serious readers slow down over single-estate chai.',category:'Retail — books & specialty café',
+custDesc:'24–45 urban readers who buy two or more books a month, romanticise rainy-day reading, and are tired of mall bookstores and algorithm feeds.',
+custPain:'No quiet third place to actually read — home is chores, cafés are loud laptop offices.',custFear:'Becoming someone who “used to read”.',custIdentity:'A person with a reading life, not just a reading list.',
+mission:'Give the city a quiet room where books and chai get equal respect.',values:'Curation over catalogue, slowness, warm honesty',personaLine:'A well-read friend who remembers what you loved last time.',archetype:'Sage',
+hookSentence:'We help busy readers finish more books without giving their evenings to screens.',proofPoint:'41 of our 60 seats have no power sockets — on purpose.',hookLever:'Belonging',
+voiceWords:'Warm, unhurried, quietly witty',formality:'2',energy:'2',neverUse:'bookworm clichés, hustle language, emoji walls',
+legalRedlines:'No health claims about chai, no “lowest price” claims',avoidTopics:'Never shame screen time or other cafés',toneLines:'No FOMO countdowns, no guilt about unread piles'};
+document.getElementById('sampleBtn').onclick=function(){IDS.forEach(function(k){var el=document.getElementById('f-'+k);if(el)el.value=SAMPLE[k]||'';});
+  document.getElementById('formLab').textContent=FORM[2];document.getElementById('enLab').textContent=EN[2];refresh();toast('Sample loaded — try Resolve');};
+document.getElementById('clearBtn').onclick=function(){IDS.forEach(function(k){var el=document.getElementById('f-'+k);if(!el)return;el.value=el.type==='range'?'3':'';});
+  document.getElementById('formLab').textContent='NEUTRAL';document.getElementById('enLab').textContent='MODERATE';refresh();};
+
+/* ---------- prompt + resolve ---------- */
+function v(id){var el=document.getElementById('f-'+id);return el?(el.value||'').trim():'';}
+function nf(x){return x?x:'(not provided)';}
+function prompt(){var s={};IDS.forEach(function(k){s[k]=v(k)});
+ return 'You are the synthesis engine for Sahoda Labs\u2019 \u201CBrand Brain\u201D. Given the raw intake below, resolve it into a structured brand decision system. Where an input is blank, infer sensibly from what was provided \u2014 synthesize tone and strategy, never invent specific facts or numbers.\n\n'
+ +'BRAND: '+nf(s.name)+'\nWHAT IT DOES: '+nf(s.oneLiner)+'\nCATEGORY: '+nf(s.category)
+ +'\n\nCUSTOMER:\n- Ideal customer: '+nf(s.custDesc)+'\n- Keeps them up at night: '+nf(s.custPain)+'\n- Afraid of: '+nf(s.custFear)+'\n- Wants to become: '+nf(s.custIdentity)
+ +'\n\nBRAND PERSONA:\n- Why it exists: '+nf(s.mission)+'\n- Values: '+nf(s.values)+'\n- As a person: '+nf(s.personaLine)+'\n- Archetype: '+nf(s.archetype)
+ +'\n\nHOOK:\n- We help ___ achieve ___ without ___: '+nf(s.hookSentence)+'\n- Proof point: '+nf(s.proofPoint)+'\n- Lever: '+nf(s.hookLever)
+ +'\n\nVOICE:\n- Three words: '+nf(s.voiceWords)+'\n- Formality 1-5: '+s.formality+'\n- Energy 1-5: '+s.energy+'\n- Never use: '+nf(s.neverUse)
+ +'\n\nTABOO:\n- Legal red lines: '+nf(s.legalRedlines)+'\n- Avoid topics: '+nf(s.avoidTopics)+'\n- Tone lines: '+nf(s.toneLines)
+ +'\n\nReturn ONLY valid JSON, no markdown fences, exactly this shape:\n{"voice":{"descriptor":"","formality_label":"","signature_phrases":["","",""],"banned_phrases":["",""]},"brand_persona":{"archetype":"","one_liner":"","core_values":["","",""]},"customer_persona":{"one_liner":"","primary_pain_point":"","primary_fear":"","desired_identity":""},"hook":{"core_promise":"","primary_emotion":"","sample_hooks":["","",""]},"taboo":{"red_lines":["","",""]},"alignment":{"signal_lock":"strong|moderate|weak","note":""}}\nKeep every value a short phrase or single sentence. sample_hooks: 3 scroll-stopping lines in the resolved voice.';}
+
+var FALLBACK={voice:{descriptor:'Warm, unhurried and quietly witty \u2014 like a well-read friend recommending, never selling.',formality_label:'Casual, calm',signature_phrases:['Slow down, you\u2019ve earned a chapter','Curation over catalogue','Rainy days are reading days'],banned_phrases:['bookworm clich\u00E9s','hustle language']},
+brand_persona:{archetype:'Sage',one_liner:'A well-read friend who remembers what you loved last time.',core_values:['Curation over catalogue','Slowness','Warm honesty']},
+customer_persona:{one_liner:'Urban readers who want a reading life back, not another loud caf\u00E9.',primary_pain_point:'No quiet third place to actually read.',primary_fear:'Becoming someone who \u201Cused to read\u201D.',desired_identity:'A person with a reading life, not just a reading list.'},
+hook:{core_promise:'Finish more books without giving your evenings to screens.',primary_emotion:'Belonging',sample_hooks:['41 of our 60 seats have no sockets. That\u2019s the point.','Your unread pile isn\u2019t guilt. It\u2019s a plan.','This monsoon, trade one scroll for one chapter.']},
+taboo:{red_lines:['No health claims about chai','No FOMO countdowns','Never shame screen time or other caf\u00E9s']},
+alignment:{signal_lock:'strong',note:'Customer pain, promise and voice all point the same way: quiet, belonging-led, anti-hype.'}};
+
+var PH=['Mapping customer emotion\u2026','Resolving voice\u2026','Cross-checking red lines\u2026','Writing sample hooks\u2026'],pi=0,pt=null,busy=false;
+document.getElementById('goBtn').onclick=async function(){
+  if(busy)return;busy=true;var btn=this,st=document.getElementById('status');document.getElementById('err').textContent='';
+  btn.disabled=true;pi=0;st.textContent=PH[0];pt=setInterval(function(){pi=(pi+1)%PH.length;st.textContent=PH[pi];},1100);
+  var data=null;
+  try{
+    var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt()}]})});
+    var j=await r.json();
+    var txt=(j.content||[]).map(function(b){return b.text||''}).join('').replace(/```json|```/g,'').trim();
+    data=JSON.parse(txt);
+    toast('Resolved live by the model');
+  }catch(e){data=JSON.parse(JSON.stringify(FALLBACK));toast('Live model unreachable here \u2014 showing a resolved sample');}
+  clearInterval(pt);st.textContent='';btn.disabled=false;busy=false;
+  render(data);clarity=1;draw(performance.now());document.getElementById('clarity').textContent='100%';
+  document.getElementById('wizard').hidden=true;document.getElementById('results').hidden=false;scrollTo({top:0,behavior:RM?'auto':'smooth'});
+};
+
+var LAST=null,version=1;
+function pills(el,arr,cls){el.innerHTML='';(arr||[]).filter(Boolean).forEach(function(x){var s=document.createElement('span');s.className='pill '+(cls||'');s.textContent=x;el.appendChild(s);});}
+function render(d){LAST=d;version=1;document.getElementById('vlabel').textContent='Brand Brain v1 \u00B7 resolved just now';
+  var lock=(d.alignment&&d.alignment.signal_lock)||'moderate';
+  var map={strong:['#15803D','Strong signal lock'],moderate:['#B45309','Moderate signal lock'],weak:['#C81E1E','Weak signal \u2014 inputs conflict']};
+  var m=map[lock]||map.moderate;document.getElementById('lockDot').style.background=m[0];document.getElementById('lockLabel').textContent=m[1];
+  document.getElementById('lockNote').textContent=(d.alignment&&d.alignment.note)||'';
+  document.getElementById('voiceDesc').textContent=d.voice.descriptor;document.getElementById('voiceForm').textContent=d.voice.formality_label;
+  pills(document.getElementById('voiceSig'),d.voice.signature_phrases,'or');pills(document.getElementById('voiceBan'),d.voice.banned_phrases,'no');
+  document.getElementById('arch').textContent=d.brand_persona.archetype;document.getElementById('brandLine').textContent=d.brand_persona.one_liner;
+  pills(document.getElementById('valuesOut'),d.brand_persona.core_values);
+  document.getElementById('custLine').textContent=d.customer_persona.one_liner;
+  document.getElementById('painOut').textContent=d.customer_persona.primary_pain_point;
+  document.getElementById('fearOut').textContent=d.customer_persona.primary_fear;
+  document.getElementById('identOut').textContent=d.customer_persona.desired_identity;
+  document.getElementById('promise').textContent=d.hook.core_promise;document.getElementById('emotion').textContent=d.hook.primary_emotion;
+  var hs=document.getElementById('hooks');hs.innerHTML='';(d.hook.sample_hooks||[]).forEach(function(h){var x=document.createElement('div');x.className='hookline';x.textContent='\u201C'+h+'\u201D';hs.appendChild(x);});
+  pills(document.getElementById('taboos'),d.taboo.red_lines,'no');
+  document.getElementById('json').textContent=JSON.stringify(d,null,2);}
+
+document.getElementById('adjustBtn').onclick=function(){document.getElementById('results').hidden=true;document.getElementById('wizard').hidden=false;refresh();show(6);};
+document.getElementById('copyBtn').onclick=function(){if(!LAST)return;navigator.clipboard&&navigator.clipboard.writeText(JSON.stringify(LAST,null,2));toast('JSON copied \u2014 paste into brand_memory.payload');};
+
+/* ---------- learnings writeback ---------- */
+document.querySelectorAll('.evyes').forEach(function(b){b.onclick=function(){var ev=b.closest('.ev');
+  var target=document.getElementById(ev.dataset.target);
+  if(ev.dataset.hook){var x=document.createElement('div');x.className='hookline';x.textContent='\u201C'+ev.dataset.add+' \u2014 monsoon-week openers\u201D';target.appendChild(x);}
+  else{var s=document.createElement('span');s.className='pill or';s.textContent=ev.dataset.add;target.appendChild(s);}
+  ev.remove();version++;document.getElementById('vlabel').textContent='Brand Brain v'+version+' \u00B7 learned from results';
+  if(LAST){if(ev.dataset.hook){LAST.hook.sample_hooks.push(ev.dataset.add);}else{LAST.voice.signature_phrases.push(ev.dataset.add);}document.getElementById('json').textContent=JSON.stringify(LAST,null,2);}
+  toast('Added \u2014 Brand Brain is now v'+version+'. Future captions use it automatically.');
+  if(!document.querySelector('.ev'))document.getElementById('events').innerHTML='<p class="note" style="margin:0">All caught up. New learnings arrive after next week\u2019s results.</p>';};});
+document.querySelectorAll('.evno').forEach(function(b){b.onclick=function(){b.closest('.ev').remove();toast('Dismissed \u2014 Sahoda won\u2019t suggest this again');
+  if(!document.querySelector('.ev'))document.getElementById('events').innerHTML='<p class="note" style="margin:0">All caught up. New learnings arrive after next week\u2019s results.</p>';};});
+
+/* init */
+size();refresh();show(0);if(!RM)requestAnimationFrame(loop);else draw(0);
+})();
+</script>
+<style>.blade,html{--bl:url("data:image/png;base64,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")}</style>
+</body>
+</html>

@@ -1,0 +1,483 @@
+import { describe, it, expect } from 'vitest'
+import { createHash } from 'node:crypto'
+import { routedTransport, type Transport, type TransportRequest } from '../transport'
+import { createTokenVault, type TokenVault } from '../vault/token-vault'
+import { createXOAuthHandlers } from './x'
+import type { ConnectionStore, ConnectionUpsert } from './store'
+import tokenSuccess from '../../fixtures/x/oauth-token.success.json'
+import tokenError from '../../fixtures/x/oauth-token.error.json'
+import meSuccess from '../../fixtures/x/users-me.success.json'
+
+const bodyText = (b: string | Uint8Array | undefined): string => (typeof b === 'string' ? b : '')
+
+const FIXED_NOW = new Date('2026-07-19T12:00:00.000Z')
+const TEST_VAULT: TokenVault = createTokenVault({
+  current: 1,
+  keys: { 1: Buffer.from('cd'.repeat(32), 'hex') },
+})
+
+function fakeStore(): { store: ConnectionStore; calls: ConnectionUpsert[] } {
+  const calls: ConnectionUpsert[] = []
+  return {
+    store: {
+      upsertConnection: async (record) => {
+        calls.push(record)
+        return { connectionId: 'conn-123' }
+      },
+    },
+    calls,
+  }
+}
+
+const ACCESS_PLAINTEXT = 'x-access-token-fixture-value'
+const REFRESH_PLAINTEXT = 'x-refresh-token-fixture-value'
+
+function handlers(
+  transport: Transport,
+  store: ConnectionStore,
+  overrides: { seal?: (plaintext: string) => string } = {},
+) {
+  return createXOAuthHandlers({
+    clientId: 'x-client-id',
+    clientSecret: 'x-client-secret',
+    redirectUri: 'https://app.example/api/oauth/x/callback',
+    transport,
+    store,
+    seal: overrides.seal ?? ((s) => JSON.stringify(TEST_VAULT.encrypt(s))),
+    unseal: (s) => TEST_VAULT.decrypt(JSON.parse(s)),
+    now: () => FIXED_NOW,
+  })
+}
+
+/** A token response with the refresh field under test — everything else fixture-shaped. */
+const tokenResponseWithRefresh = (refresh: string | undefined) => ({
+  status: 200,
+  body: {
+    token_type: 'bearer',
+    expires_in: 7200,
+    access_token: ACCESS_PLAINTEXT,
+    scope: 'tweet.read tweet.write users.read',
+    ...(refresh !== undefined ? { refresh_token: refresh } : {}),
+  },
+})
+
+const transportWithToken = (token: unknown) =>
+  routedTransport([
+    { match: { method: 'POST', urlIncludes: '/2/oauth2/token' }, response: token as never },
+    { match: { method: 'GET', urlIncludes: '/2/users/me' }, response: meSuccess as never },
+  ])
+
+const happyTransport = () =>
+  routedTransport([
+    { match: { method: 'POST', urlIncludes: '/2/oauth2/token' }, response: tokenSuccess as never },
+    { match: { method: 'GET', urlIncludes: '/2/users/me' }, response: meSuccess as never },
+  ])
+
+function callbackArgs(overrides: Record<string, unknown> = {}) {
+  return {
+    params: { code: 'auth-code-1', state: 'expected-state' },
+    expectedState: 'expected-state',
+    codeVerifier: 'verifier-value-verifier-value-verifier-value',
+    workspaceId: 'ws-1',
+    createdBy: 'user-1',
+    ...overrides,
+  }
+}
+
+describe('X OAuth — beginAuthorize', () => {
+  it('builds a spec-correct PKCE authorize URL', () => {
+    const { store } = fakeStore()
+    const h = handlers(happyTransport(), store)
+
+    const start = h.beginAuthorize()
+    const url = new URL(start.url)
+
+    expect(url.origin + url.pathname).toBe('https://x.com/i/oauth2/authorize')
+    expect(url.searchParams.get('response_type')).toBe('code')
+    expect(url.searchParams.get('client_id')).toBe('x-client-id')
+    expect(url.searchParams.get('redirect_uri')).toBe('https://app.example/api/oauth/x/callback')
+    expect(url.searchParams.get('state')).toBe(start.state)
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256')
+    const expectedChallenge = createHash('sha256').update(start.codeVerifier).digest('base64url')
+    expect(url.searchParams.get('code_challenge')).toBe(expectedChallenge)
+    const scope = url.searchParams.get('scope') ?? ''
+    for (const s of ['tweet.read', 'tweet.write', 'users.read', 'offline.access']) {
+      expect(scope).toContain(s)
+    }
+  })
+
+  it('generates a PKCE-valid code verifier and unique state by default', () => {
+    const { store } = fakeStore()
+    const h = handlers(happyTransport(), store)
+
+    const a = h.beginAuthorize()
+    const b = h.beginAuthorize()
+
+    expect(a.codeVerifier.length).toBeGreaterThanOrEqual(43)
+    expect(a.codeVerifier).toMatch(/^[A-Za-z0-9\-._~]+$/)
+    expect(a.state).not.toBe(b.state)
+    expect(a.codeVerifier).not.toBe(b.codeVerifier)
+  })
+})
+
+describe('X OAuth — handleCallback', () => {
+  it('exchanges the code, fetches the profile, and returns a token-free summary', async () => {
+    const { store } = fakeStore()
+    const h = handlers(happyTransport(), store)
+
+    const result = await h.handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data).toEqual({
+      connectionId: 'conn-123',
+      platform: 'x',
+      externalAccount: { id: '2244994945', handle: 'chaichapters', name: 'Chai & Chapters' },
+      scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
+      expiresAt: '2026-07-19T14:00:00.000Z',
+    })
+    expect(JSON.stringify(result)).not.toContain('x-access-token-fixture-value')
+    expect(JSON.stringify(result)).not.toContain('x-refresh-token-fixture-value')
+  })
+
+  it('seals the access and refresh tokens as TWO independent envelopes', async () => {
+    const { store, calls } = fakeStore()
+    const h = handlers(happyTransport(), store)
+
+    await h.handleCallback(callbackArgs())
+
+    expect(calls).toHaveLength(1)
+    const record = calls[0]!
+    expect(record.workspaceId).toBe('ws-1')
+    expect(record.platform).toBe('x')
+    expect(record.createdBy).toBe('user-1')
+    expect(record.externalAccount.id).toBe('2244994945')
+    // Each field is a lone envelope over ONE token — not a bundle, not the same blob twice.
+    expect(record.refreshTokenEnc).not.toBeNull()
+    expect(record.accessTokenEnc).not.toBe(record.refreshTokenEnc)
+    expect(TEST_VAULT.decrypt(JSON.parse(record.accessTokenEnc))).toBe(ACCESS_PLAINTEXT)
+    expect(TEST_VAULT.decrypt(JSON.parse(record.refreshTokenEnc!))).toBe(REFRESH_PLAINTEXT)
+  })
+
+  it('leaks neither plaintext token anywhere in the persisted record', async () => {
+    const { store, calls } = fakeStore()
+
+    await handlers(happyTransport(), store).handleCallback(callbackArgs())
+
+    const serialized = JSON.stringify(calls[0])
+    expect(serialized).not.toContain(ACCESS_PLAINTEXT)
+    expect(serialized).not.toContain(REFRESH_PLAINTEXT)
+  })
+
+  it('stores refreshTokenEnc as null when X issues no refresh token', async () => {
+    const { store, calls } = fakeStore()
+    const transport = transportWithToken(tokenResponseWithRefresh(undefined))
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(true)
+    const record = calls[0]!
+    // Absent refresh token is NORMAL: null, never a seal of '' and never an error.
+    expect(record.refreshTokenEnc).toBeNull()
+    expect(TEST_VAULT.decrypt(JSON.parse(record.accessTokenEnc))).toBe(ACCESS_PLAINTEXT)
+  })
+
+  it('treats an empty-string refresh token as absent, not as a credential', async () => {
+    const { store, calls } = fakeStore()
+    const transport = transportWithToken(tokenResponseWithRefresh(''))
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(true)
+    expect(calls[0]?.refreshTokenEnc).toBeNull()
+  })
+
+  it('sends the token exchange as form-encoded with Basic client auth and the verifier', async () => {
+    const { store } = fakeStore()
+    let tokenReq: TransportRequest | undefined
+    const transport: Transport = async (req) => {
+      if (req.url.includes('/2/oauth2/token')) tokenReq = req
+      return happyTransport()(req)
+    }
+
+    await handlers(transport, store).handleCallback(callbackArgs())
+
+    const expectedBasic = Buffer.from('x-client-id:x-client-secret').toString('base64')
+    expect(tokenReq?.headers?.['Authorization']).toBe(`Basic ${expectedBasic}`)
+    expect(tokenReq?.headers?.['content-type']).toBe('application/x-www-form-urlencoded')
+    const body = new URLSearchParams(bodyText(tokenReq?.body))
+    expect(body.get('grant_type')).toBe('authorization_code')
+    expect(body.get('code')).toBe('auth-code-1')
+    expect(body.get('code_verifier')).toBe('verifier-value-verifier-value-verifier-value')
+    expect(body.get('redirect_uri')).toBe('https://app.example/api/oauth/x/callback')
+  })
+
+  it('returns PROVIDER_ERROR when the user declines consent — no network, no store', async () => {
+    const { store, calls } = fakeStore()
+    let networkCalls = 0
+    const transport: Transport = async (req) => {
+      networkCalls += 1
+      return happyTransport()(req)
+    }
+
+    const result = await handlers(transport, store).handleCallback(
+      callbackArgs({ params: { error: 'access_denied', state: 'expected-state' } }),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(networkCalls).toBe(0)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('rejects a state mismatch as VALIDATION_ERROR before any network call (CSRF)', async () => {
+    const { store, calls } = fakeStore()
+    let networkCalls = 0
+    const transport: Transport = async (req) => {
+      networkCalls += 1
+      return happyTransport()(req)
+    }
+
+    const result = await handlers(transport, store).handleCallback(
+      callbackArgs({ params: { code: 'c', state: 'evil-state' } }),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('VALIDATION_ERROR')
+    expect(networkCalls).toBe(0)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('rejects a missing code as VALIDATION_ERROR', async () => {
+    const { store } = fakeStore()
+
+    const result = await handlers(happyTransport(), store).handleCallback(
+      callbackArgs({ params: { state: 'expected-state' } }),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('VALIDATION_ERROR')
+  })
+
+  it('maps a failed token exchange to PROVIDER_ERROR without leaking the client secret', async () => {
+    const { store, calls } = fakeStore()
+    const transport = routedTransport([
+      { match: { method: 'POST', urlIncludes: '/2/oauth2/token' }, response: tokenError as never },
+    ])
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(JSON.stringify(result)).not.toContain('x-client-secret')
+    expect(calls).toHaveLength(0)
+  })
+
+  it('maps a failed profile fetch to PROVIDER_ERROR and does not persist', async () => {
+    const { store, calls } = fakeStore()
+    const transport = routedTransport([
+      {
+        match: { method: 'POST', urlIncludes: '/2/oauth2/token' },
+        response: tokenSuccess as never,
+      },
+      { match: { method: 'GET', urlIncludes: '/2/users/me' }, response: { status: 500, body: {} } },
+    ])
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(calls).toHaveLength(0)
+  })
+
+  it('fails fast at construction on missing client credentials', () => {
+    const { store } = fakeStore()
+    expect(() =>
+      createXOAuthHandlers({
+        clientId: '',
+        clientSecret: 'x',
+        redirectUri: 'https://app.example/cb',
+        transport: happyTransport(),
+        store,
+      }),
+    ).toThrow()
+  })
+})
+
+describe('X OAuth — hardening (review batch)', () => {
+  it('requests the media.write scope needed for the media upload sub-step', () => {
+    const { store } = fakeStore()
+    const start = handlers(happyTransport(), store).beginAuthorize()
+    expect(new URL(start.url).searchParams.get('scope')).toContain('media.write')
+  })
+
+  it('maps a store failure to PROVIDER_ERROR instead of a raw rejection', async () => {
+    const store: ConnectionStore = {
+      upsertConnection: async () => {
+        throw new Error('supabase exploded')
+      },
+    }
+
+    const result = await handlers(happyTransport(), store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(JSON.stringify(result)).not.toContain(ACCESS_PLAINTEXT)
+    expect(JSON.stringify(result)).not.toContain(REFRESH_PLAINTEXT)
+  })
+
+  it('maps a vault seal failure to PROVIDER_ERROR instead of a raw rejection', async () => {
+    const { store, calls } = fakeStore()
+    const failingSeal = () => {
+      throw new Error(`token vault: TOKEN_VAULT_KEY is not set (${ACCESS_PLAINTEXT})`)
+    }
+
+    const result = await handlers(happyTransport(), store, { seal: failingSeal }).handleCallback(
+      callbackArgs(),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    // Nothing persisted, and the thrown text (token-adjacent) never reaches the caller.
+    expect(calls).toHaveLength(0)
+    expect(JSON.stringify(result)).not.toContain(ACCESS_PLAINTEXT)
+    expect(JSON.stringify(result)).not.toContain('TOKEN_VAULT_KEY')
+  })
+
+  it('maps a failure of the SECOND (refresh) seal to PROVIDER_ERROR', async () => {
+    const { store, calls } = fakeStore()
+    let sealCalls = 0
+    const sealFailingOnRefresh = (plaintext: string) => {
+      sealCalls += 1
+      if (sealCalls > 1) throw new Error(`vault died on ${REFRESH_PLAINTEXT}`)
+      return JSON.stringify(TEST_VAULT.encrypt(plaintext))
+    }
+
+    const result = await handlers(happyTransport(), store, {
+      seal: sealFailingOnRefresh,
+    }).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+    expect(sealCalls).toBe(2) // proves each token is sealed by its own call
+    expect(calls).toHaveLength(0)
+    expect(JSON.stringify(result)).not.toContain(REFRESH_PLAINTEXT)
+  })
+
+  it('maps a transport throw during token exchange to PROVIDER_ERROR', async () => {
+    const { store } = fakeStore()
+    const transport: Transport = async () => {
+      throw new Error('ECONNRESET')
+    }
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+  })
+
+  it('handles a token response without expires_in/scope: null expiry + fallback scopes', async () => {
+    const { store, calls } = fakeStore()
+    const minimalToken = { status: 200, body: { access_token: 'x-access-token-fixture-value' } }
+    const transport = routedTransport([
+      { match: { method: 'POST', urlIncludes: '/2/oauth2/token' }, response: minimalToken },
+      { match: { method: 'GET', urlIncludes: '/2/users/me' }, response: meSuccess as never },
+    ])
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.expiresAt).toBeNull()
+    expect(result.data.scopes).toEqual([
+      'tweet.read',
+      'tweet.write',
+      'users.read',
+      'offline.access',
+      'media.write',
+    ])
+    expect(calls[0]?.expiresAt).toBeNull()
+  })
+
+  it('rejects a non-positive expires_in as an unexpected token response', async () => {
+    const { store } = fakeStore()
+    const badToken = { status: 200, body: { access_token: 't', expires_in: -5 } }
+    const transport = routedTransport([
+      { match: { method: 'POST', urlIncludes: '/2/oauth2/token' }, response: badToken },
+      { match: { method: 'GET', urlIncludes: '/2/users/me' }, response: meSuccess as never },
+    ])
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('PROVIDER_ERROR')
+  })
+
+  it('strips control/bidi characters and caps provider display strings', async () => {
+    const { store, calls } = fakeStore()
+    const spoofedMe = {
+      status: 200,
+      body: {
+        data: {
+          id: '2244994945',
+          name: 'Chai‮ & Chapters\n' + 'x'.repeat(400),
+          username: 'chai​chapters',
+        },
+      },
+    }
+    const transport = routedTransport([
+      {
+        match: { method: 'POST', urlIncludes: '/2/oauth2/token' },
+        response: tokenSuccess as never,
+      },
+      { match: { method: 'GET', urlIncludes: '/2/users/me' }, response: spoofedMe },
+    ])
+
+    const result = await handlers(transport, store).handleCallback(callbackArgs())
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const name = result.data.externalAccount.name ?? ''
+    expect(name).not.toMatch(/[‮​\n]/)
+    expect(name.length).toBeLessThanOrEqual(200)
+    expect(result.data.externalAccount.handle).toBe('chaichapters')
+    expect(calls[0]?.externalAccount.name).not.toMatch(/[‮\n]/)
+  })
+
+  it('checks state BEFORE the provider error param — every branch is CSRF-guarded', async () => {
+    const { store } = fakeStore()
+
+    const result = await handlers(happyTransport(), store).handleCallback(
+      callbackArgs({ params: { error: 'access_denied', state: 'evil-state' } }),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('VALIDATION_ERROR')
+  })
+
+  it('collapses a malformed provider error code to unknown_error', async () => {
+    const { store } = fakeStore()
+
+    const result = await handlers(happyTransport(), store).handleCallback(
+      callbackArgs({
+        params: { error: '<img src=x onerror=alert(1)>', state: 'expected-state' },
+      }),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.message).toContain('unknown_error')
+    expect(result.error.message).not.toContain('<img')
+  })
+})

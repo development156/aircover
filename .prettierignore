@@ -1,0 +1,15 @@
+node_modules
+dist
+.next
+.turbo
+coverage
+pnpm-lock.yaml
+
+# Canon docs + living demo references — never auto-reformat (protects the two
+# demo HTMLs and the numbered spec pack from prettier drift).
+docs/
+
+# Binary assets
+public/
+SAHODA-ASSETS/
+brand/

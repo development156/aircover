@@ -1,0 +1,19 @@
+{
+  "name": "@sahoda/mesh",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "lint": "exit 0"
+  },
+  "dependencies": {
+    "@sahoda/shared": "workspace:*",
+    "zod": "^4.4.3"
+  }
+}
