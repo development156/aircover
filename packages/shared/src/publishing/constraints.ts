@@ -139,9 +139,61 @@ export const CONSTRAINTS: Record<Channel, PlatformSpec> = {
   },
 }
 
-/** Effective character count (code points; an X link is weighted at 23). */
+/**
+ * Normalise the hashtag list into the exact tokens that will be published.
+ *
+ * Empty and whitespace-only entries are dropped, a missing `#` is added, and
+ * duplicates are removed — a platform counts `#chai` once however many times it
+ * appears, so counting it twice here would block a post that is actually fine.
+ * Order is preserved because the writer chose it.
+ *
+ * Exported because the character meter, the validator and the formatter must all
+ * be looking at the SAME tokens. That was the defect: the meter counted the raw
+ * list, the formatter emitted nothing at all, and the two never had to agree.
+ */
+export function normalizeHashtags(hashtags: readonly string[] | undefined): string[] {
+  if (hashtags === undefined) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of hashtags) {
+    if (typeof raw !== 'string') continue
+    const trimmed = raw.trim()
+    if (trimmed === '' || trimmed === '#') continue
+    const tag = trimmed.startsWith('#') ? trimmed : `#${trimmed}`
+    const key = tag.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(tag)
+  }
+  return out
+}
+
+/**
+ * The tail appended to a body when hashtags are published: a blank line, then the
+ * tags separated by single spaces. One definition, used by both the counter and
+ * the formatter, so the number on screen describes the string that goes out.
+ */
+export function hashtagTail(hashtags: readonly string[] | undefined): string {
+  const tags = normalizeHashtags(hashtags)
+  return tags.length === 0 ? '' : `\n\n${tags.join(' ')}`
+}
+
+/**
+ * Effective character count (code points; an X link is weighted at 23).
+ *
+ * ── WHY HASHTAGS ARE COUNTED HERE ────────────────────────────────────────────
+ * They are published as part of the caption, so they cost characters. Before this
+ * they were validated for COUNT (`maxHashtags`) and then silently discarded by
+ * `formatForPlatform`, which meant the composer offered a hashtag box whose
+ * contents never reached any platform — and, had they reached it, a caption at
+ * exactly 2200 characters plus thirty tags would have been rejected by Instagram
+ * while the meter showed green.
+ *
+ * Counting the normalised tail rather than the raw list is deliberate: it is the
+ * string that will actually be sent, including the separating blank line.
+ */
 export function charCountFor(spec: PlatformSpec, draft: VariantDraft): number {
-  const base = Array.from(draft.body).length
+  const base = Array.from(draft.body).length + Array.from(hashtagTail(draft.hashtags)).length
   if (spec.linkPolicy === 'counted_fixed' && draft.hasLink) {
     return base + X_LINK_WEIGHT
   }
@@ -249,14 +301,23 @@ export function formatForPlatform(
   variant: VariantDraft,
   media: MediaRef[] = [],
 ): FormattedContent {
+  // The hashtags the writer typed, appended to the text that goes out.
+  //
+  // They used to be dropped here for every channel while `validateVariant` went on
+  // policing `maxHashtags` — a field that was counted, limited, and then thrown
+  // away. GBP is the one exception: `linkPolicy: 'plain'` aside, a Google Business
+  // post is a local business update and hashtags do nothing there, so the box is
+  // simply not part of that channel's output.
+  const body = spec.channel === 'gbp' ? variant.body : variant.body + hashtagTail(variant.hashtags)
+
   switch (spec.channel) {
     case 'x':
-      return { channel: 'x', text: variant.body }
+      return { channel: 'x', text: body }
     case 'gbp':
-      return { channel: 'gbp', summary: variant.body }
+      return { channel: 'gbp', summary: body }
     case 'linkedin':
-      return { channel: 'linkedin', text: variant.body }
+      return { channel: 'linkedin', text: body }
     case 'instagram':
-      return { channel: 'instagram', caption: variant.body, media }
+      return { channel: 'instagram', caption: body, media }
   }
 }

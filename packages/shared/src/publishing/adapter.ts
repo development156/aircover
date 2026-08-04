@@ -22,6 +22,19 @@ export interface PublishRequest {
   content: FormattedContent
   media: PublishRequestMedia[]
   auth: ConnectionAuth
+  /**
+   * The de-duplication key for this publish, from `publishIdempotencyKey`.
+   *
+   * Supplied by the caller rather than derived inside an adapter, and that is the
+   * whole point: two workers racing on the same scheduled post must mint the SAME
+   * key, so it has to come from facts they share — the post, the channel and the
+   * scheduled instant — never from an adapter's local view or a clock.
+   *
+   * Optional so an adapter that has no such concept ignores it; an adapter that
+   * does have one (Zernio's `x-request-id`, 5-minute window) must prefer it over
+   * anything it could assemble itself.
+   */
+  idempotencyKey?: string
 }
 
 export interface PublishSuccess {

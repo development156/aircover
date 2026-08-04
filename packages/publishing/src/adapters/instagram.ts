@@ -145,9 +145,20 @@ export function createInstagramAdapter(deps: InstagramAdapterDeps): PublishAdapt
         ...(m.altText ? { altText: m.altText } : {}),
       }))
 
-      // Deterministic per (variant, account) so a genuine retry inside their
-      // 5-minute window collapses instead of double-posting (doc 13 §5).
-      const requestId = `sahoda:${req.variantId}:${accountId}`
+      // ── THE KEY COMES FROM THE CALLER, NOT FROM HERE ────────────────────────
+      // It used to be `sahoda:{variantId}:{accountId}`, derived locally. That is
+      // stable, but it is stable in the WRONG dimension: it never changes, so a
+      // post rescheduled to next Tuesday collapses onto the Zernio post from last
+      // Tuesday and the new publish comes back as `existingPost` with the old URL.
+      //
+      // `publishIdempotencyKey(postId, channel, scheduledAt)` is the one definition
+      // (shared/jobs/payloads.ts), and the scheduled instant is written once on the
+      // row so every racing worker reads the same value. Same post, same minute →
+      // same key → one Instagram post. Rescheduled → new key → a real new post.
+      //
+      // The fallback keeps the old shape rather than inventing a fresh id: a caller
+      // that forgot the key must still de-duplicate its own retries.
+      const requestId = req.idempotencyKey ?? `sahoda:${req.variantId}:${accountId}`
 
       let created
       try {

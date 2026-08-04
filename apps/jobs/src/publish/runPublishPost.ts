@@ -2,6 +2,7 @@ import {
   AdapterError,
   CONSTRAINTS,
   formatForPlatform,
+  publishIdempotencyKey,
   validateVariant,
   type Channel,
   type PublishAdapter,
@@ -209,6 +210,10 @@ export async function runPublishPost(
         accessToken: connection.accessToken,
         externalAccountId: connection.externalAccountId,
       },
+      // Built from the payload, never from a clock: every worker racing on this
+      // post reads the same `scheduledAt` off the same row, so they all mint the
+      // same key and the platform collapses them onto one post.
+      idempotencyKey: publishIdempotencyKey(payload.postId, payload.channel, payload.scheduledAt),
     }
 
     const result = await deps.adapterFor(payload.channel).publish(request)

@@ -135,9 +135,35 @@ describe('meterFor — per-channel constraints', () => {
   })
 
   test('does not apply a hashtag cap to channels that declare none', () => {
+    // 50 tags, which is well past instagram's 30 and past anything x or linkedin
+    // would sanction if they had a limit. Neither declares one, so neither may
+    // raise MAX_HASHTAGS however many are supplied.
     const hashtags = Array.from({ length: 50 }, (_, i) => `#tag${i}`)
-    expect(meterFor('x', draft({ body: 'Chai', hashtags })).violations).toEqual([])
-    expect(meterFor('linkedin', draft({ body: 'Chai', hashtags })).violations).toEqual([])
+    for (const channel of ['x', 'linkedin'] as const) {
+      const codes = meterFor(channel, draft({ body: 'Chai', hashtags })).violations.map(
+        (v) => v.code,
+      )
+      expect(codes).not.toContain('MAX_HASHTAGS')
+    }
+  })
+
+  test('counts published hashtags against the character limit', () => {
+    // The absence of a hashtag CAP is not permission to ignore the characters.
+    // Fifty tags is ~350 characters of caption, which no longer fits in x's 280 —
+    // and that is the honest answer now they are actually published. While
+    // formatForPlatform silently dropped them, this draft read as green.
+    const hashtags = Array.from({ length: 50 }, (_, i) => `#tag${i}`)
+    const meter = meterFor('x', draft({ body: 'Chai', hashtags }))
+    expect(meter.violations.map((v) => v.code)).toContain('MAX_CHARS')
+    expect(meter.charCount).toBeGreaterThan(CONSTRAINTS.x.maxChars)
+  })
+
+  test('a handful of hashtags still fits, and is counted', () => {
+    const bare = meterFor('x', draft({ body: 'Chai' }))
+    const tagged = meterFor('x', draft({ body: 'Chai', hashtags: ['chai', '#pune'] }))
+    expect(tagged.violations).toEqual([])
+    // '\n\n#chai #pune' — the exact tail that will be published.
+    expect(tagged.charCount).toBe(bare.charCount + '\n\n#chai #pune'.length)
   })
 
   test('reports several violations at once when a draft breaks more than one rule', () => {

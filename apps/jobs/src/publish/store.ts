@@ -87,13 +87,77 @@ export function createPublishStore(opts: PublishStoreOptions) {
     )
   }
 
+  /**
+   * Take exclusive ownership of one variant for publishing. True means it is ours.
+   *
+   * ── THIS SINGLE STATEMENT IS THE WHOLE GUARANTEE ─────────────────────────────
+   * A conditional UPDATE is atomic in Postgres: two overlapping cron ticks both run
+   * it, exactly one matches a row, and the loser sees rowCount 0. There is no
+   * read-then-write window to lose, which is why the check lives in the WHERE
+   * clause rather than in a preceding SELECT.
+   *
+   * The predicate says three things:
+   *   · the variant still has work to do — `pending`, `scheduled` or a prior
+   *     `failed` (a retry is legitimate). A `published` variant is never re-claimed,
+   *     so a duplicate tick cannot post it a second time.
+   *   · nobody holds a live claim, OR the claim is older than the lease and its
+   *     holder is therefore presumed dead.
+   *   · it belongs to the workspace we were given — the payload's workspace is not
+   *     trusted for the tenant decision (that is
+   *     `assert_account_for_scheduled_post`'s job), but scoping the write to it
+   *     costs nothing and keeps this statement from reaching outside its post.
+   */
+  async function claimVariant(payload: PublishPostPayload, leaseSeconds: number): Promise<boolean> {
+    const r = await pool.query(
+      `update post_variants
+          set publish_status = 'publishing',
+              publish_claimed_at = now()
+        where id = $1
+          and post_id = $2
+          and workspace_id = $3
+          and publish_status in ('pending', 'scheduled', 'failed')
+          and (publish_claimed_at is null
+               or publish_claimed_at < now() - make_interval(secs => $4::int))`,
+      [payload.variantId, payload.postId, payload.workspaceId, leaseSeconds],
+    )
+    return (r.rowCount ?? 0) > 0
+  }
+
+  /**
+   * Hand a claim back without recording an outcome.
+   *
+   * For the TRANSIENT case only: `runPublishPost` rethrows those so a runner can
+   * retry, and it deliberately does not touch the variant — the attempt is not
+   * over. Left alone the row would sit `publishing` until its lease ran out, which
+   * shows the writer "publishing" for minutes with no error and costs at least one
+   * cron cycle. Releasing here makes the retry immediate.
+   *
+   * Guarded on `publish_status = 'publishing'` so a release arriving after the
+   * lease already expired and someone else re-claimed cannot clear THEIR claim.
+   * It returns to `scheduled` rather than `pending`: the post is still due.
+   */
+  async function releaseVariant(payload: PublishPostPayload): Promise<void> {
+    await pool.query(
+      `update post_variants
+          set publish_status = 'scheduled',
+              publish_claimed_at = null
+        where id = $1
+          and workspace_id = $2
+          and publish_status = 'publishing'`,
+      [payload.variantId, payload.workspaceId],
+    )
+  }
+
   async function markVariant(update: VariantUpdate): Promise<void> {
     await pool.query(
       `update post_variants
           set publish_status = $3,
               platform_post_id = coalesce($4, platform_post_id),
               permalink = coalesce($5, permalink),
-              last_error = $6
+              last_error = $6,
+              -- Every terminal outcome ends the claim. Leaving it set would make a
+              -- published row look like it still held a lease.
+              publish_claimed_at = null
         where id = $1 and workspace_id = $2`,
       [
         update.variantId,
@@ -207,7 +271,15 @@ export function createPublishStore(opts: PublishStoreOptions) {
     }
   }
 
-  return { loadVariant, writeLog, markVariant, markConnection, loadConnection }
+  return {
+    loadVariant,
+    claimVariant,
+    releaseVariant,
+    writeLog,
+    markVariant,
+    markConnection,
+    loadConnection,
+  }
 }
 
 /**
