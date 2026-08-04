@@ -9,6 +9,7 @@ import { blockingChannels, meterFor } from '@/lib/posts/counters'
 import { hasLink } from '@/lib/posts/detect-link'
 
 import { CHANNEL_SHORT } from './channel-label'
+import { LiveLink } from './live-link'
 import { VariantPanel } from './variant-panel'
 import type { VariantsApi } from './use-variants'
 
@@ -124,8 +125,12 @@ export function VariantTabs({ channels, canonicalBody, variants, mediaCount }: V
         role="tabpanel"
         id={`variant-panel-${active}`}
         aria-labelledby={`variant-tab-${active}`}
-        className="rounded-card border border-line bg-bg p-4 shadow-card"
+        className="space-y-3 rounded-card border border-line bg-bg p-4 shadow-card"
       >
+        {/* Above the editor, because a post that is already live changes what the
+            writer is doing: they are looking at what went out, not drafting it. */}
+        <LiveLink channel={active} permalink={variants.states[active].permalink} />
+
         <VariantPanel
           key={active}
           channel={active}

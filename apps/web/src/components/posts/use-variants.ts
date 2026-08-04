@@ -14,11 +14,25 @@ export interface VariantState {
   dirty: boolean
   saving: boolean
   error: string | null
+  /**
+   * The live URL on the platform, once it exists. Server-owned and never edited
+   * here — it is written by the publisher, and its PRESENCE is the only thing that
+   * makes a post real (doc 13 §5). Local edits do not clear it: the post that went
+   * out is still out.
+   */
+  permalink: string | null
 }
 
 export type VariantStates = Record<Channel, VariantState>
 
-const EMPTY: VariantState = { body: '', extras: {}, dirty: false, saving: false, error: null }
+const EMPTY: VariantState = {
+  body: '',
+  extras: {},
+  dirty: false,
+  saving: false,
+  error: null,
+  permalink: null,
+}
 
 function seed(variants: readonly PostVariant[]): VariantStates {
   const byChannel = new Map<Channel, PostVariant>()
@@ -36,6 +50,7 @@ function seed(variants: readonly PostVariant[]): VariantStates {
             dirty: false,
             saving: false,
             error: null,
+            permalink: row.permalink,
           }
   }
   return states

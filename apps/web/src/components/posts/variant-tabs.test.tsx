@@ -24,6 +24,7 @@ function states(bodies: Partial<Record<Channel, string>> = {}): VariantStates {
       dirty: false,
       saving: false,
       error: null,
+    permalink: null,
     }
   }
   return out
