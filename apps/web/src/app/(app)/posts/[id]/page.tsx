@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { PostEditor } from '@/components/posts/post-editor'
 import { signMediaPreviews } from '@/lib/posts/media-url'
 import { getPost, listMedia, listVariants } from '@/lib/posts/read'
+import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
 
 export const metadata = { title: 'Post' }
 
@@ -26,7 +27,13 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="space-y-grid">
-      <PostEditor post={post} variants={variants} media={media} previews={previews} />
+      <PostEditor
+        post={post}
+        variants={variants}
+        media={media}
+        previews={previews}
+        autoPublish={autoPublishEnabled()}
+      />
     </div>
   )
 }

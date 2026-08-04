@@ -58,6 +58,35 @@ export const AUTO_PUBLISH_COPY = {
 export const SCHEDULE_FIELD_NOTE =
   "Setting a time doesn't publish it — scheduled auto-publish isn't live yet. Copy it across at that time to post it."
 
+/**
+ * What the picker says once the dispatcher is actually running.
+ *
+ * Deliberately not "will go out at 6pm sharp": the sweep runs every five minutes
+ * and takes a bounded number of posts per tick, so the honest promise is "around
+ * then", and the honest scope is "the channels that are connected".
+ */
+export const SCHEDULE_FIELD_NOTE_LIVE =
+  'This goes out on its own at around that time, on every connected channel.'
+
+/** The picker's note for this environment. `enabled` is a server fact — never guessed. */
+export function scheduleFieldNote(enabled: boolean): string {
+  return enabled ? SCHEDULE_FIELD_NOTE_LIVE : SCHEDULE_FIELD_NOTE
+}
+
+/** Row copy for a live dispatcher. Nothing here claims a post already went out. */
+export const AUTO_PUBLISH_COPY_LIVE = {
+  awaiting: { note: 'Goes out on its own at this time.', short: 'Auto-posts' },
+  overdue: {
+    note: 'This time has passed and it has not gone out yet — check the channel status on the post.',
+    short: 'Late · check',
+  },
+} as const satisfies Record<Exclude<AutoPublishTruth, 'none'>, AutoPublishCopy>
+
+/** The copy set for this environment. */
+export function autoPublishCopy(enabled: boolean) {
+  return enabled ? AUTO_PUBLISH_COPY_LIVE : AUTO_PUBLISH_COPY
+}
+
 const isValidDate = (date: Date): boolean => !Number.isNaN(date.getTime())
 
 /**

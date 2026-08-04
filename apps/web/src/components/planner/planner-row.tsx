@@ -13,6 +13,12 @@ import { formatScheduledAt } from '@/lib/posts/schedule-format'
 import { cn } from '@/lib/utils'
 
 export interface PlannerRowProps {
+  /**
+   * Whether the scheduled dispatcher is on in this environment (server fact from
+   * `autoPublishEnabled()`). Defaults false so a forgotten call site under-promises
+   * rather than claiming an auto-publish that will not happen.
+   */
+  autoPublish?: boolean
   post: Post
   /** One instant for the whole list, read on the server. See `AutoPublishNote`. */
   now: Date
@@ -28,7 +34,7 @@ export interface PlannerRowProps {
  * delete) because this screen is about states and times, not content. Server
  * component; the approve and reschedule controls are the client islands.
  */
-export function PlannerRow({ post, now, mode }: PlannerRowProps) {
+export function PlannerRow({ autoPublish = false, post, now, mode }: PlannerRowProps) {
   const title = post.title?.trim()
   const scheduledAt = formatScheduledAt(post.scheduled_at)
   const channels = [...new Set(post.channels)]
@@ -82,6 +88,7 @@ export function PlannerRow({ post, now, mode }: PlannerRowProps) {
         status={post.status}
         scheduledAt={post.scheduled_at}
         now={now}
+        autoPublish={autoPublish}
         className="mt-2"
       />
     </div>

@@ -32,7 +32,17 @@ const CELL_CERTAINTY: Record<string, string> = {
   neutral: 'border border-line bg-transparent text-muted',
 }
 
-function DayChip({ post, now, mode }: { post: Post; now: Date; mode: PostPublishMode }) {
+function DayChip({
+  post,
+  now,
+  mode,
+  autoPublish,
+}: {
+  post: Post
+  now: Date
+  mode: PostPublishMode
+  autoPublish: boolean
+}) {
   const time = formatScheduledTime(post.scheduled_at)
   const certainty = certaintyFor(post.status, mode)
   return (
@@ -61,6 +71,7 @@ function DayChip({ post, now, mode }: { post: Post; now: Date; mode: PostPublish
         status={post.status}
         scheduledAt={post.scheduled_at}
         now={now}
+        autoPublish={autoPublish}
         variant="compact"
       />
     </Link>
@@ -68,6 +79,12 @@ function DayChip({ post, now, mode }: { post: Post; now: Date; mode: PostPublish
 }
 
 export interface WeekGridProps {
+  /**
+   * Whether the scheduled dispatcher is on in this environment (server fact from
+   * `autoPublishEnabled()`). Defaults false so a forgotten call site under-promises
+   * rather than claiming an auto-publish that will not happen.
+   */
+  autoPublish?: boolean
   buckets: WeekBuckets
   /** One instant for the whole grid — the same one `bucketWeek` was given. */
   now: Date
@@ -80,7 +97,7 @@ export interface WeekGridProps {
  * fit the window render below it — `bucketWeek` never drops a post, and neither
  * does this component.
  */
-export function WeekGrid({ buckets, now, modes }: WeekGridProps) {
+export function WeekGrid({ autoPublish = false, buckets, now, modes }: WeekGridProps) {
   return (
     <div className="space-y-grid">
       <div className="overflow-x-auto">
@@ -100,7 +117,13 @@ export function WeekGrid({ buckets, now, modes }: WeekGridProps) {
                 {index === 0 ? ' · Today' : ''}
               </p>
               {day.posts.map((post) => (
-                <DayChip key={post.id} post={post} now={now} mode={modes.get(post.id) ?? null} />
+                <DayChip
+                  key={post.id}
+                  post={post}
+                  now={now}
+                  mode={modes.get(post.id) ?? null}
+                  autoPublish={autoPublish}
+                />
               ))}
             </li>
           ))}
@@ -111,7 +134,13 @@ export function WeekGrid({ buckets, now, modes }: WeekGridProps) {
         <section className="space-y-2">
           <h2 className="text-[13px] font-semibold text-muted">Unscheduled</h2>
           {buckets.unscheduled.map((post) => (
-            <PlannerRow key={post.id} post={post} now={now} mode={modes.get(post.id) ?? null} />
+            <PlannerRow
+              key={post.id}
+              post={post}
+              now={now}
+              mode={modes.get(post.id) ?? null}
+              autoPublish={autoPublish}
+            />
           ))}
         </section>
       ) : null}
@@ -120,7 +149,13 @@ export function WeekGrid({ buckets, now, modes }: WeekGridProps) {
         <section className="space-y-2">
           <h2 className="text-[13px] font-semibold text-muted">Outside this week</h2>
           {buckets.outside.map((post) => (
-            <PlannerRow key={post.id} post={post} now={now} mode={modes.get(post.id) ?? null} />
+            <PlannerRow
+              key={post.id}
+              post={post}
+              now={now}
+              mode={modes.get(post.id) ?? null}
+              autoPublish={autoPublish}
+            />
           ))}
         </section>
       ) : null}

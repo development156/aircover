@@ -1,19 +1,31 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { FlaskConical } from 'lucide-react'
+import { CalendarClock, FlaskConical } from 'lucide-react'
 import type { Channel } from '@sahoda/shared'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 import { earliestScheduleAt, validateScheduleLead } from '@/lib/posts/schedule'
-import { SCHEDULE_FIELD_NOTE } from '@/lib/posts/schedule-status'
+import { scheduleFieldNote } from '@/lib/posts/schedule-status'
 
 export interface ScheduleFieldProps {
   channels: Channel[]
   /** ISO string from `posts.scheduled_at`, or null for "no schedule". */
   value: string | null
   onChange: (iso: string | null) => void
+  /** Whether the dispatcher is on HERE. Server fact; false under-promises. */
+  autoPublish?: boolean
+  /**
+   * What the server said when the schedule was last committed.
+   *
+   * Setting a time is a STATUS change now — it goes through
+   * `release_post_for_publish` / `reschedule_post` — and those refuse a post that
+   * is already going out. A picker that swallowed that would show a time the
+   * database never accepted.
+   */
+  error?: string | null
 }
 
 const CLOCK_REFRESH_MS = 30_000
@@ -42,7 +54,13 @@ function fromStored(iso: string | null): string {
  * against a different instant, and validating against a server clock would give
  * the user a verdict about a timezone they are not in.
  */
-export function ScheduleField({ channels, value, onChange }: ScheduleFieldProps) {
+export function ScheduleField({
+  channels,
+  value,
+  onChange,
+  autoPublish = false,
+  error = null,
+}: ScheduleFieldProps) {
   const [draft, setDraft] = useState<string>(() => fromStored(value))
   const [now, setNow] = useState<Date | null>(null)
 
@@ -95,7 +113,11 @@ export function ScheduleField({ channels, value, onChange }: ScheduleFieldProps)
         min={earliest !== null ? toLocalInput(earliest) : undefined}
         onChange={(event) => handleChange(event.target.value)}
       />
-      {check !== null && !check.ok && check.message !== undefined ? (
+      {error !== null ? (
+        <p role="alert" className="text-[12.5px] text-danger">
+          {error}
+        </p>
+      ) : check !== null && !check.ok && check.message !== undefined ? (
         <p role="alert" className="text-[12.5px] text-danger">
           {check.message} Nothing was saved.
         </p>
@@ -115,9 +137,18 @@ export function ScheduleField({ channels, value, onChange }: ScheduleFieldProps)
       {/* Only once a time is set: with an empty field there is no promise to
           correct, and the line above already says the post stays a draft. */}
       {draft === '' ? null : (
-        <p className="flex items-start gap-1.5 text-[12px] text-warn">
-          <FlaskConical size={13} strokeWidth={2} className="mt-[2px] shrink-0" aria-hidden />
-          <span>{SCHEDULE_FIELD_NOTE}</span>
+        <p
+          className={cn(
+            'flex items-start gap-1.5 text-[12px]',
+            autoPublish ? 'text-muted' : 'text-warn',
+          )}
+        >
+          {autoPublish ? (
+            <CalendarClock size={13} strokeWidth={2} className="mt-[2px] shrink-0" aria-hidden />
+          ) : (
+            <FlaskConical size={13} strokeWidth={2} className="mt-[2px] shrink-0" aria-hidden />
+          )}
+          <span>{scheduleFieldNote(autoPublish)}</span>
         </p>
       )}
     </div>

@@ -1,7 +1,7 @@
 import { FlaskConical, TriangleAlert } from 'lucide-react'
 import type { PostStatus } from '@sahoda/shared'
 
-import { autoPublishTruth, AUTO_PUBLISH_COPY } from '@/lib/posts/schedule-status'
+import { autoPublishTruth, autoPublishCopy } from '@/lib/posts/schedule-status'
 import { cn } from '@/lib/utils'
 
 /**
@@ -32,6 +32,12 @@ export interface AutoPublishNoteProps {
   now: Date
   /** `compact` is for week-grid cells, which have room for about 14 characters. */
   variant?: 'full' | 'compact'
+  /**
+   * Whether the dispatcher is switched on HERE. From `autoPublishEnabled()` on the
+   * server — defaulting to false so a call site that forgets it under-promises
+   * rather than claiming an auto-publish that will not happen.
+   */
+  autoPublish?: boolean
   className?: string
 }
 
@@ -40,12 +46,13 @@ export function AutoPublishNote({
   scheduledAt,
   now,
   variant = 'full',
+  autoPublish = false,
   className,
 }: AutoPublishNoteProps) {
   const truth = autoPublishTruth(status, scheduledAt, now)
   if (truth === 'none') return null
 
-  const copy = AUTO_PUBLISH_COPY[truth]
+  const copy = autoPublishCopy(autoPublish)[truth]
   const Icon = ICONS[truth]
 
   if (variant === 'compact') {

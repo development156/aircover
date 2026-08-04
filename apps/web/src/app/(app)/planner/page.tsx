@@ -8,6 +8,7 @@ import { ViewToggle, type PlannerView } from '@/components/planner/view-toggle'
 import { WeekGrid } from '@/components/planner/week-grid'
 import { bucketWeek } from '@/lib/planner/week'
 import { listPosts, listPublishModes, LIST_LIMIT } from '@/lib/posts/read'
+import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
 
 export const metadata = { title: 'Planner' }
 
@@ -30,6 +31,7 @@ export default async function PlannerPage({
   const modes = await listPublishModes(posts.map((post) => post.id))
   // One instant for the whole screen: the week buckets and the past-due notes
   // must not be computed against two different clocks.
+  const autoPublish = autoPublishEnabled()
   const now = new Date()
 
   return (
@@ -49,7 +51,12 @@ export default async function PlannerPage({
           tip="Add goals first if you have a push this week — the plan bends toward them."
         />
       ) : view === 'week' ? (
-        <WeekGrid buckets={bucketWeek(posts, now)} now={now} modes={modes} />
+        <WeekGrid
+          buckets={bucketWeek(posts, now)}
+          now={now}
+          modes={modes}
+          autoPublish={autoPublish}
+        />
       ) : (
         <ul className="space-y-2" data-guide="planner.list">
           {posts.map((post) => (

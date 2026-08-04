@@ -26,6 +26,10 @@ export interface BottomBarProps {
   saveVariantNow: (channel: Channel) => Promise<boolean>
   /** Per-channel publish state, read from post_variants on the server. */
   statusRows: readonly VariantStatusRow[]
+  /** Whether the dispatcher is on HERE. Server fact; false under-promises. */
+  autoPublish: boolean
+  /** The server's answer to the last schedule change, when it refused. */
+  scheduleError: string | null
   onGenerated: (variants: GeneratedVariant[]) => void
 }
 
@@ -45,6 +49,8 @@ export function BottomBar({
   flush,
   saveVariantNow,
   statusRows,
+  autoPublish,
+  scheduleError,
   onGenerated,
 }: BottomBarProps) {
   return (
@@ -60,7 +66,13 @@ export function BottomBar({
             onGenerated={onGenerated}
           />
         </div>
-        <ScheduleField channels={channels} value={scheduledAt} onChange={onScheduleChange} />
+        <ScheduleField
+          channels={channels}
+          value={scheduledAt}
+          onChange={onScheduleChange}
+          autoPublish={autoPublish}
+          error={scheduleError}
+        />
       </div>
 
       <div className="space-y-4 border-t border-line pt-4">

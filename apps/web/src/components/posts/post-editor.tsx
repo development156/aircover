@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import type { MediaPreview } from '@/lib/posts/media-url'
 import { selectedText, spliceSelection, type SelectionRange } from '@/lib/posts/splice-selection'
 
+import { cancelSchedule, schedulePost } from '@/app/actions/posts-schedule'
 import { variantStatusRows } from '@/lib/posts/variant-status'
 
 import { BottomBar } from './bottom-bar'
@@ -30,6 +31,12 @@ export interface PostEditorProps {
    * still lists, showing its "preview unavailable" placeholder.
    */
   previews?: MediaPreview[]
+  /**
+   * Whether the scheduled dispatcher is switched on in this environment. Read on
+   * the server via `autoPublishEnabled()`; the copy under the picker is a promise
+   * about the world and must not be guessed at from the client.
+   */
+  autoPublish?: boolean
 }
 
 const STATUS_COPY: Readonly<Record<AutosaveStatus, string>> = {
@@ -54,6 +61,7 @@ export function PostEditor({
   variants,
   media,
   previews,
+  autoPublish = false,
 }: PostEditorProps): React.JSX.Element {
   const autosave = useAutosave(post.id, post)
   const variantsApi = useVariants(post.id, variants)
@@ -62,6 +70,31 @@ export function PostEditor({
   // doing on a platform is not something the editor may have an opinion about.
   const statusRows = variantStatusRows(post.channels, variants)
   const [selection, setSelection] = useState<SelectionRange | null>(null)
+  const [scheduleError, setScheduleError] = useState<string | null>(null)
+
+  /**
+   * Setting a time is a STATUS change, and `savePost` refuses `status` on purpose
+   * — accepting it would let a hand-rolled call mark a post published. So the
+   * transition goes through the RPCs, which also enforce the role and refuse a
+   * post that is already going out.
+   *
+   * `autosave.update` still runs, and first: it keeps the field responsive and
+   * writes `scheduled_at` optimistically. The RPC then owns the status and fixes
+   * the same timestamp — `release_post_for_publish` coalesces, so the two agree
+   * rather than fighting. If the RPC refuses, the message is surfaced instead of
+   * being swallowed, because the picker would otherwise show a time the database
+   * never accepted.
+   */
+  function changeSchedule(iso: string | null) {
+    const hadSchedule = autosave.read().scheduledAt !== null
+    autosave.update({ scheduledAt: iso })
+    setScheduleError(null)
+    void (iso === null ? cancelSchedule(post.id) : schedulePost(post.id, iso, hadSchedule)).then(
+      (result) => {
+        if (!result.ok) setScheduleError(result.message)
+      },
+    )
+  }
 
   const { draft } = autosave
 
@@ -202,10 +235,12 @@ export function PostEditor({
         channels={draft.channels}
         scheduledAt={draft.scheduledAt}
         onChannelsChange={(channels) => autosave.update({ channels })}
-        onScheduleChange={(scheduledAt) => autosave.update({ scheduledAt })}
+        onScheduleChange={changeSchedule}
         flush={autosave.flush}
         saveVariantNow={variantsApi.saveNow}
         statusRows={statusRows}
+        autoPublish={autoPublish}
+        scheduleError={scheduleError}
         onGenerated={variantsApi.applyGenerated}
       />
     </div>

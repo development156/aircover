@@ -5,6 +5,7 @@ import { PageTitle } from '@/components/page-title'
 import { CreatePostButton } from '@/components/posts/create-post-button'
 import { PostCard } from '@/components/posts/post-card'
 import { listPosts, listPublishModes, LIST_LIMIT } from '@/lib/posts/read'
+import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
 
 export const metadata = { title: 'Posts' }
 
@@ -15,6 +16,7 @@ export default async function PostsPage() {
   const modes = await listPublishModes(posts.map((post) => post.id))
   // Read the clock once and pass it down, so every card on the page agrees on
   // which scheduled posts are past due. See `AutoPublishNote`.
+  const autoPublish = autoPublishEnabled()
   const now = new Date()
 
   return (
@@ -39,7 +41,12 @@ export default async function PostsPage() {
           <ul className="space-y-grid" data-guide="posts.list">
             {posts.map((post) => (
               <li key={post.id}>
-                <PostCard post={post} now={now} mode={modes.get(post.id) ?? null} />
+                <PostCard
+                  post={post}
+                  now={now}
+                  mode={modes.get(post.id) ?? null}
+                  autoPublish={autoPublish}
+                />
               </li>
             ))}
           </ul>

@@ -31,6 +31,12 @@ function excerptOf(body: string | null): string | null {
 }
 
 export interface PostCardProps {
+  /**
+   * Whether the scheduled dispatcher is on in this environment (server fact from
+   * `autoPublishEnabled()`). Defaults false so a forgotten call site under-promises
+   * rather than claiming an auto-publish that will not happen.
+   */
+  autoPublish?: boolean
   post: Post
   /** One instant for the whole list, read on the server. See `AutoPublishNote`. */
   now: Date
@@ -41,7 +47,7 @@ export interface PostCardProps {
   mode: PostPublishMode
 }
 
-export function PostCard({ post, now, mode }: PostCardProps) {
+export function PostCard({ autoPublish = false, post, now, mode }: PostCardProps) {
   const title = post.title?.trim()
   const displayTitle = title || 'Untitled post'
   const excerpt = excerptOf(post.body)
@@ -112,6 +118,7 @@ export function PostCard({ post, now, mode }: PostCardProps) {
           status={post.status}
           scheduledAt={post.scheduled_at}
           now={now}
+        autoPublish={autoPublish}
           className="mt-2"
         />
       </Link>
