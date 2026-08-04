@@ -4,9 +4,10 @@ import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { CreatePostButton } from '@/components/posts/create-post-button'
 import { PostCard } from '@/components/posts/post-card'
-import { listPosts, listPublishModes,
-  listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
+import { listPosts, listPublishModes, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
 import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
+import { listConnectedChannels } from '@/lib/connections/read'
+import { ConnectFirstNote } from '@/components/connections/connect-first-note'
 
 export const metadata = { title: 'Posts' }
 
@@ -16,9 +17,10 @@ export default async function PostsPage() {
   // which case every chip renders the weaker claim rather than a solid publish.
   const postIds = posts.map((post) => post.id)
   // Batched for the whole page: one query, not one per card.
-  const [modes, variantStates] = await Promise.all([
+  const [modes, variantStates, connected] = await Promise.all([
     listPublishModes(postIds),
     listVariantStates(postIds),
+    listConnectedChannels(),
   ])
   // Read the clock once and pass it down, so every card on the page agrees on
   // which scheduled posts are past due. See `AutoPublishNote`.
@@ -33,6 +35,8 @@ export default async function PostsPage() {
             nothing to list — two "Create post" buttons on one screen is noise. */}
         {posts.length > 0 ? <CreatePostButton /> : null}
       </div>
+
+      <ConnectFirstNote connectedCount={connected.size} />
 
       {posts.length === 0 ? (
         <EmptyState

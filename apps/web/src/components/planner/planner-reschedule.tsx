@@ -47,7 +47,9 @@ export function PlannerReschedule({ postId, channels, value }: PlannerReschedule
       // move: release_post_for_publish coalesces and will not shift an existing
       // time, and reschedule_post is the one that overwrites.
       const result =
-        iso === null ? await cancelSchedule(postId) : await schedulePost(postId, iso, current !== null)
+        iso === null
+          ? await cancelSchedule(postId)
+          : await schedulePost(postId, iso, current !== null)
       if (result.ok) {
         setCurrent(result.scheduledAt)
         toast.success(iso ? 'Rescheduled' : 'Schedule cleared')

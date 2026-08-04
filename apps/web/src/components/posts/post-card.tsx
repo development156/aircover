@@ -53,13 +53,7 @@ export interface PostCardProps {
   mode: PostPublishMode
 }
 
-export function PostCard({
-  autoPublish = false,
-  post,
-  now,
-  mode,
-  variantStates,
-}: PostCardProps) {
+export function PostCard({ autoPublish = false, post, now, mode, variantStates }: PostCardProps) {
   const title = post.title?.trim()
   const displayTitle = title || 'Untitled post'
   const excerpt = excerptOf(post.body)

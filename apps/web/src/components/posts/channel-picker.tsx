@@ -12,13 +12,19 @@ export interface ChannelPickerProps {
   selected: Channel[]
   onChange: (channels: Channel[]) => void
   disabled?: boolean
+  /**
+   * Channels with a live connection. A channel is still SELECTABLE without one —
+   * drafting ahead of connecting is legitimate — but it is labelled, so the
+   * decision is made with the fact visible rather than discovered at publish.
+   */
+  connected?: ReadonlySet<Channel>
 }
 
 /**
  * Channel multi-select over the four `ChannelSchema` values. Selection order is
  * preserved from the schema so the tab strip does not reshuffle on every toggle.
  */
-export function ChannelPicker({ selected, onChange, disabled }: ChannelPickerProps) {
+export function ChannelPicker({ selected, onChange, disabled, connected }: ChannelPickerProps) {
   function toggle(channel: Channel) {
     const next = selected.includes(channel)
       ? selected.filter((item) => item !== channel)
@@ -50,6 +56,11 @@ export function ChannelPicker({ selected, onChange, disabled }: ChannelPickerPro
             >
               {isOn ? <Check size={13} aria-hidden /> : null}
               {CHANNEL_LABELS[channel]}
+              {/* Only on a channel that is both picked and unconnected: an
+                  unpicked one is not a promise anybody has made yet. */}
+              {connected !== undefined && isOn && !connected.has(channel) ? (
+                <span className="ml-1.5 text-[11px] font-semibold opacity-75">not connected</span>
+              ) : null}
               {!CONSTRAINTS[channel].publishable ? (
                 <span className="text-[11px] font-normal opacity-70">preview only</span>
               ) : null}

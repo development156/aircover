@@ -30,6 +30,8 @@ export interface BottomBarProps {
   autoPublish: boolean
   /** The server's answer to the last schedule change, when it refused. */
   scheduleError: string | null
+  /** Channels with a live connection, read on the server. */
+  connected?: ReadonlySet<Channel>
   onGenerated: (variants: GeneratedVariant[]) => void
 }
 
@@ -51,11 +53,12 @@ export function BottomBar({
   statusRows,
   autoPublish,
   scheduleError,
+  connected,
   onGenerated,
 }: BottomBarProps) {
   return (
     <section className="space-y-4 rounded-card border border-line bg-bg p-4 shadow-card">
-      <ChannelPicker selected={channels} onChange={onChannelsChange} />
+      <ChannelPicker selected={channels} onChange={onChannelsChange} connected={connected} />
 
       <div className="grid gap-4 wide:grid-cols-2">
         <div className="space-y-2">
@@ -85,6 +88,7 @@ export function BottomBar({
           flush={flush}
           saveVariantNow={saveVariantNow}
           statusRows={statusRows}
+          connected={connected}
         />
       </div>
     </section>

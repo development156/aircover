@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { Post, PostMedia, PostVariant } from '@sahoda/shared'
+import type { Channel, Post, PostMedia, PostVariant } from '@sahoda/shared'
 
 import { CardLabel } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -37,6 +37,12 @@ export interface PostEditorProps {
    * about the world and must not be guessed at from the client.
    */
   autoPublish?: boolean
+  /**
+   * Channels with a live connection. Read on the server and passed down so the
+   * composer can say "Instagram isn't connected" while the post is being written,
+   * rather than at the moment Publish fails with the work already done.
+   */
+  connected?: ReadonlySet<Channel>
 }
 
 const STATUS_COPY: Readonly<Record<AutosaveStatus, string>> = {
@@ -62,6 +68,7 @@ export function PostEditor({
   media,
   previews,
   autoPublish = false,
+  connected,
 }: PostEditorProps): React.JSX.Element {
   const autosave = useAutosave(post.id, post)
   const variantsApi = useVariants(post.id, variants)
@@ -241,6 +248,7 @@ export function PostEditor({
         statusRows={statusRows}
         autoPublish={autoPublish}
         scheduleError={scheduleError}
+        connected={connected}
         onGenerated={variantsApi.applyGenerated}
       />
     </div>

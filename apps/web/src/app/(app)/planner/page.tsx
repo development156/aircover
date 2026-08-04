@@ -9,6 +9,8 @@ import { WeekGrid } from '@/components/planner/week-grid'
 import { bucketWeek } from '@/lib/planner/week'
 import { listPosts, listPublishModes, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
 import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
+import { listConnectedChannels } from '@/lib/connections/read'
+import { ConnectFirstNote } from '@/components/connections/connect-first-note'
 
 export const metadata = { title: 'Planner' }
 
@@ -30,9 +32,10 @@ export default async function PlannerPage({
   // which case every chip renders the weaker claim rather than a solid publish.
   const postIds = posts.map((post) => post.id)
   // Batched for the whole week: one query, not one per row.
-  const [modes, variantStates] = await Promise.all([
+  const [modes, variantStates, connected] = await Promise.all([
     listPublishModes(postIds),
     listVariantStates(postIds),
+    listConnectedChannels(),
   ])
   // One instant for the whole screen: the week buckets and the past-due notes
   // must not be computed against two different clocks.
@@ -45,6 +48,8 @@ export default async function PlannerPage({
         <PageTitle>Planner</PageTitle>
         {posts.length > 0 ? <ViewToggle active={view} /> : null}
       </div>
+
+      <ConnectFirstNote connectedCount={connected.size} />
 
       <PlanWeekPanel />
 

@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ExternalLink, Send } from 'lucide-react'
+import { ExternalLink, Plug, Send } from 'lucide-react'
+import Link from 'next/link'
 import type { Channel } from '@sahoda/shared'
 
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,15 @@ export interface PublishNowProps {
   flush: () => Promise<boolean>
   /** Persist the channel variant that is actually about to be sent. */
   saveVariantNow: (channel: Channel) => Promise<boolean>
+  /**
+   * Channels with a live connection, from the server.
+   *
+   * A channel on the live rail but WITHOUT a connection cannot publish, and the
+   * only way the composer used to convey that was to let the person press
+   * Publish and fail. Undefined means "not known" and is treated as connected —
+   * a missing prop must not silently hide a working button.
+   */
+  connected?: ReadonlySet<Channel>
   /**
    * What each channel is doing right now, straight off post_variants.
    *
@@ -64,19 +74,23 @@ export function PublishNow({
   flush,
   saveVariantNow,
   statusRows,
+  connected,
 }: PublishNowProps) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [published, setPublished] = useState<Published | null>(null)
 
-  const live = channels.filter((channel) => LIVE_RAIL.has(channel))
+  const onRail = channels.filter((channel) => LIVE_RAIL.has(channel))
+  // Split rather than filtered: the unconnected ones still need saying out loud.
+  const live = onRail.filter((channel) => connected === undefined || connected.has(channel))
+  const unconnected = onRail.filter((channel) => connected !== undefined && !connected.has(channel))
   const anyAttempted = statusRows.some((row) => row.status !== 'pending')
 
-  // Nothing to publish and nothing to report. A button that cannot work is worse
-  // than no button, and an empty status list reads as "all fine" when it is "not
-  // started".
-  if (live.length === 0 && !anyAttempted) return null
+  // Nothing to publish, nothing to report, and nothing to fix. A button that
+  // cannot work is worse than no button, and an empty status list reads as "all
+  // fine" when it is "not started".
+  if (live.length === 0 && unconnected.length === 0 && !anyAttempted) return null
 
   function run(channel: Channel) {
     setError(null)
@@ -152,6 +166,26 @@ export function PublishNow({
             ) : null
           }
         />
+      ) : null}
+
+      {/* Said BEFORE the button, not after a failed publish. The work is already
+          done by the time someone presses Publish; learning there is no account
+          then is the whole problem this replaces. */}
+      {unconnected.length > 0 ? (
+        <div className="space-y-1.5 rounded-input border border-warn bg-warn-bg p-3">
+          <p className="text-[13px] text-warn">
+            {unconnected.length === 1
+              ? `${CHANNEL_LABELS[unconnected[0]!]} isn’t connected yet, so this can’t go out there.`
+              : `${unconnected.map((c) => CHANNEL_LABELS[c]).join(' and ')} aren’t connected yet, so this can’t go out there.`}
+          </p>
+          <Link
+            href="/connections"
+            className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-warn underline underline-offset-2"
+          >
+            <Plug size={13} aria-hidden />
+            Connect {unconnected.length === 1 ? CHANNEL_LABELS[unconnected[0]!] : 'a channel'}
+          </Link>
+        </div>
       ) : null}
 
       {live.length === 0 ? null : pending ? (
