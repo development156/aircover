@@ -1,0 +1,86 @@
+import { auth } from '@clerk/nextjs/server'
+import { ensureZernioProfile } from '@sahoda/publishing'
+
+import { reportServerError } from '@/lib/observability/report'
+import { createServerSupabase } from '@/lib/supabase/server'
+import { getActiveWorkspace } from '@/lib/workspaces'
+import { zernioClient, zernioReturnUrl } from '@/lib/zernio/server'
+
+/**
+ * POST /api/oauth/zernio/start — begin connecting an Instagram account.
+ *
+ * The workspace comes from the SESSION, never from the request body. That is the
+ * whole design: Zernio validates an accountId against your entire team rather than
+ * against the profile in the request (doc 13 §3), so the tenant boundary has to be
+ * ours, and it has to be established here — before the user ever leaves the app.
+ *
+ * Sequence:
+ *   1. resolve the workspace from the Clerk session + active-workspace cookie
+ *   2. find-or-create THAT workspace's Zernio profile (1:1, enforced in Postgres)
+ *   3. record the mapping via ensure_zernio_profile — an RPC that takes identity
+ *      from auth.jwt() and refuses Zernio's shared Default profile
+ *   4. ask Zernio for an authUrl scoped to that profile, and redirect
+ *
+ * Nothing sensitive travels in the redirect, and nothing needs to: the return route
+ * re-derives the workspace the same way rather than trusting anything sent back.
+ */
+export const dynamic = 'force-dynamic'
+
+const PLATFORM = 'instagram'
+
+function fail(message: string, status: number): Response {
+  return Response.json({ ok: false, message }, { status, headers: { 'cache-control': 'no-store' } })
+}
+
+export async function POST(): Promise<Response> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return fail('Sign in to connect an account.', 401)
+
+    const client = zernioClient()
+    if (!client) {
+      // Honest, not a 500: the rail simply is not provisioned in this environment.
+      return fail('Connecting isn’t available right now — the publishing key isn’t set.', 503)
+    }
+
+    const workspace = await getActiveWorkspace()
+    if (!workspace) return fail('Create a workspace first.', 400)
+    workspaceId = workspace.id
+
+    const profileId = await ensureZernioProfile(client, {
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+    })
+
+    // Persist the mapping BEFORE sending the user away. If they connect and we have
+    // no record of which profile is theirs, the account exists at Zernio and is
+    // unreachable from here — an orphan we cannot even name.
+    const supabase = createServerSupabase()
+    const { error } = await supabase.rpc('ensure_zernio_profile', {
+      p_workspace_id: workspace.id,
+      p_profile_id: profileId,
+    })
+    if (error) {
+      const msg = error.message ?? ''
+      if (msg.includes('FORBIDDEN_ROLE')) {
+        return fail('Only an owner or editor can connect an account.', 403)
+      }
+      if (msg.includes('PROFILE_ALREADY_BOUND') || msg.includes('PROFILE_IN_USE')) {
+        // Both mean the 1:1 already resolved differently. Refusing beats repointing
+        // a workspace at another profile, which moves a tenant boundary silently.
+        return fail('This workspace is already linked to a different publishing profile.', 409)
+      }
+      return fail('Couldn’t start the connection — try again.', 500)
+    }
+
+    const authUrl = await client.connectUrl(PLATFORM, profileId, zernioReturnUrl())
+    return Response.json(
+      { ok: true, authUrl },
+      { status: 200, headers: { 'cache-control': 'no-store' } },
+    )
+  } catch (error) {
+    await reportServerError(error, { action: 'zernioStart', workspaceId })
+    return fail('Couldn’t start the connection — try again.', 500)
+  }
+}

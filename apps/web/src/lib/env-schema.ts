@@ -59,6 +59,26 @@ const EnvSchema = z.object({
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().min(1).optional(),
   /** Delivers the two-admin OTP. Absent → creating a credit request fails honestly. */
   RESEND_API_KEY: z.string().min(1).optional(),
+  /**
+   * Zernio publishing rail. `sk_` + 64 hex = 67 chars, shown once, stored by them
+   * as SHA-256 (doc 13 §1). The length is validated because a truncated paste is
+   * otherwise indistinguishable from a wrong key until the first 401 — and that
+   * first 401 would happen at publish time, in front of a customer.
+   *
+   * Optional so a build box without it still compiles; absent at runtime means the
+   * connect buttons say so rather than starting a flow that cannot finish.
+   */
+  ZERNIO_API_KEY: z
+    .string()
+    .regex(/^sk_[0-9a-f]{64}$/, 'ZERNIO_API_KEY must be sk_ followed by 64 hex characters')
+    .optional(),
+  /**
+   * Absolute origin used to build the OAuth return URL we hand to Zernio. Vercel
+   * sets VERCEL_URL without a scheme and it differs per deployment, so this is
+   * explicit: a return URL pointing at the wrong origin sends the customer's
+   * browser somewhere that cannot finish the connection.
+   */
+  NEXT_PUBLIC_APP_URL: z.url().optional(),
 })
 
 export type WebEnv = z.infer<typeof EnvSchema>

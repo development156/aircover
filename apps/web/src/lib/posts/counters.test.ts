@@ -102,7 +102,10 @@ describe('meterFor — limit boundaries', () => {
 describe('meterFor — per-channel constraints', () => {
   test('flags instagram past its 30-hashtag cap', () => {
     const hashtags = Array.from({ length: 31 }, (_, i) => `#tag${i}`)
-    const meter = meterFor('instagram', draft({ body: 'Chai o clock', hashtags }))
+    // mediaCount: 1 because instagram now REQUIRES media — without it this draft
+    // would also carry MEDIA_REQUIRED and the assertion below would be about two
+    // rules at once instead of the hashtag cap.
+    const meter = meterFor('instagram', draft({ body: 'Chai o clock', hashtags, mediaCount: 1 }))
     expect(meter.violations.map((v) => v.code)).toEqual(['MAX_HASHTAGS'])
     expect(meter.violations[0]?.field).toBe('hashtags')
     expect(meter.over).toBe(false)
@@ -110,7 +113,15 @@ describe('meterFor — per-channel constraints', () => {
 
   test('leaves instagram alone at exactly 30 hashtags', () => {
     const hashtags = Array.from({ length: 30 }, (_, i) => `#tag${i}`)
-    expect(meterFor('instagram', draft({ body: 'Chai', hashtags })).violations).toEqual([])
+    expect(
+      meterFor('instagram', draft({ body: 'Chai', hashtags, mediaCount: 1 })).violations,
+    ).toEqual([])
+  })
+
+  test('flags instagram with no media — there is no text-only post', () => {
+    const meter = meterFor('instagram', draft({ body: 'Chai' }))
+    expect(meter.violations.map((v) => v.code)).toEqual(['MEDIA_REQUIRED'])
+    expect(meter.violations[0]?.field).toBe('media')
   })
 
   test('flags gbp for a second media item', () => {
@@ -148,23 +159,29 @@ describe('meterFor — per-channel constraints', () => {
 })
 
 describe('meterFor — publishability', () => {
-  test('surfaces instagram as not publishable', () => {
-    expect(meterFor('instagram', draft({ body: 'Chai' })).publishable).toBe(false)
-  })
-
-  test('surfaces the publishable channels as publishable', () => {
+  // CONTRACT CHANGE 2026-08-04: instagram publishes via the Zernio rail. It was
+  // preview-only because we had no Meta credential; Zernio holds that credential and
+  // filed the app review, so the flag flips.
+  test('surfaces every channel as publishable, instagram included', () => {
     expect(meterFor('x', draft()).publishable).toBe(true)
     expect(meterFor('gbp', draft()).publishable).toBe(true)
     expect(meterFor('linkedin', draft()).publishable).toBe(true)
+    expect(meterFor('instagram', draft({ mediaCount: 1 })).publishable).toBe(true)
   })
 
-  test('pins the accepted limitation: being unpublishable is not itself a violation', () => {
-    // instagram is preview-only in Alpha. The meter reports that as `publishable:false`
-    // so the UI can badge it, but it never becomes a constraint violation and never
-    // blocks. A future change to this behaviour must be deliberate.
-    const meter = meterFor('instagram', draft({ body: 'Chai' }))
+  test('an instagram draft with a photo is publishable and blocks nothing', () => {
+    const meter = meterFor('instagram', draft({ body: 'Chai', mediaCount: 1 }))
     expect(meter.violations).toEqual([])
     expect(blockingChannels([meter])).toEqual([])
+  })
+
+  test('an instagram draft WITHOUT a photo blocks — the flag flip made this real', () => {
+    // Previously unpublishability was "not itself a violation" and never blocked.
+    // Now the block comes from the media rule instead, which is the honest place
+    // for it: the post is impossible, not the channel.
+    const meter = meterFor('instagram', draft({ body: 'Chai' }))
+    expect(meter.violations.map((v) => v.code)).toEqual(['MEDIA_REQUIRED'])
+    expect(blockingChannels([meter])).toEqual(['instagram'])
   })
 })
 

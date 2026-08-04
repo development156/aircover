@@ -18,6 +18,7 @@ const state = vi.hoisted(() => ({
   post: null as { id: string; channels: Channel[] } | null,
   variants: [] as { id: string; channel: Channel; body: string; extras: unknown }[],
   publishCalls: [] as Channel[],
+  media: [] as { id: string }[],
 }))
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -31,6 +32,7 @@ vi.mock('@/lib/workspaces', () => ({
 vi.mock('@/lib/posts/read', () => ({
   getPost: () => Promise.resolve(state.post),
   listVariants: () => Promise.resolve(state.variants),
+  listMedia: () => Promise.resolve(state.media),
 }))
 
 vi.mock('@sahoda/publishing', () => ({
@@ -123,21 +125,24 @@ describe('simulatePublish', () => {
     expect(state.publishCalls).toEqual(['linkedin'])
   })
 
-  test('never simulates instagram, which the engine marks not publishable', async () => {
+  // CONTRACT CHANGE 2026-08-04: instagram publishes via Zernio, so it is no longer
+  // skipped as unpublishable. It is now BLOCKED when it has no photo, which is the
+  // honest place for the block — the post is impossible, not the channel.
+  test('blocks a photoless instagram post rather than skipping the channel', async () => {
     state.post = { id: POST_ID, channels: ['instagram'] }
     state.variants = [variant('instagram', 'A short caption.')]
 
     const result = await simulatePublish(POST_ID)
 
-    // Nothing to report is stated in words rather than returned as an empty
-    // success — an empty "Simulated" box would read as a clean preview.
-    expect(result.ok).toBe(false)
-    if (result.ok) return
-    expect(result.message).toMatch(/instagram/i)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.blocked.map((b) => b.channel)).toEqual(['instagram'])
+    expect(result.blocked[0]?.violations.map((v) => v.code)).toEqual(['MEDIA_REQUIRED'])
+    expect(result.simulated).toEqual([])
     expect(state.publishCalls).toEqual([])
   })
 
-  test('reports instagram as skipped alongside a channel that did simulate', async () => {
+  test('blocks photoless instagram alongside a channel that did simulate', async () => {
     state.post = { id: POST_ID, channels: ['x', 'instagram'] }
     state.variants = [variant('x', 'Fresh chai.'), variant('instagram', 'A short caption.')]
 
@@ -145,9 +150,9 @@ describe('simulatePublish', () => {
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.skipped.map((s) => s.channel)).toEqual(['instagram'])
+    expect(result.blocked.map((b) => b.channel)).toEqual(['instagram'])
     expect(result.simulated.map((s) => s.channel)).toEqual(['x'])
-    // Skipped is neither a pass nor a failure — it must not inflate either list.
+    // Blocked is neither a pass nor a skip — it must not inflate either list.
     expect(state.publishCalls).toEqual(['x'])
   })
 

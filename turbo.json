@@ -63,7 +63,9 @@
         "DEVOPS_INGEST_TOKEN",
         "ADMIN_BOOTSTRAP_EMAILS",
         "OPS_INGEST_URL",
-        "TURNSTILE_SECRET_KEY"
+        "TURNSTILE_SECRET_KEY",
+        "ZERNIO_API_KEY",
+        "NEXT_PUBLIC_APP_URL"
       ]
     },
     "dev": {

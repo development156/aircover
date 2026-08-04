@@ -107,8 +107,26 @@ export type MemoryEventStatus = z.infer<typeof MemoryEventStatusSchema>
 export const PlannerEventKindSchema = z.enum(['note', 'festival', 'custom'])
 export type PlannerEventKind = z.infer<typeof PlannerEventKindSchema>
 
-/** OAuth-connected platforms in Alpha. */
-export const ConnectionPlatformSchema = z.enum(['x', 'gbp', 'linkedin'])
+/**
+ * Platforms that can hold a row in `connections`.
+ *
+ * Two KINDS of connection now live under one vocabulary, and the difference is a
+ * security property rather than a detail:
+ *   · x | gbp | linkedin — an OAuth grant WE hold. Mandatory `connection_secrets`
+ *     row; written only by `upsert_connection`, which raises INVALID_SECRET without
+ *     a sealed token.
+ *   · instagram — a REFERENCE to an account ZERNIO holds. No `connection_secrets`
+ *     row at all; written only by `upsert_zernio_connection`. Zernio owns the Meta
+ *     token and our app never sees one (doc 13 §7).
+ *
+ * Still deliberately NOT the same set as `Channel`: a channel we can address is not
+ * the same as a channel we can hold a binding for. They coincide today at four
+ * values; do not collapse them.
+ *
+ * MUST MOVE TOGETHER with `connections_platform_check` and the p_platform guard in
+ * `upsert_connection`.
+ */
+export const ConnectionPlatformSchema = z.enum(['x', 'gbp', 'linkedin', 'instagram'])
 export type ConnectionPlatform = z.infer<typeof ConnectionPlatformSchema>
 
 export const ConnectionStatusSchema = z.enum(['active', 'expired', 'revoked', 'error'])

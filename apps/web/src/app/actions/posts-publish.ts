@@ -6,7 +6,7 @@ import { CONSTRAINTS, formatForPlatform, validateVariant, type Channel } from '@
 
 import { reportServerError } from '@/lib/observability/report'
 import { hasLink } from '@/lib/posts/detect-link'
-import { getPost, listVariants } from '@/lib/posts/read'
+import { getPost, listMedia, listVariants } from '@/lib/posts/read'
 import { parseExtras } from '@/lib/posts/variant-extras'
 import type {
   BlockedPublish,
@@ -62,7 +62,10 @@ export async function simulatePublish(postId: string): Promise<PublishState> {
     const post = await getPost(postId)
     if (!post) return { ok: false, message: "You don't have access to this post." }
 
-    const stored = await listVariants(postId)
+    // Instagram REQUIRES media, so the preview has to know what is attached. Without
+    // this the meter would report MEDIA_REQUIRED on every instagram post, including
+    // the ones that have a photo.
+    const [stored, media] = await Promise.all([listVariants(postId), listMedia(postId)])
     if (stored.length === 0) {
       return { ok: false, message: 'Add at least one channel variant to preview publishing.' }
     }
@@ -84,8 +87,9 @@ export async function simulatePublish(postId: string): Promise<PublishState> {
       const channel: Channel = variant.channel
       const spec = CONSTRAINTS[channel]
 
-      // instagram is publishable:false in the frozen engine — simulating it
-      // would imply a path that does not exist on any adapter.
+      // Every channel is publishable now that instagram routes through Zernio. The
+      // check stays because the engine still owns the answer and a future channel
+      // may arrive before its adapter does.
       if (!spec.publishable) {
         skipped.push({ channel, reason: 'not-publishable' })
         continue
@@ -96,6 +100,7 @@ export async function simulatePublish(postId: string): Promise<PublishState> {
         body: variant.body,
         hashtags: extras.hashtags,
         hasLink: hasLink(variant.body),
+        mediaCount: media.length,
       }
 
       // The real gate. Must run BEFORE the fixture, which accepts anything.
