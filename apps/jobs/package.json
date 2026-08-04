@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./sweeps": "./src/sweeps.ts"
+    "./sweeps": "./src/sweeps.ts",
+    "./publish": "./src/publish.ts"
   },
   "types": "./src/index.ts",
   "scripts": {

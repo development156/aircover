@@ -6,6 +6,7 @@ import type { GeneratedVariant } from '@/lib/posts/state'
 
 import { ChannelPicker } from './channel-picker'
 import { GeneratePanel } from './generate-panel'
+import { PublishNow } from './publish-now'
 import { PublishPreview } from './publish-preview'
 import { ScheduleField } from './schedule-field'
 
@@ -51,8 +52,11 @@ export function BottomBar({
         <ScheduleField channels={channels} value={scheduledAt} onChange={onScheduleChange} />
       </div>
 
-      <div className="border-t border-line pt-4">
+      <div className="space-y-4 border-t border-line pt-4">
         <PublishPreview postId={postId} />
+        {/* Below the dry run on purpose: the preview is the rehearsal, this is the
+            performance, and the order on screen matches the order they belong in. */}
+        <PublishNow postId={postId} channels={channels} flush={flush} />
       </div>
     </section>
   )

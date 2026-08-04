@@ -5,6 +5,7 @@ import {
   validateVariant,
   type Channel,
   type PublishAdapter,
+  type MediaRef,
   type PublishPostPayload,
   type PublishRequestMedia,
 } from '@sahoda/shared'
@@ -68,6 +69,15 @@ export interface PublishPostDeps {
   loadVariant(payload: PublishPostPayload): Promise<PublishVariant | null>
   resolveConnection(payload: PublishPostPayload): Promise<ResolvedConnection>
   adapterFor(channel: Channel): PublishAdapter
+  /**
+   * Turn `post_media` attachments into URLs the platform can fetch.
+   *
+   * Optional, and absent means `[]` — which is correct for every channel that takes
+   * its bytes to the platform directly. It is NOT correct for instagram, which
+   * receives a URL and nothing else; without this wired, `content.media` is empty and
+   * the adapter refuses the post with MEDIA_REQUIRED.
+   */
+  hostMedia?(channel: Channel, media: PublishRequestMedia[]): Promise<MediaRef[]>
   writeLog(entry: PublishLogEntry): Promise<void>
   markVariant(update: VariantUpdate): Promise<void>
   /** Flip connections.status so the UI can raise a reconnect CTA. */
@@ -169,25 +179,38 @@ export async function runPublishPost(
     return fail('CONNECTION_UNAVAILABLE', messageOf(e), null)
   }
 
-  const request = {
-    workspaceId: payload.workspaceId,
-    postId: payload.postId,
-    variantId: variant.variantId,
-    content: formatForPlatform(spec, {
-      body: variant.body,
-      hashtags: variant.hashtags,
-      hasLink: variant.hasLink,
-      mediaCount: variant.media.length,
-    }),
-    media: variant.media,
-    auth: {
-      connectionId: connection.connectionId,
-      accessToken: connection.accessToken,
-      externalAccountId: connection.externalAccountId,
-    },
-  }
-
   try {
+    // Hosting runs INSIDE the try, and after validateVariant, on purpose. Inside, so a
+    // failed upload is classified and logged by the same path as a failed publish —
+    // otherwise a permanently-unusable file would be retried forever. After, so we
+    // never pay to upload the media of a variant the Constraint Engine has already
+    // rejected.
+    const hosted: MediaRef[] = deps.hostMedia
+      ? await deps.hostMedia(payload.channel, variant.media)
+      : []
+
+    const request = {
+      workspaceId: payload.workspaceId,
+      postId: payload.postId,
+      variantId: variant.variantId,
+      content: formatForPlatform(
+        spec,
+        {
+          body: variant.body,
+          hashtags: variant.hashtags,
+          hasLink: variant.hasLink,
+          mediaCount: variant.media.length,
+        },
+        hosted,
+      ),
+      media: variant.media,
+      auth: {
+        connectionId: connection.connectionId,
+        accessToken: connection.accessToken,
+        externalAccountId: connection.externalAccountId,
+      },
+    }
+
     const result = await deps.adapterFor(payload.channel).publish(request)
 
     // The adapter's own mode is authoritative: a fixture result is recorded as a fixture

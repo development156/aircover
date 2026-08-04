@@ -3,38 +3,20 @@
   "ui": "stream",
   "tasks": {
     "typecheck": {
-      "dependsOn": [
-        "^typecheck"
-      ]
+      "dependsOn": ["^typecheck"]
     },
     "lint": {},
     "test": {
-      "dependsOn": [
-        "^typecheck"
-      ],
-      "env": [
-        "SAHODA_ALLOW_LIVE_TESTS"
-      ]
+      "dependsOn": ["^typecheck"],
+      "env": ["SAHODA_ALLOW_LIVE_TESTS"]
     },
     "build": {
-      "dependsOn": [
-        "^build"
-      ],
-      "outputs": [
-        "dist/**",
-        ".next/**",
-        "!.next/cache/**"
-      ]
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "@sahoda/web#build": {
-      "dependsOn": [
-        "^build"
-      ],
-      "outputs": [
-        "dist/**",
-        ".next/**",
-        "!.next/cache/**"
-      ],
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
       "env": [
         "CLERK_SECRET_KEY",
         "CLERK_WEBHOOK_SECRET",
