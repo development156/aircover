@@ -28,6 +28,9 @@ export const STATUS_STYLES = {
   scheduled: { label: 'Scheduled', className: 'bg-warn-bg text-warn' },
   publishing: { label: 'Publishing', className: 'bg-warn-bg text-warn' },
   published: { label: 'Published', className: 'bg-ok-bg text-ok' },
+  // Deliberately not green and not red: it is genuinely both, and a colour that
+  // picks a side would be the flattening this status exists to avoid.
+  partial: { label: 'Partly published', className: 'bg-warn-bg text-warn' },
   failed: { label: 'Failed', className: 'bg-danger-bg text-danger' },
   expired: { label: 'Expired', className: 'bg-s2 text-muted' },
 } satisfies Record<PostStatus, StatusStyle>

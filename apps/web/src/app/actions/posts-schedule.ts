@@ -27,7 +27,8 @@ import { getActiveWorkspace } from '@/lib/workspaces'
  * none of them can mark a post published.
  */
 
-export type ScheduleState = { ok: true; scheduledAt: string | null } | { ok: false; message: string }
+export type ScheduleState =
+  { ok: true; scheduledAt: string | null } | { ok: false; message: string }
 
 /** Map a Postgres raise into copy a person can act on. */
 function messageFor(raw: string | undefined): string {

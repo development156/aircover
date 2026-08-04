@@ -159,7 +159,7 @@ export function createDispatchStore(opts: DispatchStoreOptions) {
   async function settlePost(
     postId: string,
     workspaceId: string,
-    status: 'published' | 'failed',
+    status: 'published' | 'partial' | 'failed',
   ): Promise<boolean> {
     const r = await pool.query(
       `update posts

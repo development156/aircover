@@ -10,6 +10,8 @@ import { Textarea } from '@/components/ui/textarea'
 import type { MediaPreview } from '@/lib/posts/media-url'
 import { selectedText, spliceSelection, type SelectionRange } from '@/lib/posts/splice-selection'
 
+import { variantStatusRows } from '@/lib/posts/variant-status'
+
 import { BottomBar } from './bottom-bar'
 import { InlineError } from './inline-error'
 import { InlineRewrite } from './inline-rewrite'
@@ -55,6 +57,10 @@ export function PostEditor({
 }: PostEditorProps): React.JSX.Element {
   const autosave = useAutosave(post.id, post)
   const variantsApi = useVariants(post.id, variants)
+  // Server-owned publish state, straight off the rows — deliberately NOT from
+  // `variantsApi`, which holds the writer's unsaved drafts. What a channel is
+  // doing on a platform is not something the editor may have an opinion about.
+  const statusRows = variantStatusRows(post.channels, variants)
   const [selection, setSelection] = useState<SelectionRange | null>(null)
 
   const { draft } = autosave
@@ -199,6 +205,7 @@ export function PostEditor({
         onScheduleChange={(scheduledAt) => autosave.update({ scheduledAt })}
         flush={autosave.flush}
         saveVariantNow={variantsApi.saveNow}
+        statusRows={statusRows}
         onGenerated={variantsApi.applyGenerated}
       />
     </div>

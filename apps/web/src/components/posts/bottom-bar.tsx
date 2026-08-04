@@ -3,6 +3,7 @@
 import type { Channel } from '@sahoda/shared'
 
 import type { GeneratedVariant } from '@/lib/posts/state'
+import type { VariantStatusRow } from '@/lib/posts/variant-status'
 
 import { ChannelPicker } from './channel-picker'
 import { GeneratePanel } from './generate-panel'
@@ -23,6 +24,8 @@ export interface BottomBarProps {
    * one that has to be current before anything goes out.
    */
   saveVariantNow: (channel: Channel) => Promise<boolean>
+  /** Per-channel publish state, read from post_variants on the server. */
+  statusRows: readonly VariantStatusRow[]
   onGenerated: (variants: GeneratedVariant[]) => void
 }
 
@@ -41,6 +44,7 @@ export function BottomBar({
   onScheduleChange,
   flush,
   saveVariantNow,
+  statusRows,
   onGenerated,
 }: BottomBarProps) {
   return (
@@ -68,6 +72,7 @@ export function BottomBar({
           channels={channels}
           flush={flush}
           saveVariantNow={saveVariantNow}
+          statusRows={statusRows}
         />
       </div>
     </section>

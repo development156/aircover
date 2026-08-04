@@ -52,7 +52,6 @@ export type HoldReason =
   | 'in-flight'
   | 'no-variants'
   | 'nothing-attemptable'
-  | 'partial-needs-per-channel-ui'
   | 'fixture-publish'
   | 'unknown-publish-mode'
 
@@ -64,7 +63,7 @@ interface DecisionBase {
 export type DispatchDecision =
   | (DecisionBase & { kind: 'dispatch'; variants: DispatchVariantIntent[] })
   | (DecisionBase & { kind: 'expire'; reason: 'past-grace' | 'no-variants-past-grace' })
-  | (DecisionBase & { kind: 'settle'; status: 'published' | 'failed' })
+  | (DecisionBase & { kind: 'settle'; status: 'published' | 'partial' | 'failed' })
   | (DecisionBase & {
       kind: 'hold'
       reason: HoldReason
@@ -152,8 +151,11 @@ export function classifyCandidate(
       }
     }
 
-    // Past grace with work still outstanding: those channels are never going out.
-    if (published.length > 0) return hold('partial-needs-per-channel-ui')
+    // Past grace with work still outstanding. Those channels are never going out —
+    // but something already did, so this post is partly live and must be settled
+    // as such. It used to hold here, which meant every later sweep reached the
+    // same branch and held again: a post nobody would ever get an answer about.
+    if (published.length > 0) return { ...base, kind: 'settle', status: 'partial' }
     return { ...base, kind: 'expire', reason: 'past-grace' }
   }
 
@@ -183,10 +185,11 @@ export function classifyCandidate(
   if (published.some((v) => v.publishedMode !== 'live')) return hold('fixture-publish')
 
   // Skipped channels are excluded from the denominator: the post went out everywhere it
-  // was meant to. A failed sibling is a different story — that is a partial, and until
-  // apps/web can say "went out on X, did not go out on Google" there is no honest badge
-  // for it, so it waits rather than being flattened to `failed`.
-  if (failed.length > 0) return hold('partial-needs-per-channel-ui')
+  // was meant to. A failed sibling is a different story — that is a partial, and it now
+  // has its own status rather than waiting for one. It is NOT flattened to `failed`
+  // (which would deny a channel that is live) or to `published` (which would hide one
+  // that never went); apps/web renders the per-channel breakdown underneath it.
+  if (failed.length > 0) return { ...base, kind: 'settle', status: 'partial' }
 
   return { ...base, kind: 'settle', status: 'published' }
 }

@@ -7,6 +7,9 @@ import type { Channel } from '@sahoda/shared'
 
 import { Button } from '@/components/ui/button'
 import { LIVE_RAIL } from '@/lib/posts/live-rail'
+import type { VariantStatusRow } from '@/lib/posts/variant-status'
+
+import { ChannelStatusList } from './channel-status-list'
 
 import { CHANNEL_LABELS } from './channel-label'
 import { InlineError } from './inline-error'
@@ -25,6 +28,14 @@ export interface PublishNowProps {
   flush: () => Promise<boolean>
   /** Persist the channel variant that is actually about to be sent. */
   saveVariantNow: (channel: Channel) => Promise<boolean>
+  /**
+   * What each channel is doing right now, straight off post_variants.
+   *
+   * One post can be live on Instagram and failed on X at the same moment, and
+   * this is where that is said. A single success banner over a post that half
+   * worked is the thing this whole surface exists to prevent.
+   */
+  statusRows: readonly VariantStatusRow[]
 }
 
 interface Published {
@@ -47,16 +58,25 @@ interface Published {
  * Edits are flushed BEFORE the request. Publishing what is in the database while
  * the writer looks at something newer on screen would put out the wrong words.
  */
-export function PublishNow({ postId, channels, flush, saveVariantNow }: PublishNowProps) {
+export function PublishNow({
+  postId,
+  channels,
+  flush,
+  saveVariantNow,
+  statusRows,
+}: PublishNowProps) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [published, setPublished] = useState<Published | null>(null)
 
   const live = channels.filter((channel) => LIVE_RAIL.has(channel))
+  const anyAttempted = statusRows.some((row) => row.status !== 'pending')
 
-  // Nothing to offer: say so plainly rather than showing a button that cannot work.
-  if (live.length === 0) return null
+  // Nothing to publish and nothing to report. A button that cannot work is worse
+  // than no button, and an empty status list reads as "all fine" when it is "not
+  // started".
+  if (live.length === 0 && !anyAttempted) return null
 
   function run(channel: Channel) {
     setError(null)
@@ -119,7 +139,22 @@ export function PublishNow({ postId, channels, flush, saveVariantNow }: PublishN
 
   return (
     <div className="space-y-2" data-guide="post-publish-now">
-      {pending ? (
+      {/* Above the button: what already happened comes before what to do next.
+          A retry offered without the failure beside it is a button with no reason. */}
+      {anyAttempted ? (
+        <ChannelStatusList
+          rows={statusRows}
+          renderRetry={(row) =>
+            row.status === 'failed' && LIVE_RAIL.has(row.channel) ? (
+              <Button size="sm" variant="secondary" onClick={() => run(row.channel)}>
+                Try again
+              </Button>
+            ) : null
+          }
+        />
+      ) : null}
+
+      {live.length === 0 ? null : pending ? (
         <PendingLines lines={PENDING_LINES} />
       ) : (
         <div className="flex flex-wrap gap-2">

@@ -176,16 +176,35 @@ describe('runDispatchSweep — applying decisions', () => {
     const d = deps({
       listCandidates: async () => [
         candidate('p1', 10, [variant('x', 'published', 'fixture')]),
-        candidate('p2', 10, [variant('x', 'published', 'live'), variant('gbp', 'failed')]),
-        candidate('p3', 10, [variant('x', 'published', 'fixture')]),
+        candidate('p2', 10, [variant('x', 'published', 'fixture')]),
       ],
     })
 
     const report = await runDispatchSweep(d)
 
-    expect(report.held).toBe(3)
+    expect(report.held).toBe(2)
     expect(report.holdsByReason['fixture-publish']).toBe(2)
-    expect(report.holdsByReason['partial-needs-per-channel-ui']).toBe(1)
+  })
+
+  it('settles a post that went out on one channel and failed on another as partial', async () => {
+    // This used to hold on `partial-needs-per-channel-ui` — and a hold is not a
+    // resting state, so every later sweep reached the same branch and held again.
+    // The post never left the candidate query and its owner never got an answer.
+    const settlePost = vi.fn(async () => true)
+    const d = deps({
+      listCandidates: async () => [
+        candidate('p1', 10, [variant('x', 'published', 'live'), variant('gbp', 'failed')]),
+      ],
+      settlePost,
+    })
+
+    const report = await runDispatchSweep(d)
+
+    expect(report.held).toBe(0)
+    expect(report.settled).toBe(1)
+    // Not 'failed' — that would deny a channel that is live. Not 'published' —
+    // that would hide one that never went out.
+    expect(settlePost).toHaveBeenCalledWith('p1', 'ws-1', 'partial')
   })
 })
 

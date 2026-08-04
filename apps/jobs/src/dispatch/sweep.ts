@@ -29,7 +29,11 @@ export interface DispatchSweepDeps {
    * refusal, not an error, and it must not be counted as work done.
    */
   expirePost(postId: string, workspaceId: string): Promise<boolean>
-  settlePost(postId: string, workspaceId: string, status: 'published' | 'failed'): Promise<boolean>
+  settlePost(
+    postId: string,
+    workspaceId: string,
+    status: 'published' | 'partial' | 'failed',
+  ): Promise<boolean>
   now?(): Date
 }
 

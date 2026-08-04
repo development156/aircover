@@ -260,21 +260,26 @@ describe('classifyCandidate — channels this release cannot publish', () => {
     expect(decide(candidate(120, [variant('instagram', 'pending')])).kind).toBe('expire')
   })
 
-  /** Ruling 2's conditional: apps/web has no per-channel surface, so partials wait. */
-  it('holds a partial publish instead of settling it to failed', () => {
+  /**
+   * Ruling 2's conditional is now satisfied: apps/web HAS a per-channel surface,
+   * and `partial` is a real post status. These used to hold — and a hold is not a
+   * resting state, so the post was re-read and held again on every sweep, forever.
+   */
+  it('settles a partial publish as partial, not as failed', () => {
     const d = decide(candidate(10, [variant('x', 'published', 'live'), variant('gbp', 'failed')]))
 
-    expect(d.kind).toBe('hold')
-    if (d.kind !== 'hold') return
-    expect(d.reason).toBe('partial-needs-per-channel-ui')
+    expect(d.kind).toBe('settle')
+    if (d.kind !== 'settle') return
+    // 'failed' would deny a channel that is live on the internet right now.
+    expect(d.status).toBe('partial')
   })
 
-  it('holds a past-grace partial too — the unsent channel never will be sent', () => {
+  it('settles a past-grace partial too — the unsent channel never will be sent', () => {
     const d = decide(candidate(120, [variant('x', 'published', 'live'), variant('gbp', 'pending')]))
 
-    expect(d.kind).toBe('hold')
-    if (d.kind !== 'hold') return
-    expect(d.reason).toBe('partial-needs-per-channel-ui')
+    expect(d.kind).toBe('settle')
+    if (d.kind !== 'settle') return
+    expect(d.status).toBe('partial')
   })
 
   /** Ruling 3: the post status may not outrun the mode recorded on the variant's log. */
@@ -306,8 +311,10 @@ describe('classifyCandidate — channels this release cannot publish', () => {
     expect(d.reason).toBe('unknown-publish-mode')
   })
 
-  it('reports which channels went out and which did not on a held partial', () => {
-    // The owner reviews this in report mode; a bare "partial" would not be reviewable.
+  it('counts a skipped channel as neither published nor a reason to fail', () => {
+    // A skipped channel is not a channel that failed — the post went out
+    // everywhere it was meant to go. Only the genuinely failed gbp makes this a
+    // partial; without it this would settle as a clean `published`.
     const d = decide(
       candidate(10, [
         variant('x', 'published', 'live'),
@@ -316,9 +323,17 @@ describe('classifyCandidate — channels this release cannot publish', () => {
       ]),
     )
 
-    expect(d.kind).toBe('hold')
-    if (d.kind !== 'hold') return
-    expect(d.publishedChannels).toEqual(['x'])
-    expect(d.unpublishedChannels).toEqual(['gbp', 'linkedin'])
+    expect(d.kind).toBe('settle')
+    if (d.kind !== 'settle') return
+    expect(d.status).toBe('partial')
+
+    // Per channel, the truth lives on post_variants and is read by the editor's
+    // channel-status list — the decision itself carries only the post-level answer.
+    const clean = decide(
+      candidate(10, [variant('x', 'published', 'live'), variant('linkedin', 'skipped')]),
+    )
+    expect(clean.kind).toBe('settle')
+    if (clean.kind !== 'settle') return
+    expect(clean.status).toBe('published')
   })
 })

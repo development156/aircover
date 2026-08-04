@@ -18,6 +18,9 @@ describe('canApprove', () => {
     scheduled: false,
     publishing: false,
     published: false,
+    // Terminal, like published: part of it is already on a platform, so there is
+    // nothing left to approve.
+    partial: false,
     failed: false,
     expired: false,
   }

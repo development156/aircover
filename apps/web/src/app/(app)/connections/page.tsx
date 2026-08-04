@@ -2,6 +2,7 @@ import { Link2 } from 'lucide-react'
 import type { ConnectionPlatform } from '@sahoda/shared'
 
 import { ConnectButton } from '@/components/connections/connect-button'
+import { ConnectionHealthBanner } from '@/components/connections/connection-health-banner'
 import { ConnectionRow } from '@/components/connections/connection-row'
 import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
@@ -52,13 +53,18 @@ export default async function ConnectionsPage() {
           body="Your connected accounts will be listed here with live status, and disconnecting always works from this screen."
         />
       ) : (
-        <ul className="space-y-2" data-guide="connections.list">
-          {connections.map((connection) => (
-            <li key={connection.id}>
-              <ConnectionRow connection={connection} />
-            </li>
-          ))}
-        </ul>
+        <>
+          {/* Above the list: someone scanning for "is anything wrong" should not have
+              to read every row to find out. */}
+          <ConnectionHealthBanner connections={connections} />
+          <ul className="space-y-2" data-guide="connections.list">
+            {connections.map((connection) => (
+              <li key={connection.id}>
+                <ConnectionRow connection={connection} />
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       <section className="space-y-3 rounded-card border border-line bg-bg p-4 shadow-card">

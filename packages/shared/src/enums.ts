@@ -17,6 +17,15 @@ export const PostStatusSchema = z.enum([
   'scheduled',
   'publishing',
   'published',
+  /**
+   * Live on at least one channel and definitively NOT going out on another.
+   *
+   * Terminal, and recorded rather than flattened: 'failed' would tell someone
+   * their post did not go out while it is live on Instagram, and 'published'
+   * would hide a channel that silently never went. The dispatcher used to hold
+   * these forever for want of this value.
+   */
+  'partial',
   'failed',
   'expired',
 ])

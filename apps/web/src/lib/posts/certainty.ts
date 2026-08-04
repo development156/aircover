@@ -69,12 +69,21 @@ export function certaintyFor(status: PostStatus, mode: PostPublishMode): Certain
       return { level: 'proposed', label: null }
     case 'failed':
       return { level: 'failed', label: null }
-    // No UI is built for these four — no code path writes them today (Phase A
-    // audit; see schedule-status-reachability.test.ts). They stay mapped so the
-    // switch remains exhaustive over PostStatus, and they make no claim.
-    case 'review':
+    // Partly out. `real` would claim the whole post is live; `failed` would deny
+    // the channel that is. `committed` under-claims, which this module's own rule
+    // says to prefer — and the per-channel breakdown is where `.is-real` belongs,
+    // on the one channel that earned it.
+    case 'partial':
+      return { level: 'committed', label: null }
+    // Both are now written for real: `scheduled` by release_post_for_publish and
+    // `publishing` by the dispatcher's claim. The user has committed to a time and
+    // the work is under way — a claim about intent, not about the world.
     case 'scheduled':
     case 'publishing':
+      return { level: 'committed', label: null }
+    // No UI is built for these two, and no code path writes them today. They stay
+    // mapped so the switch remains exhaustive over PostStatus, and claim nothing.
+    case 'review':
     case 'expired':
       return { level: 'neutral', label: null }
   }
