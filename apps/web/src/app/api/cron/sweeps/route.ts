@@ -1,10 +1,10 @@
 import {
-  PublishQueueUnavailableError,
   dispatchSweepDeps,
   holdSweepDeps,
   runDispatchSweep,
   sweepExpiredHolds,
 } from '@sahoda/jobs/sweeps'
+import { publishPostDeps, runClaimedPublish } from '@sahoda/jobs/publish'
 
 import { isAuthorizedCronRequest } from '@/lib/cron/authorize'
 import { runCronSweeps } from '@/lib/cron/run-sweeps'
@@ -18,12 +18,18 @@ import { reportServerError } from '@/lib/observability/report'
  * workspace packages. This is the fallback apps/jobs/CLAUDE.md already sanctions, and it
  * is a wrapper swap rather than a rewrite because both job cores are free of that SDK.
  *
- * WHAT THIS DOES NOT DO: publish. `enqueuePublish` refuses in the open, because there is
- * no queue behind this route and no CAS claim on post_variants to make an inline publish
- * safe when two invocations overlap — and Vercel documents that cron can both duplicate
- * and miss deliveries. A due post is therefore classified, counted under
- * `queueUnavailable`, and left exactly as it was. Publishing stays disabled until that
- * claim exists.
+ * THIS ROUTE NOW PUBLISHES. It refused to for as long as there was no claim on
+ * post_variants: Vercel documents that cron can both duplicate and miss deliveries, and
+ * an inline publish with two overlapping invocations is two posts on someone's Instagram.
+ * `runClaimedPublish` closes that — the claim is a single atomic UPDATE, so of two
+ * overlapping ticks exactly one owns the variant and the other does nothing at all. The
+ * publish happens inline because there is still no queue; the claim is what makes inline
+ * safe, and it is the only thing that does.
+ *
+ * Work per tick is capped separately from the classification batch. Classifying 25 posts
+ * costs three statements; PUBLISHING 25 would be 25 Instagram container polls at ~36s
+ * each, which no serverless wall accommodates. Whatever does not fit is counted as
+ * `deferred` and picked up by the next tick — never silently dropped.
  *
  * Both sweeps are behind their own flags and both default to `off`, so deploying this
  * route changes production behaviour by exactly nothing until a flag is flipped.
@@ -40,11 +46,14 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
- * Well inside the platform ceiling (300s on both Hobby and Pro with Fluid compute) and
- * inside the cron interval. A wedged tick dies in one minute and the next tick re-reads
- * its candidates, rather than straddling five intervals while holding nothing useful.
+ * The platform ceiling (300s on both Hobby and Pro with Fluid compute), and still inside
+ * the five-minute cron interval so a tick cannot straddle the next one.
+ *
+ * Raised from 60 because this route publishes now. One Instagram publish is ~50s of
+ * container polling and media upload; 60s could not fit a single one alongside the
+ * sweeps. See PUBLISH_BATCH for how the number of publishes is bounded to match.
  */
-export const maxDuration = 60
+export const maxDuration = 300
 
 /**
  * How much work one tick takes on. Both candidate queries are oldest-first, so a backlog
@@ -54,6 +63,21 @@ export const maxDuration = 60
  */
 const DISPATCH_BATCH = 25
 const HOLD_BATCH = 50
+
+/**
+ * How many variants one tick may actually publish.
+ *
+ * The binding constraint is wall-clock, not database work: an Instagram publish spends
+ * ~36s polling for its live URL plus the media upload, so each one is ~50s. Four of them
+ * is ~200s, which leaves room inside `maxDuration` for the classification pass and the
+ * hold sweep with margin for a slow cold start.
+ *
+ * A backlog is not lost, it is DEFERRED: the claim is released or the variant is left
+ * pending, `posts.scheduled_at` has not moved, and the next tick five minutes later
+ * re-reads the same candidates oldest-first. The count is reported so a backlog is
+ * visible rather than being mistaken for an idle queue.
+ */
+const PUBLISH_BATCH = 4
 
 export async function GET(request: Request): Promise<Response> {
   // FIRST STATEMENT IN THE HANDLER, AND IT MUST STAY FIRST. This route is excluded from
@@ -72,12 +96,31 @@ export async function GET(request: Request): Promise<Response> {
 
   const outcome = await runCronSweeps({
     runDispatch: () =>
-      runDispatchSweep({
-        ...dispatchSweepDeps({ limit: DISPATCH_BATCH }),
-        enqueuePublish: async () => {
-          throw new PublishQueueUnavailableError()
-        },
-      }),
+      (async () => {
+        // One deps object for the whole tick: it holds the connection pool and the
+        // Zernio client, and rebuilding it per variant would open a pool per publish.
+        const deps = publishPostDeps()
+        let published = 0
+        let deferred = 0
+
+        const report = await runDispatchSweep({
+          ...dispatchSweepDeps({ limit: DISPATCH_BATCH }),
+          enqueuePublish: async (intent) => {
+            if (published >= PUBLISH_BATCH) {
+              deferred += 1
+              return
+            }
+            published += 1
+            // Errors are deliberately NOT caught here. A transient failure must
+            // propagate so `runDispatchSweep` counts it and `runClaimedPublish` has
+            // already handed the claim back — swallowing it would report a tick that
+            // published nothing as a clean sweep.
+            await runClaimedPublish(intent, { attempt: 1, jobRunId: `cron:${intent.postId}` }, deps)
+          },
+        })
+
+        return { ...report, published, deferred }
+      })(),
     runHolds: () => sweepExpiredHolds(holdSweepDeps({ limit: HOLD_BATCH })),
     // The real error goes to Sentry; the response says only which sweep failed, because
     // a database error message can carry a connection string, a host or a query.

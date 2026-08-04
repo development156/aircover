@@ -4,10 +4,10 @@ import { createPublishStore } from './store'
 import { createAdapterSelector } from './adapters'
 import { createStorageReader, createZernioMediaHost } from './media'
 import { createConnectionResolver } from './tokens'
-import type { PublishPostDeps } from './runPublishPost'
+import type { ClaimedPublishDeps } from './runClaimedPublish'
 
 /** Dependencies for one publishPost attempt. */
-export function publishPostDeps(): PublishPostDeps {
+export function publishPostDeps(): ClaimedPublishDeps {
   const { env, pool } = getRuntime()
   const store = createPublishStore({ pool })
   const transport = fetchTransport()
@@ -31,6 +31,10 @@ export function publishPostDeps(): PublishPostDeps {
   return {
     mode: env.publishMode,
     loadVariant: store.loadVariant,
+    // The concurrency seam. Without these two a second cron tick publishes the
+    // same post again, which is the failure this whole path exists to prevent.
+    claimVariant: store.claimVariant,
+    releaseVariant: store.releaseVariant,
     // openSecret is intentionally unwired: packages/publishing exports no vault opener,
     // so a live publish fails honestly instead of inventing a token (see REQUESTS.md).
     resolveConnection: createConnectionResolver({ loadConnection: store.loadConnection }),

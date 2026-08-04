@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { auth } from '@clerk/nextjs/server'
-import { publishPostDeps, runPublishPost } from '@sahoda/jobs/publish'
+import { publishPostDeps, runClaimedPublish } from '@sahoda/jobs/publish'
 import { ChannelSchema, type Channel } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
 import { getPost, listVariants } from '@/lib/posts/read'
+import { createServerSupabase } from '@/lib/supabase/server'
 import { canPublish, getWorkspaceRole } from '@/lib/workspace-role'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
@@ -19,19 +20,17 @@ import { getActiveWorkspace } from '@/lib/workspaces'
  * itself (`@sahoda/jobs/publish`), which owns the service-role pool, exactly as the
  * cron sweeps route already does.
  *
- * ── WHY IT IS A ROUTE AND NOT THE SCHEDULER ───────────────────────────────────
- * There is no runner behind the scheduled path: `enqueuePublish` in the cron route
- * throws `PublishQueueUnavailableError` in the open, because Vercel cron can duplicate
- * and miss deliveries and no CAS claim on `post_variants` exists to make an inline
- * sweep publish safe. A user pressing a button is a different situation — it is one
- * request, synchronous, and the person is standing there watching it. That is the
- * publish path that can be honest today, so it is the one that exists.
+ * ── HOW THIS AND THE SCHEDULED SWEEP AVOID PUBLISHING THE SAME POST TWICE ─────
+ * They race for the same claim, and exactly one of them wins. `runClaimedPublish`
+ * takes an atomic claim on the variant before it does anything; the loser gets
+ * `claimed: false` and reports 409 without attempting a thing. That covers a
+ * double-click, and it covers the far more dangerous case of someone pressing
+ * Publish at the same minute the cron tick reaches the post.
  *
- * Duplicate suppression comes from Zernio rather than from a database claim: the
- * adapter sends `sahoda:{variantId}:{accountId}` as the request id, and a repeat comes
- * back as `existingPost` — the same platform post, not a second one. A double-click
- * therefore converges on one Instagram post. That is weaker than a CAS claim and it is
- * stated plainly here rather than assumed.
+ * Zernio's request id is the second line, not the first: same post, same scheduled
+ * minute, same key, so a repeat inside their five-minute window comes back as
+ * `existingPost` rather than a new one. Two independent mechanisms, one database
+ * and one platform, and neither is asked to carry the guarantee alone.
  */
 
 /** pg needs a real Node runtime; the Edge runtime cannot open a TCP socket to Postgres. */
@@ -114,19 +113,49 @@ export async function POST(
       )
     }
 
-    const outcome = await runPublishPost(
-      {
-        workspaceId: workspace.id,
-        postId,
-        variantId: variant.id,
-        channel,
-        // Publish-now has no schedule. The field is required by the payload contract
-        // and is recorded as the moment the person asked for it, which is the truth.
-        scheduledAt: new Date().toISOString(),
-      },
+    // ── RELEASE THE POST BEFORE PUBLISHING IT ─────────────────────────────────
+    // Two things depend on this and neither is optional. The tenant guard
+    // (`assert_account_for_scheduled_post`) refuses any post outside the
+    // dispatchable statuses, and posts are created 'draft'. And `scheduled_at` is
+    // the third term of the idempotency key, so it has to be written ONCE and read
+    // back — a timestamp minted here would differ between two rapid presses and
+    // Zernio would accept both as separate posts.
+    //
+    // The RPC is idempotent: `coalesce(scheduled_at, now())` means the first caller
+    // sets it and every later one reads what the first one wrote.
+    const supabase = createServerSupabase()
+    const { data: released, error: releaseError } = await supabase.rpc('release_post_for_publish', {
+      p_post_id: postId,
+    })
+    if (releaseError) {
+      const msg = releaseError.message ?? ''
+      if (msg.includes('FORBIDDEN_ROLE')) return fail('Only an owner or editor can publish.', 403)
+      if (msg.includes('POST_NOT_RELEASABLE')) {
+        return fail('This post has already been published or closed.', 409)
+      }
+      return fail('Couldn’t get this post ready to publish — try again.', 500)
+    }
+    const scheduledAt = (released as { scheduled_at?: unknown } | null)?.scheduled_at
+    if (typeof scheduledAt !== 'string') {
+      return fail('Couldn’t get this post ready to publish — try again.', 500)
+    }
+
+    const result = await runClaimedPublish(
+      { workspaceId: workspace.id, postId, variantId: variant.id, channel, scheduledAt },
       { attempt: 1, jobRunId: `web:${randomUUID()}` },
       publishPostDeps(),
     )
+
+    // Someone else is already publishing this variant — the scheduled sweep, or the
+    // same person's second click. Nothing was attempted, so nothing is reported as
+    // failure; the caller polls the post to see how it ends.
+    if (!result.claimed) {
+      return Response.json(
+        { ok: false, code: 'ALREADY_PUBLISHING', message: 'This post is already going out.' },
+        { status: 409, headers: { 'cache-control': 'no-store' } },
+      )
+    }
+    const outcome = result.outcome
 
     if (outcome.status === 'failed') {
       // The job already wrote a post_publish_logs row and marked the variant failed.

@@ -25,6 +25,13 @@ export type {
   VariantUpdate,
 } from './publish/runPublishPost'
 
+export { runClaimedPublish, PUBLISH_LEASE_SECONDS } from './publish/runClaimedPublish'
+export type {
+  ClaimedPublishDeps,
+  ClaimedPublishResult,
+  ClaimRefusal,
+} from './publish/runClaimedPublish'
+
 export { publishPostDeps } from './publish/deps'
 
 export { createStorageReader, createZernioMediaHost, StorageReadError } from './publish/media'
