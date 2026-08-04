@@ -1,4 +1,5 @@
 import {
+  PublishQueueUnavailableError,
   dispatchSweepDeps,
   holdSweepDeps,
   runDispatchSweep,
@@ -13,6 +14,7 @@ import {
 import { loadJobsEnv } from '@sahoda/jobs/sweeps'
 
 import { isAuthorizedCronRequest } from '@/lib/cron/authorize'
+import { publishFromCronEnabled } from '@/lib/cron/publish-enabled'
 import { runCronSweeps } from '@/lib/cron/run-sweeps'
 import { reportServerError } from '@/lib/observability/report'
 
@@ -24,7 +26,13 @@ import { reportServerError } from '@/lib/observability/report'
  * workspace packages. This is the fallback apps/jobs/CLAUDE.md already sanctions, and it
  * is a wrapper swap rather than a rewrite because both job cores are free of that SDK.
  *
- * THIS ROUTE NOW PUBLISHES. It refused to for as long as there was no claim on
+ * THIS ROUTE CAN NOW PUBLISH — behind SAHODA_PUBLISH_ENABLED, which is separate from
+ * the dispatch mode ON PURPOSE. This release widens what
+ * SAHODA_PUBLISH_DISPATCH_MODE=on means, from "classify and write statuses" to
+ * "publish to real accounts", and nobody consented to the second meaning by setting
+ * the first. Without the new flag the refusal below is exactly the old behaviour.
+ *
+ * It refused to publish for as long as there was no claim on
  * post_variants: Vercel documents that cron can both duplicate and miss deliveries, and
  * an inline publish with two overlapping invocations is two posts on someone's Instagram.
  * `runClaimedPublish` closes that — the claim is a single atomic UPDATE, so of two
@@ -112,13 +120,21 @@ export async function GET(request: Request): Promise<Response> {
       (async () => {
         // One deps object for the whole tick: it holds the connection pool and the
         // Zernio client, and rebuilding it per variant would open a pool per publish.
-        const deps = publishPostDeps()
+        const canPublish = publishFromCronEnabled()
+        // Built only when it will be used: publishPostDeps opens a Zernio client and
+        // touches the pool, and a tick that cannot publish has no business doing either.
+        const deps = canPublish ? publishPostDeps() : null
         let published = 0
         let deferred = 0
 
         const report = await runDispatchSweep({
           ...dispatchSweepDeps({ limit: DISPATCH_BATCH }),
           enqueuePublish: async (intent) => {
+            if (!canPublish || deps === null) {
+              // Exactly the pre-release behaviour: classified, counted under
+              // queueUnavailable, and left precisely as it was.
+              throw new PublishQueueUnavailableError()
+            }
             if (published >= PUBLISH_BATCH) {
               deferred += 1
               return
