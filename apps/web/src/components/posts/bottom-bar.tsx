@@ -17,6 +17,12 @@ export interface BottomBarProps {
   onChannelsChange: (channels: Channel[]) => void
   onScheduleChange: (iso: string | null) => void
   flush: () => Promise<boolean>
+  /**
+   * Save one channel's variant and wait for it. Distinct from `flush`, which
+   * writes the canonical post — publishing sends the VARIANT row, so that is the
+   * one that has to be current before anything goes out.
+   */
+  saveVariantNow: (channel: Channel) => Promise<boolean>
   onGenerated: (variants: GeneratedVariant[]) => void
 }
 
@@ -34,6 +40,7 @@ export function BottomBar({
   onChannelsChange,
   onScheduleChange,
   flush,
+  saveVariantNow,
   onGenerated,
 }: BottomBarProps) {
   return (
@@ -56,7 +63,12 @@ export function BottomBar({
         <PublishPreview postId={postId} />
         {/* Below the dry run on purpose: the preview is the rehearsal, this is the
             performance, and the order on screen matches the order they belong in. */}
-        <PublishNow postId={postId} channels={channels} flush={flush} />
+        <PublishNow
+          postId={postId}
+          channels={channels}
+          flush={flush}
+          saveVariantNow={saveVariantNow}
+        />
       </div>
     </section>
   )

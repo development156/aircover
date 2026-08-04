@@ -36,6 +36,7 @@ function api(overrides: Partial<VariantsApi> = {}): VariantsApi {
     setBody: vi.fn(),
     setExtras: vi.fn(),
     save: vi.fn(),
+    saveNow: vi.fn(async () => true),
     applyGenerated: vi.fn(),
     ...overrides,
   }

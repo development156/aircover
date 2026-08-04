@@ -198,6 +198,7 @@ export function PostEditor({
         onChannelsChange={(channels) => autosave.update({ channels })}
         onScheduleChange={(scheduledAt) => autosave.update({ scheduledAt })}
         flush={autosave.flush}
+        saveVariantNow={variantsApi.saveNow}
         onGenerated={variantsApi.applyGenerated}
       />
     </div>

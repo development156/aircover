@@ -22,8 +22,8 @@ export function createPublishStore(opts: PublishStoreOptions) {
   const { pool } = opts
 
   async function loadVariant(payload: PublishPostPayload): Promise<PublishVariant | null> {
-    const r = await pool.query<{ id: string; body: string }>(
-      `select id, body from post_variants
+    const r = await pool.query<{ id: string; body: string; extras: unknown }>(
+      `select id, body, extras from post_variants
         where id = $1 and post_id = $2 and workspace_id = $3`,
       [payload.variantId, payload.postId, payload.workspaceId],
     )
@@ -44,6 +44,17 @@ export function createPublishStore(opts: PublishStoreOptions) {
     return {
       variantId: row.id,
       body: row.body,
+      // The composer validates the hashtag count against `spec.maxHashtags`, and
+      // until this was read the publisher validated a variant with none — so a
+      // 40-hashtag Instagram caption was red in the editor and green here.
+      //
+      // `hasLink` is deliberately still absent. Computing it needs apps/web's
+      // `detect-link` heuristic, and a second copy of a 300-line list of TLDs is a
+      // guarantee the meter and the publisher will one day disagree. It is only
+      // read for `linkPolicy: 'counted_fixed'` (X), which cannot publish at all
+      // until the vault opener exists — so this costs nothing today and must be
+      // revisited with X. See REQUESTS.md.
+      hashtags: readHashtags(row.extras),
       media: media.rows.map((m) => ({
         storagePath: m.storage_path,
         mime: m.mime ?? 'application/octet-stream',
@@ -197,4 +208,20 @@ export function createPublishStore(opts: PublishStoreOptions) {
   }
 
   return { loadVariant, writeLog, markVariant, markConnection, loadConnection }
+}
+
+/**
+ * The hashtag list out of `post_variants.extras`, which is untyped jsonb.
+ *
+ * Never throws and never returns junk: anything that is not an array of strings
+ * comes back undefined, which is exactly "no hashtags" to the Constraint Engine.
+ * More than one lane writes this column, so a shape we do not recognise is a
+ * reason to ignore the field, not to fail the publish.
+ */
+function readHashtags(extras: unknown): string[] | undefined {
+  if (typeof extras !== 'object' || extras === null || Array.isArray(extras)) return undefined
+  const raw = (extras as Record<string, unknown>).hashtags
+  if (!Array.isArray(raw)) return undefined
+  const tags = raw.filter((tag): tag is string => typeof tag === 'string')
+  return tags.length > 0 ? tags : undefined
 }

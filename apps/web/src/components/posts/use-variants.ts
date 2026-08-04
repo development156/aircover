@@ -61,6 +61,8 @@ export interface VariantsApi {
   setBody: (channel: Channel, body: string) => void
   setExtras: (channel: Channel, patch: VariantExtras) => void
   save: (channel: Channel) => void
+  /** Save one channel and wait for the answer. Resolves false when the write failed. */
+  saveNow: (channel: Channel) => Promise<boolean>
   applyGenerated: (items: readonly GeneratedVariant[]) => void
 }
 
@@ -113,37 +115,66 @@ export function useVariants(postId: string, variants: readonly PostVariant[]): V
     [commit],
   )
 
-  const save = useCallback(
-    (channel: Channel) => {
+  /**
+   * The write itself, awaitable. Extracted so `saveNow` can report whether the
+   * variant actually landed — `save` is fire-and-forget inside a transition and
+   * has no way to tell a caller anything.
+   */
+  const write = useCallback(
+    async (channel: Channel): Promise<boolean> => {
       const draft = latest.current[channel]
-      if (draft.saving) return
       patch(channel, { saving: true, error: null })
 
-      startTransition(async () => {
-        const result = await saveVariant(postId, channel, draft.body, draft.extras)
-        commit((current) => {
-          const now = current[channel]
-          // What landed on the server is the SNAPSHOT, not whatever is in the
-          // box now. Clearing `dirty` unconditionally would label edits made
-          // during the write "Saved" and disable the only button that could
-          // save them. Every setter builds a fresh extras object, so identity
-          // is a sound comparison here.
-          const unchanged = now.body === draft.body && now.extras === draft.extras
-          return {
-            ...current,
-            [channel]: {
-              ...now,
-              saving: false,
-              // Still dirty if the write failed, or if the draft moved on.
-              dirty: !result.ok || !unchanged,
-              error: result.ok ? null : result.message,
-            },
-          }
-        })
+      const result = await saveVariant(postId, channel, draft.body, draft.extras)
+      commit((current) => {
+        const now = current[channel]
+        // What landed on the server is the SNAPSHOT, not whatever is in the
+        // box now. Clearing `dirty` unconditionally would label edits made
+        // during the write "Saved" and disable the only button that could
+        // save them. Every setter builds a fresh extras object, so identity
+        // is a sound comparison here.
+        const unchanged = now.body === draft.body && now.extras === draft.extras
+        return {
+          ...current,
+          [channel]: {
+            ...now,
+            saving: false,
+            // Still dirty if the write failed, or if the draft moved on.
+            dirty: !result.ok || !unchanged,
+            error: result.ok ? null : result.message,
+          },
+        }
       })
+      return result.ok
     },
     [commit, patch, postId],
   )
+
+  const save = useCallback(
+    (channel: Channel) => {
+      if (latest.current[channel].saving) return
+      startTransition(() => {
+        void write(channel)
+      })
+    },
+    [write],
+  )
+
+  /**
+   * Save one channel's draft and wait for the answer.
+   *
+   * Publishing needs this. `useAutosave`'s `flush` writes the CANONICAL post —
+   * title, body, channels, schedule — and never touches `post_variants`, which is
+   * the row that actually goes to the platform. Publishing after a flush alone
+   * would send whatever was last saved to the variant while the writer looks at
+   * something newer on screen.
+   *
+   * Writes unconditionally rather than skipping a clean draft: `dirty` is this
+   * component's belief about the server, and before a real, irreversible publish
+   * the cheap round-trip that makes the row match the screen is worth more than
+   * the saving.
+   */
+  const saveNow = useCallback(async (channel: Channel): Promise<boolean> => write(channel), [write])
 
   const applyGenerated = useCallback(
     (items: readonly GeneratedVariant[]) => {
@@ -163,5 +194,5 @@ export function useVariants(postId: string, variants: readonly PostVariant[]): V
     [commit],
   )
 
-  return { states, setBody, setExtras, save, applyGenerated }
+  return { states, setBody, setExtras, save, saveNow, applyGenerated }
 }

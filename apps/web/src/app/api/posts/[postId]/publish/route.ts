@@ -40,8 +40,23 @@ export const runtime = 'nodejs'
 /** Never prerendered: this mutates a real account. */
 export const dynamic = 'force-dynamic'
 
-/** Instagram's container flow can take ~15s to hand back a URL; the poll waits ~36s. */
-export const maxDuration = 60
+/**
+ * The wall this request must finish inside, and the arithmetic behind it.
+ *
+ * The Instagram adapter polls 12 × 3000ms = 36s for a `platformPostUrl` (the post
+ * observed live at ~14s). Before that it uploads each attachment: presign + PUT +
+ * HEAD. Add `runPublishPost`'s database round-trips and a cold start and the worst
+ * realistic case sits near 50s — too close to 60 to be safe.
+ *
+ * 120 leaves the adapter's own give-up INSIDE this wall, which matters: when the
+ * adapter times out it throws STILL_PROCESSING as TRANSIENT, `runPublishPost`
+ * writes its log row and leaves the variant mid-flight rather than marking it
+ * failed, and the person can press again — Zernio's request id collapses the
+ * retry onto the same post, and the second attempt polls for the URL the first
+ * one did not wait for. Being killed by the platform skips all of that and leaves
+ * no record at all.
+ */
+export const maxDuration = 120
 
 function fail(message: string, status: number): Response {
   return Response.json({ ok: false, message }, { status, headers: { 'cache-control': 'no-store' } })

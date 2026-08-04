@@ -21,8 +21,10 @@ const PENDING_LINES = [
 export interface PublishNowProps {
   postId: string
   channels: Channel[]
-  /** Persist any unsaved editor state first. Returns false if the save failed. */
+  /** Persist the canonical post (title, body, channels, schedule). */
   flush: () => Promise<boolean>
+  /** Persist the channel variant that is actually about to be sent. */
+  saveVariantNow: (channel: Channel) => Promise<boolean>
 }
 
 interface Published {
@@ -45,7 +47,7 @@ interface Published {
  * Edits are flushed BEFORE the request. Publishing what is in the database while
  * the writer looks at something newer on screen would put out the wrong words.
  */
-export function PublishNow({ postId, channels, flush }: PublishNowProps) {
+export function PublishNow({ postId, channels, flush, saveVariantNow }: PublishNowProps) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -60,8 +62,12 @@ export function PublishNow({ postId, channels, flush }: PublishNowProps) {
     setError(null)
     setPublished(null)
     startTransition(async () => {
-      const saved = await flush()
-      if (!saved) {
+      // BOTH, and in this order. `flush` writes the canonical post; the variant
+      // row is what actually goes to the platform, and it has its own save.
+      // Publishing after only one of them sends words the writer is not looking at.
+      const savedPost = await flush()
+      const savedVariant = savedPost ? await saveVariantNow(channel) : false
+      if (!savedPost || !savedVariant) {
         setError('Couldn’t save your latest edits, so nothing was published.')
         return
       }
