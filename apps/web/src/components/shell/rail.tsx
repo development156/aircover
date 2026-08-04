@@ -16,6 +16,7 @@ const NAV: ReadonlyArray<{
   { href: '/home', label: 'Home', icon: 'house', guide: 'nav.home' },
   { href: '/posts', label: 'Posts', icon: 'square-pen', guide: 'nav.posts', section: 'Create' },
   { href: '/planner', label: 'Planner', icon: 'calendar-days', guide: 'nav.planner' },
+  { href: '/inbox', label: 'Inbox', icon: 'messages-square', guide: 'nav.inbox' },
   { href: '/sites', label: 'Sites', icon: 'globe', guide: 'nav.sites' },
   { href: '/connections', label: 'Connections', icon: 'link-2', guide: 'nav.connections' },
   { href: '/wallet', label: 'Wallet', icon: 'wallet', guide: 'nav.wallet' },

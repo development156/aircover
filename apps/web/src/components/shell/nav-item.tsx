@@ -13,6 +13,7 @@ import {
   SquarePen,
   Wallet,
   type LucideIcon,
+  MessagesSquare,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -26,6 +27,7 @@ const ICONS = {
   'link-2': Link2,
   globe: Globe,
   wallet: Wallet,
+  'messages-square': MessagesSquare,
   'sliders-horizontal': SlidersHorizontal,
   shield: Shield,
 } satisfies Record<string, LucideIcon>

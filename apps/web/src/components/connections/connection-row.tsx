@@ -68,7 +68,9 @@ export function ConnectionRow({ connection, now = new Date() }: ConnectionRowPro
           ) : null}
         </div>
         <div className="flex items-center gap-2">
-          {health.kind === 'ok' ? null : <ReconnectButton platform={connection.platform} label={channel} />}
+          {health.kind === 'ok' ? null : (
+            <ReconnectButton platform={connection.platform} label={channel} />
+          )}
           <DisconnectButton connectionId={connection.id} label={label} />
         </div>
       </div>

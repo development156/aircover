@@ -75,8 +75,8 @@ export default async function ConnectionsPage() {
         <div>
           <h2 className="text-[15px] leading-5 font-bold">Connect a channel</h2>
           <p className="text-[13px] text-muted">
-            Each of these connects through our publishing partner, so you approve access once
-            on the platform&rsquo;s own screen and nothing of yours is stored here.
+            Each of these connects through our publishing partner, so you approve access once on the
+            platform&rsquo;s own screen and nothing of yours is stored here.
           </p>
         </div>
         <div className="flex flex-wrap items-start gap-3">
