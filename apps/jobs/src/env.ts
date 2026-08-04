@@ -40,6 +40,12 @@ export interface JobsEnv {
    * flag must never put the job on the live rail.
    */
   publishMode: PublishMode
+  /**
+   * Zernio API key, for the aggregator-fronted channels. Optional: absent means
+   * instagram throws NO_ADAPTER like any other channel we cannot really publish.
+   * It is NOT a boot failure — the other rails work without it.
+   */
+  zernioApiKey: string | undefined
   supabaseUrl: string
   serviceRoleKey: string
   databaseUrl: string
@@ -91,6 +97,13 @@ export function loadJobsEnv(source: NodeJS.ProcessEnv = process.env): JobsEnv {
     else holdSweepGraceSeconds = parsed
   }
 
+  // Shape-checked but never required: a wrong key is worth catching at boot, a
+  // missing one simply means the Zernio rail is not provisioned here.
+  const zernioApiKey = source.ZERNIO_API_KEY || undefined
+  if (zernioApiKey !== undefined && !/^sk_[0-9a-f]{64}$/.test(zernioApiKey)) {
+    invalid.push('ZERNIO_API_KEY')
+  }
+
   const dispatchMode = readMode(source, 'SAHODA_PUBLISH_DISPATCH_MODE', invalid)
   const holdSweepMode = readMode(source, 'SAHODA_HOLD_SWEEP_MODE', invalid)
 
@@ -114,6 +127,7 @@ export function loadJobsEnv(source: NodeJS.ProcessEnv = process.env): JobsEnv {
 
   return {
     publishMode,
+    zernioApiKey,
     supabaseUrl: toOrigin(rawUrl),
     serviceRoleKey,
     databaseUrl,

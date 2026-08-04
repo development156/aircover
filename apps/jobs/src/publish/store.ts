@@ -103,8 +103,29 @@ export function createPublishStore(opts: PublishStoreOptions) {
   /**
    * The connection for this payload's channel, with its secret left SEALED — opening it
    * is the token resolver's job, and this layer never sees plaintext.
+   *
+   * ── WHY THE ZERNIO CHANNELS TAKE A DIFFERENT PATH ───────────────────────────
+   * This query selects by `payload.workspaceId`. That value is DERIVED at dispatch
+   * from `posts.workspace_id` (dispatch/pgDispatch.ts:100) — but it then crosses the
+   * Trigger.dev queue as ordinary payload data, and between enqueue and execute
+   * nothing re-checks it.
+   *
+   * For x/gbp/linkedin that is survivable: we hold the credential, and a wrong
+   * workspace yields a connection whose token simply does not work.
+   *
+   * For instagram it is not. Zernio validates an accountId against your whole TEAM,
+   * not against the profile in the request (doc 13 §3), so a wrong id does not
+   * error — it publishes successfully to another customer's Instagram, returns HTTP
+   * 200, and hands back a live platformPostUrl. There is nothing to catch.
+   *
+   * So instagram resolves through `assert_account_for_scheduled_post`, which takes
+   * NO workspace argument at all: it re-derives the workspace from `posts` by
+   * post id, the profile from that workspace, and returns the account id only if it
+   * belongs to both. The payload's workspaceId becomes decoration on that path.
    */
   async function loadConnection(payload: PublishPostPayload): Promise<StoredConnection | null> {
+    if (payload.channel === 'instagram') return loadZernioConnection(payload)
+
     const r = await pool.query<{
       id: string
       external_account_id: string | null
@@ -130,6 +151,48 @@ export function createPublishStore(opts: PublishStoreOptions) {
       externalAccountId: row.external_account_id ?? '',
       status: row.status,
       sealedAccessToken: row.access_token_enc,
+    }
+  }
+
+  /**
+   * The guarded path. The account id comes back from the database or not at all —
+   * there is no branch here that assembles one.
+   *
+   * A refusal raises CROSS_TENANT_ACCOUNT (one error for every failure below the
+   * line, so a caller cannot enumerate another tenant's ids by probing) and this
+   * returns null, which the caller already treats as "no usable connection".
+   *
+   * No `connection_secrets` read: a Zernio connection has no sealed token, because
+   * Zernio holds the Meta credential and we never see one.
+   */
+  async function loadZernioConnection(
+    payload: PublishPostPayload,
+  ): Promise<StoredConnection | null> {
+    const candidate = await pool.query<{ id: string; external_account_id: string | null }>(
+      `select c.id, c.external_account ->> 'id' as external_account_id
+         from connections c
+        where c.workspace_id = $1 and c.platform = 'instagram' and c.status = 'active'
+        order by c.updated_at desc
+        limit 1`,
+      [payload.workspaceId],
+    )
+    const row = candidate.rows[0]
+    if (!row?.external_account_id) return null
+
+    // THE GATE. Nothing above this line is trusted: the id just read is only a
+    // candidate until the database re-derives it from the post itself.
+    const verified = await pool.query<{ account_id: string }>(
+      `select public.assert_account_for_scheduled_post($1, $2, $3) as account_id`,
+      [payload.postId, payload.variantId, row.external_account_id],
+    )
+    const accountId = verified.rows[0]?.account_id
+    if (!accountId) return null
+
+    return {
+      connectionId: row.id,
+      externalAccountId: accountId,
+      status: 'active',
+      sealedAccessToken: null,
     }
   }
 

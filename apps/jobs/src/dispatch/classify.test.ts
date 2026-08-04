@@ -214,41 +214,49 @@ describe('classifyCandidate — fan-in', () => {
 })
 
 /**
- * Instagram is `publishable: false` in this release (CONSTRAINTS) — it exists for caption
- * rules, not posting. Production has instagram variants sitting `pending` right now, so
- * this is live data, not a hypothetical.
+ * CONTRACT CHANGE 2026-08-04: instagram is `publishable: true` — it routes through the
+ * Zernio rail, which holds the Meta credential. It was the only channel this release
+ * could not publish, so these tests now pin the OPPOSITE behaviour for it.
+ *
+ * The exclusion MECHANISM is unchanged and still matters: a future channel can arrive
+ * in CONSTRAINTS before its adapter ships, and enqueueing it would buy a guaranteed
+ * CHANNEL_NOT_PUBLISHABLE and nothing else. There is simply no channel exercising it
+ * today — worth knowing, because an untested branch is how the next one breaks.
  */
 describe('classifyCandidate — channels this release cannot publish', () => {
-  it('does not dispatch a channel the release cannot publish', () => {
-    // Enqueueing it would buy a guaranteed CHANNEL_NOT_PUBLISHABLE failure and nothing else.
+  it('dispatches instagram alongside x, now that the Zernio rail exists', () => {
     const d = decide(candidate(10, [variant('x', 'pending'), variant('instagram', 'pending')]))
 
     expect(d.kind).toBe('dispatch')
     if (d.kind !== 'dispatch') return
-    expect(d.variants.map((v) => v.channel)).toEqual(['x'])
+    expect(d.variants.map((v) => v.channel).sort()).toEqual(['instagram', 'x'])
   })
 
-  it('does not let an unpublishable channel hold a post back from published', () => {
-    // Otherwise every post carrying an instagram variant becomes a permanent partial and
-    // is held forever — the post went out everywhere this release can send it.
+  it('holds a post back while its instagram variant is still pending', () => {
+    // Previously instagram was excluded and could not hold a post open. Now it is a
+    // real leg: settling as `published` while it is still pending would report a
+    // partial as complete.
     const d = decide(
       candidate(10, [variant('x', 'published', 'live'), variant('instagram', 'pending')]),
     )
 
-    expect(d.kind).toBe('settle')
-    if (d.kind !== 'settle') return
-    expect(d.status).toBe('published')
+    expect(d.kind).toBe('dispatch')
+    if (d.kind !== 'dispatch') return
+    expect(d.variants.map((v) => v.channel)).toEqual(['instagram'])
   })
 
-  it('holds a still-fresh post whose only channel cannot be published', () => {
+  it('dispatches an instagram-only post instead of holding it', () => {
+    // This used to hold with `nothing-attemptable` — instagram was the only channel
+    // that could produce that state, so an instagram-only post never went anywhere.
     const d = decide(candidate(10, [variant('instagram', 'pending')]))
 
-    expect(d.kind).toBe('hold')
-    if (d.kind !== 'hold') return
-    expect(d.reason).toBe('nothing-attemptable')
+    expect(d.kind).toBe('dispatch')
+    if (d.kind !== 'dispatch') return
+    expect(d.variants.map((v) => v.channel)).toEqual(['instagram'])
   })
 
-  it('expires it once the window has passed', () => {
+  it('still expires an instagram-only post once the window has passed', () => {
+    // Expiry is about the SCHEDULE, not about publishability, so this is unchanged.
     expect(decide(candidate(120, [variant('instagram', 'pending')])).kind).toBe('expire')
   })
 

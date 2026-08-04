@@ -152,13 +152,17 @@ describe('runPublishPost', () => {
     expect(h.variantUpdates[0]).toMatchObject({ publishStatus: 'failed' })
   })
 
-  it('refuses a channel that has no publish support', async () => {
+  // CONTRACT CHANGE 2026-08-04: instagram is publishable via the Zernio rail, so it no
+  // longer trips CHANNEL_NOT_PUBLISHABLE. It is refused BEFORE the adapter for a better
+  // reason — a photoless Instagram post cannot exist — which keeps the property this
+  // test actually guards: an impossible post never reaches the network.
+  it('refuses a photoless instagram post before reaching the adapter', async () => {
     const h = harness()
 
     const out = await runPublishPost({ ...payload, channel: 'instagram' }, ctx, h.deps)
 
     expect(out).toMatchObject({ status: 'failed', classification: 'permanent' })
-    expect(out).toHaveProperty('code', 'CHANNEL_NOT_PUBLISHABLE')
+    expect(out).toHaveProperty('code', 'MEDIA_REQUIRED')
     expect(h.adapterCalls).toBe(0)
     expect(h.logs).toHaveLength(1)
   })

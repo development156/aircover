@@ -16,7 +16,11 @@ export function publishPostDeps(): PublishPostDeps {
     // openSecret is intentionally unwired: packages/publishing exports no vault opener,
     // so a live publish fails honestly instead of inventing a token (see REQUESTS.md).
     resolveConnection: createConnectionResolver({ loadConnection: store.loadConnection }),
-    adapterFor: createAdapterSelector({ mode: env.publishMode, transport: fetchTransport() }),
+    adapterFor: createAdapterSelector({
+      mode: env.publishMode,
+      transport: fetchTransport(),
+      zernioApiKey: env.zernioApiKey,
+    }),
     writeLog: store.writeLog,
     markVariant: store.markVariant,
     markConnection: store.markConnection,

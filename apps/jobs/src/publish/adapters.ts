@@ -2,7 +2,9 @@ import { AdapterError, type Channel, type PublishAdapter } from '@sahoda/shared'
 import {
   createFixtureAdapter,
   createGbpAdapter,
+  createInstagramAdapter,
   createXAdapter,
+  createZernioClient,
   type ReadMedia,
   type Transport,
 } from '@sahoda/publishing'
@@ -18,6 +20,12 @@ export interface AdapterSelectorDeps {
    * Supabase signed URLs are async, so callers pre-sign every path and close over the map.
    */
   publicMediaUrl?: (storagePath: string) => string
+  /**
+   * Zernio API key. Absent ⇒ instagram throws NO_ADAPTER like any other channel we
+   * cannot really publish — never a fixture, which would be mock-success in a
+   * production path.
+   */
+  zernioApiKey?: string
   now?: () => Date
 }
 
@@ -46,13 +54,24 @@ export function createAdapterSelector(deps: AdapterSelectorDeps): (c: Channel) =
           publicMediaUrl: deps.publicMediaUrl,
           now: deps.now,
         })
-      default:
-        throw new AdapterError({
-          message: `No live publish adapter exists for ${channel}.`,
-          code: 'NO_ADAPTER',
-          classification: 'permanent',
-          channel,
+      case 'instagram': {
+        // Zernio holds the Meta credential; the adapter needs OUR key to reach
+        // Zernio, not a per-connection token. Without it there is no rail — and
+        // falling through to the fixture would report a post as published that
+        // was never sent.
+        if (!deps.zernioApiKey) break
+        return createInstagramAdapter({
+          client: createZernioClient({ transport: deps.transport, apiKey: deps.zernioApiKey }),
+          now: deps.now,
         })
+      }
     }
+
+    throw new AdapterError({
+      message: `No live publish adapter exists for ${channel}.`,
+      code: 'NO_ADAPTER',
+      classification: 'permanent',
+      channel,
+    })
   }
 }
