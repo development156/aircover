@@ -1,0 +1,34 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "allowJs": true
+  },
+  // vitest.setup.ts is in the program so `@testing-library/jest-dom/vitest`'s
+  // module augmentation (toBeInTheDocument, toHaveFocus, …) is visible to tsc.
+  "include": [
+    "next-env.d.ts",
+    "src",
+    // In the program so `withSentryConfig`'s options are actually typechecked.
+    // Left out, a misspelled or moved Sentry build option (they shift between
+    // majors) fails silently at build time as an ignored key — the upload just
+    // never happens and nothing says why.
+    "next.config.ts",
+    ".next/types/**/*.ts",
+    "vitest.config.ts",
+    "vitest.setup.ts",
+    "e2e",
+    "playwright.config.ts"
+  ],
+  "exclude": ["node_modules"]
+}

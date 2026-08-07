@@ -1,0 +1,10 @@
+{
+  "status": 400,
+  "headers": { "content-type": "application/problem+json" },
+  "body": {
+    "title": "Bad Request",
+    "type": "about:blank",
+    "status": 400,
+    "detail": "The media format is not supported."
+  }
+}

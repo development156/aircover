@@ -1,0 +1,78 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["^typecheck"]
+    },
+    "lint": {},
+    "test": {
+      "dependsOn": ["^typecheck"],
+      "env": ["SAHODA_ALLOW_LIVE_TESTS"]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "@sahoda/web#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": [
+        "CLERK_SECRET_KEY",
+        "CLERK_WEBHOOK_SECRET",
+        "SUPABASE_PROJECT_REF",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_DB_URL",
+        "SUPABASE_JWT_SECRET",
+        "OPENROUTER_API_KEY_TEXT",
+        "OPENROUTER_API_KEY_IMAGE",
+        "OPENROUTER_API_KEY_RESEARCH",
+        "OPENAI_API_KEY",
+        "GOOGLE_GEMINI_API_KEY",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_STARTER_PRICE_ID",
+        "RAZORPAY_KEY_ID",
+        "CASHFREE_APP_ID",
+        "CASHFREE_SECRET_KEY",
+        "CASHFREE_ENV",
+        "X_CLIENT_ID",
+        "GOOGLE_OAUTH_CLIENT_ID",
+        "GOOGLE_OAUTH_CLIENT_SECRET",
+        "LINKEDIN_CLIENT_ID",
+        "META_APP_ID",
+        "TRIGGER_SECRET_KEY",
+        "TRIGGER_PROJECT_ID",
+        "UPSTASH_REDIS_REST_URL",
+        "UPSTASH_REDIS_REST_TOKEN",
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID",
+        "CLOUDFLARE_ZONE_ID",
+        "RESEND_API_KEY",
+        "SENTRY_DSN",
+        "SENTRY_ORG",
+        "SENTRY_PROJECT",
+        "SENTRY_AUTH_TOKEN",
+        "TOKEN_VAULT_KEY",
+        "JOB_SIGNING_SECRET",
+        "CONTEXT7_API_KEY",
+        "CRON_SECRET",
+        "SAHODA_PUBLISH_DISPATCH_MODE",
+        "SAHODA_PUBLISH_DISPATCH_GRACE_SECONDS",
+        "SAHODA_HOLD_SWEEP_MODE",
+        "SAHODA_PUBLISH_ENABLED",
+        "SAHODA_RECONCILE_MODE",
+        "SAHODA_HOLD_SWEEP_GRACE_SECONDS",
+        "DEVOPS_INGEST_TOKEN",
+        "ADMIN_BOOTSTRAP_EMAILS",
+        "OPS_INGEST_URL",
+        "TURNSTILE_SECRET_KEY",
+        "ZERNIO_API_KEY",
+        "NEXT_PUBLIC_APP_URL"
+      ]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

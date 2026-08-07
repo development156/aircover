@@ -1,0 +1,13 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Append-only log: keep both sides' lines on merge instead of conflicting.
+# Scoped to this one file deliberately — union must never reach a structured file.
+LEARNINGS.md merge=union
+
+# Never auto-merge the lockfile. A 3-way text merge of pnpm-lock.yaml resolves
+# without conflict yet silently produces a broken file: merging main into wt-web
+# (1629ef1) both duplicated a snapshots key and dropped a dependency entry, which
+# made `pnpm install` fail and broke every deploy. On conflict, take either side
+# then regenerate: pnpm install --no-frozen-lockfile
+pnpm-lock.yaml -merge

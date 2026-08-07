@@ -1,0 +1,52 @@
+# Secrets / env — never commit real values; keep the template only
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Claude Code worktrees (background-job isolation)
+.claude/worktrees/
+
+# Claude Code local, per-user settings (never commit)
+.claude/settings.local.json
+
+# Editor / IDE local settings — never commit (avoids workspace-level agent bypass flags)
+.vscode/
+.idea/
+
+# Build / tooling caches & outputs
+.turbo/
+dist/
+.next/
+.playwright-mcp/
+
+# Logs
+*.log
+
+# OS junk
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Per-worktree ops overrides (see scripts/lib/ops-env.mjs)
+ops/.local.env
+.vercel
+.env*
+# Supabase CLI scratch (written by the CLI on link; not ours to commit)
+supabase/.temp/
+
+# Mutation-check backups (scripts/mutation-check.mjs); kept on disk only so a
+# failed restore can be recovered by hand.
+.mutation-backups/
+
+# --- Markdown / documentation (untracked 2026-08-05) ---
+# Files remain on disk; git simply stops tracking them.
+*.md
+*.mdx

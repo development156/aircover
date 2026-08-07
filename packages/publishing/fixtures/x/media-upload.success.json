@@ -1,0 +1,11 @@
+{
+  "status": 200,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "data": {
+      "id": "1710000000000000001",
+      "media_key": "3_1710000000000000001",
+      "expires_after_secs": 86400
+    }
+  }
+}

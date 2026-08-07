@@ -1,0 +1,10 @@
+{
+  "status": 201,
+  "headers": { "content-type": "application/json" },
+  "body": {
+    "data": {
+      "id": "<script>alert(1)</script>",
+      "text": "malformed id in an otherwise 201 response"
+    }
+  }
+}

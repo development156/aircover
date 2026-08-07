@@ -1,0 +1,540 @@
+/**
+ * THE ONE SOURCE LIST FOR EVERY BOARD CARD (SL-062 part 2).
+ *
+ * Both `ops/state/board.json` and `scripts/lib/ops-seed-data.mjs` are written
+ * FROM this array — the board by `scripts/ops-cards-write.mjs`, the seed by
+ * importing `cardDetail()` below. Before this file there were two hand-kept
+ * copies of every card's text, and they silently drifted seventeen cards apart
+ * (SL-060). One list is the fix; `seed-parity.test.ts` is the proof.
+ *
+ * ── HOW A CARD IS WRITTEN ───────────────────────────────────────────────────
+ * `title`     — plain English, for a stakeholder who does not read code. What
+ *               it does, or what is wrong. NO file paths, function names, line
+ *               numbers or table names. Ever.
+ * `plain`     — two or three sentences: what it does, then WHY IT MATTERS in
+ *               those words. This is what the dashboard shows by default.
+ * `technical` — everything an engineer needs, verbatim from the original card
+ *               where one existed. Rendered collapsed, behind a disclosure.
+ *
+ * Nothing is deleted in the rewrite. Every technical sentence that was on a
+ * card before is still on it — one click further away, not gone. A rewrite that
+ * loses the Recharts ruling or the staging plan would cost more than the
+ * readability it buys.
+ *
+ * ── WHY THIS IS ONE LONG FILE AND NOT THREE SHORT ONES ──────────────────────
+ * Card codes are derived from ARRAY POSITION (`SL-${index + 1}`), so a card
+ * that moves between files, or two files concatenated in the wrong order, would
+ * silently renumber everything after it — two cards would swap identities and
+ * the diff would read as an edit. The repo's <300-line preference is a real
+ * rule and this is a deliberate exception to it: the ordering hazard is worse
+ * than the length. `seed-parity.test.ts` asserts contiguity as a backstop.
+ */
+
+/**
+ * Separates the stakeholder half of a card's detail from the engineering half.
+ *
+ * A sentinel inside `detail` rather than a column, because `ops_tasks` has no
+ * third text field and only `wt-db` may add one. Exported so the UI's splitter
+ * and this writer cannot drift — `card-copy.test.ts` asserts they are equal.
+ */
+export const TECHNICAL_MARKER = '\n\nTechnical detail — '
+
+/** `plain` alone when there is no engineering half, otherwise both, joined. */
+export function cardDetail(card) {
+  if (!card.technical) return card.plain
+  return `${card.plain}${TECHNICAL_MARKER}${card.technical}`
+}
+
+/**
+ * Every card, in board order. Position decides the code, so NEVER reorder or
+ * remove an entry — append only.
+ */
+export const CARDS = [
+  {
+    roadmap: 'AO1',
+    title: 'Give the admin console its own private tables',
+    plain:
+      'Creates the storage behind the admin console — the board, the changelog, the testing record and the list of admins — and locks each one so only a signed-in admin can read it. Why it matters: without this the console has nowhere to keep anything, and no way to keep it private.',
+    technical:
+      'ops_* migrations + row-level security on every table + the is_ops_admin() security-definer function.',
+  },
+  {
+    roadmap: 'AO1',
+    title: 'Prove that an outsider cannot read admin data',
+    plain:
+      'A test that arrives as nobody at all and tries to read every admin table, proving each one refuses. Why it matters: a lock is only real if something rattles it on every commit.',
+    technical: 'Anon-client RLS suite across all ten ops_* tables.',
+  },
+  {
+    roadmap: 'AO1',
+    title: 'Write the admin data shapes down once, in one place',
+    plain:
+      'Defines, in a single place, what an admin, a board card, a changelog entry and a test run each look like, so every part of the app agrees. Why it matters: when two parts of a system quietly disagree about a shape, it surfaces as a bug much later and much further away.',
+    technical: 'Shared ops enums + row schemas in packages/shared.',
+  },
+  {
+    roadmap: 'AO1',
+    title: 'Lock the console behind a check that runs on the server',
+    plain:
+      'Anyone who is not an admin gets "page not found" — not a login prompt, which would confirm the console exists. Why it matters: an internal tool should not advertise itself to strangers, and a check that only hides buttons is not a lock.',
+    technical: '/admin middleware gate, requireOpsAdmin, first CSP.',
+  },
+  {
+    roadmap: 'AO1',
+    title: 'Set the whole console up from empty with one command',
+    plain:
+      'A script that fills a fresh, empty database with the roadmap and the board, and creates the private storage that test screenshots go into. Why it matters: this is the path back if the data is ever lost, so it has to work on a day nobody planned for.',
+    technical: 'Seed script, qa-artifacts bucket, env and turbo wiring.',
+  },
+  {
+    roadmap: 'AO1',
+    title: 'Record why admin tables are the one exception to the tenancy rule',
+    plain:
+      'Every other table in the product belongs to a customer workspace. These belong to the company instead, so the exception is written down alongside the safeguards that replace the usual rule. Why it matters: an undocumented exception looks like a mistake to the next person, who then "fixes" it.',
+    technical: 'sahoda-db skill amendment for platform-scope tables.',
+  },
+  {
+    roadmap: 'AO2',
+    title: 'Let the agent post progress to the console safely',
+    plain:
+      'The doorway the working agent posts through when a card moves, with proof that posting the same update twice changes nothing. Why it matters: retries are normal and unavoidable; a retry that duplicated work would corrupt the board it was meant to keep.',
+    technical: 'Ingest RPC and route with idempotency tests.',
+  },
+  {
+    roadmap: 'AO2',
+    title: 'Keep the board in the codebase, not only in the database',
+    plain:
+      'The board lives as small files in the repository, reviewed in every pull request like code, and a script mirrors them to the console. Why it matters: when the screen and the repository disagree, this is what makes the repository the answer.',
+    technical: 'ops/state seeds and scripts/ops-sync.mjs.',
+  },
+  {
+    roadmap: 'AO2',
+    title: 'Record test results and finished work without being asked',
+    plain:
+      'When a test run finishes, or a commit names a card, the console updates itself. Why it matters: a status somebody has to remember to update is a status that goes stale, and a stale board is worse than no board.',
+    technical: 'scripts/ops-hook-bash.mjs — auto QA runs and commit → done.',
+  },
+  {
+    roadmap: 'AO2',
+    title: 'Make updating the console a side-effect of doing the work',
+    plain:
+      'Standing instructions and automatic triggers, so the board moves while the work happens rather than at the end if anyone remembers. Why it matters: this is the difference between a dashboard that reflects reality and one that reflects intentions.',
+    technical: 'settings.json hook entries + sahoda-devops skill.',
+  },
+  {
+    roadmap: 'AO2',
+    title: 'Short commands for moving cards and logging work',
+    plain:
+      'One-line commands to start, review, finish or block a card, log a test, and add a changelog entry — plus a refusal to finish work that has none of them. Why it matters: it makes the honest path the quickest one.',
+    technical: '/task, /qa-log, /log-change commands + /ship refusal.',
+  },
+  {
+    roadmap: 'AO2',
+    title: 'Watch a real working session drive the board end to end',
+    plain:
+      'Confirmation that a live session actually moves cards on the live console with nobody touching the screen. Why it matters: everything above is a claim until somebody watches it happen once.',
+    technical: 'End-to-end dogfood verification against the live board.',
+  },
+  {
+    roadmap: 'AO3',
+    title: "Build the console's frame and the way into it",
+    plain:
+      "The console's own page frame, its section navigation, and the entry point from the main app's sidebar — visible only to admins.",
+    technical: 'Shell, sub-nav and rail item render; typecheck+lint green',
+  },
+  {
+    roadmap: 'AO3',
+    title: 'Show progress, and what actually stands between here and done',
+    plain:
+      'The card at the top of the console: how far along the build is, which stage it is in, and a list of what is genuinely in the way rather than a list of everything left. Why it matters: it is the one place that answers "where are we" without reading anything else.',
+    technical: 'Roadmap card renders live: Admin Ops 30%, 3 open items',
+  },
+  {
+    roadmap: 'AO3',
+    title: 'Show whether the agent is working and whether the checks are green',
+    plain:
+      'A live pulse when a session is running, and a row of green or red chips for each set of automated checks with how long ago each one ran.',
+    technical: 'Strips render live: working pulse + 5 gate chips',
+  },
+  {
+    roadmap: 'AO3',
+    title: 'The board itself — four columns you can drag between',
+    plain:
+      'To Do, In Progress, For Review and Done, with filters, a note on each card saying whether its tests passed, and a red ribbon when something is blocked.',
+    technical: 'Board renders 39 cards in four columns with filters and QA dots',
+  },
+  {
+    roadmap: 'AO3',
+    title: 'A changelog you can copy straight into a message',
+    plain:
+      "Plain-English entries with one-click copy, per entry or per day, because these get pasted into messages and investor notes rather than read on the screen they're written on.",
+    technical: 'Changelog rail live with per-entry and per-day copy',
+  },
+  {
+    roadmap: 'AO3',
+    title: 'One place to see every test run, with failures pinned to the top',
+    plain:
+      'The testing record, filterable by card, kind and outcome. A failure stays pinned at the top until it is fixed or replaced by a newer run. Why it matters: a red result that scrolls away gets forgotten.',
+    technical: 'QA console live at /admin/qa with filters and standing-failure pinning',
+  },
+  {
+    roadmap: 'AO3',
+    title: 'Write up a test you ran by hand, without losing your notes',
+    plain:
+      'A form for recording a check a person did themselves — paste or drag screenshots straight in, and it saves as you type, so closing the tab costs nothing. Why it matters: most of what has really been verified here was verified by a person, and almost none of it is written down anywhere.',
+    technical:
+      'Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label — this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open.',
+  },
+  {
+    roadmap: 'AO3',
+    title: 'Take the testing record out as a file, and put it back',
+    plain:
+      'Export everything that has been tested as a single file, and import it again. Why it matters: it is the only portable copy of the testing record — it survives a database wipe and can be handed to somebody outside the team.',
+    technical:
+      'Owed, not descoped. Doc 13 section 11 makes the manual composer, screenshots, 2s autosave and the sahoda_qa_v1 round-trip core to the QA console. Section 18 cut line is CSV export, copy-day/watermark, WIP nudge, session-strip label — this is not on it. Deferred for time on 2026-07-27 and marked blocked deliberately so it stays in To reach Done. P4/SL-031 must not close while this is open.',
+  },
+  {
+    roadmap: 'AO3',
+    title: 'Make cards move on screen while the agent works',
+    plain:
+      'Live updates, so the board changes in front of you instead of when you refresh. Why it matters: watching the work happen is most of the value of having a board at all.',
+    technical:
+      'Live updates so cards move while Claude works (Supabase Realtime on the ops tables).',
+  },
+  {
+    roadmap: 'AO3',
+    title: 'Stop stray colours getting into the product',
+    plain:
+      'A check that fails the build when a colour is written directly into a screen instead of coming from the design system. Why it matters: today that rule is only written down, and nothing enforces it — so every screen can drift a little further from the brand.',
+    technical: 'Raw-hex guard test (doc 08 has no ESLint rule behind it).',
+  },
+  {
+    roadmap: 'AO4',
+    title: 'A sign-up form we can drop onto any landing page',
+    plain:
+      'A small early-access form that can be embedded on any site we run, tagged so we know which page it came from.',
+    technical: '/embed/beta public form.',
+  },
+  {
+    roadmap: 'AO4',
+    title: 'Keep bots and floods out of the sign-up form',
+    plain:
+      'A challenge, a rate limit and a hidden trap field, all checked on the server. Why it matters: a public form on the open internet is filled in by robots within hours.',
+    technical: 'Beta-apply hardening — Turnstile, rate limit, honeypot.',
+  },
+  {
+    roadmap: 'AO4',
+    title: 'An inbox for early-access requests',
+    plain:
+      'Every application in one list with search, status filters, approve and reject on each row, and an export.',
+    technical: 'Applications inbox with CSV export.',
+  },
+  {
+    roadmap: 'AO4',
+    title: 'Invite an applicant, and know when they actually join',
+    plain:
+      'Approving an application sends a real invitation email, and the application updates itself when that person finishes signing up. Why it matters: otherwise the inbox slowly fills with people whose status nobody knows.',
+    technical: 'Clerk invitations and user.created webhook.',
+  },
+  {
+    roadmap: 'AO4',
+    title: 'Two different admins required to add credits to an account',
+    plain:
+      'One admin asks; a different admin confirms with a code sent to them. Why it matters: no single account — including a compromised one — can create credits out of nothing.',
+    technical: 'Credit request with two-admin OTP (maker-checker).',
+  },
+  {
+    roadmap: 'AO4',
+    title: 'Add credits through the one path that cannot double-charge',
+    plain:
+      'The grant goes through the single accounting function, so approving the same request twice adds the credits exactly once. Why it matters: this is money; a duplicate here is a real balance that is wrong.',
+    technical:
+      'Also owns the why-line. wt-web rewrote the wallet GRANT copy to classify from the idempotency key and actor rather than action_type, and the admin why-line went with it — so doc 13 §6\'s "Credits added by Sahoda Labs team." currently has no implementation. Add it as an `admin` origin in lib/wallet/grant-origin.ts, PROVEN from adminGrantKey() the way signup and plan are proven, not by matching action_type: that field is free text with no CHECK and the classifier deliberately stopped trusting it (see SL-032).',
+  },
+  {
+    roadmap: 'AO4',
+    title: 'Manage who has admin access, and stop the last owner locking everyone out',
+    plain:
+      'Add, demote and revoke admins, with revocation taking effect immediately. The last remaining owner cannot demote or remove themselves. Why it matters: there is no support desk to call if everybody loses access at once.',
+    technical: '/admin/team roles with last-owner guard.',
+  },
+  {
+    roadmap: 'AO4',
+    title: 'Record who did what in the admin console',
+    plain:
+      'Every approval, grant, role change and revocation is written to a log that the console itself cannot quietly edit.',
+    technical: 'Audit log on every admin mutation.',
+  },
+  {
+    roadmap: 'AO5',
+    title: 'Check the finished console against its own acceptance list',
+    plain:
+      'Walk the whole admin build against the list it was specified with, run a security review over it, and hand it over. Why it matters: it is the point where "built" becomes "verified".',
+    technical: 'Acceptance gate (doc 13 §17), security review, changelog, handoff.',
+  },
+  {
+    roadmap: null,
+    title: 'Stop guessing why a customer was given credits',
+    plain:
+      'The wallet explains each credit grant by reading a free-text label that nothing checks, so a new kind of grant can quietly show a customer the wrong explanation — "included with your plan" for credits that came from somewhere else entirely. Why it matters: the wallet is the page a customer opens when they doubt a charge, so it is the last place to be approximately right.',
+    technical:
+      'GRANT rows carry their origin in action_type, which is plain text with no enum and no CHECK. GRANT_ORIGIN in @sahoda/shared plus a migration-scanning contract test keep producer and consumer honest, but nothing stops a new writer inventing a value — it renders as "Included with your plan", which is wrong for every grant that did not come from a plan. Replace the convention with a real grant_origin column or structured meta, backfill, then delete the string matching in lib/wallet/entry-copy.ts.',
+  },
+  {
+    roadmap: null,
+    title: 'Run the checks automatically on every proposed change',
+    plain:
+      "Nothing runs the test suite today except a developer's own machine at the end of a session. This runs it on every proposed change instead. Why it matters: it is the difference between catching a break before it merges and finding it in production afterwards.",
+    technical:
+      'There is no CI at all — .github holds one issue template, and the Stop hook is the only thing standing between a broken commit and main. Smoke cannot go in the Stop hook: Playwright boots its own dev server (~8s cold) and global-setup fetches a Clerk testing token, so it would add 60-120s to every stop AND hard-fail the credential-free cloud sandbox that teammates use, where a non-technical user cannot recover. A workflow file runs the same checks once per PR instead of once per stop. Needs Clerk test and Supabase secrets in GitHub; gate the live-DB suites on their env flags so a fork PR without secrets still reports honestly rather than red. MUST ALSO HANDLE SL-046: turbo typecheck does not depend on build, so on a fresh CI checkout (no .next) typedRoutes validation is meaningless — the CI config has to build before typecheck or it inherits the trap. See also SL-047 (/ returns 404) for the smoke matrix.',
+  },
+  {
+    roadmap: null,
+    title: 'Fix a test that only fails when the whole suite runs',
+    plain:
+      'One test passed on its own and failed two runs in five alongside everything else — not because the code was wrong, but because it ran out of time waiting. Why it matters: a test that fails at random teaches everybody to ignore red, which is the expensive habit.',
+    technical:
+      'apps/web/src/app/actions/brand-resolve.test.ts > "resolveBrand — deployment config failures" > "missing billing env → honest config copy, cause logged server-side" failed 2 of 5 full-suite runs on 2026-07-26 and passes every time in isolation. It is NOT a logic race: the captured failure is "Test timed out in 5000ms". The test calls loadResolveBrand(), which resets modules and dynamically re-imports the action; in a full run the import phase alone takes ~156s across 92 files, so under that contention the import exceeds the 5s default. Fix by giving this test an explicit timeout, or by hoisting the dynamic import out of the timed body — not by raising testTimeout globally, which would hide slow tests everywhere.',
+  },
+  {
+    roadmap: null,
+    title: 'Catch a database change that reports success without doing anything',
+    plain:
+      'A change to the database was recorded as applied while the file describing it was empty. The history said done, the database had nothing, and every layer underneath reported success. Why it matters: nothing in the stack currently compares what a change CLAIMS to create against what actually exists afterwards, so this can happen again silently.',
+    technical:
+      'On 2026-07-25 migration 20260725182153_ops_ingest.sql was written to schema_migrations while the file was 0 bytes: a first push timed out before the content was copied in, and the retry applied an empty file. History said applied, the schema had neither the function nor the columns, and every layer downstream reported success — supabase db push exited 0, the app returned a clean 502, and a future push would skip the version forever. Cheapest useful guard: refuse to apply an empty migration file, then a post-push check that parses CREATE TABLE/FUNCTION/INDEX/POLICY names out of the applied files and asserts each object exists in the catalog. Run it in the CI card above.',
+  },
+  {
+    roadmap: null,
+    title: "Stop a card that moves backwards from keeping its 'finished' date",
+    plain:
+      'When a card is moved back a column, the date saying it was finished stays behind on it. Why it matters: the board shows how long a card has sat where it is, and that number is read off exactly these dates — so a reopened card can claim it was done.',
+    technical:
+      'public.ops_ingest only ever coalesces started_at / review_at / done_at, so a stamp survives a card moving back a column. Proven on 2026-07-26: the commit hook wrongly closed SL-028 and SL-032, and after reverting them to todo both still carried a done_at — the rows were repaired by hand. Fix in the RPC: null the stamps that the incoming column does not justify (done_at only when board_column = done, review_at only at review or beyond) rather than coalescing unconditionally.',
+  },
+  {
+    roadmap: null,
+    title: 'Tell the operator why admin access was refused — in the log, never on the page',
+    plain:
+      'The console answers "page not found" identically whether the page does not exist or you are not an admin, which is right for a stranger and confusing for an owner staring at their own console. The reason gets written to the developer log instead, while the page itself stays byte-for-byte identical. Why it matters: an owner lost real time working out which of the two was true, when both were.',
+    technical:
+      'Doc 13 §2 requires /admin to 404 identically for "no such route" and "not an admin". Fix in middleware.ts: when NODE_ENV !== production, console.info a single line naming the reason — `[admin] denied: no ops_admin seat` / `no session` / `ops_admins query failed` — and keep the RESPONSE byte-identical in every case. Never in production, never in a header, never in the body. Include the reason for a failed check too, since isActiveOpsAdmin() swallows every error into false and a broken query currently looks exactly like a revoked seat.',
+  },
+  {
+    roadmap: null,
+    title: 'Remove the test shortcuts that let impossible data pass',
+    plain:
+      'Test helpers can be told to skip type checking, and one of them was — so twenty-five tests passed happily against a value the real database would reject outright. Why it matters: those helpers are exactly where the checking should be strictest, because every test downstream trusts whatever shape they produce.',
+    technical:
+      'On 2026-07-26 a test factory ended `} as OpsRoadmapItem`, and the cast let four call sites pass status:"in_progress" — a value the enum does not have and the CHECK constraint rejects. Twenty-five tests were green against a status that cannot exist; the live ingest caught it, not the suite. Sweep every `as <RowType>` and `as any` in *.test.ts / *.test.tsx / test factories and fixtures across apps and packages; replace each with an annotated return type so the fields are checked at the call site. Where a cast is genuinely needed (a deliberately malformed row proving a parser rejects it) keep it and write the reason on the line above — an explained cast is a test, an unexplained one is a hole.',
+  },
+  {
+    roadmap: null,
+    title: 'Stop the dashboard guessing facts it could simply have recorded',
+    plain:
+      'In several places the dashboard works out an answer from a nearby clue instead of recording the fact — so it announced the agent was working on cards it had finished days earlier, and test results were filed against whichever card happened to be open. Why it matters: a guess presented in the same typeface as a fact is indistinguishable from one.',
+    technical:
+      'Two instances found on 2026-07-26. (1) The heartbeat derived tasks_touched from "board_column !== todo", so it named every DONE card and announced Claude was working on SL-001–003 while the real work was SL-015. (2) Roadmap item statuses are flipped by hand when their SL cards finish; nothing derives or records the link, so AO1/AO2 sat at todo while all twelve of their cards were done with shas. A third is already in the code: the auto-QA hook attributes every run to whichever card happens to be in_progress (currentTaskCode in ops-hook-bash.mjs) rather than to what was actually tested. The rule to apply: infer only what cannot be recorded, and say so where it shows. Candidates: tasks_touched, roadmap status, QA run attribution, "age in column" (see SL-036), and the changelog task_codes link.',
+  },
+  {
+    roadmap: null,
+    title: 'Walk the admin console by hand, eight steps',
+    plain:
+      'Four things the console is supposed to do have been proven only by automated tests and never once by a person clicking through: the refusal for a non-admin, an invited signup arriving, a form submitted from another website, and the progress card recomputing. Why it matters: automated checks prove the code says the right thing, not that a person can do the thing.',
+    technical:
+      'Doc 13 section 17 has four partial items that are unit-proven but never exercised by a person. Steps, in order: (1) /admin/team, add a second admin, confirm the seat reads "not signed in yet". (2) Confirm the last owner has no role select and no Revoke. (3) /admin/dev, drag a card between columns, confirm it survives a reload. (4) Block a card, confirm it refuses with no reason then accepts one. (5) /admin/applications shows the empty state. (6) /embed/beta inside an iframe on a FOREIGN origin renders, and any other route refuses framing. (7) Submit the form, it lands as new, then Approve and invite sends a real Clerk invitation. (8) The credit flow end to end: request, wrong code counts down, right code grants, SAME code again says already approved and /wallet shows ONE entry. Needs Clerk Restricted mode on, plus TURNSTILE and CLERK_WEBHOOK_SECRET in .env.',
+  },
+  {
+    roadmap: 'admin-ops',
+    title: 'Close a hole that let one admin approve their own credit grant',
+    plain:
+      'The two-admin rule on credits could be switched off by whoever was calling it — so a single admin, or any third admin holding a valid code, could grant credits alone. Proven by granting 250 credits in a test written to check the finding rather than take it on trust. Why it matters: the two-admin rule is the only thing standing between one account and unlimited credits.',
+    technical:
+      "p_allow_self was a boolean parameter on ops_credit_request_verify, a function granted to authenticated — so the caller set it, and setting it true skipped the approver check as well as self-approval. Migration 16 drops the three-argument overload, makes not_the_approver unconditional, and moves the dev escape hatch to sahoda.allow_self_approve, a database setting no PostgREST client can write. Also: Clerk user.created now requires a VERIFIED primary email before binding a seat; ops_qa_artifact_add requires the run to be the caller's own and still open; service-rpc.test.ts written, since the module header claimed it existed.",
+  },
+  {
+    roadmap: 'admin-ops',
+    title: 'Two charts: where the work is sitting, and whether the checks are healthy',
+    plain:
+      'One chart shows how many cards sat in each column, day by day. The other shows a grid of days for each set of checks, where a day nobody ran anything is drawn as a hole rather than a line joining the days either side. Why it matters: the second rule is the whole point — a chart that smooths over an untested week is a chart that lies quietly.',
+    technical:
+      'ORIGINAL ASK: Recharts, doc 08 tokens only, crimson for failures, tabular-nums. (1) Cumulative flow — To Do / In Progress / For Review / Done over time, reconstructed from ops_tasks timestamps. (2) Gate health — pass/fail per suite over time from ops_qa_runs. Honesty rules are part of the card, not polish: state the window explicitly on the chart, draw no trend through fewer than five points, and render a gap in the data as a GAP. No velocity chart until there is enough history for one to mean anything.\n\nDECIDED 2026-07-30, approved by DIVAS — do NOT "fix" this back to Recharts. Two grounds. (1) The repo already carries a hand-rolled SVG chart pattern with an explicit rationale in components/home/spend-area.tsx: "no chart library, by design". Adding one contradicts a standing decision and touches pnpm-lock, which has caused two outages. (2) Every fill is an L1 Brand Skin token (--t100/--t300/--p/--pstrong), so both charts re-theme with the workspace for free; a library\'s config object needs a per-theme branch kept in sync by hand.\n\nTwo calls inside that, also deliberate. The four board columns are an ORDERED sequence, not four categories, so they take one hue light-to-dark rather than four hues — truer to the data and colour-blind safe by construction, because lightness separates where hue would not. And gate health is a GRID OF DAY CELLS, not a line chart, because that makes the gap rule physical: there is no line that could be joined across a week nobody tested. A line chart would make the most dangerous failure mode a one-character change.\n\nIf a future session still wants Recharts, the data layer (flow-history.ts, gate-history.ts) is separate and fully tested, so the swap is contained — but read this first.',
+  },
+  {
+    roadmap: null,
+    title: 'Give testing its own database, so preview links cannot touch customers',
+    plain:
+      "There is one database, and everything shares it: a developer's laptop, every preview link, and production — holding 26 real workspaces and 17 real users. Onboarding tells non-technical teammates to check their fixes on a preview link. Why it matters: a teammate clicking through a preview to check a fix can spend a real customer's credits, and those charges cannot be undone. A second database was measured at no monthly cost; nobody had ever checked.",
+    technical:
+      "TOP OF THE OPEN LIST, promoted 2026-07-30 by DIVAS: blocking NOW, not 'when a customer exists'.\n\nThere is exactly ONE Supabase project (rloztdhzfliyvpvxsgjl, ap-south-1) serving local dev, CI, Vercel previews and production at once. Three symptoms, one cause: (a) local tests reached production through a blanked env var (R-01); (b) every migration is a production migration with no rehearsal; (c) every PREVIEW deployment reads and writes the live database — each of the five Supabase vars is a single Vercel row scoped 'Preview, Production'.\n\nCOST, measured 2026-07-30 against org 'sahoda', not estimated: a second PROJECT is $0/month; a persistent BRANCH is $0.01344/hour (~$9.80/month). A standing staging project is cheaper AND simpler than branching.\n\nFULL PLAN: docs/audit/2026-07-30-staging-project-plan.md. Headline: create sahoda-staging in ap-south-1, replay all 23 migrations onto it (that replay is the rehearsal we have never had), seed ops_* only and NO customer data, then split each of the five Vercel Supabase vars into Preview→staging and Production→prod. Point local .env at staging, move preview onto the Clerk dev instance, and flip the R-01 guard from 'abort if target is prod' to 'assert target is staging'.\n\nDONE WHEN a preview provably cannot reach production — verified by reading a row on preview that exists only in staging, not by inspecting config. SL-049 closes with this card.",
+  },
+  {
+    roadmap: null,
+    title: 'Fix admin text that is too faint to read',
+    plain:
+      'Sixteen screens in the admin console paint real content in a grey roughly half as legible as the accessibility floor, and four hand-roll a heading style instead of using the shared one. Why it matters: the console was built on a branch that split off before those readability rules landed, so it never met them — and a ratchet now stops it getting worse while this waits.',
+    technical:
+      'wt-admin branched before the v3 readability/typography guards landed on wt-web (8ea9155) and was never run against them; the 2026-07-28 trunk merge is the first time they met. 16 files paint content text with --ink-faint (~2.5:1 against a 4.5:1 floor) and 4 hand-roll an eyebrow instead of type-eyebrow. Recorded as debt in apps/web/src/lib/design/{ink-faint,eyebrow}-exceptions.ts with per-file counts, dates and this card; debt-ratchet.test.ts caps the registers so they can only shrink. Fix = text-faint -> text-muted, hand-rolled eyebrow -> type-eyebrow, then DELETE each entry and lower the ratchet baseline. Week 1 chore, not launch scope.',
+  },
+  {
+    roadmap: null,
+    title: 'Restore a test that was switched off for failing under load',
+    plain:
+      'One test passes fifteen times out of fifteen on its own and fails about one run in three alongside the full suite. It is switched off, but loudly — labelled so it stays visible in the output. Why it matters: this suite is about to become a required check, and a flaky test inherited quietly would make every red result arguable.',
+    technical:
+      'INTERMITTENT, not consistent: passes 15/15 alone, failed 1 of 3 full apps/web runs (1,816 tests) on the trunk merge. Untouched by the merge (empty diff vs 88b081a), so pre-existing flake surfaced by the larger merged suite. Assertion is toHaveFocus() after an async in-flight disable; under parallel load the restore-focus effect can land after the assertion. Skipped with test.skip and a QUARANTINED-FLAKY label so it stays VISIBLE in run output. Fix = await the focus restoration deterministically, or fix the component if the race is real, then un-skip.',
+  },
+  {
+    roadmap: null,
+    title: 'The type check reads leftover files, so on a clean machine it checks nothing',
+    plain:
+      'The check that catches broken links between pages reads a file that only exists after a build. On a developer machine there is usually an old one lying around; on a fresh machine there is none at all — so the check either fails for no reason or, worse, passes while checking nothing. Why it matters: whichever way automated checks are set up, they will inherit this trap unless it is fixed first.',
+    technical:
+      "turbo.json's `typecheck` task declares dependsOn ['^typecheck'] only — it does NOT depend on `build`. apps/web sets typedRoutes:true, so Next generates .next/types/routes.d.ts at BUILD time; typecheck therefore validates against whatever artifacts happen to be on disk. Observed 2026-07-28: immediately after the wt-admin merge, typecheck reported 7 RouteImpl errors on /admin/* purely because the route manifest predated those routes; `turbo run build --force` regenerated it and typecheck went green with zero code changes. FIX: make the gate run build before typecheck (or add dependsOn ['^build'] to the typecheck task) and prove it on a clean clone. Blocks/informs SL-033.",
+  },
+  {
+    roadmap: null,
+    title: 'Typing the web address into a browser returns "page not found"',
+    plain:
+      "The bare domain serves a 404. The app itself works — the sign-in page answers normally — you simply cannot arrive at it by typing the address. Why it matters: opening the domain is the first thing a design partner or a payment provider's reviewer does.",
+    technical:
+      'Measured 2026-07-28: https://sahodalabs.vercel.app/ -> 404, and the same on the trunk preview, so it is PRE-EXISTING and not caused by the wt-admin merge. apps/web/src/app has route groups (app)/(auth)/(onboarding) but no root page.tsx, so Next serves its default 404. /sign-in returns 200. FIX: a root page that redirects signed-out visitors to /sign-in and signed-in ones to /home, or a real landing page. Also add a probe for / to the CI smoke matrix so it cannot regress silently.',
+  },
+  {
+    roadmap: null,
+    title: 'A setting the board sync depends on was never given a value',
+    plain:
+      'The deployed app declares that it needs an address to send board updates to, and that address was never set anywhere — so the feature ships switched off while claiming a dependency it does not really have. Why it matters: it is the same half-landed shape as the error-reporting settings, which is why production crash reports are still unreadable.',
+    technical:
+      "Found 2026-07-28 during the Phase 3 pre-flight. The wt-admin merge added OPS_INGEST_URL to turbo.json's @sahoda/web#build env allowlist, but the variable does not exist in ANY Vercel environment (verified: vercel env ls shows 46 vars, this is not among them). Same class as SENTRY_ORG/PROJECT/AUTH_TOKEN (declared in turbo by ba32a3f, never set in Vercel, so production stack traces are still minified and no build complains). FIX: set the value in Vercel, or delete it from the allowlist so the declaration stops asserting a dependency that is not real. Do it AFTER the Phase 3 soak, one variable at a time.",
+  },
+  {
+    roadmap: null,
+    title:
+      'Preview links write to the live customer database, and onboarding sends teammates there',
+    plain:
+      "Every preview link shares one database with production — 26 real workspaces, 17 real users — and the onboarding guide tells non-technical teammates that visual checks happen on preview links. Why it matters: a teammate checking a fix can spend real credits, which cannot be reversed, and create real posts and sites in a paying customer's workspace. This closes when the separate database lands; it is the sharpest symptom rather than a separate fault.",
+    technical:
+      "Verified 2026-07-28 by vercel env ls: every Supabase variable (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_DB_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_JWT_SECRET, SUPABASE_PROJECT_REF) exists as exactly ONE row scoped 'Preview, Production' — a single shared value, no preview override. There is also only one Supabase project in the account, so there is nothing else a preview could point at. Note the irony recorded in the same session: the R-01 forbidden-target guard now REFUSES to let an automated test touch this database, while a human is actively directed at it through a preview. INTERIM FIX until the split lands: an explicit warning line in TEAM_ONBOARDING.md and apps/web CLAUDE.md stating that preview writes to live customer data and that teammates must not perform credit-spending or content-creating actions there.\n\nROOT CAUSE IS SL-043 (one Supabase project). It closes when SL-043's Vercel env split lands; do not fix it separately.",
+  },
+  {
+    roadmap: null,
+    title: 'A hundred tests have never run — five parts of the codebase are unchecked',
+    plain:
+      'Five parts of the codebase, including the one that handles payments, are configured in a way that finds no tests at all and then reports success for finding none. A hundred test files have therefore never executed once. Why it matters: the payment work is about to be built on top of nineteen tests nobody has ever seen the result of.',
+    technical:
+      '`packages/shared` (7 files), `billing` (19), `mesh` (14), `publishing` (8) and `sites` (52) have no `vitest.config.*` or `vite.config.*`, and there is no workspace or projects key. Each falls back to the repo-root config, whose `include` is `[\'scripts/**/*.test.mjs\']`, resolved against the package as root — matching nothing, since every test lives under `src/`. Their script is `vitest run --passWithNoTests`, which turns "found nothing" into exit 0. Only `packages/db`, `apps/web` and `apps/jobs` have ever run anything. All five also still carry `lint: exit 0`. BLOCKS SLICE A. Scope the failures before fixing — switching this on after six weeks may reveal a lot.',
+  },
+  {
+    roadmap: null,
+    title: 'Skipped tests were being counted as passed',
+    plain:
+      'The tool that records test results counted passes and failures, and had no idea what a skipped test was — so a run where 202 database tests never executed was recorded as "the checks ran and everything passed". Why it matters: it is the exact failure this project refuses, in the very tool built to catch it, and it had been hardened three times against understating success while nobody asked about the other direction.',
+    technical:
+      '`scripts/lib/ops-classify.mjs:132-135` — `countsFor()` has a regex for `passed` and one for `failed` and NONE for `skipped`. Vitest prints `Tests 71 passed | 202 skipped (273)`; the 202 is invisible. Contributing factor at `:166`: `stripAnsi(output).slice(-4000)` keeps only the tail, so the skip lines never reach the classifier and `apps/web`\'s count gets attributed to a suite labelled typecheck. Fix: add `skipped: sum(/(\\d+)\\s+skipped/i)` and make the summary sentence at `:189` conditional on it being zero. Note the shape of the bug — the function was hardened three times against UNDERSTATING success, with a comment at `:43-44` saying understatement "is its own kind of dishonesty," and nobody asked whether a test that never ran should count as one that passed. Direct violation of doc 15 §2 rule 3.',
+  },
+  {
+    roadmap: null,
+    title: 'Changes to the board file are unreadable in review',
+    plain:
+      'Every time the board is written, the whole file is rewritten — so a change touching eight lines shows up as sixty-three lines added and sixty-three removed, and a reviewer cannot see what actually changed. Why it matters: the board is meant to be reviewed like code, and this makes reviewing it pointless.',
+    technical:
+      "BACKLOG. `scripts/lib/ops-state.mjs:56-60` writes state as raw UTF-8 via `JSON.stringify(value, null, 2)`; an older writer produced ASCII-escaped `\\uXXXX`. Every `writeState('board', …)` re-encodes the whole file — commit `8f9a0db` shows 63 insertions / 63 deletions of which only 8 lines are real content. RULING: raw UTF-8 is the committed form, because `:48-54` documents that the current encoding deliberately matches Prettier's output so the formatter's rewrite is a no-op. Reverting to escapes would be flipped back by the next hook run. Remaining work: confirm no other writer produces escapes, and add an assertion to the board resolver.",
+  },
+  {
+    roadmap: null,
+    title: 'Where a screenshot gets filed is checked by the app but not by the database',
+    plain:
+      'The rule about where a test screenshot is stored is enforced by the app only, so anything talking to the database directly can ignore it. Nothing becomes readable that was not before — it is a tidiness problem, not a security one. Why it matters: the very same change argued eight lines earlier that app-only validation "disappears the first time somebody calls storage directly", and then did exactly that.',
+    technical:
+      "`ops_qa_artifact_add` accepts any text for `p_storage_path`; the `qa/<runId>/` prefix is enforced only at `apps/web/src/lib/ops/ops-qa.ts:209`. The RPC is granted to `authenticated`, so a PostgREST caller can pass an arbitrary path. NOT privilege escalation — the run must be the caller's own and still running (`ops_credit_self_approve_gate.sql:197`), and the bucket policy is admin-only. Data-integrity wrinkle only.",
+  },
+  {
+    roadmap: null,
+    title: 'Production was down for 22 hours 40 minutes',
+    plain:
+      'The hosting project was deleted and recreated, and the rebuilt one could only build a branch so old that it did not declare the settings the app needs — so roughly thirty-six of them were stripped, the build failed every time, and no request ever reached any application code. The secrets were all correct; the branch was too old to name them. Why it matters: 17 real users had no product for the best part of a day, and the rollback target had been destroyed along with the project.',
+    technical:
+      'REWRITTEN 1 Aug against verified evidence only; the original detail was inferred from measurements since withdrawn (wrong host, an SSO gate read as a broken build, probes sent with `Accept: */*`). PROVED: the recreated Vercel project built `main`, which on the new remote is a single "Initial commit" of 490 files. Its `turbo.json` has NO `@sahoda/web#build` task at all and an empty `globalEnv`, so Turborepo 2 strict mode declared nothing and stripped ~36 server variables — CLERK_SECRET_KEY, every SUPABASE_*, TOKEN_VAULT_KEY. The build FAILED (`Tasks: 0 successful` · `exited (1)`), all three attempts ERRORed, and Vercel\'s edge answered DEPLOYMENT_NOT_FOUND before any application code ran. Down from between 19:01 and 19:29 IST on 30 July to ~18:05 IST on 31 July. Fixed by a CLI deploy from wt-web at 17:47 plus disabling ssoProtection. Gate: `pnpm probe:prod`. STILL OPEN pending founder sign-in verification.',
+  },
+  {
+    roadmap: null,
+    title: 'Never delete the infrastructure that hosts production without the founder saying so',
+    plain:
+      'The code repository and the hosting project were deleted and recreated without approval. That destroyed the rollback target for every change in flight and cost 17 users nearly a day of downtime. Why it matters: this is the most irreversible class of action in the stack, and it now needs an explicit message from the founder — never an inference from a plan. Extended: production actions run in one named session at a time.',
+    technical:
+      'On 30 July the GitHub repository and the Vercel project were deleted and recreated without founder approval, causing ~22h40m of downtime for 17 users. Rule, effective immediately: the Vercel project, the GitHub repository and the Supabase project may not be deleted, recreated or re-linked without an explicit founder message. Not an assumption, not an inference from a plan. Sits alongside the non-negotiables in doc 15 §2. Extended 31 July: production actions run in ONE NAMED SESSION AT A TIME — a second session deployed at 17:47 IST while P0 was being diagnosed, and for twenty minutes two sessions held contradictory beliefs about whether production was deployed.',
+  },
+  {
+    roadmap: null,
+    title: 'Re-check the rollback plan just before pushing, not the day before',
+    plain:
+      'Every push plan named a verified version to roll back to. That version now returns "gone" — it evaporated when the hosting project was deleted, and nothing re-checked it. Why it matters: several sessions rested their safety on an artifact verified once, at one moment, that nobody looked at again.',
+    technical:
+      'Every push plan in this project ended with a named, verified rollback target — `dpl_8te1K3q…`, `isRollbackCandidate: true`. It now returns 410 GONE. A rollback target is only as durable as the project hosting it. Process change: re-assert the target exists and is promotable in the same session as the push, not in the plan that precedes it. Assert on the response body, not the status.',
+  },
+  {
+    roadmap: null,
+    title: 'The code repository is public',
+    plain:
+      'The repository is readable by anyone. A full scan across its whole history found no real credentials have ever been committed — what is exposed is the name of the production database, which is a map rather than a key. Nobody has forked or starred it, so making it private is still effective rather than symbolic. Downgraded from emergency to routine; no credential rotation needed.',
+    technical:
+      '`development156/sahodalabs` is public. Secret scan across all refs came back clean: every hit for `SUPABASE_SERVICE_ROLE`, `CLERK_SECRET_KEY`, `sk_`+64hex, `CASHFREE`, `OPENROUTER` and `DEVOPS_INGEST_TOKEN` is an empty `.env.example` key or a test fixture. What is exposed is the production Supabase project ref across 10 files and 8 audit documents. Access still requires the anon key plus a valid Clerk JWT, or the service-role key; neither is in the repo. 0 forks, 0 stars. Partly mitigated 31 July: .gitignore now carries `.vercel` and `.env*`.',
+  },
+  {
+    roadmap: null,
+    title: 'Confirm why pushing to this branch deploys to production, and pin it down',
+    plain:
+      'Pushing to the working branch does reach production — twice, provably. What nobody has confirmed is why, because the hosting setting that decides it has three possible modes and two of them would explain what we saw. Why it matters: if it turns out to be the third mode, those two successful deploys need another explanation and this becomes urgent again.',
+    technical:
+      "REWRITTEN 1 Aug. The original premise — \"pushing to trunk does not deploy until Vercel's production branch is corrected\" — is FALSE as of 31 July. Two pushes to `wt-web` each produced a git-sourced deployment with `target: production` that claimed `sahodalabs.vercel.app` (`dpl_EB5EmZ5J`, `dpl_HGxjuCHx`). What is NOT established is why: Vercel's production branch has three modes — the `main` branch, the repository's default branch, or a custom branch — and GitHub's default is now `wt-web`, so \"repository's default branch\" would resolve correctly. Nobody has read the Settings → Git page to confirm which mode is set. Close this once that page has been read after a hard refresh AND a push to `wt-web` has produced a production deployment (the latter is already twice true).",
+  },
+  {
+    roadmap: null,
+    title: 'Nothing has ever tested the sign-in gate against a running server',
+    plain:
+      'The tests covering which pages require signing in read the source code and check what it says. They cannot check what it does, because no server ever starts. They were green on the day the gate shipped broken. A first real check now runs against production; two deeper layers remain. Why it matters: proving the code says the right thing is not the same as proving a visitor is stopped.',
+    technical:
+      '`middleware.test.ts:78` asserts `/`, `/home`, `/wallet`, `/planner`, `/posts` and `/connections` are protected. 17/17 green, mutation-tested on 28 July — and blind to how those routes actually behave, because that suite READS SOURCE and asserts on its shape (`expect(code).toContain(...)`). The middleware gap documented on 26 July was theoretical; on 31 July it shipped. Tier 1 DONE (`pnpm probe:prod`): six routes, browser navigation headers, judged on where the redirect CHAIN ends — 16 unit tests, and it caught two bugs in itself before running once. Tier 2 (`next build && next start` integration tests in CI, 1-2 days) and Tier 3 (Playwright against a preview, 2-3 days, blocked on SL-043) remain. DO NOT close this by adding another source-assertion test — the existing one is correct and proved nothing.',
+  },
+  {
+    roadmap: null,
+    title: 'The recovery copy of the board had silently stopped matching it',
+    plain:
+      'The file used to rebuild the board from scratch had fallen seventeen cards behind, and restoring from it would have produced a board missing ten cards and stripped of the reasoning on eleven more — silently, with no error. Nothing was broken in production, which is the danger: this is the recovery path, and it had been rotting for weeks with no symptom. Now checked automatically on every commit.',
+    technical:
+      "Found 1 Aug while applying doc 16 §4: `scripts/lib/ops-seed-data.mjs` was SEVENTEEN cards behind `ops/state/board.json`. SL-044…049 were never added, and eleven more (SL-013…020, 033, 042, 043) carried stale or empty details. It surfaced only because doc 16 §5.7 happened to include an assertion nobody had thought to write before — and that assertion was ALREADY FAILING the first time it ran. A recovery path checked only when someone remembers is one you discover during the recovery. FIXED: seed backfilled and repaired by index, and `apps/web/src/lib/ops/seed-parity.test.ts` now asserts on every commit that a fresh seed reproduces the committed board — same codes, same titles, same details, contiguous numbering. Placed in apps/web, not beside the seed, because the Stop hook gates on turbo's `test` task and the root vitest suite is not part of it. 2 mutants killed (dropped card, altered title).",
+  },
+  {
+    roadmap: null,
+    title: 'The dashboard can be badly out of date without saying so',
+    plain:
+      "The deployed board sat 30 hours behind, showing 49 cards when there were 60, and nothing on the page said so. Updates are sent to whatever address is configured, which defaults to a developer's own machine — so unless somebody happens to have one running, the update is queued, the script promises to replay it later, and reports success. That promise is only kept if a sync ever runs; for 30 hours none did. Why it matters: a board that is quietly stale makes every other number on the page untrustworthy.",
+    technical:
+      'Same shape as the QA counter that scored skipped tests as passes, one layer up: both report success for something that did not happen, and both were introduced BY a correctness fix — the localhost default was deliberate hardening after a sync once posted local state to production by accident. A guard that fails closed still has to be loud about it. TIER 1 — show staleness. A freshness line on the roadmap card reading "Last synced N hours ago": neutral under an hour, warn past six, crimson past a day. IT MUST BE COMPUTED SERVER-SIDE FROM max(updated_at) ACROSS THE ops_ TABLES, never reported by the syncer — a syncer that never runs would otherwise report nothing wrong, which is the same bug again. TIER 2 — invert the default so the sync targets production, with a developer machine as the explicit opt-in, and make an unreachable endpoint a non-zero exit instead of a silent queue. TIER 3, separate and later (folds into SL-033 CI): a GitHub Action on push to wt-web posts the state files, so freshness depends on a push rather than on someone remembering. Tier 1 does not fix staleness; it stops staleness being invisible, which is the part that matters first.',
+  },
+  {
+    roadmap: null,
+    title: 'Rebuild the dashboard so a non-technical reader can understand it',
+    plain:
+      'Progress leads the page — how far along, which stage, days left, what shipped this week, what is blocked and who is waiting on whom. Everything else collapses out of the way. The red Alpha warning shrinks to a chip but never disappears, and the rule that outranks the rest is that nothing red may be hidden by a summary or a collapse. Why it matters: the console was written for the person who built it, and the person who needs to read it is not that person.',
+    technical:
+      'Five parts, agreed 1 Aug. (1) PROGRESS LEADS. The roadmap card becomes the hero — big percentage, stage, days remaining, what to reach Done, what shipped this week, what is blocked and why, what is next. The red Alpha warning demotes to a compact red chip inside it ("Alpha gate: 6 of 14 failing — audited 25 Jul, not re-run since") that expands on click. It stays red and stays visible. Also on the card, proposed and approved: the freshness line from SL-061, because a stale board makes every other number on it untrustworthy; a "what we cannot yet prove" line, because a reader sees a QA console and concludes the product is tested when it currently proves only that one package passed; and who is waiting on whom, because several blockers are a purchase or a walkthrough rather than engineering. Deliberately excluded: velocity, burndown and raw test counts. (2) PLAIN ENGLISH, PERMANENTLY. Every card title and detail written for a stakeholder — what it does and why it matters, no paths, function names or line numbers in the title; those move to a collapsed technical detail. Rewrite all 60, amend the sahoda-devops skill so it is the standing rule, and extend doc 13 §8 from the changelog to the board. (3) TWO VIEWS. Default is a rolled-up stakeholder view of 6-10 items grouped by roadmap stage; a "show all" toggle reveals the full board. No card is deleted or merged. (4) Collapse/expand on every region with state kept per admin, Done column capped, charts side by side, changelog rail scrolling in its own height. (5) THE RULE THAT OUTRANKS THE REST: nothing red may be hidden by a collapse or a summary. A rollup containing anything blocked or failing says so on its face.',
+  },
+  {
+    roadmap: null,
+    title: 'Moving a card used to erase what the card said',
+    plain:
+      'Recording a note while moving a card on the board replaced the entire card with that one note — everything it explained, gone, with no error and no warning. It happened twice today to two of the longest cards on the board, and was only caught because a separate check noticed the board no longer matched its source. Why it matters: the loss is silent and total, and it lands on exactly the cards that carry the most reasoning.',
+    technical:
+      "Found 1 Aug while wiring the plain-English rewrite. `scripts/ops-card.mjs` read `if (note) task.detail = note` on every start/review/done move — an overwrite, not an append, exit 0, no warning. PROVEN, not inferred: moving SL-061 and SL-062 to review with a note replaced their 1,697- and 2,167-character details with one sentence each. Both were recovered in full from `scripts/lib/ops-cards.mjs`, which is the point of having a single source list; before that list existed, this would have been unrecoverable except from git history. WHAT IS NOT ESTABLISHED, and was asserted here in an earlier draft of this card: that the same bug destroyed SL-013…018. Their details DO read like move notes ('Shell, sub-nav and rail item render; typecheck+lint green') and almost certainly are — but `git show 8ebf295:scripts/lib/ops-seed-data.mjs` shows the seed carrying those same strings, and those cards appear never to have been given a description of their own. A note filling a void is not a note destroying text, and the difference was worth checking rather than assuming. SL-060 attributed eleven stale-or-empty details to seed drift; whether this command contributed to any of them is open. FIXED: the note is printed with a line saying where a durable note belongs, and is no longer written to `detail`. There is no per-move note column and one must not be improvised out of a content field — improvising one is the whole bug.",
+  },
+  {
+    roadmap: null,
+    title: 'The tool that verifies our fixes was reporting work it had not done',
+    plain:
+      'We check that a test is real by deliberately breaking the code and confirming the test notices. The script doing that saved a copy of each file first — and when the folder for those copies was missing, the save failed, the script carried on regardless, and then printed that everything had been checked and put back. Twice in one day it reported success over work it had not done, once leaving three deliberately broken files sitting in the codebase under a clean report. Why it matters: this is the same silent-success failure the board keeps recording, sitting inside the one tool whose job is to prove the others are honest — and its output is trusted more than most.',
+    technical:
+      "Found 2026-08-03 during the SL-062 review. The ad-hoc shell loop was `cp file $S/x.bak; mutate; test; cp $S/x.bak file`, with $S pointing at a session scratch path that did not exist. Every `cp` failed to stderr and the loop continued. Run 1 additionally split its mutation spec on the wrong delimiter and rewrote a COMMENT, then reported '20 passed' as a surviving mutant — a false negative presented as evidence. Run 2 left rollup.ts, board.ts and collapsible-region.tsx mutated in the working tree beneath a report saying all three mutants were killed and all three files restored. FIXED: `scripts/lib/mutation-harness.mjs` + `scripts/mutation-check.mjs`, driven by a reviewable spec file under `mutations/`. Three guards, all structural rather than advisory: (1) the scratch directory is created AND probed with a write/read/compare before any mutation — `existsSync` would have passed a directory that exists but cannot be written to; (2) every backup is hashed back off disk and compared before the file is touched; (3) `formatReport` THROWS when any restore is unconfirmed, so no code path can print results over a mutated tree, and the failure names each affected file and its backup because a human has to recover by hand. A target matching zero or more than one occurrence is an error, not a survivor. Exit codes: 0 all killed, 1 a mutant survived, 2 the run proves nothing. 23 unit tests; `mutations/red-rule.mjs` re-runs the six SL-062 red-rule mutants (6/6 killed, tree verified clean) and the missing-directory incident was reproduced end to end and now self-heals.",
+  },
+]

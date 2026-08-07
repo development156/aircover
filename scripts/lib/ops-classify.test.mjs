@@ -1,0 +1,409 @@
+import { describe, expect, it } from 'vitest'
+
+import {
+  classifyBashRuns,
+  countsFor,
+  coverageFor,
+  isGitCommit,
+  stripAnsi,
+  suiteFor,
+  closingTaskCodes,
+  invokesOpsScript,
+  suitesFor,
+  taskCodesIn,
+  verdictFor,
+} from './ops-classify.mjs'
+
+describe('suitesFor', () => {
+  it('reports every suite a combined gate command covers', () => {
+    // The bug this pins: recording only `typecheck` for the full gate told the
+    // gates strip that lint and unit had not run, and understated a green gate.
+    expect(suitesFor('pnpm turbo run typecheck lint test')).toEqual(['typecheck', 'lint', 'unit'])
+  })
+
+  it('calls a vitest run over the isolation suites `rls`, not `unit`', () => {
+    expect(suitesFor('pnpm --filter @sahoda/db exec vitest run tests/ops_rls.test.ts')).toEqual([
+      'rls',
+    ])
+  })
+
+  it.each([
+    ['pnpm test:smoke', 'smoke'],
+    ['pnpm --filter @sahoda/web exec playwright test', 'smoke'],
+    ['tsc --noEmit', 'typecheck'],
+    ['npx eslint --fix src/', 'lint'],
+    ['pnpm --filter @sahoda/web exec vitest run', 'unit'],
+  ])('classifies %s as %s', (command, suite) => {
+    expect(suitesFor(command)).toContain(suite)
+  })
+
+  it.each(['git status', 'ls -la', 'node scripts/ops-seed.mjs', '', '   '])(
+    'ignores %j — not every command is QA',
+    (command) => {
+      expect(suitesFor(command)).toEqual([])
+      expect(suiteFor(command)).toBeNull()
+    },
+  )
+
+  it('labels a combined command by its most substantive suite', () => {
+    expect(suiteFor('pnpm turbo run typecheck lint test')).toBe('unit')
+  })
+})
+
+describe('verdictFor', () => {
+  it('lets failure evidence beat success evidence in the same output', () => {
+    // A turbo run prints both. Reading the success line first would call this pass.
+    const output = 'Tasks:    23 successful, 24 total\n Test Files  1 failed | 7 passed (8)'
+    expect(verdictFor({ output })).toBe('fail')
+  })
+
+  it('reads a clean vitest summary as pass', () => {
+    expect(verdictFor({ output: ' Test Files  92 passed (92)\n Tests  1296 passed (1296)' })).toBe(
+      'pass',
+    )
+  })
+
+  it('trusts an exit code when the harness supplied one', () => {
+    expect(verdictFor({ output: '', exitCode: 0 })).toBe('pass')
+    expect(verdictFor({ output: '', exitCode: 1 })).toBe('fail')
+  })
+
+  it('returns null on silence with no exit code, rather than guessing pass', () => {
+    // `tsc --noEmit` prints nothing when happy AND nothing when it never ran.
+    // This is the assertion that keeps invented green rows out of the console.
+    expect(verdictFor({ output: '' })).toBeNull()
+    expect(verdictFor({ output: '   \n  ' })).toBeNull()
+  })
+
+  it('sees failure through terminal colour codes', () => {
+    const coloured = ' [31m[1m1 failed[22m[39m'
+    expect(verdictFor({ output: coloured })).toBe('fail')
+  })
+})
+
+describe('stripAnsi', () => {
+  it('removes colour codes so the stored record is readable text', () => {
+    expect(stripAnsi('[33m 1006[2mms[22m[39m')).toBe(' 1006ms')
+  })
+})
+
+describe('countsFor', () => {
+  it('reads counts through colour codes', () => {
+    const output = ' Tests  [1m[32m1296 passed[39m[22m (1296)'
+    expect(countsFor(output).passed).toBe(1296)
+  })
+
+  it('returns nulls when the runner said nothing countable', () => {
+    expect(countsFor('')).toEqual({ passed: null, failed: null, skipped: null })
+  })
+
+  it('sums every package summary in a turbo run rather than taking the first', () => {
+    // The bug: turbo interleaves one summary per package, so reading the first
+    // match reported "22 passed" for a run of 1318 — a real number attached to
+    // the wrong thing, and lower than the truth.
+    const output = [
+      '@sahoda/shared:test:  Tests  22 passed (22)',
+      '@sahoda/db:test:      Tests  159 passed (159)',
+      '@sahoda/web:test:     Tests  1296 passed (1296)',
+    ].join('\n')
+
+    expect(countsFor(output).passed).toBe(22 + 159 + 1296)
+  })
+
+  it("counts a FAILING run's passes too — the summary reads 'N failed | M passed'", () => {
+    // The shape that broke it: on a red run vitest puts `failed` first, so a
+    // `Tests\s+(\d+)\s+passed` pattern matched nothing for that package and the
+    // record understated a 1518-test gate as "222 passed".
+    const output = [
+      '@sahoda/db:test:   Tests  167 passed (167)',
+      '@sahoda/web:test:  Tests  1 failed | 1295 passed (1296)',
+      '@sahoda/shared:test: Tests  55 passed (55)',
+    ].join('\n')
+
+    expect(countsFor(output)).toEqual({ passed: 167 + 1295 + 55, failed: 1, skipped: null })
+  })
+})
+
+describe('classifyBashRuns', () => {
+  const GREEN = ' Tasks:    24 successful, 24 total\n Tests  1296 passed (1296)'
+
+  it('emits one row per suite when the whole gate passed', () => {
+    // An aggregate pass genuinely proves each part passed, and every gate chip
+    // needs its own row to go green.
+    const runs = classifyBashRuns({
+      command: 'pnpm turbo run typecheck lint test',
+      output: GREEN,
+      exitCode: 0,
+    })
+
+    expect(runs.map((r) => r.suite)).toEqual(['typecheck', 'lint', 'unit'])
+    expect(runs.every((r) => r.status === 'pass')).toBe(true)
+  })
+
+  it('emits exactly ONE row when a combined gate failed', () => {
+    // An aggregate failure does not say which part broke. Marking three suites
+    // red on the strength of one failure invents evidence in the other direction.
+    const runs = classifyBashRuns({
+      command: 'pnpm turbo run typecheck lint test',
+      output: ' Test Files  1 failed | 91 passed (92)',
+      exitCode: 1,
+    })
+
+    expect(runs).toHaveLength(1)
+    expect(runs[0].status).toBe('fail')
+    expect(runs[0].suite).toBe('unit')
+    expect(runs[0].summary_plain).toContain('typecheck, lint, unit')
+  })
+
+  it('records nothing at all when the outcome is unreadable', () => {
+    expect(classifyBashRuns({ command: 'tsc --noEmit', output: '' })).toEqual([])
+  })
+
+  it('records nothing for a command that is not a test run', () => {
+    expect(classifyBashRuns({ command: 'git status', output: 'clean', exitCode: 0 })).toEqual([])
+  })
+
+  it('stores plain text, never terminal escapes', () => {
+    const runs = classifyBashRuns({
+      command: 'pnpm vitest run',
+      output: '[32m Tests  3 passed[39m',
+      exitCode: 0,
+    })
+    expect(runs[0].details).not.toContain('')
+  })
+
+  it('caps stored output so one noisy run cannot fill the column', () => {
+    const runs = classifyBashRuns({
+      command: 'pnpm vitest run',
+      output: `${'x'.repeat(50_000)}\n Tests  1 passed`,
+      exitCode: 0,
+    })
+    expect(runs[0].details.length).toBeLessThanOrEqual(4000)
+  })
+})
+
+describe('taskCodesIn', () => {
+  it('pads short codes to the board form so SL-7 and SL-007 are one card', () => {
+    expect(taskCodesIn('feat(SL-7,SL-012): thing')).toEqual(['SL-007', 'SL-012'])
+  })
+
+  it('de-duplicates a code repeated in subject and body', () => {
+    expect(taskCodesIn('feat(SL-9): x\n\nCloses SL-009.')).toEqual(['SL-009'])
+  })
+
+  it('finds nothing in a message with no codes', () => {
+    expect(taskCodesIn('chore: tidy up')).toEqual([])
+  })
+})
+
+describe('closingTaskCodes', () => {
+  it('closes only what the conventional-commit scope claims', () => {
+    expect(closingTaskCodes('feat(SL-011,SL-033): the sync commands')).toEqual(['SL-011', 'SL-033'])
+  })
+
+  it('does NOT close a card merely discussed in the body', () => {
+    // The real failure, verbatim. Commit 8f379e9 said SL-028 was still To Do and
+    // the hook marked it Done — the board contradicting the commit that fed it.
+    const message = [
+      'merge: bring wt-web into wt-admin, resolving the grant why-line in their favour',
+      '',
+      'the weakness SL-032 was carded for ... the admin grant does not exist yet',
+      '(SL-028 is still To Do, the grant lands in P3).',
+    ].join('\n')
+
+    expect(closingTaskCodes(message)).toEqual([])
+    // The general extractor still SEES them — that distinction is the fix.
+    expect(taskCodesIn(message)).toEqual(['SL-032', 'SL-028'])
+  })
+
+  it('closes nothing for a merge commit, which completes nothing', () => {
+    expect(closingTaskCodes('merge: bring wt-web into wt-admin')).toEqual([])
+  })
+
+  it('does not treat a scope QUOTED IN THE BODY as a claim', () => {
+    // Caught on the very commit that introduced the scope rule: its body
+    // explained the convention by quoting `feat(SL-011):`, and the first
+    // implementation read that as closing SL-011. A commit has one subject.
+    const message = [
+      'fix(ops): a commit closes only what its scope claims',
+      '',
+      'Writing `feat(SL-011):` is a deliberate claim that this commit is that',
+      "card's work. Body prose is discussion.",
+    ].join('\n')
+
+    expect(closingTaskCodes(message)).toEqual([])
+  })
+
+  it('reads the subject even when it arrives wrapped in shell', () => {
+    // The hook sees the whole command, heredoc and all — not a bare message.
+    const command = ["git commit -q -F - <<'MSG'", 'feat(SL-012): x', '', 'body', 'MSG'].join('\n')
+    expect(closingTaskCodes(command)).toEqual(['SL-012'])
+  })
+
+  it('ignores a scope that is not a card', () => {
+    expect(closingTaskCodes('fix(repo): repair the lockfile')).toEqual([])
+    expect(closingTaskCodes('feat(web): stop implying auto-publish works')).toEqual([])
+  })
+
+  it('normalises a short code from the scope', () => {
+    // What this test was really protecting — SL-7 and SL-007 are the same card.
+    // It used to assert that EVERY conventional type closes, which is the rule
+    // that let `docs(SL-040): card the walkthrough` mark the walkthrough walked.
+    // Completion by type now has its own describe block below.
+    expect(closingTaskCodes('feat(SL-7): x')).toEqual(['SL-007'])
+    expect(closingTaskCodes('fix(SL-007): x')).toEqual(['SL-007'])
+  })
+})
+
+describe('isGitCommit', () => {
+  it.each(['git commit -m "x"', 'git commit -F -', 'git add . && git commit -q -F -'])(
+    'recognises %s',
+    (command) => {
+      expect(isGitCommit(command)).toBe(true)
+    },
+  )
+
+  it.each(['git status', 'git log --format=%s', 'echo "git commit"'])(
+    'does not mistake %s for a commit',
+    (command) => {
+      // The echo case matters: a command that merely mentions committing must not
+      // close cards.
+      expect(isGitCommit(command)).toBe(command.startsWith('git commit'))
+    },
+  )
+})
+
+describe('invokesOpsScript', () => {
+  it.each([
+    'node scripts/ops-sync.mjs',
+    'node /abs/path/scripts/ops-sync.mjs --full',
+    'OPS_INGEST_URL=http://localhost:3002 node scripts/ops-sync.mjs',
+    'pnpm test && node scripts/ops-hook-bash.mjs',
+  ])('recognises %s as a run', (command) => {
+    expect(invokesOpsScript(command)).toBe(true)
+  })
+
+  it('does NOT treat staging the file as running it', () => {
+    // The real failure, verbatim in shape. The old guard matched the filename
+    // anywhere in the command, so this commit closed nothing: SL-015 sat in For
+    // Review with no sha while its work was committed and pushed.
+    const command =
+      "git add scripts/ops-sync.mjs && git commit -q -F - <<'MSG'\nfeat(SL-015): x\nMSG"
+
+    expect(invokesOpsScript(command)).toBe(false)
+    expect(isGitCommit(command)).toBe(true)
+    expect(closingTaskCodes(command)).toEqual(['SL-015'])
+  })
+
+  it.each([
+    'cat scripts/ops-sync.mjs',
+    'rm -f scripts/ops-hook-bash.mjs',
+    'git diff scripts/ops-sync.mjs',
+  ])('does not treat %j as a run', (command) => {
+    expect(invokesOpsScript(command)).toBe(false)
+  })
+})
+
+describe('only feat and fix CLOSE a card', () => {
+  // The regression this prevents: `docs(SL-040): card the eight-step
+  // walkthrough` was the commit that CREATED that card, and the hook read its
+  // scope as a claim of completion. The board then reported a walkthrough as
+  // walked that nobody had walked.
+  it('does not close on the commit that merely cards the work', () => {
+    expect(closingTaskCodes('docs(SL-040): card the eight-step walkthrough')).toEqual([])
+  })
+
+  it.each(['docs', 'chore', 'test', 'refactor', 'perf', 'ci', 'style', 'build', 'revert'])(
+    '%s touches a card without finishing it',
+    (type) => {
+      expect(closingTaskCodes(`${type}(SL-011): something`)).toEqual([])
+    },
+  )
+
+  it.each(['feat', 'fix'])('%s does close', (type) => {
+    expect(closingTaskCodes(`${type}(SL-011): something`)).toEqual(['SL-011'])
+  })
+
+  it('still closes several cards from one scope', () => {
+    expect(closingTaskCodes('fix(SL-011,SL-012): both')).toEqual(['SL-011', 'SL-012'])
+  })
+
+  it('a heredoc commit still finds its subject', () => {
+    expect(
+      closingTaskCodes("git commit -F - <<'MSG'\nfix(SL-016): the board writes\n\nbody\nMSG"),
+    ).toEqual(['SL-016'])
+  })
+})
+
+describe('SL-051 — a skipped test is not a passed test', () => {
+  const VITEST_SKIPS = 'Tests  71 passed | 202 skipped (273)'
+
+  it('counts skips, which were previously invisible', () => {
+    expect(countsFor(VITEST_SKIPS)).toMatchObject({ passed: 71, skipped: 202 })
+  })
+
+  it('reports zero-ish rather than inventing a count when there are none', () => {
+    expect(countsFor('Tests  71 passed (71)').skipped).toBeNull()
+  })
+
+  it('refuses to say "everything passed" when tests did not run', () => {
+    // The exact sentence that recorded a run where 202 database tests never
+    // executed as a clean pass.
+    const rows = classifyBashRuns({
+      command: 'pnpm turbo run test',
+      output: VITEST_SKIPS,
+      exitCode: 0,
+    })
+    for (const row of rows) {
+      expect(row.summary_plain).not.toMatch(/everything passed/)
+      expect(row.summary_plain).toMatch(/202 tests did NOT run/)
+    }
+  })
+
+  it('still says everything passed when nothing was skipped', () => {
+    const rows = classifyBashRuns({
+      command: 'pnpm turbo run test',
+      output: 'Tests  273 passed (273)',
+      exitCode: 0,
+    })
+    expect(rows[0].summary_plain).toMatch(/everything passed/)
+  })
+})
+
+describe('a filtered run must not record as a whole-workspace pass', () => {
+  it('extracts the packages a --filter run covered', () => {
+    expect(coverageFor('pnpm turbo run test --filter=@sahoda/web')).toEqual(['@sahoda/web'])
+    expect(coverageFor('turbo test --filter @sahoda/db --filter=@sahoda/jobs')).toEqual([
+      '@sahoda/db',
+      '@sahoda/jobs',
+    ])
+  })
+
+  it('returns null for an unfiltered run, which really did cover everything', () => {
+    expect(coverageFor('pnpm turbo run test')).toBeNull()
+  })
+
+  it('says ONLY, and names the scope, instead of claiming a clean pass', () => {
+    // The mechanism behind 38 false greens: --filter=@sahoda/web recorded as a
+    // bare `unit` pass, which the gates strip renders as the suite being green.
+    const rows = classifyBashRuns({
+      command: 'pnpm turbo run test --filter=@sahoda/web',
+      output: 'Tests  1947 passed (1947)',
+      exitCode: 0,
+    })
+    for (const row of rows) {
+      expect(row.summary_plain).toMatch(/@sahoda\/web ONLY/)
+      expect(row.summary_plain).toMatch(/does not cover the workspace/)
+      expect(row.summary_plain).not.toMatch(/everything passed/)
+    }
+  })
+
+  it('still claims a clean pass when nothing was filtered', () => {
+    const rows = classifyBashRuns({
+      command: 'pnpm turbo run test',
+      output: 'Tests  1947 passed (1947)',
+      exitCode: 0,
+    })
+    expect(rows[0].summary_plain).toMatch(/everything passed/)
+  })
+})

@@ -1,0 +1,244 @@
+/* ============================================================
+   SAHODA LABS — Design Tokens v3.0 "The Ledger"
+   Supersedes v2 and Design System doc 08 §2 token values.
+
+   Lives at: packages/shared/tokens.css
+   Reference: docs/design2.0/sahoda_design_system_v3.html
+   Rules:     docs/design2.0/UI_RULES_v3.md
+
+   THESIS — structure carries meaning, colour carries identity.
+   The app wears each customer's brand, so no state may depend on
+   colour to be understood. See the Certainty System at the bottom.
+
+   THREE LAYERS — read before editing:
+   L1  Brand Skin sources (--p …). The theming engine and the
+       workspace_themes DB rows override EXACTLY these seven
+       (TSD §17). Never rename. Never hardcode their values.
+   L2  v3 semantic names. Brand-linked ones ALIAS INTO L1 so every
+       surface re-themes. Neutrals and semantics are sources.
+   L3  Legacy names (--bg, --s1, --muted …) alias into L2 so
+       existing components keep rendering during migration.
+       Delete an alias only when nothing references it.
+
+   SPACING IS --space-N, NOT --s-N.
+   The legacy system uses --s1 / --s2 as SURFACE COLOURS. Redefining
+   them as spacing turns `background: var(--s1)` into
+   `background: 4px` and blanks every card in the app.
+   ============================================================ */
+
+:root {
+  /* ---------- L1 · BRAND SKIN SOURCES (DB contract — 7 vars) ---------- */
+  --p:       #FF4B00;  /* Sahoda Orange 500 */
+  --pfg:     #131313;  /* text/icon ON primary — 5.54:1 ok */
+  --pstrong: #D73F00;  /* large brand fills; white text 4.56:1 ok */
+  --acc:     #BA3700;  /* Ember — links, accent text, FOCUS RING 5.78:1 ok */
+  --t50:     #FFF2ED;
+  --t100:    #FFE4D9;
+  --t300:    #FFA580;
+
+  /* ---------- L2 · BRAND (aliases into L1 — re-theme safe) ---------- */
+  --brand:      var(--p);
+  --brand-ink:  var(--pfg);
+  --brand-deep: var(--pstrong);
+  --brand-text: var(--acc);
+  --brand-wash: var(--t50);
+  --brand-tint: var(--t100);
+  --brand-lift: var(--t300);
+
+  /* ---------- L2 · WARM NEUTRALS ----------
+     Warm-leaning deliberately: cool greys fight warm tenant brands,
+     and a large share of Indian SMB branding is warm. */
+  --canvas:    #FBFAF9;   /* app background */
+  --surface:   #FFFFFF;   /* cards, sidebar, topbar */
+  --surface-2: #F5F4F2;   /* wells, subtle fills */
+  --line:      #E7E5E3;   /* hairlines — these do the structural work */
+  --line-firm: #D6D3D0;   /* dashed borders, stronger dividers */
+  --ink:       #171514;   /* headings */
+  --ink-body:  #3D3936;   /* body text */
+  --ink-mute:  #6B6560;   /* secondary text */
+  --ink-faint: #A8A29E;   /* DISABLED + DECORATIVE ONLY — fails 4.5:1,
+                             never content text */
+
+  /* ---------- L2 · SEMANTIC ----------
+     Strokes, icons and text only. NEVER large fills. Brand owns fills.
+     This is what stops a tenant whose brand is red from colliding
+     with danger red — they never compete for the same surface. */
+  --ok:     #15803D;  --ok-bg:     #EAF6EE;
+  --warn:   #B45309;  --warn-bg:   #FBF1E4;
+  --danger: #C81E1E;  --danger-bg: #FDECEC;
+  --info:   #1D4ED8;  --info-bg:   #EAF0FD;
+
+  /* ---------- L2 · CHANNEL ACCENTS (platform-owned; chips only) ---------- */
+  --channel-instagram: #E1306C;
+  --channel-google:    #1A73E8;
+  --channel-whatsapp:  #25D366;
+  --channel-x:         #171514;
+  --channel-linkedin:  #0A66C2;
+
+  /* ---------- L2 · CERTAINTY ---------- */
+  --hatch: rgba(23, 21, 20, .16);   /* simulated-state diagonal */
+
+  /* ---------- L2 · TYPE ----------
+     Mono appears in exactly three places: the topbar credit pill,
+     the Credits balance, and eyebrow labels. Nowhere else.
+     Anything countable gets tabular-nums. */
+  --sans: 'Outfit', system-ui, 'Noto Sans Devanagari', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+
+  --t-display: 700 32px/38px var(--sans);
+  --t-h1:      700 24px/30px var(--sans);
+  --t-h2:      600 16px/22px var(--sans);
+  --t-body:    400 14px/22px var(--sans);
+  --t-sm:      400 13px/19px var(--sans);
+  --t-eyebrow: 600 11px/14px var(--mono);
+  --t-eyebrow-ls: .14em;
+
+  /* ---------- L2 · SPACE (4pt scale) ----------
+     --space-N. Do NOT introduce --s1/--s2 — see header. */
+  --space-1: 4px;   --space-2: 8px;   --space-3: 12px;
+  --space-4: 16px;  --space-5: 20px;  --space-6: 24px;
+  --space-8: 32px;  --space-10: 40px; --space-12: 48px;
+
+  /* ---------- L2 · RADIUS ---------- */
+  --r-sm:   6px;    /* badges, small chips */
+  --r-md:   10px;   /* buttons, inputs, channel chips */
+  --r-lg:   14px;   /* cards, nav items, wells */
+  --r-full: 999px;
+
+  /* ---------- L2 · ELEVATION (borders separate; shadows are minimal) ---------- */
+  --sh-card: 0 1px 2px rgba(23, 21, 20, .05);
+  --sh-pop:  0 6px 20px rgba(23, 21, 20, .10);
+  /* Credits balance hero ONLY. color-mix keeps it re-theme-safe —
+     a frozen rgba would not follow the tenant brand. */
+  --sh-brand: 0 8px 24px color-mix(in srgb, var(--p) 24%, transparent);
+
+  /* ---------- L2 · LAYOUT ---------- */
+  --sidebar-w:   220px;    /* collapses to 64px at 1180px and below */
+  --topbar-h:    56px;
+  --content-max: 1080px;   /* left-aligned; caps, leaves right whitespace */
+  --content-pad: 24px;
+  --rail-w:      280px;    /* Home only */
+
+  /* ---------- L2 · MOTION ---------- */
+  --ease:       cubic-bezier(.16, 1, .3, 1);
+  --ease-sweep: cubic-bezier(.2, 0, 0, 1);   /* blade-sweep signature only */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+
+  /* ---------- L3 · LEGACY ALIASES ----------
+     Existing components only. Remove one at a time as surfaces migrate.
+     NOTE --s1/--s2 stay SURFACE COLOURS here. That is deliberate. */
+  --bg:      var(--surface);
+  --s1:      var(--canvas);
+  --s2:      var(--surface-2);
+  --muted:   var(--ink-mute);
+  --faint:   var(--ink-faint);
+  --ff:      var(--sans);
+  --r-input: var(--r-md);
+  --r-card:  var(--r-lg);
+  --r-pill:  var(--r-full);
+  --dur-1:   var(--dur-fast);
+  --dur-2:   var(--dur-base);
+  /* --ink, --line, --ok, --warn, --danger, --info, --mono, --sh-card
+     and --sh-pop already carry their legacy names above — no alias needed. */
+}
+
+/* ---------- DARK ---------- */
+[data-theme="dark"] {
+  --canvas:    #141210;
+  --surface:   #1D1A18;
+  --surface-2: #262220;
+  --line:      #332E2B;
+  --line-firm: #4A433F;
+  --ink:       #F7F5F3;
+  --ink-body:  #D8D3CF;
+  --ink-mute:  #A8A29E;
+  --ink-faint: #6B6560;
+
+  --acc: var(--t300);        /* focus + accent on dark = Orange 300, 9.68:1 ok */
+  --channel-x: #F7F5F3;      /* the X glyph is invisible on dark otherwise */
+
+  --ok:     #4ADE80;  --ok-bg:     #12291B;
+  --warn:   #FBBF24;  --warn-bg:   #2B1F10;
+  --danger: #F87171;  --danger-bg: #2E1414;
+  --info:   #93C5FD;  --info-bg:   #101C2E;
+
+  --hatch:   rgba(247, 245, 243, .20);
+  --sh-card: 0 1px 2px rgba(0, 0, 0, .5);
+  --sh-pop:  0 6px 20px rgba(0, 0, 0, .6);
+}
+
+/* ---------- GLOBAL FOCUS — one treatment, no per-component overrides ---------- */
+:focus-visible {
+  outline: 2px solid var(--brand-text);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ============================================================
+   THE CERTAINTY SYSTEM — the signature.
+   Four levels of how real a thing is, each with a STRUCTURAL
+   signature that survives recolour, greyscale and colourblindness.
+   Apply to any status-bearing element: post chips, planner pills,
+   publish logs, wallet entries.
+   ============================================================ */
+
+/* REAL — it happened. Solid fill, no border. Settled. */
+.is-real {
+  background: var(--brand);
+  color: var(--brand-ink);
+  border: 1px solid transparent;
+}
+
+/* COMMITTED — it will happen. Hairline + tint. Locked in. */
+.is-committed {
+  background: var(--brand-wash);
+  color: var(--brand-text);
+  border: 1px solid var(--brand-tint);
+}
+
+/* PROPOSED — Sahoda suggests. Dashed. Visibly provisional.
+   Approving turns the dash solid: approval becomes a visible event. */
+.is-proposed {
+  background: transparent;
+  color: var(--ink-mute);
+  border: 1px dashed var(--line-firm);
+}
+
+/* SIMULATED — not real. Hatched, and ALWAYS carries a text label.
+   Never render this without the label; the hatch alone is not a claim. */
+.is-simulated {
+  background-color: transparent;
+  background-image: repeating-linear-gradient(
+    -45deg, transparent 0 5px, var(--hatch) 5px 6px);
+  color: var(--ink-mute);
+  border: 1px solid var(--line-firm);
+}
+
+/* The blade marks AGENCY — Sahoda acted, rather than the user.
+   Tints with the tenant brand automatically. One meaning only. */
+.blade {
+  display: inline-block;
+  width: 9px;
+  height: 15px;
+  background: var(--brand);
+  border-radius: 100% 0 100% 0;
+  flex: none;
+}
+
+/* Anything countable that the user is accountable for. */
+.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- REDUCED MOTION — suppresses blade-sweep, mascot, confetti ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
