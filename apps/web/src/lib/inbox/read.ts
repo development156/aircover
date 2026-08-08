@@ -1,107 +1,373 @@
 import 'server-only'
 
-import {
-  InboxMessageSchema,
-  InboxThreadSchema,
-  type InboxMessage,
-  type InboxThread,
-} from '@sahoda/shared'
+import type {
+  ScopedAccountId,
+  ScopedProfileId,
+  ZernioComment,
+  ZernioCommentedPost,
+  ZernioConversation,
+  ZernioCursorPage,
+  ZernioMessage,
+  ZernioPaged,
+  ZernioReads,
+  ZernioReview,
+} from '@sahoda/publishing'
+import { evaluateSendWindow, type ReplyAffordance } from '@sahoda/shared'
 
 import { cache } from 'react'
 
+import { newestInboundAt, threadPlatform } from '@/lib/inbox/messages'
+import {
+  SURFACE_CONNECTION_PLATFORMS,
+  decideSurface,
+  type SurfaceDecision,
+} from '@/lib/inbox/surface'
 import { createServerSupabase } from '@/lib/supabase/server'
+import { ScopeError, accountByIdForWorkspace, profileForWorkspace } from '@/lib/zernio/scope'
+import { zernioClientReads } from '@/lib/zernio/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
-/** Memoised per request, so a page's thread + message reads share one lookup. */
+import type { InboxSurfaceKey } from './emptiness'
+
+/**
+ * Server reads for the inbox, against Zernio's `/inbox/*` surface.
+ *
+ * ── READ ONLY, STRUCTURALLY ──────────────────────────────────────────────────
+ * `zernioClientReads()` returns `ZernioReads`, which has no send, reply, hide or delete
+ * method on it. A screen that displays a conversation therefore never holds a handle
+ * that could post — the capability is absent from the type, not merely unused.
+ *
+ * ── EVERY READ IS TENANT-SCOPED BY ITS PARAMETER TYPES ───────────────────────
+ * `profileId` and `accountId` are OPTIONAL filters on Zernio's side, and omitting
+ * `profileId` reads across every profile on the API key. So nothing here takes a plain
+ * string: the ids are branded and only `@/lib/zernio/scope` can mint one, from a row
+ * already fetched for the active workspace. Omission is a compile error.
+ *
+ * ── NOTHING HERE REPORTS A ZERO AS A MEASUREMENT ─────────────────────────────
+ * Every read resolves to a `SurfaceDecision` that distinguishes "we did not ask",
+ * "we could not resolve your account", "we could not reach it" and "we asked and there
+ * is nothing". Only the last of those is a statement about the customer.
+ */
+
+/** One page. A busy shop can have hundreds of conversations; the list is not the archive. */
+const PAGE = 50
+
+/** Memoised per request so several surfaces on one screen share the workspace lookup. */
 const activeWorkspaceId = cache(async (): Promise<string | null> => {
   const workspace = await getActiveWorkspace()
   return workspace?.id ?? null
 })
 
 /**
- * Inbox reads, RLS-scoped.
+ * Count this workspace's active connections that feed a surface.
  *
- * Every one of these returns an empty list today and that is the honest answer,
- * not a bug: nothing writes `inbox_threads` because there is no verified read API
- * for GBP reviews. The list is real, the query is real, and there is nothing in it.
- * The UI says exactly that rather than showing a spinner forever or seeding
- * examples that would be indistinguishable from a customer's actual reviews.
+ * RLS is the security boundary; the explicit `workspace_id` filter is a correctness
+ * filter, for the same reason `listPosts` carries one — the member policy admits every
+ * workspace the user belongs to, so an unscoped count would blend two tenants.
+ *
+ * ── WHY `external_account->>profileId` IS NOT OPTIONAL HERE ──────────────────
+ * Platform alone is the WRONG discriminator. A `gbp` row can come from the direct
+ * Google OAuth handler (`packages/publishing/src/oauth/gbp.ts`), whose
+ * `ConnectionExternalAccount` is `{ id, name?, handle? }` — no `profileId`. Only a
+ * Zernio-backed connection carries one, which is exactly why `scopeAccount` checks it
+ * before minting a `ScopedAccountId`.
+ *
+ * Without this filter, a workspace that connected GBP for PUBLISHING counts as 1
+ * queryable review account, so the reviews page claims a resolution failure instead of
+ * "connect a Google Business Profile" — the inverse of the truth, because Zernio has
+ * still never seen a GBP account. Counting only rows Zernio could actually be asked
+ * about is what makes this a measurement rather than a guess, and it stays correct
+ * after the migration that widens the platform CHECK.
  */
-
-/** Cap on one page of threads. A busy shop can have hundreds of reviews. */
-const PAGE = 50
-
-export async function listThreads(
-  filter: { kind?: InboxThread['kind']; status?: InboxThread['status'] } = {},
-): Promise<InboxThread[]> {
+async function countAccounts(surface: InboxSurfaceKey): Promise<number> {
   try {
     const workspaceId = await activeWorkspaceId()
-    if (workspaceId === null) return []
+    if (workspaceId === null) return 0
 
     const supabase = createServerSupabase()
-    let query = supabase
-      .from('inbox_threads')
-      .select('*')
+    const { count, error } = await supabase
+      .from('connections')
+      .select('id', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
-      // Newest by the PLATFORM's clock. Ordering by our own ingest time would
-      // reshuffle the list every time a poll ran late.
-      .order('posted_at', { ascending: false, nullsFirst: false })
-      .limit(PAGE)
+      .eq('status', 'active')
+      .in('platform', [...SURFACE_CONNECTION_PLATFORMS[surface]])
+      .not('external_account->>profileId', 'is', null)
 
-    if (filter.kind) query = query.eq('kind', filter.kind)
-    if (filter.status) query = query.eq('status', filter.status)
-
-    const { data, error } = await query
-    if (error || !data) return []
-    return data.flatMap((row) => {
-      const parsed = InboxThreadSchema.safeParse(row)
-      return parsed.success ? [parsed.data] : []
-    })
-  } catch {
-    return []
+    if (error) {
+      console.error('[inbox] connection count failed', error.code, error.message)
+      return 0
+    }
+    return count ?? 0
+  } catch (error) {
+    console.error('[inbox] connection count threw', error instanceof Error ? error.message : '?')
+    return 0
   }
 }
 
-export async function listMessages(threadId: string): Promise<InboxMessage[]> {
+/**
+ * Everything a read needs before it can be issued, or the reason it cannot be.
+ *
+ * The three failures are kept apart all the way to the copy: a missing key is ours to
+ * fix, a missing profile means nothing was ever connected, and neither is a reading of
+ * the customer's shop.
+ */
+type ReadContext =
+  | { ok: true; workspaceId: string; profile: ScopedProfileId; reads: ZernioReads }
+  | { ok: false; failure: 'no_reader' | 'no_profile' }
+
+async function readContext(): Promise<ReadContext> {
+  // Carried on the context rather than re-derived at each call site, so the reader is
+  // constructed once and the null check that proves it exists is the same one every
+  // caller already has to pass.
+  const reads = zernioClientReads()
+  if (reads === null) return { ok: false, failure: 'no_reader' }
+
+  const workspaceId = await activeWorkspaceId()
+  // No workspace resolves to the same sentence as no profile: there is nothing to
+  // address a read to. It is not a failed read, because no read was possible.
+  if (workspaceId === null) return { ok: false, failure: 'no_profile' }
+
   try {
-    const workspaceId = await activeWorkspaceId()
-    if (workspaceId === null) return []
-
-    const supabase = createServerSupabase()
-    const { data, error } = await supabase
-      .from('inbox_messages')
-      .select('*')
-      .eq('thread_id', threadId)
-      .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: true })
-
-    if (error || !data) return []
-    return data.flatMap((row) => {
-      const parsed = InboxMessageSchema.safeParse(row)
-      return parsed.success ? [parsed.data] : []
-    })
-  } catch {
-    return []
+    return { ok: true, workspaceId, reads, profile: await profileForWorkspace(workspaceId) }
+  } catch (error) {
+    if (error instanceof ScopeError) return { ok: false, failure: 'no_profile' }
+    throw error
   }
 }
 
-/** Star distribution for the ratings header. Only reviews carry a rating. */
-export function ratingSummary(threads: readonly InboxThread[]): {
-  count: number
-  average: number | null
-  distribution: Record<1 | 2 | 3 | 4 | 5, number>
-} {
-  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<1 | 2 | 3 | 4 | 5, number>
-  let total = 0
-  let count = 0
-  for (const thread of threads) {
-    const rating = thread.rating
-    if (rating === null) continue
-    distribution[rating as 1 | 2 | 3 | 4 | 5] += 1
-    total += rating
-    count += 1
+export interface InboxView<T> {
+  rows: T[]
+  decision: SurfaceDecision
+  /** Zernio's cursor for the next page. Null when this is the whole list. */
+  nextCursor: string | null
+}
+
+/**
+ * Run one profile-scoped list read and classify whatever came back.
+ *
+ * The `catch` deliberately narrows to `could_not_ask` rather than rethrowing: an inbox
+ * that 500s tells the user nothing, while "the request went out and came back without
+ * an answer" is both true and actionable. The upstream error goes to the server log,
+ * never to the DOM — it can carry an auth header fragment.
+ */
+async function listSurface<T>(
+  surface: InboxSurfaceKey,
+  call: (reads: ZernioReads, profile: ScopedProfileId) => Promise<ZernioPaged<T, ZernioCursorPage>>,
+): Promise<InboxView<T>> {
+  const connectedAccounts = await countAccounts(surface)
+  const context = await readContext()
+
+  if (!context.ok) {
+    return {
+      rows: [],
+      decision: decideSurface({ surface, connectedAccounts, failure: context.failure }),
+      nextCursor: null,
+    }
   }
-  // Null rather than 0: an average of zero is a claim about the business, and no
-  // reviews is not a rating of zero.
-  return { count, average: count === 0 ? null : total / count, distribution }
+
+  try {
+    const page = await call(context.reads, context.profile)
+    return {
+      rows: page.data,
+      // `meta` is threaded through verbatim, including when it is absent — that absence
+      // is what `classifyInboxResult` turns into "could not confirm this view is
+      // complete" rather than into an empty list.
+      decision: decideSurface({
+        surface,
+        connectedAccounts,
+        result: { rows: page.data.length, meta: page.meta },
+      }),
+      nextCursor: page.pagination.nextCursor,
+    }
+  } catch (error) {
+    console.error(
+      `[inbox] ${surface} read failed`,
+      error instanceof Error ? error.message : 'unknown',
+    )
+    return {
+      rows: [],
+      decision: decideSurface({ surface, connectedAccounts, failure: 'call_failed' }),
+      nextCursor: null,
+    }
+  }
+}
+
+export async function readConversations(): Promise<InboxView<ZernioConversation>> {
+  // No `platform` filter is passed: `ZernioPlatformFilter` has no `whatsapp` member, so
+  // a per-platform tab could not express the conversations surface anyway. Reading all
+  // of them and labelling each row is honest; filtering to a subset that silently drops
+  // WhatsApp would not be.
+  return listSurface('conversations', (reads, profile) =>
+    reads.listConversations(profile, { limit: PAGE }),
+  )
+}
+
+export async function readCommentedPosts(): Promise<InboxView<ZernioCommentedPost>> {
+  return listSurface('comments', (reads, profile) =>
+    reads.listCommentedPosts(profile, { limit: PAGE }),
+  )
+}
+
+export async function readReviews(): Promise<InboxView<ZernioReview>> {
+  return listSurface('reviews', (reads, profile) => reads.listReviews(profile, { limit: PAGE }))
+}
+
+/**
+ * Resolve a URL's `accountId` against this workspace, or say why it cannot be.
+ *
+ * `not_found` is returned rather than thrown so the caller decides between a 404 and a
+ * rendered explanation. An id that matches no row in THIS workspace is indistinguishable
+ * from a typo and must never reach Zernio — unscoped, it would read another tenant.
+ */
+async function scopedAccount(
+  accountId: string,
+): Promise<
+  | { ok: true; profile: ScopedProfileId; account: ScopedAccountId; reads: ZernioReads }
+  | { ok: false; failure: 'no_reader' | 'no_profile' | 'not_found' }
+> {
+  const context = await readContext()
+  if (!context.ok) return { ok: false, failure: context.failure }
+
+  try {
+    const account = await accountByIdForWorkspace(context.workspaceId, accountId, context.profile)
+    return { ok: true, profile: context.profile, account, reads: context.reads }
+  } catch (error) {
+    if (error instanceof ScopeError) return { ok: false, failure: 'not_found' }
+    throw error
+  }
+}
+
+export interface ThreadView {
+  messages: ZernioMessage[]
+  /**
+   * What a reply UI may offer, decided BEFORE a compose box would render.
+   *
+   * Always present, and `canSendFromSahoda` is always false — the send path is not
+   * wired. `unknown` is a real answer here, not a fallback.
+   */
+  affordance: ReplyAffordance | null
+  decision: SurfaceDecision
+  nextCursor: string | null
+}
+
+/**
+ * One thread, addressed by BOTH halves of its key.
+ *
+ * `accountId` is a required parameter, not an optional filter: Zernio resolves a
+ * conversation id within an account, and passing the id alone reads against whichever
+ * account happens to match — across tenants, since the profile filter defaults to the
+ * whole API key. `listMessages(account, conversationId)` on the frozen client takes both
+ * positionally, so half a key does not typecheck.
+ *
+ * Returns `null` when the account is not this workspace's, so the route can 404 rather
+ * than render an explanation for a thread that may not exist.
+ */
+export async function readThread(
+  accountId: string,
+  conversationId: string,
+  now: string,
+): Promise<ThreadView | null> {
+  const connectedAccounts = await countAccounts('conversations')
+  const scoped = await scopedAccount(accountId)
+
+  if (!scoped.ok) {
+    if (scoped.failure === 'not_found') return null
+    return {
+      messages: [],
+      affordance: null,
+      decision: decideSurface({
+        surface: 'conversations',
+        connectedAccounts,
+        failure: scoped.failure,
+      }),
+      nextCursor: null,
+    }
+  }
+
+  try {
+    const page = await scoped.reads.listMessages(scoped.account, conversationId, { limit: PAGE })
+    const platform = threadPlatform(page.messages)
+    return {
+      messages: page.messages,
+      // No platform means no modelled window, and inventing one would be the guess the
+      // affordance exists to avoid. `evaluateSendWindow` states that in words.
+      affordance:
+        platform === null
+          ? null
+          : evaluateSendWindow({
+              platform,
+              lastInboundAt: newestInboundAt(page.messages),
+              now,
+            }),
+      // `/messages` carries no per-account meta, so completeness is not in question the
+      // way it is for a fan-out list: one account was asked and it answered.
+      decision: decideSurface({
+        surface: 'conversations',
+        connectedAccounts,
+        result: { rows: page.messages.length, meta: undefined },
+      }),
+      nextCursor: page.pagination.nextCursor,
+    }
+  } catch (error) {
+    console.error('[inbox] thread read failed', error instanceof Error ? error.message : 'unknown')
+    return {
+      messages: [],
+      affordance: null,
+      decision: decideSurface({
+        surface: 'conversations',
+        connectedAccounts,
+        failure: 'call_failed',
+      }),
+      nextCursor: null,
+    }
+  }
+}
+
+/**
+ * Comments on one post. Same rule: account-scoped, never the post id alone.
+ *
+ * `platformPostId` is the PLATFORM's id — Instagram's media id, X's tweet id — which is
+ * what `post_variants.platform_post_id` holds. Passing Zernio's own 24-hex `_id` here
+ * is a defect this repo has already shipped once on the analytics side.
+ */
+export async function readPostComments(
+  accountId: string,
+  platformPostId: string,
+): Promise<InboxView<ZernioComment> | null> {
+  const connectedAccounts = await countAccounts('comments')
+  const scoped = await scopedAccount(accountId)
+
+  if (!scoped.ok) {
+    if (scoped.failure === 'not_found') return null
+    return {
+      rows: [],
+      decision: decideSurface({ surface: 'comments', connectedAccounts, failure: scoped.failure }),
+      nextCursor: null,
+    }
+  }
+
+  try {
+    const page = await scoped.reads.listPostComments(scoped.account, platformPostId, {
+      limit: PAGE,
+    })
+    return {
+      rows: page.comments,
+      decision: decideSurface({
+        surface: 'comments',
+        connectedAccounts,
+        result: { rows: page.comments.length, meta: undefined },
+      }),
+      nextCursor: page.pagination.nextCursor,
+    }
+  } catch (error) {
+    console.error(
+      '[inbox] post comments read failed',
+      error instanceof Error ? error.message : 'unknown',
+    )
+    return {
+      rows: [],
+      decision: decideSurface({ surface: 'comments', connectedAccounts, failure: 'call_failed' }),
+      nextCursor: null,
+    }
+  }
 }

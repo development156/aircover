@@ -65,6 +65,47 @@ export async function accountForWorkspace(
 }
 
 /**
+ * Scope an account id that arrived from a URL segment.
+ *
+ * ── WHY THIS EXISTS ALONGSIDE `accountForWorkspace` ──────────────────────────
+ * That one looks a connection up by PLATFORM and `.maybeSingle()`s it — fine for a
+ * screen that means "this workspace's Instagram", wrong for a route. An inbox thread
+ * is addressed by its account id, a workspace may hold two accounts on one platform,
+ * and the id in the URL is attacker-supplied: it is whatever the customer typed.
+ *
+ * So the id is used as a QUERY FILTER against this workspace's own rows, never as
+ * something to trust. If no row matches, `scopeAccount` gets `null` and throws, and
+ * the route turns that into a 404. The id never reaches Zernio unless a row in THIS
+ * workspace, carrying THIS workspace's profile, already held it.
+ *
+ * That is the whole reason the routes are two-segment: a one-segment thread URL would
+ * have no account to check, so it would have to read against whichever account Zernio
+ * matched — across tenants, since the profile filter defaults to the entire API key.
+ */
+export async function accountByIdForWorkspace(
+  workspaceId: string,
+  accountId: string,
+  profile: ScopedProfileId,
+): Promise<ScopedAccountId> {
+  const supabase = createServerSupabase()
+  const { data, error } = await supabase
+    .from('connections')
+    .select('workspace_id, external_account')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .eq('external_account->>id', accountId)
+    .maybeSingle()
+
+  if (error) {
+    throw new ScopeError(`Could not read this workspace’s connections: ${error.message}`)
+  }
+  // Re-mints from the ROW, not from the parameter. The returned brand therefore
+  // certifies the stored id, and a row whose id somehow differed would be refused
+  // rather than silently blessing the URL's version of it.
+  return scopeAccount(data, workspaceId, profile)
+}
+
+/**
  * Both ids for one platform, for the common case where a screen needs each.
  *
  * Sequential rather than parallel on purpose: the account check needs the profile to
