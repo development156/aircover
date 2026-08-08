@@ -7,7 +7,9 @@ import { AutoPublishNote } from '@/components/posts/auto-publish-note'
 import { ChannelChip } from '@/components/posts/channel-chip'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { DeletePostButton } from '@/components/posts/delete-post-button'
+import { MetricStrip } from '@/components/posts/metric-strip'
 import { StatusBadge } from '@/components/posts/status-badge'
+import type { ChannelMetrics } from '@/lib/analytics/post-metrics'
 import { Card } from '@/components/ui/card'
 import type { PostPublishMode } from '@/lib/posts/certainty'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
@@ -44,6 +46,13 @@ export interface PostCardProps {
    * Absent is a legitimate state — a channel picked with nothing written yet.
    */
   variantStates?: readonly VariantStatusRow[]
+  /**
+   * Per-channel metrics, batched for the whole page by `listPostMetrics`.
+   *
+   * Absent means the page did not ask (no workspace, no key) — which renders
+   * nothing rather than zeroes, the same rule the strip itself follows.
+   */
+  metrics?: readonly ChannelMetrics[]
   /** One instant for the whole list, read on the server. See `AutoPublishNote`. */
   now: Date
   /**
@@ -53,7 +62,14 @@ export interface PostCardProps {
   mode: PostPublishMode
 }
 
-export function PostCard({ autoPublish = false, post, now, mode, variantStates }: PostCardProps) {
+export function PostCard({
+  autoPublish = false,
+  post,
+  now,
+  mode,
+  variantStates,
+  metrics,
+}: PostCardProps) {
   const title = post.title?.trim()
   const displayTitle = title || 'Untitled post'
   const excerpt = excerptOf(post.body)
@@ -125,6 +141,11 @@ export function PostCard({ autoPublish = false, post, now, mode, variantStates }
           autoPublish={autoPublish}
           className="mt-2"
         />
+
+        {/* Below the publish claim, because a metric only means anything once the
+            post is out — and above the fold of the card, because "how did it do"
+            is the question this screen gets opened for. */}
+        <MetricStrip metrics={metrics ?? []} className="mt-3" />
       </Link>
 
       <div className="mt-4 flex justify-end border-t border-line pt-3">

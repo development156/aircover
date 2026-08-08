@@ -4,6 +4,7 @@ import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { CreatePostButton } from '@/components/posts/create-post-button'
 import { PostCard } from '@/components/posts/post-card'
+import { listPostMetrics } from '@/lib/analytics/post-metrics'
 import { listPosts, listPublishModes, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
 import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
 import { listConnectedChannels } from '@/lib/connections/read'
@@ -26,6 +27,13 @@ export default async function PostsPage() {
   // which scheduled posts are past due. See `AutoPublishNote`.
   const autoPublish = autoPublishEnabled()
   const now = new Date()
+
+  // Metrics last, because they need the variant rows: the analytics key is
+  // `post_variants.platform_post_id`, and a channel without one is never asked
+  // about at all. Bounded inside `listPostMetrics`, and it degrades to stated
+  // "not available" states rather than throwing — a metrics hiccup must not cost
+  // the list.
+  const metrics = await listPostMetrics(variantStates, now)
 
   return (
     <div className="space-y-grid">
@@ -56,6 +64,7 @@ export default async function PostsPage() {
                   now={now}
                   mode={modes.get(post.id) ?? null}
                   variantStates={variantStates.get(post.id)}
+                  metrics={metrics.get(post.id)}
                   autoPublish={autoPublish}
                 />
               </li>

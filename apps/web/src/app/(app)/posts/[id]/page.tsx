@@ -1,6 +1,9 @@
 import { notFound } from 'next/navigation'
 
 import { PostEditor } from '@/components/posts/post-editor'
+import { PostMetricsPanel } from '@/components/posts/post-metrics-panel'
+import { readPostMetrics } from '@/lib/analytics/post-metrics'
+import { variantStatusRows } from '@/lib/posts/variant-status'
 import { signMediaPreviews } from '@/lib/posts/media-url'
 import { getPost, listMedia, listVariants } from '@/lib/posts/read'
 import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
@@ -32,6 +35,11 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   // row rather than throwing, so a signing hiccup costs previews, not the page.
   const previews = await signMediaPreviews(media)
 
+  // Also sequential on the rows: the analytics key lives on them. Degrades to
+  // stated "not available" states, so a metrics failure never 404s or blanks the
+  // editor — the post is the page, the numbers are an annotation on it.
+  const metrics = await readPostMetrics(post.id, variantStatusRows(post.channels, variants))
+
   return (
     <div className="space-y-grid">
       <PostEditor
@@ -42,6 +50,10 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
         autoPublish={autoPublishEnabled()}
         connected={connected}
       />
+
+      {/* Under the editor, not inside it: the editor is about changing the post,
+          and these are about what already happened to it. */}
+      <PostMetricsPanel metrics={metrics} />
     </div>
   )
 }

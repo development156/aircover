@@ -1,11 +1,13 @@
 import { creditCost } from '@sahoda/shared'
 
+import { InstagramInsights } from '@/components/home/instagram-insights'
 import { SahodaRail } from '@/components/home/sahoda-rail'
 import { SpendArea } from '@/components/home/spend-area'
 import { SpendBars } from '@/components/home/spend-bars'
 import { WeekStrip } from '@/components/home/week-strip'
 import { Card, CardLabel } from '@/components/ui/card'
 import { LedgerTable } from '@/components/wallet/ledger-table'
+import { readInstagramAnalytics } from '@/lib/analytics/account-insights'
 import { greetingFor, greetingState } from '@/lib/home/greeting'
 import { readPostCounts } from '@/lib/home/posts'
 import { readPublishSummary } from '@/lib/home/publishing'
@@ -30,20 +32,31 @@ export const metadata = { title: 'Home' }
  * contrast — a lot of air above, tight rows below — is what stops it reading as
  * a grid of equal cards.
  *
- * Every number comes from a table. No placeholder figures, no seeded demo
- * values, and nothing about engagement, reach or followers — none of which this
- * product records.
+ * Every number comes from a table or from a platform that reported it. No
+ * placeholder figures and no seeded demo values.
+ *
+ * Followers and reach DO appear here now, which the previous version of this note
+ * said they never would — at the time nothing recorded them. They arrive from
+ * Instagram via Zernio, and they arrive with the same rule the rest of the page
+ * follows: a number is shown only when something measured it. Instagram reports on
+ * a ~24-48h delay and expresses "nothing yet" as zeroes, so those zeroes are
+ * classified upstream and rendered as "not available yet" rather than as a reading.
+ * A workspace with no Instagram connection sees no insights card at all, because a
+ * grid of zero-value cards reads broken — the rule above, applied to the new block.
  */
 export default async function HomePage() {
   const now = new Date()
 
-  const [posts, spend, counts, publish, balance, ledger] = await Promise.all([
+  const [posts, spend, counts, publish, balance, ledger, instagram] = await Promise.all([
     listPosts(),
     readSpend(now),
     readPostCounts(),
     readPublishSummary(now),
     readBalance(),
     readLedger(),
+    // Degrades to a named state — never throws, never zeroes. A dead Zernio must
+    // not take Home down with it.
+    readInstagramAnalytics(now),
   ])
 
   // Publish modes decide `.is-real` on the strip. Fails safe to an empty map, in
@@ -81,6 +94,10 @@ export default async function HomePage() {
         </Card>
 
         <div className="space-y-grid">
+          {/* In the rail, under the money: it is a status read, not the page's
+              subject. Renders nothing when Instagram is not connected. */}
+          <InstagramInsights analytics={instagram} />
+
           <Card className="shadow-brand">
             <CardLabel>Available credits</CardLabel>
             <p className="type-display num text-ink">
