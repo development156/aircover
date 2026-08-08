@@ -50,7 +50,11 @@ describe('fixture adapter — the honest labelled path', () => {
     const a = await adapter.publish(req)
     const b = await adapter.publish(req)
 
-    expect(a.platformPostId.length).toBeGreaterThan(0)
+    // The fixture adapter always mints one — `platformPostId` is nullable on the
+    // interface because a real platform may not have issued an id yet, which cannot
+    // happen here. Asserting non-null keeps that difference explicit.
+    expect(a.platformPostId).not.toBeNull()
+    expect(a.platformPostId ?? '').not.toHaveLength(0)
     expect(a.platformPostId).toBe(b.platformPostId)
     expect(a.permalink).toBe(b.permalink)
   })

@@ -4,7 +4,7 @@ import {
   fetchTransport,
   type ZernioClient,
 } from '@sahoda/publishing'
-import type { Channel } from '@sahoda/shared'
+import { assertPlatformPostId, type Channel } from '@sahoda/shared'
 
 import { getRuntime } from '../runtime'
 import type {
@@ -136,7 +136,10 @@ export function reconcileSweepDeps(opts: ReconcileDepsOptions = {}): ReconcileSw
         workspaceId: row.workspace_id,
         postId: row.post_id,
         channel: row.channel as Channel,
-        platformPostId: row.platform_post_id,
+        // post_publish_logs.platform_post_id holds ZERNIO's id on the STILL_PROCESSING
+        // path — that is what makes the post addressable here. Different column, and a
+        // different meaning, from post_variants.platform_post_id.
+        providerPostId: row.platform_post_id,
       }))
     },
 
@@ -159,7 +162,7 @@ export function reconcileSweepDeps(opts: ReconcileDepsOptions = {}): ReconcileSw
      * still pending, because there is nothing to show anybody.
      */
     async readPublish(item: UnresolvedPublish): Promise<PublishResolution> {
-      const post = await needClient().getPost(item.platformPostId)
+      const post = await needClient().getPost(item.providerPostId)
       // Zernio names GBP `google`; the rest match our channel names. One mapping,
       // shared with the adapter, so a rename cannot make this silently find nothing.
       const wanted = ZERNIO_PLATFORM_NAME[item.channel]
@@ -168,7 +171,11 @@ export function reconcileSweepDeps(opts: ReconcileDepsOptions = {}): ReconcileSw
         return {
           kind: 'published',
           permalink: leg.platformPostUrl,
-          platformPostId: item.platformPostId,
+          // The leg's OWN id, not `item.platformPostId` — that one is Zernio's `_id`,
+          // which is how we addressed this post above and is not a platform id. This
+          // is the whole reason to re-read: by now the platform has issued a real one.
+          // Null when it still has not; the column stays empty rather than wrong.
+          platformPostId: typeof leg.platformPostId === 'string' ? leg.platformPostId : null,
         }
       }
       if (leg?.status === 'failed') {
@@ -234,7 +241,9 @@ export function reconcileSweepDeps(opts: ReconcileDepsOptions = {}): ReconcileSw
           item.variantId,
           item.channel,
           succeeded ? 'succeeded' : 'failed',
-          item.platformPostId,
+          // The log keeps ZERNIO's id: this row is the reconcile trail, and the handle
+          // has to stay addressable. Only post_variants gets the platform id.
+          item.providerPostId,
           succeeded ? resolution.permalink : null,
           succeeded
             ? null
@@ -259,7 +268,10 @@ export function reconcileSweepDeps(opts: ReconcileDepsOptions = {}): ReconcileSw
           item.variantId,
           item.workspaceId,
           succeeded ? 'published' : 'failed',
-          item.platformPostId,
+          // The PLATFORM's id, taken from the leg we just re-read — never
+          // `item.platformPostId`, which is Zernio's `_id`. `coalesce` above means a
+          // null leaves whatever is already there rather than clearing it.
+          resolution.kind === 'published' ? assertPlatformPostId(resolution.platformPostId) : null,
           succeeded ? resolution.permalink : null,
         ],
       )

@@ -125,7 +125,12 @@ export async function simulatePublish(postId: string): Promise<PublishState> {
 
       // Guard the label rather than trusting it: if a future adapter swap ever
       // returned mode:'live' down this path, we must not render it as simulated.
-      if (result.mode !== 'fixture') {
+      //
+      // `platformPostId` is checked for the same reason. It is nullable on the adapter
+      // interface because a real platform may not have issued an id yet — but the
+      // fixture adapter always mints one deterministically, so a null here means this
+      // is not the fixture adapter and the preview must not claim it ran.
+      if (result.mode !== 'fixture' || result.platformPostId === null) {
         return { ok: false, message: 'Preview is unavailable right now — try again.' }
       }
 

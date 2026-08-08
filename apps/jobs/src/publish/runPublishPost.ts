@@ -99,7 +99,13 @@ export interface PublishJobContext {
 }
 
 export type PublishOutcome =
-  | { status: 'succeeded'; mode: PublishMode; platformPostId: string; permalink: string }
+  | {
+      status: 'succeeded'
+      mode: PublishMode
+      /** Null when the platform has not issued an id yet. A real success still has a permalink. */
+      platformPostId: string | null
+      permalink: string
+    }
   | {
       status: 'failed'
       classification: 'permanent'
@@ -264,13 +270,15 @@ export async function runPublishPost(
     // it, nobody can ever ask how it ended: the variant sits unresolved and the
     // customer's feed and our record disagree forever. Recording the id is what
     // makes that recoverable, and an id is not free-text — it is validated below.
-    const platformPostId = platformPostIdFrom(adapterError)
+    const providerPostId = providerPostIdFrom(adapterError)
 
     await deps.writeLog(
       logRow(payload, ctx, deps.mode, 'failed', {
         error,
         connectionId: connection.connectionId,
-        ...(platformPostId ? { platformPostId } : {}),
+        // Zernio's id, into the LOG column only — that is what makes an unresolved
+        // publish findable later. It never reaches post_variants.
+        ...(providerPostId ? { platformPostId: providerPostId } : {}),
       }),
     )
 
@@ -304,7 +312,13 @@ export async function runPublishPost(
     extra: {
       connectionId: string | null
       error?: PublishLogError
-      platformPostId?: string
+      /**
+       * Whatever id we have for the LOG row. On success that is the platform's id (or
+       * null); on the STILL_PROCESSING path it is Zernio's `_id`, deliberately, so the
+       * reconcile sweep can address the post. This column tolerates both — the one that
+       * does not is post_variants.platform_post_id.
+       */
+      platformPostId?: string | null
       permalink?: string
       publishedAt?: string
     },
@@ -331,18 +345,27 @@ function messageOf(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
 
-/** Zernio ids are 24-char lowercase hex. Anything else is not an id and is dropped. */
-const PLATFORM_ID_RE = /^[0-9a-f]{24}$/
+/** ZERNIO's own post ids are 24-char lowercase hex. Anything else is dropped. */
+const ZERNIO_POST_ID_RE = /^[0-9a-f]{24}$/
 
 /**
- * The platform's own id for a post that was accepted but has not finished.
+ * ZERNIO's id for a post that was accepted but has not finished — the reconcile handle.
  *
- * Read off `AdapterError.raw` by SHAPE — a string field named postId that matches
- * the id format — never by trusting the object. `raw` is adapter-controlled, so
- * everything else in it stays dropped.
+ * ── READ THE NAME CAREFULLY ──────────────────────────────────────────────────
+ * This is NOT a platform post id, and it was called `platformPostIdFrom` until the
+ * distinction cost us an afternoon. It is the id the reconcile sweep passes to Zernio's
+ * `GET /posts/{id}` to ask how the post ended, and it is written only to
+ * `post_publish_logs.platform_post_id` — a log column, deliberately kept addressable.
+ *
+ * It must never reach `post_variants.platform_post_id`, which is the analytics key.
+ * `assertPlatformPostId` enforces that at the write site.
+ *
+ * Read off `AdapterError.raw` by SHAPE — a string field named postId matching Zernio's
+ * id format — never by trusting the object. `raw` is adapter-controlled, so everything
+ * else in it stays dropped.
  */
-function platformPostIdFrom(error: AdapterError | null): string | null {
+function providerPostIdFrom(error: AdapterError | null): string | null {
   if (!error || typeof error.raw !== 'object' || error.raw === null) return null
   const value = (error.raw as Record<string, unknown>).postId
-  return typeof value === 'string' && PLATFORM_ID_RE.test(value) ? value : null
+  return typeof value === 'string' && ZERNIO_POST_ID_RE.test(value) ? value : null
 }
