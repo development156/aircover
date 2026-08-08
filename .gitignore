@@ -71,3 +71,30 @@ supabase/.temp/
 # widening an ignore rule beyond what was asked is how the next surprise gets made.
 !/CLAUDE.md
 !/LEARNINGS.md
+
+# --- Restored 2026-08-08: the rest of what the squash dropped ---
+#
+# Same rule as above and the same reason for the leading slashes: every pattern here is
+# ANCHORED to the repo root, so none of them can match a same-named file somewhere else
+# in the tree. `!/apps/*/CLAUDE.md` un-ignores exactly the per-package instruction files
+# and not, say, a CLAUDE.md vendored inside a dependency; `!/docs/**/*.md` cannot reach a
+# `docs/` folder belonging to some package.
+#
+# `**/` matches ZERO or more directories, so /docs/**/*.md covers both docs/00_README.md
+# and docs/design2.0/UI_RULES_v3.md. Verified with `git check-ignore -v --no-index`.
+#
+# NOTHING BROADER MAY BE ADDED BELOW THIS BLOCK. A later `*.md`, or any pattern that
+# re-matches these paths, silently re-ignores them — and because git suppresses
+# check-ignore output for tracked files, the breakage would only surface the next time
+# someone cut a fresh worktree. That is precisely how these files went missing.
+#
+# `.claude/settings.local.json` (line 13) and `.claude/worktrees/` (line 10) are NOT
+# un-ignored here, and must not be: the first is per-user, the second is scratch.
+!/docs/**/*.md
+!/docs/**/*.mdx
+!/apps/*/CLAUDE.md
+!/packages/*/CLAUDE.md
+!/.claude/agents/**/*.md
+!/.claude/commands/**/*.md
+!/.claude/skills/**/*.md
+!/.github/ISSUE_TEMPLATE/bug.md
