@@ -44,11 +44,12 @@ export type { ParsedWebhookEvent, PaymentEventType, PaymentMode } from './provid
 
 // Webhook → ledger. Every credit movement still goes through app.apply_ledger_entry:
 // processPaymentEvent → applyPlanGrant → LedgerPort.apply.
-export { processPaymentEvent } from './webhooks/processPaymentEvent'
-export type { ProcessPaymentEventDeps } from './webhooks/processPaymentEvent'
-export { applyPlanGrant } from './webhooks/applyPlanGrant'
+export { createProcessPaymentEvent } from './webhooks/processPaymentEvent'
+export type { ProcessPaymentEventDeps, ProcessResult } from './webhooks/processPaymentEvent'
+export { createApplyPlanGrant } from './webhooks/applyPlanGrant'
+export type { PlanGrantResult } from './webhooks/applyPlanGrant'
 export { createPgWebhookEventStore } from './webhooks/pgStore'
 export type { WebhookEventStore } from './webhooks/store'
 export { createPgLedgerPort, type PgLedgerPort } from './ledger/pg'
-export type { LedgerPort, ApplyLedgerInput } from './ledger/port'
+export type { LedgerPort, LedgerApplyResult } from './ledger/port'
 export { loadBillingEnv } from './env'

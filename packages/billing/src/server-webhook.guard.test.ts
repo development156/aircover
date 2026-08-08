@@ -107,8 +107,25 @@ describe('the webhook entry point is declared so a route can import it', () => {
     expect(pkg.exports['./server-webhook']).toBe('./src/server-webhook.ts')
   })
 
+  /**
+   * Asserts the BINDINGS, not the names.
+   *
+   * `Object.keys()` alone is not enough and this test caught it: a re-export of a name
+   * that does not exist still appears in the module namespace as `undefined`, vitest
+   * does not typecheck re-exports, and the assertion passed against three exports that
+   * were not real. Only `tsc` found them. Checking the value is a function closes that.
+   */
   it('still exposes the ledger path — every credit movement goes through apply_ledger_entry', () => {
-    expect(Object.keys(serverWebhook)).toContain('createPgLedgerPort')
-    expect(Object.keys(serverWebhook)).toContain('processPaymentEvent')
+    for (const name of [
+      'createPgLedgerPort',
+      'createProcessPaymentEvent',
+      'createApplyPlanGrant',
+      'createPgWebhookEventStore',
+      'verifyCashfreeWebhook',
+      'parseVerifiedCashfreeWebhook',
+    ] as const) {
+      expect(serverWebhook[name], `${name} must be a real binding, not an undefined re-export`).
+        toBeTypeOf('function')
+    }
   })
 })
