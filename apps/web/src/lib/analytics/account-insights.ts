@@ -52,10 +52,24 @@ export type AccountAnalytics =
       followers: SeriesPoint[]
       /** Headline account numbers Zernio reported, already narrowed to numbers. */
       insights: { label: string; value: number }[]
-      /** The lag the platform stated, in hours, when it stated one. */
-      lagHours: number
-      /** True when the window is younger than the lag — data is coming, not missing. */
-      withinLag: boolean
+      /**
+       * TWO lags, not one. Instagram reports follower history ~24h behind and account
+       * insights ~48h behind, and they are separate endpoints with separate
+       * `dataDelay` fields. Collapsing them lets the card print "about a day" under a
+       * reach figure that is two days old — a false freshness claim, which is the one
+       * kind of lie this whole feature exists to prevent. Each surface states its own.
+       */
+      followerLagHours: number
+      insightsLagHours: number
+      /**
+       * True when BOTH reads came back with nothing.
+       *
+       * Named for what it measures, not what we wish it meant: there is no connection
+       * timestamp here, so unlike the post half — which compares `publishedAt` against
+       * the window — this cannot tell "too early" from "never came". The copy it
+       * drives is worded to survive both readings.
+       */
+      nothingReported: boolean
     }
   | { kind: 'not-connected' }
   | { kind: 'reconnect' }
@@ -188,11 +202,15 @@ export async function readInstagramAnalytics(now: Date = new Date()): Promise<Ac
       reads.instagramAccountInsights(account, { since, until }),
     ])
 
-    // The platform's own statement of its delay wins over our constant.
-    const lagHours =
-      lagHoursFromDataDelay(history.dataDelay) ??
-      lagHoursFromDataDelay(insights.dataDelay) ??
-      INSTAGRAM_FOLLOWER_LAG_HOURS
+    // Each endpoint's own statement of its own delay wins over our constant, and
+    // neither borrows the other's — they are genuinely different numbers, and the
+    // fallbacks differ too (24h vs 48h). Taking the follower delay as a fallback for
+    // insights would UNDER-state it, which is the error that makes stale data look
+    // fresh.
+    const followerLagHours =
+      lagHoursFromDataDelay(history.dataDelay) ?? INSTAGRAM_FOLLOWER_LAG_HOURS
+    const insightsLagHours =
+      lagHoursFromDataDelay(insights.dataDelay) ?? INSTAGRAM_INSIGHTS_LAG_HOURS
 
     const followers = firstSeries(history.metrics, FOLLOWER_KEYS)
     const tiles = INSIGHT_KEYS.map(({ key, label }) => ({ label, value: num(insights.metrics[key]) }))
@@ -202,9 +220,9 @@ export async function readInstagramAnalytics(now: Date = new Date()): Promise<Ac
       kind: 'ready',
       followers,
       insights: tiles,
-      lagHours,
-      // Nothing at all, inside the window, is "not yet" rather than "none".
-      withinLag: followers.length === 0 && tiles.length === 0,
+      followerLagHours,
+      insightsLagHours,
+      nothingReported: followers.length === 0 && tiles.length === 0,
     }
   } catch {
     return { kind: 'unreadable' }

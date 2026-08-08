@@ -1,6 +1,36 @@
 import { describe, it, expect } from 'vitest'
+import { lagHoursFromDataDelay } from '@sahoda/publishing'
 
-import { seriesFrom } from '@/lib/analytics/account-insights'
+import {
+  seriesFrom,
+  INSTAGRAM_FOLLOWER_LAG_HOURS,
+  INSTAGRAM_INSIGHTS_LAG_HOURS,
+} from '@/lib/analytics/account-insights'
+
+/**
+ * Instagram reports follower history and account insights on DIFFERENT delays, from
+ * different endpoints with their own `dataDelay`. They must never be collapsed into
+ * one number: printing the shorter delay under the slower figures claims those
+ * numbers are fresher than Instagram says they are, which is a false freshness claim
+ * — exactly the class of lie the rest of this feature refuses to tell.
+ */
+describe('the two lags stay apart', () => {
+  it('uses a longer default for insights than for follower history', () => {
+    expect(INSTAGRAM_INSIGHTS_LAG_HOURS).toBe(48)
+    expect(INSTAGRAM_FOLLOWER_LAG_HOURS).toBe(24)
+    expect(INSTAGRAM_INSIGHTS_LAG_HOURS).toBeGreaterThan(INSTAGRAM_FOLLOWER_LAG_HOURS)
+  })
+
+  it('never lets one endpoint’s stated delay stand in for the other’s', () => {
+    // If only the follower endpoint states a delay, insights must fall back to its
+    // OWN constant — borrowing 24h here would under-state the insight delay.
+    const followerStated = lagHoursFromDataDelay('24 hours')
+    const insightsUnstated = lagHoursFromDataDelay(undefined)
+    expect(followerStated).toBe(24)
+    expect(insightsUnstated).toBeNull()
+    expect(insightsUnstated ?? INSTAGRAM_INSIGHTS_LAG_HOURS).toBe(48)
+  })
+})
 
 /**
  * Zernio hands follower history back as `Record<string, unknown>`, so every point is

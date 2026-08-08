@@ -55,40 +55,50 @@ export function InstagramInsights({ analytics }: { analytics: AccountAnalytics }
     )
   }
 
-  const { followers, insights, lagHours, withinLag } = analytics
+  const { followers, insights, followerLagHours, insightsLagHours, nothingReported } = analytics
 
   return (
     <Card className="space-y-4">
       <CardLabel>Instagram · last 30 days</CardLabel>
 
-      {followers.length === 0 ? (
-        <ChartEmpty
-          status="empty"
-          // NOT "0 followers". Instagram told us nothing, which is not a count.
-          empty={
-            withinLag
-              ? 'No follower history yet — Instagram reports on a delay.'
-              : 'Instagram hasn’t reported follower history for this window.'
-          }
-        />
-      ) : (
-        <FollowerLine points={followers} />
-      )}
+      <section className="space-y-2">
+        {followers.length === 0 ? (
+          <ChartEmpty
+            status="empty"
+            // NOT "0 followers". Instagram told us nothing, which is not a count.
+            // Worded to hold whether this is too-early or never-coming: there is no
+            // connection timestamp here to tell those apart. See `nothingReported`.
+            empty={
+              nothingReported
+                ? 'No follower history to show yet.'
+                : 'Instagram hasn’t reported follower history for this window.'
+            }
+          />
+        ) : (
+          <FollowerLine points={followers} />
+        )}
+        {/* Beside the followers, stating the FOLLOWER delay (~24h). */}
+        <p className="text-[12px] text-muted">{accountLagCopy(followerLagHours)}</p>
+      </section>
 
       {insights.length > 0 ? (
-        <dl className="flex flex-wrap gap-x-6 gap-y-2">
-          {insights.map((tile) => (
-            <div key={tile.label}>
-              <dt className="text-[12px] text-muted">{tile.label}</dt>
-              <dd className="text-[17px] leading-6 font-bold tabular-nums text-ink">
-                {tile.value.toLocaleString('en-IN')}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <section className="space-y-2">
+          <dl className="flex flex-wrap gap-x-6 gap-y-2">
+            {insights.map((tile) => (
+              <div key={tile.label}>
+                <dt className="text-[12px] text-muted">{tile.label}</dt>
+                <dd className="text-[17px] leading-6 font-bold tabular-nums text-ink">
+                  {tile.value.toLocaleString('en-IN')}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          {/* And its OWN delay (~48h), which is the longer one. Printing the
+              follower delay here would claim these figures are fresher than
+              Instagram says they are. */}
+          <p className="text-[12px] text-muted">{accountLagCopy(insightsLagHours)}</p>
+        </section>
       ) : null}
-
-      <p className="text-[12px] text-muted">{accountLagCopy(lagHours)}</p>
     </Card>
   )
 }

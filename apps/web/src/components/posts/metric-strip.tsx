@@ -73,7 +73,10 @@ function MetricRow({ entry, variant }: { entry: ChannelMetrics; variant: 'card' 
     )
   }
 
-  const Icon = copy.tone === 'waiting' ? Clock : HelpCircle
+  // `none` claims nothing and nothing went wrong (a capped list, an unpublished
+  // channel) — a question mark there would read as "something is unknown", undoing
+  // the distinction the tone exists to draw. Only `blocked` gets the query glyph.
+  const Icon = copy.tone === 'blocked' ? HelpCircle : Clock
 
   return (
     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[12.5px]">
