@@ -82,8 +82,18 @@ export type MetricAvailability =
        * `not-connected`  — no Zernio account for this channel in this workspace.
        * `reconnect`      — the connection exists but is not active.
        * `unreadable`     — the call failed. Distinct from "no data".
+       * `not-loaded`     — deliberately not fetched, because a list caps how many
+       *                    calls one render may make. Kept apart from `unreadable`
+       *                    because nothing went wrong and "try again" is bad advice:
+       *                    the fix is to open the post, not to refresh the list.
        */
-      reason: 'not-published' | 'no-platform-id' | 'not-connected' | 'reconnect' | 'unreadable'
+      reason:
+        | 'not-published'
+        | 'no-platform-id'
+        | 'not-connected'
+        | 'reconnect'
+        | 'unreadable'
+        | 'not-loaded'
     }
 
 /** Reads one numeric field defensively. Anything not a finite number is a gap, not a 0. */

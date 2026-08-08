@@ -36,14 +36,20 @@ const activeWorkspaceId = cache(async (): Promise<string | null> => {
 })
 
 /**
- * Most calls we will make for one render.
+ * Most calls one render may make.
  *
  * `postAnalytics` has no batch form we can trust — `listPostAnalytics` returns
  * `unknown[]` with no verified join key, and guessing one would mismatch metrics to
- * posts silently. So this is one call per published channel, bounded. Anything past
- * the ceiling reports `unreadable` ("we did not read it"), never a zero.
+ * posts silently. So this is one call per published channel, bounded.
+ *
+ * The two paths get different ceilings because they carry different risk. A LIST can
+ * hold fifty published posts, and every call is latency the whole page waits on, so
+ * it stays at roughly one round; posts past the cap say "open the post to see its
+ * metrics", which is true and actionable. A DETAIL page is one post — at most four
+ * channels — so it is never the bottleneck and gets room to spare.
  */
-const MAX_METRIC_CALLS = 24
+export const LIST_METRIC_CALLS = 6
+export const DETAIL_METRIC_CALLS = 8
 
 /** In-flight calls at once. Zernio rate-limits at 60/min; this stays well under. */
 const CONCURRENCY = 4
@@ -118,10 +124,16 @@ async function mapCapped<T, R>(
  * Returns a state for EVERY row, not only the ones we called for: "not published"
  * and "no platform id" are answers, and a card that silently omits a channel would
  * imply the channel has nothing to say rather than that we never asked.
+ *
+ * NEVER REJECTS. `read.ts` states the rule this follows — "every read degrades to
+ * empty/null rather than throwing: the app shell must survive" — and metrics are the
+ * least important thing on the posts list. A Supabase hiccup here must cost the
+ * numbers, not the page.
  */
 export async function listPostMetrics(
   statesByPost: ReadonlyMap<string, readonly VariantStatusRow[]>,
   now: Date = new Date(),
+  maxCalls: number = LIST_METRIC_CALLS,
 ): Promise<Map<string, ChannelMetrics[]>> {
   const result = new Map<string, ChannelMetrics[]>()
   const postIds = [...statesByPost.keys()]
@@ -148,6 +160,29 @@ export async function listPostMetrics(
       now,
     })
 
+  try {
+    return await fetchInto(result, statesByPost, postIds, seed, preCall, now, maxCalls)
+  } catch (error) {
+    // Any throw at all — no session, an unreachable database, a malformed row —
+    // falls back to the honest no-call verdicts rather than propagating.
+    console.error(
+      '[analytics] post metrics read threw',
+      error instanceof Error ? error.message : 'unknown',
+    )
+    return seed(preCall)
+  }
+}
+
+/** The part that can throw. Split out so the wrapper above stays obviously total. */
+async function fetchInto(
+  result: Map<string, ChannelMetrics[]>,
+  statesByPost: ReadonlyMap<string, readonly VariantStatusRow[]>,
+  postIds: string[],
+  seed: (state: (row: VariantStatusRow) => MetricAvailability) => Map<string, ChannelMetrics[]>,
+  preCall: (row: VariantStatusRow) => MetricAvailability,
+  now: Date,
+  maxCalls: number,
+): Promise<Map<string, ChannelMetrics[]>> {
   const workspaceId = await activeWorkspaceId()
   if (workspaceId === null) return seed(preCall)
 
@@ -179,8 +214,8 @@ export async function listPostMetrics(
   if (targets.length === 0) return result
 
   const times = await publishTimes(workspaceId, postIds)
-  const asked = targets.slice(0, MAX_METRIC_CALLS)
-  const skipped = targets.slice(MAX_METRIC_CALLS)
+  const asked = targets.slice(0, maxCalls)
+  const skipped = targets.slice(maxCalls)
 
   const fetched = await mapCapped(asked, CONCURRENCY, async (target) => {
     try {
@@ -194,9 +229,12 @@ export async function listPostMetrics(
 
   const verdicts = [
     ...fetched,
+    // Past the ceiling: nothing failed, we simply did not ask. `not-loaded` says
+    // that and points at the detail view, instead of advising a refresh that would
+    // hit the same cap.
     ...skipped.map((target) => ({
       target,
-      state: { kind: 'unavailable', reason: 'unreadable' } as MetricAvailability,
+      state: { kind: 'unavailable', reason: 'not-loaded' } as MetricAvailability,
     })),
   ]
 
@@ -224,12 +262,18 @@ function classify(
   })
 }
 
-/** One post's channels, for the detail view. Same rules, same refusals. */
+/**
+ * One post's channels, for the detail view. Same rules, same refusals.
+ *
+ * Gets its own ceiling rather than inheriting the list's: one post is at most four
+ * channels, so the cap that protects a fifty-post list would be wrong here — and
+ * "open the post to see its metrics" is nonsense advice on the post.
+ */
 export async function readPostMetrics(
   postId: string,
   rows: readonly VariantStatusRow[],
   now: Date = new Date(),
 ): Promise<ChannelMetrics[]> {
-  const byPost = await listPostMetrics(new Map([[postId, rows]]), now)
+  const byPost = await listPostMetrics(new Map([[postId, rows]]), now, DETAIL_METRIC_CALLS)
   return byPost.get(postId) ?? []
 }

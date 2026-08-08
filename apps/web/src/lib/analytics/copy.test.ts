@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { MetricAvailability } from '@sahoda/publishing'
 
-import { metricCopy, metricValue } from '@/lib/analytics/copy'
+import { accountLagCopy, metricCopy, metricValue } from '@/lib/analytics/copy'
 
 /**
  * The copy IS the honesty guarantee at the last mile. A correct classification
@@ -19,6 +19,7 @@ const EVERY_STATE: MetricAvailability[] = [
   { kind: 'unavailable', reason: 'not-connected' },
   { kind: 'unavailable', reason: 'reconnect' },
   { kind: 'unavailable', reason: 'unreadable' },
+  { kind: 'unavailable', reason: 'not-loaded' },
 ]
 
 describe('no un-measured state ever says a number', () => {
@@ -92,6 +93,43 @@ describe('connection states ask for the right thing', () => {
     expect(metricCopy({ kind: 'unavailable', reason: 'reconnect' }, 'gbp').detail).toBe(
       'Reconnect Google Business Profile to see metrics.',
     )
+  })
+})
+
+describe('the capped-list state does not advise a pointless retry', () => {
+  it('points at the post rather than telling anyone to refresh', () => {
+    const copy = metricCopy({ kind: 'unavailable', reason: 'not-loaded' }, 'instagram')
+    expect(copy.detail).toBe('Open the post to see its metrics.')
+    // Refreshing the list hits the same cap, so "try again" would be false advice.
+    expect(copy.detail?.toLowerCase()).not.toMatch(/try again|refresh/)
+    // Nothing failed, so it must not wear the blocked treatment.
+    expect(copy.tone).toBe('none')
+  })
+
+  it('reads differently from a genuine failure', () => {
+    const failed = metricCopy({ kind: 'unavailable', reason: 'unreadable' }, 'instagram')
+    const capped = metricCopy({ kind: 'unavailable', reason: 'not-loaded' }, 'instagram')
+    expect(failed.headline).not.toBe(capped.headline)
+  })
+})
+
+describe('accountLagCopy', () => {
+  it.each([
+    [48, 'about two days'],
+    [72, 'about two days'],
+    [24, 'about a day'],
+    [36, 'about a day'],
+    [6, 'about 6 hours'],
+  ])('phrases %i hours as "%s"', (hours, phrase) => {
+    expect(accountLagCopy(hours)).toContain(phrase)
+  })
+
+  it('always names the platform whose delay it is', () => {
+    expect(accountLagCopy(48)).toContain('Instagram')
+  })
+
+  it('never rounds a sub-hour delay down to zero hours', () => {
+    expect(accountLagCopy(0.2)).toContain('about 1 hours')
   })
 })
 

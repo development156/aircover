@@ -133,6 +133,14 @@ export function metricCopy(state: MetricAvailability, channel: Channel): MetricC
             detail: 'We couldn’t read them just now. Refresh to try again.',
             tone: 'blocked',
           }
+        case 'not-loaded':
+          return {
+            headline: 'Not loaded here',
+            // Deliberately NOT "try again" — nothing failed, and refreshing this
+            // list would hit the same cap. Points at the thing that does work.
+            detail: 'Open the post to see its metrics.',
+            tone: 'none',
+          }
       }
   }
 }

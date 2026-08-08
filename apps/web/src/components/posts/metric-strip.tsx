@@ -1,5 +1,4 @@
 import { Clock, HelpCircle } from 'lucide-react'
-import type { Channel } from '@sahoda/shared'
 
 import { CHANNEL_SHORT } from '@/components/posts/channel-label'
 import type { ChannelMetrics } from '@/lib/analytics/post-metrics'
@@ -54,8 +53,8 @@ export function MetricStrip({ metrics, variant = 'card', className }: MetricStri
 }
 
 function MetricRow({ entry, variant }: { entry: ChannelMetrics; variant: 'card' | 'detail' }) {
-  const copy = metricCopy(entry.state, entry.channel as Channel)
-  const label = CHANNEL_SHORT[entry.channel as Channel]
+  const copy = metricCopy(entry.state, entry.channel)
+  const label = CHANNEL_SHORT[entry.channel]
 
   if (entry.state.kind === 'ready') {
     const { impressions, reach, engagement } = entry.state.metrics
