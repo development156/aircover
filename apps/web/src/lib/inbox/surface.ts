@@ -49,6 +49,8 @@ export const SURFACE_CONNECTION_PLATFORMS = {
   conversations: ['instagram', 'facebook', 'whatsapp'],
   comments: ['instagram', 'facebook'],
   reviews: ['gbp'],
+  // A single thread is fed by the same connections as the list it came from.
+  thread: ['instagram', 'facebook', 'whatsapp'],
 } as const satisfies Record<InboxSurfaceKey, readonly string[]>
 
 /**

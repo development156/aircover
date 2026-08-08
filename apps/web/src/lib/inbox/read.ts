@@ -28,6 +28,7 @@ import { zernioClientReads } from '@/lib/zernio/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
 import type { InboxSurfaceKey } from './emptiness'
+import type { ReadFailure } from './surface'
 
 /**
  * Server reads for the inbox, against Zernio's `/inbox/*` surface.
@@ -113,25 +114,46 @@ async function countAccounts(surface: InboxSurfaceKey): Promise<number> {
  */
 type ReadContext =
   | { ok: true; workspaceId: string; profile: ScopedProfileId; reads: ZernioReads }
-  | { ok: false; failure: 'no_reader' | 'no_profile' }
+  | { ok: false; failure: ReadFailure }
 
+/**
+ * ── WHY THIS NEVER THROWS ────────────────────────────────────────────────────
+ * It returns a `ReadFailure` for every way it can fail, including ones it did not
+ * anticipate. `zernioClientReads()` reads `env.ZERNIO_API_KEY`, and the env proxy
+ * validates the WHOLE schema on first access — so one unrelated missing var (a Clerk
+ * key, a Supabase URL) throws from what reads like a null check. Letting that escape
+ * 500s the page, and on a `next build` it fails the whole build at prerender.
+ *
+ * "We have no usable reader" is the honest answer to that, and it is the answer this
+ * file's contract already promises. Nothing here degrades into a claim about the
+ * customer: every branch returns a failure the copy layer renders as ours, not theirs.
+ */
 async function readContext(): Promise<ReadContext> {
-  // Carried on the context rather than re-derived at each call site, so the reader is
-  // constructed once and the null check that proves it exists is the same one every
-  // caller already has to pass.
-  const reads = zernioClientReads()
+  let reads: ZernioReads | null
+  try {
+    // Carried on the context rather than re-derived at each call site, so the reader is
+    // constructed once and the null check that proves it exists is the same one every
+    // caller already has to pass.
+    reads = zernioClientReads()
+  } catch (error) {
+    console.error('[inbox] reader unavailable', error instanceof Error ? error.message : '?')
+    return { ok: false, failure: 'no_reader' }
+  }
   if (reads === null) return { ok: false, failure: 'no_reader' }
 
-  const workspaceId = await activeWorkspaceId()
-  // No workspace resolves to the same sentence as no profile: there is nothing to
-  // address a read to. It is not a failed read, because no read was possible.
-  if (workspaceId === null) return { ok: false, failure: 'no_profile' }
-
   try {
+    const workspaceId = await activeWorkspaceId()
+    // No workspace resolves to the same sentence as no profile: there is nothing to
+    // address a read to. It is not a failed read, because no read was possible.
+    if (workspaceId === null) return { ok: false, failure: 'no_profile' }
+
     return { ok: true, workspaceId, reads, profile: await profileForWorkspace(workspaceId) }
   } catch (error) {
     if (error instanceof ScopeError) return { ok: false, failure: 'no_profile' }
-    throw error
+    // An unexpected lookup failure is NOT "nothing is connected" — that would be a
+    // claim we cannot support. It is a question we could not get an answer to.
+    console.error('[inbox] scope lookup failed', error instanceof Error ? error.message : '?')
+    return { ok: false, failure: 'call_failed' }
   }
 }
 
@@ -223,7 +245,7 @@ async function scopedAccount(
   accountId: string,
 ): Promise<
   | { ok: true; profile: ScopedProfileId; account: ScopedAccountId; reads: ZernioReads }
-  | { ok: false; failure: 'no_reader' | 'no_profile' | 'not_found' }
+  | { ok: false; failure: ReadFailure | 'not_found' }
 > {
   const context = await readContext()
   if (!context.ok) return { ok: false, failure: context.failure }
@@ -267,7 +289,7 @@ export async function readThread(
   conversationId: string,
   now: string,
 ): Promise<ThreadView | null> {
-  const connectedAccounts = await countAccounts('conversations')
+  const connectedAccounts = await countAccounts('thread')
   const scoped = await scopedAccount(accountId)
 
   if (!scoped.ok) {
@@ -275,11 +297,7 @@ export async function readThread(
     return {
       messages: [],
       affordance: null,
-      decision: decideSurface({
-        surface: 'conversations',
-        connectedAccounts,
-        failure: scoped.failure,
-      }),
+      decision: decideSurface({ surface: 'thread', connectedAccounts, failure: scoped.failure }),
       nextCursor: null,
     }
   }
@@ -302,7 +320,7 @@ export async function readThread(
       // `/messages` carries no per-account meta, so completeness is not in question the
       // way it is for a fan-out list: one account was asked and it answered.
       decision: decideSurface({
-        surface: 'conversations',
+        surface: 'thread',
         connectedAccounts,
         result: { rows: page.messages.length, meta: undefined },
       }),
@@ -313,11 +331,7 @@ export async function readThread(
     return {
       messages: [],
       affordance: null,
-      decision: decideSurface({
-        surface: 'conversations',
-        connectedAccounts,
-        failure: 'call_failed',
-      }),
+      decision: decideSurface({ surface: 'thread', connectedAccounts, failure: 'call_failed' }),
       nextCursor: null,
     }
   }

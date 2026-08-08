@@ -54,6 +54,15 @@ export const INBOX_SURFACES = {
     noun: 'reviews',
     connectPrompt: 'a Google Business Profile is connected',
   },
+  /**
+   * One thread, not the list. Its own noun because "no conversations yet" on a thread
+   * the user just opened is the wrong sentence — the conversation exists; what may be
+   * missing is its messages.
+   */
+  thread: {
+    noun: 'messages',
+    connectPrompt: 'an Instagram, Facebook or WhatsApp account is connected',
+  },
 } as const satisfies Record<string, InboxSurface>
 
 export type InboxSurfaceKey = keyof typeof INBOX_SURFACES

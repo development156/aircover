@@ -166,7 +166,12 @@ describe('what the copy is forbidden from claiming', () => {
 
 describe('the classifier is not a reviews special case', () => {
   it('covers conversations, comments and reviews', () => {
-    expect(Object.keys(INBOX_SURFACES).sort()).toEqual(['comments', 'conversations', 'reviews'])
+    expect(Object.keys(INBOX_SURFACES).sort()).toEqual([
+      'comments',
+      'conversations',
+      'reviews',
+      'thread',
+    ])
   })
 
   it.each(['conversations', 'comments'] as const)(

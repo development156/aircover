@@ -81,6 +81,24 @@ export async function accountForWorkspace(
  * That is the whole reason the routes are two-segment: a one-segment thread URL would
  * have no account to check, so it would have to read against whichever account Zernio
  * matched — across tenants, since the profile filter defaults to the entire API key.
+ *
+ * ── THE ID SPACE THIS JOIN ASSUMES ───────────────────────────────────────────
+ * The inbox builds these URLs from `ZernioConversation.accountId`, and this looks that
+ * value up against `external_account->>'id'`. Those must be the same id space or every
+ * thread link 404s while the list renders perfectly — the failure would read as a
+ * routing bug, not an id mismatch. This is the same defect class the analytics lane
+ * already shipped once (Zernio's 24-hex `_id` vs the platform's own post id).
+ *
+ * VERIFIED: `external_account->>'id'` is Zernio's account `_id`. The OAuth return writes
+ * `account.accountId` from `ZernioAccount._id`
+ * (`app/api/oauth/zernio/return/route.ts`), `upsert_zernio_connection` names it
+ * ("id is Zernio's account _id"), and both `scopeAccount` and
+ * `assert_account_in_workspace_profile` reject anything but 24-char lowercase hex.
+ *
+ * ASSUMED, `[DOC]`-tier: that `/inbox/*` reports the same `_id` as `accountId`. The
+ * frozen client asserts it structurally — it passes a `ScopedAccountId` minted from this
+ * column straight into the `accountId` query param — but doc 13 records no inbox
+ * behaviour at all and no live payload has been observed. Filed in apps/web/REQUESTS.md.
  */
 export async function accountByIdForWorkspace(
   workspaceId: string,

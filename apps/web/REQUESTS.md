@@ -64,3 +64,29 @@ every reply affordance renders `unknown` forever.
 thread as replyable that is not. But it is a degradation, and it will look like a working feature.
 
 **Ask:** one real message payload, so this can be re-tiered to `[LIVE]` or corrected.
+
+---
+
+## wt-pub: is `ZernioConversation.accountId` the same id as `ZernioAccount._id`?
+
+The thread surface joins on it. `ConversationRow` builds
+`/inbox/threads/[accountId]/[conversationId]` from `ZernioConversation.accountId`, and
+`accountByIdForWorkspace` then looks that value up against `connections.external_account->>'id'`.
+
+**Verified:** `external_account->>'id'` IS Zernio's account `_id` — the OAuth return writes
+`ZernioAccount._id`, `upsert_zernio_connection` documents it as such, and both `scopeAccount` and
+`assert_account_in_workspace_profile` reject anything but 24-char lowercase hex.
+
+**Not verified:** that `/inbox/conversations` reports that same `_id` in its `accountId` field.
+`reads.ts` asserts it structurally — it passes a `ScopedAccountId` minted from this column directly
+into the `accountId` query param on `listMessages` and `listPostComments` — but doc 13 documents no
+inbox behaviour at all, so nothing observed backs it.
+
+**Why it matters more than it looks:** if the two id spaces differ, the conversations list renders
+perfectly and **every row 404s**. Because the mismatch produces a `notFound()`, it reads as a routing
+bug rather than an id-space error, and it would be silent forever. This is the same defect class
+already shipped once on the analytics side (Zernio's 24-hex `_id` vs `post_variants.platform_post_id`,
+which answers HTTP 202 with every metric 0 rather than erroring).
+
+**Ask:** one real `/inbox/conversations` payload, or confirmation from the OpenAPI spec that
+`accountId` is the account `_id`. Recorded in `lib/zernio/scope.ts` in the meantime.

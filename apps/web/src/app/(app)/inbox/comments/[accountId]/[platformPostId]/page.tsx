@@ -40,7 +40,7 @@ export default async function PostCommentsPage({
       </Link>
 
       {rows.length === 0 ? (
-        <SurfaceNotice state={decision.state} />
+        <SurfaceNotice state={decision.state} showConnectAction={false} />
       ) : (
         <>
           <SurfaceBanner state={decision.state} />
