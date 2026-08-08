@@ -28,12 +28,18 @@ function dispatchReport(over: Partial<DispatchSweepReport> = {}): DispatchSweepR
 function reconcileReport(over: Partial<ReconcileReport> = {}): ReconcileReport {
   return {
     mode: 'on',
+    outcome: 'clean',
     connectionsChecked: 0,
     connectionsUpdated: 0,
+    wouldUpdate: 0,
+    connectionsFailed: 0,
     publishesChecked: 0,
     publishesResolved: 0,
+    wouldResolve: 0,
+    publishesFailed: 0,
     stillPending: 0,
     failed: 0,
+    failures: [],
     ...over,
   }
 }
@@ -203,12 +209,20 @@ describe('runCronSweeps', () => {
       },
       reconcile: {
         mode: 'off',
+        // `clean` is the honest word for a pass that did nothing because it was
+        // told to do nothing. It is `failed` that a wholly-failed pass now says.
+        outcome: 'clean',
         connectionsChecked: 0,
         connectionsUpdated: 0,
+        wouldUpdate: 0,
+        connectionsFailed: 0,
         publishesChecked: 0,
         publishesResolved: 0,
+        wouldResolve: 0,
+        publishesFailed: 0,
         stillPending: 0,
         failed: 0,
+        failures: [],
       },
     })
   })

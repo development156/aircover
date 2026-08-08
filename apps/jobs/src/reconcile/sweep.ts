@@ -1,5 +1,14 @@
 import type { Channel } from '@sahoda/shared'
 
+import {
+  classifyFailure,
+  recordFailure,
+  type CountedReconcileFailure,
+  type ReconcileFailureEvent,
+  type ReconcileScope,
+  type ReconcileStage,
+} from './failures'
+
 /**
  * The polling sweep that stands in for webhooks we cannot verify.
  *
@@ -90,28 +99,76 @@ export interface ReconcileSweepDeps {
   applyAccountFacts(connection: ConnectionToCheck, facts: AccountFacts): Promise<void>
   /** Settle a variant that has finally resolved. */
   applyResolution(item: UnresolvedPublish, resolution: PublishResolution): Promise<void>
+  /**
+   * Where the real error goes.
+   *
+   * The report is returned on a public URL and may only carry classifications, so the
+   * cause would otherwise have nowhere to live. Optional: a caller that does not log
+   * loses the detail, which is the old behaviour and not made worse by this hook.
+   */
+  onFailure?(event: ReconcileFailureEvent): void
 }
+
+/**
+ * How a whole pass went, in one word.
+ *
+ * `clean` covers a pass that found nothing to do as well as one that did everything
+ * asked of it — in both, nothing went wrong. `failed` is the case this exists for: a
+ * pass where every unit threw used to be indistinguishable from a quiet success,
+ * because the counters it left behind were the counters of an idle tick plus a number
+ * nobody looks at.
+ */
+export type ReconcileOutcome = 'clean' | 'degraded' | 'failed'
 
 export interface ReconcileReport {
   mode: ReconcileMode
+  outcome: ReconcileOutcome
   connectionsChecked: number
+  /** Executed writes. Zero in `off` and `report`. */
   connectionsUpdated: number
+  /** Intent count, populated in every mode so a dry run predicts `on` (mirrors holds). */
+  wouldUpdate: number
+  connectionsFailed: number
   publishesChecked: number
+  /** Executed writes. Zero in `off` and `report`. */
   publishesResolved: number
+  wouldResolve: number
+  publishesFailed: number
   /** Accepted by the platform, still not finished. Counted, never guessed at. */
   stillPending: number
+  /** `connectionsFailed + publishesFailed` — the one number a dashboard row shows. */
   failed: number
+  /** What went wrong, by kind and count. Codes only: see ./failures. */
+  failures: CountedReconcileFailure[]
 }
 
 const empty = (mode: ReconcileMode): ReconcileReport => ({
   mode,
+  outcome: 'clean',
   connectionsChecked: 0,
   connectionsUpdated: 0,
+  wouldUpdate: 0,
+  connectionsFailed: 0,
   publishesChecked: 0,
   publishesResolved: 0,
+  wouldResolve: 0,
+  publishesFailed: 0,
   stillPending: 0,
   failed: 0,
+  failures: [],
 })
+
+/**
+ * Nothing failed, some of it failed, or all of it did.
+ *
+ * `failed >= checked` can only hold when every unit threw, because a unit is counted
+ * as checked before it is attempted and can fail at most once.
+ */
+function outcomeOf(report: ReconcileReport): ReconcileOutcome {
+  if (report.failed === 0) return 'clean'
+  const checked = report.connectionsChecked + report.publishesChecked
+  return report.failed >= checked ? 'failed' : 'degraded'
+}
 
 /**
  * Run one reconciliation pass.
@@ -123,44 +180,72 @@ const empty = (mode: ReconcileMode): ReconcileReport => ({
  * Every unit of work is independently try/caught. One workspace whose Zernio
  * profile has been deleted must not stop every other workspace from learning that
  * its token expires on Thursday.
+ *
+ * ── WHAT A FAILURE IS ALLOWED TO COST ────────────────────────────────────────
+ * Those catches used to be `catch {}`: the cause was discarded at the point it was
+ * caught, and the only trace left was one shared `failed` counter. A pass in which
+ * all 25 connections and all 25 publishes threw returned `failed: 50` beside an
+ * otherwise idle-looking set of zeros, the route answered 200, and "Zernio is not
+ * provisioned here", "Zernio returned 500 fifty times" and "the database refused
+ * every write" were the same report.
+ *
+ * Now each failure is classified where it is caught (`./failures`) and counted by
+ * kind, the pass says in one word whether it went `clean`, `degraded` or `failed`,
+ * and the untouched error is handed to `onFailure` for a logger that may see a
+ * message. The report itself still carries no message and no row id, because it is
+ * returned on a public URL.
+ *
+ * The two `list*` calls are deliberately NOT caught. A candidate query that fails
+ * means the pass did not happen at all, and that is the route's `catch` to name —
+ * counting it here would report a tick that read nothing as one that found nothing.
  */
 export async function runReconcileSweep(deps: ReconcileSweepDeps): Promise<ReconcileReport> {
   const report = empty(deps.mode)
   if (deps.mode === 'off') return report
 
+  /** Count it, classify it for the body, hand the real thing to the logger. */
+  const fail = (scope: ReconcileScope, stage: ReconcileStage, error: unknown): void => {
+    recordFailure(report.failures, scope, stage, error)
+    if (scope === 'connection') report.connectionsFailed += 1
+    else report.publishesFailed += 1
+    report.failed += 1
+    deps.onFailure?.({ scope, stage, ...classifyFailure(stage, error), error })
+  }
+
   const connections = await deps.listConnectionsToCheck()
   for (const connection of connections) {
     report.connectionsChecked += 1
+    // Which call is in flight. A `pool.query` rejection looks the same as a Zernio
+    // one, and only this loop knows which of the two it just made.
+    let stage: ReconcileStage = 'read'
     try {
       const accounts = await deps.readAccounts(connection.profileId)
       const match = accounts.find((a) => a.accountId === connection.accountId)
-      if (!match) {
-        // The account is gone from the profile entirely. That IS the disconnected
-        // signal, arrived by asking rather than by being told — but it is recorded
-        // as needing reconnection rather than deleted: the row carries history the
-        // customer may still want, and deleting on a single read would make one
-        // flaky response destroy a connection.
-        if (deps.mode === 'on') {
-          await deps.applyAccountFacts(connection, {
-            accountId: connection.accountId,
-            needsReconnection: true,
-            platformStatus: 'not listed under this profile',
-            tokenExpiresAt: null,
-          })
-        }
-        report.connectionsUpdated += 1
-        continue
+      // A missing account is the disconnected signal, arrived by asking rather than
+      // by being told — recorded as needing reconnection rather than deleted: the row
+      // carries history the customer may still want, and deleting on a single read
+      // would make one flaky response destroy a connection.
+      const facts = match ?? {
+        accountId: connection.accountId,
+        needsReconnection: true,
+        platformStatus: 'not listed under this profile',
+        tokenExpiresAt: null,
       }
-      if (deps.mode === 'on') await deps.applyAccountFacts(connection, match)
-      report.connectionsUpdated += 1
-    } catch {
-      report.failed += 1
+      report.wouldUpdate += 1
+      if (deps.mode === 'on') {
+        stage = 'write'
+        await deps.applyAccountFacts(connection, facts)
+        report.connectionsUpdated += 1
+      }
+    } catch (error) {
+      fail('connection', stage, error)
     }
   }
 
   const unresolved = await deps.listUnresolvedPublishes()
   for (const item of unresolved) {
     report.publishesChecked += 1
+    let stage: ReconcileStage = 'read'
     try {
       const resolution = await deps.readPublish(item)
       if (resolution.kind === 'pending') {
@@ -169,12 +254,17 @@ export async function runReconcileSweep(deps: ReconcileSweepDeps): Promise<Recon
         report.stillPending += 1
         continue
       }
-      if (deps.mode === 'on') await deps.applyResolution(item, resolution)
-      report.publishesResolved += 1
-    } catch {
-      report.failed += 1
+      report.wouldResolve += 1
+      if (deps.mode === 'on') {
+        stage = 'write'
+        await deps.applyResolution(item, resolution)
+        report.publishesResolved += 1
+      }
+    } catch (error) {
+      fail('publish', stage, error)
     }
   }
 
+  report.outcome = outcomeOf(report)
   return report
 }
