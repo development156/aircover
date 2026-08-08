@@ -1,0 +1,245 @@
+import type { ZernioInboxMeta } from '@sahoda/publishing'
+
+/**
+ * Telling "nothing is there" apart from "we could not ask".
+ *
+ * ── WHY THIS EXISTS ──────────────────────────────────────────────────────────
+ * Zernio does NOT fail an `/inbox/*` call when one account errors. It returns HTTP 200
+ * with `data: []` and reports the failure in `meta`. So an empty list has several
+ * genuinely different meanings, and rendering one sentence for all of them makes Sahoda
+ * lie — usually in the direction of a claim about the CUSTOMER'S SHOP that we have no
+ * evidence for. "No reviews" is the worst of them: we asked nobody.
+ *
+ * Only ONE of the states below earns "none yet", and it is the one where every
+ * connected account answered and the answer was nothing.
+ *
+ * ── WHY THE META TYPE IS IMPORTED, NOT REDECLARED ────────────────────────────
+ * `ZernioInboxMeta` is a wire shape and `@sahoda/publishing` owns it, next to the client
+ * that parses it. Redeclaring a structurally-identical copy here would compile happily
+ * and then drift the first time Zernio adds a field.
+ */
+
+/**
+ * A failed account, projected for display.
+ *
+ * `error` is deliberately NOT carried through: it is an upstream string that can contain
+ * an auth header or token fragment, and this object is rendered in the browser. Raw
+ * upstream errors belong in the server log and Sentry, never in the DOM.
+ */
+export interface FailedAccountSummary {
+  platform?: string
+  accountUsername?: string
+  code?: string
+  retryAfter?: number
+}
+
+/** Per-surface nouns, so one classifier writes correct copy for all three lists. */
+export interface InboxSurface {
+  /** Plural noun for the rows: "conversations", "comments", "reviews". */
+  noun: string
+  /** What has to be connected first, phrased to slot after "once …". */
+  connectPrompt: string
+}
+
+export const INBOX_SURFACES = {
+  conversations: {
+    noun: 'conversations',
+    connectPrompt: 'an Instagram, Facebook or WhatsApp account is connected',
+  },
+  comments: {
+    noun: 'comments',
+    connectPrompt: 'an Instagram or Facebook account is connected',
+  },
+  reviews: {
+    noun: 'reviews',
+    connectPrompt: 'a Google Business Profile is connected',
+  },
+  /**
+   * One thread, not the list. Its own noun because "no conversations yet" on a thread
+   * the user just opened is the wrong sentence — the conversation exists; what may be
+   * missing is its messages.
+   */
+  thread: {
+    noun: 'messages',
+    connectPrompt: 'an Instagram, Facebook or WhatsApp account is connected',
+  },
+} as const satisfies Record<string, InboxSurface>
+
+export type InboxSurfaceKey = keyof typeof INBOX_SURFACES
+
+/**
+ * Every distinct thing an inbox list can mean.
+ *
+ * `empty` is the only one that is a statement about the customer. The other six are
+ * statements about Sahoda — what it holds, what it asked, and what came back.
+ */
+export type InboxEmptinessState =
+  | 'ok'
+  | 'partial'
+  | 'empty'
+  | 'never_connected'
+  | 'unresolved'
+  | 'could_not_ask'
+  | 'not_read'
+  | 'unknown'
+
+export interface InboxEmptiness {
+  state: InboxEmptinessState
+  /** Render the rows? True whenever any arrived, even alongside a failure. */
+  showList: boolean
+  headline: string
+  body: string
+  failed: FailedAccountSummary[]
+}
+
+export interface ClassifyInput {
+  rows: number
+  meta: ZernioInboxMeta | undefined
+  surface: InboxSurface
+  /**
+   * This workspace's own count of connections Zernio could be asked about — a real
+   * measurement from `connections`, not a placeholder. It exists to catch the case
+   * `meta` alone cannot express: we hold an account and Zernio queried none of them.
+   */
+  connectedAccounts: number
+}
+
+const projectFailures = (meta: ZernioInboxMeta | undefined): FailedAccountSummary[] =>
+  (meta?.failedAccounts ?? []).map((f) => ({
+    platform: f.platform,
+    accountUsername: f.accountUsername,
+    code: f.code,
+    retryAfter: f.retryAfter,
+  }))
+
+/**
+ * No read was attempted, because the Zernio rail is not provisioned in this build.
+ *
+ * Distinct from every state below, all of which describe an answer. This one describes
+ * a question that was never asked, and no amount of connecting accounts fixes it.
+ */
+export function notRead(surface: InboxSurface): InboxEmptiness {
+  return {
+    state: 'not_read',
+    showList: false,
+    headline: `Sahoda has not read your ${surface.noun} yet`,
+    body: `The connection to our publishing partner is not configured in this environment, so no request went out. This is not a reading of your ${surface.noun}.`,
+    failed: [],
+  }
+}
+
+/**
+ * The workspace has never connected anything this surface could read.
+ *
+ * Used when there is no Zernio profile at all — the read is not merely unanswered,
+ * there is nothing to address it to.
+ */
+export function neverConnected(surface: InboxSurface): InboxEmptiness {
+  return {
+    state: 'never_connected',
+    showList: false,
+    headline: `Connect an account to see ${surface.noun} here`,
+    body: `Sahoda has not queried any account for this workspace, so it has nothing to show yet — this is not a reading of your ${surface.noun}. They appear here once ${surface.connectPrompt}.`,
+    failed: [],
+  }
+}
+
+/** The request went out and came back without an answer. */
+export function couldNotAsk(surface: InboxSurface): InboxEmptiness {
+  return {
+    state: 'could_not_ask',
+    showList: false,
+    headline: `Sahoda could not reach your connected accounts`,
+    body: `The request went out but came back without an answer, so this is not a reading of your ${surface.noun}. Nothing was charged. Refresh to try again.`,
+    failed: [],
+  }
+}
+
+/**
+ * Classify one `/inbox/*` result into a state the UI can render honestly.
+ *
+ * Order matters, and it is "what do we know about the question" before "what came back":
+ *
+ *  1. No `meta` at all → we cannot confirm the view is complete. Not empty.
+ *  2. Zernio queried nobody → either nothing is connected, or we hold a connection it
+ *     did not recognise. Those are different sentences (see `unresolved`).
+ *  3. Failures with no rows → we could not ask.
+ *  4. Failures with rows → partial; show them, and say the view is incomplete.
+ *  5. No rows, no failures, ≥1 account asked → genuinely empty. The only "none yet".
+ */
+export function classifyInboxResult({
+  rows,
+  meta,
+  surface,
+  connectedAccounts,
+}: ClassifyInput): InboxEmptiness {
+  const failed = projectFailures(meta)
+
+  if (!meta) {
+    return {
+      state: 'unknown',
+      showList: rows > 0,
+      headline: `Sahoda could not confirm this ${surface.noun} view is complete`,
+      body: `The response carried no per-account status, so we cannot tell whether every connected account answered. Refresh to try again.`,
+      failed,
+    }
+  }
+
+  if (meta.accountsQueried === 0) {
+    // ── THE DIVERGENCE THAT IS NOT A ZERO ────────────────────────────────────
+    // We hold at least one connection Zernio could be asked about, and Zernio asked
+    // none. That is "cannot resolve", the same distinction `syncStatus: orphaned`
+    // draws on the analytics side: our row points at an account the partner did not
+    // recognise. Reporting it as "nothing connected" would tell the customer to
+    // connect an account they already connected; reporting it as "no conversations"
+    // would be a measurement we never took.
+    if (connectedAccounts > 0) {
+      return {
+        state: 'unresolved',
+        showList: false,
+        headline: `Sahoda could not resolve your connected ${connectedAccounts === 1 ? 'account' : 'accounts'}`,
+        body: `This workspace has ${connectedAccounts} connected ${connectedAccounts === 1 ? 'account' : 'accounts'} for ${surface.noun}, but our publishing partner did not recognise ${connectedAccounts === 1 ? 'it' : 'any of them'} and queried nothing. This is not a reading of your ${surface.noun}. Reconnect the account to fix it.`,
+        failed,
+      }
+    }
+    return neverConnected(surface)
+  }
+
+  if (meta.accountsFailed > 0 && rows === 0) {
+    return {
+      state: 'could_not_ask',
+      showList: false,
+      headline: `Sahoda could not reach ${meta.accountsFailed === 1 ? 'a connected account' : `${meta.accountsFailed} connected accounts`}`,
+      body: `The request went out but came back without an answer, so this is not a reading of your ${surface.noun}. Nothing was charged. Refresh to try again.`,
+      failed,
+    }
+  }
+
+  if (meta.accountsFailed > 0) {
+    return {
+      state: 'partial',
+      showList: true,
+      headline: `Showing part of your ${surface.noun}`,
+      body: `${meta.accountsFailed} of ${meta.accountsQueried} connected accounts did not answer, so some ${surface.noun} may be missing from this list. Refresh to try again.`,
+      failed,
+    }
+  }
+
+  if (rows === 0) {
+    return {
+      state: 'empty',
+      showList: false,
+      headline: `No ${surface.noun} yet`,
+      body: `All ${meta.accountsQueried} connected ${meta.accountsQueried === 1 ? 'account' : 'accounts'} answered, and there is nothing waiting. New ${surface.noun} land here automatically.`,
+      failed,
+    }
+  }
+
+  return {
+    state: 'ok',
+    showList: true,
+    headline: `Showing your ${surface.noun}`,
+    body: `All ${meta.accountsQueried} connected ${meta.accountsQueried === 1 ? 'account' : 'accounts'} answered.`,
+    failed,
+  }
+}

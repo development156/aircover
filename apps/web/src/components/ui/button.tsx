@@ -8,7 +8,12 @@ import { cn } from '@/lib/utils'
 // shadcn/ui Button, restyled per Design System §6 (the only four variants the
 // spec defines). Global `:focus-visible` (globals.css) already ships the 2px
 // --acc ring — this component only needs hover/active/disabled/loading.
-const buttonVariants = cva(
+// Exported so a plain <Link> can wear the button's clothes. `<Button asChild>` is NOT
+// the route for that: Button always renders a loading-spinner slot beside {children},
+// so Radix's Slot receives two children and throws — and it forwards `disabled`, which
+// is not a valid attribute on an anchor. Filed in REQUESTS.md; the asChild path needs
+// its own review rather than a drive-by fix from a feature branch.
+export const buttonVariants = cva(
   'inline-flex shrink-0 items-center justify-center gap-2 rounded-pill font-semibold transition-micro active:scale-[.97] disabled:pointer-events-none disabled:opacity-45',
   {
     variants: {

@@ -65,6 +65,65 @@ export async function accountForWorkspace(
 }
 
 /**
+ * Scope an account id that arrived from a URL segment.
+ *
+ * ── WHY THIS EXISTS ALONGSIDE `accountForWorkspace` ──────────────────────────
+ * That one looks a connection up by PLATFORM and `.maybeSingle()`s it — fine for a
+ * screen that means "this workspace's Instagram", wrong for a route. An inbox thread
+ * is addressed by its account id, a workspace may hold two accounts on one platform,
+ * and the id in the URL is attacker-supplied: it is whatever the customer typed.
+ *
+ * So the id is used as a QUERY FILTER against this workspace's own rows, never as
+ * something to trust. If no row matches, `scopeAccount` gets `null` and throws, and
+ * the route turns that into a 404. The id never reaches Zernio unless a row in THIS
+ * workspace, carrying THIS workspace's profile, already held it.
+ *
+ * That is the whole reason the routes are two-segment: a one-segment thread URL would
+ * have no account to check, so it would have to read against whichever account Zernio
+ * matched — across tenants, since the profile filter defaults to the entire API key.
+ *
+ * ── THE ID SPACE THIS JOIN ASSUMES ───────────────────────────────────────────
+ * The inbox builds these URLs from `ZernioConversation.accountId`, and this looks that
+ * value up against `external_account->>'id'`. Those must be the same id space or every
+ * thread link 404s while the list renders perfectly — the failure would read as a
+ * routing bug, not an id mismatch. This is the same defect class the analytics lane
+ * already shipped once (Zernio's 24-hex `_id` vs the platform's own post id).
+ *
+ * VERIFIED: `external_account->>'id'` is Zernio's account `_id`. The OAuth return writes
+ * `account.accountId` from `ZernioAccount._id`
+ * (`app/api/oauth/zernio/return/route.ts`), `upsert_zernio_connection` names it
+ * ("id is Zernio's account _id"), and both `scopeAccount` and
+ * `assert_account_in_workspace_profile` reject anything but 24-char lowercase hex.
+ *
+ * ASSUMED, `[DOC]`-tier: that `/inbox/*` reports the same `_id` as `accountId`. The
+ * frozen client asserts it structurally — it passes a `ScopedAccountId` minted from this
+ * column straight into the `accountId` query param — but doc 13 records no inbox
+ * behaviour at all and no live payload has been observed. Filed in apps/web/REQUESTS.md.
+ */
+export async function accountByIdForWorkspace(
+  workspaceId: string,
+  accountId: string,
+  profile: ScopedProfileId,
+): Promise<ScopedAccountId> {
+  const supabase = createServerSupabase()
+  const { data, error } = await supabase
+    .from('connections')
+    .select('workspace_id, external_account')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .eq('external_account->>id', accountId)
+    .maybeSingle()
+
+  if (error) {
+    throw new ScopeError(`Could not read this workspace’s connections: ${error.message}`)
+  }
+  // Re-mints from the ROW, not from the parameter. The returned brand therefore
+  // certifies the stored id, and a row whose id somehow differed would be refused
+  // rather than silently blessing the URL's version of it.
+  return scopeAccount(data, workspaceId, profile)
+}
+
+/**
  * Both ids for one platform, for the common case where a screen needs each.
  *
  * Sequential rather than parallel on purpose: the account check needs the profile to

@@ -26,6 +26,9 @@ export * from './publishing/adapter'
 export * from './publishing/schedule'
 export * from './mesh/runner'
 export * from './mesh/tasks'
+// Messaging reply windows — what a platform will let you say, and when. Policy
+// only: nothing here sends, and `canSendFromSahoda` is the literal `false`.
+export * from './inbox/send-window'
 
 // Admin Ops — /admin surface + the Claude↔dashboard sync protocol (doc 13)
 export * from './ops/state'
