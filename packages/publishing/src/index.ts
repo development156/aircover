@@ -76,6 +76,38 @@ export {
   type ZernioRateLimit,
 } from './zernio/client'
 
+// ── Tenant scoping for Zernio READS ──────────────────────────────────────────
+// `profileId` and `accountId` are optional filters on Zernio's side, and an omitted
+// profileId reads across every tenant on the key. These branded ids make omission a
+// compile error: only scopeProfile/scopeAccount can produce one, and only from a row
+// already fetched for a known workspace. See zernio/scope.ts.
+export {
+  scopeProfile,
+  scopeAccount,
+  ScopeError,
+  type ScopedProfileId,
+  type ScopedAccountId,
+  type ZernioProfileRow,
+  type ZernioConnectionRow,
+} from './zernio/scope'
+
+export {
+  createZernioReads,
+  type ZernioReads,
+  type ZernioCursorPage,
+  type ZernioOffsetPage,
+  type ZernioInboxMeta,
+  type ZernioPostAnalytics,
+  type ZernioPostMetrics,
+  type ZernioConversation,
+  type ZernioMessage,
+  type ZernioCommentedPost,
+  type ZernioComment,
+  type ZernioReview,
+  type ZernioPaged,
+  type ZernioPlatformFilter,
+} from './zernio/reads'
+
 export {
   ensureZernioProfile,
   reconcileAccounts,
