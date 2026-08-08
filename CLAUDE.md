@@ -41,4 +41,3 @@ Rules for teammates fixing bugs in cloud sessions at claude.ai/code. Type `/fix 
 - **Agents:** use `reviewer` (on the diff, before opening the PR), `test-writer`, and `debug-agent`. Do NOT use `db-migration-agent`, `sites-agent`, or any agent that writes migrations.
 - **The cloud sandbox has no `.env`.** Live-database tests skip automatically and the app cannot be run locally — that is normal, not something to fix. Visual checks happen on the Vercel preview URL that builds automatically for the PR.
 - **If the fix would need a schema change, a shared-contract change, or another package's internals: STOP.** Say exactly that in the PR description instead of doing it.
-

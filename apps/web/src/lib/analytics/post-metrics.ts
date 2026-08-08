@@ -73,10 +73,7 @@ interface Target {
  * `post_variants` records it — and the lag window is measured from it. Keyed
  * `postId::channel`; only succeeded rows count, and the latest wins.
  */
-async function publishTimes(
-  workspaceId: string,
-  postIds: string[],
-): Promise<Map<string, string>> {
+async function publishTimes(workspaceId: string, postIds: string[]): Promise<Map<string, string>> {
   const times = new Map<string, string>()
   if (postIds.length === 0) return times
 

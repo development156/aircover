@@ -73,10 +73,7 @@ describe('the three waits read as one situation', () => {
   })
 
   it('gives no expected time when it cannot compute one', () => {
-    const copy = metricCopy(
-      { kind: 'pending', reason: 'lag', availableAfter: null },
-      'instagram',
-    )
+    const copy = metricCopy({ kind: 'pending', reason: 'lag', availableAfter: null }, 'instagram')
     expect(copy.detail).not.toMatch(/expected/i)
   })
 })

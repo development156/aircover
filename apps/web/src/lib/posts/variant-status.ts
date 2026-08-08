@@ -70,8 +70,9 @@ export function variantStatusRow(variant: PostVariant): VariantStatusRow {
     // Only a LIVE publish has a platform id worth asking analytics about. A fixture
     // run never touched the platform, so carrying its id forward would send a
     // simulated post to a real metrics endpoint.
-    platformPostId:
-      variant.permalink?.startsWith('fixture://') ? null : (variant.platform_post_id ?? null),
+    platformPostId: variant.permalink?.startsWith('fixture://')
+      ? null
+      : (variant.platform_post_id ?? null),
     errorMessage: message,
     errorCode: code,
     retryable: RETRYABLE.has(variant.publish_status),

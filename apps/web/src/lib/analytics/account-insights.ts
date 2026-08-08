@@ -213,8 +213,10 @@ export async function readInstagramAnalytics(now: Date = new Date()): Promise<Ac
       lagHoursFromDataDelay(insights.dataDelay) ?? INSTAGRAM_INSIGHTS_LAG_HOURS
 
     const followers = firstSeries(history.metrics, FOLLOWER_KEYS)
-    const tiles = INSIGHT_KEYS.map(({ key, label }) => ({ label, value: num(insights.metrics[key]) }))
-      .filter((t): t is { label: string; value: number } => t.value !== null)
+    const tiles = INSIGHT_KEYS.map(({ key, label }) => ({
+      label,
+      value: num(insights.metrics[key]),
+    })).filter((t): t is { label: string; value: number } => t.value !== null)
 
     return {
       kind: 'ready',

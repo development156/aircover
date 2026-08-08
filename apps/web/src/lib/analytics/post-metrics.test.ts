@@ -86,10 +86,7 @@ describe('every row gets a verdict', () => {
   })
 
   it('never calls for an unpublished channel', async () => {
-    await listPostMetrics(
-      new Map([['post-1', [row({ status: 'failed' as never })]]]),
-      NOW,
-    )
+    await listPostMetrics(new Map([['post-1', [row({ status: 'failed' as never })]]]), NOW)
     expect(reads.postAnalytics).not.toHaveBeenCalled()
   })
 })

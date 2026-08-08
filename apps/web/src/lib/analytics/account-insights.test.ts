@@ -85,9 +85,7 @@ describe('follower series narrowing', () => {
   })
 
   it('drops non-finite numbers rather than plotting them', () => {
-    expect(
-      seriesFrom({ f: [{ date: '2026-08-01', value: Number.NaN }] }, 'f'),
-    ).toEqual([])
+    expect(seriesFrom({ f: [{ date: '2026-08-01', value: Number.NaN }] }, 'f')).toEqual([])
   })
 
   it('accepts the alternate field names Zernio uses', () => {
