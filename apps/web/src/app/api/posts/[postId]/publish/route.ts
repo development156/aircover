@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { auth } from '@clerk/nextjs/server'
-import { publishPostDeps, runClaimedPublish } from '@sahoda/jobs/publish'
+import { PublishInfraError, publishPostDeps, runClaimedPublish } from '@sahoda/jobs/publish'
 import { ChannelSchema, type Channel } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
@@ -140,10 +140,21 @@ export async function POST(
       return fail('Couldn’t get this post ready to publish — try again.', 500)
     }
 
+    // Built OUTSIDE the publish call and classified on its own. `publishPostDeps` reads
+    // and validates the job env and constructs the pg pool; a throw here is a
+    // misconfigured environment, not a failed publish, and it happens before
+    // `deps.writeLog` exists to record anything.
+    let deps
+    try {
+      deps = publishPostDeps()
+    } catch (e) {
+      throw new PublishInfraError('deps', e)
+    }
+
     const result = await runClaimedPublish(
       { workspaceId: workspace.id, postId, variantId: variant.id, channel, scheduledAt },
       { attempt: 1, jobRunId: `web:${randomUUID()}` },
-      publishPostDeps(),
+      deps,
     )
 
     // Someone else is already publishing this variant — the scheduled sweep, or the
@@ -186,7 +197,32 @@ export async function POST(
     // A TRANSIENT adapter failure is rethrown by the job so a durable runner can retry.
     // There is no durable runner here, so it lands as a 503: nothing is terminally
     // recorded, and pressing the button again is the correct next move.
-    await reportServerError(error, { action: 'publishNow', workspaceId })
-    return fail('Publishing didn’t go through — try again in a moment.', 503)
+    //
+    // ── WHY THE 503 CARRIES A CODE ──────────────────────────────────────────────
+    // Two very different things reach this line. An adapter gave up mid-flight and the
+    // post may yet go live — pressing again is right. OR the infrastructure under the
+    // publish was unavailable and NOTHING was attempted, in which case pressing again
+    // will fail identically until someone fixes the environment.
+    //
+    // Both used to return the same anonymous 503 with no log row (the row is a Postgres
+    // write, and Postgres is exactly what is missing in the second case). On 2026-08-07
+    // four of these were unattributable for that reason. The code and the stage are what
+    // make them tellable apart from the outside, without a row.
+    const infra = error instanceof PublishInfraError
+    await reportServerError(error, {
+      action: 'publishNow',
+      workspaceId,
+      ...(infra ? { infraStage: error.stage } : {}),
+    })
+    return Response.json(
+      {
+        ok: false,
+        code: infra ? 'INFRA_UNAVAILABLE' : 'PUBLISH_TRANSIENT',
+        message: infra
+          ? 'Publishing is unavailable right now — nothing was sent. We’ve been alerted.'
+          : 'Publishing didn’t go through — try again in a moment.',
+      },
+      { status: 503, headers: { 'cache-control': 'no-store' } },
+    )
   }
 }

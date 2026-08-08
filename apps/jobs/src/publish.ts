@@ -25,11 +25,16 @@ export type {
   VariantUpdate,
 } from './publish/runPublishPost'
 
-export { runClaimedPublish, PUBLISH_LEASE_SECONDS } from './publish/runClaimedPublish'
+export {
+  runClaimedPublish,
+  PUBLISH_LEASE_SECONDS,
+  PublishInfraError,
+} from './publish/runClaimedPublish'
 export type {
   ClaimedPublishDeps,
   ClaimedPublishResult,
   ClaimRefusal,
+  PublishInfraStage,
 } from './publish/runClaimedPublish'
 
 export { publishPostDeps } from './publish/deps'
