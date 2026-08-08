@@ -30,7 +30,9 @@ function body(overrides: Record<string, unknown> = {}): string {
 }
 
 const sign = (raw: string, secret: string, ts = TS): string =>
-  createHmac('sha256', secret).update(ts + raw).digest('base64')
+  createHmac('sha256', secret)
+    .update(ts + raw)
+    .digest('base64')
 
 describe('verifyCashfreeWebhook — the only way to mint a LiveVerifiedBody', () => {
   it('returns a verified body for a correctly signed payload', () => {
@@ -84,7 +86,13 @@ describe('verifyCashfreeWebhook — the only way to mint a LiveVerifiedBody', ()
     const raw = body()
     for (const signature of ['', '   ', 'null', 'undefined']) {
       expect(
-        verifyCashfreeWebhook({ rawBody: raw, signature, timestamp: TS, secretKey: SECRET, now: NOW }),
+        verifyCashfreeWebhook({
+          rawBody: raw,
+          signature,
+          timestamp: TS,
+          secretKey: SECRET,
+          now: NOW,
+        }),
       ).toBeNull()
     }
   })

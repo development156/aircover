@@ -123,9 +123,16 @@ describe('the webhook entry point is declared so a route can import it', () => {
       'createPgWebhookEventStore',
       'verifyCashfreeWebhook',
       'parseVerifiedCashfreeWebhook',
+      // Without these the route cannot stamp an honest mode or find the signing secret,
+      // and would fall back to the parser's 'sandbox' default on the live rail.
+      'modeForEnv',
+      'loadCashfreeWebhookEnv',
+      'resolveCashfreeWebhookSecret',
     ] as const) {
-      expect(serverWebhook[name], `${name} must be a real binding, not an undefined re-export`).
-        toBeTypeOf('function')
+      expect(
+        serverWebhook[name],
+        `${name} must be a real binding, not an undefined re-export`,
+      ).toBeTypeOf('function')
     }
   })
 })

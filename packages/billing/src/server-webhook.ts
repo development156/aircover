@@ -36,7 +36,17 @@ export {
 } from './providers/cashfree/verified'
 
 // Cashfree env + the tag/amount contract the parser enforces.
-export { loadCashfreeEnv, type CashfreeEnv } from './providers/cashfree/env'
+//
+// `modeForEnv` is exported because the parser DEFAULTS to 'sandbox' when no mode is passed.
+// A receiver that forgets to stamp the mode would therefore label a real payment 'sandbox'
+// in the ledger's audit meta — silently, and only on the live rail. The endpoint must derive
+// the label from CASHFREE_ENV rather than inherit a default, so the deriver ships here.
+export { loadCashfreeEnv, modeForEnv, type CashfreeEnv } from './providers/cashfree/env'
+export {
+  loadCashfreeWebhookEnv,
+  resolveCashfreeWebhookSecret,
+  type CashfreeWebhookEnv,
+} from './providers/cashfree/webhook-env'
 export { CASHFREE_ID, CashfreeTagsMissingError } from './providers/cashfree/webhook'
 
 // The normalized event shape the endpoint hands on. Types only — no implementations.
