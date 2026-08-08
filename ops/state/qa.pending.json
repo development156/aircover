@@ -824,6 +824,45 @@
       "summary_plain": "The typecheck checks passed for @sahoda/jobs, @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "@sahoda/jobs:test: \n\n Tasks:    11 successful, 11 total\nCached:    6 cached, 11 total\n  Time:    49.013s \n\n=== status ===\n M apps/jobs/CLAUDE.md\n M apps/jobs/src/publish/runPublishPost.test.ts\n M apps/jobs/src/publish/store.ts\n M mutations/dead-account.mjs\n M ops/state/board.json\n M scripts/lib/ops-cards.mjs",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskor2b9-18a8429",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T18:06:52.532Z",
+      "finished_at": "2026-08-08T18:06:52.532Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran and everything passed.",
+      "details": "@sahoda/shared:typecheck: $ tsc --noEmit\n@sahoda/sites:typecheck: cache hit, replaying logs 68bc755d08da89c1\n@sahoda/mesh:typecheck: cache hit, replaying logs 714a470d1f61e07c\n@sahoda/mesh:typecheck: $ tsc --noEmit\n@sahoda/sites:typecheck: $ tsc --noEmit\n@sahoda/db:typecheck: cache hit, replaying logs 3c3ac70223692e80\n@sahoda/db:typecheck: $ tsc --noEmit\n@sahoda/billing:typecheck: cache hit, replaying logs 4970422b48dec416\n@sahoda/billing:typecheck: $ tsc --noEmit\n@sahoda/publishing:typecheck: cache hit, replaying logs 5cfa807e3a99b336\n@sahoda/publishing:typecheck: $ tsc --noEmit\n@sahoda/jobs:typecheck: cache hit, replaying logs 3adc68e81f39acaa\n@sahoda/jobs:typecheck: $ tsc --noEmit\n@sahoda/web:typecheck: cache hit, replaying logs 31c90fd01793b879\n@sahoda/web:typecheck: $ tsc --noEmit\n\n Tasks:    8 successful, 8 total\nCached:    8 cached, 8 total\n  Time:    14ms >>> FULL TURBO",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskor62h-885bd029",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T18:06:57.400Z",
+      "finished_at": "2026-08-08T18:06:57.400Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran (2145 passed), but 1 test did NOT run — this does not prove the suite passes.",
+      "details": "@sahoda/web:lint: $ exit 0\n@sahoda/billing:lint: cache hit, replaying logs 17551c35fb7e352d\n@sahoda/billing:lint: $ exit 0\n\n Tasks:    8 successful, 8 total\nCached:    8 cached, 8 total\n  Time:    12ms >>> FULL TURBO\n\n=== TEST ===\n@sahoda/web:test:  ✓  ui  src/components/wallet/ledger-grammar.test.tsx (17 tests) 723ms\n@sahoda/web:test:  ✓  ui  src/components/ui/cost-label.test.tsx (7 tests) 755ms\n@sahoda/web:test:      ✓ the whole label is one element, not three  665ms\n@sahoda/web:test:  ✓  ui  src/app/global-error.test.tsx (5 tests) 943ms\n@sahoda/web:test:      ✓ captures a root layout crash that happened during client render  795ms\n@sahoda/web:test:  ✓  ui  src/components/shell/topbar.test.tsx (5 tests) 523ms\n@sahoda/web:test:      ✓ renders the whole shell when every read succeeds  363ms\n@sahoda/web:test:  ✓  ui  src/app/(app)/wallet/page.test.tsx (8 tests) 633ms\n@sahoda/web:test:      ✓ offers the one thing that actually helps: creating a workspace  315ms\n@sahoda/web:test:  ✓  ui  src/components/home/charts.test.tsx (17 tests) 267ms\n@sahoda/web:test:  ✓  ui  src/components/admin/charts.test.tsx (11 tests) 344ms\n@sahoda/web:test:  ✓  ui  src/components/wallet/balance-hero.test.tsx (5 tests) 139ms\n@sahoda/web:test:  ✓  ui  src/components/posts/auto-publish-note.test.tsx (11 tests) 234ms\n@sahoda/web:test:  ✓  ui  src/components/posts/agency-blade.test.tsx (8 tests) 181ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  152 passed (152)\n@sahoda/web:test:       Tests  2145 passed | 1 skipped (2146)\n@sahoda/web:test:    Start at  21:31:04\n@sahoda/web:test:    Duration  40.52s (transform 43.63s, setup 21.76s, import 144.64s, tests 64.63s, environment 95.51s)\n@sahoda/web:test: \n\n Tasks:    14 successful, 14 total\nCached:    14 cached, 14 total\n  Time:    19ms >>> FULL TURBO",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskor62h-9c79c7a4",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T18:06:57.400Z",
+      "finished_at": "2026-08-08T18:06:57.400Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran (2145 passed), but 1 test did NOT run — this does not prove the suite passes.",
+      "details": "@sahoda/web:lint: $ exit 0\n@sahoda/billing:lint: cache hit, replaying logs 17551c35fb7e352d\n@sahoda/billing:lint: $ exit 0\n\n Tasks:    8 successful, 8 total\nCached:    8 cached, 8 total\n  Time:    12ms >>> FULL TURBO\n\n=== TEST ===\n@sahoda/web:test:  ✓  ui  src/components/wallet/ledger-grammar.test.tsx (17 tests) 723ms\n@sahoda/web:test:  ✓  ui  src/components/ui/cost-label.test.tsx (7 tests) 755ms\n@sahoda/web:test:      ✓ the whole label is one element, not three  665ms\n@sahoda/web:test:  ✓  ui  src/app/global-error.test.tsx (5 tests) 943ms\n@sahoda/web:test:      ✓ captures a root layout crash that happened during client render  795ms\n@sahoda/web:test:  ✓  ui  src/components/shell/topbar.test.tsx (5 tests) 523ms\n@sahoda/web:test:      ✓ renders the whole shell when every read succeeds  363ms\n@sahoda/web:test:  ✓  ui  src/app/(app)/wallet/page.test.tsx (8 tests) 633ms\n@sahoda/web:test:      ✓ offers the one thing that actually helps: creating a workspace  315ms\n@sahoda/web:test:  ✓  ui  src/components/home/charts.test.tsx (17 tests) 267ms\n@sahoda/web:test:  ✓  ui  src/components/admin/charts.test.tsx (11 tests) 344ms\n@sahoda/web:test:  ✓  ui  src/components/wallet/balance-hero.test.tsx (5 tests) 139ms\n@sahoda/web:test:  ✓  ui  src/components/posts/auto-publish-note.test.tsx (11 tests) 234ms\n@sahoda/web:test:  ✓  ui  src/components/posts/agency-blade.test.tsx (8 tests) 181ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  152 passed (152)\n@sahoda/web:test:       Tests  2145 passed | 1 skipped (2146)\n@sahoda/web:test:    Start at  21:31:04\n@sahoda/web:test:    Duration  40.52s (transform 43.63s, setup 21.76s, import 144.64s, tests 64.63s, environment 95.51s)\n@sahoda/web:test: \n\n Tasks:    14 successful, 14 total\nCached:    14 cached, 14 total\n  Time:    19ms >>> FULL TURBO",
+      "duration_ms": null
     }
   ]
 }
