@@ -744,11 +744,11 @@
       "title": "The tool that verifies our fixes was reporting work it had not done",
       "detail": "We check that a test is real by deliberately breaking the code and confirming the test notices. The script doing that saved a copy of each file first — and when the folder for those copies was missing, the save failed, the script carried on regardless, and then printed that everything had been checked and put back. Twice in one day it reported success over work it had not done, once leaving three deliberately broken files sitting in the codebase under a clean report. Why it matters: this is the same silent-success failure the board keeps recording, sitting inside the one tool whose job is to prove the others are honest — and its output is trusted more than most.\n\nTechnical detail — Found 2026-08-03 during the SL-062 review. The ad-hoc shell loop was `cp file $S/x.bak; mutate; test; cp $S/x.bak file`, with $S pointing at a session scratch path that did not exist. Every `cp` failed to stderr and the loop continued. Run 1 additionally split its mutation spec on the wrong delimiter and rewrote a COMMENT, then reported '20 passed' as a surviving mutant — a false negative presented as evidence. Run 2 left rollup.ts, board.ts and collapsible-region.tsx mutated in the working tree beneath a report saying all three mutants were killed and all three files restored. FIXED: `scripts/lib/mutation-harness.mjs` + `scripts/mutation-check.mjs`, driven by a reviewable spec file under `mutations/`. Three guards, all structural rather than advisory: (1) the scratch directory is created AND probed with a write/read/compare before any mutation — `existsSync` would have passed a directory that exists but cannot be written to; (2) every backup is hashed back off disk and compared before the file is touched; (3) `formatReport` THROWS when any restore is unconfirmed, so no code path can print results over a mutated tree, and the failure names each affected file and its backup because a human has to recover by hand. A target matching zero or more than one occurrence is an error, not a survivor. Exit codes: 0 all killed, 1 a mutant survived, 2 the run proves nothing. 23 unit tests; `mutations/red-rule.mjs` re-runs the six SL-062 red-rule mutants (6/6 killed, tree verified clean) and the missing-directory incident was reproduced end to end and now self-heals.",
       "roadmap_code": null,
-      "board_column": "review",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": null,
       "sort": 79,
-      "commit_sha": null,
+      "commit_sha": "7e02b08a04b3945372b8bd85886a83ee69b78ce2",
       "blocked": false,
       "blocked_reason": null
     }
