@@ -97,15 +97,54 @@ export function createPublishStore(opts: PublishStoreOptions) {
    * clause rather than in a preceding SELECT.
    *
    * The predicate says three things:
-   *   · the variant still has work to do — `pending`, `scheduled` or a prior
-   *     `failed` (a retry is legitimate). A `published` variant is never re-claimed,
-   *     so a duplicate tick cannot post it a second time.
+   *   · the variant still has work to do — `pending`, `scheduled`, a prior `failed`
+   *     (a retry is legitimate), or a `publishing` whose holder is gone. A
+   *     `published` variant is never re-claimed, so a duplicate tick cannot post it
+   *     a second time.
    *   · nobody holds a live claim, OR the claim is older than the lease and its
    *     holder is therefore presumed dead.
    *   · it belongs to the workspace we were given — the payload's workspace is not
    *     trusted for the tenant decision (that is
    *     `assert_account_for_scheduled_post`'s job), but scoping the write to it
    *     costs nothing and keeps this statement from reaching outside its post.
+   *
+   * ── WHY `publishing` IS IN THAT LIST, AND WAS THE WHOLE BUG ──────────────────
+   * It was not, and the lease was therefore dead code. Claiming sets
+   * `publish_status = 'publishing'`; the status list excluded `publishing`; so the
+   * only rows the age check could ever be evaluated against were rows nobody had
+   * claimed. A publisher killed mid-flight left `publishing` + a claim timestamp,
+   * and NO later tick could match it — not after ten minutes, not after a week. The
+   * variant was stranded in `publishing` permanently, which is exactly the hazard
+   * apps/jobs/CLAUDE.md's rule 3 states for `posts.status` ("a run that dies would
+   * strand it there forever"), reproduced one table down.
+   *
+   * With `publishing` in the list the two conditions compose as intended: a LIVE
+   * claim is still refused by the age check (`lease.pglite.test.ts` holds the row
+   * for the last second of the lease), and only a dead one is taken over.
+   *
+   * A `publishing` row with a NULL claim is treated as stale rather than untouchable.
+   * No path here can produce one — the claim and the status are set in this single
+   * statement, and every release clears both — so such a row can only predate the
+   * claim existing at all, and leaving it unclaimable would strand it for the same
+   * reason the bug above did.
+   *
+   * ── WHAT THIS TRADES, STATED PLAINLY ────────────────────────────────────────
+   * Re-claiming means re-PUBLISHING, and there is one case where that can post
+   * twice. `publishing` + a stale claim is reachable only by process death (the
+   * transient path releases explicitly and leaves `scheduled`). If the process died
+   * AFTER the platform accepted the post but BEFORE `writeLog` committed, the post
+   * is live with no log row — so `listUnresolvedPublishes` cannot see it either, and
+   * the next tick past the lease publishes it again.
+   *
+   * The adapter's `requestId` is deterministic (`sahoda:${variantId}:${accountId}`,
+   * or the caller's key) and Zernio collapses a repeat onto one post — but doc 13 §5
+   * puts that window at ~5 minutes and marks it `[DOC]`, never observed. The lease is
+   * ten. A re-claim therefore lands OUTSIDE the window this would rely on.
+   *
+   * Taken deliberately: the old behaviour was a GUARANTEED permanent strand on every
+   * crash, and this is a narrow race requiring death inside the gap between one HTTP
+   * response and one INSERT. It is not closed, and it must not be flipped on
+   * (`SAHODA_PUBLISH_ENABLED`) as if it were. See SL-069.
    */
   async function claimVariant(payload: PublishPostPayload, leaseSeconds: number): Promise<boolean> {
     const r = await pool.query(
@@ -115,7 +154,7 @@ export function createPublishStore(opts: PublishStoreOptions) {
         where id = $1
           and post_id = $2
           and workspace_id = $3
-          and publish_status in ('pending', 'scheduled', 'failed')
+          and publish_status in ('pending', 'scheduled', 'failed', 'publishing')
           and (publish_claimed_at is null
                or publish_claimed_at < now() - make_interval(secs => $4::int))`,
       [payload.variantId, payload.postId, payload.workspaceId, leaseSeconds],
