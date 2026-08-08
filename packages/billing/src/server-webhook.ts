@@ -49,6 +49,10 @@ export {
 } from './providers/cashfree/webhook-env'
 export { CASHFREE_ID, CashfreeTagsMissingError } from './providers/cashfree/webhook'
 
+// The timestamp-unit rule. Exported so a receiver can classify WHY it rejected a delivery
+// without re-deriving (and getting wrong) the seconds-vs-milliseconds split.
+export { parseCashfreeTimestampMs } from './providers/cashfree/signature'
+
 // The normalized event shape the endpoint hands on. Types only — no implementations.
 export type { ParsedWebhookEvent, PaymentEventType, PaymentMode } from './providers/types'
 

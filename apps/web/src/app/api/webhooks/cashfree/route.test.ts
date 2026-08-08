@@ -118,12 +118,16 @@ function recordingPool(): { pool: PoolLike; queries: RecordedQuery[] } {
   return { pool: { query, on: () => {}, end: async () => {} } as unknown as PoolLike, queries }
 }
 
-function handlerOver(pool: PoolLike): (request: Request) => Promise<Response> {
+function handlerOver(
+  pool: PoolLike,
+  onNotice?: (note: { kind: string; message: string }) => void,
+): (request: Request) => Promise<Response> {
   const ledger = createPgLedgerPort({ connectionString: 'postgres://unused', pool })
   return createCashfreeWebhookHandler({
     secretKey: SECRET,
     mode: 'sandbox',
     now: () => NOW,
+    onNotice,
     process: createProcessPaymentEvent({
       store: createPgWebhookEventStore(pool),
       applyPlanGrant: createApplyPlanGrant(ledger),
@@ -481,5 +485,108 @@ describe('POST /api/webhooks/cashfree — delivery contract', () => {
 
     expect(res.status).toBe(200)
     expect(notes).toContain('grant_replayed')
+  })
+})
+
+/**
+ * A rejected delivery writes no database row — that is the whole design. Which means that
+ * without telemetry here, a rejection leaves no trace ANYWHERE: no row, no event, no log.
+ * That is precisely the state in which a wrong secret, a clock skew, or a timestamp-unit
+ * mismatch presents as "payments taken, credits never arrived" with nothing to debug.
+ *
+ * The response must stay a uniform 401 throughout, so none of this leaks to the caller.
+ */
+describe('POST /api/webhooks/cashfree — a rejection is silent to the caller, not the operator', () => {
+  it('reports WHY a signed delivery was rejected, without telling the caller', async () => {
+    const { pool } = recordingPool()
+    const notes: { kind: string; message: string }[] = []
+    const raw = successBody()
+
+    const res = await handlerOver(pool, (n) => notes.push(n))(
+      post(raw, {
+        'x-webhook-signature': signCashfree(raw, 'not-the-merchant-secret'),
+        'x-webhook-timestamp': TS,
+      }),
+    )
+
+    expect(notes.map((n) => n.kind)).toEqual(['signature_rejected'])
+    expect(notes[0]!.message).toContain('hmac_mismatch')
+    // The caller learns nothing beyond the category.
+    expect(res.status).toBe(401)
+    expect(await res.json()).toEqual({ ok: false, error: 'invalid_signature' })
+  })
+
+  /**
+   * The diagnostic that would have saved a launch. A seconds-vs-milliseconds mismatch shows
+   * up as a skew of billions of seconds, unmistakable in a log; ordinary clock drift shows
+   * up as tens.
+   */
+  it('names the skew when a delivery falls outside the replay window', async () => {
+    const { pool } = recordingPool()
+    const notes: { kind: string; message: string }[] = []
+    const raw = successBody()
+    const stale = String(NOW.getTime() - 20 * 60_000)
+
+    await handlerOver(pool, (n) => notes.push(n))(
+      post(raw, {
+        'x-webhook-signature': signCashfree(raw, SECRET, stale),
+        'x-webhook-timestamp': stale,
+      }),
+    )
+
+    expect(notes[0]!.message).toContain('outside_window')
+    expect(notes[0]!.message).toContain('1200s')
+  })
+
+  /**
+   * NOISE BOUND. This endpoint is public and continuously scanned. A bare probe carries no
+   * signature, and reporting those would bury the one delivery that matters under traffic
+   * whose volume an attacker chooses — turning the diagnostic into its own outage.
+   */
+  it('stays quiet for an unsigned probe, so a scanner cannot flood the operator', async () => {
+    const { pool } = recordingPool()
+    const notes: { kind: string; message: string }[] = []
+
+    const res = await handlerOver(pool, (n) => notes.push(n))(
+      post(successBody(), { 'x-webhook-timestamp': TS }),
+    )
+
+    expect(notes).toEqual([])
+    expect(res.status).toBe(401)
+  })
+
+  it('never lets a throwing reporter change the response', async () => {
+    const { pool, queries } = recordingPool()
+    const raw = successBody()
+
+    const res = await handlerOver(pool, () => {
+      throw new Error('sentry is down')
+    })(
+      post(raw, {
+        'x-webhook-signature': signCashfree(raw, 'wrong'),
+        'x-webhook-timestamp': TS,
+      }),
+    )
+
+    expect(res.status).toBe(401)
+    expect(queries).toEqual([])
+  })
+
+  /** A delivery timestamped in SECONDS must verify and grant — see timestamp-unit.test.ts. */
+  it('grants normally when Cashfree stamps the timestamp in seconds', async () => {
+    const { pool, queries } = recordingPool()
+    const raw = successBody()
+    const seconds = String(Math.floor(NOW.getTime() / 1000))
+
+    const res = await handlerOver(pool)(
+      post(raw, {
+        'x-webhook-signature': signCashfree(raw, SECRET, seconds),
+        'x-webhook-timestamp': seconds,
+      }),
+    )
+
+    expect(res.status).toBe(200)
+    expect(ledgerCalls(queries)).toHaveLength(1)
+    expect(ledgerCalls(queries)[0]!.values[1]).toBe('GRANT')
   })
 })

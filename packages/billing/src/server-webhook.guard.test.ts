@@ -128,6 +128,7 @@ describe('the webhook entry point is declared so a route can import it', () => {
       'modeForEnv',
       'loadCashfreeWebhookEnv',
       'resolveCashfreeWebhookSecret',
+      'parseCashfreeTimestampMs',
     ] as const) {
       expect(
         serverWebhook[name],

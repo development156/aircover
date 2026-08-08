@@ -1,5 +1,6 @@
 import {
   CashfreeTagsMissingError,
+  parseCashfreeTimestampMs,
   parseVerifiedCashfreeWebhook,
   verifyCashfreeWebhook,
   type ParsedWebhookEvent,
@@ -37,11 +38,36 @@ const MAX_BODY_BYTES = 64 * 1024
 
 /** What the operator needs to hear about. Never sent to the caller. */
 export interface CashfreeWebhookNotice {
-  kind: 'grant_replayed' | 'tags_missing' | 'process_failed' | 'unhandled'
+  kind: 'signature_rejected' | 'grant_replayed' | 'tags_missing' | 'process_failed' | 'unhandled'
   message: string
   eventId?: string
   workspaceId?: string
   cause?: unknown
+}
+
+/**
+ * Why a delivery failed verification — for the OPERATOR only. The response stays a uniform
+ * 401 regardless, so this never becomes an oracle telling a forger what to fix.
+ *
+ * Derived from headers alone; the secret is not involved, so nothing here can leak it.
+ */
+function rejectionReason(headers: Headers, nowMs: number): string {
+  const signature = headers.get('x-webhook-signature')
+  const rawTimestamp = headers.get('x-webhook-timestamp')
+
+  if (!rawTimestamp) return 'no_timestamp_header'
+
+  const issuedAtMs = parseCashfreeTimestampMs(rawTimestamp)
+  if (issuedAtMs === null) return 'unparseable_timestamp'
+
+  const skewSeconds = Math.round((nowMs - issuedAtMs) / 1000)
+  if (Math.abs(skewSeconds) > 300) {
+    // The one an operator most needs named. A wholesale unit mismatch shows up here as a
+    // skew of billions of seconds; ordinary clock drift shows up as tens.
+    return `outside_window (skew ${skewSeconds}s)`
+  }
+
+  return signature ? 'hmac_mismatch' : 'no_signature_header'
 }
 
 export interface CashfreeWebhookDeps {
@@ -108,6 +134,22 @@ export function createCashfreeWebhookHandler(
       })
 
       if (verified === null) {
+        // A rejection writes no database row by design — so without this it would leave no
+        // trace ANYWHERE. That is the state in which a misconfigured secret, a clock skew,
+        // or a timestamp-unit mismatch looks exactly like "payments taken, credits never
+        // arrived" with nothing to debug. The reason goes to the operator; the caller still
+        // gets one uniform status.
+        //
+        // Reported only when a signature was actually PRESENT. A public endpoint is scanned
+        // continuously, and a bare probe carries no signature — emitting for those would
+        // bury the one delivery that matters under noise an attacker controls the volume of.
+        if (request.headers.get('x-webhook-signature')) {
+          notify({
+            kind: 'signature_rejected',
+            message: `cashfree webhook rejected: ${rejectionReason(request.headers, now().getTime())}`,
+          })
+        }
+
         // One status for every rejection — wrong secret, stale timestamp, tampered body,
         // missing header. Distinguishing them would turn this endpoint into an oracle that
         // tells a forger which part of their attempt to fix.
