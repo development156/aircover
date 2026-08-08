@@ -91,6 +91,23 @@ export interface ZernioPostAnalytics {
   message?: string | null
 }
 
+/**
+ * A `/analytics` answer WITH the status it arrived under.
+ *
+ * The status is not decoration. Zernio answers **202 with every metric 0** for a post
+ * whose metrics it has accepted but not computed — and `parse()` treats any status
+ * below 400 as success, so without this the caller sees a well-formed body full of
+ * zeroes and cannot tell it apart from a post that genuinely got no impressions.
+ *
+ * Kept beside the payload rather than folded into `ZernioPostAnalytics`, because that
+ * interface mirrors the wire body and a synthetic field on it would be a lie about
+ * what Zernio sent.
+ */
+export interface ZernioPostAnalyticsResult {
+  status: number
+  post: ZernioPostAnalytics
+}
+
 export interface ZernioConversation {
   id: string
   platform: string
@@ -187,7 +204,19 @@ const qs = (parts: Record<string, string | number | undefined>): string => {
 
 export interface ZernioReads {
   // ── analytics, profile-scoped ──────────────────────────────────────────────
-  postAnalytics(profile: ScopedProfileId, postId: string): Promise<ZernioPostAnalytics>
+  /**
+   * `platformPostId` is the PLATFORM's id — Instagram's media id, X's tweet id —
+   * which is what `post_variants.platform_post_id` holds and what
+   * `assertPlatformPostId` calls "the ANALYTICS key" by name.
+   *
+   * Passing Zernio's own 24-hex `_id` here does NOT error. It answers 202 with every
+   * metric 0, permanently (see `PublishSuccess.platformPostId`) — which is precisely
+   * why this returns the status rather than the payload alone.
+   */
+  postAnalytics(
+    profile: ScopedProfileId,
+    platformPostId: string,
+  ): Promise<ZernioPostAnalyticsResult>
   listPostAnalytics(
     profile: ScopedProfileId,
     opts?: { limit?: number; page?: number },
@@ -249,13 +278,13 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
   const EMPTY_CURSOR: ZernioCursorPage = { hasMore: false, nextCursor: null }
 
   return {
-    async postAnalytics(profile, postId) {
-      const { data } = await json<ZernioPostAnalytics>(
+    async postAnalytics(profile, platformPostId) {
+      const { status, data } = await json<ZernioPostAnalytics>(
         'GET',
-        `/analytics${qs({ postId, profileId: profile })}`,
+        `/analytics${qs({ postId: platformPostId, profileId: profile })}`,
         'postAnalytics',
       )
-      return data
+      return { status, post: data }
     },
 
     async listPostAnalytics(profile, opts) {

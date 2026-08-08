@@ -1,6 +1,12 @@
 import 'server-only'
 
-import { createZernioClient, fetchTransport, type ZernioClient } from '@sahoda/publishing'
+import {
+  createZernioClient,
+  createZernioReads,
+  fetchTransport,
+  type ZernioClient,
+  type ZernioReads,
+} from '@sahoda/publishing'
 
 import { env } from '@/lib/env'
 
@@ -18,6 +24,22 @@ export function zernioClient(): ZernioClient | null {
   const apiKey = env.ZERNIO_API_KEY
   if (!apiKey) return null
   return createZernioClient({ transport: fetchTransport(), apiKey })
+}
+
+/**
+ * The Zernio READ surface for this request, or null when the key is not provisioned.
+ *
+ * Separate from `zernioClient()` because these are different capabilities: that one
+ * publishes and connects, this one only reads. Nothing here can write, so a screen
+ * that merely displays metrics never holds a handle that could post.
+ *
+ * Null propagates the same way — a caller with no key must report "we could not
+ * read this", never an empty or zeroed metric.
+ */
+export function zernioClientReads(): ZernioReads | null {
+  const apiKey = env.ZERNIO_API_KEY
+  if (!apiKey) return null
+  return createZernioReads({ transport: fetchTransport(), apiKey })
 }
 
 /** True when the rail is provisioned — drives whether the connect button is live. */

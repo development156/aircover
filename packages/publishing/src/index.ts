@@ -98,6 +98,7 @@ export {
   type ZernioOffsetPage,
   type ZernioInboxMeta,
   type ZernioPostAnalytics,
+  type ZernioPostAnalyticsResult,
   type ZernioPostMetrics,
   type ZernioConversation,
   type ZernioMessage,
@@ -107,6 +108,22 @@ export {
   type ZernioPaged,
   type ZernioPlatformFilter,
 } from './zernio/reads'
+
+// ── What a metric is allowed to CLAIM ────────────────────────────────────────
+// Zernio returns zeroes for a post it has not computed (202), one it cannot tie to
+// an account (orphaned), and one still inside Instagram's ~48h reporting lag. None
+// of those is a measurement. `classifyPostMetrics` is the single place that call is
+// made — the UI renders its verdict and never re-derives one. See zernio/analytics-state.ts.
+export {
+  classifyPostMetrics,
+  lagHoursFromDataDelay,
+  INSTAGRAM_INSIGHTS_LAG_HOURS,
+  INSTAGRAM_FOLLOWER_LAG_HOURS,
+  type MetricAvailability,
+  type MetricNumber,
+  type PostMetrics,
+  type ClassifyInput,
+} from './zernio/analytics-state'
 
 export {
   ensureZernioProfile,

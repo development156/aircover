@@ -16,12 +16,15 @@ const account = scopeAccount(
 )
 
 /** Records the outbound request and answers with a valid JSON envelope. */
-function capturing(body: unknown = {}): { transport: Transport; last: () => TransportRequest } {
+function capturing(
+  body: unknown = {},
+  status = 200,
+): { transport: Transport; last: () => TransportRequest } {
   let last: TransportRequest | undefined
   const transport: Transport = async (req) => {
     last = req
     return {
-      status: 200,
+      status,
       headers: {
         'content-type': 'application/json',
         'x-ratelimit-limit': '60',
@@ -40,8 +43,8 @@ function capturing(body: unknown = {}): { transport: Transport; last: () => Tran
   }
 }
 
-const readsWith = (body: unknown = {}) => {
-  const cap = capturing(body)
+const readsWith = (body: unknown = {}, status = 200) => {
+  const cap = capturing(body, status)
   return { reads: createZernioReads({ transport: cap.transport, apiKey: 'sk_test' }), cap }
 }
 
@@ -146,6 +149,44 @@ describe('the base URL and the JSON contract', () => {
   })
 })
 
+describe('postAnalytics keeps the status, because 202 means "not computed"', () => {
+  /**
+   * `parse()` treats every status below 400 as success, so a 202 arrives as a
+   * well-formed body — and Zernio's 202 body carries every metric as 0. Dropping the
+   * status is what would make "accepted, not computed" indistinguishable from a post
+   * that honestly got no impressions.
+   */
+  it('reports 202 alongside the payload rather than swallowing it', async () => {
+    const { reads } = readsWith(
+      {
+        postId: IG_MEDIA_ID,
+        analytics: { impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, saves: 0 },
+      },
+      202,
+    )
+    const result = await reads.postAnalytics(profile, IG_MEDIA_ID)
+    expect(result.status).toBe(202)
+    // The zeroes ARE in the payload. Nothing downstream may read them as a measurement.
+    expect(result.post.analytics?.impressions).toBe(0)
+  })
+
+  it('reports 200 for a real measurement', async () => {
+    const { reads } = readsWith({
+      postId: IG_MEDIA_ID,
+      analytics: { impressions: 412, reach: 388, likes: 21, lastUpdated: '2026-08-06T09:00:00Z' },
+    })
+    const result = await reads.postAnalytics(profile, IG_MEDIA_ID)
+    expect(result.status).toBe(200)
+    expect(result.post.analytics?.impressions).toBe(412)
+  })
+
+  it('sends the PLATFORM post id as postId, not Zernio’s own _id', async () => {
+    const { reads, cap } = readsWith()
+    await reads.postAnalytics(profile, IG_MEDIA_ID)
+    expect(cap.last().url).toContain(`postId=${IG_MEDIA_ID}`)
+  })
+})
+
 describe('omitting or forging the scope is a COMPILE error, not a review item', () => {
   it('will not accept a bare profile id string', async () => {
     const { reads } = readsWith()
@@ -156,6 +197,10 @@ describe('omitting or forging the scope is a COMPILE error, not a review item', 
     await reads.instagramAccountInsights(ACCOUNT)
     // @ts-expect-error the scope is required; there is no unscoped overload to fall back to
     await reads.listConversations()
+    // @ts-expect-error the analytics read is scoped too — the post id alone is not enough
+    await reads.postAnalytics(IG_MEDIA_ID)
+    // @ts-expect-error follower history is account-scoped; a bare string cannot reach it
+    await reads.instagramFollowerHistory(ACCOUNT)
 
     // If any @ts-expect-error above stops erroring, typecheck fails and the guarantee
     // is gone. The runtime assertion is incidental — the compile step is the test.

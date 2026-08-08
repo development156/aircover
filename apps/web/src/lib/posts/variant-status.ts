@@ -17,6 +17,15 @@ export interface VariantStatusRow {
   status: VariantPublishStatus
   /** Present only when the platform gave us one. Its presence is what makes it real. */
   permalink: string | null
+  /**
+   * The PLATFORM's own post id — and the key every analytics read is made with
+   * (`assertPlatformPostId` calls this column "the ANALYTICS key" by name).
+   *
+   * Null is common and legitimate: the platform may never issue one, and the write
+   * guard stores null rather than substituting a provider id. Null here means no
+   * analytics call is possible — which the metric state reports as such, not as zero.
+   */
+  platformPostId: string | null
   /** The adapter's own message, when the last attempt failed. */
   errorMessage: string | null
   errorCode: string | null
@@ -58,6 +67,11 @@ export function variantStatusRow(variant: PostVariant): VariantStatusRow {
     // rule LiveLink applies. Treated as absent so nothing renders it as a link.
     permalink:
       variant.permalink && !variant.permalink.startsWith('fixture://') ? variant.permalink : null,
+    // Only a LIVE publish has a platform id worth asking analytics about. A fixture
+    // run never touched the platform, so carrying its id forward would send a
+    // simulated post to a real metrics endpoint.
+    platformPostId:
+      variant.permalink?.startsWith('fixture://') ? null : (variant.platform_post_id ?? null),
     errorMessage: message,
     errorCode: code,
     retryable: RETRYABLE.has(variant.publish_status),
