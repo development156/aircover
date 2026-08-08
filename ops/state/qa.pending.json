@@ -1123,6 +1123,32 @@
       "summary_plain": "The unit checks ran (2145 passed), but 1 test did NOT run — this does not prove the suite passes.",
       "details": "@sahoda/web:lint: $ exit 0\n@sahoda/billing:lint: cache hit, replaying logs 17551c35fb7e352d\n@sahoda/billing:lint: $ exit 0\n\n Tasks:    8 successful, 8 total\nCached:    8 cached, 8 total\n  Time:    12ms >>> FULL TURBO\n\n=== TEST ===\n@sahoda/web:test:  ✓  ui  src/components/wallet/ledger-grammar.test.tsx (17 tests) 723ms\n@sahoda/web:test:  ✓  ui  src/components/ui/cost-label.test.tsx (7 tests) 755ms\n@sahoda/web:test:      ✓ the whole label is one element, not three  665ms\n@sahoda/web:test:  ✓  ui  src/app/global-error.test.tsx (5 tests) 943ms\n@sahoda/web:test:      ✓ captures a root layout crash that happened during client render  795ms\n@sahoda/web:test:  ✓  ui  src/components/shell/topbar.test.tsx (5 tests) 523ms\n@sahoda/web:test:      ✓ renders the whole shell when every read succeeds  363ms\n@sahoda/web:test:  ✓  ui  src/app/(app)/wallet/page.test.tsx (8 tests) 633ms\n@sahoda/web:test:      ✓ offers the one thing that actually helps: creating a workspace  315ms\n@sahoda/web:test:  ✓  ui  src/components/home/charts.test.tsx (17 tests) 267ms\n@sahoda/web:test:  ✓  ui  src/components/admin/charts.test.tsx (11 tests) 344ms\n@sahoda/web:test:  ✓  ui  src/components/wallet/balance-hero.test.tsx (5 tests) 139ms\n@sahoda/web:test:  ✓  ui  src/components/posts/auto-publish-note.test.tsx (11 tests) 234ms\n@sahoda/web:test:  ✓  ui  src/components/posts/agency-blade.test.tsx (8 tests) 181ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  152 passed (152)\n@sahoda/web:test:       Tests  2145 passed | 1 skipped (2146)\n@sahoda/web:test:    Start at  21:31:04\n@sahoda/web:test:    Duration  40.52s (transform 43.63s, setup 21.76s, import 144.64s, tests 64.63s, environment 95.51s)\n@sahoda/web:test: \n\n Tasks:    14 successful, 14 total\nCached:    14 cached, 14 total\n  Time:    19ms >>> FULL TURBO",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskot0gv-4b8ec30d",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T18:08:23.454Z",
+      "finished_at": "2026-08-08T18:08:23.454Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The typecheck, lint, unit checks ran together and something failed (2393 passed).",
+      "details": "Scope: all 9 workspace projects\nAlready up to date\nDone in 299ms using pnpm v11.3.0\n=== TYPECHECK ===\n Tasks:    7 successful, 8 total\nCached:    6 cached, 8 total\n  Time:    7.922s \nFailed:    @sahoda/web#typecheck\n\n ERROR  run failed: command  exited (2)\n=== LINT ===\n\n Tasks:    8 successful, 8 total\nCached:    7 cached, 8 total\n  Time:    311ms \n\n=== TEST ===\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): @sahoda/billing: missing required env — SUPABASE_DB_URL\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [media] upload failed network\n@sahoda/web:test: [media] upload failed bucket \"media\" 403 at /storage/v1/object/...\n@sahoda/web:test: stderr | src/lib/home/summaries.test.ts > readPublishSummary > a failed read is UNREADABLE, never a confident zero\n@sahoda/web:test: [home] publish summary failed PGRST301 nope\n@sahoda/web:test: stderr | src/lib/home/summaries.test.ts > readPostCounts > a failed read is UNREADABLE, not zero posts\n@sahoda/web:test: [home] post counts failed PGRST301 nope\n@sahoda/web:test: [posts] publish-log read failed PGRST301 JWT expired\n@sahoda/web:test: [posts] publish-log read threw fetch failed: ETIMEDOUT\n@sahoda/web:test: [posts] publish-log read threw fetch failed: ETIMEDOUT\n@sahoda/web:test: [wallet] balance read failed PGRST116 multiple rows returned\n@sahoda/web:test:  Test Files  158 passed (158)\n@sahoda/web:test:       Tests  2240 passed | 1 skipped (2241)\n@sahoda/jobs:test:  Test Files  15 passed | 2 skipped (17)\n@sahoda/jobs:test:       Tests  153 passed | 16 skipped (169)\n Tasks:    14 successful, 14 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskot997-8a8bff60",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T18:08:34.842Z",
+      "finished_at": "2026-08-08T18:08:34.842Z",
+      "suite": "typecheck",
+      "status": "fail",
+      "summary_plain": "The typecheck checks ran and something failed.",
+      "details": "@sahoda/web:typecheck: src/app/(app)/inbox/comments/[accountId]/[platformPostId]/page.tsx(35,9): error TS2322: Type '\"/inbox/comments\"' is not assignable to type 'UrlObject | RouteImpl<\"/inbox/comments\">'.",
+      "duration_ms": null
     }
   ]
 }
