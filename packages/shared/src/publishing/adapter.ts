@@ -38,11 +38,54 @@ export interface PublishRequest {
 }
 
 export interface PublishSuccess {
-  platformPostId: string
+  /**
+   * The PLATFORM's own id for this post — Instagram's media id, X's tweet id, GBP's
+   * localPosts path. Null when the platform has not given us one yet.
+   *
+   * Nullable on purpose. It used to be `string`, which forced an adapter with no
+   * platform id to substitute something, and the Zernio adapter substituted Zernio's
+   * own 24-hex `_id`. That id is not a platform id: Zernio's analytics answer HTTP 202
+   * with every metric 0 for it, permanently, once the account is reconnected. A wrong
+   * id is worse than no id, because nothing downstream can tell it is wrong.
+   *
+   * Never put a provider's internal id here. The reconcile handle lives on
+   * `post_publish_logs.platform_post_id` and is written from `AdapterError.raw`.
+   */
+  platformPostId: string | null
   permalink: string
   publishedAt: string // ISO-8601
   /** Fixture results are always labelled — never presented as real success. */
   mode: 'live' | 'fixture'
+}
+
+/**
+ * A provider's own object id — Zernio's `_id` is 24 lowercase hex characters.
+ *
+ * Deliberately NOT exported as a general "id" matcher. It exists to be refused.
+ */
+const PROVIDER_OBJECT_ID_RE = /^[0-9a-f]{24}$/
+
+/**
+ * The chokepoint in front of `post_variants.platform_post_id`.
+ *
+ * Every write to that column goes through here. It throws rather than coercing,
+ * because a provider id reaching this point means a caller believed it had a platform
+ * id and did not — silently storing null would hide the bug that produced it, and
+ * silently storing the value is the bug we are closing.
+ *
+ * Note this guards the ANALYTICS key only. `post_publish_logs.platform_post_id` is a
+ * different column in a different table and legitimately holds Zernio's `_id` — it is
+ * the handle the reconcile sweep passes to `GET /posts/{id}`. Do not call this on it.
+ */
+export function assertPlatformPostId(value: string | null | undefined): string | null {
+  if (value === null || value === undefined || value === '') return null
+  if (PROVIDER_OBJECT_ID_RE.test(value)) {
+    throw new Error(
+      `platform_post_id refused: "${value}" is a 24-hex provider object id, not a platform post id. ` +
+        'Store null instead — see PublishSuccess.platformPostId.',
+    )
+  }
+  return value
 }
 
 export type AdapterErrorClassification = 'transient' | 'permanent'

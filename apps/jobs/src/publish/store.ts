@@ -1,5 +1,5 @@
 import type { Pool } from 'pg'
-import type { PublishPostPayload } from '@sahoda/shared'
+import { assertPlatformPostId, type PublishPostPayload } from '@sahoda/shared'
 import type { PublishLogEntry, PublishVariant, VariantUpdate } from './runPublishPost'
 import type { StoredConnection } from './tokens'
 
@@ -163,7 +163,9 @@ export function createPublishStore(opts: PublishStoreOptions) {
         update.variantId,
         update.workspaceId,
         update.publishStatus,
-        update.platformPostId ?? null,
+        // Refuses a 24-hex provider object id outright. This column is the analytics
+        // key; a Zernio `_id` here reads as populated and returns zeros forever.
+        assertPlatformPostId(update.platformPostId),
         update.permalink ?? null,
         update.lastError ? JSON.stringify(update.lastError) : null,
       ],

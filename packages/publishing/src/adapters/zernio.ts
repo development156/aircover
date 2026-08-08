@@ -97,6 +97,26 @@ function accountIdOf(p: ZernioPlatformResult): string | undefined {
   return a?._id
 }
 
+/**
+ * The platform's own post id off a leg, or null.
+ *
+ * Two things are rejected, and the second is the one that bit us:
+ *   - a missing id — the leg simply has not been given one yet;
+ *   - an id in Zernio's OWN format (24-char hex). Real platform ids are not that
+ *     shape — Instagram's is 17 decimal digits, X's is a decimal snowflake, GBP's is
+ *     an `accounts/…/localPosts/…` path — so a 24-hex value here can only be a
+ *     provider id that has leaked into a platform-id field, and storing it makes
+ *     analytics return zeros forever with no way to notice.
+ *
+ * Belt and braces with the callers' own guard: this refuses to PRODUCE one,
+ * `assertPlatformPostId` refuses to WRITE one.
+ */
+function platformIdOf(leg: ZernioPlatformResult | undefined): string | null {
+  const id = leg?.platformPostId
+  if (typeof id !== 'string' || id.length === 0) return null
+  return ZERNIO_ID_RE.test(id) ? null : id
+}
+
 export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): PublishAdapter {
   const attempts = deps.poll?.attempts ?? DEFAULT_ATTEMPTS
   const intervalMs = deps.poll?.intervalMs ?? DEFAULT_INTERVAL_MS
@@ -257,7 +277,13 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
       }
 
       return {
-        platformPostId: leg?.platformPostId ?? post._id,
+        // NEVER `?? post._id`. That is Zernio's own id, and it used to be the fallback
+        // here — which put a 24-hex Mongo id into post_variants.platform_post_id, the
+        // column analytics keys off. Zernio answers HTTP 202 with every metric 0 for
+        // that id, permanently, once the account is reconnected (observed [LIVE]
+        // 2026-08-08 against the 31 July post). Null means "not known yet", which is
+        // true and recoverable; a provider id here is silently and forever wrong.
+        platformPostId: platformIdOf(leg),
         permalink: url,
         publishedAt: now().toISOString(),
         mode: 'live',

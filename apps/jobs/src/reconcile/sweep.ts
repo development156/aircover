@@ -51,8 +51,15 @@ export interface UnresolvedPublish {
   workspaceId: string
   postId: string
   channel: Channel
-  /** Zernio's own post id, recorded when the adapter gave up mid-flight. */
-  platformPostId: string
+  /**
+   * ZERNIO's own post id, recorded when the adapter gave up mid-flight. This is the
+   * handle we pass to `GET /posts/{id}` to ask how the post ended — it is NOT a
+   * platform post id and must never be written to `post_variants.platform_post_id`.
+   *
+   * Named `providerPostId` for exactly that reason: it used to be called
+   * `platformPostId`, and the name is what made it look safe to store.
+   */
+  providerPostId: string
 }
 
 /** What Zernio says about an account right now. */
@@ -65,7 +72,8 @@ export interface AccountFacts {
 
 /** How a previously-unresolved publish actually ended. */
 export type PublishResolution =
-  | { kind: 'published'; permalink: string; platformPostId: string }
+  /** `platformPostId` is the PLATFORM's id, null when it has still not issued one. */
+  | { kind: 'published'; permalink: string; platformPostId: string | null }
   | { kind: 'failed'; reason: string | null }
   /** Still in the container flow. Left alone — it may yet go either way. */
   | { kind: 'pending' }
