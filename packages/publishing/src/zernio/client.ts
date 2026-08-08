@@ -240,7 +240,24 @@ export interface ZernioClient {
   getPost(postId: string): Promise<ZernioPost>
 }
 
-export function createZernioClient(deps: ZernioClientDeps): ZernioClient {
+export type ZernioJsonCaller = <T>(
+  method: string,
+  path: string,
+  what: string,
+  body?: unknown,
+  extraHeaders?: Record<string, string>,
+) => Promise<ZernioResult<T>>
+
+/**
+ * One authenticated JSON call against the Zernio base URL.
+ *
+ * Exported so the read surface (`./reads`) sits on the SAME `parse()` — the
+ * content-type-and-named-field assertion is the only thing standing between us and an
+ * HTML page that returns 200 (doc 13 §2.1, and now also true of `zernio.com/api/v1`
+ * itself for unknown paths — observed 2026-08-08). A second caller that re-derived
+ * that check would eventually drift from it, and the drift would be invisible.
+ */
+export function createJsonCaller(deps: ZernioClientDeps): ZernioJsonCaller {
   const base = (deps.baseUrl ?? ZERNIO_BASE_URL).replace(/\/+$/, '')
 
   const authHeaders = (extra: Record<string, string> = {}): Record<string, string> => ({
@@ -249,7 +266,7 @@ export function createZernioClient(deps: ZernioClientDeps): ZernioClient {
     ...extra,
   })
 
-  const json = async <T>(
+  return async <T>(
     method: string,
     path: string,
     what: string,
@@ -268,6 +285,10 @@ export function createZernioClient(deps: ZernioClientDeps): ZernioClient {
     })
     return parse<T>(res, what)
   }
+}
+
+export function createZernioClient(deps: ZernioClientDeps): ZernioClient {
+  const json = createJsonCaller(deps)
 
   return {
     async listProfiles(name) {
