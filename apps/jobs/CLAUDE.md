@@ -36,14 +36,17 @@ a no-variants expiry has neither), and `posts` has no reason column. `past-grace
 `no-variants-past-grace` lives only in the sweep's return value — the task run output. Anyone
 auditing why a post expired reads the run, not the row.
 
-**The dispatcher cannot publish from the cron route, by design.** `enqueuePublish` throws
-`PublishQueueUnavailableError` and the sweep counts it as `queueUnavailable` — not `failed`,
-because nothing was attempted. Publishing inline would need a CAS claim on `post_variants`
-that does not exist: **no UPDATE anywhere in this repo sets `publish_status = 'publishing'`**,
-so today's only duplicate-suppression is Trigger.dev's `idempotencyKey`, and Vercel documents
-that cron delivery can both duplicate and miss invocations. See REQUESTS.md.
+**The dispatcher publishes from the cron route only behind a claim.** With no queue,
+`enqueuePublish` throws `PublishQueueUnavailableError` and the sweep counts it as
+`queueUnavailable` — not `failed`, because nothing was attempted. Where publishing IS enabled
+(`SAHODA_PUBLISH_ENABLED`, separate from the dispatch mode), `runClaimedPublish` takes a CAS
+claim first: `claimVariant`'s single conditional UPDATE sets `publish_status = 'publishing'`
+and `publish_claimed_at`, so of two overlapping cron ticks exactly one owns the variant. That
+claim is the only thing making an inline publish safe — Vercel documents that cron delivery
+can both duplicate and miss invocations, and Trigger.dev's `idempotencyKey` is not in play on
+this rail. See REQUESTS.md.
 
-Three rules that must not be relaxed:
+Five rules that must not be relaxed:
 
 1. **Never expire a post with a published variant.** Enforced twice — the classifier cannot emit
    `expire` when one exists, and `expirePost`'s statement carries a permanent
@@ -55,3 +58,16 @@ Three rules that must not be relaxed:
 3. **Never move a dispatched post to `publishing`.** That drops it out of the gate, and a run
    that dies would strand it there forever. Re-dispatch is safe instead: the idempotency key
    `${postId}:${channel}:${scheduledAt}` collapses a repeat onto one platform post.
+4. **`publish_status = 'publishing'` must stay claimable once the lease has lapsed.** The
+   variant-level form of rule 3, and it was broken from the day the claim shipped: `claimVariant`
+   sets `publishing` but its status list excluded `publishing`, so `publish_claimed_at < now() -
+lease` could only ever be tested against rows nobody had claimed. A publisher killed mid-flight
+   stranded its variant permanently. Both halves are proven by execution in
+   `src/publish/lease.pglite.test.ts` and pinned by `mutations/publish-lease.mjs` — a live claim is
+   still refused, only a dead one is taken over, and `published` is never re-claimed.
+5. **A sweep may not hide its own failure.** No `catch {}`. Every failure is classified where it is
+   caught, counted by kind, and the pass reports `clean` / `degraded` / `failed` — a pass where
+   every unit threw used to be indistinguishable from an idle tick. The report is returned on a
+   public URL by apps/web's cron route, so it carries codes and counts only: never `error.message`,
+   never a row id. The real cause goes to `onFailure`. See `src/reconcile/failures.ts` and
+   `mutations/reconcile-failures.mjs`.

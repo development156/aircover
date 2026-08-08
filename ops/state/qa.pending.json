@@ -291,6 +291,97 @@
       "actor": "claude",
       "started_at": "2026-08-03T05:19:40.508Z",
       "finished_at": "2026-08-03T05:19:40.508Z"
+    },
+    {
+      "client_id": "qa-mskjasob-d7ff54bf",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T15:34:15.464Z",
+      "finished_at": "2026-08-08T15:34:15.464Z",
+      "suite": "typecheck",
+      "status": "fail",
+      "summary_plain": "The typecheck checks ran and something failed.",
+      "details": "@sahoda/billing:typecheck: cache hit, replaying logs 4970422b48dec416\n@sahoda/billing:typecheck: $ tsc --noEmit\n@sahoda/sites:typecheck: cache hit, replaying logs 68bc755d08da89c1\n@sahoda/sites:typecheck: $ tsc --noEmit\n@sahoda/publishing:typecheck: cache hit, replaying logs 5cfa807e3a99b336\n@sahoda/publishing:typecheck: $ tsc --noEmit\n@sahoda/mesh:typecheck: cache hit, replaying logs 714a470d1f61e07c\n@sahoda/mesh:typecheck: $ tsc --noEmit\n@sahoda/jobs:typecheck: cache miss, executing 38c33280a7ba8e55\n@sahoda/jobs:typecheck: $ tsc --noEmit\n@sahoda/web:typecheck: cache miss, executing 4eb7d4b277f38bd4\n@sahoda/web:typecheck: $ tsc --noEmit\n@sahoda/web:typecheck: src/lib/cron/run-sweeps.test.ts(29,3): error TS2322: Type '{ mode: ReconcileMode; outcome?: ReconcileOutcome | undefined; connectionsChecked: number; connectionsUpdated: number; wouldUpdate?: number | undefined; ... 7 more ...; failures?: CountedReconcileFailure[] | undefined; }' is not assignable to type 'ReconcileReport'.\n@sahoda/web:typecheck:   Types of property 'outcome' are incompatible.\n@sahoda/web:typecheck:     Type 'ReconcileOutcome | undefined' is not assignable to type 'ReconcileOutcome'.\n@sahoda/web:typecheck:       Type 'undefined' is not assignable to type 'ReconcileOutcome'.\n@sahoda/web:typecheck: [ELIFECYCLE] Command failed with exit code 2.\n@sahoda/web#typecheck:  ERROR  command (/home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-health/apps/web) /usr/bin/pnpm run typecheck exited (2)\n\n Tasks:    6 successful, 7 total\nCached:    5 cached, 7 total\n  Time:    20.678s \nFailed:    @sahoda/web#typecheck\n\n ERROR  run failed: command  exited (2)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskjc2vm-480f30ae",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T15:35:15.344Z",
+      "finished_at": "2026-08-08T15:35:15.344Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks passed for @sahoda/jobs, @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "@sahoda/jobs:typecheck: $ tsc --noEmit\n@sahoda/web:typecheck: cache miss, executing 532fbc85e10e3e90\n@sahoda/web:typecheck: $ tsc --noEmit\n\n Tasks:    7 successful, 7 total\nCached:    6 cached, 7 total\n  Time:    14.188s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskjdn00-5981571b",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T15:36:28.077Z",
+      "finished_at": "2026-08-08T15:36:28.077Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed.",
+      "details": "@sahoda/web:test:    Start at  21:05:52\n@sahoda/web:test:    Duration  34.91s (transform 33.59s, setup 19.92s, import 124.71s, tests 54.26s, environment 89.48s)\n@sahoda/web:test: \n@sahoda/web:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/web#test:  ERROR  command (/home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-health/apps/web) /usr/bin/pnpm run test exited (1)\n\n Tasks:    6 successful, 7 total\nCached:    6 cached, 7 total\n  Time:    36.269s \nFailed:    @sahoda/web#test\n\n ERROR  run failed: command  exited (1)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskjl6dt-9b9a9188",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T15:42:19.790Z",
+      "finished_at": "2026-08-08T15:42:19.790Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The typecheck, lint, unit checks ran together and something failed (2143 passed, 2 failed).",
+      "details": "@sahoda/web:test:  Test Files  1 failed | 151 passed (152)\n@sahoda/web:test:       Tests  2 failed | 2143 passed | 1 skipped (2146)\n@sahoda/web:test:    Start at  21:11:32\n@sahoda/web:test:    Duration  47.08s (transform 53.83s, setup 25.85s, import 175.10s, tests 76.58s, environment 108.78s)\n@sahoda/web:test: \n@sahoda/web:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/jobs:test: [ELIFECYCLE] Test failed. See above for more details.\n@sahoda/web#test:  ERROR  command (/home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-health/apps/web) /usr/bin/pnpm run test exited (1)\n\n Tasks:    9 successful, 11 total\nCached:    5 cached, 11 total\n  Time:    52.761s \nFailed:    @sahoda/web#test\n\n ERROR  run failed: command  exited (1)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskjq6ws-788465bc",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T15:46:13.753Z",
+      "finished_at": "2026-08-08T15:46:13.753Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran (152 passed), but 16 tests did NOT run — this does not prove the suite passes.",
+      "details": "@sahoda/jobs:test:  Test Files  15 passed | 2 skipped (17)\n@sahoda/jobs:test:       Tests  152 passed | 16 skipped (168)\n@sahoda/jobs:test:    Start at  21:15:27\n@sahoda/jobs:test:    Duration  45.90s (transform 10.67s, setup 0ms, import 23.79s, tests 85.50s, environment 7ms)\n@sahoda/jobs:test: \n\n Tasks:    11 successful, 11 total\nCached:    9 cached, 11 total\n  Time:    47.341s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskjq6ws-4aed982c",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T15:46:13.753Z",
+      "finished_at": "2026-08-08T15:46:13.753Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran (152 passed), but 16 tests did NOT run — this does not prove the suite passes.",
+      "details": "@sahoda/jobs:test:  Test Files  15 passed | 2 skipped (17)\n@sahoda/jobs:test:       Tests  152 passed | 16 skipped (168)\n@sahoda/jobs:test:    Start at  21:15:27\n@sahoda/jobs:test:    Duration  45.90s (transform 10.67s, setup 0ms, import 23.79s, tests 85.50s, environment 7ms)\n@sahoda/jobs:test: \n\n Tasks:    11 successful, 11 total\nCached:    9 cached, 11 total\n  Time:    47.341s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskjq6ws-5f039eda",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T15:46:13.753Z",
+      "finished_at": "2026-08-08T15:46:13.753Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran (152 passed), but 16 tests did NOT run — this does not prove the suite passes.",
+      "details": "@sahoda/jobs:test:  Test Files  15 passed | 2 skipped (17)\n@sahoda/jobs:test:       Tests  152 passed | 16 skipped (168)\n@sahoda/jobs:test:    Start at  21:15:27\n@sahoda/jobs:test:    Duration  45.90s (transform 10.67s, setup 0ms, import 23.79s, tests 85.50s, environment 7ms)\n@sahoda/jobs:test: \n\n Tasks:    11 successful, 11 total\nCached:    9 cached, 11 total\n  Time:    47.341s",
+      "duration_ms": null
     }
   ]
 }
