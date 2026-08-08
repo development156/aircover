@@ -16,7 +16,9 @@
  */
 export default {
   cwd: 'apps/jobs',
-  command: 'pnpm vitest run src/reconcile/store.pglite.test.ts',
+  command:
+    'pnpm vitest run src/reconcile/store.pglite.test.ts src/publish/runPublishPost.test.ts ' +
+    'src/publish/tokens.test.ts',
   mutants: [
     {
       name: 'a flagged account stays active and keeps being published to',
@@ -41,6 +43,19 @@ export default {
       file: 'apps/jobs/src/reconcile/store.ts',
       find: '              expires_at = coalesce($5::timestamptz, expires_at),',
       replace: '              expires_at = $5::timestamptz,',
+    },
+    {
+      name: 'a publish against a dead account is retryable, so it retries forever',
+      file: 'apps/jobs/src/publish/runPublishPost.ts',
+      find: "    return { status: 'failed', classification: 'permanent', code, message, reconnectRequired }",
+      replace:
+        "    return { status: 'failed', classification: 'transient', code, message, reconnectRequired }",
+    },
+    {
+      name: 'the resolver lets a publish through on an expired connection',
+      file: 'apps/jobs/src/publish/tokens.ts',
+      find: "    if (connection.status !== 'active') {",
+      replace: '    if (false) {',
     },
   ],
 }

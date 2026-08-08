@@ -803,6 +803,19 @@
       "commit_sha": null,
       "blocked": false,
       "blocked_reason": null
+    },
+    {
+      "code": "SL-069",
+      "title": "Close the gap where a crashed publish could post the same thing twice",
+      "detail": "Recovering a post whose publisher was killed mid-flight now works — it used to be abandoned forever. The recovery re-sends it, and in one narrow case the original had already gone out: if the process died in the instant between the platform accepting the post and us writing it down, nothing we store knows it exists. Why it matters: the customer sees the same post twice, and this is the one failure the whole publishing design is built to prevent.\n\nTechnical detail — Introduced knowingly on 2026-08-08 by the `claimVariant` lease fix, and strictly better than what it replaced (a GUARANTEED permanent strand on every crash). `publishing` plus a stale claim is reachable only by process death — the transient path releases explicitly and leaves `scheduled` — so the dangerous window is death between the adapter's HTTP 200 and the `post_publish_logs` INSERT. Such a post is invisible to `listUnresolvedPublishes`, which requires `l.platform_post_id is not null`, so reconciliation cannot find it either. The adapter's deterministic `requestId` (`sahoda:${variantId}:${accountId}`) does NOT close it: doc 13 §5 records Zernio's idempotency as a ~5-minute request window and marks it `[DOC]` — read in their documentation, never observed — while `PUBLISH_LEASE_SECONDS` is 600, so a re-claim lands outside it. Shortening the lease is not the fix: it has to exceed the longest possible publish (the cron route's `maxDuration` is 300s), which leaves no room under a 5-minute window. Candidate answers, none free: write an intent row BEFORE the platform call so a crashed attempt is findable (costs a statement per publish and needs the append-only table to accept it); or search Zernio by `requestId` before re-publishing a recovered claim; or first observe whether the window is real and how long it is, which doc 13 open question 5 already wants. DO NOT flip `SAHODA_PUBLISH_ENABLED` on a rail that matters without reading this.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": "docs/13_Zernio_Integration_SAHODA_LABS.md §5",
+      "sort": 690,
+      "commit_sha": null,
+      "blocked": false,
+      "blocked_reason": null
     }
   ]
 }

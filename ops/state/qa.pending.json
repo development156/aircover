@@ -382,6 +382,45 @@
       "summary_plain": "The unit checks ran (152 passed), but 16 tests did NOT run — this does not prove the suite passes.",
       "details": "@sahoda/jobs:test:  Test Files  15 passed | 2 skipped (17)\n@sahoda/jobs:test:       Tests  152 passed | 16 skipped (168)\n@sahoda/jobs:test:    Start at  21:15:27\n@sahoda/jobs:test:    Duration  45.90s (transform 10.67s, setup 0ms, import 23.79s, tests 85.50s, environment 7ms)\n@sahoda/jobs:test: \n\n Tasks:    11 successful, 11 total\nCached:    9 cached, 11 total\n  Time:    47.341s",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskka8yu-dc82ccbe",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T16:01:49.539Z",
+      "finished_at": "2026-08-08T16:01:49.539Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks passed for @sahoda/jobs, @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "@sahoda/jobs:test: \n\n Tasks:    11 successful, 11 total\nCached:    6 cached, 11 total\n  Time:    49.013s \n\n=== status ===\n M apps/jobs/CLAUDE.md\n M apps/jobs/src/publish/runPublishPost.test.ts\n M apps/jobs/src/publish/store.ts\n M mutations/dead-account.mjs\n M ops/state/board.json\n M scripts/lib/ops-cards.mjs",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskka8yu-6b8f875a",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T16:01:49.539Z",
+      "finished_at": "2026-08-08T16:01:49.539Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks passed for @sahoda/jobs, @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "@sahoda/jobs:test: \n\n Tasks:    11 successful, 11 total\nCached:    6 cached, 11 total\n  Time:    49.013s \n\n=== status ===\n M apps/jobs/CLAUDE.md\n M apps/jobs/src/publish/runPublishPost.test.ts\n M apps/jobs/src/publish/store.ts\n M mutations/dead-account.mjs\n M ops/state/board.json\n M scripts/lib/ops-cards.mjs",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mskka8yu-86300461",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-08T16:01:49.539Z",
+      "finished_at": "2026-08-08T16:01:49.539Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed for @sahoda/jobs, @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "@sahoda/jobs:test: \n\n Tasks:    11 successful, 11 total\nCached:    6 cached, 11 total\n  Time:    49.013s \n\n=== status ===\n M apps/jobs/CLAUDE.md\n M apps/jobs/src/publish/runPublishPost.test.ts\n M apps/jobs/src/publish/store.ts\n M mutations/dead-account.mjs\n M ops/state/board.json\n M scripts/lib/ops-cards.mjs",
+      "duration_ms": null
     }
   ]
 }

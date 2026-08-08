@@ -127,6 +127,24 @@ export function createPublishStore(opts: PublishStoreOptions) {
    * statement, and every release clears both — so such a row can only predate the
    * claim existing at all, and leaving it unclaimable would strand it for the same
    * reason the bug above did.
+   *
+   * ── WHAT THIS TRADES, STATED PLAINLY ────────────────────────────────────────
+   * Re-claiming means re-PUBLISHING, and there is one case where that can post
+   * twice. `publishing` + a stale claim is reachable only by process death (the
+   * transient path releases explicitly and leaves `scheduled`). If the process died
+   * AFTER the platform accepted the post but BEFORE `writeLog` committed, the post
+   * is live with no log row — so `listUnresolvedPublishes` cannot see it either, and
+   * the next tick past the lease publishes it again.
+   *
+   * The adapter's `requestId` is deterministic (`sahoda:${variantId}:${accountId}`,
+   * or the caller's key) and Zernio collapses a repeat onto one post — but doc 13 §5
+   * puts that window at ~5 minutes and marks it `[DOC]`, never observed. The lease is
+   * ten. A re-claim therefore lands OUTSIDE the window this would rely on.
+   *
+   * Taken deliberately: the old behaviour was a GUARANTEED permanent strand on every
+   * crash, and this is a narrow race requiring death inside the gap between one HTTP
+   * response and one INSERT. It is not closed, and it must not be flipped on
+   * (`SAHODA_PUBLISH_ENABLED`) as if it were. See SL-069.
    */
   async function claimVariant(payload: PublishPostPayload, leaseSeconds: number): Promise<boolean> {
     const r = await pool.query(

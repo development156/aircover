@@ -65,6 +65,11 @@ lease` could only ever be tested against rows nobody had claimed. A publisher ki
    stranded its variant permanently. Both halves are proven by execution in
    `src/publish/lease.pglite.test.ts` and pinned by `mutations/publish-lease.mjs` — a live claim is
    still refused, only a dead one is taken over, and `published` is never re-claimed.
+   **This trades a guaranteed strand for a narrow duplicate**, and the trade is not closed: a
+   process that died between the platform's 200 and its `post_publish_logs` INSERT leaves a live
+   post no query can find, and the re-claim publishes it again. The deterministic `requestId`
+   does not save it — doc 13 §5 puts Zernio's window at ~5 minutes `[DOC]`, and the lease is ten.
+   Read SL-069 before flipping `SAHODA_PUBLISH_ENABLED`.
 5. **A sweep may not hide its own failure.** No `catch {}`. Every failure is classified where it is
    caught, counted by kind, and the pass reports `clean` / `degraded` / `failed` — a pass where
    every unit threw used to be indistinguishable from an idle tick. The report is returned on a

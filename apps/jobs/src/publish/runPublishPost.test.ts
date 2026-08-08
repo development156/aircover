@@ -222,6 +222,25 @@ describe('runPublishPost', () => {
     ])
   })
 
+  it('refuses an account the health sweep expired, permanently and without asking the platform', async () => {
+    // The other end of the dead-account rule. The reconcile sweep flips a flagged
+    // connection to `expired` (proven in reconcile/store.pglite.test.ts) and the
+    // resolver then throws CONNECTION_NOT_ACTIVE (tokens.test.ts). What matters HERE
+    // is the classification: `permanent` is what stops a scheduled post retrying
+    // against an account that cannot publish until somebody reconnects it.
+    const h = harness({
+      resolveConnection: async () => {
+        throw new Error('CONNECTION_NOT_ACTIVE: x connection is expired')
+      },
+    })
+
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toMatchObject({ status: 'failed', classification: 'permanent' })
+    expect(h.adapterCalls).toBe(0)
+    expect(h.variantUpdates[0]).toMatchObject({ publishStatus: 'failed' })
+  })
+
   it('writes a log even when the token cannot be resolved', async () => {
     const h = harness({
       resolveConnection: async () => {
