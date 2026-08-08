@@ -36,6 +36,13 @@ const isPublicRoute = createRouteMatcher([
   '/api/public/beta-apply',
   '/api/admin/devops/ingest',
   '/api/webhooks/clerk',
+  // Cashfree PG. Obeys all three rules above: `verifyCashfreeWebhook` is the first thing the
+  // handler does and nothing below it can run on unverified bytes (the parser accepts only a
+  // `LiveVerifiedBody`, which only the verifier can mint); the route imports
+  // `@sahoda/billing/server-webhook`, an entry point the fixture provider is absent from, so
+  // the well-known fixture secret is unreachable rather than merely unused; and every
+  // rejection answers a fixed envelope, never a provider or DB message.
+  '/api/webhooks/cashfree',
   '/api/cron/sweeps',
 ])
 

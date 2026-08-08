@@ -28,10 +28,58 @@ const DEFAULT_HOLD_TTL_SECONDS = 600
 /** User-facing failure copy. Fixed strings only — see `notifyError`. */
 const GENERIC_FAILURE = 'Could not complete the action'
 
+/**
+ * What an external-cost resolver is told about the action that just succeeded. Everything
+ * here is already known to the wrapper — the resolver is a lookup, never a second source of
+ * truth about what happened.
+ */
+export interface ExternalCostContext {
+  workspaceId: string
+  action: string
+  /** The same objectRef the HOLD was keyed on — e.g. the post id for a publish. */
+  objectRef: string
+  /** Credits the customer is being charged. Unrelated to the USD figure being resolved. */
+  creditsCharged: number
+}
+
+/**
+ * Resolve what this action cost US in real money (USD), for `credit_ledger.cogs_usd_est`.
+ *
+ * ── THE SEAM, AND WHY IT IS EMPTY ────────────────────────────────────────────
+ * Launch Plan §5 Slice 3 wants per-post external cost threaded through the ledger; the
+ * aggregator audit §3.6 recommends the opposite — price publishing at 0 credits and absorb
+ * a flat subscription as overhead. Those cannot both be built, and which is right depends on
+ * how Zernio actually bills, which is a founder call and not a code decision.
+ *
+ * So this is the CONSUMER side only, and it is deliberately inert. `cogs_usd_est` is already
+ * a parameter of `app.apply_ledger_entry` and already optional on `ApplyLedgerInputSchema`,
+ * so no schema, no migration and no `packages/shared` change is involved: the contract
+ * existed, nothing was ever passing a value. When a producer can name a per-post figure, it
+ * fills this in and the DEBIT starts carrying it. Until then every DEBIT writes null exactly
+ * as before.
+ *
+ * ── TWO PROPERTIES THAT ARE NOT NEGOTIABLE ───────────────────────────────────
+ * 1. It cannot fail the charge. A throw, a rejection, or a nonsense number is swallowed and
+ *    the DEBIT proceeds with no cogs. This is an accounting annotation on money that has
+ *    already moved; letting a reporting lookup turn a completed action into a failure would
+ *    mean the customer's work is lost to make a spreadsheet tidier.
+ * 2. It is read once, on the settling DEBIT. A retry after a committed-but-lost-ack DEBIT
+ *    REPLAYS the same idempotency key, and a replay returns the original row — so a value
+ *    resolved on the retry never lands. Treat the first settle as authoritative.
+ */
+export type ExternalCostResolver = (
+  ctx: ExternalCostContext,
+) => number | undefined | Promise<number | undefined>
+
 export interface WithCreditsDeps {
   /** Injected for deterministic traceIds in tests; defaults to a random UUID. */
   newTraceId?: () => string
   holdTtlSeconds?: number
+  /**
+   * Optional per-action external cost in USD, written to `cogs_usd_est` on the DEBIT.
+   * Unset today — see `ExternalCostResolver` for what a producer has to supply first.
+   */
+  externalCostUsd?: ExternalCostResolver
   /**
    * Server-side observability hook. The raw cause is handed here and NEVER placed on the
    * returned Result, so an operator keeps the detail while the customer sees fixed copy.
@@ -130,7 +178,18 @@ export function createWithCredits(port: LedgerPort, deps: WithCreditsDeps = {}):
         return err(appError('PROVIDER_ERROR', GENERIC_FAILURE, traceId))
       }
 
-      // DEBIT: settle the hold for the exact cost. model_tier / cogs stay null for now
+      // What this action cost us in real money, if anyone can say. Resolved AFTER the run
+      // (a per-post figure is not knowable before the work happens) and BEFORE the settle,
+      // so it rides the same statement as the charge rather than needing a second write.
+      // Never allowed to fail the settle — see ExternalCostResolver.
+      const cogsUsdEst = await resolveExternalCost(deps.externalCostUsd, notifyError, traceId, {
+        workspaceId,
+        action,
+        objectRef,
+        creditsCharged: cost,
+      })
+
+      // DEBIT: settle the hold for the exact cost. model_tier stays null for now
       // (owner ruling #3 — enriched via the mesh seam later). If this settle throws it flows
       // to the outer backstop as PROVIDER_ERROR. Two retry cases, both exactly-once:
       //  - the DEBIT never committed → the hold is still open → the retry resumes the same
@@ -145,6 +204,7 @@ export function createWithCredits(port: LedgerPort, deps: WithCreditsDeps = {}):
         actionType: action,
         objectRef,
         settlesEntryId: holdId,
+        cogsUsdEst,
       })
 
       return ok({ data, balanceAfter: debit.entry.balanceAfter })
@@ -169,6 +229,40 @@ export function createWithCredits(port: LedgerPort, deps: WithCreditsDeps = {}):
 function nextAttempt(latest: LatestHold | null): number {
   if (!latest) return 1
   return latest.settledBy === 'release' ? latest.attempt + 1 : latest.attempt
+}
+
+/**
+ * Run the external-cost resolver defensively.
+ *
+ * Every failure mode lands on `undefined`, which writes null to `cogs_usd_est` — exactly what
+ * the column held before this seam existed. The reasons it is this paranoid:
+ *
+ *  - a THROW or rejection would escape into the outer backstop and turn a successful, already
+ *    -run action into PROVIDER_ERROR, releasing nothing and confusing a customer whose work
+ *    actually completed;
+ *  - NaN / Infinity would be handed to a `numeric` column as a value Postgres rejects, which
+ *    would fail the DEBIT itself — the settle, not the annotation;
+ *  - a NEGATIVE cost is meaningless here and would read as a credit in any margin report
+ *    built on this column later.
+ *
+ * `0` is deliberately kept: "this post cost us nothing" is a real, useful answer and must not
+ * be indistinguishable from "nobody knows".
+ */
+async function resolveExternalCost(
+  resolver: ExternalCostResolver | undefined,
+  notifyError: (cause: unknown, traceId: string) => void,
+  traceId: string,
+  ctx: ExternalCostContext,
+): Promise<number | undefined> {
+  if (!resolver) return undefined
+  try {
+    const value = await resolver(ctx)
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined
+    return value
+  } catch (cause) {
+    notifyError(cause, traceId)
+    return undefined
+  }
 }
 
 function isCreditInsufficient(e: unknown): boolean {

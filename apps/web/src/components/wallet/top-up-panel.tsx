@@ -121,9 +121,12 @@ function CheckoutResult({ result, onRetry }: { result: CheckoutState; onRetry: (
   }
 
   if (result.simulated) {
-    // The only provider wired today is the fixture double, whose checkout host
-    // does not resolve. Rendering it as a link — or as a completed purchase —
-    // would be a fake success, so it is labelled and left inert.
+    // A REAL Cashfree order now exists for this session — but in the sandbox, where no money
+    // moves, and the page that would collect the payment (`/billing/checkout/{orderId}`,
+    // which hands `payment_session_id` to `cashfree-js`) is not built yet. So this is
+    // labelled and left inert: rendering it as a link, or as a completed purchase, would be
+    // a fake success. The old copy claimed "no payment rail is connected", which stopped
+    // being true the moment the fixture double was replaced.
     return (
       // role="status": the pending line goes silent when the transition ends, so
       // without this a screen-reader user is never told the action finished.
@@ -133,11 +136,14 @@ function CheckoutResult({ result, onRetry }: { result: CheckoutState; onRetry: (
       >
         <p className="flex items-center gap-2 font-semibold">
           <Info size={14} strokeWidth={2} aria-hidden />
-          Simulated checkout — no payment rail is connected
+          {result.mode === 'sandbox'
+            ? 'Sandbox order created — no real money moves'
+            : 'Simulated checkout — no payment rail is connected'}
         </p>
         <p>
-          No payment was taken and no credits were added. This is what a {result.mode} session
-          returns while billing is being wired.
+          {result.mode === 'sandbox'
+            ? 'A real Cashfree order was opened in test mode. Nothing was charged and no credits were added — credits arrive only after a completed payment is confirmed. The payment page is not reachable from the app yet.'
+            : `No payment was taken and no credits were added. This is what a ${result.mode} session returns while billing is being wired.`}
         </p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-[12px]">
           <dt className="text-muted">mode</dt>

@@ -34,6 +34,7 @@
         "RAZORPAY_KEY_ID",
         "CASHFREE_APP_ID",
         "CASHFREE_SECRET_KEY",
+        "CASHFREE_WEBHOOK_SECRET",
         "CASHFREE_ENV",
         "X_CLIENT_ID",
         "GOOGLE_OAUTH_CLIENT_ID",
