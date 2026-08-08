@@ -98,6 +98,14 @@ export interface ServerErrorContext {
   action: string
   /** Passed only where the action already resolved it — never fetched for this. */
   workspaceId?: string
+  /**
+   * Which piece of infrastructure was unavailable, when that is what failed —
+   * `deps`, `claim`, `release`. A tag rather than a message because these are the
+   * failures that CANNOT write a database row to explain themselves: the row is a
+   * Postgres write and Postgres is what is missing. Faceting on it is the only way
+   * to tell "the database is down" from "an adapter timed out" at a glance.
+   */
+  infraStage?: string
 }
 
 export function reportServerError(error: unknown, context: ServerErrorContext): void {
@@ -120,6 +128,7 @@ export function reportServerError(error: unknown, context: ServerErrorContext): 
     const tags = {
       action: context.action,
       ...(context.workspaceId ? { workspace_id: context.workspaceId } : {}),
+      ...(context.infraStage ? { infra_stage: context.infraStage } : {}),
     }
 
     Sentry.captureException(error, { tags })

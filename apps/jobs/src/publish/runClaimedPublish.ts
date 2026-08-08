@@ -21,6 +21,42 @@ export const PUBLISH_LEASE_SECONDS = 600
 /** Why a run did nothing, when it did nothing. */
 export type ClaimRefusal = 'already-claimed'
 
+/**
+ * The infrastructure under a publish failed before the publish could be recorded.
+ *
+ * ── WHY THIS CLASS EXISTS ────────────────────────────────────────────────────
+ * "Nothing publishes without a post_publish_logs row" (apps/jobs/CLAUDE.md) holds for
+ * every failure INSIDE runPublishPost — each path writes its row first. It cannot hold
+ * for a failure that happens before then, because the row is itself a Postgres write:
+ * when the database is what is unreachable, there is nowhere to record that it is.
+ *
+ * That gap is not theoretical. On 2026-08-07 four publishes returned 503 with no log
+ * row at all, and the logs could not say why — the 503 was anonymous, so it was
+ * indistinguishable from an adapter timeout. The database was the cause
+ * (SUPABASE_DB_URL pointed at the IPv6-only direct host), and `claimVariant` is the
+ * first statement that touches it.
+ *
+ * So the failure is CLASSIFIED at its source instead. The stage travels out to the
+ * caller, which can name it in the response and attach it to Sentry — the diagnosis
+ * survives even though no row can be written.
+ */
+export type PublishInfraStage = 'deps' | 'claim' | 'release'
+
+export class PublishInfraError extends Error {
+  readonly stage: PublishInfraStage
+
+  constructor(stage: PublishInfraStage, cause: unknown) {
+    super(
+      `publish infrastructure unavailable at ${stage}: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`,
+    )
+    this.name = 'PublishInfraError'
+    this.stage = stage
+    this.cause = cause
+  }
+}
+
 export type ClaimedPublishResult =
   | { claimed: true; outcome: PublishOutcome }
   /** Someone else owns this variant, or it is already published. Not an error. */
@@ -64,7 +100,15 @@ export async function runClaimedPublish(
 ): Promise<ClaimedPublishResult> {
   const lease = deps.leaseSeconds ?? PUBLISH_LEASE_SECONDS
 
-  const claimed = await deps.claimVariant(payload, lease)
+  // The FIRST statement that touches Postgres. A throw here is the database being
+  // unreachable, not a publish failing — and it must not be reported as one. Nothing
+  // has been claimed, so nothing needs releasing.
+  let claimed: boolean
+  try {
+    claimed = await deps.claimVariant(payload, lease)
+  } catch (e) {
+    throw new PublishInfraError('claim', e)
+  }
   if (!claimed) return { claimed: false, reason: 'already-claimed' }
 
   try {
