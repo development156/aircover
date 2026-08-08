@@ -50,3 +50,24 @@ supabase/.temp/
 # Files remain on disk; git simply stops tracking them.
 *.md
 *.mdx
+
+# Two exceptions, tracked on purpose.
+#
+# ORDER MATTERS AND IS THE WHOLE POINT: the LAST matching pattern wins, so a negation
+# is only alive until something broader re-matches below it. `!.env.example` (line 4)
+# is undone by `.env*` (line 41); .env.example survives purely because it is already
+# tracked, and .gitignore does not apply to tracked files. Untrack it once and it
+# would vanish. These two negations sit below `*.md` with nothing broader after them.
+# Verify with `git check-ignore -v --no-index <path>` — WITHOUT --no-index git hides
+# the match for anything tracked, which is exactly how this stays invisible.
+#
+# Why these two and not the rest: CLAUDE.md is the instruction file every session
+# loads, and LEARNINGS.md is the running record a PR is supposed to append to. Both
+# were silently dropped by the 2026-08-08 squash, so a fresh worktree cut from
+# wt-web had neither — sessions ran without the project's own rules, and the
+# "one LEARNINGS.md line per PR" step had no file to write to.
+# Leading slash = repo root ONLY. Unanchored, `!CLAUDE.md` would also un-ignore the
+# eight per-package CLAUDE.md files, which this change is not restoring — quietly
+# widening an ignore rule beyond what was asked is how the next surprise gets made.
+!/CLAUDE.md
+!/LEARNINGS.md
