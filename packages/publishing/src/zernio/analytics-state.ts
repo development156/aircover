@@ -144,8 +144,14 @@ export interface ClassifyInput {
    * Derived from the `fixture://` permalink rather than from a null id: the id is
    * erased on the way out of the database, so by the time it reaches here "no id" and
    * "simulated" look identical, and only the permalink still carries the difference.
+   *
+   * REQUIRED, for the same reason `ResolvedConnection.viaZernio` is. It shipped optional
+   * on 2026-08-09 and one of the two call sites already omitted it; that omission was
+   * harmless only because `post-metrics.ts` filters out rows with no `platformPostId`
+   * and `variant-status.ts` erases a fixture's id — i.e. the safety lived in a different
+   * module than the assumption. Required makes the omission a compile error instead.
    */
-  simulated?: boolean
+  simulated: boolean
   /** When this channel went out, ISO-8601. Null when unknown. */
   publishedAt: string | null
   now: Date

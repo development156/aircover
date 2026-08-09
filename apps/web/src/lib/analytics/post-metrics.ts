@@ -64,6 +64,13 @@ interface Target {
   postId: string
   channel: PostVariant['channel']
   platformPostId: string
+  /**
+   * Carried rather than assumed. A fixture cannot currently become a target — the loop
+   * below skips rows with no `platformPostId`, and `variant-status.ts` erases a
+   * fixture's — but that makes this file's correctness depend on another module's
+   * behaviour. Carrying the flag means the classifier is told, not trusted to infer.
+   */
+  simulated: boolean
 }
 
 /**
@@ -207,8 +214,18 @@ async function fetchInto(
   const targets: Target[] = []
   for (const [postId, rows] of statesByPost) {
     for (const row of rows) {
-      if (row.status !== 'published' || !row.platformPostId) continue
-      targets.push({ postId, channel: row.channel, platformPostId: row.platformPostId })
+      // `simulated` is checked here as well as in the classifier, and it is not
+      // belt-and-braces: the classifier decides what the SCREEN says, this decides
+      // whether a REQUEST goes out. A fixture never touched the platform, so asking a
+      // real metrics endpoint about it spends a call to be told nothing — or worse, is
+      // answered about someone else's post if the id ever collided.
+      if (row.status !== 'published' || !row.platformPostId || row.simulated) continue
+      targets.push({
+        postId,
+        channel: row.channel,
+        platformPostId: row.platformPostId,
+        simulated: row.simulated,
+      })
     }
   }
   if (targets.length === 0) return result
@@ -257,6 +274,7 @@ function classify(
     result: answer,
     platformPostId: target.platformPostId,
     published: true,
+    simulated: target.simulated,
     publishedAt: times.get(`${target.postId}::${target.channel}`) ?? null,
     now,
   })

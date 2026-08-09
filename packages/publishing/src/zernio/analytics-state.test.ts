@@ -23,6 +23,8 @@ const input = (over: Partial<ClassifyInput> = {}): ClassifyInput => ({
   result: answer({ postId: 'p1' }),
   platformPostId: IG_MEDIA_ID,
   published: true,
+  // A real publish by default — a fixture is the exception a test must ask for.
+  simulated: false,
   publishedAt: LONG_AGO,
   now: NOW,
   ...over,

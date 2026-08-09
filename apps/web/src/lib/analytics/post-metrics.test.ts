@@ -165,3 +165,36 @@ describe('a fetched verdict overwrites the seeded one', () => {
     )
   })
 })
+
+/**
+ * A simulated publish is never asked about, and never mislabelled.
+ *
+ * `simulated` was optional when it shipped on 2026-08-09, and the second
+ * `classifyPostMetrics` call site omitted it. That was harmless only because a fixture
+ * has no `platformPostId` (variant-status.ts erases it) so it never became a target —
+ * the safety lived in a different module than the assumption. The row below carries BOTH
+ * a platform id and `simulated: true`, which the erasure normally prevents, precisely so
+ * the assumption is not what is being tested.
+ */
+describe('a simulated row is labelled simulated, not asked about', () => {
+  it('reports simulated even when the row carries a platform id', async () => {
+    const out = await listPostMetrics(
+      new Map([['post-1', [row({ simulated: true, platformPostId: '18277022635290264' })]]]),
+      NOW,
+    )
+    expect(out.get('post-1')?.[0]?.state).toEqual({ kind: 'unavailable', reason: 'simulated' })
+  })
+
+  it('makes no analytics call for it — nothing was ever sent to the platform', async () => {
+    await listPostMetrics(
+      new Map([['post-1', [row({ simulated: true, platformPostId: '18277022635290264' })]]]),
+      NOW,
+    )
+    expect(reads.postAnalytics).not.toHaveBeenCalled()
+  })
+
+  it('still asks about a real publish — the guard is not blanket', async () => {
+    await listPostMetrics(new Map([['post-1', [row({ simulated: false })]]]), NOW)
+    expect(reads.postAnalytics).toHaveBeenCalled()
+  })
+})
