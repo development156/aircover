@@ -1461,6 +1461,84 @@
       "summary_plain": "The unit checks ran (2458 passed), but 17 tests did NOT run — this does not prove the suite passes.",
       "details": "=== TYPECHECK ===\n Tasks:    8 successful, 8 total\n=== LINT ===\n Tasks:    8 successful, 8 total\n=== TEST ===\n@sahoda/jobs:test:       Tests  178 passed | 16 skipped (194)\n@sahoda/web:test:       Tests  2280 passed | 1 skipped (2281)\n Tasks:    14 successful, 14 total",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-msm1mrpf-70d3e2da",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-09T16:55:13.346Z",
+      "finished_at": "2026-08-09T16:55:13.346Z",
+      "suite": "typecheck",
+      "status": "fail",
+      "summary_plain": "The typecheck checks ran and something failed.",
+      "details": "ClassifyInput.simulated now required\n=== RED: typecheck must now fail at the omitting call site ===\n@sahoda/publishing:typecheck: src/zernio/analytics-state.test.ts(22,70): error TS2322: Type '{ simulated?: boolean | undefined; lagHours?: number; result: ZernioPostAnalyticsResult | null; platformPostId: string | null; published: boolean; publishedAt: string | null; now: Date; }' is not assignable to type 'ClassifyInput'.\nFailed:    @sahoda/publishing#typecheck",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msm1n4sv-25fdb564",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-09T16:55:30.318Z",
+      "finished_at": "2026-08-09T16:55:30.318Z",
+      "suite": "typecheck",
+      "status": "fail",
+      "summary_plain": "The typecheck checks ran and something failed.",
+      "details": "test factory fixed\n=== typecheck again: the real call sites ===\n@sahoda/web:typecheck: src/lib/analytics/post-metrics.ts(256,30): error TS2345: Argument of type '{ result: ZernioPostAnalyticsResult; platformPostId: string; published: true; publishedAt: string | null; now: Date; }' is not assignable to parameter of type 'ClassifyInput'.\nFailed:    @sahoda/web#typecheck",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msm1njyd-8fb76d0c",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-09T16:55:49.956Z",
+      "finished_at": "2026-08-09T16:55:49.956Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran and everything passed.",
+      "details": "Target carries simulated; both call sites state it\n Tasks:    8 successful, 8 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msm1qyjm-2fa7fb23",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-09T16:58:28.829Z",
+      "finished_at": "2026-08-09T16:58:28.829Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran (2469 passed), but 1 test did NOT run — this does not prove the suite passes.",
+      "details": "=== TYPECHECK ===\n Tasks:    8 successful, 8 total\n=== LINT ===\n Tasks:    8 successful, 8 total\n=== TEST ===\n@sahoda/publishing:test:       Tests  186 passed (186)\n@sahoda/web:test:       Tests  2283 passed | 1 skipped (2284)\n Tasks:    14 successful, 14 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msm1qyjm-6ca584b6",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-09T16:58:28.829Z",
+      "finished_at": "2026-08-09T16:58:28.829Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran (2469 passed), but 1 test did NOT run — this does not prove the suite passes.",
+      "details": "=== TYPECHECK ===\n Tasks:    8 successful, 8 total\n=== LINT ===\n Tasks:    8 successful, 8 total\n=== TEST ===\n@sahoda/publishing:test:       Tests  186 passed (186)\n@sahoda/web:test:       Tests  2283 passed | 1 skipped (2284)\n Tasks:    14 successful, 14 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msm1qyjm-8e4c839a",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-09T16:58:28.829Z",
+      "finished_at": "2026-08-09T16:58:28.829Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran (2469 passed), but 1 test did NOT run — this does not prove the suite passes.",
+      "details": "=== TYPECHECK ===\n Tasks:    8 successful, 8 total\n=== LINT ===\n Tasks:    8 successful, 8 total\n=== TEST ===\n@sahoda/publishing:test:       Tests  186 passed (186)\n@sahoda/web:test:       Tests  2283 passed | 1 skipped (2284)\n Tasks:    14 successful, 14 total",
+      "duration_ms": null
     }
   ]
 }
