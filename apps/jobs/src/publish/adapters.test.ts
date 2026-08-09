@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { AdapterError } from '@sahoda/shared'
 import { createAdapterSelector } from './adapters'
+import { createConnectionResolver } from './tokens'
 
 const transport = async () => ({ status: 200, body: '{}', headers: {} })
 
@@ -76,5 +77,63 @@ describe('createAdapterSelector', () => {
     const select = createAdapterSelector({ mode: 'live', transport })
 
     expect(() => select('linkedin', true)).toThrow(AdapterError)
+  })
+})
+
+/**
+ * The seam, composed — real resolver into real selector.
+ *
+ * Every unit here was correct in isolation on 2026-08-09 and the composition was still
+ * broken: the store decided `viaZernio: true`, the selector read it correctly, and the
+ * resolver between them dropped the field. Each unit test passed. This is the only
+ * shape of test that fails.
+ *
+ * `createConnectionResolver` is imported rather than stubbed for exactly that reason — a
+ * stub would carry whatever the test author believed the contract was, which is the
+ * belief that was wrong.
+ */
+describe('a Zernio-fronted connection reaches the Zernio adapter', () => {
+  const zernioRow = {
+    connectionId: '66666666-6666-4666-8666-666666666666',
+    externalAccountId: 'ig-account-1',
+    status: 'active',
+    sealedAccessToken: null,
+    viaZernio: true,
+  }
+  const payload = {
+    workspaceId: '22222222-2222-4222-8222-222222222222',
+    postId: 'p',
+    variantId: 'v',
+    channel: 'instagram' as const,
+    scheduledAt: '2026-07-19T10:00:00.000Z',
+  }
+  const ZERNIO_KEY = `sk_${'a'.repeat(64)}`
+
+  it('does not throw NO_ADAPTER for instagram in live mode', async () => {
+    const resolve = createConnectionResolver({ loadConnection: async () => zernioRow })
+    const select = createAdapterSelector({ mode: 'live', transport, zernioApiKey: ZERNIO_KEY })
+
+    const connection = await resolve(payload)
+
+    // The exact expression runPublishPost.ts uses at its call site.
+    expect(() => select(payload.channel, connection.viaZernio === true)).not.toThrow()
+    expect(select(payload.channel, connection.viaZernio === true).channel).toBe('instagram')
+  })
+
+  /**
+   * NON-VACUITY. Instagram must still throw when the connection genuinely is not
+   * Zernio-fronted — otherwise the test above would pass on a selector that returned
+   * something for everything.
+   */
+  it('still throws NO_ADAPTER when the connection is not Zernio-fronted', () => {
+    const select = createAdapterSelector({ mode: 'live', transport, zernioApiKey: ZERNIO_KEY })
+    expect(() => select('instagram', false)).toThrow(AdapterError)
+  })
+
+  it('still throws NO_ADAPTER when the rail is not provisioned', async () => {
+    const resolve = createConnectionResolver({ loadConnection: async () => zernioRow })
+    const select = createAdapterSelector({ mode: 'live', transport })
+    const connection = await resolve(payload)
+    expect(() => select(payload.channel, connection.viaZernio === true)).toThrow(AdapterError)
   })
 })

@@ -85,6 +85,10 @@ export function createConnectionResolver(
         // Deliberately empty: there is no token here, and an empty string is more
         // honest than a placeholder that could be mistaken for one.
         accessToken: '',
+        // The reason we are in THIS branch, carried forward rather than re-derived.
+        // `adapters.ts` cannot work it out again: x, gbp and linkedin exist in both
+        // shapes, so only the row knows, and this is the last point that still holds it.
+        viaZernio: true,
       }
     }
 
@@ -111,6 +115,10 @@ export function createConnectionResolver(
       connectionId: connection.connectionId,
       externalAccountId: connection.externalAccountId,
       accessToken,
+      // Stated, not omitted. Reaching here means the vault opened a secret of OURS, so
+      // this is an OAuth grant and not a Zernio-fronted account — and saying so costs
+      // nothing while leaving it out is what broke live publishing once already.
+      viaZernio: false,
     }
   }
 }

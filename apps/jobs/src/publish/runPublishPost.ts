@@ -34,8 +34,15 @@ export interface ResolvedConnection {
    * Whether this connection publishes through Zernio rather than an OAuth grant of
    * ours. Decided by the row, so it must travel WITH the resolved connection —
    * the channel alone cannot answer it for x, gbp or linkedin.
+   *
+   * REQUIRED, and it must stay required. It was optional until 2026-08-09, which meant
+   * a `return` that simply forgot it still typechecked: both branches of
+   * `createConnectionResolver` built a fresh three-field literal, the field vanished,
+   * and `connection.viaZernio === true` below read `undefined` as `false`. Every live
+   * Instagram publish then died at NO_ADAPTER holding a perfectly good connection.
+   * Optional is what let the value go missing without anyone being asked.
    */
-  viaZernio?: boolean
+  viaZernio: boolean
 }
 
 /** One immutable post_publish_logs row. The table is append-only — insert once, terminally. */

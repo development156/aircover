@@ -59,6 +59,7 @@ function harness(over: Partial<PublishPostDeps> & { variant?: Partial<PublishVar
       connectionId: '55555555-5555-4555-8555-555555555555',
       externalAccountId: 'x-account-1',
       accessToken: SECRET,
+      viaZernio: false,
     }),
     adapterFor: (channel) => countingAdapter(createFixtureAdapter(channel)),
     writeLog: async (e) => {
