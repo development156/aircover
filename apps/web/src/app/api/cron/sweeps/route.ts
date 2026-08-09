@@ -116,6 +116,14 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const outcome = await runCronSweeps({
+    // Resolved HERE, from the running deployment's environment, so the answer is
+    // measured rather than inferred. `loadJobsEnv()` applies the same default
+    // (`fixture`) that `createAdapterSelector` will act on, so this reports the rail
+    // the tick would actually publish through — not what the Vercel project intends.
+    config: {
+      publishMode: loadJobsEnv().publishMode,
+      publishEnabled: publishFromCronEnabled(),
+    },
     runDispatch: () =>
       (async () => {
         // One deps object for the whole tick: it holds the connection pool and the

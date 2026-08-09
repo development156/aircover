@@ -5,6 +5,9 @@ import { runCronSweeps } from './run-sweeps'
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
 
+/** The rail production was actually on when this was written. See the config describe below. */
+const SIMULATED_RAIL = { publishMode: 'fixture', publishEnabled: false } as const
+
 function dispatchReport(over: Partial<DispatchSweepReport> = {}): DispatchSweepReport {
   return {
     mode: 'on',
@@ -59,6 +62,7 @@ function holdReport(over: Partial<HoldSweepReport> = {}): HoldSweepReport {
 describe('runCronSweeps', () => {
   it('returns the counters from both sweeps', async () => {
     const outcome = await runCronSweeps({
+      config: SIMULATED_RAIL,
       runDispatch: async () => dispatchReport({ scanned: 4, expired: 3, queueUnavailable: 1 }),
       runHolds: async () => holdReport({ scanned: 2, released: 2 }),
       runReconcile: async () => reconcileReport(),
@@ -77,6 +81,7 @@ describe('runCronSweeps', () => {
     // per-row detail is not, and the dispatch report carries a decisions array full of
     // post and workspace ids. Anything identifying belongs in the runtime log.
     const outcome = await runCronSweeps({
+      config: SIMULATED_RAIL,
       runDispatch: async () =>
         dispatchReport({
           scanned: 1,
@@ -105,6 +110,7 @@ describe('runCronSweeps', () => {
     const runHolds = vi.fn(async () => holdReport({ scanned: 5, released: 5 }))
 
     const outcome = await runCronSweeps({
+      config: SIMULATED_RAIL,
       runDispatch: async () => {
         throw new Error('boom')
       },
@@ -118,6 +124,7 @@ describe('runCronSweeps', () => {
 
   it('answers 500 when either sweep fails, so a broken tick is visible in the dashboard', async () => {
     const dispatchFailed = await runCronSweeps({
+      config: SIMULATED_RAIL,
       runDispatch: async () => {
         throw new Error('boom')
       },
@@ -125,6 +132,7 @@ describe('runCronSweeps', () => {
       runReconcile: async () => reconcileReport(),
     })
     const holdsFailed = await runCronSweeps({
+      config: SIMULATED_RAIL,
       runDispatch: async () => dispatchReport(),
       runHolds: async () => {
         throw new Error('boom')
@@ -141,6 +149,7 @@ describe('runCronSweeps', () => {
   it('names the failing sweep without echoing the error', async () => {
     // A database error message can carry a connection string, a host or a query.
     const outcome = await runCronSweeps({
+      config: SIMULATED_RAIL,
       runDispatch: async () => {
         throw new Error('connect ECONNREFUSED postgres://u:hunter2@db.internal:5432')
       },
@@ -160,6 +169,7 @@ describe('runCronSweeps', () => {
     const onError = vi.fn()
 
     await runCronSweeps({
+      config: SIMULATED_RAIL,
       runDispatch: async () => {
         throw boom
       },
@@ -176,6 +186,7 @@ describe('runCronSweeps', () => {
     // Three sweeps now, and the property must hold for all of them: the reconcile
     // pass flips connections to `expired`, so deploying it must not start doing so.
     const outcome = await runCronSweeps({
+      config: SIMULATED_RAIL,
       runDispatch: async () => dispatchReport({ mode: 'off' }),
       runHolds: async () => holdReport({ mode: 'off' }),
       runReconcile: async () => reconcileReport({ mode: 'off' }),
@@ -184,6 +195,9 @@ describe('runCronSweeps', () => {
     expect(outcome.status).toBe(200)
     expect(outcome.body).toEqual({
       ok: true,
+      // Reported even by a tick that does nothing — "which rail am I on" is a question
+      // about the deployment, not about the work this tick happened to find.
+      config: SIMULATED_RAIL,
       dispatch: {
         mode: 'off',
         scanned: 0,
@@ -225,5 +239,56 @@ describe('runCronSweeps', () => {
         failures: [],
       },
     })
+  })
+})
+
+/**
+ * The tick reports which publish rail it is actually on.
+ *
+ * On 2026-08-09 every published variant in production turned out to be `mode: 'fixture'`
+ * — simulated posts, reported to the customer as published, for the entire life of the
+ * table. Nothing on any surface said so. `publishMode` defaults to `fixture` and
+ * `SAHODA_PUBLISH_MODE` was absent from turbo.json's build allowlist, so the value could
+ * not even be changed from the Vercel project: setting it did nothing and said nothing.
+ *
+ * Two flags decide whether a real post goes out, and they are easy to confuse because
+ * only one of them was visible. This puts both on the one authenticated surface that
+ * already runs every five minutes, so "which rail is production on" is a question with
+ * a measured answer instead of an inferred one.
+ *
+ * Counts-and-codes only, like the rest of the body: two enum-ish values, no secret, no id.
+ */
+describe('the tick says which publish rail it is on', () => {
+  const runners = {
+    runDispatch: () => Promise.resolve(dispatchReport()),
+    runHolds: () => Promise.resolve(holdReport()),
+    runReconcile: () => Promise.resolve(reconcileReport()),
+  }
+
+  it('reports the resolved publish mode and whether publishing is permitted', async () => {
+    const outcome = await runCronSweeps({
+      ...runners,
+      config: { publishMode: 'fixture', publishEnabled: false },
+    })
+    expect(outcome.body.config).toEqual({ publishMode: 'fixture', publishEnabled: false })
+  })
+
+  it('reports live when that is what resolved', async () => {
+    const outcome = await runCronSweeps({
+      ...runners,
+      config: { publishMode: 'live', publishEnabled: true },
+    })
+    expect(outcome.body.config).toEqual({ publishMode: 'live', publishEnabled: true })
+  })
+
+  it('still reports the config when a sweep failed', async () => {
+    const outcome = await runCronSweeps({
+      ...runners,
+      runDispatch: () => Promise.reject(new Error('boom')),
+      config: { publishMode: 'fixture', publishEnabled: false },
+    })
+    expect(outcome.status).toBe(500)
+    // The one field an operator most needs when a tick is failing.
+    expect(outcome.body.config.publishMode).toBe('fixture')
   })
 })

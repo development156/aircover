@@ -10,8 +10,28 @@ interface SweepError {
 /** The dispatch report minus `decisions`, which carries post and workspace ids. */
 type DispatchCounters = Omit<DispatchSweepReport, 'decisions'>
 
+/**
+ * Which publish rail this deployment is actually on.
+ *
+ * Both flags, together, because either one alone is misleading. `publishEnabled`
+ * (`SAHODA_PUBLISH_ENABLED`) says the cron tick MAY publish; `publishMode`
+ * (`SAHODA_PUBLISH_MODE`) says what it publishes THROUGH. A tick with
+ * `publishEnabled: true` and `publishMode: 'fixture'` writes simulated posts and
+ * reports them as successes — which is exactly what production did, unnoticed, for the
+ * whole life of the table.
+ *
+ * Reported rather than inferred: `publishMode` is resolved from an env var that has a
+ * default, so the only honest answer comes from the running deployment.
+ */
+export interface CronSweepConfig {
+  publishMode: 'live' | 'fixture'
+  publishEnabled: boolean
+}
+
 export interface CronSweepBody {
   ok: boolean
+  /** What rail this deployment is on. Counts-and-codes only, like the rest. */
+  config: CronSweepConfig
   dispatch: DispatchCounters | SweepError
   holds: HoldSweepReport | SweepError
   /** The polling stand-in for webhooks. Counters only, same as the others. */
@@ -27,6 +47,11 @@ export interface CronSweepRunners {
   runDispatch(): Promise<DispatchSweepReport>
   runHolds(): Promise<HoldSweepReport>
   runReconcile(): Promise<ReconcileReport>
+  /**
+   * Required, not optional. An optional field here would be omitted by exactly the
+   * caller that most needs it — the one that never thought about which rail it is on.
+   */
+  config: CronSweepConfig
   /** Receives the real error so the route can log it. Never reached by the response. */
   onError?(scope: SweepScope, error: unknown): void
 }
@@ -66,6 +91,9 @@ export async function runCronSweeps(runners: CronSweepRunners): Promise<CronSwee
     status: ok ? 200 : 500,
     body: {
       ok,
+      // Outside the ok/error split on purpose: a failing tick is when an operator most
+      // needs to know which rail it was on.
+      config: runners.config,
       dispatch: isError(dispatch) ? dispatch : stripDecisions(dispatch),
       holds,
       reconcile,
