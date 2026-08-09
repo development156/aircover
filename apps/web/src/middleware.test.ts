@@ -31,7 +31,42 @@ const PUBLIC_PATTERNS = [
   '/api/public/beta-apply',
   '/api/admin/devops/ingest',
   '/api/webhooks/clerk',
+  '/api/webhooks/cashfree',
   '/api/cron/sweeps',
+]
+
+/**
+ * Paths `config.matcher` must NOT match, so clerkMiddleware never runs on them.
+ *
+ * Being on `isPublicRoute` is not the same thing: a "public" route still executes
+ * clerkMiddleware, which still parses the request's `Authorization` header. `[LIVE
+ * 2026-08-09]` a bearer token of `aaa.bbb.ccc` — three dot-separated parts that are not
+ * base64url — makes Clerk throw where nothing catches it, and Vercel answers
+ * **500 MIDDLEWARE_INVOCATION_FAILED** on EVERY matched path, public ones included.
+ * Reproduced on /sign-in, /embed/beta, /api/public/beta-apply and all three below.
+ *
+ * These three authenticate themselves — CRON_SECRET, and an HMAC/Svix signature — and
+ * gain nothing from Clerk, so the honest fix is for Clerk not to see them at all.
+ */
+const CLERK_BYPASS_PATHS = ['/api/cron/sweeps', '/api/webhooks/cashfree', '/api/webhooks/clerk']
+
+/** Paths that MUST keep reaching clerkMiddleware. A bypass that widens is a hole. */
+const CLERK_MATCHED_PATHS = [
+  '/api/posts/abc123/publish',
+  '/api/admin/devops/ingest',
+  '/api/oauth/zernio/start',
+  '/api/oauth/zernio/return',
+  '/api/public/beta-apply',
+  '/api/debug/sentry',
+  '/api/cron/other',
+  '/api/webhooks/stripe',
+  '/admin',
+  '/admin/credits',
+  '/home',
+  '/wallet',
+  '/sign-in',
+  '/embed/beta',
+  '/',
 ]
 const ADMIN_PATTERNS = ['/admin(.*)', '/api/admin/(.*)']
 
@@ -69,9 +104,13 @@ describe('middleware routing contract', () => {
       expect(isPublicRoute(req(path))).toBe(true)
     })
 
-    it('does NOT blanket-expose /api/webhooks — only the exact Clerk path', () => {
-      expect(isPublicRoute(req('/api/webhooks/cashfree'))).toBe(false)
+    it('does NOT blanket-expose /api/webhooks — only the two exact paths', () => {
+      // This assertion used to read `cashfree → false` and PASSED while production had
+      // it public, because the drift guard below only checked one direction. Both
+      // webhooks are listed by exact path; the prefix itself is still not exposed.
       expect(isPublicRoute(req('/api/webhooks'))).toBe(false)
+      expect(isPublicRoute(req('/api/webhooks/stripe'))).toBe(false)
+      expect(isPublicRoute(req('/api/webhooks/clerk/extra'))).toBe(false)
     })
 
     it('leaves ordinary app routes protected', () => {
@@ -98,10 +137,90 @@ describe('middleware routing contract', () => {
     })
   })
 
+  /**
+   * ── 4 · WHAT CLERK NEVER SEES ────────────────────────────────────────────────
+   * `config.matcher` decides whether clerkMiddleware RUNS. `isPublicRoute` only decides
+   * what it does once it has. The distinction became load-bearing when a malformed
+   * bearer token was found to crash Clerk on every matched path (see CLERK_BYPASS_PATHS).
+   *
+   * The patterns are read out of the source and compiled as anchored RegExp, which is how
+   * Next applies them. Not a substitute for the live probe — Next's own compilation is not
+   * exercised here — but it turns a silently-widened bypass into a red test.
+   */
+  describe('4 · config.matcher keeps the self-authenticating routes away from Clerk', () => {
+    const matcherPatterns = async (): Promise<string[]> => {
+      const { readFile } = await import('node:fs/promises')
+      const source = await readFile(new URL('./middleware.ts', import.meta.url), 'utf8')
+      const block = source.slice(
+        source.indexOf('matcher: ['),
+        source.indexOf('],', source.indexOf('matcher: [')),
+      )
+      const patterns = [...block.matchAll(/'((?:[^'\\]|\\.)*)'/g)]
+        .map((m) => m[1])
+        .filter((p): p is string => p !== undefined)
+        // The source escapes the backslash for the JS string literal; the RegExp below
+        // needs the single backslash the running matcher actually sees.
+        .map((p) => p.replace(/\\\\/g, '\\'))
+      // A parse that silently found nothing would make every assertion below vacuous.
+      expect(patterns.length, 'no matcher patterns parsed out of middleware.ts').toBeGreaterThan(0)
+      return patterns
+    }
+
+    const matchesAny = (patterns: string[], path: string): boolean =>
+      patterns.some((p) => new RegExp(`^${p}$`).test(path))
+
+    it.each(CLERK_BYPASS_PATHS)(
+      '%s is not matched, so clerkMiddleware never runs',
+      async (path) => {
+        expect(matchesAny(await matcherPatterns(), path)).toBe(false)
+      },
+    )
+
+    it.each(CLERK_MATCHED_PATHS)('%s still reaches clerkMiddleware', async (path) => {
+      expect(matchesAny(await matcherPatterns(), path)).toBe(true)
+    })
+
+    it('does not bypass a longer path that merely starts with a bypassed one', async () => {
+      // `/api/cron/sweeps-v2` must NOT inherit the bypass. An unanchored lookahead would
+      // hand any future sibling an unauthenticated route — the standing-hole hazard
+      // middleware.ts's own comment block warns about, one layer down.
+      const patterns = await matcherPatterns()
+      for (const path of [
+        '/api/cron/sweeps-v2',
+        '/api/cron/sweepsx',
+        '/api/webhooks/cashfree-test',
+        '/api/webhooks/clerkx',
+      ]) {
+        expect(matchesAny(patterns, path), `${path} must stay behind Clerk`).toBe(true)
+      }
+    })
+
+    it('every bypassed path still appears on isPublicRoute', async () => {
+      // Belt and braces, and it survives the matcher being reverted: if the bypass is
+      // ever undone, these routes must still not hit auth.protect().
+      for (const path of CLERK_BYPASS_PATHS) {
+        expect(isPublicRoute(req(path)), `${path} must also be public`).toBe(true)
+      }
+    })
+  })
+
   describe('the source file still matches what this test pins', () => {
     it('declares exactly these public and admin patterns', async () => {
       const { readFile } = await import('node:fs/promises')
       const source = await readFile(new URL('./middleware.ts', import.meta.url), 'utf8')
+
+      // BOTH directions. The one-way check let `/api/webhooks/cashfree` be added to
+      // middleware.ts while this file asserted it was NOT public — and stay green,
+      // because nothing compared the source's list back against this one.
+      const declared = [
+        ...source
+          .slice(
+            source.indexOf('createRouteMatcher(['),
+            source.indexOf('])', source.indexOf('createRouteMatcher([')),
+          )
+          .matchAll(/'([^']+)'/g),
+      ].map((m) => m[1])
+      expect(new Set(declared)).toEqual(new Set(PUBLIC_PATTERNS))
 
       for (const pattern of PUBLIC_PATTERNS) {
         expect(source, `public route ${pattern} missing from middleware.ts`).toContain(

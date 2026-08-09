@@ -1,5 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server'
 
 import { provesOpsAdmin } from '@/lib/ops/gate-decision'
 import { cspFor } from '@/lib/security/csp'
@@ -87,7 +87,7 @@ function notFound(csp: string): NextResponse {
   return new NextResponse(null, { status: 404, headers: { 'Content-Security-Policy': csp } })
 }
 
-export default clerkMiddleware(
+const clerk = clerkMiddleware(
   async (auth, req) => {
     const csp = cspFor(req.nextUrl.pathname)
 
@@ -124,11 +124,102 @@ export default clerkMiddleware(
   { signInUrl: '/sign-in', signUpUrl: '/sign-up' },
 )
 
+/**
+ * clerkMiddleware, wrapped so a throw inside it is not a 500 for the whole site.
+ *
+ * ── WHY THIS EXISTS ──────────────────────────────────────────────────────────
+ * `[LIVE 2026-08-09]` `Authorization: Bearer aaa.bbb.ccc` — three dot-separated parts
+ * that are not base64url — throws inside Clerk's token decode and Vercel answers
+ * **500 MIDDLEWARE_INVOCATION_FAILED**. It reproduced on every matched path, including
+ * /sign-in and /embed/beta, from an unauthenticated request carrying one header.
+ *
+ * `config.matcher` below removes the self-authenticating routes from Clerk's path
+ * entirely, but /sign-in and /embed/beta MUST stay matched, so exclusion alone leaves the
+ * site crashable. This is the half that covers them.
+ *
+ * ── WHICH WAY IT FAILS ───────────────────────────────────────────────────────
+ * Not one direction for everything — the direction is the point:
+ *
+ *   public   → OPEN. These routes never depended on Clerk for authorisation; each
+ *              verifies its own credential in-route. A crashed /sign-in is a total
+ *              outage with no way back in, and failing it closed would be self-inflicted.
+ *   /admin   → 404, the same answer the gate gives a stranger (doc 13 §2). A crash must
+ *              not become the one response that confirms the console exists.
+ *   the rest → 503. We could not evaluate the session, so we cannot claim the caller is
+ *              anyone. NOT a redirect to /sign-in: this fires on a malformed credential,
+ *              and bouncing a signed-in user to a login page on a header they did not
+ *              knowingly send is a loop with no exit.
+ *
+ * Deliberately narrow: it catches a throw, not a 4xx. Clerk answering 401/404 normally
+ * never reaches here.
+ */
+export default async function middleware(
+  req: NextRequest,
+  event: NextFetchEvent,
+): Promise<NextResponse> {
+  try {
+    return (await clerk(req, event)) as NextResponse
+  } catch (error) {
+    const csp = cspFor(req.nextUrl.pathname)
+    // Not `reportServerError`: that helper is `server-only`, calls Sentry's `after()` and
+    // awaits a flush — none of which belong on the edge, and a throw from inside this
+    // catch would 500 exactly the request we are here to rescue. The pathname and the
+    // error's CLASS are logged and nothing else: the message can quote the malformed
+    // bearer token that caused it, and a token belongs in no log we control.
+    console.error(
+      '[middleware] clerk threw',
+      req.nextUrl.pathname,
+      error instanceof Error ? error.name : typeof error,
+    )
+
+    if (isPublicRoute(req)) {
+      const response = NextResponse.next()
+      response.headers.set('Content-Security-Policy', csp)
+      return response
+    }
+    if (isAdminRoute(req)) return notFound(csp)
+    return new NextResponse(null, {
+      status: 503,
+      headers: { 'Content-Security-Policy': csp, 'Retry-After': '5' },
+    })
+  }
+}
+
+// ── WHAT CLERK NEVER SEES, AND WHY THAT IS DIFFERENT FROM "PUBLIC" ───────────
+// `isPublicRoute` decides what clerkMiddleware DOES; this decides whether it RUNS at
+// all. Everything above is still executed for a public route, including Clerk's parse of
+// the request's `Authorization` header — and that parse is not total.
+//
+// `[LIVE 2026-08-09]` against production: a bearer token of `aaa.bbb.ccc` — three
+// dot-separated parts that are not valid base64url — passes Clerk's "is it JWT-shaped"
+// check and then throws inside the decode, where nothing catches it. Vercel answers
+// **HTTP 500 MIDDLEWARE_INVOCATION_FAILED** on EVERY matched path. Reproduced on
+// /sign-in, /embed/beta, /api/public/beta-apply and all three routes named below; a
+// 2-part token, a 4-part token and a well-formed 3-part token all answer 401 correctly.
+// One header, no credentials, any route. @clerk/nextjs 7.5.20 / @clerk/backend 3.11.7.
+//
+// The three routes below authenticate themselves — a constant-time CRON_SECRET compare,
+// a Cashfree HMAC, a Clerk/Svix signature — and take nothing from clerkMiddleware but
+// that failure mode. Excluding them here is the only bypass that works: the crash happens
+// while Clerk computes the request state, BEFORE our handler runs, so an early return
+// inside the callback would never be reached.
+//
+// This does NOT close the hole for /sign-in or /embed/beta, which must stay matched. The
+// try/catch around `clerk()` above is what covers those.
+//
+// Three rules for adding to this list, stricter than the public list's:
+//   · EXACT paths, `$`-anchored — `/api/cron/sweeps-v2` must not inherit the bypass;
+//   · the route must authenticate itself in its FIRST statement, since nothing else will;
+//   · it must be in `isPublicRoute` too, so reverting this block cannot silently start
+//     redirecting it to /sign-in.
+// Both patterns need the exclusion: the second one catches everything under /api on its
+// own, so excluding a path from the first alone does nothing. Next static-analyses these
+// at build time, so they must be literal strings — a shared const would be ignored.
 export const config = {
   matcher: [
     // Clerk-recommended shape: skip Next internals + static assets unless
     // referenced in search params. (Next 16 renames middleware → proxy; n/a on 15.)
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    '/(api|trpc)(.*)',
+    '/((?!api/cron/sweeps$|api/webhooks/cashfree$|api/webhooks/clerk$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/(?!api/cron/sweeps$|api/webhooks/cashfree$|api/webhooks/clerk$)(api|trpc)(.*)',
   ],
 }
