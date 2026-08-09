@@ -1188,6 +1188,45 @@
       "summary_plain": "The unit checks ran (4518 passed), but 245 tests did NOT run — this does not prove the suite passes.",
       "details": "=== TYPECHECK ===\n@sahoda/web:typecheck: $ tsc --noEmit\n\n Tasks:    8 successful, 8 total\nCached:    5 cached, 8 total\n  Time:    10.014s \n\n=== LINT ===\n Tasks:    8 successful, 8 total\nCached:    6 cached, 8 total\n  Time:    354ms \n\n=== TEST ===\n@sahoda/db:test:       Tests  95 passed | 202 skipped (297)\n@sahoda/publishing:test:  Test Files  12 passed (12)\n@sahoda/publishing:test:       Tests  179 passed (179)\n@sahoda/sites:test:  Test Files  52 passed (52)\n@sahoda/sites:test:       Tests  1555 passed (1555)\n@sahoda/billing:test:  Test Files  19 passed | 4 skipped (23)\n@sahoda/billing:test:       Tests  270 passed | 26 skipped (296)\n@sahoda/web:test:  Test Files  160 passed (160)\n@sahoda/web:test:       Tests  2266 passed | 1 skipped (2267)\n@sahoda/jobs:test:  Test Files  15 passed | 2 skipped (17)\n@sahoda/jobs:test:       Tests  153 passed | 16 skipped (169)\n Tasks:    14 successful, 14 total",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mslkysg0-51ec4a00",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-09T09:08:40.703Z",
+      "finished_at": "2026-08-09T09:08:40.703Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran and everything passed.",
+      "details": "=== TYPECHECK ===\n@sahoda/web:typecheck: $ tsc --noEmit\n\n Tasks:    8 successful, 8 total\nCached:    5 cached, 8 total\n  Time:    4.245s \n\n=== LINT ===\n Tasks:    8 successful, 8 total\nCached:    6 cached, 8 total\n  Time:    357ms \n\n=== TEST ===\n@sahoda/shared:test:  Test Files  8 passed (8)\n@sahoda/mesh:test:  Test Files  13 passed (13)\n@sahoda/db:test:  Test Files  4 passed | 12 skipped (16)\n@sahoda/sites:test:  Test Files  52 passed (52)\n@sahoda/billing:test:  Test Files  19 passed | 4 skipped (23)\n@sahoda/publishing:test:  Test Files  12 passed (12)\n@sahoda/web:test:  Test Files  160 passed (160)\n@sahoda/jobs:test:  Test Files  17 passed | 2 skipped (19)\n Tasks:    14 successful, 14 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mslkysg0-6c522063",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-09T09:08:40.703Z",
+      "finished_at": "2026-08-09T09:08:40.703Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran and everything passed.",
+      "details": "=== TYPECHECK ===\n@sahoda/web:typecheck: $ tsc --noEmit\n\n Tasks:    8 successful, 8 total\nCached:    5 cached, 8 total\n  Time:    4.245s \n\n=== LINT ===\n Tasks:    8 successful, 8 total\nCached:    6 cached, 8 total\n  Time:    357ms \n\n=== TEST ===\n@sahoda/shared:test:  Test Files  8 passed (8)\n@sahoda/mesh:test:  Test Files  13 passed (13)\n@sahoda/db:test:  Test Files  4 passed | 12 skipped (16)\n@sahoda/sites:test:  Test Files  52 passed (52)\n@sahoda/billing:test:  Test Files  19 passed | 4 skipped (23)\n@sahoda/publishing:test:  Test Files  12 passed (12)\n@sahoda/web:test:  Test Files  160 passed (160)\n@sahoda/jobs:test:  Test Files  17 passed | 2 skipped (19)\n Tasks:    14 successful, 14 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mslkysg0-599e9cc7",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-09T09:08:40.703Z",
+      "finished_at": "2026-08-09T09:08:40.703Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed.",
+      "details": "=== TYPECHECK ===\n@sahoda/web:typecheck: $ tsc --noEmit\n\n Tasks:    8 successful, 8 total\nCached:    5 cached, 8 total\n  Time:    4.245s \n\n=== LINT ===\n Tasks:    8 successful, 8 total\nCached:    6 cached, 8 total\n  Time:    357ms \n\n=== TEST ===\n@sahoda/shared:test:  Test Files  8 passed (8)\n@sahoda/mesh:test:  Test Files  13 passed (13)\n@sahoda/db:test:  Test Files  4 passed | 12 skipped (16)\n@sahoda/sites:test:  Test Files  52 passed (52)\n@sahoda/billing:test:  Test Files  19 passed | 4 skipped (23)\n@sahoda/publishing:test:  Test Files  12 passed (12)\n@sahoda/web:test:  Test Files  160 passed (160)\n@sahoda/jobs:test:  Test Files  17 passed | 2 skipped (19)\n Tasks:    14 successful, 14 total",
+      "duration_ms": null
     }
   ]
 }
