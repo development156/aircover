@@ -82,6 +82,9 @@ async function isActiveOpsAdmin(token: string | null): Promise<boolean> {
   }
 }
 
+/** Clerk's session cookie. The only token carrier a user cannot choose to stop sending. */
+const CLERK_SESSION_COOKIE = '__session'
+
 /** Doc 13 §2: non-admins get a plain 404, never a login upsell. */
 function notFound(csp: string): NextResponse {
   return new NextResponse(null, { status: 404, headers: { 'Content-Security-Policy': csp } })
@@ -140,15 +143,21 @@ const clerk = clerkMiddleware(
  * ── WHICH WAY IT FAILS ───────────────────────────────────────────────────────
  * Not one direction for everything — the direction is the point:
  *
- *   public   → OPEN. These routes never depended on Clerk for authorisation; each
- *              verifies its own credential in-route. A crashed /sign-in is a total
- *              outage with no way back in, and failing it closed would be self-inflicted.
- *   /admin   → 404, the same answer the gate gives a stranger (doc 13 §2). A crash must
- *              not become the one response that confirms the console exists.
- *   the rest → 503. We could not evaluate the session, so we cannot claim the caller is
- *              anyone. NOT a redirect to /sign-in: this fires on a malformed credential,
- *              and bouncing a signed-in user to a login page on a header they did not
- *              knowingly send is a loop with no exit.
+ *   public       → OPEN. These routes never depended on Clerk for authorisation; each
+ *                  verifies its own credential in-route. A crashed /sign-in is a total
+ *                  outage with no way back in, and failing it closed is self-inflicted.
+ *   /admin       → 404, the same answer the gate gives a stranger (doc 13 §2). A crash
+ *                  must not become the one response confirming the console exists.
+ *   bad COOKIE   → clear it and send them to /sign-in. A header is sent deliberately by
+ *                  a caller who can stop sending it; `__session` is carried automatically
+ *                  on every request, so a corrupted one wedges a real person out of every
+ *                  page with no way to act. `[LIVE]` confirmed: `Cookie:
+ *                  __session=aaa.bbb.ccc` on /home answered 503 before this branch.
+ *                  Expiring the cookie is what unwedges them — a bare redirect would
+ *                  carry the same cookie back and loop.
+ *   the rest     → 503. We could not evaluate the session, so we cannot claim the caller
+ *                  is anyone. Not a redirect: nothing about a malformed bearer header
+ *                  suggests a login page will help, and the caller can fix their request.
  *
  * Deliberately narrow: it catches a throw, not a 4xx. Clerk answering 401/404 normally
  * never reaches here.
@@ -178,6 +187,18 @@ export default async function middleware(
       return response
     }
     if (isAdminRoute(req)) return notFound(csp)
+
+    // A session cookie is carried automatically; a bearer header is not. Only the cookie
+    // can wedge someone who did nothing wrong, so only the cookie is worth clearing.
+    // Deliberately narrow: if the throw had another cause this signs out one request's
+    // worth of session, which the sign-in page immediately re-establishes.
+    if (req.cookies.has(CLERK_SESSION_COOKIE)) {
+      const signIn = NextResponse.redirect(new URL('/sign-in', req.url))
+      signIn.cookies.delete(CLERK_SESSION_COOKIE)
+      signIn.headers.set('Content-Security-Policy', csp)
+      return signIn
+    }
+
     return new NextResponse(null, {
       status: 503,
       headers: { 'Content-Security-Policy': csp, 'Retry-After': '5' },
