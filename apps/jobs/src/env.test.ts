@@ -164,3 +164,35 @@ describe('loadJobsEnv', () => {
     expect(message).toContain('SAHODA_PUBLISH_DISPATCH_MODE')
   })
 })
+
+/**
+ * A flag the build cannot see is a flag that does not exist.
+ *
+ * `publishMode` defaults to `fixture` and `createAdapterSelector` checks it BEFORE the
+ * Zernio rail, so fixture wins whatever the connection says. Turborepo strips any
+ * variable absent from the task's `env` list, so setting `SAHODA_PUBLISH_MODE=live` in
+ * the Vercel project while it is unlisted changes nothing at all — the default wins and
+ * the UI keeps reporting simulated posts as successful publishes.
+ *
+ * That was the state until 2026-08-09, and it was invisible precisely because the
+ * neighbouring `SAHODA_PUBLISH_ENABLED` IS listed: an operator flipping the switch they
+ * can see would have every reason to believe live publishing was on.
+ *
+ * The sweeps run from a Next.js route in apps/web, so `@sahoda/web#build` is the build
+ * that has to know about them — not `@sahoda/jobs`.
+ */
+describe('the publish mode can reach the build that runs it', () => {
+  it('lists SAHODA_PUBLISH_MODE in the @sahoda/web#build env allowlist', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const turbo = JSON.parse(
+      readFileSync(resolve(import.meta.dirname, '../../../turbo.json'), 'utf8'),
+    ) as { tasks: Record<string, { env?: string[] }> }
+
+    const allowed = turbo.tasks['@sahoda/web#build']?.env ?? []
+    expect(allowed).toContain('SAHODA_PUBLISH_MODE')
+    // The sibling that made the omission invisible. If this ever stops being listed,
+    // the two are inconsistent again in the other direction.
+    expect(allowed).toContain('SAHODA_PUBLISH_ENABLED')
+  })
+})
