@@ -135,13 +135,36 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
   const legOf = (post: ZernioPost | undefined): ZernioPlatformResult | undefined =>
     post?.platforms?.find((p) => p.platform === platform)
 
-  /** Poll until this channel's leg carries a URL, or fails, or we give up. */
+  /**
+   * Poll until this channel's leg carries a URL, or fails, or we give up.
+   *
+   * ── WHY THE URL ALONE IS NOT THE EXIT CONDITION ──────────────────────────────
+   * `platformPostUrl` and `platformPostId` are SIBLING fields on the same leg, and
+   * Zernio does not promise to fill them together. This loop used to stop on the URL
+   * and let the caller read the id off that same snapshot — so when the URL landed
+   * first, it returned on the very first check and the id, which is the analytics
+   * key, was read as absent and never asked for again. The result was a real,
+   * live post whose Performance panel could never resolve, with nothing downstream
+   * able to repair it: `listUnresolvedPublishes` only chases publishes that did NOT
+   * succeed.
+   *
+   * So an absent id now buys exactly ONE more read. The URL still terminates the
+   * loop — it is what makes the post a success — and the extra read is bounded by
+   * the same attempt budget. A Zernio that never issues an id costs one extra GET
+   * and still returns the URL; it must never turn a live post into STILL_PROCESSING.
+   *
+   * `platformIdOf` rather than a truthiness check, deliberately: a 24-hex provider id
+   * is NOT an id for this purpose, so a leg carrying one is worth re-reading too.
+   */
   const waitForUrl = async (initial: ZernioPost): Promise<ZernioPost> => {
     let current = initial
+    let rereadForId = false
     for (let i = 0; i < attempts; i += 1) {
       const leg = legOf(current)
-      if (leg?.platformPostUrl) return current
-      if (leg?.status === 'failed') return current
+      if (leg?.platformPostUrl) {
+        if (platformIdOf(leg) !== null || rereadForId) return current
+        rereadForId = true
+      } else if (leg?.status === 'failed') return current
       await sleep(intervalMs)
       try {
         current = await deps.client.getPost(current._id)

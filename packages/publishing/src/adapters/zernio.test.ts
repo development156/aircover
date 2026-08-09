@@ -65,6 +65,33 @@ const adapterFor = (post: ZernioPost) =>
     now: () => FIXED_NOW,
   })
 
+/**
+ * A client whose `getPost` answers with a LATER state than `createPost` did, and
+ * counts how many times it was asked.
+ *
+ * `stubClient` cannot express this — it hands back one frozen post for both calls, so
+ * a re-read is indistinguishable from no re-read. That is exactly the gap the tests
+ * below are about.
+ */
+function twoPhaseClient(
+  created: ZernioPost,
+  settled: ZernioPost,
+): { client: ZernioClient; reads: () => number } {
+  let reads = 0
+  const base = stubClient(created)
+  return {
+    client: {
+      ...base,
+      createPost: async () => ({ post: created }),
+      getPost: async () => {
+        reads += 1
+        return settled
+      },
+    },
+    reads: () => reads,
+  }
+}
+
 describe('Zernio adapter — platformPostId is the PLATFORM id, never Zernio ours', () => {
   it("returns the platform's own id when the leg carries one", async () => {
     const result = await adapterFor(
@@ -102,5 +129,80 @@ describe('Zernio adapter — platformPostId is the PLATFORM id, never Zernio our
     ).publish(igRequest())
 
     expect(result.platformPostId === null || !ZERNIO_ID_RE.test(result.platformPostId)).toBe(true)
+  })
+})
+
+/**
+ * The exit condition of the settle loop.
+ *
+ * `waitForUrl` used to stop the moment the leg carried `platformPostUrl` and then read
+ * `platformPostId` off that same snapshot. Those are SIBLING fields: when Zernio fills
+ * the URL first, the loop returns on the very first check and the id — the analytics
+ * key — is read as absent and never asked for again. The post is a real success with a
+ * permanently unresolvable Performance panel.
+ *
+ * The URL still terminates the loop; what changed is that an absent id buys one more
+ * read before we accept it. Bounded by the same attempt budget, so a Zernio that never
+ * issues an id costs one extra GET and still returns the URL — never a stall.
+ */
+describe('Zernio adapter — the settle loop re-reads for the platform id', () => {
+  it('re-reads once when the create response carries a URL but no platform id', async () => {
+    const { client, reads } = twoPhaseClient(
+      igPost({ platformPostUrl: PERMALINK }),
+      igPost({ platformPostUrl: PERMALINK, platformPostId: IG_MEDIA_ID }),
+    )
+    const adapter = createZernioAdapter('instagram', {
+      client,
+      poll: { attempts: 4, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    })
+
+    const result = await adapter.publish(igRequest())
+
+    expect(result.platformPostId).toBe(IG_MEDIA_ID)
+    expect(result.permalink).toBe(PERMALINK)
+    expect(reads()).toBeGreaterThanOrEqual(1)
+  })
+
+  it('does not re-read when the create response already carries the platform id', async () => {
+    const { client, reads } = twoPhaseClient(
+      igPost({ platformPostUrl: PERMALINK, platformPostId: IG_MEDIA_ID }),
+      igPost({ platformPostUrl: PERMALINK, platformPostId: IG_MEDIA_ID }),
+    )
+    const adapter = createZernioAdapter('instagram', {
+      client,
+      poll: { attempts: 4, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    })
+
+    const result = await adapter.publish(igRequest())
+
+    expect(result.platformPostId).toBe(IG_MEDIA_ID)
+    // The happy path must not pay for the fix.
+    expect(reads()).toBe(0)
+  })
+
+  it('still succeeds with a null id when the re-read never produces one', async () => {
+    const { client, reads } = twoPhaseClient(
+      igPost({ platformPostUrl: PERMALINK }),
+      igPost({ platformPostUrl: PERMALINK }),
+    )
+    const adapter = createZernioAdapter('instagram', {
+      client,
+      poll: { attempts: 3, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    })
+
+    const result = await adapter.publish(igRequest())
+
+    // A URL and no id is still a real publish — it must not become STILL_PROCESSING.
+    expect(result.permalink).toBe(PERMALINK)
+    expect(result.platformPostId).toBeNull()
+    expect(result.mode).toBe('live')
+    // Bounded: one extra read, not the whole attempt budget.
+    expect(reads()).toBe(1)
   })
 })
