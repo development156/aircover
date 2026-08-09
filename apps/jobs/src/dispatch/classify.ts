@@ -75,14 +75,23 @@ export type DispatchDecision =
 const PENDING_STATES: readonly VariantPublishStatus[] = ['pending', 'scheduled']
 
 /**
- * Whether this release can actually post to the variant's channel. Instagram is
- * `publishable: false` in CONSTRAINTS — it exists for caption rules, not posting — and
- * production carries instagram variants sitting `pending` right now.
+ * Whether this release can actually post to the variant's channel.
  *
- * Such a variant is excluded from BOTH ends: it is never dispatched, because that buys a
- * guaranteed CHANNEL_NOT_PUBLISHABLE failure and nothing else, and it never counts against
- * a post reaching `published`, because otherwise every post carrying one becomes a
- * permanent partial and is held forever.
+ * The MECHANISM: a variant on an unpublishable channel is excluded from BOTH ends — never
+ * dispatched, because that buys a guaranteed CHANNEL_NOT_PUBLISHABLE and nothing else, and
+ * never counted against a post reaching `published`, because otherwise every post carrying
+ * one becomes a permanent partial and is held forever.
+ *
+ * NO CHANNEL EXERCISES IT TODAY. All four in CONSTRAINTS are `publishable: true`, so this
+ * predicate is currently always true for a known channel. This comment used to say
+ * instagram was `publishable: false`; that stopped being true on 2026-08-04 when instagram
+ * was routed through the Zernio rail, and `classify.test.ts` has pinned the opposite
+ * behaviour since. The stale version outlived the fact by five days and was still being
+ * read as a live safety argument — it is not one.
+ *
+ * The mechanism is kept because a future channel can land in CONSTRAINTS before its adapter
+ * ships. Worth knowing when that happens: this branch has no channel covering it, and an
+ * untested branch is how the next one breaks.
  */
 const canAttempt = (v: CandidateVariant): boolean => CONSTRAINTS[v.channel]?.publishable === true
 
