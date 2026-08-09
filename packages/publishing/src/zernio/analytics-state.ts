@@ -77,6 +77,10 @@ export type MetricAvailability =
       kind: 'unavailable'
       /**
        * `not-published`  — nothing has gone out on this channel.
+       * `simulated`      — the publish ran in fixture mode. Nothing reached the
+       *                    platform, so there are no metrics and never will be. Kept
+       *                    apart from `no-platform-id` because that one blames the
+       *                    platform, and in this case the platform was never asked.
        * `no-platform-id` — published, but the platform never issued an id, so there
        *                    is no analytics key to ask with. No request is made.
        * `not-connected`  — no Zernio account for this channel in this workspace.
@@ -89,6 +93,7 @@ export type MetricAvailability =
        */
       reason:
         | 'not-published'
+        | 'simulated'
         | 'no-platform-id'
         | 'not-connected'
         | 'reconnect'
@@ -133,6 +138,14 @@ export interface ClassifyInput {
   platformPostId: string | null
   /** This channel's publish status. Only `published` can have metrics. */
   published: boolean
+  /**
+   * The publish ran in fixture mode — nothing reached the platform.
+   *
+   * Derived from the `fixture://` permalink rather than from a null id: the id is
+   * erased on the way out of the database, so by the time it reaches here "no id" and
+   * "simulated" look identical, and only the permalink still carries the difference.
+   */
+  simulated?: boolean
   /** When this channel went out, ISO-8601. Null when unknown. */
   publishedAt: string | null
   now: Date
@@ -148,6 +161,8 @@ export interface ClassifyInput {
  * arbitrary — it runs from "we never asked" down to "we asked and got an answer":
  *
  *   1. not published      — nothing exists to measure.
+ *   1a. simulated         — a fixture run. Nothing reached the platform, so there is
+ *                           nothing to measure and no platform to blame for it.
  *   2. no platform id     — nothing to ask WITH. No request is issued at all.
  *   3. no result          — we asked and could not read the answer.
  *   4. orphaned           — BEFORE 202 on purpose. A post that is both orphaned and
@@ -162,9 +177,12 @@ export interface ClassifyInput {
  * absent `analytics` object or a null `lastUpdated`.
  */
 export function classifyPostMetrics(input: ClassifyInput): MetricAvailability {
-  const { result, platformPostId, published, publishedAt, now } = input
+  const { result, platformPostId, published, publishedAt, now, simulated } = input
 
   if (!published) return { kind: 'unavailable', reason: 'not-published' }
+  // Before the id check, deliberately: a fixture publish has no real id either, and
+  // falling through to `no-platform-id` would blame a platform that was never asked.
+  if (simulated) return { kind: 'unavailable', reason: 'simulated' }
   if (!platformPostId) return { kind: 'unavailable', reason: 'no-platform-id' }
   if (!result) return { kind: 'unavailable', reason: 'unreadable' }
 

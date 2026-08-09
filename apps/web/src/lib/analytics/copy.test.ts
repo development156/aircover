@@ -15,6 +15,7 @@ const EVERY_STATE: MetricAvailability[] = [
   { kind: 'pending', reason: 'never-measured', availableAfter: null },
   { kind: 'unresolved', message: null },
   { kind: 'unavailable', reason: 'not-published' },
+  { kind: 'unavailable', reason: 'simulated' },
   { kind: 'unavailable', reason: 'no-platform-id' },
   { kind: 'unavailable', reason: 'not-connected' },
   { kind: 'unavailable', reason: 'reconnect' },
@@ -141,5 +142,38 @@ describe('metricValue', () => {
 
   it('groups digits so a big number stays readable', () => {
     expect(metricValue(1234567)).toMatch(/[\d,]+/)
+  })
+})
+
+/**
+ * A simulated run must name itself, and must not blame the platform.
+ *
+ * This is the last mile of the 2026-08-09 finding: every published variant in
+ * production was a fixture, and the panel told the customer "Instagram didn't return a
+ * post id" — a sentence about a platform that had never been contacted. The customer's
+ * reasonable conclusion is that Instagram is broken. The honest one is that nothing was
+ * published.
+ */
+describe('a simulated publish is never mistaken for a live one', () => {
+  const copy = metricCopy({ kind: 'unavailable', reason: 'simulated' }, 'instagram')
+
+  it('says the run was simulated', () => {
+    expect(`${copy.headline} ${copy.detail ?? ''}`.toLowerCase()).toContain('simulated')
+  })
+
+  it('does not blame the channel for failing to return anything', () => {
+    const text = `${copy.headline} ${copy.detail ?? ''}`
+    expect(text).not.toMatch(/didn.t return/i)
+    expect(text).not.toMatch(/can.t be resolved/i)
+  })
+
+  it('reads as blocked — it will never resolve on its own', () => {
+    expect(copy.tone).toBe('blocked')
+  })
+
+  it('is distinct from the no-platform-id copy it used to borrow', () => {
+    const idless = metricCopy({ kind: 'unavailable', reason: 'no-platform-id' }, 'instagram')
+    expect(copy.headline).not.toBe(idless.headline)
+    expect(copy.detail).not.toBe(idless.detail)
   })
 })

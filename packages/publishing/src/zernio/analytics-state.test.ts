@@ -293,3 +293,35 @@ describe('the platform states its own delay, and it wins', () => {
     expect(INSTAGRAM_INSIGHTS_LAG_HOURS).toBe(48)
   })
 })
+
+/**
+ * A simulated run must never be reported as a platform failure.
+ *
+ * Fixture publishes are indistinguishable from live ones in `publish_status`: both are
+ * `published`. Until 2026-08-09 the web read path erased a fixture's id to null before
+ * this classifier ever saw it, so a simulated post fell through to `no-platform-id` and
+ * the panel told the customer "Instagram didn't return a post id" — blaming a platform
+ * that was never contacted. `simulated` is checked BEFORE the id, because a fixture with
+ * no id is simulated first and idless second.
+ */
+describe('a simulated publish says so', () => {
+  it('reports simulated rather than no-platform-id when the id was erased', () => {
+    const state = classifyPostMetrics(input({ simulated: true, platformPostId: null }))
+    expect(state).toEqual({ kind: 'unavailable', reason: 'simulated' })
+  })
+
+  it('reports simulated even when a fixture id is carried through', () => {
+    const state = classifyPostMetrics(input({ simulated: true, platformPostId: 'fixture-abc' }))
+    expect(state).toEqual({ kind: 'unavailable', reason: 'simulated' })
+  })
+
+  it('still reports not-published first — nothing went out at all, simulated or not', () => {
+    const state = classifyPostMetrics(input({ simulated: true, published: false }))
+    expect(state).toEqual({ kind: 'unavailable', reason: 'not-published' })
+  })
+
+  it('leaves a live publish untouched', () => {
+    const state = classifyPostMetrics(input({ simulated: false }))
+    expect(state).not.toEqual({ kind: 'unavailable', reason: 'simulated' })
+  })
+})

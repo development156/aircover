@@ -108,6 +108,21 @@ export function metricCopy(state: MetricAvailability, channel: Channel): MetricC
       switch (state.reason) {
         case 'not-published':
           return { headline: 'Not published', detail: null, tone: 'none' }
+        /**
+         * Says what happened instead of what is missing.
+         *
+         * `no-platform-id` below is the sentence this state used to borrow, and it
+         * blames the channel: "Instagram didn't return a post id." For a fixture run
+         * that is false in the way that matters — Instagram was never asked, so a
+         * customer reading it concludes the integration is broken when in fact nothing
+         * was ever sent. The channel is not named here at all, deliberately.
+         */
+        case 'simulated':
+          return {
+            headline: 'Simulated run',
+            detail: 'This post was published in test mode, so it has no real metrics.',
+            tone: 'blocked',
+          }
         case 'no-platform-id':
           return {
             headline: 'Can’t be resolved',

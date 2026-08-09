@@ -51,6 +51,8 @@ const row = (over: Partial<VariantStatusRow> = {}): VariantStatusRow => ({
   status: 'published',
   permalink: 'https://instagram.com/p/abc',
   platformPostId: '18104441855596739',
+  // A real publish by default — a fixture is the exception a test must ask for.
+  simulated: false,
   errorMessage: null,
   errorCode: null,
   retryable: false,

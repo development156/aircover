@@ -153,6 +153,9 @@ export async function listPostMetrics(
       result: null,
       platformPostId: row.platformPostId,
       published: row.status === 'published',
+      // Without this a fixture arrives as a published row with a null id, which reads
+      // as "the platform gave us nothing" rather than "we never asked the platform".
+      simulated: row.simulated,
       publishedAt: null,
       now,
     })

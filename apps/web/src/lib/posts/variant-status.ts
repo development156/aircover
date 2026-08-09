@@ -26,6 +26,17 @@ export interface VariantStatusRow {
    * analytics call is possible — which the metric state reports as such, not as zero.
    */
   platformPostId: string | null
+  /**
+   * The publish ran in fixture mode — nothing reached the platform.
+   *
+   * Carried SEPARATELY from `platformPostId` because erasing the id destroys the
+   * reason. Downstream, a fixture and a live publish whose id never arrived are the
+   * same null, and the metrics panel reported both as "the platform didn't return a
+   * post id" — a sentence that blames a platform which, for a fixture, was never asked.
+   *
+   * Read off the `fixture://` permalink, which is the only field that still knows.
+   */
+  simulated: boolean
   /** The adapter's own message, when the last attempt failed. */
   errorMessage: string | null
   errorCode: string | null
@@ -60,7 +71,11 @@ const RETRYABLE: ReadonlySet<VariantPublishStatus> = new Set<VariantPublishStatu
 
 export function variantStatusRow(variant: PostVariant): VariantStatusRow {
   const { code, message } = readError(variant.last_error)
+  // The one field that still distinguishes a simulated run from a live one. Computed
+  // once, before the id is erased, because afterwards the difference is gone.
+  const simulated = variant.permalink?.startsWith('fixture://') === true
   return {
+    simulated,
     channel: variant.channel,
     status: variant.publish_status,
     // A fixture permalink is a simulation marker, not a destination — the same
