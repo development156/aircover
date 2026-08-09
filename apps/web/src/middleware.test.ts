@@ -155,7 +155,15 @@ describe('middleware routing contract', () => {
         source.indexOf('matcher: ['),
         source.indexOf('],', source.indexOf('matcher: [')),
       )
-      const patterns = [...block.matchAll(/'((?:[^'\\]|\\.)*)'/g)]
+      // Comment lines are stripped BEFORE the quotes are read. The block documents the
+      // rejected shape by quoting it, and a scraper that cannot tell an example from a
+      // live pattern reports the example as a matcher — which it did, and this test went
+      // red against a correct source until the strip was added.
+      const code = block
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('//'))
+        .join('\n')
+      const patterns = [...code.matchAll(/'((?:[^'\\]|\\.)*)'/g)]
         .map((m) => m[1])
         .filter((p): p is string => p !== undefined)
         // The source escapes the backslash for the JS string literal; the RegExp below

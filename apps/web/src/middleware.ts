@@ -220,6 +220,11 @@ export const config = {
     // Clerk-recommended shape: skip Next internals + static assets unless
     // referenced in search params. (Next 16 renames middleware → proxy; n/a on 15.)
     '/((?!api/cron/sweeps$|api/webhooks/cashfree$|api/webhooks/clerk$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    '/(?!api/cron/sweeps$|api/webhooks/cashfree$|api/webhooks/clerk$)(api|trpc)(.*)',
+    // Shaped as `/(…)` — ONE group holding the whole expression — because that is the
+    // only place Next accepts a raw regex. `'/(?!…)(api|trpc)(.*)'` reads to
+    // path-to-regexp as a group opening with invalid content and fails the BUILD with
+    // `Error parsing … invalid-route-source`. Loud and before deploy, which is the right
+    // direction for this file, but it is why the lookahead lives inside the parentheses.
+    '/((?!api/cron/sweeps$|api/webhooks/cashfree$|api/webhooks/clerk$)(?:api|trpc).*)',
   ],
 }
