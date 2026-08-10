@@ -85,6 +85,13 @@ export interface DecideInput {
    * page is not evidence of an empty inbox.
    */
   hasMore?: boolean
+  /**
+   * False for the two account-scoped reads (one thread, one post's comments). They ask
+   * a single already-resolved account and carry no per-account `meta`, so the
+   * "could not confirm every account answered" branch does not apply to them — it
+   * rendered a warning banner on every successful read until this existed.
+   */
+  fanOut?: boolean
 }
 
 /**
@@ -99,6 +106,7 @@ export function decideSurface({
   failure,
   result,
   hasMore,
+  fanOut,
 }: DecideInput): SurfaceDecision {
   const spec = INBOX_SURFACES[surface]
 
@@ -132,6 +140,7 @@ export function decideSurface({
     surface: spec,
     connectedAccounts,
     hasMore,
+    fanOut,
   })
   return { state, showList: state.showList }
 }

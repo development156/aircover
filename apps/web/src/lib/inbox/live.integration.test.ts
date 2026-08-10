@@ -94,6 +94,20 @@ describe.skipIf(!LIVE)('the inbox read path against the live Zernio API', () => 
     })
     // A definite answer either way. `unknown` here is the regression.
     expect(affordance.state).not.toBe('unknown')
+
+    // And what the PAGE says about that read. `/messages` carries no `ZernioInboxMeta`
+    // and never will — there is no fan-out on a single-account read — so without
+    // `fanOut: false` this fell into the "could not confirm every account answered"
+    // branch and `SurfaceBanner` rendered a live warning over a read that succeeded.
+    const decision = classifyInboxResult({
+      rows: thread.messages.length,
+      meta: undefined,
+      surface: INBOX_SURFACES.thread,
+      connectedAccounts: 1,
+      fanOut: false,
+    })
+    expect(decision.state).toBe('ok')
+    expect(decision.headline).not.toMatch(/could not confirm/i)
   })
 
   it('shows only comment-carrying posts and never prints Zernio’s account count', async () => {
@@ -123,6 +137,18 @@ describe.skipIf(!LIVE)('the inbox read path against the live Zernio API', () => 
     expect(page.pagination.nextCursor).toBeNull()
     expect(typeof page.pagination.hasMore).toBe('boolean')
     expect(page.comments.length).toBeGreaterThan(0)
+
+    // Same single-account rule as the thread: this endpoint's `meta` is
+    // {platform, postId, accountId, lastUpdated} and carries no `accountsQueried`.
+    const decision = classifyInboxResult({
+      rows: page.comments.length,
+      meta: undefined,
+      surface: INBOX_SURFACES.comments,
+      connectedAccounts: 1,
+      fanOut: false,
+    })
+    expect(decision.state).toBe('ok')
+    expect(decision.headline).not.toMatch(/could not confirm/i)
   })
 
   it('never claims "no reviews" for a shop it has not asked about', async () => {

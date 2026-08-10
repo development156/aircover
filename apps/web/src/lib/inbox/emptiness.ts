@@ -111,6 +111,25 @@ export interface ClassifyInput {
    * from that is precisely the measurement-we-never-took this module refuses to make.
    */
   hasMore?: boolean
+  /**
+   * Did this read fan out across the workspace's accounts?
+   *
+   * True for the three profile-scoped lists, which ask every connected account and
+   * report per-account health in `meta`. **False** for the two account-scoped reads —
+   * one thread, one post's comments — which ask exactly one account, already resolved
+   * through `accountByIdForWorkspace`.
+   *
+   * The distinction is not cosmetic. `[LIVE 2026-08-10]` neither account-scoped endpoint
+   * sends `ZernioInboxMeta` at all, so without this every successful thread read fell
+   * into the `!meta` branch and rendered "Sahoda could not confirm this view is
+   * complete" — a warning banner, on a read that fully succeeded, on the two surfaces
+   * holding the only real data we have. "We cannot confirm every account answered" is
+   * meaningless where exactly one account was asked and it answered.
+   *
+   * A missing `meta` on a fan-out list is still genuinely unconfirmable. The bug was
+   * applying that doubt to a read that has nothing to be doubtful about.
+   */
+  fanOut?: boolean
 }
 
 const projectFailures = (meta: ZernioInboxMeta | undefined): FailedAccountSummary[] =>
@@ -201,19 +220,44 @@ export function classifyInboxResult({
   surface,
   connectedAccounts,
   hasMore = false,
+  fanOut = true,
 }: ClassifyInput): InboxEmptiness {
   const failed = projectFailures(meta)
 
-  if (!meta) {
-    return {
-      state: 'unknown',
-      showList: rows > 0,
-      headline: `Sahoda could not confirm this ${surface.noun} view is complete`,
-      body: `The response carried no per-account status, so we cannot tell whether every connected account answered. Refresh to try again.`,
-      failed,
+  // ── EVERY BRANCH BELOW READS `meta`, SO EVERY ONE IS FAN-OUT ONLY ──────────
+  // A single-account read carries no per-account status because there are no other
+  // accounts to have a status. It falls straight through to the row-count branches,
+  // which is the only question that can be asked of it.
+  if (fanOut) {
+    if (!meta) {
+      return {
+        state: 'unknown',
+        showList: rows > 0,
+        headline: `Sahoda could not confirm this ${surface.noun} view is complete`,
+        body: `The response carried no per-account status, so we cannot tell whether every connected account answered. Refresh to try again.`,
+        failed,
+      }
     }
+    return classifyFanOut({ rows, meta, surface, connectedAccounts, hasMore, failed })
   }
 
+  return classifyRows({ rows, surface, hasMore, failed })
+}
+
+interface FanOutInput extends Required<Pick<ClassifyInput, 'rows' | 'surface' | 'connectedAccounts'>> {
+  meta: ZernioInboxMeta
+  hasMore: boolean
+  failed: FailedAccountSummary[]
+}
+
+function classifyFanOut({
+  rows,
+  meta,
+  surface,
+  connectedAccounts,
+  hasMore,
+  failed,
+}: FanOutInput): InboxEmptiness {
   if (meta.accountsQueried === 0) {
     // ── THE DIVERGENCE THAT IS NOT A ZERO ────────────────────────────────────
     // We hold at least one connection Zernio could be asked about, and Zernio asked
@@ -254,6 +298,27 @@ export function classifyInboxResult({
     }
   }
 
+  return classifyRows({ rows, surface, hasMore, failed })
+}
+
+/**
+ * What the row count alone says, once every question about WHO answered is settled.
+ *
+ * Shared by both paths deliberately: a fan-out list that heard from everyone and a
+ * single-account read that heard from its one account are in the same position, and
+ * two copies of these three sentences would drift.
+ */
+function classifyRows({
+  rows,
+  surface,
+  hasMore,
+  failed,
+}: {
+  rows: number
+  surface: InboxSurface
+  hasMore: boolean
+  failed: FailedAccountSummary[]
+}): InboxEmptiness {
   if (rows === 0 && hasMore) {
     // Nothing on THIS page and Zernio says there is more. "None yet" would be a
     // statement about the customer drawn from a page we chose not to show.
@@ -271,7 +336,7 @@ export function classifyInboxResult({
       state: 'empty',
       showList: false,
       headline: `No ${surface.noun} yet`,
-      body: `Every connected account answered, and there is nothing waiting. New ${surface.noun} land here automatically.`,
+      body: `Everything Sahoda asked answered, and there is nothing waiting. New ${surface.noun} land here automatically.`,
       failed,
     }
   }
@@ -280,7 +345,7 @@ export function classifyInboxResult({
     state: 'ok',
     showList: true,
     headline: `Showing your ${surface.noun}`,
-    body: `Every connected account answered.`,
+    body: `Everything Sahoda asked answered.`,
     failed,
   }
 }

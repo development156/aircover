@@ -370,6 +370,7 @@ export async function readThread(
         surface: 'thread',
         connectedAccounts,
         result: { rows: page.messages.length, meta: undefined },
+        fanOut: false,
       }),
       nextCursor: page.pagination.nextCursor,
     }
@@ -417,6 +418,7 @@ export async function readPostComments(
         surface: 'comments',
         connectedAccounts,
         result: { rows: page.comments.length, meta: undefined },
+        fanOut: false,
       }),
       nextCursor: page.pagination.nextCursor,
     }

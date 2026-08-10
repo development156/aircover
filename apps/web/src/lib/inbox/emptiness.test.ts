@@ -212,3 +212,63 @@ describe('the classifier is not a reviews special case', () => {
     expect(JSON.stringify(r)).not.toMatch(/Bearer|sk-live/)
   })
 })
+
+describe('a single-account read has no fan-out to confirm', () => {
+  /**
+   * `[LIVE 2026-08-10]` neither account-scoped endpoint sends `ZernioInboxMeta`:
+   * `/inbox/conversations/{id}/messages` sends no `meta` at all, and
+   * `/inbox/comments/{postId}` sends `{platform, postId, accountId, lastUpdated}`.
+   * Neither will ever carry `accountsQueried`, because there is no fan-out to report.
+   *
+   * Absent this distinction the `!meta` branch fired on every successful thread and
+   * drill-down read, and `SurfaceBanner` renders `unknown` — so both pages carried a
+   * live warning that Sahoda "could not confirm this view is complete" about a read
+   * that fully succeeded. Same false-claim class as an empty list reported as "none":
+   * a statement about our own uncertainty that we had no basis for.
+   */
+  const thread = INBOX_SURFACES.thread
+
+  it('does not claim a successful thread read might be incomplete', () => {
+    const r = classifyInboxResult({
+      rows: 2,
+      meta: undefined,
+      surface: thread,
+      connectedAccounts: 1,
+      fanOut: false,
+    })
+    expect(r.state).toBe('ok')
+    expect(r.showList).toBe(true)
+    expect(r.headline).not.toMatch(/could not confirm/i)
+  })
+
+  it('reports an genuinely empty thread as empty, not as unconfirmable', () => {
+    const r = classifyInboxResult({
+      rows: 0,
+      meta: undefined,
+      surface: thread,
+      connectedAccounts: 1,
+      fanOut: false,
+    })
+    expect(r.state).toBe('empty')
+  })
+
+  it('still says "cannot confirm" when a FAN-OUT list loses its meta', () => {
+    // The branch is right for the surface it was written for; it just did not belong
+    // on a read that asks exactly one account.
+    expect(classify({ meta: undefined, rows: 3 }).state).toBe('unknown')
+  })
+
+  it('never renders a connect-an-account prompt for a thread that resolved', () => {
+    // `never_connected` on a drill-down would tell the user to connect the account
+    // whose thread they are currently reading.
+    const r = classifyInboxResult({
+      rows: 0,
+      meta: undefined,
+      surface: thread,
+      connectedAccounts: 0,
+      fanOut: false,
+    })
+    expect(r.state).not.toBe('never_connected')
+    expect(r.state).not.toBe('unresolved')
+  })
+})
