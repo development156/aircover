@@ -82,7 +82,15 @@ export function PublishNow({
   const [error, setError] = useState<string | null>(null)
   const [published, setPublished] = useState<Published | null>(null)
 
-  const onRail = channels.filter((channel) => LIVE_RAIL.has(channel))
+  // DISTINCT first. `post.channels` is a `text[]` off the row, not a set, and the
+  // editor hands it over untouched — so a repeat is reachable here. BOTH branches of
+  // the split below read this list, and only one of them was defended: the warning
+  // goes through `unconnectedFrom`, which deduplicates, while `live` did not. A
+  // repeated CONNECTED channel therefore rendered two identical Publish buttons
+  // under one React key ("Encountered two children with the same key"). Deduplicating
+  // the shared input closes both branches at once; patching `live` alone would leave
+  // the same defect one refactor from returning.
+  const onRail = [...new Set(channels)].filter((channel) => LIVE_RAIL.has(channel))
   // Split rather than filtered: the unconnected ones still need saying out loud.
   // `unconnectedFrom` is shared with the schedule picker, which says the same fact
   // in different words at a different moment — one rule, two sentences.
