@@ -1,0 +1,40 @@
+{
+  "_recorded": {
+    "WARNING": "CAPTURED FROM THE LIVE API — DO NOT HAND-EDIT. See fixtures/zernio/README.md.",
+    "endpoint": "GET /analytics/instagram/account-insights",
+    "query": "accountId=6a75caf7d0fe733d1afcc1f4&since=2026-07-11&until=2026-08-10",
+    "capturedAt": "2026-08-10T09:24:00Z",
+    "account": "testingg53 (Instagram, Zernio account 6a75caf7d0fe733d1afcc1f4)",
+    "redaction": "cdninstagram.com media URLs replaced with \"[redacted at capture — signed CDN URL]\" — they carry expiring signed tokens. No other field was altered.",
+    "note": "Every metric is wrapped as { total: n }, never a bare number, and the keys are `views`/`total_interactions` — not the `impressions`/`profile_views` this app used to ask for. metricType=time_series is REFUSED here with HTTP 400 for this metric set."
+  },
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "success": true,
+    "accountId": "6a75caf7d0fe733d1afcc1f4",
+    "platform": "instagram",
+    "dateRange": {
+      "since": "2026-07-11",
+      "until": "2026-08-10"
+    },
+    "metricType": "total_value",
+    "metrics": {
+      "reach": {
+        "total": 1
+      },
+      "views": {
+        "total": 7
+      },
+      "accounts_engaged": {
+        "total": 1
+      },
+      "total_interactions": {
+        "total": 2
+      }
+    },
+    "dataDelay": "Data may be delayed up to 48 hours"
+  }
+}
