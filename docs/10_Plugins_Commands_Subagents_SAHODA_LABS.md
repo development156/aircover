@@ -39,7 +39,7 @@ Review `git diff origin/main` for: RLS on new tables + tests · withCredits on e
 ---
 description: Gate + commit + PR for the current worktree.
 ---
-Run `pnpm turbo typecheck lint test --filter=...[origin/main]`; if UI changed run the smoke tag. Fix or report failures. Then follow the sahoda-ship skill checklist, create a conventional commit, push, open a PR with what/why/how-tested, and print the PR URL. Ask before `git push` per permissions.
+Run `pnpm turbo typecheck lint test --filter=...[origin/main] && pnpm format:check`; if UI changed run the smoke tag. `format:check` is part of the gate and not optional: it is a ROOT script, outside the turbo pipeline, so a tree that is not prettier-clean fails no turbo task and passes every count you can quote. It then gets rewritten by the PostToolUse format hook on first contact, which is an extra commit and an extra deploy. Fix or report failures. Then follow the sahoda-ship skill checklist, create a conventional commit, push, open a PR with what/why/how-tested, and print the PR URL. Ask before `git push` per permissions.
 ```
 
 **fix-issue.md**

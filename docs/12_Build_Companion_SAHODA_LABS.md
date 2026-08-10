@@ -39,7 +39,7 @@ Docs are law: /docs 00_README → canon order. Sprint = docs/05 (2-day Alpha). B
 pnpm+Turborepo · apps/web Next.js 15 App Router+TS+Tailwind+shadcn · apps/jobs Trigger.dev · packages: db(Supabase+RLS+pgvector) shared(zod SOURCE OF TRUTH) mesh publishing billing render · Clerk · Upstash · Cloudflare(sites) · Resend · Sentry.
 
 ## Commands
-pnpm install · pnpm dev · turbo typecheck lint test · supabase migration new <name> (db push = ASK) · pnpm playwright test --grep @smoke
+pnpm install · pnpm dev · **the gate = `turbo typecheck lint test && pnpm format:check`** (format:check is a ROOT script outside turbo — a green turbo count says nothing about formatting) · supabase migration new <name> (db push = ASK) · pnpm playwright test --grep @smoke
 
 ## Non-negotiables
 - Types/schemas import from packages/shared only — never redefine.
@@ -82,7 +82,7 @@ pnpm install · pnpm dev · turbo typecheck lint test · supabase migration new 
     "PreToolUse": [
       { "matcher": "Edit|Write|MultiEdit", "hooks": [ { "type": "command", "command": "F=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // .tool_input.file_path // empty'); echo \"$F\" | grep -qE '\\.env|/migrations/' && [ -z \"$ALLOW_SENSITIVE\" ] && { echo 'Blocked: .env/migrations need ALLOW_SENSITIVE=1 (wt-db only)' >&2; exit 2; } || exit 0" } ] },
       { "matcher": "Bash", "hooks": [ { "type": "command", "command": "echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'DROP TABLE|TRUNCATE|service_role' && { echo 'Blocked dangerous command' >&2; exit 2; } || exit 0" } ] } ],
-    "Stop": [{ "hooks": [ { "type": "command", "command": "INPUT=$(cat); [ \"$(echo $INPUT | jq -r '.stop_hook_active')\" = 'true' ] && exit 0; pnpm turbo run typecheck test --filter=\"...[origin/main]\" || { echo 'Gates failing — fix before stopping' >&2; exit 2; }" } ] }]
+    "Stop": [{ "hooks": [ { "type": "command", "command": "INPUT=$(cat); [ \"$(echo $INPUT | jq -r '.stop_hook_active')\" = 'true' ] && exit 0; pnpm turbo run typecheck test --filter=\"...[origin/main]\" && pnpm format:check || { echo 'Gates failing — fix before stopping' >&2; exit 2; }" } ] }]
   }
 }
 ```
