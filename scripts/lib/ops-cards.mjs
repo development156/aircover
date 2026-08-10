@@ -577,4 +577,36 @@ export const CARDS = [
     technical:
       "Introduced knowingly on 2026-08-08 by the `claimVariant` lease fix, and strictly better than what it replaced (a GUARANTEED permanent strand on every crash). `publishing` plus a stale claim is reachable only by process death — the transient path releases explicitly and leaves `scheduled` — so the dangerous window is death between the adapter's HTTP 200 and the `post_publish_logs` INSERT. Such a post is invisible to `listUnresolvedPublishes`, which requires `l.platform_post_id is not null`, so reconciliation cannot find it either. The adapter's deterministic `requestId` (`sahoda:${variantId}:${accountId}`) does NOT close it: doc 13 §5 records Zernio's idempotency as a ~5-minute request window and marks it `[DOC]` — read in their documentation, never observed — while `PUBLISH_LEASE_SECONDS` is 600, so a re-claim lands outside it. Shortening the lease is not the fix: it has to exceed the longest possible publish (the cron route's `maxDuration` is 300s), which leaves no room under a 5-minute window. Candidate answers, none free: write an intent row BEFORE the platform call so a crashed attempt is findable (costs a statement per publish and needs the append-only table to accept it); or search Zernio by `requestId` before re-publishing a recovered claim; or first observe whether the window is real and how long it is, which doc 13 open question 5 already wants. DO NOT flip `SAHODA_PUBLISH_ENABLED` on a rail that matters without reading this.",
   },
+  {
+    roadmap: null,
+    title: 'Make the two questions "is this a Zernio account" agree with each other',
+    plain:
+      "Deciding which route a post takes to a platform is done twice, in two places, with two different rules — and only one of them checks whether the account is still live. A reader assumes both are asking the same question. Why it matters: an account that has expired takes the OTHER route, which skips the check that stops a post going to a different customer's page.",
+    technical:
+      "`apps/jobs/src/publish/store.ts:252` — `isZernioConnection()` filters `c.status = 'active'`; the general query it falls through to has NO status filter at all and merely ORDERS by `(status = 'active') desc`. So a Zernio-fronted row in any state but `active` fails the narrow test and takes the native path, which does not call `assert_account_for_scheduled_post` — the gate that re-derives the workspace from the post itself (doc 13 §3: Zernio validates an accountId against the whole TEAM, so a wrong id publishes successfully to someone else and returns 200). Today this is contained only by `tokens.ts:70` refusing a non-`active` connection two layers away, in a different file, for a different reason. Fix by giving both queries one predicate, or by moving the status check into `isZernioConnection`'s caller so the routing decision and the liveness decision are visibly the same decision. Found by audit 2026-08-10.",
+  },
+  {
+    roadmap: null,
+    title: 'Let the connection row, not the channel name, decide how a post is sent',
+    plain:
+      'Whether we hold the login for an account is meant to be answered by the account itself. For one platform the answer is hardcoded by name instead, and it wins over whatever the account says. A reader assumes the account record decides. Why it matters: an account of a kind we do not expect would be sent with no login at all, and the failure would look like the platform refusing us.',
+    technical:
+      "`apps/jobs/src/publish/tokens.ts:78` — `AGGREGATOR_FRONTED.has(payload.channel) || connection.viaZernio === true`. Channel membership is tested FIRST and short-circuits, so for `instagram` the row's own `viaZernio` is never consulted: a native OAuth instagram connection would return `accessToken: ''` and publish through the Zernio adapter. Unreachable today — instagram is always aggregator-fronted because we hold no Meta credential and file no app review — which is exactly why it will stay unnoticed until it is not. The same file's `StoredConnection` doc says the row is what answers this for x, gbp and linkedin; the ordering makes instagram the one exception, silently. Found by audit 2026-08-10.",
+  },
+  {
+    roadmap: null,
+    title: 'Stop offering "try again" for failures that cannot succeed on a retry',
+    plain:
+      'When a post fails for a reason we do not have words for, the screen shows a general apology and invites another go. A reader assumes an unrecognised failure is treated cautiously. Why it matters: many of those failures are permanent, so the invitation costs the shop owner a second wasted attempt and teaches them the button does nothing.',
+    technical:
+      '`apps/web/src/lib/posts/publish-error-copy.ts:144` — `COPY[code] ?? { message: GENERIC, worthRetrying: true, needsReconnect: false }`. The allowlist itself is right and deliberate: `post_publish_logs.error.message` is adapter-controlled and must never be rendered. What is not deliberate is the DEFAULT it degrades to — `worthRetrying: true` is a claim about an error we just admitted we do not recognise, and `runPublishPost` records a `classification` (`transient` | `permanent`) that the copy layer never reads. Fix by carrying the stored classification into `describePublishError` so an unknown PERMANENT code degrades to a non-retryable sentence, and only an unknown transient one offers another go. Found by audit 2026-08-10.',
+  },
+  {
+    roadmap: null,
+    title: 'Read schedule refusals by their code rather than by matching words in them',
+    plain:
+      'When the database refuses to move a post’s time, the reason is worked out by looking for phrases inside the error text. A reader assumes each refusal is matched to its own message. Why it matters: the first phrase that matches wins, and anything unrecognised becomes "try again" — which is wrong for a refusal that will never change its mind.',
+    technical:
+      "`apps/web/src/app/actions/posts-schedule.ts:33-45` — `messageFor()` is a `msg.includes(...)` ladder over the raw Postgres message, first match wins, and its fallback is 'Could not change the schedule — try again.' Two problems of one shape: the ordering is load-bearing but undocumented (`POST_ALREADY_GOING_OUT` is tested before `POST_NOT_RESCHEDULABLE`, and a message containing both would silently take the first), and the general branch invites a retry for what is usually a permanent refusal — the same defect as the publish copy map's default. `mapPostError` in `lib/posts/post-error.ts` is the clean counter-example on the same screen: a switch over SQLSTATE with an explicit default. Fix by raising these with a distinguishable errcode or by matching an anchored code rather than a substring. Found by audit 2026-08-10.",
+  },
 ]
