@@ -90,3 +90,21 @@ which answers HTTP 202 with every metric 0 rather than erroring).
 
 **Ask:** one real `/inbox/conversations` payload, or confirmation from the OpenAPI spec that
 `accountId` is the account `_id`. Recorded in `lib/zernio/scope.ts` in the meantime.
+
+## wt-db: `NOT_RESCHEDULABLE` is restated in apps/web
+
+`savePost` (`app/actions/posts.ts`) refuses a `scheduled_at` change on a post whose status
+is `published`, `failed`, `expired` or `publishing`. That list is a hand copy of
+`reschedule_post`'s own guard, which is the authority.
+
+Two copies of one rule is the drift hazard this repo keeps getting bitten by. apps/web
+cannot call `reschedule_post` from `savePost` — the RPC also sets `status`, and `savePost`
+is deliberately forbidden from touching status (a hand-rolled call could otherwise write
+`published`).
+
+Asked for: either a `posts_reschedulable(status)` SQL helper apps/web can query, or a test
+in packages/db that fails when the two lists diverge. Until one exists, a change to
+`reschedule_post`'s guard must be mirrored here by hand.
+
+Context: 2026-08-10. Two posts carried a fresh `scheduled_at` while still `expired`; the
+only symptom was a cron sweep that never found them.

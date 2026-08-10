@@ -79,6 +79,21 @@ export async function createPost(title: string): Promise<SaveState> {
  * detect a concurrent edit (`detectConflict`) — `posts` has no version column,
  * so last-write-wins plus this timestamp is the whole concurrency story.
  */
+/**
+ * Statuses from which a schedule may not be moved.
+ *
+ * Mirrors `reschedule_post`'s own guard. `partial` is deliberately absent because the
+ * RPC omits it too — a partial post still has unpublished channels worth rescheduling,
+ * and its published ones are caught by that function's separate POST_ALREADY_GOING_OUT
+ * check on the variants.
+ */
+const NOT_RESCHEDULABLE: ReadonlySet<string> = new Set([
+  'published',
+  'failed',
+  'expired',
+  'publishing',
+])
+
 export async function savePost(postId: string, patch: unknown): Promise<SaveState> {
   let workspaceId: string | undefined
   try {
@@ -112,6 +127,39 @@ export async function savePost(postId: string, patch: unknown): Promise<SaveStat
     }
 
     const supabase = createServerSupabase()
+
+    // ── A SCHEDULE THIS POST CANNOT HONOUR IS NOT A SAVE ──────────────────────
+    // `scheduled_at` is accepted here but `status` is not (see above), so writing a
+    // date onto a TERMINAL post used to succeed and change nothing that matters: the
+    // row took the new time, this action returned ok, the editor said saved — and
+    // `isDispatchable` still refused the post forever, because nothing moved it out of
+    // `expired`. Observed 2026-08-10 on two posts whose only symptom was a cron sweep
+    // that never found them.
+    //
+    // The list mirrors `reschedule_post`, which is the authority and already raises
+    // POST_NOT_RESCHEDULABLE for exactly these. Restating it rather than importing is a
+    // known hazard — but the alternative is calling the RPC from here, which would also
+    // move the status, and this action is deliberately forbidden from touching status.
+    // A divergence check belongs in the DB package; see REQUESTS.md.
+    if ('scheduled_at' in parsedPatch.data) {
+      const { data: current } = await supabase
+        .from('posts')
+        .select('status')
+        .eq('id', postId)
+        .maybeSingle()
+
+      const status = (current as { status?: unknown } | null)?.status
+      if (typeof status === 'string' && NOT_RESCHEDULABLE.has(status)) {
+        // Same words as the schedule action's POST_NOT_RESCHEDULABLE, because it is the
+        // same refusal — a person who meets it through two doors should not have to work
+        // out that it is one rule.
+        return {
+          ok: false,
+          message: 'This post has already been published or closed — its time can’t be changed.',
+        }
+      }
+    }
+
     const { data, error } = await supabase
       .from('posts')
       .update(parsedPatch.data)

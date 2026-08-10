@@ -31,6 +31,13 @@ vi.mock('@/lib/workspaces', () => ({
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: () => ({
     from: () => ({
+      // The status read `savePost` makes before it will move a schedule.
+      select: () => ({
+        eq: () => ({
+          maybeSingle: () =>
+            Promise.resolve({ data: state.row ? { status: state.row.status } : null, error: null }),
+        }),
+      }),
       update: (patch: Record<string, unknown>) => {
         state.updates.push(patch)
         return {
@@ -118,5 +125,59 @@ describe('savePost accepted patch', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.updatedAt).toBe('2026-07-19T09:00:00.000Z')
+  })
+})
+
+/**
+ * A date field that silently does nothing is a fake success.
+ *
+ * `savePost` accepts `scheduled_at` and writes it with a bare UPDATE. `posts.status` is
+ * excluded on purpose — that guard is right and stays — but the consequence was that a
+ * date could be written onto a TERMINAL post: the row got the new time, the action
+ * returned ok, the editor showed it saved, and `isDispatchable` still refused the post
+ * forever because the status never left `expired`.
+ *
+ * Observed 2026-08-10: posts 2a080a2a and 2c279329 carried a fresh `scheduled_at` while
+ * still `expired`, and the empty cron baseline was the only symptom.
+ *
+ * `reschedule_post` is the authority and already refuses these four statuses. This
+ * mirrors that list rather than inventing a second rule — two copies of one rule drifting
+ * apart is the bug class, not the fix.
+ */
+describe('savePost refuses to move a schedule it cannot honour', () => {
+  test.each(['expired', 'published', 'failed', 'publishing'] as const)(
+    'refuses a scheduled_at change on a %s post, and says why',
+    async (status) => {
+      state.row = storedRow({ status })
+
+      const result = await savePost(POST_ID, { scheduled_at: '2026-09-01T10:00:00.000Z' })
+
+      expect(result.ok).toBe(false)
+      if (result.ok) throw new Error('expected a refusal')
+      expect(result.message).toMatch(/published or closed/i)
+      // The refusal has to reach the DATABASE too — a message alone, with the row
+      // still written, is the same fake success wearing different words.
+      expect(state.updates).toEqual([])
+    },
+  )
+
+  test('still allows other edits on a terminal post', async () => {
+    // Fixing a typo on an expired post is legitimate. Only the SCHEDULE is refused,
+    // because only the schedule makes a promise the dispatcher cannot keep.
+    state.row = storedRow({ status: 'expired' })
+
+    const result = await savePost(POST_ID, { title: 'Corrected title' })
+
+    expect(result.ok).toBe(true)
+    expect(state.updates).toEqual([{ title: 'Corrected title' }])
+  })
+
+  test('still allows a schedule change on a live post', async () => {
+    state.row = storedRow({ status: 'draft' })
+
+    const result = await savePost(POST_ID, { scheduled_at: '2026-09-01T10:00:00.000Z' })
+
+    expect(result.ok).toBe(true)
+    expect(state.updates).toEqual([{ scheduled_at: '2026-09-01T10:00:00.000Z' }])
   })
 })
