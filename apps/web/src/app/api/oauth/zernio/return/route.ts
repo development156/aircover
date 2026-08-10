@@ -28,6 +28,16 @@ import { zernioClient } from '@/lib/zernio/server'
 export const dynamic = 'force-dynamic'
 
 /**
+ * One account Zernio returned, tagged with the platform it was asked for.
+ *
+ * Derived from `reconcileAccounts` rather than restated — a field added there shows
+ * up here as a type error rather than being silently dropped on the way to the RPC.
+ */
+type ReconciledForPlatform = Awaited<ReturnType<typeof reconcileAccounts>>[number] & {
+  platform: (typeof ZERNIO_PLATFORMS)[number]
+}
+
+/**
  * Where the browser ends up, whatever the HTTP status is.
  *
  * The origin comes from the incoming request URL rather than a header, so this can
@@ -57,6 +67,11 @@ function backOk(request: Request, status: 'connected' | 'nothing', detail?: stri
   return Response.redirect(connectionsUrl(request, status, detail), 303)
 }
 
+/** The sentence in the fallback body. Ours, never a message from Zernio or Postgres. */
+const DID_NOT_FINISH = 'That connection didn’t finish.'
+const SOME_DID_NOT_FINISH =
+  'Some of your accounts connected and some didn’t. The list on Connections shows which.'
+
 /**
  * A FAILED connect — answered with its real status code.
  *
@@ -74,14 +89,26 @@ function backOk(request: Request, status: 'connected' | 'nothing', detail?: stri
  * real link for anyone whose browser ignores it. The status line becomes the
  * observable outcome; the body stays the user-facing one.
  */
-function backError(request: Request, httpStatus: number, detail: string): Response {
-  const target = connectionsUrl(request, 'error', detail)
+function backError(
+  request: Request,
+  httpStatus: number,
+  detail: string,
+  /**
+   * `error` for an outright failure, `partial` for "some accounts recorded and some
+   * did not". A partial keeps the 5xx STATUS deliberately — this route exists in its
+   * current shape because a failure that leaves as 303 is invisible to a 4xx/5xx log
+   * filter, and a half-failure is a failure by that measure. Only the words change.
+   */
+  kind: 'error' | 'partial' = 'error',
+): Response {
+  const target = connectionsUrl(request, kind, detail)
   const safe = escapeAttr(target)
+  const sentence = kind === 'partial' ? SOME_DID_NOT_FINISH : DID_NOT_FINISH
   return new Response(
     `<!doctype html><html lang="en"><head><meta charset="utf-8">` +
       `<meta http-equiv="refresh" content="0; url=${safe}">` +
       `<title>Connection didn’t finish</title></head>` +
-      `<body><p>That connection didn’t finish. ` +
+      `<body><p>${sentence} ` +
       `<a href="${safe}">Go back to Connections</a> to try again.</p></body></html>`,
     {
       status: httpStatus,
@@ -137,21 +164,41 @@ export async function GET(request: Request): Promise<Response> {
     // platform under our own profile costs a few reads and cannot be steered.
     // It also self-heals: a connection that failed to record on an earlier pass is
     // picked up by the next return trip, whatever the user just connected.
-    const accounts = (
-      await Promise.all(
-        ZERNIO_PLATFORMS.map(async (platform) =>
-          (await reconcileAccounts(client, { profileId, platform })).map((a) => ({
-            ...a,
-            platform,
-          })),
-        ),
-      )
-    ).flat()
-    // Zernio has no accounts under our profile. Nothing went wrong — the user may
-    // simply have cancelled at the consent screen — so this stays a 303.
-    if (accounts.length === 0) return ok('nothing')
+    //
+    // ── ONE PLATFORM'S FAILURE IS ONE PLATFORM'S FAILURE ──────────────────────
+    // This was a bare `Promise.all`, which rejects on the first failure — so a
+    // single platform's `listAccounts` throwing threw away the accounts every
+    // OTHER platform had already returned, and the whole trip left as a generic
+    // `unexpected`. Each read is now caught where it happens and becomes its own
+    // recorded outcome, so the platforms that answered are still recorded.
+    const reads = await Promise.all(
+      ZERNIO_PLATFORMS.map(async (platform) => {
+        try {
+          const found = await reconcileAccounts(client, { profileId, platform })
+          return { platform, read: true, accounts: found.map((a) => ({ ...a, platform })) }
+        } catch (error) {
+          await reportServerError(error, { action: 'zernioReturn', workspaceId })
+          return { platform, read: false, accounts: [] as ReconciledForPlatform[] }
+        }
+      }),
+    )
+
+    const unreadable = reads.filter((r) => !r.read).map((r) => r.platform)
+    const accounts = reads.flatMap((r) => r.accounts)
+
+    // NOTHING could be read. Deliberately not `ok('nothing')`: that status claims we
+    // asked Zernio and it had no accounts, and here we never successfully asked. A
+    // measurement we did not make must not be reported as a measurement.
+    if (unreadable.length === ZERNIO_PLATFORMS.length) return fail(500, 'read')
+
+    // Zernio has no accounts under our profile, and every platform answered to say
+    // so. Nothing went wrong — the user may simply have cancelled at the consent
+    // screen — so this stays a 303.
+    if (accounts.length === 0 && unreadable.length === 0) return ok('nothing')
 
     let written = 0
+    /** Platforms whose account came back from Zernio and did NOT reach our table. */
+    const unwritten: string[] = []
     for (const account of accounts) {
       const { error } = await supabase.rpc('upsert_zernio_connection', {
         p_workspace_id: workspace.id,
@@ -174,6 +221,7 @@ export async function GET(request: Request): Promise<Response> {
           action: 'zernioReturn',
           workspaceId,
         })
+        unwritten.push(account.platform)
         continue
       }
       written += 1
@@ -181,7 +229,27 @@ export async function GET(request: Request): Promise<Response> {
 
     // Accounts existed at Zernio and NONE of them recorded. The customer's account is
     // connected on their side and unreachable from ours — a 500, loudly.
-    if (written === 0) return fail(500, 'write')
+    //
+    // `accounts.length > 0` is NOT redundant, though it reads that way. One live path
+    // arrives here with an empty list: some platforms read cleanly and had no
+    // accounts, and at least one other failed to read. `ok('nothing')` above is
+    // guarded on `unreadable.length === 0`, so that case falls through — and without
+    // this clause it would be reported as "every write failed" when no write was ever
+    // attempted. It belongs to the partial branch below.
+    if (written === 0 && accounts.length > 0) return fail(500, 'write')
+
+    // ── A PARTIAL CONNECT IS NOT A CONNECT ────────────────────────────────────
+    // This used to be the whole test: `written === 0`. So ONE platform succeeding
+    // reported `connected` while every other platform's account was silently
+    // dropped — the customer was told it worked, the row they were waiting for was
+    // never written, and the only trace was a Sentry event.
+    //
+    // Both halves count as missed, because from the customer's side they are the
+    // same thing: an account they connected at Zernio that this app cannot see.
+    const missed = [...unreadable, ...unwritten]
+    if (missed.length > 0)
+      return backError(request, 500, `${missed.length}-not-recorded`, 'partial')
+
     return ok('connected')
   } catch (error) {
     await reportServerError(error, { action: 'zernioReturn', workspaceId })

@@ -4,6 +4,7 @@ import type { ConnectionPlatform } from '@sahoda/shared'
 import { ConnectButton } from '@/components/connections/connect-button'
 import { ConnectionHealthBanner } from '@/components/connections/connection-health-banner'
 import { ConnectionRow } from '@/components/connections/connection-row'
+import { ConnectOutcomeNotice } from '@/components/connections/connect-outcome-notice'
 import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
@@ -37,13 +38,29 @@ export const metadata = { title: 'Connections' }
 const CONNECTABLE: ConnectionPlatform[] = ['instagram', 'x', 'gbp', 'linkedin']
 const LIVE_VIA_ZERNIO = new Set<ConnectionPlatform>(['instagram', 'x', 'gbp', 'linkedin'])
 
-export default async function ConnectionsPage() {
-  const connections = await listConnections()
+export default async function ConnectionsPage({
+  searchParams,
+}: {
+  /**
+   * Written by `/api/oauth/zernio/return`. `reason` is deliberately NOT read here —
+   * it exists for the log reader; the notice's words come from `zernio` alone,
+   * matched against an allowlist. Everything in this URL came through the user's
+   * browser, which is the same reason the return route refuses to read `accountId`
+   * off it.
+   */
+  searchParams: Promise<{ zernio?: string | string[] }>
+}) {
+  const [connections, { zernio }] = await Promise.all([listConnections(), searchParams])
   const railReady = zernioAvailable()
 
   return (
     <div className="space-y-grid">
       <PageTitle>Connections</PageTitle>
+
+      {/* Below the title and above everything else: what just happened comes before
+          what is there now, and a partial connect has to be read before the list is
+          mistaken for the whole story. */}
+      <ConnectOutcomeNotice status={zernio} />
 
       {connections === null ? (
         <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">

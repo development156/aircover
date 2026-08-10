@@ -6,10 +6,17 @@ const state = vi.hoisted(() => ({
   workspace: { id: 'ws-1', name: 'Chai & Chapters' } as { id: string; name: string } | null,
   mapping: { profile_id: '6a75cae32853ee463c6419d6' } as { profile_id: string } | null,
   mappingError: null as { message: string } | null,
+  /** What every platform returns, unless `accountsByPlatform` overrides it. */
   accounts: [
     { accountId: '6a75caf7d0fe733d1afcc1f4', profileId: '6a75cae32853ee463c6419d6' },
   ] as Record<string, unknown>[],
+  /** Per-platform accounts. Null means "same list for every platform". */
+  accountsByPlatform: null as Record<string, Record<string, unknown>[]> | null,
+  /** Platforms whose `reconcileAccounts` call rejects — a READ failure, not a write one. */
+  readThrowsFor: [] as string[],
   rpcError: null as { message: string } | null,
+  /** Per-platform write results. Null means `rpcError` applies to all of them. */
+  rpcErrorByPlatform: null as Record<string, { message: string } | null> | null,
   throwOnAuth: false,
 }))
 
@@ -31,10 +38,17 @@ vi.mock('@/lib/workspaces', () => ({
 vi.mock('@/lib/observability/report', () => ({ reportServerError: () => Promise.resolve() }))
 
 vi.mock('@sahoda/publishing', () => ({
-  reconcileAccounts: () => Promise.resolve(state.accounts),
+  reconcileAccounts: (_client: unknown, args: { platform: string }) => {
+    if (state.readThrowsFor.includes(args.platform)) {
+      return Promise.reject(new Error(`listAccounts failed for ${args.platform}`))
+    }
+    return Promise.resolve(state.accountsByPlatform?.[args.platform] ?? state.accounts)
+  },
 }))
 
-vi.mock('@sahoda/shared', () => ({ ZERNIO_PLATFORMS: ['instagram'] }))
+// TWO platforms, not one. A partial outcome cannot exist in a one-platform world,
+// so the old single-entry mock could not have caught the collapse this file now pins.
+vi.mock('@sahoda/shared', () => ({ ZERNIO_PLATFORMS: ['instagram', 'linkedin'] }))
 
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: () => ({
@@ -45,7 +59,12 @@ vi.mock('@/lib/supabase/server', () => ({
         }),
       }),
     }),
-    rpc: () => Promise.resolve({ error: state.rpcError }),
+    rpc: (_fn: string, args: { p_platform: string }) =>
+      Promise.resolve({
+        error: state.rpcErrorByPlatform
+          ? (state.rpcErrorByPlatform[args.p_platform] ?? null)
+          : state.rpcError,
+      }),
   }),
 }))
 
@@ -63,8 +82,106 @@ beforeEach(() => {
   state.accounts = [
     { accountId: '6a75caf7d0fe733d1afcc1f4', profileId: '6a75cae32853ee463c6419d6' },
   ]
+  state.accountsByPlatform = null
+  state.readThrowsFor = []
   state.rpcError = null
+  state.rpcErrorByPlatform = null
   state.throwOnAuth = false
+})
+
+/**
+ * The collapse this describe block exists for.
+ *
+ * The route recorded each account in a loop, swallowed a per-account failure with
+ * `continue`, and then asked ONE question: `written === 0`. So one platform
+ * succeeding masked every other platform failing — the customer was told
+ * "connected", the row they were expecting was never written, and the only trace
+ * was a Sentry event nobody was watching. A 303 also kept it out of the 4xx/5xx log
+ * filter this route was specifically rebuilt to be visible in.
+ *
+ * The read side collapsed harder still: `reconcileAccounts` ran inside a
+ * `Promise.all`, so one platform's `listAccounts` throwing discarded the successful
+ * reads for every other platform and left as a generic `unexpected`.
+ *
+ * Found by audit on 2026-08-10 while investigating post f0a777cf. It was NOT that
+ * post's cause — Zernio genuinely holds no LinkedIn account for that profile, which
+ * a read-only `GET /accounts` settled — but it is the reason that investigation
+ * could not be closed from the database alone: a dropped write and an absent
+ * account are byte-identical afterwards.
+ */
+describe('a partial connect is reported as partial, never as connected', () => {
+  it('one platform records and another fails to write', async () => {
+    state.rpcErrorByPlatform = { instagram: null, linkedin: { message: 'denied' } }
+
+    const res = await call()
+
+    // Not a success status: the whole point of this route's error shape is that a
+    // failure is findable by filtering 4xx/5xx.
+    expect(res.status).not.toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=partial')
+  })
+
+  it('one platform cannot be read at all, and the others still record', async () => {
+    state.readThrowsFor = ['linkedin']
+
+    const res = await call()
+
+    expect(res.status).not.toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=partial')
+  })
+
+  it('a read failure no longer discards the platforms that read fine', async () => {
+    // The `Promise.all` version threw here, so the instagram account that WAS read
+    // never reached upsert_zernio_connection at all.
+    state.readThrowsFor = ['linkedin']
+
+    const res = await call()
+
+    expect(res.headers.get('location')).not.toContain('reason=unexpected')
+  })
+
+  it('a platform that read cleanly but held nothing is not "every write failed"', async () => {
+    // The path that makes `written === 0 && accounts.length > 0` load-bearing: one
+    // platform answers with no accounts, another cannot be read at all. No write is
+    // ever attempted, so `written` is 0 — and reporting that as "every write failed"
+    // would name the wrong thing entirely.
+    state.accountsByPlatform = { instagram: [], linkedin: [] }
+    state.readThrowsFor = ['linkedin']
+
+    const res = await call()
+
+    expect(res.headers.get('location')).toContain('zernio=partial')
+    expect(res.headers.get('location')).not.toContain('reason=write')
+  })
+
+  it('every read failing is a real failure, not "nothing"', async () => {
+    state.readThrowsFor = ['instagram', 'linkedin']
+
+    const res = await call()
+
+    expect(res.status).toBe(500)
+    expect(res.headers.get('location')).toContain('reason=read')
+    // "nothing" claims we asked and Zernio had none. We never successfully asked.
+    expect(res.headers.get('location')).not.toContain('zernio=nothing')
+  })
+
+  it('no accounts anywhere, with every read fine, is still "nothing"', async () => {
+    // The legitimate case, and the one a real profile is in: a workspace that
+    // connected Instagram and nothing else. This must not become an error.
+    state.accounts = []
+
+    const res = await call()
+
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=nothing')
+  })
+
+  it('all accounts recording is still a plain connected', async () => {
+    const res = await call()
+
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=connected')
+  })
 })
 
 /**
@@ -132,6 +249,9 @@ describe('a failed connect answers with a real error status, never 303', () => {
     expect(res.status).not.toBe(303)
     // The reason survives, so a log reader can tell the causes apart.
     expect(res.headers.get('location')).toContain(`reason=${reason}`)
+    // And it is an outright failure, not the partial outcome — the two share the
+    // 5xx status on purpose, so only this word tells them apart.
+    expect(res.headers.get('location')).toContain('zernio=error')
   })
 
   it('still lands the customer on /connections rather than stranding them', async () => {
