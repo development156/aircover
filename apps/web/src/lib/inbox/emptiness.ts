@@ -102,6 +102,15 @@ export interface ClassifyInput {
    * `meta` alone cannot express: we hold an account and Zernio queried none of them.
    */
   connectedAccounts: number
+  /**
+   * Whether Zernio says more rows exist beyond this page.
+   *
+   * Only load-bearing when `rows` is 0 for a reason that is not "Zernio sent nothing" —
+   * the comments surface drops posts carrying no comments, so a page can filter down to
+   * empty while later pages hold every comment the customer has. Claiming "none yet"
+   * from that is precisely the measurement-we-never-took this module refuses to make.
+   */
+  hasMore?: boolean
 }
 
 const projectFailures = (meta: ZernioInboxMeta | undefined): FailedAccountSummary[] =>
@@ -158,6 +167,25 @@ export function couldNotAsk(surface: InboxSurface): InboxEmptiness {
 /**
  * Classify one `/inbox/*` result into a state the UI can render honestly.
  *
+ * ── WHY `accountsQueried` IS A SIGNAL AND NEVER A NUMBER WE PRINT ────────────
+ * `[LIVE 2026-08-10]`: the conversations response reported `accountsQueried: 2` for a
+ * workspace with ONE connected Instagram account — and `GET /accounts` unscoped returns
+ * exactly one account on the entire API key, so it is not counting accounts in any
+ * sense we share. The old copy rendered it verbatim: *"All 2 connected accounts
+ * answered"*, to a customer who has one.
+ *
+ * It is a fact about Zernio's fan-out, not about the customer's inventory, and this
+ * module used to conflate the two. Substituting our own `connectedAccounts` would be
+ * worse — the `partial` branch reads "N of M", and cross-sourcing those halves yields
+ * "2 of 1 did not answer". So: the ratio branch keeps BOTH of Zernio's numbers (one
+ * source, internally consistent, a statement about the query), and the branches that
+ * merely need "someone answered" stop printing a count at all.
+ *
+ * The `=== 0` comparison below is untouched. That is a signal use, and it is correct —
+ * the live reviews payload (`accountsQueried: 0`, no GBP ever connected) resolves to
+ * `neverConnected` exactly as intended. Why 2 is unanswerable from here; it is filed as
+ * a wt-pub ask in `apps/web/REQUESTS.md` rather than guessed at.
+ *
  * Order matters, and it is "what do we know about the question" before "what came back":
  *
  *  1. No `meta` at all → we cannot confirm the view is complete. Not empty.
@@ -172,6 +200,7 @@ export function classifyInboxResult({
   meta,
   surface,
   connectedAccounts,
+  hasMore = false,
 }: ClassifyInput): InboxEmptiness {
   const failed = projectFailures(meta)
 
@@ -225,12 +254,24 @@ export function classifyInboxResult({
     }
   }
 
+  if (rows === 0 && hasMore) {
+    // Nothing on THIS page and Zernio says there is more. "None yet" would be a
+    // statement about the customer drawn from a page we chose not to show.
+    return {
+      state: 'unknown',
+      showList: false,
+      headline: `Sahoda could not confirm this ${surface.noun} view is complete`,
+      body: `Nothing on this page, but our publishing partner reports more to read. Refresh to try again.`,
+      failed,
+    }
+  }
+
   if (rows === 0) {
     return {
       state: 'empty',
       showList: false,
       headline: `No ${surface.noun} yet`,
-      body: `All ${meta.accountsQueried} connected ${meta.accountsQueried === 1 ? 'account' : 'accounts'} answered, and there is nothing waiting. New ${surface.noun} land here automatically.`,
+      body: `Every connected account answered, and there is nothing waiting. New ${surface.noun} land here automatically.`,
       failed,
     }
   }
@@ -239,7 +280,7 @@ export function classifyInboxResult({
     state: 'ok',
     showList: true,
     headline: `Showing your ${surface.noun}`,
-    body: `All ${meta.accountsQueried} connected ${meta.accountsQueried === 1 ? 'account' : 'accounts'} answered.`,
+    body: `Every connected account answered.`,
     failed,
   }
 }

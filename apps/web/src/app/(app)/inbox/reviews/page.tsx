@@ -8,9 +8,14 @@ export const metadata = { title: 'Inbox · Reviews' }
  * `GET /inbox/reviews`, read-only. Google Business Profile only.
  *
  * ── THIS SHIPS EMPTY, AND THE EMPTY STATE MATTERS ────────────────────────────
- * Reviews are `[DOC]`-tier: stated in Zernio's docs, never observed live, because no
- * GBP account has ever connected — `accountsQueried: 0` is the proof. So the surface
- * exists and has nothing to show, and the sentence it shows instead is load-bearing.
+ * The endpoint answers `[LIVE 2026-08-10]` — envelope, `pagination`, `meta` and a
+ * `summary: {totalReviews, averageRating}` we do not yet read. The `ZernioReview` ROW
+ * shape is still `[DOC]`: not one review has been observed, because no GBP account has
+ * ever connected. `accountsQueried: 0` on that live response is the proof, and it is
+ * what drives the sentence below.
+ *
+ * So the surface exists, has nothing to show, and the sentence it shows instead is
+ * load-bearing.
  *
  * It must NOT say "no reviews". That is a claim about the customer's shop, and we have
  * asked nobody, so we have no basis for it — a business with forty reviews would open

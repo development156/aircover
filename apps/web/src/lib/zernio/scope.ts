@@ -95,10 +95,18 @@ export async function accountForWorkspace(
  * ("id is Zernio's account _id"), and both `scopeAccount` and
  * `assert_account_in_workspace_profile` reject anything but 24-char lowercase hex.
  *
- * ASSUMED, `[DOC]`-tier: that `/inbox/*` reports the same `_id` as `accountId`. The
- * frozen client asserts it structurally — it passes a `ScopedAccountId` minted from this
- * column straight into the `accountId` query param — but doc 13 records no inbox
- * behaviour at all and no live payload has been observed. Filed in apps/web/REQUESTS.md.
+ * SETTLED `[LIVE 2026-08-10]`: `/inbox/*` reports that same `_id` as `accountId`. Three
+ * values were compared against the first real payloads —
+ *
+ *   `ZernioAccount._id`                     = `6a75caf7d0fe733d1afcc1f4`
+ *   `ZernioConversation.accountId`          = `6a75caf7d0fe733d1afcc1f4`
+ *   `ZernioCommentedPost.accountId`         = `6a75caf7d0fe733d1afcc1f4`
+ *
+ * — and `ZernioMessage.accountId` agrees. The join below is correct, and the failure
+ * feared here (a perfectly-rendered list in which every row 404s, reading as a routing
+ * bug) does not occur. Pinned by `packages/publishing/src/zernio/inbox-live.test.ts`
+ * against committed captures, including the commented-post sibling: closing one row
+ * type and leaving the other is the defect class this repo has shipped before.
  */
 export async function accountByIdForWorkspace(
   workspaceId: string,

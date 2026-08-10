@@ -79,6 +79,12 @@ export interface DecideInput {
   failure?: ReadFailure
   /** Present only when a read actually happened. */
   result?: { rows: number; meta: ZernioInboxMeta | undefined }
+  /**
+   * Zernio's "there is more beyond this page". Only consulted when `rows` is 0, and
+   * only meaningful on a surface that filters its page (comments) — there, an empty
+   * page is not evidence of an empty inbox.
+   */
+  hasMore?: boolean
 }
 
 /**
@@ -92,6 +98,7 @@ export function decideSurface({
   connectedAccounts,
   failure,
   result,
+  hasMore,
 }: DecideInput): SurfaceDecision {
   const spec = INBOX_SURFACES[surface]
 
@@ -124,6 +131,7 @@ export function decideSurface({
     meta: result.meta,
     surface: spec,
     connectedAccounts,
+    hasMore,
   })
   return { state, showList: state.showList }
 }

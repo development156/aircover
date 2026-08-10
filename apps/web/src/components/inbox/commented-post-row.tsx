@@ -3,6 +3,8 @@ import { ChevronRight, ExternalLink, MessageSquare } from 'lucide-react'
 import type { Route } from 'next'
 import Link from 'next/link'
 
+import { cn } from '@/lib/utils'
+
 import { platformLabel } from './platform-label'
 
 const WHEN = new Intl.DateTimeFormat('en-IN', {
@@ -21,10 +23,14 @@ function formatWhen(value: string | undefined): string | null {
 }
 
 /**
- * `GET /inbox/comments` returns the POSTS that have comments, not the comments — the
- * comments themselves need a second, account-scoped call per post. So this row is a
- * link into that call, carrying both halves of the key for the same reason a thread
- * link does: a post id alone would read against whichever account matched.
+ * `GET /inbox/comments` returns POSTS, not comments — the comments themselves need a
+ * second, account-scoped call per post. So this row is a link into that call, carrying
+ * both halves of the key for the same reason a thread link does: a post id alone would
+ * read against whichever account matched.
+ *
+ * It returns EVERY post, not only the ones with comments `[LIVE 2026-08-10]` — this
+ * file used to say otherwise. `lib/inbox/commented-posts.ts` filters before the surface
+ * classifies, so a row reaching this component has at least one comment to open.
  */
 export function commentsHref({
   accountId,
@@ -56,8 +62,17 @@ export function CommentedPostRow({ post }: { post: ZernioCommentedPost }) {
           </span>
           {when ? <span className="text-[13px] text-muted tabular-nums">{when}</span> : null}
         </div>
-        <p className="mt-1 line-clamp-2 max-w-[70ch] text-[14px] leading-[21px]">
-          {post.content ?? 'This post has no caption.'}
+        {/* `??` never fired here: an Instagram post with no caption comes back as the
+            EMPTY STRING, not null — post 18277022635290264 [LIVE 2026-08-10], which is
+            also the only post in that page carrying comments. The row rendered a blank
+            line where its only identifying text should be. */}
+        <p
+          className={cn(
+            'mt-1 line-clamp-2 max-w-[70ch] text-[14px] leading-[21px]',
+            !post.content && 'text-muted italic',
+          )}
+        >
+          {post.content ? post.content : 'This post has no caption.'}
         </p>
       </Link>
 

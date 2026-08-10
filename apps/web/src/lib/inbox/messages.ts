@@ -1,4 +1,4 @@
-import type { ZernioMessage } from '@sahoda/publishing'
+import { messageDirection, type ZernioMessage } from '@sahoda/publishing'
 import { InboxPlatformSchema, type InboxPlatform } from '@sahoda/shared'
 
 /**
@@ -10,32 +10,34 @@ import { InboxPlatformSchema, type InboxPlatform } from '@sahoda/shared'
  */
 
 /**
- * ── UNVERIFIED: THE VALUE OF `direction` ─────────────────────────────────────
- * `ZernioMessage.direction` is typed as a bare `string` because nothing in doc 13
- * records a live message payload — the `/inbox/conversations/{id}/messages` response
- * has never been observed with real data. `'inbound'` is the documented value, not a
- * measured one.
+ * ── RESOLVED `[LIVE 2026-08-10]`: THE VALUE OF `direction` ───────────────────
+ * This module used to compare `m.direction === 'inbound'`, which was doc 13's word and
+ * had never been measured. The first real thread carries **`'incoming'`** — so this
+ * returned null for every thread, and every reply affordance in the product rendered
+ * `unknown` permanently. The degradation was honest, and it looked exactly like a
+ * working feature.
  *
- * If Zernio actually sends `'in'` or `'received'`, `newestInboundAt` returns null for
- * every thread and every reply affordance renders `unknown`. That degradation is the
- * honest one — `unknown` claims nothing — but it is a degradation, and this is where
- * to look when the first real thread renders "we have not read this yet" forever.
- * Re-tier to `[LIVE]` once a real payload is seen.
+ * The vocabulary now lives in `messageDirection` (`@sahoda/publishing`, which owns the
+ * wire shape), because it had a second caller: `components/inbox/message-list.tsx` was
+ * comparing the same literal to decide which side of the thread a bubble renders on.
+ * One spelling, two independent bugs — fixing this file alone would have left the
+ * customer's own words attributed to the shop owner.
  */
-const INBOUND = 'inbound'
 
 /**
  * The newest inbound message in a page, which is what a send window is measured from.
  *
  * Returns `null` when the page holds no inbound message — a genuine "we do not know",
  * which `evaluateSendWindow` turns into the `unknown` affordance rather than guessing.
- * Order is not assumed; the messages are scanned.
+ * A message whose direction we cannot classify is `unknown` and is skipped here too: it
+ * must not open a window it did not earn. Order is not assumed; the messages are
+ * scanned (Zernio reports `sortOrderApplied: 'asc'`, but that is a convenience).
  */
 export function newestInboundAt(messages: readonly ZernioMessage[]): string | null {
   let newest: string | null = null
   let newestMs = Number.NEGATIVE_INFINITY
   for (const m of messages) {
-    if (m.direction !== INBOUND || !m.createdAt) continue
+    if (messageDirection(m) !== 'inbound' || !m.createdAt) continue
     const ms = Date.parse(m.createdAt)
     if (Number.isNaN(ms) || ms <= newestMs) continue
     newestMs = ms
