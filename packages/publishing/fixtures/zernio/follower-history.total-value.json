@@ -1,0 +1,37 @@
+{
+  "_recorded": {
+    "WARNING": "CAPTURED FROM THE LIVE API — DO NOT HAND-EDIT. See fixtures/zernio/README.md.",
+    "endpoint": "GET /analytics/instagram/follower-history",
+    "query": "accountId=6a75caf7d0fe733d1afcc1f4&since=2026-07-11&until=2026-08-10",
+    "capturedAt": "2026-08-10T09:24:00Z",
+    "account": "testingg53 (Instagram, Zernio account 6a75caf7d0fe733d1afcc1f4)",
+    "redaction": "cdninstagram.com media URLs replaced with \"[redacted at capture — signed CDN URL]\" — they carry expiring signed tokens. No other field was altered.",
+    "note": "The DEFAULT answer, kept deliberately: this is the shape that used to be rendered as a one-point chart dated \"total\". It is the regression case for seriesFrom."
+  },
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "success": true,
+    "accountId": "6a75caf7d0fe733d1afcc1f4",
+    "platform": "instagram",
+    "dateRange": {
+      "since": "2026-07-11",
+      "until": "2026-08-10"
+    },
+    "metricType": "total_value",
+    "metrics": {
+      "follower_count": {
+        "total": 1
+      },
+      "followers_gained": {
+        "total": 1
+      },
+      "followers_lost": {
+        "total": 0
+      }
+    },
+    "dataDelay": "Data is captured by Zernio's daily snapshotter. Up to 24 hours old."
+  }
+}

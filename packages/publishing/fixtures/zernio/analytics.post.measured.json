@@ -1,0 +1,80 @@
+{
+  "_recorded": {
+    "WARNING": "CAPTURED FROM THE LIVE API — DO NOT HAND-EDIT. See fixtures/zernio/README.md.",
+    "endpoint": "GET /analytics",
+    "query": "postId=18277022635290264&profileId=6a75cae32853ee463c6419d6",
+    "capturedAt": "2026-08-10T09:24:00Z",
+    "account": "testingg53 (Instagram, Zernio account 6a75caf7d0fe733d1afcc1f4)",
+    "redaction": "cdninstagram.com media URLs replaced with \"[redacted at capture — signed CDN URL]\" — they carry expiring signed tokens. No other field was altered.",
+    "note": "Published 2026-08-09T16:42:14Z — 17h before capture, so INSIDE Instagram's 48h window, yet reporting real counts (impressions 2, reach 1, comments 2). The case that proves an early non-zero reading must still render."
+  },
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "postId": "6a78aed3d0fe733d1a85236b",
+    "latePostId": "6a78add31b9a4e4d2674f7dc",
+    "status": "published",
+    "content": "",
+    "publishedAt": "2026-08-09T16:42:07.000Z",
+    "analytics": {
+      "impressions": 2,
+      "reach": 1,
+      "likes": 0,
+      "comments": 2,
+      "shares": 0,
+      "saves": 0,
+      "clicks": 0,
+      "views": 2,
+      "follows": 0,
+      "igReelsAvgWatchTime": 0,
+      "igReelsVideoViewTotalTime": 0,
+      "engagementRate": 100,
+      "lastUpdated": "2026-08-10 09:38:57",
+      "videoDurationSeconds": null
+    },
+    "platformAnalytics": [
+      {
+        "platform": "instagram",
+        "status": "published",
+        "platformPostId": "18277022635290264",
+        "accountId": "6a75caf7d0fe733d1afcc1f4",
+        "accountUsername": "testingg53",
+        "analytics": {
+          "impressions": 2,
+          "reach": 1,
+          "likes": 0,
+          "comments": 2,
+          "shares": 0,
+          "saves": 0,
+          "clicks": 0,
+          "views": 2,
+          "follows": 0,
+          "igReelsAvgWatchTime": 0,
+          "igReelsVideoViewTotalTime": 0,
+          "engagementRate": 100,
+          "lastUpdated": "2026-08-10 09:38:57",
+          "videoDurationSeconds": null
+        },
+        "syncStatus": "synced",
+        "platformPostUrl": "https://www.instagram.com/p/Db05Hoel6_C/",
+        "errorMessage": null
+      }
+    ],
+    "platform": "instagram",
+    "platformPostUrl": "https://www.instagram.com/p/Db05Hoel6_C/",
+    "isExternal": true,
+    "syncStatus": "synced",
+    "message": null,
+    "thumbnailUrl": "[redacted at capture — signed CDN URL]",
+    "mediaType": "image",
+    "mediaItems": [
+      {
+        "type": "image",
+        "url": "[redacted at capture — signed CDN URL]",
+        "thumbnail": "[redacted at capture — signed CDN URL]"
+      }
+    ]
+  }
+}

@@ -48,7 +48,15 @@ export interface PostMetrics {
   engagement: MetricNumber
   /** Zernio's own rate when present — never recomputed from a reach we may not have. */
   engagementRate: MetricNumber
-  /** The measurement's timestamp. Its presence is what makes the numbers real. */
+  /**
+   * When Zernio last synced these numbers, as ISO-8601 UTC.
+   *
+   * NOT "when the platform measured them", and the difference is not pedantry: the
+   * same stamp comes back for every post in a sweep (see rule 6a). It is safe to print
+   * as "last updated" and unsafe to reason about as a per-post measurement time.
+   *
+   * Normalised by `normaliseMeasuredAt` — the wire format is unzoned.
+   */
   measuredAt: string
 }
 
@@ -104,6 +112,60 @@ export type MetricAvailability =
 /** Reads one numeric field defensively. Anything not a finite number is a gap, not a 0. */
 function num(raw: unknown): MetricNumber {
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : null
+}
+
+/**
+ * The raw counts Zernio reports. Derived figures (`engagementRate`) are deliberately
+ * excluded — a rate is computed FROM these, so it carries no independent evidence that
+ * anything was measured.
+ */
+const COUNT_FIELDS = [
+  'impressions',
+  'reach',
+  'likes',
+  'comments',
+  'shares',
+  'saves',
+  'clicks',
+  'views',
+  'follows',
+] as const
+
+/**
+ * Did Zernio report counts, and were every one of them zero?
+ *
+ * "Reported" means present as a finite number. An ABSENT field and a field reported as
+ * 0 must not collapse together here: absent is already Rule 6's business, and treating
+ * it as a zero would make an empty bag look like a measurement of nothing.
+ *
+ * False when nothing was reported at all, so a payload with no counts falls through to
+ * the rules that handle emptiness rather than being caught by this one.
+ */
+function reportedAllZero(metrics: Record<string, unknown>): boolean {
+  const present = COUNT_FIELDS.map((field) => num(metrics[field])).filter(
+    (value): value is number => value !== null,
+  )
+  return present.length > 0 && present.every((value) => value === 0)
+}
+
+/**
+ * Zernio's `lastUpdated` as ISO-8601 UTC.
+ *
+ * It arrives as `2026-08-10 09:38:57` — space-separated and with no zone — which is not
+ * the ISO-8601 `PostMetrics.measuredAt` promises. That matters because the copy layer
+ * hands the value straight to `new Date(...)`: V8 reads an unzoned string as LOCAL time,
+ * so "Last updated" silently shifts by the server's offset, and Safari returns NaN.
+ *
+ * Anything already zoned, or in any shape this does not recognise, is passed through
+ * untouched — a timestamp we cannot confidently re-interpret is left as it came rather
+ * than being relabelled UTC on a guess.
+ */
+const UNZONED = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(\.\d+)?$/
+
+export function normaliseMeasuredAt(raw: string): string {
+  const match = UNZONED.exec(raw.trim())
+  if (!match) return raw
+  return `${match[1]}T${match[2]}${match[3] ?? ''}Z`
 }
 
 /**
@@ -175,12 +237,31 @@ export interface ClassifyInput {
  *                           still processing is not "check back later"; it will never
  *                           resolve, and "processing" would promise that it will.
  *   5. 202                — accepted, not computed. The zeroes in the body are not data.
- *   6. no measuredAt      — `lastUpdated` is the only proof a measurement happened, so
+ *   6. no measuredAt      — no `lastUpdated` at all means nothing has been synced, so
  *                           its absence is decisive regardless of what the numbers say.
+ *   6a. all-zero, in-window — every count Zernio reported was 0 AND the platform's
+ *                           reporting window has not closed yet. See below.
  *   7. ready              — and only here can a number reach the screen.
  *
- * Rule 6 is what makes `ready` safe by construction: it cannot be reached with an
- * absent `analytics` object or a null `lastUpdated`.
+ * ── WHY 6a EXISTS: `lastUpdated` IS A POLL STAMP ─────────────────────────────
+ * Rule 6 used to be the whole guard, on the stated premise that `lastUpdated` was "the
+ * only proof a measurement happened". A live sweep on 2026-08-10 disproved it. Four
+ * posts published 17h, 41m, 36m and 26m earlier all came back carrying the SAME
+ * `lastUpdated` — `2026-08-10 09:38:57`. A timestamp identical across posts published
+ * seventeen hours apart records when ZERNIO LAST POLLED, not when each was measured.
+ *
+ * So its presence proves a sync ran, nothing more, and three of those four posts were
+ * classified `ready` with every metric 0 — the precise failure this module exists to
+ * prevent, reached through the field trusted to prevent it.
+ *
+ * 6a restores the guarantee without over-correcting. It fires only when BOTH hold, and
+ * each half is load-bearing:
+ *   · all counts zero — a non-zero reading cannot be fabricated by a poll, so an early
+ *     2 impressions is real and must still show. Demoting it would hide data the
+ *     customer has, which is the same lie pointing the other way.
+ *   · window still open — past the window a zero is a genuine measurement of nothing,
+ *     and saying "check back" forever would be its own falsehood. The rule is never a
+ *     zero we cannot justify, not never a zero.
  */
 export function classifyPostMetrics(input: ClassifyInput): MetricAvailability {
   const { result, platformPostId, published, publishedAt, now, simulated } = input
@@ -202,12 +283,21 @@ export function classifyPostMetrics(input: ClassifyInput): MetricAvailability {
 
   const analytics = post.analytics
   const measuredAt = analytics?.lastUpdated
+  const lagHours = input.lagHours ?? INSTAGRAM_INSIGHTS_LAG_HOURS
 
   if (!analytics || typeof measuredAt !== 'string' || measuredAt === '') {
-    return pendingForLag(publishedAt, now, input.lagHours ?? INSTAGRAM_INSIGHTS_LAG_HOURS)
+    return pendingForLag(publishedAt, now, lagHours)
   }
 
   const raw = analytics as unknown as Record<string, unknown>
+
+  // Rule 6a — see the precedence note above. All-zero counts inside the reporting
+  // window are the sync stamp's zeroes, not the platform's answer.
+  if (reportedAllZero(raw)) {
+    const lagged = pendingForLag(publishedAt, now, lagHours)
+    if (lagged.kind === 'pending' && lagged.reason === 'lag') return lagged
+  }
+
   return {
     kind: 'ready',
     metrics: {
@@ -215,7 +305,7 @@ export function classifyPostMetrics(input: ClassifyInput): MetricAvailability {
       reach: num(raw.reach),
       engagement: engagementOf(raw),
       engagementRate: num(raw.engagementRate),
-      measuredAt,
+      measuredAt: normaliseMeasuredAt(measuredAt),
     },
   }
 }

@@ -75,12 +75,21 @@ export type AccountAnalytics =
   | { kind: 'reconnect' }
   | { kind: 'unreadable' }
 
-/** Metric labels worth a tile, in the order they should read. */
+/**
+ * Metric labels worth a tile, in the order they should read.
+ *
+ * These are the keys `/analytics/instagram/account-insights` ACTUALLY returns, verified
+ * live on 2026-08-10. It previously asked for `impressions` and `profile_views`, which
+ * that response does not contain — Instagram's newer account metrics are `views` and
+ * `total_interactions`. Asking for a key the endpoint never sends is indistinguishable
+ * from the endpoint reporting nothing, which is how this card came to claim exactly
+ * that while holding four numbers.
+ */
 const INSIGHT_KEYS: readonly { key: string; label: string }[] = [
   { key: 'reach', label: 'Reach' },
-  { key: 'impressions', label: 'Impressions' },
-  { key: 'profile_views', label: 'Profile views' },
+  { key: 'views', label: 'Views' },
   { key: 'accounts_engaged', label: 'Accounts engaged' },
+  { key: 'total_interactions', label: 'Interactions' },
 ]
 
 /** A finite number, or nothing. Never a coerced 0. */
@@ -89,31 +98,82 @@ function num(raw: unknown): number | null {
 }
 
 /**
+ * One headline figure out of Zernio's `metrics` bag.
+ *
+ * Every metric arrives wrapped — `{ "reach": { "total": 1 } }` — under
+ * `metricType: total_value`, never as a bare number. A bare number is still accepted
+ * because it costs one line and the wrapper is a shape we learned by observation, not
+ * from a contract that guarantees it.
+ */
+function totalOf(raw: unknown): number | null {
+  const direct = num(raw)
+  if (direct !== null) return direct
+  if (typeof raw !== 'object' || raw === null) return null
+  return num((raw as Record<string, unknown>).total)
+}
+
+/**
+ * The tiles this response can honestly fill.
+ *
+ * A metric the response did not carry is dropped, never shown as 0 — but a metric
+ * REPORTED as 0 keeps its tile, because that is a measurement. Exported for the test
+ * that pins both halves of that distinction against the recorded payload.
+ */
+export function insightTiles(metrics: Record<string, unknown>): { label: string; value: number }[] {
+  return INSIGHT_KEYS.map(({ key, label }) => ({ label, value: totalOf(metrics[key]) })).filter(
+    (tile): tile is { label: string; value: number } => tile.value !== null,
+  )
+}
+
+/** A daily series is keyed by dates. `2026-08-09`, or a full ISO timestamp. */
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}/
+
+/** One `{ date, value }` point, however Zernio spelled those two fields. */
+function pointFrom(raw: unknown): SeriesPoint | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const record = raw as Record<string, unknown>
+  const date = record.date ?? record.end_time ?? record.timestamp
+  const value = num(record.value ?? record.count ?? record.followers)
+  if (typeof date !== 'string' || value === null) return null
+  return { date, value }
+}
+
+/**
  * Pull a daily series out of Zernio's untyped `metrics` bag.
  *
- * Accepts the two shapes seen in the wild — an array of points, or an object of
- * date→value — and drops anything it cannot read. A dropped point is a shorter line;
- * a coerced one is a false line, and only one of those is recoverable by looking.
+ * ── THE SHAPE THIS GOT WRONG, AND WHY IT MATTERED ────────────────────────────
+ * Three shapes are now handled: a bare array of points, a `{ values: [...] }` wrapper,
+ * and a plain date→value object. The wrapper is the one the live endpoint returns
+ * under `metricType=time_series`, and its absence here was not a silent empty — it was
+ * a fabrication.
+ *
+ * Under the default `metricType=total_value` a metric arrives as `{ total: 1 }`. That
+ * fell through to the date→value branch, which read the JSON KEY as a date and emitted
+ * `[{ date: 'total', value: 1 }]` — a one-point chart that rendered as "1 — No change
+ * over 1 day". Every part of that sentence was invented.
+ *
+ * So the date→value branch now requires its keys to look like dates. A dropped point is
+ * a shorter line; a coerced one is a false line, and only one of those is recoverable
+ * by looking at it.
  */
 export function seriesFrom(metrics: Record<string, unknown>, key: string): SeriesPoint[] {
   const raw = metrics[key]
 
   if (Array.isArray(raw)) {
-    return raw
-      .map((point) => {
-        if (typeof point !== 'object' || point === null) return null
-        const record = point as Record<string, unknown>
-        const date = record.date ?? record.end_time ?? record.timestamp
-        const value = num(record.value ?? record.count ?? record.followers)
-        if (typeof date !== 'string' || value === null) return null
-        return { date, value }
-      })
-      .filter((p): p is SeriesPoint => p !== null)
+    return raw.map(pointFrom).filter((p): p is SeriesPoint => p !== null)
   }
 
   if (typeof raw === 'object' && raw !== null) {
-    return Object.entries(raw as Record<string, unknown>)
+    const record = raw as Record<string, unknown>
+
+    // `{ total, values: [{ date, value }] }` — the time-series answer.
+    if (Array.isArray(record.values)) {
+      return record.values.map(pointFrom).filter((p): p is SeriesPoint => p !== null)
+    }
+
+    return Object.entries(record)
       .map(([date, value]) => {
+        if (!DATE_KEY.test(date)) return null
         const parsed = num(value)
         return parsed === null ? null : { date, value: parsed }
       })
@@ -198,7 +258,14 @@ export async function readInstagramAnalytics(now: Date = new Date()): Promise<Ac
 
   try {
     const [history, insights] = await Promise.all([
-      reads.instagramFollowerHistory(account, { since, until }),
+      // `time_series` is asked for EXPLICITLY. The endpoint defaults to `total_value`,
+      // which answers `{ follower_count: { total: 1 } }` — a single number for the whole
+      // window, and no history at all. A chart cannot be drawn from it, and the previous
+      // code drew one anyway (see `seriesFrom`).
+      reads.instagramFollowerHistory(account, { since, until, metricType: 'time_series' }),
+      // Insights stays on the default. `time_series` is REFUSED here — the endpoint
+      // answers HTTP 400, "Metrics [views, accounts_engaged, total_interactions] only
+      // support metricType=total_value" — and these four are read as tiles, not a line.
       reads.instagramAccountInsights(account, { since, until }),
     ])
 
@@ -213,10 +280,7 @@ export async function readInstagramAnalytics(now: Date = new Date()): Promise<Ac
       lagHoursFromDataDelay(insights.dataDelay) ?? INSTAGRAM_INSIGHTS_LAG_HOURS
 
     const followers = firstSeries(history.metrics, FOLLOWER_KEYS)
-    const tiles = INSIGHT_KEYS.map(({ key, label }) => ({
-      label,
-      value: num(insights.metrics[key]),
-    })).filter((t): t is { label: string; value: number } => t.value !== null)
+    const tiles = insightTiles(insights.metrics)
 
     return {
       kind: 'ready',

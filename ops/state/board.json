@@ -819,30 +819,32 @@
     },
     {
       "code": "SL-070",
-      "title": "Make the two questions \"is this a Zernio account\" agree with each other",
-      "detail": "Deciding which route a post takes to a platform is done twice, in two places, with two different rules — and only one of them checks whether the account is still live. A reader assumes both are asking the same question. Why it matters: an account that has expired takes the OTHER route, which skips the check that stops a post going to a different customer's page.\n\nTechnical detail — `apps/jobs/src/publish/store.ts:252` — `isZernioConnection()` filters `c.status = 'active'`; the general query it falls through to has NO status filter at all and merely ORDERS by `(status = 'active') desc`. So a Zernio-fronted row in any state but `active` fails the narrow test and takes the native path, which does not call `assert_account_for_scheduled_post` — the gate that re-derives the workspace from the post itself (doc 13 §3: Zernio validates an accountId against the whole TEAM, so a wrong id publishes successfully to someone else and returns 200). Today this is contained only by `tokens.ts:70` refusing a non-`active` connection two layers away, in a different file, for a different reason. Fix by giving both queries one predicate, or by moving the status check into `isZernioConnection`'s caller so the routing decision and the liveness decision are visibly the same decision. Found by audit 2026-08-10.",
+      "title": "Use each platform’s own reporting delay, not Instagram’s, when deciding if a metric is late",
+      "detail": "When a post’s numbers all come back as zero, we now check whether the platform has even had time to report yet before showing them — and if it has not, we say “not available yet” instead of “nobody saw this”. That check currently uses Instagram’s 48-hour delay for every channel, including ones that report much faster. Why it matters: on a channel that reports within the hour, we would keep saying “check back later” for two days over numbers we already had — the same dishonesty as showing a false zero, pointing the other way. Harmless today: Instagram is the only channel publishing live, and the LinkedIn, X and GBP rows are all simulated, so they are filtered out before any metrics call is made.\n\nTechnical detail — `listPostMetrics` never passes `lagHours` to `classifyPostMetrics`, so rule 6a always gates an all-zero payload against `INSTAGRAM_INSIGHTS_LAG_HOURS` (48). This was inert before 2026-08-10 — `lagHours` only mattered when `lastUpdated` was absent, which the live API never does — but rule 6a now decides visibility for every published channel. The account half already solves this properly: it reads each endpoint’s own `dataDelay` through `lagHoursFromDataDelay` and keeps the follower (24h) and insights (48h) delays strictly apart. `ZernioPostAnalytics` carries no `dataDelay` field, so the per-post half has nothing equivalent to read; closing this needs either a per-channel constant or a source for each platform’s stated delay.",
       "roadmap_code": null,
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": null,
+      "doc_ref": "packages/publishing/src/zernio/analytics-state.ts (rule 6a)",
       "sort": 700,
-      "commit_sha": null
+      "blocked": false,
+      "blocked_reason": null
     },
     {
       "code": "SL-071",
-      "title": "Let the connection row, not the channel name, decide how a post is sent",
-      "detail": "Whether we hold the login for an account is meant to be answered by the account itself. For one platform the answer is hardcoded by name instead, and it wins over whatever the account says. A reader assumes the account record decides. Why it matters: an account of a kind we do not expect would be sent with no login at all, and the failure would look like the platform refusing us.\n\nTechnical detail — `apps/jobs/src/publish/tokens.ts:78` — `AGGREGATOR_FRONTED.has(payload.channel) || connection.viaZernio === true`. Channel membership is tested FIRST and short-circuits, so for `instagram` the row's own `viaZernio` is never consulted: a native OAuth instagram connection would return `accessToken: ''` and publish through the Zernio adapter. Unreachable today — instagram is always aggregator-fronted because we hold no Meta credential and file no app review — which is exactly why it will stay unnoticed until it is not. The same file's `StoredConnection` doc says the row is what answers this for x, gbp and linkedin; the ordering makes instagram the one exception, silently. Found by audit 2026-08-10.",
+      "title": "Find out whether a zero in the follower chart means zero followers or no snapshot",
+      "detail": "The follower chart’s first point is a zero, and we cannot currently tell whether that means the account genuinely had no followers that day or simply that nobody had recorded a number yet. Why it matters: the chart deliberately zooms its scale so small movements are visible, so a zero that only means “not recorded” would be drawn as a dramatic drop and then a recovery — inventing a story about followers leaving and coming back. That is the same class of bug as showing an unmeasured post as having reached nobody, which was just fixed on the post side. The evidence so far is one test account with one follower, which cannot tell the two cases apart.\n\nTechnical detail — `/analytics/instagram/follower-history?metricType=time_series` returned `follower_count.values` beginning `{ date: 2026-08-08, value: 0 }` for account testingg53, recorded at `packages/publishing/fixtures/zernio/follower-history.time-series.json`. Zernio describes the source as “Zernio’s daily snapshotter”, so the open question is what it emits for dates BEFORE snapshotting began for an account: absent points, or zeroes. If zeroes, `seriesFrom` should drop leading zero points rather than plot them, because `FollowerLine` scales between the window’s own min and max and would amplify the false drop. Needs one account whose snapshots start partway through the window; a second recording under `fixtures/zernio/` settles it.",
       "roadmap_code": null,
       "board_column": "todo",
       "assignee": "claude",
-      "doc_ref": null,
+      "doc_ref": "packages/publishing/fixtures/zernio/README.md",
       "sort": 710,
-      "commit_sha": null
+      "blocked": false,
+      "blocked_reason": null
     },
     {
       "code": "SL-072",
-      "title": "Stop offering \"try again\" for failures that cannot succeed on a retry",
-      "detail": "When a post fails for a reason we do not have words for, the screen shows a general apology and invites another go. A reader assumes an unrecognised failure is treated cautiously. Why it matters: many of those failures are permanent, so the invitation costs the shop owner a second wasted attempt and teaches them the button does nothing.\n\nTechnical detail — `apps/web/src/lib/posts/publish-error-copy.ts:144` — `COPY[code] ?? { message: GENERIC, worthRetrying: true, needsReconnect: false }`. The allowlist itself is right and deliberate: `post_publish_logs.error.message` is adapter-controlled and must never be rendered. What is not deliberate is the DEFAULT it degrades to — `worthRetrying: true` is a claim about an error we just admitted we do not recognise, and `runPublishPost` records a `classification` (`transient` | `permanent`) that the copy layer never reads. Fix by carrying the stored classification into `describePublishError` so an unknown PERMANENT code degrades to a non-retryable sentence, and only an unknown transient one offers another go. Found by audit 2026-08-10.",
+      "title": "Make the two questions \"is this a Zernio account\" agree with each other",
+      "detail": "Deciding which route a post takes to a platform is done twice, in two places, with two different rules — and only one of them checks whether the account is still live. A reader assumes both are asking the same question. Why it matters: an account that has expired takes the OTHER route, which skips the check that stops a post going to a different customer's page.\n\nTechnical detail — `apps/jobs/src/publish/store.ts:252` — `isZernioConnection()` filters `c.status = 'active'`; the general query it falls through to has NO status filter at all and merely ORDERS by `(status = 'active') desc`. So a Zernio-fronted row in any state but `active` fails the narrow test and takes the native path, which does not call `assert_account_for_scheduled_post` — the gate that re-derives the workspace from the post itself (doc 13 §3: Zernio validates an accountId against the whole TEAM, so a wrong id publishes successfully to someone else and returns 200). Today this is contained only by `tokens.ts:70` refusing a non-`active` connection two layers away, in a different file, for a different reason. Fix by giving both queries one predicate, or by moving the status check into `isZernioConnection`'s caller so the routing decision and the liveness decision are visibly the same decision. Found by audit 2026-08-10.",
       "roadmap_code": null,
       "board_column": "todo",
       "assignee": "claude",
@@ -852,13 +854,35 @@
     },
     {
       "code": "SL-073",
+      "title": "Let the connection row, not the channel name, decide how a post is sent",
+      "detail": "Whether we hold the login for an account is meant to be answered by the account itself. For one platform the answer is hardcoded by name instead, and it wins over whatever the account says. A reader assumes the account record decides. Why it matters: an account of a kind we do not expect would be sent with no login at all, and the failure would look like the platform refusing us.\n\nTechnical detail — `apps/jobs/src/publish/tokens.ts:78` — `AGGREGATOR_FRONTED.has(payload.channel) || connection.viaZernio === true`. Channel membership is tested FIRST and short-circuits, so for `instagram` the row's own `viaZernio` is never consulted: a native OAuth instagram connection would return `accessToken: ''` and publish through the Zernio adapter. Unreachable today — instagram is always aggregator-fronted because we hold no Meta credential and file no app review — which is exactly why it will stay unnoticed until it is not. The same file's `StoredConnection` doc says the row is what answers this for x, gbp and linkedin; the ordering makes instagram the one exception, silently. Found by audit 2026-08-10.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": null,
+      "sort": 730,
+      "commit_sha": null
+    },
+    {
+      "code": "SL-074",
+      "title": "Stop offering \"try again\" for failures that cannot succeed on a retry",
+      "detail": "When a post fails for a reason we do not have words for, the screen shows a general apology and invites another go. A reader assumes an unrecognised failure is treated cautiously. Why it matters: many of those failures are permanent, so the invitation costs the shop owner a second wasted attempt and teaches them the button does nothing.\n\nTechnical detail — `apps/web/src/lib/posts/publish-error-copy.ts:144` — `COPY[code] ?? { message: GENERIC, worthRetrying: true, needsReconnect: false }`. The allowlist itself is right and deliberate: `post_publish_logs.error.message` is adapter-controlled and must never be rendered. What is not deliberate is the DEFAULT it degrades to — `worthRetrying: true` is a claim about an error we just admitted we do not recognise, and `runPublishPost` records a `classification` (`transient` | `permanent`) that the copy layer never reads. Fix by carrying the stored classification into `describePublishError` so an unknown PERMANENT code degrades to a non-retryable sentence, and only an unknown transient one offers another go. Found by audit 2026-08-10.",
+      "roadmap_code": null,
+      "board_column": "todo",
+      "assignee": "claude",
+      "doc_ref": null,
+      "sort": 740,
+      "commit_sha": null
+    },
+    {
+      "code": "SL-075",
       "title": "Read schedule refusals by their code rather than by matching words in them",
       "detail": "When the database refuses to move a post’s time, the reason is worked out by looking for phrases inside the error text. A reader assumes each refusal is matched to its own message. Why it matters: the first phrase that matches wins, and anything unrecognised becomes \"try again\" — which is wrong for a refusal that will never change its mind.\n\nTechnical detail — `apps/web/src/app/actions/posts-schedule.ts:33-45` — `messageFor()` is a `msg.includes(...)` ladder over the raw Postgres message, first match wins, and its fallback is 'Could not change the schedule — try again.' Two problems of one shape: the ordering is load-bearing but undocumented (`POST_ALREADY_GOING_OUT` is tested before `POST_NOT_RESCHEDULABLE`, and a message containing both would silently take the first), and the general branch invites a retry for what is usually a permanent refusal — the same defect as the publish copy map's default. `mapPostError` in `lib/posts/post-error.ts` is the clean counter-example on the same screen: a switch over SQLSTATE with an explicit default. Fix by raising these with a distinguishable errcode or by matching an anchored code rather than a substring. Found by audit 2026-08-10.",
       "roadmap_code": null,
       "board_column": "todo",
       "assignee": "claude",
       "doc_ref": null,
-      "sort": 730,
+      "sort": 750,
       "commit_sha": null
     }
   ]

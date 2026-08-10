@@ -579,6 +579,22 @@ export const CARDS = [
   },
   {
     roadmap: null,
+    title: 'Use each platform’s own reporting delay, not Instagram’s, when deciding if a metric is late',
+    plain:
+      'When a post’s numbers all come back as zero, we now check whether the platform has even had time to report yet before showing them — and if it has not, we say “not available yet” instead of “nobody saw this”. That check currently uses Instagram’s 48-hour delay for every channel, including ones that report much faster. Why it matters: on a channel that reports within the hour, we would keep saying “check back later” for two days over numbers we already had — the same dishonesty as showing a false zero, pointing the other way. Harmless today: Instagram is the only channel publishing live, and the LinkedIn, X and GBP rows are all simulated, so they are filtered out before any metrics call is made.',
+    technical:
+      '`listPostMetrics` never passes `lagHours` to `classifyPostMetrics`, so rule 6a always gates an all-zero payload against `INSTAGRAM_INSIGHTS_LAG_HOURS` (48). This was inert before 2026-08-10 — `lagHours` only mattered when `lastUpdated` was absent, which the live API never does — but rule 6a now decides visibility for every published channel. The account half already solves this properly: it reads each endpoint’s own `dataDelay` through `lagHoursFromDataDelay` and keeps the follower (24h) and insights (48h) delays strictly apart. `ZernioPostAnalytics` carries no `dataDelay` field, so the per-post half has nothing equivalent to read; closing this needs either a per-channel constant or a source for each platform’s stated delay.',
+  },
+  {
+    roadmap: null,
+    title: 'Find out whether a zero in the follower chart means zero followers or no snapshot',
+    plain:
+      'The follower chart’s first point is a zero, and we cannot currently tell whether that means the account genuinely had no followers that day or simply that nobody had recorded a number yet. Why it matters: the chart deliberately zooms its scale so small movements are visible, so a zero that only means “not recorded” would be drawn as a dramatic drop and then a recovery — inventing a story about followers leaving and coming back. That is the same class of bug as showing an unmeasured post as having reached nobody, which was just fixed on the post side. The evidence so far is one test account with one follower, which cannot tell the two cases apart.',
+    technical:
+      '`/analytics/instagram/follower-history?metricType=time_series` returned `follower_count.values` beginning `{ date: 2026-08-08, value: 0 }` for account testingg53, recorded at `packages/publishing/fixtures/zernio/follower-history.time-series.json`. Zernio describes the source as “Zernio’s daily snapshotter”, so the open question is what it emits for dates BEFORE snapshotting began for an account: absent points, or zeroes. If zeroes, `seriesFrom` should drop leading zero points rather than plot them, because `FollowerLine` scales between the window’s own min and max and would amplify the false drop. Needs one account whose snapshots start partway through the window; a second recording under `fixtures/zernio/` settles it.',
+  },
+  {
+    roadmap: null,
     title: 'Make the two questions "is this a Zernio account" agree with each other',
     plain:
       "Deciding which route a post takes to a platform is done twice, in two places, with two different rules — and only one of them checks whether the account is still live. A reader assumes both are asking the same question. Why it matters: an account that has expired takes the OTHER route, which skips the check that stops a post going to a different customer's page.",
