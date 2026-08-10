@@ -1,3 +1,19 @@
+'use client'
+
+/**
+ * A client component for ONE reason: the `onClick` below.
+ *
+ * `post-card.tsx` wraps the whole card in a Link to the editor and renders this chip
+ * INSIDE it, so a chip that did not stop the click would send a reader who asked for the
+ * live post to the draft instead. That handler is load-bearing, and a handler means this
+ * file cannot render on the server.
+ *
+ * It was missing until 2026-08-10 and nothing caught it, because the anchor only renders
+ * when `state.permalink` is truthy — and until the first live publish on 2026-08-09 every
+ * permalink in the database was `fixture://`, which `variant-status.ts` nulls. The throw
+ * was shipped by data, not by a deploy. `server-event-handler.guard.test.ts` now walks the
+ * server graph so the next one fails a test instead of a page.
+ */
 import { AlertCircle, Check, Clock, ExternalLink } from 'lucide-react'
 import type { Channel } from '@sahoda/shared'
 
