@@ -327,3 +327,144 @@ describe('a simulated publish says so', () => {
     expect(state).not.toEqual({ kind: 'unavailable', reason: 'simulated' })
   })
 })
+
+/**
+ * RECORDED FROM THE LIVE API on 2026-08-10, account `testingg53`.
+ *
+ * These four bodies are not authored — they are files under `fixtures/zernio/`, captured
+ * off the live endpoint and imported verbatim. That distinction is the point of them.
+ * Every test above this line was written against a payload we CONSTRUCTED, so it could
+ * only ever confirm what its author already believed `/analytics` returns. These were
+ * written against what it actually returned, and the two disagree on the single field
+ * the classifier trusts most.
+ *
+ * See `fixtures/zernio/README.md` — those files must be re-captured, never edited.
+ */
+import measured from '../../fixtures/zernio/analytics.post.measured.json'
+import zeroed from '../../fixtures/zernio/analytics.post.zeroed-in-window.json'
+import zeroed2 from '../../fixtures/zernio/analytics.post.zeroed-in-window.2.json'
+import zeroed3 from '../../fixtures/zernio/analytics.post.zeroed-in-window.3.json'
+
+/** The sweep these four were captured in. */
+const SWEEP = new Date('2026-08-10T09:52:00.000Z')
+
+const recorded = (fixture: { status: number; body: unknown }): ZernioPostAnalyticsResult => ({
+  status: fixture.status,
+  post: fixture.body as ZernioPostAnalytics,
+})
+
+describe('a sync stamp is not a measurement (recorded 2026-08-10)', () => {
+  /**
+   * THE PREMISE, DISPROVED BY THE RECORDINGS THEMSELVES.
+   *
+   * Rule 6 used to hold that `lastUpdated` was "the only proof a measurement happened".
+   * These four posts were published 17h, 41m, 36m and 26m before the sweep — and every
+   * one came back carrying the same stamp. A timestamp identical across posts published
+   * seventeen hours apart records when Zernio last POLLED, not when each was measured.
+   *
+   * No single fixture can show this; it is a fact about the relationship between four,
+   * which is why all four are kept.
+   */
+  it('is the same stamp on every post in the sweep, whatever their age', () => {
+    const stamps = [measured, zeroed, zeroed2, zeroed3].map(
+      (f) => (f.body as ZernioPostAnalytics).analytics?.lastUpdated,
+    )
+
+    expect(new Set(stamps).size).toBe(1)
+    expect(stamps[0]).toBe('2026-08-10 09:38:57')
+    // And it is not ISO-8601, which is what `measuredAt` promises its consumers.
+    expect(stamps[0]).not.toMatch(/T|Z|[+-]\d{2}:\d{2}$/)
+  })
+
+  /**
+   * Media 18057499664685525, published 09:11 — 41 minutes before the sweep, against
+   * Instagram's 48-hour reporting window. Every metric came back 0 with `lastUpdated`
+   * set, and the classifier called it `ready`: three of the four live posts rendered
+   * "Impressions 0 · Reach 0 · Engagement 0" as though someone had measured them.
+   */
+  it('does not call an all-zero payload measured while the window is still open', () => {
+    const state = classifyPostMetrics({
+      result: recorded(zeroed),
+      platformPostId: '18057499664685525',
+      published: true,
+      simulated: false,
+      publishedAt: '2026-08-10T09:11:19.293Z',
+      now: SWEEP,
+    })
+
+    expect(state).toEqual({
+      kind: 'pending',
+      reason: 'lag',
+      // 09:11:19 + 48h. The customer is told when to come back, not told zero.
+      availableAfter: '2026-08-12T09:11:19.293Z',
+    })
+  })
+
+  /**
+   * Media 18277022635290264, published 2026-08-09 16:42 — 17h before the sweep, so
+   * also inside the window, but it reported impressions 2 / reach 1 / comments 2.
+   *
+   * The gate must not swallow this. Nothing fabricates a 2, so an early non-zero
+   * reading is a real reading, and demoting it to "check back later" would hide data
+   * the customer has — the opposite failure, and just as dishonest.
+   */
+  it('still shows real numbers that arrive early', () => {
+    const state = classifyPostMetrics({
+      result: recorded(measured),
+      platformPostId: '18277022635290264',
+      published: true,
+      simulated: false,
+      publishedAt: '2026-08-09T16:42:14.332Z',
+      now: SWEEP,
+    })
+
+    expect(state.kind).toBe('ready')
+    if (state.kind !== 'ready') return
+    expect(state.metrics.impressions).toBe(2)
+    expect(state.metrics.reach).toBe(1)
+    expect(state.metrics.engagement).toBe(2)
+    expect(state.metrics.engagementRate).toBe(100)
+  })
+
+  /**
+   * Past the window, a zero is a real answer: the post has had its 48 hours and
+   * Instagram measured nothing. THAT is a measurement of nothing, and it is allowed —
+   * the rule is "never a zero we cannot justify", not "never a zero".
+   */
+  it('allows an all-zero reading once the window has closed', () => {
+    const state = classifyPostMetrics({
+      result: recorded(zeroed),
+      platformPostId: '18057499664685525',
+      published: true,
+      simulated: false,
+      publishedAt: LONG_AGO,
+      now: SWEEP,
+    })
+
+    expect(state.kind).toBe('ready')
+    if (state.kind !== 'ready') return
+    expect(state.metrics.impressions).toBe(0)
+  })
+
+  /**
+   * `measuredAt` is typed and documented as ISO-8601 and is handed to `new Date(...)`
+   * by the copy layer. Zernio's `2026-08-10 09:38:57` is neither ISO nor zoned: V8
+   * reads it as LOCAL time, so the "Last updated" line silently shifts by the server's
+   * offset, and Safari refuses it outright. Normalise at the boundary.
+   */
+  it('normalises the sync stamp to ISO-8601 UTC', () => {
+    const state = classifyPostMetrics({
+      result: recorded(measured),
+      platformPostId: '18277022635290264',
+      published: true,
+      simulated: false,
+      publishedAt: LONG_AGO,
+      now: SWEEP,
+    })
+
+    expect(state.kind).toBe('ready')
+    if (state.kind !== 'ready') return
+    expect(state.metrics.measuredAt).toBe('2026-08-10T09:38:57Z')
+    expect(Number.isNaN(new Date(state.metrics.measuredAt).getTime())).toBe(false)
+  })
+})

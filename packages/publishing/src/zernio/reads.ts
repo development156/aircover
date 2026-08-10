@@ -234,9 +234,19 @@ export interface ZernioReads {
     account: ScopedAccountId,
     opts?: { since?: string; until?: string; metrics?: string },
   ): Promise<{ metrics: Record<string, unknown>; dataDelay?: string }>
+  /**
+   * `metricType` decides whether this is a HISTORY at all.
+   *
+   * It defaults to `total_value` on Zernio's side, which answers one number for the
+   * whole window — `{ follower_count: { total: 1 } }` — and no per-day points. Only
+   * `time_series` returns `values: [{ date, value }]`. Verified live 2026-08-10.
+   *
+   * The same parameter is REFUSED by `instagramAccountInsights` (HTTP 400) for its
+   * default metric set, which is why it is offered here and not there.
+   */
   instagramFollowerHistory(
     account: ScopedAccountId,
-    opts?: { since?: string; until?: string },
+    opts?: { since?: string; until?: string; metricType?: 'total_value' | 'time_series' },
   ): Promise<{ metrics: Record<string, unknown>; dataDelay?: string }>
   gbpPerformance(
     account: ScopedAccountId,

@@ -177,3 +177,32 @@ describe('a simulated publish is never mistaken for a live one', () => {
     expect(copy.detail).not.toBe(idless.detail)
   })
 })
+
+/**
+ * `pending/lag` used to be nearly unreachable for a synced post: Zernio always sends
+ * `lastUpdated`, so the classifier short-circuited to `ready`. Since rule 6a it is the
+ * COMMON state for a fresh post — three of the four live posts on 2026-08-10 were in
+ * it — so the copy that carries its date is now load-bearing rather than a rare branch.
+ */
+describe('a lagged metric says when to come back', () => {
+  it('prints the date the window closes', () => {
+    const copy = metricCopy(
+      { kind: 'pending', reason: 'lag', availableAfter: '2026-08-12T09:11:19.293Z' },
+      'instagram',
+    )
+
+    expect(copy.headline).toBe('Not available yet')
+    expect(copy.tone).toBe('waiting')
+    // The whole point of `availableAfter`: a date the reader can act on, not "later".
+    expect(copy.detail).toContain('12 Aug 2026')
+    expect(copy.detail).toContain('Instagram')
+  })
+
+  it('still reads as a sentence when no date could be derived', () => {
+    const copy = metricCopy(
+      { kind: 'pending', reason: 'lag', availableAfter: null },
+      'instagram',
+    )
+    expect(copy.detail).toBe('Instagram reports metrics on a delay.')
+  })
+})
