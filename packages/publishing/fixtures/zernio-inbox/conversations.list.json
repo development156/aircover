@@ -1,0 +1,36 @@
+{
+  "data": [
+    {
+      "id": "1580525030139202",
+      "accountId": "6a75caf7d0fe733d1afcc1f4",
+      "accountUsername": "testingg53",
+      "platform": "instagram",
+      "participantId": "1580525030139202",
+      "participantName": "Priya S.",
+      "participantPicture": "https://example.invalid/redacted.jpg",
+      "participantUsername": "priyas",
+      "lastMessage": "Hi",
+      "updatedTime": "2026-08-08T14:11:04.384Z",
+      "status": "active",
+      "unreadCount": 0,
+      "instagramProfile": {
+        "isFollower": true,
+        "isFollowing": true,
+        "followerCount": 275,
+        "isVerified": false,
+        "fetchedAt": "2026-08-08T14:11:06.381Z"
+      },
+      "url": "https://www.instagram.com/direct/t/REDACTED/"
+    }
+  ],
+  "pagination": {
+    "hasMore": false,
+    "nextCursor": null
+  },
+  "meta": {
+    "accountsQueried": 2,
+    "accountsFailed": 0,
+    "failedAccounts": [],
+    "lastUpdated": "2026-08-10T09:52:01.404Z"
+  }
+}

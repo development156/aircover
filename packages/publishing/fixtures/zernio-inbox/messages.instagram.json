@@ -1,0 +1,47 @@
+{
+  "status": "success",
+  "messages": [
+    {
+      "id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDQyNzk1NDY2ODUyOjM0MDI4MjM2Njg0MTcxMDMwMTI0NDI2MDQxODI3MTE2Njg4MzExODozMjk0OTU0MjAwNDgyMzUzNTEyMzk4NTQ5MDM1MDQ0MDQ0OAZDZD",
+      "conversationId": "1580525030139202",
+      "accountId": "6a75caf7d0fe733d1afcc1f4",
+      "platform": "instagram",
+      "message": "HI",
+      "senderId": "17841442795466852",
+      "senderName": "You",
+      "direction": "outgoing",
+      "createdAt": "2026-08-08T14:10:51.201Z",
+      "attachments": [],
+      "isStoryMention": false,
+      "isEdited": false,
+      "editCount": 0,
+      "editHistory": [],
+      "isDeleted": false,
+      "sentAt": "2026-08-08T14:10:51.201Z"
+    },
+    {
+      "id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDQyNzk1NDY2ODUyOjM0MDI4MjM2Njg0MTcxMDMwMTI0NDI2MDQxODI3MTE2Njg4MzExODozMjk0OTU0MjI0Nzk5NzA1NjM0NjEzMDkyNzI3NDk1MDY1NgZDZD",
+      "conversationId": "1580525030139202",
+      "accountId": "6a75caf7d0fe733d1afcc1f4",
+      "platform": "instagram",
+      "message": "Hi",
+      "senderId": "1580525030139202",
+      "senderName": "Priya S.",
+      "direction": "incoming",
+      "createdAt": "2026-08-08T14:11:04.384Z",
+      "attachments": [],
+      "isStoryMention": false,
+      "isEdited": false,
+      "editCount": 0,
+      "editHistory": [],
+      "isDeleted": false,
+      "sentAt": "2026-08-08T14:11:04.384Z"
+    }
+  ],
+  "pagination": {
+    "hasMore": false,
+    "nextCursor": null
+  },
+  "sortOrderApplied": "asc",
+  "lastUpdated": "2026-08-10T09:52:51.365Z"
+}

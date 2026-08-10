@@ -1,0 +1,18 @@
+{
+  "status": "success",
+  "data": [],
+  "pagination": {
+    "hasMore": false,
+    "nextCursor": null
+  },
+  "meta": {
+    "accountsQueried": 0,
+    "accountsFailed": 0,
+    "failedAccounts": [],
+    "lastUpdated": "2026-08-10T09:52:02.494Z"
+  },
+  "summary": {
+    "totalReviews": 0,
+    "averageRating": null
+  }
+}
