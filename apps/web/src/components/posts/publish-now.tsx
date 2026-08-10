@@ -7,6 +7,7 @@ import Link from 'next/link'
 import type { Channel } from '@sahoda/shared'
 
 import { Button } from '@/components/ui/button'
+import { joinNames, unconnectedFrom } from '@/lib/posts/connection-gap'
 import { LIVE_RAIL } from '@/lib/posts/live-rail'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 
@@ -83,8 +84,10 @@ export function PublishNow({
 
   const onRail = channels.filter((channel) => LIVE_RAIL.has(channel))
   // Split rather than filtered: the unconnected ones still need saying out loud.
-  const live = onRail.filter((channel) => connected === undefined || connected.has(channel))
-  const unconnected = onRail.filter((channel) => connected !== undefined && !connected.has(channel))
+  // `unconnectedFrom` is shared with the schedule picker, which says the same fact
+  // in different words at a different moment — one rule, two sentences.
+  const unconnected = unconnectedFrom(onRail, connected)
+  const live = onRail.filter((channel) => !unconnected.includes(channel))
   const anyAttempted = statusRows.some((row) => row.status !== 'pending')
 
   // Nothing to publish, nothing to report, and nothing to fix. A button that
@@ -176,7 +179,7 @@ export function PublishNow({
           <p className="text-[13px] text-warn">
             {unconnected.length === 1
               ? `${CHANNEL_LABELS[unconnected[0]!]} isn’t connected yet, so this can’t go out there.`
-              : `${unconnected.map((c) => CHANNEL_LABELS[c]).join(' and ')} aren’t connected yet, so this can’t go out there.`}
+              : `${joinNames(unconnected.map((c) => CHANNEL_LABELS[c]))} aren’t connected yet, so this can’t go out there.`}
           </p>
           <Link
             href="/connections"

@@ -117,3 +117,118 @@ describe('what setting a time actually does', () => {
     expect(screen.queryByText(NOT_LIVE)).not.toBeInTheDocument()
   })
 })
+
+/**
+ * The warning post f0a777cf never got.
+ *
+ * That post was scheduled for both Instagram and LinkedIn. Instagram published;
+ * LinkedIn failed at CONNECTION_UNAVAILABLE thirty seconds later, because the
+ * workspace had no LinkedIn connection and never had one. The editor DID say so —
+ * `PublishNow` renders an unconnected-channel block — but `PlannerReschedule`
+ * renders this component alone, with no picker and no publish panel, and
+ * `ConnectFirstNote` is silent by design once any one channel is connected. So on
+ * `/planner` the schedule was set with nothing on screen mentioning it.
+ *
+ * The note REPLACES the generic line rather than stacking under it: the line it
+ * displaces says "on every connected channel", which is true and useless to
+ * someone who does not know which of theirs those are.
+ */
+describe('ScheduleField warns about a channel that cannot receive the post', () => {
+  const connected = new Set<'instagram'>(['instagram'])
+
+  test('names the unconnected channel once a time is set', () => {
+    render(
+      <ScheduleField
+        channels={['instagram', 'linkedin']}
+        value={future(86_400_000)}
+        onChange={vi.fn()}
+        autoPublish
+        connected={connected}
+      />,
+    )
+
+    expect(screen.getByText(/LinkedIn isn’t connected/)).toBeInTheDocument()
+    // The vague line it replaces must be gone, not merely joined.
+    expect(screen.queryByText(/on every connected channel/)).not.toBeInTheDocument()
+  })
+
+  test('says nothing goes out when no picked channel is connected', () => {
+    render(
+      <ScheduleField
+        channels={['linkedin']}
+        value={future(86_400_000)}
+        onChange={vi.fn()}
+        autoPublish
+        connected={connected}
+      />,
+    )
+
+    expect(screen.getByText(/Nothing goes out at that time/)).toBeInTheDocument()
+  })
+
+  test('a duplicated channel cannot turn "nothing goes out" into "it goes out"', () => {
+    // `post.channels` is a text[] off the row, not a set, and the planner passes it
+    // straight through. Counting names against `channels.length` would read
+    // 1-of-2 here and promise the post goes out somewhere.
+    render(
+      <ScheduleField
+        channels={['linkedin', 'linkedin']}
+        value={future(86_400_000)}
+        onChange={vi.fn()}
+        autoPublish
+        connected={connected}
+      />,
+    )
+
+    expect(screen.getByText(/Nothing goes out at that time/)).toBeInTheDocument()
+    // ...and it names that channel ONCE. The list is the part the reader acts on:
+    // "LinkedIn and LinkedIn" reads as two separate accounts to go and reconnect.
+    expect(screen.getByText(/LinkedIn isn’t connected/)).toBeInTheDocument()
+  })
+
+  test('stays quiet with no time set — there is no promise to correct yet', () => {
+    render(
+      <ScheduleField
+        channels={['instagram', 'linkedin']}
+        value={null}
+        onChange={vi.fn()}
+        autoPublish
+        connected={connected}
+      />,
+    )
+
+    expect(screen.queryByText(/isn’t connected/)).not.toBeInTheDocument()
+  })
+
+  test('stays quiet when the dispatcher is off — nothing goes out on ANY channel', () => {
+    // Naming one channel here would imply the others are fine, which is the
+    // opposite of the truth. The existing note already says nothing auto-posts.
+    render(
+      <ScheduleField
+        channels={['instagram', 'linkedin']}
+        value={future(86_400_000)}
+        onChange={vi.fn()}
+        connected={connected}
+      />,
+    )
+
+    expect(screen.queryByText(/isn’t connected/)).not.toBeInTheDocument()
+    // ASCII apostrophe on purpose: `SCHEDULE_FIELD_NOTE` uses one, while the copy
+    // in `connection-gap.ts` uses the typographic `’`. A regex that assumes either
+    // one everywhere passes vacuously against the other.
+    expect(screen.getByText(/isn't live yet/)).toBeInTheDocument()
+  })
+
+  test('stays quiet when the connection state was not read at all', () => {
+    render(
+      <ScheduleField
+        channels={['instagram', 'linkedin']}
+        value={future(86_400_000)}
+        onChange={vi.fn()}
+        autoPublish
+      />,
+    )
+
+    expect(screen.queryByText(/isn’t connected/)).not.toBeInTheDocument()
+  })
+})

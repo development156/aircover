@@ -75,6 +75,7 @@ export function BottomBar({
           onChange={onScheduleChange}
           autoPublish={autoPublish}
           error={scheduleError}
+          connected={connected}
         />
       </div>
 

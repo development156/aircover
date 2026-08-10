@@ -13,6 +13,14 @@ export interface PlannerRescheduleProps {
   channels: Channel[]
   /** ISO string from `posts.scheduled_at`, or null. */
   value: string | null
+  /**
+   * Channels with a live connection, and whether the dispatcher is on. Both are
+   * server facts, both are read on `/planner` already, and until now neither
+   * reached this control — so a post could be scheduled here onto a channel with
+   * no account and nothing on the screen said a word. See `ScheduleField`.
+   */
+  connected?: ReadonlySet<Channel>
+  autoPublish?: boolean
 }
 
 /**
@@ -33,7 +41,13 @@ export interface PlannerRescheduleProps {
  * Honest scope, unchanged: the lead/future check lives in `ScheduleField`
  * (CLIENT-side only). Server-side lead validation is still a filed ask.
  */
-export function PlannerReschedule({ postId, channels, value }: PlannerRescheduleProps) {
+export function PlannerReschedule({
+  postId,
+  channels,
+  value,
+  connected,
+  autoPublish = false,
+}: PlannerRescheduleProps) {
   const [open, setOpen] = useState(false)
   const [current, setCurrent] = useState(value)
   const [pending, startTransition] = useTransition()
@@ -71,7 +85,13 @@ export function PlannerReschedule({ postId, channels, value }: PlannerReschedule
       </Button>
       {open ? (
         <div className="w-64" aria-busy={pending}>
-          <ScheduleField channels={channels} value={current} onChange={save} />
+          <ScheduleField
+            channels={channels}
+            value={current}
+            onChange={save}
+            autoPublish={autoPublish}
+            connected={connected}
+          />
         </div>
       ) : null}
     </div>

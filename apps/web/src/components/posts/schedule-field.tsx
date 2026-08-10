@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CalendarClock, FlaskConical } from 'lucide-react'
+import { CalendarClock, FlaskConical, Plug } from 'lucide-react'
 import type { Channel } from '@sahoda/shared'
 
+import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { scheduleGapNote, unconnectedFrom } from '@/lib/posts/connection-gap'
 import { earliestScheduleAt, validateScheduleLead } from '@/lib/posts/schedule'
 import { scheduleFieldNote } from '@/lib/posts/schedule-status'
 
@@ -26,6 +28,22 @@ export interface ScheduleFieldProps {
    * database never accepted.
    */
   error?: string | null
+  /**
+   * Channels with a live connection, read on the server.
+   *
+   * ── WHY THE SCHEDULE PICKER NEEDS THIS AND NOT JUST THE PUBLISH BUTTON ──────
+   * `PublishNow` has warned about unconnected channels for a while, but it only
+   * exists inside the post editor. `PlannerReschedule` renders THIS component on
+   * its own — no channel picker, no publish block — and `/planner` is, by that
+   * file's own comment, "the screen most likely to be used for scheduling in the
+   * first place". `ConnectFirstNote` is silent there by design once ANY channel is
+   * connected, so a workspace with Instagram but not LinkedIn got no signal at all:
+   * the post was scheduled, and the first news of the gap was a failed variant after
+   * the time had passed (post f0a777cf, 2026-08-10).
+   *
+   * Undefined means NOT KNOWN and warns about nothing — see `unconnectedFrom`.
+   */
+  connected?: ReadonlySet<Channel>
 }
 
 const CLOCK_REFRESH_MS = 30_000
@@ -60,6 +78,7 @@ export function ScheduleField({
   onChange,
   autoPublish = false,
   error = null,
+  connected,
 }: ScheduleFieldProps) {
   const [draft, setDraft] = useState<string>(() => fromStored(value))
   const [now, setNow] = useState<Date | null>(null)
@@ -89,6 +108,16 @@ export function ScheduleField({
   const parsed = draft === '' ? null : new Date(draft)
   const check = now === null ? null : validateScheduleLead(channels, parsed, now)
   const earliest = now === null ? null : earliestScheduleAt(channels, now)
+
+  // Only when the dispatcher is actually on. With it off, nothing goes out on ANY
+  // channel and the note below already says so — naming one channel there would
+  // imply the others are fine, which is the opposite of the truth.
+  const gap = autoPublish
+    ? scheduleGapNote(
+        unconnectedFrom(channels, connected).map((channel) => CHANNEL_LABELS[channel]),
+        channels.some((channel) => connected?.has(channel) === true),
+      )
+    : null
 
   function handleChange(next: string) {
     setDraft(next)
@@ -138,17 +167,25 @@ export function ScheduleField({
           correct, and the line above already says the post stays a draft. */}
       {draft === '' ? null : (
         <p
+          data-connection-gap={gap === null ? undefined : 'true'}
           className={cn(
             'flex items-start gap-1.5 text-[12px]',
-            autoPublish ? 'text-muted' : 'text-warn',
+            // A named unconnected channel is a warning whether or not the rail is
+            // live: it is a promise this schedule cannot keep.
+            autoPublish && gap === null ? 'text-muted' : 'text-warn',
           )}
         >
-          {autoPublish ? (
+          {gap !== null ? (
+            <Plug size={13} strokeWidth={2} className="mt-[2px] shrink-0" aria-hidden />
+          ) : autoPublish ? (
             <CalendarClock size={13} strokeWidth={2} className="mt-[2px] shrink-0" aria-hidden />
           ) : (
             <FlaskConical size={13} strokeWidth={2} className="mt-[2px] shrink-0" aria-hidden />
           )}
-          <span>{scheduleFieldNote(autoPublish)}</span>
+          {/* REPLACES the generic line rather than stacking under it. The line it
+              displaces says "on every connected channel" — true, and useless to
+              someone who does not know which of theirs those are. */}
+          <span>{gap ?? scheduleFieldNote(autoPublish)}</span>
         </p>
       )}
     </div>

@@ -72,7 +72,20 @@ export default async function PlannerPage({
         <ul className="space-y-2" data-guide="planner.list">
           {posts.map((post) => (
             <li key={post.id}>
-              <PlannerRow post={post} now={now} mode={modes.get(post.id) ?? null} />
+              {/* `autoPublish` was computed here and never passed, so every row
+                  defaulted to false and read "Won't post itself — scheduled
+                  auto-publish isn't live yet" while the dispatcher was on. The
+                  default under-promises, which was the safe direction right up
+                  until the rail went live. It is also what `PlannerReschedule`
+                  needs before it can warn about an unconnected channel. */}
+              <PlannerRow
+                post={post}
+                now={now}
+                mode={modes.get(post.id) ?? null}
+                connected={connected}
+                autoPublish={autoPublish}
+                variantStates={variantStates.get(post.id)}
+              />
             </li>
           ))}
         </ul>

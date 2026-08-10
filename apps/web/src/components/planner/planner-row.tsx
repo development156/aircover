@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { CalendarClock } from 'lucide-react'
-import type { Post } from '@sahoda/shared'
+import type { Channel, Post } from '@sahoda/shared'
 
 import { ApproveButton } from '@/components/planner/approve-button'
 import { PlannerReschedule } from '@/components/planner/planner-reschedule'
@@ -30,6 +30,8 @@ export interface PlannerRowProps {
    * unknown — the chip then renders the weaker claim rather than "it happened".
    */
   mode: PostPublishMode
+  /** Channels with a live connection. Passed through to the reschedule control. */
+  connected?: ReadonlySet<Channel>
 }
 
 /**
@@ -43,6 +45,7 @@ export function PlannerRow({
   post,
   now,
   mode,
+  connected,
 }: PlannerRowProps) {
   const title = post.title?.trim()
   const scheduledAt = formatScheduledAt(post.scheduled_at)
@@ -85,7 +88,13 @@ export function PlannerRow({
 
         <div className="flex items-start gap-2">
           <ApproveButton postId={post.id} status={post.status} />
-          <PlannerReschedule postId={post.id} channels={post.channels} value={post.scheduled_at} />
+          <PlannerReschedule
+            postId={post.id}
+            channels={post.channels}
+            value={post.scheduled_at}
+            connected={connected}
+            autoPublish={autoPublish}
+          />
         </div>
       </div>
 
