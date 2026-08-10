@@ -9,6 +9,7 @@ import {
   PostVariantUpdateSchema,
   charCountFor,
   CONSTRAINTS,
+  NOT_RESCHEDULABLE_STATUSES,
 } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
@@ -79,21 +80,6 @@ export async function createPost(title: string): Promise<SaveState> {
  * detect a concurrent edit (`detectConflict`) — `posts` has no version column,
  * so last-write-wins plus this timestamp is the whole concurrency story.
  */
-/**
- * Statuses from which a schedule may not be moved.
- *
- * Mirrors `reschedule_post`'s own guard. `partial` is deliberately absent because the
- * RPC omits it too — a partial post still has unpublished channels worth rescheduling,
- * and its published ones are caught by that function's separate POST_ALREADY_GOING_OUT
- * check on the variants.
- */
-const NOT_RESCHEDULABLE: ReadonlySet<string> = new Set([
-  'published',
-  'failed',
-  'expired',
-  'publishing',
-])
-
 export async function savePost(postId: string, patch: unknown): Promise<SaveState> {
   let workspaceId: string | undefined
   try {
@@ -136,11 +122,13 @@ export async function savePost(postId: string, patch: unknown): Promise<SaveStat
     // `expired`. Observed 2026-08-10 on two posts whose only symptom was a cron sweep
     // that never found them.
     //
-    // The list mirrors `reschedule_post`, which is the authority and already raises
-    // POST_NOT_RESCHEDULABLE for exactly these. Restating it rather than importing is a
-    // known hazard — but the alternative is calling the RPC from here, which would also
-    // move the status, and this action is deliberately forbidden from touching status.
-    // A divergence check belongs in the DB package; see REQUESTS.md.
+    // The list is NOT restated here any more. It was, and that hand copy was the
+    // drift hazard REQUESTS.md logged: two SQL guards (`reschedule_post` →
+    // POST_NOT_RESCHEDULABLE, `release_post_for_publish` → POST_NOT_RELEASABLE) and
+    // this one, three copies of a four-entry list. It now comes from
+    // `@sahoda/shared`, and `packages/db/tests/schedule_guard_parity.test.ts` fails
+    // if either SQL guard stops matching it. Calling the RPC from here is still not
+    // an option — it also sets `status`, which this action is forbidden to touch.
     if ('scheduled_at' in parsedPatch.data) {
       const { data: current } = await supabase
         .from('posts')
@@ -148,8 +136,14 @@ export async function savePost(postId: string, patch: unknown): Promise<SaveStat
         .eq('id', postId)
         .maybeSingle()
 
+      // Widened to `string` deliberately: this value is whatever the row holds, and a
+      // status we do not recognise is not one we can claim is terminal. Unknown =
+      // allowed through, same as before, and the DB guard is still underneath.
       const status = (current as { status?: unknown } | null)?.status
-      if (typeof status === 'string' && NOT_RESCHEDULABLE.has(status)) {
+      if (
+        typeof status === 'string' &&
+        (NOT_RESCHEDULABLE_STATUSES as readonly string[]).includes(status)
+      ) {
         // Same words as the schedule action's POST_NOT_RESCHEDULABLE, because it is the
         // same refusal — a person who meets it through two doors should not have to work
         // out that it is one rule.

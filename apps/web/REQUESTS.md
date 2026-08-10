@@ -91,20 +91,27 @@ which answers HTTP 202 with every metric 0 rather than erroring).
 **Ask:** one real `/inbox/conversations` payload, or confirmation from the OpenAPI spec that
 `accountId` is the account `_id`. Recorded in `lib/zernio/scope.ts` in the meantime.
 
-## wt-db: `NOT_RESCHEDULABLE` is restated in apps/web
+## ~~wt-db: `NOT_RESCHEDULABLE` is restated in apps/web~~ — CLOSED 2026-08-10
 
-`savePost` (`app/actions/posts.ts`) refuses a `scheduled_at` change on a post whose status
-is `published`, `failed`, `expired` or `publishing`. That list is a hand copy of
-`reschedule_post`'s own guard, which is the authority.
+**Resolved by the second of the two options asked for: a divergence test.**
 
-Two copies of one rule is the drift hazard this repo keeps getting bitten by. apps/web
-cannot call `reschedule_post` from `savePost` — the RPC also sets `status`, and `savePost`
-is deliberately forbidden from touching status (a hand-rolled call could otherwise write
-`published`).
+The hand copy is gone. `NOT_RESCHEDULABLE_STATUSES` now lives in
+`@sahoda/shared` (`publishing/schedule.ts`, beside `DISPATCHABLE_STATUSES`), `savePost`
+imports it, and `packages/db/tests/schedule_guard_parity.test.ts` parses the guard back out
+of the migrations and fails if either SQL list stops matching. It needs no database, so it
+runs in the credential-free sandbox and on every `turbo test` — verified red in both
+directions before being declared done.
 
-Asked for: either a `posts_reschedulable(status)` SQL helper apps/web can query, or a test
-in packages/db that fails when the two lists diverge. Until one exists, a change to
-`reschedule_post`'s guard must be mirrored here by hand.
+**The request understated the problem: there were THREE copies, not two.**
+`release_post_for_publish` (`20260804000000_publish_claim.sql:231`) carries the same four
+statuses under a different error name — POST_NOT_RELEASABLE rather than
+POST_NOT_RESCHEDULABLE — and was never mentioned. The test binds both. A fourth copy was
+hardcoded in `posts-save.test.ts`'s `test.each`, which is the worst place for one: it would
+have kept passing against its own list while the product used a different one.
+
+**Still open, and still wt-db's to give if it wants it:** a `posts_reschedulable(status)`
+SQL helper would let both functions and apps/web read one definition instead of three
+agreeing ones. The test makes drift _loud_; only the helper makes it impossible.
 
 Context: 2026-08-10. Two posts carried a fresh `scheduled_at` while still `expired`; the
 only symptom was a cron sweep that never found them.

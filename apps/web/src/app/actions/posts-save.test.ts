@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { NOT_RESCHEDULABLE_STATUSES } from '@sahoda/shared'
 
 /**
  * `savePost`'s accepted patch only.
@@ -140,12 +141,15 @@ describe('savePost accepted patch', () => {
  * Observed 2026-08-10: posts 2a080a2a and 2c279329 carried a fresh `scheduled_at` while
  * still `expired`, and the empty cron baseline was the only symptom.
  *
- * `reschedule_post` is the authority and already refuses these four statuses. This
- * mirrors that list rather than inventing a second rule — two copies of one rule drifting
- * apart is the bug class, not the fix.
+ * The statuses come from `NOT_RESCHEDULABLE_STATUSES` rather than being typed out here.
+ * Listing them again would have made this the FOURTH copy of a rule that already had
+ * three — and a test carrying its own copy is the worst of them, because it would keep
+ * passing against the list it agrees with while the product used a different one.
+ * `packages/db/tests/schedule_guard_parity.test.ts` holds the two SQL guards to the
+ * same constant.
  */
 describe('savePost refuses to move a schedule it cannot honour', () => {
-  test.each(['expired', 'published', 'failed', 'publishing'] as const)(
+  test.each(NOT_RESCHEDULABLE_STATUSES)(
     'refuses a scheduled_at change on a %s post, and says why',
     async (status) => {
       state.row = storedRow({ status })
