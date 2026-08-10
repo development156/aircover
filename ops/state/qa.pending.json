@@ -2,45 +2,6 @@
   "version": 1,
   "runs": [
     {
-      "client_id": "qa-msjzfut8-9bd6443a",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-08T06:18:19.193Z",
-      "finished_at": "2026-08-08T06:18:19.193Z",
-      "suite": "typecheck",
-      "status": "fail",
-      "summary_plain": "The typecheck checks ran and something failed.",
-      "details": "@sahoda/web:typecheck: src/app/actions/posts-publish.ts(135,9): error TS2322: Type 'string | null' is not assignable to type 'string'.\n Tasks:    7 successful, 8 total\nFailed:    @sahoda/web#typecheck",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msjzh8k5-516b53da",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-08T06:19:23.667Z",
-      "finished_at": "2026-08-08T06:19:23.667Z",
-      "suite": "typecheck",
-      "status": "pass",
-      "summary_plain": "The typecheck checks ran and everything passed.",
-      "details": " Tasks:    8 successful, 8 total",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msjzibhe-d1912ea8",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-08T06:20:14.111Z",
-      "finished_at": "2026-08-08T06:20:14.111Z",
-      "suite": "unit",
-      "status": "pass",
-      "summary_plain": "The unit checks ran (4309 passed), but 245 tests did NOT run — this does not prove the suite passes.",
-      "details": "@sahoda/shared:test:  Test Files  7 passed (7)\n@sahoda/shared:test:       Tests  33 passed (33)\n@sahoda/billing:test:  ✓ src/errorLeak.test.ts (8 tests) 121ms\n@sahoda/db:test:  Test Files  4 passed | 12 skipped (16)\n@sahoda/db:test:       Tests  95 passed | 202 skipped (297)\n@sahoda/publishing:test:  Test Files  9 passed (9)\n@sahoda/publishing:test:       Tests  127 passed (127)\n@sahoda/mesh:test:  Test Files  13 passed (13)\n@sahoda/mesh:test:       Tests  80 passed (80)\n@sahoda/jobs:test:  Test Files  11 passed | 2 skipped (13)\n@sahoda/jobs:test:       Tests  119 passed | 16 skipped (135)\n@sahoda/billing:test:  Test Files  14 passed | 4 skipped (18)\n@sahoda/billing:test:       Tests  221 passed | 26 skipped (247)\n@sahoda/web:test: stderr | src/lib/home/spend.test.ts > readSpend fails safe > a PostgREST error is UNREADABLE — never an empty chart\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/sites:test:  Test Files  52 passed (52)\n@sahoda/sites:test:       Tests  1555 passed (1555)\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: stderr | src/lib/wallet/read.test.ts > a balance that genuinely could not be read stays unreadable > a PostgREST error is unreadable, not a first run\n@sahoda/web:test: stderr | src/lib/posts/publish-modes.test.ts > listPublishModes fails safe > a PostgREST error yields UNKNOWN for every post, not an empty-but-confident answer\n@sahoda/web:test:  ✓  lib  src/lib/posts/post-error.test.ts (6 tests) 19ms\n@sahoda/web:test:  ✓  lib  src/lib/brand/save-brand-error.test.ts (6 tests) 16ms\n@sahoda/web:test:      ✓ surfaces an error instead of sitting on \"saving\" when the action rejects  556ms\n@sahoda/web:test:  ✓  ui  src/app/error.test.tsx (8 tests) 960ms\n@sahoda/web:test:  ✓  ui  src/app/(app)/error.test.tsx (7 tests) 1063ms\n@sahoda/web:test:  ✓  ui  src/app/(onboarding)/error.test.tsx (7 tests) 886ms\n@sahoda/web:test:  ✓  ui  src/app/(auth)/error.test.tsx (5 tests) 837ms\n@sahoda/web:test:  ✓  ui  src/components/error-fallback.test.tsx (7 tests) 758ms\n@sahoda/web:test:  ✓  ui  src/app/global-error.test.tsx (5 tests) 641ms\n@sahoda/web:test:  Test Files  148 passed (148)\n@sahoda/web:test:       Tests  2079 passed | 1 skipped (2080)\n Tasks:    14 successful, 14 total",
-      "duration_ms": null
-    },
-    {
       "client_id": "qa-msjzii3h-fab2d7dd",
       "task_code": "SL-054",
       "kind": "auto",
@@ -2599,6 +2560,45 @@
       "status": "pass",
       "summary_plain": "The unit checks ran (2345 passed), but 1 test did NOT run — this does not prove the suite passes.",
       "details": "@sahoda/web:test:  ✓  ui  src/components/posts/auto-publish-note.test.tsx (11 tests) 72ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  164 passed (164)\n@sahoda/web:test:       Tests  2345 passed | 1 skipped (2346)\n@sahoda/web:test:    Start at  16:11:29\n@sahoda/web:test:    Duration  12.21s (transform 13.24s, setup 7.22s, import 42.30s, tests 20.05s, environment 30.91s)\n@sahoda/web:test: \n\n Tasks:    16 successful, 16 total\nCached:    14 cached, 16 total\n  Time:    12.793s \n\nEXIT=0",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msn3ta0q-619b3d64",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-10T10:44:02.425Z",
+      "finished_at": "2026-08-10T10:44:02.425Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran (2345 passed), but 1 test did NOT run — this does not prove the suite passes.",
+      "details": "@sahoda/web:test:  Test Files  164 passed (164)\n@sahoda/web:test:       Tests  2345 passed | 1 skipped (2346)\n@sahoda/web:test:    Start at  16:11:29\n@sahoda/web:test:    Duration  12.21s (transform 13.24s, setup 7.22s, import 42.30s, tests 20.05s, environment 30.91s)\n@sahoda/web:test: \n\n Tasks:    16 successful, 16 total\nCached:    16 cached, 16 total\n  Time:    21ms >>> FULL TURBO\n\nGATE_EXIT=0\n=== tree after gate ===",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msn3ta0q-21068032",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-10T10:44:02.425Z",
+      "finished_at": "2026-08-10T10:44:02.425Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran (2345 passed), but 1 test did NOT run — this does not prove the suite passes.",
+      "details": "@sahoda/web:test:  Test Files  164 passed (164)\n@sahoda/web:test:       Tests  2345 passed | 1 skipped (2346)\n@sahoda/web:test:    Start at  16:11:29\n@sahoda/web:test:    Duration  12.21s (transform 13.24s, setup 7.22s, import 42.30s, tests 20.05s, environment 30.91s)\n@sahoda/web:test: \n\n Tasks:    16 successful, 16 total\nCached:    16 cached, 16 total\n  Time:    21ms >>> FULL TURBO\n\nGATE_EXIT=0\n=== tree after gate ===",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msn3trk3-b7c46ade",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-10T10:44:25.154Z",
+      "finished_at": "2026-08-10T10:44:25.154Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran and everything passed.",
+      "details": "@sahoda/publishing:lint: $ exit 0\n@sahoda/web:lint: cache miss, executing 23db9ac24b3d7f70\n@sahoda/web:lint: $ exit 0\n\n Tasks:    8 successful, 8 total\nCached:    7 cached, 8 total\n  Time:    286ms \n\nLINT_EXIT=0",
       "duration_ms": null
     }
   ]
