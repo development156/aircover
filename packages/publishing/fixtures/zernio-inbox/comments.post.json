@@ -1,0 +1,60 @@
+{
+  "status": "success",
+  "comments": [
+    {
+      "id": "18334584862282434",
+      "message": "good post",
+      "createdTime": "2026-08-09T16:44:48+0000",
+      "from": {
+        "id": "17841442795466852",
+        "name": "testingg53",
+        "username": "testingg53",
+        "picture": "https://example.invalid/redacted.jpg",
+        "isOwner": true
+      },
+      "likeCount": 0,
+      "replyCount": 0,
+      "platform": "instagram",
+      "url": null,
+      "replies": [],
+      "isHidden": false,
+      "canReply": true,
+      "canDelete": true,
+      "canHide": true,
+      "canLike": false,
+      "isLiked": false
+    },
+    {
+      "id": "18107833487327602",
+      "message": "hi",
+      "createdTime": "2026-08-09T16:44:42+0000",
+      "from": {
+        "id": "17841442795466852",
+        "name": "testingg53",
+        "username": "testingg53",
+        "picture": "https://example.invalid/redacted.jpg",
+        "isOwner": true
+      },
+      "likeCount": 0,
+      "replyCount": 0,
+      "platform": "instagram",
+      "url": null,
+      "replies": [],
+      "isHidden": false,
+      "canReply": true,
+      "canDelete": true,
+      "canHide": true,
+      "canLike": false,
+      "isLiked": false
+    }
+  ],
+  "pagination": {
+    "hasMore": false
+  },
+  "meta": {
+    "platform": "instagram",
+    "postId": "18277022635290264",
+    "accountId": "6a75caf7d0fe733d1afcc1f4",
+    "lastUpdated": "2026-08-10T09:52:03.570Z"
+  }
+}

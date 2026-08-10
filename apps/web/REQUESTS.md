@@ -50,46 +50,97 @@ whether the union is simply incomplete.
 
 ---
 
-## wt-pub: `ZernioMessage.direction` is `[DOC]`-tier and load-bearing
+## ~~wt-pub: `ZernioMessage.direction` is `[DOC]`-tier and load-bearing~~ — CORRECTED `[LIVE 2026-08-10]`
 
-`apps/web/src/lib/inbox/messages.ts` measures every send window from the newest message whose
-`direction === 'inbound'`. `ZernioMessage.direction` is typed as a bare `string` and no live
-`/inbox/conversations/{id}/messages` payload has been observed — doc 13 §12 records no messaging
-behaviour at all, so `'inbound'` is the documented value, not a measured one.
+The documented value was **wrong**, not merely unconfirmed. Zernio sends **`"incoming"` /
+`"outgoing"`**; `'inbound'` appears in no real payload.
 
-If Zernio actually sends `'in'` or `'received'`, `newestInboundAt` returns null for every thread and
-every reply affordance renders `unknown` forever.
+Both predicted consequences had already shipped, and a second one had not been predicted:
 
-**Meanwhile:** the degradation is the honest one — `unknown` claims nothing, and never renders a
-thread as replyable that is not. But it is a degradation, and it will look like a working feature.
+1. `newestInboundAt` returned null for every thread, so **every reply affordance rendered
+   `unknown` permanently** — the honest degradation that looks exactly like a working feature.
+2. **Not foreseen:** `components/inbox/message-list.tsx` compared the same literal to choose
+   which side a bubble renders on. Every message in every thread — including the customer's —
+   rendered on the right, in the owner's colour, labelled **"You"**. Sahoda put the customer's
+   words in the shop owner's mouth, in the thread they were reading to decide how to reply.
 
-**Ask:** one real message payload, so this can be re-tiered to `[LIVE]` or corrected.
+**Fixed** by `messageDirection()` in `packages/publishing/src/zernio/reads.ts` — one place, both
+callers, and an unrecognised value now logs and resolves to `unknown` rather than defaulting to
+ours. `direction` stays typed `string`: Instagram is the only platform whose thread has been read,
+and Facebook/WhatsApp may yet speak differently.
+
+**No ask outstanding.** Captures under `packages/publishing/fixtures/zernio-inbox/`.
 
 ---
 
-## wt-pub: is `ZernioConversation.accountId` the same id as `ZernioAccount._id`?
+## ~~wt-pub: is `ZernioConversation.accountId` the same id as `ZernioAccount._id`?~~ — RESOLVED `[LIVE 2026-08-10]`
 
-The thread surface joins on it. `ConversationRow` builds
-`/inbox/threads/[accountId]/[conversationId]` from `ZernioConversation.accountId`, and
-`accountByIdForWorkspace` then looks that value up against `connections.external_account->>'id'`.
+**Yes.** Against profile `6a75cae32853ee463c6419d6`, all four report
+`6a75caf7d0fe733d1afcc1f4`: `ZernioAccount._id`, `ZernioConversation.accountId`,
+`ZernioCommentedPost.accountId` and `ZernioMessage.accountId`. `external_account->>'id'` was
+already verified to hold the same value, so the join is correct and no thread or comments row
+404s on an id-space mismatch.
 
-**Verified:** `external_account->>'id'` IS Zernio's account `_id` — the OAuth return writes
-`ZernioAccount._id`, `upsert_zernio_connection` documents it as such, and both `scopeAccount` and
-`assert_account_in_workspace_profile` reject anything but 24-char lowercase hex.
+The sibling row type (`ZernioCommentedPost`, which feeds the identical join through
+`/inbox/comments/[accountId]/[platformPostId]`) was checked in the same pass and is pinned
+alongside it in `packages/publishing/src/zernio/inbox-live.test.ts`.
 
-**Not verified:** that `/inbox/conversations` reports that same `_id` in its `accountId` field.
-`reads.ts` asserts it structurally — it passes a `ScopedAccountId` minted from this column directly
-into the `accountId` query param on `listMessages` and `listPostComments` — but doc 13 documents no
-inbox behaviour at all, so nothing observed backs it.
+**No ask outstanding.** `lib/zernio/scope.ts` re-tiered.
 
-**Why it matters more than it looks:** if the two id spaces differ, the conversations list renders
-perfectly and **every row 404s**. Because the mismatch produces a `notFound()`, it reads as a routing
-bug rather than an id-space error, and it would be silent forever. This is the same defect class
-already shipped once on the analytics side (Zernio's 24-hex `_id` vs `post_variants.platform_post_id`,
-which answers HTTP 202 with every metric 0 rather than erroring).
+---
 
-**Ask:** one real `/inbox/conversations` payload, or confirmation from the OpenAPI spec that
-`accountId` is the account `_id`. Recorded in `lib/zernio/scope.ts` in the meantime.
+## wt-pub: `meta.accountsQueried` counts something we cannot name
+
+`[LIVE 2026-08-10]` `/inbox/conversations?profileId=6a75cae32853ee463c6419d6` returned
+`meta.accountsQueried: 2`. That profile has **one** account, and `GET /accounts` **unscoped**
+returns exactly **one** account on the entire API key — so 2 is not a count of accounts in any
+sense we share, scoped or not. The unscoped conversations call reports the same 2.
+
+**Impact, already fixed here:** `emptiness.ts` rendered it verbatim as *"All 2 connected accounts
+answered"* to a customer with one Instagram account. The `ok` and `empty` branches no longer print
+a count; the `partial` branch keeps Zernio's own `N of M` ratio intact, since cross-sourcing it
+against our `connections` count would produce the worse lie *"2 of 1 did not answer"*.
+
+The `accountsQueried === 0` comparison is untouched and is confirmed correct — the live reviews
+payload reports 0 with no GBP ever connected, and resolves to "connect an account".
+
+**Ask:** what does `accountsQueried` count — accounts, per-account sub-queries (DM + story replies?),
+or something else? It is the only signal distinguishing "asked nobody" from "asked and got nothing",
+so its unit matters even though we no longer print it.
+
+---
+
+## wt-pub: `/inbox/comments` returns every post, not posts with comments
+
+`[LIVE 2026-08-10]` it returned **six** posts for `@testingg53`, of which **one** carried comments
+(`commentCount: 2`); the other five were `0`. The endpoint name, `reads.ts` and
+`commented-post-row.tsx` all described it as "the posts that have comments".
+
+**Impact, already fixed here:** `rows > 0` was permanently true, so the surface rendered *"Showing
+your comments"* for a workspace with no comments anywhere and the *"No comments yet"* state was
+unreachable. `lib/inbox/commented-posts.ts` now filters before classification, and `hasMore` is
+threaded through so a page that filters down to empty with more behind it says "could not confirm"
+rather than "none yet".
+
+**Ask:** is there a server-side filter (a `hasComments` or `minComments` parameter) so paging does
+not have to over-fetch? Filtering client-side means a page of 50 posts can yield 0 rows while the
+comments sit on page 2.
+
+---
+
+## wt-pub: `/inbox/comments/{postId}` omits `nextCursor` entirely
+
+`[LIVE 2026-08-10]` its `pagination` is `{"hasMore": false}` — the object is present and the field
+is absent, so `data.pagination ?? EMPTY_CURSOR` never fired and `undefined` flowed out through a
+field typed `string | null`. Fixed with a per-field `cursor()` normaliser in `reads.ts`; no UI
+consumed it yet, so this was type-honesty ahead of paging rather than a live symptom.
+
+Same call's `meta` is a different shape again — `{platform, postId, accountId, lastUpdated}`, with
+no `accountsQueried` — and `/inbox/conversations/{id}/messages` sends no `meta` at all. `reads.ts`
+had claimed `ZernioInboxMeta` rode on every `/inbox/*` response; corrected.
+
+**Ask:** confirm whether the omitted `nextCursor` means "no more" or "cursors unsupported on this
+endpoint". They page differently and only one of them is safe to build a "load more" on.
 
 ## ~~wt-db: `NOT_RESCHEDULABLE` is restated in apps/web~~ — CLOSED 2026-08-10
 

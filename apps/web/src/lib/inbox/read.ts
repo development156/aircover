@@ -16,6 +16,7 @@ import { evaluateSendWindow, type ReplyAffordance } from '@sahoda/shared'
 
 import { cache } from 'react'
 
+import { postsCarryingComments } from '@/lib/inbox/commented-posts'
 import { newestInboundAt, threadPlatform } from '@/lib/inbox/messages'
 import {
   SURFACE_CONNECTION_PLATFORMS,
@@ -224,10 +225,56 @@ export async function readConversations(): Promise<InboxView<ZernioConversation>
   )
 }
 
+/**
+ * The posts carrying comments — which is NOT what `GET /inbox/comments` returns.
+ *
+ * `[LIVE 2026-08-10]` it returns every post, comment-bearing or not (six posts, two
+ * comments, both on one post). Passing that through would put rows with nothing to open
+ * on a screen headed "comments", and — because the row count would then never be zero —
+ * would render "Showing your comments" to a workspace that has never received one.
+ *
+ * `postsCarryingComments` is applied BEFORE classification so the state describes what
+ * the customer actually has, and `hasMore` is threaded through so a page that filters
+ * down to empty with more behind it says "could not confirm" rather than "none yet".
+ */
 export async function readCommentedPosts(): Promise<InboxView<ZernioCommentedPost>> {
-  return listSurface('comments', (reads, profile) =>
-    reads.listCommentedPosts(profile, { limit: PAGE }),
-  )
+  const connectedAccounts = await countAccounts('comments')
+  const context = await readContext()
+
+  if (!context.ok) {
+    return {
+      rows: [],
+      decision: decideSurface({ surface: 'comments', connectedAccounts, failure: context.failure }),
+      nextCursor: null,
+    }
+  }
+
+  try {
+    const page = await context.reads.listCommentedPosts(context.profile, { limit: PAGE })
+    const view = postsCarryingComments(page.data)
+    if (view.withoutComments > 0) {
+      console.info(
+        `[inbox] comments: ${view.withoutComments} of ${page.data.length} posts carry no comments`,
+      )
+    }
+    return {
+      rows: view.posts,
+      decision: decideSurface({
+        surface: 'comments',
+        connectedAccounts,
+        result: { rows: view.posts.length, meta: page.meta },
+        hasMore: page.pagination.hasMore,
+      }),
+      nextCursor: page.pagination.nextCursor,
+    }
+  } catch (error) {
+    console.error('[inbox] comments read failed', error instanceof Error ? error.message : 'unknown')
+    return {
+      rows: [],
+      decision: decideSurface({ surface: 'comments', connectedAccounts, failure: 'call_failed' }),
+      nextCursor: null,
+    }
+  }
 }
 
 export async function readReviews(): Promise<InboxView<ZernioReview>> {
@@ -323,6 +370,7 @@ export async function readThread(
         surface: 'thread',
         connectedAccounts,
         result: { rows: page.messages.length, meta: undefined },
+        fanOut: false,
       }),
       nextCursor: page.pagination.nextCursor,
     }
@@ -370,6 +418,7 @@ export async function readPostComments(
         surface: 'comments',
         connectedAccounts,
         result: { rows: page.comments.length, meta: undefined },
+        fanOut: false,
       }),
       nextCursor: page.pagination.nextCursor,
     }

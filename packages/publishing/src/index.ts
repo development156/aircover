@@ -93,6 +93,10 @@ export {
 
 export {
   createZernioReads,
+  // The ONE place Zernio's `direction` vocabulary is interpreted. Comparing the raw
+  // field is what shipped a thread where every message read as the shop owner's.
+  messageDirection,
+  type MessageDirection,
   type ZernioReads,
   type ZernioCursorPage,
   type ZernioOffsetPage,

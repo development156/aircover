@@ -4,9 +4,19 @@ import type { ScopedAccountId, ScopedProfileId } from './scope'
 /**
  * Zernio's READ surface — analytics, messaging, comments, reviews.
  *
- * Every endpoint here was verified live on 2026-08-08 against
+ * Every endpoint here was reached live on 2026-08-08 against
  * `https://zernio.com/api/v1`; shapes come from the OpenAPI spec at
  * `docs.zernio.com/api/openapi` (v1.0.4, 375 endpoints).
+ *
+ * ── REACHED IS NOT THE SAME AS OBSERVED WITH DATA ────────────────────────────
+ * The `/inbox/*` surface answered on 2026-08-08 but had never returned a row. On
+ * **2026-08-10** it did, and three things this file asserted turned out to be wrong:
+ * `direction` (doc said `inbound`, wire says `incoming`), `meta` (not on every
+ * response), and `pagination` (one endpoint omits `nextCursor` outright). Captures are
+ * committed under `fixtures/zernio-inbox/` and pinned by `./inbox-live.test.ts`.
+ *
+ * `ZernioReview`'s ROW shape remains `[DOC]`: the reviews envelope has been observed,
+ * but no review has — no Google Business Profile has ever been connected.
  *
  * ── THE RULE THIS MODULE EXISTS TO ENFORCE ───────────────────────────────────
  * `profileId` and `accountId` are OPTIONAL filters on Zernio's side, and omitting
@@ -20,7 +30,15 @@ import type { ScopedAccountId, ScopedProfileId } from './scope'
  * alone is a HUMAN_AGENT-only regime).
  */
 
-/** Cursor pagination, used by every `/inbox/*` list. */
+/**
+ * Cursor pagination, used by every `/inbox/*` list.
+ *
+ * Both fields are required HERE because that is what a caller is handed. The wire is
+ * looser — `/inbox/comments/{postId}` sends `hasMore` and no `nextCursor` at all
+ * `[LIVE 2026-08-10]` — so responses are typed `Partial<…>` at the parse site and put
+ * back together by `cursor()`. Never widen this one; a caller that has to null-check
+ * `nextCursor` twice will eventually check it once.
+ */
 export interface ZernioCursorPage {
   hasMore: boolean
   nextCursor: string | null
@@ -35,12 +53,27 @@ export interface ZernioOffsetPage {
 }
 
 /**
- * Per-account health carried on every `/inbox/*` response.
+ * Per-account health carried on the profile-scoped fan-out lists.
  *
  * Zernio does NOT fail the whole call when one account errors — it returns 200 and
  * reports the failure here. Reading it is the difference between "no messages" and
  * "we could not ask". Surface it; never treat an empty `data` as authoritative
  * without checking `accountsFailed`.
+ *
+ * ── NOT ON EVERY `/inbox/*` RESPONSE `[LIVE 2026-08-10]` ─────────────────────
+ * This file used to claim it was. It is not. Only the three profile-scoped lists
+ * (`/inbox/conversations`, `/inbox/comments`, `/inbox/reviews`) send this shape. The
+ * two account-scoped reads answer differently:
+ *
+ *   - `/inbox/conversations/{id}/messages` sends NO `meta` at all (a `lastUpdated` and
+ *     a `sortOrderApplied` sit at the top level instead).
+ *   - `/inbox/comments/{postId}` sends a DIFFERENT `meta`:
+ *     `{ platform, postId, accountId, lastUpdated }` — no `accountsQueried`, no
+ *     `failedAccounts`.
+ *
+ * Which is why neither of those two methods returns a `meta`: typing that second shape
+ * as this one would read `accountsQueried` as `undefined` and send every caller down
+ * its "cannot confirm this view is complete" branch permanently.
  */
 export interface ZernioInboxMeta {
   accountsQueried: number
@@ -130,10 +163,65 @@ export interface ZernioMessage {
   message: string
   senderId?: string
   senderName?: string | null
+  /**
+   * `"incoming"` / `"outgoing"` on Instagram `[LIVE 2026-08-10]`.
+   *
+   * Deliberately still `string`. Narrowing it to that pair would claim a closed set
+   * observed on exactly ONE platform — Instagram is the only one whose thread has ever
+   * been read. Never compare this field directly; go through `messageDirection`, which
+   * is also where an unseen third spelling gets reported instead of silently taken for
+   * one of ours.
+   */
   direction?: string
   createdAt?: string
   readAt?: string | null
   isDeleted?: boolean
+}
+
+/** What a message's `direction` means to us, including "we do not recognise it". */
+export type MessageDirection = 'inbound' | 'outbound' | 'unknown'
+
+/**
+ * Zernio's wire vocabulary for `direction`, mapped to ours — in ONE place.
+ *
+ * ── THE BUG THIS REPLACES ────────────────────────────────────────────────────
+ * Two call sites independently compared `direction === 'inbound'`: the send-window
+ * calculation and the message list's left/right rendering. `'inbound'` was doc 13's
+ * word, never a measured one — Zernio sends `'incoming'`. So every send window read
+ * `unknown` forever, and every message in every thread rendered on the shop owner's
+ * side labelled "You", putting the customer's own words in their mouth.
+ *
+ * Both failures were silent, and each would have had to be found separately. Hence one
+ * function, exported from the package that owns the wire shape.
+ *
+ * ── WHY `unknown` IS A RESULT AND NOT A DEFAULT-TO-OURS ──────────────────────
+ * The old rule was "anything not inbound is ours", which is what let a wholly
+ * unrecognised value render confidently. `unknown` cannot open a send window (it has no
+ * timestamp to measure from) and cannot be attributed to either party. And because an
+ * unseen spelling is exactly what just cost us this bug — Instagram is one platform of
+ * three with a modelled window — it is logged rather than absorbed. The log is the
+ * difference between "wrong forever" and "wrong until the first Facebook thread".
+ */
+export function messageDirection(message: Pick<ZernioMessage, 'direction'>): MessageDirection {
+  switch (message.direction) {
+    // Observed live. Instagram, 2026-08-10.
+    case 'incoming':
+    // doc 13's spelling, and our own `inbox_messages.direction` enum. Never observed
+    // on the wire, but unambiguous — no platform could mean "outbound" by it.
+    case 'inbound':
+      return 'inbound'
+    case 'outgoing':
+    case 'outbound':
+      return 'outbound'
+    default:
+      if (message.direction !== undefined) {
+        console.error(
+          '[zernio] unrecognised message direction — the thread will render as unattributed',
+          message.direction,
+        )
+      }
+      return 'unknown'
+  }
 }
 
 export interface ZernioCommentedPost {
@@ -285,7 +373,24 @@ export interface ZernioReads {
 
 export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
   const json = createJsonCaller(deps)
-  const EMPTY_CURSOR: ZernioCursorPage = { hasMore: false, nextCursor: null }
+
+  /**
+   * Normalise whatever arrived in `pagination` into a full `ZernioCursorPage`.
+   *
+   * ── WHY A DEFAULT OBJECT WAS NOT ENOUGH `[LIVE 2026-08-10]` ────────────────
+   * The previous `data.pagination ?? EMPTY_CURSOR` only fires when the pagination
+   * OBJECT is absent. `/inbox/comments/{postId}` sends `{"hasMore": false}` — object
+   * present, `nextCursor` FIELD missing — so the default never applied and `undefined`
+   * flowed out through a field declared `string | null`.
+   *
+   * Per-field rather than per-object, because the endpoints genuinely disagree about
+   * which fields they send, and the next one to drop a field should not need its own
+   * bug first.
+   */
+  const cursor = (page: Partial<ZernioCursorPage> | undefined): ZernioCursorPage => ({
+    hasMore: page?.hasMore ?? false,
+    nextCursor: page?.nextCursor ?? null,
+  })
 
   return {
     async postAnalytics(profile, platformPostId) {
@@ -352,7 +457,7 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
     async listConversations(profile, opts) {
       const { data, rateLimit } = await json<{
         data?: ZernioConversation[]
-        pagination?: ZernioCursorPage
+        pagination?: Partial<ZernioCursorPage>
         meta?: ZernioInboxMeta
       }>(
         'GET',
@@ -366,14 +471,14 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
       )
       return {
         data: data.data ?? [],
-        pagination: data.pagination ?? EMPTY_CURSOR,
+        pagination: cursor(data.pagination),
         meta: data.meta,
         rateLimit,
       }
     },
 
     async listMessages(account, conversationId, opts) {
-      const { data } = await json<{ messages?: ZernioMessage[]; pagination?: ZernioCursorPage }>(
+      const { data } = await json<{ messages?: ZernioMessage[]; pagination?: Partial<ZernioCursorPage> }>(
         'GET',
         `/inbox/conversations/${encodeURIComponent(conversationId)}/messages${qs({
           accountId: account,
@@ -382,13 +487,13 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
         })}`,
         'listMessages',
       )
-      return { messages: data.messages ?? [], pagination: data.pagination ?? EMPTY_CURSOR }
+      return { messages: data.messages ?? [], pagination: cursor(data.pagination) }
     },
 
     async listCommentedPosts(profile, opts) {
       const { data, rateLimit } = await json<{
         data?: ZernioCommentedPost[]
-        pagination?: ZernioCursorPage
+        pagination?: Partial<ZernioCursorPage>
         meta?: ZernioInboxMeta
       }>(
         'GET',
@@ -397,14 +502,14 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
       )
       return {
         data: data.data ?? [],
-        pagination: data.pagination ?? EMPTY_CURSOR,
+        pagination: cursor(data.pagination),
         meta: data.meta,
         rateLimit,
       }
     },
 
     async listPostComments(account, platformPostId, opts) {
-      const { data } = await json<{ comments?: ZernioComment[]; pagination?: ZernioCursorPage }>(
+      const { data } = await json<{ comments?: ZernioComment[]; pagination?: Partial<ZernioCursorPage> }>(
         'GET',
         `/inbox/comments/${encodeURIComponent(platformPostId)}${qs({
           accountId: account,
@@ -413,13 +518,13 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
         })}`,
         'listPostComments',
       )
-      return { comments: data.comments ?? [], pagination: data.pagination ?? EMPTY_CURSOR }
+      return { comments: data.comments ?? [], pagination: cursor(data.pagination) }
     },
 
     async listReviews(profile, opts) {
       const { data, rateLimit } = await json<{
         data?: ZernioReview[]
-        pagination?: ZernioCursorPage
+        pagination?: Partial<ZernioCursorPage>
         meta?: ZernioInboxMeta
         summary?: unknown
       }>(
@@ -429,7 +534,7 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
       )
       return {
         data: data.data ?? [],
-        pagination: data.pagination ?? EMPTY_CURSOR,
+        pagination: cursor(data.pagination),
         meta: data.meta,
         rateLimit,
       }
