@@ -268,7 +268,10 @@ export async function readCommentedPosts(): Promise<InboxView<ZernioCommentedPos
       nextCursor: page.pagination.nextCursor,
     }
   } catch (error) {
-    console.error('[inbox] comments read failed', error instanceof Error ? error.message : 'unknown')
+    console.error(
+      '[inbox] comments read failed',
+      error instanceof Error ? error.message : 'unknown',
+    )
     return {
       rows: [],
       decision: decideSurface({ surface: 'comments', connectedAccounts, failure: 'call_failed' }),

@@ -27,9 +27,7 @@ export interface CommentedPostsView {
   withoutComments: number
 }
 
-export function postsCarryingComments(
-  rows: readonly ZernioCommentedPost[],
-): CommentedPostsView {
+export function postsCarryingComments(rows: readonly ZernioCommentedPost[]): CommentedPostsView {
   // `> 0` rather than truthiness: a count that is absent, negative or not a number is
   // not evidence of a comment, and treating it as one turns a zero into a claim.
   const posts = rows.filter((p) => Number.isFinite(p.commentCount) && p.commentCount > 0)

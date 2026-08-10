@@ -478,7 +478,10 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
     },
 
     async listMessages(account, conversationId, opts) {
-      const { data } = await json<{ messages?: ZernioMessage[]; pagination?: Partial<ZernioCursorPage> }>(
+      const { data } = await json<{
+        messages?: ZernioMessage[]
+        pagination?: Partial<ZernioCursorPage>
+      }>(
         'GET',
         `/inbox/conversations/${encodeURIComponent(conversationId)}/messages${qs({
           accountId: account,
@@ -509,7 +512,10 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
     },
 
     async listPostComments(account, platformPostId, opts) {
-      const { data } = await json<{ comments?: ZernioComment[]; pagination?: Partial<ZernioCursorPage> }>(
+      const { data } = await json<{
+        comments?: ZernioComment[]
+        pagination?: Partial<ZernioCursorPage>
+      }>(
         'GET',
         `/inbox/comments/${encodeURIComponent(platformPostId)}${qs({
           accountId: account,

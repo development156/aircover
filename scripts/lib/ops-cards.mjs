@@ -579,7 +579,8 @@ export const CARDS = [
   },
   {
     roadmap: null,
-    title: 'Use each platform’s own reporting delay, not Instagram’s, when deciding if a metric is late',
+    title:
+      'Use each platform’s own reporting delay, not Instagram’s, when deciding if a metric is late',
     plain:
       'When a post’s numbers all come back as zero, we now check whether the platform has even had time to report yet before showing them — and if it has not, we say “not available yet” instead of “nobody saw this”. That check currently uses Instagram’s 48-hour delay for every channel, including ones that report much faster. Why it matters: on a channel that reports within the hour, we would keep saying “check back later” for two days over numbers we already had — the same dishonesty as showing a false zero, pointing the other way. Harmless today: Instagram is the only channel publishing live, and the LinkedIn, X and GBP rows are all simulated, so they are filtered out before any metrics call is made.',
     technical:

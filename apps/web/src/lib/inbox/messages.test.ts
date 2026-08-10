@@ -92,9 +92,7 @@ describe('newestInboundAt', () => {
   it('also accepts doc 13’s spelling, which the wire has never used', () => {
     // Tolerated, not relied on. Kept so a future platform using the documented word is
     // not a second outage; the live value above is what the default exercises.
-    expect(newestInboundAt([message({ direction: 'inbound' })])).toBe(
-      '2026-08-08T10:00:00.000Z',
-    )
+    expect(newestInboundAt([message({ direction: 'inbound' })])).toBe('2026-08-08T10:00:00.000Z')
     expect(newestInboundAt([message({ direction: 'outbound' })])).toBeNull()
   })
 

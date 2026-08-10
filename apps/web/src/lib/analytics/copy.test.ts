@@ -199,10 +199,7 @@ describe('a lagged metric says when to come back', () => {
   })
 
   it('still reads as a sentence when no date could be derived', () => {
-    const copy = metricCopy(
-      { kind: 'pending', reason: 'lag', availableAfter: null },
-      'instagram',
-    )
+    const copy = metricCopy({ kind: 'pending', reason: 'lag', availableAfter: null }, 'instagram')
     expect(copy.detail).toBe('Instagram reports metrics on a delay.')
   })
 })

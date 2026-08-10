@@ -244,7 +244,9 @@ export function classifyInboxResult({
   return classifyRows({ rows, surface, hasMore, failed })
 }
 
-interface FanOutInput extends Required<Pick<ClassifyInput, 'rows' | 'surface' | 'connectedAccounts'>> {
+interface FanOutInput extends Required<
+  Pick<ClassifyInput, 'rows' | 'surface' | 'connectedAccounts'>
+> {
   meta: ZernioInboxMeta
   hasMore: boolean
   failed: FailedAccountSummary[]

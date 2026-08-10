@@ -1,9 +1,4 @@
-import {
-  createZernioReads,
-  messageDirection,
-  scopeAccount,
-  scopeProfile,
-} from '@sahoda/publishing'
+import { createZernioReads, messageDirection, scopeAccount, scopeProfile } from '@sahoda/publishing'
 import { evaluateSendWindow } from '@sahoda/shared'
 import { describe, expect, it } from 'vitest'
 

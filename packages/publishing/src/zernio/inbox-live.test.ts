@@ -26,10 +26,7 @@ import reviewsFixture from '../../fixtures/zernio-inbox/reviews.none-connected.j
  * A fixture invented alongside the code it tests proves only that the two agree.
  */
 
-const PROFILE = scopeProfile(
-  { workspace_id: 'w-1', profile_id: '6a75cae32853ee463c6419d6' },
-  'w-1',
-)
+const PROFILE = scopeProfile({ workspace_id: 'w-1', profile_id: '6a75cae32853ee463c6419d6' }, 'w-1')
 const ACCOUNT = scopeAccount(
   {
     workspace_id: 'w-1',
@@ -39,11 +36,13 @@ const ACCOUNT = scopeAccount(
   PROFILE,
 )
 
-const serving = (body: unknown): Transport => async () => ({
-  status: 200,
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify(body),
-})
+const serving =
+  (body: unknown): Transport =>
+  async () => ({
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 
 const readsServing = (body: unknown) =>
   createZernioReads({ transport: serving(body), apiKey: 'sk_test' })

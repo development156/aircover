@@ -60,11 +60,7 @@ describe('MessageList against the first real thread', () => {
 describe('MessageList when the direction cannot be classified', () => {
   it('renders it as unattributed rather than picking a side', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    render(
-      <MessageList
-        messages={[{ ...LIVE_THREAD[1]!, id: 'm-odd', direction: 'received' }]}
-      />,
-    )
+    render(<MessageList messages={[{ ...LIVE_THREAD[1]!, id: 'm-odd', direction: 'received' }]} />)
     expect(directions()).toEqual(['unknown'])
     // Never "You" — attributing an unreadable message to the owner is the bug that was.
     expect(screen.queryByText(/^You ·/)).toBeNull()

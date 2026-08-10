@@ -55,9 +55,7 @@ export function MessageList({ messages }: { messages: ZernioMessage[] }) {
             <div
               className={cn(
                 'max-w-[46ch] rounded-card px-3 py-2 text-[14px] leading-[21px]',
-                direction === 'outbound'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-s2 text-ink',
+                direction === 'outbound' ? 'bg-primary text-primary-foreground' : 'bg-s2 text-ink',
                 // Dashed, so an unattributed message reads as incomplete at a glance
                 // rather than as a normal bubble that happens to sit in the middle.
                 direction === 'unknown' && 'border border-dashed border-line',
