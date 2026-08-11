@@ -295,9 +295,7 @@ describe('the platform states its own delay, and it wins', () => {
   it('uses an injected lag instead of the Instagram default', () => {
     const publishedAt = '2026-08-08T06:00:00.000Z' // 6h before NOW
     // Inside 48h (would be `lag`) but outside a 2h window — so the injected value must win.
-    const state = classifyPostMetrics(
-      input({ publishedAt, window: { known: true, lagHours: 2 } }),
-    )
+    const state = classifyPostMetrics(input({ publishedAt, window: { known: true, lagHours: 2 } }))
     expect(state).toMatchObject({ reason: 'never-measured' })
     expect(INSTAGRAM_INSIGHTS_LAG_HOURS).toBe(48)
   })
@@ -708,8 +706,7 @@ describe('a LinkedIn post is not an Instagram post (recorded 2026-08-11)', () =>
    * Instagram batch in the same capture. Two platforms, two clocks.
    */
   it('carries its own sync stamp, not the Instagram batch’s', () => {
-    const stampOf = (f: { body: unknown }) =>
-      (f.body as ZernioPostAnalytics).analytics?.lastUpdated
+    const stampOf = (f: { body: unknown }) => (f.body as ZernioPostAnalytics).analytics?.lastUpdated
 
     expect(stampOf(linkedin)).toBe('2026-08-11 12:53:43')
     expect(stampOf(resolvedNextDay)).toBe('2026-08-11 13:16:55')

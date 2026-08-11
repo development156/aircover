@@ -217,10 +217,7 @@ describe('each channel is measured against its own reporting window', () => {
   const statesFor = async (channels: readonly VariantStatusRow['channel'][]) => {
     const out = await listPostMetrics(
       new Map([
-        [
-          'post-1',
-          channels.map((channel) => row({ channel, platformPostId: `id-${channel}` })),
-        ],
+        ['post-1', channels.map((channel) => row({ channel, platformPostId: `id-${channel}` }))],
       ]),
       NOW,
       10,
@@ -265,7 +262,10 @@ describe('each channel is measured against its own reporting window', () => {
   it('still reports real numbers on an unknown-window channel', async () => {
     reads.postAnalytics.mockResolvedValue({
       status: 200,
-      post: { postId: 'p', analytics: { impressions: 61, reach: 36, lastUpdated: '2026-08-11 12:53:43' } },
+      post: {
+        postId: 'p',
+        analytics: { impressions: 61, reach: 36, lastUpdated: '2026-08-11 12:53:43' },
+      },
     })
     const states = await statesFor(['linkedin'])
     const state = states.get('linkedin')
