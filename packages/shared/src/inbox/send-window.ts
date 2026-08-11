@@ -17,8 +17,10 @@ import { z } from 'zod'
  * measurement, and re-tier them to `[LIVE]` only after a send surface observes a
  * real rejection.
  *
- * Nothing here sends. This module decides what the UI may OFFER; `canSendFromSahoda`
- * is `false` on every result because the write surface is not wired (reads only).
+ * Nothing here sends. This module decides what the UI may OFFER and what payload the
+ * send surface is AUTHORISED to build — `authoriseReply` is the only place that maps a
+ * window to Zernio's `messagingType`/`messageTag` fields, so the sentence shown to the
+ * user and the bytes put on the wire cannot drift apart.
  */
 
 /** Platforms that can appear on a Zernio `/inbox/*` row. Not the publishable `Channel` set. */
@@ -99,11 +101,6 @@ interface AffordanceBase {
   platform: InboxPlatform
   /** UI-ready sentence. Renders verbatim; never asserts anything about the customer. */
   reason: string
-  /**
-   * Reads are the only wired surface, so this is `false` everywhere. It is a literal
-   * type, not a boolean: wiring a send surface has to change this file deliberately.
-   */
-  canSendFromSahoda: false
 }
 
 /**
@@ -114,13 +111,34 @@ interface AffordanceBase {
  * newest INBOUND message's timestamp — which only `listMessages` returns. Rendering a
  * hard "cannot reply" badge from list data would be asserting something unverified.
  * So the list gets `unknown`, and the thread view gets the definite answer.
+ *
+ * `updatedTime` cannot stand in for it even approximately, and the reason is worth
+ * stating: it advances on OUR OWN reply. Deriving a window from it would mean every
+ * reply we send re-opens the window we just used, which reads as a working feature and
+ * is a fabrication. Now that sending is wired, that is no longer hypothetical.
+ *
+ * ── `canSendFromSahoda` IS A LITERAL ON EACH VARIANT, NEVER A WIDENED BOOLEAN ─
+ * It was `false` everywhere while reads were the only wired surface, with a comment
+ * saying that wiring a send path had to change this file deliberately. This is that
+ * change. Per-variant rather than computed means `=== true` narrows to exactly the two
+ * states a reply can leave from, so a caller cannot hold a `closed` affordance and a
+ * send handle at once — and a NEW state must pick a side rather than inherit a
+ * permissive default from the shared base.
  */
 export type ReplyAffordance =
-  | (AffordanceBase & { state: 'open'; closesAt: string })
-  | (AffordanceBase & { state: 'tagged'; tags: readonly MessageTag[]; closesAt: string | null })
-  | (AffordanceBase & { state: 'template_only' })
-  | (AffordanceBase & { state: 'closed' })
-  | (AffordanceBase & { state: 'unknown' })
+  | (AffordanceBase & { state: 'open'; closesAt: string; canSendFromSahoda: true })
+  | (AffordanceBase & {
+      state: 'tagged'
+      tags: readonly MessageTag[]
+      closesAt: string | null
+      canSendFromSahoda: true
+    })
+  | (AffordanceBase & { state: 'template_only'; canSendFromSahoda: false })
+  | (AffordanceBase & { state: 'closed'; canSendFromSahoda: false })
+  | (AffordanceBase & { state: 'unknown'; canSendFromSahoda: false })
+
+/** The two states a reply can actually leave from. `=== true` narrows to exactly this. */
+export type SendableAffordance = Extract<ReplyAffordance, { canSendFromSahoda: true }>
 
 export interface SendWindowInput {
   platform: InboxPlatform
@@ -182,7 +200,7 @@ export function evaluateSendWindow({
       platform,
       closesAt: addHours(inboundMs, spec.standardWindowHours),
       reason: `Replies are open — ${platform} allows a free-form reply for ${spec.standardWindowHours} hours after the customer’s last message.`,
-      canSendFromSahoda: false,
+      canSendFromSahoda: true,
     }
   }
 
@@ -226,6 +244,85 @@ export function evaluateSendWindow({
     reason: onlyTag
       ? `${closedSentence} Only a ${onlyTag}-tagged reply is allowed from here.`
       : `${closedSentence} A reply now has to carry one of its message tags.`,
-    canSendFromSahoda: false,
+    canSendFromSahoda: true,
   }
+}
+
+/**
+ * What the user is trying to send. Free-form inside the window; tagged once it lapses.
+ *
+ * A discriminated union rather than an optional `tag?: MessageTag`, because "no tag"
+ * and "a tag" are different requests with different legality — and an optional field
+ * lets a caller forget the tag on a thread that requires one, which is precisely the
+ * submit-time rejection this module exists to prevent.
+ */
+export type ReplyIntent = { kind: 'free_form' } | { kind: 'tagged'; tag: MessageTag }
+
+/**
+ * The Zernio send fields an authorised reply may carry. Empty object = neither field.
+ *
+ * `messagingType` is documented as Facebook's, and `messageTag` is documented as
+ * requiring `messagingType: 'MESSAGE_TAG'`. So the two are minted together here and
+ * nowhere else — a caller cannot send one without the other, which is a 400 from Meta.
+ */
+export interface ReplyWireFields {
+  messagingType?: 'MESSAGE_TAG'
+  messageTag?: MessageTag
+}
+
+export type ReplyAuthorisation = { ok: true; wire: ReplyWireFields } | { ok: false; reason: string }
+
+/**
+ * Decide whether a reply may be sent, and with what tag fields.
+ *
+ * ── WHY THE SERVER RE-DERIVES THE AFFORDANCE AND CALLS THIS AGAIN ────────────
+ * The affordance the browser rendered is a HINT with an expiry. A tab left open across
+ * the 24-hour boundary still shows a live compose box; a `tagged` thread's HUMAN_AGENT
+ * option lapses at 168h while the page sits there. So the send path reads the thread
+ * again, re-evaluates the window against the current clock, and asks this function —
+ * which refuses in exactly the cases the UI would have refused, using the SAME sentence.
+ *
+ * The refusal quotes `affordance.reason` verbatim rather than composing its own copy.
+ * Two sentences for one fact drift, and the drift shows up as a user being told one
+ * thing by the page and a different thing by the error.
+ */
+export function authoriseReply(
+  affordance: ReplyAffordance,
+  intent: ReplyIntent,
+): ReplyAuthorisation {
+  if (!affordance.canSendFromSahoda) {
+    // Covers template_only, closed and unknown. `unknown` refusing is the point: it
+    // means the window could not be computed, and sending anyway would be a guess
+    // dressed as a promise.
+    return { ok: false, reason: affordance.reason }
+  }
+
+  if (affordance.state === 'open') {
+    if (intent.kind === 'tagged') {
+      return {
+        ok: false,
+        reason:
+          'This thread’s reply window is open, so a message tag is neither needed nor allowed. Send the reply without one.',
+      }
+    }
+    // Nothing is guessed onto the wire. `messagingType: 'RESPONSE'` would be a field we
+    // have never verified against Instagram, sent on the strength of a Facebook doc line.
+    return { ok: true, wire: {} }
+  }
+
+  // `state === 'tagged'` — the free-form window has lapsed and only a tag can carry it.
+  if (intent.kind === 'free_form') {
+    return { ok: false, reason: affordance.reason }
+  }
+
+  // Checked against THIS THREAD's live tags, not the platform's full set: HUMAN_AGENT is
+  // the only timed tag, so at 200h Facebook still has three and Instagram has none.
+  if (!affordance.tags.includes(intent.tag)) {
+    return {
+      ok: false,
+      reason: `${intent.tag} is not available on this ${affordance.platform} thread. ${affordance.reason}`,
+    }
+  }
+
+  return { ok: true, wire: { messagingType: 'MESSAGE_TAG', messageTag: intent.tag } }
 }

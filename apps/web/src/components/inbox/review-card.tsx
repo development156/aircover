@@ -4,6 +4,7 @@ import { Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import { platformLabel } from './platform-label'
+import { ReviewReply } from './review-reply'
 
 const WHEN = new Intl.DateTimeFormat('en-IN', {
   day: '2-digit',
@@ -49,8 +50,14 @@ function Rating({ rating }: { rating: number }) {
  * One review.
  *
  * `hasReply` comes back WITH the data, so the "replied" state is read rather than
- * inferred — and there is no reply button here, because replying is a write and this
- * surface is read-only. An affordance that does nothing is worse than none.
+ * inferred. It now does double duty: it draws the Replied chip AND disables the reply
+ * control, because Google keeps exactly one reply per review — a second overwrites the
+ * first, and silently replacing words the shop owner wrote is not an edit they asked for.
+ *
+ * ── STILL `[DOC]` END TO END ─────────────────────────────────────────────────
+ * No Google Business Profile has ever connected, so no review row has been observed and
+ * this reply has never been sent. With nothing connected the page renders its empty
+ * state and no card is drawn, so shipping the control costs nothing and hides nothing.
  */
 export function ReviewCard({ review }: { review: ZernioReview }) {
   const when = formatWhen(review.created)
@@ -88,7 +95,13 @@ export function ReviewCard({ review }: { review: ZernioReview }) {
             {review.reply.text}
           </p>
         </div>
-      ) : null}
+      ) : (
+        <ReviewReply
+          accountId={review.accountId}
+          reviewId={review.id}
+          hasReply={Boolean(review.hasReply)}
+        />
+      )}
     </article>
   )
 }

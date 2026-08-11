@@ -17,7 +17,7 @@ import { evaluateSendWindow, type ReplyAffordance } from '@sahoda/shared'
 import { cache } from 'react'
 
 import { postsCarryingComments } from '@/lib/inbox/commented-posts'
-import { newestInboundAt, threadPlatform } from '@/lib/inbox/messages'
+import { inChronologicalOrder, newestInboundAt, threadPlatform } from '@/lib/inbox/messages'
 import {
   SURFACE_CONNECTION_PLATFORMS,
   decideSurface,
@@ -291,7 +291,7 @@ export async function readReviews(): Promise<InboxView<ZernioReview>> {
  * rendered explanation. An id that matches no row in THIS workspace is indistinguishable
  * from a typo and must never reach Zernio — unscoped, it would read another tenant.
  */
-async function scopedAccount(
+export async function scopedAccount(
   accountId: string,
 ): Promise<
   | { ok: true; profile: ScopedProfileId; account: ScopedAccountId; reads: ZernioReads }
@@ -312,10 +312,14 @@ async function scopedAccount(
 export interface ThreadView {
   messages: ZernioMessage[]
   /**
-   * What a reply UI may offer, decided BEFORE a compose box would render.
+   * What a reply UI may offer, decided BEFORE a compose box renders.
    *
-   * Always present, and `canSendFromSahoda` is always false — the send path is not
-   * wired. `unknown` is a real answer here, not a fallback.
+   * `canSendFromSahoda` now varies: true on `open` and `tagged`, false on
+   * `template_only`, `closed` and `unknown`. It is a HINT for the UI, not the
+   * authority — the send action re-reads the thread and re-derives this against the
+   * clock at submit time, because a page left open outlives its own window.
+   *
+   * `unknown` is a real answer here, not a fallback, and it refuses.
    */
   affordance: ReplyAffordance | null
   decision: SurfaceDecision
@@ -353,10 +357,24 @@ export async function readThread(
   }
 
   try {
-    const page = await scoped.reads.listMessages(scoped.account, conversationId, { limit: PAGE })
-    const platform = threadPlatform(page.messages)
+    // ── `sortOrder: 'desc'` IS LOAD-BEARING ────────────────────────────────
+    // Zernio's default is `asc` — OLDEST first — so an unsorted page of a long thread
+    // holds its oldest fifty messages. The newest inbound message, which the reply
+    // window is measured from, would not be in it, and the window would be computed
+    // from history. Instagram and Facebook replay up to 500 messages per conversation
+    // on connect, so this is the ordinary case rather than an edge one.
+    //
+    // Display order is restored locally by `inChronologicalOrder` — sorting on the
+    // timestamps rather than reversing, because Facebook and Bluesky return
+    // newest-first whatever is asked and only reverse within a page.
+    const page = await scoped.reads.listMessages(scoped.account, conversationId, {
+      limit: PAGE,
+      sortOrder: 'desc',
+    })
+    const messages = inChronologicalOrder(page.messages)
+    const platform = threadPlatform(messages)
     return {
-      messages: page.messages,
+      messages,
       // No platform means no modelled window, and inventing one would be the guess the
       // affordance exists to avoid. `evaluateSendWindow` states that in words.
       affordance:
@@ -364,7 +382,7 @@ export async function readThread(
           ? null
           : evaluateSendWindow({
               platform,
-              lastInboundAt: newestInboundAt(page.messages),
+              lastInboundAt: newestInboundAt(messages),
               now,
             }),
       // `/messages` carries no per-account meta, so completeness is not in question the
@@ -372,7 +390,7 @@ export async function readThread(
       decision: decideSurface({
         surface: 'thread',
         connectedAccounts,
-        result: { rows: page.messages.length, meta: undefined },
+        result: { rows: messages.length, meta: undefined },
         fanOut: false,
       }),
       nextCursor: page.pagination.nextCursor,

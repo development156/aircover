@@ -111,7 +111,24 @@ export {
   type ZernioReview,
   type ZernioPaged,
   type ZernioPlatformFilter,
+  type ZernioMessagePage,
+  type MessageSortOrder,
 } from './zernio/reads'
+
+// ── The inbox WRITE surface, deliberately a separate handle ──────────────────
+// `ZernioReads` has no method that can post, and screens that display a conversation
+// hold only that. Replying requires importing this instead — so the capability is
+// granted where it is used and is absent everywhere else, rather than being present
+// and merely unused. Every method takes the workspace's profile FIRST: doc 13 §3, where
+// a wrong accountId does not error but replies on another customer's account with a 200.
+export {
+  createZernioSends,
+  type ZernioSends,
+  type ReplyReceipt,
+  type SendMessageInput,
+  type ReplyToCommentInput,
+  type ReplyToReviewInput,
+} from './zernio/sends'
 
 // ── What a metric is allowed to CLAIM ────────────────────────────────────────
 // Zernio returns zeroes for a post it has not computed (202), one it cannot tie to

@@ -47,6 +47,32 @@ export function newestInboundAt(messages: readonly ZernioMessage[]): string | nu
 }
 
 /**
+ * A page of messages in chronological order, oldest first — how a chat reads.
+ *
+ * ── WHY SORT LOCALLY RATHER THAN TRUST THE REQUEST ───────────────────────────
+ * The thread is FETCHED newest-first (`sortOrder: 'desc'`), because Zernio's default of
+ * oldest-first returns the wrong page entirely on a long thread — the newest inbound
+ * message, which the reply window is measured from, would not be in it. Having asked
+ * for the newest 50, the display order still has to be flipped back.
+ *
+ * Sorting by `createdAt` rather than reversing the array is deliberate: Facebook and
+ * Bluesky return newest-first whatever is requested and only reverse WITHIN a page, so
+ * a blind reverse would mis-order exactly the platforms whose order we cannot dictate.
+ * `sortOrderApplied` reports what happened, but sorting by the timestamps we can see is
+ * true whatever it says. Messages with no readable timestamp keep their relative
+ * position rather than being dropped or floated to one end.
+ */
+export function inChronologicalOrder(messages: readonly ZernioMessage[]): ZernioMessage[] {
+  return [...messages]
+    .map((message, index) => ({ message, index, ms: Date.parse(message.createdAt ?? '') }))
+    .sort((a, b) => {
+      if (Number.isNaN(a.ms) || Number.isNaN(b.ms)) return a.index - b.index
+      return a.ms === b.ms ? a.index - b.index : a.ms - b.ms
+    })
+    .map((entry) => entry.message)
+}
+
+/**
  * The thread's platform, or `null` when no message states one we model.
  *
  * Null rather than a default: a send window is a per-platform rule, and picking a

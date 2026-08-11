@@ -60,7 +60,13 @@ export default async function ThreadPage({
           is a per-platform rule — so there is nothing to state and nothing is shown.
           Guessing a platform here would fabricate the very answer this card exists to
           give honestly. */}
-      {thread.affordance === null ? null : <ReplyAffordanceCard affordance={thread.affordance} />}
+      {thread.affordance === null ? null : (
+        <ReplyAffordanceCard
+          affordance={thread.affordance}
+          accountId={accountId}
+          conversationId={conversationId}
+        />
+      )}
     </div>
   )
 }

@@ -283,6 +283,38 @@ interface ListOpts {
   cursor?: string
 }
 
+/** `asc` is Zernio's default on `/messages` and means OLDEST FIRST. See `MessageListOpts`. */
+export type MessageSortOrder = 'asc' | 'desc'
+
+/**
+ * ── WHY MESSAGES NEED A SORT PARAMETER AND THE OTHER LISTS DO NOT ────────────
+ * `/inbox/conversations/{id}/messages` defaults to `sortOrder=asc` — OLDEST first,
+ * chat-style. Combined with a page limit, an unsorted read of a long thread returns its
+ * oldest page: the newest messages, and therefore the newest INBOUND one that the reply
+ * window is measured from, are not in it at all.
+ *
+ * Instagram and Facebook replay up to 500 messages per conversation when an account is
+ * connected, so threads longer than one page are ordinary. A caller that needs the
+ * current state of a conversation — which is every caller we have — must ask for `desc`.
+ */
+interface MessageListOpts extends ListOpts {
+  sortOrder?: MessageSortOrder
+}
+
+export interface ZernioMessagePage {
+  messages: ZernioMessage[]
+  pagination: ZernioCursorPage
+  /**
+   * The order the server ACTUALLY applied, or `null` when it did not say.
+   *
+   * Not the order requested: Facebook and Bluesky return newest-first whatever is asked
+   * and only reverse within a single page. Null rather than an assumed `'asc'`, for the
+   * same reason `cursor()` fills pagination per-field — these endpoints disagree about
+   * which fields they send, and the last assumed value here was the `direction` enum.
+   */
+  sortOrderApplied: MessageSortOrder | null
+}
+
 const qs = (parts: Record<string, string | number | undefined>): string => {
   const out = Object.entries(parts)
     .filter((e): e is [string, string | number] => e[1] !== undefined && e[1] !== '')
@@ -346,12 +378,18 @@ export interface ZernioReads {
     profile: ScopedProfileId,
     opts?: ListOpts & { platform?: ZernioPlatformFilter },
   ): Promise<ZernioPaged<ZernioConversation, ZernioCursorPage>>
-  /** A thread is identified by (conversationId, accountId) — the id alone is not enough. */
+  /**
+   * A thread is identified by (conversationId, accountId) — the id alone is not enough.
+   *
+   * Pass `sortOrder: 'desc'` for anything that reasons about the CURRENT state of the
+   * thread (the reply window, the latest messages). The API's default is `asc`, which
+   * returns the oldest page — see `MessageListOpts`.
+   */
   listMessages(
     account: ScopedAccountId,
     conversationId: string,
-    opts?: ListOpts,
-  ): Promise<{ messages: ZernioMessage[]; pagination: ZernioCursorPage }>
+    opts?: MessageListOpts,
+  ): Promise<ZernioMessagePage>
 
   // ── comments (read only) ───────────────────────────────────────────────────
   listCommentedPosts(
@@ -481,16 +519,24 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
       const { data } = await json<{
         messages?: ZernioMessage[]
         pagination?: Partial<ZernioCursorPage>
+        sortOrderApplied?: MessageSortOrder
       }>(
         'GET',
         `/inbox/conversations/${encodeURIComponent(conversationId)}/messages${qs({
           accountId: account,
           limit: opts?.limit,
           cursor: opts?.cursor,
+          // Sent only when asked. `qs` drops undefined, so an absent option leaves the
+          // API on its own default rather than this module quietly picking one.
+          sortOrder: opts?.sortOrder,
         })}`,
         'listMessages',
       )
-      return { messages: data.messages ?? [], pagination: cursor(data.pagination) }
+      return {
+        messages: data.messages ?? [],
+        pagination: cursor(data.pagination),
+        sortOrderApplied: data.sortOrderApplied ?? null,
+      }
     },
 
     async listCommentedPosts(profile, opts) {

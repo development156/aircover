@@ -9,7 +9,7 @@ import { readPostComments } from '@/lib/inbox/read'
 export const metadata = { title: 'Inbox · Post comments' }
 
 /**
- * `GET /inbox/comments/{platformPostId}`, read-only.
+ * `GET /inbox/comments/{platformPostId}`, and the reply that goes back the other way.
  *
  * Two segments for the same reason the thread route has two: Zernio scopes this read by
  * `accountId`, and a post id alone would read against whichever account matched. The id
@@ -47,7 +47,11 @@ export default async function PostCommentsPage({
           <ul className="space-y-2" data-guide="inbox.post-comments">
             {rows.map((comment) => (
               <li key={comment.id}>
-                <CommentCard comment={comment} />
+                <CommentCard
+                  comment={comment}
+                  accountId={accountId}
+                  platformPostId={platformPostId}
+                />
               </li>
             ))}
           </ul>

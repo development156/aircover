@@ -1,7 +1,7 @@
 import type { ZernioMessage } from '@sahoda/publishing'
 import { describe, it, expect } from 'vitest'
 
-import { newestInboundAt, threadPlatform } from './messages'
+import { inChronologicalOrder, newestInboundAt, threadPlatform } from './messages'
 
 /**
  * ── WHY THIS FILE WAS REWRITTEN, NOT EXTENDED ────────────────────────────────
@@ -151,5 +151,63 @@ describe('threadPlatform', () => {
   it('skips unrecognised platforms to find one it does model', () => {
     const messages = [message({ platform: 'mastodon' }), message({ platform: 'facebook' })]
     expect(threadPlatform(messages)).toBe('facebook')
+  })
+})
+
+describe('inChronologicalOrder', () => {
+  const msg = (id: string, createdAt: string | undefined): ZernioMessage =>
+    ({ id, createdAt, direction: 'incoming', platform: 'instagram' }) as unknown as ZernioMessage
+
+  /**
+   * The thread is fetched NEWEST-first, because Zernio's oldest-first default returns
+   * the wrong page of a long conversation. This puts it back into reading order.
+   */
+  it('flips a newest-first page into oldest-first', () => {
+    const page = [
+      msg('c', '2026-08-08T12:00:00.000Z'),
+      msg('b', '2026-08-08T11:00:00.000Z'),
+      msg('a', '2026-08-08T10:00:00.000Z'),
+    ]
+    expect(inChronologicalOrder(page).map((m) => m.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('leaves an already-chronological page alone', () => {
+    const page = [msg('a', '2026-08-08T10:00:00.000Z'), msg('b', '2026-08-08T11:00:00.000Z')]
+    expect(inChronologicalOrder(page).map((m) => m.id)).toEqual(['a', 'b'])
+  })
+
+  /**
+   * Not a blind `reverse()`: Facebook and Bluesky return newest-first regardless of the
+   * requested order and only reverse within a page, so the timestamps are the only
+   * thing that is true on every platform.
+   */
+  it('orders by timestamp rather than by position', () => {
+    const page = [
+      msg('b', '2026-08-08T11:00:00.000Z'),
+      msg('c', '2026-08-08T12:00:00.000Z'),
+      msg('a', '2026-08-08T10:00:00.000Z'),
+    ]
+    expect(inChronologicalOrder(page).map((m) => m.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('keeps equal timestamps in their original order', () => {
+    const page = [msg('x', '2026-08-08T10:00:00.000Z'), msg('y', '2026-08-08T10:00:00.000Z')]
+    expect(inChronologicalOrder(page).map((m) => m.id)).toEqual(['x', 'y'])
+  })
+
+  /** An unreadable timestamp keeps its place. Dropping a message would hide a reply. */
+  it('never drops a message with an unreadable timestamp', () => {
+    const page = [msg('bad', undefined), msg('a', '2026-08-08T10:00:00.000Z')]
+    expect(
+      inChronologicalOrder(page)
+        .map((m) => m.id)
+        .sort(),
+    ).toEqual(['a', 'bad'])
+  })
+
+  it('does not mutate the page it was given', () => {
+    const page = [msg('b', '2026-08-08T11:00:00.000Z'), msg('a', '2026-08-08T10:00:00.000Z')]
+    inChronologicalOrder(page)
+    expect(page.map((m) => m.id)).toEqual(['b', 'a'])
   })
 })

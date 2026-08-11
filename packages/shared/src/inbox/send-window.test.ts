@@ -140,11 +140,20 @@ describe('evaluateSendWindow — what we refuse to claim', () => {
     }
   })
 
-  it('never reports a thread as replyable while reads are the only wired surface', () => {
+  /**
+   * This assertion used to read `toBe(false)` — reads were the only wired surface, and
+   * the flag was the literal `false` on every result so that wiring a send path could
+   * not happen by accident. The send path is now wired, and this is the deliberate
+   * change that file's comment asked for.
+   *
+   * What did NOT change is that the flag is a per-variant literal: it is true here
+   * because `open` is one of exactly two states a reply can leave from, not because a
+   * boolean got widened. `authorise-reply.test.ts` holds the flag and the gate to the
+   * same answer in both directions.
+   */
+  it('reports an open thread as replyable, now that the send path exists', () => {
     const r = evaluateSendWindow({ platform: 'instagram', lastInboundAt: T0, now: at(1) })
     expect(r.state).toBe('open')
-    // `open` describes the PLATFORM window. Whether Sahoda can send is a separate
-    // capability the read surface does not confer.
-    expect(r.canSendFromSahoda).toBe(false)
+    expect(r.canSendFromSahoda).toBe(true)
   })
 })

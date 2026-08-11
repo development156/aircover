@@ -1,6 +1,8 @@
 import type { ZernioComment } from '@sahoda/publishing'
 import { EyeOff, Heart } from 'lucide-react'
 
+import { CommentReply } from './comment-reply'
+
 const WHEN = new Intl.DateTimeFormat('en-IN', {
   day: '2-digit',
   month: 'short',
@@ -23,11 +25,30 @@ function formatWhen(value: string | undefined): string | null {
  * `canReply` / `canHide` / `canDelete` / `canLike` arrive WITH the comment. Whether an
  * action is possible varies per comment — Instagram and Facebook differ, and a comment
  * on someone else's post differs from one on your own — so there is no rule to infer it
- * from. This surface is read-only, so those bits are shown as capability, not offered
- * as buttons: an enabled control with no handler behind it is a promise we break on
- * click. When the write surface lands, these same bits become the `disabled` prop.
+ * from.
+ *
+ * The write surface has landed for REPLIES, and `canReply` is now exactly what that
+ * file predicted it would become: the `disabled` prop on the reply control, rather than
+ * a sentence describing a capability nobody could use. `canHide` / `canDelete` /
+ * `canLike` still have no handler behind them and so are still stated, not offered — an
+ * enabled control with nothing behind it is a promise broken on click.
+ *
+ * ── `canReply` IS MISSING MORE OFTEN THAN IT IS FALSE ────────────────────────
+ * The gate is `!== false`, not `=== true`. Zernio omits the field on some rows, and
+ * treating absent as "cannot reply" would hide the control on comments that are
+ * perfectly repliable. An absent permission is unknown, and the honest handling of
+ * unknown here is to let the attempt happen and report the platform's own answer —
+ * unlike a send window, a wrong guess costs a 403, not a message to the wrong person.
  */
-export function CommentCard({ comment }: { comment: ZernioComment }) {
+export function CommentCard({
+  comment,
+  accountId,
+  platformPostId,
+}: {
+  comment: ZernioComment
+  accountId: string
+  platformPostId: string
+}) {
   const when = formatWhen(comment.createdTime)
   const who = comment.from?.name ?? comment.from?.username ?? 'Unknown'
 
@@ -71,6 +92,13 @@ export function CommentCard({ comment }: { comment: ZernioComment }) {
           <span>{comment.from?.isOwner ? 'No reply thread here' : 'Replies not allowed here'}</span>
         ) : null}
       </div>
+
+      <CommentReply
+        accountId={accountId}
+        platformPostId={platformPostId}
+        commentId={comment.id}
+        canReply={comment.canReply !== false}
+      />
     </article>
   )
 }
