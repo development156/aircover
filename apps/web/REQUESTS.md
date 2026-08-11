@@ -26,6 +26,20 @@ the 60/min ceiling shared with analytics and the inbox — but it is a fallback,
 alter publication supabase_realtime add table posts, post_variants;
 ```
 
+**Answered, not applied — read this before writing it again (added 2026-08-11).** The
+migration exists: `packages/db/supabase/migrations/20260811000000_realtime_publish_state.sql`,
+written on the `wt-db2` lane and merged to mainline in the same sequence that landed this
+file. It does more than the one line above — it guards the publication AND each table
+independently, because `alter publication ... add table` raises `duplicate_object` if
+membership was ever set from the dashboard's Publications toggle, which leaves no trace in
+this directory.
+
+It is **written and NOT APPLIED.** Nothing has run it against any database, so the two
+questions below are still open and still belong with the apply, not after it. The migration's
+own header says this request is "NOT yet on wt-web, so a reader of the mainline file will not
+find it" — that sentence was true when it was written and is now out of date, since both are
+here. It is left uncorrected deliberately: this lane does not edit that directory.
+
 Default replica identity is sufficient — this lane needs only the NEW row state (status,
 scheduled_at, publish_status, permalink, platform_post_id), never the old values, so
 `replica identity full` is not requested and would only widen the WAL.

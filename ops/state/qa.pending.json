@@ -2,58 +2,6 @@
   "version": 1,
   "runs": [
     {
-      "client_id": "qa-msm1njyd-8fb76d0c",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-09T16:55:49.956Z",
-      "finished_at": "2026-08-09T16:55:49.956Z",
-      "suite": "typecheck",
-      "status": "pass",
-      "summary_plain": "The typecheck checks ran and everything passed.",
-      "details": "Target carries simulated; both call sites state it\n Tasks:    8 successful, 8 total",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msm1qyjm-2fa7fb23",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-09T16:58:28.829Z",
-      "finished_at": "2026-08-09T16:58:28.829Z",
-      "suite": "typecheck",
-      "status": "pass",
-      "summary_plain": "The typecheck checks ran (2469 passed), but 1 test did NOT run — this does not prove the suite passes.",
-      "details": "=== TYPECHECK ===\n Tasks:    8 successful, 8 total\n=== LINT ===\n Tasks:    8 successful, 8 total\n=== TEST ===\n@sahoda/publishing:test:       Tests  186 passed (186)\n@sahoda/web:test:       Tests  2283 passed | 1 skipped (2284)\n Tasks:    14 successful, 14 total",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msm1qyjm-6ca584b6",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-09T16:58:28.829Z",
-      "finished_at": "2026-08-09T16:58:28.829Z",
-      "suite": "lint",
-      "status": "pass",
-      "summary_plain": "The lint checks ran (2469 passed), but 1 test did NOT run — this does not prove the suite passes.",
-      "details": "=== TYPECHECK ===\n Tasks:    8 successful, 8 total\n=== LINT ===\n Tasks:    8 successful, 8 total\n=== TEST ===\n@sahoda/publishing:test:       Tests  186 passed (186)\n@sahoda/web:test:       Tests  2283 passed | 1 skipped (2284)\n Tasks:    14 successful, 14 total",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msm1qyjm-8e4c839a",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-09T16:58:28.829Z",
-      "finished_at": "2026-08-09T16:58:28.829Z",
-      "suite": "unit",
-      "status": "pass",
-      "summary_plain": "The unit checks ran (2469 passed), but 1 test did NOT run — this does not prove the suite passes.",
-      "details": "=== TYPECHECK ===\n Tasks:    8 successful, 8 total\n=== LINT ===\n Tasks:    8 successful, 8 total\n=== TEST ===\n@sahoda/publishing:test:       Tests  186 passed (186)\n@sahoda/web:test:       Tests  2283 passed | 1 skipped (2284)\n Tasks:    14 successful, 14 total",
-      "duration_ms": null
-    },
-    {
       "client_id": "qa-msm206zy-6c23c79b",
       "task_code": "SL-054",
       "kind": "auto",
@@ -2597,6 +2545,56 @@
       "status": "pass",
       "summary_plain": "The unit checks ran and everything passed (14 passed).",
       "details": " RUN  v4.1.10 /home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-web/apps/web\n\n\n Test Files  1 passed (1)\n      Tests  14 passed (14)\n   Start at  22:23:05\n   Duration  691ms (transform 180ms, setup 0ms, import 155ms, tests 118ms, environment 0ms)\n\n=== seed-parity ===\nat: ./apps/web/src/lib/ops/seed-parity.test.ts\npkg: apps/web",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msowsiw7-ec5e1bd4",
+      "task_code": "SL-070",
+      "kind": "manual",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The full check suite ran green on the merged branch — every package passed its type checks, its lint rules and its tests, and the formatting check was clean. The fix is deployed.",
+      "actor": "claude",
+      "started_at": "2026-08-11T17:03:02.310Z",
+      "finished_at": "2026-08-11T17:03:02.310Z"
+    },
+    {
+      "client_id": "qa-msowv5os-2da45997",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-11T17:05:05.160Z",
+      "finished_at": "2026-08-11T17:05:05.160Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran and everything passed.",
+      "details": "ops-cards-write: board already matches the source list.\n@sahoda/web:test: \n\n Tasks:    24 successful, 24 total\nCached:    21 cached, 24 total\n  Time:    1m3.075s \n\n===TURBO EXIT: 0===\n$ prettier --check .\nChecking formatting...\nAll matched files use Prettier code style!\n===FORMAT EXIT: 0===\n M apps/web/REQUESTS.md\n M ops/state/board.json\n M ops/state/changelog.pending.json\n M ops/state/qa.pending.json",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msowv5os-759cae82",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-11T17:05:05.160Z",
+      "finished_at": "2026-08-11T17:05:05.160Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran and everything passed.",
+      "details": "ops-cards-write: board already matches the source list.\n@sahoda/web:test: \n\n Tasks:    24 successful, 24 total\nCached:    21 cached, 24 total\n  Time:    1m3.075s \n\n===TURBO EXIT: 0===\n$ prettier --check .\nChecking formatting...\nAll matched files use Prettier code style!\n===FORMAT EXIT: 0===\n M apps/web/REQUESTS.md\n M ops/state/board.json\n M ops/state/changelog.pending.json\n M ops/state/qa.pending.json",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msowv5os-5aa81404",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-11T17:05:05.160Z",
+      "finished_at": "2026-08-11T17:05:05.160Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed.",
+      "details": "ops-cards-write: board already matches the source list.\n@sahoda/web:test: \n\n Tasks:    24 successful, 24 total\nCached:    21 cached, 24 total\n  Time:    1m3.075s \n\n===TURBO EXIT: 0===\n$ prettier --check .\nChecking formatting...\nAll matched files use Prettier code style!\n===FORMAT EXIT: 0===\n M apps/web/REQUESTS.md\n M ops/state/board.json\n M ops/state/changelog.pending.json\n M ops/state/qa.pending.json",
       "duration_ms": null
     }
   ]

@@ -822,12 +822,13 @@
       "title": "Use each platform’s own reporting delay, not Instagram’s, when deciding if a metric is late",
       "detail": "When a post’s numbers all come back as zero, we now check whether the platform has even had time to report yet before showing them — and if it has not, we say “not available yet” instead of “nobody saw this”. That check currently uses Instagram’s 48-hour delay for every channel, including ones that report much faster. Why it matters: on a channel that reports within the hour, we would keep saying “check back later” for two days over numbers we already had — the same dishonesty as showing a false zero, pointing the other way. Harmless today: Instagram is the only channel publishing live, and the LinkedIn, X and GBP rows are all simulated, so they are filtered out before any metrics call is made.\n\nTechnical detail — `listPostMetrics` never passes `lagHours` to `classifyPostMetrics`, so rule 6a always gates an all-zero payload against `INSTAGRAM_INSIGHTS_LAG_HOURS` (48). This was inert before 2026-08-10 — `lagHours` only mattered when `lastUpdated` was absent, which the live API never does — but rule 6a now decides visibility for every published channel. The account half already solves this properly: it reads each endpoint’s own `dataDelay` through `lagHoursFromDataDelay` and keeps the follower (24h) and insights (48h) delays strictly apart. `ZernioPostAnalytics` carries no `dataDelay` field, so the per-post half has nothing equivalent to read; closing this needs either a per-channel constant or a source for each platform’s stated delay.",
       "roadmap_code": null,
-      "board_column": "todo",
+      "board_column": "done",
       "assignee": "claude",
       "doc_ref": "packages/publishing/src/zernio/analytics-state.ts (rule 6a)",
       "sort": 700,
       "blocked": false,
-      "blocked_reason": null
+      "blocked_reason": null,
+      "commit_sha": "e3abdc5"
     },
     {
       "code": "SL-071",
