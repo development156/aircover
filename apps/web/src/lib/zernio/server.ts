@@ -3,9 +3,11 @@ import 'server-only'
 import {
   createZernioClient,
   createZernioReads,
+  createZernioSends,
   fetchTransport,
   type ZernioClient,
   type ZernioReads,
+  type ZernioSends,
 } from '@sahoda/publishing'
 
 import { env } from '@/lib/env'
@@ -40,6 +42,23 @@ export function zernioClientReads(): ZernioReads | null {
   const apiKey = env.ZERNIO_API_KEY
   if (!apiKey) return null
   return createZernioReads({ transport: fetchTransport(), apiKey })
+}
+
+/**
+ * The Zernio INBOX WRITE surface for this request, or null when the key is not there.
+ *
+ * A third handle rather than a method on either of the others, because these are three
+ * different capabilities and the separation is load-bearing: a page that renders a
+ * conversation calls `zernioClientReads()` and therefore holds nothing that can post.
+ * Only a server action that is explicitly replying reaches for this one.
+ *
+ * Null propagates like the others — a caller with no key must say it could not send,
+ * never report a reply it did not make.
+ */
+export function zernioClientSends(): ZernioSends | null {
+  const apiKey = env.ZERNIO_API_KEY
+  if (!apiKey) return null
+  return createZernioSends({ transport: fetchTransport(), apiKey })
 }
 
 /** True when the rail is provisioned — drives whether the connect button is live. */

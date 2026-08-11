@@ -4,6 +4,8 @@ import type { LucideIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
+import { ReplyComposer } from './reply-composer'
+
 import { platformLabel } from './platform-label'
 
 /**
@@ -17,11 +19,15 @@ import { platformLabel } from './platform-label'
  * an error that explains nothing. The window is knowable before the box renders, so
  * the box states its own terms.
  *
- * ── WHY THE CONTROL IS ALWAYS DISABLED TODAY ─────────────────────────────────
- * `canSendFromSahoda` is the literal type `false` in @sahoda/shared: reads are the only
- * wired surface. So there are two independent reasons a reply may be impossible — the
- * platform's window, and Sahoda's own missing send path — and both are shown. Hiding
- * the second would make a disabled box look like a platform restriction it is not.
+ * ── WHAT CHANGED WHEN SENDING WAS WIRED ──────────────────────────────────────
+ * `canSendFromSahoda` used to be the literal `false` on every state, so this card also
+ * had to explain a second, independent blocker: Sahoda's own missing send path. That
+ * blocker is gone, and the copy that named it went with it — a note saying "cannot send
+ * yet" beside a working box would be the fabrication in the other direction.
+ *
+ * The flag now varies per state, so exactly one thing stands between the customer and a
+ * reply: the platform's window. `ReplyComposer` reads the same flag to decide whether to
+ * offer a live box, which means the badge, the sentence and the control cannot disagree.
  */
 
 interface StateStyle {
@@ -66,10 +72,18 @@ function formatWhen(value: string | null | undefined): string | null {
 
 export interface ReplyAffordanceCardProps {
   affordance: ReplyAffordance
+  /** Both halves of the thread key — a send is addressed to (account, conversation). */
+  accountId: string
+  conversationId: string
   className?: string
 }
 
-export function ReplyAffordanceCard({ affordance, className }: ReplyAffordanceCardProps) {
+export function ReplyAffordanceCard({
+  affordance,
+  accountId,
+  conversationId,
+  className,
+}: ReplyAffordanceCardProps) {
   const style = STATE_STYLES[affordance.state]
   const Icon = style.icon
   const closesAt =
@@ -115,59 +129,17 @@ export function ReplyAffordanceCard({ affordance, className }: ReplyAffordanceCa
         {affordance.reason}
       </p>
 
-      {affordance.state === 'tagged' ? (
-        <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Allowed message tags">
-          {affordance.tags.map((tag) => (
-            <li
-              key={tag}
-              className="rounded-pill bg-s2 px-2 py-[2px] font-mono text-[11px] font-semibold tracking-[0.04em] text-muted"
-            >
-              {tag}
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {/* The allowed tags used to be listed here as static chips. They are now the
+          composer's radio group instead — one place, and a place where choosing one
+          does something. Two renderings of the same set would eventually disagree
+          about which tags a thread still has, and the timed HUMAN_AGENT tag is exactly
+          the one that would drift. */}
 
-      <ReplyComposer affordance={affordance} />
-    </section>
-  )
-}
-
-/**
- * The compose control, disabled with a stated cause.
- *
- * It renders even when replying is impossible, on purpose: an absent control leaves the
- * user wondering whether the feature exists, while a disabled one that says why answers
- * the question.
- *
- * `aria-describedby` lists BOTH causes, because they are independent and a thread can
- * have either, both, or only the second: the platform's window, and Sahoda's own
- * missing send path. A screen reader hears the reasons, not just "textbox, disabled".
- * The window reason is referenced by id rather than repeated — one sentence, one place.
- */
-function ReplyComposer({ affordance }: { affordance: ReplyAffordance }) {
-  const blockedByPlatform = affordance.state !== 'open'
-
-  return (
-    <div className="mt-4 border-t border-line pt-4">
-      <label htmlFor="reply-body" className="text-[13px] font-semibold">
-        Reply
-      </label>
-      <textarea
-        id="reply-body"
-        disabled
-        rows={3}
-        aria-describedby={
-          blockedByPlatform ? 'reply-window-reason reply-send-note' : 'reply-send-note'
-        }
-        placeholder={
-          blockedByPlatform ? 'Replying is not available on this thread' : 'Write a reply'
-        }
-        className="mt-1.5 w-full resize-none rounded-card border border-line bg-s2 px-3 py-2 text-[14px] text-ink placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-45"
+      <ReplyComposer
+        affordance={affordance}
+        accountId={accountId}
+        conversationId={conversationId}
       />
-      <p id="reply-send-note" className="mt-1.5 text-[13px] text-muted">
-        Sahoda can read this thread but cannot send yet — the reply path is not wired in this build.
-      </p>
-    </div>
+    </section>
   )
 }
