@@ -4,6 +4,23 @@
 "when a customer exists". There already are **26 real workspaces and 17 real users** on the
 database this plan is about.
 
+> **Update — 2026-08-11: the staging project now exists.** Its ref is **`yoxmzwkxweasfaahhvpj`**.
+> Reported in-session by DIVAS and **not** verified against the Supabase API or dashboard from
+> that session. It appeared nowhere in this repository beforehand, which is the reason it is
+> written down here and on the card rather than left in one person's memory. Section 1 below
+> still says there is exactly one project: that was true when written and is kept, not corrected.
+>
+> **Nothing in sections 3 to 5 has happened yet, and the card does not advance because a project
+> exists.** The five Vercel variables are still single rows scoped `Preview, Production`, local
+> `.env` still resolves to production, the migration replay that *is* the rehearsal has not been
+> run, and the R-01 guard still reads "abort if target is prod" rather than "assert target is
+> staging". A staging project nobody points at buys nothing — it only makes section 3 possible.
+>
+> **First mover: SL-078.** The Supabase MCP server that every working session uses is pinned to
+> `--project-ref=${SUPABASE_PROJECT_REF}`, which resolves to production. Re-pointing it at this
+> ref is a single environment value and does not wait on the Vercel variable split, the replay
+> or the seed.
+
 ---
 
 ## 1. The problem, three ways in

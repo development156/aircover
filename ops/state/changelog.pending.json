@@ -8,6 +8,30 @@
       "kind": "changed",
       "task_codes": [],
       "happened_at": "2026-08-01T13:31:28.921Z"
+    },
+    {
+      "client_id": "cl-msoweddy-b8f716b1",
+      "title": "You can see how your posts and accounts are performing",
+      "summary_plain": "There is a new Analytics screen. It shows each connected account's followers over time, and how every published post did. Where a platform has not reported a post's numbers yet, it says so instead of showing zeros, because a confident zero reads as failure when the truth is that nobody has counted yet.",
+      "kind": "added",
+      "task_codes": [],
+      "happened_at": "2026-08-11T16:52:01.991Z"
+    },
+    {
+      "client_id": "cl-msowedyo-64449db4",
+      "title": "You can reply to messages, comments and reviews without leaving Sahoda",
+      "summary_plain": "Replies can now be sent straight from the inbox. Where a platform closes the window for a free reply some hours after the customer wrote, the reply box explains that before you write rather than refusing after you press send.",
+      "kind": "added",
+      "task_codes": [],
+      "happened_at": "2026-08-11T16:52:02.736Z"
+    },
+    {
+      "client_id": "cl-msoweek5-ea77a7ab",
+      "title": "Posts show where they have got to without you refreshing the page",
+      "summary_plain": "A post that is going out now updates itself on screen as it moves from waiting to sending to sent, on both the posts list and the planner. Until now the page had to be reloaded to find out, so a post could have gone out minutes earlier and still look stuck.",
+      "kind": "changed",
+      "task_codes": [],
+      "happened_at": "2026-08-11T16:52:03.509Z"
     }
   ]
 }
