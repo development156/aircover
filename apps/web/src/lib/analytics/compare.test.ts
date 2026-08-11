@@ -8,7 +8,6 @@ import {
   coverageNote,
   measuredFor,
   rankBy,
-  shareOfMeasured,
   totalFor,
   unmeasuredFor,
   type ComparableRow,
@@ -19,8 +18,8 @@ import {
  *
  * Every refusal `classifyPostMetrics` makes about one number, this module has to
  * make again about a relationship between numbers — and the failures look nothing
- * like a rendered "0". They look like a row in last place, a total that is really a
- * subtotal, and a percentage of a population that was never measured.
+ * like a rendered "0". They look like a row in last place, and a total that is
+ * really a subtotal.
  */
 
 const STAMP = '2026-08-11T13:16:55Z'
@@ -121,9 +120,17 @@ describe('a total never pretends to be one', () => {
     })
   })
 
-  it('says so in words, both ways round', () => {
+  /**
+   * States the count and stops. It used to append "— the rest aren't available
+   * yet", which is a claim about the missing rows and is false for most of them:
+   * `not-loaded` was never asked and nothing is coming, `simulated` and
+   * `no-platform-id` never will, `unreadable` is a failure. `copy.ts` keeps those
+   * apart deliberately; a summary line must not collapse them back together.
+   */
+  it('says so in words, both ways round, and claims nothing about the rest', () => {
     expect(coverageNote({ counted: 3, of: 3 })).toBe('All 3 channels reported.')
-    expect(coverageNote({ counted: 2, of: 5 })).toContain('2 of 5 channels reported')
+    expect(coverageNote({ counted: 2, of: 5 })).toBe('2 of 5 channels reported.')
+    expect(coverageNote({ counted: 2, of: 5 })).not.toMatch(/available yet|try again|coming/i)
   })
 })
 
@@ -204,38 +211,6 @@ describe('channels are rolled up on their own coverage', () => {
     expect(byChannel(rows, 'impressions').find((c) => c.channel === 'linkedin')?.rows).toHaveLength(
       2,
     )
-  })
-})
-
-describe('a share is refused unless the whole population reported', () => {
-  /**
-   * "Instagram drove 62% of your reach" is arithmetic on a denominator. Build the
-   * denominator from partial coverage and the sentence describes a population that
-   * was never measured — not a rougher truth, a different quantity.
-   */
-  it('is null when any row in scope is unmeasured', () => {
-    const rows = [
-      row({ postId: 'p1', channel: 'instagram', state: ready({ impressions: 40 }) }),
-      row({ postId: 'p2', channel: 'linkedin', state: pending }),
-    ]
-    expect(shareOfMeasured(rows, 'instagram', 'impressions')).toBeNull()
-  })
-
-  it('is a real fraction when everything reported', () => {
-    const rows = [
-      row({ postId: 'p1', channel: 'instagram', state: ready({ impressions: 40 }) }),
-      row({ postId: 'p2', channel: 'linkedin', state: ready({ impressions: 60 }) }),
-    ]
-    expect(shareOfMeasured(rows, 'instagram', 'impressions')).toBeCloseTo(0.4)
-  })
-
-  /** No division by zero, and no "0% of nothing" either. */
-  it('is null when the measured whole is zero', () => {
-    const rows = [
-      row({ postId: 'p1', channel: 'instagram', state: ready({ impressions: 0 }) }),
-      row({ postId: 'p2', channel: 'linkedin', state: ready({ impressions: 0 }) }),
-    ]
-    expect(shareOfMeasured(rows, 'instagram', 'impressions')).toBeNull()
   })
 })
 

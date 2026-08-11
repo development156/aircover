@@ -64,28 +64,33 @@ function titleOf(post: Post): string {
   return 'Untitled post'
 }
 
-export async function readAnalyticsPage(now: Date = new Date()): Promise<AnalyticsPageData> {
-  const empty: AnalyticsPageData = {
-    rows: [],
-    posts: [],
-    account: { kind: 'unreadable' },
-    hasPublished: false,
+/**
+ * The account half, on its own and total.
+ *
+ * Its own function rather than a branch inside the post half's `try`, and that is
+ * the whole point: with both under one `try`, a throw from the POST side lands in a
+ * catch that has no account value in scope and has to invent one — reporting
+ * "couldn't read your account insights" about a connection that answered perfectly.
+ * Independence stated in a comment is independence one refactor away from being
+ * untrue; here the two cannot reach each other's failure.
+ */
+async function readAccount(now: Date): Promise<AccountAnalytics> {
+  try {
+    return await readInstagramAnalytics(now)
+  } catch {
+    return { kind: 'unreadable' }
   }
+}
+
+export async function readAnalyticsPage(now: Date = new Date()): Promise<AnalyticsPageData> {
+  // Both are total, so both can be awaited together and neither can reject. The
+  // account value is in scope for every return below, including the catch.
+  const [account, posts] = await Promise.all([readAccount(now), listPosts().catch(() => [])])
+
+  const empty: AnalyticsPageData = { rows: [], posts: [], account, hasPublished: false }
 
   try {
-    // The account half is independent of the post half — a broken Instagram
-    // connection must not empty the post table, and vice versa. Settled rather
-    // than awaited together so one rejection cannot take the other down.
-    const [postsResult, accountResult] = await Promise.allSettled([
-      listPosts(),
-      readInstagramAnalytics(now),
-    ])
-
-    const posts = postsResult.status === 'fulfilled' ? postsResult.value : []
-    const account: AccountAnalytics =
-      accountResult.status === 'fulfilled' ? accountResult.value : { kind: 'unreadable' }
-
-    if (posts.length === 0) return { ...empty, account }
+    if (posts.length === 0) return empty
 
     const variantStates = await listVariantStates(posts.map((post) => post.id))
 
@@ -106,6 +111,18 @@ export async function readAnalyticsPage(now: Date = new Date()): Promise<Analyti
     const metrics = await listPostMetrics(inScope, now, ANALYTICS_METRIC_CALLS)
     const titles = new Map(posts.map((post) => [post.id, titleOf(post)]))
 
+    /**
+     * `(postId, channel)` is unique across these rows, and downstream depends on it
+     * in three places at once: it is the React key in both of `post-table`'s lists,
+     * `totalFor` would double-count a repeat, and `coverageFor`'s `of: rows.length`
+     * would inflate its own denominator.
+     *
+     * Not defended here because it cannot be violated: `post_variants` carries
+     * `unique (post_id, channel)` (20260718000004_content.sql), so a second row for
+     * one channel of one post is not expressible. Written down because SL-076 was
+     * exactly this class of defect one commit ago, and the next reader deserves to
+     * know the guarantee is the database's rather than assume it is nobody's.
+     */
     const rows: ComparableRow[] = []
     for (const [postId, channelMetrics] of metrics) {
       for (const entry of channelMetrics) {

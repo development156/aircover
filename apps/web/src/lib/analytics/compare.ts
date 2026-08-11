@@ -20,9 +20,11 @@ import type { Channel } from '@sahoda/shared'
  *     seven posts were pending and were quietly skipped, it is a subtotal wearing a
  *     total's clothes, and it is wrong in the direction that flatters us.
  *
- *   · SHARE. "Instagram drove 80% of your reach" is arithmetic on a denominator.
- *     A denominator built from partial coverage produces a percentage that is not
- *     about anything.
+ *   · SHARE. "Instagram drove 80% of your reach" is arithmetic on a denominator, and
+ *     a denominator built from partial coverage produces a percentage that is not
+ *     about anything. There is deliberately no function here that computes one: the
+ *     honest version would return null in nearly every real case, and a figure that
+ *     is usually absent is a worse answer than no figure at all.
  *
  * So nothing here returns a bare number. Every figure arrives with the `Coverage`
  * it was computed from, and a figure with no coverage at all is `null` rather than
@@ -196,36 +198,23 @@ export function byChannel(rows: readonly ComparableRow[], metric: MetricKey): Ch
 }
 
 /**
- * A channel's share of the measured whole, when that share means anything.
+ * "3 of 8 channels reported" — the sentence a figure may never appear without.
  *
- * Null unless BOTH the part and the whole are fully covered. A percentage computed
- * across partial coverage is not a smaller truth, it is a different quantity: with
- * two of five Instagram posts reporting, "Instagram is 30% of your reach" describes
- * a population that does not exist. There is no honest way to render it, so there
- * is no number to render.
+ * States the count and STOPS. It used to add "— the rest aren't available yet",
+ * which is a claim about the five, and only true of some of them: `not-loaded` was
+ * never asked and nothing is coming, `simulated` and `no-platform-id` never will,
+ * and `unreadable` is a failure. `copy.ts` keeps those four apart on purpose —
+ * `not-loaded`'s detail is deliberately "Open the post" and pointedly not "try
+ * again" — and a summary line has no business collapsing them back together.
+ *
+ * It bit hardest on the surface that needed it most: with a 24-call ceiling over 30
+ * published channels, the old sentence said "the rest aren't available yet" about
+ * six channels nobody had asked about. The per-row reasons carry the why; this
+ * carries only the count.
  */
-export function shareOfMeasured(
-  rows: readonly ComparableRow[],
-  channel: Channel,
-  metric: MetricKey,
-): number | null {
-  const whole = totalFor(rows, metric)
-  if (whole === null || whole.value === 0) return null
-  if (whole.coverage.counted !== whole.coverage.of) return null
-
-  const part = totalFor(
-    rows.filter((row) => row.channel === channel),
-    metric,
-  )
-  if (part === null || part.coverage.counted !== part.coverage.of) return null
-
-  return part.value / whole.value
-}
-
-/** "3 of 8 channels reported" — the sentence a figure may never appear without. */
 export function coverageNote(coverage: Coverage, noun = 'channels'): string {
   if (coverage.counted === coverage.of) {
     return `All ${coverage.of} ${noun} reported.`
   }
-  return `${coverage.counted} of ${coverage.of} ${noun} reported — the rest aren’t available yet.`
+  return `${coverage.counted} of ${coverage.of} ${noun} reported.`
 }

@@ -16,10 +16,10 @@ import { byChannel, coverageFor, totalFor, type ComparableRow } from '@/lib/anal
  * bottom line states the whole table's. Neither is optional, because a number in a
  * comparison table is read AS a comparison whether or not it was offered as one.
  *
- * There is deliberately no "share of total" column. `shareOfMeasured` will compute
- * one, but only when every row in scope reported — which on a table of mixed
- * coverage is exactly when it is least likely to hold. A column that is empty most
- * of the time is worse than a column that is not there.
+ * There is deliberately no "share of total" column. An honest one could only fill
+ * when every row in scope reported — which on a table of mixed coverage is exactly
+ * when it is least likely to hold — so it would sit empty most of the time, and a
+ * column that is usually blank is a worse answer than a column that is not there.
  */
 
 const METRICS = [

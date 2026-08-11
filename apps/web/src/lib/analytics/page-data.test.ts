@@ -168,9 +168,23 @@ describe('one failing read never empties the other half', () => {
     expect(data.hasPublished).toBe(false)
   })
 
-  it('degrades to empty rather than throwing when the variant read throws', async () => {
+  /**
+   * The assertion this test used to be missing.
+   *
+   * `account` was scoped inside the same `try` as the post reads, so a throw from
+   * `listVariantStates` reached a catch with no account value in hand and returned a
+   * hardcoded `unreadable` — telling a customer with a perfectly healthy Instagram
+   * connection that we couldn't read their account. Asserting only `rows: []` passed
+   * straight through it.
+   */
+  it('degrades to empty posts WITHOUT relabelling a healthy account read', async () => {
+    account.readInstagramAnalytics.mockResolvedValue({ kind: 'ready', followers: [] })
     posts.listVariantStates.mockRejectedValue(new Error('boom'))
-    await expect(readAnalyticsPage(NOW)).resolves.toMatchObject({ rows: [] })
+
+    const data = await readAnalyticsPage(NOW)
+    expect(data.rows).toEqual([])
+    expect(data.hasPublished).toBe(false)
+    expect(data.account).toMatchObject({ kind: 'ready' })
   })
 })
 
