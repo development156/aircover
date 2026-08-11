@@ -2,6 +2,7 @@ import 'server-only'
 
 import {
   classifyPostMetrics,
+  reportingWindowFor,
   type MetricAvailability,
   type ZernioPostAnalyticsResult,
 } from '@sahoda/publishing'
@@ -165,6 +166,10 @@ export async function listPostMetrics(
       simulated: row.simulated,
       publishedAt: null,
       now,
+      // Immaterial on this path — `result: null` decides every one of these before
+      // the window is read — but passed honestly rather than filled in, so that
+      // reading this file never suggests a channel's window may be invented.
+      window: reportingWindowFor(row.channel),
     })
 
   try {
@@ -277,6 +282,11 @@ function classify(
     simulated: target.simulated,
     publishedAt: times.get(`${target.postId}::${target.channel}`) ?? null,
     now,
+    // THE FIX. This argument did not exist here, and `lagHours` defaulted to
+    // Instagram's 48 — so every channel was judged against Instagram's window,
+    // including the LinkedIn post that went live on 2026-08-10. Each channel now
+    // carries its own, and three of the four honestly carry "unknown".
+    window: reportingWindowFor(target.channel),
   })
 }
 

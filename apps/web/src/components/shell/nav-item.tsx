@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   CalendarDays,
+  ChartColumn,
   House,
   Link2,
   SlidersHorizontal,
@@ -24,6 +25,7 @@ const ICONS = {
   house: House,
   'square-pen': SquarePen,
   'calendar-days': CalendarDays,
+  'chart-column': ChartColumn,
   'link-2': Link2,
   globe: Globe,
   wallet: Wallet,

@@ -1,0 +1,80 @@
+{
+  "_recorded": {
+    "WARNING": "CAPTURED FROM THE LIVE API — DO NOT HAND-EDIT. See fixtures/zernio/README.md.",
+    "endpoint": "GET /analytics",
+    "query": "postId=urn:li:share:7492551940640530432&profileId=6a75cae32853ee463c6419d6",
+    "capturedAt": "2026-08-11T14:11:05.803Z",
+    "account": "testingg53 (Instagram, Zernio account 6a75caf7d0fe733d1afcc1f4)",
+    "redaction": "Signed/media CDN URLs (cdninstagram, fbcdn, lookaside, media.licdn, media.zernio) replaced with \"[redacted at capture — signed CDN URL]\". No other field was altered.",
+    "note": "LinkedIn leg, published 2026-08-10T12:06:27Z — 26h before capture. THE non-Instagram case: impressions 61 / reach 36, and its own sync stamp 2026-08-11 12:53:43, distinct from every Instagram post in the same sweep. Sync batches are per platform, so an Instagram-derived window was never LinkedIn's."
+  },
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "postId": "6a79c116d0fe733d1ac8cb5d",
+    "latePostId": "6a79bec1ad932cf681758667",
+    "status": "published",
+    "content": "Training budgets keep growing. Results keep lagging.\n\nThe problem isn't your team's commitment—it's that scattered programs don't compound. One module here, a workshop there, no clear path forward. By the time you measure impact, you've lost momentum and clarity.\n\nTrainx changes that. We turn fragmented training efforts into a structured system where progress is measurable at every step. Built for real training. No guesswork, just growth.\n\nYour team deserves a development path that actually builds skill. One that you can track, adjust, and prove works.\n\nLet's talk about turning training into a system.\n\nhttps://trainx.com",
+    "publishedAt": "2026-08-10T12:06:27.902Z",
+    "analytics": {
+      "impressions": 61,
+      "reach": 36,
+      "likes": 0,
+      "comments": 1,
+      "shares": 0,
+      "saves": 0,
+      "clicks": 0,
+      "views": 0,
+      "follows": 0,
+      "igReelsAvgWatchTime": 0,
+      "igReelsVideoViewTotalTime": 0,
+      "engagementRate": 1.64,
+      "lastUpdated": "2026-08-11 12:53:43",
+      "videoDurationSeconds": null
+    },
+    "platformAnalytics": [
+      {
+        "platform": "linkedin",
+        "status": "published",
+        "platformPostId": "urn:li:share:7492551940640530432",
+        "accountId": "6a79bd4fd0fe733d1ac79e70",
+        "accountUsername": "DAVE M",
+        "analytics": {
+          "impressions": 61,
+          "reach": 36,
+          "likes": 0,
+          "comments": 1,
+          "shares": 0,
+          "saves": 0,
+          "clicks": 0,
+          "views": 0,
+          "follows": 0,
+          "igReelsAvgWatchTime": 0,
+          "igReelsVideoViewTotalTime": 0,
+          "engagementRate": 1.64,
+          "lastUpdated": "2026-08-11 12:53:43",
+          "videoDurationSeconds": null
+        },
+        "syncStatus": "synced",
+        "platformPostUrl": "https://www.linkedin.com/feed/update/urn:li:share:7492551940640530432/",
+        "errorMessage": null
+      }
+    ],
+    "platform": "linkedin",
+    "platformPostUrl": "https://www.linkedin.com/feed/update/urn:li:share:7492551940640530432/",
+    "isExternal": true,
+    "syncStatus": "synced",
+    "message": null,
+    "thumbnailUrl": "[redacted at capture — signed CDN URL]",
+    "mediaType": "image",
+    "mediaItems": [
+      {
+        "type": "image",
+        "url": "[redacted at capture — signed CDN URL]",
+        "thumbnail": "[redacted at capture — signed CDN URL]"
+      }
+    ]
+  }
+}

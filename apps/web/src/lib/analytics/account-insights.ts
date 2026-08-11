@@ -50,6 +50,17 @@ export type AccountAnalytics =
       kind: 'ready'
       /** Daily follower counts, oldest first. Empty when the window held no points. */
       followers: SeriesPoint[]
+      /**
+       * Daily gains and losses, when the endpoint sends them.
+       *
+       * Separate series, not derived by differencing `followers`. A difference
+       * computed from a series with a dropped point invents a gain that never
+       * happened — and points ARE dropped here, by design, whenever they cannot be
+       * narrowed. These arrive as their own `followers_gained` / `followers_lost`
+       * series (observed live 2026-08-11) or not at all.
+       */
+      gained: SeriesPoint[]
+      lost: SeriesPoint[]
       /** Headline account numbers Zernio reported, already narrowed to numbers. */
       insights: { label: string; value: number }[]
       /**
@@ -285,6 +296,8 @@ export async function readInstagramAnalytics(now: Date = new Date()): Promise<Ac
     return {
       kind: 'ready',
       followers,
+      gained: seriesFrom(history.metrics, 'followers_gained'),
+      lost: seriesFrom(history.metrics, 'followers_lost'),
       insights: tiles,
       followerLagHours,
       insightsLagHours,
