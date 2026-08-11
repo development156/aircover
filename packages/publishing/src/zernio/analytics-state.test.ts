@@ -481,6 +481,12 @@ import zeroed from '../../fixtures/zernio/analytics.post.zeroed-in-window.json'
 import zeroed2 from '../../fixtures/zernio/analytics.post.zeroed-in-window.2.json'
 import zeroed3 from '../../fixtures/zernio/analytics.post.zeroed-in-window.3.json'
 
+// The 2026-08-11 sweep, 27h after the four above.
+import linkedin from '../../fixtures/zernio/analytics.post.linkedin.measured.2026-08-11.json'
+import resolvedNextDay from '../../fixtures/zernio/analytics.post.instagram.resolved-next-day.2026-08-11.json'
+import pastWindow from '../../fixtures/zernio/analytics.post.instagram.past-window.2026-08-11.json'
+import listing from '../../fixtures/zernio/analytics.listing.2026-08-11.json'
+
 /** The sweep these four were captured in. */
 const SWEEP = new Date('2026-08-10T09:52:00.000Z')
 
@@ -606,5 +612,173 @@ describe('a sync stamp is not a measurement (recorded 2026-08-10)', () => {
     if (state.kind !== 'ready') return
     expect(state.metrics.measuredAt).toBe('2026-08-10T09:38:57Z')
     expect(Number.isNaN(new Date(state.metrics.measuredAt).getTime())).toBe(false)
+  })
+})
+
+/**
+ * ── THE SAME POSTS, ONE DAY LATER (recorded 2026-08-11) ──────────────────────
+ * The 08-10 sweep could show that rule 6a WITHHELD something. Only a second
+ * capture of the same media can show what it withheld, and whether the promise
+ * it made ("not available yet") was kept.
+ *
+ * It was. That is not a claim this suite could make from one day's recordings,
+ * or from any payload written by hand, which is why both days are committed.
+ */
+const SWEEP_2 = new Date('2026-08-11T14:10:00.000Z')
+
+describe('what rule 6a withheld, one day later (recorded 2026-08-11)', () => {
+  /**
+   * Media 18104495198175832, the post recorded all-zero as
+   * `analytics.post.zeroed-in-window.2.json`. Re-captured 27h later it reports
+   * impressions 1 / reach 1.
+   *
+   * So the state the customer saw yesterday — "not available yet, expected after
+   * 2026-08-12" — was true, and the numbers arrived ahead of that. Had 6a not
+   * fired, the same post would have rendered "0 impressions" to someone whose
+   * post had in fact been seen.
+   */
+  it('resolves to real numbers, so the pending state was honest and temporary', () => {
+    const yesterday = classifyPostMetrics({
+      result: recorded(zeroed2),
+      platformPostId: '18104495198175832',
+      published: true,
+      simulated: false,
+      publishedAt: '2026-08-10T09:16:02.000Z',
+      now: SWEEP,
+      window: reportingWindowFor('instagram'),
+    })
+    expect(yesterday).toMatchObject({ kind: 'pending', reason: 'lag' })
+
+    const today = classifyPostMetrics({
+      result: recorded(resolvedNextDay),
+      platformPostId: '18104495198175832',
+      published: true,
+      simulated: false,
+      publishedAt: '2026-08-10T09:16:02.000Z',
+      now: SWEEP_2,
+      window: reportingWindowFor('instagram'),
+    })
+    expect(today.kind).toBe('ready')
+    if (today.kind !== 'ready') return
+    // 0 -> 2 impressions, 0 -> 1 reach, on the same media id. Yesterday's zeroes
+    // were the sweep's, exactly as 6a assumed; the platform's answer was 2.
+    expect(today.metrics.impressions).toBe(2)
+    expect(today.metrics.reach).toBe(1)
+  })
+
+  /** It is genuinely the same media, not a lookalike. The comparison needs that. */
+  it('is the same media id on both days', () => {
+    const idOf = (f: { body: unknown }) =>
+      (f.body as ZernioPostAnalytics).platformAnalytics?.[0]?.platformPostId
+    expect(idOf(resolvedNextDay)).toBe(idOf(zeroed2))
+  })
+})
+
+/**
+ * ── A NON-INSTAGRAM CHANNEL, LIVE (recorded 2026-08-11) ──────────────────────
+ * Every recording before this one was Instagram, which is precisely how a
+ * default of "Instagram's 48 hours for everything" survived: no recorded payload
+ * could contradict it. This is the first that can.
+ */
+describe('a LinkedIn post is not an Instagram post (recorded 2026-08-11)', () => {
+  const LINKEDIN_URN = 'urn:li:share:7492551940640530432'
+  const PUBLISHED = '2026-08-10T12:06:27.902Z'
+
+  it('renders its real numbers, unknown window notwithstanding', () => {
+    const state = classifyPostMetrics({
+      result: recorded(linkedin),
+      platformPostId: LINKEDIN_URN,
+      published: true,
+      simulated: false,
+      publishedAt: PUBLISHED,
+      now: SWEEP_2,
+      window: reportingWindowFor('linkedin'),
+    })
+
+    expect(state.kind).toBe('ready')
+    if (state.kind !== 'ready') return
+    expect(state.metrics.impressions).toBe(61)
+    expect(state.metrics.reach).toBe(36)
+    expect(state.metrics.engagement).toBe(1)
+  })
+
+  /**
+   * The stamp that shows why the shared window was wrong in principle, not only
+   * in arithmetic: LinkedIn is swept on its own schedule, 23 minutes before the
+   * Instagram batch in the same capture. Two platforms, two clocks.
+   */
+  it('carries its own sync stamp, not the Instagram batch’s', () => {
+    const stampOf = (f: { body: unknown }) =>
+      (f.body as ZernioPostAnalytics).analytics?.lastUpdated
+
+    expect(stampOf(linkedin)).toBe('2026-08-11 12:53:43')
+    expect(stampOf(resolvedNextDay)).toBe('2026-08-11 13:16:55')
+    expect(stampOf(linkedin)).not.toBe(stampOf(resolvedNextDay))
+  })
+
+  /** And no post payload states a delay — on either platform, on any of the eight. */
+  it('states no dataDelay of its own, which is why the window must be modelled', () => {
+    for (const f of [linkedin, resolvedNextDay, pastWindow]) {
+      expect((f.body as Record<string, unknown>).dataDelay).toBeUndefined()
+    }
+    expect(reportingWindowFor('linkedin')).toEqual(UNKNOWN_WINDOW)
+  })
+})
+
+/**
+ * ── THE POLL STAMP, RE-TESTED ON NEW DATA (recorded 2026-08-11) ──────────────
+ * The 08-10 finding rested on four posts in one sweep. A single batch could, in
+ * principle, have been a coincidence of timing. This sweep has eight posts, two
+ * platforms and two distinct batches, and the pattern holds in a sharper form:
+ * the stamp clusters by BATCH, and is indifferent to how old a post is.
+ */
+describe('the stamp clusters by sweep, not by post (recorded 2026-08-11)', () => {
+  interface Leg {
+    platform?: string
+    analytics?: { lastUpdated?: string }
+  }
+  interface ListedPost {
+    publishedAt?: string
+    platforms?: Leg[]
+  }
+
+  const posts = (listing.body as { posts?: ListedPost[] }).posts ?? []
+
+  it('gives one stamp to five Instagram posts published 19 hours apart', () => {
+    const recent = posts.filter((p) => (p.publishedAt ?? '') >= '2026-08-09')
+    const stamps = new Set(
+      recent.flatMap((p) =>
+        (p.platforms ?? [])
+          .filter((leg) => leg.platform === 'instagram')
+          .map((leg) => leg.analytics?.lastUpdated),
+      ),
+    )
+
+    expect(recent.length).toBeGreaterThanOrEqual(5)
+    // Ages spanning 26h to 45h, one stamp between them. Nothing per-post here.
+    expect(stamps.size).toBe(1)
+    expect([...stamps][0]).toBe('2026-08-11 13:16:55')
+  })
+
+  it('gives the two oldest posts a different, older stamp', () => {
+    const old = posts.filter((p) => (p.publishedAt ?? '') < '2026-08-01')
+    const stamps = new Set(
+      old.flatMap((p) => (p.platforms ?? []).map((leg) => leg.analytics?.lastUpdated)),
+    )
+    expect(old.length).toBe(2)
+    expect([...stamps]).toEqual(['2026-08-10 15:47:11'])
+  })
+
+  /**
+   * The decisive shape. If `lastUpdated` were a measurement time there would be
+   * roughly one per post; if it is a sweep time there are as many as there were
+   * sweeps. Eight posts, three stamps.
+   */
+  it('has far fewer distinct stamps than posts', () => {
+    const stamps = new Set(
+      posts.flatMap((p) => (p.platforms ?? []).map((leg) => leg.analytics?.lastUpdated)),
+    )
+    expect(posts.length).toBe(8)
+    expect(stamps.size).toBe(3)
   })
 })

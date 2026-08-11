@@ -189,3 +189,84 @@ describe('the live metrics bag (recorded 2026-08-10)', () => {
     expect(lagHoursFromDataDelay(liveInsights.body.dataDelay)).toBe(48)
   })
 })
+
+/**
+ * ── THE ACCOUNT ENDPOINTS, RE-CAPTURED (2026-08-11) ──────────────────────────
+ * A second capture, 27h after the first. It is kept alongside rather than
+ * instead of it: the follower window has moved on, and one of these series was
+ * not visible at all in the earlier recording.
+ */
+import liveHistory2 from '@sahoda/publishing/fixtures/zernio/follower-history.time-series.2026-08-11.json'
+import liveInsights2 from '@sahoda/publishing/fixtures/zernio/account-insights.total-value.2026-08-11.json'
+
+describe('the account bags, one day later (recorded 2026-08-11)', () => {
+  const HISTORY = liveHistory2.body.metrics as Record<string, unknown>
+  const INSIGHTS = liveInsights2.body.metrics as Record<string, unknown>
+
+  /**
+   * The delay strings are read from the live response, not asserted as constants.
+   * They are prose and Zernio may reword them — which is exactly why
+   * `lagHoursFromDataDelay` parses rather than matches, and why this pins the
+   * PARSE of a real string rather than the string itself.
+   */
+  it('states both delays in its own words, and both parse', () => {
+    expect(liveInsights2.body.dataDelay).toBe('Data may be delayed up to 48 hours')
+    expect(liveHistory2.body.dataDelay).toBe(
+      "Data is captured by Zernio's daily snapshotter. Up to 24 hours old.",
+    )
+    // The follower delay is the SHORTER one, and the two must never be swapped:
+    // printing 24h under the insight tiles would claim they are a day fresher
+    // than Instagram says they are.
+    expect(lagHoursFromDataDelay(liveInsights2.body.dataDelay)).toBe(48)
+    expect(lagHoursFromDataDelay(liveHistory2.body.dataDelay)).toBe(24)
+  })
+
+  it('reports a follower series with more than one point, so a trend is drawable', () => {
+    const points = seriesFrom(HISTORY, 'follower_count')
+    expect(points).toEqual([
+      { date: '2026-08-08', value: 0 },
+      { date: '2026-08-09', value: 1 },
+      { date: '2026-08-10', value: 1 },
+      { date: '2026-08-11', value: 1 },
+    ])
+  })
+
+  /**
+   * Gains and losses are their OWN series. Differencing `follower_count` would
+   * look equivalent here and is not: `seriesFrom` drops any point it cannot
+   * narrow, and a difference taken across a dropped day reports a jump that
+   * never happened.
+   */
+  it('carries gained and lost as separate series, not as a difference', () => {
+    expect(seriesFrom(HISTORY, 'followers_gained')).toEqual([
+      { date: '2026-08-09', value: 1 },
+      { date: '2026-08-10', value: 0 },
+      { date: '2026-08-11', value: 0 },
+    ])
+    expect(seriesFrom(HISTORY, 'followers_lost')).toEqual([
+      { date: '2026-08-09', value: 0 },
+      { date: '2026-08-10', value: 0 },
+      { date: '2026-08-11', value: 0 },
+    ])
+    // And they are shorter than the count series — three days against four. A
+    // chart that assumed one x-axis for all three would misalign every point.
+    expect(seriesFrom(HISTORY, 'followers_gained').length).toBe(3)
+    expect(seriesFrom(HISTORY, 'follower_count').length).toBe(4)
+  })
+
+  /** A reported 0 keeps its tile. Only an ABSENT metric loses one. */
+  it('keeps a tile reported as zero and drops one never sent', () => {
+    expect(insightTiles(INSIGHTS)).toEqual([
+      { label: 'Reach', value: 1 },
+      { label: 'Views', value: 13 },
+      { label: 'Accounts engaged', value: 2 },
+      { label: 'Interactions', value: 4 },
+    ])
+    expect(insightTiles({ ...INSIGHTS, views: { total: 0 } })).toContainEqual({
+      label: 'Views',
+      value: 0,
+    })
+    const { views: _dropped, ...withoutViews } = INSIGHTS
+    expect(insightTiles(withoutViews).map((t) => t.label)).not.toContain('Views')
+  })
+})

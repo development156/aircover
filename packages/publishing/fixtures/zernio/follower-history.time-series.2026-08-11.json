@@ -1,0 +1,83 @@
+{
+  "_recorded": {
+    "WARNING": "CAPTURED FROM THE LIVE API — DO NOT HAND-EDIT. See fixtures/zernio/README.md.",
+    "endpoint": "GET /analytics/instagram/follower-history",
+    "query": "accountId=6a75caf7d0fe733d1afcc1f4&since=2026-07-12&until=2026-08-11&metricType=time_series",
+    "capturedAt": "2026-08-11T14:11:05.803Z",
+    "account": "testingg53 (Instagram, Zernio account 6a75caf7d0fe733d1afcc1f4)",
+    "redaction": "Signed/media CDN URLs (cdninstagram, fbcdn, lookaside, media.licdn, media.zernio) replaced with \"[redacted at capture — signed CDN URL]\". No other field was altered.",
+    "note": "Follower history re-captured — 4 daily points, plus followers_gained and followers_lost series the 2026-08-10 capture did not show. dataDelay: \"Data is captured by Zernio's daily snapshotter. Up to 24 hours old.\""
+  },
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "success": true,
+    "accountId": "6a75caf7d0fe733d1afcc1f4",
+    "platform": "instagram",
+    "dateRange": {
+      "since": "2026-07-12",
+      "until": "2026-08-11"
+    },
+    "metricType": "time_series",
+    "metrics": {
+      "follower_count": {
+        "total": 1,
+        "values": [
+          {
+            "date": "2026-08-08",
+            "value": 0
+          },
+          {
+            "date": "2026-08-09",
+            "value": 1
+          },
+          {
+            "date": "2026-08-10",
+            "value": 1
+          },
+          {
+            "date": "2026-08-11",
+            "value": 1
+          }
+        ]
+      },
+      "followers_gained": {
+        "total": 1,
+        "values": [
+          {
+            "date": "2026-08-09",
+            "value": 1
+          },
+          {
+            "date": "2026-08-10",
+            "value": 0
+          },
+          {
+            "date": "2026-08-11",
+            "value": 0
+          }
+        ]
+      },
+      "followers_lost": {
+        "total": 0,
+        "values": [
+          {
+            "date": "2026-08-09",
+            "value": 0
+          },
+          {
+            "date": "2026-08-10",
+            "value": 0
+          },
+          {
+            "date": "2026-08-11",
+            "value": 0
+          }
+        ]
+      }
+    },
+    "dataDelay": "Data is captured by Zernio's daily snapshotter. Up to 24 hours old."
+  }
+}

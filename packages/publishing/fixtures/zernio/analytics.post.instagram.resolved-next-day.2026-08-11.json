@@ -1,0 +1,80 @@
+{
+  "_recorded": {
+    "WARNING": "CAPTURED FROM THE LIVE API — DO NOT HAND-EDIT. See fixtures/zernio/README.md.",
+    "endpoint": "GET /analytics",
+    "query": "postId=18104495198175832&profileId=6a75cae32853ee463c6419d6",
+    "capturedAt": "2026-08-11T14:11:05.803Z",
+    "account": "testingg53 (Instagram, Zernio account 6a75caf7d0fe733d1afcc1f4)",
+    "redaction": "Signed/media CDN URLs (cdninstagram, fbcdn, lookaside, media.licdn, media.zernio) replaced with \"[redacted at capture — signed CDN URL]\". No other field was altered.",
+    "note": "The SAME media as analytics.post.zeroed-in-window.2.json, re-captured 27h later. On 2026-08-10 it was all-zero inside the 48h window and rule 6a held it as pending; here it reports impressions 1 / reach 1. Rule 6a's promise is kept — it withheld a zero, it did not hide data."
+  },
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "postId": "6a799c31d0fe733d1abc0277",
+    "latePostId": "6a7996c07aafdac3f2cc852f",
+    "status": "published",
+    "content": "LINUX",
+    "publishedAt": "2026-08-10T09:16:02.000Z",
+    "analytics": {
+      "impressions": 2,
+      "reach": 1,
+      "likes": 0,
+      "comments": 0,
+      "shares": 0,
+      "saves": 0,
+      "clicks": 0,
+      "views": 2,
+      "follows": 0,
+      "igReelsAvgWatchTime": 0,
+      "igReelsVideoViewTotalTime": 0,
+      "engagementRate": 0,
+      "lastUpdated": "2026-08-11 13:16:55",
+      "videoDurationSeconds": null
+    },
+    "platformAnalytics": [
+      {
+        "platform": "instagram",
+        "status": "published",
+        "platformPostId": "18104495198175832",
+        "accountId": "6a75caf7d0fe733d1afcc1f4",
+        "accountUsername": "testingg53",
+        "analytics": {
+          "impressions": 2,
+          "reach": 1,
+          "likes": 0,
+          "comments": 0,
+          "shares": 0,
+          "saves": 0,
+          "clicks": 0,
+          "views": 2,
+          "follows": 0,
+          "igReelsAvgWatchTime": 0,
+          "igReelsVideoViewTotalTime": 0,
+          "engagementRate": 0,
+          "lastUpdated": "2026-08-11 13:16:55",
+          "videoDurationSeconds": null
+        },
+        "syncStatus": "synced",
+        "platformPostUrl": "https://www.instagram.com/p/Db2q2jwl3PH/",
+        "errorMessage": null
+      }
+    ],
+    "platform": "instagram",
+    "platformPostUrl": "https://www.instagram.com/p/Db2q2jwl3PH/",
+    "isExternal": true,
+    "syncStatus": "synced",
+    "message": null,
+    "thumbnailUrl": "[redacted at capture — signed CDN URL]",
+    "mediaType": "image",
+    "mediaItems": [
+      {
+        "type": "image",
+        "url": "[redacted at capture — signed CDN URL]",
+        "thumbnail": "[redacted at capture — signed CDN URL]"
+      }
+    ]
+  }
+}
