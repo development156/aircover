@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { CalendarRange } from 'lucide-react'
-import { creditCost, type Channel } from '@sahoda/shared'
+import { creditCost, toChannelSet, type ChannelSet } from '@sahoda/shared'
 
 import { planMyWeek } from '@/app/actions/plan-week'
 import { ChannelPicker } from '@/components/posts/channel-picker'
@@ -23,7 +23,7 @@ const PENDING = [
 ] as const
 
 /** The two Alpha real-publish channels — a sensible seed the user can change. */
-const DEFAULT_CHANNELS: Channel[] = ['x', 'gbp']
+const DEFAULT_CHANNELS: ChannelSet = toChannelSet(['x', 'gbp'])
 
 type Outcome =
   | { kind: 'planned'; clamped: number }
@@ -37,7 +37,7 @@ type Outcome =
  */
 export function PlanWeekPanel() {
   const [goals, setGoals] = useState('')
-  const [channels, setChannels] = useState<Channel[]>(DEFAULT_CHANNELS)
+  const [channels, setChannels] = useState<ChannelSet>(DEFAULT_CHANNELS)
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [pending, startTransition] = useTransition()
 

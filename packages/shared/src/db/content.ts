@@ -9,15 +9,21 @@ import {
   PublishLogStatusSchema,
 } from '../enums'
 import { JsonbSchema } from '../common'
+import { ChannelSetSchema, EMPTY_CHANNEL_SET } from './channel-set'
 
 // ── posts ────────────────────────────────────────────────────────────────────
+// `channels` is `ChannelSetSchema`, not `z.array(ChannelSchema)`, on all three:
+// the column is a bare `text[]`, every consumer reads it as a set, and the three
+// duplicate-channel defects of 2026-08-09/10 all came from that gap. Parsing is
+// the one place both the read and the write must pass through, so it is the one
+// place the dedupe belongs. See `channel-set.ts` for the full account.
 export const PostSchema = z.object({
   id: z.uuid(),
   workspace_id: z.uuid(),
   title: z.string().nullable(),
   body: z.string().nullable(),
   status: PostStatusSchema,
-  channels: z.array(ChannelSchema),
+  channels: ChannelSetSchema,
   scheduled_at: z.string().nullable(),
   origin: PostOriginSchema,
   created_by: z.string().nullable(),
@@ -31,7 +37,7 @@ export const PostInsertSchema = z.object({
   title: z.string().nullable().optional(),
   body: z.string().nullable().optional(),
   status: PostStatusSchema.default('draft'),
-  channels: z.array(ChannelSchema).default([]),
+  channels: ChannelSetSchema.default(EMPTY_CHANNEL_SET),
   scheduled_at: z.string().nullable().optional(),
   origin: PostOriginSchema.default('manual'),
   created_by: z.string().min(1),
@@ -43,7 +49,7 @@ export const PostUpdateSchema = z
     title: z.string().nullable(),
     body: z.string().nullable(),
     status: PostStatusSchema,
-    channels: z.array(ChannelSchema),
+    channels: ChannelSetSchema,
     scheduled_at: z.string().nullable(),
   })
   .partial()

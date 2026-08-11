@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
-import { ChannelSchema, type Channel } from '@sahoda/shared'
+import { ChannelSchema, toChannelSet, type Channel, type ChannelSet } from '@sahoda/shared'
 
 import { VariantTabs } from './variant-tabs'
 import type { VariantsApi, VariantStates } from './use-variants'
@@ -42,7 +42,7 @@ function api(overrides: Partial<VariantsApi> = {}): VariantsApi {
   }
 }
 
-const CHANNELS: Channel[] = ['x', 'gbp', 'linkedin']
+const CHANNELS: ChannelSet = toChannelSet(['x', 'gbp', 'linkedin'])
 
 describe('VariantTabs roving tabindex', () => {
   test('moves DOM focus with the selection, not just aria-selected', async () => {
@@ -178,7 +178,14 @@ describe('VariantTabs media-count rule', () => {
 
   test('states the media violation without offering a fix it cannot perform', () => {
     // GBP alone, so it is the active tab and its panel is the one rendered.
-    render(<VariantTabs channels={['gbp']} canonicalBody="" variants={api()} mediaCount={4} />)
+    render(
+      <VariantTabs
+        channels={toChannelSet(['gbp'])}
+        canonicalBody=""
+        variants={api()}
+        mediaCount={4}
+      />,
+    )
 
     expect(screen.getByRole('alert')).toHaveTextContent('gbp allows 1 media items.')
     // The panel cannot detach a file, so the CTA must be plain text, never a

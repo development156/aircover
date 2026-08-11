@@ -5,7 +5,13 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@clerk/nextjs/server'
 import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
 import { createMesh, planWeekTask, PlanWeekInputSchema, type Mesh } from '@sahoda/mesh'
-import { creditCost, MESH_TASK_ACTION, PostInsertSchema, type WithCreditsFn } from '@sahoda/shared'
+import {
+  creditCost,
+  MESH_TASK_ACTION,
+  PostInsertSchema,
+  toChannelSet,
+  type WithCreditsFn,
+} from '@sahoda/shared'
 
 import {
   BRIEF_BODY_MAX_CHARS,
@@ -87,8 +93,16 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
     // de-dupe (upstream ask filed), and the array is joined into the paid model
     // prompt — a hand-rolled call posting 500k repeats of 'x' would amplify our
     // provider spend against a flat 20-credit charge. Four distinct values max.
-    const requested = [...new Set(parsedInput.data.channels)]
-    const taskInput = { goals: parsedInput.data.goals, channels: requested }
+    //
+    // Through `toChannelSet` rather than a local `new Set`, so this shares the one
+    // implementation the posts row boundary uses. It was a hand-rolled copy, and
+    // hand-rolled copies of this exact expression are what shipped three separate
+    // duplicate-channel defects (see packages/shared/src/db/channel-set.ts).
+    const requested = toChannelSet(parsedInput.data.channels)
+    // A plain array for the mesh call — `PlanWeekInputSchema` types it mutable, and
+    // `ChannelSet` is readonly. The copy is still the distinct list; the spread only
+    // drops the brand at the package seam.
+    const taskInput = { goals: parsedInput.data.goals, channels: [...requested] }
 
     // SERVER-DERIVED ledger key, fresh per invocation — a stable ref would
     // replay a spent HOLD+DEBIT. See lib/planner/object-ref.ts.

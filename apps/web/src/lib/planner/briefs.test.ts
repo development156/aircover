@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { toChannelSet } from '@sahoda/shared'
 
 import { clampBriefText, clampChannels } from './briefs'
 
@@ -9,26 +10,28 @@ import { clampBriefText, clampChannels } from './briefs'
  */
 describe('clampChannels', () => {
   test('keeps only requested channels', () => {
-    expect(clampChannels(['x', 'linkedin'], ['x', 'gbp'])).toEqual(['x'])
+    expect(clampChannels(['x', 'linkedin'], toChannelSet(['x', 'gbp']))).toEqual(['x'])
   })
 
   test('de-dupes what the model repeated', () => {
-    expect(clampChannels(['x', 'x', 'gbp'], ['x', 'gbp'])).toEqual(['x', 'gbp'])
+    expect(clampChannels(['x', 'x', 'gbp'], toChannelSet(['x', 'gbp']))).toEqual(['x', 'gbp'])
   })
 
   test('falls back to the full requested set when the brief names none of them', () => {
-    expect(clampChannels(['linkedin'], ['x', 'gbp'])).toEqual(['x', 'gbp'])
+    expect(clampChannels(['linkedin'], toChannelSet(['x', 'gbp']))).toEqual(['x', 'gbp'])
   })
 
   test('falls back when the brief has no channels at all', () => {
-    expect(clampChannels([], ['gbp'])).toEqual(['gbp'])
+    expect(clampChannels([], toChannelSet(['gbp']))).toEqual(['gbp'])
   })
 
-  test('returns a fresh array — never the caller’s reference', () => {
-    const requested = ['x'] as const
-    const result = clampChannels([], [...requested])
-    expect(result).toEqual(['x'])
-    expect(result).not.toBe(requested)
+  test('falls back to the requested set itself, which the caller cannot mutate', () => {
+    // This used to assert a fresh array, because the return was a mutable
+    // `Channel[]` and handing back the caller's own reference let a downstream
+    // edit rewrite what the user asked for. `ChannelSet` is readonly, so sharing
+    // the reference is now safe and the copy would only hide the guarantee.
+    const requested = toChannelSet(['x'])
+    expect(clampChannels([], requested)).toEqual(['x'])
   })
 })
 

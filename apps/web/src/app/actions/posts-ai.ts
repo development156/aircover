@@ -16,6 +16,7 @@ import {
   charCountFor,
   creditCost,
   MESH_TASK_ACTION,
+  toChannelSet,
   type WithCreditsFn,
 } from '@sahoda/shared'
 
@@ -97,7 +98,18 @@ export async function generateVariants(postId: string, channels: unknown): Promi
         message: 'Write some body copy and pick at least one channel first.',
       }
     }
-    const requested = parsedInput.data.channels
+    // A SET, because this list is a cost driver. `channels` arrives as `unknown`
+    // across a server-action boundary, so the editor now sending a `ChannelSet` is
+    // not a guarantee: a hand-rolled call with `['x','x','x']` asks the model for
+    // three X variants against one flat charge, and `plan-week.ts` already guards
+    // its twin for exactly that reason.
+    //
+    // `taskInput` — not `parsedInput.data` — is what reaches the model. Deduping
+    // only the local `requested` while the raw array went on to `runTask` would be
+    // the same half-fix that let the duplicate-channel defect move three times:
+    // the check reads the clean list, the expensive path reads the dirty one.
+    const requested = toChannelSet(parsedInput.data.channels)
+    const taskInput = { ...parsedInput.data, channels: [...requested] }
 
     // SERVER-DERIVED ledger key, fresh per invocation. A stable ref (posts.id)
     // would let the second generate replay the spent HOLD+DEBIT — no charge, but
@@ -116,7 +128,7 @@ export async function generateVariants(postId: string, channels: unknown): Promi
     const credits = await getWithCredits()(
       { workspaceId: workspace.id, action, objectRef },
       async (ctx) => {
-        const result = await getMesh().runTask(contentVariantsTask.def, parsedInput.data, {
+        const result = await getMesh().runTask(contentVariantsTask.def, taskInput, {
           workspaceId: workspace.id,
           traceId,
           userId,

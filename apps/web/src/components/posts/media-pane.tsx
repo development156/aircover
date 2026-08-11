@@ -1,7 +1,7 @@
 'use client'
 
 import { AlertTriangle, ImageOff } from 'lucide-react'
-import type { Channel, PostMedia } from '@sahoda/shared'
+import type { ChannelSet, PostMedia } from '@sahoda/shared'
 
 import { CardLabel } from '@/components/ui/card'
 import type { MediaPreview } from '@/lib/posts/media-url'
@@ -15,7 +15,7 @@ import { MediaRemoveButton } from './media-remove-button'
 
 export interface MediaPaneProps {
   media: PostMedia[]
-  channels: Channel[]
+  channels: ChannelSet
   postId: string
   /**
    * Signed preview URLs from the server, one per row. Optional because a

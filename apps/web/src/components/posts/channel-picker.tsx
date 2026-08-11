@@ -1,7 +1,13 @@
 'use client'
 
 import { Check } from 'lucide-react'
-import { ChannelSchema, CONSTRAINTS, type Channel } from '@sahoda/shared'
+import {
+  ChannelSchema,
+  CONSTRAINTS,
+  toChannelSet,
+  type Channel,
+  type ChannelSet,
+} from '@sahoda/shared'
 
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
@@ -9,8 +15,8 @@ import { cn } from '@/lib/utils'
 import { CHANNEL_LABELS } from './channel-label'
 
 export interface ChannelPickerProps {
-  selected: Channel[]
-  onChange: (channels: Channel[]) => void
+  selected: ChannelSet
+  onChange: (channels: ChannelSet) => void
   disabled?: boolean
   /**
    * Channels with a live connection. A channel is still SELECTABLE without one —
@@ -29,7 +35,12 @@ export function ChannelPicker({ selected, onChange, disabled, connected }: Chann
     const next = selected.includes(channel)
       ? selected.filter((item) => item !== channel)
       : ChannelSchema.options.filter((item) => item === channel || selected.includes(item))
-    onChange(next)
+    // This is the ONE place the app builds a channel list from scratch rather than
+    // reading one off a row, so it is where the set has to be re-established. Both
+    // branches happen to be distinct already — they filter a distinct list — but
+    // saying so through `toChannelSet` is what keeps `onChange` typed as a set all
+    // the way to `savePost`, instead of a raw array re-entering at the picker.
+    onChange(toChannelSet(next))
   }
 
   return (

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 
 import { ScheduleField } from './schedule-field'
+import { toChannelSet } from '@sahoda/shared'
 
 /**
  * `draft` was seeded from `value` once and never re-synced, so restoring the
@@ -23,7 +24,7 @@ const future = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString
 describe('ScheduleField', () => {
   test('shows the stored value as local wall-clock time', () => {
     const iso = future(86_400_000)
-    render(<ScheduleField channels={['x']} value={iso} onChange={vi.fn()} />)
+    render(<ScheduleField channels={toChannelSet(['x'])} value={iso} onChange={vi.fn()} />)
 
     const expected = new Date(iso)
     expect(input().value).toMatch(
@@ -36,11 +37,13 @@ describe('ScheduleField', () => {
   test('re-syncs when the stored value is replaced underneath it', () => {
     const first = future(86_400_000)
     const second = future(172_800_000)
-    const { rerender } = render(<ScheduleField channels={['x']} value={first} onChange={vi.fn()} />)
+    const { rerender } = render(
+      <ScheduleField channels={toChannelSet(['x'])} value={first} onChange={vi.fn()} />,
+    )
     const before = input().value
 
     // What `loadTheirs` does after a divergence.
-    rerender(<ScheduleField channels={['x']} value={second} onChange={vi.fn()} />)
+    rerender(<ScheduleField channels={toChannelSet(['x'])} value={second} onChange={vi.fn()} />)
 
     expect(input().value).not.toBe(before)
     expect(input().value).toContain(String(new Date(second).getDate()).padStart(2, '0'))
@@ -48,9 +51,13 @@ describe('ScheduleField', () => {
 
   test('clears the field when the stored value is removed', () => {
     const { rerender } = render(
-      <ScheduleField channels={['x']} value={future(86_400_000)} onChange={vi.fn()} />,
+      <ScheduleField
+        channels={toChannelSet(['x'])}
+        value={future(86_400_000)}
+        onChange={vi.fn()}
+      />,
     )
-    rerender(<ScheduleField channels={['x']} value={null} onChange={vi.fn()} />)
+    rerender(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
 
     expect(input().value).toBe('')
     expect(screen.getByText(/stays a draft/i)).toBeInTheDocument()
@@ -61,7 +68,7 @@ describe('ScheduleField', () => {
     const onChange = vi.fn()
     // value stays null throughout: an incomplete datetime never reaches onChange,
     // which is exactly when a mismatch-keyed re-sync would wipe the input.
-    render(<ScheduleField channels={['x']} value={null} onChange={onChange} />)
+    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={onChange} />)
 
     await user.type(input(), '2030-01-01T10:30')
 
@@ -75,13 +82,13 @@ describe('ScheduleField', () => {
       stored = iso
     })
     const { rerender } = render(
-      <ScheduleField channels={['x']} value={stored} onChange={onChange} />,
+      <ScheduleField channels={toChannelSet(['x'])} value={stored} onChange={onChange} />,
     )
 
     await user.type(input(), '2030-01-01T10:30')
     const typed = input().value
     // Feed the committed value back the way the parent does.
-    rerender(<ScheduleField channels={['x']} value={stored} onChange={onChange} />)
+    rerender(<ScheduleField channels={toChannelSet(['x'])} value={stored} onChange={onChange} />)
 
     expect(input().value).toBe(typed)
   })
@@ -98,7 +105,7 @@ describe('what setting a time actually does', () => {
 
   test('says a time does not publish the post', async () => {
     const user = userEvent.setup()
-    render(<ScheduleField channels={['x']} value={null} onChange={vi.fn()} />)
+    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
 
     await user.type(input(), '2030-01-01T10:30')
 
@@ -106,13 +113,19 @@ describe('what setting a time actually does', () => {
   })
 
   test('says it for a time restored from the server too', () => {
-    render(<ScheduleField channels={['x']} value={future(86_400_000)} onChange={vi.fn()} />)
+    render(
+      <ScheduleField
+        channels={toChannelSet(['x'])}
+        value={future(86_400_000)}
+        onChange={vi.fn()}
+      />,
+    )
 
     expect(screen.getByText(NOT_LIVE)).toBeInTheDocument()
   })
 
   test('stays quiet when no time is set — there is no promise to correct', () => {
-    render(<ScheduleField channels={['x']} value={null} onChange={vi.fn()} />)
+    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
 
     expect(screen.queryByText(NOT_LIVE)).not.toBeInTheDocument()
   })
@@ -139,7 +152,7 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
   test('names the unconnected channel once a time is set', () => {
     render(
       <ScheduleField
-        channels={['instagram', 'linkedin']}
+        channels={toChannelSet(['instagram', 'linkedin'])}
         value={future(86_400_000)}
         onChange={vi.fn()}
         autoPublish
@@ -155,7 +168,7 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
   test('says nothing goes out when no picked channel is connected', () => {
     render(
       <ScheduleField
-        channels={['linkedin']}
+        channels={toChannelSet(['linkedin'])}
         value={future(86_400_000)}
         onChange={vi.fn()}
         autoPublish
@@ -172,7 +185,7 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
     // 1-of-2 here and promise the post goes out somewhere.
     render(
       <ScheduleField
-        channels={['linkedin', 'linkedin']}
+        channels={toChannelSet(['linkedin', 'linkedin'])}
         value={future(86_400_000)}
         onChange={vi.fn()}
         autoPublish
@@ -189,7 +202,7 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
   test('stays quiet with no time set — there is no promise to correct yet', () => {
     render(
       <ScheduleField
-        channels={['instagram', 'linkedin']}
+        channels={toChannelSet(['instagram', 'linkedin'])}
         value={null}
         onChange={vi.fn()}
         autoPublish
@@ -205,7 +218,7 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
     // opposite of the truth. The existing note already says nothing auto-posts.
     render(
       <ScheduleField
-        channels={['instagram', 'linkedin']}
+        channels={toChannelSet(['instagram', 'linkedin'])}
         value={future(86_400_000)}
         onChange={vi.fn()}
         connected={connected}
@@ -222,7 +235,7 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
   test('stays quiet when the connection state was not read at all', () => {
     render(
       <ScheduleField
-        channels={['instagram', 'linkedin']}
+        channels={toChannelSet(['instagram', 'linkedin'])}
         value={future(86_400_000)}
         onChange={vi.fn()}
         autoPublish

@@ -4,7 +4,9 @@ import {
   appError,
   err,
   ok,
+  toChannelSet,
   type Channel,
+  type ChannelSet,
   type MeshContext,
   type PlanWeekJobPayload,
   type PlanWeekOutput,
@@ -16,7 +18,14 @@ import {
 export interface BriefInsert {
   title: string
   body: string
-  channels: Channel[]
+  /**
+   * A SET. `insertBriefs` writes this straight into `posts.channels` with raw SQL,
+   * so it never passes `PostInsertSchema` and the row boundary cannot clean up
+   * after it — this is the one writer that has to arrive distinct. The model names
+   * its own channels and `PlanWeekOutputSchema` is a plain array, so a brief saying
+   * `["x","x"]` parses clean.
+   */
+  channels: ChannelSet
   scheduledAt: string
   status: 'idea'
   origin: 'plan_week'
@@ -83,7 +92,7 @@ export async function runPlanWeekJob(
       const briefs: BriefInsert[] = result.data.briefs.map((b) => ({
         title: b.title,
         body: b.body,
-        channels: b.channels,
+        channels: toChannelSet(b.channels),
         scheduledAt: b.suggestedSlot,
         status: 'idea',
         origin: 'plan_week',

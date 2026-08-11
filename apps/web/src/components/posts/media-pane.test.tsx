@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { CONSTRAINTS } from '@sahoda/shared'
 import type { PostMedia } from '@sahoda/shared'
+import { toChannelSet } from '@sahoda/shared'
 
 /**
  * The three ways this pane can lie to a writer, pinned:
@@ -83,7 +84,7 @@ describe('MediaPane — attach', () => {
       warnings: [{ channel: 'gbp', violations: [GBP_TYPE_VIOLATION] }],
     })
 
-    render(<MediaPane media={[]} channels={['x', 'gbp']} postId={POST_ID} />)
+    render(<MediaPane media={[]} channels={toChannelSet(['x', 'gbp'])} postId={POST_ID} />)
 
     await user.upload(
       screen.getByLabelText(/add media/i),
@@ -110,7 +111,7 @@ describe('MediaPane — attach', () => {
       rejections: [{ channel: 'gbp', violations: [GBP_SIZE_VIOLATION] }],
     })
 
-    render(<MediaPane media={[]} channels={['gbp']} postId={POST_ID} />)
+    render(<MediaPane media={[]} channels={toChannelSet(['gbp'])} postId={POST_ID} />)
 
     await user.upload(
       screen.getByLabelText(/add media/i),
@@ -125,7 +126,7 @@ describe('MediaPane — attach', () => {
   })
 
   test('quotes THIS post’s size ceiling, not the global upload cap', () => {
-    render(<MediaPane media={[]} channels={['gbp']} postId={POST_ID} />)
+    render(<MediaPane media={[]} channels={toChannelSet(['gbp'])} postId={POST_ID} />)
 
     const limits = screen.getByText(/images only/i)
     // gbp stops at 5 MB. Quoting the 8 MB global cap (instagram's, and the only
@@ -141,7 +142,7 @@ describe('MediaPane — attach', () => {
     // An attach is accepted when ANY selected channel takes it, so a post
     // carrying instagram really can hold 8 MB — quoting gbp's 5 here would
     // understate the post and talk the writer out of a legal file.
-    render(<MediaPane media={[]} channels={['gbp', 'instagram']} postId={POST_ID} />)
+    render(<MediaPane media={[]} channels={toChannelSet(['gbp', 'instagram'])} postId={POST_ID} />)
 
     expect(screen.getByText(/images only/i).textContent).toMatch(
       new RegExp(`up to ${CONSTRAINTS.instagram.maxMediaMB} MB`),
@@ -152,7 +153,9 @@ describe('MediaPane — attach', () => {
     const user = userEvent.setup()
     attachMedia.mockResolvedValue({ ok: true, media: mediaRow(), warnings: [] })
 
-    const { rerender } = render(<MediaPane media={[]} channels={['x']} postId={POST_ID} />)
+    const { rerender } = render(
+      <MediaPane media={[]} channels={toChannelSet(['x'])} postId={POST_ID} />,
+    )
     await user.upload(
       screen.getByLabelText(/add media/i),
       new File(['png'], 'chai.png', { type: 'image/png' }),
@@ -160,7 +163,7 @@ describe('MediaPane — attach', () => {
     expect(await screen.findByText(/every channel on this post accepts it/i)).toBeInTheDocument()
 
     // The writer adds a channel that was never part of that clearance.
-    rerender(<MediaPane media={[]} channels={['x', 'gbp']} postId={POST_ID} />)
+    rerender(<MediaPane media={[]} channels={toChannelSet(['x', 'gbp'])} postId={POST_ID} />)
 
     // Keeping it would assert a clearance gbp never gave — and the pane's own
     // violation alert can be saying the opposite directly underneath it.
@@ -200,7 +203,7 @@ describe('MediaPane — attach', () => {
       }),
     )
 
-    render(<MediaPane media={[]} channels={['x']} postId={POST_ID} />)
+    render(<MediaPane media={[]} channels={toChannelSet(['x'])} postId={POST_ID} />)
     await user.upload(
       screen.getByLabelText(/add media/i),
       new File(['png'], 'chai.png', { type: 'image/png' }),
@@ -214,7 +217,7 @@ describe('MediaPane — attach', () => {
   })
 
   test('accepts exactly the union of the selected channels’ engine mime types', () => {
-    render(<MediaPane media={[]} channels={['x', 'gbp']} postId={POST_ID} />)
+    render(<MediaPane media={[]} channels={toChannelSet(['x', 'gbp'])} postId={POST_ID} />)
 
     const accept =
       screen
@@ -237,7 +240,7 @@ describe('MediaPane — attach', () => {
       }),
     )
 
-    render(<MediaPane media={[]} channels={['x']} postId={POST_ID} />)
+    render(<MediaPane media={[]} channels={toChannelSet(['x'])} postId={POST_ID} />)
     const input = screen.getByLabelText(/add media/i)
     await user.upload(input, new File(['png'], 'chai.png', { type: 'image/png' }))
 
@@ -255,7 +258,7 @@ describe('MediaPane — previews', () => {
     render(
       <MediaPane
         media={[row]}
-        channels={['x']}
+        channels={toChannelSet(['x'])}
         postId={POST_ID}
         previews={[{ id: row.id, url: null }]}
       />,
@@ -274,7 +277,7 @@ describe('MediaPane — previews', () => {
     render(
       <MediaPane
         media={[row]}
-        channels={['x']}
+        channels={toChannelSet(['x'])}
         postId={POST_ID}
         previews={[{ id: row.id, url: 'https://example.test/signed/chai-cup.png' }]}
       />,
@@ -290,7 +293,7 @@ describe('MediaPane — previews', () => {
     render(
       <MediaPane
         media={[row]}
-        channels={['x']}
+        channels={toChannelSet(['x'])}
         postId={POST_ID}
         previews={[{ id: row.id, url: 'https://example.test/signed/chai-cup.png' }]}
       />,
@@ -303,7 +306,7 @@ describe('MediaPane — previews', () => {
 
   test('keeps a row whose mime and bytes are null rendering as unverifiable, not valid', () => {
     const row = mediaRow({ mime: null, bytes: null })
-    render(<MediaPane media={[row]} channels={['x']} postId={POST_ID} />)
+    render(<MediaPane media={[row]} channels={toChannelSet(['x'])} postId={POST_ID} />)
 
     expect(screen.getByText(/can't verify this file/i)).toBeInTheDocument()
   })
@@ -319,7 +322,7 @@ describe('MediaPane — remove', () => {
     render(
       <MediaPane
         media={[row]}
-        channels={['x']}
+        channels={toChannelSet(['x'])}
         postId={POST_ID}
         previews={[{ id: row.id, url: null }]}
       />,
@@ -349,7 +352,7 @@ describe('MediaPane — remove', () => {
     render(
       <MediaPane
         media={[row]}
-        channels={['x']}
+        channels={toChannelSet(['x'])}
         postId={POST_ID}
         previews={[{ id: row.id, url: null }]}
       />,
@@ -375,7 +378,7 @@ describe('MediaPane — remove', () => {
     render(
       <MediaPane
         media={[row]}
-        channels={['x']}
+        channels={toChannelSet(['x'])}
         postId={POST_ID}
         previews={[{ id: row.id, url: null }]}
       />,

@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Paperclip } from 'lucide-react'
-import type { Channel } from '@sahoda/shared'
+import type { ChannelSet } from '@sahoda/shared'
 
 import { attachMedia } from '@/app/actions/posts-media'
 import type { AttachMediaState } from '@/lib/posts/media-state'
@@ -15,7 +15,7 @@ import { acceptForChannels, capMbForChannels } from './media-accept'
 export interface MediaAttachProps {
   postId: string
   /** The post's selected channels — drives `accept` and the outcome copy. */
-  channels: Channel[]
+  channels: ChannelSet
 }
 
 /**

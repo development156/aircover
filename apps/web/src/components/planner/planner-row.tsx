@@ -49,7 +49,10 @@ export function PlannerRow({
 }: PlannerRowProps) {
   const title = post.title?.trim()
   const scheduledAt = formatScheduledAt(post.scheduled_at)
-  const channels = [...new Set(post.channels)]
+  // Distinct at the row boundary — see `post-card.tsx`. This row had the same
+  // local de-dupe for its chips while handing the RAW array to `PlannerReschedule`
+  // one branch below, which is the shape of every duplicate-channel defect so far.
+  const channels = post.channels
   const stateByChannel = new Map((variantStates ?? []).map((row) => [row.channel, row]))
 
   return (

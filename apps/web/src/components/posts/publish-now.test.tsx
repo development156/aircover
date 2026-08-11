@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
-import type { Channel } from '@sahoda/shared'
+import { toChannelSet, type Channel } from '@sahoda/shared'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 
@@ -28,7 +28,7 @@ const renderPublish = (channels: Channel[], connected?: ReadonlySet<Channel>) =>
   render(
     <PublishNow
       postId="p1"
-      channels={channels}
+      channels={toChannelSet(channels)}
       flush={noop}
       saveVariantNow={noop}
       statusRows={[]}

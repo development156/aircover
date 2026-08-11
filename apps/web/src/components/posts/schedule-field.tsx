@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { CalendarClock, FlaskConical, Plug } from 'lucide-react'
-import type { Channel } from '@sahoda/shared'
+import type { Channel, ChannelSet } from '@sahoda/shared'
 
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 import { Input } from '@/components/ui/input'
@@ -13,7 +13,7 @@ import { earliestScheduleAt, validateScheduleLead } from '@/lib/posts/schedule'
 import { scheduleFieldNote } from '@/lib/posts/schedule-status'
 
 export interface ScheduleFieldProps {
-  channels: Channel[]
+  channels: ChannelSet
   /** ISO string from `posts.scheduled_at`, or null for "no schedule". */
   value: string | null
   onChange: (iso: string | null) => void

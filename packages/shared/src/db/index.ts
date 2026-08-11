@@ -1,4 +1,5 @@
 // Row schemas + insert/update derivatives for every Alpha table (one domain per file).
+export * from './channel-set'
 export * from './identity'
 export * from './brand'
 export * from './content'

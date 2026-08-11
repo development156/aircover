@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ExternalLink, Plug, Send } from 'lucide-react'
 import Link from 'next/link'
-import type { Channel } from '@sahoda/shared'
+import { filterChannelSet, type Channel, type ChannelSet } from '@sahoda/shared'
 
 import { Button } from '@/components/ui/button'
 import { joinNames, unconnectedFrom } from '@/lib/posts/connection-gap'
@@ -25,7 +25,12 @@ const PENDING_LINES = [
 
 export interface PublishNowProps {
   postId: string
-  channels: Channel[]
+  /**
+   * The post's channels. A SET, not an array: this component splits them into a
+   * button rail and a warning, and those two branches must be reading the same
+   * distinct list. See the `onRail` note below.
+   */
+  channels: ChannelSet
   /** Persist the canonical post (title, body, channels, schedule). */
   flush: () => Promise<boolean>
   /** Persist the channel variant that is actually about to be sent. */
@@ -82,20 +87,19 @@ export function PublishNow({
   const [error, setError] = useState<string | null>(null)
   const [published, setPublished] = useState<Published | null>(null)
 
-  // DISTINCT first. `post.channels` is a `text[]` off the row, not a set, and the
-  // editor hands it over untouched — so a repeat is reachable here. BOTH branches of
-  // the split below read this list, and only one of them was defended: the warning
-  // goes through `unconnectedFrom`, which deduplicates, while `live` did not. A
-  // repeated CONNECTED channel therefore rendered two identical Publish buttons
-  // under one React key ("Encountered two children with the same key"). Deduplicating
-  // the shared input closes both branches at once; patching `live` alone would leave
-  // the same defect one refactor from returning.
-  const onRail = [...new Set(channels)].filter((channel) => LIVE_RAIL.has(channel))
+  // Already distinct — `channels` is a `ChannelSet`, deduplicated once when the row
+  // was parsed. This line used to deduplicate here instead, because `post.channels`
+  // arrived as a raw `text[]` and only ONE of the two branches below was defended:
+  // the warning went through `unconnectedFrom`, which deduplicated, while `live` did
+  // not, so a repeated CONNECTED channel rendered two identical Publish buttons under
+  // one React key. Two dedupes in two branches is what let that happen; there is now
+  // one, and it is upstream of both.
+  const onRail = filterChannelSet(channels, (channel) => LIVE_RAIL.has(channel))
   // Split rather than filtered: the unconnected ones still need saying out loud.
   // `unconnectedFrom` is shared with the schedule picker, which says the same fact
   // in different words at a different moment — one rule, two sentences.
   const unconnected = unconnectedFrom(onRail, connected)
-  const live = onRail.filter((channel) => !unconnected.includes(channel))
+  const live = filterChannelSet(onRail, (channel) => !unconnected.includes(channel))
   const anyAttempted = statusRows.some((row) => row.status !== 'pending')
 
   // Nothing to publish, nothing to report, and nothing to fix. A button that

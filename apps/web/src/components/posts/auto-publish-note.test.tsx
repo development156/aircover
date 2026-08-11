@@ -7,6 +7,7 @@ import { PostCard } from '@/components/posts/post-card'
 import { PlannerRow } from '@/components/planner/planner-row'
 import { WeekGrid } from '@/components/planner/week-grid'
 import { bucketWeek } from '@/lib/planner/week'
+import { toChannelSet } from '@sahoda/shared'
 
 /**
  * The note, and every surface that owes it.
@@ -37,7 +38,7 @@ const post = (overrides: Partial<Post> = {}): Post => ({
   title: 'Diwali teaser',
   body: 'Lights on.',
   status: 'scheduled',
-  channels: ['x'],
+  channels: toChannelSet(['x']),
   scheduled_at: FUTURE,
   origin: 'manual',
   created_by: 'user_1',

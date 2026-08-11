@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import type { Channel } from '@sahoda/shared'
+import type { Channel, ChannelSet } from '@sahoda/shared'
 
 import { cancelSchedule, schedulePost } from '@/app/actions/posts-schedule'
 import { ScheduleField } from '@/components/posts/schedule-field'
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 
 export interface PlannerRescheduleProps {
   postId: string
-  channels: Channel[]
+  channels: ChannelSet
   /** ISO string from `posts.scheduled_at`, or null. */
   value: string | null
   /**

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Sparkles } from 'lucide-react'
-import { creditCost, type Channel } from '@sahoda/shared'
+import { creditCost, toChannelSet, type Channel, type ChannelSet } from '@sahoda/shared'
 
 import { Button } from '@/components/ui/button'
 import { CostLabel } from '@/components/ui/cost-label'
@@ -29,7 +29,7 @@ type Outcome =
 
 export interface GeneratePanelProps {
   postId: string
-  channels: Channel[]
+  channels: ChannelSet
   /** Flush the debounced body autosave. Resolves false when the save failed. */
   flush: () => Promise<boolean>
   onGenerated: (variants: GeneratedVariant[]) => void
@@ -46,7 +46,7 @@ export function GeneratePanel({ postId, channels, flush, onGenerated }: Generate
 
   const cost = creditCost('post_variants')
 
-  function run(target: Channel[]) {
+  function run(target: ChannelSet) {
     if (target.length === 0) return
     setOutcome(null)
 
@@ -111,7 +111,7 @@ export function GeneratePanel({ postId, channels, flush, onGenerated }: Generate
                 <span>couldn&rsquo;t generate</span>
                 <button
                   type="button"
-                  onClick={() => run([channel])}
+                  onClick={() => run(toChannelSet([channel]))}
                   className="rounded-pill border border-warn px-2.5 py-1 text-[12px] font-semibold transition-micro hover:bg-warn hover:text-white"
                 >
                   <CostLabel action="Retry this channel" cost={cost} />

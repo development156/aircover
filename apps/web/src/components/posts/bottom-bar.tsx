@@ -1,6 +1,6 @@
 'use client'
 
-import type { Channel } from '@sahoda/shared'
+import type { Channel, ChannelSet } from '@sahoda/shared'
 
 import type { GeneratedVariant } from '@/lib/posts/state'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
@@ -13,9 +13,9 @@ import { ScheduleField } from './schedule-field'
 
 export interface BottomBarProps {
   postId: string
-  channels: Channel[]
+  channels: ChannelSet
   scheduledAt: string | null
-  onChannelsChange: (channels: Channel[]) => void
+  onChannelsChange: (channels: ChannelSet) => void
   onScheduleChange: (iso: string | null) => void
   flush: () => Promise<boolean>
   /**

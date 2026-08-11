@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Channel, Post } from '@sahoda/shared'
+import type { ChannelSet, Post } from '@sahoda/shared'
 
 import { savePost } from '@/app/actions/posts'
 import { detectConflict, isNewer } from '@/lib/posts/detect-conflict'
@@ -17,7 +17,7 @@ const UNREACHABLE_MESSAGE = 'Could not reach the server to save this post.'
 export interface PostDraft {
   title: string
   body: string
-  channels: Channel[]
+  channels: ChannelSet
   scheduledAt: string | null
 }
 

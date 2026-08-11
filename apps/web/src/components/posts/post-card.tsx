@@ -74,10 +74,12 @@ export function PostCard({
   const displayTitle = title || 'Untitled post'
   const excerpt = excerptOf(post.body)
   const scheduledAt = formatScheduledAt(post.scheduled_at)
-  // `posts.channels` is a bare `text[]` with no unique constraint, so a repeated
-  // value is storable. De-dupe for render: it keeps React keys unique and stops
-  // the same channel showing twice, which would read as two destinations.
-  const channels = [...new Set(post.channels)]
+  // Distinct already: `post.channels` is a `ChannelSet`, deduplicated once when
+  // the row was parsed. `posts.channels` is still a bare `text[]` with no unique
+  // constraint, so a repeated value is storable — it just cannot survive the read.
+  // This used to de-dupe here, one of four component-local copies of the same
+  // three characters, and the copies are what let the bug keep moving.
+  const channels = post.channels
   const stateByChannel = new Map((variantStates ?? []).map((row) => [row.channel, row]))
 
   return (

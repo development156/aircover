@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Channel } from '@sahoda/shared'
+import { toChannelSet, type Channel } from '@sahoda/shared'
 
 import { joinNames, scheduleGapNote, unconnectedFrom } from './connection-gap'
 
@@ -7,30 +7,38 @@ const set = (...channels: Channel[]) => new Set<Channel>(channels)
 
 describe('unconnectedFrom', () => {
   it('names the picked channels with no live connection', () => {
-    expect(unconnectedFrom(['instagram', 'linkedin'], set('instagram'))).toEqual(['linkedin'])
+    expect(unconnectedFrom(toChannelSet(['instagram', 'linkedin']), set('instagram'))).toEqual([
+      'linkedin',
+    ])
   })
 
   it('is empty when everything picked is connected', () => {
-    expect(unconnectedFrom(['instagram'], set('instagram', 'x'))).toEqual([])
+    expect(unconnectedFrom(toChannelSet(['instagram']), set('instagram', 'x'))).toEqual([])
   })
 
   it('says nothing at all when the connection state is UNKNOWN', () => {
     // A failed read must not be rendered as "not connected" — that sends someone to
     // reconnect an account that is fine. Same rule as the wallet's unreadable balance.
-    expect(unconnectedFrom(['instagram', 'linkedin'], undefined)).toEqual([])
+    expect(unconnectedFrom(toChannelSet(['instagram', 'linkedin']), undefined)).toEqual([])
   })
 
   it('does not report a connected channel the post is not aimed at', () => {
-    expect(unconnectedFrom(['instagram'], set('instagram'))).toEqual([])
+    expect(unconnectedFrom(toChannelSet(['instagram']), set('instagram'))).toEqual([])
   })
 
-  it('names a repeated channel ONCE', () => {
-    // `post.channels` is a text[] off the row, not a set, and the planner hands it
-    // over untouched. Passed straight through, a duplicate reached the copy as
-    // "LinkedIn and LinkedIn" — which reads as two separate broken accounts, and
-    // pushed the sentence onto its plural verb for a single channel.
-    expect(unconnectedFrom(['linkedin', 'linkedin'], set())).toEqual(['linkedin'])
-    expect(unconnectedFrom(['linkedin', 'instagram', 'linkedin'], set())).toEqual([
+  it('names a repeated channel ONCE, because the row boundary deduplicated it', () => {
+    // ── THE MUTATION TEST FOR THIS CONSUMER ──────────────────────────────────
+    // `unconnectedFrom` no longer deduplicates. It used to, defensively, and that
+    // private second copy is what let `PublishNow` disagree with it and render a
+    // repeated channel twice. The guarantee now comes from `toChannelSet` — so
+    // delete the `new Set` there and THIS test fails, with the copy reading
+    // "LinkedIn and LinkedIn": two separate broken accounts where there is one,
+    // on a plural verb the count had no right to.
+    //
+    // `posts.channels` is still a bare text[] with no unique constraint. The
+    // duplicate is storable; it just cannot survive the read any more.
+    expect(unconnectedFrom(toChannelSet(['linkedin', 'linkedin']), set())).toEqual(['linkedin'])
+    expect(unconnectedFrom(toChannelSet(['linkedin', 'instagram', 'linkedin']), set())).toEqual([
       'linkedin',
       'instagram',
     ])

@@ -1,4 +1,4 @@
-import type { PostVariant, VariantPublishStatus } from '@sahoda/shared'
+import type { ChannelSet, PostVariant, VariantPublishStatus } from '@sahoda/shared'
 
 /**
  * What one channel of a post is actually doing, and why.
@@ -94,9 +94,18 @@ export function variantStatusRow(variant: PostVariant): VariantStatusRow {
   }
 }
 
-/** Every selected channel's row, in the order the post declares its channels. */
+/**
+ * Every selected channel's row, in the order the post declares its channels.
+ *
+ * Takes a `ChannelSet` rather than an array because the output is rendered as a
+ * keyed list — the status list, the variant tab strip and the metric strip all
+ * key by `row.channel`. A repeated channel here would emit two rows carrying the
+ * SAME key and the same variant, which is both a React key collision and a lie:
+ * one channel, drawn as two destinations. The row boundary is what makes that
+ * unreachable.
+ */
 export function variantStatusRows(
-  channels: readonly PostVariant['channel'][],
+  channels: ChannelSet,
   variants: readonly PostVariant[],
 ): VariantStatusRow[] {
   const byChannel = new Map(variants.map((v) => [v.channel, v]))

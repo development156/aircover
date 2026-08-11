@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import type { Post } from '@sahoda/shared'
 
 import { bucketWeek } from './week'
+import { toChannelSet } from '@sahoda/shared'
 
 /**
  * Buckets are keyed by IST calendar day — the same zone the UI renders and
@@ -18,7 +19,7 @@ function post(overrides: Partial<Post>): Post {
     title: 'T',
     body: null,
     status: 'draft',
-    channels: ['x'],
+    channels: toChannelSet(['x']),
     scheduled_at: null,
     origin: 'plan_week',
     created_by: 'user_abc',

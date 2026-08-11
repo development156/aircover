@@ -1,4 +1,4 @@
-import type { Channel } from '@sahoda/shared'
+import type { Channel, ChannelSet } from '@sahoda/shared'
 
 /**
  * The gap between the channels a post is aimed at and the channels that can
@@ -22,19 +22,23 @@ import type { Channel } from '@sahoda/shared'
  * would send someone to reconnect an account that is fine. Same rule the wallet
  * applies to an unreadable balance, and the same one `PublishNow` already carried.
  *
- * DISTINCT, in first-seen order. `post.channels` is a `text[]` off the row and the
- * planner hands it over untouched, so a repeat is reachable — and every caller uses
- * this list as a set: two of them count it to pick singular or plural wording, and
- * both render it as the names to go and reconnect. Undeduplicated, one repeated
- * channel produced "LinkedIn and LinkedIn aren’t connected" — two accounts named
- * where one is broken, on a plural verb the count had no right to.
+ * DISTINCT because the INPUT is: `ChannelSet` can only have come from
+ * `toChannelSet`, which is the single dedupe at the posts row boundary. This
+ * function used to deduplicate again, defensively, and that second copy was the
+ * problem rather than the protection — `PublishNow` read the raw array for its
+ * button rail while only the warning came through here, so the two disagreed and
+ * a repeated channel rendered twice. Undeduplicated, the sentence read "LinkedIn
+ * and LinkedIn aren’t connected": two accounts named where one is broken, on a
+ * plural verb the count had no right to.
+ *
+ * The type is the guard now. A caller holding a raw `text[]` cannot reach this.
  */
 export function unconnectedFrom(
-  channels: readonly Channel[],
+  channels: ChannelSet,
   connected: ReadonlySet<Channel> | undefined,
 ): Channel[] {
   if (connected === undefined) return []
-  return [...new Set(channels)].filter((channel) => !connected.has(channel))
+  return channels.filter((channel) => !connected.has(channel))
 }
 
 /** `A` · `A and B` · `A, B and C`. Serial comma omitted to match the app's copy. */
@@ -61,11 +65,15 @@ export function scheduleGapNote(
    *
    * Stated by the caller rather than inferred from a count. It was
    * `unconnectedNames.length >= totalChannels` for one revision, which is the same
-   * thing only while `channels` holds no duplicates — and `post.channels` is a
-   * `text[]` off the row, not a set. `['linkedin','linkedin']` with LinkedIn
-   * unconnected gives `1 >= 2` false, and the picker would have promised the post
-   * goes out when nothing could receive it. A condition that can be said directly
-   * should not be derived from a length.
+   * thing only while `channels` holds no duplicates — and back then `post.channels`
+   * was a raw `text[]` off the row. `['linkedin','linkedin']` with LinkedIn
+   * unconnected gives `1 >= 2` false, and the picker promised the post goes out
+   * when nothing could receive it.
+   *
+   * `ChannelSet` now rules that input out at the boundary, and this parameter stays
+   * anyway: a condition that can be said directly should not be derived from a
+   * length. The count was only ever a proxy for it, and a proxy is one refactor
+   * from being wrong again.
    */
   someChannelStillConnected: boolean,
 ): string | null {

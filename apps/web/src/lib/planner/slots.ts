@@ -32,7 +32,7 @@ function nextFullHour(at: number): number {
  */
 export function normalizeSlot(
   rawSlot: string,
-  channels: Channel[],
+  channels: readonly Channel[],
   now: Date,
   index: number,
 ): NormalizedSlot {

@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { Post, PostMedia, PostVariant } from '@sahoda/shared'
+import { toChannelSet } from '@sahoda/shared'
 
 /**
  * The regression this file exists for:
@@ -57,7 +58,7 @@ const post: Post = {
   title: 'Morning chai',
   body: BODY,
   status: 'draft',
-  channels: ['x'],
+  channels: toChannelSet(['x']),
   scheduled_at: null,
   origin: 'manual',
   created_by: 'user_1',

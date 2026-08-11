@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { ChannelSchema, toChannelSet, type Channel } from '@sahoda/shared'
+
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
@@ -85,11 +87,24 @@ export async function readPostCounts(): Promise<PostCounts> {
       else byOrigin.manual += 1
 
       if (Array.isArray(row.channels)) {
-        // De-duped per post: `channels` is a bare text[] with no unique
-        // constraint, so a repeated value is storable and would inflate the
-        // count of a channel the post targets only once.
-        for (const channel of new Set(row.channels)) {
-          if (typeof channel !== 'string') continue
+        // This is the ONE posts read that does not go through `PostSchema` — it
+        // selects four columns for a counting query, so there is no row to parse.
+        // It therefore has to reach the row boundary itself rather than keep a
+        // private copy of it: `channels` is a bare text[] with no unique
+        // constraint, and a repeated value would inflate the count of a channel
+        // the post targets once.
+        //
+        // Narrowed per element, not per row: one unrecognised value must not
+        // discard a post's other channels, which is what parsing the whole array
+        // at once would do. A value outside `ChannelSchema` is dropped — it is not
+        // a channel this product has a name, a chip or a constraint for, and every
+        // other surface already refuses to render it.
+        const known: Channel[] = []
+        for (const channel of row.channels) {
+          const parsed = ChannelSchema.safeParse(channel)
+          if (parsed.success) known.push(parsed.data)
+        }
+        for (const channel of toChannelSet(known)) {
           perChannel.set(channel, (perChannel.get(channel) ?? 0) + 1)
         }
       }

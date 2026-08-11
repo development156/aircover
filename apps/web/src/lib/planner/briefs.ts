@@ -1,4 +1,4 @@
-import type { Channel } from '@sahoda/shared'
+import { filterChannelSet, toChannelSet, type Channel, type ChannelSet } from '@sahoda/shared'
 
 /**
  * Clamp a brief's channels to what the user actually requested. The plan_week
@@ -8,10 +8,17 @@ import type { Channel } from '@sahoda/shared'
  * picked. A brief that names none of the requested channels falls back to the
  * full requested set: the draft must land somewhere the user asked for.
  */
-export function clampChannels(briefChannels: Channel[], requested: Channel[]): Channel[] {
+export function clampChannels(
+  briefChannels: readonly Channel[],
+  requested: ChannelSet,
+): ChannelSet {
   const allowed = new Set(requested)
-  const kept = [...new Set(briefChannels)].filter((channel) => allowed.has(channel))
-  return kept.length > 0 ? kept : [...requested]
+  // A SET on the way out: this becomes `posts.channels` for a brand-new draft, and
+  // the model names its channels freely — `PlanWeekOutputSchema` is a plain array
+  // and a brief saying `["x","x"]` parses clean. Writing that row is how a duplicate
+  // gets into the column in the first place.
+  const kept = filterChannelSet(toChannelSet(briefChannels), (channel) => allowed.has(channel))
+  return kept.length > 0 ? kept : requested
 }
 
 /**

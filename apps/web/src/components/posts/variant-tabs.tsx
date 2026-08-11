@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import type { Channel } from '@sahoda/shared'
+import type { Channel, ChannelSet } from '@sahoda/shared'
 
 import { CardLabel } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -14,7 +14,7 @@ import { VariantPanel } from './variant-panel'
 import type { VariantsApi } from './use-variants'
 
 export interface VariantTabsProps {
-  channels: Channel[]
+  channels: ChannelSet
   canonicalBody: string
   variants: VariantsApi
   /**
