@@ -48,6 +48,20 @@ export type SendOutcome =
 const PAGE = 50
 
 /**
+ * An empty reply is a REFUSAL, not a failure.
+ *
+ * The transport throws on a blank message so a pointless round trip is never spent, but
+ * that throw would land in `fromError` and tell the customer "Sahoda could not reach the
+ * platform" — a false statement about the network, in a codebase whose whole discipline
+ * is that status text must be true. Caught here instead, where it is one rule with a
+ * test behind it rather than a second copy at an untestable boundary.
+ */
+function emptyReply(message: string): SendOutcome | null {
+  if (message.trim() !== '') return null
+  return { status: 'refused', message: 'Write a reply before sending it.' }
+}
+
+/**
  * Turn a receipt into an outcome.
  *
  * `sent` is reachable only through `receipt.sent === true`, which the publishing port
@@ -97,6 +111,9 @@ export async function replyToThread(
   deps: ReplyDeps,
   input: { conversationId: string; message: string; intent: ReplyIntent },
 ): Promise<SendOutcome> {
+  const empty = emptyReply(input.message)
+  if (empty) return empty
+
   let messages
   try {
     const page = await deps.reads.listMessages(deps.account, input.conversationId, {
@@ -159,6 +176,9 @@ export async function replyToComment(
   deps: ReplyDeps,
   input: { platformPostId: string; message: string; commentId?: string },
 ): Promise<SendOutcome> {
+  const empty = emptyReply(input.message)
+  if (empty) return empty
+
   try {
     const receipt = await deps.sends.replyToComment(
       deps.profile,
@@ -187,6 +207,9 @@ export async function replyToReview(
   deps: ReplyDeps,
   input: { reviewId: string; message: string },
 ): Promise<SendOutcome> {
+  const empty = emptyReply(input.message)
+  if (empty) return empty
+
   try {
     const receipt = await deps.sends.replyToReview(deps.profile, deps.account, input.reviewId, {
       message: input.message,

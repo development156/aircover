@@ -29,15 +29,26 @@ describe('authoriseReply — an open window sends free-form and tags nothing', (
     expect(decision.wire).toEqual({})
   })
 
-  it('refuses a tag on an open window rather than sending one that was not needed', () => {
+  /**
+   * ── THE RACE THIS DELIBERATELY ABSORBS ──────────────────────────────────────
+   * The page rendered `tagged`, the user picked a tag, and the customer wrote again
+   * before they pressed send — so the server re-derives `open`. An earlier version
+   * REFUSED this, which was a dead end rather than a correction: a radio group has no
+   * deselect, so the tag stays set and every retry refuses identically.
+   *
+   * The tag exists to justify a reply the window would otherwise forbid. With the
+   * window open there is nothing to justify, so it is dropped and the reply goes
+   * free-form — strictly less on the wire, and the outcome the user wanted.
+   */
+  it('drops a tag on an open window instead of refusing a reply it could send', () => {
     const decision = authoriseReply(window('instagram', 1), {
       kind: 'tagged',
       tag: 'HUMAN_AGENT',
     })
 
-    expect(decision.ok).toBe(false)
-    if (decision.ok) throw new Error('unreachable')
-    expect(decision.reason).toMatch(/open/i)
+    expect(decision.ok).toBe(true)
+    if (!decision.ok) throw new Error('unreachable')
+    expect(decision.wire).toEqual({})
   })
 })
 

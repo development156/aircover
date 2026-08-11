@@ -334,3 +334,59 @@ describe('comment and review replies — no window, same id rule', () => {
     expect(outcome.status).toBe('unconfirmed')
   })
 })
+
+describe('an empty reply is refused, never reported as a network failure', () => {
+  /**
+   * The transport throws on a blank message to save a round trip, and that throw would
+   * otherwise surface as "Sahoda could not reach the platform" — a false statement about
+   * the network. The browser gates this with a disabled button, so it is only reachable
+   * by calling the action directly; it is still classified, because "unreachable" is a
+   * claim about today's UI rather than about this function.
+   */
+  it.each(['', '   ', '\n\t'])('refuses %j without calling Zernio', async (message) => {
+    const d = deps({})
+
+    const outcome = await replyToThread(d, {
+      conversationId: 'conv-1',
+      message,
+      intent: { kind: 'free_form' },
+    })
+
+    expect(outcome.status).toBe('refused')
+    if (outcome.status !== 'refused') throw new Error('unreachable')
+    expect(outcome.message).not.toMatch(/could not reach/i)
+    expect(d.sendMessage).not.toHaveBeenCalled()
+    // Refused before the thread is even read: there is nothing to check a window for.
+    expect(d.reads.listMessages).not.toHaveBeenCalled()
+  })
+
+  it('refuses an empty comment reply', async () => {
+    const replyToCommentFn = vi.fn()
+    const d = {
+      profile: PROFILE,
+      account: ACCOUNT,
+      now: at(1),
+      reads: { listMessages: vi.fn() },
+      sends: { replyToComment: replyToCommentFn },
+    } as unknown as ReplyDeps
+
+    const outcome = await replyToComment(d, { platformPostId: 'p-1', message: '  ' })
+    expect(outcome.status).toBe('refused')
+    expect(replyToCommentFn).not.toHaveBeenCalled()
+  })
+
+  it('refuses an empty review reply', async () => {
+    const replyToReviewFn = vi.fn()
+    const d = {
+      profile: PROFILE,
+      account: ACCOUNT,
+      now: at(1),
+      reads: { listMessages: vi.fn() },
+      sends: { replyToReview: replyToReviewFn },
+    } as unknown as ReplyDeps
+
+    const outcome = await replyToReview(d, { reviewId: 'r-1', message: '' })
+    expect(outcome.status).toBe('refused')
+    expect(replyToReviewFn).not.toHaveBeenCalled()
+  })
+})

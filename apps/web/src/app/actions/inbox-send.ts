@@ -11,6 +11,8 @@ import {
   type ReplyDeps,
   type SendOutcome,
 } from '@/lib/inbox/send'
+import { commentsHref } from '@/components/inbox/commented-post-row'
+import { threadHref } from '@/components/inbox/thread-href'
 import { scopedAccount } from '@/lib/inbox/read'
 import { reportServerError } from '@/lib/observability/report'
 import { zernioClientSends } from '@/lib/zernio/server'
@@ -46,6 +48,13 @@ import { zernioClientSends } from '@/lib/zernio/server'
  * `SendOutcome` has no branch that reports success without a platform id, and
  * `revalidatePath` runs ONLY on `sent`. An unconfirmed reply does not refresh the
  * thread, so the UI cannot show it arriving as though it had.
+ *
+ * ── THE REVALIDATED PATH COMES FROM THE LINK HELPERS ─────────────────────────
+ * `threadHref` / `commentsHref` build these URLs for the links that got the user here,
+ * and they `encodeURIComponent` each segment. A hand-interpolated copy would differ on
+ * exactly the ids that contain a slash — Facebook conversation ids like `t_100/200` —
+ * turning a two-segment route into three, matching nothing, and making `revalidatePath`
+ * a silent no-op after a CONFIRMED send. One path rule, one implementation.
  */
 
 /**
@@ -136,7 +145,7 @@ export async function sendThreadReply(
     }
 
     const outcome = await performThreadReply(resolved.deps, { conversationId, message, intent })
-    return toState(outcome, `/inbox/threads/${accountId}/${conversationId}`)
+    return toState(outcome, threadHref({ accountId, conversationId }))
   } catch (error) {
     reportServerError(error, { action: 'sendThreadReply' })
     return { ok: false, status: 'failed', message: 'Could not send that reply — try again.' }
@@ -159,7 +168,7 @@ export async function sendCommentReply(
       message,
       ...(commentId === undefined || commentId === '' ? {} : { commentId }),
     })
-    return toState(outcome, `/inbox/comments/${accountId}/${platformPostId}`)
+    return toState(outcome, commentsHref({ accountId, platformPostId }))
   } catch (error) {
     reportServerError(error, { action: 'sendCommentReply' })
     return { ok: false, status: 'failed', message: 'Could not send that reply — try again.' }

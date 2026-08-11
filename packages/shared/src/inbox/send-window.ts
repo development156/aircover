@@ -298,15 +298,23 @@ export function authoriseReply(
   }
 
   if (affordance.state === 'open') {
-    if (intent.kind === 'tagged') {
-      return {
-        ok: false,
-        reason:
-          'This thread’s reply window is open, so a message tag is neither needed nor allowed. Send the reply without one.',
-      }
-    }
-    // Nothing is guessed onto the wire. `messagingType: 'RESPONSE'` would be a field we
-    // have never verified against Instagram, sent on the strength of a Facebook doc line.
+    // A tag on an OPEN window is DROPPED, not refused.
+    //
+    // This is the race the re-derivation creates: the page rendered `tagged`, the user
+    // picked a tag, and the customer wrote again before they pressed send — so by the
+    // time the server looks, the free-form window has reopened. Refusing here would be a
+    // dead end rather than a correction: a radio group has no deselect, so the tag stays
+    // set, every retry refuses identically, and the only escape is a page reload the
+    // message does not mention.
+    //
+    // Dropping it is safe in the direction that matters. The tag exists to justify a
+    // reply the window would otherwise forbid; with the window open there is nothing to
+    // justify, so sending without it is strictly LESS on the wire and cannot be refused
+    // by Meta for a reason the tag would have fixed.
+    //
+    // Nothing is guessed onto the wire either way. `messagingType: 'RESPONSE'` would be a
+    // field we have never verified against Instagram, sent on the strength of a Facebook
+    // doc line about a different platform.
     return { ok: true, wire: {} }
   }
 
