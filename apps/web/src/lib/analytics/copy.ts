@@ -37,11 +37,15 @@ function lagPhrase(hours: number): string {
 }
 
 /**
- * The three ways a metric can be "not available yet".
+ * The four ways a metric can be "not available yet".
  *
- * All three share a headline, because to the reader they are one situation: the
- * number is coming, nothing is wrong, don't act. Only the reason differs, and the
+ * All four share a headline, because to the reader they are one situation: there is
+ * no number to act on, nothing is wrong, don't act. Only the reason differs, and the
  * reason is what stops the wait feeling like a fault.
+ *
+ * Only `lag` names a date, and only because only `lag` knows one. The others say what
+ * they know and stop, rather than borrowing a deadline from a platform that never
+ * gave one.
  */
 function pendingCopy(
   state: Extract<MetricAvailability, { kind: 'pending' }>,
@@ -74,6 +78,25 @@ function pendingCopy(
       return {
         headline,
         detail: `${name} has not reported metrics for this post.`,
+        tone: 'waiting',
+      }
+    /**
+     * The channel answered, with nothing but zeroes, and we do not know how far
+     * behind it reports — so we cannot tell "too early" from "measured nothing".
+     *
+     * Worded to survive BOTH readings, the same discipline `nothingReported` uses
+     * in `account-insights.ts`. It states two facts and draws no conclusion:
+     * nothing has been reported, and the delay is not published. It deliberately
+     * does not say "check back after…", because there is no date to give, nor
+     * "0 impressions", because no one measured that.
+     */
+    case 'unknown-window':
+      return {
+        // Keeps the shared headline rather than something like "No activity",
+        // which a reader parses as a measurement of nothing — the very claim
+        // this state exists to withhold.
+        headline,
+        detail: `${name} hasn’t reported anything for this post yet, and doesn’t publish how far behind its metrics run.`,
         tone: 'waiting',
       }
   }

@@ -121,12 +121,16 @@ export {
 export {
   classifyPostMetrics,
   lagHoursFromDataDelay,
+  reportingWindowFor,
+  CHANNEL_REPORTING_WINDOW,
+  UNKNOWN_WINDOW,
   INSTAGRAM_INSIGHTS_LAG_HOURS,
   INSTAGRAM_FOLLOWER_LAG_HOURS,
   type MetricAvailability,
   type MetricNumber,
   type PostMetrics,
   type ClassifyInput,
+  type ReportingWindow,
 } from './zernio/analytics-state'
 
 export {

@@ -167,6 +167,122 @@ describe('a fetched verdict overwrites the seeded one', () => {
 })
 
 /**
+ * ── EVERY CHANNEL IS JUDGED AGAINST ITS OWN WINDOW ───────────────────────────
+ * The carded gap: `classify()` never passed a lag, and `lagHours` defaulted to
+ * Instagram's 48 — so an X, GBP or LinkedIn post was measured against a window
+ * belonging to a platform it has nothing to do with. A LinkedIn post published
+ * 2026-08-10T12:06Z on the live account made that live, not theoretical.
+ *
+ * Pinned here at the ORCHESTRATION layer rather than by spying on the classifier,
+ * because the defect was never in the classifier: it accepted a lag correctly and
+ * was simply never given one. A test that asserts "classifyPostMetrics received a
+ * window" would pass on a version that passed the wrong one.
+ */
+describe('each channel is measured against its own reporting window', () => {
+  const PUBLISHED = '2026-08-08T06:00:00.000Z' // 6h before NOW — inside Instagram's 48h
+
+  /** Every count zero, with a sync stamp set. The shape the live sweep returns. */
+  const ALL_ZERO = {
+    status: 200,
+    post: {
+      postId: 'p',
+      analytics: {
+        impressions: 0,
+        reach: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        saves: 0,
+        clicks: 0,
+        views: 0,
+        lastUpdated: '2026-08-08 11:00:00',
+      },
+    },
+  }
+
+  beforeEach(() => {
+    reads.postAnalytics.mockResolvedValue(ALL_ZERO)
+    supabase.createServerSupabase.mockReturnValue(
+      logsReturning(
+        (['instagram', 'linkedin', 'x', 'gbp'] as const).map((channel) => ({
+          post_id: 'post-1',
+          channel,
+          status: 'succeeded',
+          published_at: PUBLISHED,
+        })),
+      ),
+    )
+  })
+
+  const statesFor = async (channels: readonly VariantStatusRow['channel'][]) => {
+    const out = await listPostMetrics(
+      new Map([
+        [
+          'post-1',
+          channels.map((channel) => row({ channel, platformPostId: `id-${channel}` })),
+        ],
+      ]),
+      NOW,
+      10,
+    )
+    return new Map(out.get('post-1')?.map((entry) => [entry.channel, entry.state]) ?? [])
+  }
+
+  it('dates Instagram’s wait from Instagram’s own 48 hours', async () => {
+    const states = await statesFor(['instagram'])
+    expect(states.get('instagram')).toEqual({
+      kind: 'pending',
+      reason: 'lag',
+      availableAfter: '2026-08-10T06:00:00.000Z',
+    })
+  })
+
+  /**
+   * The discriminating assertion. Before the fix this was `lag` with an
+   * `availableAfter` of 2026-08-10T06:00Z — a date computed from Instagram's
+   * window and presented as LinkedIn's schedule.
+   */
+  it('never dates a wait for a channel whose window is unknown', async () => {
+    const states = await statesFor(['linkedin', 'x', 'gbp'])
+    for (const channel of ['linkedin', 'x', 'gbp'] as const) {
+      expect(states.get(channel)).toEqual({
+        kind: 'pending',
+        reason: 'unknown-window',
+        availableAfter: null,
+      })
+    }
+  })
+
+  /**
+   * And the mirror check, which a "just set their lag to 0" fix would fail: an
+   * unknown window must not let the zeroes through as a measurement either.
+   */
+  it('does not let an unknown window fall through to a rendered zero', async () => {
+    const states = await statesFor(['linkedin'])
+    expect(states.get('linkedin')).not.toMatchObject({ kind: 'ready' })
+  })
+
+  it('still reports real numbers on an unknown-window channel', async () => {
+    reads.postAnalytics.mockResolvedValue({
+      status: 200,
+      post: { postId: 'p', analytics: { impressions: 61, reach: 36, lastUpdated: '2026-08-11 12:53:43' } },
+    })
+    const states = await statesFor(['linkedin'])
+    const state = states.get('linkedin')
+    expect(state).toMatchObject({ kind: 'ready' })
+    if (state?.kind !== 'ready') throw new Error('expected ready')
+    expect(state.metrics.impressions).toBe(61)
+  })
+
+  /** One post, two channels, two different verdicts from one sweep. */
+  it('gives two channels of the same post different verdicts', async () => {
+    const states = await statesFor(['instagram', 'linkedin'])
+    expect(states.get('instagram')).toMatchObject({ reason: 'lag' })
+    expect(states.get('linkedin')).toMatchObject({ reason: 'unknown-window' })
+  })
+})
+
+/**
  * A simulated publish is never asked about, and never mislabelled.
  *
  * `simulated` was optional when it shipped on 2026-08-09, and the second

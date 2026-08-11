@@ -1,3 +1,5 @@
+import type { Channel } from '@sahoda/shared'
+
 import type { ZernioPostAnalytics, ZernioPostAnalyticsResult } from './reads'
 
 /**
@@ -29,6 +31,53 @@ export const INSTAGRAM_INSIGHTS_LAG_HOURS = 48
 export const INSTAGRAM_FOLLOWER_LAG_HOURS = 24
 
 const HOUR_MS = 60 * 60 * 1000
+
+/**
+ * How far behind a channel reports POST-level metrics — or an admission that we
+ * do not know.
+ *
+ * ── WHY IGNORANCE IS MODELLED INSTEAD OF GUESSED ─────────────────────────────
+ * The account endpoints state their own delay in a `dataDelay` string, and it is
+ * preferred over any constant. The POST endpoint carries no such field: verified
+ * against all eight live posts on 2026-08-11, `dataDelay` is absent from every one.
+ * Nothing else in this repo states a post-level window for x, gbp or linkedin.
+ *
+ * A number invented for them would move the "available yet?" boundary, which is
+ * the single thing this module must not get wrong — and it would move it in the
+ * dangerous direction. See `classifyPostMetrics` rule 6a: the window is what
+ * licenses a zero to be called a measurement. Guessing "linkedin: 0" does not
+ * merely mis-date a wait, it converts every all-zero LinkedIn payload into a
+ * rendered "0 impressions".
+ *
+ * So the type has no third option, and `known: false` carries no hours to misuse.
+ */
+export type ReportingWindow = { known: true; lagHours: number } | { known: false }
+
+/** The one unknown value, shared so it compares by structure everywhere. */
+export const UNKNOWN_WINDOW: ReportingWindow = { known: false }
+
+/**
+ * What we know per channel, and nothing more.
+ *
+ * Instagram is the only entry with a number, and it is not a guess: it is the
+ * documented 48h that `dataDelay` states verbatim on the account endpoints, and
+ * that the 2026-08-10 recordings show the post endpoint behaving consistently with.
+ *
+ * The other three are `known: false` because they are unknown, not because they
+ * are zero. If Zernio ever adds `dataDelay` to the post payload, prefer it over
+ * this table exactly as `account-insights.ts` does — the platform's own statement
+ * always wins over a constant.
+ */
+export const CHANNEL_REPORTING_WINDOW: Readonly<Record<Channel, ReportingWindow>> = {
+  instagram: { known: true, lagHours: INSTAGRAM_INSIGHTS_LAG_HOURS },
+  x: UNKNOWN_WINDOW,
+  gbp: UNKNOWN_WINDOW,
+  linkedin: UNKNOWN_WINDOW,
+}
+
+export function reportingWindowFor(channel: Channel): ReportingWindow {
+  return CHANNEL_REPORTING_WINDOW[channel] ?? UNKNOWN_WINDOW
+}
 
 /**
  * One metric, or an honest gap.
@@ -75,8 +124,13 @@ export type MetricAvailability =
        * `processing` — Zernio answered 202; it has the post, not the numbers.
        * `lag`        — published inside the platform's reporting window.
        * `never-measured` — past the window with still no measurement.
+       * `unknown-window` — the channel reported nothing but zeroes and we do not
+       *                    know how far behind it reports, so the zeroes cannot be
+       *                    called a measurement and the wait cannot be dated.
+       *                    Distinct from `never-measured`, which claims the channel
+       *                    reported nothing at all — here it reported, unusably.
        */
-      reason: 'processing' | 'lag' | 'never-measured'
+      reason: 'processing' | 'lag' | 'never-measured' | 'unknown-window'
       /** When the window closes, for `lag` only. ISO-8601. */
       availableAfter: string | null
     }
@@ -217,8 +271,19 @@ export interface ClassifyInput {
   /** When this channel went out, ISO-8601. Null when unknown. */
   publishedAt: string | null
   now: Date
-  /** Hours the platform lags. Defaults to Instagram insights. */
-  lagHours?: number
+  /**
+   * How far behind THIS channel reports, or that we do not know.
+   *
+   * REQUIRED, and deliberately so. It shipped as `lagHours?: number` defaulting to
+   * Instagram's 48, and `listPostMetrics` — the caller that classifies every channel
+   * of every post in the app — never passed one. Every X, GBP and LinkedIn post was
+   * therefore measured against Instagram's window, silently, and a LinkedIn post
+   * went live on 2026-08-10 with that defect in place.
+   *
+   * The same lesson as `simulated` above: an optional input with a plausible default
+   * is an omission nobody sees. Required makes it a compile error.
+   */
+  window: ReportingWindow
 }
 
 /**
@@ -262,6 +327,16 @@ export interface ClassifyInput {
  *   · window still open — past the window a zero is a genuine measurement of nothing,
  *     and saying "check back" forever would be its own falsehood. The rule is never a
  *     zero we cannot justify, not never a zero.
+ *
+ * ── AND WHEN THERE IS NO WINDOW TO CHECK ─────────────────────────────────────
+ * "Past the window" is only sayable about a channel whose window we know, and we know
+ * exactly one (see `CHANNEL_REPORTING_WINDOW`). For the rest, an all-zero payload is
+ * permanently unjustifiable — not because the data is late, but because we cannot tell
+ * late from measured. That case reports `unknown-window` and does not expire.
+ *
+ * This is the narrower of the two available falsehoods, chosen deliberately. Withholding
+ * an unverifiable zero costs the customer a number that was never evidence of anything;
+ * printing it tells them their post reached nobody. Only the second is a claim.
  */
 export function classifyPostMetrics(input: ClassifyInput): MetricAvailability {
   const { result, platformPostId, published, publishedAt, now, simulated } = input
@@ -283,10 +358,16 @@ export function classifyPostMetrics(input: ClassifyInput): MetricAvailability {
 
   const analytics = post.analytics
   const measuredAt = analytics?.lastUpdated
-  const lagHours = input.lagHours ?? INSTAGRAM_INSIGHTS_LAG_HOURS
+  const { window } = input
 
+  // Rule 6. Nothing synced at all, which is decisive on its own: the channel has
+  // reported NOTHING, and that sentence is true whether or not we know its window.
+  // So an unknown window keeps the plainer `never-measured` here rather than
+  // borrowing `unknown-window`, which claims something was reported unusably.
   if (!analytics || typeof measuredAt !== 'string' || measuredAt === '') {
-    return pendingForLag(publishedAt, now, lagHours)
+    return window.known
+      ? pendingForLag(publishedAt, now, window.lagHours)
+      : { kind: 'pending', reason: 'never-measured', availableAfter: null }
   }
 
   const raw = analytics as unknown as Record<string, unknown>
@@ -294,7 +375,14 @@ export function classifyPostMetrics(input: ClassifyInput): MetricAvailability {
   // Rule 6a — see the precedence note above. All-zero counts inside the reporting
   // window are the sync stamp's zeroes, not the platform's answer.
   if (reportedAllZero(raw)) {
-    const lagged = pendingForLag(publishedAt, now, lagHours)
+    // No window means no way to earn the zero. The window is what licenses a zero
+    // to be called a measurement ("it has had its 48 hours"), and without one that
+    // sentence cannot be said at any age — so this does not expire into `ready`.
+    // It withholds a zero, never a number: a non-zero reading never reaches here.
+    if (!window.known) {
+      return { kind: 'pending', reason: 'unknown-window', availableAfter: null }
+    }
+    const lagged = pendingForLag(publishedAt, now, window.lagHours)
     if (lagged.kind === 'pending' && lagged.reason === 'lag') return lagged
   }
 
