@@ -108,11 +108,38 @@ export function variantStatusRows(
   channels: ChannelSet,
   variants: readonly PostVariant[],
 ): VariantStatusRow[] {
-  const byChannel = new Map(variants.map((v) => [v.channel, v]))
+  return selectStatusRows(channels, variants.map(variantStatusRow))
+}
+
+/**
+ * The same selection, applied to rows that have ALREADY been built.
+ *
+ * ── WHY THIS IS EXTRACTED RATHER THAN REPEATED ───────────────────────────────
+ * "Filter to the post's channels, in the post's order" is a CONTRACT, not an
+ * implementation detail, and it now has two callers: the server render, which
+ * starts from `PostVariant` rows, and the live poll, which arrives with
+ * `VariantStatusRow`s already assembled by `listVariantStates`.
+ *
+ * The filter is load-bearing and easy to lose. `listVariants` returns rows for
+ * channels the writer may have since DESELECTED — `posts-publish.ts:73-76` says
+ * so and filters for exactly that reason: the variant row survives the deselect.
+ * A path that skipped this would hand `PublishNow` a row for a channel the post
+ * no longer targets, where `anyAttempted` (`publish-now.tsx:103`) flips on it and
+ * `ChannelStatusList` renders a chip for a destination that is not part of this
+ * post any more.
+ *
+ * Two copies of that rule would drift, and the drift would be invisible: the
+ * server render would be right and the first poll would quietly widen the list.
+ * One implementation, both callers.
+ */
+export function selectStatusRows(
+  channels: ChannelSet,
+  rows: readonly VariantStatusRow[],
+): VariantStatusRow[] {
+  const byChannel = new Map(rows.map((row) => [row.channel, row]))
   return channels
     .map((channel) => byChannel.get(channel))
-    .filter((v): v is PostVariant => v !== undefined)
-    .map(variantStatusRow)
+    .filter((row): row is VariantStatusRow => row !== undefined)
 }
 
 /**

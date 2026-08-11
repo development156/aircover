@@ -4,11 +4,11 @@ import type { Post } from '@sahoda/shared'
 
 import { AgencyBlade } from '@/components/posts/agency-blade'
 import { AutoPublishNote } from '@/components/posts/auto-publish-note'
-import { ChannelChip } from '@/components/posts/channel-chip'
+import { LiveChannelChips } from '@/components/posts/live/live-channel-chips'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { DeletePostButton } from '@/components/posts/delete-post-button'
 import { MetricStrip } from '@/components/posts/metric-strip'
-import { StatusBadge } from '@/components/posts/status-badge'
+import { LiveStatusBadge } from '@/components/posts/live/live-status-badge'
 import type { ChannelMetrics } from '@/lib/analytics/post-metrics'
 import { Card } from '@/components/ui/card'
 import type { PostPublishMode } from '@/lib/posts/certainty'
@@ -80,7 +80,6 @@ export function PostCard({
   // This used to de-dupe here, one of four component-local copies of the same
   // three characters, and the copies are what let the bug keep moving.
   const channels = post.channels
-  const stateByChannel = new Map((variantStates ?? []).map((row) => [row.channel, row]))
 
   return (
     // `group` drives the title hover. The focus ring is deliberately left to the
@@ -104,7 +103,10 @@ export function PostCard({
             <AgencyBlade origin={post.origin} />
             {displayTitle}
           </h2>
-          <StatusBadge status={post.status} mode={mode} />
+          {/* Live: a publisher can move this row while the list is open, and
+              the badge is the first place that shows. Status and mode travel
+              together — see `live-status-badge.tsx`. */}
+          <LiveStatusBadge postId={post.id} status={post.status} mode={mode} />
         </div>
 
         {excerpt ? (
@@ -115,13 +117,14 @@ export function PostCard({
 
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-[12.5px]">
           {channels.length > 0 ? (
-            <ul className="flex flex-wrap items-center gap-1.5">
-              {channels.map((channel) => (
-                <li key={channel}>
-                  <ChannelChip channel={channel} state={stateByChannel.get(channel)} />
-                </li>
-              ))}
-            </ul>
+            /* Live: this is where the platform link appears, the moment the
+               permalink lands on the variant row. */
+            <LiveChannelChips
+              postId={post.id}
+              channels={channels}
+              initialRows={variantStates ?? []}
+              className="flex flex-wrap items-center gap-1.5"
+            />
           ) : (
             <span className="text-muted">No channels picked yet</span>
           )}

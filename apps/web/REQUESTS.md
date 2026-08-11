@@ -4,6 +4,56 @@ Requests from this lane to the owners of shared code. Mirrors `packages/billing/
 
 ---
 
+## wt-db: `posts` and `post_variants` are not in the `supabase_realtime` publication
+
+`packages/db/supabase/migrations/20260725102928_ops_platform_tables.sql:314-320` is the only
+`alter publication supabase_realtime` in the repo, and it adds exactly four tables:
+`ops_tasks, ops_changelog, ops_qa_runs, ops_sessions` — the admin dashboard's own live board.
+Nothing has ever published `posts` or `post_variants`.
+
+**Consequence:** the posts and planner surfaces cannot subscribe to publish state. A scheduled
+post moves `draft → scheduled → publishing → published` entirely server-side (the sweep runs on
+a five-minute cron, `apps/web/vercel.json`), and until this lane's change the UI learned about
+none of it without a manual reload.
+
+**Shipped instead:** a bounded poll of our own Postgres (`readPublishState`), off entirely when
+nothing is in flight and when the tab is hidden. It costs Zernio nothing, so it is safe against
+the 60/min ceiling shared with analytics and the inbox — but it is a fallback, not the design.
+
+**Ask:** add both tables to the publication.
+
+```sql
+alter publication supabase_realtime add table posts, post_variants;
+```
+
+Default replica identity is sufficient — this lane needs only the NEW row state (status,
+scheduled_at, publish_status, permalink, platform_post_id), never the old values, so
+`replica identity full` is not requested and would only widen the WAL.
+
+**Two things worth deciding with it, not after it:**
+
+1. **RLS on the subscription.** `postgres_changes` filters per subscriber against the row's
+   policies, so the existing member policies should scope it correctly — but nothing here has
+   been exercised against a second workspace. That test belongs with the migration, not with
+   the client: an over-broad publication is a tenancy leak, not a UI bug.
+2. **The client has no authenticated browser Supabase client yet.** `lib/supabase/server.ts` is
+   `server-only` and `lib/ops/service-rpc.ts` is service-role. A browser client would need the
+   Clerk token wired through `accessToken`, the same way the server one is. That is this lane's
+   work once the publication exists, not wt-db's.
+
+**Not blocking.** The polled path is shipped, tested and honest about its own limits. Everything
+in `lib/posts/live-state.ts` is fed by a single `PublishSnapshot`, so replacing the timer with a
+subscription changes `publish-state-provider.tsx` and nothing else — no card, no payload, no test.
+
+**Unverified, and cheaply checkable:** the publication contents were inferred from the migrations,
+not read. The Supabase MCP is unauthorized in this session and `.env` is permission-blocked, so
+nobody has run this against the live database:
+
+```sql
+select tablename from pg_publication_tables where pubname = 'supabase_realtime';
+```
+
+
 ## wt-web: `<Button asChild>` throws on any child with more than one node — NOT fixed here
 
 `src/components/ui/button.tsx` renders `{loading ? <Loader2/> : null}{children}` inside `Comp`.

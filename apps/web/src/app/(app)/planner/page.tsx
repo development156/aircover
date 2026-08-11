@@ -8,6 +8,9 @@ import { ViewToggle, type PlannerView } from '@/components/planner/view-toggle'
 import { WeekGrid } from '@/components/planner/week-grid'
 import { bucketWeek } from '@/lib/planner/week'
 import { listPosts, listPublishModes, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
+import { assembleSnapshot } from '@/lib/posts/live-state'
+import { PublishStateProvider } from '@/components/posts/live/publish-state-provider'
+import { LivePhaseNote } from '@/components/posts/live/live-phase-note'
 import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
 import { listConnectedChannels } from '@/lib/connections/read'
 import { ConnectFirstNote } from '@/components/connections/connect-first-note'
@@ -42,60 +45,80 @@ export default async function PlannerPage({
   const autoPublish = autoPublishEnabled()
   const now = new Date()
 
+  // The provider's seed, assembled from reads this page has ALREADY done —
+  // `listPosts` returns `status` and `scheduled_at`, and the two maps are right
+  // there. So live updates cost this render exactly nothing; the first paint is
+  // still one server pass with no fetch behind it.
+  const liveSeed = assembleSnapshot(
+    posts.map((post) => ({
+      id: post.id,
+      status: post.status,
+      scheduledAt: post.scheduled_at,
+    })),
+    modes,
+    variantStates,
+    now.toISOString(),
+  )
+
   return (
-    <div className="space-y-grid">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageTitle>Planner</PageTitle>
-        {posts.length > 0 ? <ViewToggle active={view} /> : null}
-      </div>
+    <PublishStateProvider initial={liveSeed}>
+      <div className="space-y-grid">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <PageTitle>Planner</PageTitle>
+          {posts.length > 0 ? <ViewToggle active={view} /> : null}
+        </div>
 
-      <ConnectFirstNote connectedCount={connected.size} />
+        <ConnectFirstNote connectedCount={connected.size} />
 
-      <PlanWeekPanel />
+        <PlanWeekPanel />
 
-      {posts.length === 0 ? (
-        <EmptyState
-          icon={CalendarDays}
-          title="Your week shows up here"
-          body="One click up there drafts five posts and places them across your coming week."
-          tip="Add goals first if you have a push this week — the plan bends toward them."
-        />
-      ) : view === 'week' ? (
-        <WeekGrid
-          buckets={bucketWeek(posts, now)}
-          now={now}
-          modes={modes}
-          variantStates={variantStates}
-          autoPublish={autoPublish}
-        />
-      ) : (
-        <ul className="space-y-2" data-guide="planner.list">
-          {posts.map((post) => (
-            <li key={post.id}>
-              {/* `autoPublish` was computed here and never passed, so every row
+        {posts.length === 0 ? (
+          <EmptyState
+            icon={CalendarDays}
+            title="Your week shows up here"
+            body="One click up there drafts five posts and places them across your coming week."
+            tip="Add goals first if you have a push this week — the plan bends toward them."
+          />
+        ) : view === 'week' ? (
+          <WeekGrid
+            buckets={bucketWeek(posts, now)}
+            now={now}
+            modes={modes}
+            variantStates={variantStates}
+            autoPublish={autoPublish}
+          />
+        ) : (
+          <ul className="space-y-2" data-guide="planner.list">
+            {posts.map((post) => (
+              <li key={post.id}>
+                {/* `autoPublish` was computed here and never passed, so every row
                   defaulted to false and read "Won't post itself — scheduled
                   auto-publish isn't live yet" while the dispatcher was on. The
                   default under-promises, which was the safe direction right up
                   until the rail went live. It is also what `PlannerReschedule`
                   needs before it can warn about an unconnected channel. */}
-              <PlannerRow
-                post={post}
-                now={now}
-                mode={modes.get(post.id) ?? null}
-                connected={connected}
-                autoPublish={autoPublish}
-                variantStates={variantStates.get(post.id)}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
+                <PlannerRow
+                  post={post}
+                  now={now}
+                  mode={modes.get(post.id) ?? null}
+                  connected={connected}
+                  autoPublish={autoPublish}
+                  variantStates={variantStates.get(post.id)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
 
-      {posts.length === LIST_LIMIT ? (
-        <p className="text-[13px] tabular-nums text-muted">
-          Showing the {LIST_LIMIT} most recently updated posts — older ones may not be on this page.
-        </p>
-      ) : null}
-    </div>
+        <LivePhaseNote />
+
+        {posts.length === LIST_LIMIT ? (
+          <p className="text-[13px] tabular-nums text-muted">
+            Showing the {LIST_LIMIT} most recently updated posts — older ones may not be on this
+            page.
+          </p>
+        ) : null}
+      </div>
+    </PublishStateProvider>
   )
 }

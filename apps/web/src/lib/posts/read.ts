@@ -3,10 +3,12 @@ import 'server-only'
 import {
   PostMediaSchema,
   PostSchema,
+  PostStatusSchema,
   PostVariantSchema,
   PublishModeSchema,
   type Post,
   type PostMedia,
+  type PostStatus,
   type PostVariant,
 } from '@sahoda/shared'
 
@@ -117,6 +119,79 @@ export async function listVariants(postId: string): Promise<PostVariant[]> {
       return parsed.success ? [parsed.data] : []
     })
   } catch {
+    return []
+  }
+}
+
+/**
+ * The lifecycle columns of a page of posts, and NOTHING ELSE.
+ *
+ * ── WHY THE COLUMN LIST IS THE POINT ─────────────────────────────────────────
+ * This read exists to be polled while the writer has the screen open, so what it
+ * CANNOT return matters more than what it can. `select` names four columns:
+ * `id, status, scheduled_at, updated_at`. It does not name `title`, `body` or
+ * `channels`, so a live update is structurally incapable of carrying the
+ * writer's own draft back at them mid-sentence — `use-autosave.ts` owns that
+ * text and this read cannot reach it even by mistake.
+ *
+ * `updated_at` is returned for ordering and diagnosis only. It is deliberately
+ * NOT fed to `detectConflict`: a publisher bumping the row is not another person
+ * editing it, and reporting it as divergence would fire that notice on a loop
+ * for the whole duration of a publish.
+ *
+ * Bounded by the same `LIST_LIMIT` the list itself uses, and degrades to an
+ * empty array on any failure — a poll that cannot read must leave the last
+ * server-rendered state standing, never blank it.
+ */
+export interface PostLifecycleRow {
+  id: string
+  status: PostStatus
+  scheduledAt: string | null
+  updatedAt: string
+}
+
+export async function listPostLifecycles(postIds: string[]): Promise<PostLifecycleRow[]> {
+  if (postIds.length === 0) return []
+
+  try {
+    const workspaceId = await activeWorkspaceId()
+    if (workspaceId === null) return []
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('posts')
+      .select('id, status, scheduled_at, updated_at')
+      .eq('workspace_id', workspaceId)
+      .in('id', postIds)
+      .limit(LIST_LIMIT)
+
+    if (error || !data) {
+      if (error) console.error('[posts] lifecycle read failed', error.code, error.message)
+      return []
+    }
+
+    return data.flatMap((row) => {
+      const record = row as Record<string, unknown>
+      const status = PostStatusSchema.safeParse(record.status)
+      // A status outside the enum is not one this app has a chip, a certainty
+      // level or a word for. Dropping the row leaves the server-rendered state
+      // in place, which is the honest fallback; inventing a status is not.
+      if (!status.success) return []
+      if (typeof record.id !== 'string') return []
+      return [
+        {
+          id: record.id,
+          status: status.data,
+          scheduledAt: typeof record.scheduled_at === 'string' ? record.scheduled_at : null,
+          updatedAt: typeof record.updated_at === 'string' ? record.updated_at : '',
+        },
+      ]
+    })
+  } catch (error) {
+    console.error(
+      '[posts] lifecycle read threw',
+      error instanceof Error ? error.message : 'unknown',
+    )
     return []
   }
 }

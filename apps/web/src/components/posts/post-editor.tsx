@@ -11,7 +11,8 @@ import type { MediaPreview } from '@/lib/posts/media-url'
 import { selectedText, spliceSelection, type SelectionRange } from '@/lib/posts/splice-selection'
 
 import { cancelSchedule, schedulePost } from '@/app/actions/posts-schedule'
-import { variantStatusRows } from '@/lib/posts/variant-status'
+import { selectStatusRows, variantStatusRows } from '@/lib/posts/variant-status'
+import { useLivePost } from '@/components/posts/live/publish-state-provider'
 
 import { BottomBar } from './bottom-bar'
 import { InlineError } from './inline-error'
@@ -75,7 +76,27 @@ export function PostEditor({
   // Server-owned publish state, straight off the rows — deliberately NOT from
   // `variantsApi`, which holds the writer's unsaved drafts. What a channel is
   // doing on a platform is not something the editor may have an opinion about.
-  const statusRows = variantStatusRows(post.channels, variants)
+  // LIVE, and this line only. `live.variants` is server-owned publish state; the
+  // rest of `live` (status, schedule) is deliberately ignored here, and `post`
+  // itself is never replaced.
+  //
+  // Feeding a fresh post row into this component would be actively harmful:
+  // `useAutosave` runs an effect on its `post` prop (`use-autosave.ts:223-229`)
+  // that raises the "someone else changed this post" notice whenever `updated_at`
+  // moves past the timestamp this editor adopted. A publish bumps `updated_at` on
+  // every status change, so the publisher would be reported as another person
+  // editing, on a loop, while the writer is mid-sentence — and adopting that row
+  // would overwrite the draft they are typing.
+  const live = useLivePost(post.id)
+  // Filtered to THIS post's channels either way. `live.variants` arrives
+  // unfiltered from `listVariantStates`, and a variant row survives the writer
+  // deselecting its channel (`posts-publish.ts:73-76`) — so handing it over
+  // wholesale would widen `statusRows` the moment the first poll landed, and
+  // `PublishNow`'s `anyAttempted` would flip on a channel this post no longer
+  // targets. `selectStatusRows` is the same selection the server render applies.
+  const statusRows = live
+    ? selectStatusRows(post.channels, live.variants)
+    : variantStatusRows(post.channels, variants)
   const [selection, setSelection] = useState<SelectionRange | null>(null)
   const [scheduleError, setScheduleError] = useState<string | null>(null)
 

@@ -5,10 +5,10 @@ import type { Channel, Post } from '@sahoda/shared'
 import { ApproveButton } from '@/components/planner/approve-button'
 import { PlannerReschedule } from '@/components/planner/planner-reschedule'
 import { AutoPublishNote } from '@/components/posts/auto-publish-note'
-import { ChannelChip } from '@/components/posts/channel-chip'
+import { LiveChannelChips } from '@/components/posts/live/live-channel-chips'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { AgencyBlade } from '@/components/posts/agency-blade'
-import { StatusBadge } from '@/components/posts/status-badge'
+import { LiveStatusBadge } from '@/components/posts/live/live-status-badge'
 import type { PostPublishMode } from '@/lib/posts/certainty'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
 import { cn } from '@/lib/utils'
@@ -53,7 +53,6 @@ export function PlannerRow({
   // local de-dupe for its chips while handing the RAW array to `PlannerReschedule`
   // one branch below, which is the shape of every duplicate-channel defect so far.
   const channels = post.channels
-  const stateByChannel = new Map((variantStates ?? []).map((row) => [row.channel, row]))
 
   return (
     <div className="rounded-card border border-line bg-bg px-4 py-3 shadow-card">
@@ -69,15 +68,14 @@ export function PlannerRow({
           >
             {title || 'Untitled post'}
           </Link>
-          <StatusBadge status={post.status} mode={mode} />
+          <LiveStatusBadge postId={post.id} status={post.status} mode={mode} />
           {channels.length > 0 ? (
-            <ul className="flex flex-wrap items-center gap-1.5 text-[12.5px]">
-              {channels.map((channel) => (
-                <li key={channel}>
-                  <ChannelChip channel={channel} state={stateByChannel.get(channel)} />
-                </li>
-              ))}
-            </ul>
+            <LiveChannelChips
+              postId={post.id}
+              channels={channels}
+              initialRows={variantStates ?? []}
+              className="flex flex-wrap items-center gap-1.5 text-[12.5px]"
+            />
           ) : null}
           {scheduledAt ? (
             <span className="inline-flex items-center gap-1.5 text-[12.5px] text-muted">

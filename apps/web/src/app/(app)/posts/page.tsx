@@ -6,6 +6,9 @@ import { CreatePostButton } from '@/components/posts/create-post-button'
 import { PostCard } from '@/components/posts/post-card'
 import { listPostMetrics } from '@/lib/analytics/post-metrics'
 import { listPosts, listPublishModes, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
+import { assembleSnapshot } from '@/lib/posts/live-state'
+import { PublishStateProvider } from '@/components/posts/live/publish-state-provider'
+import { LivePhaseNote } from '@/components/posts/live/live-phase-note'
 import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
 import { listConnectedChannels } from '@/lib/connections/read'
 import { ConnectFirstNote } from '@/components/connections/connect-first-note'
@@ -35,6 +38,21 @@ export default async function PostsPage() {
   // the list.
   const metrics = await listPostMetrics(variantStates, now)
 
+  // The provider's seed, assembled from reads this page has ALREADY done —
+  // `listPosts` returns `status` and `scheduled_at`, and the two maps are right
+  // there. So live updates cost this render exactly nothing; the first paint is
+  // still one server pass with no fetch behind it.
+  const liveSeed = assembleSnapshot(
+    posts.map((post) => ({
+      id: post.id,
+      status: post.status,
+      scheduledAt: post.scheduled_at,
+    })),
+    modes,
+    variantStates,
+    now.toISOString(),
+  )
+
   return (
     <div className="space-y-grid">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -55,7 +73,7 @@ export default async function PostsPage() {
           tip="Write the idea once. I reshape it for each channel, so you never rewrite the same thought four times."
         />
       ) : (
-        <>
+        <PublishStateProvider initial={liveSeed}>
           <ul className="space-y-grid" data-guide="posts.list">
             {posts.map((post) => (
               <li key={post.id}>
@@ -71,6 +89,8 @@ export default async function PostsPage() {
             ))}
           </ul>
 
+          <LivePhaseNote />
+
           {/* `listPosts` is capped and there is no pagination yet. Hitting the cap
               silently would show a partial list as if it were the whole workspace,
               so we say it. Worded with "may" — a workspace of exactly LIST_LIMIT
@@ -81,7 +101,7 @@ export default async function PostsPage() {
               page.
             </p>
           ) : null}
-        </>
+        </PublishStateProvider>
       )}
     </div>
   )

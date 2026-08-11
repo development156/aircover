@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import type { PostVariant } from '@sahoda/shared'
+import { toChannelSet, type PostVariant } from '@sahoda/shared'
 
-import { variantStatusRow } from '@/lib/posts/variant-status'
+import type { VariantStatusRow } from '@/lib/posts/variant-status'
+
+import { selectStatusRows, variantStatusRow } from '@/lib/posts/variant-status'
 
 /**
  * The seam where a simulated publish must stay recognisable.
@@ -77,5 +79,49 @@ describe('a fixture publish is flagged as simulated, by its permalink', () => {
       variant({ publish_status: 'pending', permalink: null, platform_post_id: null }),
     )
     expect(row.simulated).toBe(false)
+  })
+})
+
+describe('selectStatusRows — the filter both the render and the poll share', () => {
+  const row = (over: Partial<VariantStatusRow> = {}): VariantStatusRow => ({
+    channel: 'instagram',
+    status: 'pending',
+    permalink: null,
+    platformPostId: null,
+    simulated: false,
+    errorMessage: null,
+    errorCode: null,
+    retryable: true,
+    ...over,
+  })
+
+  it('drops a row whose channel the writer has since DESELECTED', () => {
+    // `listVariants` returns rows for channels no longer on the post — the row
+    // survives the deselect, which `posts-publish.ts:73-76` filters for by name.
+    // The live path arrives with those rows already built, so it needs the same
+    // filter or the first poll silently widens the list: `PublishNow`'s
+    // `anyAttempted` would flip on a channel this post no longer targets, and a
+    // status chip would appear for a destination that is not part of it.
+    const rows = [row({ channel: 'instagram' }), row({ channel: 'x', status: 'published' })]
+
+    const selected = selectStatusRows(toChannelSet(['instagram']), rows)
+
+    expect(selected.map((r) => r.channel)).toEqual(['instagram'])
+  })
+
+  it("orders by the POST's channels, not by the order the rows arrived in", () => {
+    const rows = [row({ channel: 'gbp' }), row({ channel: 'instagram' })]
+
+    expect(
+      selectStatusRows(toChannelSet(['instagram', 'gbp']), rows).map((r) => r.channel),
+    ).toEqual(['instagram', 'gbp'])
+  })
+
+  it('omits a picked channel with no row at all, rather than inventing a state for it', () => {
+    // A channel picked but never written to has nothing to report. An empty row
+    // would render as "not sent yet" — which is a claim, and a different one.
+    expect(
+      selectStatusRows(toChannelSet(['instagram', 'x']), [row({ channel: 'instagram' })]),
+    ).toHaveLength(1)
   })
 })
