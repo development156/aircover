@@ -6,6 +6,7 @@ import { Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { signalClarityPercent } from '@/lib/brand/signal-clarity'
 
+import { AttemptErrorNotice, type AttemptError } from './attempt-error'
 import { BrandPersonaCard } from './cards/brand-persona-card'
 import { CustomerPersonaCard } from './cards/customer-persona-card'
 import { HookCard } from './cards/hook-card'
@@ -21,6 +22,8 @@ export interface RefineStepProps {
   balanceAfter: number | null
   regenerateCost: number
   regeneratePending: boolean
+  /** The last failed Regenerate, or null. Shown here, not only as a toast. */
+  regenerateError: AttemptError | null
   onRegenerate: () => void
   onContinue: () => void
 }
@@ -38,10 +41,18 @@ export function RefineStep({
   balanceAfter,
   regenerateCost,
   regeneratePending,
+  regenerateError,
   onRegenerate,
   onContinue,
 }: RefineStepProps) {
   const clarity = signalClarityPercent(brain)
+
+  // Spark disables Generate when the balance cannot cover it; Regenerate is the
+  // same charge for the same work, so it disables on the same condition. Without
+  // this the sixth card still offers a 50-credit action to a wallet holding none,
+  // and the only way to learn that is to press it.
+  const insufficient = regenerateError?.kind === 'insufficient'
+  const regenerateBlocked = regeneratePending || insufficient
 
   return (
     <div className="flex flex-col gap-5">
@@ -60,6 +71,8 @@ export function RefineStep({
         ) : null}
       </div>
 
+      {regenerateError ? <AttemptErrorNotice error={regenerateError} /> : null}
+
       {fallbackMessage ? (
         <div
           role="status"
@@ -77,42 +90,42 @@ export function RefineStep({
           value={brain.alignment}
           regenerateCost={regenerateCost}
           onRegenerate={onRegenerate}
-          regenerateDisabled={regeneratePending}
+          regenerateDisabled={regenerateBlocked}
         />
         <VoiceCard
           value={brain.voice}
           onChange={(voice) => onChange((current) => ({ ...current, voice }))}
           regenerateCost={regenerateCost}
           onRegenerate={onRegenerate}
-          regenerateDisabled={regeneratePending}
+          regenerateDisabled={regenerateBlocked}
         />
         <BrandPersonaCard
           value={brain.brand_persona}
           onChange={(brand_persona) => onChange((current) => ({ ...current, brand_persona }))}
           regenerateCost={regenerateCost}
           onRegenerate={onRegenerate}
-          regenerateDisabled={regeneratePending}
+          regenerateDisabled={regenerateBlocked}
         />
         <CustomerPersonaCard
           value={brain.customer_persona}
           onChange={(customer_persona) => onChange((current) => ({ ...current, customer_persona }))}
           regenerateCost={regenerateCost}
           onRegenerate={onRegenerate}
-          regenerateDisabled={regeneratePending}
+          regenerateDisabled={regenerateBlocked}
         />
         <HookCard
           value={brain.hook}
           onChange={(hook) => onChange((current) => ({ ...current, hook }))}
           regenerateCost={regenerateCost}
           onRegenerate={onRegenerate}
-          regenerateDisabled={regeneratePending}
+          regenerateDisabled={regenerateBlocked}
         />
         <TabooCard
           value={brain.taboo}
           onChange={(taboo) => onChange((current) => ({ ...current, taboo }))}
           regenerateCost={regenerateCost}
           onRegenerate={onRegenerate}
-          regenerateDisabled={regeneratePending}
+          regenerateDisabled={regenerateBlocked}
         />
       </div>
 

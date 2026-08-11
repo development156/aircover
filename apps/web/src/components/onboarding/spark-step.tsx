@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+import { AttemptErrorNotice, type AttemptError } from './attempt-error'
 import { LogoDrop, type LogoValue } from './logo-drop'
 
 export interface SparkValues {
@@ -15,16 +16,12 @@ export interface SparkValues {
   instagram: string
 }
 
-export type SparkAttemptError =
-  | { kind: 'insufficient'; message: string; required: number; available: number }
-  | { kind: 'error'; message: string }
-
 export interface SparkStepProps {
   formAction: (payload: FormData) => void
   /** Fired synchronously on submit (before the action runs) — clears the old error banner. */
   onSubmitStart: () => void
   isPending: boolean
-  attemptError: SparkAttemptError | null
+  attemptError: AttemptError | null
   spark: SparkValues
   onSparkChange: (patch: Partial<SparkValues>) => void
   logo: LogoValue | null
@@ -170,22 +167,7 @@ export function SparkStep({
           {isPending ? status : null}
         </p>
 
-        {attemptError ? (
-          <div
-            role="alert"
-            className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
-          >
-            {attemptError.kind === 'insufficient' ? (
-              <p>
-                Not enough credits to resolve your Brand Brain — this needs{' '}
-                <span className="tabular-nums">{attemptError.required}</span>, you have{' '}
-                <span className="tabular-nums">{attemptError.available}</span>.
-              </p>
-            ) : (
-              <p>{attemptError.message}</p>
-            )}
-          </div>
-        ) : null}
+        {attemptError ? <AttemptErrorNotice error={attemptError} /> : null}
       </div>
     </form>
   )

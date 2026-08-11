@@ -9,9 +9,10 @@ import { resolveBrand, saveBrandMemory, type SaveBrandState } from '@/app/action
 import { saveWorkspaceTheme } from '@/app/actions/theme'
 import { brandSkinVars } from '@/lib/brand/brand-theme'
 
+import type { AttemptError } from './attempt-error'
 import type { LogoValue } from './logo-drop'
 import { RefineStep } from './refine-step'
-import { SparkStep, type SparkAttemptError, type SparkValues } from './spark-step'
+import { SparkStep, type SparkValues } from './spark-step'
 import { StepRail } from './step-rail'
 import { ThemePreview } from './theme-preview'
 import { ThemeStep } from './theme-step'
@@ -51,7 +52,8 @@ export function OnboardingFlow() {
   const [screen, setScreen] = useState<Screen>('spark')
   const [spark, setSpark] = useState<SparkValues>(EMPTY_SPARK)
   const [logo, setLogo] = useState<LogoValue | null>(null)
-  const [attemptError, setAttemptError] = useState<SparkAttemptError | null>(null)
+  const [attemptError, setAttemptError] = useState<AttemptError | null>(null)
+  const [regenerateError, setRegenerateError] = useState<AttemptError | null>(null)
   const [brain, setBrain] = useState<BrandMemoryPayload | null>(null)
   const [balanceAfter, setBalanceAfter] = useState<number | null>(null)
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null)
@@ -67,27 +69,34 @@ export function OnboardingFlow() {
       setFallbackMessage(state.kind === 'fallback' ? state.message : null)
       if (state.kind === 'resolved') setBalanceAfter(state.balanceAfter)
       setAttemptError(null)
+      setRegenerateError(null)
       setScreen('refine')
       return
     }
 
+    // One shape for both screens: Generate and Regenerate are the same charge for
+    // the same work, so a failure reads the same either side of it.
+    const failure: AttemptError =
+      state.kind === 'insufficient'
+        ? {
+            kind: 'insufficient',
+            message: state.message,
+            required: state.required,
+            available: state.available,
+          }
+        : { kind: 'error', message: state.message }
+
     if (screen === 'spark') {
-      setAttemptError(
-        state.kind === 'insufficient'
-          ? {
-              kind: 'insufficient',
-              message: state.message,
-              required: state.required,
-              available: state.available,
-            }
-          : { kind: 'error', message: state.message },
-      )
+      setAttemptError(failure)
       return
     }
 
-    // A Regenerate attempt failed while a brain was already in view — keep
-    // the user's current (possibly hand-edited) Brand Brain on screen and
-    // surface the failure as a toast instead of blanking the Refine step.
+    // A Regenerate attempt failed while a brain was already in view — keep the
+    // user's current (possibly hand-edited) Brand Brain on screen. The toast is
+    // the immediate signal (the pressed card may be far down the grid); the
+    // notice on the step is what persists, and it is the only place the numbers
+    // and "nothing was charged" survive.
+    setRegenerateError(failure)
     toast(state.message)
     // `screen` is read, not depended on — only a genuinely NEW result should re-run this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -174,6 +183,7 @@ export function OnboardingFlow() {
                 balanceAfter={balanceAfter}
                 regenerateCost={RESOLVE_COST}
                 regeneratePending={isPending}
+                regenerateError={regenerateError}
                 onRegenerate={handleRegenerate}
                 onContinue={() => setScreen('theme')}
               />

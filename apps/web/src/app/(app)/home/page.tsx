@@ -1,5 +1,6 @@
 import { creditCost } from '@sahoda/shared'
 
+import { FirstRun } from '@/components/home/first-run'
 import { InstagramInsights } from '@/components/home/instagram-insights'
 import { SahodaRail } from '@/components/home/sahoda-rail'
 import { SpendArea } from '@/components/home/spend-area'
@@ -58,6 +59,12 @@ export default async function HomePage() {
     // not take Home down with it.
     readInstagramAnalytics(now),
   ])
+
+  // No workspace ⇒ no wallet, no posts, no credits, and nothing on this page can
+  // be pressed to fix that. Every read above already short-circuits on a null
+  // workspace WITHOUT touching the database, so this branch costs nothing and the
+  // dashboard is replaced rather than rendered empty. See FirstRun for why.
+  if (balance.status === 'no-workspace') return <FirstRun now={now} />
 
   // Publish modes decide `.is-real` on the strip. Fails safe to an empty map, in
   // which case a published post renders committed rather than claiming it went
