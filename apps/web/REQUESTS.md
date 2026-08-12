@@ -67,7 +67,6 @@ nobody has run this against the live database:
 select tablename from pg_publication_tables where pubname = 'supabase_realtime';
 ```
 
-
 ## wt-web: `<Button asChild>` throws on any child with more than one node — NOT fixed here
 
 `src/components/ui/button.tsx` renders `{loading ? <Loader2/> : null}{children}` inside `Comp`.
@@ -160,10 +159,10 @@ alongside it in `packages/publishing/src/zernio/inbox-live.test.ts`.
 returns exactly **one** account on the entire API key — so 2 is not a count of accounts in any
 sense we share, scoped or not. The unscoped conversations call reports the same 2.
 
-**Impact, already fixed here:** `emptiness.ts` rendered it verbatim as *"All 2 connected accounts
-answered"* to a customer with one Instagram account. The `ok` and `empty` branches no longer print
+**Impact, already fixed here:** `emptiness.ts` rendered it verbatim as _"All 2 connected accounts
+answered"_ to a customer with one Instagram account. The `ok` and `empty` branches no longer print
 a count; the `partial` branch keeps Zernio's own `N of M` ratio intact, since cross-sourcing it
-against our `connections` count would produce the worse lie *"2 of 1 did not answer"*.
+against our `connections` count would produce the worse lie _"2 of 1 did not answer"_.
 
 The `accountsQueried === 0` comparison is untouched and is confirmed correct — the live reviews
 payload reports 0 with no GBP ever connected, and resolves to "connect an account".
@@ -180,8 +179,8 @@ so its unit matters even though we no longer print it.
 (`commentCount: 2`); the other five were `0`. The endpoint name, `reads.ts` and
 `commented-post-row.tsx` all described it as "the posts that have comments".
 
-**Impact, already fixed here:** `rows > 0` was permanently true, so the surface rendered *"Showing
-your comments"* for a workspace with no comments anywhere and the *"No comments yet"* state was
+**Impact, already fixed here:** `rows > 0` was permanently true, so the surface rendered _"Showing
+your comments"_ for a workspace with no comments anywhere and the _"No comments yet"_ state was
 unreachable. `lib/inbox/commented-posts.ts` now filters before classification, and `hasMore` is
 threaded through so a page that filters down to empty with more behind it says "could not confirm"
 rather than "none yet".
