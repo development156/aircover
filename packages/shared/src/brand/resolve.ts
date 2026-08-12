@@ -45,7 +45,7 @@ export type BrandMemoryPayload = z.infer<typeof BrandMemoryPayloadSchema>
  * Signal Console intake: Source + five channels, mirroring the demo's exact
  * fields. Only `source.name` is required — blanks never block (FSD M1); a
  * tracked-field count drives the Signal Clarity meter. Voice formality/energy are
- * 1–5 sliders.
+ * 1–5 sliders and are OPTIONAL: an unanswered slider must be absent, not 3.
  *
  * `website` and `instagram` are additive (defaulted, so every existing caller
  * still parses). They are IDENTIFIERS, not content: the model cannot fetch them,
@@ -86,8 +86,16 @@ export const ResolveInputSchema = z.object({
     .prefault({}),
   voice: z
     .object({
-      formality: z.int().min(1).max(5).default(3),
-      energy: z.int().min(1).max(5).default(3),
+      // OPTIONAL, not `.default(3)`. These used to default to the mid-point, and
+      // `brand_guidelines` JSON.stringify()s the whole input — so every resolve
+      // told the model the founder had picked "3 and 3" when nobody had picked
+      // anything. It read them, too: the 2026-08-12 measurement produced a note
+      // crediting "mid-range formality/energy scores" as intake it received.
+      // A default is a fabricated signal wearing the clothes of a real one.
+      // `.optional()` (not `.nullable()`) so an unanswered slider is an ABSENT
+      // KEY in the serialised input, not a `null` the model still reads.
+      formality: z.int().min(1).max(5).optional(),
+      energy: z.int().min(1).max(5).optional(),
       voice_words: z.string().default(''),
       tone_lines: z.string().default(''),
       never_use: z.array(z.string()).default([]),

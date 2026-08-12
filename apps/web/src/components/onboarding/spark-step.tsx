@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 
 import { AttemptErrorNotice, type AttemptError } from './attempt-error'
 import { LogoDrop, type LogoValue } from './logo-drop'
@@ -12,6 +13,12 @@ import { LogoDrop, type LogoValue } from './logo-drop'
 export interface SparkValues {
   name: string
   category: string
+  /**
+   * The only intake field measured to move `signal_lock` off `weak`
+   * (2026-08-12: name+category → weak, +website+instagram → weak,
+   * +description → moderate). Optional, because blanks never block.
+   */
+  description: string
   website: string
   instagram: string
 }
@@ -116,6 +123,33 @@ export function SparkStep({
             placeholder="e.g. Retail — books & specialty café"
           />
         </div>
+        {/*
+          One sentence, optional. This is the highest-yield field on the screen:
+          it is the only one measured to move signal_lock off `weak`. The
+          placeholder shows what good looks like — specific, local, and in the
+          founder's own words — because "describe your business" reliably
+          returns the category back.
+        */}
+        <div className="flex flex-col gap-1.5 sm:col-span-2">
+          <Label htmlFor="spark-description">
+            What do you do, in one sentence?{' '}
+            <span className="font-normal text-muted">(optional)</span>
+          </Label>
+          <Textarea
+            id="spark-description"
+            name="description"
+            disabled={isPending}
+            value={spark.description}
+            onChange={(event) => onSparkChange({ description: event.target.value })}
+            placeholder="e.g. A two-room bookshop off a Buxi Bazaar side street where Odia poetry sits at eye level and the reading room upstairs is never rushed."
+            className="min-h-[64px]"
+          />
+          <p className="text-[12px] text-muted">
+            The more specific, the sharper the Brand Brain. Name the street, the regulars, the thing
+            you refuse to do.
+          </p>
+        </div>
+
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="spark-website">
             Website <span className="font-normal text-muted">(optional)</span>

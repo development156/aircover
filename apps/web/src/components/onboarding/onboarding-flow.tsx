@@ -21,12 +21,25 @@ type Screen = 'spark' | 'refine' | 'theme'
 
 const RESOLVE_COST = creditCost('brand_research')
 const DEFAULT_TAGLINE = 'A living Brand Brain shapes every caption, campaign and reply.'
-const EMPTY_SPARK: SparkValues = { name: '', category: '', website: '', instagram: '' }
+const EMPTY_SPARK: SparkValues = {
+  name: '',
+  category: '',
+  description: '',
+  website: '',
+  instagram: '',
+}
 
-function buildResolveFormData(spark: SparkValues): FormData {
+/**
+ * Regenerate does not resubmit the <form>; it hands the action a FormData built
+ * here. So every field the Spark screen collects has to be listed TWICE — once
+ * as a `name=` on the input, once here — or Regenerate silently resolves from
+ * less than Generate did. `description` was the field that made that concrete.
+ */
+export function buildResolveFormData(spark: SparkValues): FormData {
   const data = new FormData()
   data.set('name', spark.name)
   data.set('category', spark.category)
+  data.set('description', spark.description)
   data.set('website', spark.website)
   data.set('instagram', spark.instagram)
   return data

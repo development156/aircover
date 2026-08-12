@@ -20,10 +20,17 @@ describe('sparkToResolveInput', () => {
     const input = sparkToResolveInput({ name: 'Acme' })
     // the frozen schema is the source of truth — a blank spark still parses
     expect(() => ResolveInputSchema.parse(input)).not.toThrow()
-    expect(input.voice.formality).toBe(3)
-    expect(input.voice.energy).toBe(3)
     expect(input.customer.description).toBe('')
     expect(input.taboo.avoid_topics).toBe('')
+  })
+
+  // INVERTED on 2026-08-12 — see the matching note in packages/shared's
+  // resolve.test.ts. The Spark screen has no formality or energy control, so
+  // every resolve from it used to hand the model a "3" nobody chose.
+  test('sends no formality/energy at all, since the Spark screen asks for neither', () => {
+    const serialized = JSON.stringify(sparkToResolveInput({ name: 'Acme' }))
+    expect(serialized).not.toContain('formality')
+    expect(serialized).not.toContain('energy')
   })
 
   // INVERTED on 2026-08-12. This test used to assert that website/instagram were
