@@ -98,3 +98,17 @@ supabase/.temp/
 !/.claude/commands/**/*.md
 !/.claude/skills/**/*.md
 !/.github/ISSUE_TEMPLATE/bug.md
+
+# apps/web/REQUESTS.md — the cross-lane request log. TRACKED SINCE BEFORE THIS LINE
+# EXISTED, and until 2026-08-12 only because it was already tracked: `*.md` (line 51)
+# matched it and no negation below reached it, so `git check-ignore -v` on a tracked
+# file printed nothing and the hole stayed invisible. Untracking it once would have
+# deleted it from every fresh worktree, exactly as the 2026-08-08 squash did to
+# CLAUDE.md and LEARNINGS.md. Verify with --no-index or you are verifying nothing.
+#
+# NARROW ON PURPOSE — one file, not `!/apps/*/REQUESTS.md`. `apps/jobs/REQUESTS.md`
+# and `packages/billing/REQUESTS.md` also exist on disk and have NEVER been tracked;
+# a class rule would un-ignore both, and the next `git add -A` would commit two files
+# nobody reviewed. Widening later is one line. Reported rather than taken — the same
+# rule the CLAUDE.md block above states and then follows.
+!/apps/web/REQUESTS.md
