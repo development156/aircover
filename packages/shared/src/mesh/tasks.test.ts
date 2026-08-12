@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { MESH_TASK_ACTION, PlanWeekOutputSchema, SiteGenerateOutputSchema } from './tasks'
+import {
+  MESH_TASK_ACTION,
+  MeshTaskNameSchema,
+  PlanWeekOutputSchema,
+  SiteGenerateOutputSchema,
+} from './tasks'
 import { PRICING } from '../ledger/pricing'
 
 describe('mesh task contracts', () => {
@@ -15,6 +20,16 @@ describe('mesh task contracts', () => {
       const action = MESH_TASK_ACTION[name]
       expect(PRICING.actions[action], `${name} → ${action}`).toBeTypeOf('number')
     }
+  })
+
+  it('the refusal gate has no pricing key, and the absence is deliberate', () => {
+    // gate_classify is the eighth MeshTaskName and the only unpriced one: it is
+    // a condition of publishing, not an action anyone chose. A price here would
+    // be a real number a future withCredits wrapper could charge, which would
+    // bill people for being refused. The count guard above stays at 7 for
+    // exactly this reason, so this asserts the cause rather than the symptom.
+    expect(MeshTaskNameSchema.options).toContain('gate_classify')
+    expect(Object.keys(MESH_TASK_ACTION)).not.toContain('gate_classify')
   })
 
   it('plan_week output requires exactly 5 briefs', () => {

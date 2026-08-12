@@ -4,6 +4,7 @@ import { brandExtractTask } from './tasks/brand-extract'
 import { brandGuidelinesTask } from './tasks/brand-guidelines'
 import { captionRewriteTask } from './tasks/caption-rewrite'
 import { contentVariantsTask } from './tasks/content-variants'
+import { gateClassifyTask } from './tasks/gate-classify'
 import { planWeekTask } from './tasks/plan-week'
 import { siteGenerateTask } from './tasks/site-generate'
 
@@ -19,6 +20,7 @@ const TASKS = [
   brandGuidelinesTask,
   captionRewriteTask,
   contentVariantsTask,
+  gateClassifyTask,
   planWeekTask,
   siteGenerateTask,
 ]

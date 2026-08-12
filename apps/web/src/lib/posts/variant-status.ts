@@ -1,5 +1,7 @@
 import type { ChannelSet, PostVariant, VariantPublishStatus } from '@sahoda/shared'
 
+import { readGateRefusal, type GateRefusal } from './gate-refusal'
+
 /**
  * What one channel of a post is actually doing, and why.
  *
@@ -40,6 +42,20 @@ export interface VariantStatusRow {
   /** The adapter's own message, when the last attempt failed. */
   errorMessage: string | null
   errorCode: string | null
+  /**
+   * The refusal gate's verdict, when the gate is what stopped this one.
+   *
+   * Carried SEPARATELY from `errorCode` for the same reason `simulated` is
+   * carried separately from `platformPostId`: the code alone destroys the
+   * reason. `describePublishError` maps a code to one safe sentence, which is
+   * right for an adapter failure and is a refusal that names nothing for a gate
+   * block — and doc 18 §8's whole point is that a block which only says no
+   * teaches people to route around the product.
+   *
+   * Null for every non-gate failure, and for a gate row written before this
+   * shape existed. The caller then falls back to the code copy.
+   */
+  gateRefusal: GateRefusal | null
   /** True when a fresh attempt is worth offering. */
   retryable: boolean
 }
@@ -90,6 +106,7 @@ export function variantStatusRow(variant: PostVariant): VariantStatusRow {
       : (variant.platform_post_id ?? null),
     errorMessage: message,
     errorCode: code,
+    gateRefusal: readGateRefusal(variant.last_error),
     retryable: RETRYABLE.has(variant.publish_status),
   }
 }

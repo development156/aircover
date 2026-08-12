@@ -19,6 +19,9 @@ export { brandGuidelinesTask } from './tasks/brand-guidelines'
 export { brandExtractTask, BrandExtractInputSchema } from './tasks/brand-extract'
 export type { BrandExtractInput } from './tasks/brand-extract'
 export { captionRewriteTask } from './tasks/caption-rewrite'
+// The refusal gate's classifier (doc 18 §8, layer 3). Never charged — it is a
+// condition of publishing, not a user-invoked action.
+export { gateClassifyTask } from './tasks/gate-classify'
 export { contentVariantsTask, ContentVariantsInputSchema } from './tasks/content-variants'
 export type { ContentVariantsInput } from './tasks/content-variants'
 export { planWeekTask, PlanWeekInputSchema } from './tasks/plan-week'

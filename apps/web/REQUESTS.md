@@ -572,3 +572,82 @@ ever needs to be hard rather than best-effort.
 Until then the window is open, documented at both call sites, and recorded as F4 in
 `docs/ux-findings.md`. The failure direction is over-provisioning a paid resource under a
 race — never a charge for nothing, since the gate runs before any credit hold.
+
+---
+
+## For wt-onboard — persist the intake, or the mandated tier is the floor and nothing else
+
+**Filed by wt-gate, 2026-08-12.** The refusal gate (doc 18 §8) now runs as a condition of
+publishing. Layer 1 resolves the rule set from `regime x locale`, and it cannot: onboarding
+parses `IntakeSchema` in `actions/onboarding-resolve.ts`, hands it to `toResolveInput`, and that
+function folds it into prose (`REGIME_NOUN` inside a sentence). Nothing stores the three picks and
+nothing can read them back.
+
+The measurable consequence, pinned by
+`packages/shared/src/gate/resolve-ruleset.test.ts` ("gives a clinic the floor, not the healthcare
+pack"): **every existing workspace resolves to `consumer` with basis `default`, so the mandated
+tier is the floor pack alone.** A clinic that picked "Health & care" gets the general
+advertising floor, not `regime-healthcare`. The OWNER tier — their own `taboo.red_lines` and
+`voice.banned_phrases` — works fully today and is the half that protects people on day one.
+
+**The ask, and it needs no migration.** Write the intake into `brand_memory.payload` as
+`intake: { model, regime, locale }`. `public.resolve_brand_memory` validates the six sections and
+ignores anything else, which is the same seam `field_meta` already rides on. The gate reads it
+through `intakeFrom()` in `packages/shared/src/gate/brain-rules.ts` — already written, already
+tested against a payload that carries one, and returning `basis: 'default'` until it does.
+
+Please do NOT stamp `basis: 'declared'` for a value the user did not pick. The gate's refusal copy
+branches on it: `declared` may say "this comes with the trade you told us you are in", and
+anything else must say "this applies to every business". Attributing a floor rule to a regulator
+nobody consulted is the failure this whole surface exists to prevent.
+
+---
+
+## For wt-db — nothing records who approved a post
+
+**Filed by wt-gate, 2026-08-12.** Doc 18 §8 requires the audit trail to answer "who approved,
+when" and requires escalation "to a named human". Neither is answerable from stored data:
+`approvePost` (`actions/planner.ts`) writes exactly `{ status: 'approved' }` and records no
+approver, and `posts` has no column for one. `posts.created_by` is the AUTHOR, which is a
+different person and a different claim.
+
+So `audit_logs.meta.approver` is written as an explicit `null` on every gate row today — an
+honest gap rather than a placeholder, and deliberately not filled with `actor` (the job run
+identity, `web:<uuid>` or `cron:<postId>`), which identifies whoever triggered the publish and not
+whoever reviewed it. Filling it with "whoever happened to be logged in" is the thing doc 18 §8
+names outright.
+
+**The ask:** an approver identity recorded at the moment of approval — `posts.approved_by` +
+`posts.approved_at`, or an `approvals` row if the history matters. Until then the gate can prove
+which rule set was in force and that a check ran, but not who stood behind it, and the product
+must not claim otherwise.
+
+---
+
+## For whoever owns the composer — Preview still promises green on a post the gate refuses
+
+**Filed by wt-gate, 2026-08-12.** `simulatePublish` (`actions/posts-publish.ts`) runs
+`validateVariant` plus the fixture adapter and reports per-channel "would have been accepted".
+It does NOT run the refusal gate, so a post carrying a red line previews clean and is then
+refused at publish. That is the same shape as the promise this lane exists to keep — a screen
+saying a check passed when the check never ran.
+
+It was left out deliberately rather than overlooked. The gate needs the Brand Brain (readable by
+the RLS anon client) and a mesh call (available server-side), so a preview-mode gate IS buildable
+in apps/web — but it must NOT write an `audit_logs` row (a preview is not a publish, and the
+table is server-only insert anyway), which means a second binding with the audit write omitted
+and the decision rendered as advice rather than as a refusal. That is its own piece of work and
+its own set of copy decisions.
+
+Until it exists, do not describe Preview as a compliance check anywhere in the UI. It checks the
+channel's limits, and that is all it has ever checked.
+
+---
+
+## Also open: the gate holds, but nothing ASKS
+
+Doc 18 §8's rule is "stop and ask", and escalation "to a named human". The gate stops. Nothing
+asks: a held post lands `failed` with `GATE_HELD` and its reason on the variant, and somebody has
+to go and look. There is no notification, no review queue, and no owner assignment — and the
+approver gap above is the same hole from the other side. A held post inside a scheduled window
+therefore expires quietly once the dispatch grace passes unless a person happens to notice.
