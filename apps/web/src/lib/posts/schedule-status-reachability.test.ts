@@ -49,6 +49,7 @@ const WAITING = [
     simulated: false,
     errorMessage: null,
     errorCode: null,
+    gateRefusal: null,
     retryable: true,
   },
 ] as const satisfies readonly VariantStatusRow[]

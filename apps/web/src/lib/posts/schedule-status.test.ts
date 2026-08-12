@@ -33,6 +33,7 @@ function row(
     simulated: false,
     errorMessage: null,
     errorCode: null,
+    gateRefusal: null,
     retryable: false,
     ...overrides,
   }
