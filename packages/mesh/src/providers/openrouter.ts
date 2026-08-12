@@ -45,7 +45,14 @@ export const FREE_PDF_ENGINE = 'cloudflare-ai' as const
 const extraBody = (req: ChatRequest): Record<string, unknown> => {
   const hasFile = req.messages.some((m) => (m.files?.length ?? 0) > 0)
   if (!hasFile) return {}
-  return { plugins: [{ id: 'file-parser', pdf: { engine: req.pdfEngine ?? FREE_PDF_ENGINE } }] }
+  // A per-message engine overrides the request default. That is how the paid
+  // OCR retry is expressed: the caller attaches the same file again and names
+  // `mistral-ocr` on it, so the choice travels WITH the document rather than
+  // being a mode set somewhere else and forgotten.
+  const perFile = req.messages.flatMap((m) => m.files ?? []).find((f) => f.engine)?.engine
+  return {
+    plugins: [{ id: 'file-parser', pdf: { engine: perFile ?? req.pdfEngine ?? FREE_PDF_ENGINE } }],
+  }
 }
 
 /**

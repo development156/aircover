@@ -5,6 +5,16 @@
 export interface ChatFile {
   filename: string
   dataUrl: string
+  /**
+   * Parse this document with a NAMED engine, overriding the request default.
+   *
+   * `cloudflare-ai` is free and reads a text layer. A design-heavy PDF whose
+   * words live inside images returns almost nothing from it — measured: an
+   * 869 KB proposal yielded 1,048 prompt tokens against an 800-token empty
+   * baseline. `mistral-ocr` reads those, and costs $2 per 1,000 pages, so it is
+   * never the default and never chosen on the customer's behalf.
+   */
+  engine?: 'cloudflare-ai' | 'mistral-ocr' | 'native'
 }
 
 /**

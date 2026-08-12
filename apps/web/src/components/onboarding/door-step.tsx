@@ -75,15 +75,42 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
     else if (state) setAnnounced(state.message)
   }, [state])
 
+  /**
+   * Elapsed seconds while a read runs.
+   *
+   * MEASURED IN PRODUCTION 2026-08-12: brand_extract p50 26.3s, p90 37.0s;
+   * brand_guidelines p50 19.1s, p90 23.8s. Twenty-six seconds of a spinner with
+   * no words is indistinguishable from a hang, and the person waiting has no way
+   * to tell whether to keep waiting or reload — which is how a slow success gets
+   * reported as a failure.
+   */
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    if (!isPending) {
+      setElapsed(0)
+      return
+    }
+    const started = Date.now()
+    const id = setInterval(() => setElapsed(Math.round((Date.now() - started) / 1000)), 1000)
+    return () => clearInterval(id)
+  }, [isPending])
+
+  // Named from what was actually submitted, in the order the server tries them.
+  const stage = file ? 'Reading your document' : url.trim() ? 'Reading your website' : 'Reading'
+  const typicalSeconds = file ? 26 : 12
+
   const read = state?.ok ? state : null
   // Suppressed while a new read is running or the form has moved on.
   const failure = state && !state.ok && !isPending && !dirty ? state : null
 
-  function submit(): void {
+  function submit(ocr = false): void {
     const data = new FormData()
     data.set('url', url)
     data.set('sentence', sentence)
     if (file) data.set('pdf', file)
+    // PAID, and only ever from a press that says so. Measured 2026-08-12 on an
+    // image-only PDF: the free engine returned 0 fields, mistral-ocr returned 8.
+    if (ocr) data.set('ocr', '1')
     formAction(data)
   }
 
@@ -190,6 +217,25 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
         </div>
       </form>
 
+      {isPending ? (
+        <div className="rounded-card border border-line bg-s1 p-4" role="status">
+          <p className="text-[13px] font-semibold text-ink">
+            {stage}… <span className="num font-normal text-muted">{elapsed}s</span>
+          </p>
+          <p className="mt-1 text-[12.5px] text-muted">
+            {file
+              ? 'A document usually takes about 26 seconds, sometimes 40.'
+              : 'A website usually takes about 12 seconds — we read up to five pages.'}{' '}
+            Nothing is charged for this.
+          </p>
+          {elapsed > typicalSeconds * 2 ? (
+            <p className="mt-1 text-[12.5px] text-muted">
+              Longer than usual — it is still going, and it will say so either way.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <p aria-live="polite" className="sr-only">
         {announced}
       </p>
@@ -222,7 +268,12 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
             document — the Brain will be thinner, and every field stays a guess until you confirm
             it.
           </p>
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap gap-2">
+            {file ? (
+              <Button type="button" size="sm" onClick={() => submit(true)}>
+                Read it with OCR · about ₹2 a page
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="ghost"
@@ -246,7 +297,17 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
             <p className="mt-1 text-[12.5px] text-muted">
               Check it is yours before we resolve anything from it.
             </p>
-            {read.note ? <p className="mt-1 text-[12.5px] text-muted">{read.note}</p> : null}
+            {read.note ? (
+              <p
+                className={
+                  read.fellBack
+                    ? 'mt-1 rounded-input border border-warn-bg bg-warn-bg px-2.5 py-1.5 text-[12.5px] text-warn'
+                    : 'mt-1 text-[12.5px] text-muted'
+                }
+              >
+                {read.note}
+              </p>
+            ) : null}
           </div>
 
           <div className="max-h-56 overflow-y-auto rounded-card border border-line bg-bg p-3">

@@ -34,6 +34,13 @@ export const BrandExtractInputSchema = z
         filename: z.string().min(1),
         /** `data:application/pdf;base64,…`, or an https URL the provider fetches. */
         dataUrl: z.string().min(1),
+        /**
+         * PAID OCR, opted into explicitly. Absent means the free engine.
+         * A design-heavy PDF returns almost nothing from `cloudflare-ai`
+         * because its words are inside images; this is the retry that reads
+         * them, and it is never selected on the customer's behalf.
+         */
+        engine: z.enum(['cloudflare-ai', 'mistral-ocr', 'native']).optional(),
       })
       .optional(),
     /**
@@ -117,7 +124,13 @@ function buildMessages(input: BrandExtractInput, _ctx: MeshContext): ChatMessage
           'filename as source_url.',
           `Filename: ${input.file.filename}`,
         ].join('\n'),
-        files: [{ filename: input.file.filename, dataUrl: input.file.dataUrl }],
+        files: [
+          {
+            filename: input.file.filename,
+            dataUrl: input.file.dataUrl,
+            ...(input.file.engine ? { engine: input.file.engine } : {}),
+          },
+        ],
         ...(input.annotations && input.annotations.length > 0
           ? { annotations: input.annotations as ChatMessage['annotations'] }
           : {}),

@@ -82,7 +82,16 @@ describe.skipIf(!LIVE)('the upload door on the wire', () => {
       const mesh = createMesh()
       const result = await mesh.runTask(
         brandExtractTask.def,
-        { name: 'Rolling Pin Bakehouse', file: { filename: 'brandbook.pdf', dataUrl } },
+        {
+          name: 'Rolling Pin Bakehouse',
+          file: {
+            filename: 'brandbook.pdf',
+            dataUrl,
+            ...(process.env.PDF_DOOR_ENGINE
+              ? { engine: process.env.PDF_DOOR_ENGINE as 'mistral-ocr' }
+              : {}),
+          },
+        },
         { workspaceId: 'probe', traceId: 'probe', userId: 'probe' },
       )
 

@@ -7,7 +7,14 @@ import { openSite, quarantineCorpus } from '@sahoda/research'
 
 import { declaredColors } from '@/lib/brand/declared-colors'
 import { openUploadDoor, type ExtractRunner } from '@/lib/brand/url-door'
-import { MAX_PDF_BYTES, pickDoor, precedenceNote, type DoorKind } from '@/lib/onboarding/door'
+import {
+  MAX_PDF_BYTES,
+  MIN_SENTENCE_CHARS,
+  normaliseUrl,
+  pickDoor,
+  precedenceNote,
+  type DoorKind,
+} from '@/lib/onboarding/door'
 import { reportServerError } from '@/lib/observability/report'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
@@ -45,8 +52,10 @@ export type DoorState =
       foundName: string
       /** Colours the site declares about itself, as oklch(). May be empty. */
       colors: string[]
-      /** Why another filled input was ignored. Null when nothing was. */
+      /** Why another filled input was ignored, or what we fell back from. */
       note: string | null
+      /** True when a higher-precedence input failed and this one was used instead. */
+      fellBack: boolean
     }
   | { ok: false; message: string }
 
@@ -71,6 +80,21 @@ function fieldsAsText(fields: readonly { channel: string; key: string; value: st
   return fields.map((f) => `${f.channel}.${f.key}: ${f.value}`).join('\n')
 }
 
+/**
+ * Read whatever came through the door — trying EVERY input that was filled, in
+ * precedence order, until one works.
+ *
+ * THE BUG THIS FIXES. `pickDoor` chooses one winner and the old code read only
+ * that one: a user who supplied a PDF *and* a website got "we could not read
+ * that" when the PDF failed, while their website sat there unread. The three
+ * inputs are independent, and a failure on the richest is no reason to ignore
+ * the others — "we could not read X" and "we have nothing to read" are
+ * different sentences and only one of them was true.
+ *
+ * Precedence still decides the ORDER (a document beats a site beats a
+ * sentence), so a successful PDF is still preferred. Falling back is stated in
+ * `note`, because silently reading something else is its own kind of lie.
+ */
 export async function readDoor(_prev: DoorState | null, formData: FormData): Promise<DoorState> {
   try {
     const { userId } = await auth()
@@ -80,10 +104,8 @@ export async function readDoor(_prev: DoorState | null, formData: FormData): Pro
     const pdf = file instanceof File && file.size > 0 ? file : null
     const url = String(formData.get('url') ?? '')
     const sentence = String(formData.get('sentence') ?? '')
+    const useOcr = String(formData.get('ocr') ?? '') === '1'
 
-    // STAGE LOG. The door the precedence rule PICKED, beside what actually
-    // arrived — a PDF that was chosen in the browser but did not reach the
-    // request shows up here as pdf:null with kind:'url' or 'sentence'.
     const choice = pickDoor({ pdfName: pdf?.name ?? null, url, sentence })
     console.log(
       '[door] picked',
@@ -93,9 +115,9 @@ export async function readDoor(_prev: DoorState | null, formData: FormData): Pro
         pdfBytes: pdf?.size ?? 0,
         hasUrl: url.trim().length > 0,
         hasSentence: sentence.trim().length > 0,
+        ocr: useOcr,
       }),
     )
-    const note = precedenceNote(choice)
 
     if (choice.kind === 'none') {
       return {
@@ -104,99 +126,132 @@ export async function readDoor(_prev: DoorState | null, formData: FormData): Pro
       }
     }
 
-    if (choice.kind === 'sentence') {
-      // No gate: a sentence someone typed about themselves is short by design,
-      // and it is the fallback every other failure points at. Gating it would
-      // leave a user with no way through at all.
+    const note = precedenceNote(choice)
+    const failures: string[] = []
+
+    // ── 1. the document ──────────────────────────────────────────────────────
+    if (pdf) {
+      const attempt = await readPdf(pdf, useOcr)
+      if (attempt.ok) return { ok: true, ...attempt.value, note, fellBack: false }
+      failures.push(attempt.message)
+    }
+
+    // ── 2. the site ──────────────────────────────────────────────────────────
+    const normalisedUrl = normaliseUrl(url)
+    if (normalisedUrl) {
+      const attempt = await readUrl(normalisedUrl)
+      if (attempt.ok) {
+        return {
+          ok: true,
+          ...attempt.value,
+          note: pdf ? 'We could not read the PDF, so we read your website instead.' : note,
+          fellBack: pdf !== null,
+        }
+      }
+      failures.push(attempt.message)
+    }
+
+    // ── 3. their own words ───────────────────────────────────────────────────
+    if (sentence.trim().length >= MIN_SENTENCE_CHARS) {
       return {
         ok: true,
         kind: 'sentence',
-        text: choice.sentence,
-        label: choice.label,
+        text: sentence.trim(),
+        label: 'what you told us',
         foundName: '',
         colors: [],
-        note,
+        note:
+          pdf || normalisedUrl
+            ? 'We could not read what you gave us, so we used your own words instead.'
+            : note,
+        fellBack: pdf !== null || normalisedUrl !== null,
       }
     }
 
-    if (choice.kind === 'pdf' && pdf) {
-      // Checked before reading the bytes into memory, not after.
-      if (pdf.size > MAX_PDF_BYTES) {
-        return {
-          ok: false,
-          message: `That PDF is over ${Math.round(MAX_PDF_BYTES / 1024 / 1024)}MB — upload a shorter one, or type a sentence instead.`,
-        }
-      }
-
-      const workspace = await getActiveWorkspace()
-      if (!workspace) return { ok: false, message: 'Create a workspace first.' }
-
-      // STAGE LOG. Reported before any model call, so a request that never
-      // carried a file is distinguishable from one whose extraction came back
-      // empty — the two produce the same screen and need different fixes.
-      console.log(
-        '[door.upload] received',
-        JSON.stringify({ filename: pdf.name, bytes: pdf.size, type: pdf.type }),
-      )
-
-      const dataUrl = `data:application/pdf;base64,${Buffer.from(await pdf.arrayBuffer()).toString('base64')}`
-      const door = await openUploadDoor({ filename: pdf.name, dataUrl }, pdf.name, {
-        extract: extractRunner(),
-        ctx: { workspaceId: workspace.id, traceId: randomUUID(), userId },
-      })
-      // Each arm of the taxonomy is a different sentence to the founder — a
-      // scanned book and an oversized one need different things back.
-      if (!door.ok) {
-        console.log('[door.upload] refused', JSON.stringify({ reason: door.reason }))
-        return { ok: false, message: door.message }
-      }
-
-      return {
-        ok: true,
-        kind: 'pdf',
-        text: fieldsAsText(door.fields),
-        label: choice.label,
-        // A PDF carries no reliable name and no declared colour. Saying so by
-        // returning empties is better than guessing at either.
-        foundName: '',
-        colors: [],
-        note,
-      }
+    // Nothing worked. Report the FIRST failure — it is the one about the input
+    // they most wanted us to read.
+    return {
+      ok: false,
+      message: failures[0] ?? 'We could not read that — type a sentence instead.',
     }
-
-    if (choice.kind === 'url') {
-      // The landing page's markup, captured before turndown discards it. Only
-      // tier 1 supplies it; a site read by a later tier simply has no colours.
-      let landingHtml = ''
-      const site = await openSite(choice.url, {
-        direct: { timeoutMs: 20_000, onLandingHtml: (html) => (landingHtml ||= html) },
-      })
-
-      if (!site.outcome.ok) {
-        // `unreachable`, `js_only`, `thin`, `invalid_url`, `crawler_error` — the
-        // crawl already writes the right sentence for each, and every one of
-        // them routes the user to typing something instead.
-        return { ok: false, message: site.outcome.message }
-      }
-
-      return {
-        ok: true,
-        kind: 'url',
-        // QUARANTINED, which the old hand-rolled path was not. The corpus is
-        // customer-supplied text on its way into a model prompt, and this is the
-        // wrapper that says so: evidence, not instructions.
-        text: quarantineCorpus(site.outcome.pages),
-        label: choice.label,
-        foundName: site.outcome.pages[0]?.title ?? '',
-        colors: landingHtml ? declaredColors(landingHtml) : [],
-        note,
-      }
-    }
-
-    return { ok: false, message: 'We could not read that — type a sentence instead.' }
   } catch (error) {
     reportServerError(error, { action: 'readDoor' })
     return { ok: false, message: 'We could not read that — type a sentence instead.' }
+  }
+}
+
+type DoorSuccess = Extract<DoorState, { ok: true }>
+type Attempt =
+  | { ok: true; value: Omit<DoorSuccess, 'ok' | 'note' | 'fellBack'> }
+  | { ok: false; message: string }
+
+async function readPdf(pdf: File, useOcr: boolean): Promise<Attempt> {
+  if (pdf.size > MAX_PDF_BYTES) {
+    return {
+      ok: false,
+      message: `That PDF is over ${Math.round(MAX_PDF_BYTES / 1024 / 1024)}MB — upload a shorter one, or type a sentence instead.`,
+    }
+  }
+
+  const workspace = await getActiveWorkspace()
+  if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+
+  console.log(
+    '[door.upload] received',
+    JSON.stringify({ filename: pdf.name, bytes: pdf.size, type: pdf.type, ocr: useOcr }),
+  )
+
+  const dataUrl = `data:application/pdf;base64,${Buffer.from(await pdf.arrayBuffer()).toString('base64')}`
+  const door = await openUploadDoor(
+    { filename: pdf.name, dataUrl, ...(useOcr ? { engine: 'mistral-ocr' as const } : {}) },
+    pdf.name,
+    {
+      extract: extractRunner(),
+      ctx: { workspaceId: workspace.id, traceId: randomUUID(), userId: '' },
+    },
+  )
+  if (!door.ok) {
+    console.log('[door.upload] refused', JSON.stringify({ reason: door.reason }))
+    return { ok: false, message: door.message }
+  }
+
+  return {
+    ok: true,
+    value: {
+      kind: 'pdf',
+      text: fieldsAsText(door.fields),
+      label: pdf.name,
+      foundName: '',
+      colors: [],
+    },
+  }
+}
+
+async function readUrl(url: string): Promise<Attempt> {
+  let landingHtml = ''
+  const site = await openSite(url, {
+    direct: { timeoutMs: 20_000, onLandingHtml: (html) => (landingHtml ||= html) },
+  })
+  console.log(
+    '[door.url] crawl',
+    JSON.stringify({
+      ok: site.outcome.ok,
+      servedBy: site.servedBy,
+      reason: site.outcome.ok ? null : site.outcome.reason,
+      pages: site.outcome.ok ? site.outcome.pages.length : 0,
+    }),
+  )
+  if (!site.outcome.ok) return { ok: false, message: site.outcome.message }
+
+  return {
+    ok: true,
+    value: {
+      kind: 'url',
+      text: quarantineCorpus(site.outcome.pages),
+      label: new URL(url).hostname,
+      foundName: site.outcome.pages[0]?.title ?? '',
+      colors: landingHtml ? declaredColors(landingHtml) : [],
+    },
   }
 }
 

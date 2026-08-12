@@ -210,7 +210,7 @@ function approximateBytes(dataUrl: string): number {
 }
 
 export async function openUploadDoor(
-  file: { filename: string; dataUrl: string } | null,
+  file: { filename: string; dataUrl: string; engine?: 'mistral-ocr' } | null,
   name: string,
   opts: UploadDoorOptions,
 ): Promise<UploadDoorOutcome> {
@@ -278,7 +278,15 @@ export async function openUploadDoor(
     return {
       ok: false,
       reason: 'unreadable',
-      message: 'Could not find any text in that document — if it is a scan, tell us in your own words instead.',
+      // NOT "this is a scan". We do not know that, and saying it sends someone
+      // to re-scan a file that was never the problem. What we DO know is what
+      // the free parser returned: nothing. Measured 2026-08-12 — a design-heavy
+      // 869 KB proposal produced 1,048 prompt tokens against an 800-token empty
+      // baseline, i.e. the words are inside the artwork, not in a text layer.
+      // So the sentence names the cause we can stand behind and offers the
+      // engine that reads pictures, with its price attached.
+      message:
+        'The free reader found almost no text in that document — its words are probably inside the design rather than in a text layer. Reading it with OCR costs about ₹2 per page and takes longer, or you can point us at your website or tell us in your own words.',
     }
   }
 

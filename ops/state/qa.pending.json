@@ -2,58 +2,6 @@
   "version": 1,
   "runs": [
     {
-      "client_id": "qa-msoi4q1f-76d49ec5",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-11T10:12:37.203Z",
-      "finished_at": "2026-08-11T10:12:37.203Z",
-      "suite": "typecheck",
-      "status": "fail",
-      "summary_plain": "The typecheck checks ran and something failed.",
-      "details": "@sahoda/web:typecheck: src/components/planner/planner-row.tsx(93,13): error TS2740: Type 'readonly (\"x\" | \"gbp\" | \"linkedin\" | \"instagram\")[] & { readonly [CHANNEL_SET]: true; }' is missing the following properties from type '(\"x\" | \"gbp\" | \"linkedin\" | \"instagram\")[]': pop, push, reverse, shift, and 5 more.\n@sahoda/web:typecheck: src/components/posts/auto-publish-note.test.tsx(40,3): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/post-editor.test.tsx(60,3): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/use-autosave.test.tsx(42,3): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/use-autosave.ts(57,5): error TS2740: Type 'readonly (\"x\" | \"gbp\" | \"linkedin\" | \"instagram\")[] & { readonly [CHANNEL_SET]: true; }' is missing the following properties from type '(\"x\" | \"gbp\" | \"linkedin\" | \"instagram\")[]': pop, push, reverse, shift, and 5 more.\n@sahoda/web:typecheck: src/lib/planner/week.test.ts(21,5): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n Tasks:    7 successful, 8 total\nFailed:    @sahoda/web#typecheck",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msoidowf-c7a3f18b",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-11T10:19:35.631Z",
-      "finished_at": "2026-08-11T10:19:35.631Z",
-      "suite": "typecheck",
-      "status": "fail",
-      "summary_plain": "The typecheck checks ran and something failed.",
-      "details": "or TS2322: Type '(\"x\" | \"gbp\")[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/media-pane.test.tsx(203,34): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/media-pane.test.tsx(217,34): error TS2322: Type '(\"x\" | \"gbp\")[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/media-pane.test.tsx(240,34): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/media-pane.test.tsx(258,9): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/media-pane.test.tsx(277,9): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/media-pane.test.tsx(293,9): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/media-pane.test.tsx(306,37): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/media-pane.test.tsx(322,9): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/media-pane.test.tsx(352,9): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/media-pane.test.tsx(378,9): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/post-editor.test.tsx(60,3): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/publish-now.test.tsx(31,7): error TS2322: Type '(\"x\" | \"gbp\" | \"linkedin\" | \"instagram\")[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(26,27): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(39,48): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(43,29): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(51,22): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(53,29): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(64,27): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(78,22): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(84,29): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(101,27): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(109,27): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(115,27): error TS2322: Type '\"x\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(142,9): error TS2322: Type '(\"linkedin\" | \"instagram\")[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(158,9): error TS2322: Type '\"linkedin\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(175,9): error TS2322: Type '\"linkedin\"[]' is not assignable to type 'ChannelSet'.\n@sahoda/web:typecheck: src/components/posts/schedule-field.test.tsx(192,9): error TS2322: Type '(\"linkedin\" | \"instagram\")[]' is not assignable to type 'ChannelSet'.",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msoif4xq-99b75b63",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-11T10:20:43.070Z",
-      "finished_at": "2026-08-11T10:20:43.070Z",
-      "suite": "typecheck",
-      "status": "fail",
-      "summary_plain": "The typecheck checks ran and something failed.",
-      "details": "@sahoda/web:typecheck: src/app/actions/plan-week.ts(154,59): error TS2345: Argument of type 'ChannelSet' is not assignable to parameter of type '(\"x\" | \"gbp\" | \"linkedin\" | \"instagram\")[]'.\n@sahoda/web:typecheck: src/components/posts/generate-panel.tsx(96,36): error TS2345: Argument of type 'ChannelSet' is not assignable to parameter of type '(\"x\" | \"gbp\" | \"linkedin\" | \"instagram\")[]'.",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msoifh8t-8c8d5c66",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-11T10:20:59.019Z",
-      "finished_at": "2026-08-11T10:20:59.019Z",
-      "suite": "unit",
-      "status": "fail",
-      "summary_plain": "The typecheck, unit checks ran together and something failed.",
-      "details": "ok apps/web/src/lib/planner/slots.ts\nok apps/web/src/components/posts/generate-panel.tsx\n@sahoda/web:typecheck: src/components/posts/generate-panel.tsx(114,38): error TS2345: Argument of type '(\"x\" | \"gbp\" | \"linkedin\" | \"instagram\")[]' is not assignable to parameter of type 'ChannelSet'.",
-      "duration_ms": null
-    },
-    {
       "client_id": "qa-msoihhqm-ab8082e6",
       "task_code": "SL-054",
       "kind": "auto",
@@ -2597,6 +2545,58 @@
       "status": "pass",
       "summary_plain": "The unit checks ran and everything passed (1 passed).",
       "details": "      Tests  1 passed (1)\nplugins      : [{\"id\": \"file-parser\", \"pdf\": {\"engine\": \"cloudflare-ai\"}}]\nparts        : ['text', 'file'] ['brandbook.pdf']\nhttp/finish  : 200 stop\nmodel fields : 11\npage values  : [1]\n\n=== does the DEPLOYED commit contain the fix? ===\n39faf52 has attachSingleSource in shared : 1\n39faf52 upload door uses it              : 1\n39faf52 still uses the broken indexed call: 0",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msq8nj07-fdd0efdc",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T15:22:50.741Z",
+      "finished_at": "2026-08-12T15:22:50.741Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran and everything passed.",
+      "details": "@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    27 successful, 27 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msq8nj07-cf9da63",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T15:22:50.741Z",
+      "finished_at": "2026-08-12T15:22:50.741Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran and everything passed.",
+      "details": "@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    27 successful, 27 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msq8nj07-bcef7c9a",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T15:22:50.741Z",
+      "finished_at": "2026-08-12T15:22:50.741Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed.",
+      "details": "@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    27 successful, 27 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msq8pwui-5df04833",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T15:24:41.992Z",
+      "finished_at": "2026-08-12T15:24:41.992Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The typecheck, lint, unit checks ran together and something failed.",
+      "details": "@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    27 successful, 27 total\n[warn] apps/web/src/app/actions/onboarding-door.ts\n[warn] Code style issues found in the above file. Run Prettier with --write to fix.\n[ELIFECYCLE] Command failed with exit code 1.",
       "duration_ms": null
     }
   ]
