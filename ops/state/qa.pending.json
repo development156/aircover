@@ -2,58 +2,6 @@
   "version": 1,
   "runs": [
     {
-      "client_id": "qa-msm206zy-6c23c79b",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-09T17:05:39.692Z",
-      "finished_at": "2026-08-09T17:05:39.692Z",
-      "suite": "unit",
-      "status": "fail",
-      "summary_plain": "The unit checks ran and something failed (16 passed, 7 failed).",
-      "details": " ❯ src/lib/inbox/messages.test.ts:92:12\n     90| describe('isInboundMessage', () => {\n     91|   it('recognises both the live and the documented spelling', () => {\n     92|     expect(isInboundMessage(message({ direction: 'incoming' }))).toBe(…\n       |            ^\n     93|     expect(isInboundMessage(message({ direction: 'inbound' }))).toBe(t…\n     94|   })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯\n\n FAIL  |lib| src/lib/inbox/messages.test.ts > isInboundMessage > treats the outbound side and every unknown value as not inbound\nTypeError: isInboundMessage is not a function\n ❯ src/lib/inbox/messages.test.ts:101:14\n     99|     // customer on the strength of \"it wasn't 'outgoing'\".\n    100|     for (const direction of ['outgoing', 'outbound', 'received', 'in',…\n    101|       expect(isInboundMessage(message({ direction }))).toBe(false)\n       |              ^\n    102|     }\n    103|   })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯\n\n FAIL  |lib| src/lib/inbox/messages.test.ts > isInboundMessage > is case-insensitive — casing is not a contract Zernio has stated\nTypeError: isInboundMessage is not a function\n ❯ src/lib/inbox/messages.test.ts:106:12\n    104|\n    105|   it('is case-insensitive — casing is not a contract Zernio has stated…\n    106|     expect(isInboundMessage(message({ direction: 'Incoming' }))).toBe(…\n       |            ^\n    107|     expect(isInboundMessage(message({ direction: 'INBOUND' }))).toBe(t…\n    108|   })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯\n\n\n Test Files  2 failed (2)\n      Tests  7 failed | 16 passed (23)\n   Start at  22:35:38\n   Duration  1.02s (transform 157ms, setup 126ms, import 291ms, tests 114ms, environment 667ms)\n\nShell cwd was reset to /home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-web",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msm21xj5-4d10af4",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-09T17:07:00.736Z",
-      "finished_at": "2026-08-09T17:07:00.736Z",
-      "suite": "unit",
-      "status": "pass",
-      "summary_plain": "The unit checks ran and everything passed (45 passed).",
-      "details": " RUN  v4.1.10 /home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-inbox2/apps/web\n\n\n Test Files  3 passed (3)\n      Tests  45 passed (45)\n   Start at  22:36:59\n   Duration  1.37s (transform 412ms, setup 210ms, import 877ms, tests 458ms, environment 1.06s)\n\nShell cwd was reset to /home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-web",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msm22rbh-aa34d965",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-09T17:07:39.340Z",
-      "finished_at": "2026-08-09T17:07:39.340Z",
-      "suite": "unit",
-      "status": "fail",
-      "summary_plain": "The unit checks ran and something failed (21 passed, 3 failed).",
-      "details": "     × reads `cursor` off the per-post comments endpoint 3ms\n     × never leaks `undefined` where the type promises `string | null` 0ms\n     × treats a missing `hasMore` as \"no more\", never as truthy-unknown 2ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯\n FAIL  src/zernio/reads.test.ts > cursor pagination, as each endpoint actually spells it > reads `cursor` off the per-post comments endpoint\nAssertionError: expected undefined to be 'QVFIU25JVm5uekF0' // Object.is equality\n FAIL  src/zernio/reads.test.ts > cursor pagination, as each endpoint actually spells it > never leaks `undefined` where the type promises `string | null`\nAssertionError: expected undefined to be null\n FAIL  src/zernio/reads.test.ts > cursor pagination, as each endpoint actually spells it > treats a missing `hasMore` as \"no more\", never as truthy-unknown\nAssertionError: expected {} to deeply equal { hasMore: false, nextCursor: null }\n      Tests  3 failed | 21 passed (24)\n\nShell cwd was reset to /home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-web",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msm23l5w-35496ee5",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-09T17:08:18.019Z",
-      "finished_at": "2026-08-09T17:08:18.019Z",
-      "suite": "unit",
-      "status": "pass",
-      "summary_plain": "The unit checks ran and everything passed (24 passed).",
-      "details": " RUN  v4.1.10 /home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-inbox2/packages/publishing\n\n\n Test Files  1 passed (1)\n      Tests  24 passed (24)\n   Start at  22:38:17\n   Duration  162ms (transform 41ms, setup 0ms, import 55ms, tests 9ms, environment 0ms)\n\nShell cwd was reset to /home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-web",
-      "duration_ms": null
-    },
-    {
       "client_id": "qa-msm2536m-5dd67c60",
       "task_code": "SL-054",
       "kind": "auto",
@@ -2595,6 +2543,58 @@
       "status": "pass",
       "summary_plain": "The unit checks ran and everything passed.",
       "details": "ops-cards-write: board already matches the source list.\n@sahoda/web:test: \n\n Tasks:    24 successful, 24 total\nCached:    21 cached, 24 total\n  Time:    1m3.075s \n\n===TURBO EXIT: 0===\n$ prettier --check .\nChecking formatting...\nAll matched files use Prettier code style!\n===FORMAT EXIT: 0===\n M apps/web/REQUESTS.md\n M ops/state/board.json\n M ops/state/changelog.pending.json\n M ops/state/qa.pending.json",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mspop9aq-40965124",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T06:04:19.153Z",
+      "finished_at": "2026-08-12T06:04:19.153Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (16 passed, 2 failed).",
+      "details": "--- MUTATION B: cachePrefix removed, buildMessages intact ---\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n FAIL  src/tasks/caption-rewrite.test.ts > captionRewriteTask brand grounding > sends the voice descriptor and the banned phrases to the provider\n FAIL  src/tasks/caption-rewrite.test.ts > captionRewriteTask brand grounding > marks the brand block cacheable and orders it system → brand → caption\n      Tests  2 failed | 7 passed (9)\n--- RESTORE ---\n      Tests  9 passed (9)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mspp00sq-af8e0134",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T06:12:41.353Z",
+      "finished_at": "2026-08-12T06:12:41.353Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran (178 passed), but 16 tests did NOT run — this does not prove the suite passes.",
+      "details": "@sahoda/jobs:test:        ✓ takes a published variant with a real permalink and no platform id  2791ms\n@sahoda/jobs:test:        ✓ never takes a fixture:// permalink  2462ms\n@sahoda/jobs:test:        ✓ never takes a variant that already has a platform id  2647ms\n@sahoda/jobs:test:        ✓ never takes a variant with no permalink  2518ms\n@sahoda/jobs:test:        ✓ never takes a variant in pending  2678ms\n@sahoda/jobs:test:        ✓ never takes a variant in scheduled  2901ms\n@sahoda/jobs:test:        ✓ never takes a variant in failed  3605ms\n@sahoda/jobs:test:        ✓ never takes a variant in publishing  2672ms\n@sahoda/jobs:test:        ✓ never takes a variant in skipped  2840ms\n@sahoda/jobs:test:        ✓ is bounded by the limit  1173ms\n@sahoda/jobs:test:        ✓ has a bounded default  861ms\n@sahoda/jobs:test:        ✓ writes the platform id when the column is null  866ms\n@sahoda/jobs:test:        ✓ refuses to overwrite an id that is already there, and says so  844ms\n@sahoda/jobs:test:        ✓ refuses a 24-hex provider object id rather than storing it  881ms\n@sahoda/jobs:test: \n@sahoda/jobs:test:  Test Files  17 passed | 2 skipped (19)\n@sahoda/jobs:test:       Tests  178 passed | 16 skipped (194)\n@sahoda/jobs:test:    Start at  11:42:10\n@sahoda/jobs:test:    Duration  30.84s (transform 5.25s, setup 0ms, import 10.19s, tests 77.17s, environment 3ms)\n@sahoda/jobs:test: \n\n Tasks:    24 successful, 24 total\nCached:    5 cached, 24 total\n  Time:    37.134s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mspp00sq-1dd1fa73",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T06:12:41.353Z",
+      "finished_at": "2026-08-12T06:12:41.353Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran (178 passed), but 16 tests did NOT run — this does not prove the suite passes.",
+      "details": "@sahoda/jobs:test:        ✓ takes a published variant with a real permalink and no platform id  2791ms\n@sahoda/jobs:test:        ✓ never takes a fixture:// permalink  2462ms\n@sahoda/jobs:test:        ✓ never takes a variant that already has a platform id  2647ms\n@sahoda/jobs:test:        ✓ never takes a variant with no permalink  2518ms\n@sahoda/jobs:test:        ✓ never takes a variant in pending  2678ms\n@sahoda/jobs:test:        ✓ never takes a variant in scheduled  2901ms\n@sahoda/jobs:test:        ✓ never takes a variant in failed  3605ms\n@sahoda/jobs:test:        ✓ never takes a variant in publishing  2672ms\n@sahoda/jobs:test:        ✓ never takes a variant in skipped  2840ms\n@sahoda/jobs:test:        ✓ is bounded by the limit  1173ms\n@sahoda/jobs:test:        ✓ has a bounded default  861ms\n@sahoda/jobs:test:        ✓ writes the platform id when the column is null  866ms\n@sahoda/jobs:test:        ✓ refuses to overwrite an id that is already there, and says so  844ms\n@sahoda/jobs:test:        ✓ refuses a 24-hex provider object id rather than storing it  881ms\n@sahoda/jobs:test: \n@sahoda/jobs:test:  Test Files  17 passed | 2 skipped (19)\n@sahoda/jobs:test:       Tests  178 passed | 16 skipped (194)\n@sahoda/jobs:test:    Start at  11:42:10\n@sahoda/jobs:test:    Duration  30.84s (transform 5.25s, setup 0ms, import 10.19s, tests 77.17s, environment 3ms)\n@sahoda/jobs:test: \n\n Tasks:    24 successful, 24 total\nCached:    5 cached, 24 total\n  Time:    37.134s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mspp00sq-7116cb86",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T06:12:41.353Z",
+      "finished_at": "2026-08-12T06:12:41.353Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran (178 passed), but 16 tests did NOT run — this does not prove the suite passes.",
+      "details": "@sahoda/jobs:test:        ✓ takes a published variant with a real permalink and no platform id  2791ms\n@sahoda/jobs:test:        ✓ never takes a fixture:// permalink  2462ms\n@sahoda/jobs:test:        ✓ never takes a variant that already has a platform id  2647ms\n@sahoda/jobs:test:        ✓ never takes a variant with no permalink  2518ms\n@sahoda/jobs:test:        ✓ never takes a variant in pending  2678ms\n@sahoda/jobs:test:        ✓ never takes a variant in scheduled  2901ms\n@sahoda/jobs:test:        ✓ never takes a variant in failed  3605ms\n@sahoda/jobs:test:        ✓ never takes a variant in publishing  2672ms\n@sahoda/jobs:test:        ✓ never takes a variant in skipped  2840ms\n@sahoda/jobs:test:        ✓ is bounded by the limit  1173ms\n@sahoda/jobs:test:        ✓ has a bounded default  861ms\n@sahoda/jobs:test:        ✓ writes the platform id when the column is null  866ms\n@sahoda/jobs:test:        ✓ refuses to overwrite an id that is already there, and says so  844ms\n@sahoda/jobs:test:        ✓ refuses a 24-hex provider object id rather than storing it  881ms\n@sahoda/jobs:test: \n@sahoda/jobs:test:  Test Files  17 passed | 2 skipped (19)\n@sahoda/jobs:test:       Tests  178 passed | 16 skipped (194)\n@sahoda/jobs:test:    Start at  11:42:10\n@sahoda/jobs:test:    Duration  30.84s (transform 5.25s, setup 0ms, import 10.19s, tests 77.17s, environment 3ms)\n@sahoda/jobs:test: \n\n Tasks:    24 successful, 24 total\nCached:    5 cached, 24 total\n  Time:    37.134s",
       "duration_ms": null
     }
   ]
