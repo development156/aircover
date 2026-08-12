@@ -27,8 +27,10 @@ describe('task → tier map', () => {
   it('assigns a tier to every Alpha mesh task, resolvable to a route and key class', () => {
     const names = MeshTaskNameSchema.options
     // Count guard: a new mesh task must be a deliberate decision here, not a
-    // silent addition. image_generate brought it to 6.
-    expect(names.length).toBe(6)
+    // silent addition. image_generate brought it to 6; brand_extract — the URL
+    // door's quarantined extractor — to 7, at standard tier because it reads
+    // adversarial customer text and a bad read becomes the Brain.
+    expect(names.length).toBe(7)
     for (const name of names) {
       const tier = TASK_TIER[name]
       expect(ModelTierSchema.options, name).toContain(tier)

@@ -6,8 +6,11 @@ describe('mesh task contracts', () => {
   it('every mesh task maps to a real pricing action', () => {
     const names = Object.keys(MESH_TASK_ACTION) as (keyof typeof MESH_TASK_ACTION)[]
     // Count guard: a new mesh task must be a deliberate decision here, not a
-    // silent addition. image_generate brought it to 6.
-    expect(names.length).toBe(6)
+    // silent addition. image_generate brought it to 6; brand_extract (the URL
+    // door's quarantined extractor) to 7. brand_extract shares brand_research's
+    // pricing key ON PURPOSE — the crawl is part of brand research, not a second
+    // purchase, so one withCredits call covers crawl → extract → resolve.
+    expect(names.length).toBe(7)
     for (const name of names) {
       const action = MESH_TASK_ACTION[name]
       expect(PRICING.actions[action], `${name} → ${action}`).toBeTypeOf('number')

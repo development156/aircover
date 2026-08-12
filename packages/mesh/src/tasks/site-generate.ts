@@ -4,7 +4,14 @@ import type { MeshContext, MeshTaskDef, SiteGenerateOutput } from '@sahoda/share
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
 
-const MAX_TOKENS = 4096
+/**
+ * 8192. Telemetry shows 4,980 output tokens against the old 4,096 ceiling — a
+ * repaired SUM, i.e. proof this task was already truncating. It is `premium`
+ * tier, the most expensive model we route to, so the ceiling change has real
+ * cost consequences: a run that needs the room now gets it in ONE call instead
+ * of paying for a truncation plus a repair that truncates again.
+ */
+const MAX_TOKENS = 8192
 
 /** Site brief. Local input (the page/section tree output is the frozen seam). */
 export const SiteGenerateInputSchema = z.object({

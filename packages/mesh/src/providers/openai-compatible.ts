@@ -1,10 +1,22 @@
-import type { ChatMessage, ChatRequest, ChatResponse, FetchLike, Provider } from './types'
+import type {
+  ChatMessage,
+  ChatRequest,
+  ChatResponse,
+  FetchLike,
+  FileAnnotation,
+  Provider,
+} from './types'
 import { ProviderCallError } from './types'
 
 /** Shape of the OpenAI-compatible /chat/completions response we depend on. */
 interface OpenAiChatCompletion {
   model?: string
-  choices?: Array<{ message?: { content?: string } }>
+  choices?: Array<{
+    message?: { content?: string; annotations?: FileAnnotation[] }
+    /** 'stop' | 'length' | … — 'length' means the token ceiling cut it off. */
+    finish_reason?: string
+    native_finish_reason?: string
+  }>
   usage?: {
     prompt_tokens?: number
     completion_tokens?: number
@@ -21,9 +33,37 @@ export interface OpenAiCompatibleOptions {
   headers?: Record<string, string>
   /** Provider-specific message encoder (default: plain {role, content}). */
   encodeMessage?: (m: ChatMessage) => unknown
+  /**
+   * Extra TOP-LEVEL body fields, computed per request. OpenRouter's `plugins`
+   * (the PDF file-parser) is a sibling of `messages`, not a header and not part
+   * of a message — there was no seam for it before.
+   */
+  extraBody?: (req: ChatRequest) => Record<string, unknown>
+  /** True only for providers that accept files AND honour an explicit pdfEngine. */
+  supportsFiles?: boolean
 }
 
-const defaultEncode = (m: ChatMessage): unknown => ({ role: m.role, content: m.content })
+/**
+ * Plain string content when there is nothing attached; the OpenAI content-part
+ * array when there is. Annotations ride on the turn that carries them so a
+ * replayed parse reaches the provider intact.
+ */
+const defaultEncode = (m: ChatMessage): unknown => {
+  const base: Record<string, unknown> = { role: m.role }
+  if (m.files && m.files.length > 0) {
+    base.content = [
+      { type: 'text', text: m.content },
+      ...m.files.map((f) => ({
+        type: 'file',
+        file: { filename: f.filename, file_data: f.dataUrl },
+      })),
+    ]
+  } else {
+    base.content = m.content
+  }
+  if (m.annotations && m.annotations.length > 0) base.annotations = m.annotations
+  return base
+}
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
@@ -38,13 +78,26 @@ export function createOpenAiCompatibleProvider(opts: OpenAiCompatibleOptions): P
 
   return {
     name: opts.name,
+    ...(opts.supportsFiles ? { supportsFiles: true as const } : {}),
     async chat(req: ChatRequest): Promise<ChatResponse> {
+      // Defence in depth behind the runner's own check: a provider that cannot
+      // honour an explicit pdfEngine must never receive a file, because the
+      // charge for parsing it lands silently as input tokens.
+      if (!opts.supportsFiles && req.messages.some((m) => (m.files?.length ?? 0) > 0)) {
+        throw new ProviderCallError(
+          opts.name,
+          null,
+          'provider cannot accept files — refusing rather than paying to parse them natively',
+        )
+      }
+
       const body = {
         model: req.model,
         messages: req.messages.map(encode),
         max_tokens: req.maxTokens,
         ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
         ...(req.jsonMode ? { response_format: { type: 'json_object' } } : {}),
+        ...(opts.extraBody?.(req) ?? {}),
       }
 
       let res: Response
@@ -76,8 +129,16 @@ export function createOpenAiCompatibleProvider(opts: OpenAiCompatibleOptions): P
       } catch {
         throw new ProviderCallError(opts.name, res.status, 'provider returned a non-JSON body')
       }
+      const choice = json.choices?.[0]
+      const annotations = choice?.message?.annotations
+      // OpenRouter normalises to `finish_reason` but also passes the upstream
+      // value through; either saying 'length' means the ceiling was hit.
+      const truncated =
+        choice?.finish_reason === 'length' || choice?.native_finish_reason === 'length'
       return {
-        text: json.choices?.[0]?.message?.content ?? '',
+        text: choice?.message?.content ?? '',
+        ...(truncated ? { truncated: true } : {}),
+        ...(annotations && annotations.length > 0 ? { annotations } : {}),
         usage: {
           provider: opts.name,
           model: json.model ?? req.model,

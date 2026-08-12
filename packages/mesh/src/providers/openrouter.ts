@@ -1,4 +1,4 @@
-import type { FetchLike, ImageRequest, ImageResponse, Provider } from './types'
+import type { ChatRequest, FetchLike, ImageRequest, ImageResponse, Provider } from './types'
 import type { ChatMessage } from './types'
 import { ProviderCallError } from './types'
 import { createOpenAiCompatibleProvider } from './openai-compatible'
@@ -9,13 +9,44 @@ const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
  * OpenRouter passes Anthropic-style prompt caching through as a `cache_control`
  * breakpoint on the marked prefix message (the Brand Brain block).
  */
-const encodeMessage = (m: ChatMessage): unknown =>
-  m.cache
-    ? {
-        role: m.role,
-        content: [{ type: 'text', text: m.content, cache_control: { type: 'ephemeral' } }],
-      }
-    : { role: m.role, content: m.content }
+const encodeMessage = (m: ChatMessage): unknown => {
+  const parts: unknown[] = []
+  if (m.cache) {
+    parts.push({ type: 'text', text: m.content, cache_control: { type: 'ephemeral' } })
+  } else if (m.files && m.files.length > 0) {
+    parts.push({ type: 'text', text: m.content })
+  }
+  if (m.files) {
+    for (const f of m.files) {
+      parts.push({ type: 'file', file: { filename: f.filename, file_data: f.dataUrl } })
+    }
+  }
+
+  const encoded: Record<string, unknown> =
+    parts.length > 0 ? { role: m.role, content: parts } : { role: m.role, content: m.content }
+  if (m.annotations && m.annotations.length > 0) encoded.annotations = m.annotations
+  return encoded
+}
+
+/** The free engine. `pdf-text` is deprecated and redirects here. */
+export const FREE_PDF_ENGINE = 'cloudflare-ai' as const
+
+/**
+ * `plugins` is a TOP-LEVEL body field, and it is only sent when a file is
+ * actually attached — an unconditional plugin block would be a claim about
+ * every text call.
+ *
+ * The engine is ALWAYS spelled out. OpenRouter's documented default is native
+ * first, then a fall back to `mistral-ocr` at $2 per 1,000 pages: a charge for a
+ * choice nobody made. There is deliberately no "if unset use the free one"
+ * branch here — `pdfEngine` is required at the call site so the decision is
+ * visible where a reader can see it.
+ */
+const extraBody = (req: ChatRequest): Record<string, unknown> => {
+  const hasFile = req.messages.some((m) => (m.files?.length ?? 0) > 0)
+  if (!hasFile) return {}
+  return { plugins: [{ id: 'file-parser', pdf: { engine: req.pdfEngine ?? FREE_PDF_ENGINE } }] }
+}
 
 /**
  * A data URL as OpenRouter returns generated images: `data:image/png;base64,…`.
@@ -42,6 +73,8 @@ export function createOpenRouterProvider(apiKey: string, fetchImpl?: FetchLike):
     apiKey,
     fetchImpl,
     encodeMessage,
+    extraBody,
+    supportsFiles: true,
     headers: {
       'http-referer': 'https://sahoda.site',
       'x-title': 'SAHODA LABS',

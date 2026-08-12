@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 
 import { AttemptErrorNotice, type AttemptError } from './attempt-error'
 import { LogoDrop, type LogoValue } from './logo-drop'
@@ -12,6 +13,12 @@ import { LogoDrop, type LogoValue } from './logo-drop'
 export interface SparkValues {
   name: string
   category: string
+  /**
+   * The only intake field measured to move `signal_lock` off `weak`
+   * (2026-08-12: name+category → weak, +website+instagram → weak,
+   * +description → moderate). Optional, because blanks never block.
+   */
+  description: string
   website: string
   instagram: string
 }
@@ -26,6 +33,14 @@ export interface SparkStepProps {
   onSparkChange: (patch: Partial<SparkValues>) => void
   logo: LogoValue | null
   onLogoChange: (logo: LogoValue | null) => void
+  /**
+   * Held by the parent, exactly like `logo`, and NOT part of SparkValues — a
+   * File is not a string. It has to live above this component because Regenerate
+   * rebuilds its FormData by hand: leave the file here and the second resolve
+   * silently reads a worse intake than the first.
+   */
+  brandBook: File | null
+  onBrandBookChange: (file: File | null) => void
   generateCost: number
 }
 
@@ -70,6 +85,8 @@ export function SparkStep({
   onSparkChange,
   logo,
   onLogoChange,
+  brandBook,
+  onBrandBookChange,
   generateCost,
 }: SparkStepProps) {
   const status = useCyclingStatus(isPending)
@@ -116,6 +133,33 @@ export function SparkStep({
             placeholder="e.g. Retail — books & specialty café"
           />
         </div>
+        {/*
+          One sentence, optional. This is the highest-yield field on the screen:
+          it is the only one measured to move signal_lock off `weak`. The
+          placeholder shows what good looks like — specific, local, and in the
+          founder's own words — because "describe your business" reliably
+          returns the category back.
+        */}
+        <div className="flex flex-col gap-1.5 sm:col-span-2">
+          <Label htmlFor="spark-description">
+            What do you do, in one sentence?{' '}
+            <span className="font-normal text-muted">(optional)</span>
+          </Label>
+          <Textarea
+            id="spark-description"
+            name="description"
+            disabled={isPending}
+            value={spark.description}
+            onChange={(event) => onSparkChange({ description: event.target.value })}
+            placeholder="e.g. A two-room bookshop off a Buxi Bazaar side street where Odia poetry sits at eye level and the reading room upstairs is never rushed."
+            className="min-h-[64px]"
+          />
+          <p className="text-[12px] text-muted">
+            The more specific, the sharper the Brand Brain. Name the street, the regulars, the thing
+            you refuse to do.
+          </p>
+        </div>
+
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="spark-website">
             Website <span className="font-normal text-muted">(optional)</span>
@@ -145,6 +189,32 @@ export function SparkStep({
         </div>
         <div className="sm:col-span-2">
           <LogoDrop value={logo} onChange={onLogoChange} guide="onboarding.logo-upload" />
+        </div>
+
+        {/*
+          The UPLOAD door (doc 18 §5): "brands with a brand book; agencies
+          inheriting one". Parsed by OpenRouter's free cloudflare-ai engine — the
+          engine is named explicitly because the provider default falls back to
+          paid OCR. Everything it yields is confirmed:false, like the crawl.
+        */}
+        <div className="flex flex-col gap-1.5 sm:col-span-2">
+          <Label htmlFor="spark-brandbook">
+            Brand book or prospectus <span className="font-normal text-muted">(optional, PDF)</span>
+          </Label>
+          <Input
+            id="spark-brandbook"
+            name="brandbook"
+            type="file"
+            accept="application/pdf"
+            disabled={isPending}
+            onChange={(event) => onBrandBookChange(event.target.files?.[0] ?? null)}
+            className="file:mr-3 file:rounded-control file:border-0 file:bg-tint-100 file:px-3 file:py-1.5 file:text-[13px] file:font-semibold file:text-ink dark:file:bg-s2"
+          />
+          <p className="text-[12px] text-muted">
+            {brandBook
+              ? `Reading ${brandBook.name}.`
+              : 'If you have one, this is the richest thing you can give us — it states red lines a website only implies.'}
+          </p>
         </div>
       </div>
 

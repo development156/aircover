@@ -25,13 +25,23 @@ const def: MeshTaskDef<CaptionRewriteInput, CaptionRewriteOutput> = {
   inputSchema: CaptionRewriteInputSchema,
   outputSchema: CaptionRewriteOutputSchema,
   maxTokens: MAX_TOKENS,
+  // "more on-brand" was the directive's promise while the task had no brand to be
+  // on. content_variants and plan_week ground; the one task the user invokes
+  // directly on their own words did not. `cachePrefix` alone only makes the engine
+  // FETCH the brain — buildMessages below is what actually spends it.
+  cachePrefix: 'brand_context',
 }
 
-function buildMessages(input: CaptionRewriteInput, _ctx: MeshContext): ChatMessage[] {
+function buildMessages(
+  input: CaptionRewriteInput,
+  _ctx: MeshContext,
+  brand?: ChatMessage,
+): ChatMessage[] {
   // Rewrite the selection when the editor sends one; otherwise the whole caption.
   const target = input.selection ?? input.text
   return [
     { role: 'system', content: `${SYSTEM_BASE} ${DIRECTIVES[input.instruction]}` },
+    ...(brand ? [brand] : []),
     { role: 'user', content: target },
   ]
 }

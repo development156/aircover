@@ -1,0 +1,282 @@
+import { FirecrawlError } from './firecrawl'
+import { isNearDuplicate, shingles } from './similarity'
+import {
+  MAX_PAGES,
+  MIN_CORPUS_WORDS,
+  type CrawledPage,
+  type CrawlOutcome,
+  type PageSource,
+} from './types'
+
+/**
+ * Pages worth a credit, in the order we want them. A voice corpus lives in the
+ * pages a business writes ABOUT ITSELF; a privacy policy is a lawyer's voice and
+ * a blog index is a list of titles. Ordering is a preference, not a filter — if
+ * a site has none of these we still take its first pages.
+ */
+const PREFERRED = [
+  /\/(about|about-us|our-story|story|who-we-are)\b/i,
+  /\/(services|what-we-do|offerings|menu|products|shop)\b/i,
+  /\/(work|portfolio|case-stud|projects|testimonial|reviews)\b/i,
+  /\/(contact|visit|location|hours)\b/i,
+]
+
+/** A lawyer's voice, a login wall, or a feed of other people's words. */
+const AVOID = /\/(privacy|terms|cookie|legal|login|signin|cart|checkout|tag|category|feed|rss)\b/i
+
+/** Words are counted the same way everywhere so one threshold means one thing. */
+export function countWords(markdown: string): number {
+  const stripped = markdown
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[#>*_`|-]+/g, ' ')
+  return stripped.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Home first, then the pages a business writes about itself, then the rest.
+ *
+ * SAME HOST ONLY. A sitemap can reference anything — a CDN, a booking widget's
+ * domain, a partner site. Scraping those spends the founder's crawl budget on
+ * pages they may not own, and worse, files the result under a `source_url` that
+ * reads as their own word. `source_url` is required precisely so a founder can
+ * check a claim we made about their business; a claim sourced to somebody
+ * else's domain quietly breaks that. Firecrawl's `includeSubdomains` is also
+ * pinned to false at the client, so this is the second of two guards.
+ */
+/** First path segment — `/products/x` and `/products/y` are one family. */
+function familyOf(url: string): string {
+  try {
+    return new URL(url).pathname.split('/').filter(Boolean)[0] ?? ''
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * At most this many pages from any one path family beyond the home page.
+ *
+ * PREFER BREADTH. `/products` matches PREFERRED, and on a Shopify store that
+ * means variant pages: the 2026-08-12 run filled four of five slots with the
+ * same blurb in four colours and never reached an About page. A cap per family
+ * is what stops one section of a site from spending the whole budget.
+ */
+export const MAX_PER_FAMILY = 2
+
+export function selectPages(homeUrl: string, links: readonly string[], max: number): string[] {
+  const seen = new Set<string>()
+  const ordered: string[] = []
+  const perFamily = new Map<string, number>()
+  const host = hostOf(homeUrl)
+
+  const push = (url: string, enforceFamilyCap = true): void => {
+    const key = url.replace(/#.*$/, '').replace(/\/$/, '')
+    if (seen.has(key) || ordered.length >= max) return
+    if (enforceFamilyCap) {
+      const family = familyOf(url)
+      const used = perFamily.get(family) ?? 0
+      if (family && used >= MAX_PER_FAMILY) return
+      perFamily.set(family, used + 1)
+    }
+    seen.add(key)
+    ordered.push(url)
+  }
+
+  push(homeUrl, false)
+  const candidates = links.filter((url) => !AVOID.test(url) && hostOf(url) === host)
+  for (const pattern of PREFERRED) {
+    for (const url of candidates) if (pattern.test(url)) push(url)
+  }
+  for (const url of candidates) push(url)
+
+  // Only if breadth left the budget unspent do we allow a family to exceed its
+  // cap — a short site should still get five pages.
+  if (ordered.length < max) {
+    for (const url of candidates) push(url, false)
+  }
+  return ordered
+}
+
+function normalizeUrl(raw: string): string | null {
+  const trimmed = raw.trim()
+  if (trimmed.length === 0) return null
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+  try {
+    const parsed = new URL(withScheme)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+    if (!parsed.hostname.includes('.')) return null
+    return parsed.toString()
+  } catch {
+    return null
+  }
+}
+
+export interface CrawlSiteOptions {
+  /** Any tier. crawlSite cannot tell them apart, and must not try to. */
+  client: PageSource
+  maxPages?: number
+  minWords?: number
+}
+
+/**
+ * The URL door (doc 18 §5). Map the site, pick several pages, scrape them.
+ *
+ * FAILS HONESTLY. Every unusable outcome returns a named reason and a sentence
+ * that falls back to asking — never an invented voice presented as extracted.
+ * The three that look alike and are not:
+ *   · `unreachable` — nothing answered. Maybe the URL is wrong.
+ *   · `js_only`     — pages answered 200 and every one was empty. The site is
+ *                     real; we cannot read it. Do not tell them it is empty.
+ *   · `thin`        — real words, too few to be a voice corpus.
+ * `crawler_error` is OUR failure (bad key, no credits) and must never be
+ * reported to a founder as a fact about their website.
+ *
+ * Map is one call and scrapes are one credit each, so cost is `pages + 1` and is
+ * knowable before spend. `skipped` names what the cap dropped — a silent top-N
+ * reads as "we crawled your site" when it did not.
+ */
+export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise<CrawlOutcome> {
+  const maxPages = opts.maxPages ?? MAX_PAGES
+  const minWords = opts.minWords ?? MIN_CORPUS_WORDS
+
+  if (rawUrl.trim().length === 0) {
+    return {
+      ok: false,
+      reason: 'no_url',
+      message: 'No website to read — we will ask you instead.',
+      attempted: [],
+      pagesFetched: 0,
+      wordsFound: 0,
+      creditsUsed: 0,
+    }
+  }
+
+  const homeUrl = normalizeUrl(rawUrl)
+  if (!homeUrl) {
+    return {
+      ok: false,
+      reason: 'invalid_url',
+      message:
+        'Check that website address — we could not read it as a link. Or tell us in your own words instead.',
+      attempted: [],
+      pagesFetched: 0,
+      wordsFound: 0,
+      creditsUsed: 0,
+    }
+  }
+
+  const perCall = opts.client.creditsPerCall ?? 1
+  let mapped: string[] = []
+  let creditsUsed = 0
+  try {
+    mapped = (await opts.client.map(homeUrl, maxPages * 4)).map((link) => link.url)
+    // Map bills 1 credit PER CALL on the paid tier, not per URL discovered — so
+    // a vendor crawl costs `pages + 1` and a scrape-only tally would under-report
+    // every signup. Tier 1 and 2 declare `creditsPerCall: 0`, so this is
+    // genuinely zero for them rather than an untracked cost. Counted on success
+    // only: a call that threw cannot be assumed to have billed.
+    creditsUsed += perCall
+  } catch (error) {
+    // A map failure is not proof the site is unreadable — fall through and try
+    // the home page directly. Only a Firecrawl-side refusal (402/429) stops us.
+    if (error instanceof FirecrawlError && (error.status === 402 || error.status === 429)) {
+      return {
+        ok: false,
+        reason: 'crawler_error',
+        message: 'Could not read your website just now — we will ask you instead.',
+        attempted: [],
+        pagesFetched: 0,
+        wordsFound: 0,
+        creditsUsed: 0,
+      }
+    }
+  }
+
+  const selected = selectPages(homeUrl, mapped, maxPages)
+  const skipped = mapped.filter((url) => !selected.includes(url))
+
+  const pages: CrawledPage[] = []
+  const fingerprints: Set<string>[] = []
+  const duplicates: string[] = []
+  let answered = 0
+  let crawlerRefused = false
+
+  for (const url of selected) {
+    try {
+      const page = await opts.client.scrape(url)
+      creditsUsed += perCall
+      // A 2xx with no text is the JS-only signature; a 4xx/5xx never answered.
+      if (page.statusCode >= 200 && page.statusCode < 400) answered += 1
+      const words = countWords(page.markdown)
+      if (words > 0) {
+        // A page that says what one we already have says adds no signal and
+        // inflates wordsFound past the corpus threshold on nothing.
+        const print = shingles(page.markdown)
+        if (isNearDuplicate(print, fingerprints)) {
+          duplicates.push(page.url)
+        } else {
+          fingerprints.push(print)
+          pages.push({ url: page.url, title: page.title, markdown: page.markdown, words })
+        }
+      }
+    } catch (error) {
+      if (error instanceof FirecrawlError && (error.status === 402 || error.status === 429)) {
+        crawlerRefused = true
+        break
+      }
+      // A single page failing is ordinary; keep going and judge on the total.
+    }
+  }
+
+  const wordsFound = pages.reduce((sum, page) => sum + page.words, 0)
+
+  if (crawlerRefused && pages.length === 0) {
+    return {
+      ok: false,
+      reason: 'crawler_error',
+      message: 'Could not read your website just now — we will ask you instead.',
+      attempted: selected,
+      pagesFetched: 0,
+      wordsFound: 0,
+      creditsUsed,
+    }
+  }
+
+  if (pages.length === 0) {
+    const jsOnly = answered > 0
+    return {
+      ok: false,
+      reason: jsOnly ? 'js_only' : 'unreachable',
+      attempted: selected,
+      message: jsOnly
+        ? 'Your site loads its text with JavaScript, so we could not read it — tell us in your own words instead.'
+        : 'Could not reach that website — check the address, or tell us in your own words instead.',
+      pagesFetched: 0,
+      wordsFound: 0,
+      creditsUsed,
+    }
+  }
+
+  if (wordsFound < minWords) {
+    return {
+      ok: false,
+      reason: 'thin',
+      attempted: selected,
+      message: `Read ${pages.length} page${pages.length === 1 ? '' : 's'}, but there was not enough writing to learn your voice — tell us in your own words instead.`,
+      pagesFetched: pages.length,
+      wordsFound,
+      creditsUsed,
+    }
+  }
+
+  return { ok: true, pages, attempted: selected, skipped, duplicates, wordsFound, creditsUsed }
+}

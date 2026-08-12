@@ -4,12 +4,14 @@ import { appError } from '@sahoda/shared'
 import type {
   ChatMessage,
   ChatRequest,
+  FileAnnotation,
   ChatResponse,
   ImageRequest,
   Provider,
   ProviderUsage,
 } from './providers/types'
 import { ProviderCallError } from './providers/types'
+import { FREE_PDF_ENGINE } from './providers/openrouter'
 import type { LogSink, ProviderLogRow } from './telemetry'
 import type { BrandContextProvider } from './brand-context'
 
@@ -36,6 +38,25 @@ export interface MeshTaskSpec<I, O> {
   fallbackPayload?: (input: I) => O
 }
 
+/**
+ * A first attempt that failed its schema and had to be repaired.
+ *
+ * A repair is a DEFECT, not a success: it doubles the call (the retry resends
+ * every original message), and until now nothing recorded that it happened —
+ * a repaired call and a clean one both logged `status: 'ok'`. This is the seam
+ * that makes the first-attempt error visible at all.
+ */
+export interface RepairEvent {
+  task: string
+  traceId: string
+  /** zod's own message for the FIRST attempt. The diagnosis lives here. */
+  reason: string
+  /** Truncated raw first-attempt text. Diagnostic only — never written to the DB. */
+  sample: string
+  /** Did the one retry succeed, or did the call fail outright? */
+  recovered: boolean
+}
+
 export interface MeshRunnerDeps {
   /** Ordered providers for a tier: [OpenRouter primary, OpenAI fallback]. */
   planAttempts: (tier: ModelTier) => Attempt[]
@@ -47,6 +68,11 @@ export interface MeshRunnerDeps {
   /** Resolves the Brand Brain prefix for `cachePrefix: 'brand_context'` tasks (best-effort). */
   brandContext?: BrandContextProvider
   /**
+   * Called whenever a first attempt fails its schema. Best-effort observability
+   * — it must never break the user's action, so it is wrapped in a try.
+   */
+  onRepair?: (event: RepairEvent) => void
+  /**
    * The one image-capable provider and the model to ask. Undefined when the rail
    * is not configured, and `runImage` then fails honestly rather than reaching for
    * a text model that would return a paragraph describing a picture.
@@ -55,15 +81,29 @@ export interface MeshRunnerDeps {
 }
 
 export type MeshResult<O> = (
-  { ok: true; data: O; fallback?: true } | { ok: false; error: ReturnType<typeof appError> }
+  | { ok: true; data: O; fallback?: true; annotations?: FileAnnotation[] }
+  | { ok: false; error: ReturnType<typeof appError> }
 ) & {
   usage?: MeshUsage
 }
 
 const REPAIR_CODE = 'JSON_REPAIR_FAILED'
+/** First attempt failed its schema, the one retry rescued it. Cost: two calls. */
+const REPAIRED_CODE = 'JSON_REPAIRED'
+/** The answer was cut off at max_tokens. A ceiling problem, not a model problem. */
+const TRUNCATED_CODE = 'OUTPUT_TRUNCATED'
 
 function buildRequest(model: string, messages: ChatMessage[], maxTokens: number): ChatRequest {
-  return { model, messages, maxTokens, jsonMode: true }
+  const carriesFile = messages.some((m) => (m.files?.length ?? 0) > 0)
+  // Spelled out on every file-bearing call. See ChatRequest.pdfEngine: the
+  // provider default is not free.
+  return {
+    model,
+    messages,
+    maxTokens,
+    jsonMode: true,
+    ...(carriesFile ? { pdfEngine: FREE_PDF_ENGINE } : {}),
+  }
 }
 
 /** Strip a ```json … ``` fence if present, then trim. */
@@ -168,7 +208,17 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     }
 
     const messages = spec.buildMessages(input, ctx, brand)
-    const attempts = deps.planAttempts(def.tier)
+
+    // A file may only go to a provider that can honour an explicit PDF engine.
+    // The chain is [OpenRouter, OpenAI] and only the first has the file-parser
+    // plugin, so an unfiltered fallback would hand the same brand book to a
+    // provider that parses it as native input tokens — a charge nobody chose,
+    // on the failure path, where no happy-path test looks. Filtering here means
+    // a PDF call with no capable provider fails honestly instead.
+    const carriesFile = messages.some((m) => (m.files?.length ?? 0) > 0)
+    const attempts = deps
+      .planAttempts(def.tier)
+      .filter((a) => !carriesFile || a.provider.supportsFiles === true)
 
     // 1) Fallback chain: try each provider until one responds.
     let responded: { attempt: Attempt; chat: ChatResponse; latencyMs: number } | undefined
@@ -191,7 +241,9 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     }
 
     if (!responded) {
-      await writeLog(toLogRow(def, ctx, undefined, 'error', 'PROVIDER_UNAVAILABLE'))
+      const code =
+        carriesFile && attempts.length === 0 ? 'NO_FILE_PROVIDER' : 'PROVIDER_UNAVAILABLE'
+      await writeLog(toLogRow(def, ctx, undefined, 'error', code))
       return {
         ok: false,
         error: appError('PROVIDER_ERROR', 'all providers failed to respond', ctx.traceId, {
@@ -206,7 +258,43 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     let latencyMs = responded.latencyMs
     let parsed = safeParseOutput(def.outputSchema, responded.chat.text)
 
+    // Non-null iff the first attempt failed its schema. Carried to the log row
+    // so a repair stops being invisible, and to onRepair so it can be diagnosed.
+    let firstAttemptError: string | null = null
+
+    // TRUNCATION IS NOT REPAIRABLE — do not spend a second call proving it.
+    //
+    // A repair replays the same request under the SAME budget, so a response cut
+    // off at max_tokens is cut off again. Worse than wasteful: `plan_week`
+    // requires exactly 5 briefs and three arrays are pinned at exactly 3, so a
+    // truncated-then-repaired answer can PASS the schema while silently holding
+    // less than the caller asked for. Fail loudly and name the ceiling, so the
+    // fix is a number someone can change rather than a mystery to re-diagnose.
+    if (responded.chat.truncated === true) {
+      const usageNow: MeshUsage = {
+        provider: combined.provider,
+        model: combined.model,
+        tokensIn: combined.tokensIn,
+        tokensOut: combined.tokensOut,
+        cachedTokens: combined.cachedTokens,
+        costUsd: deps.price(combined),
+        latencyMs,
+      }
+      await writeLog(toLogRow(def, ctx, usageNow, 'error', TRUNCATED_CODE))
+      return {
+        ok: false,
+        error: appError(
+          'PROVIDER_ERROR',
+          `model output hit the ${def.maxTokens}-token ceiling for ${def.name} and was cut off`,
+          ctx.traceId,
+          { task: def.name, maxTokens: def.maxTokens },
+        ),
+        usage: usageNow,
+      }
+    }
+
     if (!parsed.ok) {
+      firstAttemptError = parsed.error
       const repairMessages = buildRepairMessages(messages, responded.chat.text, parsed.error)
       const started = deps.now()
       try {
@@ -232,10 +320,34 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
       latencyMs,
     }
 
+    if (firstAttemptError !== null) {
+      try {
+        deps.onRepair?.({
+          task: def.name,
+          traceId: ctx.traceId,
+          reason: firstAttemptError,
+          sample: responded.chat.text.slice(0, 2000),
+          recovered: parsed.ok,
+        })
+      } catch {
+        /* observability must never break the action */
+      }
+    }
+
     if (parsed.ok) {
       const status: AiLogStatus = isFallbackProvider ? 'fallback' : 'ok'
-      await writeLog(toLogRow(def, ctx, usage, status, null))
-      return { ok: true, data: parsed.value, usage }
+      // `status` cannot say "repaired" — it carries a DB CHECK constraint of
+      // ('ok','error','fallback') and widening it is a migration, which is
+      // wt-db's lane. `error_code` is free text and null on every clean call,
+      // so a non-null error_code beside status 'ok' is an unambiguous and
+      // queryable "recovered from a defect". Requested properly in
+      // packages/mesh/REQUESTS.md.
+      await writeLog(toLogRow(def, ctx, usage, status, firstAttemptError ? REPAIRED_CODE : null))
+      // Annotations ride out so the caller can replay the parse and not pay for
+      // it twice. Kept off the frozen Result<O> shape, like `fallback`.
+      return responded.chat.annotations
+        ? { ok: true, data: parsed.value, usage, annotations: responded.chat.annotations }
+        : { ok: true, data: parsed.value, usage }
     }
 
     // 3) Double JSON failure: demo-fallback (brand_guidelines) or typed PROVIDER_ERROR.

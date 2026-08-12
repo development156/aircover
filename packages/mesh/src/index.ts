@@ -12,10 +12,12 @@ export { createMesh } from './mesh'
 export type { Mesh, CreateMeshOptions } from './mesh'
 
 // Result shape (a superset of the frozen Result<O> & { usage? } — adds fallback:true).
-export type { MeshResult, MeshTaskSpec, Attempt } from './engine'
+export type { MeshResult, MeshTaskSpec, Attempt, RepairEvent } from './engine'
 
 // Wired Alpha tasks — pass `.def` to runTask.
 export { brandGuidelinesTask } from './tasks/brand-guidelines'
+export { brandExtractTask, BrandExtractInputSchema } from './tasks/brand-extract'
+export type { BrandExtractInput } from './tasks/brand-extract'
 export { captionRewriteTask } from './tasks/caption-rewrite'
 export { contentVariantsTask, ContentVariantsInputSchema } from './tasks/content-variants'
 export type { ContentVariantsInput } from './tasks/content-variants'

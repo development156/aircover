@@ -18,11 +18,38 @@ describe('brand resolve contract', () => {
     const r = ResolveInputSchema.safeParse({ source: { name: 'Chai & Chapters' } })
     expect(r.success).toBe(true)
     if (r.success) {
-      expect(r.data.voice.formality).toBe(3)
-      expect(r.data.voice.energy).toBe(3)
       expect(r.data.customer.pain).toBe('')
       expect(r.data.voice.never_use).toEqual([])
     }
+  })
+
+  // INVERTED on 2026-08-12. This used to assert `formality === 3` / `energy === 3`
+  // on a spark that answered neither. `brand_guidelines` serialises the whole
+  // input, so those defaults reached the model as founder input — and the model
+  // said so, crediting "mid-range formality/energy scores" in a resolve note.
+  // The assertion is inverted rather than deleted so the reversal is on record.
+  it('leaves an unanswered formality/energy slider ABSENT, never defaulted to 3', () => {
+    const r = ResolveInputSchema.safeParse({ source: { name: 'Chai & Chapters' } })
+    expect(r.success).toBe(true)
+    if (!r.success) return
+    expect(r.data.voice.formality).toBeUndefined()
+    expect(r.data.voice.energy).toBeUndefined()
+    // The objective is the PROMPT, not the parsed object: `undefined` and `null`
+    // are both keys the model can read. Assert on what it is actually sent.
+    const serialized = JSON.stringify(r.data)
+    expect(serialized).not.toContain('formality')
+    expect(serialized).not.toContain('energy')
+  })
+
+  it('still carries a slider the founder DID answer', () => {
+    const r = ResolveInputSchema.safeParse({
+      source: { name: 'X' },
+      voice: { formality: 5, energy: 1 },
+    })
+    expect(r.success).toBe(true)
+    if (!r.success) return
+    expect(r.data.voice.formality).toBe(5)
+    expect(JSON.stringify(r.data)).toContain('"formality":5')
   })
 
   it('rejects an empty source.name and out-of-range sliders', () => {

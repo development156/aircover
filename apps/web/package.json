@@ -21,6 +21,7 @@
     "@sahoda/jobs": "workspace:*",
     "@sahoda/mesh": "workspace:*",
     "@sahoda/publishing": "workspace:*",
+    "@sahoda/research": "workspace:*",
     "@sahoda/shared": "workspace:*",
     "@sahoda/sites": "workspace:*",
     "@sentry/nextjs": "^10.66.0",

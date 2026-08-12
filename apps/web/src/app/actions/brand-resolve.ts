@@ -2,7 +2,8 @@
 
 import { randomUUID } from 'node:crypto'
 import { auth } from '@clerk/nextjs/server'
-import { brandGuidelinesTask, createMesh, type Mesh } from '@sahoda/mesh'
+import { brandExtractTask, brandGuidelinesTask, createMesh, type Mesh } from '@sahoda/mesh'
+import { createDirectSource } from '@sahoda/research'
 import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
 import {
   BrandMemoryPayloadSchema,
@@ -26,9 +27,16 @@ import { createServerSupabase } from '@/lib/supabase/server'
 import {
   mapResolveOutcome,
   type CreditsOutcome,
+  type DoorProvenance,
   type MeshResolveOutcome,
   type ResolveActionState,
 } from '@/lib/brand/resolve-result'
+import {
+  applyExtractedFields,
+  openUploadDoor,
+  openUrlDoor,
+  type ExtractRunner,
+} from '@/lib/brand/url-door'
 import { sparkToResolveInput, type SparkInput } from '@/lib/brand/spark-to-resolve-input'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
@@ -130,19 +138,93 @@ export async function resolveBrand(
     const name = field(formData, 'name')
     if (!name) return { ok: false, kind: 'error', message: 'Enter your business name.' }
 
+    // Every field the Spark screen collects now reaches the model. `description`
+    // has no input mounted yet, so it reads '' in production — the mapper is
+    // ready for the field the moment a screen asks for it.
     const spark: SparkInput = {
       name,
       category: field(formData, 'category'),
       website: field(formData, 'website'),
       instagram: field(formData, 'instagram'),
+      description: field(formData, 'description'),
     }
-    const input = sparkToResolveInput(spark)
+    const traceId = randomUUID()
+    let input = sparkToResolveInput(spark)
+
+    // ── THE DOORS ────────────────────────────────────────────────────────────
+    //
+    // Read the website (tier 1: plain fetch, no vendor, no key) or the uploaded
+    // brand book, and fold what they say into the intake. Both are best-effort:
+    // a door that fails NEVER fails the resolve, it just means the model gets
+    // less. Every failure sentence already falls back to asking.
+    //
+    // The extracted fields ride out on the action state as well, each
+    // `confirmed: false` with its source. Folding them into ResolveInput is what
+    // the model needs; carrying them separately is what stops a crawled sentence
+    // from becoming indistinguishable from one the founder typed.
+    let provenance: DoorProvenance | undefined
+    const pdf = formData.get('brandbook')
+    const runner: ExtractRunner = {
+      async run(extractInput, extractCtx) {
+        const r = await getMesh().runTask(
+          brandExtractTask.def,
+          extractInput as Parameters<typeof brandExtractTask.buildMessages>[0],
+          extractCtx,
+        )
+        if (!r.ok) return { ok: false }
+        return {
+          ok: true,
+          data: r.data,
+          ...((r as { annotations?: unknown[] }).annotations
+            ? { annotations: (r as { annotations?: unknown[] }).annotations }
+            : {}),
+        }
+      },
+    }
+
+    try {
+      if (pdf instanceof File && pdf.size > 0) {
+        const dataUrl = `data:application/pdf;base64,${Buffer.from(await pdf.arrayBuffer()).toString('base64')}`
+        const door = await openUploadDoor({ filename: pdf.name, dataUrl }, name, {
+          extract: runner,
+          ctx: { workspaceId: workspace.id, traceId, userId },
+        })
+        if (door.ok) {
+          input = applyExtractedFields(input, door.fields)
+          provenance = {
+            door: 'upload',
+            fields: door.fields,
+            instructionAttempts: door.instructionAttempts,
+            gaps: door.gaps,
+            sourcesRead: [pdf.name],
+          }
+        }
+      } else if (spark.website) {
+        const door = await openUrlDoor(spark.website, name, {
+          client: createDirectSource({ timeoutMs: 20_000 }),
+          extract: runner,
+          ctx: { workspaceId: workspace.id, traceId, userId },
+        })
+        if (door.ok) {
+          input = applyExtractedFields(input, door.fields)
+          provenance = {
+            door: 'url',
+            fields: door.fields,
+            instructionAttempts: door.instructionAttempts,
+            gaps: door.gaps,
+            sourcesRead: door.pagesRead,
+          }
+        }
+      }
+    } catch (error) {
+      // A door is an enrichment, never a gate. Report and resolve from the spark.
+      reportServerError(error, { action: 'resolveBrand.door', workspaceId })
+    }
 
     // SERVER-DERIVED ledger key + trace id — never from the request body. A
     // client-supplied objectRef could replay a spent key: withCredits would replay
     // the HOLD+DEBIT (no new charge) while still running the paid model call.
     const objectRef = newResolveObjectRef(workspace.id)
-    const traceId = randomUUID()
 
     // TODO(owner ruling #5): entitlements are a SEPARATE gate called BEFORE
     // withCredits at every AI entry point. Mount it here once @sahoda/billing
@@ -200,7 +282,7 @@ export async function resolveBrand(
           }
         : { ok: false, insufficient: false, message: credits.error.message }
 
-    return mapResolveOutcome(meshOutcome, creditsOutcome)
+    return mapResolveOutcome(meshOutcome, creditsOutcome, provenance)
   } catch (error) {
     reportServerError(error, { action: 'resolveBrand', workspaceId })
     reportPaidActionFailure('brand-resolve', error)

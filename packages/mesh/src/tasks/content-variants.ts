@@ -4,7 +4,8 @@ import type { Channel, ContentVariantsOutput, MeshContext, MeshTaskDef } from '@
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
 
-const MAX_TOKENS = 1024
+/** 2048: measured 925 x 1.4 (token-budget.ts). 1024 left 10% headroom. */
+const MAX_TOKENS = 2048
 
 /** Canonical body + the channels to adapt it for. Local input (not a cross-worktree seam). */
 export const ContentVariantsInputSchema = z.object({
