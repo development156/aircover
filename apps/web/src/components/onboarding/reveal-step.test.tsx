@@ -140,9 +140,19 @@ describe('RevealStep regenerate guard', () => {
 
 describe('RevealStep colour claim', () => {
   test('claims a new colour only when one was found', () => {
-    setup({ colors: ['oklch(0.6 0.15 30)'] })
+    setup({ colors: ['oklch(0.6 0.15 30)'], hasSavedTheme: false })
 
     expect(screen.getByText(/paints the app in the colour we found/)).toBeInTheDocument()
+  })
+
+  test('says a colour is being REPLACED when the workspace already wears one', () => {
+    // Start over on a themed workspace, then a URL door that yields colours:
+    // `saveWorkspaceTheme` archives the active theme and installs the new one.
+    // "Approving also paints the app" does not say that anything is lost.
+    setup({ colors: ['oklch(0.6 0.15 30)'], hasSavedTheme: true })
+
+    expect(screen.getByText(/replaces the colour this workspace wears/)).toBeInTheDocument()
+    expect(screen.queryByText(/also paints the app/)).not.toBeInTheDocument()
   })
 
   test('does not tell a themed workspace we found no colour', () => {

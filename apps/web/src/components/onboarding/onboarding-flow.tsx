@@ -208,6 +208,11 @@ export function OnboardingFlow({
             updatedAt={savedBrain.updatedAt}
             onStartOver={() => {
               setBrain(null)
+              // Reset with the brain it describes. The next resolve overwrites
+              // it either way, so this is symmetry rather than a live bug —
+              // but a reset that clears two of three related pieces of state is
+              // how the third becomes one on the next edit.
+              setBrainSource('resolved')
               setSaveState(null)
               setScreen('intake')
             }}

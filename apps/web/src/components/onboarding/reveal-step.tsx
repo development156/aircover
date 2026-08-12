@@ -169,14 +169,18 @@ export function RevealStep({
       ) : null}
 
       <div className="flex flex-col gap-2 border-t border-line pt-4">
-        {/* Three states, because two of them are easy to say wrongly. On
-            re-entry `colors` is empty — the door was never opened this session —
-            and the old copy read "we found no colour" to a workspace that may be
-            wearing its own theme right now. Absence of a NEW colour is not
-            absence of a colour. */}
+        {/* FOUR states, because "a colour was found" and "a colour is already
+            worn" are independent and every combination reads differently.
+            Collapsing them costs the truth twice: on re-entry `colors` is empty
+            (the door was never opened this session) and "we found no colour"
+            is false of a workspace wearing its own theme; and when a themed
+            workspace starts over and gives a URL, `saveWorkspaceTheme` ARCHIVES
+            what it wears — which "also paints the app" does not say. */}
         <p className="text-[12.5px] text-muted">
           {colors.length > 0
-            ? 'Approving also paints the app in the colour we found on your site.'
+            ? hasSavedTheme
+              ? 'Approving replaces the colour this workspace wears with the one we found on your site.'
+              : 'Approving also paints the app in the colour we found on your site.'
             : hasSavedTheme
               ? 'The app keeps the colour this workspace already wears.'
               : 'We found no colour to take, so the app keeps Sahoda’s default. You can set one later.'}
