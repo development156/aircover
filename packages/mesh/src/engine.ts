@@ -90,6 +90,8 @@ export type MeshResult<O> = (
 const REPAIR_CODE = 'JSON_REPAIR_FAILED'
 /** First attempt failed its schema, the one retry rescued it. Cost: two calls. */
 const REPAIRED_CODE = 'JSON_REPAIRED'
+/** The answer was cut off at max_tokens. A ceiling problem, not a model problem. */
+const TRUNCATED_CODE = 'OUTPUT_TRUNCATED'
 
 function buildRequest(model: string, messages: ChatMessage[], maxTokens: number): ChatRequest {
   const carriesFile = messages.some((m) => (m.files?.length ?? 0) > 0)
@@ -259,6 +261,37 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     // Non-null iff the first attempt failed its schema. Carried to the log row
     // so a repair stops being invisible, and to onRepair so it can be diagnosed.
     let firstAttemptError: string | null = null
+
+    // TRUNCATION IS NOT REPAIRABLE — do not spend a second call proving it.
+    //
+    // A repair replays the same request under the SAME budget, so a response cut
+    // off at max_tokens is cut off again. Worse than wasteful: `plan_week`
+    // requires exactly 5 briefs and three arrays are pinned at exactly 3, so a
+    // truncated-then-repaired answer can PASS the schema while silently holding
+    // less than the caller asked for. Fail loudly and name the ceiling, so the
+    // fix is a number someone can change rather than a mystery to re-diagnose.
+    if (responded.chat.truncated === true) {
+      const usageNow: MeshUsage = {
+        provider: combined.provider,
+        model: combined.model,
+        tokensIn: combined.tokensIn,
+        tokensOut: combined.tokensOut,
+        cachedTokens: combined.cachedTokens,
+        costUsd: deps.price(combined),
+        latencyMs,
+      }
+      await writeLog(toLogRow(def, ctx, usageNow, 'error', TRUNCATED_CODE))
+      return {
+        ok: false,
+        error: appError(
+          'PROVIDER_ERROR',
+          `model output hit the ${def.maxTokens}-token ceiling for ${def.name} and was cut off`,
+          ctx.traceId,
+          { task: def.name, maxTokens: def.maxTokens },
+        ),
+        usage: usageNow,
+      }
+    }
 
     if (!parsed.ok) {
       firstAttemptError = parsed.error

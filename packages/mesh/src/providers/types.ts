@@ -58,6 +58,15 @@ export interface ProviderUsage {
 
 export interface ChatResponse {
   text: string
+  /**
+   * TRUE when the provider stopped because it hit `max_tokens`, not because the
+   * model finished. This is the only signal that distinguishes "the answer was
+   * cut off" from "the model wrote bad JSON" — and they need opposite responses:
+   * bad JSON is worth one repair, a truncation retried under the SAME budget
+   * truncates again. Inferring it from token counts is impossible after the
+   * fact, because a repaired call reports both attempts summed.
+   */
+  truncated?: boolean
   usage: ProviderUsage
   /** Returned when the call parsed a file. Replay to skip (and not pay for) a re-parse. */
   annotations?: FileAnnotation[]

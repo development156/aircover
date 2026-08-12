@@ -11,7 +11,12 @@ import { ProviderCallError } from './types'
 /** Shape of the OpenAI-compatible /chat/completions response we depend on. */
 interface OpenAiChatCompletion {
   model?: string
-  choices?: Array<{ message?: { content?: string; annotations?: FileAnnotation[] } }>
+  choices?: Array<{
+    message?: { content?: string; annotations?: FileAnnotation[] }
+    /** 'stop' | 'length' | … — 'length' means the token ceiling cut it off. */
+    finish_reason?: string
+    native_finish_reason?: string
+  }>
   usage?: {
     prompt_tokens?: number
     completion_tokens?: number
@@ -124,9 +129,15 @@ export function createOpenAiCompatibleProvider(opts: OpenAiCompatibleOptions): P
       } catch {
         throw new ProviderCallError(opts.name, res.status, 'provider returned a non-JSON body')
       }
-      const annotations = json.choices?.[0]?.message?.annotations
+      const choice = json.choices?.[0]
+      const annotations = choice?.message?.annotations
+      // OpenRouter normalises to `finish_reason` but also passes the upstream
+      // value through; either saying 'length' means the ceiling was hit.
+      const truncated =
+        choice?.finish_reason === 'length' || choice?.native_finish_reason === 'length'
       return {
-        text: json.choices?.[0]?.message?.content ?? '',
+        text: choice?.message?.content ?? '',
+        ...(truncated ? { truncated: true } : {}),
         ...(annotations && annotations.length > 0 ? { annotations } : {}),
         usage: {
           provider: opts.name,

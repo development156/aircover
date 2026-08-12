@@ -7,7 +7,8 @@ import type { BrandMemoryPayload, MeshContext, MeshTaskDef, ResolveInput } from 
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
 
-const MAX_TOKENS = 2048
+/** 4096: measured single-pass need 2,750 x 1.4 headroom (token-budget.ts). Was 2048 — under it. */
+const MAX_TOKENS = 4096
 
 /**
  * Static output contract for the Signal Resolution engine (FSD M1). Mirrors

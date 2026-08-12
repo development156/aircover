@@ -4,7 +4,8 @@ import type { Channel, MeshContext, MeshTaskDef, PlanWeekOutput } from '@sahoda/
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
 
-const MAX_TOKENS = 2048
+/** 3072: measured 1,855 x 1.4 (token-budget.ts). 2048 left 9% headroom — one cliff away. */
+const MAX_TOKENS = 3072
 
 /**
  * How far ahead a slot may be placed. Mirrors the caller's `SLOT_HORIZON_DAYS`
