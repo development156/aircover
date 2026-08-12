@@ -264,3 +264,57 @@ take, so `lib/brand/fields.ts` stamps them `asked` and says so in a comment at t
 
 Context: 2026-08-12, wt-web reconciling wt-brain and wt-brainui. `lib/brand/field-meta.ts` is the
 whole contract now; `provenance.ts` only reads what it writes.
+
+## owner: wt-onboard and wt-brain shipped two onboarding stacks — NOT merged, needs a decision
+
+Added 2026-08-12 by wt-web. The merge of `wt-onboard` into wt-web was **aborted**, deliberately
+and cleanly. `wt-brain` and `wt-brainui` are merged and green; wt-onboard is untouched on its own
+branch. This is not a textual conflict anyone can resolve by picking hunks — both lanes answer the
+same product question and the answers are incompatible.
+
+**The four conflicts** were `apps/web/REQUESTS.md`, `apps/web/src/app/actions/brand-resolve.ts`,
+`apps/web/src/components/onboarding/onboarding-flow.tsx`, and a modify/delete on
+`apps/web/src/components/onboarding/spark-step.tsx`. The first two are mechanical. The last two are
+the collision.
+
+**What each lane owns.**
+
+|                | wt-brain (merged)                                                                                                              | wt-onboard (not merged)                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| screens        | Spark → Refine → Theme                                                                                                         | intake → door → question → reveal                                                                     |
+| URL door       | `packages/research` (SSRF-guarded fetch, tier-1 no-vendor HTML reader, Firecrawl vendor, quarantine) + `lib/brand/url-door.ts` | `lib/onboarding/fetch-site.ts` + `site-text.ts`                                                       |
+| PDF door       | `openUploadDoor` — the file goes to the model as a data URL                                                                    | `lib/onboarding/pdf-text.ts` — hand-rolled `node:zlib` FlateDecode + `Tj`/`TJ` scanner, no dependency |
+| refusal        | `quarantine.ts`, failure taxonomy per arm                                                                                      | `refusal.ts`, `classify.ts`, `lexicon.ts`                                                             |
+| charged action | `resolveBrand`                                                                                                                 | `resolveOnboarding` (+ `onboarding-door.ts`)                                                          |
+
+**wt-onboard DELETES six components wt-brain extends**: `spark-step.tsx`, `refine-step.tsx`
+(+ test), `theme-step.tsx`, `theme-preview.tsx`, `logo-drop.tsx`. So merging is not additive in
+either direction — taking wt-onboard discards the Spark screen and the brand-book upload wt-brain
+just built on it; taking wt-brain discards the rebuilt flow, the PDF extractor and the refusal
+vocabulary. Both lanes are independently gate-green.
+
+**Ask:** which onboarding ships. Then a follow-up lane cut off wt-web HEAD can port the losing
+lane's genuinely additive parts — `packages/research`'s SSRF guard and quarantine are worth keeping
+whichever flow wins, and so is `pdf-text.ts`'s `gateText`/`measureText` pair, which is independent
+of who extracts the text.
+
+**Also blocked on this:** deleting `resolveBrand`. It is dead only once `resolveOnboarding` exists;
+today `onboarding-flow.tsx` still calls it, so removing it would take onboarding down. See the
+entry below.
+
+## owner: `resolveBrand` is a live 50-credit endpoint that should be deleted — after wt-onboard lands
+
+Added 2026-08-12 by wt-web. `apps/web/src/app/actions/brand-resolve.ts#resolveBrand` is a
+`'use server'` export, which makes it a callable RPC whether or not any UI references it — the
+reason its removal matters is that it charges 50 credits (`brand_research`) and runs a model call.
+
+It is **not** dead yet. wt-onboard replaces it with `resolveOnboarding` and repoints
+`onboarding-flow.tsx`; without that merge, `resolveBrand` is the only resolve path onboarding has.
+Deleting it now breaks signup.
+
+**Do not delete `saveBrandMemory` with it** — that is a different export in the same file, still
+used by `brand-field.ts` and `persist-brain.ts`.
+
+**When it goes**, check these for orphaning rather than sweeping them: `lib/brand/resolve-result.ts`,
+`spark-to-resolve-input.ts`, `resolve-object-ref.ts`, and `url-door.ts`'s two door entry points —
+wt-onboard's `onboarding-resolve.ts` may or may not reuse them, and that is the merge's call.
