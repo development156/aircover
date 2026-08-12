@@ -2,19 +2,6 @@
   "version": 1,
   "runs": [
     {
-      "client_id": "qa-msmzwrq7-6574461",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-10T08:54:46.878Z",
-      "finished_at": "2026-08-10T08:54:46.878Z",
-      "suite": "typecheck",
-      "status": "pass",
-      "summary_plain": "The typecheck checks ran (2306 passed), but 1 test did NOT run — this does not prove the suite passes.",
-      "details": "=== TYPECHECK ===\n Tasks:    8 successful, 8 total\n=== LINT ===\n Tasks:    8 successful, 8 total\n=== TEST ===\n@sahoda/web:test:       Tests  2306 passed | 1 skipped (2307)\n Tasks:    14 successful, 14 total",
-      "duration_ms": null
-    },
-    {
       "client_id": "qa-msmzwrq7-b55ae509",
       "task_code": "SL-054",
       "kind": "auto",
@@ -2595,6 +2582,19 @@
       "status": "pass",
       "summary_plain": "The unit checks ran and everything passed.",
       "details": " Tasks:    27 successful, 27 total\nCached:    18 cached, 27 total\n  Time:    33.14s \n\nChecking formatting...\nAll matched files use Prettier code style!\n--- build ---\n Tasks:    1 successful, 1 total\nCached:    0 cached, 1 total\n  Time:    37.123s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mspwdhnv-aeb38081",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T09:39:07.050Z",
+      "finished_at": "2026-08-12T09:39:07.050Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The typecheck, lint, unit checks ran together and something failed.",
+      "details": " Tasks:    27 successful, 27 total\nCached:    15 cached, 27 total\n  Time:    49.65s \n\n[warn] Code style issues found in the above file. Run Prettier with --write to fix.\n[ELIFECYCLE] Command failed with exit code 1.\nCached:    0 cached, 1 total\n  Time:    43.505s",
       "duration_ms": null
     }
   ]
