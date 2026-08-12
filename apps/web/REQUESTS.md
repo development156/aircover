@@ -458,3 +458,56 @@ yields the CATEGORY's voice and not the company's; a single failure string → s
 each of which is a different sentence to the founder; and, the one with no counterpart at all,
 `quarantineCorpus` — the replaced path sent raw page text into a model prompt with nothing
 saying it was evidence rather than instructions.
+
+## wt-db: `ops_workspace_reset(p_workspace_id uuid)` — the console's reset has no write path
+
+Added 2026-08-12 by wt-web. The `/admin/dev` Danger Zone is built, gated, tested and shipped;
+pressing it today returns _"Reset is not available yet — the ops_workspace_reset function has not
+been applied to this database."_ That sentence is the whole of what is missing.
+
+**Why it cannot be done from `apps/web`, and each reason is decisive on its own.**
+
+1. **One transaction.** Thirteen sequential `.delete()` calls have none. A failure on the fifth
+   leaves a half-reset workspace with no resume path and no record of where it stopped.
+2. **`brand_memory` and `memory_events` carry `app.apply_tenant_read_policy`** — SELECT only. No
+   client can delete them, and the Brand Brain is the headline item of a reset.
+   `inbox_threads`, `inbox_messages` and `leads` likewise have select/update/insert policies but
+   **no delete policy**.
+3. **Two different identities.** `/admin` authorises against `ops_admins`; an RLS delete is scoped
+   by `app.member_workspace_ids()`. An ops owner need not be a member of the workspace being
+   reset, so a client-side delete would affect nothing — or the wrong tenant.
+
+**Signature and guard** — mirror `ops_admin_upsert` exactly:
+
+```sql
+create or replace function public.ops_workspace_reset(p_workspace_id uuid)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare caller text := app.ops_owner();   -- raises 42501 for anyone else
+```
+
+Raise `OPS_RESET_UNKNOWN_WORKSPACE` when the id matches no row (the action already maps it), and
+write one `ops_audit_log` row with `action = 'workspace.reset'` and the per-table counts.
+
+**CLEAR these thirteen** (the app reads the same list from `apps/web/src/lib/ops/reset-scope.ts` —
+`RESET_CLEARS` — so please keep the two in step):
+
+`brand_memory`, `memory_events`, `posts`, `post_variants`, `post_media`, `planner_events`,
+`sites`, `site_pages`, `site_sections`, `inbox_threads`, `inbox_messages`, `leads`, `tour_progress`
+
+**KEEP, each for its own reason** (`RESET_KEEPS`): `credit_ledger`, `credit_balances`,
+`subscriptions` (money — the ledger is append-only and is the financial record), `connections` and
+`connection_secrets` (no re-authorising), `workspace_themes` (Brand Skin), `workspace_members`,
+`post_publish_logs` and `audit_logs` (append-only evidence).
+
+**NEVER NAME THESE, and this is the trap worth stating.** `plans` and `guide_tours` carry
+`using (true)` policies — they are GLOBAL catalogues every tenant reads, not rows belonging to
+anyone. A per-workspace reset that named them would delete the product's own configuration for
+every customer at once. `RESET_NEVER_GLOBAL` holds them with a test asserting they are in neither
+list.
+
+**One behaviour to confirm rather than assume.** `post_publish_logs` carries
+`app.block_mutations()`, which returns instead of raising when `pg_trigger_depth() > 1` — so a
+CASCADE from `posts` passes through, but a direct delete raises `restrict_violation`. If those
+rows cascade from `posts`, the append-only guarantee is being satisfied by the escape hatch rather
+than by the reset avoiding them; worth deciding deliberately, because "publish history survived a
+reset" is a promise the Danger Zone copy makes to the operator on screen.

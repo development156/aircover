@@ -1,6 +1,7 @@
 import { Board } from '@/components/admin/board'
 import { AdminCharts } from '@/components/admin/charts'
 import { Changelog } from '@/components/admin/changelog'
+import { DangerZone } from '@/components/admin/danger-zone'
 import { DevRegions } from '@/components/admin/dev-regions'
 import { HeroCard } from '@/components/admin/hero-card'
 import { HeaderStrips } from '@/components/admin/strips'
@@ -63,6 +64,12 @@ export default async function AdminDevPage() {
         changelog={<Changelog />}
         charts={<AdminCharts />}
       />
+
+      {/* Last on the page, and outside the collapsible regions: a destructive
+          tool should not be something you meet by expanding a header. Renders
+          nothing at all for a non-owner — the RPC refuses them anyway, so a
+          visible control would only be a button that fails. */}
+      <DangerZone isOwner={admin?.role === 'owner'} />
     </div>
   )
 }
