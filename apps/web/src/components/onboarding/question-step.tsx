@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import type { Intake } from '@/lib/onboarding/intake'
 import { questionFor } from '@/lib/onboarding/question'
 import { isUsableRefusal, refusalToRule } from '@/lib/onboarding/refusal'
+import { ResolvingPanel } from './resolving-panel'
 
 import { AttemptErrorNotice, type AttemptError } from './attempt-error'
 
@@ -83,6 +84,8 @@ export function QuestionStep({
           </p>
         </div>
       ) : null}
+
+      {isPending ? <ResolvingPanel isFree={isFree} /> : null}
 
       <div className="flex flex-col gap-2 border-t border-line pt-4">
         <div className="flex flex-wrap items-center gap-2">
