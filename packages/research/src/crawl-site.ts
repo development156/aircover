@@ -1,4 +1,5 @@
 import { FirecrawlError } from './firecrawl'
+import { isNearDuplicate, shingles } from './similarity'
 import {
   MAX_PAGES,
   MIN_CORPUS_WORDS,
@@ -52,23 +53,56 @@ function hostOf(url: string): string {
  * else's domain quietly breaks that. Firecrawl's `includeSubdomains` is also
  * pinned to false at the client, so this is the second of two guards.
  */
+/** First path segment — `/products/x` and `/products/y` are one family. */
+function familyOf(url: string): string {
+  try {
+    return new URL(url).pathname.split('/').filter(Boolean)[0] ?? ''
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * At most this many pages from any one path family beyond the home page.
+ *
+ * PREFER BREADTH. `/products` matches PREFERRED, and on a Shopify store that
+ * means variant pages: the 2026-08-12 run filled four of five slots with the
+ * same blurb in four colours and never reached an About page. A cap per family
+ * is what stops one section of a site from spending the whole budget.
+ */
+export const MAX_PER_FAMILY = 2
+
 export function selectPages(homeUrl: string, links: readonly string[], max: number): string[] {
   const seen = new Set<string>()
   const ordered: string[] = []
+  const perFamily = new Map<string, number>()
   const host = hostOf(homeUrl)
-  const push = (url: string): void => {
+
+  const push = (url: string, enforceFamilyCap = true): void => {
     const key = url.replace(/#.*$/, '').replace(/\/$/, '')
     if (seen.has(key) || ordered.length >= max) return
+    if (enforceFamilyCap) {
+      const family = familyOf(url)
+      const used = perFamily.get(family) ?? 0
+      if (family && used >= MAX_PER_FAMILY) return
+      perFamily.set(family, used + 1)
+    }
     seen.add(key)
     ordered.push(url)
   }
 
-  push(homeUrl)
+  push(homeUrl, false)
   const candidates = links.filter((url) => !AVOID.test(url) && hostOf(url) === host)
   for (const pattern of PREFERRED) {
     for (const url of candidates) if (pattern.test(url)) push(url)
   }
   for (const url of candidates) push(url)
+
+  // Only if breadth left the budget unspent do we allow a family to exceed its
+  // cap — a short site should still get five pages.
+  if (ordered.length < max) {
+    for (const url of candidates) push(url, false)
+  }
   return ordered
 }
 
@@ -171,6 +205,8 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
   const skipped = mapped.filter((url) => !selected.includes(url))
 
   const pages: CrawledPage[] = []
+  const fingerprints: Set<string>[] = []
+  const duplicates: string[] = []
   let answered = 0
   let crawlerRefused = false
 
@@ -182,7 +218,15 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
       if (page.statusCode >= 200 && page.statusCode < 400) answered += 1
       const words = countWords(page.markdown)
       if (words > 0) {
-        pages.push({ url: page.url, title: page.title, markdown: page.markdown, words })
+        // A page that says what one we already have says adds no signal and
+        // inflates wordsFound past the corpus threshold on nothing.
+        const print = shingles(page.markdown)
+        if (isNearDuplicate(print, fingerprints)) {
+          duplicates.push(page.url)
+        } else {
+          fingerprints.push(print)
+          pages.push({ url: page.url, title: page.title, markdown: page.markdown, words })
+        }
       }
     } catch (error) {
       if (error instanceof FirecrawlError && (error.status === 402 || error.status === 429)) {
@@ -234,5 +278,5 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
     }
   }
 
-  return { ok: true, pages, attempted: selected, skipped, wordsFound, creditsUsed }
+  return { ok: true, pages, attempted: selected, skipped, duplicates, wordsFound, creditsUsed }
 }

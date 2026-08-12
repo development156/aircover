@@ -1,8 +1,32 @@
+/**
+ * A document attached to a turn. `dataUrl` is `data:application/pdf;base64,…`
+ * (or an https URL the provider fetches). UNTRUSTED, like any customer file.
+ */
+export interface ChatFile {
+  filename: string
+  dataUrl: string
+}
+
+/**
+ * A provider's record of a file it already parsed. Replaying it on a later call
+ * makes the provider reuse the parse instead of redoing it — which is the
+ * difference between a free re-resolve and paying to read the same brand book
+ * twice. `hash` identifies the parsed content.
+ */
+export interface FileAnnotation {
+  type: 'file'
+  file: { hash?: string; name?: string; content?: unknown }
+}
+
 /** A single chat turn. `cache` marks the stable, cache-controlled prefix (e.g. the Brand Brain block). */
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
   cache?: boolean
+  /** Attached documents. Only providers with `supportsFiles` may be sent these. */
+  files?: ChatFile[]
+  /** Prior parses replayed to avoid paying for the same parse twice. */
+  annotations?: FileAnnotation[]
 }
 
 export interface ChatRequest {
@@ -12,6 +36,15 @@ export interface ChatRequest {
   temperature?: number
   /** Ask the provider for a JSON-object response. */
   jsonMode?: boolean
+  /**
+   * PDF parsing engine, sent EXPLICITLY whenever a file rides along.
+   *
+   * Never omitted. OpenRouter's documented default is "native first, then fall
+   * back to mistral-ocr" — so leaving this unset bills $2 per 1,000 pages for a
+   * choice nobody made. `cloudflare-ai` is the free engine (`pdf-text` is
+   * deprecated and redirects to it).
+   */
+  pdfEngine?: 'cloudflare-ai' | 'mistral-ocr' | 'native'
 }
 
 /** Raw per-call token counts; costUsd + latency are derived by the runner. */
@@ -26,6 +59,8 @@ export interface ProviderUsage {
 export interface ChatResponse {
   text: string
   usage: ProviderUsage
+  /** Returned when the call parsed a file. Replay to skip (and not pay for) a re-parse. */
+  annotations?: FileAnnotation[]
 }
 
 /**
@@ -53,6 +88,15 @@ export interface ImageResponse {
 
 export interface Provider {
   readonly name: string
+  /**
+   * Whether this provider can accept `ChatMessage.files` AND honour an explicit
+   * `pdfEngine`. Absent means NO, and that absence is load-bearing: the runner's
+   * fallback chain is [OpenRouter, OpenAI], and OpenAI has no file-parser
+   * plugin. Sending it a PDF anyway would parse the document as native input
+   * tokens — a silent charge on the failure path, which is the one path no
+   * happy-path test exercises. The runner skips providers without this.
+   */
+  readonly supportsFiles?: boolean
   chat(req: ChatRequest): Promise<ChatResponse>
   /**
    * OPTIONAL, and its absence is meaningful: most providers here are text-only,

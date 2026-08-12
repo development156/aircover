@@ -11,7 +11,8 @@ export const RESEARCH_PACKAGE = '@sahoda/research' as const
 export { createFirecrawlClient, FirecrawlError } from './firecrawl'
 export type { FirecrawlClient, FirecrawlOptions, FetchLike } from './firecrawl'
 
-export { crawlSite, selectPages, countWords } from './crawl-site'
+export { crawlSite, selectPages, countWords, MAX_PER_FAMILY } from './crawl-site'
+export { shingles, similarity, isNearDuplicate, NEAR_DUPLICATE_THRESHOLD } from './similarity'
 export type { CrawlSiteOptions } from './crawl-site'
 
 // Tier 1 — plain fetch + turndown. No vendor, no key, no credits.

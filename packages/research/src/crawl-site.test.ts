@@ -101,6 +101,29 @@ describe('selectPages', () => {
   })
 })
 
+/**
+ * Genuinely different prose per page. Appending a suffix to one shared
+ * paragraph is NOT enough — that is exactly the product-variant shape the
+ * near-duplicate check exists to reject, and writing the fixture that way was
+ * how I found out the check works.
+ */
+const TOPICS = [
+  'shelves poetry Odia Ravenshaw teachers students afternoon light stairs tailor creak winter',
+  'chai pot refills kettle ginger cardamom lemongrass jaggery clay cup saucer steam morning',
+  'club Saturday upstairs borrow copy discussion translation Sarala Das Gopinath Mohanty essays',
+  'pakhala summer lunch curd rice fried brinjal badi chutney seat cooler shade verandah',
+  'orders imports small presses Cuttack Bhubaneswar delivery cycle courier packing brown paper',
+]
+function distinct(index: number): string {
+  const topic = TOPICS[index % TOPICS.length]!
+  const words = topic.split(' ')
+  const lines: string[] = []
+  for (let i = 0; i < 20; i += 1) {
+    lines.push(words.map((w) => `${w}${(i * 7 + index) % 13}`).join(' '))
+  }
+  return lines.join('. ')
+}
+
 describe('crawlSite — several pages, not one', () => {
   it('crawls the cap and reports what the cap dropped', async () => {
     const links = [
@@ -109,7 +132,7 @@ describe('crawlSite — several pages, not one', () => {
       'https://chaiandchapters.in/c',
     ]
     const pages = Object.fromEntries(
-      [HOME, ...links].map((url) => [url, page(url, PROSE)] as const),
+      [HOME, ...links].map((url, i) => [url, page(url, distinct(i))] as const),
     )
     const { client: c } = client({ links, pages })
 
@@ -128,7 +151,7 @@ describe('crawlSite — several pages, not one', () => {
   it('bills pages + 1 — the map call is a credit, not free', async () => {
     const links = ['https://chaiandchapters.in/a']
     const pages = Object.fromEntries(
-      [HOME, ...links].map((url) => [url, page(url, PROSE)] as const),
+      [HOME, ...links].map((url, i) => [url, page(url, distinct(i))] as const),
     )
     const { client: c } = client({ links, pages })
 

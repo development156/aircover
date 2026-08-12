@@ -4,12 +4,14 @@ import { appError } from '@sahoda/shared'
 import type {
   ChatMessage,
   ChatRequest,
+  FileAnnotation,
   ChatResponse,
   ImageRequest,
   Provider,
   ProviderUsage,
 } from './providers/types'
 import { ProviderCallError } from './providers/types'
+import { FREE_PDF_ENGINE } from './providers/openrouter'
 import type { LogSink, ProviderLogRow } from './telemetry'
 import type { BrandContextProvider } from './brand-context'
 
@@ -55,7 +57,8 @@ export interface MeshRunnerDeps {
 }
 
 export type MeshResult<O> = (
-  { ok: true; data: O; fallback?: true } | { ok: false; error: ReturnType<typeof appError> }
+  | { ok: true; data: O; fallback?: true; annotations?: FileAnnotation[] }
+  | { ok: false; error: ReturnType<typeof appError> }
 ) & {
   usage?: MeshUsage
 }
@@ -63,7 +66,16 @@ export type MeshResult<O> = (
 const REPAIR_CODE = 'JSON_REPAIR_FAILED'
 
 function buildRequest(model: string, messages: ChatMessage[], maxTokens: number): ChatRequest {
-  return { model, messages, maxTokens, jsonMode: true }
+  const carriesFile = messages.some((m) => (m.files?.length ?? 0) > 0)
+  // Spelled out on every file-bearing call. See ChatRequest.pdfEngine: the
+  // provider default is not free.
+  return {
+    model,
+    messages,
+    maxTokens,
+    jsonMode: true,
+    ...(carriesFile ? { pdfEngine: FREE_PDF_ENGINE } : {}),
+  }
 }
 
 /** Strip a ```json … ``` fence if present, then trim. */
@@ -168,7 +180,17 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     }
 
     const messages = spec.buildMessages(input, ctx, brand)
-    const attempts = deps.planAttempts(def.tier)
+
+    // A file may only go to a provider that can honour an explicit PDF engine.
+    // The chain is [OpenRouter, OpenAI] and only the first has the file-parser
+    // plugin, so an unfiltered fallback would hand the same brand book to a
+    // provider that parses it as native input tokens — a charge nobody chose,
+    // on the failure path, where no happy-path test looks. Filtering here means
+    // a PDF call with no capable provider fails honestly instead.
+    const carriesFile = messages.some((m) => (m.files?.length ?? 0) > 0)
+    const attempts = deps
+      .planAttempts(def.tier)
+      .filter((a) => !carriesFile || a.provider.supportsFiles === true)
 
     // 1) Fallback chain: try each provider until one responds.
     let responded: { attempt: Attempt; chat: ChatResponse; latencyMs: number } | undefined
@@ -191,7 +213,9 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     }
 
     if (!responded) {
-      await writeLog(toLogRow(def, ctx, undefined, 'error', 'PROVIDER_UNAVAILABLE'))
+      const code =
+        carriesFile && attempts.length === 0 ? 'NO_FILE_PROVIDER' : 'PROVIDER_UNAVAILABLE'
+      await writeLog(toLogRow(def, ctx, undefined, 'error', code))
       return {
         ok: false,
         error: appError('PROVIDER_ERROR', 'all providers failed to respond', ctx.traceId, {
@@ -235,7 +259,11 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     if (parsed.ok) {
       const status: AiLogStatus = isFallbackProvider ? 'fallback' : 'ok'
       await writeLog(toLogRow(def, ctx, usage, status, null))
-      return { ok: true, data: parsed.value, usage }
+      // Annotations ride out so the caller can replay the parse and not pay for
+      // it twice. Kept off the frozen Result<O> shape, like `fallback`.
+      return responded.chat.annotations
+        ? { ok: true, data: parsed.value, usage, annotations: responded.chat.annotations }
+        : { ok: true, data: parsed.value, usage }
     }
 
     // 3) Double JSON failure: demo-fallback (brand_guidelines) or typed PROVIDER_ERROR.

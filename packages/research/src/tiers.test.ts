@@ -124,7 +124,7 @@ describe('the escalation ladder', () => {
     const direct = source('direct', {}, links)
     const reader = source('reader', { [HOME]: PROSE, [links[0]!]: PROSE })
 
-    const result = await openSite(HOME, { sources: { direct, reader } })
+    const result = await openSite(HOME, { sources: { direct, reader }, flags: { reader: true } })
 
     expect(result.attempts[0]).toMatchObject({ tier: 1, ok: false, reason: 'js_only' })
     expect(result.servedBy).toBe(2)
@@ -135,7 +135,10 @@ describe('the escalation ladder', () => {
   it('escalates on thin as well as js_only', async () => {
     const direct = source('direct', { [HOME]: 'Chai and books. Open daily.' })
     const reader = source('reader', { [HOME]: PROSE })
-    const result = await openSite(HOME, { sources: { direct, reader } })
+    const result = await openSite(HOME, {
+      sources: { direct, reader },
+      flags: { reader: true },
+    })
     expect(result.attempts[0]!.reason).toBe('thin')
     expect(result.servedBy).toBe(2)
   })
@@ -166,17 +169,20 @@ describe('the escalation ladder', () => {
     expect(result.creditsUsed).toBe(0)
   })
 
-  it('leaves tier 3 OFF by default — the only tier that spends money', async () => {
+  it('leaves BOTH tier 2 and tier 3 off by default — one tier runs unless asked', async () => {
     const direct = source('direct', {}, [])
     const reader = source('reader', {}, [])
     const firecrawl = source('firecrawl', { [HOME]: PROSE }, [], 1)
 
     const result = await openSite(HOME, { sources: { direct, reader, firecrawl } })
 
+    expect(reader.calls).toEqual([])
     expect(firecrawl.calls).toEqual([])
     expect(result.servedBy).toBeNull()
     expect(result.creditsUsed).toBe(0)
-    expect(result.attempts.map((a) => a.tier)).toEqual([1, 2])
+    // Was [1, 2] while tier 2 defaulted on. Updated, not deleted: the default
+    // moved deliberately (cached snapshots + third-party disclosure).
+    expect(result.attempts.map((a) => a.tier)).toEqual([1])
   })
 
   it('uses tier 3 only when its flag is explicitly on, and bills only then', async () => {
@@ -186,7 +192,7 @@ describe('the escalation ladder', () => {
 
     const result = await openSite(HOME, {
       sources: { direct, reader, firecrawl },
-      flags: { firecrawl: true },
+      flags: { reader: true, firecrawl: true },
     })
 
     expect(result.servedBy).toBe(3)
@@ -197,7 +203,7 @@ describe('the escalation ladder', () => {
   it('returns the LAST failure, which is the most informed one', async () => {
     const direct = source('direct', {}, [])
     const reader = source('reader', {}, [])
-    const result = await openSite(HOME, { sources: { direct, reader } })
+    const result = await openSite(HOME, { sources: { direct, reader }, flags: { reader: true } })
     expect(result.outcome.ok).toBe(false)
     if (result.outcome.ok) return
     expect(result.attempts).toHaveLength(2)

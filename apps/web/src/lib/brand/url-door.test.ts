@@ -2,7 +2,15 @@ import { ResolveInputSchema, type BrandExtractOutput, type ExtractedField } from
 import type { CrawlOutcome, FirecrawlClient } from '@sahoda/research'
 import { describe, expect, test } from 'vitest'
 
-import { applyExtractedFields, openUrlDoor, type ExtractRunner } from './url-door'
+import {
+  applyExtractedFields,
+  openUploadDoor,
+  openUrlDoor,
+  MAX_UPLOAD_BYTES,
+  type ExtractRunner,
+} from './url-door'
+
+const PDF = 'data:application/pdf;base64,JVBERi0xLjcK'
 
 const ctx = { workspaceId: 'ws', traceId: 't' }
 const noClient = {} as FirecrawlClient
@@ -27,6 +35,7 @@ const CRAWLED: CrawlOutcome = {
   pages: [{ url: 'https://x.in/about', title: 'About', markdown: 'Odia poetry.', words: 2 }],
   attempted: ['https://x.in/', 'https://x.in/about'],
   skipped: ['https://x.in/blog'],
+  duplicates: [],
   wordsFound: 200,
   creditsUsed: 2,
 }
@@ -142,5 +151,85 @@ describe('applyExtractedFields', () => {
     // `formality` is a number in the contract, so a string extraction must not
     // land there and must not resurrect the key we just removed.
     expect(JSON.stringify(next)).not.toContain('formality')
+  })
+})
+
+describe('openUploadDoor', () => {
+  const runner = (
+    result: BrandExtractOutput | null,
+    annotations?: unknown[],
+  ): ExtractRunner => ({
+    run: async () => (result ? { ok: true, data: result, annotations } : { ok: false }),
+  })
+
+  test('returns unconfirmed fields and the parse annotation', async () => {
+    const out = await openUploadDoor({ filename: 'brand.pdf', dataUrl: PDF }, 'Acme', {
+      ctx,
+      extract: runner({ fields: [field()], instruction_attempts: [], gaps: [] }, [
+        { type: 'file', file: { hash: 'h1' } },
+      ]),
+    })
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.fields[0]!.confirmed).toBe(false)
+    // The hash is what makes a re-resolve free instead of a second parse.
+    expect(JSON.stringify(out.annotations)).toContain('h1')
+  })
+
+  test('refuses a non-PDF before spending a model call', async () => {
+    let called = false
+    const out = await openUploadDoor(
+      { filename: 'brand.docx', dataUrl: 'data:application/msword;base64,AAA' },
+      'Acme',
+      {
+        ctx,
+        extract: {
+          run: async () => {
+            called = true
+            return { ok: false }
+          },
+        },
+      },
+    )
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect(out.reason).toBe('not_pdf')
+    expect(called).toBe(false)
+  })
+
+  test('refuses an oversized document — a 40-page book bypasses the page cap', async () => {
+    const huge = `data:application/pdf;base64,${'A'.repeat(MAX_UPLOAD_BYTES * 2)}`
+    const out = await openUploadDoor({ filename: 'big.pdf', dataUrl: huge }, 'Acme', {
+      ctx,
+      extract: runner(null),
+    })
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect(out.reason).toBe('too_large')
+  })
+
+  test('a scan with no text layer says so rather than serving an empty brand', async () => {
+    const out = await openUploadDoor({ filename: 'scan.pdf', dataUrl: PDF }, 'Acme', {
+      ctx,
+      extract: runner({ fields: [], instruction_attempts: [], gaps: ['everything'] }),
+    })
+    expect(out.ok).toBe(false)
+    if (out.ok) return
+    expect(out.reason).toBe('unreadable')
+    expect(out.message).toMatch(/your own words/i)
+  })
+
+  test('every upload failure falls back to asking', async () => {
+    const cases = [
+      null,
+      { filename: 'x.docx', dataUrl: 'data:text/plain;base64,AA' },
+      { filename: 'x.pdf', dataUrl: PDF },
+    ]
+    for (const f of cases) {
+      const out = await openUploadDoor(f, 'Acme', { ctx, extract: runner(null) })
+      expect(out.ok).toBe(false)
+      if (out.ok) continue
+      expect(out.message).toMatch(/ask|your own words/i)
+    }
   })
 })

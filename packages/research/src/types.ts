@@ -100,6 +100,13 @@ export interface CrawlSuccess {
    * silent top-N reads as "we crawled your site" when it did not.
    */
   skipped: string[]
+  /**
+   * Pages fetched and then DISCARDED as near-duplicates of one already kept.
+   * Named rather than silently dropped: "we read five pages" and "five pages
+   * were worth reading" are different claims, and only one of them is ours.
+   */
+  duplicates: string[]
+  /** Words in the DISTINCT pages only. A duplicate contributes nothing. */
   wordsFound: number
   creditsUsed: number
 }

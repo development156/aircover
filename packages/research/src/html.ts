@@ -37,6 +37,58 @@ const DROP = new Set([
   'aside',
 ])
 
+/**
+ * Chrome that Wix, Shopify and WordPress put in plain `<div>`s, where the
+ * semantic DROP list above cannot see it. Observed in the 2026-08-12 SMB run:
+ * "top of page", "Skip to content", "Log in".
+ *
+ * DELIBERATELY ABSENT: `menu`, and bare `header`.
+ *
+ * A café's `<div class="menu">` is its menu — the single most brand-specific
+ * thing on the page — and half of these themes class the hero as `.header`.
+ * Matching either would strip exactly the copy tier 1 exists to read, and the
+ * damage would show up as a LOWER word count that looks like a cleaner corpus.
+ * Only compound, unambiguous chrome tokens are listed; the navigation cases are
+ * `nav-menu` / `menu-toggle` / `mobile-menu`, never `menu` alone.
+ */
+const CHROME_TOKEN =
+  /(^|[\s_-])(navbar|nav-menu|nav-link|menu-toggle|mobile-menu|offcanvas|breadcrumb|cookie|consent|gdpr|sidebar|widget-area|social-links|share-button|newsletter|subscribe|back-to-top|skip-link|skiplink|screen-?reader|sr-only|visually-hidden|site-header|site-footer|topbar|top-bar|announcement-bar)([\s_-]|$)/i
+
+/** ARIA landmarks that say "this is chrome" in a theme-independent way. */
+const CHROME_ROLE = /^(navigation|banner|contentinfo|search|menubar|toolbar)$/i
+
+/** Chrome destinations. A link to a login form is not a sentence about a brand. */
+const CHROME_HREF =
+  /\/(customer_authentication|account\/login|my-account|wp-login|login|signin|sign-in|register|cart|checkout)\b/i
+
+interface AttrNode {
+  nodeName: string
+  getAttribute?: (name: string) => string | null
+  textContent?: string | null
+}
+
+function attr(node: AttrNode, name: string): string {
+  return node.getAttribute?.(name) ?? ''
+}
+
+function isChrome(node: AttrNode): boolean {
+  if (DROP.has(node.nodeName.toLowerCase())) return true
+  if (attr(node, 'aria-hidden') === 'true') return true
+  if (CHROME_ROLE.test(attr(node, 'role'))) return true
+  const signature = `${attr(node, 'class')} ${attr(node, 'id')}`
+  return CHROME_TOKEN.test(signature)
+}
+
+function isChromeLink(node: AttrNode): boolean {
+  if (node.nodeName.toLowerCase() !== 'a') return false
+  const href = attr(node, 'href')
+  // `javascript:void(0)` is a control dressed as a link — it went straight into
+  // the corpus on three of five real sites.
+  if (/^javascript:/i.test(href)) return true
+  if (CHROME_HREF.test(href)) return true
+  return /^\s*skip to (main )?content\s*$/i.test(node.textContent ?? '')
+}
+
 function service(): TurndownService {
   const td = new TurndownService({
     headingStyle: 'atx',
@@ -48,7 +100,11 @@ function service(): TurndownService {
   // invisible in this package (tsconfig `types: ["node"]`, no DOM lib) and only
   // surfaces where apps/web compiles it. A predicate is both correct and honest
   // about matching on the node's own name.
-  td.remove((node) => DROP.has(node.nodeName.toLowerCase()))
+  td.remove((node) => isChrome(node as unknown as AttrNode))
+  td.addRule('dropChromeLinks', {
+    filter: (node) => isChromeLink(node as unknown as AttrNode),
+    replacement: () => '',
+  })
   // Images contribute an alt string at best and a wall of base64 at worst.
   td.addRule('dropImages', { filter: 'img', replacement: () => '' })
   return td

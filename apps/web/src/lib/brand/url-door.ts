@@ -38,9 +38,14 @@ export type UrlDoorOutcome =
 /** Just enough of the mesh to run one task — injected so this is testable. */
 export interface ExtractRunner {
   run(
-    input: { corpus: string; name: string },
+    input: {
+      corpus?: string
+      name: string
+      file?: { filename: string; dataUrl: string }
+      annotations?: unknown[]
+    },
     ctx: MeshContext,
-  ): Promise<{ ok: true; data: BrandExtractOutput } | { ok: false }>
+  ): Promise<{ ok: true; data: BrandExtractOutput; annotations?: unknown[] } | { ok: false }>
 }
 
 export interface UrlDoorOptions {
@@ -136,4 +141,123 @@ export function applyExtractedFields(
   }
 
   return next
+}
+
+
+// ── the UPLOAD door ───────────────────────────────────────────────────────────
+
+/**
+ * Why an upload door at all: doc 18 §5 lists three doors, and upload is the one
+ * for "brands with a brand book; agencies inheriting one". A brand book states
+ * red lines explicitly — the load-bearing half — where a website only implies
+ * them.
+ */
+
+/** Same shape as the crawl's failure taxonomy, for the same reason: each arm is a different sentence. */
+export type UploadFailureReason =
+  | 'no_file'
+  | 'not_pdf'
+  | 'too_large'
+  | 'unreadable'
+  | 'extract_failed'
+
+export type UploadDoorOutcome =
+  | {
+      ok: true
+      fields: ExtractedField[]
+      instructionAttempts: string[]
+      gaps: string[]
+      /**
+       * The provider's record of the parse. Replaying it on a later call makes
+       * the provider reuse the parse instead of charging to read the same book
+       * again — so a re-resolve is free. NOTE: free per SESSION only. Persisting
+       * it needs a store that does not exist yet, and brand_memory is the wrong
+       * home for it.
+       */
+      annotations: unknown[]
+    }
+  | { ok: false; reason: UploadFailureReason; message: string }
+
+/**
+ * A brand book is not a web page: 40 pages of parsed text arrives through the
+ * provider's annotation and bypasses `MAX_CHARS_PER_PAGE` entirely. Capping the
+ * INPUT is the only lever we hold — both a cost line (~25k input tokens on a
+ * long book) and the same context-flooding surface a long web page has.
+ */
+export const MAX_UPLOAD_BYTES = 8_000_000
+
+export interface UploadDoorOptions {
+  extract: ExtractRunner
+  ctx: MeshContext
+  /** A prior parse of THIS file, if we already have one. */
+  annotations?: unknown[]
+}
+
+/** `data:application/pdf;base64,…` — the shape OpenRouter's file_data expects. */
+function isPdfDataUrl(dataUrl: string): boolean {
+  return /^data:application\/pdf;base64,/i.test(dataUrl)
+}
+
+/** Base64 expands ~4/3; estimate the decoded size without decoding it. */
+function approximateBytes(dataUrl: string): number {
+  const comma = dataUrl.indexOf(',')
+  const payload = comma >= 0 ? dataUrl.length - comma - 1 : dataUrl.length
+  return Math.floor((payload * 3) / 4)
+}
+
+export async function openUploadDoor(
+  file: { filename: string; dataUrl: string } | null,
+  name: string,
+  opts: UploadDoorOptions,
+): Promise<UploadDoorOutcome> {
+  if (!file || file.dataUrl.length === 0) {
+    return { ok: false, reason: 'no_file', message: 'No document to read — we will ask you instead.' }
+  }
+  if (!isPdfDataUrl(file.dataUrl)) {
+    // A DOCX or a scan-as-JPEG is a different door, and pretending otherwise
+    // would spend a model call to learn we cannot read it.
+    return {
+      ok: false,
+      reason: 'not_pdf',
+      message: 'That file is not a PDF — upload a PDF, or tell us in your own words instead.',
+    }
+  }
+  if (approximateBytes(file.dataUrl) > MAX_UPLOAD_BYTES) {
+    return {
+      ok: false,
+      reason: 'too_large',
+      message: 'That document is too large to read — send a shorter one, or tell us in your own words.',
+    }
+  }
+
+  const result = await opts.extract.run(
+    { name, file, ...(opts.annotations ? { annotations: opts.annotations } : {}) },
+    opts.ctx,
+  )
+
+  if (!result.ok) {
+    return {
+      ok: false,
+      reason: 'extract_failed',
+      message: 'Read your document, but could not turn it into a brand just now — tell us in your own words instead.',
+    }
+  }
+
+  // A parse that yielded nothing is a scanned book with no text layer. Say so
+  // rather than serving an empty brand as a success.
+  if (result.data.fields.length === 0) {
+    return {
+      ok: false,
+      reason: 'unreadable',
+      message: 'Could not find any text in that document — if it is a scan, tell us in your own words instead.',
+    }
+  }
+
+  return {
+    ok: true,
+    fields: result.data.fields,
+    instructionAttempts: result.data.instruction_attempts,
+    gaps: result.data.gaps,
+    annotations: result.annotations ?? [],
+  }
 }

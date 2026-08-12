@@ -8,8 +8,8 @@ import type { CrawlFailureReason, CrawlOutcome, PageSource } from './types'
  * The escalation ladder.
  *
  *   tier 1  direct     plain fetch + turndown. Always tried first. Free.
- *   tier 2  reader     free reader service. ONLY on js_only / thin. Free, keyless,
- *                      shared 20/min budget, may serve a cached snapshot.
+ *   tier 2  reader     free reader service. ONLY on js_only / thin. DEFAULT OFF —
+ *                      cached snapshots and third-party disclosure, not cost.
  *   tier 3  firecrawl  the paid vendor. Behind a flag, DEFAULT OFF.
  *
  * The flag lives here rather than inside `crawlSite` or the Firecrawl client on
@@ -26,7 +26,16 @@ import type { CrawlFailureReason, CrawlOutcome, PageSource } from './types'
 const ESCALATES: ReadonlySet<CrawlFailureReason> = new Set<CrawlFailureReason>(['js_only', 'thin'])
 
 export interface TierFlags {
-  /** Tier 2. Default ON: free, keyless, and only reached after tier 1 has failed. */
+  /**
+   * Tier 2. DEFAULT OFF — and not for cost, since it is free and keyless. Two
+   * reasons, both about truth rather than money:
+   *   · it can serve a CACHED SNAPSHOT (observed: "Warning: This is a cached
+   *     snapshot of the original page"), so a voice corpus may come from a
+   *     version of the site the founder has since changed, and the body does not
+   *     reliably say which we got;
+   *   · it discloses a customer's URL to a third party. Tier 1 does not.
+   * Opt in per call when those are acceptable.
+   */
   reader?: boolean
   /** Tier 3. Default OFF — it is the only tier that spends money. */
   firecrawl?: boolean
@@ -72,7 +81,7 @@ export async function openSite(
   rawUrl: string,
   opts: OpenSiteOptions = {},
 ): Promise<OpenSiteResult> {
-  const flags = { reader: true, firecrawl: false, ...opts.flags }
+  const flags = { reader: false, firecrawl: false, ...opts.flags }
   const attempts: TierAttempt[] = []
   let creditsUsed = 0
 
