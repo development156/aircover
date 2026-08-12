@@ -70,6 +70,9 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
   }
 
   const unchanged = leavesEqual(draft, value)
+  // Unchanged text on an already-confirmed field is the one press that genuinely
+  // records nothing — the server short-circuits it rather than burning a version.
+  const alreadyConfirmed = state === 'confirmed'
 
   return (
     <div data-guide={`brain.field.${field.path}`} className="flex flex-col gap-1.5">
@@ -103,19 +106,30 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
             </p>
           ) : null}
           <div className="flex items-center gap-2">
-            {/* Disabled while the draft matches what is already stored. Provenance
-                is derived from the version where a value last CHANGED, so an
-                identical save records no authorship — the press would report
-                success and confirm nothing. Better to refuse it than to lie. */}
-            <Button type="button" size="sm" loading={pending} disabled={unchanged} onClick={save}>
-              Save · free
+            {/* Enabled even when the draft matches what is stored, and the label
+                changes to say what the press actually does.
+
+                This button used to be DISABLED here, beside "Change something to
+                confirm this field." — because provenance was derived from the
+                version where a value last changed, so an identical save recorded
+                no authorship and the press would have reported success while
+                confirming nothing. Refusing it was the honest move given that
+                mechanism. `field_meta` carries the confirmation independently of
+                the text, so agreeing with a guess is now a real, recordable act
+                and the fastest path to a confirmed brain. Leaving the button
+                disabled would have kept the whole point of that change
+                unreachable from the one screen that offers it. */}
+            <Button type="button" size="sm" loading={pending} onClick={save}>
+              {unchanged && !alreadyConfirmed ? 'Confirm · free' : 'Save · free'}
             </Button>
             <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>
               Cancel
             </Button>
             {unchanged && !pending ? (
               <span className="text-[12.5px] text-muted">
-                Change something to confirm this field.
+                {alreadyConfirmed
+                  ? 'Already confirmed — edit the text to change it.'
+                  : 'Saves this wording as yours, exactly as written.'}
               </span>
             ) : null}
           </div>

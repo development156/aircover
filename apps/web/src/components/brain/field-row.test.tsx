@@ -56,12 +56,17 @@ describe('FieldRow', () => {
     expect(confirmBrainField).toHaveBeenCalledWith(TEXT_FIELD.path, 'Confidence')
   })
 
-  test('the save button carries "free", so it cannot be mistaken for the 50-credit resolve', async () => {
+  test('the commit button carries "free" in BOTH wordings, so neither reads as the 50-credit resolve', async () => {
+    // The label now switches between Confirm and Save depending on whether the
+    // text moved. "free" has to survive that switch — the whole reason it is
+    // there is that a press on this page must never look like `brand_research`.
     const user = userEvent.setup()
     render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
 
     await user.click(screen.getByRole('button', { name: /edit/i }))
+    expect(screen.getByRole('button', { name: /confirm · free/i })).toBeInTheDocument()
 
+    await user.type(screen.getByLabelText(TEXT_FIELD.label), '!')
     expect(screen.getByRole('button', { name: /save · free/i })).toBeInTheDocument()
   })
 
@@ -74,17 +79,31 @@ describe('FieldRow', () => {
     expect(screen.getByText(TEXT_FIELD.question)).toBeInTheDocument()
   })
 
-  test('save is disabled until something actually changes', async () => {
-    // An identical save records no authorship, so the press would report success
-    // and confirm nothing. Refusing it beats lying about it.
+  test('agreeing with a guess VERBATIM is offered, not refused', async () => {
+    // This button used to be disabled here, beside "Change something to confirm
+    // this field." Provenance came from diffing versions, so an identical save
+    // recorded no authorship and refusing the press was the honest move. It is
+    // now stored per field, independently of the text — so agreeing is a real
+    // act, and the fastest path to a confirmed brain. A disabled button would
+    // leave the whole point of that change unreachable from this screen.
     const user = userEvent.setup()
     render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
 
     await user.click(screen.getByRole('button', { name: /edit/i }))
-    expect(screen.getByRole('button', { name: /save · free/i })).toBeDisabled()
+    const confirm = screen.getByRole('button', { name: /confirm · free/i })
+    expect(confirm).toBeEnabled()
 
-    await user.type(screen.getByLabelText(TEXT_FIELD.label), '!')
-    expect(screen.getByRole('button', { name: /save · free/i })).toBeEnabled()
+    await user.click(confirm)
+    expect(confirmBrainField).toHaveBeenCalledWith(TEXT_FIELD.path, 'Relief')
+  })
+
+  test('an already-confirmed field says so instead of inviting a no-op press', async () => {
+    // The one press that genuinely records nothing: same text, already confirmed.
+    const user = userEvent.setup()
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="confirmed" />)
+
+    await user.click(screen.getByRole('button', { name: /edit/i }))
+    expect(screen.getByText(/already confirmed/i)).toBeInTheDocument()
   })
 
   test('a failed save keeps the editor open with the typing intact', async () => {

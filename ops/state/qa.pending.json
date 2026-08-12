@@ -2,45 +2,6 @@
   "version": 1,
   "runs": [
     {
-      "client_id": "qa-msn3wzwo-e095ee15",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-10T10:46:55.943Z",
-      "finished_at": "2026-08-10T10:46:55.943Z",
-      "suite": "typecheck",
-      "status": "pass",
-      "summary_plain": "The typecheck checks ran (2345 passed), but 1 test did NOT run — this does not prove the suite passes.",
-      "details": "@sahoda/web:test:  ✓  ui  src/app/(app)/error.test.tsx (7 tests) 321ms\n@sahoda/web:test:  ✓  ui  src/app/global-error.test.tsx (5 tests) 231ms\n@sahoda/web:test:  ✓  ui  src/components/posts/status-badge.test.tsx (12 tests) 317ms\n@sahoda/web:test:  ✓  ui  src/components/inbox/surface-notice.test.tsx (17 tests) 336ms\n@sahoda/web:test:  ✓  ui  src/components/planner/approve-button.test.tsx (5 tests) 275ms\n@sahoda/web:test:  ✓  ui  src/components/shell/credit-chip.test.tsx (7 tests) 224ms\n@sahoda/web:test:  ✓  ui  src/components/inbox/conversation-row.test.tsx (10 tests) 207ms\n@sahoda/web:test:  ✓  ui  src/components/admin/sub-nav.test.tsx (5 tests) 270ms\n@sahoda/web:test:  ✓  ui  src/app/(app)/wallet/page.test.tsx (8 tests) 247ms\n@sahoda/web:test:  ✓  ui  src/components/posts/schedule-field.test.tsx (14 tests) 554ms\n@sahoda/web:test:  ✓  ui  src/components/home/charts.test.tsx (17 tests) 87ms\n@sahoda/web:test:  ✓  ui  src/components/connections/connect-outcome-notice.test.tsx (7 tests) 165ms\n@sahoda/web:test:  ✓  ui  src/components/ui/cost-label.test.tsx (7 tests) 143ms\n@sahoda/web:test:  ✓  ui  src/components/shell/topbar.test.tsx (5 tests) 152ms\n@sahoda/web:test:  ✓  ui  src/components/wallet/ledger-grammar.test.tsx (17 tests) 132ms\n@sahoda/web:test:  ✓  ui  src/components/wallet/balance-hero.test.tsx (5 tests) 72ms\n@sahoda/web:test:  ✓  ui  src/components/admin/charts.test.tsx (11 tests) 73ms\n@sahoda/web:test:  ✓  ui  src/components/posts/agency-blade.test.tsx (8 tests) 59ms\n@sahoda/web:test:  ✓  ui  src/components/posts/auto-publish-note.test.tsx (11 tests) 72ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  164 passed (164)\n@sahoda/web:test:       Tests  2345 passed | 1 skipped (2346)\n@sahoda/web:test:    Start at  16:11:29\n@sahoda/web:test:    Duration  12.21s (transform 13.24s, setup 7.22s, import 42.30s, tests 20.05s, environment 30.91s)\n@sahoda/web:test: \n\n Tasks:    16 successful, 16 total\nCached:    16 cached, 16 total\n  Time:    30ms >>> FULL TURBO",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msn3x3v9-d8129141",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-10T10:47:01.076Z",
-      "finished_at": "2026-08-10T10:47:01.076Z",
-      "suite": "lint",
-      "status": "pass",
-      "summary_plain": "The lint checks passed for ...[origin/main] ONLY — this run was filtered and does not cover the workspace.",
-      "details": "@sahoda/billing:lint: $ exit 0\n@sahoda/mesh:lint: cache hit, replaying logs 25986f0461452c0c\n@sahoda/mesh:lint: $ exit 0\n@sahoda/web:lint: cache hit, replaying logs 23db9ac24b3d7f70\n@sahoda/web:lint: $ exit 0\n@sahoda/jobs:lint: cache hit, replaying logs 3838d0e84588a355\n@sahoda/jobs:lint: $ exit 0\n\n Tasks:    8 successful, 8 total\nCached:    8 cached, 8 total\n  Time:    22ms >>> FULL TURBO",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msn4bxx4-67ad6d03",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-10T10:58:33.207Z",
-      "finished_at": "2026-08-10T10:58:33.207Z",
-      "suite": "typecheck",
-      "status": "pass",
-      "summary_plain": "The typecheck checks ran (178 passed), but 16 tests did NOT run — this does not prove the suite passes.",
-      "details": "@sahoda/jobs:test:        ✓ writes the platform id when the column is null  1000ms\n@sahoda/jobs:test:        ✓ refuses to overwrite an id that is already there, and says so  1022ms\n@sahoda/jobs:test:        ✓ refuses a 24-hex provider object id rather than storing it  968ms\n@sahoda/jobs:test: \n@sahoda/jobs:test:  Test Files  17 passed | 2 skipped (19)\n@sahoda/jobs:test:       Tests  178 passed | 16 skipped (194)\n@sahoda/jobs:test:    Start at  16:28:00\n@sahoda/jobs:test:    Duration  32.60s (transform 3.86s, setup 0ms, import 8.32s, tests 84.65s, environment 2ms)\n@sahoda/jobs:test: \n\n Tasks:    16 successful, 16 total\nCached:    10 cached, 16 total\n  Time:    34.079s",
-      "duration_ms": null
-    },
-    {
       "client_id": "qa-msn4bxx4-79597a28",
       "task_code": "SL-054",
       "kind": "auto",
@@ -2595,6 +2556,45 @@
       "status": "pass",
       "summary_plain": "The unit checks ran (2674 passed), but 5 tests did NOT run — this does not prove the suite passes.",
       "details": "@sahoda/web:test:       Tests  2674 passed | 5 skipped (2679)\n Tasks:    27 successful, 27 total\n=== FORMAT ===\n$ prettier --check .\nChecking formatting...\nAll matched files use Prettier code style!",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msq1j4w2-790f64cb",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T12:03:28.514Z",
+      "finished_at": "2026-08-12T12:03:28.514Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran (2675 passed), but 5 tests did NOT run — this does not prove the suite passes.",
+      "details": "=== FULL GATE ===\n@sahoda/web:test:       Tests  2675 passed | 5 skipped (2680)\n Tasks:    27 successful, 27 total\n$ prettier --check .\nChecking formatting...\nAll matched files use Prettier code style!",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msq1j4w2-5d3d58d9",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T12:03:28.514Z",
+      "finished_at": "2026-08-12T12:03:28.514Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran (2675 passed), but 5 tests did NOT run — this does not prove the suite passes.",
+      "details": "=== FULL GATE ===\n@sahoda/web:test:       Tests  2675 passed | 5 skipped (2680)\n Tasks:    27 successful, 27 total\n$ prettier --check .\nChecking formatting...\nAll matched files use Prettier code style!",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msq1j4w2-a972b919",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T12:03:28.514Z",
+      "finished_at": "2026-08-12T12:03:28.514Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran (2675 passed), but 5 tests did NOT run — this does not prove the suite passes.",
+      "details": "=== FULL GATE ===\n@sahoda/web:test:       Tests  2675 passed | 5 skipped (2680)\n Tasks:    27 successful, 27 total\n$ prettier --check .\nChecking formatting...\nAll matched files use Prettier code style!",
       "duration_ms": null
     }
   ]
