@@ -318,3 +318,127 @@ used by `brand-field.ts` and `persist-brain.ts`.
 **When it goes**, check these for orphaning rather than sweeping them: `lib/brand/resolve-result.ts`,
 `spark-to-resolve-input.ts`, `resolve-object-ref.ts`, and `url-door.ts`'s two door entry points —
 wt-onboard's `onboarding-resolve.ts` may or may not reuse them, and that is the merge's call.
+
+---
+
+## owner: a PDF text-extraction dependency for the onboarding door
+
+Added 2026-08-12 by `wt-onboard`. UI_RULES_v3 §"Stop and ask" requires asking before adding
+any dependency, so this ships without one and asks here.
+
+Screen 2 of the rebuilt onboarding lets someone hand over a PDF — a deck, a menu, a
+one-pager. Nothing in the repo could read one, and `apps/web` has no image or document
+library at all (`sharp` is a transitive dep of something else, not ours).
+
+**Shipped instead:** `src/lib/onboarding/pdf-text.ts` — `node:zlib` over FlateDecode content
+streams plus a `Tj`/`TJ`/`'`/`"` operator scanner. No dependency. It handles the ordinary
+case; verified against a Ghostscript-produced PDF whose ground truth came from `pdftotext`.
+
+**What it cannot do:** scanned pages, CID-keyed fonts, object streams (`/ObjStm`), LZW.
+Those are not rare. It is safe anyway because the extractor is gated — output that does not
+read like prose is REFUSED with a reason, never passed to `brand_guidelines` — but a refusal
+is still a door closing on a user who had a perfectly good PDF.
+
+**Ask:** approval to add `unpdf` (ESM, no native build, bundles a pdf.js core) or
+`pdf-parse`. Roughly: delete `inflateStreams`/`showText`/`readEscape`/`readHexString`, keep
+`gateText` and `measureText` exactly as they are — the gate is the valuable half and is
+independent of who extracts.
+
+## wt-shared: onboarding has three enums and no home for them
+
+Added 2026-08-12 by `wt-onboard`.
+
+`src/lib/onboarding/intake.ts` defines `BusinessModel`, `Regime` and `Locale` with zod
+schemas. CLAUDE.md says types and schemas import from `packages/shared` only — these break
+no such rule (shared defines none of them, and this lane may not edit shared), but they are
+product vocabulary and they will be wanted outside onboarding the moment anything else wants
+to know what sector a workspace is in.
+
+**Ask:** lift the file into `packages/shared/src/brand/intake.ts` verbatim and re-export.
+Nothing else has to change; `apps/web` swaps one import path.
+
+## wt-shared: `ResolveInput` has nowhere to put the door text
+
+Added 2026-08-12 by `wt-onboard`.
+
+Onboarding now reads a whole website or PDF — typically 1,000 to 20,000 words the business
+wrote about itself. That is by far the richest signal the resolve has ever had, and
+`ResolveInputSchema` has no field that can hold prose.
+
+Following `spark-to-resolve-input.ts`'s precedent, nothing was smuggled. Exactly two
+sentences survive into the contract, both VERBATIM and both into fields that mean what they
+are (`src/lib/onboarding/to-resolve-input.ts`):
+
+- `source.one_liner` — the first sentence long enough not to be a nav item.
+- `brand.proof_point` — the first sentence carrying a year or a counted quantity.
+
+Everything else is dropped on the floor. Paraphrasing an About page into `source.mission`
+would have been the easy move and would have put words in the user's mouth.
+
+**Ask:** a field that can carry the raw signal — `source.evidence: z.string().max(N)` or
+similar — so the resolve can read what the business actually says rather than two sentences
+of it. If it lands, `toResolveInput` fills it and drops nothing.
+
+**Related, smaller:** `ResolveInput` has no jurisdiction field either. Locale currently rides
+inside `source.category` as prose ("local presence in food, in India"), which works because
+`category` is free text, but it is a phrase doing a field's job.
+
+## wt-db: nothing durable counts a FREE resolve
+
+Added 2026-08-12 by `wt-onboard`. Recorded as an accepted cost, not a surprise.
+
+The first resolve is free, and "first" is decided server-side by
+`isFirstResolve()` — true when the workspace has no active `brand_memory` row.
+That follows the rule as stated (we charge for output; a user who resolved,
+disliked it and left without approving took none) and it cannot be forged from
+the client, because `brand_memory` is only writable through
+`resolve_brand_memory`.
+
+**The consequence:** free resolves are not counted, so re-resolving without ever
+approving stays free indefinitely. Each one is a real model call. Nothing in
+`apps/web` can bound it — a free resolve writes no ledger entry to count, and
+`memory_events` is read-only to members, so this lane has no durable place to
+record "this workspace has had its free resolve".
+
+Mitigated in the UI as far as the UI can: Regenerate is disabled entirely on a
+reveal that was LOADED rather than answered for, so the loop needs a deliberate
+walk back through all three screens each time. It is not a rate limit.
+
+**Ask:** either a `workspaces.free_resolve_used_at timestamptz` column (the
+smaller change — `isFirstResolve` reads that instead, and the resolve stamps it),
+or a decision that unlimited pre-approval resolves are intended, in which case
+this entry closes and the behaviour is simply documented.
+
+## owner: two things this lane found next door and did not finish
+
+Added 2026-08-12 by `wt-onboard`. Neither is onboarding's, both were found from it.
+
+**1. `activeThemeTokens()` is not workspace-scoped.** `src/lib/brand/read-theme.ts`
+reads `workspace_themes` filtered only on `status = 'active'`, with a comment
+saying RLS makes a workspace filter unnecessary. RLS scopes to the caller's
+MEMBERSHIPS, which is not the same as the workspace they are currently in — so a
+user in two workspaces can have the app shell painted in the other one's brand,
+depending on which row sorts first. The same defect existed in this lane's
+`brand_memory` reader and was fixed there by filtering explicitly.
+
+An optional `workspaceId` parameter was added and onboarding passes it. **The app
+shell's own call still does not**, because changing what colour the shell paints
+for existing users is a visible behaviour change that belongs with whoever owns
+the theming surface, not in an onboarding PR.
+
+**Ask:** pass the active workspace id at the shell's call site and drop the
+optional-ness.
+
+**2. No server action in this app is rate-limited, and one of them now makes
+outbound HTTP.** `readDoor` fetches a user-supplied URL. It is SSRF-guarded at
+the socket (`fetch-site.ts`), capped, deadlined and redirect-checked, and it is
+behind Clerk auth — but a signed-in user can point it at an arbitrary host as
+often as they like, which is the shape of a traffic-amplification complaint even
+though nothing is charged.
+
+security.md asks for "rate limiting on all endpoints" and Upstash is in the
+stack. Nothing in `apps/web/src/app/actions/` uses it today, so adding a limiter
+to this one action alone would be both inconsistent and out of this lane's scope.
+
+**Ask:** a decision on where the limiter lives — a shared wrapper every action
+opts into, or middleware — and then `readDoor` is a first customer for it.

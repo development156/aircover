@@ -1,12 +1,12 @@
 import type { BrandMemoryPayload } from '@sahoda/shared'
 
-import { BrandCard } from '@/components/onboarding/brand-card'
+import { BrandCard, type RegenerateCost } from '@/components/onboarding/brand-card'
 import { EditableField } from '@/components/onboarding/editable-field'
 
 export interface CustomerPersonaCardProps {
   value: BrandMemoryPayload['customer_persona']
   onChange: (value: BrandMemoryPayload['customer_persona']) => void
-  regenerateCost: number
+  regenerateCost: RegenerateCost
   onRegenerate: () => void
   regenerateDisabled: boolean
 }

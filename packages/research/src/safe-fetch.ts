@@ -1,5 +1,7 @@
 import { lookup } from 'node:dns/promises'
 
+import { pinnedFetch } from './pinned-fetch'
+
 /**
  * Tier 1 fetches a FOUNDER-SUPPLIED URL from our own server. Firecrawl did not
  * have this problem: the request left their infrastructure, not ours. A direct
@@ -12,11 +14,14 @@ import { lookup } from 'node:dns/promises'
  * exactly that reason — `redirect: 'follow'` would resolve hop 2 inside undici
  * where we can never see it.
  *
- * KNOWN RESIDUAL: DNS rebinding. We resolve, check, then fetch, and a hostile
- * resolver can answer differently between those two steps. Closing it needs
- * pinning the checked address into the connection (a custom agent/dispatcher),
- * which is a bigger change than this tier warrants today. Recorded rather than
- * hidden.
+ * DNS REBINDING — CLOSED 2026-08-12, and worth stating because this comment
+ * used to record it as an accepted residual. Resolving, checking, then calling
+ * `fetch` leaves a window: the runtime resolves the name a SECOND time, and a
+ * record with a one-second TTL can answer publicly the first time and
+ * 169.254.169.254 the second. The default transport is now `pinnedFetch`, which
+ * supplies `node:http`'s `lookup` — called by the socket at connect time, so the
+ * address approved is the address used. Ported from the onboarding lane's own
+ * fetcher, which had solved this before it was replaced by this package.
  */
 
 export class UnsafeUrlError extends Error {
@@ -30,7 +35,7 @@ export class UnsafeUrlError extends Error {
 function isPrivateIpv4(ip: string): boolean {
   const parts = ip.split('.').map(Number)
   if (parts.length !== 4 || parts.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return true
-  const [a, b] = parts as [number, number, number, number]
+  const [a, b, c] = parts as [number, number, number, number]
   if (a === 0 || a === 127) return true // this-host, loopback
   if (a === 10) return true // private
   if (a === 172 && b >= 16 && b <= 31) return true // private
@@ -38,6 +43,15 @@ function isPrivateIpv4(ip: string): boolean {
   if (a === 169 && b === 254) return true // link-local — cloud metadata lives here
   if (a === 100 && b >= 64 && b <= 127) return true // CGNAT
   if (a >= 224) return true // multicast + reserved
+  // Reserved ranges carried over from the onboarding lane's own address guard,
+  // which listed them and this did not. None is routable, so none can be a real
+  // customer's site — and a range nobody can legitimately be in is one a crawler
+  // should refuse rather than time out on.
+  if (a === 192 && b === 0 && c === 0) return true // IETF protocol assignments
+  if (a === 192 && b === 0 && c === 2) return true // TEST-NET-1
+  if (a === 198 && (b === 18 || b === 19)) return true // benchmarking
+  if (a === 198 && b === 51 && c === 100) return true // TEST-NET-2
+  if (a === 203 && b === 0 && c === 113) return true // TEST-NET-3
   return false
 }
 
@@ -134,7 +148,9 @@ const UA =
  * transport failures.
  */
 export async function safeFetch(raw: string, opts: SafeFetchOptions = {}): Promise<FetchedPage> {
-  const doFetch = opts.fetchImpl ?? fetch
+  // `pinnedFetch`, not the global — see the DNS-rebinding note at the top of
+  // this file. Tests inject `fetchImpl` and are unaffected either way.
+  const doFetch = opts.fetchImpl ?? pinnedFetch
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES
   const maxRedirects = opts.maxRedirects ?? DEFAULT_MAX_REDIRECTS
 

@@ -1,73 +1,62 @@
 'use server'
 
-import { randomUUID } from 'node:crypto'
 import { auth } from '@clerk/nextjs/server'
-import { brandExtractTask, brandGuidelinesTask, createMesh, type Mesh } from '@sahoda/mesh'
-import { createDirectSource } from '@sahoda/research'
-import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
-import {
-  BrandMemoryPayloadSchema,
-  ResolveBrandMemoryResultSchema,
-  creditCost,
-  type CreditInsufficientDetails,
-  type WithCreditsFn,
-} from '@sahoda/shared'
+import { BrandMemoryPayloadSchema, ResolveBrandMemoryResultSchema } from '@sahoda/shared'
 
-import {
-  DEPLOYMENT_CONFIG_MESSAGE,
-  isDeploymentConfigCause,
-  reportPaidActionFailure,
-} from '@/lib/actions/paid-failure'
-import { revalidateBalance } from '@/lib/actions/revalidate-balance'
-import { reportServerError } from '@/lib/observability/report'
 import { nextFieldMeta } from '@/lib/brand/field-meta'
 import { pruneBlankListEntries } from '@/lib/brand/prune-blank-entries'
 import { readBrain } from '@/lib/brand/read-brain'
-import { newResolveObjectRef } from '@/lib/brand/resolve-object-ref'
 import { mapSaveBrandError } from '@/lib/brand/save-brand-error'
+import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
-import {
-  mapResolveOutcome,
-  type CreditsOutcome,
-  type DoorProvenance,
-  type MeshResolveOutcome,
-  type ResolveActionState,
-} from '@/lib/brand/resolve-result'
-import {
-  applyExtractedFields,
-  openUploadDoor,
-  openUrlDoor,
-  type ExtractRunner,
-} from '@/lib/brand/url-door'
-import { sparkToResolveInput, type SparkInput } from '@/lib/brand/spark-to-resolve-input'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
-// 'use server' modules may export only async functions — these singletons stay
-// module-private (never `export`ed). Built lazily so a missing key surfaces as a
-// typed error inside the action, not an import-time crash.
-let meshSingleton: Mesh | undefined
-function getMesh(): Mesh {
-  return (meshSingleton ??= createMesh())
-}
-
-let withCreditsSingleton: WithCreditsFn | undefined
-function getWithCredits(): WithCreditsFn {
-  if (withCreditsSingleton) return withCreditsSingleton
-  const { databaseUrl } = loadBillingEnv()
-  withCreditsSingleton = createWithCredits(createPgLedgerPort({ connectionString: databaseUrl }))
-  return withCreditsSingleton
-}
+/**
+ * The Brand Brain WRITE path, and nothing else.
+ *
+ * `resolveBrand` used to live here — the 50-credit `brand_research` entry point
+ * for the Spark screen. Both are gone: `resolveOnboarding` is now the only
+ * charged resolve, and it owns the doors. A `'use server'` export is a callable
+ * RPC whether or not any UI references it, so leaving a second charging endpoint
+ * standing "just in case" would leave a second way to spend a customer's credits
+ * with nothing on screen able to explain it.
+ */
 
 export type SaveBrandState =
   { ok: true; version: number; replayed: boolean } | { ok: false; message: string }
 
 /**
- * Who wrote this version. `manual` is the load-bearing one: it selects which of
- * the two provenance rules applies to every field (see lib/brand/field-meta.ts),
- * so a hand-edit saved as `resolved` would render the user's own sentence as a
- * machine guess.
+ * Who wrote this version. Three values, and each one is load-bearing:
+ *
+ *   `manual`   — a person. It selects which provenance rule applies to every
+ *                field (lib/brand/field-meta.ts), so a hand-edit saved as
+ *                `resolved` renders the user's own sentence as a machine guess.
+ *   `resolved` — a genuine model resolve of THIS brand.
+ *   `system`   — a demo fallback. `packages/shared/src/brand/resolve.ts` states
+ *                the contract: a fallback "persists with `source='system'` and a
+ *                visible notice — never presented as a genuine resolve". This
+ *                once hardcoded `'resolved'`, survivable only while nothing could
+ *                re-save a fallback; onboarding now loads a saved brain and
+ *                offers Approve on it, so a sample could be approved straight
+ *                back in as a real resolve — laundering the one flag that says it
+ *                is not the user's brand.
+ *
+ * A closed union rather than a raw string: the RPC rejects anything outside its
+ * three values anyway, and this keeps a caller from naming one it has not
+ * thought about.
  */
-export type SaveBrandSource = 'resolved' | 'manual'
+export type SaveBrandSource = 'resolved' | 'manual' | 'system'
+
+/**
+ * The two sources ONBOARDING can produce. It never writes `manual` — the reveal
+ * either approves what the model returned or approves a served sample, and
+ * per-field authorship there is carried by `confirmPaths`, not by this.
+ *
+ * A narrowed alias rather than a second union, so it cannot drift from the set
+ * the RPC accepts. (Type exports are erased, so they are legal from a
+ * `'use server'` module — only runtime exports must be async functions.)
+ */
+export type BrandMemorySource = Extract<SaveBrandSource, 'resolved' | 'system'>
 
 /**
  * Persist the (possibly hand-edited) Brand Brain via `public.resolve_brand_memory`
@@ -78,8 +67,7 @@ export type SaveBrandSource = 'resolved' | 'manual'
  * VERSION_CONFLICT. Identity and membership are derived from the JWT inside the
  * function; we still zod-parse both directions at this boundary.
  *
- * This writes only. It never calls the mesh and never charges — a resolve is a
- * separate, 50-credit action (`resolveBrand`) that the user asks for explicitly.
+ * This writes only. It never calls the mesh and never charges.
  */
 export async function saveBrandMemory(
   brain: unknown,
@@ -114,6 +102,10 @@ export async function saveBrandMemory(
     // — an unpruned candidate differs from a pruned predecessor in the two
     // open-ended lists alone, which would revert those fields to guesses on every
     // save for a reason the user never caused.
+    //
+    // A `system` save names no confirmPaths, so a demo fallback lands with all
+    // fifteen fields unconfirmed. That is the correct reading: nobody agreed to
+    // a sample, least of all to one of a brand that is not theirs.
     const previous = await readBrain()
     const fieldMeta = nextFieldMeta(
       previous.status === 'ok' ? { payload: previous.active, meta: previous.meta } : null,
@@ -137,191 +129,5 @@ export async function saveBrandMemory(
   } catch (error) {
     reportServerError(error, { action: 'saveBrandMemory', workspaceId })
     return { ok: false, message: 'Could not save your Brand Brain — try again.' }
-  }
-}
-
-function field(formData: FormData, key: string): string {
-  const value = formData.get(key)
-  return typeof value === 'string' ? value.trim() : ''
-}
-
-/**
- * Resolve the active workspace's Brand Brain from a minimal spark. `withCredits`
- * reserves the 50cr, runs `brand_guidelines`, and DEBITs — but only on a *real*
- * resolve: a demo fallback or an error throws inside the wrapper so the hold is
- * RELEASED (the user is not charged), and the flagged fallback is carried out so
- * the UI can show it honestly (never as a genuine resolve).
- */
-export async function resolveBrand(
-  _prev: ResolveActionState | null,
-  formData: FormData,
-): Promise<ResolveActionState> {
-  let workspaceId: string | undefined
-  try {
-    const { userId } = await auth()
-    if (!userId)
-      return { ok: false, kind: 'error', message: 'Sign in to resolve your Brand Brain.' }
-
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, kind: 'error', message: 'Create a workspace first.' }
-    workspaceId = workspace.id
-
-    const name = field(formData, 'name')
-    if (!name) return { ok: false, kind: 'error', message: 'Enter your business name.' }
-
-    // Every field the Spark screen collects now reaches the model. `description`
-    // has no input mounted yet, so it reads '' in production — the mapper is
-    // ready for the field the moment a screen asks for it.
-    const spark: SparkInput = {
-      name,
-      category: field(formData, 'category'),
-      website: field(formData, 'website'),
-      instagram: field(formData, 'instagram'),
-      description: field(formData, 'description'),
-    }
-    const traceId = randomUUID()
-    let input = sparkToResolveInput(spark)
-
-    // ── THE DOORS ────────────────────────────────────────────────────────────
-    //
-    // Read the website (tier 1: plain fetch, no vendor, no key) or the uploaded
-    // brand book, and fold what they say into the intake. Both are best-effort:
-    // a door that fails NEVER fails the resolve, it just means the model gets
-    // less. Every failure sentence already falls back to asking.
-    //
-    // The extracted fields ride out on the action state as well, each
-    // `confirmed: false` with its source. Folding them into ResolveInput is what
-    // the model needs; carrying them separately is what stops a crawled sentence
-    // from becoming indistinguishable from one the founder typed.
-    let provenance: DoorProvenance | undefined
-    const pdf = formData.get('brandbook')
-    const runner: ExtractRunner = {
-      async run(extractInput, extractCtx) {
-        const r = await getMesh().runTask(
-          brandExtractTask.def,
-          extractInput as Parameters<typeof brandExtractTask.buildMessages>[0],
-          extractCtx,
-        )
-        if (!r.ok) return { ok: false }
-        return {
-          ok: true,
-          data: r.data,
-          ...((r as { annotations?: unknown[] }).annotations
-            ? { annotations: (r as { annotations?: unknown[] }).annotations }
-            : {}),
-        }
-      },
-    }
-
-    try {
-      if (pdf instanceof File && pdf.size > 0) {
-        const dataUrl = `data:application/pdf;base64,${Buffer.from(await pdf.arrayBuffer()).toString('base64')}`
-        const door = await openUploadDoor({ filename: pdf.name, dataUrl }, name, {
-          extract: runner,
-          ctx: { workspaceId: workspace.id, traceId, userId },
-        })
-        if (door.ok) {
-          input = applyExtractedFields(input, door.fields)
-          provenance = {
-            door: 'upload',
-            fields: door.fields,
-            instructionAttempts: door.instructionAttempts,
-            gaps: door.gaps,
-            sourcesRead: [pdf.name],
-          }
-        }
-      } else if (spark.website) {
-        const door = await openUrlDoor(spark.website, name, {
-          client: createDirectSource({ timeoutMs: 20_000 }),
-          extract: runner,
-          ctx: { workspaceId: workspace.id, traceId, userId },
-        })
-        if (door.ok) {
-          input = applyExtractedFields(input, door.fields)
-          provenance = {
-            door: 'url',
-            fields: door.fields,
-            instructionAttempts: door.instructionAttempts,
-            gaps: door.gaps,
-            sourcesRead: door.pagesRead,
-          }
-        }
-      }
-    } catch (error) {
-      // A door is an enrichment, never a gate. Report and resolve from the spark.
-      reportServerError(error, { action: 'resolveBrand.door', workspaceId })
-    }
-
-    // SERVER-DERIVED ledger key + trace id — never from the request body. A
-    // client-supplied objectRef could replay a spent key: withCredits would replay
-    // the HOLD+DEBIT (no new charge) while still running the paid model call.
-    const objectRef = newResolveObjectRef(workspace.id)
-
-    // TODO(owner ruling #5): entitlements are a SEPARATE gate called BEFORE
-    // withCredits at every AI entry point. Mount it here once @sahoda/billing
-    // ships the gate helper — today only the credit balance limits this action.
-    let meshOutcome: MeshResolveOutcome | null = null
-    const credits = await getWithCredits()(
-      { workspaceId: workspace.id, action: 'brand_research', objectRef },
-      async (ctx) => {
-        const result = await getMesh().runTask(brandGuidelinesTask.def, input, {
-          workspaceId: workspace.id,
-          traceId,
-          userId,
-          actionType: ctx.actionType,
-          creditsCharged: ctx.creditsCharged,
-        })
-        if (!result.ok) {
-          meshOutcome = { kind: 'error', message: result.error.message }
-          throw new Error('MESH_ERROR') // → RELEASE, no charge
-        }
-        // runTask's declared return is the frozen Result<O> (no `fallback`); the mesh
-        // engine sets `fallback:true` at runtime on a demo-fallback (double JSON failure).
-        if ((result as { fallback?: boolean }).fallback === true) {
-          meshOutcome = { kind: 'fallback', brain: result.data }
-          throw new Error('MESH_FALLBACK') // → RELEASE, no charge (a sample, not a resolve)
-        }
-        meshOutcome = { kind: 'real', brain: result.data }
-        return result.data // → DEBIT (the only charged path)
-      },
-    )
-
-    // The balance moved (or may have, when the model delivered but the wrapper
-    // still failed). The chip lives in the layout, so a page revalidate misses it.
-    if (credits.ok || meshOutcome !== null) revalidateBalance()
-
-    if (!credits.ok) {
-      reportPaidActionFailure('brand-resolve', credits.error)
-      // A mesh config throw inside the callback released the hold (meshOutcome
-      // is still null there — getMesh() failed before runTask could stash one),
-      // so the not-charged claim is verifiable and a retry cannot fix it.
-      if (meshOutcome === null && isDeploymentConfigCause(credits.error)) {
-        return { ok: false, kind: 'error', message: DEPLOYMENT_CONFIG_MESSAGE }
-      }
-    }
-
-    const creditsOutcome: CreditsOutcome = credits.ok
-      ? { ok: true, balanceAfter: credits.data.balanceAfter }
-      : credits.error.code === 'CREDIT_INSUFFICIENT'
-        ? {
-            ok: false,
-            insufficient: true,
-            required:
-              (credits.error.details as CreditInsufficientDetails)?.required ??
-              creditCost('brand_research'),
-            available: (credits.error.details as CreditInsufficientDetails)?.available ?? 0,
-          }
-        : { ok: false, insufficient: false, message: credits.error.message }
-
-    return mapResolveOutcome(meshOutcome, creditsOutcome, provenance)
-  } catch (error) {
-    reportServerError(error, { action: 'resolveBrand', workspaceId })
-    reportPaidActionFailure('brand-resolve', error)
-    // The billing env loader throws before any HOLD exists — config failures
-    // caught here are verifiably uncharged, and a retry cannot fix them.
-    if (isDeploymentConfigCause(error)) {
-      return { ok: false, kind: 'error', message: DEPLOYMENT_CONFIG_MESSAGE }
-    }
-    return { ok: false, kind: 'error', message: 'Could not resolve your Brand Brain — try again.' }
   }
 }

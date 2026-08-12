@@ -22,6 +22,21 @@ import type { MappedLink, PageSource, ScrapedPage } from './types'
 export interface DirectSourceOptions extends SafeFetchOptions {
   /** Shared across map+scrape so the home page is fetched once, not twice. */
   cache?: Map<string, ScrapedPage>
+  /**
+   * The LANDING page's raw HTML, handed back before it is converted away.
+   *
+   * `ScrapedPage` carries markdown, deliberately — every consumer downstream
+   * wants prose, and holding five pages of HTML to serve one of them would be a
+   * lot of string for nothing. But a page's DECLARED colours (`theme-color`, the
+   * brand hex its stylesheet repeats) live only in the markup, and turndown
+   * throws them away. This is the one hook that sees them.
+   *
+   * Called from `map()` only, so exactly one page's HTML is ever exposed, by
+   * construction rather than by discipline. Tiers 2 and 3 return text and
+   * markdown respectively and never call this — a site read by either yields no
+   * colours, which `declaredColors` already treats as a first-class answer.
+   */
+  onLandingHtml?: (html: string) => void
 }
 
 export function createDirectSource(opts: DirectSourceOptions = {}): PageSource {
@@ -52,6 +67,8 @@ export function createDirectSource(opts: DirectSourceOptions = {}): PageSource {
 
     async map(url: string): Promise<MappedLink[]> {
       const res = await safeFetch(url, opts)
+      // Before turndown throws the markup away — see `onLandingHtml`.
+      opts.onLandingHtml?.(res.html)
       // Populate the cache with what we just paid a request for.
       const parsed = parsePage(res.html, res.url)
       cache.set(url, {

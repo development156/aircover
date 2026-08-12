@@ -33,7 +33,7 @@ beforeEach(() => {
 
 describe('(onboarding) error boundary', () => {
   test('captures a client-side crash and shows the user its event id', () => {
-    const error = new Error('colour extraction worker died')
+    const error = new Error('classifier crashed while reading the intake sentence')
 
     render(<OnboardingError error={error} reset={vi.fn()} />)
 
@@ -68,12 +68,14 @@ describe('(onboarding) error boundary', () => {
   })
 
   test('tells the user retrying restarts setup, because that is what it does', () => {
-    // HONESTY. OnboardingFlow holds every answer in useState — spark, logo,
-    // colours, the generated brain — and writes nothing until resolve_brand_memory
-    // at Finish. reset() remounts the flow at screen one with EMPTY_SPARK, so
-    // copy promising that progress survives would be false the moment it was
-    // pressed. If this assertion ever needs relaxing, the flow gained real
-    // persistence and the copy should change with it, not the other way round.
+    // HONESTY. OnboardingFlow holds every in-flight answer in useState — the
+    // three picks, the door text, the refusal, the resolved brain — and writes
+    // nothing until resolve_brand_memory at Approve. reset() re-renders the
+    // segment, so a brain already SAVED is read back by page.tsx and survives;
+    // everything answered since does not. Copy promising that progress survives
+    // would be false for the half that matters. If this assertion ever needs
+    // relaxing, the flow gained persistence for the UNSAVED half and the copy
+    // should change with it, not the other way round.
     render(<OnboardingError error={new Error('boom')} reset={vi.fn()} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('Try again to restart setup')

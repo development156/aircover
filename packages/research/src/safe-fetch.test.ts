@@ -45,6 +45,29 @@ describe('isPrivateAddress', () => {
   })
 })
 
+describe('reserved ranges carried over from the onboarding address guard', () => {
+  it('refuses every reserved range the guard now lists', () => {
+    for (const ip of [
+      '192.0.0.1', // IETF protocol assignments
+      '192.0.2.5', // TEST-NET-1
+      '198.18.0.1', // benchmarking
+      '198.19.255.254', // benchmarking, upper half of the /15
+      '198.51.100.7', // TEST-NET-2
+      '203.0.113.9', // TEST-NET-3
+    ]) {
+      expect(isPrivateAddress(ip, 4), ip).toBe(true)
+    }
+  })
+
+  it('leaves a neighbouring PUBLIC address alone', () => {
+    // The /15 and /24 boundaries are the easy thing to get wrong, and a guard
+    // that blocked 198.20.x or 203.0.114.x would silently refuse real customers.
+    expect(isPrivateAddress('198.20.0.1', 4)).toBe(false)
+    expect(isPrivateAddress('203.0.114.1', 4)).toBe(false)
+    expect(isPrivateAddress('192.1.0.1', 4)).toBe(false)
+  })
+})
+
 describe('assertPublicUrl', () => {
   it('refuses a non-http scheme — file: and data: are ways out of "fetch a page"', async () => {
     await expect(assertPublicUrl('file:///etc/passwd')).rejects.toThrow(UnsafeUrlError)

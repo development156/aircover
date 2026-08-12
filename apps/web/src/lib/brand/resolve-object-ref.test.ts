@@ -19,16 +19,21 @@ describe('newResolveObjectRef', () => {
 })
 
 /**
- * Regression guard for the money path: the resolve action must NEVER derive its
+ * Regression guard for the money path: the charged resolve must NEVER derive its
  * ledger idempotency key from client input. Replaying a spent objectRef makes
  * withCredits replay the HOLD+DEBIT while still running the paid model call, so
  * a client-controlled value is an unlimited-free-resolve hole. This asserts on
  * the source because the property is about what the action does NOT read, which
  * no amount of mocking can prove.
+ *
+ * IT POINTS AT `onboarding-resolve.ts` NOW. It used to read `brand-resolve.ts`,
+ * which was the charged path until `resolveBrand` was deleted — and a guard left
+ * aimed at a file that no longer charges is worse than no guard, because it goes
+ * on passing while the thing it protects moves out from under it.
  */
-describe('resolve action ledger key provenance', () => {
+describe('charged resolve ledger key provenance', () => {
   const source = readFileSync(
-    new URL('../../app/actions/brand-resolve.ts', import.meta.url),
+    new URL('../../app/actions/onboarding-resolve.ts', import.meta.url),
     'utf8',
   )
 
@@ -39,6 +44,16 @@ describe('resolve action ledger key provenance', () => {
   })
 
   test('derives the ledger key from the server-only helper', () => {
-    expect(source).toMatch(/newResolveObjectRef\(\s*workspace\.id\s*\)/)
+    expect(source).toMatch(/newResolveObjectRef\(\s*workspaceId\s*\)/)
+  })
+
+  test('the deleted resolveBrand endpoint has not come back', () => {
+    // Two charging endpoints for one action is two ways to spend a customer's
+    // credits, and only one of them would have a screen able to explain it.
+    const writePath = readFileSync(
+      new URL('../../app/actions/brand-resolve.ts', import.meta.url),
+      'utf8',
+    )
+    expect(writePath).not.toMatch(/withCredits|runTask/)
   })
 })
