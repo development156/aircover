@@ -31,6 +31,11 @@ export default defineConfig({
           name: 'lib',
           environment: 'node',
           include: ['src/**/*.test.ts'],
+          // `*.live.test.ts` spends real money (Firecrawl credits, provider
+          // tokens) and needs keys CI does not have. Without this exclusion the
+          // glob above would sweep them into `turbo test`. Run them with
+          // vitest.live.config.ts — never here.
+          exclude: ['**/node_modules/**', '**/*.live.test.ts'],
         },
       },
       {

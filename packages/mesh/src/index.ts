@@ -16,6 +16,8 @@ export type { MeshResult, MeshTaskSpec, Attempt } from './engine'
 
 // Wired Alpha tasks — pass `.def` to runTask.
 export { brandGuidelinesTask } from './tasks/brand-guidelines'
+export { brandExtractTask, BrandExtractInputSchema } from './tasks/brand-extract'
+export type { BrandExtractInput } from './tasks/brand-extract'
 export { captionRewriteTask } from './tasks/caption-rewrite'
 export { contentVariantsTask, ContentVariantsInputSchema } from './tasks/content-variants'
 export type { ContentVariantsInput } from './tasks/content-variants'

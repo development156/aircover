@@ -18,6 +18,7 @@ import { createPostgrestBrandContext } from './brand-context'
 import { createMeshRunner, type Attempt, type MeshResult, type MeshTaskSpec } from './engine'
 import { TIER_ROUTES, imageModelForTier } from './routing'
 import { brandGuidelinesTask } from './tasks/brand-guidelines'
+import { brandExtractTask } from './tasks/brand-extract'
 import { captionRewriteTask } from './tasks/caption-rewrite'
 import { contentVariantsTask } from './tasks/content-variants'
 import { planWeekTask } from './tasks/plan-week'
@@ -120,6 +121,7 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
     dispatch.set(spec.def.name, (input, ctx) => runner.run(spec, input as I, ctx))
   }
   register(brandGuidelinesTask)
+  register(brandExtractTask)
   register(captionRewriteTask)
   register(contentVariantsTask)
   register(planWeekTask)

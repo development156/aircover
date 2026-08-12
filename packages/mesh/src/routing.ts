@@ -30,6 +30,11 @@ export const TIER_ROUTES: Record<ModelTier, TierRoute> = {
  */
 export const TASK_TIER: Record<MeshTaskName, ModelTier> = {
   brand_guidelines: 'standard',
+  // Standard, not economy: this one reads adversarial customer-supplied text and
+  // has to keep telling instruction from evidence over several pages. It is also
+  // the cheapest place in the product to be wrong — a bad extraction becomes the
+  // Brain, and the Brain grounds every caption after it.
+  brand_extract: 'standard',
   content_variants: 'economy',
   caption_rewrite: 'economy',
   plan_week: 'standard',
