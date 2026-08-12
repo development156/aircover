@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { resolveBrand, saveBrandMemory, type SaveBrandState } from '@/app/actions/brand-resolve'
 import { saveWorkspaceTheme } from '@/app/actions/theme'
 import { brandSkinVars } from '@/lib/brand/brand-theme'
+import { persistBrainVersions } from '@/lib/brand/persist-brain'
 
 import type { AttemptError } from './attempt-error'
 import type { LogoValue } from './logo-drop'
@@ -73,6 +74,10 @@ export function OnboardingFlow() {
   const [attemptError, setAttemptError] = useState<AttemptError | null>(null)
   const [regenerateError, setRegenerateError] = useState<AttemptError | null>(null)
   const [brain, setBrain] = useState<BrandMemoryPayload | null>(null)
+  // The model's output, untouched, as it arrived. `brain` diverges from this the
+  // moment a Refine card is edited; Finish persists BOTH so per-field provenance
+  // is recoverable from the version history (see the comment on handleFinish).
+  const [baseline, setBaseline] = useState<BrandMemoryPayload | null>(null)
   const [balanceAfter, setBalanceAfter] = useState<number | null>(null)
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null)
   const [colors, setColors] = useState<string[] | null>(null)
@@ -84,6 +89,11 @@ export function OnboardingFlow() {
 
     if (state.ok) {
       setBrain(state.brain)
+      // Re-seeded on every resolve INCLUDING a Regenerate: the baseline must be
+      // the output the user is currently looking at, or Finish would diff their
+      // edits against a payload that is two model calls old and attribute the
+      // model's own rewrites to them.
+      setBaseline(state.brain)
       setFallbackMessage(state.kind === 'fallback' ? state.message : null)
       if (state.kind === 'resolved') setBalanceAfter(state.balanceAfter)
       setAttemptError(null)
@@ -135,7 +145,10 @@ export function OnboardingFlow() {
         const themeState = await saveWorkspaceTheme(colors)
         if (!themeState.ok) toast(themeState.message)
       }
-      setSaveState(await saveBrandMemory(brain))
+      // Two versions, not one — the model's output followed by the user's edits,
+      // so per-field provenance is recoverable from the history. See
+      // lib/brand/persist-brain.ts for why a single save cannot carry it.
+      setSaveState(await persistBrainVersions(saveBrandMemory, baseline, brain))
     })
   }
 

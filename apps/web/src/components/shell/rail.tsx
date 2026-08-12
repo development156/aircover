@@ -14,6 +14,10 @@ const NAV: ReadonlyArray<{
   section?: string
 }> = [
   { href: '/home', label: 'Home', icon: 'house', guide: 'nav.home' },
+  // Above the Create section on purpose: the Brand Brain is what every screen
+  // below it writes FROM, and until now the core of the product had no entry in
+  // the nav at all — reachable only by finishing onboarding.
+  { href: '/brain', label: 'Brand Brain', icon: 'brain-circuit', guide: 'nav.brain' },
   { href: '/posts', label: 'Posts', icon: 'square-pen', guide: 'nav.posts', section: 'Create' },
   { href: '/planner', label: 'Planner', icon: 'calendar-days', guide: 'nav.planner' },
   { href: '/inbox', label: 'Inbox', icon: 'messages-square', guide: 'nav.inbox' },

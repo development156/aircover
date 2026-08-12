@@ -229,3 +229,44 @@ agreeing ones. The test makes drift _loud_; only the helper makes it impossible.
 
 Context: 2026-08-10. Two posts carried a fresh `scheduled_at` while still `expired`; the
 only symptom was a cron sweep that never found them.
+
+## wt-db: `brand_memory` stores values but not authorship, so /brain derives it by diffing versions
+
+`/brain` renders each field as **confirmed** (a person wrote it) or **guessed** (the model did), and
+the topbar ring counts the first. Nothing in the schema records that. `brand_memory.payload` is a
+strict `BrandMemoryPayloadSchema` with no room for per-field metadata, the table is read-only under
+RLS, and `resolve_brand_memory` re-checks the shape in SQL — so there is no place to put a flag.
+
+**What wt-brainui built instead, and why it is honest.** Authorship IS recoverable from what is
+already stored: versions are append-only and each carries a `source`. For every field, find the
+version at which its value last CHANGED and read that version's source — `manual` means a person
+typed it. Two behaviours fall out for free and both are correct: a regenerate that returns the SAME
+text for a confirmed field leaves the confirmation standing (the model agreeing with you is not
+grounds to demote your answer), and one that returns DIFFERENT text reverts the field to a guess
+(what is on screen is now the model's sentence, not yours). See `lib/brand/provenance.ts`.
+
+This needed no migration and no contract change. It has two real costs.
+
+**1. One version per confirmed field.** Every field edit writes a `brand_memory` version through the
+RPC, and the advisory lock serialises rapid saves. A user confirming all fifteen fields writes
+fifteen versions. Accepted deliberately — the ledger metaphor says history is the evidence — but a
+`brand_field_state(workspace_id, path, confirmed_at, confirmed_by)` table would make it one row per
+field with no version burned.
+
+**2. "That guess is right" is unrepresentable, and it is the most valuable interaction on the page.**
+A user who reads a field, agrees with it, and wants to say so has no way to. An identical payload
+records no change, so provenance cannot attribute it — `confirmBrainField` refuses the write and the
+Save button is disabled with "Change something to confirm this field." That is honest about the
+mechanism but it is not the product we want: the fastest path to a confirmed brain is a user saying
+yes fifteen times, and today they must retype fifteen sentences instead. **This one is worth a
+schema change on its own.**
+
+**Ask:** a `brand_field_state` table (workspace-scoped, RLS, one row per dotted path) plus a
+server-side writer — or a `memory_events` writer RPC, since `memory_events` already models exactly
+this shape (`source='user'`, `status='accepted'`, `diff` naming the path) and has no writer at all
+today. wt-brainui deliberately did NOT reach for a service-role write into `memory_events` from a
+server action: no RPC exists, it would need hand-rolled membership checks, and it duplicates state
+the version history already carries.
+
+Context: 2026-08-12, wt-brainui. `provenance.ts` is the whole contract — if a table lands, that
+module is the only thing that has to change.
