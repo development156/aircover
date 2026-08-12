@@ -24,3 +24,23 @@ describe('pinnedFetch is a usable transport', () => {
     expect(await res.text()).toContain('<')
   }, 20_000)
 })
+
+/**
+ * THE REGRESSION THIS GUARDS, found by walking the deployed flow: `node:http`
+ * does not decompress, so every crawled page arrived as gzip bytes and the
+ * corpus handed to the model began with the gzip magic number instead of prose.
+ * `fetch` had been doing this for us silently.
+ */
+describe('pinnedFetch returns TEXT, not compressed bytes', () => {
+  test('a gzip-serving origin comes back as readable html', async () => {
+    const res = await pinnedFetch('https://www.python.org/', {
+      headers: { accept: 'text/html' },
+      signal: AbortSignal.timeout(20_000),
+    })
+    const body = await res.text()
+    expect(res.status).toBe(200)
+    expect(body.charCodeAt(0), 'a leading 0x1f is the gzip magic number').not.toBe(0x1f)
+    expect(body.toLowerCase()).toContain('<html')
+    expect(body.toLowerCase()).toContain('python')
+  }, 30_000)
+})

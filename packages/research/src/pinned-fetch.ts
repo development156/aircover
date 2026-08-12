@@ -3,6 +3,7 @@ import { request as httpRequest, type RequestOptions } from 'node:http'
 import type { LookupFunction } from 'node:net'
 import { request as httpsRequest } from 'node:https'
 import { Readable } from 'node:stream'
+import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
 
 import { isPrivateAddress } from './safe-fetch'
 
@@ -115,6 +116,22 @@ export const pinnedFetch: typeof fetch = async (input, init) => {
   new Headers(init?.headers).forEach((value, key) => {
     headers[key] = value
   })
+  /**
+   * DECOMPRESSION IS OURS NOW, and forgetting it was a live regression.
+   *
+   * `fetch` (undici) negotiates and transparently gunzips. `node:http` does
+   * neither — it hands back the raw body. Swapping the transport for the DNS
+   * guard therefore turned every crawled page into gzip bytes rendered as
+   * mojibake, and the corpus that reached the model began `\x1f\x8b` (the gzip
+   * magic number) instead of prose. Caught by walking the deployed flow.
+   *
+   * Both halves are needed: asking for the encodings we can undo, AND undoing
+   * whichever one arrives, because a server may compress regardless of what was
+   * asked.
+   */
+  if (!Object.keys(headers).some((h) => h.toLowerCase() === 'accept-encoding')) {
+    headers['accept-encoding'] = 'gzip, deflate, br'
+  }
 
   const options: RequestOptions = {
     method: init?.method ?? 'GET',
@@ -139,9 +156,23 @@ export const pinnedFetch: typeof fetch = async (input, init) => {
         return
       }
 
-      resolve(
-        new Response(Readable.toWeb(res) as ReadableStream<Uint8Array>, { status, headers: out }),
-      )
+      const encoding = String(res.headers['content-encoding'] ?? '').toLowerCase()
+      const decoder =
+        encoding === 'gzip'
+          ? createGunzip()
+          : encoding === 'deflate'
+            ? createInflate()
+            : encoding === 'br'
+              ? createBrotliDecompress()
+              : null
+      // `content-length` and `content-encoding` describe the COMPRESSED body and
+      // would both be lies about what the caller now reads.
+      if (decoder) {
+        out.delete('content-encoding')
+        out.delete('content-length')
+      }
+      const body = decoder ? res.pipe(decoder) : res
+      resolve(new Response(Readable.toWeb(body) as ReadableStream<Uint8Array>, { status, headers: out }))
     })
 
     req.on('error', reject)
