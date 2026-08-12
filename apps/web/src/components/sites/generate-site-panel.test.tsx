@@ -45,7 +45,7 @@ beforeEach(() => {
 
 describe('GenerateSitePanel', () => {
   test('the cost is on the button BEFORE the click, and a nameless site cannot spend', () => {
-    render(<GenerateSitePanel />)
+    render(<GenerateSitePanel limitNotice={null} />)
 
     const button = screen.getByRole('button', { name: /generate site · 100 credits/i })
     expect(button).toBeDisabled()
@@ -53,7 +53,7 @@ describe('GenerateSitePanel', () => {
   })
 
   test('one click sends name and goal', async () => {
-    render(<GenerateSitePanel />)
+    render(<GenerateSitePanel limitNotice={null} />)
 
     await userEvent.type(screen.getByLabelText(/site name/i), 'Sharma Dental')
     await userEvent.type(screen.getByLabelText(/goal/i), 'More bookings')
@@ -73,7 +73,7 @@ describe('GenerateSitePanel', () => {
       creditsCharged: 100,
     }
 
-    render(<GenerateSitePanel />)
+    render(<GenerateSitePanel limitNotice={null} />)
     await userEvent.type(screen.getByLabelText(/site name/i), 'A')
     await userEvent.click(screen.getByRole('button', { name: /generate site/i }))
 
@@ -83,7 +83,7 @@ describe('GenerateSitePanel', () => {
   test('insufficient credits shows the exact shortfall and the not-charged claim', async () => {
     state.result = { ok: false, insufficient: true, required: 100, available: 7 }
 
-    render(<GenerateSitePanel />)
+    render(<GenerateSitePanel limitNotice={null} />)
     await userEvent.type(screen.getByLabelText(/site name/i), 'A')
     await userEvent.click(screen.getByRole('button', { name: /generate site/i }))
 
@@ -103,7 +103,7 @@ describe('GenerateSitePanel', () => {
       message: 'The site could not be saved. You were not charged — try again.',
     }
 
-    render(<GenerateSitePanel />)
+    render(<GenerateSitePanel limitNotice={null} />)
     await userEvent.type(screen.getByLabelText(/site name/i), 'A')
     await userEvent.click(screen.getByRole('button', { name: /generate site/i }))
 
@@ -112,8 +112,30 @@ describe('GenerateSitePanel', () => {
     ).toBeInTheDocument()
   })
 
+  test('the plan limit is shown BEFORE the click and the button cannot spend', () => {
+    render(
+      <GenerateSitePanel limitNotice="Sites are on Starter and above — your Free plan doesn't include one." />,
+    )
+
+    expect(
+      screen.getByText(/sites are on starter and above — your free plan doesn't include one\./i),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /generate site/i })).toBeDisabled()
+  })
+
+  test('a blocked panel does not call the action even with a name filled in', async () => {
+    render(
+      <GenerateSitePanel limitNotice="Your Starter plan includes 1 site and you're using 1." />,
+    )
+
+    await userEvent.type(screen.getByLabelText(/site name/i), 'Sharma Dental')
+    await userEvent.click(screen.getByRole('button', { name: /generate site/i }))
+
+    expect(state.calls).toHaveLength(0)
+  })
+
   test('carries the seeded tour anchor', () => {
-    const { container } = render(<GenerateSitePanel />)
+    const { container } = render(<GenerateSitePanel limitNotice={null} />)
 
     expect(container.querySelector('[data-guide="sites.generate"]')).not.toBeNull()
   })

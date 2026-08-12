@@ -63,3 +63,62 @@ export async function listConnectedChannels(): Promise<Set<Channel>> {
 
 /** ConnectionPlatform is wider than Channel — a platform we cannot compose for is not one. */
 const CHANNEL_SET: ReadonlySet<Channel> = new Set(ChannelSchema.options)
+
+/**
+ * The identity of one connection, matching `upsert_zernio_connection`'s conflict
+ * target `(workspace_id, platform, external_account ->> 'id')`.
+ *
+ * Derived from the same tuple the database upserts on, because the whole point of
+ * the caller's partition is "would this write CREATE a row or UPDATE one" — and any
+ * key that disagrees with the conflict target answers a different question. Keying
+ * on `profileId` in particular would collapse every account under one Zernio profile
+ * into a single slot, which is most of a workspace's channels.
+ */
+export const connectionKey = (platform: string, accountId: string): string =>
+  `${platform}:${accountId}`
+
+export interface ConnectionSlots {
+  /** Every connection row for the workspace — this is the `channels` usage. */
+  count: number
+  /** `connectionKey` for each existing row. */
+  keys: ReadonlySet<string>
+}
+
+/**
+ * What this workspace already has connected, for the entitlements gate.
+ *
+ * `null` means COULD NOT READ. A caller must fail closed on it rather than treat it
+ * as an empty workspace: without this read there is no way to tell a REFRESH of an
+ * existing account (consumes no allowance) from a NEW one (does), and guessing wrong
+ * in the permissive direction is exactly the unbounded-channels hole this closes.
+ *
+ * Counts every row regardless of `status`. An `expired` or `revoked` connection is
+ * still an account occupying a slot — it can be reconnected without a new grant, and
+ * excluding it would let a workspace hold unlimited channels by letting them lapse.
+ *
+ * Takes `workspaceId` explicitly rather than reading the active-workspace cache: the
+ * OAuth return route derives the workspace from the session itself and must count
+ * against THAT one, not against whatever cookie happens to be set.
+ */
+export async function readConnectionSlots(workspaceId: string): Promise<ConnectionSlots | null> {
+  const supabase = createServerSupabase()
+  const { data, error } = await supabase
+    .from('connections')
+    .select('platform, external_account')
+    .eq('workspace_id', workspaceId)
+  if (error || !data) return null
+
+  const keys = new Set<string>()
+  for (const row of data) {
+    const platform = row.platform as string | null
+    const accountId = (row.external_account as { id?: unknown } | null)?.id
+    if (typeof platform === 'string' && typeof accountId === 'string') {
+      keys.add(connectionKey(platform, accountId))
+    }
+  }
+
+  // `count` is the ROW count, not `keys.size`. A row whose external_account is
+  // malformed still occupies a slot, and dropping it from the count would hand the
+  // workspace a free channel for every unparseable row it holds.
+  return { count: data.length, keys }
+}

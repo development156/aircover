@@ -109,9 +109,18 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
     const objectRef = newPlanWeekRef(workspace.id)
     const traceId = randomUUID()
 
-    // TODO(owner ruling #5): entitlements are a SEPARATE gate called BEFORE
-    // withCredits at every AI entry point. Mount it here once @sahoda/billing
-    // ships the gate helper — today only the credit balance limits this action.
+    // NO ENTITLEMENT GATE HERE, deliberately. The gate is mounted (see
+    // site-generate.ts and lib/billing/entitlements.ts) — this action has no
+    // dimension to gate on. `PLAN_CATALOG.limits` is {channels, sites, seats,
+    // loopLevel, twinSize}; planning a week is none of them. `loopLevel` is the
+    // maximum AUTONOMY level for the Loop, which is unbuilt, and this is a
+    // user-clicked manual action — gating it on loopLevel would refuse a free
+    // customer the credits they were granted to spend.
+    //
+    // A `checkEntitlement({ workspaceId })` with no dimension was considered and
+    // rejected: it returns `allowed: true` unconditionally, so it would read as a
+    // gate to every future maintainer while enforcing nothing. Credits are the real
+    // and only limit on this action, and `withCredits` below is what applies them.
     let failure: string | null = null
     let delivered = false
     let created = 0

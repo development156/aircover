@@ -22,7 +22,7 @@ import { AlertCircle, CheckCircle2, Info, TriangleAlert } from 'lucide-react'
  * what exists, and it is read from the database.
  */
 
-export type ConnectOutcome = 'connected' | 'partial' | 'error' | 'nothing'
+export type ConnectOutcome = 'connected' | 'partial' | 'error' | 'limit' | 'nothing'
 
 interface OutcomeCopy {
   readonly title: string
@@ -52,6 +52,16 @@ const OUTCOMES: Readonly<Record<ConnectOutcome, OutcomeCopy>> = {
     body: 'Nothing was changed. Try connecting the channel again.',
     icon: AlertCircle,
     tone: 'border-danger bg-danger-bg text-danger',
+  },
+  limit: {
+    // Not `partial`, and not `error`. Nothing failed — we declined to add these,
+    // which is a different thing and has a different fix. Saying "didn't finish
+    // connecting" would send them to reconnect an account that will be declined
+    // again for the same reason.
+    title: 'Your plan is full',
+    body: 'Everything we could add is listed below. The rest are still connected on the platform — connect again once your plan has room and they’ll be picked up.',
+    icon: Info,
+    tone: 'border-line bg-s1 text-muted',
   },
   nothing: {
     title: 'Nothing new to connect',

@@ -117,9 +117,15 @@ export async function generateVariants(postId: string, channels: unknown): Promi
     const objectRef = newVariantsObjectRef(workspace.id)
     const traceId = randomUUID()
 
-    // TODO(owner ruling #5): entitlements are a SEPARATE gate called BEFORE
-    // withCredits at every AI entry point. Mount it here once @sahoda/billing
-    // ships the gate helper — today only the credit balance limits this action.
+    // NO ENTITLEMENT GATE HERE, deliberately — no PLAN_CATALOG dimension covers
+    // generating variants. See the long note in plan-week.ts for the full reasoning
+    // and for why an argument-less `checkEntitlement` call was rejected rather than
+    // added. Credits are the real limit; `withCredits` below applies them.
+    //
+    // The CHANNELS limit is enforced where channels are acquired (the Zernio return
+    // route), not here: this action writes variants for channels the workspace has
+    // already connected, and refusing at composition time would block a customer
+    // from using a connection they legitimately hold.
     let failure: string | null = null
     let delivered = false
     let generated: GeneratedVariant[] = []
@@ -240,7 +246,8 @@ export async function rewriteCaption(
     const objectRef = newCaptionRewriteRef(workspace.id)
     const traceId = randomUUID()
 
-    // TODO(owner ruling #5): entitlement gate goes here, before withCredits.
+    // NO ENTITLEMENT GATE HERE, deliberately — rewriting a caption maps to no
+    // PLAN_CATALOG dimension. Same reasoning as generateVariants above.
     let failure: string | null = null
     let delivered = false
     let rewritten = ''

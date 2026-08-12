@@ -56,6 +56,29 @@ export async function recentSites(limit = 3): Promise<Site[] | null> {
     .map((parsed) => parsed.data)
 }
 
+/**
+ * How many sites this workspace has — the `currentUsage` the entitlements gate
+ * needs. `null` means COULD NOT COUNT, never 0, and every caller must treat it as a
+ * refusal: the whole point of the gate is that a Starter workspace with its one site
+ * cannot generate a second, and a count that silently degraded to 0 would hand it
+ * back the unlimited behaviour the gate exists to remove.
+ *
+ * Takes `workspaceId` explicitly instead of reading the active-workspace cache, so
+ * the number is bound to the SAME workspace the caller is about to insert into. It
+ * counts every row including drafts, because `sites.status` never leaves 'draft'
+ * today — counting only published sites would count nothing at all.
+ */
+export async function countSites(workspaceId: string): Promise<number | null> {
+  const supabase = createServerSupabase()
+  const { count, error } = await supabase
+    .from('sites')
+    .select('id', { count: 'exact', head: true })
+    .eq('workspace_id', workspaceId)
+
+  if (error || count === null || count === undefined) return null
+  return count
+}
+
 export interface SiteTree {
   pages: SitePage[]
   sections: SiteSection[]

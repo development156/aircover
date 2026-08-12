@@ -64,3 +64,34 @@ export const PLAN_CATALOG: Record<PlanId, PlanCatalogEntry> = {
 
 /** Entitlements for a plan (from the catalog; Alpha never edits them). */
 export const getEntitlements = (planId: PlanId): PlanLimits => PLAN_CATALOG[planId].limits
+
+/**
+ * The cheapest plan whose `dimension` limit is at least `needed`, or `null` when no
+ * plan in the catalog reaches it.
+ *
+ * Exists so upgrade copy is DERIVED rather than written. The obvious hand-written
+ * sentence for a blocked site — "Sites are on Growth and above" — is false: `sites`
+ * is 0 on Free but 1 on Starter, so it names a plan three times the price of the one
+ * the customer actually needs. A sentence built from this function cannot drift from
+ * the catalog it describes.
+ *
+ * Deliberately a plain catalog query with NO entitlement semantics baked in: the
+ * caller converts its own question into `needed` (a countable dimension asks for
+ * `currentUsage + 1`; a level dimension asks for the level itself). That keeps the
+ * countable-vs-level distinction in exactly one place — `checkEntitlement`'s
+ * `isAllowed` — instead of restating it here where it could disagree.
+ *
+ * Ordered by `priceInr`, not by declaration order: "cheapest" is a price question,
+ * and a catalog reordering must not silently change which plan gets recommended.
+ */
+export function cheapestPlanWithAtLeast(
+  dimension: keyof PlanLimits,
+  needed: number,
+): PlanCatalogEntry | null {
+  return (
+    Object.values(PLAN_CATALOG)
+      .slice()
+      .sort((a, b) => a.priceInr - b.priceInr)
+      .find((plan) => plan.limits[dimension] >= needed) ?? null
+  )
+}

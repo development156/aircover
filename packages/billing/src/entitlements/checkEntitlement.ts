@@ -91,7 +91,11 @@ export type CheckEntitlementFn = (input: EntitlementCheckInput) => Promise<Resul
  *      or a count and insert in one statement), or
  *   2. relying on a DB constraint that bounds the resource per workspace.
  * No such constraint exists today — `subscriptions_one_live` bounds subscriptions, not resource
- * counts — so option 1 is the only live remedy. Filed in REQUESTS.md §8.
+ * counts — so option 1 is the only live remedy. Filed in docs/ux-findings.md (F4) and
+ * apps/web/REQUESTS.md. (This said "REQUESTS.md §8", which pointed at nothing: the
+ * mirrored packages/billing/REQUESTS.md does not exist and apps/web/REQUESTS.md has no
+ * numbered sections — so the caveat was filed nowhere at all until wt-limits mounted
+ * the gate and rediscovered it.)
  *
  * Deliberately NOT solved inside this package: the gate has no transaction to join (it must run
  * from apps/jobs as well as a server action), and only the caller knows the write it is about to

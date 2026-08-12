@@ -35,6 +35,14 @@ const state = vi.hoisted(() => ({
   insufficient: false,
   lostAck: false,
   deleteThrows: false,
+  /** What `countSites` reads back. `null` count = the read failed (never "zero sites"). */
+  siteCount: 0 as number | null,
+  siteCountError: null as { code: string } | null,
+  /** The entitlements verdict for this run. */
+  limitVerdict: { kind: 'allowed', limit: 1 } as
+    | { kind: 'allowed'; limit: number }
+    | { kind: 'blocked'; sentence: string }
+    | { kind: 'unknown' },
   /** `loadBillingEnv` throws its fail-fast error (SUPABASE_DB_URL unset on the deployment). */
   billingEnvMissing: false,
   /** `createMesh` throws its fail-fast error (a mesh key unset on the deployment). */
@@ -46,6 +54,8 @@ const state = vi.hoisted(() => ({
     sectionRows: [] as Array<Record<string, unknown>>,
     siteDeletes: [] as string[],
     meshRuns: 0,
+    /** Every entitlements question the action asked, in order. */
+    limitChecks: [] as Array<{ workspaceId: string; dimension: string; currentUsage: number }>,
   },
 }))
 
@@ -128,9 +138,25 @@ vi.mock('@sahoda/mesh', async (importOriginal) => {
   }
 })
 
+vi.mock('@/lib/billing/entitlements', () => ({
+  checkCountableLimit: (workspaceId: string, dimension: string, currentUsage: number) => {
+    state.calls.limitChecks.push({ workspaceId, dimension, currentUsage })
+    return Promise.resolve(state.limitVerdict)
+  },
+}))
+
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: () => ({
     from: (table: string) => ({
+      // `countSites` — head+count read. Distinct from the `insert(...).select(...)`
+      // chain below, which hangs off the insert result rather than off `from`.
+      select: () => ({
+        eq: () =>
+          Promise.resolve({
+            count: state.siteCountError ? null : state.siteCount,
+            error: state.siteCountError,
+          }),
+      }),
       insert: (rows: Record<string, unknown> | Array<Record<string, unknown>>) => {
         if (table === 'sites') {
           state.calls.siteRows.push(rows as Record<string, unknown>)
@@ -179,6 +205,9 @@ beforeEach(async () => {
   state.deleteThrows = false
   state.billingEnvMissing = false
   state.meshEnvMissing = false
+  state.siteCount = 0
+  state.siteCountError = null
+  state.limitVerdict = { kind: 'allowed', limit: 1 }
   state.calls = {
     configs: [],
     siteRows: [],
@@ -186,6 +215,7 @@ beforeEach(async () => {
     sectionRows: [],
     siteDeletes: [],
     meshRuns: 0,
+    limitChecks: [],
   }
   vi.mocked((await import('next/cache')).revalidatePath).mockClear()
 })
@@ -293,6 +323,90 @@ describe('generateSite', () => {
 
     expect(result.ok).toBe(false)
     expect(state.calls.configs).toHaveLength(0)
+  })
+})
+
+/**
+ * The entitlements gate (owner ruling #5). Every test here is about ORDER as much
+ * as outcome: a refusal that lands after the credit hold is worse than no gate,
+ * because the customer watches credits move for an action their plan forbids and
+ * "you were not charged" stops being checkable.
+ */
+describe('generateSite — the plan gate', () => {
+  test('a blocked plan refuses BEFORE the hold: no ledger call, no model run', async () => {
+    state.limitVerdict = {
+      kind: 'blocked',
+      sentence: "Sites are on Starter and above — your Free plan doesn't include one.",
+    }
+
+    const result = await generateSite('Sharma Dental', 'More bookings')
+
+    // ⚠ MUTATION WITNESS. Delete the `limit.kind === 'blocked'` branch from
+    // site-generate.ts and this test fails: the action runs the model and takes
+    // the hold for a site the plan does not allow.
+    expect(state.calls.configs).toHaveLength(0)
+    expect(state.calls.meshRuns).toBe(0)
+    expect(state.calls.siteRows).toHaveLength(0)
+
+    expect(result).toMatchObject({ ok: false, insufficient: false })
+    if (!result.ok && !result.insufficient) {
+      expect(result.message).toContain('Sites are on Starter and above')
+      // Verifiable, not hopeful: no HOLD exists at the line that returns this.
+      expect(result.message).toContain('you were not charged')
+    }
+  })
+
+  test('the gate is asked with the REAL site count, not a placeholder', async () => {
+    state.siteCount = 1
+
+    await generateSite('Second Site', '')
+
+    // ⚠ MUTATION WITNESS. Drop `currentUsage` (or hardcode 0) at the call site and
+    // this fails. Without it the gate answers the weaker `limit > 0` question,
+    // which admits every paid tier without bound — see lib/billing/limit-gates.test.ts.
+    expect(state.calls.limitChecks).toEqual([
+      { workspaceId: WS_ID, dimension: 'sites', currentUsage: 1 },
+    ])
+  })
+
+  test('an unreadable site count refuses — it must never read as "you have none"', async () => {
+    state.siteCountError = { code: '42501' }
+
+    const result = await generateSite('A', '')
+
+    expect(state.calls.limitChecks).toHaveLength(0)
+    expect(state.calls.configs).toHaveLength(0)
+    expect(state.calls.meshRuns).toBe(0)
+    if (!result.ok && !result.insufficient) {
+      expect(result.message).toMatch(/couldn't check how many sites/i)
+      expect(result.message).toContain('you were not charged')
+    }
+  })
+
+  test('an unanswerable plan refuses without naming a plan we never read', async () => {
+    state.limitVerdict = { kind: 'unknown' }
+
+    const result = await generateSite('A', '')
+
+    expect(state.calls.configs).toHaveLength(0)
+    expect(state.calls.meshRuns).toBe(0)
+    if (!result.ok && !result.insufficient) {
+      expect(result.message).toMatch(/couldn't check your plan/i)
+      // Naming a plan here would send them to buy an upgrade for OUR outage.
+      expect(result.message).not.toMatch(/free|starter|growth|agency/i)
+      expect(result.message).toContain('you were not charged')
+    }
+  })
+
+  test('an allowed plan is invisible: the happy path still charges and inserts', async () => {
+    state.siteCount = 0
+    state.limitVerdict = { kind: 'allowed', limit: 1 }
+
+    const result = await generateSite('Sharma Dental', '')
+
+    expect(result.ok).toBe(true)
+    expect(state.calls.configs).toHaveLength(1)
+    expect(state.calls.siteRows).toHaveLength(1)
   })
 })
 

@@ -2,6 +2,8 @@ import { auth } from '@clerk/nextjs/server'
 import { ensureZernioProfile } from '@sahoda/publishing'
 import { isZernioPlatform, type ZernioPlatform } from '@sahoda/shared'
 
+import { checkCountableLimit } from '@/lib/billing/entitlements'
+import { readConnectionSlots } from '@/lib/connections/read'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
@@ -62,6 +64,31 @@ export async function POST(request: Request): Promise<Response> {
     const workspace = await getActiveWorkspace()
     if (!workspace) return fail('Create a workspace first.', 400)
     workspaceId = workspace.id
+
+    // ── THE CHANNELS PLAN LIMIT, ENFORCED BEFORE THE CONSENT SCREEN ──────────
+    // The return route enforces this too, and has to — it is the only place that
+    // knows what Zernio actually handed back. But enforcing ONLY there means the
+    // refusal lands after the customer has approved third-party access to their
+    // Instagram account on the platform's own screen. That grant is real and
+    // external; we cannot undo it, and "your plan is full" afterwards is precisely
+    // the failure-after-commitment this gate exists to prevent. For a paid action
+    // the commitment is a credit hold; for a channel it is an OAuth grant, and this
+    // is the line before it.
+    //
+    // Placed above `ensureZernioProfile` on purpose: that call CREATES a profile at
+    // Zernio for workspaces that have none, and there is no reason to provision one
+    // for a connect that is about to be refused.
+    //
+    // The disabled buttons on /connections are courtesy, not enforcement — a stale
+    // page, a second tab, or a direct POST all reach this route with the buttons
+    // never consulted.
+    const slots = await readConnectionSlots(workspace.id)
+    // Fail closed: without the count we cannot say there is room.
+    if (slots === null) return fail('Couldn’t check your plan — try again.', 500)
+
+    const limit = await checkCountableLimit(workspace.id, 'channels', slots.count)
+    if (limit.kind === 'blocked') return fail(limit.sentence, 403)
+    if (limit.kind === 'unknown') return fail('Couldn’t check your plan — try again.', 503)
 
     const profileId = await ensureZernioProfile(client, {
       workspaceId: workspace.id,

@@ -14,9 +14,11 @@ import {
   reportPaidActionFailure,
 } from '@/lib/actions/paid-failure'
 import { revalidateBalance } from '@/lib/actions/revalidate-balance'
+import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { reportServerError } from '@/lib/observability/report'
 import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
 import { newSiteGenerateRef } from '@/lib/sites/object-ref'
+import { countSites } from '@/lib/sites/read'
 import { draftSlug } from '@/lib/sites/slug'
 import type { GenerateSiteState } from '@/lib/sites/state'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -25,6 +27,15 @@ import { getActiveWorkspace } from '@/lib/workspaces'
 /** Model-input caps — same reasoning as plan-week's GOALS_MAX_CHARS. */
 const NAME_MAX_CHARS = 80
 const GOAL_MAX_CHARS = 500
+
+/**
+ * Entitlement refusal copy. All three are pre-HOLD, so the not-charged claim is
+ * verifiable rather than hopeful — this is the payoff for gating before
+ * `withCredits` rather than inside it.
+ */
+const NOT_GENERATED = 'Nothing was generated and you were not charged.'
+const COUNT_UNREADABLE = `Couldn't check how many sites you already have. ${NOT_GENERATED} Reload and try again.`
+const PLAN_UNREADABLE = `Couldn't check your plan just now. ${NOT_GENERATED} Try again in a moment.`
 
 /** Alpha generates the homepage; more pages when the deploy half exists. */
 const PAGES_V0 = 1
@@ -82,11 +93,49 @@ export async function generateSite(name: unknown, goal: unknown): Promise<Genera
       return { ok: false, insufficient: false, message: 'Name your site first.' }
     }
 
+    // ── ENTITLEMENTS GATE (owner ruling #5) ──────────────────────────────────
+    // BEFORE `withCredits`, and before the objectRef that keys the ledger. A plan
+    // refusal that arrives AFTER a hold is worse than no check at all: the customer
+    // watches credits move for an action their plan was never going to allow, and
+    // "you were not charged" stops being verifiable. Refusing here makes that claim
+    // true by construction — no HOLD has been taken at this line.
+    //
+    // Free allows `sites: 0`, so before this gate existed a free workspace could
+    // spend all 100 of its granted credits on the one thing its plan forbids.
+    //
+    // The count is REAL and passed in, never omitted — see the CALLER OBLIGATION on
+    // `createCheckEntitlement` and the warning on `checkCountableLimit`. Omitting it
+    // still refuses Free (`limit > 0` is false at 0) while admitting a Starter
+    // workspace that already holds its single site, forever.
+    //
+    // ⚠ RESIDUAL TOCTOU, accepted in this lane. This counts and then inserts in
+    // separate statements, so two concurrent generates on Starter can both read 0
+    // and both insert. The gate's own doc names the only two remedies — count inside
+    // the inserting transaction, or a DB constraint bounding rows per workspace. The
+    // inserts below are three separate PostgREST calls (not one transaction), and
+    // only wt-db may add a constraint. Neither is available here. Filed as F4 in
+    // docs/ux-findings.md. The window is narrow and the failure is over-provisioning
+    // a paid resource, not a charge for nothing.
+    const siteCount = await countSites(workspace.id)
+    if (siteCount === null) {
+      // Fail CLOSED. An unreadable count must never read as zero — the same
+      // unreadable-≠-zero rule `recentSites` already follows two files over.
+      return { ok: false, insufficient: false, message: COUNT_UNREADABLE }
+    }
+
+    const limit = await checkCountableLimit(workspace.id, 'sites', siteCount)
+    if (limit.kind === 'blocked') {
+      return { ok: false, insufficient: false, message: `${limit.sentence} ${NOT_GENERATED}` }
+    }
+    if (limit.kind === 'unknown') {
+      // The gate could not answer. Refuse, but say whose problem it is — naming a
+      // plan we failed to read would send them to a pricing page for our outage.
+      return { ok: false, insufficient: false, message: PLAN_UNREADABLE }
+    }
+
     const objectRef = newSiteGenerateRef(workspace.id)
     const traceId = randomUUID()
 
-    // TODO(owner ruling #5): entitlements gate BEFORE withCredits, once
-    // @sahoda/billing ships the helper — same note as posts-ai/plan-week.
     let failure: string | null = null
     let delivered = false
     let outcome = { siteId: '', slug: '', pages: 0, dropped: 0 }
