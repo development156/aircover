@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { AdapterError } from '@sahoda/shared'
 import { createFixtureAdapter } from '@sahoda/publishing'
-import type { PublishAdapter, PublishPostPayload } from '@sahoda/shared'
+import type {
+  GateCheckInput,
+  GateVerdict,
+  PublishAdapter,
+  PublishGate,
+  PublishPostPayload,
+  RuleSet,
+} from '@sahoda/shared'
 import {
   runPublishPost,
   type PublishJobContext,
@@ -23,8 +30,56 @@ const ctx: PublishJobContext = { attempt: 1, jobRunId: 'run_abc' }
 
 const SECRET = 'super-secret-access-token'
 
+// ── The refusal gate, as a test double ───────────────────────────────────────
+// A real RuleSet rather than a stub, so a verdict built here is the same shape
+// `resolveRuleSet` produces and a field added there cannot be forgotten here.
+const RULE_SET: RuleSet = {
+  ruleSetVersion: 'regime-_floor@2026.08',
+  packs: [{ id: 'regime-_floor', version: '2026.08' }],
+  rules: [],
+  regime: { value: 'consumer', locale: 'IN', basis: 'default' },
+}
+
+const passVerdict = (): GateVerdict => ({
+  decision: 'pass',
+  findings: [],
+  ruleSet: RULE_SET,
+  brandVersion: 2,
+  checks: { hard: 'ran', classifier: 'ran' },
+  classifierModel: 'test-model',
+})
+
+const blockVerdict = (): GateVerdict => ({
+  decision: 'block',
+  findings: [
+    {
+      ruleId: 'health.no-cure-claim',
+      tier: 'mandated',
+      statement: 'A treatment may not be advertised as a cure.',
+      source: 'packs/regime/healthcare.md',
+      layer: 'hard',
+      quote: 'cure',
+      rewrite: 'Describe what the treatment does.',
+    },
+  ],
+  ruleSet: RULE_SET,
+  brandVersion: 2,
+  checks: { hard: 'ran', classifier: 'skipped-already-blocked' },
+})
+
+const holdVerdict = (): GateVerdict => ({
+  decision: 'hold',
+  findings: [],
+  ruleSet: RULE_SET,
+  brandVersion: 2,
+  checks: { hard: 'ran', classifier: 'timeout' },
+  holdReason: 'The wording check did not finish in time.',
+})
+
 interface Harness {
   deps: PublishPostDeps
+  /** Every call the publish core made to the gate, in order. */
+  gateChecks: GateCheckInput[]
   logs: PublishLogEntry[]
   variantUpdates: VariantUpdate[]
   connectionUpdates: { connectionId: string; status: string }[]
@@ -35,7 +90,18 @@ function harness(over: Partial<PublishPostDeps> & { variant?: Partial<PublishVar
   const logs: PublishLogEntry[] = []
   const variantUpdates: VariantUpdate[] = []
   const connectionUpdates: { connectionId: string; status: string }[] = []
+  const gateChecks: GateCheckInput[] = []
   let adapterCalls = 0
+
+  // Wraps whatever gate the test supplied so `gateChecks` records the call
+  // either way. A test that overrides the verdict still proves the gate RAN.
+  const inner = over.gate
+  const gate: PublishGate = {
+    check: async (input) => {
+      gateChecks.push(input)
+      return inner ? inner.check(input) : passVerdict()
+    },
+  }
 
   const variant: PublishVariant = {
     variantId: payload.variantId,
@@ -72,6 +138,9 @@ function harness(over: Partial<PublishPostDeps> & { variant?: Partial<PublishVar
       connectionUpdates.push({ connectionId, status })
     },
     ...over,
+    // AFTER the spread on purpose: `over.gate` is already wrapped above, and
+    // letting the raw one back in would lose the recording.
+    gate,
   }
 
   const h: Harness = {
@@ -79,6 +148,7 @@ function harness(over: Partial<PublishPostDeps> & { variant?: Partial<PublishVar
     logs,
     variantUpdates,
     connectionUpdates,
+    gateChecks,
     get adapterCalls() {
       return adapterCalls
     },
@@ -290,5 +360,136 @@ describe('runPublishPost', () => {
     expect(out).toMatchObject({ status: 'failed', classification: 'permanent' })
     expect(out).toHaveProperty('code', 'VARIANT_NOT_FOUND')
     expect(h.logs).toHaveLength(1)
+  })
+})
+
+/**
+ * THE GATE IS A CONDITION OF PUBLISHING, NOT A PREFLIGHT (doc 18 §8).
+ *
+ * Every test here is a way the gate could stop being one — by not running, by
+ * running too late, by being talked round, or by leaving a refusal a person
+ * cannot act on. `mutations/publish-gate.mjs` re-runs this file against a
+ * deliberately broken gate; if any of these can pass while the gate is gone,
+ * that spec reports a survivor.
+ */
+describe('runPublishPost — the refusal gate', () => {
+  it('checks every publish, including one that goes on to succeed', async () => {
+    const h = harness()
+
+    await runPublishPost(payload, ctx, h.deps)
+
+    expect(h.gateChecks).toHaveLength(1)
+    expect(h.gateChecks[0]).toMatchObject({
+      postId: payload.postId,
+      variantId: payload.variantId,
+      channel: 'x',
+      jobRunId: 'run_abc',
+    })
+  })
+
+  it('checks the words that will be published, hashtag tail included', async () => {
+    // A red line written into a hashtag is still on the post. Gating
+    // `variant.body` would miss it, because `formatForPlatform` appends the tail.
+    const h = harness({ variant: { body: 'Open late', hashtags: ['guaranteedresults'] } })
+
+    await runPublishPost(payload, ctx, h.deps)
+
+    expect(h.gateChecks[0]?.text).toContain('#guaranteedresults')
+  })
+
+  it('blocks before the adapter is ever reached', async () => {
+    const h = harness({ gate: { check: async () => blockVerdict() } })
+
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toMatchObject({ status: 'failed', classification: 'permanent' })
+    expect(out).toHaveProperty('code', 'GATE_BLOCKED')
+    // Nothing was sent anywhere.
+    expect(h.adapterCalls).toBe(0)
+  })
+
+  it('blocks before a token is resolved', async () => {
+    // A post that is not going out has no business causing a decrypt.
+    let resolved = 0
+    const h = harness({
+      gate: { check: async () => blockVerdict() },
+      resolveConnection: async () => {
+        resolved += 1
+        throw new Error('should never be reached')
+      },
+    })
+
+    await runPublishPost(payload, ctx, h.deps)
+
+    expect(resolved).toBe(0)
+  })
+
+  it('holds — does not publish — when the gate could not decide', async () => {
+    // Ambiguity is not permission. A timeout is the state that looks most like
+    // nothing happened, which is exactly why it is the one tested here.
+    const h = harness({ gate: { check: async () => holdVerdict() } })
+
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toMatchObject({ status: 'failed' })
+    expect(out).toHaveProperty('code', 'GATE_HELD')
+    expect(h.adapterCalls).toBe(0)
+  })
+
+  it('records the refusal in a form a person can act on', async () => {
+    const h = harness({ gate: { check: async () => blockVerdict() } })
+
+    await runPublishPost(payload, ctx, h.deps)
+
+    // Named line, inherited-vs-theirs, and the rewrite — requirement 3, as
+    // STRUCTURE. `describePublishError` in apps/web never echoes a stored
+    // message, so a refusal carried as prose would arrive on screen as "something
+    // went wrong".
+    expect(h.logs[0]?.error?.gate).toMatchObject({
+      decision: 'block',
+      ruleSetVersion: 'regime-_floor@2026.08',
+      brandVersion: 2,
+      regime: { value: 'consumer', basis: 'default' },
+      findings: [
+        {
+          ruleId: 'health.no-cure-claim',
+          tier: 'mandated',
+          statement: 'A treatment may not be advertised as a cure.',
+          quote: 'cure',
+          rewrite: 'Describe what the treatment does.',
+        },
+      ],
+    })
+  })
+
+  it('leaves the variant retryable after a refusal, not stranded', async () => {
+    // `failed` and not `skipped`: `skipped` is absent from claimVariant's
+    // predicate, so a held variant could never be claimed again and the writer's
+    // second press would return a 409 saying the post was already going out.
+    const h = harness({ gate: { check: async () => holdVerdict() } })
+
+    await runPublishPost(payload, ctx, h.deps)
+
+    expect(h.variantUpdates).toHaveLength(1)
+    expect(h.variantUpdates[0]).toMatchObject({ publishStatus: 'failed' })
+    expect(h.variantUpdates[0]?.lastError?.gate?.holdReason).toBeTruthy()
+  })
+
+  it('does not ask the gate about a variant the Constraint Engine already refused', async () => {
+    // Gating a 600-character X post spends a model call to refuse it twice.
+    const h = harness({ variant: { body: 'x'.repeat(400) } })
+
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toHaveProperty('code', 'MAX_CHARS')
+    expect(h.gateChecks).toHaveLength(0)
+  })
+
+  it('does not ask the gate about a channel this release cannot publish to', async () => {
+    const h = harness({ loadVariant: async () => null })
+
+    await runPublishPost(payload, ctx, h.deps)
+
+    expect(h.gateChecks).toHaveLength(0)
   })
 })

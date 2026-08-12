@@ -91,6 +91,7 @@ describe('selectStatusRows — the filter both the render and the poll share', (
     simulated: false,
     errorMessage: null,
     errorCode: null,
+    gateRefusal: null,
     retryable: true,
     ...over,
   })

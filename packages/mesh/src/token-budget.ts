@@ -56,6 +56,23 @@ export const TOKEN_EVIDENCE: Record<
     observedMax: 210,
     source: 'ai_provider_logs max over 3 rows',
   },
+  gate_classify: {
+    // NOT A MEASUREMENT, and it must not be read as one. No gate_classify call
+    // has been made against a provider, so there is no single-pass observation
+    // to seed from and this file's own rule forbids inventing one.
+    //
+    // What this number IS: the structural size of the largest legal answer.
+    // GATE_CLASSIFY_MAX_RULES is 24, the schema permits one finding per rule,
+    // and a finding carrying a quote, a reason and a rewrite runs ~60 tokens.
+    // 24 x 60 = 1440. It is a bound on the SHAPE, which the input schema
+    // enforces, rather than on observed behaviour.
+    //
+    // Replace it with a real observation on the first live run. Until then the
+    // ceiling is deliberately well clear of it: truncation here does not
+    // degrade to a weaker check, it fails the zod parse and HOLDS the post.
+    observedMax: 1440,
+    source: 'UNKNOWN — no live run; structural bound from GATE_CLASSIFY_MAX_RULES x ~60 tokens',
+  },
   site_generate: {
     // 4,980 is a repaired sum against a 4,096 ceiling. The true single-pass need
     // is UNKNOWN — the sum hides it — so this is the ceiling itself, treated as

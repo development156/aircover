@@ -5,6 +5,10 @@ import { createAdapterSelector } from './adapters'
 import { createStorageReader, createZernioMediaHost } from './media'
 import { createConnectionResolver } from './tokens'
 import type { ClaimedPublishDeps } from './runClaimedPublish'
+import { createGateClassifier } from '../gate/classifier'
+import { createPublishGate } from '../gate/gate'
+import { createGateStore } from '../gate/store'
+import { getMesh } from '../ai/mesh'
 
 /** Dependencies for one publishPost attempt. */
 export function publishPostDeps(): ClaimedPublishDeps {
@@ -28,8 +32,22 @@ export function publishPostDeps(): ClaimedPublishDeps {
       })
     : undefined
 
+  // The refusal gate. Built here rather than passed in because it is not
+  // optional and never has been — see `PublishPostDeps.gate`. It shares the same
+  // pool as everything else in this object: the gate reads one row and writes
+  // one, and a second pool for two statements would be a pool per publish.
+  //
+  // `getMesh()` is a process-wide singleton, so the classifier costs nothing to
+  // construct on a tick that never reaches it.
+  const gateStore = createGateStore({ pool })
+
   return {
     mode: env.publishMode,
+    gate: createPublishGate({
+      loadGateContext: gateStore.loadGateContext,
+      writeGateAudit: gateStore.writeGateAudit,
+      classifier: createGateClassifier({ runTask: getMesh().runTask }),
+    }),
     loadVariant: store.loadVariant,
     // The concurrency seam. Without these two a second cron tick publishes the
     // same post again, which is the failure this whole path exists to prevent.

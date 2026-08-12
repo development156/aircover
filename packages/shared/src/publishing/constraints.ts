@@ -62,6 +62,29 @@ export type FormattedContent =
   | { channel: 'linkedin'; text: string; media: MediaRef[] }
   | { channel: 'instagram'; caption: string; media: MediaRef[] }
 
+/**
+ * The words that will actually appear on the platform, whatever the channel
+ * called the field.
+ *
+ * Four arms name the same thing four ways (`text`, `summary`, `caption`), which
+ * is correct for adapters — each mirrors its platform's own API — and useless
+ * for anything that reads the post rather than sends it. The refusal gate is the
+ * first such reader: it must check what goes out, including the hashtag tail
+ * `formatForPlatform` appends, and a gate that read `variant.body` instead would
+ * miss a red line written into a hashtag.
+ */
+export function publishedTextOf(content: FormattedContent): string {
+  switch (content.channel) {
+    case 'x':
+    case 'linkedin':
+      return content.text
+    case 'gbp':
+      return content.summary
+    case 'instagram':
+      return content.caption
+  }
+}
+
 export interface ConstraintViolation {
   code: string
   message: string

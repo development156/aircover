@@ -129,6 +129,29 @@ const COPY: Record<string, PublishErrorDisplay> = {
     worthRetrying: false,
     needsReconnect: true,
   },
+  // ── The refusal gate (doc 18 §8) ───────────────────────────────────────────
+  // These two are the LAST RESORT, not the refusal. The real one is rendered by
+  // `GateRefusalNote` from `last_error.gate`, which names the rule, says whether
+  // it is inherited or theirs, and offers the rewrite. This copy is what shows
+  // when that structure is missing — an old row, or a shape we cannot read — and
+  // it is written to still be actionable rather than to say "something went
+  // wrong", because that sentence is what teaches people to route around us.
+  GATE_BLOCKED: {
+    message:
+      'This breaks a rule your brand is held to, so it was not sent. Reword it and try again.',
+    // FALSE on purpose. The identical words will be refused identically, so a
+    // retry button here would be an invitation to a loop.
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  GATE_HELD: {
+    message: 'This is waiting for a person to read it before it goes out. Nothing was sent.',
+    // TRUE: a hold is usually the check being unavailable or unsure, and the
+    // same words may well clear on a second run.
+    worthRetrying: true,
+    needsReconnect: false,
+  },
+
   POST_NOT_PUBLISHABLE: {
     message: 'This post is no longer in a state that can be published.',
     worthRetrying: false,

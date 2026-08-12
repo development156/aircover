@@ -39,6 +39,12 @@ export const TASK_TIER: Record<MeshTaskName, ModelTier> = {
   caption_rewrite: 'economy',
   plan_week: 'standard',
   site_generate: 'premium',
+  // The refusal gate's classifier. Standard rather than economy because it is
+  // the last thing between a draft and a public account, and because the
+  // purpose-built guardrail route doc 18 §10 calls for does not exist — see
+  // tasks/gate-classify.ts. Economy here would trade a held clinic post for
+  // fractions of a cent.
+  gate_classify: 'standard',
   // Images do not use TIER_ROUTES at all — those are chat models. The tier is
   // recorded because MeshTaskDef requires one and telemetry reads it; the model
   // comes from IMAGE_ROUTES below.

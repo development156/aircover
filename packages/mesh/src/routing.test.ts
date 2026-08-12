@@ -29,8 +29,11 @@ describe('task → tier map', () => {
     // Count guard: a new mesh task must be a deliberate decision here, not a
     // silent addition. image_generate brought it to 6; brand_extract — the URL
     // door's quarantined extractor — to 7, at standard tier because it reads
-    // adversarial customer text and a bad read becomes the Brain.
-    expect(names.length).toBe(7)
+    // adversarial customer text and a bad read becomes the Brain. gate_classify
+    // — the refusal gate's layer 3 — to 8, also standard: it is the last thing
+    // between a draft and a public account, and the purpose-built guardrail
+    // route doc 18 §10 asks for does not exist to route it to.
+    expect(names.length).toBe(8)
     for (const name of names) {
       const tier = TASK_TIER[name]
       expect(ModelTierSchema.options, name).toContain(tier)

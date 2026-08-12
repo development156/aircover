@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ChannelSchema, SectionKindSchema } from '../enums'
 import { BrandMemoryPayloadSchema } from '../brand/resolve'
+import { ClassifierFindingSchema, RuleTierSchema } from '../gate/rules'
 import type { ActionType } from '../ledger/pricing'
 
 /** The Alpha mesh tasks. */
@@ -12,6 +13,9 @@ export const MeshTaskNameSchema = z.enum([
   'plan_week',
   'site_generate',
   'image_generate',
+  // The refusal gate's classifier. Not a user-invoked action and never charged
+  // — see `gate-classify.ts` for why a mandatory check may not cost credits.
+  'gate_classify',
 ])
 export type MeshTaskName = z.infer<typeof MeshTaskNameSchema>
 
@@ -160,6 +164,51 @@ export type CaptionRewriteInput = z.infer<typeof CaptionRewriteInputSchema>
 export const CaptionRewriteOutputSchema = z.object({ text: z.string() })
 export type CaptionRewriteOutput = z.infer<typeof CaptionRewriteOutputSchema>
 
+// ── gate_classify — layer 3 of the refusal gate (doc 18 §8) ──────────────────
+
+/**
+ * BOUNDED, and both bounds are the point rather than tuning.
+ *
+ * This call sits inside a publish, on a path with a hard wall: the publish-now
+ * route caps at 120s and the cron tick publishes up to four variants inside 300s
+ * — arithmetic computed before any model call lived here. An unbounded rule list
+ * or an unbounded body turns a gate into the reason publishing times out, and a
+ * gate that makes publishing unreliable gets switched off.
+ *
+ * Exceeding either bound is NOT a silent truncation. The caller reports what it
+ * dropped, because a rule that was never put to the classifier must not be
+ * counted as one that came back clear.
+ */
+export const GATE_CLASSIFY_MAX_RULES = 24
+export const GATE_CLASSIFY_MAX_CHARS = 4000
+
+export const GateClassifyInputSchema = z.object({
+  channel: ChannelSchema,
+  text: z.string().min(1).max(GATE_CLASSIFY_MAX_CHARS),
+  rules: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        tier: RuleTierSchema,
+        statement: z.string().min(1),
+      }),
+    )
+    .min(1)
+    .max(GATE_CLASSIFY_MAX_RULES),
+})
+export type GateClassifyInput = z.infer<typeof GateClassifyInputSchema>
+
+/**
+ * One entry per rule it was given, and the engine's zod re-parse is what makes
+ * that enforceable. A model that answers about three of eight rules leaves five
+ * unjudged — and `decideGate` only ever sees rules it has an answer for, so a
+ * short answer would read as five clean rules rather than five unanswered ones.
+ */
+export const GateClassifyOutputSchema = z.object({
+  findings: z.array(ClassifierFindingSchema),
+})
+export type GateClassifyOutput = z.infer<typeof GateClassifyOutputSchema>
+
 /** content_variants → one entry per channel; maps 1:1 onto post_variants rows. */
 export const ContentVariantsOutputSchema = z.object({
   variants: z.array(
@@ -216,7 +265,20 @@ export type SiteGenerateOutput = z.infer<typeof SiteGenerateOutputSchema>
  * before the H2 freeze so every AI action can be charged (Alpha Gate). Values are
  * type-checked against the pricing.config.json key union.
  */
-export const MESH_TASK_ACTION: Record<MeshTaskName, ActionType> = {
+/**
+ * `gate_classify` is EXCLUDED FROM THE KEY, not mapped to a placeholder.
+ *
+ * It is the only mesh task that is a condition of publishing rather than
+ * something a person chose and saw a price for. Giving it any pricing key here
+ * would leave a real, lookup-able number that some future `withCredits` wrapper
+ * could act on in good faith — and the result would be charging people for
+ * being refused, against "users never pay for failures".
+ *
+ * Excluding it from the KEY TYPE, rather than mapping it to null, means
+ * `MESH_TASK_ACTION.gate_classify` does not typecheck at all. There is no price
+ * to find, by construction.
+ */
+export const MESH_TASK_ACTION: Record<Exclude<MeshTaskName, 'gate_classify'>, ActionType> = {
   brand_guidelines: 'brand_research',
   // The URL door is PART of brand research, not a second purchase. This map is a
   // pricing-key lookup, not an instruction to charge: one `withCredits` call

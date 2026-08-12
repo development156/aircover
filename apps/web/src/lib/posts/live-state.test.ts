@@ -25,6 +25,7 @@ const variant = (over: Partial<VariantStatusRow> = {}): VariantStatusRow => ({
   simulated: false,
   errorMessage: null,
   errorCode: null,
+  gateRefusal: null,
   retryable: true,
   ...over,
 })

@@ -2,6 +2,7 @@ import { AlertCircle, CheckCircle2, Clock, ExternalLink, Loader2, MinusCircle } 
 import type { VariantPublishStatus } from '@sahoda/shared'
 
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
+import { GateRefusalNote } from '@/components/posts/gate-refusal-note'
 import { describePublishError } from '@/lib/posts/publish-error-copy'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { cn } from '@/lib/utils'
@@ -62,10 +63,16 @@ export function ChannelStatusList({ rows, renderRetry }: ChannelStatusListProps)
                     adapter-controlled and can carry text straight from Zernio or
                     Meta, so it is never rendered — an unknown code degrades to a
                     safe sentence rather than echoing an unreviewed string. */}
-                {row.status === 'failed' ? (
+                {row.status === 'failed' && row.gateRefusal === null ? (
                   <p className="mt-0.5 text-[12.5px] text-danger">
                     {describePublishError(row.errorCode).message}
                   </p>
+                ) : null}
+                {/* The gate's own refusal REPLACES the one-line code copy rather
+                    than sitting under it. Both would say the post was stopped,
+                    and the generic sentence adds nothing next to a named rule. */}
+                {row.status === 'failed' && row.gateRefusal ? (
+                  <GateRefusalNote refusal={row.gateRefusal} />
                 ) : null}
               </div>
             </div>

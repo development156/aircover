@@ -1,14 +1,20 @@
 import {
   AdapterError,
   CONSTRAINTS,
+  GATE_BLOCKED_CODE,
+  GATE_HELD_CODE,
   formatForPlatform,
   publishIdempotencyKey,
+  publishedTextOf,
   validateVariant,
   type Channel,
+  type GateVerdict,
   type PublishAdapter,
+  type PublishGate,
   type MediaRef,
   type PublishPostPayload,
   type PublishRequestMedia,
+  type RuleTier,
 } from '@sahoda/shared'
 
 /** Auth-class failures the user can only fix by reconnecting the account. */
@@ -66,6 +72,57 @@ export interface PublishLogError {
   code: string
   classification: 'transient' | 'permanent'
   message: string
+  /**
+   * The refusal gate's verdict, when the gate is what refused.
+   *
+   * Carried as STRUCTURE rather than prose in `message`, and the reason is
+   * requirement 3: the refusal has to name the line it trips, say whether it is
+   * inherited or theirs, and offer a compliant rewrite. A sentence cannot be
+   * rendered as a rule chip with a one-click fix, and `describePublishError` in
+   * apps/web is an allowlist that deliberately never echoes a stored message —
+   * so prose here would arrive on screen as the generic "something went wrong".
+   *
+   * `post_publish_logs.error` and `post_variants.last_error` are both jsonb and
+   * both already carry this object whole, so the audit half of doc 18 §8 rides
+   * along on the existing write with no migration.
+   */
+  gate?: GateErrorDetail
+}
+
+/** The refusal, in the shape apps/web renders it. Nothing here is model prose. */
+export interface GateErrorDetail {
+  decision: 'block' | 'hold'
+  ruleSetVersion: string
+  brandVersion: number | null
+  /** How the regime was arrived at — never flattened into a claim it was declared. */
+  regime: { value: string; basis: 'declared' | 'derived' | 'default' }
+  findings: {
+    ruleId: string
+    /** `mandated` reads as inherited; `owner` reads as theirs. */
+    tier: RuleTier
+    statement: string
+    quote?: string
+    rewrite?: string
+  }[]
+  holdReason?: string
+}
+
+/** `GateVerdict` → the slice that travels on an error row. */
+function gateDetail(verdict: GateVerdict): GateErrorDetail {
+  return {
+    decision: verdict.decision === 'block' ? 'block' : 'hold',
+    ruleSetVersion: verdict.ruleSet.ruleSetVersion,
+    brandVersion: verdict.brandVersion,
+    regime: { value: verdict.ruleSet.regime.value, basis: verdict.ruleSet.regime.basis },
+    findings: verdict.findings.map((f) => ({
+      ruleId: f.ruleId,
+      tier: f.tier,
+      statement: f.statement,
+      ...(f.quote ? { quote: f.quote } : {}),
+      ...(f.rewrite ? { rewrite: f.rewrite } : {}),
+    })),
+    ...(verdict.holdReason ? { holdReason: verdict.holdReason } : {}),
+  }
 }
 
 export interface VariantUpdate {
@@ -80,6 +137,23 @@ export interface VariantUpdate {
 export interface PublishPostDeps {
   /** Which rail this run is on. The adapter's own result still wins when it disagrees. */
   mode: PublishMode
+  /**
+   * The refusal gate (doc 18 §8). REQUIRED, AND IT MUST STAY REQUIRED.
+   *
+   * `viaZernio` on `ResolvedConnection` is the cautionary tale, forty lines up in
+   * this same file: it was optional, a `return` that simply forgot it still
+   * typechecked, and every live Instagram publish then died holding a perfectly
+   * good connection. "Optional is what let the value go missing without anyone
+   * being asked."
+   *
+   * The same shape here fails in the opposite and worse direction. An optional
+   * `gate?` is a gate that silently does not run in whichever call site forgets
+   * it — and a publish path with no gate does not look broken, it looks fast.
+   * Required means every deps-constructing site in the repo fails to COMPILE
+   * until it supplies one, which is the only form of proof that no publish path
+   * skipped the check.
+   */
+  gate: PublishGate
   loadVariant(payload: PublishPostPayload): Promise<PublishVariant | null>
   resolveConnection(payload: PublishPostPayload): Promise<ResolvedConnection>
   adapterFor(channel: Channel, viaZernio: boolean): PublishAdapter
@@ -148,8 +222,14 @@ export async function runPublishPost(
     code: string,
     message: string,
     connectionId: string | null,
+    gate?: GateErrorDetail,
   ): Promise<PublishOutcome> => {
-    const error: PublishLogError = { code, classification: 'permanent', message }
+    const error: PublishLogError = {
+      code,
+      classification: 'permanent',
+      message,
+      ...(gate ? { gate } : {}),
+    }
     await deps.writeLog(logRow(payload, ctx, deps.mode, 'failed', { error, connectionId }))
     await deps.markVariant({
       workspaceId: payload.workspaceId,
@@ -179,16 +259,64 @@ export async function runPublishPost(
     )
   }
 
-  // The real gate. Must run before the adapter, which validates nothing.
-  const { violations } = validateVariant(spec, {
+  // Hoisted: the Constraint Engine, the refusal gate and the adapter request all
+  // describe the SAME draft, and three literals would be three chances for them
+  // to drift — which is how the composer's hashtag count and the publisher's
+  // once disagreed for weeks.
+  const draft = {
     body: variant.body,
     hashtags: variant.hashtags,
     hasLink: variant.hasLink,
     mediaCount: variant.media.length,
-  })
+  }
+
+  // The channel's own limits. Must run before the adapter, which validates nothing.
+  const { violations } = validateVariant(spec, draft)
   if (violations.length > 0) {
     const first = violations[0]!
     return fail(first.code, first.message, null)
+  }
+
+  // ── THE REFUSAL GATE (doc 18 §8) ────────────────────────────────────────────
+  // A CONDITION OF PUBLISHING, NOT A PREFLIGHT. It sits on the one function all
+  // four entries into publishing pass through — the publish-now route, the cron
+  // sweep, the Trigger.dev task and the bare `@sahoda/jobs/publish` export — so
+  // there is no rail that reaches an adapter around it.
+  //
+  // ── WHY EXACTLY HERE, AND NOT A LINE EITHER SIDE ────────────────────────────
+  //  · AFTER `validateVariant`, so the words checked are words that could
+  //    actually be published. Gating a 600-character X post that the engine is
+  //    about to refuse spends a model call to refuse it twice.
+  //  · BEFORE `resolveConnection`, for the reason this file already gives about
+  //    `hostMedia` ("so we never pay to upload the media of a variant the
+  //    Constraint Engine has already rejected"), one step earlier: a post that
+  //    is not going out has no business causing a token to be decrypted.
+  //
+  // `publishedTextOf` rather than `variant.body`: `formatForPlatform` appends the
+  // hashtag tail, and a red line written into a hashtag is still on the post.
+  // Media is deliberately omitted from this call — it changes `content.media`
+  // and never the text, and the real request re-formats with the hosted URLs.
+  const verdict = await deps.gate.check({
+    workspaceId: payload.workspaceId,
+    postId: payload.postId,
+    variantId: variant.variantId,
+    channel: payload.channel,
+    text: publishedTextOf(formatForPlatform(spec, draft)),
+    jobRunId: ctx.jobRunId,
+  })
+
+  if (verdict.decision !== 'pass') {
+    // BOTH refusals land as `failed`, and the distinction lives in the CODE.
+    //
+    // `failed` rather than `skipped` on purpose, and it is not a cosmetic choice:
+    // `skipped` is absent from `claimVariant`'s status predicate, so a held
+    // variant could never be claimed again — the writer would fix the wording,
+    // press Publish, and get a 409 reading "This post is already going out"
+    // about a post that never could. `failed` IS claimable, so rewrite-and-retry
+    // works, and `classifyCandidate` never re-dispatches it (PENDING_STATES is
+    // `pending|scheduled`), so the cron cannot loop on it either.
+    const code = verdict.decision === 'block' ? GATE_BLOCKED_CODE : GATE_HELD_CODE
+    return fail(code, gateMessage(verdict), null, gateDetail(verdict))
   }
 
   let connection: ResolvedConnection
@@ -213,16 +341,7 @@ export async function runPublishPost(
       workspaceId: payload.workspaceId,
       postId: payload.postId,
       variantId: variant.variantId,
-      content: formatForPlatform(
-        spec,
-        {
-          body: variant.body,
-          hashtags: variant.hashtags,
-          hasLink: variant.hasLink,
-          mediaCount: variant.media.length,
-        },
-        hosted,
-      ),
+      content: formatForPlatform(spec, draft, hosted),
       media: variant.media,
       auth: {
         connectionId: connection.connectionId,
@@ -350,6 +469,25 @@ export async function runPublishPost(
 
 function messageOf(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
+}
+
+/**
+ * One line for the log row, and it is deliberately thin.
+ *
+ * The refusal a person reads is built in apps/web from `error.gate`, which
+ * carries the rule, the tier and the rewrite as structure. This string exists so
+ * that a log tail is not blank; putting the full refusal here instead would give
+ * two places for the same words to live and one of them would go stale.
+ */
+function gateMessage(verdict: GateVerdict): string {
+  if (verdict.decision === 'hold') {
+    return verdict.holdReason ?? 'Held for review before publishing.'
+  }
+  const first = verdict.findings[0]
+  const tier = first?.tier === 'mandated' ? 'a required rule' : 'one of your own rules'
+  return first
+    ? `Stopped before publishing: this breaks ${tier}.`
+    : 'Stopped before publishing: a rule was broken.'
 }
 
 /** ZERNIO's own post ids are 24-char lowercase hex. Anything else is dropped. */
