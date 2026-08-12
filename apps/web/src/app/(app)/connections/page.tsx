@@ -8,7 +8,9 @@ import { ConnectOutcomeNotice } from '@/components/connections/connect-outcome-n
 import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
-import { listConnections } from '@/lib/connections/read'
+import { checkCountableLimit } from '@/lib/billing/entitlements'
+import { listConnections, readConnectionSlots } from '@/lib/connections/read'
+import { getActiveWorkspace } from '@/lib/workspaces'
 import { zernioAvailable } from '@/lib/zernio/server'
 
 export const metadata = { title: 'Connections' }
@@ -38,6 +40,29 @@ export const metadata = { title: 'Connections' }
 const CONNECTABLE: ConnectionPlatform[] = ['instagram', 'x', 'gbp', 'linkedin']
 const LIVE_VIA_ZERNIO = new Set<ConnectionPlatform>(['instagram', 'x', 'gbp', 'linkedin'])
 
+/**
+ * The plan sentence when this workspace has no room for another channel, else null.
+ *
+ * Read from the DATABASE, never from the query string — the same rule
+ * `ConnectOutcomeNotice` follows when it refuses to render counts off the address
+ * bar. The `?zernio=limit` notice says WHAT happened in fixed words; these are the
+ * real numbers behind it.
+ *
+ * Null on every "could not tell" case. The return route fails closed regardless, so
+ * nothing is admitted by this being null; what it avoids is telling someone their
+ * plan is full when the truth is we could not read it.
+ */
+async function channelLimitNotice(): Promise<string | null> {
+  const workspace = await getActiveWorkspace()
+  if (!workspace) return null
+
+  const slots = await readConnectionSlots(workspace.id)
+  if (slots === null) return null
+
+  const verdict = await checkCountableLimit(workspace.id, 'channels', slots.count)
+  return verdict.kind === 'blocked' ? verdict.sentence : null
+}
+
 export default async function ConnectionsPage({
   searchParams,
 }: {
@@ -50,8 +75,13 @@ export default async function ConnectionsPage({
    */
   searchParams: Promise<{ zernio?: string | string[] }>
 }) {
-  const [connections, { zernio }] = await Promise.all([listConnections(), searchParams])
+  const [connections, { zernio }, channelLimit] = await Promise.all([
+    listConnections(),
+    searchParams,
+    channelLimitNotice(),
+  ])
   const railReady = zernioAvailable()
+  const planFull = channelLimit !== null
 
   return (
     <div className="space-y-grid">
@@ -96,9 +126,18 @@ export default async function ConnectionsPage({
             platform&rsquo;s own screen and nothing of yours is stored here.
           </p>
         </div>
+        {/* The limit BEFORE the click. Without it the customer approves access on
+            the platform's own screen, comes back, and only then learns their plan
+            had no room — work we could have saved them for free. */}
+        {planFull ? (
+          <p className="rounded-input bg-s2 px-3 py-2.5 text-[13px] text-muted" role="status">
+            {channelLimit}
+          </p>
+        ) : null}
+
         <div className="flex flex-wrap items-start gap-3">
           {CONNECTABLE.map((platform) => {
-            const live = LIVE_VIA_ZERNIO.has(platform) && railReady
+            const live = LIVE_VIA_ZERNIO.has(platform) && railReady && !planFull
             return (
               <ConnectButton
                 key={platform}
@@ -106,11 +145,13 @@ export default async function ConnectionsPage({
                 label={CHANNEL_LABELS[platform]}
                 disabled={!live}
                 disabledReason={
-                  LIVE_VIA_ZERNIO.has(platform)
-                    ? railReady
-                      ? undefined
-                      : 'Publishing key isn’t set in this environment.'
-                    : 'Secure token flow still being wired.'
+                  planFull
+                    ? 'Your plan has no room for another channel.'
+                    : LIVE_VIA_ZERNIO.has(platform)
+                      ? railReady
+                        ? undefined
+                        : 'Publishing key isn’t set in this environment.'
+                      : 'Secure token flow still being wired.'
                 }
               />
             )

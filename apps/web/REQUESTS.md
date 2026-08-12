@@ -511,3 +511,32 @@ CASCADE from `posts` passes through, but a direct delete raises `restrict_violat
 rows cascade from `posts`, the append-only guarantee is being satisfied by the escape hatch rather
 than by the reset avoiding them; worth deciding deliberately, because "publish history survived a
 reset" is a promise the Danger Zone copy makes to the operator on screen.
+
+## wt-db: nothing bounds a per-workspace resource count, so the entitlements gate cannot be atomic
+
+`checkEntitlement` is now mounted (wt-limits) at the two live call sites: `generateSite`
+and the Zernio OAuth return route. It is a stateless calculator over a `currentUsage`
+the caller supplies — it counts nothing and takes no lock, which its own doc is explicit
+about. Two concurrent `generateSite` calls on a Starter plan can both count 0, both pass,
+and both insert: 2 sites on a plan that allows 1.
+
+The gate's doc names the only two remedies. Neither is reachable from apps/web:
+
+1. **Count inside the inserting transaction.** `generateSite` writes across `sites`,
+   `site_pages` and `site_sections` as three separate PostgREST calls. There is no
+   transaction to join.
+2. **A DB constraint bounding the resource per workspace.** None exists.
+   `subscriptions_one_live` bounds subscriptions, not resource counts.
+
+A plain unique index or `check` cannot express this: the bound depends on the
+workspace's current plan, which lives in `subscriptions` → `plans.limits`.
+
+**Request:** a `SECURITY DEFINER` insert function for `sites` that re-counts and compares
+against the plan's limit in the same statement — the shape `apply_ledger_entry` already
+uses, and for the same reason (the check and the mutation being one statement is what
+makes a guarantee possible). Same shape would serve `connections` if the channel count
+ever needs to be hard rather than best-effort.
+
+Until then the window is open, documented at both call sites, and recorded as F4 in
+`docs/ux-findings.md`. The failure direction is over-provisioning a paid resource under a
+race — never a charge for nothing, since the gate runs before any credit hold.

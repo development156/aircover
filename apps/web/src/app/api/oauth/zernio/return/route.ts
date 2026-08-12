@@ -2,6 +2,8 @@ import { auth } from '@clerk/nextjs/server'
 import { reconcileAccounts } from '@sahoda/publishing'
 import { ZERNIO_PLATFORMS } from '@sahoda/shared'
 
+import { checkCountableLimit } from '@/lib/billing/entitlements'
+import { connectionKey, readConnectionSlots } from '@/lib/connections/read'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
@@ -63,7 +65,11 @@ function escapeAttr(value: string): string {
  * A real outcome: the connect worked, or there was genuinely nothing new to record.
  * 303 is correct here and the logs are already truthful about it.
  */
-function backOk(request: Request, status: 'connected' | 'nothing', detail?: string): Response {
+function backOk(
+  request: Request,
+  status: 'connected' | 'nothing' | 'limit',
+  detail?: string,
+): Response {
   return Response.redirect(connectionsUrl(request, status, detail), 303)
 }
 
@@ -124,7 +130,8 @@ function backError(
 }
 
 export async function GET(request: Request): Promise<Response> {
-  const ok = (status: 'connected' | 'nothing', detail?: string) => backOk(request, status, detail)
+  const ok = (status: 'connected' | 'nothing' | 'limit', detail?: string) =>
+    backOk(request, status, detail)
   /** Each failure carries the status a log reader would expect for that cause. */
   const fail = (httpStatus: number, detail: string) => backError(request, httpStatus, detail)
 
@@ -196,10 +203,58 @@ export async function GET(request: Request): Promise<Response> {
     // screen — so this stays a 303.
     if (accounts.length === 0 && unreadable.length === 0) return ok('nothing')
 
+    // ── PLAN LIMIT ON CHANNELS (owner ruling #5) ─────────────────────────────
+    // Free allows 2 channels; this loop used to write every account Zernio
+    // returned, so a free workspace could hold all four platforms.
+    //
+    // ── WHY THIS ADMITS UP TO THE LIMIT AND NEVER REFUSES THE TRIP ───────────
+    // By the time this route runs, the account is ALREADY connected on Zernio's
+    // side — the user approved it on the platform's own screen. Rejecting the whole
+    // return would produce precisely the failure this file's comments are built to
+    // avoid: "an account they connected at Zernio that this app cannot see." It
+    // would also break the documented self-heal, where a later trip picks up a
+    // connection an earlier one failed to record, and it would misfire on every
+    // repeat visit, since re-upserting EXISTING rows would be counted as new.
+    //
+    // So the accounts are partitioned. A key already in `slots` is a REFRESH: it
+    // updates a row that already exists and consumes no allowance, so it is written
+    // unconditionally — that is what keeps the self-heal working. Only genuinely new
+    // rows draw down headroom, and the remainder are left unwritten and reported.
+    const slots = await readConnectionSlots(workspace.id)
+    // Fail CLOSED. Without this read there is no way to tell a refresh from a new
+    // row, and writing blind is the hole being closed. The self-heal covers it: the
+    // next trip back reconciles everything this one declined to touch.
+    if (slots === null) return fail(500, 'slots')
+
+    const limitVerdict = await checkCountableLimit(workspace.id, 'channels', slots.count)
+    // `blocked` and `unknown` are both zero headroom. They differ in what the
+    // customer is told, not in what gets written — an unreadable plan must not
+    // admit a channel.
+    const headroom =
+      limitVerdict.kind === 'allowed' ? Math.max(0, limitVerdict.limit - slots.count) : 0
+
     let written = 0
     /** Platforms whose account came back from Zernio and did NOT reach our table. */
     const unwritten: string[] = []
+    /** New accounts the plan had no room for. Deliberately not written, not an error. */
+    const overLimit: string[] = []
+    /** Upserts actually ATTEMPTED — see the `written === 0` branch below. */
+    let attempted = 0
+    /** New rows admitted so far this trip. */
+    let admitted = 0
+
     for (const account of accounts) {
+      const isRefresh = slots.keys.has(connectionKey(account.platform, account.accountId))
+
+      if (!isRefresh) {
+        if (admitted >= headroom) {
+          overLimit.push(account.platform)
+          continue
+        }
+        admitted += 1
+      }
+
+      attempted += 1
       const { error } = await supabase.rpc('upsert_zernio_connection', {
         p_workspace_id: workspace.id,
         p_platform: account.platform,
@@ -222,21 +277,28 @@ export async function GET(request: Request): Promise<Response> {
           workspaceId,
         })
         unwritten.push(account.platform)
+        // The row was not created, so the slot it claimed is free again — give it
+        // back rather than letting a failed write shut a later account out of a
+        // place the plan still has room for.
+        if (!isRefresh) admitted -= 1
         continue
       }
       written += 1
     }
 
-    // Accounts existed at Zernio and NONE of them recorded. The customer's account is
-    // connected on their side and unreachable from ours — a 500, loudly.
+    // Accounts existed at Zernio and every write we ATTEMPTED failed. The customer's
+    // account is connected on their side and unreachable from ours — a 500, loudly.
     //
-    // `accounts.length > 0` is NOT redundant, though it reads that way. One live path
-    // arrives here with an empty list: some platforms read cleanly and had no
-    // accounts, and at least one other failed to read. `ok('nothing')` above is
-    // guarded on `unreadable.length === 0`, so that case falls through — and without
-    // this clause it would be reported as "every write failed" when no write was ever
-    // attempted. It belongs to the partial branch below.
-    if (written === 0 && accounts.length > 0) return fail(500, 'write')
+    // The guard is `attempted > 0`, not `accounts.length > 0`. It was the latter, to
+    // exclude one live path that arrives here with an empty list (some platforms read
+    // cleanly and had no accounts, at least one other failed to read — which falls
+    // past `ok('nothing')` because that is guarded on `unreadable.length === 0`).
+    // The plan limit adds a SECOND such path: when every returned account is over
+    // the limit, nothing is attempted and `written` is 0 while `accounts.length` is
+    // not. Reported as "every write failed" that would be a fabricated outage — the
+    // writes did not fail, they were never made. Counting attempts states the real
+    // condition directly and covers both paths.
+    if (written === 0 && attempted > 0) return fail(500, 'write')
 
     // ── A PARTIAL CONNECT IS NOT A CONNECT ────────────────────────────────────
     // This used to be the whole test: `written === 0`. So ONE platform succeeding
@@ -249,6 +311,16 @@ export async function GET(request: Request): Promise<Response> {
     const missed = [...unreadable, ...unwritten]
     if (missed.length > 0)
       return backError(request, 500, `${missed.length}-not-recorded`, 'partial')
+
+    // Some accounts were declined by the PLAN. Ranked below `partial` on purpose: a
+    // genuine failure outranks a policy decision, and reporting a limit while a write
+    // silently died would hide the write.
+    //
+    // A 303, not a 5xx. Nothing went wrong — every write we chose to make succeeded,
+    // and the accounts we skipped are still connected at Zernio and will be picked up
+    // by the next return trip once there is room. Sending this to the 4xx/5xx log
+    // filter would fill the failure channel with correct behaviour.
+    if (overLimit.length > 0) return ok('limit', `${overLimit.length}-over-limit`)
 
     return ok('connected')
   } catch (error) {

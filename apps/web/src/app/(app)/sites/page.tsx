@@ -8,7 +8,9 @@ import { SitePreview } from '@/components/sites/site-preview'
 import { siteTreeToOutput } from '@/lib/sites/from-rows'
 import { toPreviewPages, type PreviewPage } from '@/lib/sites/preview'
 import { activeThemeTokens } from '@/lib/brand/read-theme'
-import { readSiteTree, recentSites } from '@/lib/sites/read'
+import { checkCountableLimit } from '@/lib/billing/entitlements'
+import { countSites, readSiteTree, recentSites } from '@/lib/sites/read'
+import { getActiveWorkspace } from '@/lib/workspaces'
 import { renderPreviewSafely } from '@/lib/sites/safe-preview'
 import { sharedTokensCss } from '@/lib/sites/tokens-css'
 
@@ -84,14 +86,32 @@ async function buildPreview(): Promise<Preview> {
   return 'unreadable'
 }
 
+/**
+ * The plan sentence to show BEFORE the click, or null when this workspace may
+ * generate. Null for every "we could not tell" case as well — an unreadable
+ * workspace, an unreadable count, or an unreachable plan resolver. The server
+ * action fails closed on all three, so nothing is admitted by this returning null;
+ * what it avoids is asserting a limit we did not actually read.
+ */
+async function siteLimitNotice(): Promise<string | null> {
+  const workspace = await getActiveWorkspace()
+  if (!workspace) return null
+
+  const count = await countSites(workspace.id)
+  if (count === null) return null
+
+  const limit = await checkCountableLimit(workspace.id, 'sites', count)
+  return limit.kind === 'blocked' ? limit.sentence : null
+}
+
 export default async function SitesPage() {
-  const preview = await buildPreview()
+  const [preview, limitNotice] = await Promise.all([buildPreview(), siteLimitNotice()])
 
   return (
     <div className="space-y-grid">
       <PageTitle>Sites</PageTitle>
 
-      <GenerateSitePanel />
+      <GenerateSitePanel limitNotice={limitNotice} />
 
       {preview === null ? (
         <EmptyState

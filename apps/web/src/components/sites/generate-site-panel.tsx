@@ -27,13 +27,35 @@ type Outcome =
   | { kind: 'insufficient'; required: number; available: number }
   | { kind: 'failed'; message: string }
 
+export interface GenerateSitePanelProps {
+  /**
+   * The plan sentence when this workspace may NOT generate another site, else null.
+   *
+   * REQUIRED, not optional-with-a-default. An omitted prop defaulting to null would
+   * silently render the un-gated panel — the exact shape of the bug this gate exists
+   * to close — and every caller that forgot it would look correct. The page owns the
+   * read; this component only renders what it is told.
+   *
+   * Null on an unreadable plan too, deliberately: the pre-click UI must not claim a
+   * limit it could not confirm. The server action still fails closed, so the honest
+   * outcome there is a refusal at click time, not a fabricated notice now.
+   */
+  limitNotice: string | null
+}
+
 /**
  * Generate the site draft (homepage, preview-only). Cost rendered from
  * `creditCost('site_generate')` BEFORE the click; dropped sections are
  * reported, never hidden. Publishing to a real address is deferred and the
  * page copy says so — this panel never implies a deploy.
+ *
+ * The PLAN limit is shown before the click for the same reason the cost is: a
+ * customer who learns "Sites are on Starter and above" after filling in a name and
+ * committing to a 100-credit action has been made to work for a refusal we could
+ * have shown them for free. The action re-checks regardless — this notice is
+ * courtesy, never the enforcement.
  */
-export function GenerateSitePanel() {
+export function GenerateSitePanel({ limitNotice }: GenerateSitePanelProps) {
   const [name, setName] = useState('')
   const [goal, setGoal] = useState('')
   const [outcome, setOutcome] = useState<Outcome | null>(null)
@@ -41,8 +63,10 @@ export function GenerateSitePanel() {
 
   const cost = creditCost('site_generate')
 
+  const blocked = limitNotice !== null
+
   function run() {
-    if (name.trim() === '') return
+    if (name.trim() === '' || blocked) return
     setOutcome(null)
 
     startTransition(async () => {
@@ -112,10 +136,17 @@ export function GenerateSitePanel() {
         />
       </div>
 
+      {/* The limit, before the click — same moment the cost is shown. */}
+      {blocked ? (
+        <p className="rounded-input bg-s2 px-3 py-2.5 text-[13px] text-muted" role="status">
+          {limitNotice}
+        </p>
+      ) : null}
+
       {pending ? (
         <PendingLines lines={PENDING} />
       ) : (
-        <Button onClick={run} disabled={name.trim() === ''} className="w-full">
+        <Button onClick={run} disabled={blocked || name.trim() === ''} className="w-full">
           <Globe size={14} aria-hidden />
           <CostLabel action="Generate site" cost={cost} />
         </Button>
