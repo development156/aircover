@@ -31,7 +31,10 @@ import { normaliseUrl } from './door'
  * only HTML accepted.
  */
 
+/** Idle timeout — resets on every byte, so it only catches a silent server. */
 export const FETCH_TIMEOUT_MS = 8_000
+/** Wall-clock ceiling for one hop. The remote end cannot extend this one. */
+export const FETCH_DEADLINE_MS = 15_000
 export const MAX_HTML_BYTES = 1_500_000
 export const MAX_REDIRECTS = 3
 
@@ -153,7 +156,18 @@ function requestOnce(url: URL): Promise<RawResponse> {
       )
     })
 
+    // TWO timeouts, because they stop different things.
+    //
+    // `setTimeout` is an IDLE timeout: it resets on every byte received, so a
+    // server dribbling one character every few seconds holds the connection
+    // open indefinitely and never trips it. The deadline is wall-clock and
+    // cannot be reset by the remote end at all.
     request.setTimeout(FETCH_TIMEOUT_MS, () => request.destroy(new Error('TIMEOUT')))
+    const deadline = setTimeout(() => request.destroy(new Error('TIMEOUT')), FETCH_DEADLINE_MS)
+    // `unref` so a pending deadline cannot hold the process open on its own.
+    deadline.unref?.()
+    request.on('close', () => clearTimeout(deadline))
+
     request.on('error', reject)
     request.end()
   })

@@ -4,13 +4,23 @@ import { Button } from '@/components/ui/button'
 import { Card, CardLabel } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
+/**
+ * What a Regenerate costs: a number of credits, or `'free'`.
+ *
+ * Modelled as a union rather than as `0` because the two are different claims
+ * and "Uses 0 credits" is a sentence no one should ever read on a money
+ * surface. It is a union rather than a separate boolean so that "free AND 50
+ * credits" cannot be expressed at all.
+ */
+export type RegenerateCost = number | 'free'
+
 export interface BrandCardProps {
   title: string
   guide: string
   full?: boolean
   onRegenerate: () => void
   regenerateDisabled: boolean
-  regenerateCost: number
+  regenerateCost: RegenerateCost
   children: React.ReactNode
 }
 
@@ -45,7 +55,13 @@ export function BrandCard({
           {/* One span = one flex item, so the button's gap-2 applies once
               (icon | label) instead of around every fragment of the sentence. */}
           <span>
-            Regenerate · Uses <span className="tabular-nums">{regenerateCost}</span> credits
+            {regenerateCost === 'free' ? (
+              'Regenerate · free'
+            ) : (
+              <>
+                Regenerate · Uses <span className="tabular-nums">{regenerateCost}</span> credits
+              </>
+            )}
           </span>
         </Button>
       </div>

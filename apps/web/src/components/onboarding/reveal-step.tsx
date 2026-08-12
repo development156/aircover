@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { signalClarityPercent } from '@/lib/brand/signal-clarity'
 
 import { AttemptErrorNotice, type AttemptError } from './attempt-error'
+import type { RegenerateCost } from './brand-card'
 import { BrandPersonaCard } from './cards/brand-persona-card'
 import { CustomerPersonaCard } from './cards/customer-persona-card'
 import { HookCard } from './cards/hook-card'
@@ -24,9 +25,16 @@ export interface RevealStepProps {
   /** True when the resolve that produced this brain cost nothing. */
   wasFree: boolean
   fallbackMessage: string | null
-  /** Colours found at the door. Empty means the app keeps its defaults. */
+  /** Colours found at the door THIS session. Empty means none were found. */
   colors: string[]
-  regenerateCost: number
+  /** True when the workspace already has an active Brand Skin saved. */
+  hasSavedTheme: boolean
+  /**
+   * False when this reveal is showing a brain loaded from the database rather
+   * than one resolved from answers given in this session. See the guard below.
+   */
+  canRegenerate: boolean
+  regenerateCost: RegenerateCost
   regeneratePending: boolean
   regenerateError: AttemptError | null
   onRegenerate: () => void
@@ -54,6 +62,8 @@ export function RevealStep({
   wasFree,
   fallbackMessage,
   colors,
+  hasSavedTheme,
+  canRegenerate,
   regenerateCost,
   regeneratePending,
   regenerateError,
@@ -64,7 +74,14 @@ export function RevealStep({
 }: RevealStepProps) {
   const clarity = signalClarityPercent(brain)
   const insufficient = regenerateError?.kind === 'insufficient'
-  const regenerateBlocked = regeneratePending || insufficient
+
+  // `!canRegenerate` is the one that had teeth. Opening /onboarding on a saved
+  // brain lands straight here with no picks, no door text and no refusal held
+  // in state — so Regenerate posted the DEFAULTS, took the charged path
+  // (a saved brain exists, so the resolve is no longer free), debited 50
+  // credits, and replaced the loaded brain with a generic one built from the
+  // workspace name alone. Six cards offered that button and nothing stopped it.
+  const regenerateBlocked = regeneratePending || insufficient || !canRegenerate
   const saved = saveState?.ok === true
 
   return (
@@ -144,11 +161,25 @@ export function RevealStep({
         />
       </div>
 
+      {!canRegenerate ? (
+        <p className="text-[12.5px] text-muted">
+          Regenerate is off because there is nothing to resolve from — this brain was loaded, not
+          answered for. Start over to give Sahoda the three answers again.
+        </p>
+      ) : null}
+
       <div className="flex flex-col gap-2 border-t border-line pt-4">
+        {/* Three states, because two of them are easy to say wrongly. On
+            re-entry `colors` is empty — the door was never opened this session —
+            and the old copy read "we found no colour" to a workspace that may be
+            wearing its own theme right now. Absence of a NEW colour is not
+            absence of a colour. */}
         <p className="text-[12.5px] text-muted">
           {colors.length > 0
             ? 'Approving also paints the app in the colour we found on your site.'
-            : 'We found no colour to take, so the app keeps Sahoda’s default. You can set one later.'}
+            : hasSavedTheme
+              ? 'The app keeps the colour this workspace already wears.'
+              : 'We found no colour to take, so the app keeps Sahoda’s default. You can set one later.'}
         </p>
 
         <div className="flex flex-wrap items-center gap-2">

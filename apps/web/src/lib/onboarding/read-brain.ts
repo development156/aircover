@@ -26,6 +26,30 @@ export interface SavedBrain {
   updatedAt: string
 }
 
+/**
+ * Is the next resolve free for this workspace?
+ *
+ * The signal is "has this workspace ever SAVED a Brand Brain", not "has it ever
+ * spent credits" — we charge for output and never for the product working out
+ * who someone is, and a user who resolved, disliked what came back and left
+ * without approving it took no output.
+ *
+ * It lives here rather than in the `'use server'` action module because every
+ * export of one of those is a callable endpoint, and a workspace-id-taking
+ * predicate has no business being reachable from a browser. `brand_memory` is
+ * only writable through `resolve_brand_memory`, so this cannot be reset from
+ * the client either way.
+ *
+ * KNOWN CONSEQUENCE, accepted deliberately: free resolves are not counted, so
+ * a user who keeps re-resolving without ever approving keeps getting them free.
+ * That follows from the rule as stated — they have taken no output — and there
+ * is no durable per-workspace counter to bound it without a schema change.
+ * `apps/web/REQUESTS.md` asks wt-db for one.
+ */
+export async function isFirstResolve(workspaceId: string): Promise<boolean> {
+  return (await activeBrandMemory(workspaceId)) === null
+}
+
 export async function activeBrandMemory(workspaceId: string): Promise<SavedBrain | null> {
   try {
     const supabase = createServerSupabase()

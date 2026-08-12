@@ -1,6 +1,8 @@
-import { isFirstResolve, resolveCost } from '@/app/actions/onboarding-resolve'
+import { creditCost } from '@sahoda/shared'
+
 import { OnboardingFlow } from '@/components/onboarding/onboarding-flow'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
+import { activeThemeTokens } from '@/lib/brand/read-theme'
 import { activeBrandMemory } from '@/lib/onboarding/read-brain'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
@@ -40,11 +42,7 @@ export default async function OnboardingPage() {
     )
   }
 
-  const [saved, free, cost] = await Promise.all([
-    activeBrandMemory(workspace.id),
-    isFirstResolve(workspace.id),
-    resolveCost(),
-  ])
+  const [saved, theme] = await Promise.all([activeBrandMemory(workspace.id), activeThemeTokens()])
 
   return (
     <OnboardingFlow
@@ -58,8 +56,13 @@ export default async function OnboardingPage() {
             }
           : null
       }
-      isFree={free}
-      cost={cost}
+      // Derived from the SAME read, not a second query. Asking `isFirstResolve`
+      // separately meant `activeBrandMemory` ran twice, and two reads can
+      // disagree — leaving the screen holding a saved brain while offering a
+      // free resolve, or the reverse.
+      isFree={saved === null}
+      cost={creditCost('brand_research')}
+      hasSavedTheme={theme !== null}
       workspaceName={workspace.name}
     />
   )

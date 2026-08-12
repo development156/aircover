@@ -294,3 +294,29 @@ of it. If it lands, `toResolveInput` fills it and drops nothing.
 **Related, smaller:** `ResolveInput` has no jurisdiction field either. Locale currently rides
 inside `source.category` as prose ("local presence in food, in India"), which works because
 `category` is free text, but it is a phrase doing a field's job.
+
+## wt-db: nothing durable counts a FREE resolve
+
+Added 2026-08-12 by `wt-onboard`. Recorded as an accepted cost, not a surprise.
+
+The first resolve is free, and "first" is decided server-side by
+`isFirstResolve()` — true when the workspace has no active `brand_memory` row.
+That follows the rule as stated (we charge for output; a user who resolved,
+disliked it and left without approving took none) and it cannot be forged from
+the client, because `brand_memory` is only writable through
+`resolve_brand_memory`.
+
+**The consequence:** free resolves are not counted, so re-resolving without ever
+approving stays free indefinitely. Each one is a real model call. Nothing in
+`apps/web` can bound it — a free resolve writes no ledger entry to count, and
+`memory_events` is read-only to members, so this lane has no durable place to
+record "this workspace has had its free resolve".
+
+Mitigated in the UI as far as the UI can: Regenerate is disabled entirely on a
+reveal that was LOADED rather than answered for, so the loop needs a deliberate
+walk back through all three screens each time. It is not a rate limit.
+
+**Ask:** either a `workspaces.free_resolve_used_at timestamptz` column (the
+smaller change — `isFirstResolve` reads that instead, and the resolve stamps it),
+or a decision that unlimited pre-approval resolves are intended, in which case
+this entry closes and the behaviour is simply documented.

@@ -25,7 +25,7 @@ import {
   type ResolveActionState,
 } from '@/lib/brand/resolve-result'
 import { IntakeSchema } from '@/lib/onboarding/intake'
-import { activeBrandMemory } from '@/lib/onboarding/read-brain'
+import { isFirstResolve } from '@/lib/onboarding/read-brain'
 import { toResolveInput } from '@/lib/onboarding/to-resolve-input'
 import { reportServerError } from '@/lib/observability/report'
 import { getActiveWorkspace } from '@/lib/workspaces'
@@ -58,26 +58,10 @@ export type OnboardingResolveState =
 const FALLBACK_MESSAGE =
   'Showing a sample Brand Brain — the model could not be reached, so nothing was charged. Retry to resolve yours.'
 
-/** Cost of a resolve AFTER the first one. Server-owned (UI_RULES credits protocol). */
-export async function resolveCost(): Promise<number> {
-  return creditCost('brand_research')
-}
-
-/**
- * Is the next resolve free for this workspace?
- *
- * The signal is "has this workspace ever SAVED a Brand Brain", not "has it ever
- * spent credits". That is deliberate, and it is the policy rather than a gap in
- * it: the rule is that we charge for output and never for the product working
- * out who someone is. A user who resolved, disliked what came back and left
- * without saving took no output — so their next attempt is free too.
- *
- * `brand_memory` is only writable through `resolve_brand_memory`, so this
- * cannot be reset from the client.
- */
-export async function isFirstResolve(workspaceId: string): Promise<boolean> {
-  return (await activeBrandMemory(workspaceId)) === null
-}
+// NOTHING ELSE IS EXPORTED FROM HERE. Every export of a `'use server'` module
+// is a callable endpoint, so `isFirstResolve` (which takes a workspace id) and
+// the cost lookup live in `read-brain.ts` and `@sahoda/shared` respectively —
+// neither has any reason to be reachable from a browser.
 
 interface ResolveArgs {
   workspaceId: string

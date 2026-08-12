@@ -38,6 +38,8 @@ export interface OnboardingFlowProps {
   isFree: boolean
   /** Server-owned cost of a charged resolve. */
   cost: number
+  /** True when the workspace already has an active Brand Skin. */
+  hasSavedTheme: boolean
   /** Fallback name when the door gives us none. */
   workspaceName: string
 }
@@ -51,7 +53,13 @@ export interface OnboardingFlowProps {
  * resolved was to pay for a new one. When `savedBrain` is present the flow
  * opens ON the reveal, holding that brain, and no resolve has to happen at all.
  */
-export function OnboardingFlow({ savedBrain, isFree, cost, workspaceName }: OnboardingFlowProps) {
+export function OnboardingFlow({
+  savedBrain,
+  isFree,
+  cost,
+  hasSavedTheme,
+  workspaceName,
+}: OnboardingFlowProps) {
   const router = useRouter()
   const [state, formAction, isPending] = useActionState<OnboardingResolveState | null, FormData>(
     resolveOnboarding,
@@ -230,7 +238,17 @@ export function OnboardingFlow({ savedBrain, isFree, cost, workspaceName }: Onbo
               wasFree={wasFree}
               fallbackMessage={fallbackMessage}
               colors={colors}
-              regenerateCost={cost}
+              hasSavedTheme={hasSavedTheme}
+              // `door !== null` is the proof that screens 1-3 were answered in
+              // THIS session. Without it, a reveal opened from a saved brain
+              // would resolve from the default picks and an empty door.
+              canRegenerate={door !== null}
+              // The EFFECTIVE cost, not the list price. A re-resolve before
+              // anything is approved takes the same free path the first one did
+              // (`isFirstResolve` reads `brand_memory`, which is still empty),
+              // so a card reading "Uses 50 credits" would be quoting a charge
+              // the server is not going to make.
+              regenerateCost={isFree ? 'free' : cost}
               regeneratePending={isPending}
               regenerateError={attemptError}
               onRegenerate={() => formAction(buildFormData(refusal))}

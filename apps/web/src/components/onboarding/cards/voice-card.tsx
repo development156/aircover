@@ -1,6 +1,6 @@
 import type { BrandMemoryPayload } from '@sahoda/shared'
 
-import { BrandCard } from '@/components/onboarding/brand-card'
+import { BrandCard, type RegenerateCost } from '@/components/onboarding/brand-card'
 import { EditableField } from '@/components/onboarding/editable-field'
 import { EditableList } from '@/components/onboarding/editable-list'
 import { MAX_OPEN_LIST_ENTRIES } from '@/lib/brand/limits'
@@ -8,7 +8,7 @@ import { MAX_OPEN_LIST_ENTRIES } from '@/lib/brand/limits'
 export interface VoiceCardProps {
   value: BrandMemoryPayload['voice']
   onChange: (value: BrandMemoryPayload['voice']) => void
-  regenerateCost: number
+  regenerateCost: RegenerateCost
   onRegenerate: () => void
   regenerateDisabled: boolean
 }
