@@ -92,7 +92,23 @@ describe('crawlSite — several pages, not one', () => {
     expect(out.pages).toHaveLength(2)
     // A silent top-N reads as "we crawled your site" when it did not.
     expect(out.skipped).toEqual(['https://x.in/b', 'https://x.in/c'])
-    expect(out.creditsUsed).toBe(2)
+    // pages + 1: map bills per CALL, so a scrape-only tally under-reports every
+    // signup by one credit. Cost has to be right before it can be shown.
+    expect(out.creditsUsed).toBe(3)
+  })
+
+  it('bills pages + 1 — the map call is a credit, not free', async () => {
+    const links = ['https://x.in/a']
+    const pages = Object.fromEntries(
+      [HOME, ...links].map((url) => [url, page(url, PROSE)] as const),
+    )
+    const { client: c } = client({ links, pages })
+
+    const out = await crawlSite(HOME, { client: c, maxPages: 5 })
+
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.creditsUsed).toBe(out.pages.length + 1)
   })
 })
 

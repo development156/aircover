@@ -56,7 +56,7 @@ describe.runIf(LIVE)('firecrawl live', () => {
     if (out.ok) {
       expect(out.pages.length).toBeGreaterThan(1) // several pages, not one
       expect(out.wordsFound).toBeGreaterThan(0)
-      expect(out.creditsUsed).toBe(out.pages.length)
+      expect(out.creditsUsed).toBe(out.pages.length + 1) // scrapes + the map call
     } else {
       // A named reason and a sentence that falls back to asking is a PASS: the
       // requirement is honesty, not that every site be readable.

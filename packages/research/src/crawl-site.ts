@@ -117,6 +117,11 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
   let creditsUsed = 0
   try {
     mapped = (await opts.client.map(homeUrl, maxPages * 4)).map((link) => link.url)
+    // Map bills 1 credit PER CALL, not per URL discovered — so the true cost of
+    // a crawl is `pages + 1`, and a counter that only tallied scrapes would
+    // under-report every signup. Counted on success only: a call that threw
+    // cannot be assumed to have billed.
+    creditsUsed += 1
   } catch (error) {
     // A map failure is not proof the site is unreadable — fall through and try
     // the home page directly. Only a Firecrawl-side refusal (402/429) stops us.
