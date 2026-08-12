@@ -2,58 +2,6 @@
   "version": 1,
   "runs": [
     {
-      "client_id": "qa-msoihhqm-ab8082e6",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-11T10:22:32.973Z",
-      "finished_at": "2026-08-11T10:22:32.973Z",
-      "suite": "typecheck",
-      "status": "fail",
-      "summary_plain": "The typecheck checks ran and something failed.",
-      "details": "@sahoda/web:typecheck: src/components/posts/variant-tabs.test.tsx(45,17): error TS2552: Cannot find name 'ChannelSet'. Did you mean 'Channel'?\n@sahoda/web:typecheck: src/components/posts/variant-tabs.test.tsx(45,30): error TS2552: Cannot find name 'toChannelSet'. Did you mean 'CHANNELS'?\n@sahoda/web:typecheck: src/components/posts/variant-tabs.test.tsx(181,25): error TS2322: Type '\"gbp\"[]' is not assignable to type 'ChannelSet'.\n Tasks:    7 successful, 8 total\nFailed:    @sahoda/web#typecheck",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msoiht2j-ffcbdbc",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-11T10:22:47.658Z",
-      "finished_at": "2026-08-11T10:22:47.658Z",
-      "suite": "typecheck",
-      "status": "pass",
-      "summary_plain": "The typecheck checks ran and everything passed.",
-      "details": "ok\n Tasks:    8 successful, 8 total",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msoiiivo-1310dbc4",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-11T10:23:21.107Z",
-      "finished_at": "2026-08-11T10:23:21.107Z",
-      "suite": "lint",
-      "status": "pass",
-      "summary_plain": "The lint checks ran (178 passed), but 16 tests did NOT run — this does not prove the suite passes.",
-      "details": "@sahoda/jobs:test:      ✓ holds the row for the last second of the lease  2165ms\n@sahoda/jobs:test:      ✓ never re-claims a published variant, however stale its claim looks  2635ms\n@sahoda/jobs:test:      ✓ hands the row back to scheduled when the publisher releases it  2639ms\n@sahoda/jobs:test:      ✓ a release cannot undo a terminal outcome  1519ms\n@sahoda/jobs:test:  ✓ src/reconcile/store.pglite.test.ts (9 tests) 20964ms\n@sahoda/jobs:test:        ✓ is flagged and taken out of active in the same statement  4432ms\n@sahoda/jobs:test:        ✓ is never asked about again — which is what makes it permanent  2173ms\n@sahoda/jobs:test:        ✓ keeps the ids that make the row matchable at all  2193ms\n@sahoda/jobs:test:        ✓ leaves a healthy connection active  2406ms\n@sahoda/jobs:test:        ✓ writes the expiry apps/web derives the warning from  2288ms\n@sahoda/jobs:test:        ✓ does not blank a known expiry when a later read carries none  2475ms\n@sahoda/jobs:test:        ✓ stamps last_checked_at so the batch rotates instead of re-reading one row  2466ms\n@sahoda/jobs:test:        ✓ ignores a native OAuth row, which carries no profileId  1584ms\n@sahoda/jobs:test:        ✓ takes every channel on the Zernio rail, not just instagram  940ms\n@sahoda/jobs:test:  ✓ src/backfill/store.pglite.test.ts (14 tests) 24997ms\n@sahoda/jobs:test:        ✓ takes a published variant with a real permalink and no platform id  4490ms\n@sahoda/jobs:test:        ✓ never takes a fixture:// permalink  2219ms\n@sahoda/jobs:test:        ✓ never takes a variant that already has a platform id  2112ms\n@sahoda/jobs:test:        ✓ never takes a variant with no permalink  2366ms\n@sahoda/jobs:test:        ✓ never takes a variant in pending  2360ms\n@sahoda/jobs:test:        ✓ never takes a variant in scheduled  2328ms\n@sahoda/jobs:test:        ✓ never takes a variant in failed  2421ms\n@sahoda/jobs:test:        ✓ never takes a variant in publishing  1601ms\n@sahoda/jobs:test:        ✓ never takes a variant in skipped  946ms\n@sahoda/jobs:test:        ✓ is bounded by the limit  833ms\n@sahoda/jobs:test:        ✓ has a bounded default  829ms\n@sahoda/jobs:test:        ✓ writes the platform id when the column is null  833ms\n@sahoda/jobs:test:        ✓ refuses to overwrite an id that is already there, and says so  845ms\n@sahoda/jobs:test:        ✓ refuses a 24-hex provider object id rather than storing it  806ms\n@sahoda/jobs:test: \n@sahoda/jobs:test:  Test Files  17 passed | 2 skipped (19)\n@sahoda/jobs:test:       Tests  178 passed | 16 skipped (194)\n@sahoda/jobs:test:    Start at  15:52:52\n@sahoda/jobs:test:    Duration  28.83s (transform 15.13s, setup 0ms, import 32.58s, tests 66.32s, environment 28ms)\n@sahoda/jobs:test: \n\n Tasks:    22 successful, 22 total\nCached:    12 cached, 22 total\n  Time:    29.711s",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msoiiivo-220cf6c0",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-11T10:23:21.107Z",
-      "finished_at": "2026-08-11T10:23:21.107Z",
-      "suite": "unit",
-      "status": "pass",
-      "summary_plain": "The unit checks ran (178 passed), but 16 tests did NOT run — this does not prove the suite passes.",
-      "details": "@sahoda/jobs:test:      ✓ holds the row for the last second of the lease  2165ms\n@sahoda/jobs:test:      ✓ never re-claims a published variant, however stale its claim looks  2635ms\n@sahoda/jobs:test:      ✓ hands the row back to scheduled when the publisher releases it  2639ms\n@sahoda/jobs:test:      ✓ a release cannot undo a terminal outcome  1519ms\n@sahoda/jobs:test:  ✓ src/reconcile/store.pglite.test.ts (9 tests) 20964ms\n@sahoda/jobs:test:        ✓ is flagged and taken out of active in the same statement  4432ms\n@sahoda/jobs:test:        ✓ is never asked about again — which is what makes it permanent  2173ms\n@sahoda/jobs:test:        ✓ keeps the ids that make the row matchable at all  2193ms\n@sahoda/jobs:test:        ✓ leaves a healthy connection active  2406ms\n@sahoda/jobs:test:        ✓ writes the expiry apps/web derives the warning from  2288ms\n@sahoda/jobs:test:        ✓ does not blank a known expiry when a later read carries none  2475ms\n@sahoda/jobs:test:        ✓ stamps last_checked_at so the batch rotates instead of re-reading one row  2466ms\n@sahoda/jobs:test:        ✓ ignores a native OAuth row, which carries no profileId  1584ms\n@sahoda/jobs:test:        ✓ takes every channel on the Zernio rail, not just instagram  940ms\n@sahoda/jobs:test:  ✓ src/backfill/store.pglite.test.ts (14 tests) 24997ms\n@sahoda/jobs:test:        ✓ takes a published variant with a real permalink and no platform id  4490ms\n@sahoda/jobs:test:        ✓ never takes a fixture:// permalink  2219ms\n@sahoda/jobs:test:        ✓ never takes a variant that already has a platform id  2112ms\n@sahoda/jobs:test:        ✓ never takes a variant with no permalink  2366ms\n@sahoda/jobs:test:        ✓ never takes a variant in pending  2360ms\n@sahoda/jobs:test:        ✓ never takes a variant in scheduled  2328ms\n@sahoda/jobs:test:        ✓ never takes a variant in failed  2421ms\n@sahoda/jobs:test:        ✓ never takes a variant in publishing  1601ms\n@sahoda/jobs:test:        ✓ never takes a variant in skipped  946ms\n@sahoda/jobs:test:        ✓ is bounded by the limit  833ms\n@sahoda/jobs:test:        ✓ has a bounded default  829ms\n@sahoda/jobs:test:        ✓ writes the platform id when the column is null  833ms\n@sahoda/jobs:test:        ✓ refuses to overwrite an id that is already there, and says so  845ms\n@sahoda/jobs:test:        ✓ refuses a 24-hex provider object id rather than storing it  806ms\n@sahoda/jobs:test: \n@sahoda/jobs:test:  Test Files  17 passed | 2 skipped (19)\n@sahoda/jobs:test:       Tests  178 passed | 16 skipped (194)\n@sahoda/jobs:test:    Start at  15:52:52\n@sahoda/jobs:test:    Duration  28.83s (transform 15.13s, setup 0ms, import 32.58s, tests 66.32s, environment 28ms)\n@sahoda/jobs:test: \n\n Tasks:    22 successful, 22 total\nCached:    12 cached, 22 total\n  Time:    29.711s",
-      "duration_ms": null
-    },
-    {
       "client_id": "qa-msoik6xh-94e4ffdb",
       "task_code": "SL-054",
       "kind": "auto",
@@ -2597,6 +2545,58 @@
       "status": "fail",
       "summary_plain": "The typecheck, lint, unit checks ran together and something failed.",
       "details": "@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    27 successful, 27 total\n[warn] apps/web/src/app/actions/onboarding-door.ts\n[warn] Code style issues found in the above file. Run Prettier with --write to fix.\n[ELIFECYCLE] Command failed with exit code 1.",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msqakt43-26e314d4",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T16:16:43.106Z",
+      "finished_at": "2026-08-12T16:16:43.106Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran and everything passed.",
+      "details": "$ tsc --noEmit\n--- repo gate ---\n Tasks:    27 successful, 27 total\nChecking formatting...\nAll matched files use Prettier code style!",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msqakt43-20ac7caa",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T16:16:43.106Z",
+      "finished_at": "2026-08-12T16:16:43.106Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran and everything passed.",
+      "details": "$ tsc --noEmit\n--- repo gate ---\n Tasks:    27 successful, 27 total\nChecking formatting...\nAll matched files use Prettier code style!",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msqakt43-262a9840",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T16:16:43.106Z",
+      "finished_at": "2026-08-12T16:16:43.106Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed.",
+      "details": "$ tsc --noEmit\n--- repo gate ---\n Tasks:    27 successful, 27 total\nChecking formatting...\nAll matched files use Prettier code style!",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msqbui5y-e11b2793",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T16:52:15.092Z",
+      "finished_at": "2026-08-12T16:52:15.092Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The typecheck, lint, unit checks ran together and something failed.",
+      "details": "/**\n * The door's RESULT TYPE. The read itself lives in\n * `app/api/onboarding/door/route.ts`.\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    27 successful, 27 total\n[warn] Code style issues found in 2 files. Run Prettier with --write to fix.\n[ELIFECYCLE] Command failed with exit code 1.\n=== gpt-5 rerun status ===\nstill running",
       "duration_ms": null
     }
   ]

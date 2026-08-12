@@ -1,8 +1,8 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import { readDoor, type DoorState } from '@/app/actions/onboarding-door'
+import type { DoorState } from '@/app/actions/onboarding-door'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,7 +36,13 @@ const PREVIEW_CHARS = 1200
  * resolve — never here.
  */
 export function DoorStep({ onContinue, onBack }: DoorStepProps) {
-  const [state, formAction, isPending] = useActionState<DoorState | null, FormData>(readDoor, null)
+  const [state, setState] = useState<DoorState | null>(null)
+  const [isPending, setPending] = useState(false)
+  /**
+   * The stages the SERVER has reported, in order. Never invented here — each
+   * line arrived because something finished on the other end.
+   */
+  const [stages, setStages] = useState<{ detail: string; ms: number; costUsd?: number }[]>([])
   const [sentence, setSentence] = useState('')
 
   /**
@@ -103,15 +109,52 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
   // Suppressed while a new read is running or the form has moved on.
   const failure = state && !state.ok && !isPending && !dirty ? state : null
 
-  function submit(ocr = false): void {
+  async function submit(): Promise<void> {
     const data = new FormData()
     data.set('url', url)
     data.set('sentence', sentence)
     if (file) data.set('pdf', file)
-    // PAID, and only ever from a press that says so. Measured 2026-08-12 on an
-    // image-only PDF: the free engine returned 0 fields, mistral-ocr returned 8.
-    if (ocr) data.set('ocr', '1')
-    formAction(data)
+
+    setPending(true)
+    setStages([])
+    setState(null)
+    try {
+      const res = await fetch('/api/onboarding/door', { method: 'POST', body: data })
+      if (!res.ok || !res.body) {
+        setState({
+          ok: false,
+          message: 'We could not read that — tell us in your own words instead.',
+        })
+        return
+      }
+      // NDJSON: one event per line. A chunk may split a line, so the tail is
+      // carried over rather than parsed as if it were complete.
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const raw of lines) {
+          if (!raw.trim()) continue
+          const event = JSON.parse(raw) as
+            | { type: 'stage'; detail: string; ms: number; costUsd?: number }
+            | { type: 'done'; result: DoorState }
+          if (event.type === 'stage') {
+            setStages((current) => [...current, event])
+          } else {
+            setState(event.result)
+          }
+        }
+      }
+    } catch {
+      setState({ ok: false, message: 'The connection dropped while reading — try again.' })
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
@@ -127,7 +170,7 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
       <form
         onSubmit={(event) => {
           event.preventDefault()
-          submit()
+          void submit()
         }}
         className="flex flex-col gap-4"
       >
@@ -220,17 +263,29 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
       {isPending ? (
         <div className="rounded-card border border-line bg-s1 p-4" role="status">
           <p className="text-[13px] font-semibold text-ink">
-            {stage}… <span className="num font-normal text-muted">{elapsed}s</span>
+            {stages.at(-1)?.detail ?? 'Starting'}…{' '}
+            <span className="num font-normal text-muted">{elapsed}s</span>
           </p>
-          <p className="mt-1 text-[12.5px] text-muted">
+          {/* Everything already finished, newest last. These are server events,
+              so the list only grows when something actually happened. */}
+          {stages.length > 1 ? (
+            <ul className="mt-1.5 space-y-0.5">
+              {stages.slice(0, -1).map((entry, index) => (
+                <li key={`${entry.ms}-${index}`} className="text-[12.5px] text-muted">
+                  {entry.detail}
+                  <span className="num"> · {Math.round(entry.ms / 1000)}s</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <p className="mt-1.5 text-[12.5px] text-muted">
             {file
               ? 'A document usually takes about 26 seconds, sometimes 40.'
-              : 'A website usually takes about 12 seconds — we read up to five pages.'}{' '}
-            Nothing is charged for this.
+              : 'A website usually takes about 12 seconds — we read up to five pages.'}
           </p>
           {elapsed > typicalSeconds * 2 ? (
-            <p className="mt-1 text-[12.5px] text-muted">
-              Longer than usual — it is still going, and it will say so either way.
+            <p className="mt-1 text-[12.5px] text-warn">
+              This is taking longer than usual. It is still going, and it will say so either way.
             </p>
           ) : null}
         </div>
@@ -269,11 +324,6 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
             it.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {file ? (
-              <Button type="button" size="sm" onClick={() => submit(true)}>
-                Read it with OCR · about ₹2 a page
-              </Button>
-            ) : null}
             <Button
               type="button"
               variant="ghost"
@@ -316,6 +366,17 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
               {read.text.length > PREVIEW_CHARS ? '…' : ''}
             </p>
           </div>
+
+          {/* PAID WORK IS ALWAYS STATED. The escalation to OCR happens without
+              asking — a shop owner should not be picking a parser — so the only
+              honest counterpart is showing what it cost the moment it is done. */}
+          {(read as { costUsd?: number }).costUsd ? (
+            <p className="rounded-input border border-line bg-bg px-2.5 py-1.5 text-[12.5px] text-ink">
+              The free reader found no text, so we used OCR to read the pictures. That cost about ₹
+              {Math.max(1, Math.round((read as { costUsd: number }).costUsd * 88))} — an estimate
+              for a short document, charged to us, not to your credits.
+            </p>
+          ) : null}
 
           {read.colors.length > 0 ? (
             <p className="text-[12.5px] text-muted">
