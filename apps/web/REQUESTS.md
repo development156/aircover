@@ -560,3 +560,33 @@ names outright.
 `posts.approved_at`, or an `approvals` row if the history matters. Until then the gate can prove
 which rule set was in force and that a check ran, but not who stood behind it, and the product
 must not claim otherwise.
+
+---
+
+## For whoever owns the composer — Preview still promises green on a post the gate refuses
+
+**Filed by wt-gate, 2026-08-12.** `simulatePublish` (`actions/posts-publish.ts`) runs
+`validateVariant` plus the fixture adapter and reports per-channel "would have been accepted".
+It does NOT run the refusal gate, so a post carrying a red line previews clean and is then
+refused at publish. That is the same shape as the promise this lane exists to keep — a screen
+saying a check passed when the check never ran.
+
+It was left out deliberately rather than overlooked. The gate needs the Brand Brain (readable by
+the RLS anon client) and a mesh call (available server-side), so a preview-mode gate IS buildable
+in apps/web — but it must NOT write an `audit_logs` row (a preview is not a publish, and the
+table is server-only insert anyway), which means a second binding with the audit write omitted
+and the decision rendered as advice rather than as a refusal. That is its own piece of work and
+its own set of copy decisions.
+
+Until it exists, do not describe Preview as a compliance check anywhere in the UI. It checks the
+channel's limits, and that is all it has ever checked.
+
+---
+
+## Also open: the gate holds, but nothing ASKS
+
+Doc 18 §8's rule is "stop and ask", and escalation "to a named human". The gate stops. Nothing
+asks: a held post lands `failed` with `GATE_HELD` and its reason on the variant, and somebody has
+to go and look. There is no notification, no review queue, and no owner assignment — and the
+approver gap above is the same hole from the other side. A held post inside a scheduled window
+therefore expires quietly once the dispatch grace passes unless a person happens to notice.

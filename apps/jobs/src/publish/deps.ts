@@ -36,9 +36,6 @@ export function publishPostDeps(): ClaimedPublishDeps {
   // optional and never has been — see `PublishPostDeps.gate`. It shares the same
   // pool as everything else in this object: the gate reads one row and writes
   // one, and a second pool for two statements would be a pool per publish.
-  //
-  // `getMesh()` is a process-wide singleton, so the classifier costs nothing to
-  // construct on a tick that never reaches it.
   const gateStore = createGateStore({ pool })
 
   return {
@@ -46,7 +43,28 @@ export function publishPostDeps(): ClaimedPublishDeps {
     gate: createPublishGate({
       loadGateContext: gateStore.loadGateContext,
       writeGateAudit: gateStore.writeGateAudit,
-      classifier: createGateClassifier({ runTask: getMesh().runTask }),
+      classifier: createGateClassifier({
+        // ── THE MESH IS RESOLVED PER CALL, NOT HERE ────────────────────────
+        // `createMesh()` fails fast on missing provider keys, by design. Calling
+        // it at THIS line would move that throw into `publishPostDeps()`, which
+        // the publish-now route classifies as `PublishInfraError('deps')` and
+        // reports as a 503 INFRA_UNAVAILABLE — indistinguishable from the
+        // database being unreachable, which is the exact confusion the stage
+        // classification was introduced to end (2026-08-07, four unattributable
+        // 503s). A deployment missing provider keys would have stopped
+        // publishing entirely, reported as an outage nobody could locate.
+        //
+        // Deferred, the same missing key surfaces where it belongs: inside
+        // `classify`, whose catch turns it into `unavailable` — a transient hold
+        // that retries, names itself in the audit row, and never publishes. The
+        // gate still refuses; it just refuses legibly.
+        //
+        // `getMesh()` is a process-wide singleton, so the deferral costs one
+        // property read per publish and nothing on a tick that never gates.
+        runTask: ((def, input, meshCtx) => getMesh().runTask(def, input, meshCtx)) as ReturnType<
+          typeof getMesh
+        >['runTask'],
+      }),
     }),
     loadVariant: store.loadVariant,
     // The concurrency seam. Without these two a second cron tick publishes the

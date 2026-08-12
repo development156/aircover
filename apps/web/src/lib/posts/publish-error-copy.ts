@@ -136,18 +136,29 @@ const COPY: Record<string, PublishErrorDisplay> = {
   // when that structure is missing — an old row, or a shape we cannot read — and
   // it is written to still be actionable rather than to say "something went
   // wrong", because that sentence is what teaches people to route around us.
+  //
+  // ── ON `worthRetrying` FOR THESE TWO ───────────────────────────────────────
+  // It is documented as "trying again could plausibly work WITHOUT the user
+  // changing anything", and that is the reading applied here. It does not gate
+  // the retry affordance — `ChannelStatusList` branches on `row.retryable`,
+  // which is true for any `failed` variant — and nothing in apps/web reads this
+  // field today. So it is a claim about the world, not a switch, and the claim
+  // has to be the honest one: after a rewrite, retrying a blocked post is
+  // exactly the right move and the button is correct to be there.
   GATE_BLOCKED: {
     message:
       'This breaks a rule your brand is held to, so it was not sent. Reword it and try again.',
-    // FALSE on purpose. The identical words will be refused identically, so a
-    // retry button here would be an invitation to a loop.
+    // FALSE because the SAME words are refused identically — the deterministic
+    // layer is a pure function of the text. Change the wording and retry.
     worthRetrying: false,
     needsReconnect: false,
   },
   GATE_HELD: {
     message: 'This is waiting for a person to read it before it goes out. Nothing was sent.',
-    // TRUE: a hold is usually the check being unavailable or unsure, and the
-    // same words may well clear on a second run.
+    // TRUE, and unusually so: a hold is often the check being unreachable rather
+    // than a judgement about the post, and the identical words may clear on a
+    // second run. The publisher already retries that case on its own — an
+    // unreachable check is recorded transient and the claim is handed back.
     worthRetrying: true,
     needsReconnect: false,
   },

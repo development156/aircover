@@ -7,8 +7,8 @@
  * did not. Showing constraints you do not enforce is worse than having none,
  * because you have told a regulated business they are protected.
  *
- * A gate is only real if removing it BREAKS something. Nine ways to remove it,
- * each of which some named test must notice.
+ * A gate is only real if removing it BREAKS something. Eleven ways to remove
+ * it, each of which some named test must notice.
  *
  *   node scripts/mutation-check.mjs mutations/publish-gate.mjs
  *
@@ -88,6 +88,20 @@ export default {
       file: 'packages/shared/src/gate/verdict.ts',
       find: '    if (rule) known.push({ finding, rule })\n    else unknownIds.push(finding.ruleId)',
       replace: '    if (rule) known.push({ finding, rule })',
+    },
+
+    // ── A hold is not one thing ─────────────────────────────────────────────
+    {
+      name: 'an unreachable check terminally fails every post scheduled in an outage',
+      file: 'packages/shared/src/gate/verdict.ts',
+      find: "  if (verdict.decision !== 'hold') return false\n  return verdict.checks.classifier === 'unavailable' || verdict.checks.classifier === 'timeout'",
+      replace: '  return false',
+    },
+    {
+      name: 'an unsure verdict is retried forever instead of waiting for a person',
+      file: 'packages/shared/src/gate/verdict.ts',
+      find: "  if (verdict.decision !== 'hold') return false\n  return verdict.checks.classifier === 'unavailable' || verdict.checks.classifier === 'timeout'",
+      replace: "  return verdict.decision === 'hold'",
     },
 
     // ── The record ──────────────────────────────────────────────────────────

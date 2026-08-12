@@ -78,6 +78,22 @@ describe('createGateClassifier — every exit is findings or a hold', () => {
     expect(await classifier.classify(input(), ctx)).toEqual({ ran: false, state: 'unavailable' })
   })
 
+  it('survives a runTask that throws SYNCHRONOUSLY, which is the missing-key shape', async () => {
+    // `publish/deps.ts` defers `getMesh()` into this call precisely so a missing
+    // provider key lands here rather than in `publishPostDeps()`, where it would
+    // read as a 503 INFRA_UNAVAILABLE indistinguishable from a database outage.
+    // `createMesh()` throws synchronously, not as a rejected promise, so the
+    // call has to be INSIDE the try — a `.catch()` on the returned promise would
+    // not catch this one.
+    const classifier = createGateClassifier({
+      runTask: (() => {
+        throw new Error('@sahoda/mesh: missing required env var(s): OPENROUTER_API_KEY_TEXT')
+      }) as unknown as RunTask,
+    })
+
+    expect(await classifier.classify(input(), ctx)).toEqual({ ran: false, state: 'unavailable' })
+  })
+
   it('times out rather than hanging inside the publish wall', async () => {
     const classifier = createGateClassifier({
       runTask: (() => new Promise(() => {})) as unknown as RunTask,

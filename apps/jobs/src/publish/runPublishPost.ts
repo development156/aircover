@@ -4,6 +4,7 @@ import {
   GATE_BLOCKED_CODE,
   GATE_HELD_CODE,
   formatForPlatform,
+  gateHoldIsTransient,
   publishIdempotencyKey,
   publishedTextOf,
   validateVariant,
@@ -16,6 +17,23 @@ import {
   type PublishRequestMedia,
   type RuleTier,
 } from '@sahoda/shared'
+
+/**
+ * The refusal gate could not be reached — so nothing about this post is in
+ * question, and a retry is the correct next move.
+ *
+ * Thrown rather than returned, because "transient" in this file MEANS thrown:
+ * `runClaimedPublish` catches it, hands the claim back, and the next tick picks
+ * the variant up. Returning a permanent failure instead would let one provider
+ * outage mark every post scheduled inside it as failed, needing a person to
+ * press Publish on each by hand.
+ */
+export class GateUnavailableError extends Error {
+  constructor(reason: string) {
+    super(`refusal gate unavailable: ${reason}`)
+    this.name = 'GateUnavailableError'
+  }
+}
 
 /** Auth-class failures the user can only fix by reconnecting the account. */
 const RECONNECT_CODES = new Set(['UNAUTHORIZED', 'FORBIDDEN'])
@@ -306,7 +324,26 @@ export async function runPublishPost(
   })
 
   if (verdict.decision !== 'pass') {
-    // BOTH refusals land as `failed`, and the distinction lives in the CODE.
+    // ── AN UNREACHABLE CHECK IS NOT A VERDICT ABOUT THE POST ─────────────────
+    // It still does not publish. But it is recorded as TRANSIENT and rethrown so
+    // the claim comes back and the next tick tries again, because the
+    // alternative is that a five-minute provider outage permanently fails every
+    // post scheduled inside it. The post is not stranded either way: the
+    // dispatcher's grace window expires it if the outage outlasts it.
+    if (gateHoldIsTransient(verdict)) {
+      const error: PublishLogError = {
+        code: GATE_HELD_CODE,
+        classification: 'transient',
+        message: gateMessage(verdict),
+        gate: gateDetail(verdict),
+      }
+      await deps.writeLog(logRow(payload, ctx, deps.mode, 'failed', { error, connectionId: null }))
+      // The variant is deliberately NOT marked — the attempt is not over, and
+      // this is the same shape as the adapter's own transient path below.
+      throw new GateUnavailableError(verdict.holdReason ?? 'the check could not run')
+    }
+
+    // BOTH remaining refusals land as `failed`, and the distinction lives in the CODE.
     //
     // `failed` rather than `skipped` on purpose, and it is not a cosmetic choice:
     // `skipped` is absent from `claimVariant`'s status predicate, so a held

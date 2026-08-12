@@ -193,6 +193,34 @@ export function decideGate(input: DecideGateInput): GateVerdict {
   }
 }
 
+/**
+ * Whether a HOLD is the check being unreachable rather than the check being
+ * unsure — and therefore whether trying again could ever produce a different
+ * answer.
+ *
+ * ── WHY THE DISTINCTION HAS TO EXIST AT ALL ──────────────────────────────────
+ * Both hold, and neither publishes, so requirement 4 is satisfied either way.
+ * What differs is what happens NEXT, and the difference is large:
+ *
+ *   · `unsure` and an invented rule id are JUDGEMENTS. A person has to read the
+ *     post. Retrying re-asks a model that already said it could not tell, so the
+ *     variant is terminal and waits for a human.
+ *   · `unavailable` and `timeout` are INFRASTRUCTURE. Nothing about the post is
+ *     in question. Left terminal, a five-minute provider outage during a
+ *     scheduled window marks every post due in it permanently failed, and a
+ *     person then has to press Publish on each one by hand — a self-inflicted
+ *     incident caused by the safety mechanism.
+ *
+ *   · `unparseable` and `over-bounds` stay terminal deliberately. The mesh has
+ *     already spent its one repair retry on the first, and the second is a
+ *     workspace with more rules than one call can carry — both fail identically
+ *     on every retry, so retrying is a loop rather than a recovery.
+ */
+export function gateHoldIsTransient(verdict: GateVerdict): boolean {
+  if (verdict.decision !== 'hold') return false
+  return verdict.checks.classifier === 'unavailable' || verdict.checks.classifier === 'timeout'
+}
+
 /** One line each, ours — never a model's prose, and never a stack trace. */
 const HOLD_REASONS: Record<string, string> = {
   'skipped-already-blocked': 'A rule was already tripped outright.',

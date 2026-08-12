@@ -67,13 +67,25 @@ const blockVerdict = (): GateVerdict => ({
   checks: { hard: 'ran', classifier: 'skipped-already-blocked' },
 })
 
+/** A hold that a PERSON must resolve — the check ran and could not tell. */
 const holdVerdict = (): GateVerdict => ({
   decision: 'hold',
   findings: [],
   ruleSet: RULE_SET,
   brandVersion: 2,
-  checks: { hard: 'ran', classifier: 'timeout' },
-  holdReason: 'The wording check did not finish in time.',
+  checks: { hard: 'ran', classifier: 'ran' },
+  classifierModel: 'test-model',
+  holdReason: 'The check was not certain about this one.',
+})
+
+/** A hold that is INFRASTRUCTURE — the check could not be reached at all. */
+const unreachableVerdict = (): GateVerdict => ({
+  decision: 'hold',
+  findings: [],
+  ruleSet: RULE_SET,
+  brandVersion: 2,
+  checks: { hard: 'ran', classifier: 'unavailable' },
+  holdReason: 'The wording check could not run, so nothing was cleared to go out.',
 })
 
 interface Harness {
@@ -425,8 +437,7 @@ describe('runPublishPost — the refusal gate', () => {
   })
 
   it('holds — does not publish — when the gate could not decide', async () => {
-    // Ambiguity is not permission. A timeout is the state that looks most like
-    // nothing happened, which is exactly why it is the one tested here.
+    // Ambiguity is not permission.
     const h = harness({ gate: { check: async () => holdVerdict() } })
 
     const out = await runPublishPost(payload, ctx, h.deps)
@@ -491,5 +502,55 @@ describe('runPublishPost — the refusal gate', () => {
     await runPublishPost(payload, ctx, h.deps)
 
     expect(h.gateChecks).toHaveLength(0)
+  })
+})
+
+/**
+ * A HOLD IS NOT ONE THING, and conflating the two costs an incident.
+ *
+ * "The check read this and could not tell" needs a person. "The check could not
+ * be reached" needs a retry — and left terminal it would mean one provider
+ * outage permanently failing every post scheduled inside it, each needing a
+ * human to press Publish. Neither publishes, which is what requirement 4 asks.
+ */
+describe('runPublishPost — an unreachable gate is transient, an unsure one is not', () => {
+  it('rethrows when the check could not be reached, so the claim comes back', async () => {
+    const h = harness({ gate: { check: async () => unreachableVerdict() } })
+
+    await expect(runPublishPost(payload, ctx, h.deps)).rejects.toThrow(/gate unavailable/i)
+
+    // Recorded — "nothing publishes without a post_publish_logs row" holds here
+    // too — but recorded as TRANSIENT, and the variant is left mid-flight rather
+    // than marked failed.
+    expect(h.logs).toHaveLength(1)
+    expect(h.logs[0]?.error).toMatchObject({ code: 'GATE_HELD', classification: 'transient' })
+    expect(h.variantUpdates).toHaveLength(0)
+    expect(h.adapterCalls).toBe(0)
+  })
+
+  it('terminally fails when the check ran and was unsure — a person must read it', async () => {
+    const h = harness({ gate: { check: async () => holdVerdict() } })
+
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toMatchObject({ status: 'failed', classification: 'permanent' })
+    expect(h.logs[0]?.error).toMatchObject({ code: 'GATE_HELD', classification: 'permanent' })
+    expect(h.variantUpdates[0]).toMatchObject({ publishStatus: 'failed' })
+  })
+
+  it('terminally fails a workspace with more rules than one check can carry', async () => {
+    // `over-bounds` fails identically on every retry, so retrying is a loop.
+    const h = harness({
+      gate: {
+        check: async () => ({
+          ...unreachableVerdict(),
+          checks: { hard: 'ran' as const, classifier: 'over-bounds' as const },
+        }),
+      },
+    })
+
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toMatchObject({ status: 'failed', classification: 'permanent' })
   })
 })
