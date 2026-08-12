@@ -172,7 +172,9 @@ export const pinnedFetch: typeof fetch = async (input, init) => {
         out.delete('content-length')
       }
       const body = decoder ? res.pipe(decoder) : res
-      resolve(new Response(Readable.toWeb(body) as ReadableStream<Uint8Array>, { status, headers: out }))
+      resolve(
+        new Response(Readable.toWeb(body) as ReadableStream<Uint8Array>, { status, headers: out }),
+      )
     })
 
     req.on('error', reject)
