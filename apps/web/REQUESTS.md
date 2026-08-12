@@ -265,84 +265,57 @@ take, so `lib/brand/fields.ts` stamps them `asked` and says so in a comment at t
 Context: 2026-08-12, wt-web reconciling wt-brain and wt-brainui. `lib/brand/field-meta.ts` is the
 whole contract now; `provenance.ts` only reads what it writes.
 
-## owner: wt-onboard and wt-brain shipped two onboarding stacks — NOT merged, needs a decision
+## ~~owner: two onboarding stacks~~ — RESOLVED 2026-08-12, flow from one, plumbing from the other
 
-Added 2026-08-12 by wt-web. The merge of `wt-onboard` into wt-web was **aborted**, deliberately
-and cleanly. `wt-brain` and `wt-brainui` are merged and green; wt-onboard is untouched on its own
-branch. This is not a textual conflict anyone can resolve by picking hunks — both lanes answer the
-same product question and the answers are incompatible.
+Both lanes are merged. The decision taken, on the owner's instruction: **the FLOW is
+wt-onboard's** (intake → door → question → reveal; Spark, Refine and Theme deleted; the 17
+question variants and free-until-first-Approve stand) and **the PLUMBING is wt-brain's**
+(`@sahoda/research` for URLs, `openUploadDoor` for PDFs). `fetch-site.ts`, `site-text.ts` and
+`pdf-text.ts` are deleted.
 
-**The four conflicts** were `apps/web/REQUESTS.md`, `apps/web/src/app/actions/brand-resolve.ts`,
-`apps/web/src/components/onboarding/onboarding-flow.tsx`, and a modify/delete on
-`apps/web/src/components/onboarding/spark-step.tsx`. The first two are mechanical. The last two are
-the collision.
+One piece of the losing side was kept because the winning side has no answer for it —
+`declaredColors`, now `lib/brand/declared-colors.ts`. See the note below on what else the
+replaced door did.
 
-**What each lane owns.**
+## ~~owner: `resolveBrand` is a live 50-credit endpoint~~ — DELETED 2026-08-12
 
-|                | wt-brain (merged)                                                                                                              | wt-onboard (not merged)                                                                               |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| screens        | Spark → Refine → Theme                                                                                                         | intake → door → question → reveal                                                                     |
-| URL door       | `packages/research` (SSRF-guarded fetch, tier-1 no-vendor HTML reader, Firecrawl vendor, quarantine) + `lib/brand/url-door.ts` | `lib/onboarding/fetch-site.ts` + `site-text.ts`                                                       |
-| PDF door       | `openUploadDoor` — the file goes to the model as a data URL                                                                    | `lib/onboarding/pdf-text.ts` — hand-rolled `node:zlib` FlateDecode + `Tj`/`TJ` scanner, no dependency |
-| refusal        | `quarantine.ts`, failure taxonomy per arm                                                                                      | `refusal.ts`, `classify.ts`, `lexicon.ts`                                                             |
-| charged action | `resolveBrand`                                                                                                                 | `resolveOnboarding` (+ `onboarding-door.ts`)                                                          |
+`resolveOnboarding` is now the only charged resolve, so the second endpoint is gone along with
+its test. `saveBrandMemory` stayed — different export, same file, still the Brand Brain write
+path for `brand-field.ts` and the reveal's Approve.
 
-**wt-onboard DELETES six components wt-brain extends**: `spark-step.tsx`, `refine-step.tsx`
-(+ test), `theme-step.tsx`, `theme-preview.tsx`, `logo-drop.tsx`. So merging is not additive in
-either direction — taking wt-onboard discards the Spark screen and the brand-book upload wt-brain
-just built on it; taking wt-brain discards the rebuilt flow, the PDF extractor and the refusal
-vocabulary. Both lanes are independently gate-green.
+The money-path guard in `lib/brand/resolve-object-ref.test.ts` was REPOINTED at
+`onboarding-resolve.ts` rather than deleted. A guard left reading a file that no longer charges
+keeps passing while the thing it protects moves out from under it, which is worse than no guard.
+It also now asserts `brand-resolve.ts` contains no `withCredits`/`runTask`, so the endpoint
+cannot quietly come back.
 
-**Ask:** which onboarding ships. Then a follow-up lane cut off wt-web HEAD can port the losing
-lane's genuinely additive parts — `packages/research`'s SSRF guard and quarantine are worth keeping
-whichever flow wins, and so is `pdf-text.ts`'s `gateText`/`measureText` pair, which is independent
-of who extracts the text.
+**Orphaned by the rewire, reported rather than swept** — none is referenced outside its own
+tests, and whether they are deleted or kept for a future screen is a call for their owner:
+`openUrlDoor` and `applyExtractedFields` (in `lib/brand/url-door.ts`, which still houses the
+live `openUploadDoor`), `lib/brand/spark-to-resolve-input.ts`, `lib/onboarding/address-guard.ts`,
+and `DoorProvenance` in `lib/brand/resolve-result.ts`.
 
-**Also blocked on this:** deleting `resolveBrand`. It is dead only once `resolveOnboarding` exists;
-today `onboarding-flow.tsx` still calls it, so removing it would take onboarding down. See the
-entry below.
+## ~~owner: a PDF text-extraction dependency~~ — WITHDRAWN 2026-08-12, no dependency needed
 
-## owner: `resolveBrand` is a live 50-credit endpoint that should be deleted — after wt-onboard lands
+The ask was to add `unpdf` or `pdf-parse` so the hand-rolled `node:zlib` extractor could stop
+failing on scans, CID fonts and object streams. It is withdrawn: `pdf-text.ts` is deleted and
+PDFs go to `openUploadDoor`, which hands the file to the model as a data URL. The model reads
+the formats the hand-rolled parser could not, so the gap the dependency was for is closed
+without one.
 
-Added 2026-08-12 by wt-web. `apps/web/src/app/actions/brand-resolve.ts#resolveBrand` is a
-`'use server'` export, which makes it a callable RPC whether or not any UI references it — the
-reason its removal matters is that it charges 50 credits (`brand_research`) and runs a model call.
+**`gateText`/`measureText` went with it, and that was the argument worth stating.** The entry
+called the gate "the valuable half", and it was — against an extractor that could emit mojibake
+that LOOKS like prose. That failure mode is gone with the extractor: the model either reads the
+document or returns nothing, and `openUploadDoor` already fails `unreadable` on zero fields
+rather than serving an empty brand as a success. Keeping a legibility gate for output that can
+no longer be illegible would be keeping the answer to a question nobody asks any more.
 
-It is **not** dead yet. wt-onboard replaces it with `resolveOnboarding` and repoints
-`onboarding-flow.tsx`; without that merge, `resolveBrand` is the only resolve path onboarding has.
-Deleting it now breaks signup.
-
-**Do not delete `saveBrandMemory` with it** — that is a different export in the same file, still
-used by `brand-field.ts` and `persist-brain.ts`.
-
-**When it goes**, check these for orphaning rather than sweeping them: `lib/brand/resolve-result.ts`,
-`spark-to-resolve-input.ts`, `resolve-object-ref.ts`, and `url-door.ts`'s two door entry points —
-wt-onboard's `onboarding-resolve.ts` may or may not reuse them, and that is the merge's call.
-
----
-
-## owner: a PDF text-extraction dependency for the onboarding door
-
-Added 2026-08-12 by `wt-onboard`. UI_RULES_v3 §"Stop and ask" requires asking before adding
-any dependency, so this ships without one and asks here.
-
-Screen 2 of the rebuilt onboarding lets someone hand over a PDF — a deck, a menu, a
-one-pager. Nothing in the repo could read one, and `apps/web` has no image or document
-library at all (`sharp` is a transitive dep of something else, not ours).
-
-**Shipped instead:** `src/lib/onboarding/pdf-text.ts` — `node:zlib` over FlateDecode content
-streams plus a `Tj`/`TJ`/`'`/`"` operator scanner. No dependency. It handles the ordinary
-case; verified against a Ghostscript-produced PDF whose ground truth came from `pdftotext`.
-
-**What it cannot do:** scanned pages, CID-keyed fonts, object streams (`/ObjStm`), LZW.
-Those are not rare. It is safe anyway because the extractor is gated — output that does not
-read like prose is REFUSED with a reason, never passed to `brand_guidelines` — but a refusal
-is still a door closing on a user who had a perfectly good PDF.
-
-**Ask:** approval to add `unpdf` (ESM, no native build, bundles a pdf.js core) or
-`pdf-parse`. Roughly: delete `inflateStreams`/`showText`/`readEscape`/`readHexString`, keep
-`gateText` and `measureText` exactly as they are — the gate is the valuable half and is
-independent of who extracts.
+**The cost line this creates.** URL = one model call (`brand_guidelines`). PDF = two
+(`brand_extract`, then `brand_guidelines`). On the free first resolve that is doubled unpaid
+provider cost on the PDF path — deliberate, and noted here because nothing on screen shows it.
+`openUploadDoor` returns `annotations` so a re-parse of the same file is free, but screen 2 reads
+the door and screen 4 resolves, and they are not carried across that hop; its own comment says
+the saving is per-session only, so this drops a saving rather than a correctness property.
 
 ## wt-shared: onboarding has three enums and no home for them
 
@@ -442,3 +415,46 @@ to this one action alone would be both inconsistent and out of this lane's scope
 
 **Ask:** a decision on where the limiter lives — a shared wrapper every action
 opts into, or middleware — and then `readDoor` is a first customer for it.
+
+## note: what the replaced onboarding door did that `@sahoda/research` did not
+
+Added 2026-08-12 by wt-web, when `fetch-site.ts` / `site-text.ts` / `pdf-text.ts` were replaced.
+Four differences, and only one of them favoured the package that won.
+
+**1. DNS rebinding — the deleted door was STRICTER, and this is now fixed in research.**
+`safe-fetch.ts` carried a comment reading _"KNOWN RESIDUAL: DNS rebinding. We resolve, check,
+then fetch, and a hostile resolver can answer differently between those two steps."_ The door it
+replaced had already closed that: `node:http` accepts a `lookup` function which is called BY THE
+SOCKET at connect time, so the address approved is the address used, with no second resolution
+left to disagree. Swapping the fetchers as-is would have been a security REGRESSION on the one
+surface where a customer types a URL our server then fetches. Ported as
+`packages/research/src/pinned-fetch.ts`, wired in under the existing `fetchImpl` seam so none of
+`safeFetch`'s redirect, cap or content-type logic changed. Its blind spot is carried over too:
+Node never calls `lookup` for an IP LITERAL, so `http://127.0.0.1/` is checked explicitly — the
+original found that by executing it against a live loopback server, and the test does the same.
+
+**2. The address blocklist was more complete.** research covered every range that leads to a real
+bypass (loopback, link-local/metadata, private, CGNAT, multicast). The deleted `address-guard.ts`
+also listed the reserved ones — `192.0.0.0/24`, TEST-NET-1/2/3, `198.18.0.0/15`. None is
+routable, so none can be a customer, and they are now refused rather than timed out on.
+
+**3. Theme colour from a server-fetched page — KEPT, because research has no answer.**
+`lib/brand/color-extract.ts#extractPalette` takes an `HTMLImageElement` and reads pixels through
+a canvas: browser-only by construction. It can run on a logo a founder drops into the page and
+never on markup we fetched server-side, and decoding the logo in Node instead would mean a new
+image dependency for one meta tag's worth of signal. So `declaredColors` reads what the page
+SAYS rather than what it looks like — `<meta name="theme-color">` outranks everything (it is a
+deliberate declaration), otherwise the most-repeated non-neutral hex or `rgb()` in the markup,
+with near-white / near-black / near-grey rejected as the page furniture every site has. Kept
+verbatim as `lib/brand/declared-colors.ts`. Research converts HTML to markdown and discards the
+markup, so it is reached by a new `onLandingHtml` hook on the direct source, called from `map()`
+ONLY — one page's HTML, by construction rather than by discipline. Tiers 2 and 3 return text and
+markdown and never call it, so a site read by either yields no colours, which `declaredColors`
+already treats as a first-class answer.
+
+**4. Everything else was subsumed, and research is better at all of it.** `htmlToText` →
+`htmlToMarkdown`; `pageTitle` → the crawl's own `title`; one page → up to five, because one page
+yields the CATEGORY's voice and not the company's; a single failure string → six named reasons
+each of which is a different sentence to the founder; and, the one with no counterpart at all,
+`quarantineCorpus` — the replaced path sent raw page text into a model prompt with nothing
+saying it was evidence rather than instructions.
