@@ -35,13 +35,17 @@ const EMPTY_SPARK: SparkValues = {
  * as a `name=` on the input, once here — or Regenerate silently resolves from
  * less than Generate did. `description` was the field that made that concrete.
  */
-export function buildResolveFormData(spark: SparkValues): FormData {
+export function buildResolveFormData(spark: SparkValues, brandBook?: File | null): FormData {
   const data = new FormData()
   data.set('name', spark.name)
   data.set('category', spark.category)
   data.set('description', spark.description)
   data.set('website', spark.website)
   data.set('instagram', spark.instagram)
+  // The brand book rides on BOTH paths or on neither. It is not in SparkValues
+  // because a File is not a string, and that is exactly how it would have been
+  // dropped here.
+  if (brandBook) data.set('brandbook', brandBook)
   return data
 }
 
@@ -65,6 +69,7 @@ export function OnboardingFlow() {
   const [screen, setScreen] = useState<Screen>('spark')
   const [spark, setSpark] = useState<SparkValues>(EMPTY_SPARK)
   const [logo, setLogo] = useState<LogoValue | null>(null)
+  const [brandBook, setBrandBook] = useState<File | null>(null)
   const [attemptError, setAttemptError] = useState<AttemptError | null>(null)
   const [regenerateError, setRegenerateError] = useState<AttemptError | null>(null)
   const [brain, setBrain] = useState<BrandMemoryPayload | null>(null)
@@ -135,7 +140,7 @@ export function OnboardingFlow() {
   }
 
   function handleRegenerate() {
-    formAction(buildResolveFormData(spark))
+    formAction(buildResolveFormData(spark, brandBook))
   }
 
   const brandName = spark.name.trim()
@@ -182,6 +187,8 @@ export function OnboardingFlow() {
                 onSparkChange={(patch) => setSpark((current) => ({ ...current, ...patch }))}
                 logo={logo}
                 onLogoChange={setLogo}
+                brandBook={brandBook}
+                onBrandBookChange={setBrandBook}
                 generateCost={RESOLVE_COST}
               />
             ) : null}

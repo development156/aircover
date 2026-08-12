@@ -14,6 +14,7 @@ export * from './db'
 
 // Domain + cross-package contracts
 export * from './brand/resolve'
+export * from './brand/audiences'
 export * from './theme/tokens'
 export * from './guide/tour'
 export * from './jobs/payloads'

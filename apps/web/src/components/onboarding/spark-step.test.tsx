@@ -35,6 +35,8 @@ function renderStep(overrides: Partial<Parameters<typeof SparkStep>[0]> = {}) {
       onSparkChange={() => {}}
       logo={null}
       onLogoChange={() => {}}
+      brandBook={null}
+      onBrandBookChange={() => {}}
       generateCost={50}
       {...overrides}
     />,
@@ -79,14 +81,17 @@ describe('SparkStep intake', () => {
     }
   })
 
-  test('the two paths agree exactly — no field on one and not the other', () => {
+  test('the two paths agree exactly — including the file Regenerate cannot re-pick', () => {
     const { container } = renderStep()
     const formNames = new Set(
       Array.from(container.querySelectorAll('input[name], textarea[name]')).map((el) =>
         el.getAttribute('name'),
       ),
     )
-    const regenerateNames = new Set(Array.from(buildResolveFormData(SPARK).keys()))
+    const book = new File(['%PDF-1.7'], 'brand.pdf', { type: 'application/pdf' })
+    const regenerateNames = new Set(Array.from(buildResolveFormData(SPARK, book).keys()))
+    // A File is not a SparkValue, which is exactly how the brand book would have
+    // been dropped on Regenerate — a second resolve silently reading less.
     expect([...regenerateNames].sort()).toEqual([...formNames].sort())
   })
 })
