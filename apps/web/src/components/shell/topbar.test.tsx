@@ -1,11 +1,14 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { DEMO_FALLBACK_PAYLOAD } from '@sahoda/shared'
 
 import * as Sentry from '@sentry/nextjs'
+import { RING_DENOMINATOR } from '@/lib/brand/fields'
 
 import { Topbar } from './topbar'
 import { listWorkspaces, getActiveWorkspaceSlug } from '@/lib/workspaces'
 import { readBalance } from '@/lib/wallet/read'
+import { readBrain } from '@/lib/brand/read-brain'
 
 // The topbar renders OUTSIDE every scoped error.tsx — (app)/error.tsx is a
 // sibling of the layout that renders this component, and a React boundary does
@@ -38,6 +41,12 @@ vi.mock('@/lib/wallet/read', () => ({
   readBalance: vi.fn(),
 }))
 
+// The Brand Brain ring is the fourth shell read, and it obeys the same rule as
+// the other three: it may degrade, it may not throw past this component.
+vi.mock('@/lib/brand/read-brain', () => ({
+  readBrain: vi.fn(),
+}))
+
 const WORKSPACES = [
   { id: 'ws_1', name: 'Sahoda Labs', slug: 'sahoda-labs' },
   { id: 'ws_2', name: 'Second Brand', slug: 'second-brand' },
@@ -47,6 +56,7 @@ const mocked = {
   listWorkspaces: vi.mocked(listWorkspaces),
   getActiveWorkspaceSlug: vi.mocked(getActiveWorkspaceSlug),
   readBalance: vi.mocked(readBalance),
+  readBrain: vi.mocked(readBrain),
   captureException: vi.mocked(Sentry.captureException),
 }
 
@@ -58,6 +68,7 @@ beforeEach(() => {
     status: 'ok',
     balance: { total: 4200, held: 0, available: 4200, hasHold: false, heldNote: null },
   })
+  mocked.readBrain.mockResolvedValue({ status: 'no-brain' })
 })
 
 describe('Topbar', () => {
@@ -124,6 +135,7 @@ describe('Topbar', () => {
     mocked.listWorkspaces.mockRejectedValue(new Error('down'))
     mocked.getActiveWorkspaceSlug.mockRejectedValue(new Error('down'))
     mocked.readBalance.mockRejectedValue(new Error('down'))
+    mocked.readBrain.mockRejectedValue(new Error('down'))
 
     render(await Topbar())
 
@@ -131,9 +143,66 @@ describe('Topbar', () => {
     // An em dash, not a zero. "We could not read your balance" and "you have no
     // credits" are different claims and only one of them is true — telling a
     // funded user they have 0 credits would stop them working for no reason.
-    expect(screen.getByText('—')).toBeInTheDocument()
+    //
+    // Scoped to the credit chip by its aria-label rather than matched globally:
+    // the brain ring uses the same em dash for the same reason, and an unscoped
+    // getByText would now find two and fail without either one being wrong.
+    expect(
+      within(screen.getByLabelText('Credit balance unavailable. Open wallet')).getByText('—'),
+    ).toBeInTheDocument()
+    // The ring degrades the same way, and to the same claim: not 0/15, which
+    // would report every confirmed field as unconfirmed.
+    expect(
+      within(screen.getByLabelText('Brand Brain unavailable. Open Brand Brain')).getByText('—'),
+    ).toBeInTheDocument()
     // Each failure reported on its own, so the tags say which subsystem is down
-    // rather than collapsing three outages into one anonymous event.
-    expect(mocked.captureException).toHaveBeenCalledTimes(3)
+    // rather than collapsing four outages into one anonymous event.
+    expect(mocked.captureException).toHaveBeenCalledTimes(4)
+    expect(mocked.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { shell_read: 'brand_brain' },
+    })
+  })
+
+  describe('the Brand Brain ring', () => {
+    test('counts confirmed fields, not filled ones', async () => {
+      // A resolved brain with nothing confirmed. Every field is FILLED; the ring
+      // must still read 0 — this is the claim the whole feature exists to make.
+      mocked.readBrain.mockResolvedValue({
+        status: 'ok',
+        active: DEMO_FALLBACK_PAYLOAD,
+        version: 1,
+        provenance: new Map(),
+        historyComplete: true,
+      })
+
+      render(await Topbar())
+
+      expect(screen.getByText(`0/${RING_DENOMINATOR}`)).toBeInTheDocument()
+    })
+
+    test('offers onboarding, not a zero, when there is no brain at all', async () => {
+      mocked.readBrain.mockResolvedValue({ status: 'no-brain' })
+
+      render(await Topbar())
+
+      // 0/15 would claim a brain exists and is unconfirmed. None exists.
+      expect(screen.queryByText(`0/${RING_DENOMINATOR}`)).not.toBeInTheDocument()
+      expect(screen.getByLabelText('No Brand Brain yet. Set one up')).toHaveAttribute(
+        'href',
+        '/onboarding',
+      )
+    })
+
+    test('renders nothing at all when there is no workspace', async () => {
+      // No workspace means no brain to have. A nudge here would point at a page
+      // that cannot work yet — the same trap the credit chip's "No wallet yet"
+      // case was built to avoid.
+      mocked.readBrain.mockResolvedValue({ status: 'no-workspace' })
+
+      render(await Topbar())
+
+      expect(screen.getByRole('banner')).toBeInTheDocument()
+      expect(screen.queryByText(/Brand Brain/)).not.toBeInTheDocument()
+    })
   })
 })

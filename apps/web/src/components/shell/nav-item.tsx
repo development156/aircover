@@ -4,6 +4,7 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+  BrainCircuit,
   CalendarDays,
   ChartColumn,
   House,
@@ -23,6 +24,7 @@ import { cn } from '@/lib/utils'
 // server→client boundary.
 const ICONS = {
   house: House,
+  'brain-circuit': BrainCircuit,
   'square-pen': SquarePen,
   'calendar-days': CalendarDays,
   'chart-column': ChartColumn,

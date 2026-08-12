@@ -52,6 +52,14 @@ export type SaveBrandState =
   { ok: true; version: number; replayed: boolean } | { ok: false; message: string }
 
 /**
+ * Who wrote this version. `manual` is the load-bearing one: per-field provenance
+ * is derived by diffing the version history and reading the source of the version
+ * where each field last CHANGED (see lib/brand/provenance.ts), so a hand-edit
+ * saved as `resolved` would render the user's own sentence as a machine guess.
+ */
+export type SaveBrandSource = 'resolved' | 'manual'
+
+/**
  * Persist the (possibly hand-edited) Brand Brain via `public.resolve_brand_memory`
  * — the one client-reachable write into `brand_memory` (the table is read-only
  * under RLS). Called with THREE arguments on purpose: omitting the optimistic
@@ -59,8 +67,14 @@ export type SaveBrandState =
  * replays the already-active payload as a success instead of raising
  * VERSION_CONFLICT. Identity and membership are derived from the JWT inside the
  * function; we still zod-parse both directions at this boundary.
+ *
+ * This writes only. It never calls the mesh and never charges — a resolve is a
+ * separate, 50-credit action (`resolveBrand`) that the user asks for explicitly.
  */
-export async function saveBrandMemory(brain: unknown): Promise<SaveBrandState> {
+export async function saveBrandMemory(
+  brain: unknown,
+  source: SaveBrandSource = 'resolved',
+): Promise<SaveBrandState> {
   // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
   let workspaceId: string | undefined
   try {
@@ -86,7 +100,7 @@ export async function saveBrandMemory(brain: unknown): Promise<SaveBrandState> {
     const { data, error } = await supabase.rpc('resolve_brand_memory', {
       p_workspace_id: workspace.id,
       p_payload: payload,
-      p_source: 'resolved',
+      p_source: source,
     })
     if (error || !data) return { ok: false, message: mapSaveBrandError(error) }
 

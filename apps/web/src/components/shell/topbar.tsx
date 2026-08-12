@@ -1,8 +1,10 @@
 import { UserButton } from '@clerk/nextjs'
 import * as Sentry from '@sentry/nextjs'
 
+import { BrainRing } from '@/components/shell/brain-ring'
 import { CreditChip } from '@/components/shell/credit-chip'
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher'
+import { readBrain, type BrainRead } from '@/lib/brand/read-brain'
 import { readBalance, type BalanceRead } from '@/lib/wallet/read'
 import {
   getActiveWorkspaceSlug,
@@ -49,13 +51,18 @@ export async function Topbar() {
   // Promise.all: `Promise.all` rejects the moment ANY input rejects, so a single
   // failing read would throw away the two that succeeded and blank the whole
   // topbar over one bad row.
-  const [workspaces, activeSlug, balance] = await Promise.all([
+  const [workspaces, activeSlug, balance, brain] = await Promise.all([
     softRead<WorkspaceOption[]>('workspaces', listWorkspaces, []),
     softRead<string | null>('active_workspace_slug', getActiveWorkspaceSlug, null),
     // The same three-way answer /wallet renders, so the chip and the page
     // cannot disagree. A throw here is `unreadable` — the honest fallback,
     // since a read that blew up is exactly that, and never a placeholder 0.
     softRead<BalanceRead>('available_credits', readBalance, { status: 'unreadable' }),
+    // Same discipline for the ring: the union /brain renders, and a throw is
+    // `unreadable` rather than a 0/15 that would report every confirmed field
+    // as unconfirmed. `readBrain` already catches internally — this wrapper is
+    // the SHELL's guarantee, not a restatement of that module's internals.
+    softRead<BrainRead>('brand_brain', readBrain, { status: 'unreadable' }),
   ])
   const active = resolveActiveWorkspace(workspaces, activeSlug)
 
@@ -71,6 +78,9 @@ export async function Topbar() {
         <WorkspaceSwitcher workspaces={workspaces} active={active} />
       </div>
       <div className="ml-auto" />
+      {/* Beside the credit chip, and before it: the brain is what Sahoda spends
+          those credits ON, so it reads left-to-right as cause then cost. */}
+      <BrainRing brain={brain} />
       <CreditChip balance={balance} />
       <div data-guide="topbar.avatar" className="grid size-8 place-items-center">
         <UserButton />
