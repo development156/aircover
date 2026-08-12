@@ -42,7 +42,15 @@ export default async function OnboardingPage() {
     )
   }
 
-  const [saved, theme] = await Promise.all([activeBrandMemory(workspace.id), activeThemeTokens()])
+  // Both reads are workspace-scoped. `activeThemeTokens` defaults to unscoped
+  // for the shell's sake, and unscoped it can answer about a DIFFERENT
+  // workspace of the same user — which would have the reveal telling someone
+  // "the app keeps the colour this workspace already wears" about a workspace
+  // that wears nothing.
+  const [saved, theme] = await Promise.all([
+    activeBrandMemory(workspace.id),
+    activeThemeTokens(workspace.id),
+  ])
 
   return (
     <OnboardingFlow

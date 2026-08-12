@@ -6,7 +6,11 @@ import Link from 'next/link'
 import type { BrandMemoryPayload } from '@sahoda/shared'
 import { toast } from 'sonner'
 
-import { saveBrandMemory, type SaveBrandState } from '@/app/actions/brand-resolve'
+import {
+  saveBrandMemory,
+  type BrandMemorySource,
+  type SaveBrandState,
+} from '@/app/actions/brand-resolve'
 import { resolveOnboarding, type OnboardingResolveState } from '@/app/actions/onboarding-resolve'
 import { saveWorkspaceTheme } from '@/app/actions/theme'
 import { brandSkinVars } from '@/lib/brand/brand-theme'
@@ -74,6 +78,16 @@ export function OnboardingFlow({
   const [refusal, setRefusal] = useState('')
 
   const [brain, setBrain] = useState<BrandMemoryPayload | null>(savedBrain?.payload ?? null)
+  /**
+   * Provenance of the brain currently on screen, carried so Approve can write
+   * it back truthfully. A demo fallback is saved `system` and stays `system`
+   * even after hand-editing: editing a sample does not turn it into a resolve
+   * of this brand, and `system` is the flag that stops it being mistaken for
+   * one later.
+   */
+  const [brainSource, setBrainSource] = useState<BrandMemorySource>(
+    savedBrain?.source === 'system' ? 'system' : 'resolved',
+  )
   const [wasFree, setWasFree] = useState(false)
   const [balanceAfter, setBalanceAfter] = useState<number | null>(null)
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null)
@@ -87,6 +101,7 @@ export function OnboardingFlow({
 
     if (state.ok) {
       setBrain(state.brain)
+      setBrainSource(state.kind === 'fallback' ? 'system' : 'resolved')
       setWasFree(state.kind === 'free')
       setBalanceAfter(state.kind === 'resolved' ? state.balanceAfter : null)
       setFallbackMessage(state.kind === 'fallback' ? state.message : null)
@@ -144,7 +159,7 @@ export function OnboardingFlow({
         const themeState = await saveWorkspaceTheme(colors)
         if (!themeState.ok) toast(themeState.message)
       }
-      const result = await saveBrandMemory(brain)
+      const result = await saveBrandMemory(brain, brainSource)
       setSaveState(result)
       // The theme paints the shell, so the app has to be re-entered to wear it.
       if (result.ok) router.push('/home')
@@ -155,16 +170,21 @@ export function OnboardingFlow({
   const previewStyle: CSSProperties | undefined =
     colors.length > 0 ? (brandSkinVars(colors) as CSSProperties) : undefined
 
+  // `savedBrain` is a server prop and never clears, so "Start over" leaves it
+  // set while the user is back on screen 1 with nothing loaded. The header has
+  // to track the SCREEN as well, exactly as the banner below already does.
+  const showingSaved = savedBrain !== null && screen === 'reveal'
+
   return (
     <div style={previewStyle} className="mx-auto max-w-content p-page max-narrow:p-page-mobile">
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
           <span className="type-eyebrow text-accent">Brand Brain</span>
           <h1 className="mt-1 text-[25px] font-extrabold text-ink">
-            {savedBrain ? 'Your Brand Brain' : 'Three answers, then we listen'}
+            {showingSaved ? 'Your Brand Brain' : 'Three answers, then we listen'}
           </h1>
           <p className="mt-1 text-[13.5px] text-muted">
-            {savedBrain
+            {showingSaved
               ? 'Loaded from your workspace. Edit anything and approve to save a new version.'
               : 'Tell us what you do, show us how you talk, answer one question.'}
           </p>
@@ -181,7 +201,7 @@ export function OnboardingFlow({
       <div className="flex min-w-0 flex-col gap-4">
         <StepRail activeIndex={SCREEN_INDEX[screen]} />
 
-        {savedBrain && screen === 'reveal' ? (
+        {showingSaved && savedBrain ? (
           <SavedBrainBanner
             version={savedBrain.version}
             source={savedBrain.source}

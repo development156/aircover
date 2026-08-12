@@ -320,3 +320,37 @@ walk back through all three screens each time. It is not a rate limit.
 smaller change — `isFirstResolve` reads that instead, and the resolve stamps it),
 or a decision that unlimited pre-approval resolves are intended, in which case
 this entry closes and the behaviour is simply documented.
+
+## owner: two things this lane found next door and did not finish
+
+Added 2026-08-12 by `wt-onboard`. Neither is onboarding's, both were found from it.
+
+**1. `activeThemeTokens()` is not workspace-scoped.** `src/lib/brand/read-theme.ts`
+reads `workspace_themes` filtered only on `status = 'active'`, with a comment
+saying RLS makes a workspace filter unnecessary. RLS scopes to the caller's
+MEMBERSHIPS, which is not the same as the workspace they are currently in — so a
+user in two workspaces can have the app shell painted in the other one's brand,
+depending on which row sorts first. The same defect existed in this lane's
+`brand_memory` reader and was fixed there by filtering explicitly.
+
+An optional `workspaceId` parameter was added and onboarding passes it. **The app
+shell's own call still does not**, because changing what colour the shell paints
+for existing users is a visible behaviour change that belongs with whoever owns
+the theming surface, not in an onboarding PR.
+
+**Ask:** pass the active workspace id at the shell's call site and drop the
+optional-ness.
+
+**2. No server action in this app is rate-limited, and one of them now makes
+outbound HTTP.** `readDoor` fetches a user-supplied URL. It is SSRF-guarded at
+the socket (`fetch-site.ts`), capped, deadlined and redirect-checked, and it is
+behind Clerk auth — but a signed-in user can point it at an arbitrary host as
+often as they like, which is the shape of a traffic-amplification complaint even
+though nothing is charged.
+
+security.md asks for "rate limiting on all endpoints" and Upstash is in the
+stack. Nothing in `apps/web/src/app/actions/` uses it today, so adding a limiter
+to this one action alone would be both inconsistent and out of this lane's scope.
+
+**Ask:** a decision on where the limiter lives — a shared wrapper every action
+opts into, or middleware — and then `readDoor` is a first customer for it.

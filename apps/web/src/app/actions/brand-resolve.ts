@@ -59,8 +59,24 @@ export type SaveBrandState =
  * replays the already-active payload as a success instead of raising
  * VERSION_CONFLICT. Identity and membership are derived from the JWT inside the
  * function; we still zod-parse both directions at this boundary.
+ *
+ * `source` MUST be passed as `'system'` for a demo-fallback payload.
+ * `packages/shared/src/brand/resolve.ts` states the contract: a fallback
+ * "persists with `source='system'` and a visible notice — never presented as a
+ * genuine resolve". This used to hardcode `'resolved'`, which was survivable
+ * only while nothing could re-save a fallback; onboarding now loads a saved
+ * brain and offers Approve on it, so a sample the model fell back to could be
+ * approved straight back in as a real resolve — laundering the one flag that
+ * says it is not the user's brand. Whitelisted here rather than taken as a raw
+ * string: the RPC rejects anything outside its three values, and this keeps the
+ * caller from being able to name a value it has not thought about.
  */
-export async function saveBrandMemory(brain: unknown): Promise<SaveBrandState> {
+export type BrandMemorySource = 'resolved' | 'system'
+
+export async function saveBrandMemory(
+  brain: unknown,
+  source: BrandMemorySource = 'resolved',
+): Promise<SaveBrandState> {
   // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
   let workspaceId: string | undefined
   try {
@@ -86,7 +102,7 @@ export async function saveBrandMemory(brain: unknown): Promise<SaveBrandState> {
     const { data, error } = await supabase.rpc('resolve_brand_memory', {
       p_workspace_id: workspace.id,
       p_payload: payload,
-      p_source: 'resolved',
+      p_source: source === 'system' ? 'system' : 'resolved',
     })
     if (error || !data) return { ok: false, message: mapSaveBrandError(error) }
 
