@@ -143,6 +143,7 @@ export function PostCard({
           status={post.status}
           scheduledAt={post.scheduled_at}
           now={now}
+          variants={variantStates ?? []}
           autoPublish={autoPublish}
           className="mt-2"
         />

@@ -1,4 +1,6 @@
-import type { PostStatus } from '@sahoda/shared'
+import type { PostStatus, VariantPublishStatus } from '@sahoda/shared'
+
+import type { VariantStatusRow } from '@/lib/posts/variant-status'
 
 /**
  * Whether a post's "Scheduled" badge is making a promise the product cannot
@@ -20,11 +22,13 @@ import type { PostStatus } from '@sahoda/shared'
  */
 
 /**
- * - `none`     — the post makes no auto-publish promise.
- * - `awaiting` — scheduled, time still ahead (or unknown): it will not post itself.
- * - `overdue`  — scheduled, time provably past: it did not post, and never will.
+ * - `none`      — the post makes no auto-publish promise, or it is fully out.
+ * - `awaiting`  — nothing has published, time still ahead (or unknown): it will not post itself.
+ * - `overdue`   — nothing has published, time provably past: it did not post, and never will.
+ * - `partial`   — live on at least one channel, not on at least one other.
+ * - `simulated` — every publish on it was a fixture run: nothing reached a platform.
  */
-export type AutoPublishTruth = 'none' | 'awaiting' | 'overdue'
+export type AutoPublishTruth = 'none' | 'awaiting' | 'overdue' | 'partial' | 'simulated'
 
 interface AutoPublishCopy {
   /** Full sentence for list rows and the editor. */
@@ -47,6 +51,14 @@ export const AUTO_PUBLISH_COPY = {
   overdue: {
     note: "This time has passed and nothing was published — scheduled auto-publish isn't live yet. Copy it across to post it.",
     short: 'Missed · not posted',
+  },
+  partial: {
+    note: "Out on some channels and not on others — scheduled auto-publish isn't live yet, so the rest will stay put. Send those from the post rather than publishing it again.",
+    short: 'Partly out',
+  },
+  simulated: {
+    note: "Nothing reached a platform — this ran as a simulation, and scheduled auto-publish isn't live yet. Copy it across to post it for real.",
+    short: 'Simulated only',
   },
 } as const satisfies Record<Exclude<AutoPublishTruth, 'none'>, AutoPublishCopy>
 
@@ -80,6 +92,14 @@ export const AUTO_PUBLISH_COPY_LIVE = {
     note: 'This time has passed and it has not gone out yet — check the channel status on the post.',
     short: 'Late · check',
   },
+  partial: {
+    note: 'Out on some channels and not on others — check the channel status on the post.',
+    short: 'Partly out',
+  },
+  simulated: {
+    note: 'Nothing reached a platform — this ran as a simulation. Send it again to post it for real.',
+    short: 'Simulated only',
+  },
 } as const satisfies Record<Exclude<AutoPublishTruth, 'none'>, AutoPublishCopy>
 
 /** The copy set for this environment. */
@@ -88,6 +108,53 @@ export function autoPublishCopy(enabled: boolean) {
 }
 
 const isValidDate = (date: Date): boolean => !Number.isNaN(date.getTime())
+
+/**
+ * A channel that is still expected to go somewhere.
+ *
+ * `published` and `skipped` are absent for opposite reasons and the same
+ * conclusion — one is done, one was never going — and neither can be waiting.
+ * `publishing` IS outstanding: a claim is held right now, so "nothing was
+ * published" is not merely unproven, it is being decided as we render.
+ */
+const OUTSTANDING: ReadonlySet<VariantPublishStatus> = new Set<VariantPublishStatus>([
+  'pending',
+  'scheduled',
+  'publishing',
+  'failed',
+])
+
+interface PublishEvidence {
+  /** Published AND not a fixture run — the only rows that prove a platform received it. */
+  live: number
+  /** Published, but through the fixture rail: the row says published, no platform saw it. */
+  simulated: number
+  outstanding: number
+}
+
+/**
+ * What the variant rows PROVE, which is the only thing this module may speak from.
+ *
+ * `simulated` is counted apart from `live` rather than folded into it because the
+ * two support opposite sentences. `variant-status.ts` computes the flag from the
+ * `fixture://` permalink before that permalink is nulled — "computed once, before
+ * the id is erased, because afterwards the difference is gone" — and collapsing it
+ * here would throw away the distinction that file exists to preserve.
+ */
+function evidenceOf(variants: readonly VariantStatusRow[]): PublishEvidence {
+  let live = 0
+  let simulated = 0
+  let outstanding = 0
+  for (const row of variants) {
+    if (row.status === 'published') {
+      if (row.simulated) simulated += 1
+      else live += 1
+    } else if (OUTSTANDING.has(row.status)) {
+      outstanding += 1
+    }
+  }
+  return { live, simulated, outstanding }
+}
 
 /**
  * What a scheduled post looks like HERE, which is not what the name suggests.
@@ -116,19 +183,59 @@ const isValidDate = (date: Date): boolean => !Number.isNaN(date.getTime())
  *
  * `schedule-status-reachability.test.ts` reads the statuses this app writes out
  * of the source and fails if this gate stops matching any of them.
+ *
+ * ── WHY THE VARIANT ROWS ARE AN ARGUMENT AND NOT AN OPTION ───────────────────
+ * `posts.status` plus a date cannot answer "did this go out". It answered
+ * `overdue` — "this time has passed and nothing was published" — for four rows in
+ * production whose own channel chips, two inches above, read "published". The
+ * post-level status rolls up late or not at all: `65dc1a34` sat at `scheduled`
+ * with both of its variants at `published`, and three demo posts sat at
+ * `approved` with two published channels each. `post_variants.publish_status` is
+ * where a publish is actually recorded, so that is what this reads.
+ *
+ * Required in position, never optional. `variantStates?:` on the props is the
+ * shape that produced two defects in two days elsewhere in this app (`lagHours?`,
+ * `simulated?`): a call site that forgets it gets a silent default instead of a
+ * type error, and the default is invisible precisely where it is wrong.
+ *
+ * ── NO ROWS IS NOT EVIDENCE OF NO PUBLISH ────────────────────────────────────
+ * `listVariantStates` returns an empty map on ANY read failure, and `.get(id)`
+ * cannot distinguish "this post has no variants" from "the query threw". So an
+ * empty list yields the floor rather than `overdue`: during a variant-read outage
+ * the alternative is every past-due card on the page reviving the exact lie this
+ * change removes. The cost is a post whose variants were never generated reading
+ * "won't post itself" instead of "missed" — weaker, still true, and production
+ * carries no such row (0 past-due posts have no variants).
  */
 export function autoPublishTruth(
   status: PostStatus,
   scheduledAt: string | null,
   now: Date,
+  variants: readonly VariantStatusRow[],
 ): AutoPublishTruth {
   const promisesAutoPublish =
     status === 'scheduled' || (status === 'approved' && scheduledAt !== null)
   if (!promisesAutoPublish) return 'none'
 
+  const evidence = evidenceOf(variants)
+
+  // A platform has it. Nothing below may say otherwise, whatever the clock says —
+  // the time a post was due is not evidence about whether it went.
+  if (evidence.live > 0) {
+    // A fixture channel counts as unfinished here: the row says published and no
+    // platform ever saw it, so the post is not out everywhere it was aimed.
+    return evidence.outstanding > 0 || evidence.simulated > 0 ? 'partial' : 'none'
+  }
+
+  // Published only through the fixture rail. "Nothing was published" is TRUE of
+  // the platforms and false of the screen, which shows two channels marked
+  // published — so it names the simulation instead of denying the chips.
+  if (evidence.simulated > 0) return 'simulated'
+
   // "It will not post itself" is true regardless of the time, so it is the
   // floor. Everything below can only ever upgrade to the stronger claim.
   if (scheduledAt === null || !isValidDate(now)) return 'awaiting'
+  if (evidence.outstanding === 0) return 'awaiting'
 
   const due = Date.parse(scheduledAt)
   if (!Number.isFinite(due)) return 'awaiting'

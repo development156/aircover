@@ -1,7 +1,8 @@
-import { FlaskConical, TriangleAlert } from 'lucide-react'
+import { AlertCircle, FlaskConical, TriangleAlert } from 'lucide-react'
 import type { PostStatus } from '@sahoda/shared'
 
 import { autoPublishTruth, autoPublishCopy } from '@/lib/posts/schedule-status'
+import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { cn } from '@/lib/utils'
 
 /**
@@ -24,12 +25,28 @@ const ICONS = {
   // A promise that has already failed is a warning, not a footnote — same icon
   // the wallet uses for holds nothing will release.
   overdue: TriangleAlert,
+  // Something IS out. That is not a failed promise, it is an uneven one, so it
+  // takes the softer of the two warning marks the app already uses.
+  partial: AlertCircle,
+  // The fixture marker again, and for the literal reason: this post's publishes
+  // ran on the fixture rail.
+  simulated: FlaskConical,
 } as const
 
 export interface AutoPublishNoteProps {
   status: PostStatus
   scheduledAt: string | null
   now: Date
+  /**
+   * Per-channel publish state for THIS post's channels, from `listVariantStates`.
+   *
+   * Required, and never optional: what a post has actually published is the whole
+   * basis for what may be said about it, and a call site that forgot the prop
+   * would silently revive the claim that this note exists to stop making. Pass
+   * `[]` to mean "no rows" — see `autoPublishTruth` for why that is read as the
+   * floor rather than as proof nothing published.
+   */
+  variants: readonly VariantStatusRow[]
   /** `compact` is for week-grid cells, which have room for about 14 characters. */
   variant?: 'full' | 'compact'
   /**
@@ -45,11 +62,12 @@ export function AutoPublishNote({
   status,
   scheduledAt,
   now,
+  variants,
   variant = 'full',
   autoPublish = false,
   className,
 }: AutoPublishNoteProps) {
-  const truth = autoPublishTruth(status, scheduledAt, now)
+  const truth = autoPublishTruth(status, scheduledAt, now, variants)
   if (truth === 'none') return null
 
   const copy = autoPublishCopy(autoPublish)[truth]

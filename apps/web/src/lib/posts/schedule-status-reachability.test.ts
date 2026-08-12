@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest'
 import { PostStatusSchema, type PostStatus } from '@sahoda/shared'
 
 import { autoPublishTruth } from './schedule-status'
+import type { VariantStatusRow } from './variant-status'
 
 /**
  * Reachability guard for the auto-publish gate.
@@ -33,6 +34,24 @@ const WEB_SRC = resolve(HERE, '../..')
 
 const NOW = new Date('2026-07-25T12:00:00.000Z')
 const A_DATE = '2026-07-25T18:00:00.000Z'
+/**
+ * One variant, still waiting — the shape a genuinely-unpublished post carries.
+ * `autoPublishTruth` now reads the variant rows, and an EMPTY list is read as
+ * "no evidence" rather than as proof nothing published, so a reachability probe
+ * that passed `[]` would be testing the fallback instead of the gate.
+ */
+const WAITING = [
+  {
+    channel: 'instagram',
+    status: 'pending',
+    permalink: null,
+    platformPostId: null,
+    simulated: false,
+    errorMessage: null,
+    errorCode: null,
+    retryable: true,
+  },
+] as const satisfies readonly VariantStatusRow[]
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -102,7 +121,9 @@ describe('the auto-publish gate can match a post this app can actually produce',
 
   test('at least one written status is labelled once it carries a date', () => {
     const written = statusesTheAppWrites()
-    const labelled = written.filter((status) => autoPublishTruth(status, A_DATE, NOW) !== 'none')
+    const labelled = written.filter(
+      (status) => autoPublishTruth(status, A_DATE, NOW, WAITING) !== 'none',
+    )
 
     expect(
       labelled,
@@ -116,6 +137,6 @@ describe('the auto-publish gate can match a post this app can actually produce',
     // Nothing writes this today. The gate must keep honouring it anyway, or the
     // day someone ships a schedule action the labelling silently goes dark
     // again — this time with a status that IS reachable.
-    expect(autoPublishTruth('scheduled', A_DATE, NOW)).not.toBe('none')
+    expect(autoPublishTruth('scheduled', A_DATE, NOW, WAITING)).not.toBe('none')
   })
 })

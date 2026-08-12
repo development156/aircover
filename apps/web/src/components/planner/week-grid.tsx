@@ -38,11 +38,14 @@ function DayChip({
   now,
   mode,
   autoPublish,
+  variants,
 }: {
   post: Post
   now: Date
   mode: PostPublishMode
   autoPublish: boolean
+  /** Required, like the note's own prop: see `AutoPublishNote.variants`. */
+  variants: readonly VariantStatusRow[]
 }) {
   const time = formatScheduledTime(post.scheduled_at)
   const certainty = certaintyFor(post.status, mode)
@@ -72,6 +75,7 @@ function DayChip({
         status={post.status}
         scheduledAt={post.scheduled_at}
         now={now}
+        variants={variants}
         autoPublish={autoPublish}
         variant="compact"
       />
@@ -132,6 +136,7 @@ export function WeekGrid({
                   now={now}
                   mode={modes.get(post.id) ?? null}
                   autoPublish={autoPublish}
+                  variants={variantStates?.get(post.id) ?? []}
                 />
               ))}
             </li>
