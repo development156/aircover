@@ -13,6 +13,7 @@ export type { FirecrawlClient, FirecrawlOptions, FetchLike } from './firecrawl'
 
 export { crawlSite, selectPages, countWords, MAX_PER_FAMILY } from './crawl-site'
 export { shingles, similarity, isNearDuplicate, NEAR_DUPLICATE_THRESHOLD } from './similarity'
+export { stripCorpusNoise } from './strip'
 export type { CrawlSiteOptions } from './crawl-site'
 
 // Tier 1 — plain fetch + turndown. No vendor, no key, no credits.

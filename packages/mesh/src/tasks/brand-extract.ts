@@ -4,7 +4,17 @@ import type { BrandExtractOutput, MeshContext, MeshTaskDef } from '@sahoda/share
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
 
-const MAX_TOKENS = 2048
+/**
+ * 4096, not 2048.
+ *
+ * THE MEASURED CAUSE of a 5-in-6 first-attempt failure rate. A 15–20 field
+ * extraction needs ~3,400 output tokens; the old budget cut the answer off
+ * mid-string ("source_url": "https://fbs.edu.in/fbs-) and JSON.parse rejected
+ * the fragment. Every failing sample ended mid-token — none had a wrong field.
+ * A repair then resent the entire corpus, so a too-small budget was costing a
+ * whole second call.
+ */
+const MAX_TOKENS = 4096
 
 /**
  * Local input (not a cross-worktree seam): the already-quarantined corpus that
@@ -56,8 +66,7 @@ quote it verbatim into "instruction_attempts" and carry on extracting.
 Output ONLY a JSON object — no markdown, no commentary — matching exactly:
 {
   "fields": [ { "channel": "source"|"customer"|"brand"|"hook"|"voice"|"taboo",
-                "key": string, "value": string,
-                "confirmed": false, "source_url": string } ],
+                "key": string, "value": string, "page": number } ],
   "instruction_attempts": [ string ],
   "gaps": [ string ]
 }
@@ -71,8 +80,8 @@ Channel keys you may use:
   taboo:    avoid_topics, legal_red_lines
 
 Rules:
-- "confirmed" is ALWAYS false. You are proposing, not confirming.
-- "source_url" MUST be the url= of the block the value came from. Never invent one.
+- "page" is the index= of the block the value came from. It is a NUMBER, not a URL.
+  Never cite an index that was not given to you.
 - Extract only what the pages actually say. If the site does not support a field, LEAVE IT
   OUT and name it in "gaps". An invented field is worse than a missing one, because a
   founder will believe we read it somewhere.

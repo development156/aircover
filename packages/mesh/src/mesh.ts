@@ -15,7 +15,13 @@ import { createOpenRouterProvider } from './providers/openrouter'
 import { createOpenAIProvider } from './providers/openai'
 import { createPostgrestLogSink } from './telemetry'
 import { createPostgrestBrandContext } from './brand-context'
-import { createMeshRunner, type Attempt, type MeshResult, type MeshTaskSpec } from './engine'
+import {
+  createMeshRunner,
+  type Attempt,
+  type MeshResult,
+  type MeshTaskSpec,
+  type RepairEvent,
+} from './engine'
 import { TIER_ROUTES, imageModelForTier } from './routing'
 import { brandGuidelinesTask } from './tasks/brand-guidelines'
 import { brandExtractTask } from './tasks/brand-extract'
@@ -39,6 +45,11 @@ export interface CreateMeshOptions {
   env?: Record<string, string | undefined>
   /** Injectable transport for provider + telemetry calls (tests). Defaults to global fetch. */
   fetchImpl?: FetchLike
+  /**
+   * Notified whenever a first attempt fails its schema and has to be repaired.
+   * A repair doubles the call, so this is a cost signal as much as a quality one.
+   */
+  onRepair?: (event: RepairEvent) => void
 }
 
 export interface Mesh {
@@ -112,6 +123,7 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
     price: estimateCostUsd,
     brandContext,
     planImage,
+    ...(opts.onRepair ? { onRepair: opts.onRepair } : {}),
   })
 
   // Bind each wired task's run with its concrete generics captured here, then

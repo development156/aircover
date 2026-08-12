@@ -1,3 +1,4 @@
+import { stripCorpusNoise } from './strip'
 import type { CrawledPage } from './types'
 
 /**
@@ -55,9 +56,12 @@ export function truncate(text: string, max = MAX_CHARS_PER_PAGE): string {
  * their own business.
  */
 export function quarantinePage(page: CrawledPage, index: number): string {
+  // Stripped BEFORE truncation, so the 6,000-character budget is spent on words
+  // rather than on hrefs. The url stays on the header line, once, where it is
+  // provenance rather than noise repeated on every link.
   return [
     `${OPEN} index=${index} url=${JSON.stringify(page.url)} title=${JSON.stringify(page.title)}`,
-    neutralize(truncate(page.markdown)),
+    neutralize(truncate(stripCorpusNoise(page.markdown))),
     CLOSE,
   ].join('\n')
 }

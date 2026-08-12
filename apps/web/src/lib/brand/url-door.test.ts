@@ -1,4 +1,9 @@
-import { ResolveInputSchema, type BrandExtractOutput, type ExtractedField } from '@sahoda/shared'
+import {
+  ResolveInputSchema,
+  type BrandExtractOutput,
+  type ExtractedField,
+  type ExtractedFieldWire,
+} from '@sahoda/shared'
 import type { CrawlOutcome, FirecrawlClient } from '@sahoda/research'
 import { describe, expect, test } from 'vitest'
 
@@ -19,6 +24,18 @@ function extractor(result: BrandExtractOutput | null): ExtractRunner {
   return { run: async () => (result ? { ok: true, data: result } : { ok: false }) }
 }
 
+/** What the MODEL emits: an index, no confirmed flag. */
+function wire(over: Partial<ExtractedFieldWire> = {}): ExtractedFieldWire {
+  return {
+    channel: 'source',
+    key: 'one_liner',
+    value: 'A two-room bookshop off a Buxi Bazaar side street.',
+    page: 0,
+    ...over,
+  }
+}
+
+/** What the DOOR hands out, after provenance is stamped server-side. */
 function field(over: Partial<ExtractedField> = {}): ExtractedField {
   return {
     channel: 'source',
@@ -46,7 +63,7 @@ describe('openUrlDoor', () => {
       client: noClient,
       ctx,
       crawl: async () => CRAWLED,
-      extract: extractor({ fields: [field()], instruction_attempts: [], gaps: ['customer.pain'] }),
+      extract: extractor({ fields: [wire()], instruction_attempts: [], gaps: ['customer.pain'] }),
     })
 
     expect(out.ok).toBe(true)
@@ -71,7 +88,7 @@ describe('openUrlDoor', () => {
         wordsFound: 0,
         creditsUsed: 1,
       }),
-      extract: extractor({ fields: [field()], instruction_attempts: [], gaps: [] }),
+      extract: extractor({ fields: [wire()], instruction_attempts: [], gaps: [] }),
     })
 
     expect(out.ok).toBe(false)
@@ -165,7 +182,7 @@ describe('openUploadDoor', () => {
   test('returns unconfirmed fields and the parse annotation', async () => {
     const out = await openUploadDoor({ filename: 'brand.pdf', dataUrl: PDF }, 'Acme', {
       ctx,
-      extract: runner({ fields: [field()], instruction_attempts: [], gaps: [] }, [
+      extract: runner({ fields: [wire()], instruction_attempts: [], gaps: [] }, [
         { type: 'file', file: { hash: 'h1' } },
       ]),
     })

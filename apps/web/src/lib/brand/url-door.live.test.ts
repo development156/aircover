@@ -9,6 +9,7 @@ import {
 import { brandExtractTask, brandGuidelinesTask, createMesh } from '@sahoda/mesh'
 import { ResolveInputSchema, type MeshContext, type ResolveInput } from '@sahoda/shared'
 
+import { attachProvenance } from '@sahoda/shared'
 import { applyExtractedFields } from './url-door'
 
 /**
@@ -110,7 +111,10 @@ describe.runIf(LIVE)('arm D — the URL door on a real site', () => {
     }
 
     // ── arm D: the same control, plus what the site actually said ────────────
-    const enriched = applyExtractedFields(control, extraction.data.fields)
+    const enriched = applyExtractedFields(
+      control,
+      attachProvenance(extraction.data.fields, crawl.pages.map((p) => p.url)),
+    )
     record.armDInput = enriched
     const armD = await mesh.runTask(brandGuidelinesTask.def, enriched, ctxFor('d'))
     record.armD = { ok: armD.ok, usage: armD.usage, payload: armD.ok ? armD.data : armD.error }

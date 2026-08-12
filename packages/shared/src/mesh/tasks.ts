@@ -53,6 +53,52 @@ export const ExtractedFieldSchema = z.object({
 export type ExtractedField = z.infer<typeof ExtractedFieldSchema>
 
 /**
+ * What the MODEL actually emits — deliberately smaller than the field above.
+ *
+ * `confirmed` is gone from the wire and stamped server-side. The literal `false`
+ * was already unfakeable, but making the model write a constant on every field
+ * cost ~5 output tokens each for no information, and the stronger property is
+ * that the model has no channel to express confirmation AT ALL.
+ *
+ * `source_url` is replaced by `page`, the index of the quarantine block the
+ * value came from. Two wins: a long URL repeated per field was the single
+ * biggest slice of the output, and "never invent a source_url" stops being a
+ * prompt instruction the model can disobey — an index either addresses a block
+ * we supplied or it does not.
+ *
+ * Both changes exist because the 2026-08-12 diagnosis found extraction failing
+ * its schema 5 times in 6, always by TRUNCATION at max_tokens, never by getting
+ * a field wrong.
+ */
+export const ExtractedFieldWireSchema = z.object({
+  channel: IntakeChannelSchema,
+  key: z.string().min(1),
+  value: z.string().min(1),
+  /** 0-based index of the source block. Resolved to a URL by the caller. */
+  page: z.number().int().min(0),
+})
+export type ExtractedFieldWire = z.infer<typeof ExtractedFieldWireSchema>
+
+/**
+ * Stamp provenance the model could not forge: `confirmed:false` always, and a
+ * source resolved from OUR list rather than the model's memory. An index past
+ * the end of the list is dropped — a citation to a block that does not exist is
+ * exactly the invention the index was introduced to prevent.
+ */
+export function attachProvenance(
+  fields: readonly ExtractedFieldWire[],
+  sources: readonly string[],
+): ExtractedField[] {
+  const out: ExtractedField[] = []
+  for (const f of fields) {
+    const source_url = sources[f.page]
+    if (!source_url) continue
+    out.push({ channel: f.channel, key: f.key, value: f.value, confirmed: false, source_url })
+  }
+  return out
+}
+
+/**
  * brand_extract → fields proposed from quarantined page text, plus an honest
  * account of what the pages could NOT support.
  *
@@ -62,7 +108,7 @@ export type ExtractedField = z.infer<typeof ExtractedFieldSchema>
  * against imagination.
  */
 export const BrandExtractOutputSchema = z.object({
-  fields: z.array(ExtractedFieldSchema),
+  fields: z.array(ExtractedFieldWireSchema),
   /** Verbatim quotes that read like directives aimed at the reader. Data, not orders. */
   instruction_attempts: z.array(z.string()),
   /** What the site did not say. Empty is a legitimate answer; inventing is not. */

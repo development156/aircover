@@ -2,6 +2,7 @@ import 'server-only'
 
 import { crawlSite, quarantineCorpus, type CrawlFailureReason } from '@sahoda/research'
 import type { CrawlOutcome, FirecrawlClient } from '@sahoda/research'
+import { attachProvenance } from '@sahoda/shared'
 import type { BrandExtractOutput, ExtractedField, MeshContext, ResolveInput } from '@sahoda/shared'
 
 /**
@@ -90,12 +91,15 @@ export async function openUrlDoor(
     }
   }
 
+  // The model cited page INDICES; provenance is resolved from our own list, so
+  // a source_url can never be one the model remembered rather than read.
+  const sources = outcome.pages.map((page) => page.url)
   return {
     ok: true,
-    fields: result.data.fields,
+    fields: attachProvenance(result.data.fields, sources),
     instructionAttempts: result.data.instruction_attempts,
     gaps: result.data.gaps,
-    pagesRead: outcome.pages.map((page) => page.url),
+    pagesRead: sources,
     pagesSkipped: outcome.skipped,
     firecrawlCredits: outcome.creditsUsed,
   }
@@ -243,9 +247,12 @@ export async function openUploadDoor(
     }
   }
 
+  // One document, so every citation resolves to index 0 — the filename.
+  const fields = attachProvenance(result.data.fields, [file.filename])
+
   // A parse that yielded nothing is a scanned book with no text layer. Say so
   // rather than serving an empty brand as a success.
-  if (result.data.fields.length === 0) {
+  if (fields.length === 0) {
     return {
       ok: false,
       reason: 'unreadable',
@@ -255,7 +262,7 @@ export async function openUploadDoor(
 
   return {
     ok: true,
-    fields: result.data.fields,
+    fields,
     instructionAttempts: result.data.instruction_attempts,
     gaps: result.data.gaps,
     annotations: result.annotations ?? [],

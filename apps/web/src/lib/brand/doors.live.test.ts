@@ -4,6 +4,7 @@ import { createDirectSource, crawlSite, quarantineCorpus } from '@sahoda/researc
 import { brandExtractTask, brandGuidelinesTask, createMesh } from '@sahoda/mesh'
 import { ResolveInputSchema, type MeshContext, type ResolveInput } from '@sahoda/shared'
 
+import { attachProvenance } from '@sahoda/shared'
 import { applyExtractedFields } from './url-door'
 
 /**
@@ -71,7 +72,10 @@ describe.runIf(LIVE)('the three doors, one brand', () => {
       const ex = await mesh.runTask(brandExtractTask.def, { corpus, name: NAME }, ctxFor('d-extract'))
       record.extractD = { ok: ex.ok, usage: ex.usage, data: ex.ok ? ex.data : ex.error }
       if (ex.ok) {
-        const enriched = applyExtractedFields(control, ex.data.fields)
+        const enriched = applyExtractedFields(
+          control,
+          attachProvenance(ex.data.fields, crawl.pages.map((p) => p.url)),
+        )
         record.armDInput = enriched
         const d = await mesh.runTask(brandGuidelinesTask.def, enriched, ctxFor('d'))
         record.armD = { ok: d.ok, usage: d.usage, payload: d.ok ? d.data : d.error }
@@ -100,7 +104,10 @@ describe.runIf(LIVE)('the three doors, one brand', () => {
           ).map((a) => a.file?.hash),
         }
         if (ex.ok) {
-          const enriched = applyExtractedFields(control, ex.data.fields)
+          const enriched = applyExtractedFields(
+            control,
+            attachProvenance(ex.data.fields, ['FBS-Prospectus-2026-27.pdf']),
+          )
           record.armEInput = enriched
           const e = await mesh.runTask(brandGuidelinesTask.def, enriched, ctxFor('e'))
           record.armE = { ok: e.ok, usage: e.usage, payload: e.ok ? e.data : e.error }

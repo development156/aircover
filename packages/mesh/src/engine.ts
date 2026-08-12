@@ -38,6 +38,25 @@ export interface MeshTaskSpec<I, O> {
   fallbackPayload?: (input: I) => O
 }
 
+/**
+ * A first attempt that failed its schema and had to be repaired.
+ *
+ * A repair is a DEFECT, not a success: it doubles the call (the retry resends
+ * every original message), and until now nothing recorded that it happened —
+ * a repaired call and a clean one both logged `status: 'ok'`. This is the seam
+ * that makes the first-attempt error visible at all.
+ */
+export interface RepairEvent {
+  task: string
+  traceId: string
+  /** zod's own message for the FIRST attempt. The diagnosis lives here. */
+  reason: string
+  /** Truncated raw first-attempt text. Diagnostic only — never written to the DB. */
+  sample: string
+  /** Did the one retry succeed, or did the call fail outright? */
+  recovered: boolean
+}
+
 export interface MeshRunnerDeps {
   /** Ordered providers for a tier: [OpenRouter primary, OpenAI fallback]. */
   planAttempts: (tier: ModelTier) => Attempt[]
@@ -48,6 +67,11 @@ export interface MeshRunnerDeps {
   price: (usage: ProviderUsage) => number
   /** Resolves the Brand Brain prefix for `cachePrefix: 'brand_context'` tasks (best-effort). */
   brandContext?: BrandContextProvider
+  /**
+   * Called whenever a first attempt fails its schema. Best-effort observability
+   * — it must never break the user's action, so it is wrapped in a try.
+   */
+  onRepair?: (event: RepairEvent) => void
   /**
    * The one image-capable provider and the model to ask. Undefined when the rail
    * is not configured, and `runImage` then fails honestly rather than reaching for
@@ -64,6 +88,8 @@ export type MeshResult<O> = (
 }
 
 const REPAIR_CODE = 'JSON_REPAIR_FAILED'
+/** First attempt failed its schema, the one retry rescued it. Cost: two calls. */
+const REPAIRED_CODE = 'JSON_REPAIRED'
 
 function buildRequest(model: string, messages: ChatMessage[], maxTokens: number): ChatRequest {
   const carriesFile = messages.some((m) => (m.files?.length ?? 0) > 0)
@@ -230,7 +256,12 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     let latencyMs = responded.latencyMs
     let parsed = safeParseOutput(def.outputSchema, responded.chat.text)
 
+    // Non-null iff the first attempt failed its schema. Carried to the log row
+    // so a repair stops being invisible, and to onRepair so it can be diagnosed.
+    let firstAttemptError: string | null = null
+
     if (!parsed.ok) {
+      firstAttemptError = parsed.error
       const repairMessages = buildRepairMessages(messages, responded.chat.text, parsed.error)
       const started = deps.now()
       try {
@@ -256,9 +287,29 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
       latencyMs,
     }
 
+    if (firstAttemptError !== null) {
+      try {
+        deps.onRepair?.({
+          task: def.name,
+          traceId: ctx.traceId,
+          reason: firstAttemptError,
+          sample: responded.chat.text.slice(0, 2000),
+          recovered: parsed.ok,
+        })
+      } catch {
+        /* observability must never break the action */
+      }
+    }
+
     if (parsed.ok) {
       const status: AiLogStatus = isFallbackProvider ? 'fallback' : 'ok'
-      await writeLog(toLogRow(def, ctx, usage, status, null))
+      // `status` cannot say "repaired" — it carries a DB CHECK constraint of
+      // ('ok','error','fallback') and widening it is a migration, which is
+      // wt-db's lane. `error_code` is free text and null on every clean call,
+      // so a non-null error_code beside status 'ok' is an unambiguous and
+      // queryable "recovered from a defect". Requested properly in
+      // packages/mesh/REQUESTS.md.
+      await writeLog(toLogRow(def, ctx, usage, status, firstAttemptError ? REPAIRED_CODE : null))
       // Annotations ride out so the caller can replay the parse and not pay for
       // it twice. Kept off the frozen Result<O> shape, like `fallback`.
       return responded.chat.annotations

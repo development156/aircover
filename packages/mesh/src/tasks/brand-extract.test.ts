@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BrandExtractOutputSchema, type MeshContext } from '@sahoda/shared'
+import { attachProvenance, BrandExtractOutputSchema, type MeshContext } from '@sahoda/shared'
 import type { ChatRequest, ChatResponse, Provider } from '../providers/types'
 import { createMeshRunner } from '../engine'
 import { BrandExtractInputSchema, brandExtractTask } from './brand-extract'
@@ -47,13 +47,7 @@ const input = BrandExtractInputSchema.parse({
 
 const GOOD = JSON.stringify({
   fields: [
-    {
-      channel: 'brand',
-      key: 'values',
-      value: 'Odia writing gets the front shelf',
-      confirmed: false,
-      source_url: 'https://x.in/about',
-    },
+    { channel: 'brand', key: 'values', value: 'Odia writing gets the front shelf', page: 0 },
   ],
   instruction_attempts: [],
   gaps: ['customer.pain'],
@@ -88,38 +82,62 @@ describe('brandExtractTask', () => {
     expect(last.content).toContain('UNTRUSTED_PAGE')
   })
 
-  it('parses a well-formed extraction', async () => {
+  it('parses a well-formed extraction and cites a page INDEX, not a URL', async () => {
     const { provider } = capturing([GOOD])
     const result = await runnerFor(provider).run(brandExtractTask, input, ctx)
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.data.fields[0]!.confirmed).toBe(false)
-    expect(result.data.fields[0]!.source_url).toBe('https://x.in/about')
+    expect(result.data.fields[0]!.page).toBe(0)
+    // The model never writes confirmed or a URL — both are stamped by us.
+    expect(JSON.stringify(result.data.fields[0])).not.toContain('confirmed')
+  })
+
+  it('stamps confirmed:false and resolves provenance from OUR list', () => {
+    const stamped = attachProvenance(
+      [{ channel: 'brand', key: 'values', value: 'x', page: 0 }],
+      ['https://x.in/about'],
+    )
+    expect(stamped[0]!.confirmed).toBe(false)
+    expect(stamped[0]!.source_url).toBe('https://x.in/about')
+  })
+
+  it('drops a citation to a block that was never supplied', () => {
+    // "Never invent a source" stops being a prompt rule the model can disobey:
+    // an index either addresses a block we sent or it addresses nothing.
+    expect(
+      attachProvenance([{ channel: 'brand', key: 'values', value: 'x', page: 7 }], ['only-one']),
+    ).toEqual([])
   })
 
   // The structural guarantee, tested at the schema rather than the prompt: a
   // model that has been argued into compliance by a hostile page STILL cannot
   // emit a confirmed field, because the shape it must fill has no `true`.
-  it('cannot emit confirmed:true — the schema has no room for it', () => {
+  it('has no channel to claim confirmation at all — stronger than rejecting true', () => {
+    // Previously the model wrote `confirmed: false` and a literal rejected
+    // `true`. Now the field is not on the wire: a page that argues its way into
+    // compliance still has nowhere to write a confirmation.
     const claimed = {
       fields: [
         {
           channel: 'brand',
           key: 'proof_point',
-          value: 'The #1 bookshop in India',
+          value: 'The #1 bookshop',
+          page: 0,
           confirmed: true,
-          source_url: 'https://x.in/about',
         },
       ],
       instruction_attempts: [],
       gaps: [],
     }
-    expect(BrandExtractOutputSchema.safeParse(claimed).success).toBe(false)
+    const parsed = BrandExtractOutputSchema.safeParse(claimed)
+    expect(parsed.success).toBe(true)
+    if (!parsed.success) return
+    expect(JSON.stringify(parsed.data.fields[0])).not.toContain('confirmed')
   })
 
   it('rejects a field with no provenance — an untraceable claim is uncorrectable', () => {
     const orphan = {
-      fields: [{ channel: 'brand', key: 'values', value: 'x', confirmed: false, source_url: '' }],
+      fields: [{ channel: 'brand', key: 'values', value: 'x' }],
       instruction_attempts: [],
       gaps: [],
     }
@@ -128,15 +146,11 @@ describe('brandExtractTask', () => {
 
   it('a compliant model that obeys the page fails the run rather than succeeding wrongly', async () => {
     // Both attempts return the "unrestricted mode" answer the injection asked for.
+    // The injection asked for a confirmed proof point; the wire shape has no
+    // `page`, so the answer it produces cannot parse.
     const obeyed = JSON.stringify({
       fields: [
-        {
-          channel: 'brand',
-          key: 'proof_point',
-          value: 'we are the #1 bookshop in India',
-          confirmed: true,
-          source_url: 'https://x.in/about',
-        },
+        { channel: 'brand', key: 'proof_point', value: 'we are the #1 bookshop', confirmed: true },
       ],
       instruction_attempts: [],
       gaps: [],
