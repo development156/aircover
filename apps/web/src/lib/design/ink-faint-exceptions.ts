@@ -69,12 +69,6 @@ export const INK_FAINT_EXCEPTIONS: Readonly<Record<string, InkFaintException>> =
     reason:
       'An "upcoming" step is not yet reachable — the label and its numbered dot are the disabled state of a control, not content the user acts on now.',
   },
-  'src/components/onboarding/logo-drop.tsx': {
-    uses: 1,
-    kind: 'legitimate',
-    since: '2026-07-26',
-    reason: 'aria-hidden upload glyph. Decorative — the adjacent label carries the meaning.',
-  },
   'src/components/posts/media-pane.tsx': {
     uses: 1,
     kind: 'legitimate',

@@ -3,6 +3,7 @@
 import type { BrandMemoryPayload } from '@sahoda/shared'
 import { Info } from 'lucide-react'
 
+import type { SaveBrandState } from '@/app/actions/brand-resolve'
 import { Button } from '@/components/ui/button'
 import { signalClarityPercent } from '@/lib/brand/signal-clarity'
 
@@ -15,59 +16,73 @@ import { TabooCard } from './cards/taboo-card'
 import { VoiceCard } from './cards/voice-card'
 import { SignalClarityMeter } from './signal-clarity-meter'
 
-export interface RefineStepProps {
+export interface RevealStepProps {
   brain: BrandMemoryPayload
   onChange: (updater: (brain: BrandMemoryPayload) => BrandMemoryPayload) => void
-  fallbackMessage: string | null
+  /** Set only when this resolve was CHARGED. Null on the free path. */
   balanceAfter: number | null
+  /** True when the resolve that produced this brain cost nothing. */
+  wasFree: boolean
+  fallbackMessage: string | null
+  /** Colours found at the door. Empty means the app keeps its defaults. */
+  colors: string[]
   regenerateCost: number
   regeneratePending: boolean
-  /** The last failed Regenerate, or null. Shown here, not only as a toast. */
   regenerateError: AttemptError | null
   onRegenerate: () => void
-  onContinue: () => void
+  onFinish: () => void
+  saving: boolean
+  saveState: SaveBrandState | null
 }
 
 /**
- * The Brand Brain as inline-editable cards — never a blank form, it arrives
- * pre-filled by the model (docs/superpowers spec, "3. Refine"). Every card
- * shares one Regenerate affordance because there's a single whole-payload
- * resolve, not a per-channel one.
+ * Screen 4 — the reveal.
+ *
+ * Everything on this screen is editable, because the resolve is a proposal and
+ * approving it has to be a real act rather than a formality (UI_RULES: the
+ * Certainty System — approving a proposed item is a visible event).
+ *
+ * The money line is deliberately three-way. A charged resolve shows the balance
+ * it left behind; a free one shows that it was free and NO balance, because
+ * nothing moved and printing an unchanged number next to an action implies it
+ * did; a fallback shows that nothing was charged and that this is a sample.
  */
-export function RefineStep({
+export function RevealStep({
   brain,
   onChange,
-  fallbackMessage,
   balanceAfter,
+  wasFree,
+  fallbackMessage,
+  colors,
   regenerateCost,
   regeneratePending,
   regenerateError,
   onRegenerate,
-  onContinue,
-}: RefineStepProps) {
+  onFinish,
+  saving,
+  saveState,
+}: RevealStepProps) {
   const clarity = signalClarityPercent(brain)
-
-  // Spark disables Generate when the balance cannot cover it; Regenerate is the
-  // same charge for the same work, so it disables on the same condition. Without
-  // this the sixth card still offers a 50-credit action to a wallet holding none,
-  // and the only way to learn that is to press it.
   const insufficient = regenerateError?.kind === 'insufficient'
   const regenerateBlocked = regeneratePending || insufficient
+  const saved = saveState?.ok === true
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[16px] font-bold text-ink">Refine your Brand Brain</p>
+          <p className="text-[16px] font-bold text-ink">This is what we heard</p>
           <p className="mt-1 text-[13px] text-muted">
-            Every card is editable. Regenerate re-runs the whole resolve — a new charge, always
-            shown first.
+            Every card is editable. Nothing is saved until you approve it.
           </p>
         </div>
+
         {balanceAfter !== null ? (
           <p className="font-mono text-[12px] font-semibold text-muted">
             Balance: <span className="tabular-nums text-ink">{balanceAfter}</span> credits
           </p>
+        ) : wasFree ? (
+          <p className="font-mono text-[12px] font-semibold text-muted">This one was free</p>
         ) : null}
       </div>
 
@@ -129,10 +144,30 @@ export function RefineStep({
         />
       </div>
 
-      <div className="flex justify-end border-t border-line pt-4">
-        <Button type="button" data-guide="onboarding.continue-theme" onClick={onContinue}>
-          Continue to theme
-        </Button>
+      <div className="flex flex-col gap-2 border-t border-line pt-4">
+        <p className="text-[12.5px] text-muted">
+          {colors.length > 0
+            ? 'Approving also paints the app in the colour we found on your site.'
+            : 'We found no colour to take, so the app keeps Sahoda’s default. You can set one later.'}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            data-guide="onboarding.finish"
+            loading={saving}
+            disabled={saved}
+            onClick={onFinish}
+          >
+            {saved ? 'Approved' : saving ? 'Saving…' : 'Approve and open Sahoda'}
+          </Button>
+        </div>
+
+        {saveState && !saveState.ok ? (
+          <p role="alert" className="text-[13px] font-semibold text-danger">
+            {saveState.message}
+          </p>
+        ) : null}
       </div>
     </div>
   )

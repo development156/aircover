@@ -44,11 +44,13 @@ export default function OnboardingError({
     <div className="grid min-h-dvh place-items-center bg-s1 p-page max-narrow:p-page-mobile">
       <div className="w-full max-w-[520px]">
         {/* "restart setup", not "try again", because that is what the button
-            actually does. OnboardingFlow holds every answer in useState — spark,
-            logo, colours, the generated brain — and nothing is written until the
-            resolve_brand_memory RPC at Finish. reset() remounts the flow at the
-            first screen with EMPTY_SPARK, so promising the user their progress
-            survives would be false the moment they pressed it.
+            actually does. OnboardingFlow holds every in-flight answer in
+            useState — the three picks, the door text, the refusal, the resolved
+            brain — and nothing is written until the resolve_brand_memory RPC at
+            Approve. reset() re-renders the segment from the server component, so
+            a brain that was already SAVED comes back (page.tsx reads it), while
+            everything answered since the last save does not. Copy promising the
+            user their progress survives would be false for the half that matters.
 
             The sentence stops at "contact support" and does not point at the
             reference: server-origin errors take the early return above and

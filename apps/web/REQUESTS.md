@@ -230,3 +230,67 @@ agreeing ones. The test makes drift _loud_; only the helper makes it impossible.
 
 Context: 2026-08-10. Two posts carried a fresh `scheduled_at` while still `expired`; the
 only symptom was a cron sweep that never found them.
+
+---
+
+## owner: a PDF text-extraction dependency for the onboarding door
+
+Added 2026-08-12 by `wt-onboard`. UI_RULES_v3 §"Stop and ask" requires asking before adding
+any dependency, so this ships without one and asks here.
+
+Screen 2 of the rebuilt onboarding lets someone hand over a PDF — a deck, a menu, a
+one-pager. Nothing in the repo could read one, and `apps/web` has no image or document
+library at all (`sharp` is a transitive dep of something else, not ours).
+
+**Shipped instead:** `src/lib/onboarding/pdf-text.ts` — `node:zlib` over FlateDecode content
+streams plus a `Tj`/`TJ`/`'`/`"` operator scanner. No dependency. It handles the ordinary
+case; verified against a Ghostscript-produced PDF whose ground truth came from `pdftotext`.
+
+**What it cannot do:** scanned pages, CID-keyed fonts, object streams (`/ObjStm`), LZW.
+Those are not rare. It is safe anyway because the extractor is gated — output that does not
+read like prose is REFUSED with a reason, never passed to `brand_guidelines` — but a refusal
+is still a door closing on a user who had a perfectly good PDF.
+
+**Ask:** approval to add `unpdf` (ESM, no native build, bundles a pdf.js core) or
+`pdf-parse`. Roughly: delete `inflateStreams`/`showText`/`readEscape`/`readHexString`, keep
+`gateText` and `measureText` exactly as they are — the gate is the valuable half and is
+independent of who extracts.
+
+## wt-shared: onboarding has three enums and no home for them
+
+Added 2026-08-12 by `wt-onboard`.
+
+`src/lib/onboarding/intake.ts` defines `BusinessModel`, `Regime` and `Locale` with zod
+schemas. CLAUDE.md says types and schemas import from `packages/shared` only — these break
+no such rule (shared defines none of them, and this lane may not edit shared), but they are
+product vocabulary and they will be wanted outside onboarding the moment anything else wants
+to know what sector a workspace is in.
+
+**Ask:** lift the file into `packages/shared/src/brand/intake.ts` verbatim and re-export.
+Nothing else has to change; `apps/web` swaps one import path.
+
+## wt-shared: `ResolveInput` has nowhere to put the door text
+
+Added 2026-08-12 by `wt-onboard`.
+
+Onboarding now reads a whole website or PDF — typically 1,000 to 20,000 words the business
+wrote about itself. That is by far the richest signal the resolve has ever had, and
+`ResolveInputSchema` has no field that can hold prose.
+
+Following `spark-to-resolve-input.ts`'s precedent, nothing was smuggled. Exactly two
+sentences survive into the contract, both VERBATIM and both into fields that mean what they
+are (`src/lib/onboarding/to-resolve-input.ts`):
+
+- `source.one_liner` — the first sentence long enough not to be a nav item.
+- `brand.proof_point` — the first sentence carrying a year or a counted quantity.
+
+Everything else is dropped on the floor. Paraphrasing an About page into `source.mission`
+would have been the easy move and would have put words in the user's mouth.
+
+**Ask:** a field that can carry the raw signal — `source.evidence: z.string().max(N)` or
+similar — so the resolve can read what the business actually says rather than two sentences
+of it. If it lands, `toResolveInput` fills it and drops nothing.
+
+**Related, smaller:** `ResolveInput` has no jurisdiction field either. Locale currently rides
+inside `source.category` as prose ("local presence in food, in India"), which works because
+`category` is free text, but it is a phrase doing a field's job.
