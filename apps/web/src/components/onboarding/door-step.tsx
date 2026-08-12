@@ -39,6 +39,35 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
   const [state, formAction, isPending] = useActionState<DoorState | null, FormData>(readDoor, null)
   const [sentence, setSentence] = useState('')
 
+  /**
+   * URL AND FILE ARE HELD HERE, not read off the DOM at submit time.
+   *
+   * React 19 RESETS an uncontrolled field inside `<form action={fn}>` once the
+   * action completes. That is the reported bug: a failed read cleared the file
+   * input back to "No file chosen" and blanked the URL, while the error from
+   * that attempt stayed on screen — so the next press submitted an EMPTY form
+   * and the user was looking at a message about a file the form no longer had.
+   *
+   * Holding both in state means the reset cannot take them, and the submit
+   * builds its own FormData from what we hold rather than from what survived.
+   */
+  const [url, setUrl] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+
+  /**
+   * True when the form has changed since the result on screen was produced.
+   *
+   * `useActionState` keeps the last result until the next one lands, so an error
+   * outlives the attempt that caused it: it is still rendered while the user
+   * edits the form and while the NEXT read is in flight. A failure message that
+   * describes an attempt nobody is making any more is a lie about the current
+   * state, and it is what made this look like a door that never recovers.
+   */
+  const [dirty, setDirty] = useState(false)
+  useEffect(() => {
+    if (state) setDirty(false)
+  }, [state])
+
   // Announce the outcome once, when it arrives.
   const [announced, setAnnounced] = useState('')
   useEffect(() => {
@@ -47,6 +76,16 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
   }, [state])
 
   const read = state?.ok ? state : null
+  // Suppressed while a new read is running or the form has moved on.
+  const failure = state && !state.ok && !isPending && !dirty ? state : null
+
+  function submit(): void {
+    const data = new FormData()
+    data.set('url', url)
+    data.set('sentence', sentence)
+    if (file) data.set('pdf', file)
+    formAction(data)
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -58,10 +97,26 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
         </p>
       </div>
 
-      <form action={formAction} className="flex flex-col gap-4">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          submit()
+        }}
+        className="flex flex-col gap-4"
+      >
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="door-url">Your website</Label>
-          <Input id="door-url" name="url" disabled={isPending} placeholder="yourbrand.com" />
+          <Input
+            id="door-url"
+            name="url"
+            value={url}
+            onChange={(event) => {
+              setUrl(event.target.value)
+              setDirty(true)
+            }}
+            disabled={isPending}
+            placeholder="yourbrand.com"
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -74,8 +129,32 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
             type="file"
             accept="application/pdf,.pdf"
             disabled={isPending}
+            onChange={(event) => {
+              setFile(event.target.files?.[0] ?? null)
+              setDirty(true)
+            }}
             className="rounded-card border border-line bg-bg p-2.5 text-[13px] text-ink file:mr-3 file:rounded-pill file:border-0 file:bg-s2 file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-ink"
           />
+          {/* The native control says "No file chosen" again the moment React
+              resets the form, so what WE hold is stated separately — otherwise
+              the page contradicts the request it is about to send. */}
+          {file ? (
+            <p className="text-[12px] text-muted">
+              Holding <span className="font-semibold text-ink">{file.name}</span> (
+              {Math.max(1, Math.round(file.size / 1024))} KB). It stays attached until you pick
+              another or clear it.{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setFile(null)
+                  setDirty(true)
+                }}
+                className="underline"
+              >
+                Clear
+              </button>
+            </p>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -86,7 +165,10 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
             rows={3}
             disabled={isPending}
             value={sentence}
-            onChange={(event) => setSentence(event.target.value)}
+            onChange={(event) => {
+              setSentence(event.target.value)
+              setDirty(true)
+            }}
             placeholder="We bake sourdough and celebration cakes on Prabhat Road, and nothing is bought in."
             className="w-full rounded-card border border-line bg-bg p-3 text-[14px] text-ink transition-micro placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           />
@@ -128,9 +210,9 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
         result: the reveal must be resolved from less, not from a document we
         never read.
       */}
-      {state && !state.ok ? (
+      {failure ? (
         <div className="rounded-card border border-danger bg-danger-bg p-4">
-          <p className="text-[13px] font-semibold text-danger">{state.message}</p>
+          <p className="text-[13px] font-semibold text-danger">{failure.message}</p>
           <p className="mt-1 text-[12.5px] text-muted">
             Nothing was charged — reading is always free.
           </p>

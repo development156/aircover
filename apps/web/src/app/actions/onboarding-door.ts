@@ -81,7 +81,20 @@ export async function readDoor(_prev: DoorState | null, formData: FormData): Pro
     const url = String(formData.get('url') ?? '')
     const sentence = String(formData.get('sentence') ?? '')
 
+    // STAGE LOG. The door the precedence rule PICKED, beside what actually
+    // arrived — a PDF that was chosen in the browser but did not reach the
+    // request shows up here as pdf:null with kind:'url' or 'sentence'.
     const choice = pickDoor({ pdfName: pdf?.name ?? null, url, sentence })
+    console.log(
+      '[door] picked',
+      JSON.stringify({
+        kind: choice.kind,
+        hasPdfPart: pdf !== null,
+        pdfBytes: pdf?.size ?? 0,
+        hasUrl: url.trim().length > 0,
+        hasSentence: sentence.trim().length > 0,
+      }),
+    )
     const note = precedenceNote(choice)
 
     if (choice.kind === 'none') {
@@ -118,6 +131,14 @@ export async function readDoor(_prev: DoorState | null, formData: FormData): Pro
       const workspace = await getActiveWorkspace()
       if (!workspace) return { ok: false, message: 'Create a workspace first.' }
 
+      // STAGE LOG. Reported before any model call, so a request that never
+      // carried a file is distinguishable from one whose extraction came back
+      // empty — the two produce the same screen and need different fixes.
+      console.log(
+        '[door.upload] received',
+        JSON.stringify({ filename: pdf.name, bytes: pdf.size, type: pdf.type }),
+      )
+
       const dataUrl = `data:application/pdf;base64,${Buffer.from(await pdf.arrayBuffer()).toString('base64')}`
       const door = await openUploadDoor({ filename: pdf.name, dataUrl }, pdf.name, {
         extract: extractRunner(),
@@ -125,7 +146,10 @@ export async function readDoor(_prev: DoorState | null, formData: FormData): Pro
       })
       // Each arm of the taxonomy is a different sentence to the founder — a
       // scanned book and an oversized one need different things back.
-      if (!door.ok) return { ok: false, message: door.message }
+      if (!door.ok) {
+        console.log('[door.upload] refused', JSON.stringify({ reason: door.reason }))
+        return { ok: false, message: door.message }
+      }
 
       return {
         ok: true,

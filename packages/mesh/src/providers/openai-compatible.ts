@@ -100,6 +100,31 @@ export function createOpenAiCompatibleProvider(opts: OpenAiCompatibleOptions): P
         ...(opts.extraBody?.(req) ?? {}),
       }
 
+      /**
+       * STAGE LOG, file-bearing calls only.
+       *
+       * `ai_provider_logs` records the model, tokens, cost and status, but not
+       * whether a FILE part actually made it onto the body or which PDF engine
+       * was asked for — and those are exactly the two facts a "my PDF was not
+       * read" report turns on. Logged before the call so a network failure still
+       * leaves a record that the request was well-formed. No file BYTES are
+       * logged: `file_data` is a base64 data URL and would dump the document
+       * into the log stream.
+       */
+      const fileParts = req.messages.reduce((n, m) => n + (m.files?.length ?? 0), 0)
+      if (fileParts > 0) {
+        console.log(
+          '[mesh.file] request',
+          JSON.stringify({
+            provider: opts.name,
+            model: req.model,
+            fileParts,
+            plugins: (body as { plugins?: unknown }).plugins ?? null,
+            maxTokens: req.maxTokens,
+          }),
+        )
+      }
+
       let res: Response
       try {
         res = await fetchImpl(`${opts.baseUrl}/chat/completions`, {
@@ -114,6 +139,8 @@ export function createOpenAiCompatibleProvider(opts: OpenAiCompatibleOptions): P
       } catch (e) {
         throw new ProviderCallError(opts.name, null, `network error: ${errText(e)}`)
       }
+
+      if (fileParts > 0) console.log('[mesh.file] http', res.status)
 
       if (!res.ok) {
         // Status only — the response body may echo request context; never re-throw it.
@@ -135,6 +162,21 @@ export function createOpenAiCompatibleProvider(opts: OpenAiCompatibleOptions): P
       // value through; either saying 'length' means the ceiling was hit.
       const truncated =
         choice?.finish_reason === 'length' || choice?.native_finish_reason === 'length'
+
+      if (fileParts > 0) {
+        console.log(
+          '[mesh.file] response',
+          JSON.stringify({
+            finishReason: choice?.finish_reason ?? null,
+            nativeFinishReason: choice?.native_finish_reason ?? null,
+            truncated,
+            contentChars: (choice?.message?.content ?? '').length,
+            tokensOut: json.usage?.completion_tokens ?? 0,
+            annotations: choice?.message?.annotations?.length ?? 0,
+          }),
+        )
+      }
+
       return {
         text: choice?.message?.content ?? '',
         ...(truncated ? { truncated: true } : {}),

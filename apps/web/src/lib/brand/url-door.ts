@@ -253,6 +253,21 @@ export async function openUploadDoor(
   // page 1 and a one-element array has only index 0.
   const fields = attachSingleSource(result.data.fields, file.filename)
 
+  // STAGE LOG. The two counts either side of provenance are the whole reason
+  // this exists: a text-layer PDF once produced 14 model fields and 0 survivors,
+  // and the door reported that as "this looks like a scan". If they ever diverge
+  // again, this line names the stage instead of leaving it to be guessed.
+  console.log(
+    '[door.upload] extracted',
+    JSON.stringify({
+      filename: file.filename,
+      modelFields: result.data.fields.length,
+      survivingFields: fields.length,
+      gaps: result.data.gaps.length,
+      instructionAttempts: result.data.instruction_attempts.length,
+    }),
+  )
+
   // NOW this means what it says. `result.data.fields` is what the MODEL
   // returned, so an empty list here is genuinely "nothing was readable in that
   // document" — a scan with no text layer, which is what the copy claims. It is
