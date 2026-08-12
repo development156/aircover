@@ -83,16 +83,23 @@ describe('resolveRuleSet — the owner tier', () => {
 
 describe('what a workspace actually gets today', () => {
   /**
-   * The honest state of the mandated tier, pinned so it cannot be quietly
-   * overstated in a demo. Onboarding collects the regime and `toResolveInput`
-   * folds it into prose, so nothing reads it back: every existing workspace
-   * resolves to `consumer` / `default` and gets the floor pack only.
+   * ── CHANGED LOUDLY, 2026-08-13 · onboarding now persists the intake ─────────
    *
-   * The OWNER tier is the half that works fully on day one. When onboarding
-   * persists the intake this test is the one that changes, and it should be
-   * changed loudly.
+   * This block used to record that the mandated tier was the floor pack and
+   * NOTHING else, on every workspace that had ever existed, because onboarding
+   * folded the regime into prose and kept no structure. That is no longer the
+   * state of the product: `apps/web/src/lib/onboarding/to-stored-intake.ts`
+   * writes `payload.intake`, and `saveBrandMemory` carries it across every later
+   * version.
+   *
+   * The floor-only case below is kept and is still exactly right — it is now the
+   * LEGACY read: a brain written before this existed, or one whose regime was
+   * only ever assumed, carries no intake and gets the floor. That remains the
+   * honest answer for those rows and must not be quietly upgraded.
+   *
+   * The OWNER tier was, and still is, the half that works on day one.
    */
-  it('gives a clinic the floor, not the healthcare pack, because no regime is stored', () => {
+  it('gives the floor, not the healthcare pack, to a brain that stores no regime', () => {
     const brain = { taboo: { red_lines: ['never promise a recovery time'] } }
     const stored = intakeFrom(brain)
     expect(stored).toEqual({ regime: null, locale: null, basis: 'default' })
@@ -109,10 +116,30 @@ describe('what a workspace actually gets today', () => {
   })
 
   it('selects the healthcare pack the moment an intake IS stored', () => {
-    const brain = { intake: { regime: 'healthcare', locale: 'IN' } }
+    const brain = { intake: { regime: 'healthcare', locale: 'IN', basis: 'declared' } }
     const set = resolveRuleSet(intakeFrom(brain))
     expect(set.regime).toEqual({ value: 'healthcare', locale: 'IN', basis: 'declared' })
     expect(set.rules.some((r) => r.id === 'health.no-cure-claim')).toBe(true)
+  })
+
+  it('honours a DERIVED regime — the pack applies, the attribution does not', () => {
+    // Onboarding writes `derived` when it read the trade out of the customer's
+    // own sentence rather than being told. The pack must still apply: the rule
+    // is about what may be claimed, not about who typed it. But `describeRuleSource`
+    // may only say "the trade you told us you are in" under `declared`, and a
+    // clinic we merely recognised never told us anything.
+    const brain = { intake: { regime: 'healthcare', locale: 'IN', basis: 'derived' } }
+    const set = resolveRuleSet(intakeFrom(brain))
+
+    expect(set.regime.basis).toBe('derived')
+    expect(set.rules.some((r) => r.id === 'health.no-cure-claim')).toBe(true)
+  })
+
+  it('reads an intake with no basis as derived, never as declared', () => {
+    // A regime IS stored, so its pack applies and `default` ("this applies to
+    // every business") would misdescribe a healthcare rule. But nothing in the
+    // payload says the customer picked it, and the stronger claim needs saying.
+    expect(intakeFrom({ intake: { regime: 'finance' } }).basis).toBe('derived')
   })
 })
 

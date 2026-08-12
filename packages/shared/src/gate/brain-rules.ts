@@ -63,12 +63,13 @@ export function ownerBannedPhrasesFrom(payload: unknown): readonly string[] {
 const IntakeShape = z.object({
   regime: z.string().min(1).optional(),
   locale: z.string().min(1).optional(),
+  basis: z.enum(['declared', 'derived']).optional(),
 })
 
 export interface StoredIntake {
   regime: string | null
   locale: string | null
-  basis: 'declared' | 'default'
+  basis: 'declared' | 'derived' | 'default'
 }
 
 export function intakeFrom(payload: unknown): StoredIntake {
@@ -82,10 +83,18 @@ export function intakeFrom(payload: unknown): StoredIntake {
   return {
     regime: parsed.data.regime,
     locale: parsed.data.locale ?? null,
-    // `declared` only when a regime was actually stored. A locale on its own
-    // does not upgrade the basis — the regime is what selects the pack, and
-    // recording a default as a declaration is the audit trail overstating what
-    // it knew.
-    basis: 'declared',
+    // The writer's own word for how it got there, because only the writer knows.
+    // Onboarding's classifier distinguishes a chip the user OVERRODE from a
+    // regime read out of a sentence they typed, and the refusal copy branches on
+    // exactly that: `declared` may say "the trade you told us you are in", and
+    // `derived` may not.
+    //
+    // An intake with no `basis` reads as `derived`, never `declared` — a regime
+    // IS stored, so its pack applies and `default` ("this applies to every
+    // business") would misdescribe a healthcare rule; but nothing in the payload
+    // says the customer picked it, and the stronger claim needs saying, not
+    // assuming. A locale on its own still does not reach here at all: the regime
+    // is what selects the pack.
+    basis: parsed.data.basis ?? 'derived',
   }
 }

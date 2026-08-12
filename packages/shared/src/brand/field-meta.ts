@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { FieldMetaSchema } from './audiences'
+import { BrandIntakeSchema } from './intake'
 import { BrandMemoryPayloadSchema } from './resolve'
 
 /**
@@ -47,6 +48,15 @@ export type BrandFieldMetaMap = z.infer<typeof BrandFieldMetaMapSchema>
  */
 export const StoredBrandMemorySchema = BrandMemoryPayloadSchema.extend({
   field_meta: BrandFieldMetaMapSchema.optional(),
+  /**
+   * The onboarding picks, on the same seam and for the same three reasons — the
+   * model must not be able to write them, `brand-context.ts` strips them before
+   * paying tokens for them, and the RPC ignores what it does not validate.
+   *
+   * OPTIONAL, and it must stay optional: every row written before this has none,
+   * and a workspace whose regime was only ever ASSUMED deliberately writes none.
+   */
+  intake: BrandIntakeSchema.optional(),
 })
 export type StoredBrandMemory = z.infer<typeof StoredBrandMemorySchema>
 

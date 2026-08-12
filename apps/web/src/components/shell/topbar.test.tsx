@@ -173,6 +173,7 @@ describe('Topbar', () => {
         version: 1,
         provenance: new Map(),
         meta: undefined,
+        intake: undefined,
       })
 
       render(await Topbar())

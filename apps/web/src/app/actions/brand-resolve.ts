@@ -1,7 +1,12 @@
 'use server'
 
 import { auth } from '@clerk/nextjs/server'
-import { BrandMemoryPayloadSchema, ResolveBrandMemoryResultSchema } from '@sahoda/shared'
+import {
+  BrandIntakeSchema,
+  BrandMemoryPayloadSchema,
+  ResolveBrandMemoryResultSchema,
+  type BrandIntake,
+} from '@sahoda/shared'
 
 import { nextFieldMeta } from '@/lib/brand/field-meta'
 import { pruneBlankListEntries } from '@/lib/brand/prune-blank-entries'
@@ -74,6 +79,26 @@ export async function saveBrandMemory(
   source: SaveBrandSource = 'resolved',
   /** Fields this write confirms outright — see `nextFieldMeta`. */
   confirmPaths: readonly string[] = [],
+  /**
+   * The onboarding picks, when THIS write is the one that learned them.
+   *
+   * `null` means "say nothing about the intake", and it is the right answer for
+   * every caller except onboarding: a single-field edit from /brain knows
+   * nothing about the customer's trade and must not be able to speak for it.
+   *
+   * ── WHY NULL CANNOT ERASE ────────────────────────────────────────────────
+   * `BrandMemoryPayloadSchema` has no `intake` key, so the parse below strips
+   * any that arrives on `brain` — which means every save would drop a stored
+   * intake unless it is deliberately carried forward. It is, from the row being
+   * replaced. Without that, one hand-edit of a tagline would silently return a
+   * clinic to the floor pack, and nothing on any screen would say so.
+   *
+   * The default is `null` rather than required-in-position only because two
+   * optional parameters already precede it. The default is the IDENTITY —
+   * it never writes and never erases — so a call site that forgets it loses a
+   * new intake at worst and can never destroy a stored one.
+   */
+  intake: BrandIntake | null = null,
 ): Promise<SaveBrandState> {
   // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
   let workspaceId: string | undefined
@@ -113,10 +138,20 @@ export async function saveBrandMemory(
       confirmPaths,
     )
 
+    // Carried forward when this write has nothing to say about it — see the
+    // `intake` parameter. Validated on the way through so a malformed stored
+    // value is dropped rather than re-persisted for ever.
+    const carried = previous.status === 'ok' ? previous.intake : null
+    const nextIntake = BrandIntakeSchema.safeParse(intake ?? carried)
+
     const supabase = createServerSupabase()
     const { data, error } = await supabase.rpc('resolve_brand_memory', {
       p_workspace_id: workspace.id,
-      p_payload: { ...payload, field_meta: fieldMeta },
+      p_payload: {
+        ...payload,
+        field_meta: fieldMeta,
+        ...(nextIntake.success ? { intake: nextIntake.data } : {}),
+      },
       p_source: source,
     })
     if (error || !data) return { ok: false, message: mapSaveBrandError(error) }

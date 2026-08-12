@@ -33,6 +33,7 @@ const OK = {
   version: 1,
   provenance: new Map(),
   meta: undefined,
+  intake: undefined,
 }
 
 beforeEach(() => {

@@ -16,6 +16,7 @@ import { saveWorkspaceTheme } from '@/app/actions/theme'
 import { brandSkinVars } from '@/lib/brand/brand-theme'
 import { editedPaths } from '@/lib/brand/edited-paths'
 import { refineWithDoorText } from '@/lib/onboarding/classify'
+import { storedIntakeFrom } from '@/lib/onboarding/to-stored-intake'
 import { DEFAULT_INTAKE, type Intake } from '@/lib/onboarding/intake'
 
 import type { AttemptError } from './attempt-error'
@@ -177,7 +178,18 @@ export function OnboardingFlow({
       // Naming the edited fields is what confirms them. Editing a card on a
       // demo fallback still counts: the row stays `system` (it is not this
       // brand's resolve), but the sentence the user typed is theirs.
-      const result = await saveBrandMemory(brain, brainSource, editedPaths(baseline, brain))
+      //
+      // The intake rides along on THIS write because this is the only moment the
+      // three picks and the brain are both in hand. Without it the refusal gate
+      // resolves every workspace to `consumer`/`default` and the mandated tier is
+      // the floor pack alone — see `storedIntakeFrom`, which returns null rather
+      // than persisting a regime nobody actually indicated.
+      const result = await saveBrandMemory(
+        brain,
+        brainSource,
+        editedPaths(baseline, brain),
+        storedIntakeFrom(intakeText, door?.text ?? '', overrides),
+      )
       setSaveState(result)
       // The theme paints the shell, so the app has to be re-entered to wear it.
       if (result.ok) router.push('/home')

@@ -1,7 +1,12 @@
 import 'server-only'
 
 import { cache } from 'react'
-import { StoredBrandMemorySchema, type BrandFieldMetaMap, type BrandMemoryPayload } from '@sahoda/shared'
+import {
+  StoredBrandMemorySchema,
+  type BrandFieldMetaMap,
+  type BrandIntake,
+  type BrandMemoryPayload,
+} from '@sahoda/shared'
 
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
@@ -54,6 +59,20 @@ export type BrainRead =
        * `field_meta` existed.
        */
       meta: BrandFieldMetaMap | undefined
+      /**
+       * The stored onboarding picks, carried so `saveBrandMemory` can hand them
+       * back to the next version rather than dropping them.
+       *
+       * `BrandMemoryPayloadSchema` has no `intake` key, so anything left on
+       * `active` would be stripped on the next save and the regime would be lost
+       * to the first hand-edit. It is destructured OUT of `active` for the same
+       * reason `field_meta` is: `active` is what the editor renders and what the
+       * model contract validates, and neither has any business seeing this.
+       *
+       * `undefined` for every brain written before this existed, and for any
+       * workspace whose regime was only ever assumed.
+       */
+      intake: BrandIntake | undefined
     }
   | { status: 'no-workspace' }
   | { status: 'no-brain' }
@@ -87,7 +106,7 @@ export const readBrain = cache(async (): Promise<BrainRead> => {
     const stored = StoredBrandMemorySchema.safeParse(row.payload)
     if (!stored.success) return { status: 'unreadable' }
 
-    const { field_meta: meta, ...active } = stored.data
+    const { field_meta: meta, intake, ...active } = stored.data
 
     return {
       status: 'ok',
@@ -95,6 +114,7 @@ export const readBrain = cache(async (): Promise<BrainRead> => {
       version: typeof row.version === 'number' ? row.version : 0,
       provenance: provenanceOf(meta),
       meta,
+      intake,
     }
   } catch (error) {
     console.error('[brain] active read threw', error instanceof Error ? error.message : 'unknown')
