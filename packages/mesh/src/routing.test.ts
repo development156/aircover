@@ -39,8 +39,19 @@ describe('task → tier map', () => {
     }
   })
 
-  it('matches the frozen sahoda-mesh tier guide', () => {
-    expect(TASK_TIER.brand_guidelines).toBe('standard')
+  it('matches the frozen sahoda-mesh tier guide, with one measured exception', () => {
+    /**
+     * brand_guidelines LEFT `standard` on 2026-08-12, against the guide, on a
+     * bake-off (n=3, same intake): haiku-4.5 produced the same FOUR specific red
+     * lines as sonnet-5 at 5.7x less cost and 2.6x less latency, while
+     * gemini-flash — cheaper still — echoed the intake back verbatim and was
+     * disqualified on the text rather than the price.
+     *
+     * The guide in the sahoda-mesh skill still says `standard`. It should be
+     * updated or this reverted; a doc and a routing table that disagree is how
+     * the next person makes the wrong call confidently. Flagged in REQUESTS.md.
+     */
+    expect(TASK_TIER.brand_guidelines).toBe('economy')
     expect(TASK_TIER.caption_rewrite).toBe('economy')
     expect(TASK_TIER.content_variants).toBe('economy')
     expect(TASK_TIER.plan_week).toBe('standard')

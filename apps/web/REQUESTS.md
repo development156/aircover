@@ -511,3 +511,35 @@ CASCADE from `posts` passes through, but a direct delete raises `restrict_violat
 rows cascade from `posts`, the append-only guarantee is being satisfied by the escape hatch rather
 than by the reset avoiding them; worth deciding deliberately, because "publish history survived a
 reset" is a promise the Danger Zone copy makes to the operator on screen.
+
+## owner: the mesh tier guide and the routing table now disagree on brand_guidelines
+
+Added 2026-08-12 by wt-web. `TASK_TIER.brand_guidelines` moved from `standard` to `economy`
+(claude-haiku-4.5) on a measured bake-off — n=3, one intake, strict schema, all five candidates
+passing schema 3/3, so the decision turned on the RED LINES:
+
+| model               | red lines                      | cost        | latency  |
+| ------------------- | ------------------------------ | ----------- | -------- |
+| sonnet-5 (was)      | 4, specific                    | $0.0227     | 24.6s    |
+| **haiku-4.5 (now)** | **4, specific**                | **$0.0040** | **9.3s** |
+| gpt-5-mini          | 3, specific                    | $0.0040     | 27.2s    |
+| gemini-2.5-pro      | 2, thin                        | $0.0225     | 21.0s    |
+| gemini-2.5-flash    | 2, verbatim echo of the intake | $0.0015     | 4.0s     |
+
+`gemini-flash` is the cheapest and fastest and was disqualified on the text, not the price: it
+returned "health benefit claims" — the input, handed back. haiku wrote "Never use 'artisanal' or
+'craft' as a marketing crutch", a rule nobody supplied.
+
+**The sahoda-mesh skill still documents `brand_guidelines = standard`.** Either the guide is
+updated or this is reverted; a doc and a routing table that disagree is how the next person makes
+the wrong call confidently.
+
+**Also fixed in passing, and worth knowing:** `TIER_ROUTES` pointed `nano` and `economy` at
+`anthropic/claude-haiku-4-5`, which is **not in OpenRouter's model list** — the alias it used to
+resolve through is gone. Production logs show recent calls normalising to `claude-haiku-4.5`, so it
+was working on borrowed time. Corrected to the canonical slug.
+
+**One thing to re-measure before trusting the new route:** haiku returned `signal_lock: 'strong'` on
+all three runs where sonnet said `'moderate'`. On this intake either is arguable, but signal_lock is
+a claim about certainty, and a model that always says strong is worthless. Re-run against a
+deliberately THIN intake.
