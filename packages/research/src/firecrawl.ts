@@ -99,7 +99,16 @@ export function createFirecrawlClient(opts: FirecrawlOptions): FirecrawlClient {
 
   return {
     async map(url: string, limit: number): Promise<MappedLink[]> {
-      const body = await post<MapResponse>('/map', { url, limit, sitemap: 'include' })
+      // `includeSubdomains` DEFAULTS TO TRUE. Left alone, a sitemap that
+      // references shop.example.com or a CDN host would spend our credits on
+      // pages the founder may not own — and land them in the corpus carrying a
+      // source_url that reads as their own authoritative provenance.
+      const body = await post<MapResponse>('/map', {
+        url,
+        limit,
+        sitemap: 'include',
+        includeSubdomains: false,
+      })
       return (body.links ?? [])
         .map((link) =>
           typeof link === 'string' ? { url: link } : { ...link, url: link.url ?? '' },

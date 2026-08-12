@@ -28,10 +28,29 @@ export function countWords(markdown: string): number {
   return stripped.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
 }
 
-/** Home first, then the pages a business writes about itself, then the rest. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Home first, then the pages a business writes about itself, then the rest.
+ *
+ * SAME HOST ONLY. A sitemap can reference anything — a CDN, a booking widget's
+ * domain, a partner site. Scraping those spends the founder's crawl budget on
+ * pages they may not own, and worse, files the result under a `source_url` that
+ * reads as their own word. `source_url` is required precisely so a founder can
+ * check a claim we made about their business; a claim sourced to somebody
+ * else's domain quietly breaks that. Firecrawl's `includeSubdomains` is also
+ * pinned to false at the client, so this is the second of two guards.
+ */
 export function selectPages(homeUrl: string, links: readonly string[], max: number): string[] {
   const seen = new Set<string>()
   const ordered: string[] = []
+  const host = hostOf(homeUrl)
   const push = (url: string): void => {
     const key = url.replace(/#.*$/, '').replace(/\/$/, '')
     if (seen.has(key) || ordered.length >= max) return
@@ -40,7 +59,7 @@ export function selectPages(homeUrl: string, links: readonly string[], max: numb
   }
 
   push(homeUrl)
-  const candidates = links.filter((url) => !AVOID.test(url))
+  const candidates = links.filter((url) => !AVOID.test(url) && hostOf(url) === host)
   for (const pattern of PREFERRED) {
     for (const url of candidates) if (pattern.test(url)) push(url)
   }

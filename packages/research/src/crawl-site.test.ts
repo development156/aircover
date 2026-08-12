@@ -56,21 +56,43 @@ describe('selectPages', () => {
   it('takes the home page first, then the pages a business writes about itself', () => {
     const selected = selectPages(
       HOME,
-      ['https://x.in/blog/post-1', 'https://x.in/about', 'https://x.in/menu'],
+      [
+        'https://chaiandchapters.in/blog/post-1',
+        'https://chaiandchapters.in/about',
+        'https://chaiandchapters.in/menu',
+      ],
       3,
     )
     expect(selected[0]).toBe(HOME)
-    expect(selected[1]).toBe('https://x.in/about')
-    expect(selected[2]).toBe('https://x.in/menu')
+    expect(selected[1]).toBe('https://chaiandchapters.in/about')
+    expect(selected[2]).toBe('https://chaiandchapters.in/menu')
   })
 
   it('skips a lawyer voice and a login wall', () => {
-    const selected = selectPages(HOME, ['https://x.in/privacy', 'https://x.in/terms'], 5)
+    const selected = selectPages(
+      HOME,
+      ['https://chaiandchapters.in/privacy', 'https://chaiandchapters.in/terms'],
+      5,
+    )
     expect(selected).toEqual([HOME])
   })
 
+  it("takes ONLY the founder's own host — a sitemap can reference anything", () => {
+    const selected = selectPages(
+      'https://x.in/',
+      [
+        'https://x.in/about',
+        'https://shop.x.in/catalogue', // subdomain: not obviously theirs
+        'https://cdn.example.com/assets', // third-party host
+        'https://partner.co/x-in-listing',
+      ],
+      5,
+    )
+    expect(selected).toEqual(['https://x.in/', 'https://x.in/about'])
+  })
+
   it('never exceeds the cap, and never repeats a page', () => {
-    const links = Array.from({ length: 40 }, (_, i) => `https://x.in/p${i}`)
+    const links = Array.from({ length: 40 }, (_, i) => `https://chaiandchapters.in/p${i}`)
     const selected = selectPages(HOME, [...links, HOME], 5)
     expect(selected).toHaveLength(5)
     expect(new Set(selected).size).toBe(5)
@@ -79,7 +101,11 @@ describe('selectPages', () => {
 
 describe('crawlSite — several pages, not one', () => {
   it('crawls the cap and reports what the cap dropped', async () => {
-    const links = ['https://x.in/a', 'https://x.in/b', 'https://x.in/c']
+    const links = [
+      'https://chaiandchapters.in/a',
+      'https://chaiandchapters.in/b',
+      'https://chaiandchapters.in/c',
+    ]
     const pages = Object.fromEntries(
       [HOME, ...links].map((url) => [url, page(url, PROSE)] as const),
     )
@@ -91,14 +117,14 @@ describe('crawlSite — several pages, not one', () => {
     if (!out.ok) return
     expect(out.pages).toHaveLength(2)
     // A silent top-N reads as "we crawled your site" when it did not.
-    expect(out.skipped).toEqual(['https://x.in/b', 'https://x.in/c'])
+    expect(out.skipped).toEqual(['https://chaiandchapters.in/b', 'https://chaiandchapters.in/c'])
     // pages + 1: map bills per CALL, so a scrape-only tally under-reports every
     // signup by one credit. Cost has to be right before it can be shown.
     expect(out.creditsUsed).toBe(3)
   })
 
   it('bills pages + 1 — the map call is a credit, not free', async () => {
-    const links = ['https://x.in/a']
+    const links = ['https://chaiandchapters.in/a']
     const pages = Object.fromEntries(
       [HOME, ...links].map((url) => [url, page(url, PROSE)] as const),
     )
