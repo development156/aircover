@@ -20,7 +20,9 @@ import {
 } from '@/lib/actions/paid-failure'
 import { revalidateBalance } from '@/lib/actions/revalidate-balance'
 import { reportServerError } from '@/lib/observability/report'
+import { nextFieldMeta } from '@/lib/brand/field-meta'
 import { pruneBlankListEntries } from '@/lib/brand/prune-blank-entries'
+import { readBrain } from '@/lib/brand/read-brain'
 import { newResolveObjectRef } from '@/lib/brand/resolve-object-ref'
 import { mapSaveBrandError } from '@/lib/brand/save-brand-error'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -60,10 +62,10 @@ export type SaveBrandState =
   { ok: true; version: number; replayed: boolean } | { ok: false; message: string }
 
 /**
- * Who wrote this version. `manual` is the load-bearing one: per-field provenance
- * is derived by diffing the version history and reading the source of the version
- * where each field last CHANGED (see lib/brand/provenance.ts), so a hand-edit
- * saved as `resolved` would render the user's own sentence as a machine guess.
+ * Who wrote this version. `manual` is the load-bearing one: it selects which of
+ * the two provenance rules applies to every field (see lib/brand/field-meta.ts),
+ * so a hand-edit saved as `resolved` would render the user's own sentence as a
+ * machine guess.
  */
 export type SaveBrandSource = 'resolved' | 'manual'
 
@@ -82,6 +84,8 @@ export type SaveBrandSource = 'resolved' | 'manual'
 export async function saveBrandMemory(
   brain: unknown,
   source: SaveBrandSource = 'resolved',
+  /** Fields this write confirms outright — see `nextFieldMeta`. */
+  confirmPaths: readonly string[] = [],
 ): Promise<SaveBrandState> {
   // Hoisted so the catch can tag the tenant — see lib/observability/report.ts.
   let workspaceId: string | undefined
@@ -104,10 +108,23 @@ export async function saveBrandMemory(
     // prepends the active brain to every model call.
     const payload = pruneBlankListEntries(parsed.data)
 
+    // Provenance is stamped against the brain being REPLACED, so both rules can
+    // be applied: a confirmation survives only where the new text matches what
+    // the owner already agreed to. The comparison must run on the PRUNED payload
+    // — an unpruned candidate differs from a pruned predecessor in the two
+    // open-ended lists alone, which would revert those fields to guesses on every
+    // save for a reason the user never caused.
+    const previous = await readBrain()
+    const fieldMeta = nextFieldMeta(
+      previous.status === 'ok' ? { payload: previous.active, meta: previous.meta } : null,
+      payload,
+      confirmPaths,
+    )
+
     const supabase = createServerSupabase()
     const { data, error } = await supabase.rpc('resolve_brand_memory', {
       p_workspace_id: workspace.id,
-      p_payload: payload,
+      p_payload: { ...payload, field_meta: fieldMeta },
       p_source: source,
     })
     if (error || !data) return { ok: false, message: mapSaveBrandError(error) }

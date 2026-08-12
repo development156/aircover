@@ -13,12 +13,34 @@
  */
 export type BrainFieldKind = 'text' | 'longtext' | 'list'
 
+/**
+ * The provenance kind stamped onto this field's `FieldMeta` (packages/shared,
+ * brand/audiences.ts). NOT the same axis as `kind` above, which picks an editor.
+ *
+ * Only `asked` and `negotiated` appear here, and that is a statement about v1
+ * rather than a shortening of the taxonomy: `mandated` needs a regime pack that
+ * nothing selects yet, and the one genuinely DERIVED field in v1 —
+ * `alignment.signal_lock` — is not in this list at all. It lives in
+ * `DERIVED_FIELDS`, outside the ring, precisely because a conclusion is not
+ * something a person can confirm.
+ *
+ * KNOWN DIVERGENCE, deliberately not resolved here. wt-brain's v2 taxonomy
+ * classes `brand_persona.*` and `hook.primary_emotion` / `hook.sample_hooks` as
+ * `derived` — unconfirmable by definition — while this page offers an editor for
+ * all five and counts them in the ring. Honouring v2 would drop the denominator
+ * from 15 to 10 and remove three cards from /brain, which is a product decision
+ * and not a merge decision. Reported rather than taken.
+ */
+export type BrainFieldMetaKind = 'asked' | 'negotiated'
+
 export interface BrainField {
   /** Dotted path into `BrandMemoryPayload`, e.g. `hook.core_promise`. */
   path: string
   section: BrainSectionKey
   label: string
   kind: BrainFieldKind
+  /** Provenance kind written into `FieldMeta.kind` when this field is stamped. */
+  metaKind: BrainFieldMetaKind
   /** Shown when the field is still a guess — the one line the ring's hover asks. */
   question: string
   /** Fixed at exactly 3 by the payload contract; the editor may not add or remove. */
@@ -76,6 +98,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'hook.core_promise',
     section: 'hook',
+    metaKind: 'asked',
     label: 'Core promise',
     kind: 'longtext',
     question: 'What does a customer get from you that they cannot get next door?',
@@ -83,6 +106,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'customer_persona.primary_pain_point',
     section: 'customer_persona',
+    metaKind: 'asked',
     label: 'Pain point',
     kind: 'text',
     question: 'What problem sends someone looking for you in the first place?',
@@ -90,6 +114,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'voice.descriptor',
     section: 'voice',
+    metaKind: 'negotiated',
     label: 'How it sounds',
     kind: 'longtext',
     question: 'How should you sound to someone reading you for the first time?',
@@ -97,6 +122,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'taboo.red_lines',
     section: 'taboo',
+    metaKind: 'asked',
     label: 'Red lines',
     kind: 'list',
     question: 'What must Sahoda never say on your behalf?',
@@ -104,6 +130,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'brand_persona.archetype',
     section: 'brand_persona',
+    metaKind: 'asked',
     label: 'Archetype',
     kind: 'text',
     question: 'If your brand were a person, what kind of person would it be?',
@@ -111,6 +138,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'customer_persona.one_liner',
     section: 'customer_persona',
+    metaKind: 'asked',
     label: 'Who this is for',
     kind: 'longtext',
     question: 'Who is your best customer, in one sentence?',
@@ -118,6 +146,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'voice.banned_phrases',
     section: 'voice',
+    metaKind: 'negotiated',
     label: 'Never say',
     kind: 'list',
     question: 'Which words or phrases should never appear in your posts?',
@@ -125,6 +154,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'hook.primary_emotion',
     section: 'hook',
+    metaKind: 'asked',
     label: 'Primary emotion',
     kind: 'text',
     question: 'What should someone feel after reading one of your posts?',
@@ -132,6 +162,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'brand_persona.one_liner',
     section: 'brand_persona',
+    metaKind: 'asked',
     label: 'As a person',
     kind: 'longtext',
     question: 'How would you describe your brand to a friend in one line?',
@@ -139,6 +170,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'customer_persona.primary_fear',
     section: 'customer_persona',
+    metaKind: 'asked',
     label: 'Fear',
     kind: 'text',
     question: 'What is your customer afraid of getting wrong?',
@@ -146,6 +178,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'customer_persona.desired_identity',
     section: 'customer_persona',
+    metaKind: 'asked',
     label: 'Wants to become',
     kind: 'text',
     question: 'Who does your customer want to be seen as?',
@@ -153,6 +186,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'voice.signature_phrases',
     section: 'voice',
+    metaKind: 'negotiated',
     label: 'Signature phrases',
     kind: 'list',
     fixedLength: true,
@@ -161,6 +195,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'brand_persona.core_values',
     section: 'brand_persona',
+    metaKind: 'asked',
     label: 'Core values',
     kind: 'list',
     fixedLength: true,
@@ -169,6 +204,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'hook.sample_hooks',
     section: 'hook',
+    metaKind: 'asked',
     label: 'Sample hooks',
     kind: 'list',
     fixedLength: true,
@@ -177,6 +213,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
   {
     path: 'voice.formality_label',
     section: 'voice',
+    metaKind: 'negotiated',
     label: 'Register',
     kind: 'text',
     question: 'How formal should you be — a shopkeeper, or a consultant?',

@@ -90,24 +90,7 @@ export default async function BrainPage() {
     <div className="space-y-grid">
       <PageTitle>Brand Brain</PageTitle>
 
-      <BrainHeader
-        provenance={brain.provenance}
-        version={brain.version}
-        historyComplete={brain.historyComplete}
-      />
-
-      {/* Provenance is served empty when a historical version could not be read,
-          so every field below reads as a guess. Say why, rather than let a user
-          watch their confirmations disappear without explanation. */}
-      {!brain.historyComplete ? (
-        <div
-          role="status"
-          className="rounded-input border border-warn-bg bg-warn-bg px-3 py-2.5 text-[13px] text-warn"
-        >
-          Part of this brain&apos;s history could not be read, so confirmations are not shown. The
-          values below are current and correct; reload to try reading the history again.
-        </div>
-      ) : null}
+      <BrainHeader provenance={brain.provenance} version={brain.version} />
 
       <div className="grid gap-grid sm:grid-cols-2">
         {BRAIN_SECTIONS.map((section) => (

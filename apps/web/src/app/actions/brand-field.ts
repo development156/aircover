@@ -41,11 +41,11 @@ function validate(path: string, value: BrainLeaf): string | null {
 /**
  * Confirm one field of the Brand Brain.
  *
- * Editing a field is how it becomes confirmed, and this is the whole write path
- * for it: read the active brain, replace one leaf, save the result as a `manual`
- * version. The next diff of the version history attributes exactly that leaf to a
- * person (lib/brand/provenance.ts), and the field's border goes from dashed to
- * solid.
+ * Editing a field — or simply agreeing with it — is how it becomes confirmed, and
+ * this is the whole write path for it: read the active brain, replace one leaf if
+ * the text changed, and save as a `manual` version naming that path as confirmed.
+ * `field_meta` records the confirmation against the path itself
+ * (lib/brand/field-meta.ts), and the field's border goes from dashed to solid.
  *
  * IT NEVER RE-RESOLVES. A resolve is `brand_research` — 50 credits, a model call,
  * and a fresh payload for EVERY field, which would overwrite the fourteen answers
@@ -73,16 +73,25 @@ export async function confirmBrainField(
       return { ok: false, message: 'Could not read your Brand Brain — reload and try again.' }
     }
 
-    // An unchanged value writes nothing. Saving it would burn a version, and —
-    // because provenance keys off the version where a value last CHANGED — an
-    // identical payload records no authorship anyway. Blur-without-typing is the
+    // Unchanged text on an ALREADY-confirmed field is the only true no-op left:
+    // there is no new value and no new fact about who stands behind it, so a
+    // write would burn a version to record nothing. Blur-without-typing is the
     // common case here, so this is the common path, not an edge case.
-    if (leavesEqual(readLeaf(brain.active, path), value)) {
+    //
+    // Unchanged text on a GUESS is emphatically not a no-op — it is a person
+    // saying "that one is right", which is the single most valuable thing they
+    // can do on this page. Under version-diffing it was unrepresentable: an
+    // identical payload records no change, so the diff had nothing to attribute
+    // and the editor had to refuse the write. `field_meta` carries the
+    // confirmation independently of the text, so agreeing now costs one tap
+    // instead of retyping a sentence verbatim.
+    const unchangedText = leavesEqual(readLeaf(brain.active, path), value)
+    if (unchangedText && brain.meta?.[path]?.confirmed === true) {
       return { ok: true, version: brain.version, unchanged: true }
     }
 
-    const next = writeLeaf(brain.active, path, value)
-    const saved: SaveBrandState = await saveBrandMemory(next, 'manual')
+    const next = unchangedText ? brain.active : writeLeaf(brain.active, path, value)
+    const saved: SaveBrandState = await saveBrandMemory(next, 'manual', [path])
     if (!saved.ok) return { ok: false, message: saved.message }
 
     // The ring lives in the app layout, so a page-scoped revalidate would leave

@@ -230,43 +230,37 @@ agreeing ones. The test makes drift _loud_; only the helper makes it impossible.
 Context: 2026-08-10. Two posts carried a fresh `scheduled_at` while still `expired`; the
 only symptom was a cron sweep that never found them.
 
-## wt-db: `brand_memory` stores values but not authorship, so /brain derives it by diffing versions
+## wt-db: per-field provenance now rides in the payload — RESOLVED here, one thing left to note
 
-`/brain` renders each field as **confirmed** (a person wrote it) or **guessed** (the model did), and
-the topbar ring counts the first. Nothing in the schema records that. `brand_memory.payload` is a
-strict `BrandMemoryPayloadSchema` with no room for per-field metadata, the table is read-only under
-RLS, and `resolve_brand_memory` re-checks the shape in SQL — so there is no place to put a flag.
+**This entry replaces an ask, and the ask is withdrawn.** wt-brainui originally requested a
+`brand_field_state` table because `brand_memory.payload` was a strict `BrandMemoryPayloadSchema`
+with nowhere to put a per-field flag. It turned out there was somewhere.
 
-**What wt-brainui built instead, and why it is honest.** Authorship IS recoverable from what is
-already stored: versions are append-only and each carries a `source`. For every field, find the
-version at which its value last CHANGED and read that version's source — `manual` means a person
-typed it. Two behaviours fall out for free and both are correct: a regenerate that returns the SAME
-text for a confirmed field leaves the confirmation standing (the model agreeing with you is not
-grounds to demote your answer), and one that returns DIFFERENT text reverts the field to a guess
-(what is on screen is now the model's sentence, not yours). See `lib/brand/provenance.ts`.
+`public.resolve_brand_memory` validates that the six top-level sections are objects and pins the
+three fixed array lengths. It does not reject ADDITIONAL keys, and the 32 KB payload ceiling has
+~30 KB of headroom against a ~2 KB brain. So provenance is stored as a `field_meta` key on the
+payload itself: one `FieldMeta` per dotted leaf path, using `FieldMetaSchema` from
+`packages/shared/src/brand/audiences.ts` — wt-brain's contract, adopted at the granularity v1
+actually has. **No migration, no change to any applied migration, nothing owed to wt-db.**
 
-This needed no migration and no contract change. It has two real costs.
+**Why it does not bloat the model prompt.** `packages/mesh/src/brand-context.ts` re-parses the
+stored row with `BrandMemoryPayloadSchema` before prepending the brain to every model call, and zod
+strips unknown keys — so `field_meta` is dropped there without anyone having to remember to drop it.
+`brand_guidelines` still declares the unextended schema as its output, so the model has no channel
+to write provenance at all. That is the same property `ExtractedFieldSchema` gets from pinning
+`confirmed: z.literal(false)`.
 
-**1. One version per confirmed field.** Every field edit writes a `brand_memory` version through the
-RPC, and the advisory lock serialises rapid saves. A user confirming all fifteen fields writes
-fifteen versions. Accepted deliberately — the ledger metaphor says history is the evidence — but a
-`brand_field_state(workspace_id, path, confirmed_at, confirmed_by)` table would make it one row per
-field with no version burned.
+**Both original costs are gone.** "That guess is right" — the interaction the entry called the most
+valuable on the page and unrepresentable — now costs one tap: `field_meta` carries the confirmation
+independently of the text, so agreeing no longer requires retyping a sentence verbatim. And Finish
+writes ONE version instead of two, because the model/user pair existed only to make a diff work.
 
-**2. "That guess is right" is unrepresentable, and it is the most valuable interaction on the page.**
-A user who reads a field, agrees with it, and wants to say so has no way to. An identical payload
-records no change, so provenance cannot attribute it — `confirmBrainField` refuses the write and the
-Save button is disabled with "Change something to confirm this field." That is honest about the
-mechanism but it is not the product we want: the fastest path to a confirmed brain is a user saying
-yes fifteen times, and today they must retype fifteen sentences instead. **This one is worth a
-schema change on its own.**
+**The one thing still owed, and it is a product decision rather than a schema one.** wt-brain's v2
+taxonomy classes `brand_persona.*` and `hook.primary_emotion` / `hook.sample_hooks` as `derived` —
+unconfirmable by definition, since confirming a diagnosis is not a thing an owner is asked to do.
+/brain offers an editor for all five and counts them in the ring. Honouring v2 would drop the
+denominator from 15 to 10 and remove three cards from the page. That was not a merge decision to
+take, so `lib/brand/fields.ts` stamps them `asked` and says so in a comment at the definition.
 
-**Ask:** a `brand_field_state` table (workspace-scoped, RLS, one row per dotted path) plus a
-server-side writer — or a `memory_events` writer RPC, since `memory_events` already models exactly
-this shape (`source='user'`, `status='accepted'`, `diff` naming the path) and has no writer at all
-today. wt-brainui deliberately did NOT reach for a service-role write into `memory_events` from a
-server action: no RPC exists, it would need hand-rolled membership checks, and it duplicates state
-the version history already carries.
-
-Context: 2026-08-12, wt-brainui. `provenance.ts` is the whole contract — if a table lands, that
-module is the only thing that has to change.
+Context: 2026-08-12, wt-web reconciling wt-brain and wt-brainui. `lib/brand/field-meta.ts` is the
+whole contract now; `provenance.ts` only reads what it writes.

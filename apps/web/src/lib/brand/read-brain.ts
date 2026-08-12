@@ -1,23 +1,27 @@
 import 'server-only'
 
 import { cache } from 'react'
-import { BrandMemoryPayloadSchema, type BrandMemoryPayload } from '@sahoda/shared'
+import { StoredBrandMemorySchema, type BrandFieldMetaMap, type BrandMemoryPayload } from '@sahoda/shared'
 
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
-import { provenanceOf, type BrainVersion, type Provenance } from './provenance'
+import { provenanceOf, type Provenance } from './provenance'
 
 /**
  * Brand Brain reads. `brand_memory` carries a member-SELECT policy only (writes go
  * through `public.resolve_brand_memory`), and that policy filters on
- * `workspace_id` alone — superseded versions are readable, which is what makes
- * per-field provenance recoverable from history at all.
+ * `workspace_id` alone.
  *
  * Every read is filtered to the ACTIVE workspace. As in the wallet reads, this is
  * a CORRECTNESS filter and not an authorization check: the member policy admits
- * every workspace the user belongs to, so without it a second membership would
- * fold two brands' version histories into one diff.
+ * every workspace the user belongs to, so without it a second membership could
+ * surface another brand's brain.
+ *
+ * This used to select EVERY version, because provenance was reconstructed by
+ * diffing the history. It now reads the active row alone: `field_meta` on that
+ * row says what each field's provenance is, so the superseded versions are no
+ * longer evidence about anything on this page.
  */
 
 const activeWorkspaceId = cache(async (): Promise<string | null> => {
@@ -45,37 +49,20 @@ export type BrainRead =
       version: number
       provenance: Provenance
       /**
-       * False when a historical version could not be parsed. Provenance is then
-       * served EMPTY (every field reads as a guess) rather than computed from a
-       * hole: a missing version silently re-attributes its edits to whichever
-       * version came next, which would manufacture confirmations nobody made.
+       * Raw per-field provenance, carried so a write path can merge onto it
+       * rather than re-deriving it. `undefined` for every brain saved before
+       * `field_meta` existed.
        */
-      historyComplete: boolean
+      meta: BrandFieldMetaMap | undefined
     }
   | { status: 'no-workspace' }
   | { status: 'no-brain' }
   | { status: 'unreadable' }
 
-interface RawRow {
-  version?: unknown
-  status?: unknown
-  source?: unknown
-  payload?: unknown
-}
-
-function toVersion(row: RawRow): BrainVersion | null {
-  const { version, source } = row
-  if (typeof version !== 'number') return null
-  if (source !== 'resolved' && source !== 'manual' && source !== 'system') return null
-  const payload = BrandMemoryPayloadSchema.safeParse(row.payload)
-  if (!payload.success) return null
-  return { version, source, payload: payload.data }
-}
-
 /**
- * Memoised per request: the topbar ring and the /brain page both need the full
- * version history, and they render in the same pass. Without this they issue the
- * same query twice and — worse — could disagree if a write landed between them.
+ * Memoised per request: the topbar ring and the /brain page both need the active
+ * brain, and they render in the same pass. Without this they issue the same query
+ * twice and — worse — could disagree if a write landed between them.
  */
 export const readBrain = cache(async (): Promise<BrainRead> => {
   try {
@@ -87,44 +74,30 @@ export const readBrain = cache(async (): Promise<BrainRead> => {
       .from('brand_memory')
       .select('version, status, source, payload')
       .eq('workspace_id', workspaceId)
-      .order('version', { ascending: true })
+      .eq('status', 'active')
+      .maybeSingle()
 
     if (error) {
-      console.error('[brain] version read failed', error.code, error.message)
+      console.error('[brain] active read failed', error.code, error.message)
       return { status: 'unreadable' }
     }
-    const rows = (data ?? []) as RawRow[]
-    if (rows.length === 0) return { status: 'no-brain' }
+    if (!data) return { status: 'no-brain' }
 
-    const activeRow = rows.find((row) => row.status === 'active')
-    // Rows exist but none is active. The one-active-per-workspace index makes
-    // this impossible by construction, so it is a fault, not a first run —
-    // "reload" is the honest remedy, and offering onboarding here would invite
-    // the user to overwrite a brain that is still there.
-    if (!activeRow) {
-      console.error('[brain] no active version among', rows.length, 'rows')
-      return { status: 'unreadable' }
-    }
+    const row = data as { version?: unknown; payload?: unknown }
+    const stored = StoredBrandMemorySchema.safeParse(row.payload)
+    if (!stored.success) return { status: 'unreadable' }
 
-    const active = BrandMemoryPayloadSchema.safeParse(activeRow.payload)
-    if (!active.success) return { status: 'unreadable' }
-    const version = typeof activeRow.version === 'number' ? activeRow.version : 0
-
-    const versions = rows.flatMap((row) => {
-      const parsed = toVersion(row)
-      return parsed ? [parsed] : []
-    })
-    const historyComplete = versions.length === rows.length
+    const { field_meta: meta, ...active } = stored.data
 
     return {
       status: 'ok',
-      active: active.data,
-      version,
-      provenance: historyComplete ? provenanceOf(versions) : new Map(),
-      historyComplete,
+      active,
+      version: typeof row.version === 'number' ? row.version : 0,
+      provenance: provenanceOf(meta),
+      meta,
     }
   } catch (error) {
-    console.error('[brain] version read threw', error instanceof Error ? error.message : 'unknown')
+    console.error('[brain] active read threw', error instanceof Error ? error.message : 'unknown')
     return { status: 'unreadable' }
   }
 })

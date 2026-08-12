@@ -62,7 +62,7 @@ beforeEach(() => {
     active: BRAIN,
     version: 3,
     provenance: new Map(),
-    historyComplete: true,
+    meta: undefined,
   }
   saveBrandMemory.mockImplementation(() => Promise.resolve(state.saveResult))
 })
@@ -72,12 +72,13 @@ describe('confirmBrainField', () => {
     const result = await confirmBrainField('hook.primary_emotion', 'Confidence')
 
     expect(result).toEqual({ ok: true, version: 4, unchanged: false })
-    // `manual` is the whole mechanism: provenance reads the source of the version
-    // where a field last changed, so saving this as `resolved` would render the
-    // user's own sentence back to them as a machine guess.
+    // `manual` picks which provenance rule applies, and naming the path is what
+    // records authorship — saving this as `resolved` with no path would render
+    // the user's own sentence back to them as a machine guess.
     expect(saveBrandMemory).toHaveBeenCalledWith(
       writeLeaf(BRAIN, 'hook.primary_emotion', 'Confidence'),
       'manual',
+      ['hook.primary_emotion'],
     )
   })
 
@@ -126,17 +127,37 @@ describe('confirmBrainField', () => {
     expect(imports).toMatch(/@\/lib\/brand\/read-brain/)
   })
 
-  test('an unchanged value writes nothing', async () => {
-    // Provenance keys off the version where a value last CHANGED, so an identical
-    // save records no authorship — it would burn a version and confirm nothing.
+  test('unchanged text on a GUESS confirms it — the value did not move, the claim did', async () => {
+    // The interaction version-diffing could not express at all. An identical
+    // payload records no change, so the old diff had nothing to attribute and
+    // the editor refused the write; a user who agreed with what they read had to
+    // retype it verbatim to be counted. `field_meta` carries the confirmation
+    // independently of the text, so agreeing costs one tap.
     const result = await confirmBrainField('hook.primary_emotion', BRAIN.hook.primary_emotion)
 
-    expect(result).toEqual({ ok: true, version: 3, unchanged: true })
-    expect(saveBrandMemory).not.toHaveBeenCalled()
+    expect(result).toEqual({ ok: true, version: 4, unchanged: false })
+    expect(saveBrandMemory).toHaveBeenCalledWith(BRAIN, 'manual', ['hook.primary_emotion'])
   })
 
-  test('an unchanged LIST writes nothing either', async () => {
+  test('an unchanged LIST confirms too', async () => {
     const result = await confirmBrainField('taboo.red_lines', [...BRAIN.taboo.red_lines])
+
+    expect(result).toEqual({ ok: true, version: 4, unchanged: false })
+    expect(saveBrandMemory).toHaveBeenCalledWith(BRAIN, 'manual', ['taboo.red_lines'])
+  })
+
+  test('unchanged text on an ALREADY-confirmed field writes nothing', async () => {
+    // The only true no-op left: no new value and no new fact about who stands
+    // behind it, so a write would burn a version to record nothing.
+    state.brainRead = {
+      status: 'ok',
+      active: BRAIN,
+      version: 3,
+      provenance: new Map(),
+      meta: { 'hook.primary_emotion': { kind: 'asked', confirmed: true, source: 'owner' } },
+    }
+
+    const result = await confirmBrainField('hook.primary_emotion', BRAIN.hook.primary_emotion)
 
     expect(result).toEqual({ ok: true, version: 3, unchanged: true })
     expect(saveBrandMemory).not.toHaveBeenCalled()

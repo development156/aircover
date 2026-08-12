@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { DEMO_FALLBACK_PAYLOAD } from '@sahoda/shared'
+import { DEMO_FALLBACK_PAYLOAD, type BrandFieldMetaMap } from '@sahoda/shared'
 
 import { readBrain } from '@/lib/brand/read-brain'
 import { BRAIN_FIELDS, RING_DENOMINATOR } from '@/lib/brand/fields'
@@ -22,12 +22,17 @@ vi.mock('@/app/actions/brand-field', () => ({ confirmBrainField: vi.fn() }))
 
 const mockedReadBrain = vi.mocked(readBrain)
 
+/** A brain with exactly one field confirmed — stored provenance, not a diff. */
+const CONFIRMED_EMOTION: BrandFieldMetaMap = {
+  'hook.primary_emotion': { kind: 'asked', confirmed: true, source: 'owner' },
+}
+
 const OK = {
   status: 'ok' as const,
   active: DEMO_FALLBACK_PAYLOAD,
   version: 1,
   provenance: new Map(),
-  historyComplete: true,
+  meta: undefined,
 }
 
 beforeEach(() => {
@@ -59,10 +64,8 @@ describe('/brain', () => {
       ...OK,
       active: edited,
       version: 2,
-      provenance: provenanceOf([
-        { version: 1, source: 'resolved', payload: DEMO_FALLBACK_PAYLOAD },
-        { version: 2, source: 'manual', payload: edited },
-      ]),
+      provenance: provenanceOf(CONFIRMED_EMOTION),
+      meta: CONFIRMED_EMOTION,
     })
 
     render(await BrainPage())
@@ -150,10 +153,8 @@ describe('/brain', () => {
       mockedReadBrain.mockResolvedValue({
         ...OK,
         active: edited,
-        provenance: provenanceOf([
-          { version: 1, source: 'resolved', payload: DEMO_FALLBACK_PAYLOAD },
-          { version: 2, source: 'manual', payload: edited },
-        ]),
+        provenance: provenanceOf(CONFIRMED_EMOTION),
+        meta: CONFIRMED_EMOTION,
       })
 
       render(await BrainPage())
@@ -162,32 +163,6 @@ describe('/brain', () => {
         screen.queryByText(/only started recording who wrote each field/),
       ).not.toBeInTheDocument()
     })
-
-    test('does not stack two contradicting notices when the history is incomplete', async () => {
-      // That case serves an EMPTY provenance, so the count is 0 for a different
-      // reason and the page already says which. Two explanations for one zero
-      // would leave the user unable to tell which applies to them.
-      mockedReadBrain.mockResolvedValue({ ...OK, historyComplete: false })
-
-      render(await BrainPage())
-
-      expect(
-        screen.queryByText(/only started recording who wrote each field/),
-      ).not.toBeInTheDocument()
-      expect(screen.getByRole('status')).toHaveTextContent('history could not be read')
-    })
-  })
-
-  test('says why confirmations are missing when the history could not be read', async () => {
-    // Provenance is served EMPTY in this case, so every field reads as a guess.
-    // Without the notice a user watches their confirmations vanish unexplained.
-    mockedReadBrain.mockResolvedValue({ ...OK, historyComplete: false })
-
-    render(await BrainPage())
-
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'history could not be read, so confirmations are not shown',
-    )
   })
 
   test('the free edit and the paid resolve are told apart in words', async () => {

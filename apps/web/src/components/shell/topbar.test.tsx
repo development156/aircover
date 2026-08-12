@@ -172,7 +172,7 @@ describe('Topbar', () => {
         active: DEMO_FALLBACK_PAYLOAD,
         version: 1,
         provenance: new Map(),
-        historyComplete: true,
+        meta: undefined,
       })
 
       render(await Topbar())

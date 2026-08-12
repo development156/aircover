@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { DEMO_FALLBACK_PAYLOAD } from '@sahoda/shared'
 
+import { nextFieldMeta } from './field-meta'
 import { writeLeaf } from './leaf'
 import { persistBrainVersions, type SaveBrain } from './persist-brain'
 import { provenanceOf, stateOf } from './provenance'
@@ -8,25 +9,25 @@ import { provenanceOf, stateOf } from './provenance'
 const BASE = DEMO_FALLBACK_PAYLOAD
 const EDITED = writeLeaf(BASE, 'hook.primary_emotion', 'Confidence')
 
-function saver(result: { ok: boolean } = { ok: true }): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue(
-    result.ok ? { ok: true, version: 1, replayed: false } : { ok: false, message: 'nope' },
-  )
+function saver(): ReturnType<typeof vi.fn> {
+  return vi.fn().mockResolvedValue({ ok: true, version: 1, replayed: false })
 }
 
 describe('persistBrainVersions', () => {
-  test('writes the model output, then the edit, when the user changed something', async () => {
+  test('writes ONE version, naming the fields the user edited', async () => {
+    // This used to write two — the model's output then the user's — so that
+    // diffing the pair recovered who wrote what. field_meta records it directly,
+    // so the second version was a wasted write.
     const save = saver()
 
     await persistBrainVersions(save as unknown as SaveBrain, BASE, EDITED)
 
-    expect(save).toHaveBeenCalledTimes(2)
-    expect(save).toHaveBeenNthCalledWith(1, BASE, 'resolved')
-    expect(save).toHaveBeenNthCalledWith(2, EDITED, 'manual')
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(save).toHaveBeenCalledWith(EDITED, 'manual', ['hook.primary_emotion'])
   })
 
-  test('writes ONE version when nothing was edited', async () => {
-    // A `manual` twin here would claim the user confirmed every field by
+  test('claims nothing when the user edited nothing', async () => {
+    // Naming fields here would claim the user confirmed every one of them by
     // pressing Finish, which is exactly what they did not do.
     const save = saver()
 
@@ -38,13 +39,12 @@ describe('persistBrainVersions', () => {
 
   test('an alignment-only difference is not a human edit', async () => {
     // The model recomputes signal_lock; nobody edits it. Treating a change there
-    // as a user edit would write a `manual` version off the model's own work.
+    // as a user edit would claim a confirmation off the model's own work.
     const recomputed = { ...BASE, alignment: { ...BASE.alignment, note: 'different prose' } }
     const save = saver()
 
     await persistBrainVersions(save as unknown as SaveBrain, BASE, recomputed)
 
-    expect(save).toHaveBeenCalledTimes(1)
     expect(save).toHaveBeenCalledWith(recomputed, 'resolved')
   })
 
@@ -57,49 +57,39 @@ describe('persistBrainVersions', () => {
     expect(save).toHaveBeenCalledWith(EDITED, 'resolved')
   })
 
-  test('a failed baseline write DOWNGRADES the edit to resolved', async () => {
-    // Without the baseline there is nothing to diff against, and a lone `manual`
-    // version would mark every field confirmed. Under-claim: the values are still
-    // saved, only the confirmations are lost.
-    const save = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: false, message: 'baseline failed' })
-      .mockResolvedValueOnce({ ok: true, version: 1, replayed: false })
+  test('names every edited field, not just the first', async () => {
+    const twice = writeLeaf(EDITED, 'voice.descriptor', 'Brisk and plain')
+    const save = saver()
 
-    const result = await persistBrainVersions(save as unknown as SaveBrain, BASE, EDITED)
+    await persistBrainVersions(save as unknown as SaveBrain, BASE, twice)
 
-    expect(save).toHaveBeenNthCalledWith(2, EDITED, 'resolved')
-    expect(result.ok).toBe(true)
+    const [, , paths] = save.mock.calls[0] as [unknown, unknown, string[]]
+    expect([...paths].sort()).toEqual(['hook.primary_emotion', 'voice.descriptor'])
   })
 
-  test('the outcome reported is the EDIT’s, not the baseline’s', async () => {
-    // The user's brain is what matters; the baseline exists only so provenance
-    // can be derived. A green baseline must not mask a failed real save.
-    const save = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, version: 1, replayed: false })
-      .mockResolvedValueOnce({ ok: false, message: 'the real save failed' })
+  test('the outcome reported is the save’s own', async () => {
+    const save = vi.fn().mockResolvedValue({ ok: false, message: 'the save failed' })
 
     const result = await persistBrainVersions(save as unknown as SaveBrain, BASE, EDITED)
 
-    expect(result).toEqual({ ok: false, message: 'the real save failed' })
+    expect(result).toEqual({ ok: false, message: 'the save failed' })
   })
 
   /**
-   * The pair exists to make this true — asserted end to end against the real
-   * provenance reader rather than by counting calls.
+   * Asserted end to end against the real meta writer and reader rather than by
+   * counting calls — the point of the paths is what they make true on /brain.
    */
-  test('the two versions it writes yield exactly the edited field as confirmed', async () => {
-    const written: { source: 'resolved' | 'manual'; payload: typeof BASE }[] = []
-    const save: SaveBrain = async (payload, source) => {
-      written.push({ source, payload })
-      return { ok: true, version: written.length, replayed: false }
+  test('what it writes yields exactly the edited field as confirmed', async () => {
+    let captured: string[] = []
+    const save: SaveBrain = async (_payload, _source, confirmPaths = []) => {
+      captured = [...confirmPaths]
+      return { ok: true, version: 1, replayed: false }
     }
 
     await persistBrainVersions(save, BASE, EDITED)
 
     const provenance = provenanceOf(
-      written.map((row, index) => ({ version: index + 1, source: row.source, payload: row.payload })),
+      nextFieldMeta({ payload: BASE, meta: undefined }, EDITED, captured),
     )
     expect(stateOf(provenance, 'hook.primary_emotion')).toBe('confirmed')
     expect(stateOf(provenance, 'hook.core_promise')).toBe('guessed')

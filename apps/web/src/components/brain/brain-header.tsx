@@ -12,24 +12,16 @@ import { buttonVariants } from '@/components/ui/button'
  * question the ring shows on hover, because a user who came here BY the ring
  * should land on the thing it was pointing at.
  */
-export function BrainHeader({
-  provenance,
-  version,
-  historyComplete,
-}: {
-  provenance: Provenance
-  version: number
-  historyComplete: boolean
-}) {
+export function BrainHeader({ provenance, version }: { provenance: Provenance; version: number }) {
   const ring = brainRing(provenance)
 
   /**
    * Why a zero needs a sentence.
    *
-   * Until this release `saveBrandMemory` stamped EVERY write `resolved`, Finish
-   * included. So a user who spent twenty minutes correcting cards during setup
-   * has a history containing no `manual` version, and provenance — correctly —
-   * attributes nothing to them. Their brain opens at 0 of 15.
+   * Every brain saved before `field_meta` existed carries no per-field
+   * provenance, so it opens at 0 of 15 — including one belonging to a user who
+   * spent twenty minutes correcting cards during setup. Nothing recorded that
+   * they did, so nothing can be counted now.
    *
    * The count is honest; the silence around it is not. Without a sentence, a
    * returning user reads "0 of 15" beside "editing is free" and concludes their
@@ -37,15 +29,13 @@ export function BrainHeader({
    * credit chip's three-way split exists to prevent, arriving through a number
    * instead of an em dash.
    *
-   * The condition is just "nothing is confirmed", because a single `resolved`
-   * version is what BOTH a brand-new resolve and a pre-release edited brain look
-   * like — the old code recorded no difference between them, so no test on the
-   * history can tell them apart now. The copy is therefore written to be true of
-   * both: it states the rule going forward and never asserts that earlier edits
-   * happened. Suppressed when the history is incomplete, where the page already
-   * explains the zero for a different reason and two notices would contradict.
+   * The condition is just "nothing is confirmed", because a brand-new resolve and
+   * a pre-release edited brain are indistinguishable — the old code recorded no
+   * difference between them, so no test can tell them apart now. The copy is
+   * therefore written to be true of both: it states the rule going forward and
+   * never asserts that earlier edits happened.
    */
-  const explainsZero = ring.confirmed === 0 && historyComplete
+  const explainsZero = ring.confirmed === 0
 
   return (
     <section className="flex flex-col gap-4 rounded-card border border-line bg-bg p-5 shadow-card">
