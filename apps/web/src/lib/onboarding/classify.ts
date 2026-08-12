@@ -187,6 +187,54 @@ export function withOverrides(
 }
 
 /**
+ * Improve an ASSUMED pick using the door text.
+ *
+ * THE BUG THIS FIXES, from a real walk: a founder typed a thin sentence on
+ * screen 1 ("Rolling Pin", or nothing at all), then handed over a bakery
+ * website on screen 2 — and got the AGENCY question. `questionFor` reads the
+ * intake picks and never the door, and a thin sentence classifies to
+ * `service(assumed) x consumer(assumed)`, whose key is `servicexconsumer`: the
+ * retainer question, asked of a bakery.
+ *
+ * The door text is the richest description in the flow — a crawled site or a
+ * brand book, rather than a name typed into a box — so an ASSUMPTION should
+ * yield to it. Two things it must never do:
+ *
+ *   · override a pick the user CHOSE. `overrides` is their own correction and
+ *     outranks any evidence, which is the whole point of `withOverrides`.
+ *   · override a pick the intake sentence MATCHED. They described themselves in
+ *     their own words on screen 1; a crawl of a site that mentions a supplier's
+ *     sector must not talk us out of it.
+ *
+ * So only `assumed` is replaced, and only by a `matched` verdict.
+ */
+export function refineWithDoorText(
+  intakeText: string,
+  doorText: string,
+  overrides: Partial<Intake>,
+): Classification {
+  const fromIntake = classify(intakeText)
+  if (!doorText.trim()) return withOverrides(fromIntake, overrides)
+
+  const fromDoor = classify(doorText)
+  const better = <T>(a: Verdict<T>, b: Verdict<T>): Verdict<T> =>
+    a.basis === 'assumed' && b.basis === 'matched' ? b : a
+
+  const merged: Classification = {
+    intake: fromIntake.intake,
+    model: better(fromIntake.model, fromDoor.model),
+    regime: better(fromIntake.regime, fromDoor.regime),
+    locale: better(fromIntake.locale, fromDoor.locale),
+  }
+  merged.intake = {
+    model: merged.model.value,
+    regime: merged.regime.value,
+    locale: merged.locale.value,
+  }
+  return withOverrides(merged, overrides)
+}
+
+/**
  * The sentence screen 1 shows back. One sentence, sentence case, no hedging
  * adverbs — the correction affordance is the chips beside it, not weasel words.
  */

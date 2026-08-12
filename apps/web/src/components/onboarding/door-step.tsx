@@ -112,12 +112,46 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
         {announced}
       </p>
 
+      {/*
+        A FAILED DOOR MUST NOT LEAVE SOMEONE STUCK, and it must not let them
+        walk on believing their document was read.
+
+        Before this, a failure rendered the message and nothing else: `read` is
+        null, so the continue button disappeared, and the only ways on were to
+        retry or press Back. Correct in that it never proceeds on input we do
+        not have — but silent about the fact that going on WITHOUT it is a real
+        choice, and a legitimate one. The rest of the flow needs the intake
+        sentence and the refusal; the door is the enrichment.
+
+        So the failure states the trade in words, and the way forward is
+        labelled with what it actually does. `onContinue` receives an EMPTY
+        result: the reveal must be resolved from less, not from a document we
+        never read.
+      */}
       {state && !state.ok ? (
         <div className="rounded-card border border-danger bg-danger-bg p-4">
           <p className="text-[13px] font-semibold text-danger">{state.message}</p>
           <p className="mt-1 text-[12.5px] text-muted">
             Nothing was charged — reading is always free.
           </p>
+          <p className="mt-2 text-[12.5px] text-muted">
+            You can try another link or PDF, type a sentence above, or go on without it. Going on
+            without it means we resolve from what you have already told us, and nothing from that
+            document — the Brain will be thinner, and every field stays a guess until you confirm
+            it.
+          </p>
+          <div className="mt-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                onContinue({ text: '', foundName: '', colors: [], label: '', kind: 'sentence' })
+              }
+            >
+              Continue without it
+            </Button>
+          </div>
         </div>
       ) : null}
 

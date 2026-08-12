@@ -15,6 +15,7 @@ import { resolveOnboarding, type OnboardingResolveState } from '@/app/actions/on
 import { saveWorkspaceTheme } from '@/app/actions/theme'
 import { brandSkinVars } from '@/lib/brand/brand-theme'
 import { editedPaths } from '@/lib/brand/edited-paths'
+import { refineWithDoorText } from '@/lib/onboarding/classify'
 import { DEFAULT_INTAKE, type Intake } from '@/lib/onboarding/intake'
 
 import type { AttemptError } from './attempt-error'
@@ -255,6 +256,11 @@ export function OnboardingFlow({
               onBack={() => setScreen('intake')}
               onContinue={(result) => {
                 setDoor(result)
+                // The door text is richer than the sentence typed on screen 1,
+                // so an ASSUMED pick yields to it — otherwise a bakery whose
+                // owner typed only its name is asked the agency question.
+                // A pick they CHOSE, or one the sentence matched, is untouched.
+                setIntake(refineWithDoorText(intakeText, result.text, overrides).intake)
                 setScreen('question')
               }}
             />

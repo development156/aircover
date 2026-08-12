@@ -74,22 +74,89 @@ function punctuate(value: string): string {
 }
 
 /**
- * Turn a typed refusal into a rule.
+ * The verb the QUESTION already put in the founder's mouth.
  *
- * When the sentence opens with a recognisable refusal ("we won't call it
- * homemade") it becomes "Never call it homemade." When it does not, their
- * sentence is kept verbatim — reading back something the user did not say, in
- * order to make it fit a template, is worse than a rule that reads slightly
- * unevenly.
+ * Every ask is shaped "What do you refuse to <verb phrase>?" — "call it",
+ * "do, even though they are paying", "promise". Lifting that phrase back out is
+ * how the rule stays in the language of the thing they answered, without any
+ * new vocabulary being invented for them.
+ *
+ * `say` is the fallback because a brand red line is nearly always about what is
+ * SAID; it is the safest hinge when no ask is to hand.
  */
-export function refusalToRule(raw: string): RefusalRule {
+/**
+ * Words that mean the sentence is ALREADY a refusal, without one of the
+ * `NEGATIVE_OPENERS` shapes in front of it.
+ *
+ * "nothing goes out before consent is in hand" and "no discounts on wedding
+ * cakes" are finished rules: they carry their own negation and reading them
+ * back verbatim is exactly right. Negating them a SECOND time inverts them —
+ * "Never say nothing goes out..." permits the thing they just forbade. So the
+ * negation below fires only on an answer that has none of its own.
+ */
+const ALREADY_NEGATIVE = new Set([
+  'no',
+  'not',
+  'none',
+  'never',
+  'nothing',
+  'nobody',
+  'no-one',
+  'noone',
+  'neither',
+  'nor',
+])
+
+function carriesOwnNegation(value: string): boolean {
+  const first = value.toLowerCase().split(/[\s,]+/)[0] ?? ''
+  return ALREADY_NEGATIVE.has(first.replace(/[^a-z-]/g, ''))
+}
+
+export function refusalVerb(ask?: string): string {
+  const match = /refuse to ([^?,.]+)/i.exec(ask ?? '')
+  return match ? match[1]!.trim().toLowerCase() : 'say'
+}
+
+/**
+ * Turn a typed refusal into a rule. IT ALWAYS NEGATES.
+ *
+ * THE BUG THIS FIXES, observed on a real walk: the screen asks "what do you
+ * refuse to call it?", the founder answers with the THING THEY REFUSE — "AI
+ * slop works" — and the old code, finding no negative opener, read it straight
+ * back as the rule "AI slop works." That is not a weaker rule, it is the
+ * OPPOSITE one: the brand's red line became the brand's claim, and it would
+ * have been persisted as a red line and prepended to every model call.
+ *
+ * A bare answer to "what do you refuse to X?" is not already a rule. It is the
+ * object of a refusal, and turning it into one means supplying the negation the
+ * question left implicit — never dropping it.
+ *
+ * The words themselves are still theirs. Only "Never" and the question's own
+ * verb are added, and when their sentence already carries a refusal ("we won't
+ * call it homemade") the opener is stripped so it does not read "Never we
+ * won't". A rule that reads a little unevenly in their words beats a smooth one
+ * in ours.
+ */
+export function refusalToRule(raw: string, ask?: string): RefusalRule {
   const value = (raw ?? '').trim().replace(/\s+/g, ' ').slice(0, MAX_REFUSAL_CHARS)
   if (!value) return { rule: '', transformed: false }
 
   const stripped = stripOpener(value)
   if (stripped) return { rule: punctuate(sentenceCase(`never ${stripped}`)), transformed: true }
 
-  return { rule: punctuate(sentenceCase(value)), transformed: false }
+  // Already a rule in their own words — leave every word alone.
+  if (carriesOwnNegation(value)) return { rule: punctuate(sentenceCase(value)), transformed: false }
+
+  // No opener and no negation of its own: they answered with the THING they
+  // refuse. Negate it using the verb the question asked with, unless their
+  // answer already opens with that verb — repeating it would read
+  // "Never call it call it homemade".
+  const verb = refusalVerb(ask)
+  // When their answer already opens with the question's verb ("call it
+  // homemade"), the verb is theirs and stays — only "Never" is added. Slicing it
+  // off instead would produce "Never homemade.", which is not a sentence.
+  const body = value.toLowerCase().startsWith(`${verb} `) ? value : `${verb} ${value}`
+  return { rule: punctuate(sentenceCase(`never ${body}`)), transformed: true }
 }
 
 /** Is this long enough to be worth holding onto? */

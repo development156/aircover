@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { assumptionNote, classify, readBack, withOverrides, MAX_CLASSIFY_CHARS } from './classify'
+import {
+  assumptionNote,
+  classify,
+  readBack,
+  refineWithDoorText,
+  withOverrides,
+  MAX_CLASSIFY_CHARS,
+} from './classify'
 import { DEFAULT_INTAKE } from './intake'
 
 describe('classify', () => {
@@ -153,5 +160,39 @@ describe('assumptionNote', () => {
     expect(note).toMatch(/your sector/)
     expect(note).toMatch(/where you are/)
     expect(note).not.toMatch(/what you are/)
+  })
+})
+
+/**
+ * THE WRONG QUESTION, from a real walk: a bakery got the agency question.
+ * `questionFor` reads the intake picks and never the door, and a thin sentence
+ * classifies to service(assumed) x consumer(assumed) — whose key is
+ * `servicexconsumer`, the retainer question.
+ */
+describe('refineWithDoorText', () => {
+  const bakeryDoor = 'We are a neighbourhood sourdough bakery selling bread and cakes.'
+
+  it('lets the door correct a pick we only ASSUMED', () => {
+    const out = refineWithDoorText('Rolling Pin', bakeryDoor, {})
+    expect(out.intake.model).toBe('local_presence')
+    expect(out.intake.regime).toBe('food')
+  })
+
+  it('never overrides a pick the user CHOSE', () => {
+    const out = refineWithDoorText('Rolling Pin', bakeryDoor, { model: 'platform' })
+    expect(out.intake.model).toBe('platform')
+    expect(out.model.basis).toBe('chosen')
+  })
+
+  it('never overrides a pick the intake sentence MATCHED', () => {
+    // They described themselves in their own words; a crawl that mentions a
+    // supplier's sector must not talk us out of it.
+    const out = refineWithDoorText('We are a marketing agency on retainer', bakeryDoor, {})
+    expect(out.intake.model).toBe('service')
+  })
+
+  it('is a no-op when the door produced nothing', () => {
+    const out = refineWithDoorText('Rolling Pin', '', {})
+    expect(out.intake).toEqual(classify('Rolling Pin').intake)
   })
 })

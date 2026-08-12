@@ -2,7 +2,7 @@ import 'server-only'
 
 import { crawlSite, quarantineCorpus, type CrawlFailureReason } from '@sahoda/research'
 import type { CrawlOutcome, FirecrawlClient } from '@sahoda/research'
-import { attachProvenance } from '@sahoda/shared'
+import { attachProvenance, attachSingleSource } from '@sahoda/shared'
 import type { BrandExtractOutput, ExtractedField, MeshContext, ResolveInput } from '@sahoda/shared'
 
 /**
@@ -247,11 +247,18 @@ export async function openUploadDoor(
     }
   }
 
-  // One document, so every citation resolves to index 0 — the filename.
-  const fields = attachProvenance(result.data.fields, [file.filename])
+  // ONE source, so the model's page number is not resolved against anything —
+  // see `attachSingleSource`. Using `attachProvenance` here dropped every field
+  // of a perfectly good text-layer PDF, because the model cites the document's
+  // page 1 and a one-element array has only index 0.
+  const fields = attachSingleSource(result.data.fields, file.filename)
 
-  // A parse that yielded nothing is a scanned book with no text layer. Say so
-  // rather than serving an empty brand as a success.
+  // NOW this means what it says. `result.data.fields` is what the MODEL
+  // returned, so an empty list here is genuinely "nothing was readable in that
+  // document" — a scan with no text layer, which is what the copy claims. It is
+  // no longer reachable by a provenance fault on our side, and that distinction
+  // is the whole point: a parse error blamed on the customer's file sends them
+  // to re-scan a document that was fine.
   if (fields.length === 0) {
     return {
       ok: false,

@@ -71,3 +71,37 @@ describe('isUsableRefusal', () => {
     expect(isUsableRefusal('we will not say homemade')).toBe(true)
   })
 })
+
+/**
+ * THE INVERSION, from a real onboarding walk. The screen asks "what do you
+ * refuse to call it?", the founder answers with the thing itself — "AI slop
+ * works" — and the old code read it straight back as the rule. That is not a
+ * weaker rule, it is the opposite one: the brand's red line became its claim,
+ * and it would have been stored as a red line and prepended to every call.
+ */
+describe('a bare answer is the thing refused, not a rule', () => {
+  it('negates it, using the verb the question asked with', () => {
+    const { rule, transformed } = refusalToRule('AI slop works', 'What do you refuse to say?')
+    expect(rule).toBe('Never say AI slop works.')
+    expect(transformed).toBe(true)
+  })
+
+  it('never reads the answer back as an assertion', () => {
+    // The whole failure in one line: the output must not BE the input.
+    expect(refusalToRule('AI slop works').rule).not.toBe('AI slop works.')
+  })
+
+  it('falls back to "say" when no ask is to hand', () => {
+    expect(refusalToRule('AI slop works').rule).toBe('Never say AI slop works.')
+  })
+
+  it('does not repeat a verb the answer already opens with', () => {
+    const { rule } = refusalToRule('call it homemade', 'What do you refuse to call it?')
+    expect(rule).toBe('Never call it homemade.')
+  })
+
+  it('leaves an answer that carries its own negation alone', () => {
+    // Negating a second time permits what they just forbade.
+    expect(refusalToRule('nothing goes out before consent is in hand').transformed).toBe(false)
+  })
+})

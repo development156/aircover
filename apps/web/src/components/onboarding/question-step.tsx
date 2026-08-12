@@ -45,7 +45,9 @@ export function QuestionStep({
   const question = useMemo(() => questionFor(intake), [intake])
   const [refusal, setRefusal] = useState('')
 
-  const rule = refusalToRule(refusal).rule
+  // The ask supplies the verb, so the rule reads in the language of the
+  // question they just answered.
+  const rule = refusalToRule(refusal, question.ask).rule
   const usable = isUsableRefusal(refusal)
   const insufficient = attemptError?.kind === 'insufficient'
 

@@ -2,32 +2,6 @@
   "version": 1,
   "runs": [
     {
-      "client_id": "qa-msn5pqgb-56cc1d28",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-10T11:37:16.329Z",
-      "finished_at": "2026-08-10T11:37:16.329Z",
-      "suite": "lint",
-      "status": "pass",
-      "summary_plain": "The lint checks passed for ...[origin/main] ONLY — this run was filtered and does not cover the workspace.",
-      "details": "npm warn Unknown project config \"public-hoist-pattern\". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.\nscripts/lib/ops-cards.mjs 58ms\n--- re-run full gate ---\nturbo exit: 0\n Tasks:    24 successful, 24 total\nCached:    24 cached, 24 total\n  Time:    26ms >>> FULL TURBO\n\n$ prettier --check .\nChecking formatting...\nAll matched files use Prettier code style!",
-      "duration_ms": null
-    },
-    {
-      "client_id": "qa-msn5pqgb-6c980518",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-10T11:37:16.329Z",
-      "finished_at": "2026-08-10T11:37:16.329Z",
-      "suite": "unit",
-      "status": "pass",
-      "summary_plain": "The unit checks passed for ...[origin/main] ONLY — this run was filtered and does not cover the workspace.",
-      "details": "npm warn Unknown project config \"public-hoist-pattern\". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.\nscripts/lib/ops-cards.mjs 58ms\n--- re-run full gate ---\nturbo exit: 0\n Tasks:    24 successful, 24 total\nCached:    24 cached, 24 total\n  Time:    26ms >>> FULL TURBO\n\n$ prettier --check .\nChecking formatting...\nAll matched files use Prettier code style!",
-      "duration_ms": null
-    },
-    {
       "client_id": "qa-msn5pqgb-b6fe98bc",
       "task_code": "SL-054",
       "kind": "auto",
@@ -2595,6 +2569,32 @@
       "status": "pass",
       "summary_plain": "The unit checks ran and everything passed.",
       "details": "@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    27 successful, 27 total\n$ prettier --check .\nChecking formatting...\nAll matched files use Prettier code style!",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msq6e7tk-7a166cf5",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T14:19:37.111Z",
+      "finished_at": "2026-08-12T14:19:37.111Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The typecheck, lint, unit checks ran together and something failed (99 passed).",
+      "details": "@sahoda/shared:test:       Tests  99 passed (99)\n@sahoda/mesh:typecheck: src/model-bakeoff.live.test.ts(53,25): error TS2339: Property 'choices' does not exist on type '{}'.\n@sahoda/mesh:typecheck: src/model-bakeoff.live.test.ts(54,28): error TS2339: Property 'choices' does not exist on type '{}'.\n@sahoda/mesh:typecheck: src/model-bakeoff.live.test.ts(74,24): error TS2339: Property 'usage' does not exist on type '{}'.\n@sahoda/mesh:typecheck: src/model-bakeoff.live.test.ts(75,23): error TS2339: Property 'usage' does not exist on type '{}'.\n@sahoda/mesh:typecheck: src/pdf-door.live.test.ts(44,39): error TS2552: Cannot find name 'RequestInfo'. Did you mean 'RequestInit'?\n Tasks:    16 successful, 23 total\nFailed:    @sahoda/mesh#typecheck\n[warn] packages/mesh/src/model-bakeoff.live.test.ts\n[warn] Code style issues found in 2 files. Run Prettier with --write to fix.\n[ELIFECYCLE] Command failed with exit code 1.",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-msq6fqcp-80c0040e",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-12T14:20:47.783Z",
+      "finished_at": "2026-08-12T14:20:47.783Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The typecheck, lint, unit checks ran together and something failed.",
+      "details": "@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    27 successful, 27 total\n[warn] apps/web/src/components/onboarding/door-step.tsx\n[warn] Code style issues found in the above file. Run Prettier with --write to fix.\n[ELIFECYCLE] Command failed with exit code 1.",
       "duration_ms": null
     }
   ]

@@ -85,6 +85,40 @@ export type ExtractedFieldWire = z.infer<typeof ExtractedFieldWireSchema>
  * the end of the list is dropped — a citation to a block that does not exist is
  * exactly the invention the index was introduced to prevent.
  */
+/**
+ * Stamp provenance when there is exactly ONE source — the upload door.
+ *
+ * `attachProvenance` resolves `page` as an index into a list of quarantined
+ * blocks, and DROPS a field whose index is out of range. That is right for a
+ * crawl: the blocks are labelled `index=0,1,2…` by `quarantinePage`, the prompt
+ * tells the model to cite one of them, and an index nobody supplied is exactly
+ * the invention the rule exists to catch.
+ *
+ * It is nonsense for a file. A PDF is attached as a `file` content part, so the
+ * model is given NO blocks and no `index=` to cite — and it reasonably answers
+ * with the document's own page number. Measured 2026-08-12: a text-layer PDF
+ * produced 14 good fields, every one stamped `page: 1`, and every one was then
+ * dropped by `sources[1]` on a one-element array. The door reported that as
+ * "could not find any text in that document — if it is a scan", which is a claim
+ * about the customer's file for a fault entirely on our side.
+ *
+ * With one source there is nothing to resolve and nothing a wrong number can
+ * forge: whatever the model says, the value came from that file. So the index is
+ * ignored rather than obeyed, and `confirmed:false` still holds.
+ */
+export function attachSingleSource(
+  fields: readonly ExtractedFieldWire[],
+  source: string,
+): ExtractedField[] {
+  return fields.map((f) => ({
+    channel: f.channel,
+    key: f.key,
+    value: f.value,
+    confirmed: false as const,
+    source_url: source,
+  }))
+}
+
 export function attachProvenance(
   fields: readonly ExtractedFieldWire[],
   sources: readonly string[],

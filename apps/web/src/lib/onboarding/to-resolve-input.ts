@@ -1,6 +1,7 @@
 import { ResolveInputSchema, type ResolveInput } from '@sahoda/shared'
 
 import { LOCALE_LABEL, MODEL_NOUN, REGIME_NOUN, type Intake } from './intake'
+import { questionFor } from './question'
 import { refusalToRule } from './refusal'
 
 /**
@@ -82,7 +83,9 @@ export function firstProofPoint(text: string): string {
  */
 export function toResolveInput(answers: OnboardingAnswers): ResolveInput {
   const { intake, doorText, refusal, name } = answers
-  const rule = refusalToRule(refusal).rule
+  // Same ask the screen showed, re-derived from the intake rather than
+  // passed through a form field a client could disagree with.
+  const rule = refusalToRule(refusal, questionFor(intake).ask).rule
 
   return ResolveInputSchema.parse({
     source: {
