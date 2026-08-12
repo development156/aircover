@@ -44,6 +44,22 @@ export async function createInvitation(email: string): Promise<InviteOutcome> {
     method: 'POST',
     body: JSON.stringify({
       email_address: email,
+      /**
+       * WITHOUT THIS, EVERY INVITATION WE SEND IS UNUSABLE. Observed 2026-08-12.
+       *
+       * Clerk redeems the ticket and then redirects to the instance's default
+       * landing URL, which is `/`. `/` is not public, so `middleware.ts` sends
+       * the visitor to `/sign-in` — and a SIGN-IN page cannot consume a sign-up
+       * ticket. The ticket is dropped one step before it is used, and the
+       * visitor is shown "New sign-ups are currently restricted", which is true
+       * and completely misleading: they were invited, and the invitation is
+       * still pending. Clicking the link again reproduces it forever.
+       *
+       * `/sign-up(.*)` IS in `isPublicRoute`, so naming it explicitly lands the
+       * ticket on the one page able to redeem it. Falls back to the bare path
+       * when APP_URL is unset — a relative redirect still beats the default.
+       */
+      redirect_url: `${env.NEXT_PUBLIC_APP_URL ?? ''}/sign-up`,
       // Clerk resends rather than erroring on a repeat, which is what an admin
       // clicking Approve twice actually wants.
       notify: true,
