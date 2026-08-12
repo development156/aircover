@@ -1,6 +1,11 @@
 import { writeFileSync } from 'node:fs'
 import { describe, it } from 'vitest'
-import { createFirecrawlClient, crawlSite, loadResearchEnv, quarantineCorpus } from '@sahoda/research'
+import {
+  createFirecrawlClient,
+  crawlSite,
+  loadResearchEnv,
+  quarantineCorpus,
+} from '@sahoda/research'
 import { brandExtractTask, brandGuidelinesTask, createMesh } from '@sahoda/mesh'
 import { ResolveInputSchema, type MeshContext, type ResolveInput } from '@sahoda/shared'
 
@@ -82,18 +87,15 @@ describe.runIf(LIVE)('arm D — the URL door on a real site', () => {
     if (!crawl.ok) {
       // Fail honestly: record the reason and stop. No invented arm D.
       record.armD = { skipped: `crawl failed: ${crawl.reason}` }
-      if (process.env.ARM_D_OUT) writeFileSync(process.env.ARM_D_OUT, JSON.stringify(record, null, 2))
+      if (process.env.ARM_D_OUT)
+        writeFileSync(process.env.ARM_D_OUT, JSON.stringify(record, null, 2))
       return
     }
 
     // ── the quarantined extraction ───────────────────────────────────────────
     const corpus = quarantineCorpus(crawl.pages)
     record.corpusChars = corpus.length
-    const extraction = await mesh.runTask(
-      brandExtractTask.def,
-      { corpus, name },
-      ctxFor('extract'),
-    )
+    const extraction = await mesh.runTask(brandExtractTask.def, { corpus, name }, ctxFor('extract'))
     record.extract = {
       ok: extraction.ok,
       usage: extraction.usage,
@@ -102,7 +104,8 @@ describe.runIf(LIVE)('arm D — the URL door on a real site', () => {
 
     if (!extraction.ok) {
       record.armD = { skipped: 'extraction failed' }
-      if (process.env.ARM_D_OUT) writeFileSync(process.env.ARM_D_OUT, JSON.stringify(record, null, 2))
+      if (process.env.ARM_D_OUT)
+        writeFileSync(process.env.ARM_D_OUT, JSON.stringify(record, null, 2))
       return
     }
 

@@ -1,6 +1,11 @@
-import type { FirecrawlClient } from './firecrawl'
 import { FirecrawlError } from './firecrawl'
-import { MAX_PAGES, MIN_CORPUS_WORDS, type CrawledPage, type CrawlOutcome } from './types'
+import {
+  MAX_PAGES,
+  MIN_CORPUS_WORDS,
+  type CrawledPage,
+  type CrawlOutcome,
+  type PageSource,
+} from './types'
 
 /**
  * Pages worth a credit, in the order we want them. A voice corpus lives in the
@@ -82,7 +87,8 @@ function normalizeUrl(raw: string): string | null {
 }
 
 export interface CrawlSiteOptions {
-  client: FirecrawlClient
+  /** Any tier. crawlSite cannot tell them apart, and must not try to. */
+  client: PageSource
   maxPages?: number
   minWords?: number
 }
@@ -113,6 +119,7 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
       ok: false,
       reason: 'no_url',
       message: 'No website to read — we will ask you instead.',
+      attempted: [],
       pagesFetched: 0,
       wordsFound: 0,
       creditsUsed: 0,
@@ -126,21 +133,24 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
       reason: 'invalid_url',
       message:
         'Check that website address — we could not read it as a link. Or tell us in your own words instead.',
+      attempted: [],
       pagesFetched: 0,
       wordsFound: 0,
       creditsUsed: 0,
     }
   }
 
+  const perCall = opts.client.creditsPerCall ?? 1
   let mapped: string[] = []
   let creditsUsed = 0
   try {
     mapped = (await opts.client.map(homeUrl, maxPages * 4)).map((link) => link.url)
-    // Map bills 1 credit PER CALL, not per URL discovered — so the true cost of
-    // a crawl is `pages + 1`, and a counter that only tallied scrapes would
-    // under-report every signup. Counted on success only: a call that threw
-    // cannot be assumed to have billed.
-    creditsUsed += 1
+    // Map bills 1 credit PER CALL on the paid tier, not per URL discovered — so
+    // a vendor crawl costs `pages + 1` and a scrape-only tally would under-report
+    // every signup. Tier 1 and 2 declare `creditsPerCall: 0`, so this is
+    // genuinely zero for them rather than an untracked cost. Counted on success
+    // only: a call that threw cannot be assumed to have billed.
+    creditsUsed += perCall
   } catch (error) {
     // A map failure is not proof the site is unreadable — fall through and try
     // the home page directly. Only a Firecrawl-side refusal (402/429) stops us.
@@ -149,6 +159,7 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
         ok: false,
         reason: 'crawler_error',
         message: 'Could not read your website just now — we will ask you instead.',
+        attempted: [],
         pagesFetched: 0,
         wordsFound: 0,
         creditsUsed: 0,
@@ -166,7 +177,7 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
   for (const url of selected) {
     try {
       const page = await opts.client.scrape(url)
-      creditsUsed += 1
+      creditsUsed += perCall
       // A 2xx with no text is the JS-only signature; a 4xx/5xx never answered.
       if (page.statusCode >= 200 && page.statusCode < 400) answered += 1
       const words = countWords(page.markdown)
@@ -189,6 +200,7 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
       ok: false,
       reason: 'crawler_error',
       message: 'Could not read your website just now — we will ask you instead.',
+      attempted: selected,
       pagesFetched: 0,
       wordsFound: 0,
       creditsUsed,
@@ -200,6 +212,7 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
     return {
       ok: false,
       reason: jsOnly ? 'js_only' : 'unreachable',
+      attempted: selected,
       message: jsOnly
         ? 'Your site loads its text with JavaScript, so we could not read it — tell us in your own words instead.'
         : 'Could not reach that website — check the address, or tell us in your own words instead.',
@@ -213,6 +226,7 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
     return {
       ok: false,
       reason: 'thin',
+      attempted: selected,
       message: `Read ${pages.length} page${pages.length === 1 ? '' : 's'}, but there was not enough writing to learn your voice — tell us in your own words instead.`,
       pagesFetched: pages.length,
       wordsFound,

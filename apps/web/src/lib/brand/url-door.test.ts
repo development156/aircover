@@ -55,7 +55,9 @@ describe('openUrlDoor', () => {
       crawl: async () => ({
         ok: false,
         reason: 'js_only',
-        message: 'Your site loads its text with JavaScript, so we could not read it — tell us in your own words instead.',
+        message:
+          'Your site loads its text with JavaScript, so we could not read it — tell us in your own words instead.',
+        attempted: ['https://x.in/'],
         pagesFetched: 0,
         wordsFound: 0,
         creditsUsed: 1,
@@ -107,7 +109,9 @@ describe('applyExtractedFields', () => {
   const base = ResolveInputSchema.parse({ source: { name: 'Chai & Chapters' } })
 
   test('fills a blank leaf in the right channel', () => {
-    const next = applyExtractedFields(base, [field({ channel: 'customer', key: 'pain', value: 'Odia titles are hard to find.' })])
+    const next = applyExtractedFields(base, [
+      field({ channel: 'customer', key: 'pain', value: 'Odia titles are hard to find.' }),
+    ])
     expect(next.customer.pain).toBe('Odia titles are hard to find.')
   })
 
@@ -132,7 +136,9 @@ describe('applyExtractedFields', () => {
   })
 
   test('still sends no formality/energy — a crawl cannot answer a slider either', () => {
-    const next = applyExtractedFields(base, [field({ channel: 'voice', key: 'formality', value: '5' })])
+    const next = applyExtractedFields(base, [
+      field({ channel: 'voice', key: 'formality', value: '5' }),
+    ])
     // `formality` is a number in the contract, so a string extraction must not
     // land there and must not resurrect the key we just removed.
     expect(JSON.stringify(next)).not.toContain('formality')

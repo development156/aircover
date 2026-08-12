@@ -1,4 +1,5 @@
 import { DEFAULT_FIRECRAWL_URL } from './env'
+import type { MappedLink, PageSource, ScrapedPage } from './types'
 
 /**
  * A DIRECT Firecrawl integration — deliberately not a mesh route.
@@ -31,18 +32,7 @@ export class FirecrawlError extends Error {
   }
 }
 
-export interface MappedLink {
-  url: string
-  title?: string
-  description?: string
-}
-
-export interface ScrapedPage {
-  url: string
-  title: string
-  markdown: string
-  statusCode: number
-}
+export type { MappedLink, ScrapedPage } from './types'
 
 interface MapResponse {
   success?: boolean
@@ -69,12 +59,11 @@ function firstString(value: string | string[] | undefined): string {
   return value ?? ''
 }
 
-export interface FirecrawlClient {
-  /** Discover the site's URLs without spending a scrape credit on each. */
-  map(url: string, limit: number): Promise<MappedLink[]>
-  /** Fetch one page as markdown. Costs one Firecrawl credit. */
-  scrape(url: string): Promise<ScrapedPage>
-}
+/**
+ * Tier 3. A PageSource like the other two — the only one that bills. `map`
+ * discovers without spending a scrape credit each; `scrape` costs one credit.
+ */
+export type FirecrawlClient = PageSource
 
 const SCRAPE_TIMEOUT_MS = 30_000
 
@@ -98,6 +87,9 @@ export function createFirecrawlClient(opts: FirecrawlOptions): FirecrawlClient {
   }
 
   return {
+    name: 'firecrawl',
+    creditsPerCall: 1,
+
     async map(url: string, limit: number): Promise<MappedLink[]> {
       // `includeSubdomains` DEFAULTS TO TRUE. Left alone, a sitemap that
       // references shop.example.com or a CDN host would spend our credits on

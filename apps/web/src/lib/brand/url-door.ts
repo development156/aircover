@@ -37,9 +37,10 @@ export type UrlDoorOutcome =
 
 /** Just enough of the mesh to run one task — injected so this is testable. */
 export interface ExtractRunner {
-  run(input: { corpus: string; name: string }, ctx: MeshContext): Promise<
-    { ok: true; data: BrandExtractOutput } | { ok: false }
-  >
+  run(
+    input: { corpus: string; name: string },
+    ctx: MeshContext,
+  ): Promise<{ ok: true; data: BrandExtractOutput } | { ok: false }>
 }
 
 export interface UrlDoorOptions {
@@ -61,7 +62,12 @@ export async function openUrlDoor(
   if (!outcome.ok) {
     // Pass the crawl's own sentence through unchanged. Each reason is a
     // different thing to say, and flattening them here would undo that.
-    return { ok: false, reason: outcome.reason, message: outcome.message, firecrawlCredits: outcome.creditsUsed }
+    return {
+      ok: false,
+      reason: outcome.reason,
+      message: outcome.message,
+      firecrawlCredits: outcome.creditsUsed,
+    }
   }
 
   const corpus = quarantineCorpus(outcome.pages)
@@ -73,7 +79,8 @@ export async function openUrlDoor(
     return {
       ok: false,
       reason: 'extract_failed',
-      message: 'Read your website, but could not turn it into a brand just now — tell us in your own words instead.',
+      message:
+        'Read your website, but could not turn it into a brand just now — tell us in your own words instead.',
       firecrawlCredits: outcome.creditsUsed,
     }
   }

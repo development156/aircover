@@ -1,3 +1,43 @@
+/** A URL discovered on a site, before we decide whether it is worth fetching. */
+export interface MappedLink {
+  url: string
+  title?: string
+  description?: string
+}
+
+/** One page as a source returned it, before word-counting or classification. */
+export interface ScrapedPage {
+  url: string
+  title: string
+  markdown: string
+  statusCode: number
+}
+
+/**
+ * Where pages come from. Three implementations sit behind this, and `crawlSite`
+ * cannot tell them apart — which is the point: page selection, the failure
+ * taxonomy, word counting and quarantine are written once and every tier gets
+ * them.
+ *
+ *   tier 1  direct    plain fetch + turndown. No vendor, no key, no credits.
+ *   tier 2  reader    a free reader service. Fallback on js_only / thin only.
+ *   tier 3  firecrawl the paid vendor. Behind a flag, default off.
+ */
+export interface PageSource {
+  /** Named so a report can say which tier produced a corpus. */
+  readonly name: string
+  /**
+   * Vendor credits billed per call. Omitted means 1 (the Firecrawl case, which
+   * this interface was extracted from). Tier 1 sets 0 — and 0 must mean zero in
+   * the report, not "we forgot to count".
+   */
+  readonly creditsPerCall?: number
+  /** Discover the site's URLs. */
+  map(url: string, limit: number): Promise<MappedLink[]>
+  /** Fetch one page as markdown. */
+  scrape(url: string): Promise<ScrapedPage>
+}
+
 /** One page the crawler actually retrieved. */
 export interface CrawledPage {
   /** The URL the content came from. Rides with every extracted field as provenance. */
@@ -37,6 +77,12 @@ export interface CrawlFailure {
   reason: CrawlFailureReason
   /** Founder-facing, verb-first, and never blames them for having a small site. */
   message: string
+  /**
+   * URLs this attempt selected, even though it failed. The escalation ladder
+   * hands them to tier 2, which reads pages but cannot discover a site — without
+   * them a JS-only site would escalate and then read exactly one page.
+   */
+  attempted: string[]
   /** Pages we managed to fetch, if any — kept so `thin` can say how thin. */
   pagesFetched: number
   wordsFound: number

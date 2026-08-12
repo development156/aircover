@@ -19,6 +19,8 @@ function client(opts: {
   return {
     scraped,
     client: {
+      name: 'fixture',
+      creditsPerCall: 1, // the vendor's billing, so the committed cost tests keep meaning
       async map() {
         if (opts.mapThrows) throw opts.mapThrows
         return (opts.links ?? []).map((url) => ({ url }))

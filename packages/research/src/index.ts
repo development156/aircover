@@ -9,16 +9,33 @@
 export const RESEARCH_PACKAGE = '@sahoda/research' as const
 
 export { createFirecrawlClient, FirecrawlError } from './firecrawl'
-export type {
-  FirecrawlClient,
-  FirecrawlOptions,
-  FetchLike,
-  MappedLink,
-  ScrapedPage,
-} from './firecrawl'
+export type { FirecrawlClient, FirecrawlOptions, FetchLike } from './firecrawl'
 
 export { crawlSite, selectPages, countWords } from './crawl-site'
 export type { CrawlSiteOptions } from './crawl-site'
+
+// Tier 1 — plain fetch + turndown. No vendor, no key, no credits.
+export { createDirectSource } from './direct-source'
+export type { DirectSourceOptions } from './direct-source'
+export { safeFetch, assertPublicUrl, isPrivateAddress, UnsafeUrlError } from './safe-fetch'
+export type { FetchedPage, SafeFetchOptions } from './safe-fetch'
+export { parsePage, htmlToMarkdown, extractLinks } from './html'
+export type { ParsedPage } from './html'
+
+// Tier 2 — free keyless reader, escalated to only on js_only / thin.
+export {
+  createReaderSource,
+  parseReaderBody,
+  servedFromCache,
+  ReaderRateLimitError,
+  DEFAULT_READER_URL,
+  READER_RATE_LIMIT_PER_MIN,
+} from './reader-source'
+export type { ReaderSourceOptions } from './reader-source'
+
+// The ladder. Tier 3 (Firecrawl) is behind a flag, default off.
+export { openSite } from './tiers'
+export type { OpenSiteOptions, OpenSiteResult, TierAttempt, TierFlags } from './tiers'
 
 export {
   quarantineCorpus,
@@ -30,6 +47,9 @@ export {
 
 export { MAX_PAGES, MIN_CORPUS_WORDS } from './types'
 export type {
+  PageSource,
+  MappedLink,
+  ScrapedPage,
   CrawledPage,
   CrawlOutcome,
   CrawlSuccess,
