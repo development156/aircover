@@ -16,7 +16,12 @@ import { captionRewriteTask } from './tasks/caption-rewrite'
  *
  * Run it (never in CI) with real credentials on PATH, e.g.:
  *   set -a; source .env; set +a
- *   MESH_LIVE_SMOKE=1 pnpm --filter @sahoda/mesh test src/smoke.live.test.ts
+ *   MESH_LIVE_SMOKE=1 npx vitest run --config vitest.live.config.ts src/smoke.live.test.ts
+ *
+ * NOT via `pnpm test`: vitest.config.ts excludes `*.live.test.ts`, and a filter
+ * that matches nothing after the exclude prints "No test files found" and exits
+ * 0 — a green run that executed no live call at all. vitest.live.config.ts is
+ * the inverse config (include live only) and is the only way to run this file.
  */
 const LIVE = process.env.MESH_LIVE_SMOKE === '1'
 

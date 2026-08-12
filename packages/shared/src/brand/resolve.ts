@@ -46,6 +46,12 @@ export type BrandMemoryPayload = z.infer<typeof BrandMemoryPayloadSchema>
  * fields. Only `source.name` is required — blanks never block (FSD M1); a
  * tracked-field count drives the Signal Clarity meter. Voice formality/energy are
  * 1–5 sliders.
+ *
+ * `website` and `instagram` are additive (defaulted, so every existing caller
+ * still parses). They are IDENTIFIERS, not content: the model cannot fetch them,
+ * so a URL contributes roughly what a domain name contributes. The content lift
+ * is the URL door in doc 18 §5 (Firecrawl → quarantined extraction), which lands
+ * its result in these same channels as `confirmed: false` fields.
  */
 export const ResolveInputSchema = z.object({
   source: z.object({
@@ -53,6 +59,8 @@ export const ResolveInputSchema = z.object({
     one_liner: z.string().default(''),
     category: z.string().default(''),
     mission: z.string().default(''),
+    website: z.string().default(''),
+    instagram: z.string().default(''),
   }),
   customer: z
     .object({

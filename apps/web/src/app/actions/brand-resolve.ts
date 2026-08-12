@@ -130,11 +130,15 @@ export async function resolveBrand(
     const name = field(formData, 'name')
     if (!name) return { ok: false, kind: 'error', message: 'Enter your business name.' }
 
+    // Every field the Spark screen collects now reaches the model. `description`
+    // has no input mounted yet, so it reads '' in production — the mapper is
+    // ready for the field the moment a screen asks for it.
     const spark: SparkInput = {
       name,
       category: field(formData, 'category'),
       website: field(formData, 'website'),
       instagram: field(formData, 'instagram'),
+      description: field(formData, 'description'),
     }
     const input = sparkToResolveInput(spark)
 
