@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 
-import { PENDING_ANCHORS } from './anchors'
+import { DYNAMIC_ANCHORS, PENDING_ANCHORS } from './anchors'
 
 /**
  * Anchor integrity.
@@ -102,15 +102,18 @@ describe('Guide anchor integrity', () => {
     expect(seededAnchors().length).toBeGreaterThan(0)
   })
 
-  test('every seeded tour anchor is either rendered or explicitly pending', () => {
+  test('every seeded tour anchor is rendered, dynamic, or explicitly pending', () => {
     const rendered = renderedAnchors()
     const unaccounted = seededAnchors().filter(
-      (anchor) => !rendered.has(anchor) && PENDING_ANCHORS[anchor] === undefined,
+      (anchor) =>
+        !rendered.has(anchor) &&
+        DYNAMIC_ANCHORS[anchor] === undefined &&
+        PENDING_ANCHORS[anchor] === undefined,
     )
 
     expect(
       unaccounted,
-      `Seeded tour anchors with no target and no entry in PENDING_ANCHORS. Either add the ` +
+      `Seeded tour anchors with no target and no registry entry. Either add the ` +
         `data-guide attribute to the real control, or record why it cannot exist yet:\n  ` +
         unaccounted.join('\n  '),
     ).toEqual([])
@@ -129,15 +132,45 @@ describe('Guide anchor integrity', () => {
     ).toEqual([])
   })
 
-  test('every pending anchor is one the seed actually asks for', () => {
+  test('no anchor is claimed both built-dynamically and not-built', () => {
+    // The two registries make opposite claims. An anchor in both would let
+    // whichever the reader looked at first be true.
+    const both = Object.keys(DYNAMIC_ANCHORS).filter(
+      (anchor) => PENDING_ANCHORS[anchor] !== undefined,
+    )
+    expect(both, `Listed as BOTH dynamic and pending:\n  ${both.join('\n  ')}`).toEqual([])
+  })
+
+  test('every dynamic anchor names a real component that carries a data-guide', () => {
+    // The exemption's expiry date. `DYNAMIC_ANCHORS` asserts "this IS rendered,
+    // the regex just cannot see it" — an assertion that would quietly outlive
+    // the component if nothing checked. Deleting or un-anchoring the named file
+    // fails here instead of silently re-hiding a broken tour step.
+    for (const [anchor, relPath] of Object.entries(DYNAMIC_ANCHORS)) {
+      const full = join(WEB_SRC, relPath)
+      let src: string
+      try {
+        src = readFileSync(full, 'utf8')
+      } catch {
+        throw new Error(`DYNAMIC_ANCHORS["${anchor}"] names ${relPath}, which does not exist`)
+      }
+      expect(src, `${relPath} no longer sets a data-guide — ${anchor} is not rendered`).toContain(
+        'data-guide',
+      )
+    }
+  })
+
+  test('every registry anchor is one the seed actually asks for', () => {
     // Guards against a typo'd or obsolete key sitting in the registry forever,
     // silently excusing an anchor no tour references.
     const seeded = new Set(seededAnchors())
-    const orphans = Object.keys(PENDING_ANCHORS).filter((anchor) => !seeded.has(anchor))
+    const orphans = [...Object.keys(PENDING_ANCHORS), ...Object.keys(DYNAMIC_ANCHORS)].filter(
+      (anchor) => !seeded.has(anchor),
+    )
 
     expect(
       orphans,
-      `PENDING_ANCHORS entries no seeded tour references:\n  ${orphans.join('\n  ')}`,
+      `Registry entries no seeded tour references:\n  ${orphans.join('\n  ')}`,
     ).toEqual([])
   })
 
