@@ -5,7 +5,11 @@ import {
   ALPHA_GATE,
   GATE_STALE_AFTER_DAYS,
   ageLabel,
+  codesAt,
   gateAgeDays,
+  shaDrift,
+  shortSha,
+  type AlphaAssessment,
   type AlphaGateRecord,
 } from '@/lib/ops/alpha-gate'
 
@@ -25,20 +29,33 @@ import {
  * expansion adds detail rather than revealing the problem.
  *
  * IT ALSO SUBTRACTS THE DESCOPES, and that is the one arithmetic it is allowed
- * to do. `record.failingCodes` stays as audited; items in `record.outOfScope`
+ * to do. The record's statuses stay as audited; items in `record.outOfScope`
  * leave the failure count here, on screen, with the drop stated on the chip face
  * and every descoped item named, dated and reasoned in the expansion. A panel
  * that counted a deliberate decision as a defect was wrong; one that quietly
  * dropped it would be worse.
+ *
+ * ── EVERY ITEM IS ACCOUNTED FOR, INCLUDING THE ONES THAT PASSED ─────────────
+ * The record enumerates all fourteen, so this renders all fourteen: failing and
+ * partial by name with their evidence, and the remainder counted with the date
+ * of the reading attached. A reader who sees "4 failing" must not be able to
+ * conclude the other ten were checked today, because ten of them were not.
  */
 export function AlphaChip({
   items,
   today,
   record = ALPHA_GATE,
+  deployedSha,
 }: {
   items: readonly OpsRoadmapItem[]
   today: Date
   record?: AlphaGateRecord
+  /**
+   * `process.env.VERCEL_GIT_COMMIT_SHA`, read by the server component that
+   * renders this and passed in — so the component stays pure and its tests
+   * stay deterministic. Undefined locally, which is a real state, not a bug.
+   */
+  deployedSha?: string
 }) {
   const alphaItems = items.filter((item) => item.stage === 'alpha')
   const titleOf = (code: string) => alphaItems.find((item) => item.code === code)
@@ -48,19 +65,21 @@ export function AlphaChip({
   // `alpha-gate.ts` still transcribes what the audit found; this is the only
   // place the two numbers are reconciled, and the chip face states both.
   const descoped = new Set(record.outOfScope.map((entry) => entry.code))
-  const defectCodes = record.failingCodes.filter((code) => !descoped.has(code))
-  const failing = defectCodes
-    .map(titleOf)
-    .filter((item): item is OpsRoadmapItem => item !== undefined)
+  const counted = record.assessments.filter((a) => !descoped.has(a.code))
 
-  // How many of the recorded failures the descope removed. Only the overlap
-  // counts: an item taken out of scope that was never recorded as failing did
-  // not shrink this number, and saying it did would misattribute the drop.
-  const descopedFailures = record.failingCodes.length - defectCodes.length
+  const failing = counted.filter((a) => a.status === 'fail')
+  const partial = counted.filter((a) => a.status === 'partial')
+  const passing = counted.filter((a) => a.status === 'pass')
 
-  // Codes recorded as failing that no longer exist on the roadmap. Silence here
-  // would quietly shrink the count.
-  const unmatched = defectCodes.length - failing.length
+  // How many recorded defects the descope removed. Only fails and partials
+  // count: descoping something that was already passing did not shrink this.
+  const descopedDefects = record.assessments.filter(
+    (a) => descoped.has(a.code) && a.status !== 'pass',
+  ).length
+
+  // Codes in the record that no longer exist on the roadmap. Silence here would
+  // quietly shrink the count.
+  const unmatched = counted.filter((a) => titleOf(a.code) === undefined).length
 
   // Same guard on the other list: a descoped code matching no roadmap item must
   // be visible, or a typo in the descope would silently erase a real failure.
@@ -68,8 +87,12 @@ export function AlphaChip({
 
   const age = gateAgeDays(record, today)
   const stale = age > GATE_STALE_AFTER_DAYS
+  const drift = shaDrift(record, deployedSha)
 
-  if (record.verdict === 'ship' && failing.length === 0) {
+  // Partials are defects. A "ship" verdict with five half-built items is not a
+  // pass, so this early return needs both to be empty — the old version tested
+  // failures alone and would have gone green the moment a fail became a partial.
+  if (record.verdict === 'ship' && failing.length === 0 && partial.length === 0) {
     return (
       <p className="text-[12px] text-ok">
         Alpha items all passed when last checked, {ageLabel(age)}.
@@ -89,19 +112,25 @@ export function AlphaChip({
         <span className="text-[12px] font-bold text-danger">
           Alpha gate:{' '}
           <span className="tabular-nums">
-            {defectCodes.length} of {alphaItems.length}
+            {failing.length} of {alphaItems.length}
           </span>{' '}
           failing
-          {descopedFailures > 0 ? (
-            // On the FACE, not only in the expansion. A count that drops from six
-            // to five with the reason hidden behind a click is the same silence
-            // the `unmatched` line exists to prevent.
+          {partial.length > 0 ? (
             <>
               {' '}
-              · <span className="tabular-nums">{descopedFailures}</span> out of scope
+              · <span className="tabular-nums">{partial.length}</span> partial
             </>
           ) : null}
-          , audited {formatShort(record.recordedOn)}, not re-run since
+          {descopedDefects > 0 ? (
+            // On the FACE, not only in the expansion. A count that drops with
+            // the reason hidden behind a click is the same silence the
+            // `unmatched` line exists to prevent.
+            <>
+              {' '}
+              · <span className="tabular-nums">{descopedDefects}</span> out of scope
+            </>
+          ) : null}
+          , audited {formatShort(record.recordedOn)}
         </span>
         <span className="ml-auto shrink-0 text-[11px] font-medium text-danger/80 group-open:hidden">
           Show
@@ -117,24 +146,28 @@ export function AlphaChip({
         </p>
         {failing.length === 0 ? (
           <p className="mt-1.5 text-[12px] text-ink">
-            None of the recorded failures are still counted — every one of them has since been taken
-            out of scope. That is a decision, not a pass.
+            Nothing is recorded as fully broken. That is not a pass — see the partial items below.
           </p>
         ) : (
-          <ul className="mt-1.5 space-y-1">
-            {failing.map((item) => (
-              <li key={item.code} className="text-[12px] text-ink">
-                <span className="font-mono text-[10px] text-muted tabular-nums">{item.code}</span>{' '}
-                {item.title}
-              </li>
-            ))}
-          </ul>
+          <AssessmentList entries={failing} titleOf={titleOf} />
         )}
+
+        {/* Partial is the status this panel most needs to state plainly. An item
+            that does half of what was asked is neither a failure to be counted
+            with the rest nor a pass to be left silent. */}
+        {partial.length > 0 ? (
+          <div className="mt-2.5 border-t border-danger/20 pt-2.5">
+            <p className="text-[12px] font-semibold text-warn">
+              Partly working — real, and not what was asked for:
+            </p>
+            <AssessmentList entries={partial} titleOf={titleOf} />
+          </div>
+        ) : null}
 
         {unmatched > 0 ? (
           <p className="mt-1.5 text-[11px] text-warn tabular-nums">
-            {unmatched} recorded failure{unmatched === 1 ? '' : 's'} no longer match a roadmap item
-            — the record and the roadmap disagree.
+            {unmatched} assessed item{unmatched === 1 ? '' : 's'} no longer match a roadmap item —
+            the record and the roadmap disagree.
           </p>
         ) : null}
 
@@ -168,21 +201,84 @@ export function AlphaChip({
           </div>
         ) : null}
 
-        {/* Counting six failures invites the reader to assume the rest passed.
-            The eleven behavioural checks are a DIFFERENT list nobody has run,
-            so their state is unknown — neither a pass nor a failure. */}
+        {/* The remainder, counted and dated. Leaving these unmentioned is what
+            let a reader treat "not listed" as "verified fine". */}
+        {passing.length > 0 ? (
+          <p className="mt-2.5 border-t border-danger/20 pt-2.5 text-[12px] text-ink">
+            The other <span className="font-semibold tabular-nums">{passing.length}</span> items
+            were recorded passing by the {formatShort(record.recordedOn)} sweep and{' '}
+            <span className="font-semibold">have not been re-checked since</span> — that is a
+            reading from {ageLabel(age)}, not a statement about today.
+          </p>
+        ) : null}
+
+        {/* Counting failures invites the reader to assume the rest passed. The
+            eleven behavioural checks are a DIFFERENT list. Ten are unrun; the
+            eleventh is now known to be unmeetable, and saying "never been run"
+            of that one would contradict A9's own evidence two inches above. */}
         <p className="mt-2 text-[12px] text-ink">
           Separately, the <span className="font-semibold tabular-nums">11 behavioural checks</span>{' '}
-          of the Alpha Gate are <span className="font-semibold">unverified, not failed</span> — that
-          gate has never been run.
+          of the Alpha Gate are a different list.{' '}
+          <span className="font-semibold tabular-nums">10</span> are{' '}
+          <span className="font-semibold">unverified, not failed</span> — nobody has run them. The
+          eleventh, “a scheduled post fires within ±60s”, cannot be met as built: the cron that
+          publishes ticks every five minutes (A9).
+        </p>
+
+        {/* Stated as fact, in muted type, deliberately NOT an alarm. Work lands
+            here several times a day, so a red banner on every deploy would be
+            lit permanently and learned-past within a week — the exact failure
+            this component's demotion exists to avoid. */}
+        <p className="mt-2 text-[11px] text-muted">
+          {drift === 'unknown' ? (
+            <>
+              Audited at <span className="font-mono">{record.auditedSha}</span>. This build recorded
+              no deployed commit, so the audit cannot be matched to what is running.
+            </>
+          ) : drift === 'match' ? (
+            <>
+              Audited at <span className="font-mono">{record.auditedSha}</span>, which is the commit
+              deployed.
+            </>
+          ) : (
+            <>
+              Audited at <span className="font-mono">{record.auditedSha}</span>; deployed is{' '}
+              <span className="font-mono">{shortSha(deployedSha ?? '')}</span>. Work has landed
+              since the audit, so it does not describe this build exactly.
+            </>
+          )}
         </p>
 
         <p className="mt-2 text-[11px] text-muted">
-          Recorded {ageLabel(age)} · {record.source} · not re-run since.
+          Recorded {ageLabel(age)} · {record.source}.
           {stale ? ' This verdict may be out of date.' : ''}
         </p>
       </div>
     </details>
+  )
+}
+
+/** Code, title and the sentence of evidence behind the status. */
+function AssessmentList({
+  entries,
+  titleOf,
+}: {
+  entries: readonly AlphaAssessment[]
+  titleOf: (code: string) => OpsRoadmapItem | undefined
+}) {
+  return (
+    <ul className="mt-1.5 space-y-1.5">
+      {entries.map((entry) => (
+        <li key={entry.code} className="text-[12px] text-ink">
+          <span className="font-mono text-[10px] text-muted tabular-nums">{entry.code}</span>{' '}
+          {titleOf(entry.code)?.title ?? 'unknown item'}
+          <span className="block text-[11px] text-muted">
+            {entry.evidence}
+            {entry.revisedOn ? ` Re-read ${entry.revisedOn}.` : ''}
+          </span>
+        </li>
+      ))}
+    </ul>
   )
 }
 

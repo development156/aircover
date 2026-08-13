@@ -31,27 +31,29 @@ function alphaItems(): OpsRoadmapItem[] {
 }
 
 describe('the Alpha warning is demoted but never softened', () => {
-  it('states the count and the date on the collapsed chip', () => {
+  it('states failing, partial and descoped counts on the collapsed chip', () => {
     // Demoting a warning is a layout decision. If the reader had to expand it to
     // learn there IS a problem, the demotion would have become a suppression.
+    // Partial belongs on the FACE for the same reason: four half-built items
+    // hidden behind a click reads as four fewer problems.
     render(<AlphaChip items={alphaItems()} today={TODAY} />)
 
-    // The count sits in its own span for tabular-nums, so the sentence spans
+    // The counts sit in their own spans for tabular-nums, so the sentence spans
     // several nodes — assert on the rendered text, not on one node.
     expect(screen.getByText(/Alpha gate:/).textContent).toMatch(
-      /Alpha gate:\s*5 of 14\s*failing · 1\s*out of scope, audited 25 Jul, not re-run since/,
+      /Alpha gate:\s*4 of 14\s*failing · 4\s*partial · 1\s*out of scope, audited 25 Jul/,
     )
   })
 
   it('states the descope on the face, so the count never shrinks in silence', () => {
-    // Six were audited as failing; five are counted. The one-item difference is
-    // the whole risk of this feature, so it is on the collapsed chip — a reader
-    // who never clicks must still learn the number was reduced and by how much.
+    // The one-item difference is the whole risk of this feature, so it is on the
+    // collapsed chip — a reader who never clicks must still learn the number was
+    // reduced and by how much.
     render(<AlphaChip items={alphaItems()} today={TODAY} />)
     expect(screen.getByText(/Alpha gate:/).textContent).toMatch(/out of scope/)
   })
 
-  it('keeps the failing items out of sight until asked, then names all five', async () => {
+  it('keeps the failing items out of sight until asked, then names all four', async () => {
     render(<AlphaChip items={alphaItems()} today={TODAY} />)
 
     const details = screen.getByText(/Alpha gate:/).closest('details')!
@@ -60,9 +62,40 @@ describe('the Alpha warning is demoted but never softened', () => {
     await userEvent.click(screen.getByText(/Alpha gate:/))
     expect(details.open).toBe(true)
 
-    for (const code of ['A3', 'A5', 'A9', 'A13', 'A14']) {
+    for (const code of ['A3', 'A8', 'A13', 'A14']) {
       expect(within(details).getByText(code)).toBeInTheDocument()
     }
+  })
+
+  it('names the partial items under their own heading, never merged into the failures', async () => {
+    // The status exists so that "does half of what was asked" is neither counted
+    // as broken nor left silent. Merging the two lists loses exactly that.
+    render(<AlphaChip items={alphaItems()} today={TODAY} />)
+    await userEvent.click(screen.getByText(/Alpha gate:/))
+
+    expect(screen.getByText(/Partly working/)).toBeInTheDocument()
+    for (const code of ['A2', 'A5', 'A9', 'A10']) {
+      expect(screen.getByText(code)).toBeInTheDocument()
+    }
+  })
+
+  it('shows the evidence behind a status, not just the verdict', async () => {
+    // A status with no evidence is a number the reader has to trust. A8 flipped
+    // from an implied pass to a fail, so the reason has to be on screen.
+    render(<AlphaChip items={alphaItems()} today={TODAY} />)
+    await userEvent.click(screen.getByText(/Alpha gate:/))
+
+    const a8 = screen.getByText('A8').closest('li')!
+    expect(within(a8).getByText(/fixture/)).toBeInTheDocument()
+  })
+
+  it('accounts for the passing remainder instead of leaving it silent', async () => {
+    // The failure this prevents: "4 failing" read as "the other ten are fine".
+    // Ten of them were last looked at on 25 Jul.
+    render(<AlphaChip items={alphaItems()} today={TODAY} />)
+    await userEvent.click(screen.getByText(/Alpha gate:/))
+
+    expect(screen.getByText(/have not been re-checked since/)).toBeInTheDocument()
   })
 
   it('names the descoped item under its own heading, with a reason and a date', async () => {
@@ -78,22 +111,60 @@ describe('the Alpha warning is demoted but never softened', () => {
     expect(within(descopeItem).getByText(/Decided 2026-08-13/)).toBeInTheDocument()
   })
 
-  it('still says the eleven behavioural checks are unverified, not passed', async () => {
+  it('separates the ten unrun behavioural checks from the one known unmeetable', async () => {
+    // A9's evidence now cites the five-minute cron, which makes the ±60s check
+    // known-failing. Saying all eleven "have never been run" alongside that
+    // would put two contradictory claims in one panel.
     render(<AlphaChip items={alphaItems()} today={TODAY} />)
     await userEvent.click(screen.getByText(/Alpha gate:/))
 
     expect(screen.getByText(/unverified, not failed/)).toBeInTheDocument()
-    expect(screen.getByText(/never been run/)).toBeInTheDocument()
+    expect(screen.getByText(/cannot be met as built/)).toBeInTheDocument()
+    expect(screen.queryByText(/that gate has never been run/i)).not.toBeInTheDocument()
+  })
+
+  it('says the audit cannot be matched to the build when no SHA was recorded', () => {
+    // Undefined is the LOCAL case and a real deployed one. It must never render
+    // as agreement — "cannot verify" and "matches" are different claims.
+    render(<AlphaChip items={alphaItems()} today={TODAY} />)
+    expect(screen.getByText(/recorded no deployed commit/)).toBeInTheDocument()
+  })
+
+  it('states both SHAs as fact when the deploy has moved past the audit', async () => {
+    // Deliberately muted, not an alarm: work lands several times a day, so a red
+    // banner here would be lit permanently and learned past within a week.
+    render(
+      <AlphaChip
+        items={alphaItems()}
+        today={TODAY}
+        deployedSha="565913e0abcdef1234567890abcdef1234567890"
+      />,
+    )
+    await userEvent.click(screen.getByText(/Alpha gate:/))
+
+    expect(screen.getByText(/565913e/)).toBeInTheDocument()
+    expect(screen.getByText(/Work has landed since/)).toBeInTheDocument()
+  })
+
+  it('reports a match when the deployed commit is the audited one', () => {
+    render(
+      <AlphaChip
+        items={alphaItems()}
+        today={TODAY}
+        deployedSha="a9aad9c5f4ed8244ef5a34a16aa57efd6278f76f"
+      />,
+    )
+    expect(screen.getByText(/which is the commit deployed/)).toBeInTheDocument()
   })
 
   it('says the record and the roadmap disagree rather than shrinking the count', () => {
-    // Only A3 exists, so four of the five counted failures match nothing. The
-    // headline must still read 5, with the mismatch stated.
+    // Only A3 exists, so twelve of the thirteen counted items match nothing. The
+    // headline must still read 4, with the mismatch stated.
     const oneItem = alphaItems().filter((item) => item.code === 'A3')
     render(<AlphaChip items={oneItem} today={TODAY} />)
 
-    expect(screen.getByText(/5 of 1\b/)).toBeInTheDocument()
-    expect(screen.getByText(/4 recorded failures no longer match/)).toBeInTheDocument()
+    expect(screen.getByText(/4 of 1\b/)).toBeInTheDocument()
+    expect(screen.getByText(/12 assessed items no longer match/)).toBeInTheDocument()
   })
 
   it('flags an out-of-scope code that matches no roadmap item', () => {

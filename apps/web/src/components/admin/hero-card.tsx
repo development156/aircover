@@ -260,7 +260,12 @@ export async function HeroCard() {
 
       {/* Demoted to a chip, still crimson, still here. */}
       <div className="mt-4">
-        <AlphaChip items={items.data} today={now} />
+        {/* Read HERE, in the server component, and passed down: `AlphaChip`
+            stays pure so its tests are deterministic, and the env read stays
+            off the client. Turbo passes VERCEL_GIT_COMMIT_SHA through as a
+            system var — see `turbo-env-wiring.test.ts`, which deliberately
+            keeps it OUT of the build allowlist so it cannot bust the cache. */}
+        <AlphaChip items={items.data} today={now} deployedSha={process.env.VERCEL_GIT_COMMIT_SHA} />
       </div>
 
       <div className="mt-4 grid gap-3 narrow:grid-cols-2 wide:grid-cols-3">
