@@ -60,9 +60,20 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
     // (workspace_id, version) — omitting it fails the insert outright (found
     // the hard way: the first cut silently toasted "could not save" on every
     // Finish). Read the current max and take the next.
+    //
+    // SCOPED TO THIS WORKSPACE, which the first cut was not. Without the
+    // `.eq`, this read the highest version across every workspace the caller
+    // can see under RLS. That never broke the insert — UNIQUE is
+    // (workspace_id, version) and a global max is always ≥ this workspace's,
+    // so the value stayed unique — which is exactly why it survived: a
+    // cross-workspace read on a workspace-scoped table with no visible
+    // symptom. It is wrong on the terms this repo cares about (every read on
+    // a workspace table is workspace-bound), and it would have handed a
+    // member of two workspaces a second workspace's version number.
     const { data: latest, error: versionError } = await supabase
       .from('workspace_themes')
       .select('version')
+      .eq('workspace_id', workspace.id)
       .order('version', { ascending: false })
       .limit(1)
       .maybeSingle()

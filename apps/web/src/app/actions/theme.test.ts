@@ -41,6 +41,12 @@ const state = vi.hoisted(() => ({
   calls: {
     inserted: [] as Array<Record<string, unknown>>,
     updates: [] as UpdateCall[],
+    /**
+     * Every SELECT chain, with the `.eq()` filters it accumulated. Recorded so
+     * a read on a workspace-scoped table can be asserted to BE scoped — the
+     * version lookup once was not, and nothing observable failed.
+     */
+    selects: [] as Array<{ table: string; eqs: Array<[string, unknown]> }>,
   },
 }))
 
@@ -65,10 +71,15 @@ vi.mock('@/lib/supabase/server', () => ({
       // (.select().order().limit().maybeSingle()) and the postcondition check
       // (.select().eq().eq().limit() — awaited directly, no maybeSingle).
       select: () => {
+        const call = { table, eqs: [] as Array<[string, unknown]> }
+        state.calls.selects.push(call)
         const chain = {
           order: () => chain,
           limit: () => chain,
-          eq: () => chain,
+          eq: (col: string, val: unknown) => {
+            call.eqs.push([col, val])
+            return chain
+          },
           maybeSingle: () =>
             Promise.resolve({
               data: state.latestVersion === null ? null : { version: state.latestVersion },
@@ -117,7 +128,7 @@ beforeEach(() => {
   state.verifyError = null
   state.workspace = { id: WS_ID }
   state.userId = 'user_abc'
-  state.calls = { inserted: [], updates: [] }
+  state.calls = { inserted: [], updates: [], selects: [] }
 })
 
 describe('saveWorkspaceTheme', () => {
@@ -132,6 +143,27 @@ describe('saveWorkspaceTheme', () => {
     expect(row?.source).toBe('extracted')
     expect(row?.status).toBe('active')
     expect(row?.created_by).toBe('user_abc')
+  })
+
+  test('scopes the version lookup to this workspace, not to everything RLS allows', async () => {
+    /**
+     * A LATENT DEFECT WITH NO SYMPTOM, which is why it needs a test rather than
+     * a comment. The version read carried no `workspace_id` filter, so it took
+     * the highest version across every workspace the caller can see. That never
+     * produced a visible failure: UNIQUE is (workspace_id, version), and a
+     * global max is always at least this workspace's max, so the derived value
+     * stayed unique and every insert succeeded.
+     *
+     * Nothing in the result, the row, or the database would ever have shown it.
+     * The only observable is the query itself — so the query is what is
+     * asserted. A member of two workspaces would otherwise have themed their
+     * second workspace at the first one's version number.
+     */
+    await saveWorkspaceTheme(COLORS)
+
+    const versionRead = state.calls.selects.find((s) => s.table === 'workspace_themes')
+    expect(versionRead).toBeDefined()
+    expect(versionRead?.eqs).toContainEqual(['workspace_id', WS_ID])
   })
 
   /**
