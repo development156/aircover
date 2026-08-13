@@ -166,7 +166,8 @@ describe('a post that has already published — the reported defect', () => {
 
   test('a channel that was skipped does not keep a finished post unfinished', () => {
     // `skipped` means the post went out everywhere it was MEANT to — the same
-    // reading `isPartial` takes. It cannot be something still waiting to send.
+    // reading `publishEvidence` takes, where it counts as neither published nor
+    // outstanding. It cannot be something still waiting to send.
     expect(
       autoPublishTruth('approved', EARLIER, NOW, [
         row('x', 'published'),
