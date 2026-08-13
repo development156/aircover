@@ -5,7 +5,6 @@ import {
   ALPHA_GATE,
   GATE_STALE_AFTER_DAYS,
   ageLabel,
-  codesAt,
   gateAgeDays,
   shaDrift,
   shortSha,
@@ -22,11 +21,18 @@ import {
  * chip that expands on click.
  *
  * WHAT DID NOT CHANGE, and must not: it is still crimson, still on the hero
- * card, still names every failing item, and still carries its date and the fact
- * that it has not been re-run. Demoting a warning is a layout decision;
+ * card, still names every failing item, and every status it shows still carries
+ * the date of the reading behind it. Demoting a warning is a layout decision;
  * softening it would be a different and much worse one. It never renders
- * collapsed-and-silent — the count and the age are on the chip face, so the
- * expansion adds detail rather than revealing the problem.
+ * collapsed-and-silent — the counts and the audit date are on the chip face, so
+ * the expansion adds detail rather than revealing the problem.
+ *
+ * The face used to end ", not re-run since". That came off when six items WERE
+ * re-read, because it had become false — but the fact it protected has not been
+ * dropped: the passing remainder states its own staleness in the expansion, and
+ * every un-revisited item says so in its evidence line. The invariant is that a
+ * reading is never shown without its date, not that any particular sentence
+ * survives.
  *
  * IT ALSO SUBTRACTS THE DESCOPES, and that is the one arithmetic it is allowed
  * to do. The record's statuses stay as audited; items in `record.outOfScope`

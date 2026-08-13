@@ -14,7 +14,9 @@
       "title": "You can see how your posts and accounts are performing",
       "summary_plain": "There is a new Analytics screen. It shows each connected account's followers over time, and how every published post did. Where a platform has not reported a post's numbers yet, it says so instead of showing zeros, because a confident zero reads as failure when the truth is that nobody has counted yet.",
       "kind": "added",
-      "task_codes": ["SL-070"],
+      "task_codes": [
+        "SL-070"
+      ],
       "happened_at": "2026-08-11T16:52:01.991Z"
     },
     {
@@ -32,6 +34,14 @@
       "kind": "changed",
       "task_codes": [],
       "happened_at": "2026-08-11T16:52:03.509Z"
+    },
+    {
+      "client_id": "cl-msri6x9i-9e641156",
+      "title": "Websites are hidden for now",
+      "summary_plain": "The Sites section has been taken out of the menu for the beta. You can still describe a site and see it built and previewed, but putting one online at its own address is not finished, so we would rather show nothing than a half-finished screen. It comes back when the address, the contact form and the leads it collects all work.",
+      "kind": "changed",
+      "task_codes": [],
+      "happened_at": "2026-08-13T12:37:38.406Z"
     }
   ]
 }

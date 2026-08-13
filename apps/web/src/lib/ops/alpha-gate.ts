@@ -127,7 +127,7 @@ export const ALPHA_GATE: AlphaGateRecord = {
       status: 'partial',
       revisedOn: '2026-08-13',
       evidence:
-        'Schema, RLS and apply_ledger_entry() are live and in use. The CLAUDE.md non-negotiable is "every table: workspace_id + RLS + anon-client test", and the test half is not met: packages/db/tests holds 17 table suites, and the 27 Jul audit (docs/audit/2026-07-27) counted the anon-client test on 11 of 27 tables. Narrower than it was, not closed.',
+        'Schema, RLS and apply_ledger_entry() are live and in use. The CLAUDE.md non-negotiable is "every table: workspace_id + RLS + anon-client test", and the test half is not met: the 27 Jul audit (docs/audit/2026-07-27) counted the anon-client test on 11 of 27 tables. packages/db/tests holds 17 files today, but several are cross-cutting rather than per-table (migration integrity, the live guard, the ledger key contract), so the per-table count has not been re-derived and is somewhere above 11 and below 17.',
     },
     {
       code: 'A3',
@@ -175,7 +175,7 @@ export const ALPHA_GATE: AlphaGateRecord = {
       status: 'partial',
       revisedOn: '2026-08-13',
       evidence:
-        'Grants, HOLD→DEBIT and the wallet UI are live through apply_ledger_entry. The checkout is not the one A10 names: packages/billing/src/providers holds cashfree and a fixture, and no Stripe provider exists, so "Stripe test checkout" is unbuilt rather than untested.',
+        'Grants, HOLD→DEBIT and the wallet UI are live through apply_ledger_entry. The checkout is not the one A10 names: packages/billing/src/providers holds cashfree and a fixture, and no source file anywhere reads STRIPE_SECRET_KEY or STRIPE_STARTER_PRICE_ID, though both still sit in the build env allowlist. "stripe" survives as an enum value and a type name and nothing else, so the Stripe test checkout is unbuilt rather than untested.',
     },
     {
       code: 'A11',
