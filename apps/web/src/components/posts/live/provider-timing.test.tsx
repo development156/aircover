@@ -23,16 +23,14 @@ const NOW = new Date('2026-08-11T12:00:00.000Z')
 
 const snapshot = (over: Partial<PublishSnapshot['posts'][number]> = {}): PublishSnapshot => ({
   readAt: NOW.toISOString(),
-  posts: [
-    { postId: POST_ID, status: 'draft', scheduledAt: null, mode: null, variants: [], ...over },
-  ],
+  posts: [{ postId: POST_ID, intent: 'draft', scheduledAt: null, variants: [], ...over }],
 })
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: false })
   vi.setSystemTime(NOW)
   readPublishState.mockReset()
-  readPublishState.mockResolvedValue(snapshot({ status: 'published' }))
+  readPublishState.mockResolvedValue(snapshot({ intent: 'published' }))
 })
 
 afterEach(() => {
@@ -44,7 +42,7 @@ describe('a post scheduled beyond the watch window', () => {
     // Arrange — due in ten minutes. The watch window opens five minutes from now.
     render(
       <PublishStateProvider
-        initial={snapshot({ status: 'scheduled', scheduledAt: '2026-08-11T12:10:00.000Z' })}
+        initial={snapshot({ intent: 'scheduled', scheduledAt: '2026-08-11T12:10:00.000Z' })}
       >
         <span>list</span>
       </PublishStateProvider>,
@@ -67,7 +65,7 @@ describe('a post scheduled beyond the watch window', () => {
 describe('a quiet page', () => {
   test('never polls at all when nothing is scheduled and nothing is in flight', async () => {
     render(
-      <PublishStateProvider initial={snapshot({ status: 'draft' })}>
+      <PublishStateProvider initial={snapshot({ intent: 'draft' })}>
         <span>list</span>
       </PublishStateProvider>,
     )
@@ -81,7 +79,7 @@ describe('a quiet page', () => {
 describe('LivePhaseNote', () => {
   test('says nothing while the page is quiet', async () => {
     render(
-      <PublishStateProvider initial={snapshot({ status: 'draft' })}>
+      <PublishStateProvider initial={snapshot({ intent: 'draft' })}>
         <LivePhaseNote />
       </PublishStateProvider>,
     )
@@ -96,10 +94,10 @@ describe('LivePhaseNote', () => {
     // A publish that never resolves. The watch stops at the cap by design — but
     // stopping silently would leave "Publishing" on screen with nothing behind
     // it, and a stale chip is indistinguishable from a current one.
-    readPublishState.mockResolvedValue(snapshot({ status: 'publishing' }))
+    readPublishState.mockResolvedValue(snapshot({ intent: 'publishing' }))
 
     render(
-      <PublishStateProvider initial={snapshot({ status: 'publishing' })}>
+      <PublishStateProvider initial={snapshot({ intent: 'publishing' })}>
         <LivePhaseNote />
       </PublishStateProvider>,
     )

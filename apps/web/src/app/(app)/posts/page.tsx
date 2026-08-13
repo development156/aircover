@@ -5,7 +5,8 @@ import { PageTitle } from '@/components/page-title'
 import { CreatePostButton } from '@/components/posts/create-post-button'
 import { PostCard } from '@/components/posts/post-card'
 import { listPostMetrics } from '@/lib/analytics/post-metrics'
-import { listPosts, listPublishModes, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
+import { forDisplay } from '@/lib/posts/display-post'
+import { listPosts, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
 import { assembleSnapshot } from '@/lib/posts/live-state'
 import { PublishStateProvider } from '@/components/posts/live/publish-state-provider'
 import { LivePhaseNote } from '@/components/posts/live/live-phase-note'
@@ -21,8 +22,7 @@ export default async function PostsPage() {
   // which case every chip renders the weaker claim rather than a solid publish.
   const postIds = posts.map((post) => post.id)
   // Batched for the whole page: one query, not one per card.
-  const [modes, variantStates, connected] = await Promise.all([
-    listPublishModes(postIds),
+  const [variantStates, connected] = await Promise.all([
     listVariantStates(postIds),
     listConnectedChannels(),
   ])
@@ -48,10 +48,13 @@ export default async function PostsPage() {
       status: post.status,
       scheduledAt: post.scheduled_at,
     })),
-    modes,
     variantStates,
     now.toISOString(),
   )
+
+  // Converted at the page boundary, in the open: past this line no component can
+  // reach `post.status` at all. See `display-post.ts`.
+  const shown = posts.map(forDisplay)
 
   return (
     <div className="space-y-grid">
@@ -75,13 +78,12 @@ export default async function PostsPage() {
       ) : (
         <PublishStateProvider initial={liveSeed}>
           <ul className="space-y-grid" data-guide="posts.list">
-            {posts.map((post) => (
+            {shown.map((post) => (
               <li key={post.id}>
                 <PostCard
                   post={post}
                   now={now}
-                  mode={modes.get(post.id) ?? null}
-                  variantStates={variantStates.get(post.id)}
+                  variantStates={variantStates.get(post.id) ?? []}
                   metrics={metrics.get(post.id)}
                   autoPublish={autoPublish}
                 />

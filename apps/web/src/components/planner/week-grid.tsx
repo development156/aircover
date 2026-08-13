@@ -1,11 +1,12 @@
 import Link from 'next/link'
-import type { Post } from '@sahoda/shared'
 
 import { PlannerRow } from '@/components/planner/planner-row'
 import { AutoPublishNote } from '@/components/posts/auto-publish-note'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { AgencyBlade } from '@/components/posts/agency-blade'
-import { certaintyFor, type PostPublishMode } from '@/lib/posts/certainty'
+import { certaintyFor } from '@/lib/posts/certainty'
+import type { DisplayPost } from '@/lib/posts/display-post'
+import { outcomeOf } from '@/lib/posts/publish-evidence'
 import { formatScheduledTime } from '@/lib/posts/schedule-format'
 import type { WeekBuckets } from '@/lib/planner/week'
 import { cn } from '@/lib/utils'
@@ -36,19 +37,19 @@ const CELL_CERTAINTY: Record<string, string> = {
 function DayChip({
   post,
   now,
-  mode,
   autoPublish,
   variants,
 }: {
-  post: Post
+  post: DisplayPost
   now: Date
-  mode: PostPublishMode
   autoPublish: boolean
   /** Required, like the note's own prop: see `AutoPublishNote.variants`. */
   variants: readonly VariantStatusRow[]
 }) {
   const time = formatScheduledTime(post.scheduled_at)
-  const certainty = certaintyFor(post.status, mode)
+  // The cell's whole signature — solid, hairline, dash or hatch — comes from
+  // what the variant rows prove, not from the post row's stale status.
+  const certainty = certaintyFor(post.intent, outcomeOf(variants))
   return (
     <Link
       href={`/posts/${post.id}`}
@@ -72,7 +73,7 @@ function DayChip({
           screen. The cell has no room for the sentence, so it abbreviates —
           and carries the full one for screen readers. */}
       <AutoPublishNote
-        status={post.status}
+        intent={post.intent}
         scheduledAt={post.scheduled_at}
         now={now}
         variants={variants}
@@ -90,13 +91,17 @@ export interface WeekGridProps {
    * rather than claiming an auto-publish that will not happen.
    */
   autoPublish?: boolean
-  /** Per-channel publish state by post id, batched for the whole page. */
-  variantStates?: ReadonlyMap<string, readonly VariantStatusRow[]>
+  /**
+   * Per-channel publish state by post id, batched for the whole page.
+   *
+   * Required in position — it is the sole evidence behind every cell's certainty
+   * signature. A missing entry for one post is still legitimate and means
+   * unknown, which under-claims rather than denying a publish.
+   */
+  variantStates: ReadonlyMap<string, readonly VariantStatusRow[]>
   buckets: WeekBuckets
   /** One instant for the whole grid — the same one `bucketWeek` was given. */
   now: Date
-  /** post id -> what the publish logs prove. Absent means unknown, never live. */
-  modes: ReadonlyMap<string, PostPublishMode>
 }
 
 /**
@@ -104,13 +109,7 @@ export interface WeekGridProps {
  * fit the window render below it — `bucketWeek` never drops a post, and neither
  * does this component.
  */
-export function WeekGrid({
-  autoPublish = false,
-  variantStates,
-  buckets,
-  now,
-  modes,
-}: WeekGridProps) {
+export function WeekGrid({ autoPublish = false, variantStates, buckets, now }: WeekGridProps) {
   return (
     <div className="space-y-grid">
       <div className="overflow-x-auto">
@@ -134,9 +133,8 @@ export function WeekGrid({
                   key={post.id}
                   post={post}
                   now={now}
-                  mode={modes.get(post.id) ?? null}
                   autoPublish={autoPublish}
-                  variants={variantStates?.get(post.id) ?? []}
+                  variants={variantStates.get(post.id) ?? []}
                 />
               ))}
             </li>
@@ -152,9 +150,8 @@ export function WeekGrid({
               key={post.id}
               post={post}
               now={now}
-              mode={modes.get(post.id) ?? null}
               autoPublish={autoPublish}
-              variantStates={variantStates?.get(post.id)}
+              variantStates={variantStates.get(post.id) ?? []}
             />
           ))}
         </section>
@@ -168,9 +165,8 @@ export function WeekGrid({
               key={post.id}
               post={post}
               now={now}
-              mode={modes.get(post.id) ?? null}
               autoPublish={autoPublish}
-              variantStates={variantStates?.get(post.id)}
+              variantStates={variantStates.get(post.id) ?? []}
             />
           ))}
         </section>

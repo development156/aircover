@@ -39,9 +39,8 @@ const snapshot = (over: Partial<PublishSnapshot['posts'][number]> = {}): Publish
   posts: [
     {
       postId: POST_ID,
-      status: 'draft',
+      intent: 'draft',
       scheduledAt: null,
-      mode: null,
       variants: [],
       ...over,
     },
@@ -52,7 +51,7 @@ describe('LiveStatusBadge', () => {
   test('renders the server status when there is no provider above it', () => {
     // A live region is an ENHANCEMENT. Nothing on these screens may depend on it
     // to be correct, so the un-wired case must be exactly `StatusBadge`.
-    render(<LiveStatusBadge postId={POST_ID} status="scheduled" mode={null} />)
+    render(<LiveStatusBadge postId={POST_ID} intent="scheduled" variants={[]} />)
 
     expect(screen.getByText('Scheduled')).toBeInTheDocument()
   })
@@ -61,8 +60,8 @@ describe('LiveStatusBadge', () => {
     // Arrange — the page was rendered while the post was still scheduled.
     // Act
     render(
-      <PublishStateProvider initial={snapshot({ status: 'publishing' })}>
-        <LiveStatusBadge postId={POST_ID} status="scheduled" mode={null} />
+      <PublishStateProvider initial={snapshot({ intent: 'publishing' })}>
+        <LiveStatusBadge postId={POST_ID} intent="scheduled" variants={[]} />
       </PublishStateProvider>,
     )
 
@@ -71,20 +70,24 @@ describe('LiveStatusBadge', () => {
     expect(screen.queryByText('Scheduled')).not.toBeInTheDocument()
   })
 
-  test('takes status and mode from the SAME read, never one of each', () => {
+  test('takes intent and evidence from the SAME read, never one of each', () => {
     // The honesty rule that is easiest to break by accident. `certaintyFor`
-    // grants `.is-real` — "it happened" — only on a live publish log. A live
-    // status paired with a stale server mode is the one combination that can
+    // grants `.is-real` — "it happened" — only on a live outcome. A fresh intent
+    // paired with the stale SERVER rows is the one combination that can
     // manufacture a claim neither read supports.
     const { container } = render(
-      <PublishStateProvider initial={snapshot({ status: 'published', mode: null })}>
-        {/* The server prop claims a LIVE publish; the fresh read does not know. */}
-        <LiveStatusBadge postId={POST_ID} status="draft" mode="live" />
+      <PublishStateProvider initial={snapshot({ intent: 'published', variants: [] })}>
+        {/* The server prop carries a live publish; the fresh read has no rows. */}
+        <LiveStatusBadge
+          postId={POST_ID}
+          intent="draft"
+          variants={[variant({ status: 'published', permalink: 'https://example.test/p/1' })]}
+        />
       </PublishStateProvider>,
     )
 
-    // The weaker claim wins, because the mode came from the same object as the
-    // status. `.is-real` here would be an unearned "it happened".
+    // The weaker claim wins, because the evidence came from the same object as
+    // the intent. `.is-real` here would be an unearned "it happened".
     expect(screen.getByText('Published')).toBeInTheDocument()
     expect(container.querySelector('.is-real')).toBeNull()
   })
@@ -110,8 +113,7 @@ describe('LiveChannelChips', () => {
     // Arrange — the server rendered a publish that had no URL yet. The poll has
     // since seen `platformPostUrl` arrive on the variant row.
     const live = snapshot({
-      status: 'published',
-      mode: 'live',
+      intent: 'published',
       variants: [
         variant({
           status: 'published',
@@ -143,8 +145,7 @@ describe('LiveChannelChips', () => {
     // `permalink` but dropped `simulated` would look complete and would relabel
     // every simulated run as a real publish — so the row travels whole.
     const live = snapshot({
-      status: 'published',
-      mode: 'fixture',
+      intent: 'published',
       variants: [variant({ status: 'published', simulated: true, permalink: null })],
     })
 

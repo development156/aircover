@@ -5,7 +5,7 @@ import { readInstagramAnalytics } from '@/lib/analytics/account-insights'
 import { readPostCounts } from '@/lib/home/posts'
 import { readPublishSummary } from '@/lib/home/publishing'
 import { readSpend } from '@/lib/home/spend'
-import { listPosts, listPublishModes } from '@/lib/posts/read'
+import { listPosts, listVariantStates } from '@/lib/posts/read'
 import { readBalance, readLedger } from '@/lib/wallet/read'
 
 import HomePage from './page'
@@ -32,7 +32,7 @@ vi.mock('@/lib/wallet/read', () => ({
   readBalance: vi.fn(),
   readLedger: vi.fn(),
 }))
-vi.mock('@/lib/posts/read', () => ({ listPosts: vi.fn(), listPublishModes: vi.fn() }))
+vi.mock('@/lib/posts/read', () => ({ listPosts: vi.fn(), listVariantStates: vi.fn() }))
 vi.mock('@/lib/home/spend', () => ({ readSpend: vi.fn() }))
 vi.mock('@/lib/home/posts', () => ({ readPostCounts: vi.fn() }))
 vi.mock('@/lib/home/publishing', () => ({ readPublishSummary: vi.fn() }))
@@ -78,7 +78,7 @@ const EMPTY_PUBLISH = {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(listPosts).mockResolvedValue([])
-  vi.mocked(listPublishModes).mockResolvedValue(new Map())
+  vi.mocked(listVariantStates).mockResolvedValue(new Map())
   vi.mocked(readLedger).mockResolvedValue({ entries: [], skipped: 0 })
   vi.mocked(readSpend).mockResolvedValue(EMPTY_SPEND)
   vi.mocked(readPostCounts).mockResolvedValue(EMPTY_COUNTS)

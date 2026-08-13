@@ -1,5 +1,6 @@
-import type { PostStatus, VariantPublishStatus } from '@sahoda/shared'
+import type { PostStatus } from '@sahoda/shared'
 
+import { publishEvidence } from '@/lib/posts/publish-evidence'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 
 /**
@@ -110,53 +111,6 @@ export function autoPublishCopy(enabled: boolean) {
 const isValidDate = (date: Date): boolean => !Number.isNaN(date.getTime())
 
 /**
- * A channel that is still expected to go somewhere.
- *
- * `published` and `skipped` are absent for opposite reasons and the same
- * conclusion — one is done, one was never going — and neither can be waiting.
- * `publishing` IS outstanding: a claim is held right now, so "nothing was
- * published" is not merely unproven, it is being decided as we render.
- */
-const OUTSTANDING: ReadonlySet<VariantPublishStatus> = new Set<VariantPublishStatus>([
-  'pending',
-  'scheduled',
-  'publishing',
-  'failed',
-])
-
-interface PublishEvidence {
-  /** Published AND not a fixture run — the only rows that prove a platform received it. */
-  live: number
-  /** Published, but through the fixture rail: the row says published, no platform saw it. */
-  simulated: number
-  outstanding: number
-}
-
-/**
- * What the variant rows PROVE, which is the only thing this module may speak from.
- *
- * `simulated` is counted apart from `live` rather than folded into it because the
- * two support opposite sentences. `variant-status.ts` computes the flag from the
- * `fixture://` permalink before that permalink is nulled — "computed once, before
- * the id is erased, because afterwards the difference is gone" — and collapsing it
- * here would throw away the distinction that file exists to preserve.
- */
-function evidenceOf(variants: readonly VariantStatusRow[]): PublishEvidence {
-  let live = 0
-  let simulated = 0
-  let outstanding = 0
-  for (const row of variants) {
-    if (row.status === 'published') {
-      if (row.simulated) simulated += 1
-      else live += 1
-    } else if (OUTSTANDING.has(row.status)) {
-      outstanding += 1
-    }
-  }
-  return { live, simulated, outstanding }
-}
-
-/**
  * What a scheduled post looks like HERE, which is not what the name suggests.
  *
  * This gate read `status === 'scheduled'` until it was found to be dead code:
@@ -185,7 +139,8 @@ function evidenceOf(variants: readonly VariantStatusRow[]): PublishEvidence {
  * of the source and fails if this gate stops matching any of them.
  *
  * ── WHY THE VARIANT ROWS ARE AN ARGUMENT AND NOT AN OPTION ───────────────────
- * `posts.status` plus a date cannot answer "did this go out". It answered
+ * `posts.status` plus a date cannot answer "did this go out" — see
+ * `publish-evidence.ts`, which now owns that reading for every consumer. It answered
  * `overdue` — "this time has passed and nothing was published" — for four rows in
  * production whose own channel chips, two inches above, read "published". The
  * post-level status rolls up late or not at all: `65dc1a34` sat at `scheduled`
@@ -217,7 +172,7 @@ export function autoPublishTruth(
     status === 'scheduled' || (status === 'approved' && scheduledAt !== null)
   if (!promisesAutoPublish) return 'none'
 
-  const evidence = evidenceOf(variants)
+  const evidence = publishEvidence(variants)
 
   // A platform has it. Nothing below may say otherwise, whatever the clock says —
   // the time a post was due is not evidence about whether it went.

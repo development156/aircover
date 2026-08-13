@@ -14,7 +14,8 @@ import { readPostCounts } from '@/lib/home/posts'
 import { readPublishSummary } from '@/lib/home/publishing'
 import { readSpend } from '@/lib/home/spend'
 import { bucketWeek } from '@/lib/planner/week'
-import { listPosts, listPublishModes } from '@/lib/posts/read'
+import { forDisplay } from '@/lib/posts/display-post'
+import { listPosts, listVariantStates } from '@/lib/posts/read'
 import { HISTORY_LIMIT, readBalance, readLedger } from '@/lib/wallet/read'
 
 export const metadata = { title: 'Home' }
@@ -66,11 +67,16 @@ export default async function HomePage() {
   // dashboard is replaced rather than rendered empty. See FirstRun for why.
   if (balance.status === 'no-workspace') return <FirstRun now={now} />
 
-  // Publish modes decide `.is-real` on the strip. Fails safe to an empty map, in
-  // which case a published post renders committed rather than claiming it went
-  // out live.
-  const modes = await listPublishModes(posts.map((post) => post.id))
-  const buckets = bucketWeek(posts, now)
+  // The evidence behind `.is-real` on the strip. This page read publish-log
+  // MODES here and never the variant rows, so a post that had genuinely gone out
+  // could not render as real on Home at all — `posts.status` stays `approved`
+  // through a publish. One batched query for the week, and it fails safe to an
+  // empty map, in which case every entry under-claims rather than denying a
+  // publish nobody read.
+  const variantStates = await listVariantStates(posts.map((post) => post.id))
+  // Converted at the page boundary, in the open: past this line no component can
+  // reach `post.status` at all. See `display-post.ts`.
+  const buckets = bucketWeek(posts.map(forDisplay), now)
 
   const weekIds = new Set(buckets.days.flatMap((day) => day.posts.map((post) => post.id)))
   const draftedThisWeek = posts.filter(
@@ -86,7 +92,7 @@ export default async function HomePage() {
       </header>
 
       {/* 2 — The week. Full width, the hero, readable without reading. */}
-      <WeekStrip buckets={buckets} modes={modes} />
+      <WeekStrip buckets={buckets} variantStates={variantStates} />
 
       {/* 3 — Asymmetric split: the chart gets the room, the rail gets the money.
               Collapses to one column below the wide breakpoint. */}

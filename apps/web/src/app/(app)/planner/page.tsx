@@ -7,7 +7,8 @@ import { PlannerRow } from '@/components/planner/planner-row'
 import { ViewToggle, type PlannerView } from '@/components/planner/view-toggle'
 import { WeekGrid } from '@/components/planner/week-grid'
 import { bucketWeek } from '@/lib/planner/week'
-import { listPosts, listPublishModes, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
+import { forDisplay } from '@/lib/posts/display-post'
+import { listPosts, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
 import { assembleSnapshot } from '@/lib/posts/live-state'
 import { PublishStateProvider } from '@/components/posts/live/publish-state-provider'
 import { LivePhaseNote } from '@/components/posts/live/live-phase-note'
@@ -35,8 +36,7 @@ export default async function PlannerPage({
   // which case every chip renders the weaker claim rather than a solid publish.
   const postIds = posts.map((post) => post.id)
   // Batched for the whole week: one query, not one per row.
-  const [modes, variantStates, connected] = await Promise.all([
-    listPublishModes(postIds),
+  const [variantStates, connected] = await Promise.all([
     listVariantStates(postIds),
     listConnectedChannels(),
   ])
@@ -55,10 +55,13 @@ export default async function PlannerPage({
       status: post.status,
       scheduledAt: post.scheduled_at,
     })),
-    modes,
     variantStates,
     now.toISOString(),
   )
+
+  // Converted at the page boundary, in the open: past this line no component can
+  // reach `post.status` at all. See `display-post.ts`.
+  const shown = posts.map(forDisplay)
 
   return (
     <PublishStateProvider initial={liveSeed}>
@@ -81,15 +84,14 @@ export default async function PlannerPage({
           />
         ) : view === 'week' ? (
           <WeekGrid
-            buckets={bucketWeek(posts, now)}
+            buckets={bucketWeek(shown, now)}
             now={now}
-            modes={modes}
             variantStates={variantStates}
             autoPublish={autoPublish}
           />
         ) : (
           <ul className="space-y-2" data-guide="planner.list">
-            {posts.map((post) => (
+            {shown.map((post) => (
               <li key={post.id}>
                 {/* `autoPublish` was computed here and never passed, so every row
                   defaulted to false and read "Won't post itself — scheduled
@@ -100,10 +102,9 @@ export default async function PlannerPage({
                 <PlannerRow
                   post={post}
                   now={now}
-                  mode={modes.get(post.id) ?? null}
                   connected={connected}
                   autoPublish={autoPublish}
-                  variantStates={variantStates.get(post.id)}
+                  variantStates={variantStates.get(post.id) ?? []}
                 />
               </li>
             ))}

@@ -1,6 +1,7 @@
 import type { PostStatus } from '@sahoda/shared'
 
-import { certaintyFor, type CertaintyLevel, type PostPublishMode } from '@/lib/posts/certainty'
+import { certaintyFor, type CertaintyLevel } from '@/lib/posts/certainty'
+import type { PostOutcome } from '@/lib/posts/publish-evidence'
 import { cn } from '@/lib/utils'
 
 /**
@@ -56,25 +57,66 @@ const CERTAINTY_CLASS: Record<CertaintyLevel, string> = {
   neutral: 'border border-line bg-transparent text-muted',
 }
 
+/**
+ * The status this chip may SAY, which is not always the one on the post row.
+ *
+ * ── WHY THE WORD ITSELF HAD TO MOVE ──────────────────────────────────────────
+ * Changing only the certainty signature would have left the chip reading
+ * "Approved" in a solid `.is-real` fill — a post the badge admits is live, under
+ * a word that says nobody has sent it. `posts.status` is stale by design here:
+ * the publish path writes `post_variants` and never touches the post row, so for
+ * every post that actually went out, the column's word is the wrong one.
+ *
+ * The evidence outranks it. Where the variant rows say nothing — `none` (rows
+ * exist, nothing sent) or `unknown` (nothing read) — intent is all there is, and
+ * it is used unchanged.
+ *
+ * `simulated` deliberately maps to `published`: the channels ARE marked
+ * published and denying that would contradict the chips beside it. The
+ * simulation is named by the certainty label, which `.is-simulated` requires to
+ * be visible text.
+ */
+export function displayStatus(intent: PostStatus, outcome: PostOutcome): PostStatus {
+  switch (outcome) {
+    case 'live':
+    case 'simulated':
+      return 'published'
+    case 'partial':
+      return 'partial'
+    case 'failed':
+      return 'failed'
+    case 'none':
+    case 'unknown':
+      return intent
+  }
+}
+
 export interface StatusBadgeProps {
-  status: PostStatus
   /**
-   * What the publish logs prove. REQUIRED — not optional — so a call site cannot
-   * forget it and silently get the wrong certainty. Pass `null` when unknown;
-   * `certaintyFor` then renders the weaker claim.
+   * What the user committed to — `posts.status`, under the name that says what
+   * it actually is. NOT evidence that anything was published.
    */
-  mode: PostPublishMode
+  intent: PostStatus
+  /**
+   * What the variant rows PROVE (`outcomeOf`). REQUIRED — not optional — so a
+   * call site cannot forget it and silently get the wrong claim. Pass the rows
+   * through `outcomeOf([])` for "no rows"; that reports `unknown`, and the chip
+   * falls back to intent rather than claiming anything.
+   */
+  outcome: PostOutcome
   className?: string
 }
 
-export function StatusBadge({ status, mode, className }: StatusBadgeProps) {
-  const style = STATUS_STYLES[status]
-  const certainty = certaintyFor(status, mode)
+export function StatusBadge({ intent, outcome, className }: StatusBadgeProps) {
+  const shown = displayStatus(intent, outcome)
+  const style = STATUS_STYLES[shown]
+  const certainty = certaintyFor(intent, outcome)
 
   return (
     <span
       data-testid="status-chip"
-      data-status={status}
+      data-status={shown}
+      data-intent={intent}
       data-certainty={certainty.level}
       className={cn(
         'inline-flex shrink-0 items-center gap-1.5 rounded-pill px-2.5 py-[3px] text-[12px] leading-[18px] font-semibold',

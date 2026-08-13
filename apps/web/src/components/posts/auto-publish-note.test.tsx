@@ -7,6 +7,7 @@ import { PostCard } from '@/components/posts/post-card'
 import { PlannerRow } from '@/components/planner/planner-row'
 import { WeekGrid } from '@/components/planner/week-grid'
 import { bucketWeek } from '@/lib/planner/week'
+import { forDisplay, type DisplayPost } from '@/lib/posts/display-post'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { toChannelSet } from '@sahoda/shared'
 
@@ -38,20 +39,21 @@ const NOW = new Date('2026-07-25T12:00:00.000Z')
 const PAST = '2026-07-24T12:00:00.000Z'
 const FUTURE = '2026-07-26T12:00:00.000Z'
 
-const post = (overrides: Partial<Post> = {}): Post => ({
-  id: '11111111-1111-4111-8111-111111111111',
-  workspace_id: '22222222-2222-4222-8222-222222222222',
-  title: 'Diwali teaser',
-  body: 'Lights on.',
-  status: 'scheduled',
-  channels: toChannelSet(['x']),
-  scheduled_at: FUTURE,
-  origin: 'manual',
-  created_by: 'user_1',
-  created_at: '2026-07-20T10:00:00.000Z',
-  updated_at: '2026-07-20T10:00:00.000Z',
-  ...overrides,
-})
+const post = (overrides: Partial<Post> = {}): DisplayPost =>
+  forDisplay({
+    id: '11111111-1111-4111-8111-111111111111',
+    workspace_id: '22222222-2222-4222-8222-222222222222',
+    title: 'Diwali teaser',
+    body: 'Lights on.',
+    status: 'scheduled',
+    channels: toChannelSet(['x']),
+    scheduled_at: FUTURE,
+    origin: 'manual',
+    created_by: 'user_1',
+    created_at: '2026-07-20T10:00:00.000Z',
+    updated_at: '2026-07-20T10:00:00.000Z',
+    ...overrides,
+  })
 
 function row(
   channel: Channel,
@@ -83,20 +85,20 @@ const COPY_IT_ACROSS = /copy it across/i
 
 describe('AutoPublishNote', () => {
   test('says a scheduled post will not post itself', () => {
-    render(<AutoPublishNote status="scheduled" scheduledAt={FUTURE} now={NOW} variants={WAITING} />)
+    render(<AutoPublishNote intent="scheduled" scheduledAt={FUTURE} now={NOW} variants={WAITING} />)
 
     expect(screen.getByText(NOT_LIVE)).toBeInTheDocument()
   })
 
   test('says outright that a past-due one did not publish', () => {
-    render(<AutoPublishNote status="scheduled" scheduledAt={PAST} now={NOW} variants={WAITING} />)
+    render(<AutoPublishNote intent="scheduled" scheduledAt={PAST} now={NOW} variants={WAITING} />)
 
     expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
   })
 
   test('stays silent on a post that promises nothing', () => {
     const { container } = render(
-      <AutoPublishNote status="draft" scheduledAt={PAST} now={NOW} variants={WAITING} />,
+      <AutoPublishNote intent="draft" scheduledAt={PAST} now={NOW} variants={WAITING} />,
     )
 
     expect(container).toBeEmptyDOMElement()
@@ -107,7 +109,7 @@ describe('AutoPublishNote', () => {
     // posted"; anyone on a screen reader must not get LESS of the truth.
     render(
       <AutoPublishNote
-        status="scheduled"
+        intent="scheduled"
         scheduledAt={PAST}
         now={NOW}
         variants={WAITING}
@@ -120,7 +122,7 @@ describe('AutoPublishNote', () => {
 
   test('says nothing at all over a post that is fully out', () => {
     const { container } = render(
-      <AutoPublishNote status="scheduled" scheduledAt={PAST} now={NOW} variants={PUBLISHED} />,
+      <AutoPublishNote intent="scheduled" scheduledAt={PAST} now={NOW} variants={PUBLISHED} />,
     )
 
     expect(container).toBeEmptyDOMElement()
@@ -131,7 +133,7 @@ describe('AutoPublishNote', () => {
     // channels were already done, told to publish itself again.
     render(
       <AutoPublishNote
-        status="scheduled"
+        intent="scheduled"
         scheduledAt={PAST}
         now={NOW}
         variants={[row('instagram', 'published'), row('linkedin', 'pending')]}
@@ -146,7 +148,7 @@ describe('AutoPublishNote', () => {
   test('names the simulation when every publish ran on the fixture rail', () => {
     render(
       <AutoPublishNote
-        status="scheduled"
+        intent="scheduled"
         scheduledAt={PAST}
         now={NOW}
         variants={[
@@ -162,20 +164,13 @@ describe('AutoPublishNote', () => {
 
 describe('the posts list', () => {
   test('labels a past-due scheduled post', () => {
-    render(
-      <PostCard
-        post={post({ scheduled_at: PAST })}
-        now={NOW}
-        mode={null}
-        variantStates={WAITING}
-      />,
-    )
+    render(<PostCard post={post({ scheduled_at: PAST })} now={NOW} variantStates={WAITING} />)
 
     expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
   })
 
   test('labels an upcoming scheduled post too', () => {
-    render(<PostCard post={post()} now={NOW} mode={null} variantStates={WAITING} />)
+    render(<PostCard post={post()} now={NOW} variantStates={WAITING} />)
 
     expect(screen.getByText(NOT_LIVE)).toBeInTheDocument()
   })
@@ -185,7 +180,6 @@ describe('the posts list', () => {
       <PostCard
         post={post({ status: 'draft', scheduled_at: PAST })}
         now={NOW}
-        mode={null}
         variantStates={WAITING}
       />,
     )
@@ -197,14 +191,7 @@ describe('the posts list', () => {
     // Pins the WIRING, not the rule. The card holds the rows already; dropping
     // the prop on the way to the note is a one-line regression that no test of
     // `autoPublishTruth` alone would ever see.
-    render(
-      <PostCard
-        post={post({ scheduled_at: PAST })}
-        now={NOW}
-        mode={null}
-        variantStates={PUBLISHED}
-      />,
-    )
+    render(<PostCard post={post({ scheduled_at: PAST })} now={NOW} variantStates={PUBLISHED} />)
 
     expect(screen.queryByText(NOTHING_PUBLISHED)).not.toBeInTheDocument()
     expect(screen.queryByText(COPY_IT_ACROSS)).not.toBeInTheDocument()
@@ -213,14 +200,7 @@ describe('the posts list', () => {
 
 describe('the planner list', () => {
   test('labels a past-due scheduled post', () => {
-    render(
-      <PlannerRow
-        post={post({ scheduled_at: PAST })}
-        now={NOW}
-        mode={null}
-        variantStates={WAITING}
-      />,
-    )
+    render(<PlannerRow post={post({ scheduled_at: PAST })} now={NOW} variantStates={WAITING} />)
 
     expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
   })
@@ -230,7 +210,6 @@ describe('the planner list', () => {
       <PlannerRow
         post={post({ status: 'draft', scheduled_at: PAST })}
         now={NOW}
-        mode={null}
         variantStates={WAITING}
       />,
     )
@@ -239,14 +218,7 @@ describe('the planner list', () => {
   })
 
   test('passes the variant rows down, so a published post is not told to publish', () => {
-    render(
-      <PlannerRow
-        post={post({ scheduled_at: PAST })}
-        now={NOW}
-        mode={null}
-        variantStates={PUBLISHED}
-      />,
-    )
+    render(<PlannerRow post={post({ scheduled_at: PAST })} now={NOW} variantStates={PUBLISHED} />)
 
     expect(screen.queryByText(NOTHING_PUBLISHED)).not.toBeInTheDocument()
   })
@@ -264,9 +236,7 @@ describe('the planner week grid', () => {
   test('marks a past-due scheduled post inside its day cell', () => {
     const buckets = bucketWeek([post({ scheduled_at: EARLIER_TODAY })], NOW)
 
-    render(
-      <WeekGrid buckets={buckets} now={NOW} modes={new Map()} variantStates={statesFor(WAITING)} />,
-    )
+    render(<WeekGrid buckets={buckets} now={NOW} variantStates={statesFor(WAITING)} />)
 
     expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
   })
@@ -276,9 +246,7 @@ describe('the planner week grid', () => {
     // was due last month is the most misleading one on the screen.
     const buckets = bucketWeek([post({ scheduled_at: LAST_MONTH })], NOW)
 
-    render(
-      <WeekGrid buckets={buckets} now={NOW} modes={new Map()} variantStates={statesFor(WAITING)} />,
-    )
+    render(<WeekGrid buckets={buckets} now={NOW} variantStates={statesFor(WAITING)} />)
 
     expect(screen.getByText(NOTHING_PUBLISHED)).toBeInTheDocument()
   })
@@ -289,14 +257,7 @@ describe('the planner week grid', () => {
     // disprove. This is the assertion that was missing.
     const buckets = bucketWeek([post({ scheduled_at: EARLIER_TODAY })], NOW)
 
-    render(
-      <WeekGrid
-        buckets={buckets}
-        now={NOW}
-        modes={new Map()}
-        variantStates={statesFor(PUBLISHED)}
-      />,
-    )
+    render(<WeekGrid buckets={buckets} now={NOW} variantStates={statesFor(PUBLISHED)} />)
 
     expect(screen.queryByText(NOTHING_PUBLISHED)).not.toBeInTheDocument()
   })

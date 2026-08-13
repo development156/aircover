@@ -158,15 +158,3 @@ export function selectStatusRows(
     .map((channel) => byChannel.get(channel))
     .filter((row): row is VariantStatusRow => row !== undefined)
 }
-
-/**
- * Whether this post is partly out — live somewhere, definitively not somewhere else.
- *
- * Mirrors the dispatcher's own reading so the badge and the sweep agree. `skipped`
- * counts as neither: the post went out everywhere it was meant to.
- */
-export function isPartial(rows: readonly VariantStatusRow[]): boolean {
-  const published = rows.filter((r) => r.status === 'published').length
-  const failed = rows.filter((r) => r.status === 'failed').length
-  return published > 0 && failed > 0
-}

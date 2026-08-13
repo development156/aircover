@@ -5,7 +5,7 @@ import { PostMetricsPanel } from '@/components/posts/post-metrics-panel'
 import { readPostMetrics } from '@/lib/analytics/post-metrics'
 import { variantStatusRows } from '@/lib/posts/variant-status'
 import { signMediaPreviews } from '@/lib/posts/media-url'
-import { getPost, listMedia, listPublishModes, listVariants } from '@/lib/posts/read'
+import { getPost, listMedia, listVariants } from '@/lib/posts/read'
 import { assembleSnapshot } from '@/lib/posts/live-state'
 import { PublishStateProvider } from '@/components/posts/live/publish-state-provider'
 import { LivePhaseNote } from '@/components/posts/live/live-phase-note'
@@ -26,17 +26,12 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   const post = await getPost(id)
   if (!post) notFound()
 
-  const [variants, media, connected, modes] = await Promise.all([
+  const [variants, media, connected] = await Promise.all([
     listVariants(post.id),
     listMedia(post.id),
     // Read here so the composer can say "not connected" while the post is being
     // written, instead of at the moment Publish fails with the work already done.
     listConnectedChannels(),
-    // Only so the live seed and the polled updates that follow it agree. The
-    // editor renders no certainty chip of its own today; seeding `mode` as null
-    // and then having the first poll fill it in would be a difference with no
-    // cause, which is the kind of thing that gets debugged twice.
-    listPublishModes([post.id]),
   ])
 
   // Seeded from the rows this render already holds. `variantStatusRow` is the
@@ -45,7 +40,6 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   // `fixture://` permalink before that permalink is nulled.
   const liveSeed = assembleSnapshot(
     [{ id: post.id, status: post.status, scheduledAt: post.scheduled_at }],
-    modes,
     new Map([[post.id, variants.map(variantStatusRow)]]),
     new Date().toISOString(),
   )

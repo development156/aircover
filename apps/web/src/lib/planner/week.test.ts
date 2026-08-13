@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import type { Post } from '@sahoda/shared'
 
 import { bucketWeek } from './week'
+import { forDisplay, type DisplayPost } from '@/lib/posts/display-post'
 import { toChannelSet } from '@sahoda/shared'
 
 /**
@@ -12,8 +13,10 @@ import { toChannelSet } from '@sahoda/shared'
 
 const NOW = new Date('2026-07-20T06:00:00.000Z') // 11:30 IST, Mon 20 Jul
 
-function post(overrides: Partial<Post>): Post {
-  return {
+// Through `forDisplay`, like every real call site: the buckets carry what the
+// RENDERING layer sees, which no longer includes `status`.
+function post(overrides: Partial<Post>): DisplayPost {
+  return forDisplay({
     id: '11111111-1111-4111-8111-111111111111',
     workspace_id: '22222222-2222-4222-8222-222222222222',
     title: 'T',
@@ -26,7 +29,7 @@ function post(overrides: Partial<Post>): Post {
     created_at: '2026-07-20T00:00:00.000Z',
     updated_at: '2026-07-20T00:00:00.000Z',
     ...overrides,
-  }
+  })
 }
 
 describe('bucketWeek', () => {

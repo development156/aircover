@@ -1,4 +1,4 @@
-import type { Post } from '@sahoda/shared'
+import type { DisplayPost } from '@/lib/posts/display-post'
 
 /**
  * Buckets are keyed by IST calendar day because that is the zone the UI
@@ -23,15 +23,15 @@ export interface DayBucket {
    * agree; IST has no DST, so +24h advances the IST day exactly once.
    */
   date: Date
-  posts: Post[]
+  posts: DisplayPost[]
 }
 
 export interface WeekBuckets {
   days: DayBucket[]
   /** No timestamp, or one that does not parse. */
-  unscheduled: Post[]
+  unscheduled: DisplayPost[]
   /** Parseable but before today or past the window — shown, never dropped. */
-  outside: Post[]
+  outside: DisplayPost[]
 }
 
 function istKeyOf(at: Date): string {
@@ -39,7 +39,7 @@ function istKeyOf(at: Date): string {
 }
 
 /** Rolling window of `dayCount` IST days starting today, plus honest overflow buckets. */
-export function bucketWeek(posts: Post[], now: Date, dayCount = 7): WeekBuckets {
+export function bucketWeek(posts: DisplayPost[], now: Date, dayCount = 7): WeekBuckets {
   const days: DayBucket[] = []
   const byKey = new Map<string, DayBucket>()
   for (let i = 0; i < dayCount; i++) {
@@ -49,8 +49,8 @@ export function bucketWeek(posts: Post[], now: Date, dayCount = 7): WeekBuckets 
     byKey.set(bucket.key, bucket)
   }
 
-  const unscheduled: Post[] = []
-  const outside: Post[] = []
+  const unscheduled: DisplayPost[] = []
+  const outside: DisplayPost[] = []
   for (const post of posts) {
     if (!post.scheduled_at) {
       unscheduled.push(post)

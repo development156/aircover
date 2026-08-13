@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { CalendarClock } from 'lucide-react'
-import type { Channel, Post } from '@sahoda/shared'
+import type { Channel } from '@sahoda/shared'
 
 import { ApproveButton } from '@/components/planner/approve-button'
 import { PlannerReschedule } from '@/components/planner/planner-reschedule'
@@ -9,7 +9,7 @@ import { LiveChannelChips } from '@/components/posts/live/live-channel-chips'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import { AgencyBlade } from '@/components/posts/agency-blade'
 import { LiveStatusBadge } from '@/components/posts/live/live-status-badge'
-import type { PostPublishMode } from '@/lib/posts/certainty'
+import type { DisplayPost } from '@/lib/posts/display-post'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
 import { cn } from '@/lib/utils'
 
@@ -20,16 +20,15 @@ export interface PlannerRowProps {
    * rather than claiming an auto-publish that will not happen.
    */
   autoPublish?: boolean
-  /** Per-channel publish state, batched for the whole page by listVariantStates. */
-  variantStates?: readonly VariantStatusRow[]
-  post: Post
+  /**
+   * Per-channel publish state, batched for the whole page by `listVariantStates`.
+   * Required in position — it is the sole evidence behind the status chip. See
+   * `PostCardProps.variantStates` for why it stopped being optional.
+   */
+  variantStates: readonly VariantStatusRow[]
+  post: DisplayPost
   /** One instant for the whole list, read on the server. See `AutoPublishNote`. */
   now: Date
-  /**
-   * What the publish logs prove about this post. Required, and `null` when
-   * unknown — the chip then renders the weaker claim rather than "it happened".
-   */
-  mode: PostPublishMode
   /** Channels with a live connection. Passed through to the reschedule control. */
   connected?: ReadonlySet<Channel>
 }
@@ -44,7 +43,6 @@ export function PlannerRow({
   variantStates,
   post,
   now,
-  mode,
   connected,
 }: PlannerRowProps) {
   const title = post.title?.trim()
@@ -68,12 +66,12 @@ export function PlannerRow({
           >
             {title || 'Untitled post'}
           </Link>
-          <LiveStatusBadge postId={post.id} status={post.status} mode={mode} />
+          <LiveStatusBadge postId={post.id} intent={post.intent} variants={variantStates} />
           {channels.length > 0 ? (
             <LiveChannelChips
               postId={post.id}
               channels={channels}
-              initialRows={variantStates ?? []}
+              initialRows={variantStates}
               className="flex flex-wrap items-center gap-1.5 text-[12.5px]"
             />
           ) : null}
@@ -88,7 +86,9 @@ export function PlannerRow({
         </div>
 
         <div className="flex items-start gap-2">
-          <ApproveButton postId={post.id} status={post.status} />
+          {/* Intent, legitimately: approving is a decision about the post, not a
+              claim about what it did. */}
+          <ApproveButton postId={post.id} status={post.intent} />
           <PlannerReschedule
             postId={post.id}
             channels={post.channels}
@@ -102,10 +102,10 @@ export function PlannerRow({
       {/* Full width under the row: this qualifies the badge and the time above
           it, and must not compete with them for space on a narrow screen. */}
       <AutoPublishNote
-        status={post.status}
+        intent={post.intent}
         scheduledAt={post.scheduled_at}
         now={now}
-        variants={variantStates ?? []}
+        variants={variantStates}
         autoPublish={autoPublish}
         className="mt-2"
       />

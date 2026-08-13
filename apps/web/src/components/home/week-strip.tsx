@@ -1,8 +1,10 @@
 import Link from 'next/link'
-import type { Post } from '@sahoda/shared'
 
 import { AgencyBlade } from '@/components/posts/agency-blade'
-import { certaintyFor, type PostPublishMode } from '@/lib/posts/certainty'
+import { certaintyFor } from '@/lib/posts/certainty'
+import type { DisplayPost } from '@/lib/posts/display-post'
+import { outcomeOf } from '@/lib/posts/publish-evidence'
+import type { VariantStatusRow } from '@/lib/posts/variant-status'
 import type { WeekBuckets } from '@/lib/planner/week'
 import { cn } from '@/lib/utils'
 
@@ -14,11 +16,15 @@ import { cn } from '@/lib/utils'
  * hatch), so the shape of the week is legible before any word is, and stays
  * legible under a tenant's Brand Skin, in greyscale, and to a colourblind user.
  *
- * Expect mostly COMMITTED and PROPOSED. `.is-real` needs a live publish log and
- * most workspaces have none; a published post without one renders committed,
- * which under-claims rather than lying. That contrast — a few firm things among
- * many dashed ones — is the honest picture of a week that is mostly planned and
- * partly done, and it is what the strip is for.
+ * Expect mostly COMMITTED and PROPOSED. `.is-real` needs a channel that is live
+ * on a real platform; a post with none renders committed, which under-claims
+ * rather than lying. That contrast — a few firm things among many dashed ones —
+ * is the honest picture of a week that is mostly planned and partly done, and it
+ * is what the strip is for.
+ *
+ * This strip read `posts.status` through `certaintyFor` and had no variant data
+ * at all, so a post that genuinely went out could never show as real here. Home
+ * now reads the rows and passes them down — see `publish-evidence.ts`.
  *
  * PHONE TREATMENT, not a squeeze. Seven columns at 375px would be 40px wide and
  * unreadable, so below the narrow breakpoint the strip becomes a vertical list:
@@ -41,8 +47,8 @@ const CERTAINTY_CLASS: Record<string, string> = {
   neutral: 'border border-line bg-transparent text-muted',
 }
 
-function Entry({ post, mode }: { post: Post; mode: PostPublishMode }) {
-  const certainty = certaintyFor(post.status, mode)
+function Entry({ post, variants }: { post: DisplayPost; variants: readonly VariantStatusRow[] }) {
+  const certainty = certaintyFor(post.intent, outcomeOf(variants))
 
   return (
     <Link
@@ -65,11 +71,15 @@ function Entry({ post, mode }: { post: Post; mode: PostPublishMode }) {
 
 export interface WeekStripProps {
   buckets: WeekBuckets
-  /** post id → what the publish logs prove. Absent means unknown, never live. */
-  modes: ReadonlyMap<string, PostPublishMode>
+  /**
+   * post id → per-channel publish state. Required in position; an ABSENT entry
+   * for one post means unknown, which under-claims rather than denying a
+   * publish nobody read.
+   */
+  variantStates: ReadonlyMap<string, readonly VariantStatusRow[]>
 }
 
-export function WeekStrip({ buckets, modes }: WeekStripProps) {
+export function WeekStrip({ buckets, variantStates }: WeekStripProps) {
   const total = buckets.days.reduce((sum, day) => sum + day.posts.length, 0)
 
   return (
@@ -103,7 +113,7 @@ export function WeekStrip({ buckets, modes }: WeekStripProps) {
                 <span className="sr-only">Nothing planned</span>
               ) : (
                 day.posts.map((post) => (
-                  <Entry key={post.id} post={post} mode={modes.get(post.id) ?? null} />
+                  <Entry key={post.id} post={post} variants={variantStates.get(post.id) ?? []} />
                 ))
               )}
             </div>

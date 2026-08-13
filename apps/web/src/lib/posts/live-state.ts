@@ -1,6 +1,5 @@
 import type { PostStatus } from '@sahoda/shared'
 
-import type { PostPublishMode } from '@/lib/posts/certainty'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 
 /**
@@ -37,29 +36,31 @@ import type { VariantStatusRow } from '@/lib/posts/variant-status'
 /** One post's server-owned publish state. */
 export interface PostLiveState {
   postId: string
-  status: PostStatus
+  /**
+   * `posts.status` — what the user COMMITTED to, under the name that says so.
+   *
+   * Never evidence that anything published. The publish path writes
+   * `post_variants` and leaves this column alone, so on a post that actually
+   * went out this still reads `approved`. What happened is derived from
+   * `variants` below, via `outcomeOf`.
+   */
+  intent: PostStatus
   /** ISO-8601, or null when the post carries no schedule. */
   scheduledAt: string | null
   /**
-   * What `post_publish_logs` proves. `null` is UNKNOWN and is a first-class
-   * value, not a failure — `certaintyFor` renders the weaker claim on it.
-   *
-   * Carried in the payload rather than left to the server render because a poll
-   * that refreshed statuses and NOT modes would flip a post to `published` while
-   * its mode stayed at whatever the page loaded with. On a post that published
-   * after the page opened, that is `null` forever: a permanently degraded claim
-   * on a post that really did go out.
-   */
-  mode: PostPublishMode
-  /**
-   * Per-channel outcome, EXACTLY as `variantStatusRow` built it.
+   * Per-channel outcome, EXACTLY as `variantStatusRow` built it — and the ONLY
+   * evidence in this payload about what the post did.
    *
    * Not reshaped, not slimmed. `simulated` is computed there from the
    * `fixture://` permalink and then the permalink is nulled — "afterwards the
-   * difference is gone" (`variant-status.ts:74-76`). Any hand-rolled wire shape
+   * difference is gone" (`variant-status.ts:90-92`). Any hand-rolled wire shape
    * that carried `permalink` and `status` but dropped `simulated` would relabel
    * every fixture run as a real publish, which is the exact claim the whole rail
    * exists to refuse.
+   *
+   * This payload also carried `mode`, read from `post_publish_logs`, until that
+   * turned out to be a SECOND derivation of the same fact off a different table.
+   * These rows are what the publish path writes, so they are what is left.
    */
   variants: VariantStatusRow[]
 }
@@ -109,7 +110,7 @@ export const TICK_LEAD_MS = 5 * 60 * 1000
  */
 export const WATCH_CAP_MS = 12 * 60 * 1000
 
-/** Post statuses from which the server can still move the post on its own. */
+/** Intents from which the server can still move the post on its own. */
 const IN_FLIGHT_STATUSES: ReadonlySet<PostStatus> = new Set<PostStatus>(['publishing'])
 
 /** Variant statuses that mean a publisher currently holds this channel. */
@@ -118,7 +119,7 @@ const IN_FLIGHT_VARIANTS: ReadonlySet<VariantStatusRow['status']> = new Set(['pu
 /** True when a publisher is working on this post right now. */
 export function isInFlight(post: PostLiveState): boolean {
   return (
-    IN_FLIGHT_STATUSES.has(post.status) ||
+    IN_FLIGHT_STATUSES.has(post.intent) ||
     post.variants.some((variant) => IN_FLIGHT_VARIANTS.has(variant.status))
   )
 }
@@ -129,7 +130,7 @@ export function isInFlight(post: PostLiveState): boolean {
  * start a poll on a row nothing is going to touch.
  */
 export function isDueSoon(post: PostLiveState, now: Date): boolean {
-  if (post.status !== 'scheduled') return false
+  if (post.intent !== 'scheduled') return false
   if (post.scheduledAt === null) return false
   const at = Date.parse(post.scheduledAt)
   if (Number.isNaN(at)) return false
@@ -213,7 +214,7 @@ export const MAX_WAKE_MS = 5 * 60 * 1000
  */
 export function msUntilNextWatch(posts: readonly PostLiveState[], now: Date): number | null {
   const waits = posts
-    .filter((post) => post.status === 'scheduled' && post.scheduledAt !== null)
+    .filter((post) => post.intent === 'scheduled' && post.scheduledAt !== null)
     .map((post) => Date.parse(post.scheduledAt as string))
     .filter((at) => !Number.isNaN(at))
     // The moment it enters the watch window, not the moment it fires: the sweep
@@ -256,7 +257,6 @@ export interface LifecycleFacts {
  */
 export function assembleSnapshot(
   lifecycles: readonly LifecycleFacts[],
-  modes: ReadonlyMap<string, PostPublishMode>,
   variants: ReadonlyMap<string, VariantStatusRow[]>,
   readAt: string,
 ): PublishSnapshot {
@@ -264,12 +264,12 @@ export function assembleSnapshot(
     readAt,
     posts: lifecycles.map((row) => ({
       postId: row.id,
-      status: row.status,
+      intent: row.status,
       scheduledAt: row.scheduledAt,
-      // `?? null` is load-bearing: absent means the log read found nothing, which
-      // is UNKNOWN. `certaintyFor` renders the weaker claim on it, and it must
-      // never collapse into a mode nobody read.
-      mode: modes.get(row.id) ?? null,
+      // `?? []` is load-bearing and means UNKNOWN, not "nothing published":
+      // `listVariantStates` returns an empty map on any read failure. `outcomeOf`
+      // reports `unknown` for it and every consumer then falls back to intent
+      // rather than claiming — or denying — a publish nobody read.
       variants: variants.get(row.id) ?? [],
     })),
   }

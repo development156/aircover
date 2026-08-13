@@ -4,6 +4,7 @@ import { PostSchema } from '@sahoda/shared'
 
 import { PostCard } from '@/components/posts/post-card'
 import { PlannerRow } from '@/components/planner/planner-row'
+import { forDisplay } from '@/lib/posts/display-post'
 
 /**
  * The channel chips on the two list surfaces, against a row that repeats a channel.
@@ -53,10 +54,10 @@ const rowWithRepeatedChannel = {
 describe('a repeated channel on a posts row', () => {
   test('renders ONE chip on the posts list, not two destinations', () => {
     // Arrange — the row goes through the real read boundary.
-    const post = PostSchema.parse(rowWithRepeatedChannel)
+    const post = forDisplay(PostSchema.parse(rowWithRepeatedChannel))
 
     // Act
-    render(<PostCard post={post} now={NOW} mode={null} />)
+    render(<PostCard post={post} now={NOW} variantStates={[]} />)
 
     // Assert — `CHANNEL_SHORT.linkedin`. Two of these is the defect: the card
     // reads as a post aimed at two separate LinkedIn destinations.
@@ -65,10 +66,10 @@ describe('a repeated channel on a posts row', () => {
 
   test('renders ONE chip on the planner row', () => {
     // Arrange
-    const post = PostSchema.parse(rowWithRepeatedChannel)
+    const post = forDisplay(PostSchema.parse(rowWithRepeatedChannel))
 
     // Act
-    render(<PlannerRow post={post} now={NOW} mode={null} />)
+    render(<PlannerRow post={post} now={NOW} variantStates={[]} />)
 
     // Assert
     expect(screen.getAllByText('LinkedIn')).toHaveLength(1)

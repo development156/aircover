@@ -34,7 +34,12 @@ const ICONS = {
 } as const
 
 export interface AutoPublishNoteProps {
-  status: PostStatus
+  /**
+   * `posts.status`, under the name that says what it is. Used ONLY for the
+   * promise gate — whether this post claims it will publish itself — never as
+   * evidence about what happened. That comes from `variants`.
+   */
+  intent: PostStatus
   scheduledAt: string | null
   now: Date
   /**
@@ -59,7 +64,7 @@ export interface AutoPublishNoteProps {
 }
 
 export function AutoPublishNote({
-  status,
+  intent,
   scheduledAt,
   now,
   variants,
@@ -67,7 +72,7 @@ export function AutoPublishNote({
   autoPublish = false,
   className,
 }: AutoPublishNoteProps) {
-  const truth = autoPublishTruth(status, scheduledAt, now, variants)
+  const truth = autoPublishTruth(intent, scheduledAt, now, variants)
   if (truth === 'none') return null
 
   const copy = autoPublishCopy(autoPublish)[truth]

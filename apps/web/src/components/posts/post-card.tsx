@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { CalendarClock } from 'lucide-react'
-import type { Post } from '@sahoda/shared'
 
 import { AgencyBlade } from '@/components/posts/agency-blade'
 import { AutoPublishNote } from '@/components/posts/auto-publish-note'
@@ -11,7 +10,7 @@ import { MetricStrip } from '@/components/posts/metric-strip'
 import { LiveStatusBadge } from '@/components/posts/live/live-status-badge'
 import type { ChannelMetrics } from '@/lib/analytics/post-metrics'
 import { Card } from '@/components/ui/card'
-import type { PostPublishMode } from '@/lib/posts/certainty'
+import type { DisplayPost } from '@/lib/posts/display-post'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
 import { cn } from '@/lib/utils'
 
@@ -40,12 +39,17 @@ export interface PostCardProps {
    * rather than claiming an auto-publish that will not happen.
    */
   autoPublish?: boolean
-  post: Post
+  post: DisplayPost
   /**
    * Per-channel publish state, batched for the whole page by `listVariantStates`.
-   * Absent is a legitimate state — a channel picked with nothing written yet.
+   *
+   * Required in position. It used to be optional, which was survivable while it
+   * only fed the auto-publish note; now it is the sole evidence behind the
+   * status chip, and a call site that forgot it would get `unknown` and quietly
+   * fall back to the stale intent word — the defect this card was changed to fix.
+   * Pass `[]` to mean "no rows".
    */
-  variantStates?: readonly VariantStatusRow[]
+  variantStates: readonly VariantStatusRow[]
   /**
    * Per-channel metrics, batched for the whole page by `listPostMetrics`.
    *
@@ -55,18 +59,12 @@ export interface PostCardProps {
   metrics?: readonly ChannelMetrics[]
   /** One instant for the whole list, read on the server. See `AutoPublishNote`. */
   now: Date
-  /**
-   * What the publish logs prove about this post. Required, and `null` when
-   * unknown — the chip then renders the weaker claim rather than "it happened".
-   */
-  mode: PostPublishMode
 }
 
 export function PostCard({
   autoPublish = false,
   post,
   now,
-  mode,
   variantStates,
   metrics,
 }: PostCardProps) {
@@ -104,9 +102,9 @@ export function PostCard({
             {displayTitle}
           </h2>
           {/* Live: a publisher can move this row while the list is open, and
-              the badge is the first place that shows. Status and mode travel
+              the badge is the first place that shows. Intent and evidence travel
               together — see `live-status-badge.tsx`. */}
-          <LiveStatusBadge postId={post.id} status={post.status} mode={mode} />
+          <LiveStatusBadge postId={post.id} intent={post.intent} variants={variantStates} />
         </div>
 
         {excerpt ? (
@@ -122,7 +120,7 @@ export function PostCard({
             <LiveChannelChips
               postId={post.id}
               channels={channels}
-              initialRows={variantStates ?? []}
+              initialRows={variantStates}
               className="flex flex-wrap items-center gap-1.5"
             />
           ) : (
@@ -140,10 +138,10 @@ export function PostCard({
         {/* Directly under the badge and the time it qualifies — the two things
             that together read as "this goes out on its own". */}
         <AutoPublishNote
-          status={post.status}
+          intent={post.intent}
           scheduledAt={post.scheduled_at}
           now={now}
-          variants={variantStates ?? []}
+          variants={variantStates}
           autoPublish={autoPublish}
           className="mt-2"
         />
