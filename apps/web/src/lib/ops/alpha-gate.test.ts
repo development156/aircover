@@ -17,10 +17,34 @@ describe('ALPHA_GATE', () => {
   })
 
   it('names only codes that exist in the seeded Alpha stage (A1–A14)', () => {
-    for (const code of ALPHA_GATE.failingCodes) {
+    for (const code of [...ALPHA_GATE.failingCodes, ...ALPHA_GATE.outOfScope.map((s) => s.code)]) {
       const n = Number(code.replace('A', ''))
       expect(n).toBeGreaterThanOrEqual(1)
       expect(n).toBeLessThanOrEqual(14)
+    }
+  })
+
+  it('records A12 Sites as a scope decision, leaving the audit untouched', () => {
+    // The point of the separate field. A12 is still in `failingCodes` because
+    // the 25 Jul audit did find it failing — editing that would make a dated
+    // transcription say something nobody transcribed. The descope is its own
+    // record, and only the RENDER subtracts one from the other.
+    expect(ALPHA_GATE.failingCodes).toContain('A12')
+    expect(ALPHA_GATE.outOfScope.map((s) => s.code)).toEqual(['A12'])
+  })
+
+  it('gives every descope its own date and a reason, never a bare code', () => {
+    // A code with no reason is indistinguishable from a code someone deleted to
+    // make the number smaller.
+    for (const entry of ALPHA_GATE.outOfScope) {
+      expect(entry.decidedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(entry.reason.length).toBeGreaterThan(20)
+    }
+  })
+
+  it('dates the descope separately from the audit it post-dates', () => {
+    for (const entry of ALPHA_GATE.outOfScope) {
+      expect(Date.parse(entry.decidedOn)).toBeGreaterThan(Date.parse(ALPHA_GATE.recordedOn))
     }
   })
 })

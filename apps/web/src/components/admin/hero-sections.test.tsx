@@ -39,11 +39,19 @@ describe('the Alpha warning is demoted but never softened', () => {
     // The count sits in its own span for tabular-nums, so the sentence spans
     // several nodes — assert on the rendered text, not on one node.
     expect(screen.getByText(/Alpha gate:/).textContent).toMatch(
-      /Alpha gate:\s*6 of 14\s*failing, audited 25 Jul, not re-run since/,
+      /Alpha gate:\s*5 of 14\s*failing · 1\s*out of scope, audited 25 Jul, not re-run since/,
     )
   })
 
-  it('keeps the failing items out of sight until asked, then names all six', async () => {
+  it('states the descope on the face, so the count never shrinks in silence', () => {
+    // Six were audited as failing; five are counted. The one-item difference is
+    // the whole risk of this feature, so it is on the collapsed chip — a reader
+    // who never clicks must still learn the number was reduced and by how much.
+    render(<AlphaChip items={alphaItems()} today={TODAY} />)
+    expect(screen.getByText(/Alpha gate:/).textContent).toMatch(/out of scope/)
+  })
+
+  it('keeps the failing items out of sight until asked, then names all five', async () => {
     render(<AlphaChip items={alphaItems()} today={TODAY} />)
 
     const details = screen.getByText(/Alpha gate:/).closest('details')!
@@ -52,9 +60,22 @@ describe('the Alpha warning is demoted but never softened', () => {
     await userEvent.click(screen.getByText(/Alpha gate:/))
     expect(details.open).toBe(true)
 
-    for (const code of ['A3', 'A5', 'A9', 'A12', 'A13', 'A14']) {
+    for (const code of ['A3', 'A5', 'A9', 'A13', 'A14']) {
       expect(within(details).getByText(code)).toBeInTheDocument()
     }
+  })
+
+  it('names the descoped item under its own heading, with a reason and a date', async () => {
+    // Present, but NOT in the failure list — the separation is the point. A12
+    // vanishing entirely would be the same defect as counting it as broken.
+    render(<AlphaChip items={alphaItems()} today={TODAY} />)
+    await userEvent.click(screen.getByText(/Alpha gate:/))
+
+    expect(screen.getByText(/Taken out of scope on purpose/)).toBeInTheDocument()
+
+    const descopeItem = screen.getByText('A12').closest('li')!
+    expect(within(descopeItem).getByText(/out of beta scope/)).toBeInTheDocument()
+    expect(within(descopeItem).getByText(/Decided 2026-08-13/)).toBeInTheDocument()
   })
 
   it('still says the eleven behavioural checks are unverified, not passed', async () => {
@@ -66,13 +87,22 @@ describe('the Alpha warning is demoted but never softened', () => {
   })
 
   it('says the record and the roadmap disagree rather than shrinking the count', () => {
-    // Only A3 exists, so five recorded failures match nothing. The headline must
-    // still read 6, with the mismatch stated.
+    // Only A3 exists, so four of the five counted failures match nothing. The
+    // headline must still read 5, with the mismatch stated.
     const oneItem = alphaItems().filter((item) => item.code === 'A3')
     render(<AlphaChip items={oneItem} today={TODAY} />)
 
-    expect(screen.getByText(/6 of 1\b/)).toBeInTheDocument()
-    expect(screen.getByText(/5 recorded failures no longer match/)).toBeInTheDocument()
+    expect(screen.getByText(/5 of 1\b/)).toBeInTheDocument()
+    expect(screen.getByText(/4 recorded failures no longer match/)).toBeInTheDocument()
+  })
+
+  it('flags an out-of-scope code that matches no roadmap item', () => {
+    // The descope is the one place a code can leave the failure count, so a typo
+    // there silently erases a real failure. A12 matches nothing in this roadmap.
+    const oneItem = alphaItems().filter((item) => item.code === 'A3')
+    render(<AlphaChip items={oneItem} today={TODAY} />)
+
+    expect(screen.getByText(/1 out-of-scope code matches no roadmap item/)).toBeInTheDocument()
   })
 })
 

@@ -5,7 +5,14 @@ import { NavItem, type NavIconName } from '@/components/shell/nav-item'
 import { getOpsAdmin } from '@/lib/ops/guard'
 
 // Alpha nav subset only — every href has a real page (typedRoutes enforces it).
-// Full nav (Loop, Sites, Inbox, Measure, …) lands with its modules per docs/06 §3.
+// Full nav (Loop, Measure, …) lands with its modules per docs/06 §3.
+//
+// SITES IS DELIBERATELY ABSENT, not unbuilt. `/sites` still exists, still
+// generates, still previews, and its tests still run — it is out of BETA scope
+// because the deploy half is unowned (no Cloudflare client, `sites.status` never
+// leaves 'draft'), so the module can only ever show a customer a preview of an
+// address they cannot have. The route is left reachable by URL on purpose: the
+// code is not dead, it is waiting. Restoring it is one line here.
 const NAV: ReadonlyArray<{
   href: Route
   label: string
@@ -22,7 +29,6 @@ const NAV: ReadonlyArray<{
   { href: '/planner', label: 'Planner', icon: 'calendar-days', guide: 'nav.planner' },
   { href: '/inbox', label: 'Inbox', icon: 'messages-square', guide: 'nav.inbox' },
   { href: '/analytics', label: 'Analytics', icon: 'chart-column', guide: 'nav.analytics' },
-  { href: '/sites', label: 'Sites', icon: 'globe', guide: 'nav.sites' },
   { href: '/connections', label: 'Connections', icon: 'link-2', guide: 'nav.connections' },
   { href: '/wallet', label: 'Wallet', icon: 'wallet', guide: 'nav.wallet' },
   { href: '/settings', label: 'Settings', icon: 'sliders-horizontal', guide: 'nav.settings' },

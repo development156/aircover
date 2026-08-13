@@ -21,12 +21,39 @@
  * number to the wrong thing.
  */
 
+/**
+ * An Alpha item taken OUT of the beta on purpose, with the date and the reason.
+ *
+ * A descope is a decision, not a defect, and the two must not share a number —
+ * a panel that counts them together tells the reader six things are broken when
+ * the truth is five are broken and one was never attempted.
+ *
+ * It is a SEPARATE record from the audit above and carries its own date, because
+ * it was made by a different person on a different day. Editing `failingCodes`
+ * instead would have been the cheaper change and a false one: it would make the
+ * 25 Jul audit claim it found five failures when it found six.
+ */
+export interface AlphaDescope {
+  /** The roadmap item code, e.g. `A12`. */
+  code: string
+  /** ISO date the scope decision was made — NOT the audit date. */
+  decidedOn: string
+  /** Why it is out, in words a person can check. */
+  reason: string
+}
+
 export interface AlphaGateRecord {
   /** ISO date the assessment was made. */
   recordedOn: string
   verdict: 'no-ship' | 'ship'
-  /** Roadmap item codes assessed as not working. */
+  /**
+   * Roadmap item codes assessed as not working, EXACTLY as audited. A code that
+   * was later descoped stays here and is listed in `outOfScope` as well — the
+   * subtraction happens on screen, where a reader can see it.
+   */
   failingCodes: readonly string[]
+  /** Items deliberately deferred past the beta. */
+  outOfScope: readonly AlphaDescope[]
   /** Where the judgement came from, in words a person can check. */
   source: string
 }
@@ -37,6 +64,14 @@ export const ALPHA_GATE: AlphaGateRecord = {
   // A3 workspace switcher · A5 themes · A9 scheduled publish · A12 sites
   // · A13 dashboard · A14 guide.
   failingCodes: ['A3', 'A5', 'A9', 'A12', 'A13', 'A14'],
+  outOfScope: [
+    {
+      code: 'A12',
+      decidedOn: '2026-08-13',
+      reason:
+        'Sites is out of beta scope. Generation and preview work; the deploy half (real address, contact form, leads) is unowned, so the module is hidden from the nav rather than shown half-finished.',
+    },
+  ],
   source: 'wt-web audit, 25 Jul 2026',
 }
 
