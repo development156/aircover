@@ -987,7 +987,7 @@
       "assignee": "claude",
       "doc_ref": null,
       "sort": 830,
-      "commit_sha": null,
+      "commit_sha": "a4caacef8d9abde3423683e8eccbadcb9e567cd7",
       "blocked": false,
       "blocked_reason": null
     }
