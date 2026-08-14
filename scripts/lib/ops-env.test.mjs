@@ -44,8 +44,29 @@ describe('where the sync publishes when nobody said', () => {
   })
 
   it('does not treat a lookalike host as production', () => {
-    expect(resolveIngestUrl('https://app.sahodalabs.com.evil.test').ingestUrlIsProduction).toBe(
+    // Suffix confusion: the guard must compare ORIGINS, not test `startsWith`.
+    // Kept in step with PRODUCTION_INGEST_URL deliberately — pinned to the old
+    // `app.sahodalabs.com` this would still pass while proving nothing, because
+    // the string would no longer relate to the origin being defended.
+    expect(resolveIngestUrl(`${PRODUCTION_INGEST_URL}.evil.test`).ingestUrlIsProduction).toBe(false)
+    expect(resolveIngestUrl('https://sahodalabs.vercel.app.evil.test').ingestUrlIsProduction).toBe(
       false,
     )
+  })
+
+  /**
+   * SL-080. The default published to `app.sahodalabs.com` for a week; that host
+   * is not this project and returns Vercel's `DEPLOYMENT_NOT_FOUND`, so every
+   * board move went into a hole while each sync reported a queue it would
+   * replay. 140 QA runs were evicted by the 200-run cap before it ever drained.
+   *
+   * Asserted as a NEGATIVE against the specific dead host rather than only as a
+   * positive on the live one: someone restoring the old constant from the older
+   * comment above it is the exact regression this is here to stop, and a test
+   * that only checks the new value would go green on a third, equally dead host.
+   */
+  it('never publishes to the host that was never attached to this project', () => {
+    expect(new URL(PRODUCTION_INGEST_URL).host).not.toBe('app.sahodalabs.com')
+    expect(resolveIngestUrl('').ingestUrl).not.toMatch(/app\.sahodalabs\.com/)
   })
 })

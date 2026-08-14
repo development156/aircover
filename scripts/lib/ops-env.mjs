@@ -110,8 +110,34 @@ export function loadEnv() {
  * ships as `http://localhost:3000` — a "production default" that resolves to a
  * laptop on any fresh checkout would be the same silence this card is about,
  * one layer along.
+ *
+ * ── WAS `https://app.sahodalabs.com` UNTIL 2026-08-14 (SL-080) ──────────────
+ * That host is not this project and never has been. It answers
+ * `DEPLOYMENT_NOT_FOUND` from Vercel's edge — the platform's way of saying the
+ * domain is registered to Vercel with NO deployment aliased behind it. It is
+ * not a rival app serving a 404; there is nothing there at all. Confirmed
+ * against the project itself: `sahodalabs` (prj_L4IDks4bMlBwObyKcHzej6lVqm9D,
+ * team development-4417s-projects) lists exactly three domains, and
+ * `app.sahodalabs.com` is not among them.
+ *
+ * So every board move, changelog entry and QA run for a week POSTed into a
+ * hole. The state files stayed correct — they are committed and reviewed like
+ * code — but the `ops_*` tables the console reads went stale, and 140 queued QA
+ * runs were lost outright when the 200-run cap in `ops-hook-bash.mjs` evicted
+ * them faster than a dead endpoint could drain them.
+ *
+ * This is fix (a) from SL-080: point at the origin that actually serves this
+ * project. It does not foreclose fix (b) — releasing `app.sahodalabs.com` from
+ * the old Vercel account and attaching it here. When that happens, change this
+ * one constant back and the lookalike test below with it.
+ *
+ * Verified at the time of the change, without writing a row: a POST carrying
+ * the real token and a deliberately unparseable body returned
+ * `{"ok":false,"error":"invalid_json"}` (400) — which is one line PAST the
+ * constant-time token check in the route and short of any write. Reaching that
+ * error proves the route is live here and that the token matches.
  */
-export const PRODUCTION_INGEST_URL = 'https://app.sahodalabs.com'
+export const PRODUCTION_INGEST_URL = 'https://sahodalabs.vercel.app'
 
 /**
  * THE DEFAULT TARGET IS PRODUCTION. Reversed 2026-08-01 (SL-061 Tier 2).
