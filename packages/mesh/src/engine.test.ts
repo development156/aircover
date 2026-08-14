@@ -223,6 +223,101 @@ describe('createMeshRunner', () => {
     expect(rows[0]!.task).toBe('test_task')
   })
 
+  /**
+   * `ai_provider_logs.repaired` shipped to production and nothing wrote it, so the
+   * column read `false` forever and the repair rate it was added to expose stayed
+   * invisible. These pin the write.
+   *
+   * The first test is the one that matters: two runs of the SAME task, differing
+   * only in whether the first attempt parsed. If the rows come back identical on
+   * this field, the column is decorative again.
+   */
+  describe('repaired', () => {
+    it('separates a repaired call from a clean one — the same task, two different rows', async () => {
+      const cleanSink = capturingSink()
+      await runnerWith(
+        [
+          {
+            provider: scriptedProvider('openrouter', [resp('openrouter', '{"value":"hi"}')]),
+            model: 'or-model',
+          },
+        ],
+        cleanSink.sink,
+      ).run(spec(), { q: 'go' }, ctx)
+
+      const repairedSink = capturingSink()
+      await runnerWith(
+        [
+          {
+            provider: scriptedProvider('openrouter', [
+              resp('openrouter', 'not json at all'),
+              resp('openrouter', '{"value":"repaired"}'),
+            ]),
+            model: 'or-model',
+          },
+        ],
+        repairedSink.sink,
+      ).run(spec(), { q: 'go' }, ctx)
+
+      expect(cleanSink.rows[0]!.repaired).toBe(false)
+      expect(repairedSink.rows[0]!.repaired).toBe(true)
+      // Both succeeded. `status` cannot tell them apart — that is the whole reason
+      // `repaired` is a separate column rather than a fourth status value.
+      expect(cleanSink.rows[0]!.status).toBe('ok')
+      expect(repairedSink.rows[0]!.status).toBe('ok')
+    })
+
+    it('stays true when the repair itself failed — it records the spend, not the outcome', async () => {
+      const { sink, rows } = capturingSink()
+      const primary = scriptedProvider('openrouter', [
+        resp('openrouter', 'garbage'),
+        resp('openrouter', 'still garbage'),
+      ])
+
+      await runnerWith([{ provider: primary, model: 'or-model' }], sink).run(
+        spec(),
+        { q: 'go' },
+        ctx,
+      )
+
+      expect(rows[0]!.status).toBe('error')
+      expect(rows[0]!.repaired).toBe(true)
+    })
+
+    it('stays true underneath a demo-fallback payload, which would otherwise look clean', async () => {
+      const { sink, rows } = capturingSink()
+      const primary = scriptedProvider('openrouter', [
+        resp('openrouter', 'garbage'),
+        resp('openrouter', 'still garbage'),
+      ])
+
+      await runnerWith([{ provider: primary, model: 'or-model' }], sink).run(
+        spec(() => ({ value: 'DEMO' })),
+        { q: 'go' },
+        ctx,
+      )
+
+      expect(rows[0]!.status).toBe('fallback')
+      expect(rows[0]!.repaired).toBe(true)
+    })
+
+    it('is false when a provider outage means no output ever existed to fail a schema', async () => {
+      const { sink, rows } = capturingSink()
+      const primary = scriptedProvider('openrouter', [
+        new ProviderCallError('openrouter', 503, 'down'),
+      ])
+
+      await runnerWith([{ provider: primary, model: 'or-model' }], sink).run(
+        spec(),
+        { q: 'go' },
+        ctx,
+      )
+
+      expect(rows[0]!.status).toBe('error')
+      expect(rows[0]!.repaired).toBe(false)
+    })
+  })
+
   it('never lets a telemetry write failure break the model result', async () => {
     const primary = scriptedProvider('openrouter', [resp('openrouter', '{"value":"ok"}')])
     const state = capturingSink()

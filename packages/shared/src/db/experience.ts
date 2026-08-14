@@ -76,6 +76,24 @@ export const AiProviderLogSchema = z.object({
   credits_charged: z.int().nullable(),
   status: AiLogStatusSchema.nullable(),
   error_code: z.string().nullable(),
+  /**
+   * TRUE when the first attempt failed its schema and the engine's one repair
+   * retry was spent — the retry resends every original message, so the call
+   * billed roughly twice.
+   *
+   * ORTHOGONAL TO `status`, which still reports the final outcome. A call can be
+   * ok-and-repaired, error-and-repaired or fallback-and-repaired, and only a
+   * separate field can say all three (see the column's migration comment).
+   *
+   * NEITHER NULLABLE NOR OPTIONAL, deliberately. The column is `not null default
+   * false`, so an optional field here would let a writer omit it and have the DB
+   * record "ran clean" for a call that repaired — silently recreating the exact
+   * blindness this field exists to end. Required means the compiler asks every
+   * writer the question.
+   *
+   * `false` on rows written before 2026-08-12 means "not measured", NOT "clean".
+   */
+  repaired: z.boolean(),
   trace_id: z.string().nullable(),
   created_at: z.string(),
 })

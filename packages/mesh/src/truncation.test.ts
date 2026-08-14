@@ -87,6 +87,21 @@ describe('truncation', () => {
     expect(repairs).toEqual([])
   })
 
+  it('writes repaired=false on the truncation row — no second call was billed', async () => {
+    // The DB column has to agree with the in-memory event above. A ceiling and a
+    // repair are the two costs this engine distinguishes, and marking a
+    // truncation as "repaired" would inflate the repair rate with calls that
+    // never made a second request.
+    const logs: Array<{ error_code?: string | null; repaired?: boolean }> = []
+    const { provider: p, calls } = provider([{ text: '{"ok":tr', truncated: true, usage }])
+
+    await runner(p, logs as unknown[]).run(spec, { x: 1 }, ctx)
+
+    expect(calls).toHaveLength(1)
+    expect(logs[0]!.error_code).toBe('OUTPUT_TRUNCATED')
+    expect(logs[0]!.repaired).toBe(false)
+  })
+
   it('still repairs ordinary bad JSON — this narrows the retry, it does not remove it', async () => {
     const repairs: RepairEvent[] = []
     const { provider: p, calls } = provider([

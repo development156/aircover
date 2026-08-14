@@ -30,6 +30,7 @@ const row: ProviderLogRow = {
   credits_charged: 5,
   status: 'ok',
   error_code: null,
+  repaired: false,
   trace_id: 'trace-abc',
 }
 
@@ -48,6 +49,10 @@ const ALLOWED_COLUMNS = new Set([
   'credits_charged',
   'status',
   'error_code',
+  // A boolean ABOUT the call (did the one repair retry get spent), never
+  // anything FROM it. The first-attempt text that explains a repair stays on the
+  // in-memory RepairEvent and is not a column here — see RepairEvent.sample.
+  'repaired',
   'trace_id',
 ])
 

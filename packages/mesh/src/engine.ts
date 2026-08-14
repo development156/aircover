@@ -154,12 +154,22 @@ function sumUsage(a: ProviderUsage, b: ProviderUsage): ProviderUsage {
 }
 
 export function createMeshRunner(deps: MeshRunnerDeps) {
+  /**
+   * `repaired` is a REQUIRED parameter, not an optional one defaulting to false.
+   *
+   * ProviderLogRow derives from the frozen shared row schema, where `repaired` is
+   * required — so every call site below has to answer the question rather than
+   * inherit a silent `false`. That is the point: the column exists because a
+   * repaired call and a clean call were indistinguishable, and a defaulted
+   * parameter would have rebuilt that blindness one layer up.
+   */
   function toLogRow(
     def: MeshTaskDef<unknown, unknown>,
     ctx: MeshContext,
     usage: MeshUsage | undefined,
     status: AiLogStatus,
     errorCode: string | null,
+    repaired: boolean,
   ): ProviderLogRow {
     return {
       workspace_id: ctx.workspaceId,
@@ -175,6 +185,7 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
       credits_charged: ctx.creditsCharged ?? null,
       status,
       error_code: errorCode,
+      repaired,
       trace_id: ctx.traceId,
     }
   }
@@ -243,7 +254,9 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     if (!responded) {
       const code =
         carriesFile && attempts.length === 0 ? 'NO_FILE_PROVIDER' : 'PROVIDER_UNAVAILABLE'
-      await writeLog(toLogRow(def, ctx, undefined, 'error', code))
+      // No provider answered at all, so there was no output to fail a schema and
+      // no repair to spend.
+      await writeLog(toLogRow(def, ctx, undefined, 'error', code, false))
       return {
         ok: false,
         error: appError('PROVIDER_ERROR', 'all providers failed to respond', ctx.traceId, {
@@ -280,7 +293,10 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
         costUsd: deps.price(combined),
         latencyMs,
       }
-      await writeLog(toLogRow(def, ctx, usageNow, 'error', TRUNCATED_CODE))
+      // FALSE, and this is the one place it needs saying: truncation returns
+      // BEFORE the repair block precisely because a repair cannot fix a ceiling.
+      // No second call was made, so the call did not bill twice.
+      await writeLog(toLogRow(def, ctx, usageNow, 'error', TRUNCATED_CODE, false))
       return {
         ok: false,
         error: appError(
@@ -320,6 +336,18 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
       latencyMs,
     }
 
+    /**
+     * THE VALUE THAT GOES TO THE DB, for all three outcomes below.
+     *
+     * Derived from `firstAttemptError`, not restated as a literal at each write:
+     * the two failure paths are only reachable when the first parse failed, so a
+     * hand-written `true` would be correct today and a lie the moment someone
+     * makes them reachable another way. It is deliberately NOT `parsed.ok` — a
+     * repair that failed still cost the second call, and `status` already carries
+     * the success/failure axis.
+     */
+    const repaired = firstAttemptError !== null
+
     if (firstAttemptError !== null) {
       try {
         deps.onRepair?.({
@@ -342,7 +370,9 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
       // so a non-null error_code beside status 'ok' is an unambiguous and
       // queryable "recovered from a defect". Requested properly in
       // packages/mesh/REQUESTS.md.
-      await writeLog(toLogRow(def, ctx, usage, status, firstAttemptError ? REPAIRED_CODE : null))
+      await writeLog(
+        toLogRow(def, ctx, usage, status, firstAttemptError ? REPAIRED_CODE : null, repaired),
+      )
       // Annotations ride out so the caller can replay the parse and not pay for
       // it twice. Kept off the frozen Result<O> shape, like `fallback`.
       return responded.chat.annotations
@@ -353,11 +383,11 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     // 3) Double JSON failure: demo-fallback (brand_guidelines) or typed PROVIDER_ERROR.
     if (spec.fallbackPayload) {
       const data = spec.fallbackPayload(input)
-      await writeLog(toLogRow(def, ctx, usage, 'fallback', REPAIR_CODE))
+      await writeLog(toLogRow(def, ctx, usage, 'fallback', REPAIR_CODE, repaired))
       return { ok: true, data, fallback: true, usage }
     }
 
-    await writeLog(toLogRow(def, ctx, usage, 'error', REPAIR_CODE))
+    await writeLog(toLogRow(def, ctx, usage, 'error', REPAIR_CODE, repaired))
     return {
       ok: false,
       error: appError('PROVIDER_ERROR', 'model returned unparseable output', ctx.traceId),
@@ -382,7 +412,10 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     try {
       return await execute(spec, input, ctx)
     } catch {
-      await writeLog(toLogRow(spec.def, ctx, undefined, 'error', 'UNEXPECTED_ERROR'))
+      // An unexpected throw: `repaired` lives inside `execute` and is gone with
+      // its frame. FALSE understates rather than invents — see the column
+      // comment, where false already means "no repair recorded", not "ran clean".
+      await writeLog(toLogRow(spec.def, ctx, undefined, 'error', 'UNEXPECTED_ERROR', false))
       return {
         ok: false,
         error: appError('PROVIDER_ERROR', 'mesh task failed unexpectedly', ctx.traceId),
@@ -412,7 +445,7 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
   ): Promise<MeshResult<{ base64: string; mime: string }>> {
     const planned = deps.planImage?.(def.tier)
     if (!planned?.provider.image) {
-      await writeLog(toLogRow(def, ctx, undefined, 'error', 'NO_IMAGE_PROVIDER'))
+      await writeLog(toLogRow(def, ctx, undefined, 'error', 'NO_IMAGE_PROVIDER', false))
       return {
         ok: false,
         error: appError('PROVIDER_ERROR', 'no image-capable provider is configured', ctx.traceId),
@@ -427,12 +460,21 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
         costUsd: deps.price(result.usage),
         latencyMs: deps.now() - started,
       }
-      await writeLog(toLogRow(def, ctx, usage, 'ok', null))
+      // Images are bytes, never zod-parsed, so this path has no repair to record
+      // and never will. FALSE here is permanent, not a placeholder.
+      await writeLog(toLogRow(def, ctx, usage, 'ok', null, false))
       return { ok: true, data: { base64: result.base64, mime: result.mime }, usage }
     } catch (e) {
       const status = e instanceof ProviderCallError ? e.status : null
       await writeLog(
-        toLogRow(def, ctx, undefined, 'error', status === null ? 'NETWORK' : `HTTP_${status}`),
+        toLogRow(
+          def,
+          ctx,
+          undefined,
+          'error',
+          status === null ? 'NETWORK' : `HTTP_${status}`,
+          false,
+        ),
       )
       // Our own message — a provider error can echo the prompt back.
       return {
