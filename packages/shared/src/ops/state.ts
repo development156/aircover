@@ -38,7 +38,27 @@ export const OpsStateTaskSchema = z
   .object({
     code: OpsTaskCodeSchema,
     title: z.string().trim().min(1).max(200),
-    detail: z.string().max(2000).nullish(),
+    /**
+     * 20000, raised from 2000 on 2026-08-14 (SL-080).
+     *
+     * The 2000 was a zod-only invention: `ops_tasks.detail` is plain unbounded
+     * `text` with no check constraint (20260725102928_ops_platform_tables.sql
+     * :126), so nothing about storage wanted this number.
+     *
+     * It made the ingest endpoint reject the WHOLE payload — the schema is
+     * `.strict()` and one long card fails all 83 — so the board could not sync
+     * even after its dead-URL was corrected. Twelve cards were already over the
+     * cap; the longest was 4763. A cap of 4000 would have bought weeks, not a
+     * fix, because the sahoda-devops rule is that a card's technical detail is
+     * verbatim and NOTHING is deleted in a rewrite: these fields only grow. So
+     * this matches `OpsRoadmapItemSchema.details` (20000) below rather than
+     * inventing a third number.
+     *
+     * Truncating in the syncer was the alternative and is the wrong one — it
+     * would delete the detail the skill forbids deleting, and make the sync
+     * report success while quietly shortening the record.
+     */
+    detail: z.string().max(20000).nullish(),
     doc_ref: z.string().max(200).nullish(),
     roadmap_code: z.string().max(40).nullish(),
     board_column: OpsTaskColumnSchema,
