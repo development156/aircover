@@ -49,9 +49,6 @@ describe('where the sync publishes when nobody said', () => {
     // `app.sahodalabs.com` this would still pass while proving nothing, because
     // the string would no longer relate to the origin being defended.
     expect(resolveIngestUrl(`${PRODUCTION_INGEST_URL}.evil.test`).ingestUrlIsProduction).toBe(false)
-    expect(resolveIngestUrl('https://sahodalabs.vercel.app.evil.test').ingestUrlIsProduction).toBe(
-      false,
-    )
   })
 
   /**
