@@ -119,9 +119,29 @@ export const OpsStateChangelogEntrySchema = z
   .strict()
 export type OpsStateChangelogEntry = z.infer<typeof OpsStateChangelogEntrySchema>
 
+/**
+ * `OPS_QUEUE_CEILING`, not `OPS_WIRE_BATCH_MAX` — the two are different limits
+ * that were one number until SL-084.
+ *
+ * A `*.pending.json` file is an OUTBOX: rows leave it only when the dashboard
+ * acknowledges them, so everything in it is unsent. Capping it at one POST's
+ * worth is what made `ops-hook-bash.mjs` evict 140 unsent QA runs while a dead
+ * endpoint kept the drain from ever running. Retention is now the writer's
+ * business (scripts/lib/ops-queue.mjs), and it refuses loudly instead of
+ * deleting; this bound only has to be at least as large as the writer's ceiling
+ * so that a legitimately backed-up file still parses.
+ *
+ * The wire limit below is UNCHANGED and must stay 200: it is the server's, and
+ * exceeding it 400s the whole payload.
+ */
+export const OPS_QUEUE_CEILING = 1000
+
+/** One POST's worth. Mirrored in scripts/lib/ops-queue.mjs — see state-sendable.test.ts. */
+export const OPS_WIRE_BATCH_MAX = 200
+
 export const OpsChangelogPendingSchema = z.object({
   version: z.literal(1),
-  entries: z.array(OpsStateChangelogEntrySchema).max(200),
+  entries: z.array(OpsStateChangelogEntrySchema).max(OPS_QUEUE_CEILING),
 })
 export type OpsChangelogPending = z.infer<typeof OpsChangelogPendingSchema>
 
@@ -145,7 +165,7 @@ export type OpsStateQaRun = z.infer<typeof OpsStateQaRunSchema>
 
 export const OpsQaPendingSchema = z.object({
   version: z.literal(1),
-  runs: z.array(OpsStateQaRunSchema).max(200),
+  runs: z.array(OpsStateQaRunSchema).max(OPS_QUEUE_CEILING),
 })
 export type OpsQaPending = z.infer<typeof OpsQaPendingSchema>
 
@@ -181,8 +201,12 @@ export const OpsIngestPayloadSchema = z
     full: z.boolean().default(false),
     roadmap: z.array(OpsStateRoadmapItemSchema).max(500).default([]),
     tasks: z.array(OpsStateTaskSchema).max(1000).default([]),
-    changelog: z.array(OpsStateChangelogEntrySchema).max(200).default([]),
-    qa: z.array(OpsStateQaRunSchema).max(200).default([]),
+    // The WIRE limit, and the reason scripts/ops-sync.mjs sends the oldest
+    // OPS_WIRE_BATCH_MAX rows rather than the whole queue. Raising it is a
+    // server-side decision; a client that exceeds it gets a 400 on the ENTIRE
+    // payload, which `ingestVerdict` correctly refuses to retry.
+    changelog: z.array(OpsStateChangelogEntrySchema).max(OPS_WIRE_BATCH_MAX).default([]),
+    qa: z.array(OpsStateQaRunSchema).max(OPS_WIRE_BATCH_MAX).default([]),
     session: OpsIngestSessionSchema.nullish(),
   })
   .strict()

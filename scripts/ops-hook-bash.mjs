@@ -2,6 +2,7 @@
 import { execFileSync, execFileSync as run } from 'node:child_process'
 import { warn } from './lib/ops-env.mjs'
 import { readState, writeState, clientId } from './lib/ops-state.mjs'
+import { appendCapped, ceilingWarning } from './lib/ops-queue.mjs'
 import {
   classifyBashRuns,
   closingTaskCodes,
@@ -72,14 +73,22 @@ function currentTaskCode() {
   return inProgress?.code ?? null
 }
 
+/**
+ * Append auto runs to the outbox.
+ *
+ * This function ended with `.slice(-200)` until SL-084, which made it a ring
+ * buffer over rows that had never been sent anywhere — see the header of
+ * scripts/lib/ops-queue.mjs for what that cost. It now refuses at the ceiling
+ * instead of evicting, and says so.
+ */
 function recordQaRuns(entries) {
   const qa = readState('qa')
   const now = new Date().toISOString()
   const task_code = currentTaskCode()
 
-  qa.runs = [
-    ...(Array.isArray(qa.runs) ? qa.runs : []),
-    ...entries.map((entry) => ({
+  const { items, accepted, refused } = appendCapped(
+    qa.runs,
+    entries.map((entry) => ({
       client_id: clientId('qa'),
       task_code,
       kind: 'auto',
@@ -88,8 +97,15 @@ function recordQaRuns(entries) {
       finished_at: now,
       ...entry,
     })),
-  ].slice(-200)
+  )
+
+  qa.runs = items
   writeState('qa', qa)
+
+  const warning = ceilingWarning({ queue: 'QA', refused, queued: items.length })
+  if (warning) console.error(warning)
+
+  return accepted
 }
 
 function markCommitted(codes) {
@@ -160,8 +176,18 @@ async function main() {
   // a QA console that invents green rows is worse than one with gaps.
   if (entries.length === 0) return
 
-  recordQaRuns(entries)
-  console.log(`ops: QA ${entries.map((e) => `${e.suite} ${e.status}`).join(' · ')}`)
+  // Only what was actually written is announced. A refused run has already had
+  // its own block printed, and reporting it here as recorded would be the same
+  // fake success the ceiling exists to prevent.
+  const accepted = recordQaRuns(entries)
+  if (accepted > 0) {
+    console.log(
+      `ops: QA ${entries
+        .slice(0, accepted)
+        .map((e) => `${e.suite} ${e.status}`)
+        .join(' · ')}`,
+    )
+  }
   sync()
 }
 

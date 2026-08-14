@@ -29,6 +29,14 @@ const EMPTY = {
   qa: { version: 1, runs: [] },
 }
 
+/** Which key holds the rows, per state file. */
+const ROWS = {
+  roadmap: 'items',
+  board: 'tasks',
+  changelog: 'entries',
+  qa: 'runs',
+}
+
 export const STATE_DIR = 'ops/state'
 
 function pathFor(name) {
@@ -66,6 +74,35 @@ export function stateExists(name) {
 /** Drain a pending queue after the server has acknowledged it — never before. */
 export function clearPending(name) {
   writeState(name, structuredClone(EMPTY[name]))
+}
+
+/**
+ * Drop the rows a POST just had acknowledged, and nothing else (SL-084).
+ *
+ * The queue is FIFO and the sync sends the OLDEST `WIRE_BATCH_MAX` rows, so what
+ * was acknowledged is exactly the first `count` — the file is re-read here so
+ * that anything appended while the request was in flight survives.
+ *
+ * This replaces `clearPending` on the ack path, which wiped the whole file. That
+ * was correct only while a payload always carried the entire queue; the moment
+ * the sync started batching it would have thrown away every unsent row past 200
+ * on the first successful sync, which is the shredder again wearing a different
+ * hat. It is also why a QA run recorded during the 8-second POST window used to
+ * be lost.
+ *
+ * Rows are dropped by POSITION rather than by matching `client_id`: a row with a
+ * missing or duplicated id would match nothing, the drop would silently remove
+ * zero rows, and the queue would never drain — the same wedge, via identity
+ * instead of size.
+ */
+export function dropSent(name, count) {
+  if (!Number.isInteger(count) || count <= 0) return
+
+  const state = readState(name)
+  const key = ROWS[name]
+  const rows = Array.isArray(state[key]) ? state[key] : []
+
+  writeState(name, { ...state, [key]: rows.slice(count) })
 }
 
 /** Stable-enough id for rows the server dedupes on. Not a security value. */

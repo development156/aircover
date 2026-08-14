@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process'
 import { loadEnv, warn } from './lib/ops-env.mjs'
-import { readState, clearPending, STATE_DIR } from './lib/ops-state.mjs'
+import { readState, dropSent, STATE_DIR } from './lib/ops-state.mjs'
+import { planSync, WIRE_BATCH_MAX } from './lib/ops-queue.mjs'
 import { ingestVerdict, formatPermanent } from './lib/ops-ingest-verdict.mjs'
 
 /**
@@ -87,11 +88,28 @@ function sessionIdFrom(hookJson) {
   return `local:${git('rev-parse', '--abbrev-ref', 'HEAD') || 'detached'}`
 }
 
-function buildPayload({ source, sessionId, sessionStatus, tasksTouched }) {
+/**
+ * ONE POST'S WORTH of each pending queue, oldest first (SL-084).
+ *
+ * The queues used to be sent whole. That worked only because the writer capped
+ * them at exactly the wire limit by deleting unsent rows; with the writer fixed
+ * to keep them, a backlog past 200 would fail `OpsIngestPayloadSchema` and the
+ * route would 400 the WHOLE payload — board and roadmap included — every time,
+ * for ever, because `ingestVerdict` rightly calls a 400 permanent.
+ *
+ * So the cap lives here now, where exceeding it costs a second round trip
+ * instead of the record. `backlog` is what is left over, and it is reported.
+ */
+function pendingBatches() {
+  return planSync({
+    changelog: readState('changelog').entries,
+    qa: readState('qa').runs,
+  })
+}
+
+function buildPayload({ source, sessionId, sessionStatus, tasksTouched, batches }) {
   const board = readState('board')
   const roadmap = readState('roadmap')
-  const changelog = readState('changelog')
-  const qa = readState('qa')
 
   return {
     source,
@@ -103,8 +121,8 @@ function buildPayload({ source, sessionId, sessionStatus, tasksTouched }) {
     },
     roadmap: Array.isArray(roadmap.items) ? roadmap.items : [],
     tasks: Array.isArray(board.tasks) ? board.tasks : [],
-    changelog: Array.isArray(changelog.entries) ? changelog.entries : [],
-    qa: Array.isArray(qa.runs) ? qa.runs : [],
+    changelog: batches.changelog,
+    qa: batches.qa,
     session: sessionStatus
       ? {
           session_id: sessionId,
@@ -202,6 +220,7 @@ async function main() {
   const statusFor = { start: 'working', stop: 'idle', idle: 'idle', end: 'ended' }
   const sessionStatus = FLAGS.heartbeat ? (statusFor[FLAGS.heartbeat] ?? 'working') : 'working'
 
+  const batches = pendingBatches()
   const payload = buildPayload({
     source: FLAGS.heartbeat
       ? `heartbeat:${FLAGS.heartbeat}`
@@ -211,20 +230,33 @@ async function main() {
     sessionId: sessionIdFrom(hookJson),
     sessionStatus,
     tasksTouched: touched,
+    batches,
   })
 
   const ack = await post(payload)
   if (!ack) return
 
-  // Drain the queues only now. Anything that was not acknowledged stays on disk
-  // and goes again next time, which is what makes an offline dev server a delay
-  // rather than a hole in the record.
-  if (payload.changelog.length > 0) clearPending('changelog')
-  if (payload.qa.length > 0) clearPending('qa')
+  // Drain only what was acknowledged, and only that. Anything unsent stays on
+  // disk and goes again next time, which is what makes an offline dev server a
+  // delay rather than a hole in the record — and dropping by count rather than
+  // wiping the file is what keeps a run recorded DURING the post.
+  dropSent('changelog', payload.changelog.length)
+  dropSent('qa', payload.qa.length)
 
   const parts = ['roadmap', 'tasks', 'changelog', 'qa']
     .map((k) => `${k} ${ack[k] ?? 0}`)
     .join(' · ')
+
+  // A backlog is stated, never implied. One sync carries WIRE_BATCH_MAX rows of
+  // each queue; if more were waiting, the line that reports success has to say
+  // that the record is still not fully published.
+  const waiting = ['changelog', 'qa'].filter((k) => batches.backlog[k] > 0)
+  if (waiting.length > 0) {
+    console.error(
+      `ops: ${waiting.map((k) => `${batches.backlog[k]} ${k}`).join(' and ')} still queued —` +
+        ` one sync carries ${WIRE_BATCH_MAX} of each. Run \`pnpm ops:sync\` again to send the rest.`,
+    )
+  }
   // The TARGET is printed on every successful sync, not only on failure. The
   // default now publishes to production (SL-061 Tier 2), and "where did that
   // go" must be answerable from the scrollback rather than by reading env files.

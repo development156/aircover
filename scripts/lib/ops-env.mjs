@@ -12,7 +12,18 @@ import { fileURLToPath } from 'node:url'
  * stale local file.
  */
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+/**
+ * `OPS_REPO_ROOT` exists so a test can run the real hook end to end (SL-084).
+ *
+ * Without it the only way to prove that the queue writer shouts when it refuses
+ * work is to run it against the repo's own `ops/state`, which a test may not do.
+ * With it, the loud path is exercised by spawning the actual script against a
+ * temp directory — so deleting the warning makes a test go red rather than
+ * making the repo quietly lossy again.
+ */
+const REPO_ROOT = process.env.OPS_REPO_ROOT
+  ? resolve(process.env.OPS_REPO_ROOT)
+  : resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /**
  * A value that is still a placeholder is NOT configured.

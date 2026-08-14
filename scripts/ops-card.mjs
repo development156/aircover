@@ -4,6 +4,7 @@ import { warn } from './lib/ops-env.mjs'
 import { readState, writeState, clientId } from './lib/ops-state.mjs'
 import { hasDbCredentials, select } from './lib/ops-rest.mjs'
 import { taskCodesIn } from './lib/ops-classify.mjs'
+import { appendCapped, ceilingWarning } from './lib/ops-queue.mjs'
 
 /**
  * The verbs behind /task, /qa-log, /log-change and the /ship gate (doc 13 §9.5).
@@ -145,8 +146,7 @@ function cmdQa() {
 
   const qa = readState('qa')
   const now = new Date().toISOString()
-  qa.runs = [
-    ...(Array.isArray(qa.runs) ? qa.runs : []),
+  const { items, accepted, refused } = appendCapped(qa.runs, [
     {
       client_id: clientId('qa'),
       task_code: code,
@@ -158,9 +158,21 @@ function cmdQa() {
       started_at: now,
       finished_at: now,
     },
-  ]
+  ])
+
+  qa.runs = items
   writeState('qa', qa)
-  console.log(`ops: QA ${suite} ${status} on ${code}`)
+
+  const warning = ceilingWarning({ queue: 'QA', refused, queued: items.length })
+  if (warning) {
+    console.error(warning)
+    // A manual QA run is something a human typed and cannot recover from a
+    // scrollback the way an auto run can, so this exits non-zero. The hook path
+    // may not (doc 13 §9.2) — this is not a hook.
+    process.exitCode = 1
+    return
+  }
+  if (accepted > 0) console.log(`ops: QA ${suite} ${status} on ${code}`)
   sync()
 }
 
@@ -179,8 +191,7 @@ function cmdChange() {
   }
 
   const changelog = readState('changelog')
-  changelog.entries = [
-    ...(Array.isArray(changelog.entries) ? changelog.entries : []),
+  const { items, accepted, refused } = appendCapped(changelog.entries, [
     {
       client_id: clientId('cl'),
       title,
@@ -194,9 +205,20 @@ function cmdChange() {
       task_codes: taskCodesIn(`${codes} ${title}`),
       happened_at: new Date().toISOString(),
     },
-  ]
+  ])
+
+  changelog.entries = items
   writeState('changelog', changelog)
-  console.log(`ops: changelog entry queued (${kind}) — author is assigned server-side`)
+
+  const warning = ceilingWarning({ queue: 'changelog', refused, queued: items.length })
+  if (warning) {
+    console.error(warning)
+    process.exitCode = 1
+    return
+  }
+  if (accepted > 0) {
+    console.log(`ops: changelog entry queued (${kind}) — author is assigned server-side`)
+  }
   sync()
 }
 
