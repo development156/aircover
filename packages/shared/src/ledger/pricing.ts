@@ -6,6 +6,11 @@ import rawPricing from '../../../../pricing.config.json'
  * from here and nowhere else (CLAUDE.md non-negotiable). Plan subscription
  * prices + monthly grants are a separate catalog (see billing/plans) — this file
  * is action credit costs only.
+ *
+ * The import below escapes this package, so Turborepo cannot see it while
+ * hashing @sahoda/shared. Root turbo.json lists pricing.config.json under
+ * `globalDependencies` to close that gap — without it a price edit replays a
+ * cached green suite and ships unguarded. Keep the two in step.
  */
 export const PricingConfigSchema = z.object({
   currency_note: z.string(),
