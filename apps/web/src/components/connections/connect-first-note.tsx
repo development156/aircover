@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { Plug } from 'lucide-react'
 
+import { buttonVariants } from '@/components/ui/button'
+
 /**
  * The first thing a new shop owner needs to be told, on the screen where they
  * start.
@@ -21,17 +23,22 @@ export function ConnectFirstNote({ connectedCount }: { connectedCount: number })
   if (connectedCount > 0) return null
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-tint-300 bg-tint-50 p-4 dark:bg-s2">
+    // The kit's `.sl-banner`: a wash with a hairline ring, not a border — the
+    // tints are alphas, so this composites on dark without a second value and
+    // the `dark:bg-s2` override it used to need is gone.
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-card bg-brand-wash p-4 shadow-[inset_0_0_0_1px_var(--brand-lift)]">
       <div className="min-w-0">
-        <p className="text-[14px] font-bold">Connect a channel to post for real</p>
+        <p className="text-[14px] font-[650]">Connect a channel to post for real</p>
         <p className="text-[13px] text-muted">
           You can write and plan without one. Connecting is what lets a post actually go out.
         </p>
       </div>
+      {/* Wears the Button's clothes rather than re-typing them — this one was a
+          32px pill in `bg-accent` because it was hand-rolled. */}
       <Link
         href="/connections"
         data-guide="nudge.connect"
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-accent px-3 py-1.5 text-[13px] font-semibold text-white transition-micro hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className={buttonVariants({ variant: 'primary' })}
       >
         <Plug size={14} aria-hidden />
         Connect a channel

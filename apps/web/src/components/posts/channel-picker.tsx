@@ -57,12 +57,16 @@ export function ChannelPicker({ selected, onChange, disabled, connected }: Chann
               aria-pressed={isOn}
               onClick={() => toggle(channel)}
               className={cn(
-                'flex items-center gap-1.5 rounded-pill border px-3 py-[7px] text-[13px] font-semibold transition-micro',
+                // The kit's `.sl-chip`: 28px, pill, INSET RING not a border —
+                // a border makes toggling one chip reflow the whole row.
+                // Selected is solid INK, not orange: this row shows four chips
+                // at once and an orange selected state paints up to four
+                // oranges on one screen (RETHEME.md §9).
+                'inline-flex h-7 items-center gap-1.5 rounded-full px-[10px] text-[13px] font-[550] transition-micro',
                 'disabled:pointer-events-none disabled:opacity-45',
                 isOn
-                  ? // dark: tint-50 stays warm-light while --acc flips to Orange300
-                    'border-tint-300 bg-tint-50 text-accent dark:bg-s2'
-                  : 'border-line bg-bg text-muted hover:border-faint hover:text-ink',
+                  ? 'bg-ink text-white dark:bg-white dark:text-ink'
+                  : 'text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink hover:shadow-[inset_0_0_0_1px_var(--line-firm)]',
               )}
             >
               {isOn ? <Check size={13} aria-hidden /> : null}

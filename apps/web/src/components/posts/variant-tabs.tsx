@@ -102,11 +102,14 @@ export function VariantTabs({ channels, canonicalBody, variants, mediaCount }: V
                 moveFocus(channel, event.key === 'ArrowRight' ? 1 : -1)
               }}
               className={cn(
-                'flex items-center gap-2 rounded-pill border px-3 py-[7px] text-[13px] font-semibold transition-micro',
+                // Same `.sl-chip` shape as the picker. These tabs are the
+                // PER-CHANNEL VARIANTS — one body and one publish state each —
+                // so the selected tab has to read as "you are editing this one",
+                // which solid ink does more plainly than a wash.
+                'inline-flex h-7 items-center gap-2 rounded-full px-[10px] text-[13px] font-[550] transition-micro',
                 isActive
-                  ? // dark: tint-50 stays warm-light while --acc flips to Orange300
-                    'border-tint-300 bg-tint-50 text-accent dark:bg-s2'
-                  : 'border-line bg-bg text-muted hover:border-faint hover:text-ink',
+                  ? 'bg-ink text-white dark:bg-white dark:text-ink'
+                  : 'text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink hover:shadow-[inset_0_0_0_1px_var(--line-firm)]',
               )}
             >
               {CHANNEL_SHORT[channel]}
