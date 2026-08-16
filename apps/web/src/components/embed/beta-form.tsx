@@ -25,10 +25,18 @@ type Status =
   | { kind: 'sent'; message: string }
   | { kind: 'error'; message: string }
 
+// The kit's `.sl-input` / `.sl-label`, hand-written rather than imported:
+// this form is rendered inside a third-party page as an embed, so it must not
+// grow a dependency on the app's component tree.
+//
+// 16px on the input is NOT a slip and must not be "corrected" to the kit's
+// 13px: iOS Safari zooms the viewport on focus for any font-size below 16px,
+// and this form is an embed on someone else's mobile page where that zoom
+// cannot be undone. The label carries the density instead.
 const FIELD =
-  'w-full rounded-input border border-line bg-s1 px-3 py-2 text-[15px] text-ink transition-micro focus-visible:bg-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+  'h-input w-full rounded-sm bg-surface px-[11px] text-[16px] text-ink shadow-[inset_0_0_0_1px_var(--line)] transition-micro focus-visible:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus-visible:outline-none aria-invalid:shadow-[inset_0_0_0_1.5px_var(--danger)]'
 
-const LABEL = 'block text-[13px] font-semibold text-ink'
+const LABEL = 'mb-[6px] block text-[12px] font-[550] text-muted'
 
 export function BetaForm({ siteKey, source }: { siteKey: string | null; source: string | null }) {
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
@@ -98,7 +106,7 @@ export function BetaForm({ siteKey, source }: { siteKey: string | null; source: 
 
   if (status.kind === 'sent') {
     return (
-      <div role="status" className="rounded-card border border-line bg-bg p-5 shadow-card">
+      <div role="status" className="surface-ring rounded-card bg-surface p-4">
         <p className="text-[15px] text-ink">{status.message}</p>
       </div>
     )
@@ -107,11 +115,7 @@ export function BetaForm({ siteKey, source }: { siteKey: string | null; source: 
   const sending = status.kind === 'sending'
 
   return (
-    <form
-      onSubmit={submit}
-      noValidate
-      className="rounded-card border border-line bg-bg p-5 shadow-card"
-    >
+    <form onSubmit={submit} noValidate className="surface-ring rounded-card bg-surface p-4">
       <div className="grid gap-3">
         <div>
           <label className={LABEL} htmlFor="beta-name">
@@ -207,7 +211,7 @@ export function BetaForm({ siteKey, source }: { siteKey: string | null; source: 
       <button
         type="submit"
         disabled={sending || !siteKey}
-        className="mt-4 w-full rounded-pill bg-primary px-4 py-[10px] text-[14px] font-semibold text-primary-foreground transition-micro hover:bg-primary-strong hover:text-white disabled:pointer-events-none disabled:opacity-45"
+        className="mt-4 h-10 w-full rounded-sm bg-primary text-[14px] leading-none font-[550] text-primary-foreground transition-micro hover:bg-ink active:translate-y-[0.5px] disabled:pointer-events-none disabled:bg-line disabled:text-white"
       >
         {sending ? 'Sending…' : 'Request early access'}
       </button>

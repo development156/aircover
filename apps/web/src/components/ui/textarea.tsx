@@ -17,10 +17,10 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(fun
       ref={ref}
       aria-invalid={error || undefined}
       className={cn(
-        'min-h-[74px] w-full resize-y rounded-input border bg-s1 px-3 py-2.5 text-[14px] text-ink transition-micro placeholder:text-muted',
-        'focus:bg-bg focus:outline-none',
+        'min-h-[74px] w-full resize-y rounded-sm border-none bg-surface px-[11px] py-2 text-[13px] text-ink transition-micro placeholder:text-muted',
+        'focus:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus:outline-none',
         'disabled:opacity-50',
-        error ? 'border-danger' : 'border-line',
+        error ? 'shadow-[inset_0_0_0_1.5px_var(--danger)]' : 'shadow-[inset_0_0_0_1px_var(--line)]',
         className,
       )}
       {...props}

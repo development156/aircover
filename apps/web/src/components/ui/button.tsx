@@ -14,19 +14,31 @@ import { cn } from '@/lib/utils'
 // is not a valid attribute on an anchor. Filed in REQUESTS.md; the asChild path needs
 // its own review rather than a drive-by fix from a feature branch.
 export const buttonVariants = cva(
-  'inline-flex shrink-0 items-center justify-center gap-2 rounded-pill font-semibold transition-micro active:scale-[.97] disabled:pointer-events-none disabled:opacity-45',
+  // An INSET RING, never a border. A border changes the box size, so a hover
+  // that thickens the edge shifts the layout by a pixel; an inset shadow paints
+  // inside the box and never reflows. `active` nudges half a pixel down rather
+  // than scaling — a scale on text is a re-raster, and it reads as a wobble.
+  'inline-flex shrink-0 items-center justify-center gap-[6px] rounded-sm leading-none font-[550] transition-micro active:translate-y-[0.5px] disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-[15px] [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        primary: 'bg-primary text-primary-foreground hover:bg-primary-strong hover:text-white',
-        secondary:
-          'border-[1.5px] border-ink bg-transparent text-ink hover:bg-ink hover:text-white',
-        ghost: 'text-muted hover:bg-s2 hover:text-ink',
-        destructive: 'bg-danger text-white hover:brightness-95',
+        // Rationed to ONE per view. Hovers to BLACK, not to a darker orange:
+        // orange is the resting state, black is the commitment.
+        primary:
+          'bg-primary text-primary-foreground hover:bg-ink hover:text-white disabled:bg-line disabled:text-white disabled:opacity-100',
+        // The workhorse — white with a hairline ring.
+        secondary: 'surface-ring-firm bg-surface text-ink hover:bg-s2',
+        ghost: 'text-muted hover:bg-surface-3 hover:text-ink',
+        // ⚠ There is NO red in this palette. Destructive is solid INK, and it
+        // reads as dangerous because it is solid and because it says "Delete" —
+        // not because of hue (RETHEME.md §5). Mapping it to --danger would make
+        // it identical to primary, since --danger is now the brand orange.
+        destructive: 'bg-ink text-white hover:bg-primary',
       },
       size: {
-        default: 'px-4 py-[9px] text-[14px]',
-        sm: 'px-3 py-[6px] text-[13px]',
+        default: 'h-control px-3 text-[13px]',
+        sm: 'h-7 px-[9px] text-[12px] [&_svg]:size-[13px]',
+        lg: 'h-10 px-4 text-[14px]',
       },
     },
     defaultVariants: { variant: 'primary', size: 'default' },

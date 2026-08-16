@@ -36,10 +36,11 @@ export default async function EmbedBetaPage({
 
   return (
     <main className="mx-auto w-full max-w-[440px] p-4">
-      <h1 className="mb-1 text-[20px] leading-7 font-extrabold tracking-[-0.01em]">
-        Request early access
-      </h1>
-      <p className="mb-4 text-[14px] text-muted">
+      {/* The kit's `.sl-page-title` / `.sl-page-sub`: 20px at 650 with -0.02em,
+          then 13px muted. 650 rather than extrabold is the whole point of
+          loading Inter on its variable axis — see layout.tsx. */}
+      <h1 className="text-[20px] leading-7 font-[650] tracking-[-0.02em]">Request early access</h1>
+      <p className="mt-[2px] mb-4 text-[13px] text-muted">
         Tell us where to reach you and we&apos;ll be in touch.
       </p>
 

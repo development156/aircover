@@ -7,8 +7,18 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   interactive?: boolean
 }
 
-// shadcn/ui Card, restyled per Design System §6: --bg, --line, --r-card,
-// --sh-card, pad 16–24; interactive variant hovers translateY(-2px).
+// shadcn/ui Card, restyled to the kit's `.sl-card`.
+//
+// A RESTING CARD HAS NO SHADOW. A shadow means "this floats above the page", so
+// it is reserved for layers that genuinely do — which is what lets a dialog read
+// as ABOVE rather than merely bigger. Depth here comes from a hairline inset
+// ring instead, and that is also why the card reads flat and dense rather than
+// puffy. Keeping BOTH a border and the ring is the single most common way this
+// port goes wrong (RETHEME.md §9: "Cards look heavy"), so there is exactly one:
+// the ring.
+//
+// Only `interactive` cards lift. Cards that are not clickable do not move,
+// because a hover response is a promise that a click does something.
 export const Card = React.forwardRef<HTMLDivElement, CardProps>(function Card(
   { className, interactive, ...props },
   ref,
@@ -17,8 +27,14 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(function Card(
     <div
       ref={ref}
       className={cn(
-        'rounded-card border border-line bg-bg p-5 shadow-card',
-        interactive && 'transition-panel hover:-translate-y-0.5',
+        'surface-ring rounded-card bg-surface p-4',
+        // The kit draws this hover ring with --text-3, whose equivalent here is
+        // --ink-faint. Using --line-firm instead: ink-faint is ratcheted to a
+        // shrinking allowlist (ink-faint-exceptions.ts — adding an entry fails
+        // the gate), and a ring is a LINE, so a line token is the honest name
+        // for it regardless. Same rendered weight, no debt added.
+        interactive &&
+          'transition-panel hover:-translate-y-px hover:shadow-[inset_0_0_0_1px_var(--line-firm),var(--sh-card)]',
         className,
       )}
       {...props}
