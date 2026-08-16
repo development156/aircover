@@ -2,6 +2,7 @@ import { ChartColumn } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
+import { PerformanceStrip } from '@/components/analytics/performance-strip'
 import { AccountPanel } from '@/components/analytics/account-panel'
 import { ChannelTable } from '@/components/analytics/channel-table'
 import { PostTable } from '@/components/analytics/post-table'
@@ -43,6 +44,17 @@ export default async function AnalyticsPage() {
           </p>
         ) : null}
       </div>
+
+      {/* The reference opens this page with a KPI strip (1150x103) and the app
+          had none in ANY state. It is NOT gated on `hasPublished`, and that is
+          the point: these are ACCOUNT insights — reach, views, accounts engaged,
+          interactions — which Instagram reports for the account itself and which
+          do not require this workspace to have published anything. Hiding them
+          behind a post count would withhold numbers that already exist.
+
+          The tables below stay gated, because those genuinely are per-post rows
+          and there is nothing to tabulate until a post goes out. */}
+      <PerformanceStrip analytics={account} />
 
       <AccountPanel analytics={account} />
 
