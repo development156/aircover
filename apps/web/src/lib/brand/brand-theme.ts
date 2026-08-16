@@ -22,16 +22,16 @@ export const WHITE_RGB: Rgb = { r: 255, g: 255, b: 255 }
  * also the stricter of the two to read against.
  */
 export const SURFACE_RGB: Rgb = { r: 255, g: 255, b: 255 }
-/** tokens.css `--ink` (#171514) — headings, and the dark option for --pfg. */
-export const INK_RGB: Rgb = { r: 23, g: 21, b: 20 }
+/** tokens.css `--ink` (#000000) — headings, and the dark option for --pfg. */
+export const INK_RGB: Rgb = { r: 0, g: 0, b: 0 }
 
 const MIN_CONTRAST = 4.5
 const DARKEN_STEP = 0.03
 const MAX_DARKEN_ITERATIONS = 32
 
-// docs/08 §2 default brand orange (--p:#FF4B00 = rgb(255,75,0)) — the
+// Default brand orange (tokens.css --p: #FF6600 = rgb(255,102,0)) — the
 // fallback primary when no logo/colors were extracted yet.
-const DEFAULT_PRIMARY = parseOklch(rgbToOklch(255, 75, 0))
+const DEFAULT_PRIMARY = parseOklch(rgbToOklch(255, 102, 0))
 
 /**
  * The last-resort near-black both darkening loops fall back to.
@@ -139,21 +139,26 @@ export function brandSkinVars(colors: string[]): BrandSkinVars {
   }
 }
 
-// tokens.css v3 neutral/semantic hex, converted once to decimal RGB — never
+// tokens.css v4 neutral/semantic hex, converted once to decimal RGB — never
 // re-themed by Brand Skin, so these stay fixed regardless of `colors`. Keys keep
-// their legacy names (`s1`, `muted`) while the values track the v3 tokens; the
-// comment on each line is the mirror `guard-neutrals.test.ts` enforces.
+// their legacy names (`s1`, `muted`) while the values track the current tokens;
+// the comment on each line is the mirror `guard-neutrals.test.ts` enforces.
+//
+// v4 made the palette achromatic and dropped red/green/amber entirely, so `ok`
+// is black and `warn`/`danger` are both the brand orange. That is not a bug in
+// the mirror: severity is carried by fill weight + glyph + label, never by hue
+// (docs/ui-package/sahoda-labs/theme/RETHEME.md §5).
 export const NEUTRAL_RGB = {
-  bg: { r: 255, g: 255, b: 255 }, // --surface  #ffffff
-  s1: { r: 251, g: 250, b: 249 }, // --canvas   #fbfaf9
-  s2: { r: 245, g: 244, b: 242 }, // --surface-2 #f5f4f2
-  line: { r: 231, g: 229, b: 227 }, // --line   #e7e5e3
-  ink: { r: 23, g: 21, b: 20 }, // --ink        #171514
-  muted: { r: 107, g: 101, b: 96 }, // --ink-mute  #6b6560
-  faint: { r: 168, g: 162, b: 158 }, // --ink-faint #a8a29e
-  ok: { r: 21, g: 128, b: 61 }, // --ok         #15803d
-  warn: { r: 180, g: 83, b: 9 }, // --warn      #b45309
-  danger: { r: 200, g: 30, b: 30 }, // --danger #c81e1e
+  bg: { r: 255, g: 255, b: 255 }, // --surface   #ffffff
+  s1: { r: 255, g: 255, b: 255 }, // --canvas    #ffffff
+  s2: { r: 250, g: 250, b: 250 }, // --surface-2 #fafafa
+  line: { r: 220, g: 220, b: 220 }, // --line    #dcdcdc
+  ink: { r: 0, g: 0, b: 0 }, // --ink            #000000
+  muted: { r: 87, g: 87, b: 86 }, // --ink-mute  #575756
+  faint: { r: 140, g: 140, b: 140 }, // --ink-faint #8c8c8c
+  ok: { r: 0, g: 0, b: 0 }, // --ok              #000000
+  warn: { r: 255, g: 102, b: 0 }, // --warn      #ff6600
+  danger: { r: 255, g: 102, b: 0 }, // --danger  #ff6600
 } as const satisfies Record<string, Rgb>
 
 function oklchOf(rgb: Rgb): string {
@@ -186,8 +191,8 @@ export function themeTokensFrom(colors: string[]): ThemeTokens {
     warning: oklchOf(NEUTRAL_RGB.warn),
     danger: oklchOf(NEUTRAL_RGB.danger),
     // tokens.css --r-lg (cards, nav items, wells). Pinned by guard-neutrals.test.ts.
-    radius: '14px',
-    fontHeading: 'Outfit',
-    fontBody: 'Outfit',
+    radius: '12px',
+    fontHeading: 'Inter',
+    fontBody: 'Inter',
   }
 }

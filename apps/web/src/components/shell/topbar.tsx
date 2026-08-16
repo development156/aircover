@@ -2,6 +2,7 @@ import { UserButton } from '@clerk/nextjs'
 import * as Sentry from '@sentry/nextjs'
 
 import { BrainRing } from '@/components/shell/brain-ring'
+import { CommandPalette } from '@/components/shell/command-palette'
 import { CreditChip } from '@/components/shell/credit-chip'
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher'
 import { readBrain, type BrainRead } from '@/lib/brand/read-brain'
@@ -69,7 +70,7 @@ export async function Topbar() {
   return (
     <header
       data-guide="topbar.root"
-      className="sticky top-0 z-5 flex h-topbar items-center gap-3 border-b border-line bg-s1/90 px-page backdrop-blur-[6px] max-narrow:gap-2 max-narrow:px-page-mobile"
+      className="sticky top-0 z-5 flex h-topbar flex-none items-center gap-3 border-b border-line-soft bg-surface px-page max-narrow:gap-2 max-narrow:px-page-mobile"
     >
       {/* min-w-0 is load-bearing: a flex item defaults to min-width:auto and
           refuses to shrink below its content, so without it the switcher pushed
@@ -77,7 +78,10 @@ export async function Topbar() {
       <div className="min-w-0">
         <WorkspaceSwitcher workspaces={workspaces} active={active} />
       </div>
-      <div className="ml-auto" />
+      {/* Centred, and it does the centring itself via `mx-auto` — a spacer div
+          would centre it against the wrong axis the moment the switcher's width
+          changes with the workspace name. */}
+      <CommandPalette />
       {/* Beside the credit chip, and before it: the brain is what Sahoda spends
           those credits ON, so it reads left-to-right as cause then cost. */}
       <BrainRing brain={brain} />

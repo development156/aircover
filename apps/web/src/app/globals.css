@@ -4,43 +4,49 @@
 /* If the package-exports import ever fails to resolve under a bundler change,
    fall back to: @import '../../../../../packages/shared/tokens.css'; */
 
-/* Bind next/font families to the canonical tokens (docs/design2.0/UI_RULES_v3.md;
-   Outfit now, Garet later via a display token after license — no font files
-   in-repo). next/font emits hashed family names, so the literal 'Outfit' /
-   'JetBrains Mono' in tokens.css can never match; this override is the
-   sanctioned runtime binding.
+/* Bind the next/font family to the canonical token. next/font emits a HASHED
+   family name, so the literal 'Inter' in tokens.css can never match; this
+   override is the sanctioned runtime binding.
 
-   v3 makes --sans/--mono the SOURCES and --ff a legacy alias of --sans, so the
-   binding lands on --sans: the type shorthands (--t-body, --t-h1 …) read --sans
-   directly and would otherwise keep the unhashed family. --ff follows for free,
-   because var() resolves against the final cascade value. */
+   The binding lands on --sans because the type shorthands (--t-body, --t-h1 …)
+   read --sans directly and would otherwise keep the unhashed family. --ff and
+   --mono follow for free — both alias --sans — because var() resolves against
+   the final cascade value.
+
+   Inter is loaded as a VARIABLE font (no `weight` array in layout.tsx). That is
+   load-bearing, not incidental: the kit separates a label from its value with
+   550 and 650, which do not exist as static instances. Pin the weights and they
+   round to 500/600 and the whole hierarchy flattens (RETHEME.md §2). */
 :root {
-  --sans: var(--font-outfit), Inter, system-ui, 'Noto Sans Devanagari', sans-serif;
-  --mono: var(--font-jbmono), 'SF Mono', ui-monospace, monospace;
+  --sans:
+    var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans Devanagari',
+    sans-serif;
 }
 
-/* dark:* utilities keyed to the canonical [data-theme] attribute (docs/08 §2),
-   not a .dark class. */
-@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+/* dark:* utilities key to BOTH signals. tokens.css defines the dark block for
+   [data-theme='dark'] and .dark together, and this must agree with it — a
+   variant that matches only one of the two is exactly how a light dropdown ends
+   up inside a dark panel (RETHEME.md §6). */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *, .dark, .dark *));
 
 @theme {
   /* Tokens-only enforcement (docs/08 §1–2): wipe the stock palette so raw
-     Tailwind colors (bg-red-500 …) do not compile at all. */
-  --color-*: initial;
-  /* SANCTIONED LITERAL — the only hex in app code. docs/08 §6 requires white
-     on --brand-deep/--ink (buttons, toasts) and tokens.css v3 still has no
-     --white token. Follow-up filed with the shared owner: add --white via the
-     Readability Guard, then replace this with var(--white). */
-  --color-white: #ffffff;
+     Tailwind colors (bg-red-500 …) do not compile at all.
 
-  /* Two breakpoints only (docs/08 §4): 700 / 1180. 1180 is also where v3
-     collapses the sidebar to --spacing-rail-collapsed. */
+     THIS WIPE STAYS. It is the mechanism that keeps red out of a palette that
+     deliberately has none (RETHEME.md §5) — dropping it would let `bg-red-500`
+     compile again and put the traffic-light convention back one careless class
+     at a time. The shadcn bridge is made to resolve by COMPLETING the
+     `@theme inline` coverage below, not by re-opening the stock palette. */
+  --color-*: initial;
+
+  /* Two breakpoints only (docs/08 §4): 700 / 1180. 1180 is also where the
+     sidebar collapses to --spacing-rail-collapsed. */
   --breakpoint-*: initial;
   --breakpoint-narrow: 700px;
   --breakpoint-wide: 1180px;
 
-  /* No v3 token — kept as literals until the shell spec names them. */
-  --spacing-rail-collapsed: 64px;
+  /* Not token-backed — layout constants the kit does not name. */
   --spacing-page-mobile: 14px;
   --spacing-grid: 18px;
 }
@@ -73,12 +79,14 @@
   --color-brand-tint: var(--brand-tint);
   --color-brand-lift: var(--brand-lift);
 
-  /* ---- L2 · warm neutrals ---- */
+  /* ---- L2 · achromatic neutrals ---- */
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-line: var(--line);
   --color-line-firm: var(--line-firm);
+  --color-line-soft: var(--line-soft);
   --color-ink: var(--ink);
   --color-ink-body: var(--ink-body);
   --color-ink-mute: var(--ink-mute);
@@ -111,24 +119,55 @@
   --color-muted: var(--muted);
   --color-faint: var(--faint);
 
-  /* shadcn-compat aliases (restyle-on-vend policy — see components.json note):
-     vended `bg-accent`/`bg-muted` must be rewritten to bg-s2 by hand. */
-  --color-background: var(--bg);
+  /* ---- shadcn-compat aliases — the bridge layer ----
+     theme/sahoda-shadcn-v4.css installs by pasting `--background`, `--card`,
+     `--primary` … over shadcn's own :root. That is Path A4 for an app whose
+     `@theme inline` points at THOSE names. This app points at Sahoda token
+     names instead, so the bridge is wired here rather than pasted: every
+     shadcn utility resolves to the Sahoda token carrying the same meaning,
+     and the values match the bridge file byte for byte.
+
+     Coverage is the thing that was actually missing. accent-foreground,
+     destructive-foreground, chart-* and the whole sidebar-* family had no
+     entry at all, so those utilities compiled to nothing. */
+  --color-background: var(--canvas);
   --color-foreground: var(--ink);
-  --color-card: var(--bg);
+  --color-card: var(--surface);
   --color-card-foreground: var(--ink);
-  --color-popover: var(--bg);
+  --color-popover: var(--surface);
   --color-popover-foreground: var(--ink);
-  --color-secondary: var(--s2);
+  --color-secondary: var(--surface-2);
   --color-secondary-foreground: var(--ink);
   --color-muted-foreground: var(--muted);
   --color-destructive: var(--danger);
+  --color-destructive-foreground: var(--white);
+  --color-accent-foreground: var(--ink);
   --color-border: var(--line);
   --color-input: var(--line);
   --color-ring: var(--acc);
+  --color-white: var(--white);
 
-  /* ---- Shape — v3 names, plus the legacy trio pointing at the same steps ---- */
+  /* Charts separate by LIGHTNESS, not hue — one brand colour, then
+     achromatic. Survives greyscale and colour-blind viewers. */
+  --color-chart-1: var(--brand);
+  --color-chart-2: var(--ink);
+  --color-chart-3: var(--ink-mute);
+  --color-chart-4: var(--brand-lift);
+  --color-chart-5: var(--line);
+
+  /* Sidebar reads as chrome — a step off the page ground. */
+  --color-sidebar: var(--surface-2);
+  --color-sidebar-foreground: var(--ink-mute);
+  --color-sidebar-primary: var(--brand);
+  --color-sidebar-primary-foreground: var(--brand-ink);
+  --color-sidebar-accent: var(--surface-3);
+  --color-sidebar-accent-foreground: var(--ink);
+  --color-sidebar-border: var(--line);
+  --color-sidebar-ring: var(--acc);
+
+  /* ---- Shape — kit names, plus the legacy trio pointing at the same steps ---- */
   --radius-sm: var(--r-sm);
+  --radius: var(--r);
   --radius-md: var(--r-md);
   --radius-lg: var(--r-lg);
   --radius-full: var(--r-full);
@@ -136,21 +175,28 @@
   --radius-card: var(--r-card);
   --radius-pill: var(--r-pill);
 
-  /* ---- Elevation ---- */
+  /* ---- Elevation ----
+     Hairline first. A shadow means "this floats above the page", so only
+     overlays get one — which is what lets a dialog read as ABOVE rather than
+     merely bigger. Resting cards use an inset ring (shadow-ring below). */
   --shadow-card: var(--sh-card);
   --shadow-pop: var(--sh-pop);
-  /* Credits balance hero only; color-mix keeps it following the tenant brand. */
+  --shadow-lg: var(--sh-lg);
+  /* Credits balance hero only. */
   --shadow-brand: var(--sh-brand);
 
   /* ---- Type ---- */
   --font-sans: var(--sans);
   --font-mono: var(--mono);
 
-  /* ---- Shell dims (v3 §layout) → w-rail, h-topbar, p-page, max-w-content ---- */
+  /* ---- Shell dims → w-rail, h-topbar, p-page, max-w-content ---- */
   --spacing-rail: var(--sidebar-w);
+  --spacing-rail-collapsed: var(--sidebar-w-collapsed);
   --spacing-topbar: var(--topbar-h);
   --spacing-page: var(--content-pad);
   --spacing-home-rail: var(--rail-w);
+  --spacing-control: var(--control-h);
+  --spacing-input: var(--input-h);
   --container-content: var(--content-max);
 
   /* ---- Motion ----
@@ -163,19 +209,47 @@
 }
 
 @layer base {
-  /* v3 base scale, matching sahoda_design_system_v3.html: canvas background,
-     --ink-body for body copy, --ink reserved for headings. Body type is the
-     --t-body shorthand rather than a hand-written font declaration. */
+  /* Base scale, matching the kit: canvas ground, --ink-body for body copy,
+     --ink for headings. Body type is the --t-body shorthand (400 13px/20px)
+     rather than a hand-written font declaration.
+
+     13px, not 16px. Density is most of what makes the reference read like
+     itself; an app that fights this looks puffy and sparse no matter how
+     correct its colours are (RETHEME.md §9). */
   body {
     background: var(--canvas);
     color: var(--ink-body);
     font: var(--t-body);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
   h1,
   h2,
   h3 {
     color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  h1 {
+    letter-spacing: -0.02em;
+  }
+  /* Thin, low-contrast scrollbars — chrome should not compete with content. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-soft) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--line-soft);
+    border-radius: var(--r-full);
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--line-firm);
   }
   /* :focus-visible is NOT declared here. tokens.css v3 ships the single global
      focus treatment (2px --brand-text, offset 2, --r-sm radius) unlayered, so it
@@ -205,8 +279,22 @@
   text-transform: uppercase;
 }
 
+/* ---- Surface treatments ----
+   An INSET RING, not a border. A border changes the box size, so a hover that
+   thickens the edge shifts the layout by a pixel; an inset shadow paints inside
+   the box and never reflows. It is also why cards read flat and dense instead
+   of puffy — and using border AND ring together is the single most common way
+   this port goes wrong (RETHEME.md §9). Pick one: this. */
+@utility surface-ring {
+  box-shadow: inset 0 0 0 1px var(--line-soft);
+}
+/* The firmer ring — controls, and cards that need to separate from a fill. */
+@utility surface-ring-firm {
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
 /* Motion tokens as utilities (docs/08 §5): micro = --dur-1, panels = --dur-2.
-   Both now alias the v3 --dur-fast / --dur-base. */
+   Both now alias --dur-fast / --dur-base. */
 @utility transition-micro {
   transition-property: color, background-color, border-color, opacity, box-shadow, transform;
   transition-duration: var(--dur-1);

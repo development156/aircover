@@ -60,15 +60,25 @@ export function NavItem({
       data-guide={guide}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex items-center gap-[11px] rounded-input px-3 py-[9px] font-medium text-muted transition-micro',
-        'hover:bg-s2 hover:text-ink',
+        // 34px tall, 9px inset, 13px/500 — the kit's control height. The density
+        // is not incidental: 34px rows against 40px is most of what separates
+        // this shell from a stock dashboard.
+        'relative flex h-[34px] items-center gap-[10px] rounded-sm px-[9px] text-[13px] font-medium text-muted transition-micro',
+        'hover:bg-surface-3 hover:text-ink',
         'max-wide:justify-center max-wide:px-0',
-        // dark: --t50 stays warm-light while --acc flips to Orange300 — pairing
-        // them is ~1.7:1, so the active surface becomes s2 on dark (9.7:1).
-        active && 'bg-tint-50 font-semibold text-accent dark:bg-s2',
+        // The active surface is an ALPHA wash (--t50 = orange at 6%), so it
+        // composites correctly on white AND on the dark shell — which is why
+        // this no longer needs the `dark:bg-s2` override the solid v3 tint did.
+        // Orange on the dark-composited wash measures ~6.7:1.
+        active && 'bg-brand-wash font-semibold text-accent',
+        // The 2px rail. Structure, not decoration: it is the one active signal
+        // that survives greyscale, so the state does not rest on hue alone.
+        active &&
+          'before:absolute before:top-2 before:bottom-2 before:-left-[9px] before:w-[2px] before:rounded-full before:bg-brand before:content-[""]',
+        active && 'max-wide:before:hidden',
       )}
     >
-      <Icon size={20} strokeWidth={1.7} className="shrink-0" />
+      <Icon size={17} strokeWidth={1.7} className="shrink-0" />
       <span className="max-wide:hidden">{label}</span>
     </Link>
   )

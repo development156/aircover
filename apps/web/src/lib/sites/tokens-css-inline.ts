@@ -1,5 +1,5 @@
 /**
- * Byte-for-byte inline of `packages/shared/tokens.css` (Design Tokens v3.0).
+ * Byte-for-byte inline of `packages/shared/tokens.css` (Design Tokens v4.0).
  *
  * The /sites preview needs this stylesheet as a STRING to inject into
  * `renderBundle`'s RenderContext. It used to be read from disk at request time
@@ -16,48 +16,75 @@
  *
  * DO NOT hand-edit. `tokens.css` remains the single source of truth;
  * `tokens-css-inline.test.ts` reads it from disk and fails if this copy drifts.
- * Regenerate rather than patch: the v3 file contains backticks in its comments,
- * so the copy is escaped for the template literal and cannot be pasted raw.
+ * Regenerate with scripts/gen-tokens-inline.mjs rather than patching by hand.
  */
 export const TOKENS_CSS = `/* ============================================================
-   SAHODA LABS — Design Tokens v3.0 "The Ledger"
-   Supersedes v2 and Design System doc 08 §2 token values.
+   SAHODA LABS — Design Tokens v4.0 "The Kit"
+   Supersedes v3.0 "The Ledger" (warm neutrals + Outfit).
 
    Lives at: packages/shared/tokens.css
-   Reference: docs/design2.0/sahoda_design_system_v3.html
-   Rules:     docs/design2.0/UI_RULES_v3.md
+   Reference: docs/ui-package/sahoda-labs/ — the RENDERED output of
+              theme/sahoda-tokens.css + theme/sahoda-components.css.
+   Retheme guide: docs/ui-package/sahoda-labs/theme/RETHEME.md
 
-   THESIS — structure carries meaning, colour carries identity.
-   The app wears each customer's brand, so no state may depend on
-   colour to be understood. See the Certainty System at the bottom.
+   WHAT CHANGED FROM v3 — values only, no names.
+   Every token NAME in v3 survives, so every \`bg-s1\` / \`text-muted\` /
+   \`type-h1\` call site in apps/web keeps compiling and simply renders
+   in the new palette. What moved is what the names RESOLVE TO:
+     · warm neutrals (#fbfaf9 / #171514) -> achromatic (white / black)
+     · Sahoda Orange #ff4b00 -> #ff6600
+     · Outfit -> Inter (variable axis; 550 + 650 are load-bearing)
+     · base body type 14px -> 13px (the density is most of the look)
+     · solid brand tints -> orange at alpha (composites on any surface)
+
+   THE PALETTE IS FIVE COLOURS. Everything else is one of them at
+   reduced alpha. Platform marks (Instagram, LinkedIn, ...) keep their
+   own brand colours because they are identity, not UI chrome — that is
+   the only exception, and it never leaks into buttons, text or surfaces.
+
+   THERE IS NO RED. Severity is carried by fill weight + glyph + label,
+   never by hue (RETHEME.md §5). --danger and --warn are both orange on
+   purpose; the four-rung ladder separates them by FILL, and the label
+   does the rest. This survives greyscale and colour-blind viewers.
 
    THREE LAYERS — read before editing:
-   L1  Brand Skin sources (--p …). The theming engine and the
-       workspace_themes DB rows override EXACTLY these seven
-       (TSD §17). Never rename. Never hardcode their values.
-   L2  v3 semantic names. Brand-linked ones ALIAS INTO L1 so every
-       surface re-themes. Neutrals and semantics are sources.
-   L3  Legacy names (--bg, --s1, --muted …) alias into L2 so
-       existing components keep rendering during migration.
-       Delete an alias only when nothing references it.
+   L1  Brand Skin sources (--p ...). Brand Skin is CUT, but the seven
+       names stay: apps/web/src/lib/brand/* still imports them and the
+       whole L2 brand block aliases into them.
+   L2  Semantic names. Brand-linked ones ALIAS INTO L1 so one flip
+       retunes every surface. Neutrals and semantics are sources.
+   L3  Legacy names (--bg, --s1, --muted ...) alias into L2 so existing
+       components keep rendering. Delete an alias only when nothing
+       references it.
 
    SPACING IS --space-N, NOT --s-N.
-   The legacy system uses --s1 / --s2 as SURFACE COLOURS. Redefining
-   them as spacing turns \`background: var(--s1)\` into
-   \`background: 4px\` and blanks every card in the app.
+   The portable kit calls its spacing scale --sl-s1 ... --sl-s9. This
+   file must NOT copy those names: --s1 / --s2 are SURFACE COLOURS here
+   (158 references across apps/web), and redefining them as spacing
+   turns \`background: var(--s1)\` into \`background: 4px\` and blanks every
+   card in the app. The two scales are identical in value anyway
+   (4/8/12/16/20/24/32/40/48) — use --space-N.
    ============================================================ */
 
 :root {
-  /* ---------- L1 · BRAND SKIN SOURCES (DB contract — 7 vars) ---------- */
-  --p: #ff4b00; /* Sahoda Orange 500 */
-  --pfg: #131313; /* text/icon ON primary — 5.54:1 ok */
-  --pstrong: #d73f00; /* large brand fills; white text 4.56:1 ok */
-  --acc: #ba3700; /* Ember — links, accent text, FOCUS RING 5.78:1 ok */
-  --t50: #fff2ed;
-  --t100: #ffe4d9;
-  --t300: #ffa580;
+  /* ---------- L1 · BRAND SOURCES (7 names — never rename) ---------- */
+  --p: #ff6600; /* Sahoda Orange — the one brand colour */
+  --pfg: #ffffff; /* text/icon ON primary. 3.13:1 — see NOTE below */
+  --pstrong: #000000; /* primary hovers to BLACK, not a darker orange:
+                             orange is the resting state, black is the
+                             commitment (RETHEME.md §3) */
+  --acc: #ff6600; /* links, accent text, FOCUS RING */
+  /* Tints are orange AT ALPHA, not solid steps: they composite correctly
+     on white, on --surface-2 and on dark without a second set of values.
+     Chosen by USE, not by lightness —
+       --t50  washes   (committed backgrounds)
+       --t100 rings    (committed borders — must stay visible)
+       --t300 lifts    (hover fills, dark-mode accents) */
+  --t50: rgba(255, 102, 0, 0.06);
+  --t100: rgba(255, 102, 0, 0.4);
+  --t300: rgba(255, 102, 0, 0.24);
 
-  /* ---------- L2 · BRAND (aliases into L1 — re-theme safe) ---------- */
+  /* ---------- L2 · BRAND (aliases into L1) ---------- */
   --brand: var(--p);
   --brand-ink: var(--pfg);
   --brand-deep: var(--pstrong);
@@ -66,57 +93,79 @@ export const TOKENS_CSS = `/* ==================================================
   --brand-tint: var(--t100);
   --brand-lift: var(--t300);
 
-  /* ---------- L2 · WARM NEUTRALS ----------
-     Warm-leaning deliberately: cool greys fight warm tenant brands,
-     and a large share of Indian SMB branding is warm. */
-  --canvas: #fbfaf9; /* app background */
+  /* ---------- L2 · ACHROMATIC NEUTRALS ----------
+     Ground and card are the SAME white, separated by a hairline. That
+     is deliberate: a card tinted off the page ground reads as a box
+     inside a box, and it is why this UI reads flat and dense rather
+     than puffy. Depth comes from the ring, not from a fill step. */
+  --canvas: #ffffff; /* app background */
   --surface: #ffffff; /* cards, sidebar, topbar */
-  --surface-2: #f5f4f2; /* wells, subtle fills */
-  --line: #e7e5e3; /* hairlines — these do the structural work */
-  --line-firm: #d6d3d0; /* dashed borders, stronger dividers */
-  --ink: #171514; /* headings */
-  --ink-body: #3d3936; /* body text */
-  --ink-mute: #6b6560; /* secondary text */
-  --ink-faint: #a8a29e; /* DISABLED + DECORATIVE ONLY — fails 4.5:1,
-                             never content text */
+  --surface-2: #fafafa; /* wells, subtle fills, chrome */
+  --surface-3: #f4f4f4; /* hover wash, pressed states */
+  --line: #dcdcdc; /* hairlines — these do the structural work */
+  --line-firm: rgba(0, 0, 0, 0.3); /* dashed borders, stronger dividers */
+  --line-soft: rgba(0, 0, 0, 0.08); /* card inset rings */
+  --ink: #000000; /* headings */
+  --ink-body: #000000; /* body text */
+  --ink-mute: #575756; /* secondary text — 7.0:1 on white */
+  /* DISABLED + DECORATIVE ONLY — 3.54:1, never content text.
+     Flattened to hex rather than left as rgba(0,0,0,.45): the Readability
+     Guard mirrors this token as decimal RGB and can only parse 6-digit hex
+     (guard-neutrals.test.ts). #8c8c8c IS black-45 composited on white. */
+  --ink-faint: #8c8c8c;
+  --white: #ffffff; /* was the one sanctioned hex in globals.css */
 
   /* ---------- L2 · SEMANTIC ----------
-     Strokes, icons and text only. NEVER large fills. Brand owns fills.
-     This is what stops a tenant whose brand is red from colliding
-     with danger red — they never compete for the same surface. */
-  --ok: #15803d;
-  --ok-bg: #eaf6ee;
-  --warn: #b45309;
-  --warn-bg: #fbf1e4;
-  --danger: #c81e1e;
-  --danger-bg: #fdecec;
-  --info: #1d4ed8;
-  --info-bg: #eaf0fd;
+     Strokes, icons and text only. NEVER large fills.
+     There is no red, green or amber in this palette (RETHEME.md §5).
+     --danger and --warn are BOTH orange; they are told apart by fill
+     weight and by the label, which is what survives a photocopier.
+     --ok and --info are achromatic, because "it worked" and "here is
+     some context" are the two states that never need to shout. */
+  --ok: #000000;
+  --ok-bg: rgba(0, 0, 0, 0.04);
+  --warn: #ff6600;
+  --warn-bg: rgba(255, 102, 0, 0.06);
+  --danger: #ff6600;
+  --danger-bg: rgba(255, 102, 0, 0.06);
+  --info: #575756;
+  --info-bg: rgba(0, 0, 0, 0.04);
 
-  /* ---------- L2 · CHANNEL ACCENTS (platform-owned; chips only) ---------- */
+  /* ---------- L2 · CHANNEL ACCENTS (platform-owned; chips only) ----------
+     The one place a non-palette colour is allowed: a platform mark is
+     identity, not UI chrome. It never leaks into buttons or text. */
   --channel-instagram: #e1306c;
   --channel-google: #1a73e8;
   --channel-whatsapp: #25d366;
-  --channel-x: #171514;
+  --channel-x: #000000;
   --channel-linkedin: #0a66c2;
 
   /* ---------- L2 · CERTAINTY ---------- */
-  --hatch: rgba(23, 21, 20, 0.16); /* simulated-state diagonal */
+  --hatch: rgba(0, 0, 0, 0.16); /* simulated-state diagonal */
 
   /* ---------- L2 · TYPE ----------
-     Mono appears in exactly three places: the topbar credit pill,
-     the Credits balance, and eyebrow labels. Nowhere else.
-     Anything countable gets tabular-nums. */
-  --sans: 'Outfit', system-ui, 'Noto Sans Devanagari', -apple-system, sans-serif;
-  --mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+     Inter, variable axis. 550 and 650 are load-bearing, not decoration:
+     the UI separates a label from its value with a half-step instead of
+     jumping to bold. Load it as a VARIABLE font or they round to
+     500/600 and the whole hierarchy flattens (RETHEME.md §2).
 
-  --t-display: 700 32px/38px var(--sans);
-  --t-h1: 700 24px/30px var(--sans);
-  --t-h2: 600 16px/22px var(--sans);
-  --t-body: 400 14px/22px var(--sans);
-  --t-sm: 400 13px/19px var(--sans);
-  --t-eyebrow: 600 11px/14px var(--mono);
-  --t-eyebrow-ls: 0.14em;
+     The kit ships NO mono family, so --mono aliases --sans. The three
+     places v3 used mono — the topbar credit pill, the Credits balance
+     and eyebrow labels — are sans here; anything countable still gets
+     tabular-nums, which Inter provides. */
+  --sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans Devanagari', sans-serif;
+  --mono: var(--sans);
+
+  /* Base is 13px, not 16px. This is the second biggest reason the
+     reference reads denser than a stock dashboard (RETHEME.md §2). */
+  --t-display: 700 30px/36px var(--sans);
+  --t-h1: 600 24px/30px var(--sans);
+  --t-h2: 600 20px/26px var(--sans);
+  --t-body: 400 13px/20px var(--sans);
+  --t-sm: 400 12px/18px var(--sans);
+  --t-eyebrow: 600 11px/14px var(--sans);
+  --t-eyebrow-ls: 0.06em;
 
   /* ---------- L2 · SPACE (4pt scale) ----------
      --space-N. Do NOT introduce --s1/--s2 — see header. */
@@ -131,31 +180,37 @@ export const TOKENS_CSS = `/* ==================================================
   --space-12: 48px;
 
   /* ---------- L2 · RADIUS ---------- */
-  --r-sm: 6px; /* badges, small chips */
-  --r-md: 10px; /* buttons, inputs, channel chips */
-  --r-lg: 14px; /* cards, nav items, wells */
+  --r-sm: 6px; /* buttons, inputs, badges, chips */
+  --r: 8px; /* tiles, small surfaces */
+  --r-md: 10px; /* segmented controls, larger controls */
+  --r-lg: 12px; /* cards, nav items, wells */
   --r-full: 999px;
 
-  /* ---------- L2 · ELEVATION (borders separate; shadows are minimal) ---------- */
-  --sh-card: 0 1px 2px rgba(23, 21, 20, 0.05);
-  --sh-pop: 0 6px 20px rgba(23, 21, 20, 0.1);
-  /* Credits balance hero ONLY. color-mix keeps it re-theme-safe —
-     a frozen rgba would not follow the tenant brand. */
+  /* ---------- L2 · ELEVATION ----------
+     Hairline first. A shadow means "this floats above the page", so
+     only overlays get one. Resting cards use an inset ring. */
+  --sh-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --sh-pop: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --sh-lg: 0 16px 48px rgba(0, 0, 0, 0.14);
+  /* Credits balance hero ONLY. color-mix keeps it tied to --p. */
   --sh-brand: 0 8px 24px color-mix(in srgb, var(--p) 24%, transparent);
 
   /* ---------- L2 · LAYOUT ---------- */
-  --sidebar-w: 220px; /* collapses to 64px at 1180px and below */
+  --sidebar-w: 232px; /* collapses to 64px at 1180px and below */
+  --sidebar-w-collapsed: 64px;
   --topbar-h: 56px;
   --content-max: 1080px; /* left-aligned; caps, leaves right whitespace */
   --content-pad: 24px;
   --rail-w: 280px; /* Home only */
+  --control-h: 34px; /* buttons, segmented controls */
+  --input-h: 38px; /* text inputs, selects */
 
   /* ---------- L2 · MOTION ---------- */
-  --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-sweep: cubic-bezier(0.2, 0, 0, 1); /* blade-sweep signature only */
-  --dur-fast: 120ms;
-  --dur-base: 200ms;
-  --dur-slow: 320ms;
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-sweep: cubic-bezier(0.16, 1, 0.3, 1); /* blade-sweep signature only */
+  --dur-fast: 140ms;
+  --dur-base: 180ms;
+  --dur-slow: 280ms;
 
   /* ---------- L3 · LEGACY ALIASES ----------
      Existing components only. Remove one at a time as surfaces migrate.
@@ -166,7 +221,7 @@ export const TOKENS_CSS = `/* ==================================================
   --muted: var(--ink-mute);
   --faint: var(--ink-faint);
   --ff: var(--sans);
-  --r-input: var(--r-md);
+  --r-input: var(--r-sm);
   --r-card: var(--r-lg);
   --r-pill: var(--r-full);
   --dur-1: var(--dur-fast);
@@ -175,40 +230,56 @@ export const TOKENS_CSS = `/* ==================================================
      and --sh-pop already carry their legacy names above — no alias needed. */
 }
 
-/* ---------- DARK ---------- */
-[data-theme='dark'] {
-  --canvas: #141210;
-  --surface: #1d1a18;
-  --surface-2: #262220;
-  --line: #332e2b;
-  --line-firm: #4a433f;
-  --ink: #f7f5f3;
-  --ink-body: #d8d3cf;
-  --ink-mute: #a8a29e;
-  --ink-faint: #6b6560;
+/* ---------- DARK ----------
+   Responds to [data-theme='dark'] AND .dark, because next-themes and
+   Tailwind reach for the class while the app's own toggle sets the
+   attribute. Running only one of the two is how a light dropdown ends
+   up inside a dark panel (RETHEME.md §6). */
+:root[data-theme='dark'],
+[data-theme='dark'],
+.dark {
+  --canvas: #0b0b0c;
+  --surface: #131315;
+  --surface-2: #17171a;
+  --surface-3: #1f1f23;
+  --line: rgba(255, 255, 255, 0.14);
+  --line-firm: rgba(255, 255, 255, 0.3);
+  --line-soft: rgba(255, 255, 255, 0.1);
+  --ink: #ffffff;
+  --ink-body: #ffffff;
+  --ink-mute: #dcdcdc; /* not #575756 — grey dies on black */
+  --ink-faint: rgba(255, 255, 255, 0.45);
 
-  --acc: var(--t300); /* focus + accent on dark = Orange 300, 9.68:1 ok */
-  --channel-x: #f7f5f3; /* the X glyph is invisible on dark otherwise */
+  /* Orange does not shift between themes — the one fixed point. It is
+     NOT re-pointed at a tint here: a 24%-alpha focus ring is invisible. */
+  --acc: #ff6600;
+  --channel-x: #ffffff; /* the X glyph is invisible on dark otherwise */
 
-  --ok: #4ade80;
-  --ok-bg: #12291b;
-  --warn: #fbbf24;
-  --warn-bg: #2b1f10;
-  --danger: #f87171;
-  --danger-bg: #2e1414;
-  --info: #93c5fd;
-  --info-bg: #101c2e;
+  --ok: #ffffff;
+  --ok-bg: rgba(255, 255, 255, 0.06);
+  --warn: #ff6600;
+  --warn-bg: rgba(255, 102, 0, 0.12);
+  --danger: #ff6600;
+  --danger-bg: rgba(255, 102, 0, 0.12);
+  --info: #dcdcdc;
+  --info-bg: rgba(255, 255, 255, 0.06);
 
-  --hatch: rgba(247, 245, 243, 0.2);
+  --hatch: rgba(255, 255, 255, 0.2);
   --sh-card: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --sh-pop: 0 6px 20px rgba(0, 0, 0, 0.6);
+  --sh-pop: 0 4px 16px rgba(0, 0, 0, 0.6);
+  --sh-lg: 0 16px 48px rgba(0, 0, 0, 0.7);
 }
 
 /* ---------- GLOBAL FOCUS — one treatment, no per-component overrides ---------- */
 :focus-visible {
-  outline: 2px solid var(--brand-text);
+  outline: 2px solid var(--acc);
   outline-offset: 2px;
   border-radius: var(--r-sm);
+}
+
+::selection {
+  background: rgba(255, 102, 0, 0.16);
+  color: var(--ink);
 }
 
 /* ============================================================
@@ -217,6 +288,14 @@ export const TOKENS_CSS = `/* ==================================================
    signature that survives recolour, greyscale and colourblindness.
    Apply to any status-bearing element: post chips, planner pills,
    publish logs, wallet entries.
+
+   These now line up 1:1 with the kit's four-rung ladder
+   (RETHEME.md §5), so a Certainty state and an .sl-badge rung are
+   the same object seen from two angles:
+     .is-real      = rung 1 urgent   solid orange
+     .is-committed = rung 3 pending  orange ring on a wash
+     .is-proposed  = rung 4 calm     grey outline, dashed
+     .is-simulated = (no rung)       hatched, always labelled
    ============================================================ */
 
 /* REAL — it happened. Solid fill, no border. Settled. */
@@ -251,7 +330,7 @@ export const TOKENS_CSS = `/* ==================================================
 }
 
 /* The blade marks AGENCY — Sahoda acted, rather than the user.
-   Tints with the tenant brand automatically. One meaning only. */
+   One meaning only. */
 .blade {
   display: inline-block;
   width: 9px;
@@ -261,7 +340,8 @@ export const TOKENS_CSS = `/* ==================================================
   flex: none;
 }
 
-/* Anything countable that the user is accountable for. */
+/* Anything countable that the user is accountable for. Inter carries
+   tabular figures, so this no longer needs a second family. */
 .num {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;

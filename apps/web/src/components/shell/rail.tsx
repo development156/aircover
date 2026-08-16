@@ -1,4 +1,6 @@
 import type { Route } from 'next'
+import Image from 'next/image'
+import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
 
 import { NavItem, type NavIconName } from '@/components/shell/nav-item'
@@ -7,12 +9,14 @@ import { getOpsAdmin } from '@/lib/ops/guard'
 // Alpha nav subset only — every href has a real page (typedRoutes enforces it).
 // Full nav (Loop, Measure, …) lands with its modules per docs/06 §3.
 //
-// SITES IS DELIBERATELY ABSENT, not unbuilt. `/sites` still exists, still
-// generates, still previews, and its tests still run — it is out of BETA scope
-// because the deploy half is unowned (no Cloudflare client, `sites.status` never
-// leaves 'draft'), so the module can only ever show a customer a preview of an
-// address they cannot have. The route is left reachable by URL on purpose: the
-// code is not dead, it is waiting. Restoring it is one line here.
+// SITES IS PRESENT AGAIN, by operator instruction during the UI port
+// (.claude/UI_PORT_CHECKPOINT.md). It was previously omitted on purpose, and
+// that reasoning has NOT been retired — only overruled: the deploy half is
+// still unowned (no Cloudflare client, `sites.status` never leaves 'draft'), so
+// the module shows a customer a preview of an address they cannot yet have.
+// Restoring the entry is one line; removing it again is the same line. If the
+// deploy half is still unowned when this ships, that is the thing to fix — not
+// this list.
 const NAV: ReadonlyArray<{
   href: Route
   label: string
@@ -28,6 +32,7 @@ const NAV: ReadonlyArray<{
   { href: '/posts', label: 'Posts', icon: 'square-pen', guide: 'nav.posts', section: 'Create' },
   { href: '/planner', label: 'Planner', icon: 'calendar-days', guide: 'nav.planner' },
   { href: '/inbox', label: 'Inbox', icon: 'messages-square', guide: 'nav.inbox' },
+  { href: '/sites', label: 'Sites', icon: 'globe', guide: 'nav.sites' },
   { href: '/analytics', label: 'Analytics', icon: 'chart-column', guide: 'nav.analytics' },
   { href: '/connections', label: 'Connections', icon: 'link-2', guide: 'nav.connections' },
   { href: '/wallet', label: 'Wallet', icon: 'wallet', guide: 'nav.wallet' },
@@ -60,20 +65,50 @@ export async function Rail() {
   return (
     <aside
       data-guide="nav.rail"
-      className="sticky top-0 flex h-dvh w-rail flex-col gap-1 border-r border-line bg-bg px-3 py-[18px] max-wide:w-rail-collapsed max-wide:px-2"
+      className="sticky top-0 flex h-dvh w-rail flex-col border-r border-line-soft bg-surface max-wide:w-rail-collapsed"
     >
-      <div className="mb-4 flex items-center gap-[10px] px-3 max-wide:justify-center max-wide:px-0">
-        {/* Blade glyph placeholder — real SVG mask (auto-tints with Brand Skin) later */}
-        <span aria-hidden className="size-[18px] shrink-0 rounded-[5px] bg-primary" />
-        <span className="text-[17px] font-extrabold tracking-[-0.01em] max-wide:hidden">
-          Sahoda
-        </span>
+      {/* Brand block is exactly topbar-height so the rail's baseline and the
+          header's baseline are the same line across the fold. */}
+      <div className="flex h-topbar flex-none items-center px-4 max-wide:justify-center max-wide:px-0">
+        <Link href="/home" aria-label="Sahoda — go to Home" className="rounded-sm">
+          {/* The supplied lockup is mark + wordmark in ONE file. Collapsing the
+              rail CROPS the container to the mark rather than scaling the whole
+              lockup down into illegibility — which is why this is an
+              overflow-hidden box with a fixed height, not a resized image. */}
+          <span className="block h-[34px] w-[120px] overflow-hidden max-wide:w-[34px]">
+            <Image
+              src="/brand/logo-dark.png"
+              alt="Sahoda"
+              width={120}
+              height={34}
+              priority
+              className="block h-[34px] w-[120px] max-w-none dark:hidden"
+            />
+            <Image
+              src="/brand/logo-white.png"
+              alt=""
+              aria-hidden
+              width={120}
+              height={34}
+              className="hidden h-[34px] w-[120px] max-w-none dark:block"
+            />
+          </span>
+        </Link>
       </div>
-      <nav aria-label="Main" className="flex flex-col gap-1">
+      <nav
+        aria-label="Main"
+        className="flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto px-3 py-2 max-wide:px-2"
+      >
         {NAV.map((item) => (
           <div key={item.href}>
+            {/* A group label, so it must not compete with the active item —
+                hence muted rather than accent. The kit puts this at --text-3
+                (black-45); this app uses --ink-mute instead, because
+                ink-faint.test.ts bans --ink-faint as content text and an 11px
+                uppercase eyebrow at 3.5:1 is the exact string that ban exists
+                for. Accessibility floor wins over an exact colour match. */}
             {item.section ? (
-              <div className="type-eyebrow mt-3 mb-1 px-3 text-accent max-wide:hidden">
+              <div className="type-eyebrow px-[9px] pt-4 pb-[5px] text-muted max-wide:hidden">
                 {item.section}
               </div>
             ) : null}
@@ -83,7 +118,7 @@ export async function Rail() {
         {/* doc 13 §14: visible only to ops admins. Absence is the point — a
             greyed-out Admin item would tell every tenant the console exists. */}
         {isOpsAdmin ? (
-          <div className="mt-3 border-t border-line pt-3">
+          <div className="mt-3 border-t border-line-soft pt-3">
             <NavItem href="/admin/dev" label="Admin" icon="shield" guide="nav.admin" />
           </div>
         ) : null}
