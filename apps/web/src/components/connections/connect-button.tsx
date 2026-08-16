@@ -4,8 +4,6 @@ import { useState, useTransition } from 'react'
 
 import type { Channel } from '@sahoda/shared'
 
-import { ChannelLogo } from '@/components/connections/channel-logo'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
 /**
@@ -22,14 +20,11 @@ export function ConnectButton({
   label,
   disabled,
   disabledReason,
-  note,
 }: {
   platform: Channel
   label: string
   disabled?: boolean
   disabledReason?: string
-  /** The fourth, INFORMATIONAL state — see the badge below. */
-  note?: string
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -59,41 +54,24 @@ export function ConnectButton({
   }
 
   return (
-    <div className="surface-ring flex min-w-[196px] flex-col gap-2 rounded-card bg-surface p-3">
-      <div className="flex items-center gap-2">
-        {/* The mark, uncontained — the row's own ring is the only edge. */}
-        <ChannelLogo channel={platform} size={20} />
-        <span className="truncate text-[13px] font-[550]">{label}</span>
-        {note ? (
-          // THE FOURTH STATE — informational.
-          //
-          // The kit's enum is connected | disconnected | error, and on a channel
-          // the customer cannot actually complete, `disconnected` reads as an
-          // INVITATION they cannot accept: a live-looking "Connect X" that ends
-          // in a dead end after they have already approved access on X's own
-          // screen. This fourth state says the true thing instead — the channel
-          // is listed, and here is why it is not offered yet.
-          // `hideGlyph`: rung 4's glyph is a CHECK, and a tick beside "Not
-          // verified live" claims the exact opposite of the words next to it.
-          <Badge rung="calm" hideGlyph className="ml-auto shrink-0">
-            {note}
-          </Badge>
-        ) : null}
-      </div>
-
+    // Just the control now. The CARD is `ChannelTile`, which owns the logo, the
+    // name and the state — this used to draw its own card and its own logo row,
+    // which is how the page ended up with two different tiles for one idea.
+    <div className="flex w-full flex-col gap-1">
       <Button
-        variant="secondary"
+        variant={disabled ? 'secondary' : 'primary'}
         size="sm"
+        className="w-full"
         disabled={disabled || pending}
         onClick={start}
         data-guide={disabled ? undefined : `connections.connect_${platform}`}
       >
-        {pending ? `Opening ${label}…` : `Connect ${label}`}
+        {pending ? `Opening ${label}\u2026` : `Connect ${label}`}
       </Button>
       {disabled && disabledReason ? (
-        <span className="text-[12px] text-muted">{disabledReason}</span>
+        <span className="text-[11px] text-muted">{disabledReason}</span>
       ) : null}
-      {error ? <span className="text-[12px] text-danger">{error}</span> : null}
+      {error ? <span className="text-[11px] text-danger">{error}</span> : null}
     </div>
   )
 }

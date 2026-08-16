@@ -1,13 +1,9 @@
-import { Link2 } from 'lucide-react'
 import type { ConnectionPlatform } from '@sahoda/shared'
 
-import { ConnectButton } from '@/components/connections/connect-button'
+import { ChannelTile } from '@/components/connections/channel-tile'
 import { ConnectionHealthBanner } from '@/components/connections/connection-health-banner'
-import { ConnectionRow } from '@/components/connections/connection-row'
 import { ConnectOutcomeNotice } from '@/components/connections/connect-outcome-notice'
-import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
-import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { listConnections, readConnectionSlots } from '@/lib/connections/read'
 import { getActiveWorkspace } from '@/lib/workspaces'
@@ -59,6 +55,22 @@ const LIVE_VIA_ZERNIO = new Set<ConnectionPlatform>(['instagram', 'x', 'gbp', 'l
 const UNPROVEN = new Set<ConnectionPlatform>(['x', 'gbp'])
 
 /**
+ * Channel groups (reference `GROUPS`).
+ *
+ * The reference groups its ecosystem into sections and renders each as its own
+ * 4-column grid. This product has four channels, and they genuinely divide:
+ * three are feeds you post INTO, one is a listing customers find you THROUGH.
+ * Grouping is not decoration here — "why is Google Business Profile in with
+ * Instagram" is a real question, and the section heading answers it.
+ *
+ * A group with no channels renders nothing, exactly as the reference does.
+ */
+const GROUPS: ReadonlyArray<{ name: string; channels: ConnectionPlatform[] }> = [
+  { name: 'Social', channels: ['instagram', 'linkedin', 'x'] },
+  { name: 'Local listings', channels: ['gbp'] },
+]
+
+/**
  * The plan sentence when this workspace has no room for another channel, else null.
  *
  * Read from the DATABASE, never from the query string — the same rule
@@ -101,13 +113,17 @@ export default async function ConnectionsPage({
   const railReady = zernioAvailable()
   const planFull = channelLimit !== null
 
-  return (
-    <div className="space-y-grid">
-      <PageTitle>Connections</PageTitle>
+  // One lookup, so a channel appears exactly once whether or not it is linked.
+  const byChannel = new Map((connections ?? []).map((c) => [c.platform, c]))
 
-      {/* Below the title and above everything else: what just happened comes before
-          what is there now, and a partial connect has to be read before the list is
-          mistaken for the whole story. */}
+  return (
+    <div className="space-y-6">
+      {/* The reference's `.page__hd`: title + sub on the left, tools right. */}
+      <header className="flex flex-wrap items-start gap-3">
+        <PageTitle sub="Connect your marketing ecosystem.">Connections</PageTitle>
+      </header>
+
+      {/* What just happened comes before what is there now. */}
       <ConnectOutcomeNotice status={zernio} />
 
       {connections === null ? (
@@ -115,68 +131,67 @@ export default async function ConnectionsPage({
           Couldn&rsquo;t check your connections just now — reload to see what&rsquo;s already
           linked.
         </p>
-      ) : connections.length === 0 ? (
-        <EmptyState
-          icon={Link2}
-          title="No channels connected"
-          body="Your connected accounts will be listed here with live status, and disconnecting always works from this screen."
-        />
       ) : (
         <>
-          {/* Above the list: someone scanning for "is anything wrong" should not have
-              to read every row to find out. */}
+          {/* `.banner--alert` — the most expensive thing on this page is a
+              broken connection, so it is stated at the top and never inferred
+              from a colour on a tile further down. */}
           <ConnectionHealthBanner connections={connections} />
-          <ul className="space-y-2" data-guide="connections.list">
-            {connections.map((connection) => (
-              <li key={connection.id}>
-                <ConnectionRow connection={connection} />
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
 
-      <section className="surface-ring space-y-3 rounded-card bg-surface p-4">
-        <div>
-          <h2 className="text-[15px] leading-5 font-bold">Connect a channel</h2>
-          <p className="text-[13px] text-muted">
-            Each of these connects through our publishing partner, so you approve access once on the
-            platform&rsquo;s own screen and nothing of yours is stored here.
-          </p>
-        </div>
-        {/* The limit BEFORE the click. Without it the customer approves access on
-            the platform's own screen, comes back, and only then learns their plan
-            had no room — work we could have saved them for free. */}
-        {planFull ? (
-          <p className="rounded-input bg-s2 px-3 py-2.5 text-[13px] text-muted" role="status">
-            {channelLimit}
-          </p>
-        ) : null}
+          {planFull ? (
+            <p
+              className="surface-ring rounded-card bg-s2 px-3 py-2.5 text-[13px] text-muted"
+              role="status"
+            >
+              {channelLimit}
+            </p>
+          ) : null}
 
-        <div className="flex flex-wrap items-start gap-3">
-          {CONNECTABLE.map((platform) => {
-            const live = LIVE_VIA_ZERNIO.has(platform) && railReady && !planFull
+          {/* ONE GRID PER GROUP, one tile per channel. Connected and
+              unconnected share the tile: which one you are looking at is a
+              property of the channel, not a different kind of thing. */}
+          {GROUPS.map((group) => {
+            const channels = group.channels.filter((c) => CONNECTABLE.includes(c))
+            if (channels.length === 0) return null
+            const live = channels.filter((c) => byChannel.get(c)?.status === 'active').length
+
             return (
-              <ConnectButton
-                key={platform}
-                platform={platform}
-                label={CHANNEL_LABELS[platform]}
-                note={UNPROVEN.has(platform) ? 'Not verified live' : undefined}
-                disabled={!live}
-                disabledReason={
-                  planFull
-                    ? 'Your plan has no room for another channel.'
-                    : LIVE_VIA_ZERNIO.has(platform)
-                      ? railReady
-                        ? undefined
-                        : 'Publishing key isn’t set in this environment.'
-                      : 'Secure token flow still being wired.'
-                }
-              />
+              <section
+                key={group.name}
+                className="space-y-3"
+                data-guide={`connections.${group.name}`}
+              >
+                <div className="flex items-center gap-2">
+                  <h2 className="text-[14px] font-semibold tracking-[-0.01em]">{group.name}</h2>
+                  <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-s2 px-[5px] text-[11px] font-bold text-muted tabular-nums">
+                    {live}/{channels.length}
+                  </span>
+                </div>
+                <div className="grid gap-3 wide:grid-cols-3 max-wide:grid-cols-2 max-narrow:grid-cols-1">
+                  {channels.map((channel) => (
+                    <ChannelTile
+                      key={channel}
+                      channel={channel}
+                      connection={byChannel.get(channel)}
+                      unproven={UNPROVEN.has(channel)}
+                      disabled={!(LIVE_VIA_ZERNIO.has(channel) && railReady && !planFull)}
+                      disabledReason={
+                        planFull
+                          ? 'Your plan has no room for another channel.'
+                          : LIVE_VIA_ZERNIO.has(channel)
+                            ? railReady
+                              ? undefined
+                              : 'Publishing key isn\u2019t set in this environment.'
+                            : 'Secure token flow still being wired.'
+                      }
+                    />
+                  ))}
+                </div>
+              </section>
             )
           })}
-        </div>
-      </section>
+        </>
+      )}
     </div>
   )
 }
