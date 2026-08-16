@@ -20,6 +20,14 @@ import { cn } from '@/lib/utils'
  */
 const TABS: ReadonlyArray<{ href: Route; label: string }> = [
   { href: '/brain', label: 'Overview' },
+  // Two tabs the app HAS data for, and which the flat grid used to bury:
+  // five sections sat in one undifferentiated list.
+  { href: '/brain/identity', label: 'Identity' },
+  { href: '/brain/voice', label: 'Voice & Tone' },
+  // Three the app does not. They render the coming-soon screen rather than a
+  // stub, and they are NOT the same thing as the brain fields that resemble
+  // them — `customer_persona` is a brand fact the brain already holds and lives
+  // under Identity; "Audience Twin" is an unbuilt feature.
   { href: '/brain/audience', label: 'Audience' },
   { href: '/brain/competitors', label: 'Competitors' },
   { href: '/brain/knowledge', label: 'Knowledge' },

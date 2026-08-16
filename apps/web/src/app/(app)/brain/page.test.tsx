@@ -8,6 +8,21 @@ import { provenanceOf } from '@/lib/brand/provenance'
 import { writeLeaf } from '@/lib/brand/leaf'
 
 import BrainPage from './page'
+import BrainIdentityPage from './identity/page'
+import BrainVoicePage from './voice/page'
+
+/**
+ * The field cards moved from the Overview's flat grid onto the Identity and
+ * Voice & Tone tabs during the structure port. The GUARANTEE did not move: every
+ * editable field must still render, still be editable, and still carry its
+ * certainty. So the assertions that used to target the Overview now render BOTH
+ * tabs together — which additionally proves the split leaves no field orphaned,
+ * a risk that did not exist while everything was on one page.
+ */
+async function renderAllFieldTabs() {
+  render(await BrainIdentityPage())
+  render(await BrainVoicePage())
+}
 
 /**
  * /brain answers four different questions, and each one carries a different
@@ -42,8 +57,8 @@ beforeEach(() => {
 })
 
 describe('/brain', () => {
-  test('renders every editable field', async () => {
-    render(await BrainPage())
+  test('renders every editable field, and the tab split orphans none', async () => {
+    await renderAllFieldTabs()
 
     for (const field of BRAIN_FIELDS) {
       expect(screen.getAllByText(field.label).length, field.path).toBeGreaterThan(0)
@@ -52,11 +67,19 @@ describe('/brain', () => {
 
   test('a freshly resolved brain counts 0 confirmed, though every field is filled', async () => {
     render(await BrainPage())
-
-    expect(screen.getByText('0')).toBeInTheDocument()
+    // The COUNT lives on the Overview.
+    // '0' appears twice now — the confidence card's split and the header's
+    // count — so this asserts presence, not uniqueness.
+    expect(screen.getAllByText('0').length).toBeGreaterThan(0)
     expect(screen.getByText(`of ${RING_DENOMINATOR}`)).toBeInTheDocument()
-    // Filled, not confirmed: the values are all on screen.
+  })
+
+  test('the values are all present even though none is confirmed', async () => {
+    // The other half of the same claim — filled is not confirmed — now checked
+    // where the values actually render.
+    await renderAllFieldTabs()
     expect(screen.getByText(DEMO_FALLBACK_PAYLOAD.brand_persona.archetype)).toBeInTheDocument()
+    expect(screen.queryByText('Confirmed')).not.toBeInTheDocument()
   })
 
   test('counts a confirmed field, and only that one', async () => {
@@ -70,9 +93,11 @@ describe('/brain', () => {
     })
 
     render(await BrainPage())
+    expect(screen.getAllByText('1').length).toBeGreaterThan(0)
 
-    expect(screen.getByText('1')).toBeInTheDocument()
-    expect(screen.getByText('Confirmed')).toBeInTheDocument()
+    // The chip that says WHICH field is confirmed lives with the field.
+    await renderAllFieldTabs()
+    expect(screen.getAllByText('Confirmed').length).toBeGreaterThan(0)
   })
 
   test('points at the most valuable unanswered question', async () => {
@@ -96,9 +121,13 @@ describe('/brain', () => {
     })
 
     test('is not editable — a conclusion is not a question anyone can answer', async () => {
-      render(await BrainPage())
+      // One Edit button per editable field ACROSS THE TABS, and not one more.
+      // The derived field renders on the Overview and must contribute none.
+      await renderAllFieldTabs()
+      expect(screen.getAllByRole('button', { name: /edit/i })).toHaveLength(RING_DENOMINATOR)
 
-      // One Edit button per editable field, and not one more.
+      render(await BrainPage())
+      // Still none added by the Overview's derived card.
       expect(screen.getAllByRole('button', { name: /edit/i })).toHaveLength(RING_DENOMINATOR)
     })
   })

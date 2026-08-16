@@ -3,11 +3,11 @@ import { BrainCircuit } from 'lucide-react'
 
 import { BrainHeader } from '@/components/brain/brain-header'
 import { DerivedCard } from '@/components/brain/derived-card'
-import { SectionCard } from '@/components/brain/section-card'
+import { ConfidenceCard } from '@/components/brain/confidence-card'
+import { SectionsList } from '@/components/brain/sections-list'
 import { EmptyState } from '@/components/empty-state'
 import { buttonVariants } from '@/components/ui/button'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
-import { BRAIN_SECTIONS } from '@/lib/brand/fields'
 import { readBrain } from '@/lib/brand/read-brain'
 
 export const metadata = { title: 'Brand Brain' }
@@ -83,21 +83,23 @@ export default async function BrainPage() {
   }
 
   return (
-    <div className="space-y-grid">
-      <BrainHeader provenance={brain.provenance} version={brain.version} />
-
-      <div className="grid gap-grid sm:grid-cols-2">
-        {BRAIN_SECTIONS.map((section) => (
-          <SectionCard
-            key={section.key}
-            section={section}
-            brain={brain.active}
-            provenance={brain.provenance}
-          />
-        ))}
+    // The reference's `.split` — a lead card and a navigable list on the left,
+    // a narrower aside on the right. Replaces a flat 2-column grid of five
+    // equal cards, which gave no reading order and no way to see which part of
+    // the brand was least settled.
+    <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-grid max-wide:grid-cols-1">
+      <div className="flex min-w-0 flex-col gap-grid">
+        <ConfidenceCard provenance={brain.provenance} />
+        <SectionsList provenance={brain.provenance} />
       </div>
 
-      <DerivedCard alignment={brain.active.alignment} provenance={brain.provenance} />
+      <aside className="flex flex-col gap-grid">
+        {/* The single most useful thing to do next. It was the second half of
+            BrainHeader; here it becomes the aside's lead, which is where the
+            reference puts its own "suggested improvement". */}
+        <BrainHeader provenance={brain.provenance} version={brain.version} />
+        <DerivedCard alignment={brain.active.alignment} provenance={brain.provenance} />
+      </aside>
     </div>
   )
 }
