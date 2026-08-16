@@ -2,6 +2,7 @@ import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 
+import { ThemeScript } from '@/components/shell/theme-script'
 import { clerkAppearance } from '@/lib/clerk-appearance'
 // No env import here — validation is LAZY (first `env.X` access, i.e. the first
 // data-touching request) so an env-less `next build` can collect page data.
@@ -33,7 +34,15 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider appearance={clerkAppearance} signInUrl="/sign-in" signUpUrl="/sign-up">
-      <html lang="en" className={inter.variable}>
+      {/* suppressHydrationWarning is required and narrow: ThemeScript writes
+          data-theme onto this exact element before React hydrates, so the
+          server's markup and the client's DOM differ by that one attribute by
+          design. It suppresses the warning for <html>'s own attributes only,
+          not for any subtree. */}
+      <html lang="en" className={inter.variable} suppressHydrationWarning>
+        <head>
+          <ThemeScript />
+        </head>
         <body>{children}</body>
       </html>
     </ClerkProvider>

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
 
 import { NavItem, type NavIconName } from '@/components/shell/nav-item'
+import { RailFoot } from '@/components/shell/rail-foot'
 import { getOpsAdmin } from '@/lib/ops/guard'
 
 // Alpha nav subset only — every href has a real page (typedRoutes enforces it).
@@ -120,6 +121,8 @@ export async function Rail() {
           </div>
         ) : null}
       </nav>
+      {/* The reference's third sidebar block. The rail shipped with two. */}
+      <RailFoot />
     </aside>
   )
 }

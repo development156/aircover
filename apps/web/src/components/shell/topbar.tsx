@@ -5,6 +5,7 @@ import { MobileHeaderMark } from '@/components/shell/bottom-nav'
 import { BrainRing } from '@/components/shell/brain-ring'
 import { CommandPalette } from '@/components/shell/command-palette'
 import { CreditChip } from '@/components/shell/credit-chip'
+import { ThemeToggle } from '@/components/shell/theme-toggle'
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher'
 import { readBrain, type BrainRead } from '@/lib/brand/read-brain'
 import { readBalance, type BalanceRead } from '@/lib/wallet/read'
@@ -91,7 +92,11 @@ export async function Topbar() {
           those credits ON, so it reads left-to-right as cause then cost. */}
       <BrainRing brain={brain} />
       <CreditChip balance={balance} />
-      <div data-guide="topbar.avatar" className="grid size-8 place-items-center">
+      {/* The reference's right cluster ends icon, then avatar. The dark theme
+          was fully built and completely unreachable until this button existed —
+          see ThemeToggle. */}
+      <ThemeToggle />
+      <div data-guide="topbar.avatar" className="grid size-8 flex-none place-items-center">
         <UserButton />
       </div>
     </header>

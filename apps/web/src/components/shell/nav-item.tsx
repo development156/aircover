@@ -43,12 +43,28 @@ export function NavItem({
   label,
   icon,
   guide,
+  count,
 }: {
   // typedRoutes' Route union — no hand-maintained href list to drift
   href: Route
   label: string
   icon: NavIconName
   guide: string
+  /**
+   * A live count for this destination (reference: Approvals 5, Conversations 3).
+   *
+   * SPECIFICATION.md §7 is explicit that this is DERIVED and never sent — the
+   * sidebar badge, the Home count and the page's own header must read one
+   * collection, because "a separate pendingCount field will eventually disagree
+   * with it". Nothing passes it yet; the slot exists so that whoever wires the
+   * first one wires it from the collection rather than inventing a field.
+   *
+   * Zero renders nothing. That is the same rule SurfaceList already states — a
+   * "0" badge is noise, not information — and it also means an unwired nav item
+   * is indistinguishable from a genuinely empty one, which is correct: both have
+   * nothing to report.
+   */
+  count?: number
 }) {
   const pathname = usePathname()
   const active = pathname === href || pathname.startsWith(`${href}/`)
@@ -87,6 +103,22 @@ export function NavItem({
           the reference's design; losing the name was not. sr-only is absolutely
           positioned, so it leaves the flex row and the centred icon is unmoved. */}
       <span className="max-wide:sr-only">{label}</span>
+      {count !== undefined && count > 0 ? (
+        <>
+          {/* Expanded: the number, pushed to the trailing edge. */}
+          <span className="ml-auto grid h-[18px] min-w-[18px] flex-none place-items-center rounded-full bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums max-wide:hidden">
+            {count}
+          </span>
+          {/* Collapsed: a dot. The count has nowhere to go in a 64px rail, but
+              losing the signal entirely would hide the one thing the badge is
+              for. The accessible name below carries the number either way. */}
+          <span
+            aria-hidden
+            className="absolute top-[7px] right-[13px] hidden size-[7px] rounded-full bg-brand ring-2 ring-surface max-wide:block"
+          />
+          <span className="sr-only">{count} waiting</span>
+        </>
+      ) : null}
     </Link>
   )
 }
