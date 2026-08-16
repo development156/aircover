@@ -7,6 +7,8 @@ import { readPublishSummary } from '@/lib/home/publishing'
 import { readSpend } from '@/lib/home/spend'
 import { listPosts, listVariantStates } from '@/lib/posts/read'
 import { readBalance, readLedger } from '@/lib/wallet/read'
+import { readBrain } from '@/lib/brand/read-brain'
+import { listConnections } from '@/lib/connections/read'
 
 import HomePage from './page'
 
@@ -37,9 +39,22 @@ vi.mock('@/lib/home/spend', () => ({ readSpend: vi.fn() }))
 vi.mock('@/lib/home/posts', () => ({ readPostCounts: vi.fn() }))
 vi.mock('@/lib/home/publishing', () => ({ readPublishSummary: vi.fn() }))
 vi.mock('@/lib/analytics/account-insights', () => ({ readInstagramAnalytics: vi.fn() }))
+// Added when Home's rail gained the Brand Brain and Connections cards. Both
+// reach `cookies()`, so without a mock every test here fails on "called outside
+// a request scope" rather than on anything it is actually asserting.
+vi.mock('@/lib/brand/read-brain', () => ({ readBrain: vi.fn() }))
+vi.mock('@/lib/connections/read', () => ({ listConnections: vi.fn() }))
 
 // Reached through CreateWorkspaceButton, which is a `'use server'` import away.
 vi.mock('@/app/actions/workspace', () => ({ createWorkspace: vi.fn() }))
+// The greeting banner carries the page's primary action, and CreatePostButton
+// creates a draft and then NAVIGATES to it — so it calls `useRouter`, which
+// throws "expected app router to be mounted" when the page is rendered outside
+// a router. Mocked rather than designed away: unlike the command palette, the
+// navigation here happens after a server action returns an id, so there is no
+// `<Link>` to point at ahead of time.
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }))
+vi.mock('@/app/actions/posts', () => ({ createPost: vi.fn() }))
 
 const balanceRead = vi.mocked(readBalance)
 
@@ -79,6 +94,11 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(listPosts).mockResolvedValue([])
   vi.mocked(listVariantStates).mockResolvedValue(new Map())
+  // The rail's two reads. `no-brain` and `null` are the honest defaults for a
+  // fresh workspace, so the dashboard branch renders its empty rail rather than
+  // a half-populated one.
+  vi.mocked(readBrain).mockResolvedValue({ status: 'no-brain' })
+  vi.mocked(listConnections).mockResolvedValue([])
   vi.mocked(readLedger).mockResolvedValue({ entries: [], skipped: 0 })
   vi.mocked(readSpend).mockResolvedValue(EMPTY_SPEND)
   vi.mocked(readPostCounts).mockResolvedValue(EMPTY_COUNTS)

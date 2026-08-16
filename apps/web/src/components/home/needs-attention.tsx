@@ -1,0 +1,98 @@
+import Link from 'next/link'
+import type { Route } from 'next'
+
+import { Badge } from '@/components/ui/badge'
+import { CHANNEL_SHORT } from '@/components/posts/channel-label'
+import { rungFor } from '@/lib/posts/rung'
+import { STATUS_WORD } from '@/lib/posts/status-word'
+import type { DisplayPost } from '@/lib/posts/display-post'
+
+/**
+ * "Needs your attention" — question 3 of the reference's four
+ * (SPECIFICATION.md §1), and the one this app was missing entirely.
+ *
+ * Home answered "what happened" and "what is happening" and then stopped, so
+ * the screen was a report rather than a queue. This is the part that gives
+ * someone a reason to open the app on a Tuesday.
+ *
+ * ── WHAT COUNTS AS NEEDING YOU ───────────────────────────────────────────────
+ * Only posts whose rung is `urgent` — the ladder's own definition of "needs you
+ * now", which is `review`, `failed` and `partial`. A draft is NOT on this list:
+ * it is waiting on you in the sense that everything unfinished is, and a queue
+ * that includes every unfinished thing is a list of everything, which nobody
+ * reads. Drafts have their own home on /posts.
+ *
+ * NO ACTION BUTTONS. The reference's `.att` card carries Approve / Review
+ * inline, and approving from the dashboard is a real interaction there. Here
+ * each row is a LINK into the editor instead: approving is a state change on a
+ * real post, and a one-click approve on a summary screen — where you cannot see
+ * the body you are approving — is the wrong place to put it. The row opens the
+ * post; the decision happens where the content is.
+ */
+export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
+  // `intent` — NOT `status`. `DisplayPost` seals `status` behind an
+  // uninhabitable type precisely so a summary screen cannot read it and claim
+  // an outcome the variant rows never reported (see display-post.ts).
+  const waiting = posts.filter((post) => rungFor(post.intent) === 'urgent')
+
+  return (
+    <section
+      aria-labelledby="home-attention"
+      className="surface-ring rounded-card bg-surface"
+      data-guide="home.attention"
+    >
+      <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
+        <h2 id="home-attention" className="text-[14px] font-semibold tracking-[-0.01em]">
+          Needs your attention
+        </h2>
+        {waiting.length > 0 ? (
+          <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-tint px-[5px] text-[11px] font-bold text-accent tabular-nums">
+            {waiting.length}
+          </span>
+        ) : null}
+        <Link href="/posts" className="ml-auto text-[12px] font-[550] text-muted hover:text-accent">
+          View all
+        </Link>
+      </header>
+
+      {waiting.length === 0 ? (
+        // Honest, and specific about WHY it is empty. "Nothing needs you" is a
+        // real and good answer; it must not read like a failure to load.
+        <p className="px-4 py-6 text-center text-[13px] text-muted">
+          Nothing is waiting on you. Anything sent for review, or that fails to go out, shows up
+          here.
+        </p>
+      ) : (
+        <ul className="grid gap-3 p-4 wide:grid-cols-2">
+          {waiting.slice(0, 4).map((post) => (
+            <li key={post.id}>
+              <Link
+                href={`/posts/${post.id}` as Route}
+                className="surface-ring block rounded-[8px] p-3 transition-micro hover:shadow-[inset_0_0_0_1px_var(--line-firm)]"
+              >
+                <div className="flex items-start gap-2">
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-[550] text-ink">
+                    {post.title?.trim() || 'Untitled post'}
+                  </span>
+                  <Badge rung="urgent">{STATUS_WORD[post.intent]}</Badge>
+                </div>
+                {post.body?.trim() ? (
+                  <p className="mt-1 line-clamp-2 text-[12px] text-muted">{post.body}</p>
+                ) : (
+                  // R7: an empty body is an empty body. No lorem, no preview
+                  // stitched from the title.
+                  <p className="mt-1 text-[12px] text-muted">No content written yet.</p>
+                )}
+                {post.channels.length > 0 ? (
+                  <p className="mt-2 text-[11px] text-muted">
+                    {post.channels.map((c) => CHANNEL_SHORT[c]).join(' · ')}
+                  </p>
+                ) : null}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
