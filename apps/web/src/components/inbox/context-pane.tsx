@@ -26,6 +26,10 @@ import { PaneHeader, PaneScroll } from '@/components/inbox/inbox-panes'
  * The pane hides entirely below 1180px, exactly as the reference does: at that
  * width the list and the thread are what matter, and context is the first thing
  * the reference drops.
+ *
+ * The copy says "something from the list", not "a conversation": this same pane
+ * serves messages, comments AND reviews, and naming one of the three made it
+ * wrong on the other two.
  */
 export function ContextPane() {
   return (
@@ -36,7 +40,7 @@ export function ContextPane() {
 
       <PaneScroll className="p-4">
         <p className="text-[13px] text-muted">
-          Open a conversation and what Sahoda knows about that person appears here.
+          Open something from the list and what Sahoda knows about that person appears here.
         </p>
       </PaneScroll>
     </>

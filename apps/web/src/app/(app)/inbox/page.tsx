@@ -1,7 +1,5 @@
-import { ContextPane } from '@/components/inbox/context-pane'
 import { ConversationList } from '@/components/inbox/conversation-list'
-import { InboxPane, InboxPanes } from '@/components/inbox/inbox-panes'
-import { SurfaceBanner } from '@/components/inbox/surface-notice'
+import { InboxShell } from '@/components/inbox/inbox-shell'
 import { ThreadPlaceholder } from '@/components/inbox/thread-placeholder'
 import { readConversations } from '@/lib/inbox/read'
 
@@ -36,36 +34,26 @@ export default async function InboxMessagesPage() {
   const conversations = decision.showList ? rows : []
 
   return (
-    <div className="space-y-3">
-      {/* Partial and unknown states still warn ABOVE the panes: they mean the
-          list is real but incomplete, which no empty state can express. */}
-      <SurfaceBanner state={decision.state} />
-
-      {/* With conversations the list IS the phone screen; with none, the
-          thread pane is, because it carries the reason. */}
-      <InboxPanes mobileShow={conversations.length > 0 ? 'list' : 'thread'}>
-        <InboxPane kind="list">
-          <ConversationList
-            conversations={conversations}
-            emptyLine={
-              decision.showList
-                ? 'No conversations yet.'
-                : 'Nothing read yet — see the panel beside this one.'
-            }
-          />
-        </InboxPane>
-
-        <InboxPane kind="thread">
-          <ThreadPlaceholder
-            emptiness={decision.state}
-            hasConversations={conversations.length > 0}
-          />
-        </InboxPane>
-
-        <InboxPane kind="context">
-          <ContextPane />
-        </InboxPane>
-      </InboxPanes>
-    </div>
+    <InboxShell
+      emptiness={decision.state}
+      mobileShow={conversations.length > 0 ? 'list' : 'thread'}
+      list={
+        <ConversationList
+          conversations={conversations}
+          emptyLine={
+            decision.showList
+              ? 'No conversations yet.'
+              : 'Nothing read yet — see the panel beside this one.'
+          }
+        />
+      }
+      thread={
+        <ThreadPlaceholder
+          emptiness={decision.state}
+          hasConversations={conversations.length > 0}
+          selectLine="Pick a conversation to read it and reply."
+        />
+      }
+    />
   )
 }

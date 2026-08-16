@@ -1,32 +1,55 @@
 import { CommentedPostRow } from '@/components/inbox/commented-post-row'
-import { SurfaceBanner, SurfaceNotice } from '@/components/inbox/surface-notice'
+import { InboxShell } from '@/components/inbox/inbox-shell'
+import { SurfaceList, SurfaceRow } from '@/components/inbox/surface-list'
+import { ThreadPlaceholder } from '@/components/inbox/thread-placeholder'
 import { readCommentedPosts } from '@/lib/inbox/read'
 
 export const metadata = { title: 'Inbox · Comments' }
 
 /**
- * `GET /inbox/comments`, read-only.
+ * `GET /inbox/comments`, read-only — now in the shared inbox shell.
  *
- * This endpoint returns the POSTS carrying comments, not the comments — those need a
- * second account-scoped call, which each row links to.
+ * This endpoint returns the POSTS carrying comments, not the comments — those
+ * need a second account-scoped call, which each row links to. That two-step is
+ * exactly why the three panes suit it: the post list stays on screen while its
+ * comments open beside it.
+ *
+ * `showList` no longer replaces the whole screen. In one column that was right;
+ * in three panes it would also remove the list header and the layout, so a new
+ * user would never see what this surface IS.
  */
 export default async function InboxCommentsPage() {
   const { rows, decision } = await readCommentedPosts()
-
-  if (!decision.showList) {
-    return <SurfaceNotice state={decision.state} />
-  }
+  const posts = decision.showList ? rows : []
 
   return (
-    <div className="space-y-grid">
-      <SurfaceBanner state={decision.state} />
-      <ul className="space-y-2" data-guide="inbox.commented-posts">
-        {rows.map((post) => (
-          <li key={`${post.accountId}:${post.id}`}>
-            <CommentedPostRow post={post} />
-          </li>
-        ))}
-      </ul>
-    </div>
+    <InboxShell
+      emptiness={decision.state}
+      mobileShow={posts.length > 0 ? 'list' : 'thread'}
+      list={
+        <SurfaceList
+          title="Comments"
+          isEmpty={posts.length === 0}
+          emptyLine={
+            decision.showList
+              ? 'No posts have comments yet.'
+              : 'Nothing read yet — see the panel beside this one.'
+          }
+        >
+          {posts.map((post) => (
+            <SurfaceRow key={`${post.accountId}:${post.id}`}>
+              <CommentedPostRow post={post} />
+            </SurfaceRow>
+          ))}
+        </SurfaceList>
+      }
+      thread={
+        <ThreadPlaceholder
+          emptiness={decision.state}
+          hasConversations={posts.length > 0}
+          selectLine="Pick a post to read its comments."
+        />
+      }
+    />
   )
 }

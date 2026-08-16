@@ -28,9 +28,12 @@ import type { InboxEmptiness } from '@/lib/inbox/emptiness'
 export function ThreadPlaceholder({
   emptiness,
   hasConversations,
+  selectLine = 'Pick one from the list to read it and reply.',
 }: {
   emptiness: InboxEmptiness
   hasConversations: boolean
+  /** What "nothing selected" means on THIS surface — a post, a review, a thread. */
+  selectLine?: string
 }) {
   return (
     <PaneScroll className="grid place-items-center p-6">
@@ -44,10 +47,8 @@ export function ThreadPlaceholder({
 
         {hasConversations ? (
           <>
-            <h2 className="text-[14px] font-semibold">No conversation selected</h2>
-            <p className="mt-1 text-[13px] text-muted">
-              Pick one from the list to read it and reply.
-            </p>
+            <h2 className="text-[14px] font-semibold">Nothing selected</h2>
+            <p className="mt-1 text-[13px] text-muted">{selectLine}</p>
           </>
         ) : (
           <>

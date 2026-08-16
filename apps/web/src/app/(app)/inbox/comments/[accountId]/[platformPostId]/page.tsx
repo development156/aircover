@@ -3,8 +3,12 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { CommentCard } from '@/components/inbox/comment-card'
-import { SurfaceBanner, SurfaceNotice } from '@/components/inbox/surface-notice'
-import { readPostComments } from '@/lib/inbox/read'
+import { CommentedPostRow } from '@/components/inbox/commented-post-row'
+import { InboxShell } from '@/components/inbox/inbox-shell'
+import { PaneHeader, PaneScroll } from '@/components/inbox/inbox-panes'
+import { SurfaceBanner } from '@/components/inbox/surface-notice'
+import { SurfaceList, SurfaceRow } from '@/components/inbox/surface-list'
+import { readCommentedPosts, readPostComments } from '@/lib/inbox/read'
 
 export const metadata = { title: 'Inbox · Post comments' }
 
@@ -29,34 +33,64 @@ export default async function PostCommentsPage({
   if (view === null) notFound()
   const { rows, decision } = view
 
-  return (
-    <div className="space-y-grid">
-      <Link
-        href="/inbox/comments"
-        className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-muted transition-micro hover:text-ink"
-      >
-        <ArrowLeft size={14} aria-hidden />
-        Back to comments
-      </Link>
+  // The sibling list, so the comments open beside the posts rather than after
+  // leaving them.
+  const { rows: siblings, decision: listDecision } = await readCommentedPosts()
 
-      {rows.length === 0 ? (
-        <SurfaceNotice state={decision.state} showConnectAction={false} />
-      ) : (
+  return (
+    <InboxShell
+      emptiness={decision.state}
+      mobileShow="thread"
+      list={
+        <SurfaceList
+          title="Comments"
+          isEmpty={!listDecision.showList || siblings.length === 0}
+          emptyLine="Nothing else to show."
+        >
+          {(listDecision.showList ? siblings : []).map((post) => (
+            <SurfaceRow key={`${post.accountId}:${post.id}`}>
+              <CommentedPostRow post={post} />
+            </SurfaceRow>
+          ))}
+        </SurfaceList>
+      }
+      thread={
         <>
-          <SurfaceBanner state={decision.state} />
-          <ul className="space-y-2" data-guide="inbox.post-comments">
-            {rows.map((comment) => (
-              <li key={comment.id}>
-                <CommentCard
-                  comment={comment}
-                  accountId={accountId}
-                  platformPostId={platformPostId}
-                />
-              </li>
-            ))}
-          </ul>
+          <PaneHeader>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/inbox/comments"
+                aria-label="Back to comments"
+                className="surface-ring grid size-8 shrink-0 place-items-center rounded-sm text-muted transition-micro hover:text-ink wide:hidden"
+              >
+                <ArrowLeft size={15} aria-hidden />
+              </Link>
+              <h2 className="text-[14px] font-semibold tracking-[-0.01em]">
+                Comments on this post
+              </h2>
+            </div>
+          </PaneHeader>
+
+          <PaneScroll className="p-4">
+            <SurfaceBanner state={decision.state} />
+            {rows.length === 0 ? (
+              <p className="py-6 text-center text-[13px] text-muted">{decision.state.body}</p>
+            ) : (
+              <ul className="space-y-2" data-guide="inbox.post-comments">
+                {rows.map((comment) => (
+                  <li key={comment.id}>
+                    <CommentCard
+                      comment={comment}
+                      accountId={accountId}
+                      platformPostId={platformPostId}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </PaneScroll>
         </>
-      )}
-    </div>
+      }
+    />
   )
 }

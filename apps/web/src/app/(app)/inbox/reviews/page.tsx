@@ -1,5 +1,7 @@
+import { InboxShell } from '@/components/inbox/inbox-shell'
 import { ReviewCard } from '@/components/inbox/review-card'
-import { SurfaceBanner, SurfaceNotice } from '@/components/inbox/surface-notice'
+import { SurfaceList, SurfaceRow } from '@/components/inbox/surface-list'
+import { ThreadPlaceholder } from '@/components/inbox/thread-placeholder'
 import { readReviews } from '@/lib/inbox/read'
 
 export const metadata = { title: 'Inbox · Reviews' }
@@ -8,38 +10,51 @@ export const metadata = { title: 'Inbox · Reviews' }
  * `GET /inbox/reviews`, read-only. Google Business Profile only.
  *
  * ── THIS SHIPS EMPTY, AND THE EMPTY STATE MATTERS ────────────────────────────
- * The endpoint answers `[LIVE 2026-08-10]` — envelope, `pagination`, `meta` and a
- * `summary: {totalReviews, averageRating}` we do not yet read. The `ZernioReview` ROW
- * shape is still `[DOC]`: not one review has been observed, because no GBP account has
- * ever connected. `accountsQueried: 0` on that live response is the proof, and it is
- * what drives the sentence below.
+ * The endpoint answers `[LIVE 2026-08-10]` — envelope, `pagination`, `meta` and
+ * a `summary: {totalReviews, averageRating}` we do not yet read. The
+ * `ZernioReview` ROW shape is still `[DOC]`: not one review has been observed,
+ * because no GBP account has ever connected. `accountsQueried: 0` on that live
+ * response is the proof.
  *
- * So the surface exists, has nothing to show, and the sentence it shows instead is
- * load-bearing.
- *
- * It must NOT say "no reviews". That is a claim about the customer's shop, and we have
- * asked nobody, so we have no basis for it — a business with forty reviews would open
- * this page and be told it has none. It says the reviews will appear once a Google
- * Business Profile is connected, which is a statement about Sahoda and is true.
- * `decideSurface` enforces the distinction; the copy lives in `@/lib/inbox/emptiness`.
+ * It must NOT say "no reviews". That is a claim about the customer's shop, and
+ * we have asked nobody — a business with forty reviews would open this page and
+ * be told it has none. It says the reviews will appear once a Google Business
+ * Profile is connected, which is a statement about Sahoda and is true.
+ * `decideSurface` enforces the distinction; the copy lives in
+ * `@/lib/inbox/emptiness`, which is also why none is written here.
  */
 export default async function InboxReviewsPage() {
   const { rows, decision } = await readReviews()
-
-  if (!decision.showList) {
-    return <SurfaceNotice state={decision.state} />
-  }
+  const reviews = decision.showList ? rows : []
 
   return (
-    <div className="space-y-grid">
-      <SurfaceBanner state={decision.state} />
-      <ul className="space-y-2" data-guide="inbox.reviews">
-        {rows.map((review) => (
-          <li key={`${review.accountId}:${review.id}`}>
-            <ReviewCard review={review} />
-          </li>
-        ))}
-      </ul>
-    </div>
+    <InboxShell
+      emptiness={decision.state}
+      mobileShow={reviews.length > 0 ? 'list' : 'thread'}
+      list={
+        <SurfaceList
+          title="Reviews"
+          isEmpty={reviews.length === 0}
+          emptyLine={
+            decision.showList
+              ? 'Nothing to show for the accounts we asked.'
+              : 'Nothing read yet — see the panel beside this one.'
+          }
+        >
+          {reviews.map((review) => (
+            <SurfaceRow key={`${review.accountId}:${review.id}`}>
+              <ReviewCard review={review} />
+            </SurfaceRow>
+          ))}
+        </SurfaceList>
+      }
+      thread={
+        <ThreadPlaceholder
+          emptiness={decision.state}
+          hasConversations={reviews.length > 0}
+          selectLine="Pick a review to read and reply to it."
+        />
+      }
+    />
   )
 }
