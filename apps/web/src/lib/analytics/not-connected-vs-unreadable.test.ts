@@ -107,13 +107,46 @@ describe('a missing connection is not a failed read', () => {
     expect((await readInstagramAnalytics(AT)).kind).toBe('reconnect')
   })
 
-  test('still reports unreadable when an account EXISTS and the client is unconfigured', async () => {
+  test('still reports a problem when an account EXISTS and the client is unconfigured', async () => {
     // The other side of the same ordering: once there is something to read,
-    // being unable to reach it is a genuine failure and must still say so.
+    // being unable to reach it must still say so, and must never send the owner
+    // to connect an account they already connected.
+    //
+    // This asserted `unreadable` while that was the only failure state. It is
+    // now `not-configured`, which is the same guarantee stated more precisely:
+    // no call went out, so nothing "failed", and the copy must not promise that
+    // retrying will help. The GUARANTEE — never not-connected, never reconnect —
+    // is asserted below rather than left implied by the one discriminant.
     const { readInstagramAnalytics } = await load()
     scopeForWorkspace.mockResolvedValue({ account: { id: 'acc_1' } })
     zernioClientReads.mockReturnValue(null)
 
-    expect((await readInstagramAnalytics(AT)).kind).toBe('unreadable')
+    const { kind } = await readInstagramAnalytics(AT)
+    expect(kind).toBe('not-configured')
+    expect(kind).not.toBe('not-connected')
+    expect(kind).not.toBe('reconnect')
+  })
+
+  test('separates "no key in this environment" from "the call failed"', async () => {
+    // The distinction this state exists for. `unreadable` says "try again in a
+    // moment", which is true of a timed-out call and false of an absent
+    // environment variable — retrying cannot conjure a key. Collapsing the two
+    // is how a connected workspace reads a transient-failure message forever.
+    // lib/inbox/surface.ts draws the same line as `no_reader` vs `call_failed`.
+    const { readInstagramAnalytics } = await load()
+    scopeForWorkspace.mockResolvedValue({ account: { id: 'acc_1' } })
+
+    zernioClientReads.mockReturnValue(null)
+    expect((await readInstagramAnalytics(AT)).kind).toBe('not-configured')
+
+    // A configured client whose calls reject IS a genuine read failure.
+    vi.resetModules()
+    const again = await load()
+    scopeForWorkspace.mockResolvedValue({ account: { id: 'acc_1' } })
+    zernioClientReads.mockReturnValue({
+      instagramFollowerHistory: () => Promise.reject(new Error('boom')),
+      instagramAccountInsights: () => Promise.reject(new Error('boom')),
+    })
+    expect((await again.readInstagramAnalytics(AT)).kind).toBe('unreadable')
   })
 })

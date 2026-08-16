@@ -61,6 +61,22 @@ export function AccountPanel({ analytics }: { analytics: AccountAnalytics }) {
     )
   }
 
+  // Distinct from `unreadable` below: there a call went out and did not come
+  // back, here no call was ever made. "Refresh to try again" is the right advice
+  // for the first and useless for the second, so this branch does not offer it.
+  if (analytics.kind === 'not-configured') {
+    return (
+      <Card className="space-y-2">
+        <CardLabel>Instagram account</CardLabel>
+        <p className="text-[14px] text-ink">Sahoda can’t read account insights here.</p>
+        <p className="text-[12.5px] text-muted">
+          Your account is connected. This environment has no metrics connection, so no request went
+          out. Your posts and their own metrics are unaffected.
+        </p>
+      </Card>
+    )
+  }
+
   if (analytics.kind === 'unreadable') {
     return (
       <Card className="space-y-2">

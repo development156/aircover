@@ -46,6 +46,23 @@ export function InstagramInsights({ analytics }: { analytics: AccountAnalytics }
     )
   }
 
+  // Nothing was asked, so nothing failed. This states the situation and offers
+  // no retry, because retrying cannot add a key to the deployment. It is worded
+  // for the person reading it: they connected Instagram, and this build simply
+  // cannot reach it.
+  if (analytics.kind === 'not-configured') {
+    return (
+      <Card className="space-y-2">
+        <CardLabel>Instagram</CardLabel>
+        <p className="text-[14px] text-ink">Sahoda can’t read Instagram metrics here.</p>
+        <p className="text-[12.5px] text-muted">
+          Your account is connected. This environment has no metrics connection, so no request went
+          out. Nothing is wrong with your account.
+        </p>
+      </Card>
+    )
+  }
+
   if (analytics.kind === 'unreadable') {
     return (
       <Card className="space-y-2">

@@ -84,6 +84,20 @@ export type AccountAnalytics =
     }
   | { kind: 'not-connected' }
   | { kind: 'reconnect' }
+  /**
+   * There is an account to read, and this deployment has no publishing key.
+   *
+   * Split out of `unreadable` because the two need different sentences and only
+   * one of them is worth retrying. `unreadable` says "try again in a moment",
+   * which is true of a timed-out call and false of a missing environment
+   * variable — retrying cannot conjure a key. A connected workspace was being
+   * told its metrics had failed transiently when nothing had been attempted.
+   *
+   * The inbox already draws this line: `ReadFailure` in lib/inbox/surface.ts
+   * separates `no_reader` ("No ZERNIO_API_KEY in this environment. No request
+   * went out.") from `call_failed`. This is the same distinction, arriving late.
+   */
+  | { kind: 'not-configured' }
   | { kind: 'unreadable' }
 
 /**
@@ -272,11 +286,16 @@ export async function readInstagramAnalytics(now: Date = new Date()): Promise<Ac
       : { kind: 'not-connected' }
   }
 
-  // Only NOW is a missing client a genuine read failure: there is an account to
-  // read and we cannot reach it. Before this line it was an absent account
-  // wearing a failure's words.
+  // Only NOW does a missing client mean anything about THIS account: there is
+  // one to read. Before this line it was an absent account wearing a failure's
+  // words.
+  //
+  // But it is still not `unreadable`. Nothing was attempted, so nothing failed,
+  // and "try again in a moment" is advice that cannot work — the key is absent
+  // from the deployment, not late. A connected workspace on a build without a
+  // publishing key was reading a transient-failure message forever.
   const reads = zernioClientReads()
-  if (!reads) return { kind: 'unreadable' }
+  if (!reads) return { kind: 'not-configured' }
 
   const since = isoDaysAgo(now, WINDOW_DAYS)
   const until = isoDaysAgo(now, 0)
