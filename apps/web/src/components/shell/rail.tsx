@@ -9,14 +9,12 @@ import { getOpsAdmin } from '@/lib/ops/guard'
 // Alpha nav subset only — every href has a real page (typedRoutes enforces it).
 // Full nav (Loop, Measure, …) lands with its modules per docs/06 §3.
 //
-// SITES IS PRESENT AGAIN, by operator instruction during the UI port
-// (.claude/UI_PORT_CHECKPOINT.md). It was previously omitted on purpose, and
-// that reasoning has NOT been retired — only overruled: the deploy half is
-// still unowned (no Cloudflare client, `sites.status` never leaves 'draft'), so
-// the module shows a customer a preview of an address they cannot yet have.
-// Restoring the entry is one line; removing it again is the same line. If the
-// deploy half is still unowned when this ships, that is the thing to fix — not
-// this list.
+// SITES IS DELIBERATELY ABSENT, not unbuilt. `/sites` still exists, still
+// generates, still previews, and its tests still run — it is out of BETA scope
+// because the deploy half is unowned (no Cloudflare client, `sites.status` never
+// leaves 'draft'), so the module can only ever show a customer a preview of an
+// address they cannot have. The route is left reachable by URL on purpose: the
+// code is not dead, it is waiting. Restoring it is one line here.
 const NAV: ReadonlyArray<{
   href: Route
   label: string
@@ -32,7 +30,6 @@ const NAV: ReadonlyArray<{
   { href: '/posts', label: 'Posts', icon: 'square-pen', guide: 'nav.posts', section: 'Create' },
   { href: '/planner', label: 'Planner', icon: 'calendar-days', guide: 'nav.planner' },
   { href: '/inbox', label: 'Inbox', icon: 'messages-square', guide: 'nav.inbox' },
-  { href: '/sites', label: 'Sites', icon: 'globe', guide: 'nav.sites' },
   { href: '/analytics', label: 'Analytics', icon: 'chart-column', guide: 'nav.analytics' },
   { href: '/connections', label: 'Connections', icon: 'link-2', guide: 'nav.connections' },
   { href: '/wallet', label: 'Wallet', icon: 'wallet', guide: 'nav.wallet' },

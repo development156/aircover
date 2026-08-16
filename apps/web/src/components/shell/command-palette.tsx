@@ -22,14 +22,19 @@ import { cn } from '@/lib/utils'
 
 type Destination = { href: Route; label: string; hint: string }
 
-/** Mirrors the rail's NAV. Kept flat and literal so it stays greppable. */
+/**
+ * Mirrors the rail's NAV. Kept flat and literal so it stays greppable.
+ *
+ * `/sites` is deliberately absent, for the same reason it is absent from the
+ * rail — it is out of BETA scope. A palette that surfaces what the menu hides
+ * is not a shortcut, it is a leak. The route stays reachable by URL, as before.
+ */
 const DESTINATIONS: readonly Destination[] = [
   { href: '/home', label: 'Home', hint: 'Today, and what needs you' },
   { href: '/brain', label: 'Brand Brain', hint: 'What Sahoda knows about you' },
   { href: '/posts', label: 'Posts', hint: 'Draft, approve, publish' },
   { href: '/planner', label: 'Planner', hint: 'The schedule' },
   { href: '/inbox', label: 'Inbox', hint: 'Comments, messages, reviews' },
-  { href: '/sites', label: 'Sites', hint: 'Generated pages' },
   { href: '/analytics', label: 'Analytics', hint: 'How it performed' },
   { href: '/connections', label: 'Connections', hint: 'Channels and accounts' },
   { href: '/wallet', label: 'Wallet', hint: 'Credits and spend' },

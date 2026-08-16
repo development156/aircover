@@ -112,3 +112,6 @@ supabase/.temp/
 # nobody reviewed. Widening later is one line. Reported rather than taken — the same
 # rule the CLAUDE.md block above states and then follows.
 !/apps/web/REQUESTS.md
+
+# Playwright storageState for local visual verification — never commit a session.
+.auth/
