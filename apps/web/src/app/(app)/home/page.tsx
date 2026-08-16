@@ -85,10 +85,17 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-8">
-      {/* 1 — Greeting. Display size, then one sentence of real state. */}
-      <header className="space-y-1">
-        <h1 className="type-display">{greetingFor(now)}</h1>
-        <p className="text-[15px] text-ink-mute">{greetingState(counts, publish)}</p>
+      {/* 1 — Greeting, then one sentence of real state.
+              The kit's `.greet__t` / `.greet__s`: 20px at 650, and the state
+              line in ACCENT rather than muted. That colour is doing work — the
+              sentence below a greeting is the only line on the page that says
+              what changed since you last looked, and muting it buries the one
+              thing the screen exists to tell you. */}
+      <header>
+        <h1 className="text-[20px] leading-7 font-[650] tracking-[-0.02em]">{greetingFor(now)}</h1>
+        <p className="mt-[1px] text-[13px] font-[550] text-accent">
+          {greetingState(counts, publish)}
+        </p>
       </header>
 
       {/* 2 — The week. Full width, the hero, readable without reading. */}
@@ -96,7 +103,11 @@ export default async function HomePage() {
 
       {/* 3 — Asymmetric split: the chart gets the room, the rail gets the money.
               Collapses to one column below the wide breakpoint. */}
-      <div className="grid grid-cols-[1fr_var(--rail-w)] gap-grid max-wide:grid-cols-1">
+      {/* `items-start` is load-bearing: a grid stretches its items by default,
+          so the chart card was growing to match the combined height of the
+          three cards beside it and rendering ~250px of empty surface under a
+          one-line chart. */}
+      <div className="grid grid-cols-[1fr_var(--rail-w)] items-start gap-grid max-wide:grid-cols-1">
         <Card className="space-y-4">
           <div className="flex items-baseline justify-between gap-3">
             <CardLabel>Credits spent · last 30 days</CardLabel>

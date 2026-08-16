@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { Post } from '@sahoda/shared'
 
 import { AgencyBlade } from '@/components/posts/agency-blade'
+import { buttonVariants } from '@/components/ui/button'
 import { CardLabel } from '@/components/ui/card'
 
 /**
@@ -32,10 +33,10 @@ export function SahodaRail({ drafted, planCost }: SahodaRailProps) {
       {drafted.length === 0 ? (
         <div className="space-y-3">
           <p className="text-[13px] text-muted">Sahoda hasn&rsquo;t drafted anything this week.</p>
-          <Link
-            href="/planner"
-            className="inline-flex items-center justify-center rounded-pill bg-primary px-4 py-[9px] text-[14px] font-semibold text-primary-foreground transition-micro hover:bg-primary-strong hover:text-white active:scale-[.97]"
-          >
+          {/* Wears the Button's clothes via `buttonVariants` rather than
+              re-typing them: a hand-rolled copy is how this one ended up a
+              40px pill after the control shapes moved to 34px / 6px. */}
+          <Link href="/planner" className={buttonVariants({ variant: 'primary' })}>
             <span>
               Plan my week · <span className="tabular-nums">{planCost}</span>{' '}
               {planCost === 1 ? 'credit' : 'credits'}
