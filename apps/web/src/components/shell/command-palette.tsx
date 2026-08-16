@@ -66,25 +66,30 @@ export function CommandPalette() {
     setCursor(0)
   }, [])
 
-  // ⌘K / Ctrl+K from anywhere. Bound on the document because the point of the
-  // shortcut is that it works while focus is somewhere else entirely.
+  // ⌘K / Ctrl+K, and Escape, from anywhere. Both are bound on the document
+  // because the point of a global shortcut is that it works while focus is
+  // somewhere else — and Escape especially: bound to the input alone it stops
+  // working the moment the user tabs to a result, which is exactly when someone
+  // reaching for Escape most expects it to fire.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
         event.preventDefault()
         setOpen((wasOpen) => !wasOpen)
       }
+      if (event.key === 'Escape') close()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [])
+  }, [close])
 
   useEffect(() => {
     if (open) inputRef.current?.focus()
   }, [open])
 
+  // Escape is NOT handled here — the document listener owns it, so it fires
+  // wherever focus happens to be.
   function onInputKey(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Escape') return close()
     if (event.key === 'ArrowDown') {
       event.preventDefault()
       return setCursor((c) => (results.length === 0 ? 0 : (c + 1) % results.length))

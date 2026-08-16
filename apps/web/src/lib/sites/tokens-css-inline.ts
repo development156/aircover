@@ -74,15 +74,21 @@ export const TOKENS_CSS = `/* ==================================================
                              orange is the resting state, black is the
                              commitment (RETHEME.md §3) */
   --acc: #ff6600; /* links, accent text, FOCUS RING */
-  /* Tints are orange AT ALPHA, not solid steps: they composite correctly
-     on white, on --surface-2 and on dark without a second set of values.
-     Chosen by USE, not by lightness —
-       --t50  washes   (committed backgrounds)
-       --t100 rings    (committed borders — must stay visible)
-       --t300 lifts    (hover fills, dark-mode accents) */
+  /* Tints are orange AT ALPHA, not solid steps: they composite correctly on
+     white, on --surface-2 and on dark without a second set of values.
+
+     The alphas are chosen so that OVER WHITE they land on the v3 solids they
+     replace, because ~31 call sites across apps/web already depend on that
+     ramp and cannot be re-checked one by one:
+       --t50   0.06 -> #fff3ed   (was #fff2ed)  light wash FILL
+       --t100  0.16 -> #ffe0cc   (was #ffe4d9)  stronger FILL — badge grounds
+       --t300  0.40 -> #ffc299   (was #ffa580)  BORDER / ring
+     Keep them in lightness order. An earlier pass assigned them "by use" and
+     inverted 100 and 300, which would have rendered \`bg-tint-100 text-accent\`
+     (status-badge "approved", comment-card) as orange text on 40% orange. */
   --t50: rgba(255, 102, 0, 0.06);
-  --t100: rgba(255, 102, 0, 0.4);
-  --t300: rgba(255, 102, 0, 0.24);
+  --t100: rgba(255, 102, 0, 0.16);
+  --t300: rgba(255, 102, 0, 0.4);
 
   /* ---------- L2 · BRAND (aliases into L1) ---------- */
   --brand: var(--p);
@@ -289,13 +295,16 @@ export const TOKENS_CSS = `/* ==================================================
    Apply to any status-bearing element: post chips, planner pills,
    publish logs, wallet entries.
 
-   These now line up 1:1 with the kit's four-rung ladder
-   (RETHEME.md §5), so a Certainty state and an .sl-badge rung are
-   the same object seen from two angles:
-     .is-real      = rung 1 urgent   solid orange
-     .is-committed = rung 3 pending  orange ring on a wash
-     .is-proposed  = rung 4 calm     grey outline, dashed
-     .is-simulated = (no rung)       hatched, always labelled
+   CERTAINTY IS NOT URGENCY. These four say how REAL a thing is. The
+   kit's four-rung badge ladder (RETHEME.md §5) says how much it NEEDS
+   YOU. The axes are orthogonal and must not be collapsed: a published
+   post is maximally real and minimally urgent — it is \`.is-real\` AND
+   rung 4 "calm". Mapping .is-real onto rung 1 "urgent" would stamp a
+   \`!\` glyph on every successful publish.
+
+   So: reuse the kit's FILL WEIGHTS (solid / wash+ring / dashed), which
+   is what the borrowing below is, and pick the rung separately from
+   urgency when the badge ladder gets built.
    ============================================================ */
 
 /* REAL — it happened. Solid fill, no border. Settled. */
@@ -305,11 +314,14 @@ export const TOKENS_CSS = `/* ==================================================
   border: 1px solid transparent;
 }
 
-/* COMMITTED — it will happen. Hairline + tint. Locked in. */
+/* COMMITTED — it will happen. Hairline + tint. Locked in.
+   The ring is --brand-lift (orange 40%), not --brand-tint (16%): at 16% the
+   border is invisible against the 6% wash it sits on, and the state would then
+   rest on text colour alone. Matches the kit's \`.sl-badge--pending\`. */
 .is-committed {
   background: var(--brand-wash);
   color: var(--brand-text);
-  border: 1px solid var(--brand-tint);
+  border: 1px solid var(--brand-lift);
 }
 
 /* PROPOSED — Sahoda suggests. Dashed. Visibly provisional.
