@@ -13,3 +13,6 @@ docs/
 public/
 SAHODA-ASSETS/
 brand/
+
+# Local visual-verification scratch (see .gitignore).
+.ui-port-shots/

@@ -1,6 +1,7 @@
 import { UserButton } from '@clerk/nextjs'
 import * as Sentry from '@sentry/nextjs'
 
+import { MobileHeaderMark } from '@/components/shell/bottom-nav'
 import { BrainRing } from '@/components/shell/brain-ring'
 import { CommandPalette } from '@/components/shell/command-palette'
 import { CreditChip } from '@/components/shell/credit-chip'
@@ -72,6 +73,10 @@ export async function Topbar() {
       data-guide="topbar.root"
       className="sticky top-0 z-5 flex h-topbar flex-none items-center gap-3 border-b border-line-soft bg-surface px-page max-narrow:gap-2 max-narrow:px-page-mobile"
     >
+      {/* On a phone the rail is gone entirely, and the brand mark went with it —
+          so it reappears here. Hidden ≥768px, where the rail carries the full
+          lockup and a second mark would be a duplicate. */}
+      <MobileHeaderMark />
       {/* min-w-0 is load-bearing: a flex item defaults to min-width:auto and
           refuses to shrink below its content, so without it the switcher pushed
           the credit pill and avatar off the right edge at 375px. */}

@@ -5,7 +5,6 @@ import { BrainHeader } from '@/components/brain/brain-header'
 import { DerivedCard } from '@/components/brain/derived-card'
 import { SectionCard } from '@/components/brain/section-card'
 import { EmptyState } from '@/components/empty-state'
-import { PageTitle } from '@/components/page-title'
 import { buttonVariants } from '@/components/ui/button'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { BRAIN_SECTIONS } from '@/lib/brand/fields'
@@ -42,7 +41,6 @@ export default async function BrainPage() {
   if (brain.status === 'no-workspace') {
     return (
       <div className="space-y-grid">
-        <PageTitle>Brand Brain</PageTitle>
         <EmptyState
           icon={BrainCircuit}
           title="Create a workspace to build a Brand Brain"
@@ -59,7 +57,6 @@ export default async function BrainPage() {
   if (brain.status === 'no-brain') {
     return (
       <div className="space-y-grid">
-        <PageTitle>Brand Brain</PageTitle>
         <EmptyState
           icon={BrainCircuit}
           title="Sahoda doesn't know your brand yet"
@@ -74,7 +71,6 @@ export default async function BrainPage() {
   if (brain.status === 'unreadable') {
     return (
       <div className="space-y-grid">
-        <PageTitle>Brand Brain</PageTitle>
         <div
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
@@ -88,8 +84,6 @@ export default async function BrainPage() {
 
   return (
     <div className="space-y-grid">
-      <PageTitle>Brand Brain</PageTitle>
-
       <BrainHeader provenance={brain.provenance} version={brain.version} />
 
       <div className="grid gap-grid sm:grid-cols-2">

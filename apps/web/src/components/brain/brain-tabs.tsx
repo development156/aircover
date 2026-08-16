@@ -1,0 +1,58 @@
+'use client'
+
+import type { Route } from 'next'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+
+import { cn } from '@/lib/utils'
+
+/**
+ * Section tabs for the Brand Brain — the kit's `.sl-utabs`.
+ *
+ * Underline tabs, not segmented pills: the kit uses segmented controls to switch
+ * a VIEW of the same data, and underline tabs to navigate between SECTIONS.
+ * These are real routes, so they are the latter.
+ *
+ * Three of the four sections are not built yet. They are still listed, because
+ * the point of this row is to show what the Brand Brain is for — and each one
+ * lands on a screen that says plainly that it does not exist yet, rather than
+ * on a 404 or a blank page.
+ */
+const TABS: ReadonlyArray<{ href: Route; label: string }> = [
+  { href: '/brain', label: 'Overview' },
+  { href: '/brain/audience', label: 'Audience' },
+  { href: '/brain/competitors', label: 'Competitors' },
+  { href: '/brain/knowledge', label: 'Knowledge' },
+]
+
+export function BrainTabs() {
+  const pathname = usePathname()
+
+  return (
+    <nav
+      aria-label="Brand Brain sections"
+      // `scrollbar-none` + overflow-x so the row scrolls rather than wraps on a
+      // phone — a wrapped tab row reads as two rows of unrelated links.
+      className="flex gap-5 overflow-x-auto border-b border-line-soft [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {TABS.map((tab) => {
+        // Exact match only: '/brain' is a prefix of every other tab, so
+        // startsWith would light up Overview on all four.
+        const active = pathname === tab.href
+        return (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            aria-current={active ? 'page' : undefined}
+            className={cn(
+              '-mb-px border-b-2 border-transparent pt-[9px] pb-[10px] text-[13px] font-[550] whitespace-nowrap transition-micro',
+              active ? 'border-brand text-accent' : 'text-muted hover:text-ink',
+            )}
+          >
+            {tab.label}
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}
