@@ -21,13 +21,16 @@ import { cn } from '@/lib/utils'
 
 export const CREATE_WORKSPACE_LABEL = 'Create workspace'
 
+// Both wear the kit's control shape: 34px tall, 6px radius, 13px at weight 550.
+// The `quiet` one uses an INSET RING rather than a border so hovering cannot
+// shift the topbar by a pixel.
 const VARIANTS = {
   /** Topbar: sits among bordered shell controls, so it stays quiet. */
   quiet:
-    'border border-line bg-bg px-3 py-[7px] font-semibold text-muted hover:bg-s1 hover:text-ink rounded-input',
+    'surface-ring-firm h-control bg-surface px-3 text-[13px] font-[550] text-ink hover:bg-s2 rounded-sm',
   /** Empty state: the single primary action on the screen, so it leads. */
   primary:
-    'bg-primary px-4 py-2 font-semibold text-primary-foreground hover:bg-primary-strong hover:text-white active:scale-[.97] rounded-pill',
+    'h-control bg-primary px-3 text-[13px] font-[550] text-primary-foreground hover:bg-ink active:translate-y-[0.5px] rounded-sm',
 } as const
 
 export interface CreateWorkspaceButtonProps {

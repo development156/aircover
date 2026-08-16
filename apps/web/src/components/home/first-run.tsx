@@ -37,9 +37,15 @@ export interface FirstRunProps {
 export function FirstRun({ now }: FirstRunProps) {
   return (
     <div className="space-y-8">
-      <header className="space-y-1">
-        <h1 className="type-display">{greetingFor(now)}</h1>
-        <p className="text-[15px] text-ink-mute">
+      {/* Same treatment as the populated Home — the kit's `.greet__t` /
+          `.greet__s`, 20px at 650 with the state line in ACCENT. It has to
+          match: this branch and the dashboard branch are the same screen to the
+          user, and the first-run version is the one every new account sees, so
+          a header that only got restyled on the populated path would leave the
+          more-seen screen on the old type scale. */}
+      <header>
+        <h1 className="text-[20px] leading-7 font-[650] tracking-[-0.02em]">{greetingFor(now)}</h1>
+        <p className="mt-[1px] text-[13px] font-[550] text-accent">
           Create a workspace and Sahoda starts filling this in.
         </p>
       </header>
