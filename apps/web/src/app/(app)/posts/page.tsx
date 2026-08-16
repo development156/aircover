@@ -73,7 +73,7 @@ export default async function PostsPage() {
           title="Nothing drafted yet"
           body="Start a post here, then let me write the per-channel versions for you."
           action={<CreatePostButton />}
-          tip="Write the idea once. I reshape it for each channel, so you never rewrite the same thought four times."
+          tip="Write the idea once. Sahoda reshapes it for each channel, so you never rewrite the same thought four times."
         />
       ) : (
         <PublishStateProvider initial={liveSeed}>

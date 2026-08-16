@@ -41,3 +41,15 @@ Rules for teammates fixing bugs in cloud sessions at claude.ai/code. Type `/fix 
 - **Agents:** use `reviewer` (on the diff, before opening the PR), `test-writer`, and `debug-agent`. Do NOT use `db-migration-agent`, `sites-agent`, or any agent that writes migrations.
 - **The cloud sandbox has no `.env`.** Live-database tests skip automatically and the app cannot be run locally — that is normal, not something to fix. Visual checks happen on the Vercel preview URL that builds automatically for the PR.
 - **If the fix would need a schema change, a shared-contract change, or another package's internals: STOP.** Say exactly that in the PR description instead of doing it.
+
+## Copy style
+
+User-facing copy follows `.agents/skills/humanizer` (33 patterns, from Wikipedia's "Signs of AI writing"). Three standing rulings, so nobody re-litigates them:
+
+- **Em dashes stay.** §14 bans them outright, but the reference design uses 542 and this app 355, and the skill's own Voice Calibration says a writing sample outranks §14. Matching the house voice beats scrubbing the tell. Never run a bulk em-dash strip.
+- **Sahoda speaks in the third person.** "Sahoda could not reach your accounts", never "I could not". 44 third-person mentions set the voice; the two first-person strays were fixed 2026-08-16.
+- **Curly quotes around user content are correct typography**, not a tell — §19's own false-positive clause. `Delete "{title}" for good?` keeps them.
+
+The mechanical patterns (AI vocabulary, filler, signposting, servility, emoji, rule-of-three) audit clean and have stayed clean. What actually gets caught here is implementation jargon leaking into user-facing bodies — "the response carried no per-account status" describes our payload, not the reader's situation — plus subjectless fragments and garden-path sentences.
+
+Empty states and errors state the CLAIM precisely: "we never asked" and "we asked and got nothing" are different sentences, and `lib/inbox/emptiness.ts` exists to keep eight of them apart. Its tests assert the claim (`not a reading of your reviews`, `nothing was charged`) and the forbidden claim (`not.toMatch(/\bno reviews\b/)`), never the wording — so rewrite the sentence freely and keep the guarantee.

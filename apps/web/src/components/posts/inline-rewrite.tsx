@@ -22,7 +22,7 @@ const INSTRUCTIONS = [
 const PENDING_LINES = [
   'Sending the selected text to the model…',
   'Waiting on the rewrite…',
-  'Still waiting — I will not charge you if this fails.',
+  'Still waiting — you are not charged if this fails.',
 ] as const
 
 type Failure =

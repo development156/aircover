@@ -167,7 +167,7 @@ export function neverConnected(surface: InboxSurface): InboxEmptiness {
     state: 'never_connected',
     showList: false,
     headline: `Connect an account to see ${surface.noun} here`,
-    body: `Sahoda has not queried any account for this workspace, so it has nothing to show yet — this is not a reading of your ${surface.noun}. They appear here once ${surface.connectPrompt}.`,
+    body: `Sahoda has not asked any account for this workspace, so it has nothing to show yet — this is not a reading of your ${surface.noun}. Your ${surface.noun} appear here once ${surface.connectPrompt}.`,
     failed: [],
   }
 }
@@ -234,7 +234,7 @@ export function classifyInboxResult({
         state: 'unknown',
         showList: rows > 0,
         headline: `Sahoda could not confirm this ${surface.noun} view is complete`,
-        body: `The response carried no per-account status, so we cannot tell whether every connected account answered. Refresh to try again.`,
+        body: `Sahoda cannot tell whether every connected account answered, so some ${surface.noun} may be missing from this list. Refresh to try again.`,
         failed,
       }
     }
@@ -273,7 +273,7 @@ function classifyFanOut({
         state: 'unresolved',
         showList: false,
         headline: `Sahoda could not resolve your connected ${connectedAccounts === 1 ? 'account' : 'accounts'}`,
-        body: `This workspace has ${connectedAccounts} connected ${connectedAccounts === 1 ? 'account' : 'accounts'} for ${surface.noun}, but our publishing partner did not recognise ${connectedAccounts === 1 ? 'it' : 'any of them'} and queried nothing. This is not a reading of your ${surface.noun}. Reconnect the account to fix it.`,
+        body: `This workspace has ${connectedAccounts} connected ${connectedAccounts === 1 ? 'account' : 'accounts'} for ${surface.noun}, but our publishing partner did not recognise ${connectedAccounts === 1 ? 'it' : 'any of them'} and sent no request at all. This is not a reading of your ${surface.noun}. Reconnect the ${connectedAccounts === 1 ? 'account' : 'accounts'} to fix it.`,
         failed,
       }
     }
@@ -328,7 +328,7 @@ function classifyRows({
       state: 'unknown',
       showList: false,
       headline: `Sahoda could not confirm this ${surface.noun} view is complete`,
-      body: `Nothing on this page, but our publishing partner reports more to read. Refresh to try again.`,
+      body: `There is nothing on this page, but our publishing partner reports more to read. Refresh to try again.`,
       failed,
     }
   }
@@ -338,7 +338,7 @@ function classifyRows({
       state: 'empty',
       showList: false,
       headline: `No ${surface.noun} yet`,
-      body: `Everything Sahoda asked answered, and there is nothing waiting. New ${surface.noun} land here automatically.`,
+      body: `Every account Sahoda asked answered, and there is nothing waiting. New ${surface.noun} land here automatically.`,
       failed,
     }
   }
@@ -347,7 +347,7 @@ function classifyRows({
     state: 'ok',
     showList: true,
     headline: `Showing your ${surface.noun}`,
-    body: `Everything Sahoda asked answered.`,
+    body: `Every account Sahoda asked answered.`,
     failed,
   }
 }
