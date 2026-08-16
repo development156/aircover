@@ -247,9 +247,17 @@ export async function readInstagramAnalytics(now: Date = new Date()): Promise<Ac
   const workspaceId = await activeWorkspaceId()
   if (workspaceId === null) return { kind: 'not-connected' }
 
-  const reads = zernioClientReads()
-  if (!reads) return { kind: 'unreadable' }
-
+  // ── ASK WHO IS CONNECTED BEFORE ASKING THE TRANSPORT ────────────────────────
+  // This order is the fix, and the order is the whole fix.
+  //
+  // `zernioClientReads()` used to be consulted FIRST, so an environment with no
+  // publishing key returned `unreadable` — "couldn't read your account insights
+  // just now" — to a brand-new user who has never connected anything. That is a
+  // failure report where nothing failed, on the first screen they open, and it
+  // is the one wrong answer this union exists to prevent.
+  //
+  // "No account connected" is TRUE whether or not the client is configured, so
+  // it is answered from the connections table, which needs no transport at all.
   let account
   try {
     ;({ account } = await scopeForWorkspace(workspaceId, 'instagram'))
@@ -263,6 +271,12 @@ export async function readInstagramAnalytics(now: Date = new Date()): Promise<Ac
       ? { kind: 'reconnect' }
       : { kind: 'not-connected' }
   }
+
+  // Only NOW is a missing client a genuine read failure: there is an account to
+  // read and we cannot reach it. Before this line it was an absent account
+  // wearing a failure's words.
+  const reads = zernioClientReads()
+  if (!reads) return { kind: 'unreadable' }
 
   const since = isoDaysAgo(now, WINDOW_DAYS)
   const until = isoDaysAgo(now, 0)
