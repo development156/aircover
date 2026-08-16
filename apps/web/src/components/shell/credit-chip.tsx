@@ -49,13 +49,19 @@ function contentFor(balance: BalanceRead): ChipContent {
 export function CreditChip({ balance }: { balance: BalanceRead }) {
   const content = contentFor(balance)
 
+  // `flex-none whitespace-nowrap` below for the same reason as the brain ring
+  // beside it — see that component. This chip reads "100 credits" for a funded
+  // workspace and never wrapped in testing, but its `no-workspace` state is the
+  // three-word NO_WALLET_TEXT: the identical shape, in a state no account with a
+  // workspace can display. Fixing only the pill that happened to reproduce would
+  // have left its sibling walking through the same hole.
   return (
     <Link
       href="/wallet"
       data-guide="topbar.credits"
       aria-live="polite"
       aria-label={content.label}
-      className="flex items-center gap-[7px] rounded-pill border-[1.5px] border-primary bg-bg px-[13px] py-1.5 font-semibold transition-micro hover:bg-tint-50 active:scale-[.97] dark:hover:bg-s2"
+      className="flex flex-none items-center gap-[7px] rounded-pill border-[1.5px] border-primary bg-bg px-[13px] py-1.5 font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] dark:hover:bg-s2"
     >
       {/* `.num` (tokens.css v3: mono + tabular-nums) only where there is a
           number to align — v3 puts mono in exactly three places and the topbar

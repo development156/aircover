@@ -65,8 +65,16 @@ function HoverLine({ children }: { children: string }) {
 export function BrainRing({ brain }: { brain: BrainRead }) {
   if (brain.status === 'no-workspace') return null
 
+  // `flex-none whitespace-nowrap` is load-bearing, not tidying. This pill is a
+  // flex item in the topbar row, and a flex item shrinks below its content by
+  // default — so between 768px and 1279px "No brain yet" wrapped: two lines at
+  // 900–1200, THREE at 768, where the pill grew to 70px inside a 56px header and
+  // burst out of it. The row's other items already carry this discipline
+  // (`shrink-0` on the mark, `truncate` on the switcher and the palette); these
+  // two chips were the only ones without it. The palette, sized
+  // `w-[min(420px,100%)]`, is the item meant to absorb the shrink.
   const shell =
-    'group relative flex items-center gap-2 rounded-pill border border-line bg-bg px-2 py-1 font-semibold transition-micro hover:bg-tint-50 active:scale-[.97] dark:hover:bg-s2'
+    'group relative flex flex-none items-center gap-2 rounded-pill border border-line bg-bg px-2 py-1 font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] dark:hover:bg-s2'
 
   if (brain.status === 'no-brain') {
     return (

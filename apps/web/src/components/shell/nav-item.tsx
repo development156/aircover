@@ -79,7 +79,14 @@ export function NavItem({
       )}
     >
       <Icon size={17} strokeWidth={1.7} className="shrink-0" />
-      <span className="max-wide:hidden">{label}</span>
+      {/* sr-only, NOT hidden, when the rail collapses. `display:none` removes the
+          node from the accessibility tree, which took the link's NAME with it —
+          below 1180px all nine nav items announced as unnamed links, so the app's
+          main navigation was unusable by screen reader and unlabelled to the eye
+          across every width from 768 to 1179. The collapse to a 64px icon rail is
+          the reference's design; losing the name was not. sr-only is absolutely
+          positioned, so it leaves the flex row and the centred icon is unmoved. */}
+      <span className="max-wide:sr-only">{label}</span>
     </Link>
   )
 }
