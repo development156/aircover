@@ -74,7 +74,7 @@ export function IntakeStep({ initialText, initialOverrides, onContinue }: Intake
           onChange={(event) => setText(event.target.value)}
           rows={3}
           placeholder="e.g. I run a bakery on Prabhat Road in Pune"
-          className="w-full rounded-card border border-line bg-bg p-3 text-[14px] text-ink transition-micro placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="w-full surface-ring rounded-card bg-surface p-3 text-[14px] text-ink transition-micro placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         />
       </div>
 

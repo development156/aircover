@@ -210,7 +210,7 @@ export function OnboardingFlow({
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
           <span className="type-eyebrow text-accent">Brand Brain</span>
-          <h1 className="mt-1 text-[25px] font-extrabold text-ink">
+          <h1 className="mt-1 text-[20px] font-[650] tracking-[-0.02em] text-ink">
             {showingSaved ? 'Your Brand Brain' : 'Three answers, then we listen'}
           </h1>
           <p className="mt-1 text-[13.5px] text-muted">
@@ -249,7 +249,7 @@ export function OnboardingFlow({
           />
         ) : null}
 
-        <div className="rounded-card border border-line bg-bg p-6 shadow-card wide:p-7">
+        <div className="surface-ring rounded-card bg-surface p-5 wide:p-6">
           {screen === 'intake' ? (
             <IntakeStep
               initialText={intakeText}

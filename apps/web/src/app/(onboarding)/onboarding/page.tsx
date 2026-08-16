@@ -27,9 +27,11 @@ export default async function OnboardingPage() {
   if (!workspace) {
     return (
       <div className="mx-auto max-w-content p-page max-narrow:p-page-mobile">
-        <div className="rounded-card border border-line bg-bg p-6 shadow-card">
+        <div className="surface-ring rounded-card bg-surface p-5">
           <span className="type-eyebrow text-accent">Brand Brain</span>
-          <h1 className="mt-1 text-[25px] font-extrabold text-ink">Make a workspace first</h1>
+          <h1 className="mt-1 text-[20px] font-[650] tracking-[-0.02em] text-ink">
+            Make a workspace first
+          </h1>
           <p className="mt-1 text-[13.5px] text-muted">
             Your Brand Brain belongs to a workspace, so there has to be one to put it in. This takes
             a second and costs nothing.

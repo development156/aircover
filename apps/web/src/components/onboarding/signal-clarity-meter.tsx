@@ -18,7 +18,7 @@ export function SignalClarityMeter({ percent }: SignalClarityMeterProps) {
   return (
     <div
       data-guide="onboarding.signal-clarity"
-      className="rounded-card border border-line bg-bg p-4 shadow-card"
+      className="surface-ring rounded-card bg-surface p-4"
     >
       <div className="type-eyebrow mb-2 flex items-center justify-between text-muted">
         <span>Fields filled</span>

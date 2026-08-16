@@ -62,13 +62,14 @@ export interface InkFaintException {
  */
 export const INK_FAINT_EXCEPTIONS: Readonly<Record<string, InkFaintException>> = Object.freeze({
   // ── legitimate: disabled or decorative, permanent ──────────────────────────
-  'src/components/onboarding/step-rail.tsx': {
-    uses: 2,
-    kind: 'legitimate',
-    since: '2026-07-26',
-    reason:
-      'An "upcoming" step is not yet reachable — the label and its numbered dot are the disabled state of a control, not content the user acts on now.',
-  },
+  //
+  // `src/components/onboarding/step-rail.tsx` was here with `uses: 2` and is
+  // deliberately GONE (2026-08-16, UI port). Both applications moved to
+  // --ink-mute during the kit restyle: an upcoming step is a real label a user
+  // reads to see what is coming, so "disabled control" was the wrong reading of
+  // it, and 3.5:1 was doing that label no favours. The ratchet caught the entry
+  // going stale in the SHRINKING direction, which is exactly what it is for —
+  // an allowlist that only ever grew would be a suppression list.
   'src/components/posts/media-pane.tsx': {
     uses: 1,
     kind: 'legitimate',

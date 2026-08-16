@@ -52,13 +52,23 @@ export function PickChips<T extends string>({
           return (
             <label
               key={option}
+              // The kit's `.sl-chip`: 28px, pill, and an INSET RING rather than
+              // a border so selecting one cannot shift the row by a pixel.
+              //
+              // The selected chip is solid INK, not orange. That is the kit's
+              // `.sl-chip.is-on`, and it matters here more than anywhere: this
+              // step shows three chip groups at once, so an orange selected
+              // state painted three oranges on one screen — "orange everywhere,
+              // nothing stands out" (RETHEME.md §9). Orange stays rationed to
+              // the one action that moves you forward.
               className={cn(
-                'cursor-pointer rounded-pill border px-3 py-1.5 text-[13px] font-semibold transition-micro',
+                'inline-flex h-7 cursor-pointer items-center rounded-full px-[10px] text-[13px] font-[550] transition-micro',
                 'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent',
                 checked
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-line bg-bg text-muted hover:border-primary hover:text-ink',
-                checked && assumed && 'border-dashed',
+                  ? 'bg-ink text-white dark:bg-white dark:text-ink'
+                  : 'text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink hover:shadow-[inset_0_0_0_1px_var(--line-firm)]',
+                // A guessed-and-still-unconfirmed pick stays visibly provisional.
+                checked && assumed && 'shadow-[inset_0_0_0_1px_var(--line-firm)]',
               )}
             >
               <input

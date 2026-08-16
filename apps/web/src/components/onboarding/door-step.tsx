@@ -240,7 +240,7 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
               setDirty(true)
             }}
             placeholder="We bake sourdough and celebration cakes on Prabhat Road, and nothing is bought in."
-            className="w-full rounded-card border border-line bg-bg p-3 text-[14px] text-ink transition-micro placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="w-full surface-ring rounded-card bg-surface p-3 text-[14px] text-ink transition-micro placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           />
           {sentence.length > 0 && sentence.trim().length < MIN_SENTENCE_CHARS ? (
             <p className="text-[12px] text-muted">
@@ -360,7 +360,7 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
             ) : null}
           </div>
 
-          <div className="max-h-56 overflow-y-auto rounded-card border border-line bg-bg p-3">
+          <div className="max-h-56 overflow-y-auto surface-ring rounded-card bg-surface p-3">
             <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink">
               {read.text.slice(0, PREVIEW_CHARS)}
               {read.text.length > PREVIEW_CHARS ? '…' : ''}

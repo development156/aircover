@@ -26,19 +26,26 @@ export function StepRail({ activeIndex }: StepRailProps) {
           <div
             key={label}
             aria-current={status === 'current' ? 'step' : undefined}
+            // A nav row, so it wears the rail's shape: 34px, 6px radius, and
+            // the accent wash on the current step. Not a pill — a full-width
+            // pill reads as a button you can press, and these are not pressable.
             className={cn(
-              'flex shrink-0 items-center gap-2.5 rounded-pill px-3 py-2 text-[13px] font-semibold transition-micro',
-              status === 'current' && 'bg-tint-50 text-accent dark:bg-s2',
-              status === 'upcoming' && 'text-faint',
-              status === 'done' && 'text-ok',
+              'flex h-[34px] shrink-0 items-center gap-2.5 rounded-sm px-3 text-[13px] font-[550] transition-micro',
+              status === 'current' && 'bg-brand-wash font-semibold text-accent',
+              status === 'upcoming' && 'text-muted',
+              // `--ok` is black now, so "done" reads as full-strength ink
+              // rather than as a colour. The check glyph carries the meaning.
+              status === 'done' && 'text-ink',
             )}
           >
             <span
               className={cn(
-                'grid size-5 shrink-0 place-items-center rounded-pill font-mono text-[10px] font-semibold',
-                status === 'done' && 'bg-ok-bg text-ok',
+                'grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-semibold tabular-nums',
+                // Done is an inked disc, current is the orange one. Only one
+                // step is ever current, so orange stays rationed to it.
+                status === 'done' && 'bg-ink text-white dark:bg-white dark:text-ink',
                 status === 'current' && 'bg-primary text-primary-foreground',
-                status === 'upcoming' && 'bg-s2 text-faint',
+                status === 'upcoming' && 'bg-s2 text-muted',
               )}
             >
               {status === 'done' ? <Check size={12} aria-hidden /> : index + 1}
