@@ -6,6 +6,8 @@ import { PlanWeekPanel } from '@/components/planner/plan-week-panel'
 import { PlannerRow } from '@/components/planner/planner-row'
 import { ViewToggle, type PlannerView } from '@/components/planner/view-toggle'
 import { WeekGrid } from '@/components/planner/week-grid'
+import { MonthGrid } from '@/components/planner/month-grid'
+import { firstGridDay, MONTH_GRID_DAYS } from '@/lib/planner/month'
 import { bucketWeek } from '@/lib/planner/week'
 import { forDisplay } from '@/lib/posts/display-post'
 import { listPosts, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
@@ -30,7 +32,12 @@ export default async function PlannerPage({
   // reschedule) behind a toggle the user hasn't found yet. The review that
   // caught this: anchor-integrity scans source text, so only runtime DOM
   // reachability decides whether a tour actually shows.
-  const view: PlannerView = rawView === 'week' ? 'week' : 'list'
+  // LIST stays the DEFAULT even though the reference leads with its calendar.
+  // The reason above still holds: approve and reschedule live on list rows and
+  // the seeded tour anchors `planner.approve` on this route, so defaulting to a
+  // grid would put the tour's anchor behind a toggle nobody has found yet.
+  // Calendar is one click away and is the first segment in the control.
+  const view: PlannerView = rawView === 'week' ? 'week' : rawView === 'month' ? 'month' : 'list'
   const posts = await listPosts()
   // The evidence behind any "it happened" claim. Fails safe to an empty map, in
   // which case every chip renders the weaker claim rather than a solid publish.
@@ -67,7 +74,7 @@ export default async function PlannerPage({
     <PublishStateProvider initial={liveSeed}>
       <div className="space-y-grid">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <PageTitle>Planner</PageTitle>
+          <PageTitle sub="Plan, schedule and stay ahead.">Planner</PageTitle>
           {posts.length > 0 ? <ViewToggle active={view} /> : null}
         </div>
 
@@ -81,6 +88,14 @@ export default async function PlannerPage({
             title="Your week shows up here"
             body="One click up there drafts five posts and places them across your coming week."
             tip="Add goals first if you have a push this week — the plan bends toward them."
+          />
+        ) : view === 'month' ? (
+          // 42 IST days from the Monday on or before the 1st — `bucketWeek`
+          // already buckets any run of consecutive days, so the calendar needed
+          // no second date implementation to drift from the first.
+          <MonthGrid
+            buckets={bucketWeek(shown, firstGridDay(now), MONTH_GRID_DAYS)}
+            monthAnchor={now}
           />
         ) : view === 'week' ? (
           <WeekGrid
