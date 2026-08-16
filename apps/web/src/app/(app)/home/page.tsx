@@ -6,6 +6,7 @@ import { GreetingBanner } from '@/components/home/greeting-banner'
 import { NeedsAttention } from '@/components/home/needs-attention'
 import { BrainCard, ConnectionsCard } from '@/components/home/rail-cards'
 import { InstagramInsights } from '@/components/home/instagram-insights'
+import { PerformanceStrip } from '@/components/home/performance-strip'
 import { SahodaRail } from '@/components/home/sahoda-rail'
 import { SpendArea } from '@/components/home/spend-area'
 import { SpendBars } from '@/components/home/spend-bars'
@@ -119,8 +120,16 @@ export default async function HomePage() {
           row and the stack read as a leftovers column. */}
       <div className="grid grid-cols-[minmax(0,1fr)_380px] items-start gap-4 max-wide:grid-cols-1">
         <div className="flex min-w-0 flex-col gap-4">
-          {/* 2 — WHAT IS HAPPENING. Instagram first when connected; spend is
-                  the only other real series this workspace has. */}
+          {/* 2 — WHAT IS HAPPENING. The reference opens this column with the
+                  performance strip, and this page had no metric container at
+                  all — not an empty one, none. Its four slots read "—" until
+                  something is connected, which is the honest answer; showing
+                  nothing left the reader unable to tell "we measured nothing"
+                  from "this product does not measure". */}
+          <PerformanceStrip analytics={instagram} />
+
+          {/* Instagram's own series sits below the strip: the strip carries the
+              headline numbers, this carries the one real chart. */}
           <InstagramInsights analytics={instagram} />
 
           <Card className="space-y-4">
