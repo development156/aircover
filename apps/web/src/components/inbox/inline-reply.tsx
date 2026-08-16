@@ -85,7 +85,7 @@ export function InlineReply({ fieldId, label, canReply, send }: InlineReplyProps
         <button
           type="submit"
           disabled={disabled}
-          className="rounded-pill bg-primary px-3 py-1 text-[13px] font-semibold text-primary-foreground transition-micro hover:bg-primary-strong hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-45"
+          className="h-7 rounded-sm bg-primary px-[9px] text-[12px] font-[550] text-primary-foreground transition-micro hover:bg-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-45"
         >
           {pending ? 'Sending…' : 'Send reply'}
         </button>

@@ -57,6 +57,12 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   return (
     <PublishStateProvider initial={liveSeed}>
       <div className="space-y-grid">
+        {/* The editor's own "title" is an INPUT, so this screen had no heading
+            at all — invisible to anyone navigating by headings, and the second
+            screen in the app with that gap. Visually hidden rather than shown:
+            the editor's layout is settled and does not get a page title, but a
+            document still needs one. */}
+        <h1 className="sr-only">Edit post</h1>
         <PostEditor
           post={post}
           variants={variants}

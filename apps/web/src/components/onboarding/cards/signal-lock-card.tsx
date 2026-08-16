@@ -1,3 +1,4 @@
+import { Badge, type Rung } from '@/components/ui/badge'
 import type { BrandMemoryPayload } from '@sahoda/shared'
 
 import { BrandCard, type RegenerateCost } from '@/components/onboarding/brand-card'
@@ -16,17 +17,29 @@ const LOCK_COPY: Record<BrandMemoryPayload['alignment']['signal_lock'], string> 
   weak: 'Weak signal — inputs conflict',
 }
 
-const LOCK_TONE: Record<BrandMemoryPayload['alignment']['signal_lock'], string> = {
-  strong: 'bg-ok-bg text-ok',
-  moderate: 'bg-warn-bg text-warn',
-  weak: 'bg-danger-bg text-danger',
+/**
+ * Signal-lock strength as a RUNG, not a colour pair.
+ *
+ * It had to change: `--warn` and `--danger` are BOTH the brand orange now, and
+ * `--warn-bg`/`--danger-bg` are the same 6% wash, so `moderate` and `weak`
+ * rendered IDENTICALLY. Three states collapsed to two, and only the label told
+ * them apart.
+ *
+ * The rung is chosen by urgency, which is what this field is actually saying:
+ *   weak      inputs CONFLICT — the model is unsure and you should look  -> urgent
+ *   moderate  usable, worth improving                                    -> pending
+ *   strong    nothing needed                                             -> calm
+ * Fill weight, glyph and label, none of them hue.
+ */
+const LOCK_RUNG: Record<BrandMemoryPayload['alignment']['signal_lock'], Rung> = {
+  strong: 'calm',
+  moderate: 'pending',
+  weak: 'urgent',
 }
 
-const LOCK_DOT: Record<BrandMemoryPayload['alignment']['signal_lock'], string> = {
-  strong: 'bg-ok',
-  moderate: 'bg-warn',
-  weak: 'bg-danger',
-}
+// The colour-only dot is GONE. `bg-warn` and `bg-danger` are the same colour,
+// so it could not distinguish two of its three states — a signal that carried
+// no signal. The badge's glyph does the job it was meant to do.
 
 /**
  * Signal Lock is computed by the model from every other channel — there's no
@@ -47,15 +60,9 @@ export function SignalLockCard({
       regenerateDisabled={regenerateDisabled}
       regenerateCost={regenerateCost}
     >
-      <span
-        className={cn(
-          'inline-flex w-fit items-center gap-2 rounded-pill px-3 py-1.5 text-[14px] font-bold',
-          LOCK_TONE[value.signal_lock],
-        )}
-      >
-        <span className={cn('size-2.5 rounded-pill', LOCK_DOT[value.signal_lock])} aria-hidden />
+      <Badge rung={LOCK_RUNG[value.signal_lock]} className="w-fit">
         {LOCK_COPY[value.signal_lock]}
-      </span>
+      </Badge>
       <p className="text-[13px] text-muted">{value.note}</p>
     </BrandCard>
   )

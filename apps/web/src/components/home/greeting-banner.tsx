@@ -67,7 +67,11 @@ export function GreetingBanner({
 
       <div className="relative flex w-full flex-wrap items-center gap-3">
         <div className="min-w-0">
-          <p className="text-[20px] leading-7 font-[650] tracking-[-0.02em]">{greeting}</p>
+          {/* An <h1>, not a <p>. The banner replaced Home's PageTitle during the
+              structure port and took the page's only heading with it, leaving
+              the app's most-visited screen with no h1 at all — invisible to
+              anyone navigating by headings. */}
+          <h1 className="text-[20px] leading-7 font-[650] tracking-[-0.02em]">{greeting}</h1>
           <p className="mt-[1px] text-[13px] font-[550] text-accent">{state}</p>
         </div>
         <div className="ml-auto flex flex-none items-center gap-2">

@@ -86,7 +86,7 @@ export function ReplyComposer({ affordance, accountId, conversationId }: ReplyCo
         <button
           type="submit"
           disabled={disabled}
-          className="inline-flex items-center gap-1.5 rounded-pill bg-primary px-3.5 py-1.5 text-[13px] font-semibold text-primary-foreground transition-micro hover:bg-primary-strong hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-45"
+          className="inline-flex items-center gap-1.5 h-control rounded-sm bg-primary px-3 text-[13px] font-[550] text-primary-foreground transition-micro hover:bg-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-45"
         >
           <Send size={13} strokeWidth={2} aria-hidden />
           {status === 'sending' ? 'Sending…' : tags.length > 0 ? 'Send tagged reply' : 'Send reply'}

@@ -4,7 +4,7 @@ import { Card, CardLabel } from '@/components/ui/card'
 import { sectionTally } from '@/lib/brand/brain-ring'
 import { BRAIN_SECTIONS, DERIVED_FIELDS } from '@/lib/brand/fields'
 import type { Provenance } from '@/lib/brand/provenance'
-import { cn } from '@/lib/utils'
+import { Badge, type Rung } from '@/components/ui/badge'
 
 const LOCK_COPY: Record<BrandMemoryPayload['alignment']['signal_lock'], string> = {
   strong: 'Strong signal lock',
@@ -12,10 +12,24 @@ const LOCK_COPY: Record<BrandMemoryPayload['alignment']['signal_lock'], string> 
   weak: 'Weak signal — inputs conflict',
 }
 
-const LOCK_TONE: Record<BrandMemoryPayload['alignment']['signal_lock'], string> = {
-  strong: 'bg-ok-bg text-ok',
-  moderate: 'bg-warn-bg text-warn',
-  weak: 'bg-danger-bg text-danger',
+/**
+ * Signal-lock strength as a RUNG, not a colour pair.
+ *
+ * It had to change: `--warn` and `--danger` are BOTH the brand orange now, and
+ * `--warn-bg`/`--danger-bg` are the same 6% wash, so `moderate` and `weak`
+ * rendered IDENTICALLY. Three states collapsed to two, and only the label told
+ * them apart.
+ *
+ * The rung is chosen by urgency, which is what this field is actually saying:
+ *   weak      inputs CONFLICT — the model is unsure and you should look  -> urgent
+ *   moderate  usable, worth improving                                    -> pending
+ *   strong    nothing needed                                             -> calm
+ * Fill weight, glyph and label, none of them hue.
+ */
+const LOCK_RUNG: Record<BrandMemoryPayload['alignment']['signal_lock'], Rung> = {
+  strong: 'calm',
+  moderate: 'pending',
+  weak: 'urgent',
 }
 
 /**
@@ -52,14 +66,9 @@ export function DerivedCard({
       </div>
 
       <div className="flex flex-col gap-2">
-        <span
-          className={cn(
-            'inline-flex w-fit items-center gap-2 rounded-pill px-3 py-1.5 text-[14px] font-bold',
-            LOCK_TONE[alignment.signal_lock],
-          )}
-        >
+        <Badge rung={LOCK_RUNG[alignment.signal_lock]} className="w-fit">
           {LOCK_COPY[alignment.signal_lock]}
-        </span>
+        </Badge>
         <p className="text-[13px] text-muted">{alignment.note}</p>
       </div>
 
