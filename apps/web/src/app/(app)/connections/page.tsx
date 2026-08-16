@@ -41,6 +41,24 @@ const CONNECTABLE: ConnectionPlatform[] = ['instagram', 'x', 'gbp', 'linkedin']
 const LIVE_VIA_ZERNIO = new Set<ConnectionPlatform>(['instagram', 'x', 'gbp', 'linkedin'])
 
 /**
+ * Listed and wired, but never yet proven to publish against the real platform.
+ *
+ * THE FOURTH, INFORMATIONAL STATE. The kit's connection enum is
+ * connected | disconnected | error, and on these two `disconnected` reads as an
+ * INVITATION the customer cannot accept — a live-looking "Connect X" that only
+ * fails after they have already approved access on X's own screen.
+ *
+ * Every live connection row in this product is instagram or linkedin; x and gbp
+ * exist in fixtures and in the adapter layer and have never completed a real
+ * publish. Saying so on the card is the honest version, and it costs the
+ * customer nothing to know it BEFORE the redirect rather than after.
+ *
+ * Delete an entry here the day that channel publishes live — this is a claim
+ * about evidence, not about code.
+ */
+const UNPROVEN = new Set<ConnectionPlatform>(['x', 'gbp'])
+
+/**
  * The plan sentence when this workspace has no room for another channel, else null.
  *
  * Read from the DATABASE, never from the query string — the same rule
@@ -118,7 +136,7 @@ export default async function ConnectionsPage({
         </>
       )}
 
-      <section className="space-y-3 rounded-card border border-line bg-bg p-4 shadow-card">
+      <section className="surface-ring space-y-3 rounded-card bg-surface p-4">
         <div>
           <h2 className="text-[15px] leading-5 font-bold">Connect a channel</h2>
           <p className="text-[13px] text-muted">
@@ -143,6 +161,7 @@ export default async function ConnectionsPage({
                 key={platform}
                 platform={platform}
                 label={CHANNEL_LABELS[platform]}
+                note={UNPROVEN.has(platform) ? 'Not verified live' : undefined}
                 disabled={!live}
                 disabledReason={
                   planFull

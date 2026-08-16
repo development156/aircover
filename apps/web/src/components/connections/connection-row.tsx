@@ -1,8 +1,10 @@
 import type { Connection, ConnectionStatus } from '@sahoda/shared'
 
+import { ChannelLogo } from '@/components/connections/channel-logo'
 import { DisconnectButton } from '@/components/connections/disconnect-button'
 import { ReconnectButton } from '@/components/connections/reconnect-button'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
+import { Badge, type Rung } from '@/components/ui/badge'
 import { accountLabel } from '@/lib/connections/account-label'
 import { connectionHealth, handleOf, platformStatusOf } from '@/lib/connections/health'
 import { cn } from '@/lib/utils'
@@ -10,13 +12,22 @@ import { cn } from '@/lib/utils'
 /**
  * Status chip, exhaustively pinned over the frozen enum — a new status becomes
  * a compile error here, not an unstyled chip (same rule as StatusBadge).
+ *
+ * Now a RUNG rather than a colour pair. It had to become one: `--ok` is black
+ * and `--warn` and `--danger` are both the brand orange, so `bg-ok-bg text-ok`
+ * and `bg-danger-bg text-danger` had stopped distinguishing anything. The rung
+ * carries it in fill weight and glyph instead.
+ *
+ * Chosen by URGENCY, as everywhere: `error` and `expired` both need you now, so
+ * both are rung 1 — a revoked token and a dead one are the same problem to the
+ * person whose posts have stopped going out.
  */
 const STATUS_STYLES = {
-  active: { label: 'Active', className: 'bg-ok-bg text-ok' },
-  expired: { label: 'Expired', className: 'bg-warn-bg text-warn' },
-  revoked: { label: 'Revoked', className: 'bg-s2 text-muted' },
-  error: { label: 'Error', className: 'bg-danger-bg text-danger' },
-} satisfies Record<ConnectionStatus, { label: string; className: string }>
+  active: { label: 'Active', rung: 'active' },
+  expired: { label: 'Expired', rung: 'urgent' },
+  revoked: { label: 'Revoked', rung: 'calm' },
+  error: { label: 'Error', rung: 'urgent' },
+} satisfies Record<ConnectionStatus, { label: string; rung: Rung }>
 
 export interface ConnectionRowProps {
   connection: Connection
@@ -46,19 +57,18 @@ export function ConnectionRow({ connection, now = new Date() }: ConnectionRowPro
   const channel = CHANNEL_LABELS[connection.platform]
 
   return (
-    <div className="space-y-2 rounded-card border border-line bg-bg px-4 py-3 shadow-card">
+    <div className="surface-ring space-y-2 rounded-card bg-surface px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="text-[15px] font-bold">{channel}</span>
+          {/* The mark, with no container around it. */}
+          <ChannelLogo channel={connection.platform} />
+          <span className="text-[14px] font-[650]">{channel}</span>
           <span className="max-w-[28ch] truncate text-[13px] text-muted">
             {handle ? `@${handle.replace(/^@/, '')}` : label}
           </span>
-          <span
-            data-status={connection.status}
-            className={cn('rounded-pill px-2 py-[2px] text-[12px] font-semibold', style.className)}
-          >
+          <Badge rung={style.rung} data-status={connection.status}>
             {style.label}
-          </span>
+          </Badge>
           {/* Zernio's own word for the account, when it gave one. Never invented:
               absent means they said nothing, which is not the same as "healthy". */}
           {platformStatus && platformStatus.toLowerCase() !== connection.status ? (
