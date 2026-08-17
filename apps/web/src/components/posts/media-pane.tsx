@@ -164,7 +164,7 @@ export function MediaPane({ media, channels, postId, previews = [] }: MediaPaneP
             Channel limits still apply to text-only posts.
           </p>
           <p className="mt-2 text-[12px] text-muted">
-            Sahoda: I check every file against each channel before you publish.
+            Sahoda checks every file against each channel before you publish.
           </p>
         </div>
       ) : (

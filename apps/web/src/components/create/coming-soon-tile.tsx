@@ -35,14 +35,50 @@ export function ComingSoonTile({
   icon,
   title,
   note,
+  layout = 'stack',
   className = '',
 }: {
   icon?: React.ReactNode
   title: string
   /** One line about the feature. NEVER a number about the user. */
   note?: string
+  /**
+   * `stack` is the default: icon over title over badge, for a tile standing on
+   * its own or beside other stacked tiles.
+   *
+   * `row` is for a tile sharing a grid with SELECTABLE tiles, which are built
+   * `flex items-center` — mark left, label and status in the middle, state
+   * marker right. In the channel step the two shapes sat side by side in one
+   * 4-column grid at 64px and 110px, so nine tiles for one kind of thing read as
+   * two unrelated components. Being unbuilt is a reason to look PROVISIONAL,
+   * which `.is-proposed` already says; it is not a reason to be a different
+   * shape. The 64px floor matches the selectable tile's two-line height.
+   */
+  layout?: 'stack' | 'row'
   className?: string
 }) {
+  if (layout === 'row') {
+    return (
+      <div
+        data-coming-soon
+        className={`is-proposed flex min-h-16 items-center gap-2 rounded-card px-3 py-3 ${className}`}
+      >
+        {icon ? (
+          <span aria-hidden className="grid size-7 shrink-0 place-items-center text-muted">
+            {icon}
+          </span>
+        ) : null}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-semibold text-muted">{title}</span>
+          {note ? <span className="block text-[11.5px] text-muted">{note}</span> : null}
+        </span>
+        <Badge rung="calm" hideGlyph>
+          Coming soon
+        </Badge>
+      </div>
+    )
+  }
+
   return (
     <div
       data-coming-soon

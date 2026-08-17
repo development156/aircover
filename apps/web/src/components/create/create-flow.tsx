@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button'
 import { InlineError } from '@/components/posts/inline-error'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 import { MediaPane } from '@/components/posts/media-pane'
-import { GenerateImage } from '@/components/posts/generate-image'
 import type { MediaPreview } from '@/lib/posts/media-url'
 
 /**
@@ -340,9 +339,13 @@ function StepChannel({
           )
         })}
 
+        {/* `row`, because these share the grid above with the selectable channel
+            tiles. Stacked, they rendered 110px against those tiles' 64px and the
+            one grid read as two different components. */}
         {SOON_CHANNELS.map((c) => (
           <ComingSoonTile
             key={c.key}
+            layout="row"
             icon={<Image src={c.mark} alt="" aria-hidden width={18} height={18} />}
             title={c.label}
           />
@@ -451,21 +454,23 @@ function StepContent({
       </div>
 
       {/* ── MEDIA ────────────────────────────────────────────────────────────
-          The SAME MediaPane and GenerateImage the editor uses, not a second
-          implementation. MediaPane validates attachments against the post's own
-          channels, so Instagram's requiresMedia and every channel's
-          maxMediaCount are enforced here exactly as they are there — a separate
-          panel would be a second opinion about the same rules.
+          The SAME MediaPane the editor uses, not a second implementation.
+          MediaPane validates attachments against the post's own channels, so
+          Instagram's requiresMedia and every channel's maxMediaCount are enforced
+          here exactly as they are there — a separate panel would be a second
+          opinion about the same rules.
 
-          Both need a saved post to attach to, so before the row exists the
-          panel says so rather than offering an upload that has nowhere to go. */}
+          MediaPane ALREADY RENDERS GenerateImage (media-pane.tsx). This step used
+          to mount a second one beside it in a 280px column, so the Content step
+          showed "Describe the picture you want" and "Make an image · 6 credits"
+          TWICE — MEASURED at x=315 and x=1067. Two copies of one spend control is
+          worse than an unclear one: it invites the reader to wonder which of them
+          charges. The reuse was right; mounting it twice was not.
+
+          It needs a saved post to attach to, so before the row exists the panel
+          says so rather than offering an upload that has nowhere to go. */}
       {postId && postChannels ? (
-        <div className="grid grid-cols-[minmax(0,1fr)_280px] items-start gap-4 max-wide:grid-cols-1">
-          <MediaPane media={media} channels={postChannels} postId={postId} previews={previews} />
-          {/* Its own cost line comes from creditCost('image_standard') — the
-              component reads the price, this screen never restates it. */}
-          <GenerateImage postId={postId} />
-        </div>
+        <MediaPane media={media} channels={postChannels} postId={postId} previews={previews} />
       ) : (
         <p className="text-[12.5px] text-muted">
           Images can be added once the post is saved. Press Continue and come back.
