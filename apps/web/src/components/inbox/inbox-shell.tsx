@@ -38,7 +38,7 @@ export function InboxShell({
   mobileShow: 'list' | 'thread'
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-fullbleed>
       {/* `partial` and `unknown` warn ABOVE the panes: they mean the list is
           real but incomplete, which no empty state can express — an empty state
           would claim there is nothing, and there is something. */}

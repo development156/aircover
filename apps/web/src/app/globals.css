@@ -322,3 +322,24 @@
     margin-block: -12px;
   }
 }
+
+/* ── A FULL-BLEED SCREEN ──────────────────────────────────────────────────────
+   The inbox is a three-pane WORKSPACE, not a document, and the reference runs
+   it edge to edge: its own main is 1208px wide with zero padding, against the
+   app's 1032px inside `max-w-content p-page`. That is 176px taken off the one
+   screen with the least room to give — the thread column.
+
+   Declared BY THE SCREEN rather than decided in the shared layout. `<main>` is
+   rendered once for every route, so a pathname branch there would put every
+   page's width in one conditional; `:has()` lets the inbox opt itself in and
+   leaves every other route's layout untouched and unaware.
+
+   Only above `narrow`: on a phone the panes stack and the page padding is what
+   keeps the content off the screen edge. */
+@media (min-width: 700px) {
+  main:has([data-fullbleed]) {
+    max-width: none;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}

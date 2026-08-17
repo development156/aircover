@@ -9,8 +9,17 @@ import { PageTitle } from '@/components/page-title'
 export default function InboxLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="space-y-grid">
-      <PageTitle>Inbox</PageTitle>
-      <InboxTabs />
+      {/* The PANES run full-bleed (see the data-fullbleed rule in globals.css —
+          the reference gives this workspace the whole width), but the heading
+          and the tabs are ordinary page furniture and keep the page's own
+          gutter. Without this they sit flush against the rail, which reads as a
+          layout fault rather than as a deliberate edge-to-edge workspace. */}
+      <div className="px-page max-narrow:px-0">
+        <PageTitle>Inbox</PageTitle>
+        <div className="mt-grid">
+          <InboxTabs />
+        </div>
+      </div>
       {children}
     </div>
   )
