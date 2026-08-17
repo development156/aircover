@@ -34,7 +34,7 @@ export function AccountPanel({ analytics }: { analytics: AccountAnalytics }) {
         </p>
         <Link
           href="/connections"
-          className="inline-flex text-[13px] font-semibold text-accent underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="inline-flex items-center text-[13px] font-semibold text-accent underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-narrow:min-h-[44px]"
         >
           Open connections
         </Link>
@@ -53,7 +53,7 @@ export function AccountPanel({ analytics }: { analytics: AccountAnalytics }) {
         </p>
         <Link
           href="/connections"
-          className="inline-flex text-[13px] font-semibold text-accent underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="inline-flex items-center text-[13px] font-semibold text-accent underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-narrow:min-h-[44px]"
         >
           Open connections
         </Link>

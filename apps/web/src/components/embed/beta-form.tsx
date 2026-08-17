@@ -33,8 +33,13 @@ type Status =
 // 13px: iOS Safari zooms the viewport on focus for any font-size below 16px,
 // and this form is an embed on someone else's mobile page where that zoom
 // cannot be undone. The label carries the density instead.
+// SPECIFICATION.md §10: 44px of target on a phone. This is a PUBLIC lead form
+// embedded on a marketing page, so the phone is where most of it is filled in —
+// the one screen in the product where the mobile target matters most. The 16px
+// text size is already deliberate (anything smaller makes iOS Safari zoom on
+// focus); this adds the height to match.
 const FIELD =
-  'h-input w-full rounded-sm bg-surface px-[11px] text-[16px] text-ink shadow-[inset_0_0_0_1px_var(--line)] transition-micro focus-visible:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus-visible:outline-none aria-invalid:shadow-[inset_0_0_0_1.5px_var(--danger)]'
+  'h-input max-narrow:min-h-[44px] w-full rounded-sm bg-surface px-[11px] text-[16px] text-ink shadow-[inset_0_0_0_1px_var(--line)] transition-micro focus-visible:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus-visible:outline-none aria-invalid:shadow-[inset_0_0_0_1.5px_var(--danger)]'
 
 const LABEL = 'mb-[6px] block text-[12px] font-[550] text-muted'
 
