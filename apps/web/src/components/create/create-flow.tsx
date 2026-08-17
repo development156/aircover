@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Check, Image as ImageIcon, MapPin, SquarePen } from 'lucide-react'
 import { useState, useTransition } from 'react'
-import { CONSTRAINTS, type Channel } from '@sahoda/shared'
+import { CONSTRAINTS, type Channel, type ChannelSet } from '@sahoda/shared'
+import type { PostMedia } from '@sahoda/shared'
 
 import { createPost, savePost, saveVariant } from '@/app/actions/posts'
 import { ComingSoonTile } from '@/components/create/coming-soon-tile'
@@ -15,6 +16,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { InlineError } from '@/components/posts/inline-error'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
+import { MediaPane } from '@/components/posts/media-pane'
+import { GenerateImage } from '@/components/posts/generate-image'
+import type { MediaPreview } from '@/lib/posts/media-url'
 
 /**
  * The five-step create flow, as FULL-SCREEN PAGES, backed by a real row.
@@ -101,12 +105,19 @@ export function CreateFlow({
   initialChannels,
   initialBodies,
   initialScheduledAt,
+  media,
+  previews,
+  postChannels,
 }: {
   connected: readonly Channel[]
   postId: string | null
   initialChannels: readonly Channel[]
   initialBodies: Record<string, string>
   initialScheduledAt: string | null
+  media: PostMedia[]
+  previews: MediaPreview[]
+  /** The post's OWN channels, branded. MediaPane validates attachments per channel. */
+  postChannels: ChannelSet | null
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -233,6 +244,10 @@ export function CreateFlow({
             bodies={bodies}
             onChange={(ch, value) => setBodies((prev) => ({ ...prev, [ch]: value }))}
             onCommit={persistVariant}
+            postId={postId}
+            media={media}
+            previews={previews}
+            postChannels={postChannels}
           />
         ) : null}
         {current === 'preview' ? <StepPreview channels={channels} bodies={bodies} /> : null}
@@ -392,11 +407,19 @@ function StepContent({
   bodies,
   onChange,
   onCommit,
+  postId,
+  media,
+  previews,
+  postChannels,
 }: {
   channels: readonly Channel[]
   bodies: Record<string, string>
   onChange: (channel: Channel, value: string) => void
   onCommit: (channel: Channel, value: string) => void
+  postId: string | null
+  media: PostMedia[]
+  previews: MediaPreview[]
+  postChannels: ChannelSet | null
 }) {
   if (channels.length === 0) {
     return (
@@ -426,6 +449,28 @@ function StepContent({
             no templates table, so the card exists and the COUNT does not. */}
         <ComingSoonTile title="Use a template" note="Starting points for common posts" />
       </div>
+
+      {/* ── MEDIA ────────────────────────────────────────────────────────────
+          The SAME MediaPane and GenerateImage the editor uses, not a second
+          implementation. MediaPane validates attachments against the post's own
+          channels, so Instagram's requiresMedia and every channel's
+          maxMediaCount are enforced here exactly as they are there — a separate
+          panel would be a second opinion about the same rules.
+
+          Both need a saved post to attach to, so before the row exists the
+          panel says so rather than offering an upload that has nowhere to go. */}
+      {postId && postChannels ? (
+        <div className="grid grid-cols-[minmax(0,1fr)_280px] items-start gap-4 max-wide:grid-cols-1">
+          <MediaPane media={media} channels={postChannels} postId={postId} previews={previews} />
+          {/* Its own cost line comes from creditCost('image_standard') — the
+              component reads the price, this screen never restates it. */}
+          <GenerateImage postId={postId} />
+        </div>
+      ) : (
+        <p className="text-[12.5px] text-muted">
+          Images can be added once the post is saved. Press Continue and come back.
+        </p>
+      )}
 
       {channels.map((channel) => {
         const value = bodies[channel] ?? ''

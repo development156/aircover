@@ -3,7 +3,8 @@ import type { Channel } from '@sahoda/shared'
 
 import { CreateFlow } from '@/components/create/create-flow'
 import { listConnectedChannels } from '@/lib/connections/read'
-import { getPost, listVariants } from '@/lib/posts/read'
+import { getPost, listMedia, listVariants } from '@/lib/posts/read'
+import { signMediaPreviews } from '@/lib/posts/media-url'
 
 export const metadata = { title: 'New post' }
 
@@ -47,6 +48,12 @@ export default async function CreatePostPage({
 
   const post = postId ? await getPost(postId) : null
   const variants = post ? await listVariants(post.id) : []
+  // Media travels with the post so the flow's panel is the SAME panel the
+  // editor shows — same rows, same signed previews, same per-channel
+  // attachment rules. Two media surfaces reading different sources is how one
+  // of them ends up claiming an image the other cannot see.
+  const media = post ? await listMedia(post.id) : []
+  const previews = media.length > 0 ? await signMediaPreviews(media) : []
 
   return (
     <Suspense fallback={null}>
@@ -56,6 +63,9 @@ export default async function CreatePostPage({
         initialChannels={(post?.channels ?? []) as Channel[]}
         initialBodies={Object.fromEntries(variants.map((v) => [v.channel, v.body]))}
         initialScheduledAt={post?.scheduled_at ?? null}
+        media={media}
+        previews={previews}
+        postChannels={post?.channels ?? null}
       />
     </Suspense>
   )
