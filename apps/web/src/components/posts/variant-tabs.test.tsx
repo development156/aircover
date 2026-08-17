@@ -187,7 +187,14 @@ describe('VariantTabs media-count rule', () => {
       />,
     )
 
-    expect(screen.getByRole('alert')).toHaveTextContent('gbp allows 1 media items.')
+    // The engine says "gbp"; the editor says "Google Business Profile". Violation
+    // sentences go through `presentViolation` at the render edge, so the channel
+    // reads as its display label rather than its key — the panel is headed with
+    // the label, and the two disagreeing was the defect. The engine's own message
+    // is still rendered VERBATIM by `describeViolation`; only presentation moved.
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Google Business Profile allows 1 media items.',
+    )
     // The panel cannot detach a file, so the CTA must be plain text, never a
     // button that does nothing.
     expect(screen.queryByRole('button', { name: 'Remove extra media' })).toBeNull()

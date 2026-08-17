@@ -156,3 +156,39 @@ export function summarizeViolations(vs: readonly ConstraintViolation[]): string 
   if (vs.length === 1) return describeViolation(first).message
   return `${vs.length} issues to fix`
 }
+
+/**
+ * Presentation polish for an already-gated violation sentence.
+ *
+ * DELIBERATELY SEPARATE FROM `describeViolation`. That function renders the
+ * engine's message VERBATIM when it matches the allowlist, and
+ * `violation-copy.test.ts` has a load-bearing canary asserting exactly that —
+ * the canary is how engine drift gets caught, so normalising inside the gate
+ * would trade a real safety net for a cosmetic gain.
+ *
+ * This runs at the RENDER EDGE instead, on a string that has already passed the
+ * anchored shape check, so nothing untrusted can reach it.
+ *
+ * Two mismatches it fixes, both visible in the editor at once:
+ *   · the engine names the channel by its KEY, so a panel headed "Instagram"
+ *     said "instagram allows 2200 characters"
+ *   · the engine prints bare integers, so "2200" sat directly beneath a counter
+ *     reading "2,200" — the same number, two formats, forty pixels apart
+ */
+export function presentViolation(
+  message: string,
+  labels: Readonly<Record<string, string>>,
+): string {
+  let out = message
+  // Only ever the LEADING channel key: the engine always opens with it, and
+  // anchoring here keeps a channel word inside prose from being rewritten.
+  for (const [key, label] of Object.entries(labels)) {
+    if (out.startsWith(`${key} `)) {
+      out = `${label}${out.slice(key.length)}`
+      break
+    }
+  }
+  // Group only bare 4+ digit integers. Shorter numbers (280, 10) read fine
+  // unseparated and match how the counter renders them.
+  return out.replace(/\b(\d{4,9})\b/g, (n) => Number(n).toLocaleString('en-IN'))
+}

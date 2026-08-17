@@ -1,8 +1,11 @@
+import { Link2 } from 'lucide-react'
 import type { ConnectionPlatform } from '@sahoda/shared'
 
 import { ChannelTile } from '@/components/connections/channel-tile'
 import { ConnectionHealthBanner } from '@/components/connections/connection-health-banner'
 import { ConnectOutcomeNotice } from '@/components/connections/connect-outcome-notice'
+import { EmptyState } from '@/components/empty-state'
+import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { PageTitle } from '@/components/page-title'
 import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { listConnections, readConnectionSlots } from '@/lib/connections/read'
@@ -105,10 +108,11 @@ export default async function ConnectionsPage({
    */
   searchParams: Promise<{ zernio?: string | string[] }>
 }) {
-  const [connections, { zernio }, channelLimit] = await Promise.all([
+  const [connections, { zernio }, channelLimit, workspace] = await Promise.all([
     listConnections(),
     searchParams,
     channelLimitNotice(),
+    getActiveWorkspace(),
   ])
   const railReady = zernioAvailable()
   const planFull = channelLimit !== null
@@ -126,9 +130,26 @@ export default async function ConnectionsPage({
       {/* What just happened comes before what is there now. */}
       <ConnectOutcomeNotice status={zernio} />
 
-      {connections === null ? (
+      {workspace === null ? (
+        /* NO WORKSPACE IS NOT A FAILED READ. `listConnections()` returns null both
+           when the read breaks AND when there is nothing to read, and this page
+           used to render the failure copy for both — telling a brand-new account
+           that Sahoda "couldn't check your connections" and offering NOTHING to
+           press. MEASURED on a seeded account: 18 words, zero controls, and the
+           one remedy on offer (reload) can never succeed.
+
+           Run 9's rule: "read failed" and "no workspace yet" are different claims
+           and only one of them is true here. /wallet and /home already say this
+           properly; this is the same sentence in the same shape. */
+        <EmptyState
+          icon={Link2}
+          title="Create a workspace to connect a channel"
+          body="Channels belong to a workspace and you don't have one yet. Nothing failed — there is simply nothing to connect to until one exists."
+          action={<CreateWorkspaceButton variant="primary" />}
+        />
+      ) : connections === null ? (
         <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
-          Couldn&rsquo;t check your connections just now — reload to see what&rsquo;s already
+          Couldn&rsquo;t check your connections just now &mdash; reload to see what&rsquo;s already
           linked.
         </p>
       ) : (

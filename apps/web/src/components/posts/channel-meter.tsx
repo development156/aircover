@@ -3,7 +3,8 @@
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 import type { ChannelMeter } from '@/lib/posts/counters'
-import { describeViolation } from '@/lib/posts/violation-copy'
+import { describeViolation, presentViolation } from '@/lib/posts/violation-copy'
+import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 
 export interface ChannelMeterViewProps {
   meter: ChannelMeter
@@ -45,7 +46,10 @@ export function ChannelMeterView({ meter, fixes }: ChannelMeterViewProps) {
                 role="alert"
                 className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
               >
-                <p>{display.message}</p>
+                {/* Presented, not re-gated: the channel key becomes its display
+                    label and 4-digit numbers get the same separators the counter
+                    above already uses. See presentViolation. */}
+                <p>{presentViolation(display.message, CHANNEL_LABELS)}</p>
                 {display.fixLabel !== undefined ? (
                   fix !== undefined ? (
                     <button
