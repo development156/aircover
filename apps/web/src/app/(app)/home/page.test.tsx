@@ -47,12 +47,11 @@ vi.mock('@/lib/connections/read', () => ({ listConnections: vi.fn() }))
 
 // Reached through CreateWorkspaceButton, which is a `'use server'` import away.
 vi.mock('@/app/actions/workspace', () => ({ createWorkspace: vi.fn() }))
-// The greeting banner carries the page's primary action, and CreatePostButton
-// creates a draft and then NAVIGATES to it — so it calls `useRouter`, which
-// throws "expected app router to be mounted" when the page is rendered outside
-// a router. Mocked rather than designed away: unlike the command palette, the
-// navigation here happens after a server action returns an id, so there is no
-// `<Link>` to point at ahead of time.
+// The greeting banner carries the page's primary action. CreatePostButton is
+// now a plain <Link> to the create flow — it no longer writes a draft before
+// asking anything, so it needs neither the router nor the action. Both mocks
+// are kept because OTHER components on this page still reach for them, and
+// removing them here would only move the failure.
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }))
 vi.mock('@/app/actions/posts', () => ({ createPost: vi.fn() }))
 

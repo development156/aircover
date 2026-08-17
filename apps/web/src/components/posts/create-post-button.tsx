@@ -1,21 +1,28 @@
-'use client'
-
-import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Plus } from 'lucide-react'
 
-import { createPost } from '@/app/actions/posts'
-import { InlineError } from '@/components/posts/inline-error'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 /**
- * Creates an empty draft, then routes into the editor. `createPost` costs no
- * credits (it is a plain insert), so there is deliberately no cost line here —
- * showing one would be a fabricated price.
+ * The primary "Create post" action, on Home and /posts.
  *
- * The action never throws; it returns a discriminated union, so the failure
- * path is a real inline banner rather than an unhandled rejection.
+ * ── IT USED TO INSERT A ROW BEFORE ASKING ANYTHING ───────────────────────────
+ * This button called `createPost('')`, wrote an empty draft, and routed into the
+ * editor with its id. Every press produced a row, so an abandoned click left an
+ * "Untitled post" in the list forever and the workspace accumulated debris from
+ * people who changed their mind on the first screen.
+ *
+ * It now opens the create flow instead, and nothing is written until the flow
+ * has something to write. `createPost` is unchanged and still used by the flow's
+ * own final step; only the moment of insertion moved.
+ *
+ * ── WHY A LINK AND NOT A BUTTON ──────────────────────────────────────────────
+ * The destination is known ahead of time now, so this is a navigation and should
+ * be a real anchor: middle-click, open-in-new-tab, and the browser's own status
+ * bar preview all work, none of which a `<button onClick={router.push}>` gives.
+ * That also drops the transition state and the inline error, because there is no
+ * longer a server call here that can fail.
  */
 export interface CreatePostButtonProps {
   size?: 'default' | 'sm'
@@ -23,39 +30,15 @@ export interface CreatePostButtonProps {
 }
 
 export function CreatePostButton({ size = 'default', className }: CreatePostButtonProps) {
-  const router = useRouter()
-  const [pending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-
-  function onCreate() {
-    setError(null)
-    startTransition(async () => {
-      // Untitled by design: the editor is where a title gets written, and an
-      // empty title renders as "Untitled post" everywhere.
-      const result = await createPost('')
-      if (!result.ok) {
-        setError(result.message)
-        return
-      }
-      router.push(`/posts/${result.postId}`)
-    })
-  }
-
   return (
-    <div className={cn('flex flex-col items-start gap-2', className)}>
-      <Button
-        type="button"
-        size={size}
-        loading={pending}
-        onClick={onCreate}
-        data-guide="posts.new_button"
-      >
-        {pending ? null : <Plus size={16} strokeWidth={2} aria-hidden />}
-        {/* Buttons keep their name through the flow — verb stays "create". */}
-        {pending ? 'Creating post…' : 'Create post'}
-      </Button>
-
-      {error ? <InlineError>{error} Nothing was created — try again.</InlineError> : null}
-    </div>
+    <Link
+      href="/create/post"
+      data-guide="posts.new_button"
+      className={cn(buttonVariants({ variant: 'primary', size }), className)}
+    >
+      <Plus size={16} strokeWidth={2} aria-hidden />
+      {/* The verb stays "create" the whole way through the flow. */}
+      Create post
+    </Link>
   )
 }

@@ -30,6 +30,9 @@ type Destination = { href: Route; label: string; hint: string }
  * is not a shortcut, it is a leak. The route stays reachable by URL, as before.
  */
 const DESTINATIONS: readonly Destination[] = [
+  // Creation is the reference's first-class command: the + button, C and ⌘K
+  // all open it, so it leads the list rather than sitting under Posts.
+  { href: '/create', label: 'Create', hint: 'Start something new' },
   { href: '/home', label: 'Home', hint: 'Today, and what needs you' },
   { href: '/brain', label: 'Brand Brain', hint: 'What Sahoda knows about you' },
   { href: '/posts', label: 'Posts', hint: 'Draft, approve, publish' },
