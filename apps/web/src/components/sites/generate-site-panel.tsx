@@ -136,11 +136,22 @@ export function GenerateSitePanel({ limitNotice }: GenerateSitePanelProps) {
         />
       </div>
 
-      {/* The limit, before the click — same moment the cost is shown. */}
+      {/* The limit, before the click — same moment the cost is shown.
+          AND THE WAY OUT. This said "your Free plan doesn't include one" and
+          stopped there, which is a dead end: the sentence names a plan the
+          reader cannot reach from the screen telling them about it. The plans
+          live on /wallet, so the notice now ends at the door rather than at a
+          wall. docs/ux-findings.md #13. */}
       {blocked ? (
-        <p className="rounded-input bg-s2 px-3 py-2.5 text-[13px] text-muted" role="status">
-          {limitNotice}
-        </p>
+        <div className="rounded-input bg-s2 px-3 py-2.5" role="status">
+          <p className="text-[13px] text-muted">{limitNotice}</p>
+          <Link
+            href="/wallet"
+            className="mt-1 inline-flex items-center rounded-sm text-[13px] font-semibold text-accent transition-micro hover:underline max-narrow:min-h-[44px]"
+          >
+            See plans
+          </Link>
+        </div>
       ) : null}
 
       {pending ? (

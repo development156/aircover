@@ -25,7 +25,10 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
       ref={ref}
       aria-invalid={error || undefined}
       className={cn(
-        'h-input w-full rounded-sm border-none bg-surface px-[11px] text-[13px] text-ink transition-micro placeholder:text-muted',
+        // SPECIFICATION.md §10: a phone needs 44px of target; desktop keeps the kit's
+        // dense --h-input. Applied here so every field in the app clears the floor
+        // rather than one screen at a time.
+        'h-input w-full rounded-sm border-none bg-surface px-[11px] text-[13px] text-ink transition-micro placeholder:text-muted max-narrow:min-h-[44px]',
         'focus:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus:outline-none',
         'disabled:opacity-50',
         // Error is a RING WEIGHT change, not a hue change — --danger is the
