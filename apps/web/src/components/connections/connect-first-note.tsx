@@ -34,11 +34,22 @@ export function ConnectFirstNote({ connectedCount }: { connectedCount: number })
         </p>
       </div>
       {/* Wears the Button's clothes rather than re-typing them — this one was a
-          32px pill in `bg-accent` because it was hand-rolled. */}
+          32px pill in `bg-accent` because it was hand-rolled.
+
+          SECONDARY, not primary. The reference rations orange to one primary per
+          view, and this banner appears on exactly two screens that already have
+          one: /posts ("Create post") and /planner ("Plan my week"). On /posts the
+          two solid oranges sat 71px apart in the first screenful, so the GATE
+          shouted louder than the action the page exists for. The banner is still
+          the loudest thing in its own right — it has the wash AND the hairline
+          ring above — so demoting the button costs it no visibility. Same ruling
+          run 17 applied to /connections' four full-width oranges.
+
+          Its own copy argues for this: "You can write and plan without one." */}
       <Link
         href="/connections"
         data-guide="nudge.connect"
-        className={buttonVariants({ variant: 'primary' })}
+        className={buttonVariants({ variant: 'secondary' })}
       >
         <Plug size={14} aria-hidden />
         Connect a channel
