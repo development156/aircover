@@ -3,7 +3,22 @@ import Link from 'next/link'
 import { brainRing, ringAriaLabel, ringHoverLine } from '@/lib/brand/brain-ring'
 import type { BrainRead } from '@/lib/brand/read-brain'
 
-// The Brand Brain ring, beside the credit chip.
+// The Brand Brain ring, beside the credit chip. HIDDEN ON A PHONE — see below.
+//
+// ── WHY IT DROPS AT max-narrow ───────────────────────────────────────────────
+// The mobile header carries six items in 380px. When every tappable control was
+// raised to the 44px floor SPECIFICATION.md §10 requires, the theme toggle and
+// the avatar each grew 12px WIDER as well as taller, and because every chip is
+// `flex-none` the whole 24px came out of the only shrinkable item: the workspace
+// switcher, which collapsed to 56px and rendered "S Sah". A name nobody can read
+// is worse than a status pill nobody can see.
+//
+// §10's rule is "mobile is recomposed, not shrunk", so the answer is to carry
+// fewer things rather than to squeeze all six. This is the one that gives up
+// least: it shows a COUNT, not an alert, it triggers nothing, and /brain is one
+// tap away in the bottom nav. The credit chip stays because spend is the thing
+// people check mid-task; the switcher stays because being in the wrong workspace
+// is the mistake that costs the most.
 //
 // It counts CONFIRMED fields, never filled ones. A resolve fills all fifteen at
 // once, so a fullness meter reads 100% the moment the model answers — a claim the
@@ -74,7 +89,7 @@ export function BrainRing({ brain }: { brain: BrainRead }) {
   // two chips were the only ones without it. The palette, sized
   // `w-[min(420px,100%)]`, is the item meant to absorb the shrink.
   const shell =
-    'group relative flex flex-none items-center gap-2 rounded-pill border border-line bg-bg px-2 py-1 font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] max-narrow:min-h-[44px] dark:hover:bg-s2'
+    'group relative flex flex-none items-center gap-2 rounded-pill border border-line bg-bg px-2 py-1 font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] max-narrow:hidden dark:hover:bg-s2'
 
   if (brain.status === 'no-brain') {
     return (
