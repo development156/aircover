@@ -77,7 +77,7 @@ export function WorkspaceSwitcher({ workspaces, active }: WorkspaceSwitcherProps
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((value) => !value)}
-        className="flex min-w-0 items-center gap-2 rounded-input border border-line bg-bg px-3 py-[7px] font-semibold transition-micro hover:bg-s1 max-narrow:px-2"
+        className="flex min-w-0 items-center gap-2 rounded-input border border-line bg-bg px-3 py-[7px] font-semibold transition-micro hover:bg-s1 max-narrow:min-h-[44px] max-narrow:px-2"
       >
         <WorkspaceBadge name={active.name} />
         <span className="max-w-[16ch] truncate max-narrow:max-w-[7ch]">{active.name}</span>

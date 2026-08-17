@@ -96,7 +96,10 @@ export async function Topbar() {
           was fully built and completely unreachable until this button existed —
           see ThemeToggle. */}
       <ThemeToggle />
-      <div data-guide="topbar.avatar" className="grid size-8 flex-none place-items-center">
+      <div
+        data-guide="topbar.avatar"
+        className="grid size-8 flex-none place-items-center max-narrow:size-11"
+      >
         <UserButton />
       </div>
     </header>

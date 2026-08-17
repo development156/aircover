@@ -79,7 +79,7 @@ export function PerformanceStrip({ analytics }: { analytics: AccountAnalytics })
         <h2 className="text-[14px] font-semibold tracking-[-0.01em]">Performance</h2>
         <Link
           href="/analytics"
-          className="rounded-sm text-[12.5px] font-semibold text-accent transition-micro hover:underline"
+          className="card-link rounded-sm text-[12.5px] font-semibold text-accent transition-micro hover:underline"
         >
           Details
         </Link>

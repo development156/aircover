@@ -47,7 +47,7 @@ export function SettingsNav() {
             href={item.href}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'flex h-[34px] items-center gap-[10px] rounded-sm px-[9px] text-[13px] font-medium transition-micro',
+              'flex h-[34px] items-center gap-[10px] rounded-sm px-[9px] text-[13px] font-medium transition-micro max-narrow:h-[44px]',
               active
                 ? 'bg-brand-wash font-semibold text-accent'
                 : 'text-muted hover:bg-surface-3 hover:text-ink',

@@ -31,7 +31,10 @@ function RailCard({
     <section className="surface-ring rounded-card bg-surface">
       <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
         <h2 className="text-[14px] font-semibold tracking-[-0.01em]">{title}</h2>
-        <Link href={href} className="ml-auto text-[12px] font-[550] text-muted hover:text-accent">
+        <Link
+          href={href}
+          className="card-link ml-auto text-[12px] font-[550] text-muted hover:text-accent"
+        >
           {linkLabel}
         </Link>
       </header>

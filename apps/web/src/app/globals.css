@@ -308,3 +308,17 @@
 
 /* Z scale (docs/08 §4), used as z-<number> bare values:
    content 0 · sticky 5 · popover 15 · mascot 20 · toast 30 · overlay/tour 40 · confetti 50 */
+
+/* A card-header link ("View all", "Manage", "Details").
+   Dense at desktop by design; on a phone SPECIFICATION.md §10 wants every
+   tappable control to clear 44px, and these measured 20. The height is added
+   only at max-narrow, and the negative margin keeps the header's baseline where
+   the design put it rather than pushing the row 24px taller. */
+@media (max-width: 699px) {
+  .card-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-block: -12px;
+  }
+}

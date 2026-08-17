@@ -103,7 +103,7 @@ export function MobileHeaderMark() {
     <Link
       href="/home"
       aria-label="Sahoda — go to Home"
-      className="hidden shrink-0 rounded-sm max-narrow:block"
+      className="hidden shrink-0 items-center rounded-sm max-narrow:flex max-narrow:min-h-[44px]"
     >
       <Image
         src="/brand/favicon-dark.png"

@@ -157,7 +157,7 @@ export default async function HomePage() {
               <h2 className="text-[14px] font-semibold tracking-[-0.01em]">Recent activity</h2>
               <Link
                 href="/wallet"
-                className="ml-auto text-[12px] font-[550] text-muted hover:text-accent"
+                className="card-link ml-auto text-[12px] font-[550] text-muted hover:text-accent"
               >
                 View all
               </Link>

@@ -50,7 +50,10 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
             {waiting.length}
           </span>
         ) : null}
-        <Link href="/posts" className="ml-auto text-[12px] font-[550] text-muted hover:text-accent">
+        <Link
+          href="/posts"
+          className="card-link ml-auto text-[12px] font-[550] text-muted hover:text-accent"
+        >
           View all
         </Link>
       </header>

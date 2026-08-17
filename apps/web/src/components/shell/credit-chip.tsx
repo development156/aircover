@@ -61,7 +61,7 @@ export function CreditChip({ balance }: { balance: BalanceRead }) {
       data-guide="topbar.credits"
       aria-live="polite"
       aria-label={content.label}
-      className="flex flex-none items-center gap-[7px] rounded-pill border-[1.5px] border-primary bg-bg px-[13px] py-1.5 font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] dark:hover:bg-s2"
+      className="flex flex-none items-center gap-[7px] rounded-pill border-[1.5px] border-primary bg-bg px-[13px] py-1.5 font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] max-narrow:min-h-[44px] dark:hover:bg-s2"
     >
       {/* `.num` (tokens.css v3: mono + tabular-nums) only where there is a
           number to align — v3 puts mono in exactly three places and the topbar

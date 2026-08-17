@@ -35,10 +35,14 @@ export const buttonVariants = cva(
         // it identical to primary, since --danger is now the brand orange.
         destructive: 'bg-ink text-white hover:bg-primary',
       },
+      // SPECIFICATION.md §10: "Every tappable control clears 44px; desktop stays
+      // dense." The kit's 34px control height is a DESKTOP number — it is what
+      // separates this shell from a stock dashboard — so the floor is added at
+      // max-narrow only and every size keeps its exact desktop height.
       size: {
-        default: 'h-control px-3 text-[13px]',
-        sm: 'h-7 px-[9px] text-[12px] [&_svg]:size-[13px]',
-        lg: 'h-10 px-4 text-[14px]',
+        default: 'h-control px-3 text-[13px] max-narrow:min-h-[44px]',
+        sm: 'h-7 px-[9px] text-[12px] [&_svg]:size-[13px] max-narrow:min-h-[44px]',
+        lg: 'h-10 px-4 text-[14px] max-narrow:min-h-[44px]',
       },
     },
     defaultVariants: { variant: 'primary', size: 'default' },
