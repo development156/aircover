@@ -113,3 +113,62 @@ export async function setActiveWorkspace(formData: FormData): Promise<void> {
   })
   revalidatePath('/', 'layout')
 }
+
+/**
+ * Rename the active workspace.
+ *
+ * ── WHY THE NAME AND NOTHING ELSE ────────────────────────────────────────────
+ * /settings displayed the workspace name as read-only text, so the label a
+ * person sees in the switcher on every screen — usually derived from their
+ * email at bootstrap, e.g. "sahoda+clerk_test's workspace" — could never be
+ * changed from inside the app.
+ *
+ * The SLUG is deliberately not touched. Its own hint on that page says it is
+ * "used in links and never reused": it is the pointer the active-workspace
+ * cookie holds and the value shared URLs carry, so renaming it would silently
+ * break every link anyone had already sent. A rename here is a display change
+ * only, which is what people actually want when they rename a workspace.
+ *
+ * ── WHY THIS IS SAFE TO WRITE DIRECTLY ───────────────────────────────────────
+ * `workspaces` is RLS-scoped to the caller's memberships, so the UPDATE can only
+ * ever reach a row this user is entitled to, and `name` carries no authorisation
+ * meaning anywhere — nothing branches on it. That is the whole reason the slug
+ * stays out: it IS a pointer, and this is not.
+ */
+export async function renameWorkspace(
+  workspaceId: string,
+  name: string,
+): Promise<{ ok: true; name: string } | { ok: false; message: string }> {
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to rename this workspace.' }
+
+    const trimmed = name.trim()
+    if (trimmed.length === 0) return { ok: false, message: 'Give the workspace a name.' }
+    if (trimmed.length > 80) return { ok: false, message: 'Keep the name under 80 characters.' }
+
+    const id = z.uuid().safeParse(workspaceId)
+    if (!id.success) return { ok: false, message: 'That workspace could not be found.' }
+
+    const supabase = createServerSupabase()
+    // `.select()` is not decorative: PostgREST returns a null error for an
+    // UPDATE that matched NO ROWS, so without reading a row back a rename that
+    // RLS refused would report success. The returned row is the evidence.
+    const { data, error } = await supabase
+      .from('workspaces')
+      .update({ name: trimmed })
+      .eq('id', id.data)
+      .select('name')
+      .maybeSingle()
+
+    if (error || !data) {
+      return { ok: false, message: 'Could not rename this workspace — try again.' }
+    }
+
+    revalidatePath('/settings')
+    revalidatePath('/', 'layout')
+    return { ok: true, name: (data as { name: string }).name }
+  } catch {
+    return { ok: false, message: 'Could not rename this workspace — try again.' }
+  }
+}

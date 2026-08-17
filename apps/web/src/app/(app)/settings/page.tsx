@@ -1,4 +1,5 @@
 import { SlidersHorizontal } from 'lucide-react'
+import { WorkspaceNameField } from '@/components/settings/workspace-name-field'
 
 import { EmptyState } from '@/components/empty-state'
 import { SettingCard, SettingRow } from '@/components/settings/setting-row'
@@ -31,7 +32,7 @@ export default async function SettingsPage() {
       <SettingRow
         label="Name"
         hint="What this workspace is called in the switcher."
-        control={<span className="text-[13px] font-[550] text-ink">{workspace.name}</span>}
+        control={<WorkspaceNameField workspaceId={workspace.id} initialName={workspace.name} />}
       />
       <SettingRow
         label="Address"
