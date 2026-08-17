@@ -69,6 +69,48 @@ export function BrainCard({ brain }: { brain: BrainRead }) {
             Confirmed means a person checked it. The rest are still Sahoda&rsquo;s reading of what
             it found.
           </p>
+
+          {/* ── THE REFERENCE'S SIX TILES ────────────────────────────────────
+              Reference card: 380x231 with six — Brand Voice, Writing Style,
+              Primary Color, Audience, Competitors "12 tracked", Knowledge
+              "120 docs". This app's card was 380x151 and had none of them.
+
+              TWO of the six have a real source and are filled from the brain:
+              voice.descriptor and voice.formality_label.
+
+              THE OTHER FOUR RENDER AN EM DASH, AND THAT IS THE POINT.
+                Primary color   the workspace theme is not applied here, and a
+                                swatch would claim one exists
+                Audience        customer_persona holds a one-liner, a pain point,
+                                a fear and a desired identity — no age range.
+                                "25–45 yrs" has no field to come from
+                Competitors     there is no competitors table. "12 tracked" would
+                                be a count of a thing that does not exist
+                Knowledge       there is no document library. Same.
+              A container with a label and a dash is honest; the reference's
+              numbers here are fixture data about a business we cannot read. */}
+          <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-line-soft pt-3">
+            {(
+              [
+                ['Brand voice', brain.active.voice?.descriptor?.trim() || null],
+                ['Writing style', brain.active.voice?.formality_label?.trim() || null],
+                ['Primary colour', null],
+                ['Audience', null],
+                ['Competitors', null],
+                ['Knowledge', null],
+              ] as ReadonlyArray<readonly [string, string | null]>
+            ).map(([label, value]) => (
+              <div key={label} className="min-w-0">
+                <dt className="truncate text-[11px] text-muted">{label}</dt>
+                <dd
+                  className={`truncate text-[12.5px] ${value ? 'font-[550] text-ink' : 'text-muted'}`}
+                  title={value ?? undefined}
+                >
+                  {value ?? '—'}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
       ) : (
         <p className="px-4 py-6 text-center text-[13px] text-muted">
