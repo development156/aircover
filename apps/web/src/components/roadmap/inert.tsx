@@ -93,7 +93,7 @@ export function InertField({ label }: { label: string }) {
  */
 export function RoadmapBanner({ what }: { what: string }) {
   return (
-    <div className="is-proposed flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-card px-3 py-2.5">
+    <div className="is-proposed flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-card p-4">
       <Badge rung="calm" hideGlyph>
         Coming soon
       </Badge>

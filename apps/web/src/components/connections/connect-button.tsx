@@ -59,7 +59,20 @@ export function ConnectButton({
     // which is how the page ended up with two different tiles for one idea.
     <div className="flex w-full flex-col gap-1">
       <Button
-        variant={disabled ? 'secondary' : 'primary'}
+        /* SECONDARY, not primary, and this is the reference's own rule rather
+           than a preference: "one primary per view" and "orange is rationed"
+           (README §Design system). /connections renders FOUR of these at once —
+           Instagram, LinkedIn, X, Google Business Profile — so making each one
+           a solid orange full-width button spent the accent four times on a
+           single screen and turned a calm checklist into the loudest page in
+           the app.
+
+           Four equal options also means there is no single primary here: none
+           of these channels outranks the others, and the page's real job is to
+           show which are connected. The workhorse secondary says "you may press
+           this" without shouting, and the accent stays available for the one
+           place a screen genuinely has a primary action. */
+        variant="secondary"
         size="sm"
         className="w-full"
         disabled={disabled || pending}

@@ -65,7 +65,7 @@ export default function ApprovalsPage() {
       </div>
 
       {/* The bulk bar. Present because it is most of why this screen exists. */}
-      <div className="is-proposed flex flex-wrap items-center gap-2 rounded-card px-3 py-2.5">
+      <div className="is-proposed flex flex-wrap items-center gap-2 rounded-card p-4">
         <span className="text-[12.5px] text-muted">With selected</span>
         <InertButton className="px-2 py-[3px] text-[12px]">
           <X size={13} strokeWidth={2} aria-hidden />
@@ -80,7 +80,7 @@ export default function ApprovalsPage() {
       <section className="is-proposed rounded-card" aria-label="Review queue — coming soon">
         <div className="flex flex-wrap items-center gap-2 border-b border-line-soft px-3 py-2.5">
           {/* The noun, without the count. */}
-          <h2 className="text-[13px] font-semibold text-muted">Awaiting review</h2>
+          <h2 className="text-[14px] font-semibold text-muted">Awaiting review</h2>
           <span className="ml-auto flex items-center gap-1.5 text-[11px] text-muted max-narrow:hidden">
             <kbd className="rounded-sm bg-s2 px-[5px] py-[1px] font-medium">A</kbd> approve
             <kbd className="rounded-sm bg-s2 px-[5px] py-[1px] font-medium">R</kbd> reject
