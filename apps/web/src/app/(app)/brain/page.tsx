@@ -5,6 +5,7 @@ import { BrainHeader } from '@/components/brain/brain-header'
 import { DerivedCard } from '@/components/brain/derived-card'
 import { ConfidenceCard } from '@/components/brain/confidence-card'
 import { SectionsList } from '@/components/brain/sections-list'
+import { BRAIN_SECTIONS } from '@/lib/brand/fields'
 import { EmptyState } from '@/components/empty-state'
 import { buttonVariants } from '@/components/ui/button'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
@@ -51,9 +52,16 @@ export default async function BrainPage() {
     )
   }
 
-  // A workspace with no brain is a first run, not a fault. Rendering empty cards
-  // at 0/15 would claim a brain exists and is blank; the remedy is the resolve,
-  // and it is the only thing offered.
+  // A workspace with no brain is a first run, not a fault. The remedy is the
+  // resolve, and it stays the page's one action.
+  //
+  // The note that used to sit here said rendering empty cards "at 0/15 would
+  // claim a brain exists and is blank". That is right about a TALLY and only
+  // about a tally, so the structure below carries none: no ring, no percentage,
+  // no n/n. What it does carry is the list of sections, which is the reference's
+  // own "Sections" container and the answer to the question a first run actually
+  // has — what is a Brand Brain made of? Replacing that with one sentence left
+  // the most important screen in the product describing itself in the abstract.
   if (brain.status === 'no-brain') {
     return (
       <div className="space-y-grid">
@@ -64,6 +72,29 @@ export default async function BrainPage() {
           action={<OnboardingLink>Set up your Brand Brain</OnboardingLink>}
           tip="You approve and correct what it resolves — you never start from a blank form."
         />
+
+        <section className="surface-ring rounded-card bg-surface" aria-labelledby="brain-will-hold">
+          <header className="flex min-h-[46px] items-center border-b border-line-soft px-4 py-3">
+            <h2 id="brain-will-hold" className="text-[14px] font-semibold tracking-[-0.01em]">
+              Sections
+            </h2>
+          </header>
+          <ul>
+            {BRAIN_SECTIONS.map((section) => (
+              <li
+                key={section.key}
+                className="flex items-baseline justify-between gap-4 border-b border-line-soft px-4 py-3 last:border-b-0"
+              >
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold">{section.title}</p>
+                  <p className="mt-[1px] text-[12.5px] text-muted">{section.blurb}</p>
+                </div>
+                {/* No percentage and no n/n. There is no brain to measure. */}
+                <span className="shrink-0 text-[13px] text-muted">&mdash;</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
     )
   }

@@ -2,6 +2,7 @@ import { BrainCircuit } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
 import { SectionCard } from '@/components/brain/section-card'
+import { SectionCardEmpty } from '@/components/brain/section-card-empty'
 import { BRAIN_SECTIONS, type BrainSectionKey } from '@/lib/brand/fields'
 import { readBrain } from '@/lib/brand/read-brain'
 
@@ -20,13 +21,39 @@ import { readBrain } from '@/lib/brand/read-brain'
 export async function BrainSections({ only }: { only: readonly BrainSectionKey[] }) {
   const brain = await readBrain()
 
-  if (brain.status === 'no-workspace' || brain.status === 'no-brain') {
+  const sections = BRAIN_SECTIONS.filter((section) => only.includes(section.key))
+
+  // No workspace means there is nowhere for a brain to live and nothing on this
+  // screen can change that, so the structure would be decoration. Onboarding is
+  // the only thing that helps, and FirstRun already says so elsewhere.
+  if (brain.status === 'no-workspace') {
     return (
       <EmptyState
         icon={BrainCircuit}
         title="Sahoda doesn’t know your brand yet"
         body="These fields are what every caption, campaign and reply is written from. There is nothing to show until the Brand Brain has been resolved once."
       />
+    )
+  }
+
+  // NO BRAIN, BUT A WORKSPACE. The sections still render — empty, labelled, and
+  // claiming nothing. Replacing them with a single sentence, as this branch used
+  // to, deleted the one thing a new user is actually asking: what does a Brand
+  // Brain hold? The line below still says nothing has been resolved; it just no
+  // longer stands in place of the structure.
+  if (brain.status === 'no-brain') {
+    return (
+      <div className="space-y-grid">
+        <p className="text-[13px] text-muted">
+          Nothing has been resolved yet. These are the fields every caption, campaign and reply is
+          written from.
+        </p>
+        <div className="grid gap-grid wide:grid-cols-2">
+          {sections.map((section) => (
+            <SectionCardEmpty key={section.key} section={section} />
+          ))}
+        </div>
+      </div>
     )
   }
 
@@ -38,8 +65,6 @@ export async function BrainSections({ only }: { only: readonly BrainSectionKey[]
       </div>
     )
   }
-
-  const sections = BRAIN_SECTIONS.filter((section) => only.includes(section.key))
 
   return (
     <div className="grid gap-grid wide:grid-cols-2">
