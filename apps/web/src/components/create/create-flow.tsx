@@ -1,44 +1,48 @@
 'use client'
 
+import type { Route } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Check, Image as ImageIcon, MapPin, SquarePen } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState, useTransition } from 'react'
 import { CONSTRAINTS, type Channel } from '@sahoda/shared'
 
+import { createPost, savePost, saveVariant } from '@/app/actions/posts'
 import { ComingSoonTile } from '@/components/create/coming-soon-tile'
 import { StepIndicator } from '@/components/create/step-indicator'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { InlineError } from '@/components/posts/inline-error'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 
 /**
- * The five-step create flow, as FULL-SCREEN PAGES.
+ * The five-step create flow, as FULL-SCREEN PAGES, backed by a real row.
  *
  * ── WHY NOT THE REFERENCE'S MODAL ────────────────────────────────────────────
- * The reference holds all of this in one overlay, and its Content step has ONE
- * body: "Write the post once — AI shapes it per channel", a single textarea and
- * a single 2200 counter. Per-channel copy appears only as read-only previews.
+ * The reference's Content step has ONE body — a single textarea and a single
+ * 2200 counter — and per-channel copy appears only as read-only previews. This
+ * product stores one body PER CHANNEL in `post_variants`, each with its own
+ * limit and its own publish_status, so a modal has nowhere to put four editors
+ * beside four previews. The divergence is the requirement.
  *
- * This product does not work that way. It stores one body PER CHANNEL in
- * `post_variants`, each with its own Constraint Engine limit and its own
- * publish_status. A modal has nowhere to put four editors and four previews, so
- * the flow is full-screen and the Content step diverges from the reference on
- * purpose: one editable body per selected channel. That divergence IS the
- * requirement, not a shortcut around it.
+ * ── WHERE THE WORK LIVES ─────────────────────────────────────────────────────
+ * In the database, from the moment the person commits to a set of channels.
+ * The flow previously held everything in React, so a reload threw the writing
+ * away. Now `Continue` on step 1 creates the row, the id travels in `?post=`,
+ * and each channel's body is written to its OWN `post_variants` row through
+ * `saveVariant`. Reload rehydrates from those rows.
  *
- * ── STEP LIVES IN THE URL ────────────────────────────────────────────────────
- * `?step=` rather than component state, so Back works, a step is linkable, and
- * each step can be enumerated independently. A wizard whose state is invisible
- * to the address bar can only ever be tested in one of its states.
+ * The row is created on the FIRST continue, not on the button that opens the
+ * flow: opening a screen is not intent, and creating on open is what left
+ * "Untitled post" debris behind every abandoned click.
  *
- * ── WHAT THIS FLOW NEVER DOES ────────────────────────────────────────────────
- * It renders no predicted reach, no engagement rate, no template count, no
- * "audience peaks at" window and no revenue share. Every one of those is a
- * claim about the customer's business that no query in this codebase can
- * produce. Containers for them exist and are labelled coming soon; the numbers
- * do not exist at all.
+ * ── WHAT IT WILL NOT DO ──────────────────────────────────────────────────────
+ * Publish. `savePost` does not accept `status` — deliberately, see its own note
+ * — so nothing here can mark a post published, and Publish now is rendered
+ * disabled with the reason stated. It renders no predicted reach, no template
+ * count, no peak-time window and no revenue share, because no query in this
+ * codebase can produce any of them.
  */
 
 const STEPS = ['Channel', 'Format', 'Content', 'Preview', 'Schedule'] as const
@@ -48,12 +52,7 @@ const ORDER: readonly StepKey[] = ['channel', 'format', 'content', 'preview', 's
 /** The four channels with adapters, in the reference's reading order. */
 const REAL_CHANNELS: readonly Channel[] = ['instagram', 'linkedin', 'x', 'gbp']
 
-/**
- * Channels the reference shows that this product cannot publish to.
- *
- * Their marks ship in the package (`public/channels/`), so the tiles are real
- * tiles rather than grey boxes — the roadmap made visible, per the ruling.
- */
+/** Channels the reference shows that this product cannot publish to yet. */
 const SOON_CHANNELS: readonly { key: string; label: string; mark: string }[] = [
   { key: 'facebook', label: 'Facebook', mark: '/channels/facebook.png' },
   { key: 'tiktok', label: 'TikTok', mark: '/channels/tiktok.png' },
@@ -96,33 +95,103 @@ function ChannelMark({ channel, size = 22 }: { channel: Channel; size?: number }
   )
 }
 
-export function CreateFlow({ connected }: { connected: readonly Channel[] }) {
+export function CreateFlow({
+  connected,
+  postId: initialPostId,
+  initialChannels,
+  initialBodies,
+  initialScheduledAt,
+}: {
+  connected: readonly Channel[]
+  postId: string | null
+  initialChannels: readonly Channel[]
+  initialBodies: Record<string, string>
+  initialScheduledAt: string | null
+}) {
   const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  // `useSearchParams`, NOT a one-time read of window.location.
+  //
+  // This read `window.location.search` during render for one revision, and the
+  // step froze on its first value: router.push changed the URL, the server
+  // re-rendered, and this component kept showing step 1 because an imperative
+  // location read is not a reactive dependency and nothing told React to run
+  // again. The hook subscribes; the raw read does not.
   const params = useSearchParams()
-  const raw = params.get('step')
-  const step: StepKey = (ORDER as readonly string[]).includes(raw ?? '')
-    ? (raw as StepKey)
+  const step = params.get('step') ?? 'channel'
+  const current: StepKey = (ORDER as readonly string[]).includes(step)
+    ? (step as StepKey)
     : 'channel'
-  const index = ORDER.indexOf(step)
+  const index = ORDER.indexOf(current)
 
-  const [channels, setChannels] = useState<Channel[]>([])
-  // One body per channel. Keyed by channel, never a single shared string —
-  // collapsing these into one field is the exact regression R1 forbids.
-  const [bodies, setBodies] = useState<Partial<Record<Channel, string>>>({})
+  const [postId, setPostId] = useState<string | null>(initialPostId)
+  const [channels, setChannels] = useState<Channel[]>([...initialChannels])
+  const [bodies, setBodies] = useState<Record<string, string>>(initialBodies)
+  const [savedAt, setSavedAt] = useState<string | null>(null)
 
-  const connectedSet = useMemo(() => new Set(connected), [connected])
+  const connectedSet = new Set(connected)
 
-  function go(next: StepKey) {
-    router.push(`/create/post?step=${next}`)
+  // typedRoutes cannot narrow a template literal that carries a runtime id, so
+  // the cast is made ONCE here rather than at each call site. The route half is
+  // still a literal the manifest checks; only the query string is dynamic.
+  function href(next: StepKey, id: string | null): Route {
+    return `/create/post?step=${next}${id ? `&post=${id}` : ''}` as Route
   }
 
-  function toggle(channel: Channel) {
-    setChannels((prev) =>
-      prev.includes(channel) ? prev.filter((c) => c !== channel) : [...prev, channel],
-    )
+  /**
+   * Move forward, creating or updating the row first.
+   *
+   * The channel set is written on EVERY forward move from step 1, not only the
+   * first: someone who walks back and changes their mind must not leave the row
+   * claiming the old channels.
+   */
+  function advance() {
+    setError(null)
+    const next = ORDER[index + 1]
+    if (!next) return
+
+    if (current !== 'channel') {
+      router.push(href(next, postId))
+      return
+    }
+
+    startTransition(async () => {
+      let id = postId
+      if (!id) {
+        const created = await createPost('')
+        if (!created.ok) {
+          setError(created.message)
+          return
+        }
+        id = created.postId
+        setPostId(id)
+      }
+      const saved = await savePost(id, { channels })
+      if (!saved.ok) {
+        setError(saved.message)
+        return
+      }
+      router.push(href(next, id))
+    })
   }
 
-  const canContinue = step !== 'channel' || channels.length > 0
+  /** Persist one channel's body to its OWN variant row. Never a shared field. */
+  function persistVariant(channel: Channel, body: string) {
+    if (!postId) return
+    startTransition(async () => {
+      const result = await saveVariant(postId, channel, body, {})
+      if (!result.ok) {
+        setError(result.message)
+        return
+      }
+      setError(null)
+      setSavedAt(new Date().toISOString())
+    })
+  }
+
+  const canContinue = current !== 'channel' || channels.length > 0
 
   return (
     <div className="space-y-grid" data-guide="create.flow">
@@ -131,43 +200,57 @@ export function CreateFlow({ connected }: { connected: readonly Channel[] }) {
           <h1 className="text-[20px] leading-7 font-[650] tracking-[-0.02em]">New post</h1>
           <p className="mt-[1px] text-[13px] text-muted">
             Step {index + 1} of 5 · {STEPS[index]}
+            {savedAt ? <span data-saved> · Saved</span> : null}
           </p>
         </div>
-        {/* SPECIFICATION.md §10: every tappable control clears 44px on a phone,
-            while desktop stays dense. A 20px-tall text link is comfortable with
-            a mouse and a miss with a thumb, so the height is added at
-            max-narrow only. */}
+        {/* SPECIFICATION.md §10: 44px tap targets on a phone, dense on desktop. */}
         <Link
-          href="/posts"
+          href={postId ? `/posts/${postId}` : '/posts'}
           className="-mx-2 inline-flex items-center rounded-sm px-2 text-[13px] font-semibold text-muted transition-micro hover:text-ink max-narrow:min-h-[44px]"
         >
-          Cancel
+          {postId ? 'Open in editor' : 'Cancel'}
         </Link>
       </div>
 
       <StepIndicator steps={STEPS} current={index} />
 
+      {error ? <InlineError>{error}</InlineError> : null}
+
       <div className="min-h-[320px]">
-        {step === 'channel' ? (
-          <StepChannel channels={channels} connectedSet={connectedSet} onToggle={toggle} />
+        {current === 'channel' ? (
+          <StepChannel
+            channels={channels}
+            connectedSet={connectedSet}
+            onToggle={(c) =>
+              setChannels((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]))
+            }
+          />
         ) : null}
-        {step === 'format' ? <StepFormat /> : null}
-        {step === 'content' ? (
-          <StepContent channels={channels} bodies={bodies} onChange={setBodies} />
+        {current === 'format' ? <StepFormat /> : null}
+        {current === 'content' ? (
+          <StepContent
+            channels={channels}
+            bodies={bodies}
+            onChange={(ch, value) => setBodies((prev) => ({ ...prev, [ch]: value }))}
+            onCommit={persistVariant}
+          />
         ) : null}
-        {step === 'preview' ? <StepPreview channels={channels} bodies={bodies} /> : null}
-        {step === 'schedule' ? <StepSchedule /> : null}
+        {current === 'preview' ? <StepPreview channels={channels} bodies={bodies} /> : null}
+        {current === 'schedule' ? (
+          <StepSchedule
+            postId={postId}
+            initialScheduledAt={initialScheduledAt}
+            onError={setError}
+          />
+        ) : null}
       </div>
 
-      {/* Back / Continue, in the reference's placement: back left, primary
-          right. Both clear 44px on a phone (SPECIFICATION.md §10) and keep the
-          kit's dense 34px on desktop. */}
       <div className="flex items-center justify-between gap-3 border-t border-line-soft pt-4">
         {index > 0 ? (
           <Button
             variant="secondary"
             className="max-narrow:min-h-[44px]"
-            onClick={() => go(ORDER[index - 1]!)}
+            onClick={() => router.push(href(ORDER[index - 1]!, postId))}
           >
             <ArrowLeft size={15} strokeWidth={1.9} aria-hidden />
             Back
@@ -180,7 +263,8 @@ export function CreateFlow({ connected }: { connected: readonly Channel[] }) {
             variant="primary"
             className="max-narrow:min-h-[44px]"
             disabled={!canContinue}
-            onClick={() => go(ORDER[index + 1]!)}
+            loading={pending}
+            onClick={advance}
           >
             Continue
             <ArrowRight size={15} strokeWidth={1.9} aria-hidden />
@@ -193,8 +277,8 @@ export function CreateFlow({ connected }: { connected: readonly Channel[] }) {
 
 /* ── 1 · CHANNEL ─────────────────────────────────────────────────────────────
    No "Pre-selected for you" panel. The reference's rationale reads "Instagram
-   drives 38% of your revenue" — this product holds no revenue data of any kind,
-   so there is nothing to pre-select FROM and nothing true to say about why. */
+   drives 38% of your revenue"; this product holds no revenue data at all, so
+   there is nothing to select FROM and nothing true to say about why. */
 function StepChannel({
   channels,
   connectedSet,
@@ -207,7 +291,7 @@ function StepChannel({
   return (
     <div className="space-y-4">
       <p className="text-[13px] text-muted">
-        Pick one or more channels. Sahoda writes the post once and adapts it per channel.
+        Pick one or more channels. Each one gets its own copy, which you can edit separately.
       </p>
 
       <div className="grid grid-cols-4 gap-2 max-wide:grid-cols-2 max-narrow:grid-cols-1">
@@ -221,7 +305,7 @@ function StepChannel({
               aria-pressed={on}
               onClick={() => onToggle(channel)}
               className={[
-                'surface-ring flex items-center gap-2 rounded-card bg-surface px-3 py-3 text-left transition-micro',
+                'surface-ring flex items-center gap-2 rounded-card bg-surface px-3 py-3 text-left transition-micro max-narrow:min-h-[44px]',
                 on ? 'bg-brand-wash shadow-[inset_0_0_0_1.5px_var(--brand)]' : 'hover:bg-s2',
               ].join(' ')}
             >
@@ -230,9 +314,6 @@ function StepChannel({
                 <span className="block truncate text-[13px] font-[550]">
                   {CHANNEL_LABELS[channel]}
                 </span>
-                {/* Not connected is stated, and is NOT a blocker: writing and
-                    planning work without a connection. Saying so here stops the
-                    tile reading as disabled. */}
                 <span className="block text-[11.5px] text-muted">
                   {connectedSet.has(channel) ? 'Connected' : 'Not connected · you can still write'}
                 </span>
@@ -263,16 +344,11 @@ function StepChannel({
 }
 
 /* ── 2 · FORMAT ──────────────────────────────────────────────────────────────
-   ONE real format. packages/shared/src/publishing/constraints.ts carries no
-   format field at all: every channel's `mediaTypes` is image-only (x:121,
-   gbp:133, linkedin:146, instagram:160 — no video mime anywhere), and
-   `PublishDraft` (:53-63) has one shape per channel with no format
-   discriminator. Validation branches on maxChars, maxMediaCount, requiresMedia
-   and mediaTypes, and on nothing else.
-
-   So Post is selectable and the other four are coming soon. A chooser where
-   picking Reel changed nothing would be a fake success state; a chooser where
-   the unbuilt options say they are unbuilt is honest. */
+   ONE real format. packages/shared/src/publishing/constraints.ts has no format
+   field: every channel's mediaTypes is image-only (x:121, gbp:133,
+   linkedin:146, instagram:160 — no video mime anywhere) and PublishDraft
+   (:53-63) is one shape per channel with no format discriminator. Validation
+   branches on maxChars, maxMediaCount, requiresMedia and mediaTypes only. */
 function StepFormat() {
   return (
     <div className="space-y-4">
@@ -309,17 +385,18 @@ function StepFormat() {
 
 /* ── 3 · CONTENT ─────────────────────────────────────────────────────────────
    R1 LIVES HERE. One editable body per selected channel, each with its own
-   Constraint Engine limit read from CONSTRAINTS[channel].maxChars, and each
-   showing its own over-limit state. The reference has one shared body; this
-   deliberately does not. */
+   Constraint Engine limit, each written to its OWN post_variants row on blur.
+   The reference has one shared body; this deliberately does not. */
 function StepContent({
   channels,
   bodies,
   onChange,
+  onCommit,
 }: {
   channels: readonly Channel[]
-  bodies: Partial<Record<Channel, string>>
-  onChange: (next: Partial<Record<Channel, string>>) => void
+  bodies: Record<string, string>
+  onChange: (channel: Channel, value: string) => void
+  onCommit: (channel: Channel, value: string) => void
 }) {
   if (channels.length === 0) {
     return (
@@ -336,10 +413,13 @@ function StepContent({
             A blank editor for each channel
           </span>
         </div>
+        {/* The rewrite tools live in the editor, where a text SELECTION exists to
+            rewrite. Offering them here with nothing selected would be a control
+            that cannot succeed. */}
         <div className="surface-ring rounded-card bg-surface px-3 py-3">
-          <span className="block text-[13px] font-semibold">Generate with AI</span>
+          <span className="block text-[13px] font-semibold">Rewrite with AI</span>
           <span className="mt-1 block text-[11.5px] text-muted">
-            Uses your Brand Brain · spends credits
+            Select text in the editor after saving
           </span>
         </div>
         {/* The reference says "14 templates matched to your industry". There is
@@ -364,7 +444,10 @@ function StepContent({
               data-variant-editor={channel}
               rows={5}
               value={value}
-              onChange={(e) => onChange({ ...bodies, [channel]: e.target.value })}
+              onChange={(e) => onChange(channel, e.target.value)}
+              // Committed on blur rather than per keystroke: one row write per
+              // edit session instead of one per character.
+              onBlur={(e) => onCommit(channel, e.target.value)}
               placeholder={`Write the ${CHANNEL_LABELS[channel]} version.`}
               className="w-full rounded-input border border-line bg-bg px-3 py-2 text-[13px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
@@ -388,17 +471,13 @@ function StepContent({
   )
 }
 
-/* ── 4 · PREVIEW ─────────────────────────────────────────────────────────────
-   One preview per selected channel. Predicted performance is a container with
-   no numbers: there is no prediction engine, and this is the screen where
-   someone decides whether to publish — the worst possible place for a figure
-   nothing measured. */
+/* ── 4 · PREVIEW ─────────────────────────────────────────────────────────── */
 function StepPreview({
   channels,
   bodies,
 }: {
   channels: readonly Channel[]
-  bodies: Partial<Record<Channel, string>>
+  bodies: Record<string, string>
 }) {
   if (channels.length === 0) {
     return (
@@ -435,6 +514,9 @@ function StepPreview({
         ))}
       </div>
 
+      {/* No prediction engine exists, and this is the screen where someone
+          decides whether to publish — the worst possible place for a figure
+          nothing measured. */}
       <ComingSoonTile
         title="Predicted performance"
         note="How this post is likely to do, before it goes out"
@@ -445,42 +527,115 @@ function StepPreview({
 }
 
 /* ── 5 · SCHEDULE ────────────────────────────────────────────────────────────
-   Plain date and time. The reference badges the field "AI recommended" and
-   says "audience peaks between 9:40 and 10:20"; no timing analysis exists in
-   this product, so there is no badge and no window. */
-function StepSchedule() {
+   Save as draft and Schedule are wired. PUBLISH NOW IS NOT, and says so.
+
+   A publish is irreversible and reaches a real account, and the cross-tenant
+   pre-flight assertion — the workspace_id check before the Zernio call — does
+   not exist yet. Until it does, this button stays inert rather than removed:
+   deleting it would hide that publishing is the point of the product, while
+   leaving it live would risk one workspace's content on another's feed. */
+function StepSchedule({
+  postId,
+  initialScheduledAt,
+  onError,
+}: {
+  postId: string | null
+  initialScheduledAt: string | null
+  onError: (message: string | null) => void
+}) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [when, setWhen] = useState<string>(
+    initialScheduledAt ? initialScheduledAt.slice(0, 16) : '',
+  )
+  const [done, setDone] = useState<string | null>(null)
+
+  function schedule() {
+    if (!postId || !when) return
+    onError(null)
+    startTransition(async () => {
+      const at = new Date(when)
+      const result = await savePost(postId, { scheduled_at: at.toISOString() })
+      if (!result.ok) {
+        onError(result.message)
+        return
+      }
+      setDone('Scheduled')
+    })
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2 max-narrow:grid-cols-1">
-        {[
-          ['Publish now', 'Goes out on every selected channel'],
-          ['Schedule', 'Pick a date and time'],
-          ['Save as draft', 'Keep it in the planner'],
-        ].map(([title, note]) => (
-          <div key={title} className="surface-ring rounded-card bg-surface px-3 py-3">
-            <span className="block text-[13px] font-semibold">{title}</span>
-            <span className="mt-1 block text-[11.5px] text-muted">{note}</span>
-          </div>
-        ))}
+        {/* Publish now — present, inert, and honest about why. */}
+        <div
+          data-publish-disabled
+          className="is-proposed flex flex-col items-start gap-1.5 rounded-card px-3 py-3"
+        >
+          <span className="text-[13px] font-semibold text-muted">Publish now</span>
+          <span className="text-[11.5px] text-muted">
+            Turned off in this build while the cross-workspace safety check is finished.
+          </span>
+          <Badge rung="calm" hideGlyph>
+            Not available yet
+          </Badge>
+        </div>
+
+        <button
+          type="button"
+          data-action="schedule"
+          disabled={!postId || !when || pending}
+          onClick={schedule}
+          className="surface-ring rounded-card bg-surface px-3 py-3 text-left transition-micro hover:bg-s2 disabled:opacity-60 max-narrow:min-h-[44px]"
+        >
+          <span className="block text-[13px] font-semibold">Schedule</span>
+          <span className="mt-1 block text-[11.5px] text-muted">
+            {when ? 'Save this time on the post' : 'Pick a date and time below first'}
+          </span>
+        </button>
+
+        <Link
+          href={postId ? `/posts/${postId}` : '/posts'}
+          data-action="draft"
+          className="surface-ring rounded-card bg-surface px-3 py-3 text-left transition-micro hover:bg-s2 max-narrow:min-h-[44px]"
+        >
+          <span className="block text-[13px] font-semibold">Save as draft</span>
+          <span className="mt-1 block text-[11.5px] text-muted">
+            Already saved · open it in the editor
+          </span>
+        </Link>
       </div>
 
       <div className="surface-ring rounded-card bg-surface p-3">
-        <span className="block text-[12.5px] font-semibold">When</span>
-        <div className="mt-2 flex gap-2 max-narrow:flex-col">
-          <input
-            type="date"
-            aria-label="Date"
-            className="rounded-input border border-line bg-bg px-3 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-          <input
-            type="time"
-            aria-label="Time"
-            className="rounded-input border border-line bg-bg px-3 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        </div>
+        <label htmlFor="create-when" className="block text-[12.5px] font-semibold">
+          When
+        </label>
+        <input
+          id="create-when"
+          data-when
+          type="datetime-local"
+          value={when}
+          onChange={(e) => setWhen(e.target.value)}
+          className="mt-2 rounded-input border border-line bg-bg px-3 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring max-narrow:min-h-[44px]"
+        />
+        {/* The reference badges this field "AI recommended" and says "audience
+            peaks between 9:40 and 10:20". No timing analysis exists here, so
+            there is no badge and no window. */}
         <p className="mt-2 text-[12.5px] text-muted">
           Sahoda does not suggest a time yet. Pick whatever suits you.
         </p>
+        {done ? (
+          <p data-scheduled className="mt-2 text-[12.5px] font-semibold text-accent">
+            {done}.{' '}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => router.push((postId ? `/posts/${postId}` : '/posts') as Route)}
+            >
+              Open it in the editor
+            </button>
+          </p>
+        ) : null}
       </div>
     </div>
   )
