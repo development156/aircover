@@ -62,7 +62,7 @@ export function ChannelPicker({ selected, onChange, disabled, connected }: Chann
                 // Selected is solid INK, not orange: this row shows four chips
                 // at once and an orange selected state paints up to four
                 // oranges on one screen (RETHEME.md §9).
-                'inline-flex h-7 items-center gap-1.5 rounded-full px-[10px] text-[13px] font-[550] transition-micro',
+                'inline-flex h-7 items-center gap-1.5 rounded-full px-[10px] text-[13px] font-[550] transition-micro max-narrow:h-11',
                 'disabled:pointer-events-none disabled:opacity-45',
                 isOn
                   ? 'bg-ink text-white dark:bg-white dark:text-ink'

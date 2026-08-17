@@ -53,7 +53,7 @@ export function BrainTabs() {
             href={tab.href}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              '-mb-px border-b-2 border-transparent pt-[9px] pb-[10px] text-[13px] font-[550] whitespace-nowrap transition-micro',
+              '-mb-px inline-flex items-center border-b-2 border-transparent pt-[9px] pb-[10px] text-[13px] font-[550] whitespace-nowrap transition-micro max-narrow:min-h-[44px]',
               active ? 'border-brand text-accent' : 'text-muted hover:text-ink',
             )}
           >

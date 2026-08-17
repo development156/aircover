@@ -60,7 +60,7 @@ export function PlannerRow({
           <Link
             href={`/posts/${post.id}`}
             className={cn(
-              'max-w-[32ch] truncate rounded-input text-[15px] font-bold transition-micro hover:text-accent',
+              'inline-flex max-w-[32ch] items-center truncate rounded-input text-[15px] font-bold transition-micro hover:text-accent max-narrow:min-h-[44px]',
               !title && 'font-semibold text-muted',
             )}
           >

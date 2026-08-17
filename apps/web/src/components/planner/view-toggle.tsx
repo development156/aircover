@@ -37,7 +37,7 @@ export function ViewToggle({ active }: { active: PlannerView }) {
           href={{ pathname: '/planner', query: { view } }}
           aria-current={active === view ? 'page' : undefined}
           className={cn(
-            'inline-flex h-7 items-center gap-[6px] rounded-sm px-[11px] text-[13px] font-[550] transition-micro',
+            'inline-flex h-7 items-center gap-[6px] rounded-sm px-[11px] text-[13px] font-[550] transition-micro max-narrow:h-11',
             active === view ? 'bg-surface text-accent shadow-card' : 'text-muted hover:text-ink',
           )}
         >
