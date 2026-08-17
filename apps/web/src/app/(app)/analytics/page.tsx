@@ -3,6 +3,7 @@ import { ChartColumn } from 'lucide-react'
 import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
+import { BestPerforming, PerformanceOverTime } from '@/components/analytics/best-performing'
 import { AccountPanel } from '@/components/analytics/account-panel'
 import { ChannelTable } from '@/components/analytics/channel-table'
 import { PostTable } from '@/components/analytics/post-table'
@@ -57,6 +58,15 @@ export default async function AnalyticsPage() {
       <PerformanceStrip analytics={account} />
 
       <AccountPanel analytics={account} />
+
+      {/* The reference's two remaining containers, side by side beneath the
+          account panel. Best performing is WIRED — rankBy already refuses to
+          rank an unmeasured row. Performance over time is a container only:
+          nothing in this product stores a metric history. See the component. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-grid max-wide:grid-cols-1">
+        <PerformanceOverTime />
+        <BestPerforming rows={rows} />
+      </div>
 
       {hasPublished ? (
         <>

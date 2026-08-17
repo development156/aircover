@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import type { Connection } from '@sahoda/shared'
+import type { Channel, Connection } from '@sahoda/shared'
 
 import { ChannelLogo } from '@/components/connections/channel-logo'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
@@ -128,6 +128,9 @@ export function BrainCard({ brain }: { brain: BrainRead }) {
  * dot. The dot is ALWAYS paired with a word (SPECIFICATION.md §11): a dot alone
  * carries meaning in colour, which this palette cannot do.
  */
+/** Every channel this product has an adapter for, in the reference's order. */
+const CONNECTABLE: readonly Channel[] = ['instagram', 'linkedin', 'x', 'gbp']
+
 export function ConnectionsCard({ connections }: { connections: Connection[] | null }) {
   return (
     <RailCard title="Connections" href="/connections" linkLabel="Manage">
@@ -136,9 +139,38 @@ export function ConnectionsCard({ connections }: { connections: Connection[] | n
           Couldn&rsquo;t check your connections just now.
         </p>
       ) : connections.length === 0 ? (
-        <p className="px-4 py-6 text-center text-[13px] text-muted">
-          Nothing connected yet. You can write and plan without one.
-        </p>
+        /* ── THE TILES STAND EVEN WITH NOTHING CONNECTED ──────────────────────
+           This was one sentence, so a new workspace — which is every workspace
+           on day one — could not see WHICH channels Sahoda can post to. The
+           reference shows the platform row regardless; the tiles are structure
+           and the connection state is content.
+
+           Each tile says "Not connected" rather than being greyed out, because
+           writing and planning genuinely work without a connection: this is not
+           a blocked state, it is an empty one. */
+        <>
+          <ul className="grid grid-cols-2 gap-2 p-4 pb-2">
+            {CONNECTABLE.map((channel) => (
+              <li key={channel}>
+                <Link
+                  href="/connections"
+                  className="surface-ring flex items-center gap-2 rounded-[8px] p-2 transition-micro hover:shadow-[inset_0_0_0_1px_var(--line-firm)]"
+                >
+                  <ChannelLogo channel={channel} size={18} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[12px] font-[550] text-ink">
+                      {CHANNEL_LABELS[channel]}
+                    </span>
+                    <span className="block text-[11px] text-muted">Not connected</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className="px-4 pb-4 text-[12px] text-muted">
+            You can write and plan without one. Connecting is what lets a post actually go out.
+          </p>
+        </>
       ) : (
         <ul className="grid grid-cols-2 gap-2 p-4">
           {connections.slice(0, 4).map((connection) => (
