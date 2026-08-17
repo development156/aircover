@@ -31,6 +31,33 @@ export function SpendArea({ spend }: { spend: SpendRead }) {
   }
 
   const values = spend.days.map((day) => day.credits)
+
+  /* ── TOO LITTLE HISTORY TO BE A SHAPE ──────────────────────────────────────
+     A line needs somewhere to go. With one active day in thirty, this drew 29
+     points at an identical y and one spike at the right edge — MEASURED, and it
+     reads as a rendering fault rather than as a chart. No axis weight, grid
+     density or line treatment fixes that; the series simply has no shape yet.
+
+     Three is the floor because two points are a straight line between them,
+     which says nothing a number does not say better. Below it, the card states
+     the figure and what it is waiting for, which is the honest version of the
+     same information.
+
+     `activeDays` is a real count of days that had spend — read, never invented.
+     The days themselves ARE data: "you spent nothing on 29 days" is true. It is
+     just not a trend, and drawing it as one overstates what happened. */
+  const activeDays = values.filter((v) => v > 0).length
+  if (activeDays < 3) {
+    return (
+      <div data-testid="spend-sparse" className="grid min-h-[120px] place-items-center px-3">
+        <p className="max-w-[40ch] text-center text-[12.5px] text-muted">
+          {activeDays === 0
+            ? 'No credits spent in the last 30 days.'
+            : `Spend shows as a trend once a few days have activity. So far ${activeDays === 1 ? 'one day has' : `${activeDays} days have`}.`}
+        </p>
+      </div>
+    )
+  }
   // A genuine all-zero window still plots — those days were read and really had
   // no spend, which is different from having no data. The `|| 1` only avoids a
   // divide-by-zero; it never invents height.

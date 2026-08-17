@@ -33,5 +33,46 @@ export const clerkAppearance = {
         minHeight: '44px',
       },
     },
+
+    /* ── THE AUTH CARD ────────────────────────────────────────────────────────
+       The page around this card already carries the lockup and one line of
+       product copy (see (auth)/layout.tsx). Clerk draws its OWN mark, its own
+       "Sign in to SAHODA LABS" and its own "Welcome back! Please sign in to
+       continue" — so the brand appeared TWICE within 150px, in two different
+       voices, on the first screen a beta user ever sees. One of them had to go.
+
+       Clerk's goes. The frame keeps the product's own mark and its own sentence;
+       Clerk supplies the form, which is the part it is actually good at. That
+       also removes the shouted application name (SAHODA LABS) and the only
+       exclamation mark anywhere in this product's copy. */
+    header: { display: 'none' },
+    logoBox: { display: 'none' },
+
+    /* The card wears the app's own surface treatment rather than Clerk's
+       shadow, so it reads as the same product as every screen behind it. */
+    card: {
+      boxShadow: 'inset 0 0 0 1px var(--line)',
+      borderRadius: 'var(--r-card)',
+      backgroundColor: 'var(--surface)',
+    },
+
+    /* 34px is the kit's control height and what every other button in the app
+       uses; 44px is SPECIFICATION.md §10's phone floor. Clerk shipped 32. */
+    formButtonPrimary: {
+      minHeight: '34px',
+      fontSize: '13px',
+      textTransform: 'none',
+      '@media (max-width: 699px)': { minHeight: '44px' },
+    },
+    formFieldInput: {
+      minHeight: '34px',
+      fontSize: '13px',
+      '@media (max-width: 699px)': { minHeight: '44px' },
+    },
+    socialButtonsBlockButton: {
+      minHeight: '34px',
+      fontSize: '13px',
+      '@media (max-width: 699px)': { minHeight: '44px' },
+    },
   },
 }

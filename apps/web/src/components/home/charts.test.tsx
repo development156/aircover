@@ -90,18 +90,39 @@ describe('SpendArea', () => {
   test('the path stays inside the viewBox for a single spike', () => {
     // A lone large value must not send the path above the top edge, which would
     // clip the peak and understate it.
-    render(<SpendArea spend={spend({ days: days([0, 0, 999, 0]) })} />)
+    //
+    // The fixture gained two more active days. It was [0, 0, 999, 0] — ONE day
+    // with spend — which now renders the sparse state instead of a path, so the
+    // geometry it means to guard was no longer being exercised. The guarantee is
+    // unchanged and still the point: a lone enormous value among ordinary ones
+    // must stay inside the box.
+    render(<SpendArea spend={spend({ days: days([0, 1, 999, 1, 1]) })} />)
     const d = screen.getByTestId('spend-area-line').getAttribute('d') ?? ''
     const ys = [...d.matchAll(/[ ,](-?\d+(?:\.\d+)?)(?=[ L]|$)/g)].map((m) => Number(m[1]))
 
     expect(Math.min(...ys)).toBeGreaterThanOrEqual(0)
   })
 
-  test('an all-zero window still plots a real zero line', () => {
-    // Distinct from empty: these days were READ and genuinely had no spend.
+  test('a measured-zero window says so, and is never the no-data state', () => {
+    // The guarantee this has always made: days that were READ and genuinely had
+    // no spend must not be reported as "we have nothing". That still holds — it
+    // is now made in words rather than as a flat line at the axis, because a
+    // zero line and a broken chart are the same picture.
     render(<SpendArea spend={spend({ days: days([0, 0, 0]), total: 0 })} />)
 
-    expect(screen.getByTestId('spend-area-line')).toBeInTheDocument()
+    expect(screen.getByTestId('spend-sparse')).toBeInTheDocument()
+    expect(screen.getByText(/No credits spent in the last 30 days/i)).toBeInTheDocument()
+    // The no-data copy, which would be the false claim, must NOT appear.
+    expect(screen.queryByText(/Your first AI action will show up here/i)).not.toBeInTheDocument()
+  })
+
+  test('one active day is not charted as a trend', () => {
+    // The shape that started this: 29 zeros and one spike drew a flat line with
+    // a vertical edge and read as a rendering fault.
+    render(<SpendArea spend={spend({ days: days([0, 0, 0, 0, 6]), total: 6 })} />)
+
+    expect(screen.getByTestId('spend-sparse')).toBeInTheDocument()
+    expect(screen.queryByTestId('spend-area-line')).not.toBeInTheDocument()
   })
 })
 
