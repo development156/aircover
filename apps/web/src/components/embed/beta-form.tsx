@@ -216,7 +216,7 @@ export function BetaForm({ siteKey, source }: { siteKey: string | null; source: 
       <button
         type="submit"
         disabled={sending || !siteKey}
-        className="mt-4 h-10 w-full rounded-sm bg-primary text-[14px] leading-none font-[550] text-primary-foreground transition-micro hover:bg-ink active:translate-y-[0.5px] disabled:pointer-events-none disabled:bg-line disabled:text-white"
+        className="mt-4 h-10 w-full rounded-sm bg-primary text-[14px] leading-none font-[550] text-primary-foreground transition-micro hover:bg-ink dark:hover:bg-white dark:hover:text-[var(--canvas)] active:translate-y-[0.5px] disabled:pointer-events-none disabled:bg-line disabled:text-white"
       >
         {sending ? 'Sending…' : 'Request early access'}
       </button>

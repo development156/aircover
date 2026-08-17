@@ -65,7 +65,7 @@ export function ChannelPicker({ selected, onChange, disabled, connected }: Chann
                 'inline-flex h-7 items-center gap-1.5 rounded-full px-[10px] text-[13px] font-[550] transition-micro max-narrow:h-11',
                 'disabled:pointer-events-none disabled:opacity-45',
                 isOn
-                  ? 'bg-ink text-white dark:bg-white dark:text-ink'
+                  ? 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'
                   : 'text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink hover:shadow-[inset_0_0_0_1px_var(--line-firm)]',
               )}
             >

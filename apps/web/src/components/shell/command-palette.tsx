@@ -68,10 +68,21 @@ export function CommandPalette() {
   // leave the cursor pointing past the end, which would make Enter a no-op.
   const active = results.length === 0 ? -1 : Math.min(cursor, results.length - 1)
 
+  // Where focus was when the palette opened, so closing can put it back.
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+
   const close = useCallback(() => {
     setOpen(false)
     setQuery('')
     setCursor(0)
+    // MEASURED before this: Escape closed the palette and left focus on <body>,
+    // so a keyboard user was dropped at the top of the document and had to tab
+    // back through the whole rail to get anywhere. The workspace switcher beside
+    // it already restores focus to its trigger; this is the same contract.
+    // Deferred a frame because the trigger is only re-rendered as focusable once
+    // the overlay has gone.
+    const target = returnFocusRef.current
+    if (target) requestAnimationFrame(() => target.focus())
   }, [])
 
   // ⌘K / Ctrl+K, and Escape, from anywhere. Both are bound on the document
@@ -83,7 +94,11 @@ export function CommandPalette() {
     function onKey(event: KeyboardEvent) {
       if (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
         event.preventDefault()
-        setOpen((wasOpen) => !wasOpen)
+        setOpen((wasOpen) => {
+          // Capture the trigger on the way IN so `close` can hand focus back.
+          if (!wasOpen) returnFocusRef.current = document.activeElement as HTMLElement | null
+          return !wasOpen
+        })
       }
       if (event.key === 'Escape') close()
     }
@@ -121,7 +136,10 @@ export function CommandPalette() {
           would promise inline search it does not do. */}
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={(event) => {
+          returnFocusRef.current = event.currentTarget
+          setOpen(true)
+        }}
         data-guide="topbar.search"
         className="surface-ring mx-auto flex h-9 w-[min(420px,100%)] items-center gap-2 rounded-lg bg-s2 px-[10px] text-left text-[13px] text-muted transition-micro hover:shadow-[inset_0_0_0_1px_var(--line)] max-narrow:hidden"
       >

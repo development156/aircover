@@ -235,8 +235,8 @@ export function PostEditor({
           {autosave.error !== null ? (
             <InlineError className="flex flex-wrap items-center gap-3">
               <span className="grow">
-                {autosave.error} Your text is still here — retry now, or keep editing and I&rsquo;ll
-                retry on the next change.
+                {autosave.error} Your text is still here — retry now, or keep editing and Sahoda
+                retries on the next change.
               </span>
               <button
                 type="button"

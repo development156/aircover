@@ -103,7 +103,7 @@ export function ConversationList({
                     className={cn(
                       'inline-flex h-7 items-center rounded-full px-[10px] text-[12px] font-[550] transition-micro',
                       channel === key
-                        ? 'bg-ink text-white dark:bg-white dark:text-ink'
+                        ? 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'
                         : 'text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink',
                     )}
                   >
@@ -141,7 +141,7 @@ export function ConversationList({
                   >
                     <span
                       aria-hidden
-                      className="grid size-8 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white dark:bg-white dark:text-ink"
+                      className="grid size-8 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white dark:bg-white dark:text-[var(--canvas)]"
                     >
                       {initialsOf(who)}
                     </span>

@@ -128,7 +128,7 @@ export function MediaAttach({ postId, channels }: MediaAttachProps) {
           'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent',
           pending
             ? 'pointer-events-none opacity-45'
-            : 'cursor-pointer hover:bg-ink hover:text-white active:scale-[.97]',
+            : 'cursor-pointer hover:bg-ink hover:text-white dark:hover:bg-white dark:hover:text-[var(--canvas)] active:scale-[.97]',
         )}
       >
         <Paperclip size={13} aria-hidden />

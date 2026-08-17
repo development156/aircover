@@ -68,7 +68,7 @@ export function VariantTabs({ channels, canonicalBody, variants, mediaCount }: V
       <section className="space-y-3" data-guide="post-variants">
         <CardLabel className="mb-0">Channel variants</CardLabel>
         <p className="rounded-card border border-line bg-bg p-4 text-[13px] text-muted">
-          Pick a channel below and I&rsquo;ll open a tab for it here.
+          Pick a channel below and Sahoda opens a tab for it here.
         </p>
       </section>
     )
@@ -116,7 +116,7 @@ export function VariantTabs({ channels, canonicalBody, variants, mediaCount }: V
                 // which solid ink does more plainly than a wash.
                 'inline-flex h-7 items-center gap-2 rounded-full px-[10px] text-[13px] font-[550] transition-micro',
                 isActive
-                  ? 'bg-ink text-white dark:bg-white dark:text-ink'
+                  ? 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'
                   : 'text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink hover:shadow-[inset_0_0_0_1px_var(--line-firm)]',
               )}
             >

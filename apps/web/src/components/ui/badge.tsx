@@ -65,7 +65,7 @@ const RUNG_GLYPH: Record<Rung, React.ComponentType<{ className?: string }>> = {
  */
 const RUNG_FILL: Record<Rung, string> = {
   urgent: 'bg-brand text-white',
-  active: 'bg-ink text-white dark:bg-white dark:text-ink',
+  active: 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]',
   // 1.5px ring, not 1px. In COLOUR the orange ring separates this from `calm`
   // instantly; in GREYSCALE it does not — orange-40 over white flattens to
   // ~#d4d4d4 and --line is #dcdcdc, near-identical greys. The greyscale check

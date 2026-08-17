@@ -39,7 +39,7 @@ export function InboxTabs() {
                 className={cn(
                   'inline-flex items-center rounded-pill px-3.5 py-[7px] text-[14px] font-semibold transition-micro max-narrow:min-h-[44px]',
                   active
-                    ? 'bg-ink text-white'
+                    ? 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'
                     : 'bg-s2 text-muted hover:bg-tint-50 hover:text-ink dark:hover:bg-s2',
                 )}
               >
