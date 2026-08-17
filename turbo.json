@@ -11,6 +11,11 @@
       "dependsOn": ["^typecheck"],
       "env": ["SAHODA_ALLOW_LIVE_TESTS"]
     },
+    "test:smoke": {
+      "dependsOn": ["^typecheck"],
+      "cache": false,
+      "env": ["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "CLERK_SECRET_KEY", "SUPABASE_DB_URL"]
+    },
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]

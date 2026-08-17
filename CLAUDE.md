@@ -10,7 +10,11 @@ pnpm+Turborepo · apps/web Next.js 15 App Router+TS+Tailwind+shadcn · apps/jobs
 
 ## Commands
 
-pnpm install · pnpm dev · **the gate = `turbo typecheck lint test && pnpm format:check`** (format:check is a ROOT script outside turbo — a green turbo count says nothing about formatting) · supabase migration new <name> (db push = ASK) · pnpm test:smoke
+pnpm install · pnpm dev · **the gate = `pnpm gate`** · supabase migration new <name> (db push = ASK)
+
+`pnpm gate` = `turbo run typecheck lint test && turbo run test:smoke && prettier --check .` — one command, because the two halves that used to sit outside it were both silently red for months. `format:check` is a ROOT script outside turbo, so a green turbo count says nothing about formatting. And `turbo test` runs VITEST ONLY: the Playwright suite sat outside the gate for twenty runs while `golden-path` was failing the whole time, because a product change turned "Create post" from a `<button>` into a `<Link>` and nothing was watching. All 15 e2e tests are tagged `@smoke`, so the gate runs every one of them.
+
+`pnpm gate` needs `apps/web/.env.local` (Clerk keys) for the e2e half; without it `e2e/global-setup.ts` throws with the missing names.
 
 ## Non-negotiables
 

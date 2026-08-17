@@ -41,8 +41,29 @@ test.describe('golden path @smoke', () => {
     await expect(page).toHaveURL(/\/posts/)
 
     // ── 4. Draft a post. This is a real insert under RLS.
-    await page.getByRole('button', { name: /create post/i }).click()
-    await page.waitForURL(/\/posts\/[0-9a-f-]{36}/, { timeout: 30_000 })
+    //
+    // A LINK, not a button. `CreatePostButton` was a <button> that wrote an empty
+    // draft and jumped straight to /posts/<id>; commit faded84 ("route every
+    // create entry point into the flow") made it a <Link href="/create/post">.
+    // Its ARIA role changed with it, so `getByRole('button')` stopped matching
+    // and this step had been timing out ever since — invisibly, because the e2e
+    // suite has never run inside the gate.
+    await page.getByRole('link', { name: /create post/i }).click()
+    await page.waitForURL(/\/create\/post/, { timeout: 30_000 })
+
+    // The flow no longer creates the row on entry. It creates it when the first
+    // step is completed, so the draft this journey is about does not exist until
+    // a channel is picked and Continue is pressed — at which point the post id
+    // arrives in the URL.
+    await page.locator('[data-channel-tile="instagram"]').click()
+    await page.getByRole('button', { name: /^continue/i }).click()
+    await page.waitForURL(/[?&]post=[0-9a-f-]{36}/, { timeout: 30_000 })
+
+    // Back to the editor the rest of this journey asserts against. Taking the id
+    // from the URL rather than guessing keeps the two in step.
+    const postId = new URL(page.url()).searchParams.get('post')
+    expect(postId).toMatch(/^[0-9a-f-]{36}$/)
+    await page.goto(`/posts/${postId}`)
 
     const body = page.getByLabel('Body')
     await expect(body).toBeVisible()
@@ -100,7 +121,12 @@ test.describe('golden path @smoke', () => {
 
     // `—` is the honest "could not read" state. After a successful bootstrap the
     // balance IS readable, so an em dash here means the read broke.
-    const chip = page.getByRole('link', { name: /credits/i })
+    // By the tour anchor, not by copy — the same rule this spec already applies
+    // to the wallet balance and ledger below, and for the same reason: /credits/i
+    // is not unique on this screen. It matches the topbar chip AND the planner's
+    // "Plan my week · 20 credits" button, so the unscoped lookup fails strict
+    // mode. Pricing copy will keep growing; the anchor will not.
+    const chip = page.locator('[data-guide="topbar.credits"]')
     await expect(chip).toBeVisible()
     await expect(chip).not.toContainText('—')
   })

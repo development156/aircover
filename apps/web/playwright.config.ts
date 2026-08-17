@@ -57,7 +57,17 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // One retry LOCALLY too, now that `pnpm gate` runs this suite. The observed
+  // flake is not ours: `fixtures/seeded-user.ts` redeems a Clerk sign-in ticket,
+  // and Clerk's own FAPI intermittently fails that exchange
+  // ("[Clerk Testing] FAPI request failed after 4 attempts"), leaving the page
+  // parked on /sign-in until the 30s waitForURL gives up. Roughly one run in
+  // three. A gate that is randomly red is a gate people learn to skip, which is
+  // how this suite came to sit outside the gate for twenty runs in the first
+  // place. Retries cover a third-party handshake, never an app assertion — every
+  // failure in this file that was OURS was deterministic and was fixed, not
+  // retried.
+  retries: process.env.CI ? 2 : 1,
   // A first dev-server compile of a heavy route can genuinely take a while;
   // this is not a licence for a slow app, it is Turbopack cold start.
   timeout: 60_000,
