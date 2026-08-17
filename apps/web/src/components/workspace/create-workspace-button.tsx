@@ -25,9 +25,18 @@ export const CREATE_WORKSPACE_LABEL = 'Create workspace'
 // The `quiet` one uses an INSET RING rather than a border so hovering cannot
 // shift the topbar by a pixel.
 const VARIANTS = {
-  /** Topbar: sits among bordered shell controls, so it stays quiet. */
+  /**
+   * Topbar: sits among bordered shell controls, so it stays quiet.
+   *
+   * `shrink-0` because this shares the topbar's flex row with the brain ring and
+   * the credit chip, both of which were given `flex-none whitespace-nowrap` in
+   * run 8 when they wrapped. THIS button was the sibling that fix missed: it only
+   * renders while the account has NO workspace, a state no funded test account
+   * can show, so four QA passes never saw it. At 390px it rendered "Create" over
+   * "workspace" beside a correctly single-line "No wallet yet".
+   */
   quiet:
-    'surface-ring-firm h-control bg-surface px-3 text-[13px] font-[550] text-ink hover:bg-s2 rounded-sm',
+    'surface-ring-firm h-control shrink-0 bg-surface px-3 text-[13px] font-[550] text-ink hover:bg-s2 rounded-sm',
   /** Empty state: the single primary action on the screen, so it leads. */
   primary:
     'h-control bg-primary px-3 text-[13px] font-[550] text-primary-foreground hover:bg-ink active:translate-y-[0.5px] rounded-sm',
@@ -58,7 +67,9 @@ export function CreateWorkspaceButton({
         disabled={pending}
         data-guide={guideAnchor}
         className={cn(
-          'flex items-center gap-2 transition-micro disabled:opacity-45',
+          // `whitespace-nowrap`: "Create workspace" is one label, not two words to
+          // be broken across lines when the row runs short.
+          'flex items-center gap-2 whitespace-nowrap transition-micro disabled:opacity-45',
           VARIANTS[variant],
         )}
       >

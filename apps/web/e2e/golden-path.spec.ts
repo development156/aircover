@@ -23,7 +23,12 @@ test.describe('golden path @smoke', () => {
   }) => {
     // ── 1. Signed in, but no workspace yet — the state a wiped database leaves.
     await page.goto('/home')
-    const createWorkspace = page.getByRole('button', { name: /create workspace/i })
+    // Scoped to the PAGE, not the shell. A workspace-less account is offered the
+    // bootstrap twice — once quietly in the topbar switcher and once as the empty
+    // state's primary action — so an unscoped by-name lookup matches two elements
+    // and fails Playwright's strict mode. The empty state's button is the one
+    // this journey is about: it is what a new account actually presses.
+    const createWorkspace = page.locator('#main').getByRole('button', { name: /create workspace/i })
     await expect(createWorkspace).toBeVisible()
 
     // ── 2. Bootstrap. One RPC creates the workspace, the owner membership, the
@@ -85,7 +90,11 @@ test.describe('golden path @smoke', () => {
     signedIn,
   }) => {
     await page.goto('/home')
-    await page.getByRole('button', { name: /create workspace/i }).click()
+    // Scoped for the same reason as above — the offer appears in the shell too.
+    await page
+      .locator('#main')
+      .getByRole('button', { name: /create workspace/i })
+      .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
     await page.goto('/home')
 

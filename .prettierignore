@@ -16,3 +16,9 @@ brand/
 
 # Local visual-verification scratch (see .gitignore).
 .ui-port-shots/
+
+# Playwright run artifacts. Already gitignored, but prettier reads only this
+# file, so without these two lines a smoke run leaves the tree in a state where
+# the documented format gate fails on generated JSON it does not own.
+apps/web/test-results/
+apps/web/playwright-report/
