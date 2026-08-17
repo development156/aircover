@@ -37,7 +37,11 @@ export function MonthGrid({ buckets, monthAnchor }: { buckets: WeekBuckets; mont
   return (
     <section className="surface-ring overflow-hidden rounded-card bg-surface">
       <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
-        <h2 className="text-[14px] font-semibold tracking-[-0.01em]">
+        {/* `shrink-0 whitespace-nowrap`: this is a flex item, and a flex item
+            shrinks below its content by default, so at 390px the IST note beside
+            it squeezed the label into two lines reading "August" / "2026". A month
+            and its year are one token. Same failure the topbar chips had. */}
+        <h2 className="shrink-0 text-[14px] font-semibold tracking-[-0.01em] whitespace-nowrap">
           {istMonthLabel(monthAnchor)}
         </h2>
         <p className="ml-auto text-[12px] text-muted">

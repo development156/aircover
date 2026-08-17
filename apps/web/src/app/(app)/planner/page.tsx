@@ -72,64 +72,84 @@ export default async function PlannerPage({
 
   return (
     <PublishStateProvider initial={liveSeed}>
-      <div className="space-y-grid">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* ── ON A PHONE THE PLAN COMES FIRST ──────────────────────────────────────
+          At 390px the grid used to start at y=773, behind the page header, the
+          connect note and the Plan my week panel. A planner whose plan is below
+          three panels is not a planner on a phone, so below 700px the grid moves
+          directly under the title and the two panels follow it. Founder ruling;
+          desktop order is deliberately unchanged.
+
+          `flex flex-col gap-grid` rather than `space-y-grid` because space-y is
+          margin-based and applies to DOM order, so it would have spaced the
+          children in their written order while the eye saw a different one. gap
+          is order-agnostic. EVERY child carries an explicit max-narrow order:
+          anything left at the default order-0 would sort ahead of the grid. */}
+      <div className="flex flex-col gap-grid">
+        <div className="flex flex-wrap items-center justify-between gap-3 max-narrow:order-1">
           <PageTitle sub="Plan, schedule and stay ahead.">Planner</PageTitle>
           {posts.length > 0 ? <ViewToggle active={view} /> : null}
         </div>
 
-        <ConnectFirstNote connectedCount={connected.size} />
+        <div className="max-narrow:order-3">
+          <ConnectFirstNote connectedCount={connected.size} />
+        </div>
 
-        <PlanWeekPanel />
+        <div className="max-narrow:order-4">
+          <PlanWeekPanel />
+        </div>
 
-        {posts.length === 0 ? (
-          <EmptyState
-            icon={CalendarDays}
-            title="Your week shows up here"
-            body="One click up there drafts five posts and places them across your coming week."
-            tip="Add goals first if you have a push this week — the plan bends toward them."
-          />
-        ) : view === 'month' ? (
-          // 42 IST days from the Monday on or before the 1st — `bucketWeek`
-          // already buckets any run of consecutive days, so the calendar needed
-          // no second date implementation to drift from the first.
-          <MonthGrid
-            buckets={bucketWeek(shown, firstGridDay(now), MONTH_GRID_DAYS)}
-            monthAnchor={now}
-          />
-        ) : view === 'week' ? (
-          <WeekGrid
-            buckets={bucketWeek(shown, now)}
-            now={now}
-            variantStates={variantStates}
-            autoPublish={autoPublish}
-          />
-        ) : (
-          <ul className="space-y-2" data-guide="planner.list">
-            {shown.map((post) => (
-              <li key={post.id}>
-                {/* `autoPublish` was computed here and never passed, so every row
+        <div className="max-narrow:order-2">
+          {posts.length === 0 ? (
+            <EmptyState
+              icon={CalendarDays}
+              title="Your week shows up here"
+              body="One click up there drafts five posts and places them across your coming week."
+              tip="Add goals first if you have a push this week — the plan bends toward them."
+            />
+          ) : view === 'month' ? (
+            // 42 IST days from the Monday on or before the 1st — `bucketWeek`
+            // already buckets any run of consecutive days, so the calendar needed
+            // no second date implementation to drift from the first.
+            <MonthGrid
+              buckets={bucketWeek(shown, firstGridDay(now), MONTH_GRID_DAYS)}
+              monthAnchor={now}
+            />
+          ) : view === 'week' ? (
+            <WeekGrid
+              buckets={bucketWeek(shown, now)}
+              now={now}
+              variantStates={variantStates}
+              autoPublish={autoPublish}
+            />
+          ) : (
+            <ul className="space-y-2" data-guide="planner.list">
+              {shown.map((post) => (
+                <li key={post.id}>
+                  {/* `autoPublish` was computed here and never passed, so every row
                   defaulted to false and read "Won't post itself — scheduled
                   auto-publish isn't live yet" while the dispatcher was on. The
                   default under-promises, which was the safe direction right up
                   until the rail went live. It is also what `PlannerReschedule`
                   needs before it can warn about an unconnected channel. */}
-                <PlannerRow
-                  post={post}
-                  now={now}
-                  connected={connected}
-                  autoPublish={autoPublish}
-                  variantStates={variantStates.get(post.id) ?? []}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
+                  <PlannerRow
+                    post={post}
+                    now={now}
+                    connected={connected}
+                    autoPublish={autoPublish}
+                    variantStates={variantStates.get(post.id) ?? []}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-        <LivePhaseNote />
+        <div className="max-narrow:order-5">
+          <LivePhaseNote />
+        </div>
 
         {posts.length === LIST_LIMIT ? (
-          <p className="text-[13px] tabular-nums text-muted">
+          <p className="text-[13px] tabular-nums text-muted max-narrow:order-6">
             Showing the {LIST_LIMIT} most recently updated posts — older ones may not be on this
             page.
           </p>
