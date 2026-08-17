@@ -45,61 +45,74 @@ export function MonthGrid({ buckets, monthAnchor }: { buckets: WeekBuckets; mont
         </p>
       </header>
 
-      {/* Weekday header. `aria-hidden` because each cell already names its own
-          date — a screen reader reading seven weekday names before the grid
-          would announce a header row it cannot navigate by. */}
-      <div aria-hidden className="grid grid-cols-7 border-b border-line-soft max-narrow:hidden">
-        {WEEKDAYS.map((day) => (
-          <div key={day} className="type-eyebrow px-2 py-2 text-center text-muted">
-            {day}
-          </div>
-        ))}
-      </div>
+      {/* ── ONE SCROLLER FOR BOTH ROWS ──────────────────────────────────────────
+          Below 700px this used to hide the weekday header, collapse the grid to
+          `grid-cols-1` and drop the cell min-height, which turned the calendar
+          into 42 full-width rows of bare date numbers — 41 of them empty in a
+          workspace with one dated post. It stopped being a calendar, which is the
+          one thing this component's 6×7 shape exists to be.
 
-      <div className="grid grid-cols-7 max-narrow:grid-cols-1">
-        {buckets.days.map((bucket) => {
-          const inMonth = isSameIstMonth(bucket.date, monthAnchor)
-          return (
-            <div
-              key={bucket.key}
-              className={cn(
-                'min-h-[104px] border-r border-b border-line-soft p-2 last:border-r-0 max-narrow:min-h-0',
-                // Outside the displayed month: quieter ground, but the posts
-                // still render at full strength.
-                inMonth ? 'bg-surface' : 'bg-s2',
-              )}
-            >
-              <p
+          WeekGrid already solved this: keep the seven columns, force a min-width,
+          let the container scroll. Same 840px here (120px per day). The weekday
+          header and the day grid share ONE scroller so the labels cannot drift out
+          of register with the columns they name. */}
+      <div className="overflow-x-auto">
+        {/* `aria-hidden` because each cell already names its own date — a screen
+            reader reading seven weekday names before the grid would announce a
+            header row it cannot navigate by. */}
+        <div aria-hidden className="grid min-w-[840px] grid-cols-7 border-b border-line-soft">
+          {WEEKDAYS.map((day) => (
+            <div key={day} className="type-eyebrow px-2 py-2 text-center text-muted">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid min-w-[840px] grid-cols-7">
+          {buckets.days.map((bucket) => {
+            const inMonth = isSameIstMonth(bucket.date, monthAnchor)
+            return (
+              <div
+                key={bucket.key}
                 className={cn(
-                  'text-[11px] font-semibold tabular-nums',
-                  inMonth ? 'text-ink' : 'text-muted',
+                  'min-h-[104px] border-r border-b border-line-soft p-2 last:border-r-0',
+                  // Outside the displayed month: quieter ground, but the posts
+                  // still render at full strength.
+                  inMonth ? 'bg-surface' : 'bg-s2',
                 )}
               >
-                {istDayOfMonth(bucket.date)}
-              </p>
+                <p
+                  className={cn(
+                    'text-[11px] font-semibold tabular-nums',
+                    inMonth ? 'text-ink' : 'text-muted',
+                  )}
+                >
+                  {istDayOfMonth(bucket.date)}
+                </p>
 
-              <ul className="mt-1 flex flex-col gap-1">
-                {bucket.posts.map((post) => (
-                  <li key={post.id}>
-                    <Link
-                      href={`/posts/${post.id}` as Route}
-                      className="surface-ring block rounded-sm bg-surface px-[6px] py-[3px] transition-micro hover:shadow-[inset_0_0_0_1px_var(--line-firm)]"
-                    >
-                      <span className="block truncate text-[11px] font-[550] text-ink">
-                        {post.title?.trim() || 'Untitled post'}
-                      </span>
-                      {post.channels.length > 0 ? (
-                        <span className="block truncate text-[10px] text-muted">
-                          {post.channels.map((c) => CHANNEL_SHORT[c]).join(' · ')}
+                <ul className="mt-1 flex flex-col gap-1">
+                  {bucket.posts.map((post) => (
+                    <li key={post.id}>
+                      <Link
+                        href={`/posts/${post.id}` as Route}
+                        className="surface-ring block rounded-sm bg-surface px-[6px] py-[3px] transition-micro hover:shadow-[inset_0_0_0_1px_var(--line-firm)]"
+                      >
+                        <span className="block truncate text-[11px] font-[550] text-ink">
+                          {post.title?.trim() || 'Untitled post'}
                         </span>
-                      ) : null}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )
-        })}
+                        {post.channels.length > 0 ? (
+                          <span className="block truncate text-[10px] text-muted">
+                            {post.channels.map((c) => CHANNEL_SHORT[c]).join(' · ')}
+                          </span>
+                        ) : null}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* A calendar can only show what has a date. Anything without one is

@@ -171,7 +171,9 @@ export function PostEditor({
         <MediaPane media={media} channels={draft.channels} postId={post.id} previews={previews} />
 
         <section className="space-y-3" data-guide="post-body">
-          <div className="flex items-center justify-between gap-2">
+          {/* min-h-5 pins the header row so all three column labels share a
+              baseline regardless of what trails them — see variant-tabs.tsx. */}
+          <div className="flex min-h-5 items-center justify-between gap-2">
             <CardLabel className="mb-0">Post</CardLabel>
             <span
               aria-live="polite"
@@ -199,7 +201,7 @@ export function PostEditor({
               id="post-body"
               rows={14}
               value={draft.body}
-              placeholder="Write the post once — I'll shape it per channel."
+              placeholder="Write the post once — Sahoda shapes it per channel."
               onChange={(event) => autosave.update({ body: event.target.value })}
               onSelect={captureSelection}
             />

@@ -76,7 +76,15 @@ export function VariantTabs({ channels, canonicalBody, variants, mediaCount }: V
 
   return (
     <section className="space-y-3" data-guide="post-variants">
-      <CardLabel className="mb-0">Channel variants</CardLabel>
+      {/* The same 20px header row Media and Post use, even with nothing trailing.
+          Those two carry a 12px/20px value beside the label, so `items-center`
+          settles their 14px label 3px down the row — and this one, unwrapped, sat
+          at the container top. Three adjacent column labels, one type, three
+          baselines. `min-h-5` states the row height instead of inheriting it from
+          whatever happens to sit next to the label. */}
+      <div className="flex min-h-5 items-center justify-between gap-2">
+        <CardLabel className="mb-0">Channel variants</CardLabel>
+      </div>
 
       <div role="tablist" aria-label="Channel variants" className="flex flex-wrap gap-1.5">
         {channels.map((channel) => {
