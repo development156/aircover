@@ -98,6 +98,7 @@ function divergenceText(): string {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  sessionStorage.clear()
   savePost.mockResolvedValue({ ok: true, postId: post.id, updatedAt: OUR_WRITE_AT })
 })
 
@@ -278,12 +279,12 @@ describe('useAutosave — divergence', () => {
  * same thing, and the text is there. That pair is what makes it the WINDOW and
  * not a mis-aimed selector.
  *
- * A client-routed Back fires no unload event, so `pagehide` was never going to
- * catch this. What is asserted below is the TEARDOWN contract, and it is real:
- * a genuine unmount inside the window now writes instead of discarding. The
- * BROWSER case is NOT closed by it and is not claimed to be — measured again
- * after this change and after a direct-`savePost` variant, the Back still comes
- * back empty, which points at the segment not unmounting at all. Reported.
+ * A client-routed Back fires no unload event. What is asserted below is the
+ * TEARDOWN contract: a genuine unmount inside the window writes instead of
+ * discarding. It is real but it was never the browser fix — run 24 measured why
+ * (the segment does not unmount at all, and the action that popstate does fire is
+ * killed by the navigation), and closed the browser case with the recovery buffer
+ * asserted further down.
  * Found by
  * enumerating the sibling of the create flow's blur-only save rather than by
  * waiting for it to be reported — the two surfaces where a person types a post
@@ -314,5 +315,114 @@ describe('useAutosave — leaving the page inside the debounce window', () => {
     // no edit must not put a redundant write on the wire — every mounted editor
     // in the app would otherwise save on every navigation.
     await waitFor(() => expect(savePost).not.toHaveBeenCalled())
+  })
+})
+
+/**
+ * THE CRASH BUFFER — what finally closed the Back case.
+ *
+ * Three fixes were tried on the way out and all three failed for one measured
+ * reason. In a real browser, typing into the body and pressing Back:
+ *
+ *   the effect cleanup never ran        (Next keeps the segment in its router
+ *                                        cache; nothing is torn down)
+ *   popstate DID fire and the action
+ *   went out with the right words       REQ /posts/<id> :: {"body":"EDITOR TEXT…"}
+ *   and the navigation killed it        FAILED … :: net::ERR_ABORTED
+ *
+ * A server action cannot outlive the navigation that triggers it, so no moment
+ * to send is the answer. Every change is written to `sessionStorage` instead —
+ * synchronously, where nothing can abort it — and the next mount hands it back.
+ *
+ * VERIFIED IN A REAL BROWSER, both halves:
+ *   FIELD                  -> "EDITOR TEXT typed and never blurred."
+ *   ROW AFTER BUFFER WIPED -> "EDITOR TEXT typed and never blurred."
+ * The second is the one that matters: the recovery re-enters `update()`, so the
+ * words reach the database and not merely the textarea.
+ */
+describe('useAutosave — recovering what a navigation cancelled', () => {
+  test('writes every change to the buffer, synchronously', async () => {
+    const user = userEvent.setup()
+    render(<Harness current={post} />)
+
+    await user.click(press('edit'))
+
+    // No debounce, no await: this is the point — it is already there.
+    const raw = sessionStorage.getItem(`sahoda.draft.${post.id}`)
+    expect(raw).not.toBeNull()
+    expect(JSON.parse(raw ?? '{}')).toMatchObject({ body: MY_TEXT })
+  })
+
+  test('hands the buffered text back on the next mount', async () => {
+    sessionStorage.setItem(
+      `sahoda.draft.${post.id}`,
+      JSON.stringify({
+        ...post,
+        title: post.title,
+        body: MY_TEXT,
+        channels: post.channels,
+        scheduledAt: null,
+      }),
+    )
+
+    render(<Harness current={post} />)
+
+    // The customer's own words, returned to them — not a conflict, because
+    // nobody else wrote them.
+    await waitFor(() => expect(screen.getByTestId('body').textContent).toBe(MY_TEXT))
+  })
+
+  test('the recovered draft reaches the ROW, not just the textarea', async () => {
+    sessionStorage.setItem(
+      `sahoda.draft.${post.id}`,
+      JSON.stringify({
+        title: post.title,
+        body: MY_TEXT,
+        channels: post.channels,
+        scheduledAt: null,
+      }),
+    )
+
+    render(<Harness current={post} />)
+
+    // Recovery goes through `update()`, so it inherits the debounce and saves
+    // itself. A buffer that only repopulated the field would lose the text again
+    // on the next device.
+    await waitFor(
+      () =>
+        expect(savePost).toHaveBeenCalledWith(post.id, expect.objectContaining({ body: MY_TEXT })),
+      {
+        timeout: 4000,
+      },
+    )
+  })
+
+  test('a confirmed save clears the buffer', async () => {
+    const user = userEvent.setup()
+    render(<Harness current={post} />)
+
+    await user.click(press('edit'))
+    await user.click(press('flush'))
+
+    await waitFor(() => expect(sessionStorage.getItem(`sahoda.draft.${post.id}`)).toBeNull())
+  })
+
+  test('a buffer matching the row is discarded rather than re-saved', async () => {
+    sessionStorage.setItem(
+      `sahoda.draft.${post.id}`,
+      JSON.stringify({
+        title: post.title,
+        body: post.body,
+        channels: post.channels,
+        scheduledAt: null,
+      }),
+    )
+
+    render(<Harness current={post} />)
+
+    // Nothing to recover. Adopting it anyway would mark a clean editor unsaved
+    // and put a redundant write on the wire on every visit to every post.
+    await waitFor(() => expect(sessionStorage.getItem(`sahoda.draft.${post.id}`)).toBeNull())
+    expect(savePost).not.toHaveBeenCalled()
   })
 })

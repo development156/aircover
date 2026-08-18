@@ -1,6 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+
+import { clearStash, readStash, stashDraft } from './draft-recovery'
+import { useFlushOnLeave } from './use-flush-on-leave'
 import type { ChannelSet, Post } from '@sahoda/shared'
 
 import { savePost } from '@/app/actions/posts'
@@ -171,6 +174,9 @@ export function useAutosave(postId: string, post: Post): AutosaveApi {
       if (!isNewer(adopted.current, result.updatedAt)) adopted.current = result.updatedAt
 
       lastSaved.current = snapshot
+      // Confirmed by the server: the buffer has nothing left to protect. Cleared
+      // only on the arm where `result.ok` is true, so a failed write keeps it.
+      if (sameDraft(latest.current, snapshot)) clearStash(postId)
       setStatus(sameDraft(latest.current, snapshot) ? 'saved' : 'unsaved')
       return true
     } finally {
@@ -198,6 +204,9 @@ export function useAutosave(postId: string, post: Post): AutosaveApi {
       latest.current = next
       setDraft(next)
       setStatus('unsaved')
+      // Synchronous, local, and impossible to abort. The debounced write below is
+      // still the primary path; this is what survives a navigation cancelling it.
+      stashDraft(postId, next)
 
       if (timer.current !== null) clearTimeout(timer.current)
       timer.current = setTimeout(() => {
@@ -205,7 +214,7 @@ export function useAutosave(postId: string, post: Post): AutosaveApi {
         void enqueue()
       }, DEBOUNCE_MS)
     },
-    [enqueue],
+    [enqueue, postId],
   )
 
   const flush = useCallback((): Promise<boolean> => {
@@ -261,11 +270,40 @@ export function useAutosave(postId: string, post: Post): AutosaveApi {
    */
   const flushRef = useRef(flush)
   flushRef.current = flush
+  /**
+   * ── HAND BACK WHAT THE LAST VISIT COULD NOT SAVE ───────────────────────────
+   * Runs once, before anything is written. A buffer only exists when a previous
+   * render of THIS post had unsaved words, so finding one means the customer
+   * typed something we failed to persist in time — their own text, restored to
+   * them. It is deliberately NOT treated as a conflict: nobody else wrote it and
+   * there is nothing to choose between.
+   *
+   * `update()` rather than a bare setState, so the recovered draft goes through
+   * the same debounce and reaches the row on its own.
+   */
+  const recovered = useRef(false)
+  useEffect(() => {
+    if (recovered.current) return
+    recovered.current = true
+    const stash = readStash(postId)
+    if (stash === null) return
+    if (sameDraft(stash, latest.current)) {
+      clearStash(postId)
+      return
+    }
+    update(stash)
+  }, [postId, update])
+
   useEffect(() => {
     return () => {
       void flushRef.current()
     }
   }, [])
+
+  // The teardown above is NOT enough and measurement says so — see
+  // `useFlushOnLeave`. A Back out of /posts/[id] never unmounts this hook, so the
+  // navigation itself has to be the trigger.
+  useFlushOnLeave(() => void flushRef.current())
 
   const loadTheirs = useCallback(() => {
     const theirs = divergence?.theirs
