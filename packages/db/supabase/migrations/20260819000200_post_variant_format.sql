@@ -1,0 +1,68 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- A3 · format — record what KIND of post each channel version is
+-- ─────────────────────────────────────────────────────────────────────────────
+--
+-- WHAT IS MISSING TODAY.
+-- Every channel version of a post is stored as words plus attached photos, with
+-- nothing saying whether it is meant to be a single photo, a swipeable set, a
+-- video, or text on its own. The platforms treat those as different kinds of post
+-- with different rules, so the distinction has to exist somewhere before Sahoda can
+-- offer it.
+--
+-- WHAT THIS FILE DOES. Adds one column to record the choice.
+--
+-- ── READ THIS PART BEFORE APPLYING ──────────────────────────────────────────
+-- THE COLUMN ON ITS OWN CHANGES NOTHING, AND THAT IS THE RISK.
+--
+-- Publishing sends exactly one kind of post today, and it is hard-coded:
+-- `packages/publishing/src/adapters/zernio.ts:222` builds every attachment as
+-- `type: 'image'`. There is no branch anywhere that reads a format.
+--
+-- So if a screen is built that lets someone choose "Video" BEFORE that line is
+-- changed, the choice is saved, shown back to them, and then ignored — a photo
+-- post goes out and the app says it published what they asked for. That is the
+-- exact class of thing this product refuses to do, and a column is what makes it
+-- possible. Applying this file is safe; building a picker on top of it before the
+-- publishing change is not.
+--
+-- WHAT MUST CHANGE AFTER THIS LANDS, in order:
+--   1. `packages/publishing/src/adapters/zernio.ts:222` — the attachment type must
+--      come from the variant instead of the literal 'image'.
+--   2. The frozen contract in `packages/shared` describes a post version and does
+--      not mention this column, and it strips anything it does not know. So even
+--      after the column exists, the app cannot SEE it through the normal read — a
+--      separate small read has to fetch it, the same way the concurrent-edit work
+--      in A1 fetches its counter. Until one of those two things happens, this
+--      column is written by nothing and read by nothing.
+--
+-- IF THIS FILE IS WRONG: nothing at all changes. No screen reads this column and
+-- no publish path branches on it.
+--
+-- REVERSIBLE: yes, cleanly, by `alter table post_variants drop column format`.
+-- Nothing depends on it, so nothing breaks when it goes.
+--
+-- NO NEW TABLE, so no new security rules. `post_variants` already has row-level
+-- security switched on and scoped to `workspace_id`.
+--
+-- APPLY ORDER: independent of everything else in this batch.
+
+
+-- ── 1 of 1 ───────────────────────────────────────────────────────────────────
+-- The column. Deliberately allowed to be empty rather than given a default.
+--
+-- A default would write a claim onto every post that already exists — "this one is
+-- a single photo" — that nobody made and that may be untrue. Empty means "nobody
+-- has chosen", which is exactly the truth about every row written before today,
+-- and it is a state the screens can render honestly.
+--
+-- The four values are spelled out so a typo becomes an error at the moment of
+-- writing rather than a post that silently never publishes. They are the kinds the
+-- four supported channels have in common; a channel-specific kind (a Story, a
+-- Reel, a Google offer) is deliberately NOT in this list, because those need their
+-- own fields and belong to their own change.
+--
+-- IF THIS IS WRONG: the column does not appear and nothing changes. Safe to run
+-- twice.
+alter table public.post_variants
+  add column if not exists format text
+    check (format is null or format in ('text', 'image', 'carousel', 'video'));
