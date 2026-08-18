@@ -2,7 +2,7 @@ import 'server-only'
 
 import { createServerSupabase } from '@/lib/supabase/server'
 import { actionLabel } from '@/lib/wallet/entry-copy'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 
 /**
  * Credit spend over the last 30 days, for Home's area chart.
@@ -87,8 +87,12 @@ interface SpendRow {
 
 export async function readSpend(now: Date = new Date()): Promise<SpendRead> {
   try {
-    const workspace = await getActiveWorkspace()
-    if (workspace === null) return EMPTY
+    // An UNREADABLE workspace read is not an empty workspace. It used to arrive
+    // here as `null` and render as "nothing yet", which is a claim about the
+    // account drawn from a question that never got an answer.
+    const workspace = await activeWorkspaceRead()
+    if (workspace.status === 'unreadable') return UNREADABLE
+    if (workspace.status === 'none') return EMPTY
 
     const since = new Date(now.getTime() - (SPEND_DAYS - 1) * 86_400_000)
     since.setUTCHours(0, 0, 0, 0)
@@ -97,7 +101,7 @@ export async function readSpend(now: Date = new Date()): Promise<SpendRead> {
     const { data, error } = await supabase
       .from('credit_ledger')
       .select('amount, action_type, created_at')
-      .eq('workspace_id', workspace.id)
+      .eq('workspace_id', workspace.workspace.id)
       // DEBIT only. A HOLD reserves and a RELEASE un-reserves; neither moves the
       // wallet total, and counting them would roughly double every number here.
       .eq('entry_type', 'DEBIT')

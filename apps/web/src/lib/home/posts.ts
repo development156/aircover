@@ -3,7 +3,7 @@ import 'server-only'
 import { ChannelSchema, toChannelSet, type Channel } from '@sahoda/shared'
 
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 
 /**
  * Post counts by status, channel and origin, for Home's greeting sentence.
@@ -51,14 +51,18 @@ interface PostRow {
 
 export async function readPostCounts(): Promise<PostCounts> {
   try {
-    const workspace = await getActiveWorkspace()
-    if (workspace === null) return EMPTY
+    // An UNREADABLE workspace read is not an empty workspace. It used to arrive
+    // here as `null` and render as "nothing yet", which is a claim about the
+    // account drawn from a question that never got an answer.
+    const workspace = await activeWorkspaceRead()
+    if (workspace.status === 'unreadable') return { ...EMPTY, status: 'unreadable' }
+    if (workspace.status === 'none') return EMPTY
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
       .from('posts')
       .select('status, origin, channels, updated_at')
-      .eq('workspace_id', workspace.id)
+      .eq('workspace_id', workspace.workspace.id)
       .order('updated_at', { ascending: false })
       .limit(COUNTS_LIMIT)
 

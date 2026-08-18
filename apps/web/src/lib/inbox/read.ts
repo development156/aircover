@@ -26,7 +26,7 @@ import {
 import { createServerSupabase } from '@/lib/supabase/server'
 import { ScopeError, accountByIdForWorkspace, profileForWorkspace } from '@/lib/zernio/scope'
 import { zernioClientReads } from '@/lib/zernio/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 
 import type { InboxSurfaceKey } from './emptiness'
 import type { ReadFailure } from './surface'
@@ -56,8 +56,8 @@ const PAGE = 50
 
 /** Memoised per request so several surfaces on one screen share the workspace lookup. */
 const activeWorkspaceId = cache(async (): Promise<string | null> => {
-  const workspace = await getActiveWorkspace()
-  return workspace?.id ?? null
+  const read = await activeWorkspaceRead()
+  return read.status === 'ok' ? read.workspace.id : null
 })
 
 /**
@@ -143,10 +143,17 @@ async function readContext(): Promise<ReadContext> {
   if (reads === null) return { ok: false, failure: 'no_reader' }
 
   try {
-    const workspaceId = await activeWorkspaceId()
+    // THREE answers, and only two of them were being told apart. An unreadable
+    // WORKSPACE read used to arrive as `no_profile`, whose copy says nothing is
+    // connected — a claim about the customer's accounts drawn from a question
+    // about ours that never got an answer. `call_failed` is what this is: a read
+    // we could not complete.
+    const workspace = await activeWorkspaceRead()
+    if (workspace.status === 'unreadable') return { ok: false, failure: 'call_failed' }
     // No workspace resolves to the same sentence as no profile: there is nothing to
     // address a read to. It is not a failed read, because no read was possible.
-    if (workspaceId === null) return { ok: false, failure: 'no_profile' }
+    if (workspace.status === 'none') return { ok: false, failure: 'no_profile' }
+    const workspaceId = workspace.workspace.id
 
     return { ok: true, workspaceId, reads, profile: await profileForWorkspace(workspaceId) }
   } catch (error) {

@@ -31,6 +31,13 @@ const state = vi.hoisted(() => ({
 vi.mock('server-only', () => ({}))
 vi.mock('@/lib/workspaces', () => ({
   getActiveWorkspace: () => Promise.resolve(state.workspace),
+  activeWorkspaceRead: async () => {
+    // Derived from the SAME value the two-way mock returned, so every
+    // assertion below still means what it meant. `null` here is the
+    // no-workspace arm; the unreadable arm is exercised by its own test.
+    const w = await Promise.resolve(state.workspace)
+    return w ? { status: 'ok', workspace: w } : { status: 'none' }
+  },
 }))
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabase: () => ({

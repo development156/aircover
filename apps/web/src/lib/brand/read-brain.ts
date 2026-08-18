@@ -9,7 +9,7 @@ import {
 } from '@sahoda/shared'
 
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 
 import { provenanceOf, type Provenance } from './provenance'
 
@@ -30,8 +30,8 @@ import { provenanceOf, type Provenance } from './provenance'
  */
 
 const activeWorkspaceId = cache(async (): Promise<string | null> => {
-  const workspace = await getActiveWorkspace()
-  return workspace?.id ?? null
+  const read = await activeWorkspaceRead()
+  return read.status === 'ok' ? read.workspace.id : null
 })
 
 /**
@@ -85,8 +85,14 @@ export type BrainRead =
  */
 export const readBrain = cache(async (): Promise<BrainRead> => {
   try {
-    const workspaceId = await activeWorkspaceId()
-    if (workspaceId === null) return { status: 'no-workspace' }
+    // `no-workspace` and `unreadable` are two of this union's four answers, and
+    // the read below used to collapse them: an unreadable workspace read reached
+    // here as `null` and the topbar ring reported "No brain yet" — a claim about
+    // the account, from a question that never got an answer.
+    const workspace = await activeWorkspaceRead()
+    if (workspace.status === 'unreadable') return { status: 'unreadable' }
+    if (workspace.status === 'none') return { status: 'no-workspace' }
+    const workspaceId = workspace.workspace.id
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase

@@ -11,7 +11,7 @@ import type { PostVariant } from '@sahoda/shared'
 import { cache } from 'react'
 
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 import { profileForWorkspace } from '@/lib/zernio/scope'
 import { zernioClientReads } from '@/lib/zernio/server'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
@@ -31,9 +31,15 @@ import type { VariantStatusRow } from '@/lib/posts/variant-status'
  */
 
 /** Memoised per request, so a page's several metric reads share one lookup. */
+/**
+ * NOT split three ways, and deliberately. `seed(preCall)` classifies every row
+ * with `result: null`, which is the "we never asked" verdict — already the right
+ * answer for a workspace we could not identify. There is no false claim here to
+ * fix, and inventing an `unreadable` arm would say more than this read knows.
+ */
 const activeWorkspaceId = cache(async (): Promise<string | null> => {
-  const workspace = await getActiveWorkspace()
-  return workspace?.id ?? null
+  const read = await activeWorkspaceRead()
+  return read.status === 'ok' ? read.workspace.id : null
 })
 
 /**

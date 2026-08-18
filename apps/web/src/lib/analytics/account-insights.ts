@@ -12,7 +12,7 @@ import type { ZernioPlatform } from '@sahoda/shared'
 import { cache } from 'react'
 
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 import { scopeForWorkspace } from '@/lib/zernio/scope'
 import { zernioClientReads } from '@/lib/zernio/server'
 
@@ -32,8 +32,8 @@ import { zernioClientReads } from '@/lib/zernio/server'
 
 /** Memoised per request so the two reads on one page share a lookup. */
 const activeWorkspaceId = cache(async (): Promise<string | null> => {
-  const workspace = await getActiveWorkspace()
-  return workspace?.id ?? null
+  const read = await activeWorkspaceRead()
+  return read.status === 'ok' ? read.workspace.id : null
 })
 
 /** How far back the dashboard asks. Instagram's own windows are shorter than this. */
@@ -258,8 +258,13 @@ async function hasInactiveConnection(
  * cross-tenant read that an omitted filter would cause is not expressible here.
  */
 export async function readInstagramAnalytics(now: Date = new Date()): Promise<AccountAnalytics> {
-  const workspaceId = await activeWorkspaceId()
-  if (workspaceId === null) return { kind: 'not-connected' }
+  // "Nothing connected" is a claim about the customer's accounts. An unreadable
+  // WORKSPACE read supports no claim about them at all — the union's own rule,
+  // applied to the one input that had not been split yet.
+  const workspace = await activeWorkspaceRead()
+  if (workspace.status === 'unreadable') return { kind: 'unreadable' }
+  if (workspace.status === 'none') return { kind: 'not-connected' }
+  const workspaceId = workspace.workspace.id
 
   // ── ASK WHO IS CONNECTED BEFORE ASKING THE TRANSPORT ────────────────────────
   // This order is the fix, and the order is the whole fix.
