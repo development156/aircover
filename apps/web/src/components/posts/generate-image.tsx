@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
 import { creditCost } from '@sahoda/shared'
@@ -34,19 +35,32 @@ const PENDING_LINES = [
 export function GenerateImage({ postId, disabled }: { postId: string; disabled?: boolean }) {
   const router = useRouter()
   const [prompt, setPrompt] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  /**
+   * `insufficient` is its own shape, not a string, for the same reason the other
+   * three paid controls model it that way: it is the ONE refusal that names a
+   * route out. Flattened into `error`, this control told the customer
+   * "You need 6 credits for this and have 0." and stopped — a shortfall stated
+   * with nowhere to go, on the only spend control in the app that offered no
+   * top-up. It also dropped the "nothing was charged" reassurance its three
+   * siblings carry, which matters most here, right after describing an image.
+   */
+  const [failure, setFailure] = useState<
+    | { kind: 'insufficient'; required: number; available: number }
+    | { kind: 'failed'; message: string }
+    | null
+  >(null)
   const [pending, startTransition] = useTransition()
   const cost = creditCost('image_standard')
 
   function run() {
-    setError(null)
+    setFailure(null)
     startTransition(async () => {
       const result = await generateImage(postId, { prompt, size: 'square' })
       if (!result.ok) {
-        setError(
+        setFailure(
           result.insufficient
-            ? `You need ${result.required} credits for this and have ${result.available}.`
-            : result.message,
+            ? { kind: 'insufficient', required: result.required, available: result.available }
+            : { kind: 'failed', message: result.message },
         )
         return
       }
@@ -82,7 +96,24 @@ export function GenerateImage({ postId, disabled }: { postId: string; disabled?:
         Square by default, which fits every channel. If the picture doesn&rsquo;t suit the channels
         you picked, it isn&rsquo;t attached and you aren&rsquo;t charged.
       </p>
-      {error !== null ? <InlineError>{error}</InlineError> : null}
+      {failure !== null ? (
+        <InlineError>
+          {failure.kind === 'insufficient' ? (
+            <>
+              An image needs <span className="tabular-nums">{failure.required}</span> credits and
+              you have <span className="tabular-nums">{failure.available}</span>. Nothing was
+              generated and you were not charged.{' '}
+              <Link href="/wallet" className="font-semibold underline underline-offset-2">
+                Top up your wallet
+              </Link>
+            </>
+          ) : (
+            // Verbatim: the action owns the charge statement. Appending our own
+            // would contradict it outright when it cannot confirm the charge.
+            failure.message
+          )}
+        </InlineError>
+      ) : null}
     </div>
   )
 }

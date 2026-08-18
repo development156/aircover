@@ -1,0 +1,175 @@
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+
+/**
+ * EVERY SPEND CONTROL, AT A ZERO BALANCE.
+ *
+ * ── WHY THIS IS A TEST AND NOT A QA WALK ─────────────────────────────────────
+ * The state is unreachable by hand. Emptying the wallet needs either real AI
+ * generation — which spends real money to reach a screen — or a ledger write,
+ * which is forbidden. So five spend controls have shipped for months with the
+ * one outcome nobody has ever seen: the customer runs out mid-task.
+ *
+ * A zero balance is not an error. It is the most ordinary thing that happens to
+ * a paying account, and it has exactly one correct shape, which three of the
+ * five already had and this file now holds all five to:
+ *
+ *   1. state the shortfall with BOTH numbers, so it is a fact and not a scold
+ *   2. say plainly that nothing was charged
+ *   3. offer the route out — a link to /wallet
+ *
+ * A control that fails and stops is a dead end, and it is worse here than
+ * anywhere else in the app: the customer has already written the prompt, picked
+ * the channels, described the image. Telling them the number and nothing else
+ * ends the session.
+ *
+ * ── WHY THE BUTTON IS NOT DISABLED AT ZERO ───────────────────────────────────
+ * Deliberate, and asserted below. The balance is a server fact; a client that
+ * pre-disabled on a cached number would refuse a customer who topped up in
+ * another tab. Attempt-then-explain is the honest order, and the action's own
+ * `withCredits` gate is the enforcement — never this.
+ */
+
+const INSUFFICIENT = { required: 6, available: 0 }
+
+const state = vi.hoisted(() => ({
+  image: {} as Record<string, unknown>,
+  variants: {} as Record<string, unknown>,
+  rewrite: {} as Record<string, unknown>,
+  planWeek: {} as Record<string, unknown>,
+  site: {} as Record<string, unknown>,
+}))
+
+vi.mock('@/app/actions/posts-image', () => ({
+  generateImage: () => Promise.resolve(state.image),
+}))
+vi.mock('@/app/actions/posts-ai', () => ({
+  generateVariants: () => Promise.resolve(state.variants),
+  rewriteCaption: () => Promise.resolve(state.rewrite),
+}))
+vi.mock('@/app/actions/plan-week', () => ({
+  planMyWeek: () => Promise.resolve(state.planWeek),
+}))
+vi.mock('@/app/actions/site-generate', () => ({
+  generateSite: () => Promise.resolve(state.site),
+}))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+
+import { GenerateImage } from './posts/generate-image'
+import { GeneratePanel } from './posts/generate-panel'
+import { InlineRewrite } from './posts/inline-rewrite'
+import { PlanWeekPanel } from './planner/plan-week-panel'
+import { GenerateSitePanel } from './sites/generate-site-panel'
+import { toChannelSet } from '@sahoda/shared'
+
+const REFUSAL = { ok: false, insufficient: true, message: 'Not enough credits.', ...INSUFFICIENT }
+
+beforeEach(() => {
+  state.image = REFUSAL
+  state.variants = REFUSAL
+  state.rewrite = REFUSAL
+  state.planWeek = REFUSAL
+  state.site = REFUSAL
+})
+
+/**
+ * Each entry renders one control and performs whatever the customer would do to
+ * reach the spend. The `press` step is real interaction, not a prop — a refusal
+ * that only renders from a hand-set state proves nothing about the path there.
+ */
+const CONTROLS: ReadonlyArray<{
+  name: string
+  press: () => Promise<void>
+}> = [
+  {
+    name: 'Make an image',
+    press: async () => {
+      const user = userEvent.setup()
+      render(<GenerateImage postId="p1" />)
+      await user.type(screen.getByPlaceholderText(/describe the picture/i), 'a warm shopfront')
+      await user.click(screen.getByRole('button', { name: /make an image/i }))
+    },
+  },
+  {
+    name: 'Generate variants',
+    press: async () => {
+      const user = userEvent.setup()
+      render(
+        <GeneratePanel
+          postId="p1"
+          channels={toChannelSet(['instagram'])}
+          flush={async () => true}
+          onGenerated={() => {}}
+        />,
+      )
+      await user.click(screen.getByRole('button', { name: /write.*channel|generate/i }))
+    },
+  },
+  {
+    name: 'Rewrite a caption',
+    press: async () => {
+      const user = userEvent.setup()
+      render(
+        <InlineRewrite
+          body="A short caption about the bakery."
+          selection={{ start: 0, end: 15 }}
+          onReplace={() => true}
+        />,
+      )
+      await user.click(screen.getByRole('button', { name: /rewrite/i }))
+    },
+  },
+  {
+    name: 'Plan my week',
+    press: async () => {
+      const user = userEvent.setup()
+      render(<PlanWeekPanel />)
+      await user.click(screen.getByRole('button', { name: /plan my week/i }))
+    },
+  },
+  {
+    name: 'Generate site',
+    press: async () => {
+      const user = userEvent.setup()
+      render(<GenerateSitePanel limitNotice={null} />)
+      await user.type(screen.getAllByRole('textbox')[0]!, 'Corner Bakery')
+      await user.click(screen.getByRole('button', { name: /generate site/i }))
+    },
+  },
+]
+
+describe.each(CONTROLS)('$name, with an empty wallet', ({ press }) => {
+  test('states the shortfall, confirms nothing was charged, and offers the way out', async () => {
+    await press()
+
+    const alert = await screen.findByRole('alert')
+    const text = alert.textContent ?? ''
+
+    // 1. BOTH numbers. "Not enough credits" alone is a scold; the pair is a fact
+    //    the customer can act on — they know exactly how far short they are.
+    expect(text).toMatch(/\b6\b/)
+    expect(text).toMatch(/\b0\b/)
+    // 2. The charge claim. Right after describing an image or picking channels,
+    //    "did that cost me anything?" is the first question.
+    expect(text).toMatch(/not charged|nothing was charged|weren.t charged/i)
+    // 3. THE ROUTE OUT. Without this the control is a dead end — which is what
+    //    "Make an image" was: it stated the shortfall and stopped.
+    const topUp = screen.getByRole('link', { name: /top up your wallet/i })
+    expect(topUp).toHaveAttribute('href', '/wallet')
+  })
+})
+
+describe('the spend controls do not pre-disable on a balance they did not read', () => {
+  test('Make an image stays pressable so a top-up in another tab still works', async () => {
+    render(<GenerateImage postId="p1" />)
+
+    // Only the prompt gates it. A client-side balance check here would refuse a
+    // customer who has just paid, and the server gate is the real enforcement.
+    const button = screen.getByRole('button', { name: /make an image/i })
+    expect(button).toBeDisabled() // no prompt yet
+    await userEvent.type(screen.getByPlaceholderText(/describe the picture/i), 'a shopfront')
+    expect(button).toBeEnabled()
+  })
+})
