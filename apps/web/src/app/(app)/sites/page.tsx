@@ -2,6 +2,7 @@ import { Globe } from 'lucide-react'
 import { normalizeDraft, renderBundle } from '@sahoda/sites'
 
 import { EmptyState } from '@/components/empty-state'
+import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { PageTitle } from '@/components/page-title'
 import { GenerateSitePanel } from '@/components/sites/generate-site-panel'
 import { SitePreview } from '@/components/sites/site-preview'
@@ -9,7 +10,7 @@ import { siteTreeToOutput } from '@/lib/sites/from-rows'
 import { toPreviewPages, type PreviewPage } from '@/lib/sites/preview'
 import { activeThemeTokens } from '@/lib/brand/read-theme'
 import { checkCountableLimit } from '@/lib/billing/entitlements'
-import { countSites, readSiteTree, recentSites } from '@/lib/sites/read'
+import { countSites, readRecentSites, readSiteTree } from '@/lib/sites/read'
 import { getActiveWorkspace } from '@/lib/workspaces'
 import { renderPreviewSafely } from '@/lib/sites/safe-preview'
 import { sharedTokensCss } from '@/lib/sites/tokens-css'
@@ -32,7 +33,8 @@ export const metadata = { title: 'Sites' }
  * fabricated success the honesty rule forbids.
  */
 
-type Preview = { siteName: string; pages: PreviewPage[] } | 'unreadable' | 'read-failed' | null
+type Preview =
+  { siteName: string; pages: PreviewPage[] } | 'unreadable' | 'read-failed' | 'no-workspace' | null
 
 /**
  * Walks the recent sites (newest first) until one renders. A newest row with
@@ -42,8 +44,14 @@ type Preview = { siteName: string; pages: PreviewPage[] } | 'unreadable' | 'read
  * one of them may honestly suggest generating.
  */
 async function buildPreview(): Promise<Preview> {
-  const sites = await recentSites()
-  if (sites === null) return 'read-failed'
+  const read = await readRecentSites()
+  // FOUR answers, not three. "No workspace yet" used to arrive as 'read-failed'
+  // and render "reload before generating — you may already have a site, and
+  // generating again costs credits": a failure that had not happened, a site that
+  // cannot exist, and a charge against a wallet that does not exist either.
+  if (read.status === 'no-workspace') return 'no-workspace'
+  if (read.status === 'unreadable') return 'read-failed'
+  const sites = read.sites
   if (sites.length === 0) return null
 
   // The workspace's accepted Brand Skin. `null` when no logo was ever uploaded,
@@ -111,9 +119,19 @@ export default async function SitesPage() {
     <div className="space-y-grid">
       <PageTitle>Sites</PageTitle>
 
-      <GenerateSitePanel limitNotice={limitNotice} />
+      {/* The spend panel is withheld ONLY when there is nothing to spend from.
+          Everywhere else it stays: a read hiccup must not remove the control the
+          page exists for. */}
+      {preview === 'no-workspace' ? null : <GenerateSitePanel limitNotice={limitNotice} />}
 
-      {preview === null ? (
+      {preview === 'no-workspace' ? (
+        <EmptyState
+          icon={Globe}
+          title="Create a workspace to build a site"
+          body="Sites belong to a workspace and you don't have one yet. Nothing failed — and nothing has been charged."
+          action={<CreateWorkspaceButton variant="primary" />}
+        />
+      ) : preview === null ? (
         <EmptyState
           icon={Globe}
           title="Your site shows up here"

@@ -11,7 +11,7 @@ import {
 } from '@sahoda/shared'
 
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 
 /**
  * Site reads, RLS-scoped, filtered to the ACTIVE workspace (a correctness
@@ -21,8 +21,8 @@ import { getActiveWorkspace } from '@/lib/workspaces'
  */
 
 const activeWorkspaceId = cache(async (): Promise<string | null> => {
-  const workspace = await getActiveWorkspace()
-  return workspace?.id ?? null
+  const read = await activeWorkspaceRead()
+  return read.status === 'ok' ? read.workspace.id : null
 })
 
 /**
@@ -37,23 +37,43 @@ const activeWorkspaceId = cache(async (): Promise<string | null> => {
  * orphan permanently shadow the older, healthy, paid site underneath. The
  * caller walks these until one previews.
  */
-export async function recentSites(limit = 3): Promise<Site[] | null> {
-  const wsId = await activeWorkspaceId()
-  if (!wsId) return null
+export type SitesRead =
+  { status: 'ok'; sites: Site[] } | { status: 'no-workspace' } | { status: 'unreadable' }
+
+/**
+ * The three-way answer. `null` used to carry "no workspace" as well as "could not
+ * read", and /sites rendered the failure copy for both — telling a brand-new
+ * account "Couldn't check your sites just now — reload before generating. You may
+ * already have a site, and generating again costs credits." Not one clause of that
+ * was true, and it warned about a charge over an account that has no wallet.
+ */
+export async function readRecentSites(limit = 3): Promise<SitesRead> {
+  const workspace = await activeWorkspaceRead()
+  if (workspace.status === 'unreadable') return { status: 'unreadable' }
+  if (workspace.status === 'none') return { status: 'no-workspace' }
 
   const supabase = createServerSupabase()
   const { data, error } = await supabase
     .from('sites')
     .select('*')
-    .eq('workspace_id', wsId)
+    .eq('workspace_id', workspace.workspace.id)
     .order('created_at', { ascending: false })
     .limit(limit)
-  if (error || !data) return null
+  if (error || !data) return { status: 'unreadable' }
 
-  return data
-    .map((row) => SiteSchema.safeParse(row))
-    .filter((parsed) => parsed.success)
-    .map((parsed) => parsed.data)
+  return {
+    status: 'ok',
+    sites: data
+      .map((row) => SiteSchema.safeParse(row))
+      .filter((parsed) => parsed.success)
+      .map((parsed) => parsed.data),
+  }
+}
+
+/** The lossy view, for callers that cannot render the difference. */
+export async function recentSites(limit = 3): Promise<Site[] | null> {
+  const read = await readRecentSites(limit)
+  return read.status === 'ok' ? read.sites : null
 }
 
 /**

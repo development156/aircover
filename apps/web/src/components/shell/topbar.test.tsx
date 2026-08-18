@@ -6,7 +6,7 @@ import * as Sentry from '@sentry/nextjs'
 import { RING_DENOMINATOR } from '@/lib/brand/fields'
 
 import { Topbar } from './topbar'
-import { listWorkspaces, getActiveWorkspaceSlug } from '@/lib/workspaces'
+import { readWorkspaces, getActiveWorkspaceSlug } from '@/lib/workspaces'
 import { readBalance } from '@/lib/wallet/read'
 import { readBrain } from '@/lib/brand/read-brain'
 
@@ -33,7 +33,7 @@ vi.mock('@clerk/nextjs', () => ({
 // the behaviour under test.
 vi.mock('@/lib/workspaces', async (importActual) => ({
   ...(await importActual<typeof import('@/lib/workspaces')>()),
-  listWorkspaces: vi.fn(),
+  readWorkspaces: vi.fn(),
   getActiveWorkspaceSlug: vi.fn(),
 }))
 
@@ -53,7 +53,7 @@ const WORKSPACES = [
 ]
 
 const mocked = {
-  listWorkspaces: vi.mocked(listWorkspaces),
+  readWorkspaces: vi.mocked(readWorkspaces),
   getActiveWorkspaceSlug: vi.mocked(getActiveWorkspaceSlug),
   readBalance: vi.mocked(readBalance),
   readBrain: vi.mocked(readBrain),
@@ -62,7 +62,7 @@ const mocked = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocked.listWorkspaces.mockResolvedValue(WORKSPACES)
+  mocked.readWorkspaces.mockResolvedValue({ status: 'ok', workspaces: WORKSPACES })
   mocked.getActiveWorkspaceSlug.mockResolvedValue('sahoda-labs')
   mocked.readBalance.mockResolvedValue({
     status: 'ok',
@@ -85,7 +85,7 @@ describe('Topbar', () => {
     // The headline case. Supabase unreachable, or the lazy env parse throwing on
     // a missing var — the single most likely infrastructure failure, and the one
     // that used to take the entire document down with it.
-    mocked.listWorkspaces.mockRejectedValue(new Error('supabase unreachable'))
+    mocked.readWorkspaces.mockRejectedValue(new Error('supabase unreachable'))
 
     render(await Topbar())
 
@@ -103,7 +103,7 @@ describe('Topbar', () => {
     // workspace read indistinguishable from a brand-new empty account: nobody is
     // paged, and the outage arrives as a support ticket days later.
     const failure = new Error('supabase unreachable')
-    mocked.listWorkspaces.mockRejectedValue(failure)
+    mocked.readWorkspaces.mockRejectedValue(failure)
 
     render(await Topbar())
 
@@ -132,7 +132,7 @@ describe('Topbar', () => {
   })
 
   test('renders a degraded but usable shell when every read rejects', async () => {
-    mocked.listWorkspaces.mockRejectedValue(new Error('down'))
+    mocked.readWorkspaces.mockRejectedValue(new Error('down'))
     mocked.getActiveWorkspaceSlug.mockRejectedValue(new Error('down'))
     mocked.readBalance.mockRejectedValue(new Error('down'))
     mocked.readBrain.mockRejectedValue(new Error('down'))
@@ -205,5 +205,47 @@ describe('Topbar', () => {
       expect(screen.getByRole('banner')).toBeInTheDocument()
       expect(screen.queryByText(/Brand Brain/)).not.toBeInTheDocument()
     })
+  })
+})
+
+/**
+ * THE PAIR. Neither test means anything alone — together they are the whole
+ * claim: two different facts about the account produce two different sentences.
+ *
+ * Before this, `listWorkspaces` returned `[]` for both, so the switcher told a
+ * founder whose read had merely hiccuped that they had no workspace and offered
+ * to create one. Run 22 fixed the same conflation on /connections; this is the
+ * read UPSTREAM of that fix, which is what made the fix itself falsifiable.
+ */
+describe('the workspace switcher tells "none" apart from "could not tell"', () => {
+  test('offers to create one when the account genuinely has none', async () => {
+    mocked.readWorkspaces.mockResolvedValue({ status: 'ok', workspaces: [] })
+
+    render(await Topbar())
+
+    expect(screen.getByRole('button', { name: 'Create workspace' })).toBeInTheDocument()
+  })
+
+  test('never offers to create one when the read did not answer', async () => {
+    mocked.readWorkspaces.mockResolvedValue({ status: 'unreadable' })
+
+    render(await Topbar())
+
+    // The false claim: "you have no workspace", asserted from a read that failed.
+    expect(screen.queryByRole('button', { name: 'Create workspace' })).toBeNull()
+    // And it says which of the two it is, so the sentence beneath it is not the
+    // only thing standing between the user and a wrong conclusion.
+    expect(screen.getByText('Workspace unavailable')).toBeInTheDocument()
+  })
+
+  test('a rejected read is unreadable, not an empty account', async () => {
+    // softRead's fallback carries the same claim as the reader's own catch. A
+    // fallback of `[]` here would re-open the exact hole from the other side.
+    mocked.readWorkspaces.mockRejectedValue(new Error('supabase unreachable'))
+
+    render(await Topbar())
+
+    expect(screen.queryByRole('button', { name: 'Create workspace' })).toBeNull()
+    expect(screen.getByText('Workspace unavailable')).toBeInTheDocument()
   })
 })

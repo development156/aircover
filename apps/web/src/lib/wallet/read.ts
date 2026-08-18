@@ -3,7 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 
 import { toBalance, type WalletBalance } from './balance'
 import { parseEntries, type ParsedLedger } from './parse-entries'
@@ -33,8 +33,8 @@ import { parseEntries, type ParsedLedger } from './parse-entries'
  * if a caller runs outside a request scope — no correctness impact either way.
  */
 const activeWorkspaceId = cache(async (): Promise<string | null> => {
-  const workspace = await getActiveWorkspace()
-  return workspace?.id ?? null
+  const read = await activeWorkspaceRead()
+  return read.status === 'ok' ? read.workspace.id : null
 })
 
 /** Row cap for the history read. Exported so the UI can state the window it is showing. */
@@ -71,8 +71,15 @@ export async function readBalance(): Promise<BalanceRead> {
     // No active workspace means there is no wallet yet — a first run, not a
     // fault. Callers branch on this to offer "Create workspace" instead of a
     // reload that cannot help.
-    const workspaceId = await activeWorkspaceId()
-    if (workspaceId === null) return { status: 'no-workspace' }
+    // THE THREE-WAY ANSWER STARTS ONE LAYER UP. This used to read a `string |
+    // null`, which was itself two meanings in one value — so an unreadable
+    // WORKSPACE read arrived here as `no-workspace` and /home replaced the whole
+    // dashboard with First run for a founder who has one. The union below is only
+    // as honest as the read that feeds it.
+    const read = await activeWorkspaceRead()
+    if (read.status === 'unreadable') return { status: 'unreadable' }
+    if (read.status === 'none') return { status: 'no-workspace' }
+    const workspaceId = read.workspace.id
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase

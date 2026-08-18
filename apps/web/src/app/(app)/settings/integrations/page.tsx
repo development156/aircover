@@ -4,7 +4,7 @@ import { ChannelLogo } from '@/components/connections/channel-logo'
 import { SettingCard, SettingRow } from '@/components/settings/setting-row'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 import { buttonVariants } from '@/components/ui/button'
-import { listConnections } from '@/lib/connections/read'
+import { readConnections } from '@/lib/connections/read'
 
 export const metadata = { title: 'Integrations' }
 
@@ -17,13 +17,23 @@ export const metadata = { title: 'Integrations' }
  * and hands over.
  */
 export default async function SettingsIntegrationsPage() {
-  const connections = await listConnections()
+  const read = await readConnections()
 
   return (
     <SettingCard title="Connected platforms">
-      {connections === null ? (
+      {read.status === 'unreadable' ? (
         <SettingRow label="Couldn’t read your connections just now" hint="Reload to try again." />
-      ) : connections.length === 0 ? (
+      ) : read.status === 'no-workspace' ? (
+        /* The same sentence /connections was corrected to, because it is the
+           same fact. This tab said "Couldn't read your connections just now —
+           reload to try again" to a brand-new account: a failure that had not
+           happened, and a remedy that cannot produce a workspace. Reloading
+           forever is the whole of what that row offered. */
+        <SettingRow
+          label="No workspace yet"
+          hint="Channels belong to a workspace. Nothing failed — there is nothing to connect to until one exists."
+        />
+      ) : read.connections.length === 0 ? (
         <SettingRow
           label="Nothing connected"
           hint="You can write and plan without a channel. Connecting is what lets a post go out."
@@ -37,7 +47,7 @@ export default async function SettingsIntegrationsPage() {
           }
         />
       ) : (
-        connections.map((connection) => (
+        read.connections.map((connection) => (
           <SettingRow
             key={connection.id}
             label={CHANNEL_LABELS[connection.platform]}

@@ -26,6 +26,8 @@ const state = vi.hoisted(() => ({
   /** Every `.eq()` applied, per `.from()` call, in order. */
   queries: [] as { table: string; filters: Filter[] }[],
   workspace: null as { id: string } | null,
+  /** The workspace read itself failed — distinct from "there is none". */
+  workspaceUnreadable: false,
   rows: null as unknown,
   /** PostgREST error to hand back, or null for a clean read. */
   error: null as { code: string; message: string } | null,
@@ -35,7 +37,18 @@ const state = vi.hoisted(() => ({
 vi.mock('server-only', () => ({}))
 
 vi.mock('@/lib/workspaces', () => ({
-  getActiveWorkspace: () => Promise.resolve(state.workspace),
+  // The THREE-way read, because that distinction is now made one layer up. With
+  // the old two-way `getActiveWorkspace`, an unreadable workspace read reached
+  // `readBalance` as `null` and came back as `no-workspace` — which /home turns
+  // into the whole First-run screen for a founder who has one.
+  activeWorkspaceRead: () =>
+    Promise.resolve(
+      state.workspaceUnreadable
+        ? { status: 'unreadable' }
+        : state.workspace === null
+          ? { status: 'none' }
+          : { status: 'ok', workspace: { ...state.workspace, name: 'W', slug: 'w' } },
+    ),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -69,6 +82,7 @@ const scopedTo = (query: { filters: Filter[] }) =>
 beforeEach(() => {
   state.queries = []
   state.workspace = { id: WORKSPACE }
+  state.workspaceUnreadable = false
   state.rows = null
   state.error = null
 })
@@ -155,5 +169,23 @@ describe('a balance that genuinely could not be read stays unreadable', () => {
     }
 
     await expect(readBalance()).resolves.toEqual({ status: 'unreadable' })
+  })
+})
+
+/**
+ * The arm that did not exist. `readBalance` split `no-workspace` from
+ * `unreadable` in its OWN failure modes but read a `string | null` workspace id,
+ * which had already collapsed the same two. So a failed workspace read arrived
+ * as `no-workspace` and /home replaced the entire dashboard with First run —
+ * "Create a workspace" to someone who has one — while the credit chip read
+ * "No wallet yet" beside it.
+ */
+describe('an unreadable workspace read is not an empty account', () => {
+  test('readBalance reports unreadable, NOT no-workspace, and issues no query', async () => {
+    state.workspaceUnreadable = true
+
+    await expect(readBalance()).resolves.toEqual({ status: 'unreadable' })
+    // Nothing may be asked of a workspace we could not identify.
+    expect(state.queries).toEqual([])
   })
 })

@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 import { SettingCard, SettingRow } from '@/components/settings/setting-row'
 import { buttonVariants } from '@/components/ui/button'
-import { readBalance } from '@/lib/wallet/read'
+import { readBalance, type BalanceRead } from '@/lib/wallet/read'
 
 export const metadata = { title: 'Plan & credits' }
 
@@ -18,6 +18,23 @@ export const metadata = { title: 'Plan & credits' }
  * unreadable balance says so rather than showing a zero, which is the whole
  * point of the three-way split this read returns.
  */
+/**
+ * `readBalance` answers in THREE parts and this tab used to render two.
+ *
+ * `no-workspace` fell into the same arm as `unreadable`, so a brand-new account
+ * was told "We could not read your balance just now" — a failure that had not
+ * happened, attached to a remedy (reload) that cannot produce a wallet. The
+ * union in lib/wallet/read.ts was introduced to end exactly that sentence on
+ * /home and the credit chip; this consumer flattened it straight back.
+ *
+ * Each arm now carries its own remedy, and only one of them is a reload.
+ */
+const AVAILABLE_HINT: Record<BalanceRead['status'], string> = {
+  ok: 'What you can spend right now.',
+  'no-workspace': 'Credits belong to a workspace and you don’t have one yet.',
+  unreadable: 'We could not read your balance just now — this is not a zero.',
+}
+
 export default async function SettingsPlanPage() {
   const balance = await readBalance()
 
@@ -25,11 +42,7 @@ export default async function SettingsPlanPage() {
     <SettingCard title="Credits">
       <SettingRow
         label="Available"
-        hint={
-          balance.status === 'ok'
-            ? 'What you can spend right now.'
-            : 'We could not read your balance just now — this is not a zero.'
-        }
+        hint={AVAILABLE_HINT[balance.status]}
         control={
           <span className="text-[15px] font-[650] text-ink tabular-nums">
             {balance.status === 'ok' ? balance.balance.available : '—'}

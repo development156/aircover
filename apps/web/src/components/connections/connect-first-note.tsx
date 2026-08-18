@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Plug } from 'lucide-react'
 
 import { buttonVariants } from '@/components/ui/button'
+import type { ConnectedChannelsRead } from '@/lib/connections/read'
 
 /**
  * The first thing a new shop owner needs to be told, on the screen where they
@@ -19,8 +20,21 @@ import { buttonVariants } from '@/components/ui/button'
  * has connected Instagram but not LinkedIn would be noise they learn to ignore —
  * which is how the notice that actually matters stops being read.
  */
-export function ConnectFirstNote({ connectedCount }: { connectedCount: number }) {
-  if (connectedCount > 0) return null
+/**
+ * ── WHY IT TAKES THE READ AND NOT A COUNT ────────────────────────────────────
+ * A count of zero used to arrive here from three different facts: nothing is
+ * connected, there is no workspace to connect to, and the read failed. Only the
+ * first earns this banner. The other two made it assert something about the
+ * customer's account that nobody had established — and then pointed them at
+ * /connections, which now says something different, so the two screens disagreed
+ * about the same account.
+ *
+ * Silence on the other two is deliberate. There is no honest banner for "we
+ * could not tell", and the page's own empty state owns "no workspace yet".
+ */
+export function ConnectFirstNote({ connections }: { connections: ConnectedChannelsRead }) {
+  if (connections.status !== 'ok') return null
+  if (connections.channels.size > 0) return null
 
   return (
     // The kit's `.sl-banner`: a wash with a hairline ring, not a border — the

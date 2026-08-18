@@ -1,3 +1,4 @@
+import type { Channel } from '@sahoda/shared'
 import { notFound } from 'next/navigation'
 
 import { PostEditor } from '@/components/posts/post-editor'
@@ -11,7 +12,7 @@ import { PublishStateProvider } from '@/components/posts/live/publish-state-prov
 import { LivePhaseNote } from '@/components/posts/live/live-phase-note'
 import { variantStatusRow } from '@/lib/posts/variant-status'
 import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
-import { listConnectedChannels } from '@/lib/connections/read'
+import { readConnectedChannels } from '@/lib/connections/read'
 
 export const metadata = { title: 'Post' }
 
@@ -31,8 +32,19 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
     listMedia(post.id),
     // Read here so the composer can say "not connected" while the post is being
     // written, instead of at the moment Publish fails with the work already done.
-    listConnectedChannels(),
+    readConnectedChannels(),
   ])
+
+  // The gate models NOT KNOWN as `undefined` and answers it with silence (see
+  // `unconnectedFrom`); this read was the half that could not say it. An empty
+  // set from a FAILED read reads to the gate as "known: nothing is connected",
+  // so a hiccup told the writer every picked channel was disconnected.
+  const connectedChannels =
+    connected.status === 'ok'
+      ? connected.channels
+      : connected.status === 'no-workspace'
+        ? new Set<Channel>()
+        : undefined
 
   // Seeded from the rows this render already holds. `variantStatusRow` is the
   // same function `listVariantStates` uses, so the seed and the poll produce
@@ -69,7 +81,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           media={media}
           previews={previews}
           autoPublish={autoPublishEnabled()}
-          connected={connected}
+          connected={connectedChannels}
         />
 
         {/* Under the editor, not inside it: the editor is about changing the post,

@@ -11,9 +11,9 @@ import { readBrain, type BrainRead } from '@/lib/brand/read-brain'
 import { readBalance, type BalanceRead } from '@/lib/wallet/read'
 import {
   getActiveWorkspaceSlug,
-  listWorkspaces,
+  readWorkspaces,
   resolveActiveWorkspace,
-  type WorkspaceOption,
+  type WorkspacesRead,
 } from '@/lib/workspaces'
 
 /**
@@ -29,7 +29,7 @@ import {
  * Guarding at the source keeps a failed read as what it actually is: a missing
  * value in one chip, with the rest of the shell still on screen and navigable.
  *
- * Two of the three reads below already guard themselves (`listWorkspaces` and
+ * Two of the three reads below already guard themselves (`readWorkspaces` and
  * `readBalance` both catch internally and return an empty/unreadable value),
  * so today this wrapper is load-bearing for exactly one — `getActiveWorkspaceSlug`,
  * whose `cookies()` call throws when invoked outside a request scope. It wraps
@@ -54,8 +54,14 @@ export async function Topbar() {
   // Promise.all: `Promise.all` rejects the moment ANY input rejects, so a single
   // failing read would throw away the two that succeeded and blank the whole
   // topbar over one bad row.
-  const [workspaces, activeSlug, balance, brain] = await Promise.all([
-    softRead<WorkspaceOption[]>('workspaces', listWorkspaces, []),
+  const [workspacesRead, activeSlug, balance, brain] = await Promise.all([
+    // The three-way read, not the lossy `listWorkspaces`. An empty array here
+    // used to mean two different things — "this account has none" and "we could
+    // not look" — and the switcher rendered "Create workspace" for both, telling
+    // a founder with a live workspace that they had none. See lib/workspaces.ts.
+    // A THROW is `unreadable` for the same reason the balance chip's is: it is
+    // exactly what a read that blew up amounts to, and never an empty account.
+    softRead<WorkspacesRead>('workspaces', readWorkspaces, { status: 'unreadable' }),
     softRead<string | null>('active_workspace_slug', getActiveWorkspaceSlug, null),
     // The same three-way answer /wallet renders, so the chip and the page
     // cannot disagree. A throw here is `unreadable` — the honest fallback,
@@ -67,6 +73,7 @@ export async function Topbar() {
     // the SHELL's guarantee, not a restatement of that module's internals.
     softRead<BrainRead>('brand_brain', readBrain, { status: 'unreadable' }),
   ])
+  const workspaces = workspacesRead.status === 'ok' ? workspacesRead.workspaces : []
   const active = resolveActiveWorkspace(workspaces, activeSlug)
 
   return (
@@ -82,7 +89,11 @@ export async function Topbar() {
           refuses to shrink below its content, so without it the switcher pushed
           the credit pill and avatar off the right edge at 375px. */}
       <div className="min-w-0">
-        <WorkspaceSwitcher workspaces={workspaces} active={active} />
+        <WorkspaceSwitcher
+          workspaces={workspaces}
+          active={active}
+          unreadable={workspacesRead.status !== 'ok'}
+        />
       </div>
       {/* Centred, and it does the centring itself via `mx-auto` — a spacer div
           would centre it against the wrong axis the moment the switcher's width

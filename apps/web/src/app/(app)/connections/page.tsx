@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/empty-state'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { PageTitle } from '@/components/page-title'
 import { checkCountableLimit } from '@/lib/billing/entitlements'
-import { listConnections, readConnectionSlots } from '@/lib/connections/read'
+import { readConnections, readConnectionSlots } from '@/lib/connections/read'
 import { getActiveWorkspace } from '@/lib/workspaces'
 import { zernioAvailable } from '@/lib/zernio/server'
 
@@ -108,17 +108,22 @@ export default async function ConnectionsPage({
    */
   searchParams: Promise<{ zernio?: string | string[] }>
 }) {
-  const [connections, { zernio }, channelLimit, workspace] = await Promise.all([
-    listConnections(),
+  // ONE read, three answers. This page used to take two — `listConnections()` for
+  // the rows and `getActiveWorkspace()` to work out which of that read's two
+  // nulls it was looking at — and the second was itself two meanings in one
+  // value, so the "Create a workspace" branch fired on a failed workspace read
+  // too. `readConnections` now returns the reason with the rows.
+  const [connections, { zernio }, channelLimit] = await Promise.all([
+    readConnections(),
     searchParams,
     channelLimitNotice(),
-    getActiveWorkspace(),
   ])
   const railReady = zernioAvailable()
   const planFull = channelLimit !== null
 
   // One lookup, so a channel appears exactly once whether or not it is linked.
-  const byChannel = new Map((connections ?? []).map((c) => [c.platform, c]))
+  const rows = connections.status === 'ok' ? connections.connections : []
+  const byChannel = new Map(rows.map((c) => [c.platform, c]))
 
   return (
     <div className="space-y-6">
@@ -130,7 +135,16 @@ export default async function ConnectionsPage({
       {/* What just happened comes before what is there now. */}
       <ConnectOutcomeNotice status={zernio} />
 
-      {workspace === null ? (
+      {connections.status === 'unreadable' ? (
+        /* WE DID NOT FIND OUT. Not "no workspace" and not "no connections" —
+           either would be a claim about the account drawn from a read that
+           failed. This is the only branch on this page where reloading is the
+           correct remedy, so it is the only one that offers it. */
+        <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
+          Couldn&rsquo;t check your connections just now &mdash; reload to see what&rsquo;s already
+          linked.
+        </p>
+      ) : connections.status === 'no-workspace' ? (
         /* NO WORKSPACE IS NOT A FAILED READ. `listConnections()` returns null both
            when the read breaks AND when there is nothing to read, and this page
            used to render the failure copy for both — telling a brand-new account
@@ -147,17 +161,12 @@ export default async function ConnectionsPage({
           body="Channels belong to a workspace and you don't have one yet. Nothing failed — there is simply nothing to connect to until one exists."
           action={<CreateWorkspaceButton variant="primary" />}
         />
-      ) : connections === null ? (
-        <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
-          Couldn&rsquo;t check your connections just now &mdash; reload to see what&rsquo;s already
-          linked.
-        </p>
       ) : (
         <>
           {/* `.banner--alert` — the most expensive thing on this page is a
               broken connection, so it is stated at the top and never inferred
               from a colour on a tile further down. */}
-          <ConnectionHealthBanner connections={connections} />
+          <ConnectionHealthBanner connections={rows} />
 
           {planFull ? (
             <p

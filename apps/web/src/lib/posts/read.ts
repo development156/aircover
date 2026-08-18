@@ -15,7 +15,7 @@ import { cache } from 'react'
 
 import { createServerSupabase } from '@/lib/supabase/server'
 import { variantStatusRow, type VariantStatusRow } from '@/lib/posts/variant-status'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 
 /**
  * Post reads, RLS-scoped via the Clerk session JWT. `posts` / `post_variants` /
@@ -38,10 +38,15 @@ import { getActiveWorkspace } from '@/lib/workspaces'
  * save, billing the user for variants they cannot keep.
  */
 
-/** Memoised per request so a post page's three reads share one workspace lookup. */
+/**
+ * Memoised per request so a post page's three reads share one workspace lookup.
+ * `null` here folds "no workspace" into "could not tell" ON PURPOSE, and only the
+ * reads whose caller cannot render the difference use it — `readPosts` below
+ * takes the three-way read directly.
+ */
 const activeWorkspaceId = cache(async (): Promise<string | null> => {
-  const workspace = await getActiveWorkspace()
-  return workspace?.id ?? null
+  const read = await activeWorkspaceRead()
+  return read.status === 'ok' ? read.workspace.id : null
 })
 
 /**
@@ -51,10 +56,24 @@ const activeWorkspaceId = cache(async (): Promise<string | null> => {
  */
 export const LIST_LIMIT = 100
 
-export async function listPosts(): Promise<Post[]> {
+/**
+ * The three answers a post list can give, and why `Post[]` could not carry them.
+ *
+ * `listPosts` returned `[]` for a genuinely empty workspace, for an account with
+ * no workspace at all, AND for a read that failed — so /posts and /planner said
+ * "Nothing drafted yet" to a workspace holding forty posts whose query hiccuped,
+ * and offered "Create post" as the remedy. An empty list is the one shape that
+ * makes a false claim look like a designed screen.
+ */
+export type PostsRead =
+  { status: 'ok'; posts: Post[] } | { status: 'no-workspace' } | { status: 'unreadable' }
+
+export async function readPosts(): Promise<PostsRead> {
   try {
-    const workspaceId = await activeWorkspaceId()
-    if (workspaceId === null) return []
+    const workspace = await activeWorkspaceRead()
+    if (workspace.status === 'unreadable') return { status: 'unreadable' }
+    if (workspace.status === 'none') return { status: 'no-workspace' }
+    const workspaceId = workspace.workspace.id
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -66,16 +85,30 @@ export async function listPosts(): Promise<Post[]> {
 
     if (error || !data) {
       if (error) console.error('[posts] list failed', error.code, error.message)
-      return []
+      return { status: 'unreadable' }
     }
-    return data.flatMap((row) => {
-      const parsed = PostSchema.safeParse(row)
-      return parsed.success ? [parsed.data] : []
-    })
+    return {
+      status: 'ok',
+      posts: data.flatMap((row) => {
+        const parsed = PostSchema.safeParse(row)
+        return parsed.success ? [parsed.data] : []
+      }),
+    }
   } catch (error) {
     console.error('[posts] list threw', error instanceof Error ? error.message : 'unknown')
-    return []
+    return { status: 'unreadable' }
   }
+}
+
+/**
+ * The lossy view. Correct only where the caller has ALREADY decided which of the
+ * three it is in — /home short-circuits on the wallet's `no-workspace` before it
+ * reaches a post — and never where an empty list is about to be rendered as a
+ * sentence.
+ */
+export async function listPosts(): Promise<Post[]> {
+  const read = await readPosts()
+  return read.status === 'ok' ? read.posts : []
 }
 
 export async function getPost(postId: string): Promise<Post | null> {

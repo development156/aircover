@@ -1,6 +1,8 @@
+import type { Channel } from '@sahoda/shared'
 import { CalendarDays } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
+import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { PageTitle } from '@/components/page-title'
 import { PlanWeekPanel } from '@/components/planner/plan-week-panel'
 import { PlannerRow } from '@/components/planner/planner-row'
@@ -10,12 +12,12 @@ import { MonthGrid } from '@/components/planner/month-grid'
 import { firstGridDay, MONTH_GRID_DAYS } from '@/lib/planner/month'
 import { bucketWeek } from '@/lib/planner/week'
 import { forDisplay } from '@/lib/posts/display-post'
-import { listPosts, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
+import { readPosts, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
 import { assembleSnapshot } from '@/lib/posts/live-state'
 import { PublishStateProvider } from '@/components/posts/live/publish-state-provider'
 import { LivePhaseNote } from '@/components/posts/live/live-phase-note'
 import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
-import { listConnectedChannels } from '@/lib/connections/read'
+import { readConnectedChannels } from '@/lib/connections/read'
 import { ConnectFirstNote } from '@/components/connections/connect-first-note'
 
 export const metadata = { title: 'Planner' }
@@ -38,14 +40,19 @@ export default async function PlannerPage({
   // grid would put the tour's anchor behind a toggle nobody has found yet.
   // Calendar is one click away and is the first segment in the control.
   const view: PlannerView = rawView === 'week' ? 'week' : rawView === 'month' ? 'month' : 'list'
-  const posts = await listPosts()
+  // THREE answers. "Your week shows up here" was rendered for a failed read and
+  // for an account with no workspace as readily as for a genuinely empty plan —
+  // and the panel above it offers to draft five posts into a week that cannot
+  // hold them.
+  const read = await readPosts()
+  const posts = read.status === 'ok' ? read.posts : []
   // The evidence behind any "it happened" claim. Fails safe to an empty map, in
   // which case every chip renders the weaker claim rather than a solid publish.
   const postIds = posts.map((post) => post.id)
   // Batched for the whole week: one query, not one per row.
   const [variantStates, connected] = await Promise.all([
     listVariantStates(postIds),
-    listConnectedChannels(),
+    readConnectedChannels(),
   ])
   // One instant for the whole screen: the week buckets and the past-due notes
   // must not be computed against two different clocks.
@@ -68,6 +75,20 @@ export default async function PlannerPage({
 
   // Converted at the page boundary, in the open: past this line no component can
   // reach `post.status` at all. See `display-post.ts`.
+  // The gate below already models NOT KNOWN as `undefined` and answers it with
+  // silence (see `unconnectedFrom`) — this read was the half that could not say
+  // it. `listConnectedChannels` returned an EMPTY SET for a failed read, which
+  // the gate reads as "known: nothing is connected", so a hiccup warned that
+  // every picked channel was disconnected and sent the writer to reconnect
+  // accounts that were fine. `no-workspace` stays an empty set because there it
+  // is simply true.
+  const connectedChannels =
+    connected.status === 'ok'
+      ? connected.channels
+      : connected.status === 'no-workspace'
+        ? new Set<Channel>()
+        : undefined
+
   const shown = posts.map(forDisplay)
 
   return (
@@ -91,15 +112,31 @@ export default async function PlannerPage({
         </div>
 
         <div className="max-narrow:order-3">
-          <ConnectFirstNote connectedCount={connected.size} />
+          <ConnectFirstNote connections={connected} />
         </div>
 
-        <div className="max-narrow:order-4">
-          <PlanWeekPanel />
-        </div>
+        {/* The spend panel goes only where there is something to spend from. A
+            read hiccup keeps it — the plan may well be there. */}
+        {read.status === 'no-workspace' ? null : (
+          <div className="max-narrow:order-4">
+            <PlanWeekPanel />
+          </div>
+        )}
 
         <div className="max-narrow:order-2">
-          {posts.length === 0 ? (
+          {read.status === 'unreadable' ? (
+            <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
+              Couldn&rsquo;t load your plan just now &mdash; reload to see it. Nothing has been
+              lost.
+            </p>
+          ) : read.status === 'no-workspace' ? (
+            <EmptyState
+              icon={CalendarDays}
+              title="Create a workspace to plan a week"
+              body="A plan belongs to a workspace and you don't have one yet. Nothing failed — there is simply no week to fill until one exists."
+              action={<CreateWorkspaceButton variant="primary" />}
+            />
+          ) : posts.length === 0 ? (
             <EmptyState
               icon={CalendarDays}
               title="Your week shows up here"
@@ -134,7 +171,7 @@ export default async function PlannerPage({
                   <PlannerRow
                     post={post}
                     now={now}
-                    connected={connected}
+                    connected={connectedChannels}
                     autoPublish={autoPublish}
                     variantStates={variantStates.get(post.id) ?? []}
                   />

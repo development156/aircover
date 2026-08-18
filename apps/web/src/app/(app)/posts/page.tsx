@@ -1,30 +1,36 @@
 import { SquarePen } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
+import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { PageTitle } from '@/components/page-title'
 import { CreatePostButton } from '@/components/posts/create-post-button'
 import { PostCard } from '@/components/posts/post-card'
 import { listPostMetrics } from '@/lib/analytics/post-metrics'
 import { forDisplay } from '@/lib/posts/display-post'
-import { listPosts, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
+import { readPosts, listVariantStates, LIST_LIMIT } from '@/lib/posts/read'
 import { assembleSnapshot } from '@/lib/posts/live-state'
 import { PublishStateProvider } from '@/components/posts/live/publish-state-provider'
 import { LivePhaseNote } from '@/components/posts/live/live-phase-note'
 import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
-import { listConnectedChannels } from '@/lib/connections/read'
+import { readConnectedChannels } from '@/lib/connections/read'
 import { ConnectFirstNote } from '@/components/connections/connect-first-note'
 
 export const metadata = { title: 'Posts' }
 
 export default async function PostsPage() {
-  const posts = await listPosts()
+  // THREE answers, and this page used to render one sentence for all of them.
+  // "Nothing drafted yet · Create post" was shown to a workspace with forty posts
+  // whose read hiccuped, and to an account with no workspace at all — where the
+  // button it offers refuses with "Create a workspace first."
+  const read = await readPosts()
+  const posts = read.status === 'ok' ? read.posts : []
   // The evidence behind any "it happened" claim. Fails safe to an empty map, in
   // which case every chip renders the weaker claim rather than a solid publish.
   const postIds = posts.map((post) => post.id)
   // Batched for the whole page: one query, not one per card.
   const [variantStates, connected] = await Promise.all([
     listVariantStates(postIds),
-    listConnectedChannels(),
+    readConnectedChannels(),
   ])
   // Read the clock once and pass it down, so every card on the page agrees on
   // which scheduled posts are past due. See `AutoPublishNote`.
@@ -65,9 +71,20 @@ export default async function PostsPage() {
         {posts.length > 0 ? <CreatePostButton /> : null}
       </div>
 
-      <ConnectFirstNote connectedCount={connected.size} />
+      <ConnectFirstNote connections={connected} />
 
-      {posts.length === 0 ? (
+      {read.status === 'unreadable' ? (
+        <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
+          Couldn&rsquo;t load your posts just now &mdash; reload to see them. Nothing has been lost.
+        </p>
+      ) : read.status === 'no-workspace' ? (
+        <EmptyState
+          icon={SquarePen}
+          title="Create a workspace to start writing"
+          body="Posts belong to a workspace and you don't have one yet. Nothing failed — there is simply nowhere to keep a draft until one exists."
+          action={<CreateWorkspaceButton variant="primary" />}
+        />
+      ) : posts.length === 0 ? (
         <EmptyState
           icon={SquarePen}
           title="Nothing drafted yet"

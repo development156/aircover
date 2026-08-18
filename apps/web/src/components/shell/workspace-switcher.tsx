@@ -11,6 +11,11 @@ import type { WorkspaceOption } from '@/lib/workspaces'
 interface WorkspaceSwitcherProps {
   workspaces: WorkspaceOption[]
   active: WorkspaceOption | null
+  /**
+   * The workspace read did not answer. NOT the same as an empty list, and the
+   * difference is the whole reason this prop exists — see the third branch.
+   */
+  unreadable?: boolean
 }
 
 // Initial-letter avatar — honest stand-in until per-workspace Brand Skin colors
@@ -28,7 +33,11 @@ function WorkspaceBadge({ name }: { name: string }) {
   )
 }
 
-export function WorkspaceSwitcher({ workspaces, active }: WorkspaceSwitcherProps) {
+export function WorkspaceSwitcher({
+  workspaces,
+  active,
+  unreadable = false,
+}: WorkspaceSwitcherProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -58,6 +67,28 @@ export function WorkspaceSwitcher({ workspaces, active }: WorkspaceSwitcherProps
   function closeToTrigger() {
     setOpen(false)
     triggerRef.current?.focus()
+  }
+
+  // AN UNREADABLE READ IS NOT AN EMPTY ACCOUNT. Both used to arrive here as an
+  // empty array, so a Supabase hiccup put "Create workspace" in the topbar of a
+  // founder who already has one — a claim about their account that nothing
+  // measured. It is not destructive (bootstrap_workspace replays for the owner
+  // and returns the existing row) but it is false, and it is the same
+  // one-null-two-meanings defect /wallet, /home and /connections each had to fix
+  // downstream of THIS read.
+  //
+  // A span, not a button: the remedy for an unreadable read is to reload, this
+  // control cannot reload anything, and a control that cannot do what it implies
+  // is the dead end the kit forbids. The page below states the remedy.
+  if (unreadable) {
+    return (
+      <span
+        role="status"
+        className="surface-ring-firm grid h-control shrink-0 place-items-center rounded-sm bg-surface px-3 text-[13px] font-[550] whitespace-nowrap text-muted"
+      >
+        Workspace unavailable
+      </span>
+    )
   }
 
   // Honest empty state: no memberships yet (bootstrap pending) → a real create

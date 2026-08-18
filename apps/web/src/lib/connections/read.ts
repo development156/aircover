@@ -1,10 +1,9 @@
 import 'server-only'
 
-import { cache } from 'react'
 import { ChannelSchema, ConnectionSchema, type Channel, type Connection } from '@sahoda/shared'
 
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 
 /**
  * Connection reads, RLS-scoped, filtered to the ACTIVE workspace (correctness
@@ -14,27 +13,58 @@ import { getActiveWorkspace } from '@/lib/workspaces'
  * invite a redundant reconnect the moment connecting exists).
  */
 
-const activeWorkspaceId = cache(async (): Promise<string | null> => {
-  const workspace = await getActiveWorkspace()
-  return workspace?.id ?? null
-})
+/**
+ * The three things that can be true of "what is connected", each with its own
+ * sentence and its own remedy:
+ *
+ *  - `ok`           — we read them. `[]` is a real answer: nothing is connected.
+ *  - `no-workspace` — there is no workspace to hold a connection. Create one;
+ *                     reloading cannot conjure a channel.
+ *  - `unreadable`   — the read failed. Reload. Nothing may be claimed about the
+ *                     account from this, in EITHER direction: "nothing connected"
+ *                     is as false a report as "your connections broke".
+ *
+ * `Connection[] | null` could not express this, which is how /connections came to
+ * tell a brand-new account that Sahoda "couldn't check your connections" and
+ * /settings/integrations still said "Couldn't read your connections just now —
+ * reload to try again" for the same non-failure.
+ */
+export type ConnectionsRead =
+  | { status: 'ok'; connections: Connection[] }
+  | { status: 'no-workspace' }
+  | { status: 'unreadable' }
 
-export async function listConnections(): Promise<Connection[] | null> {
-  const wsId = await activeWorkspaceId()
-  if (!wsId) return null
+export async function readConnections(): Promise<ConnectionsRead> {
+  const workspace = await activeWorkspaceRead()
+  if (workspace.status === 'unreadable') return { status: 'unreadable' }
+  if (workspace.status === 'none') return { status: 'no-workspace' }
 
   const supabase = createServerSupabase()
   const { data, error } = await supabase
     .from('connections')
     .select('*')
-    .eq('workspace_id', wsId)
+    .eq('workspace_id', workspace.workspace.id)
     .order('created_at', { ascending: true })
-  if (error || !data) return null
+  if (error || !data) return { status: 'unreadable' }
 
-  return data
-    .map((row) => ConnectionSchema.safeParse(row))
-    .filter((parsed) => parsed.success)
-    .map((parsed) => parsed.data)
+  return {
+    status: 'ok',
+    connections: data
+      .map((row) => ConnectionSchema.safeParse(row))
+      .filter((parsed) => parsed.success)
+      .map((parsed) => parsed.data),
+  }
+}
+
+/**
+ * The lossy view, for callers that only need the rows and already know which of
+ * the two nulls they are in. Kept so `/home` — which short-circuits on the
+ * wallet's `no-workspace` long before it renders a connection — does not have to
+ * re-decide a question it has already answered.
+ */
+export async function listConnections(): Promise<Connection[] | null> {
+  const read = await readConnections()
+  return read.status === 'ok' ? read.connections : null
 }
 
 /**
@@ -50,15 +80,38 @@ export async function listConnections(): Promise<Connection[] | null> {
  * exists and cannot publish, and offering it would recreate the same surprise one
  * layer down.
  */
+export type ConnectedChannelsRead =
+  { status: 'ok'; channels: Set<Channel> } | { status: 'no-workspace' } | { status: 'unreadable' }
+
+/**
+ * `Set<Channel>` alone could not say "we did not find out", so an unreadable read
+ * arrived at `ConnectFirstNote` as an EMPTY SET and /posts, /planner and the post
+ * detail all told the writer "Connect a channel to post for real" — a claim about
+ * their account made from a question that never got an answer. The banner then
+ * points at /connections, which by now says something different again.
+ */
+export async function readConnectedChannels(): Promise<ConnectedChannelsRead> {
+  const read = await readConnections()
+  if (read.status !== 'ok') return read
+  return {
+    status: 'ok',
+    channels: new Set(
+      read.connections
+        .filter((connection) => connection.status === 'active')
+        .map((connection) => connection.platform)
+        .filter((platform): platform is Channel => CHANNEL_SET.has(platform as Channel)),
+    ),
+  }
+}
+
+/**
+ * The lossy view. Correct ONLY where an empty set and an unknown one lead to the
+ * same behaviour — the composer offers every channel either way and refuses at
+ * publish, which is a gate rather than a claim.
+ */
 export async function listConnectedChannels(): Promise<Set<Channel>> {
-  const connections = await listConnections()
-  if (connections === null) return new Set()
-  return new Set(
-    connections
-      .filter((connection) => connection.status === 'active')
-      .map((connection) => connection.platform)
-      .filter((platform): platform is Channel => CHANNEL_SET.has(platform as Channel)),
-  )
+  const read = await readConnectedChannels()
+  return read.status === 'ok' ? read.channels : new Set()
 }
 
 /** ConnectionPlatform is wider than Channel — a platform we cannot compose for is not one. */

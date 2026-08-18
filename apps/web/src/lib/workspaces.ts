@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -17,11 +18,34 @@ export interface WorkspaceOption {
 }
 
 /**
- * Workspaces the signed-in user can see, RLS-scoped via the Clerk session JWT.
- * Empty until the user bootstraps one (createWorkspace → bootstrap_workspace RPC).
- * Any read hiccup degrades to an empty switcher — the app shell never crashes.
+ * Why this read is a two-way answer and the active one a three-way.
+ *
+ * ── THE BUG THIS ENDS ────────────────────────────────────────────────────────
+ * `listWorkspaces` used to return `[]` for BOTH "this account has no workspace"
+ * and "the read failed", and `getActiveWorkspace` collapsed both into `null`.
+ * Every screen that branches on that null therefore asserts "you have no
+ * workspace yet" the moment a query hiccups — to a user who has one. That is the
+ * same one-null-two-meanings defect the wallet, /home and /connections each had
+ * to fix downstream, except this one is UPSTREAM OF ALL OF THEM: it makes the
+ * fixes themselves false. The switcher goes further and renders "Create
+ * workspace" over a workspace that exists.
+ *
+ * (Pressing it is not destructive — `bootstrap_workspace` carries an owner
+ * replay guard and returns the existing row — but "you have no workspace" is
+ * still a claim about the account that nothing here measured.)
+ *
+ * `unreadable` is NOT `none`, and only one of them is fixed by reloading.
  */
-export async function listWorkspaces(): Promise<WorkspaceOption[]> {
+export type WorkspacesRead =
+  { status: 'ok'; workspaces: WorkspaceOption[] } | { status: 'unreadable' }
+
+/**
+ * Workspaces the signed-in user can see, RLS-scoped via the Clerk session JWT.
+ * `{ status: 'ok', workspaces: [] }` is a real answer — the account has none yet
+ * and bootstrap is the remedy. `unreadable` means the question did not get an
+ * answer, and nothing may be claimed about the account from it.
+ */
+export async function readWorkspaces(): Promise<WorkspacesRead> {
   try {
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -31,13 +55,27 @@ export async function listWorkspaces(): Promise<WorkspaceOption[]> {
 
     if (error || !data) {
       if (error) console.error('[workspaces] read failed', error.code, error.message)
-      return []
+      return { status: 'unreadable' }
     }
-    return data as WorkspaceOption[]
+    return { status: 'ok', workspaces: data as WorkspaceOption[] }
   } catch (error) {
     console.error('[workspaces] read threw', error instanceof Error ? error.message : 'unknown')
-    return []
+    return { status: 'unreadable' }
   }
+}
+
+/**
+ * The lossy view, kept deliberately and used only where the loss is CORRECT.
+ *
+ * A mutation refuses on both arms — "no workspace" and "could not tell" are the
+ * same instruction to a write path, which is to not write — so collapsing them
+ * there costs nothing. A RENDERED SENTENCE is the opposite: it has to choose
+ * between two different claims and two different remedies, and it must use
+ * `readActiveWorkspace` instead.
+ */
+export async function listWorkspaces(): Promise<WorkspaceOption[]> {
+  const read = await readWorkspaces()
+  return read.status === 'ok' ? read.workspaces : []
 }
 
 export async function getActiveWorkspaceSlug(): Promise<string | null> {
@@ -59,8 +97,39 @@ export function resolveActiveWorkspace(
   return chosen ?? first
 }
 
+/**
+ * The three things that can be true of "which workspace am I in", each with its
+ * own remedy:
+ *
+ *  - `ok`         — this one. Nothing to say.
+ *  - `none`       — the account has no workspace yet. Create one; reloading cannot help.
+ *  - `unreadable` — we could not find out. Reload; creating one would be acting on
+ *                   a fact nobody established.
+ */
+export type ActiveWorkspaceRead =
+  { status: 'ok'; workspace: WorkspaceOption } | { status: 'none' } | { status: 'unreadable' }
+
+/** The active workspace for the current request, with the reason when there is none. */
+export async function readActiveWorkspace(): Promise<ActiveWorkspaceRead> {
+  const [read, activeSlug] = await Promise.all([readWorkspaces(), getActiveWorkspaceSlug()])
+  if (read.status === 'unreadable') return { status: 'unreadable' }
+  const workspace = resolveActiveWorkspace(read.workspaces, activeSlug)
+  return workspace === null ? { status: 'none' } : { status: 'ok', workspace }
+}
+
 /** The active workspace for the current request (RLS-scoped list + cookie pointer). */
 export async function getActiveWorkspace(): Promise<WorkspaceOption | null> {
-  const [workspaces, activeSlug] = await Promise.all([listWorkspaces(), getActiveWorkspaceSlug()])
-  return resolveActiveWorkspace(workspaces, activeSlug)
+  const read = await readActiveWorkspace()
+  return read.status === 'ok' ? read.workspace : null
 }
+
+/**
+ * The request-scoped active-workspace read every other reader should use.
+ *
+ * Memoised with React `cache`, so the eight modules that used to keep their own
+ * private `activeWorkspaceId` memo now share ONE lookup per request instead of
+ * issuing eight — and, more to the point, they share one ANSWER. A private memo
+ * per module is how two panels on the same screen end up disagreeing about
+ * whether a workspace exists.
+ */
+export const activeWorkspaceRead = cache(readActiveWorkspace)
