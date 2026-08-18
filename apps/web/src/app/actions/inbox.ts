@@ -6,7 +6,7 @@ import { InboxDraftReplySchema, InboxStatusSchema } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 
 /**
  * Inbox actions: draft a reply, and move a thread through open/snoozed/resolved.
@@ -33,8 +33,9 @@ export async function draftReply(input: unknown): Promise<InboxActionState> {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to reply.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     const parsed = InboxDraftReplySchema.safeParse(input)
@@ -70,8 +71,9 @@ export async function setThreadStatus(
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to change this.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     const parsed = InboxStatusSchema.safeParse(status)

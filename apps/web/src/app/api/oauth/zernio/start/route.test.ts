@@ -17,6 +17,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({
   userId: 'user_1' as string | null,
+  /** The workspace READ failed — distinct from having none. */
+  workspaceUnreadable: false,
   clientPresent: true,
   workspace: { id: 'ws-1', name: 'Chai & Chapters' } as { id: string; name: string } | null,
   slots: { count: 0, keys: new Set<string>() } as { count: number; keys: Set<string> } | null,
@@ -49,6 +51,22 @@ vi.mock('@/lib/zernio/server', () => ({
 
 vi.mock('@/lib/workspaces', () => ({
   getActiveWorkspace: () => Promise.resolve(state.workspace),
+  // The THREE-way read the handlers now branch on. `state.workspace` null is the
+  // `none` arm; the `unreadable` arm has its own test rather than a shared flag,
+  // because it is the arm that used to be indistinguishable.
+  readActiveWorkspace: async () => {
+    if (state.workspaceUnreadable) return { status: 'unreadable' }
+    const w = await Promise.resolve(state.workspace)
+    return w ? { status: 'ok', workspace: w } : { status: 'none' }
+  },
+  // Derived from the SAME value the two-way mock returns, so every assertion in
+  // this file still means what it meant. `workspaceForWrite` carries the REFUSAL
+  // SENTENCE as well as the workspace — the split run 24 made, because "Create a
+  // workspace first." was being said to people who had one.
+  workspaceForWrite: async () => {
+    const w = await Promise.resolve(state.workspace)
+    return w ? { ok: true, workspace: w } : { ok: false, message: 'Create a workspace first.' }
+  },
 }))
 
 vi.mock('@sahoda/publishing', () => ({
@@ -89,6 +107,7 @@ const call = () =>
 
 beforeEach(() => {
   state.userId = 'user_1'
+  state.workspaceUnreadable = false
   state.clientPresent = true
   state.workspace = { id: 'ws-1', name: 'Chai & Chapters' }
   state.slots = { count: 0, keys: new Set<string>() }
@@ -165,5 +184,53 @@ describe('the channels plan limit is enforced before the consent screen', () => 
     expect(body.ok).toBe(true)
     expect(body.authUrl).toBe('https://zernio.example/consent')
     expect(state.profileEnsured).toBe(1)
+  })
+})
+
+/**
+ * A 4xx SAYING "CREATE A WORKSPACE FIRST" FOR A READ THAT BROKE.
+ *
+ * Run 23 split the workspace read into three arms and stated plainly that the
+ * route handlers were NOT audited — "a gap, not a clean bill". This is what the
+ * gap held: the handler took the two-way lookup, so a Supabase hiccup arrived as
+ * `null` and left as a 400 telling a customer who HAS a workspace to make
+ * another. Twice wrong — the remedy cannot work, and a 4xx blames the caller for
+ * a fault on our side, so the outage is invisible to a 5xx log filter.
+ *
+ * The pair is the claim: two different facts, two different statuses, two
+ * different sentences.
+ */
+describe('the workspace read tells "none" apart from "could not tell"', () => {
+  it('refuses with 400 and the real remedy when the account has no workspace', async () => {
+    state.workspace = null
+
+    const res = await call()
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ message: 'Create a workspace first.' })
+  })
+
+  it('refuses with 503 and never says "create a workspace" when the read failed', async () => {
+    state.workspaceUnreadable = true
+
+    const res = await call()
+
+    // 5xx, because it is our fault and a log filter has to see it.
+    expect(res.status).toBe(503)
+    const body = (await res.json()) as { message: string }
+    // THE WHOLE CLAIM: it must not send someone to create a second workspace.
+    expect(body.message).not.toMatch(/create a workspace/i)
+    expect(body.message).toMatch(/try again/i)
+  })
+
+  it('does not provision a Zernio profile for a workspace it could not read', async () => {
+    state.workspaceUnreadable = true
+
+    await call()
+
+    // `ensureZernioProfile` CREATES a profile at Zernio. Doing that off a read
+    // that failed would leave an orphan for a workspace we never identified.
+    expect(state.profileEnsured).toBe(0)
+    expect(state.connectUrlCalls).toBe(0)
   })
 })

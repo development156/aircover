@@ -18,7 +18,7 @@ import { hasLink } from '@/lib/posts/detect-link'
 import { parseExtras } from '@/lib/posts/variant-extras'
 import type { DeleteState, SaveState } from '@/lib/posts/state'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 
 /**
  * Post CRUD. `posts` / `post_variants` carry full member CRUD policies, so these
@@ -38,8 +38,9 @@ export async function createPost(title: string): Promise<SaveState> {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to create a post.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     const trimmed = title.trim()
@@ -86,8 +87,9 @@ export async function savePost(postId: string, patch: unknown): Promise<SaveStat
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to save this post.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     // NARROWER than PostUpdateSchema on purpose. The shared schema also admits
@@ -194,8 +196,9 @@ export async function saveVariant(
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to save this variant.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     const parsedChannel = ChannelSchema.safeParse(channel)
@@ -252,8 +255,9 @@ export async function deletePost(postId: string): Promise<DeleteState> {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to delete this post.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     const supabase = createServerSupabase()

@@ -6,7 +6,7 @@ import { ThemeTokensSchema } from '@sahoda/shared'
 
 import { themeTokensFrom } from '@/lib/brand/brand-theme'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 
 export type SaveThemeState = { ok: true } | { ok: false; message: string }
 
@@ -31,8 +31,9 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to save your theme.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    const workspace = ws.workspace
 
     // The palette comes from client-side extraction, so it is untrusted input:
     // a degenerate or non-string list would derive a broken token set and

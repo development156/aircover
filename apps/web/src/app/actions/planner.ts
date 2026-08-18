@@ -8,7 +8,7 @@ import { reportServerError } from '@/lib/observability/report'
 import { APPROVABLE_FROM } from '@/lib/planner/transitions'
 import type { ApproveState } from '@/lib/planner/state'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 
 const CANNOT_APPROVE = "Can't approve this post from its current state — reload to see where it is."
 
@@ -28,8 +28,9 @@ export async function approvePost(postId: string): Promise<ApproveState> {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to approve this post.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     const supabase = createServerSupabase()

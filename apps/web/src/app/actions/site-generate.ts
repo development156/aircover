@@ -22,7 +22,7 @@ import { countSites } from '@/lib/sites/read'
 import { draftSlug } from '@/lib/sites/slug'
 import type { GenerateSiteState } from '@/lib/sites/state'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 
 /** Model-input caps — same reasoning as plan-week's GOALS_MAX_CHARS. */
 const NAME_MAX_CHARS = 80
@@ -76,10 +76,14 @@ export async function generateSite(name: unknown, goal: unknown): Promise<Genera
     const { userId } = await auth()
     if (!userId) return { ok: false, insufficient: false, message: 'Sign in to generate a site.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) {
-      return { ok: false, insufficient: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) {
+      // `insufficient: false` because nothing was charged and nothing could be —
+      // there is no wallet to charge. The MESSAGE is the part that was wrong: on
+      // an unreadable read it told someone with a workspace to make another.
+      return { ok: false, insufficient: false, message: ws.message }
     }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     // Parse BEFORE the callback — never reserve credits for garbage.

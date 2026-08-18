@@ -6,7 +6,7 @@ import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { readConnectionSlots } from '@/lib/connections/read'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { readActiveWorkspace } from '@/lib/workspaces'
 import { zernioClient, zernioReturnUrl } from '@/lib/zernio/server'
 
 /**
@@ -61,8 +61,25 @@ export async function POST(request: Request): Promise<Response> {
       return fail('Connecting isn’t available right now — the publishing key isn’t set.', 503)
     }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return fail('Create a workspace first.', 400)
+    /**
+     * ── A 400 SAYING "CREATE A WORKSPACE FIRST" FOR A READ THAT BROKE ───────────
+     * The workspace lookup used to return null for BOTH "this account has no
+     * workspace" and "the workspace read failed" — the conflation run 23 split at
+     * the reader. The handlers were named as unaudited then, and this is what it
+     * cost here: a Supabase hiccup told a customer who HAS a workspace to create
+     * one, under a 4xx that blames them for a fault on our side. A log reader
+     * filtering 5xx saw nothing; the outage read as a client error.
+     *
+     * `none` keeps its 400 — the request genuinely cannot be served and the remedy
+     * is real. `unreadable` is a 503: our side, transient, and retrying is the only
+     * honest advice.
+     */
+    const workspaceRead = await readActiveWorkspace()
+    if (workspaceRead.status === 'unreadable') {
+      return fail('Couldn’t check your workspace just now — try again.', 503)
+    }
+    if (workspaceRead.status === 'none') return fail('Create a workspace first.', 400)
+    const workspace = workspaceRead.workspace
     workspaceId = workspace.id
 
     // ── THE CHANNELS PLAN LIMIT, ENFORCED BEFORE THE CONSENT SCREEN ──────────

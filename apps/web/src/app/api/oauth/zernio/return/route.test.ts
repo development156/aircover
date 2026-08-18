@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({
   userId: 'user_1' as string | null,
+  /** The workspace READ failed — distinct from having none. */
+  workspaceUnreadable: false,
   clientPresent: true,
   workspace: { id: 'ws-1', name: 'Chai & Chapters' } as { id: string; name: string } | null,
   mapping: { profile_id: '6a75cae32853ee463c6419d6' } as { profile_id: string } | null,
@@ -47,6 +49,22 @@ vi.mock('@/lib/zernio/server', () => ({
 
 vi.mock('@/lib/workspaces', () => ({
   getActiveWorkspace: () => Promise.resolve(state.workspace),
+  // The THREE-way read the handlers now branch on. `state.workspace` null is the
+  // `none` arm; the `unreadable` arm has its own test rather than a shared flag,
+  // because it is the arm that used to be indistinguishable.
+  readActiveWorkspace: async () => {
+    if (state.workspaceUnreadable) return { status: 'unreadable' }
+    const w = await Promise.resolve(state.workspace)
+    return w ? { status: 'ok', workspace: w } : { status: 'none' }
+  },
+  // Derived from the SAME value the two-way mock returns, so every assertion in
+  // this file still means what it meant. `workspaceForWrite` carries the REFUSAL
+  // SENTENCE as well as the workspace — the split run 24 made, because "Create a
+  // workspace first." was being said to people who had one.
+  workspaceForWrite: async () => {
+    const w = await Promise.resolve(state.workspace)
+    return w ? { ok: true, workspace: w } : { ok: false, message: 'Create a workspace first.' }
+  },
 }))
 
 vi.mock('@/lib/observability/report', () => ({ reportServerError: () => Promise.resolve() }))
@@ -106,6 +124,7 @@ const call = () =>
 
 beforeEach(() => {
   state.userId = 'user_1'
+  state.workspaceUnreadable = false
   state.clientPresent = true
   state.workspace = { id: 'ws-1', name: 'Chai & Chapters' }
   state.mapping = { profile_id: '6a75cae32853ee463c6419d6' }
@@ -439,5 +458,51 @@ describe('the query string is still ignored wholesale', () => {
     expect(res.status).toBe(303)
     expect(res.headers.get('location')).not.toContain('deadbeef')
     expect(res.headers.get('location')).not.toContain('faceface')
+  })
+})
+
+/**
+ * THE STATUS LINE IS THIS ROUTE'S WHOLE OBSERVABILITY STORY.
+ *
+ * This file exists in its current shape because a failed connect leaving as a
+ * 303 was invisible to a 4xx/5xx log filter — twenty-four hours of logs could
+ * not answer whether a customer had failed to connect. A 400 on a read that
+ * BROKE is the same lie one class down: it says the request was wrong when our
+ * database did not answer, so the outage reads as a client error.
+ *
+ * Run 23 named the handlers as unaudited. This is what that gap held.
+ */
+describe('a broken workspace read is not a missing workspace', () => {
+  it('answers 400 when the account genuinely has none', async () => {
+    state.workspace = null
+
+    const res = await call()
+
+    expect(res.status).toBe(400)
+    expect(res.headers.get('location')).toContain('reason=no-workspace')
+  })
+
+  it('answers 503, not 400, when the workspace read failed', async () => {
+    state.workspaceUnreadable = true
+
+    const res = await call()
+
+    // 5xx: ours, transient, and a log filter must see it.
+    expect(res.status).toBe(503)
+    expect(res.headers.get('location')).toContain('reason=workspace-unreadable')
+    // The VISIBLE status stays `error`, because ConnectOutcomeNotice matches an
+    // allowlist and renders nothing for a value it does not know — a sixth
+    // status here would have shown the customer no notice at all.
+    expect(res.headers.get('location')).toContain('zernio=error')
+  })
+
+  it('the two answers are not the same answer', async () => {
+    state.workspace = null
+    const none = await call()
+    state.workspace = { id: 'ws-1', name: 'W' }
+    state.workspaceUnreadable = true
+    const unreadable = await call()
+
+    expect(none.status).not.toBe(unreadable.status)
   })
 })

@@ -33,7 +33,7 @@ import { getPost } from '@/lib/posts/read'
 import { filterVariants } from '@/lib/posts/filter-variants'
 import { newCaptionRewriteRef, newVariantsObjectRef } from '@/lib/posts/object-ref'
 import type { GenerateState, GeneratedVariant, RewriteState } from '@/lib/posts/state'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 
 // 'use server' modules may export only async functions — these singletons stay
 // module-private. Built lazily so a missing key surfaces as a typed error inside
@@ -73,10 +73,14 @@ export async function generateVariants(postId: string, channels: unknown): Promi
       return { ok: false, insufficient: false, message: 'Sign in to generate variants.' }
     }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) {
-      return { ok: false, insufficient: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) {
+      // `insufficient: false` because nothing was charged and nothing could be —
+      // there is no wallet to charge. The MESSAGE is the part that was wrong: on
+      // an unreadable read it told someone with a workspace to make another.
+      return { ok: false, insufficient: false, message: ws.message }
     }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     const post = await getPost(postId)
@@ -226,10 +230,14 @@ export async function rewriteCaption(
       return { ok: false, insufficient: false, message: 'Sign in to rewrite this caption.' }
     }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) {
-      return { ok: false, insufficient: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) {
+      // `insufficient: false` because nothing was charged and nothing could be —
+      // there is no wallet to charge. The MESSAGE is the part that was wrong: on
+      // an unreadable read it told someone with a workspace to make another.
+      return { ok: false, insufficient: false, message: ws.message }
     }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     // captionRewriteTask's schemas are not re-exported from @sahoda/mesh — the

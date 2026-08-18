@@ -21,7 +21,7 @@ import { newImageGenerateRef } from '@/lib/posts/object-ref'
 import { getPost, listMedia } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 
 // 'use server' modules may export only async functions — these singletons stay
 // module-private. Built lazily so a missing key surfaces as a typed error inside
@@ -81,8 +81,9 @@ export async function generateImage(postId: string, input: unknown): Promise<Gen
     const { userId } = await auth()
     if (!userId) return { ok: false, insufficient: false, message: 'Sign in to generate an image.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, insufficient: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, insufficient: false, message: ws.message }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     const post = await getPost(postId)

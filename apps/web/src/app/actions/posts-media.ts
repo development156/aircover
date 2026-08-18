@@ -14,7 +14,7 @@ import { getPost, listMedia } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import type { AttachMediaState, DetachMediaState } from '@/lib/posts/media-state'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 
 /**
  * Attach a file to a post.
@@ -41,8 +41,9 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to attach media.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    const workspace = ws.workspace
     workspaceId = workspace.id
     workspaceId = workspace.id
 
@@ -157,8 +158,9 @@ export async function detachMedia(mediaId: string): Promise<DetachMediaState> {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to remove media.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    const workspace = ws.workspace
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase

@@ -17,6 +17,14 @@ const rpc = vi.fn()
 vi.mock('@clerk/nextjs/server', () => ({ auth: vi.fn(async () => ({ userId: 'user_1' })) }))
 vi.mock('@/lib/workspaces', () => ({
   getActiveWorkspace: vi.fn(async () => ({ id: 'ws_1', slug: 'ws', name: 'Workspace' })),
+  // Derived from the SAME value the two-way mock returns, so every assertion in
+  // this file still means what it meant. `workspaceForWrite` carries the REFUSAL
+  // SENTENCE as well as the workspace — the split run 24 made, because "Create a
+  // workspace first." was being said to people who had one.
+  workspaceForWrite: async () => {
+    const w = await Promise.resolve({ id: 'ws_1', slug: 'ws', name: 'Workspace' })
+    return w ? { ok: true, workspace: w } : { ok: false, message: 'Create a workspace first.' }
+  },
 }))
 vi.mock('@/lib/supabase/server', () => ({ createServerSupabase: () => ({ rpc }) }))
 vi.mock('@/lib/observability/report', () => ({ reportServerError: vi.fn() }))

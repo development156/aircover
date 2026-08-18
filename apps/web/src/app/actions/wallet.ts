@@ -6,7 +6,7 @@ import { PlanIdSchema } from '@sahoda/shared'
 
 import { env } from '@/lib/env'
 import { reportServerError } from '@/lib/observability/report'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 import type { CheckoutState } from '@/lib/wallet/checkout-state'
 import { currentBillingPeriod } from '@/lib/wallet/checkout-state'
 
@@ -56,8 +56,9 @@ export async function startCheckout(planId: unknown): Promise<CheckoutState> {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to top up credits.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     const parsedPlan = PlanIdSchema.safeParse(planId)

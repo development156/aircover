@@ -133,3 +133,34 @@ export async function getActiveWorkspace(): Promise<WorkspaceOption | null> {
  * whether a workspace exists.
  */
 export const activeWorkspaceRead = cache(readActiveWorkspace)
+
+/**
+ * ── WHAT A WRITE PATH SHOULD REFUSE WITH ─────────────────────────────────────
+ * Run 23 classified the write actions as CORRECT on the grounds that a mutation
+ * refuses on both arms, so collapsing them costs it nothing. That is true of the
+ * DECISION and false of the SENTENCE. Every one of them refuses with
+ *
+ *     "Create a workspace first."
+ *
+ * and on the unreadable arm that is a remedy the customer cannot carry out —
+ * they already have a workspace, and making a second one would not help. It is
+ * the same defect the pages were cleared of, surviving in the toast.
+ *
+ * One helper rather than twenty-three branches, because the point of splitting
+ * the reader was to stop each caller deciding this for itself.
+ */
+export const WRITE_NO_WORKSPACE = 'Create a workspace first.'
+export const WRITE_WORKSPACE_UNREADABLE = 'Couldn’t check your workspace just now — try again.'
+
+export type WriteWorkspace =
+  { ok: true; workspace: WorkspaceOption } | { ok: false; message: string }
+
+/** The workspace to write into, or the sentence to refuse with. Never both. */
+export async function workspaceForWrite(): Promise<WriteWorkspace> {
+  const read = await readActiveWorkspace()
+  if (read.status === 'ok') return { ok: true, workspace: read.workspace }
+  return {
+    ok: false,
+    message: read.status === 'none' ? WRITE_NO_WORKSPACE : WRITE_WORKSPACE_UNREADABLE,
+  }
+}

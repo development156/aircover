@@ -56,6 +56,14 @@ vi.mock('@clerk/nextjs/server', () => ({
 
 vi.mock('@/lib/workspaces', () => ({
   getActiveWorkspace: () => Promise.resolve(state.workspace),
+  // Derived from the SAME value the two-way mock returns, so every assertion in
+  // this file still means what it meant. `workspaceForWrite` carries the REFUSAL
+  // SENTENCE as well as the workspace — the split run 24 made, because "Create a
+  // workspace first." was being said to people who had one.
+  workspaceForWrite: async () => {
+    const w = await Promise.resolve(state.workspace)
+    return w ? { ok: true, workspace: w } : { ok: false, message: 'Create a workspace first.' }
+  },
 }))
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))

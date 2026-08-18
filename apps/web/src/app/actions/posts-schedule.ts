@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 
 /**
  * Arm, move and cancel a scheduled post.
@@ -63,8 +63,9 @@ export async function schedulePost(
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to schedule this post.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     const when = new Date(iso)
@@ -100,8 +101,9 @@ export async function cancelSchedule(postId: string): Promise<ScheduleState> {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to change this post.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return { ok: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     const supabase = createServerSupabase()

@@ -31,7 +31,7 @@ import { normalizeSlot } from '@/lib/planner/slots'
 import type { PlanWeekState } from '@/lib/planner/state'
 import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 
 /** Goals are model input — cap what one click can stuff into a paid prompt. */
 const GOALS_MAX_CHARS = 500
@@ -69,10 +69,14 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
     const { userId } = await auth()
     if (!userId) return { ok: false, insufficient: false, message: 'Sign in to plan your week.' }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) {
-      return { ok: false, insufficient: false, message: 'Create a workspace first.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) {
+      // `insufficient: false` because nothing was charged and nothing could be —
+      // there is no wallet to charge. The MESSAGE is the part that was wrong: on
+      // an unreadable read it told someone with a workspace to make another.
+      return { ok: false, insufficient: false, message: ws.message }
     }
+    const workspace = ws.workspace
     workspaceId = workspace.id
 
     // Parse BEFORE the withCredits callback: runTask does not validate input,

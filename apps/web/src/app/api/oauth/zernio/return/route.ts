@@ -6,7 +6,7 @@ import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { connectionKey, readConnectionSlots } from '@/lib/connections/read'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { readActiveWorkspace } from '@/lib/workspaces'
 import { zernioClient } from '@/lib/zernio/server'
 
 /**
@@ -144,8 +144,26 @@ export async function GET(request: Request): Promise<Response> {
     // The rail is not provisioned in this environment — ours to fix, not the user's.
     if (!client) return fail(503, 'unavailable')
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return fail(400, 'no-workspace')
+    /**
+     * ── THE SAME CONFLATION, AND HERE IT MISLABELS AN OUTAGE ───────────────────
+     * The workspace lookup returned null for "no workspace" AND for "the read
+     * failed", so a broken query left this route as a 400 tagged `no-workspace`.
+     * This file exists in its current shape precisely because a failure that
+     * leaves as a success status is invisible to a log filter — and a 4xx on a
+     * server-side read failure is the same lie one class down: it says the
+     * customer's request was wrong when our database did not answer.
+     *
+     * 503, and the visible status stays `error`: `ConnectOutcomeNotice` matches
+     * an ALLOWLIST and renders nothing for a value it does not know, so inventing
+     * a sixth status here would silently show the customer no notice at all. The
+     * truth rides in the HTTP status and in `reason`, which is what the log reader
+     * needs; `error`'s copy — "Nothing was changed. Try connecting the channel
+     * again." — is true of this case and is the right advice for it.
+     */
+    const workspaceRead = await readActiveWorkspace()
+    if (workspaceRead.status === 'unreadable') return fail(503, 'workspace-unreadable')
+    if (workspaceRead.status === 'none') return fail(400, 'no-workspace')
+    const workspace = workspaceRead.workspace
     workspaceId = workspace.id
 
     const supabase = createServerSupabase()

@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 
 import { reportServerError } from '@/lib/observability/report'
 import { readDoorStreaming, type Stage } from '@/lib/onboarding/read-door'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { readActiveWorkspace } from '@/lib/workspaces'
 
 /**
  * The door, streamed.
@@ -32,8 +32,28 @@ export async function POST(request: Request): Promise<Response> {
     const { userId } = await auth()
     if (!userId) return Response.json({ error: 'signed_out' }, { status: 401 })
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return Response.json({ error: 'no_workspace' }, { status: 400 })
+    /**
+     * ── `no_workspace` WAS ALSO SAYING "THE READ BROKE" ────────────────────────
+     * The lookup returned null for both, so a failed workspace query left here as
+     * a 400 tagged `no_workspace`: a client-error status, and a named cause that
+     * was not the cause. Run 23 split this at the reader and named the handlers as
+     * unaudited; this is one of them.
+     *
+     * The caller collapses every non-ok into one sentence — "We could not read
+     * that — tell us in your own words instead" — which is a claim about the SITE
+     * the customer submitted. It is wrong for both arms and it lives in
+     * components/onboarding, which is out of scope for this run, so it is reported
+     * rather than touched. What changes here is the only thing in reach: the
+     * status a log reader sees, and the cause it is given.
+     */
+    const workspaceRead = await readActiveWorkspace()
+    if (workspaceRead.status === 'unreadable') {
+      return Response.json({ error: 'workspace_unreadable' }, { status: 503 })
+    }
+    if (workspaceRead.status === 'none') {
+      return Response.json({ error: 'no_workspace' }, { status: 400 })
+    }
+    const workspace = workspaceRead.workspace
 
     const form = await request.formData()
     const file = form.get('pdf')
