@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Check, Image as ImageIcon, MapPin, SquarePen } from 'lucide-react'
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { CONSTRAINTS, type Channel, type ChannelSet } from '@sahoda/shared'
 import type { PostMedia } from '@sahoda/shared'
 
@@ -183,6 +183,26 @@ export function CreateFlow({
         setError(saved.message)
         return
       }
+      /**
+       * STAMP THE ID ON THE ENTRY THEY WILL COME BACK TO, before pushing the
+       * next one.
+       *
+       * MEASURED: step 1 → Continue creates post A and pushes
+       * `?step=format&post=A`, but the entry underneath is still the bare
+       * `/create/post` from before A existed. Press Back and then reload — a
+       * phone restoring a tab does exactly this — and the flow starts blank,
+       * Continue creates post B, and A is orphaned with whatever was written on
+       * it. Two drafts, and the half they can see is the empty one.
+       *
+       * `window.history.replaceState`, NOT `router.replace`. MEASURED: a
+       * `router.replace` immediately followed by `router.push` leaves the Back
+       * entry unchanged — the two navigations collapse into the push and the
+       * entry underneath is still the bare `/create/post`. The history API is
+       * supported directly by the App Router (Next 15) and is what this needs:
+       * rewrite the address of the entry we are standing on, with no navigation,
+       * no server round trip and no re-render, then push the next one.
+       */
+      window.history.replaceState(window.history.state, '', href('channel', id))
       router.push(href(next, id))
     })
   }
@@ -200,6 +220,75 @@ export function CreateFlow({
       setSavedAt(new Date().toISOString())
     })
   }
+
+  /**
+   * ── BLUR WAS THE ONLY SAVE, AND A BACK PRESS DOES NOT BLUR ───────────────────
+   * MEASURED: 100 characters typed into the Instagram body, browser Back, then
+   * Forward — 65 came back. The 35 typed since the last blur were gone, and gone
+   * for good, because Forward re-reads the row. On a phone that is the swipe-back
+   * gesture, which is how people leave a screen.
+   *
+   * The comment on this page still says the flow is "backed by a real row" so a
+   * reload cannot discard what was written. That was only ever true of text the
+   * customer had blurred out of.
+   *
+   * Two triggers now, and the pair is the point:
+   *  · a 2s debounce while typing, matching the editor's own autosave, so a
+   *    pause is enough to make the work durable;
+   *  · a flush when this component goes away, which is what a Back press
+   *    actually does in a client-routed app — no unload event fires, so
+   *    `pagehide` would never have caught it.
+   *
+   * Still one row write per edit session in the common case: the timer is reset
+   * on every keystroke, so a continuous typist writes once when they pause.
+   */
+  const AUTOSAVE_MS = 2000
+  /** Latest unsaved body per channel, with its pending timer. */
+  const unsaved = useRef(new Map<Channel, { body: string; timer: ReturnType<typeof setTimeout> }>())
+
+  function clearPending(channel: Channel) {
+    const entry = unsaved.current.get(channel)
+    if (entry) {
+      clearTimeout(entry.timer)
+      unsaved.current.delete(channel)
+    }
+  }
+
+  /** Debounced write. Called on every keystroke; fires once the typing stops. */
+  function scheduleVariant(channel: Channel, body: string) {
+    clearPending(channel)
+    const timer = setTimeout(() => {
+      unsaved.current.delete(channel)
+      persistVariant(channel, body)
+    }, AUTOSAVE_MS)
+    unsaved.current.set(channel, { body, timer })
+  }
+
+  /** Immediate write, cancelling any pending one for the same channel. */
+  function commitVariant(channel: Channel, body: string) {
+    clearPending(channel)
+    persistVariant(channel, body)
+  }
+
+  /**
+   * Flush on the way out. Deliberately calls the action DIRECTLY rather than
+   * through `startTransition` and `persistVariant`: this runs during teardown,
+   * when setting state is both pointless and a warning. The request is already
+   * in flight by the time React finishes unmounting — an SPA back does not tear
+   * the page down, so it completes.
+   *
+   * The ref is read inside the cleanup, so it carries the LAST body typed rather
+   * than whatever was current when the effect was created.
+   */
+  const flushRef = useRef<() => void>(() => {})
+  flushRef.current = () => {
+    for (const [channel, entry] of unsaved.current) {
+      clearTimeout(entry.timer)
+      if (postId) void saveVariant(postId, channel, entry.body, {})
+    }
+    unsaved.current.clear()
+  }
+  useEffect(() => () => flushRef.current(), [])
 
   const canContinue = current !== 'channel' || channels.length > 0
 
@@ -241,8 +330,11 @@ export function CreateFlow({
           <StepContent
             channels={channels}
             bodies={bodies}
-            onChange={(ch, value) => setBodies((prev) => ({ ...prev, [ch]: value }))}
-            onCommit={persistVariant}
+            onChange={(ch, value) => {
+              setBodies((prev) => ({ ...prev, [ch]: value }))
+              scheduleVariant(ch, value)
+            }}
+            onCommit={commitVariant}
             postId={postId}
             media={media}
             previews={previews}
@@ -432,6 +524,26 @@ function StepContent({
 
   return (
     <div className="space-y-4">
+      {/* ── A DEEP LINK LANDS HERE WITH NOTHING BEHIND IT ────────────────────────
+          `/create/post?step=schedule` with no `?post=` is a real address — a
+          bookmark, a shared link, a phone restoring a tab whose id was dropped.
+          MEASURED before this: the step rendered in full, "Schedule" was disabled
+          under the words "Pick a date and time below first" — which is not why it
+          was disabled and picking a time would not have helped — and "Save as
+          draft" said "Already saved · open it in the editor" about a post that
+          did not exist. Two false statements on one screen.
+
+          The step still renders rather than redirecting: silently moving someone
+          to step 1 hides what happened. It says what is missing instead. */}
+      {postId === null ? (
+        <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
+          There&rsquo;s no post to schedule yet &mdash; this link skipped the start of the flow.{' '}
+          <Link href="/create/post" className="font-semibold underline underline-offset-2">
+            Start a post
+          </Link>
+        </p>
+      ) : null}
+
       <div className="grid grid-cols-3 gap-2 max-narrow:grid-cols-1">
         <div className="surface-ring rounded-card bg-surface px-3 py-3">
           <span className="block text-[13px] font-semibold">Start from scratch</span>
@@ -494,9 +606,12 @@ function StepContent({
               data-variant-editor={channel}
               rows={5}
               value={value}
+              // `onChange` now also schedules a debounced write — blur alone lost
+              // everything typed since the last one to a browser Back. See
+              // `scheduleVariant`.
               onChange={(e) => onChange(channel, e.target.value)}
-              // Committed on blur rather than per keystroke: one row write per
-              // edit session instead of one per character.
+              // Blur still writes IMMEDIATELY and cancels the pending timer, so
+              // leaving the field is as durable as it has always been.
               onBlur={(e) => onCommit(channel, e.target.value)}
               placeholder={`Write the ${CHANNEL_LABELS[channel]} version.`}
               className="w-full rounded-input border border-line bg-bg px-3 py-2 text-[13px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -616,6 +731,26 @@ function StepSchedule({
 
   return (
     <div className="space-y-4">
+      {/* ── A DEEP LINK LANDS HERE WITH NOTHING BEHIND IT ────────────────────────
+          `/create/post?step=schedule` with no `?post=` is a real address — a
+          bookmark, a shared link, a phone restoring a tab whose id was dropped.
+          MEASURED before this: the step rendered in full, "Schedule" was disabled
+          under the words "Pick a date and time below first" — which is not why it
+          was disabled and picking a time would not have helped — and "Save as
+          draft" said "Already saved · open it in the editor" about a post that
+          did not exist. Two false statements on one screen.
+
+          The step still renders rather than redirecting: silently moving someone
+          to step 1 hides what happened. It says what is missing instead. */}
+      {postId === null ? (
+        <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
+          There&rsquo;s no post to schedule yet &mdash; this link skipped the start of the flow.{' '}
+          <Link href="/create/post" className="font-semibold underline underline-offset-2">
+            Start a post
+          </Link>
+        </p>
+      ) : null}
+
       <div className="grid grid-cols-3 gap-2 max-narrow:grid-cols-1">
         {/* Publish now — present, inert, and honest about why. */}
         <div
@@ -640,7 +775,14 @@ function StepSchedule({
         >
           <span className="block text-[13px] font-semibold">Schedule</span>
           <span className="mt-1 block text-[11.5px] text-muted">
-            {when ? 'Save this time on the post' : 'Pick a date and time below first'}
+            {/* The reason has to be the REAL one. A disabled control that blames
+                the wrong thing sends the customer to fix something that was
+                never the problem. */}
+            {postId === null
+              ? 'There is no post to schedule'
+              : when
+                ? 'Save this time on the post'
+                : 'Pick a date and time below first'}
           </span>
         </button>
 
@@ -649,9 +791,13 @@ function StepSchedule({
           data-action="draft"
           className="surface-ring rounded-card bg-surface px-3 py-3 text-left transition-micro hover:bg-s2 max-narrow:min-h-[44px]"
         >
-          <span className="block text-[13px] font-semibold">Save as draft</span>
+          <span className="block text-[13px] font-semibold">
+            {postId === null ? 'Back to your posts' : 'Save as draft'}
+          </span>
           <span className="mt-1 block text-[11.5px] text-muted">
-            Already saved · open it in the editor
+            {/* "Already saved" is a claim, and with no post there is nothing it
+                could be true of. */}
+            {postId === null ? 'Nothing was started here' : 'Already saved · open it in the editor'}
           </span>
         </Link>
       </div>
