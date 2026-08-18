@@ -85,10 +85,24 @@ export async function Topbar() {
           so it reappears here. Hidden ≥768px, where the rail carries the full
           lockup and a second mark would be a duplicate. */}
       <MobileHeaderMark />
-      {/* min-w-0 is load-bearing: a flex item defaults to min-width:auto and
-          refuses to shrink below its content, so without it the switcher pushed
-          the credit pill and avatar off the right edge at 375px. */}
-      <div className="min-w-0">
+      {/* ── min-w-0 SHRANK THE SLOT BELOW THE CONTROL INSIDE IT ─────────────────
+          `min-w-0` was added so a long workspace name could not push the credit
+          pill and avatar off the right edge at 375px. It let the SLOT shrink —
+          but the control inside is `shrink-0`, so the slot went narrower than the
+          control and the control painted outside it, under whichever sibling was
+          drawn next.
+
+          MEASURED with no workspace: the slot was 105px and "Create workspace"
+          164px, so it spilled 59px — the credit pill covered 51px of it at 390px
+          and 11px at 430px, and the command palette 52px at 700px. Hiding the
+          pill on a phone moved the collision rather than ending it; this is where
+          it actually lives.
+
+          `shrink-0` is safe here in a way it was not when that comment was
+          written: the switcher's trigger now carries its own `max-w-[16ch]
+          truncate` (`7ch` below 700px), so this slot is bounded by its control at
+          every width and can no longer be the thing that overflows. */}
+      <div className="shrink-0">
         <WorkspaceSwitcher
           workspaces={workspaces}
           active={active}
@@ -106,6 +120,13 @@ export async function Topbar() {
       {/* The reference's right cluster ends icon, then avatar. The dark theme
           was fully built and completely unreachable until this button existed —
           see ThemeToggle. */}
+      {/* `ml-auto` below 700px, because the element that used to do the pushing
+          is not there. `CommandPalette` carries `mx-auto` and absorbs the free
+          space at ≥700px, but it is `max-narrow:hidden` — and once the credit
+          pill also steps aside (no workspace, narrow), nothing was left to fill
+          the row and the toggle and avatar drifted 74px short of the edge.
+          MEASURED: last control right=316 in a 390px viewport. */}
+      <div className="max-narrow:ml-auto" />
       <ThemeToggle />
       <div
         data-guide="topbar.avatar"

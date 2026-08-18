@@ -76,8 +76,28 @@ const DETECTOR = `(() => {
   return hits
 })()`
 
-/** Reachable with a seeded account that has no workspace yet. */
-const ROUTES = ['/home', '/posts', '/planner', '/wallet', '/settings', '/connections', '/inbox']
+/**
+ * Reachable with a seeded account that has no workspace yet.
+ *
+ * The four /settings tabs joined this list when the overflow half of it caught a
+ * real one: a 48-character sign-in address ran /settings/profile 3px past the
+ * viewport at 390px and the page scrolled sideways. The row's control slot was
+ * `flex-none` and the slot holds customer data. Only /settings itself was
+ * covered, and the address lives on /settings/profile — so the guard was one
+ * route short of the bug for four passes.
+ */
+const ROUTES = [
+  '/home',
+  '/posts',
+  '/planner',
+  '/wallet',
+  '/settings',
+  '/settings/profile',
+  '/settings/plan',
+  '/settings/integrations',
+  '/connections',
+  '/inbox',
+]
 
 test.describe('no truncated labels at 390px @smoke', () => {
   /**
@@ -142,6 +162,89 @@ test.describe('no truncated labels at 390px @smoke', () => {
         `${route} scrolls horizontally at 390px (${overflow.scrollW}px of content). ` +
           `A nowrap/shrink-0 fix has pushed the row wider than the screen — carry fewer items instead.`,
       ).toBeLessThanOrEqual(overflow.innerW + 1)
+    })
+  }
+})
+
+/**
+ * THE OTHER HALF OF THE SAME BUG, WHICH NEITHER CHECK ABOVE COULD SEE.
+ *
+ * The CLIPPED check needs `overflow: hidden`; the WRAPPED check needs two lines;
+ * the page-overflow check needs the document to grow. A control that paints
+ * OUTSIDE its own slot, under the sibling drawn after it, trips none of them —
+ * the boxes are all the size they claim to be and the document never widens.
+ *
+ * MEASURED on a seeded account with no workspace: the switcher's slot was 105px
+ * and "Create workspace" inside it 164px, because the slot carried `min-w-0` and
+ * the button `shrink-0`. The credit pill covered 51px of that button at 390px,
+ * 11px at 430px, and the command palette 52px of it at 700px. The screenshot read
+ * "Create work" with a pill sitting on the rest of the word.
+ *
+ * Both assertions together, because each fix is the other's failure mode: end the
+ * overlap by refusing to shrink and the avatar goes 45px off-screen instead
+ * (measured, at 390px, when only the slot was fixed). Neither may be bought with
+ * the other.
+ *
+ * 700px is in the list on purpose — it is the `narrow` breakpoint, where the
+ * command palette appears and the row gains an item.
+ */
+test.describe('the topbar controls neither overlap nor leave the screen @smoke', () => {
+  for (const width of [390, 430, 700, 1440]) {
+    test(`topbar at ${width}px`, async ({ page, signedIn }) => {
+      expect(signedIn).toBeTruthy()
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/home')
+      await page.waitForLoadState('networkidle')
+
+      const geometry = await page.evaluate(() => {
+        const controls = [
+          ...document.querySelectorAll('header button, header a, header [role="status"]'),
+        ]
+          .filter((e) => {
+            const cs = getComputedStyle(e)
+            // Run 22's retraction: a display:none child reports x:0 right:0 w:0
+            // and "overlaps" everything. Only painted boxes are compared.
+            return (
+              cs.display !== 'none' &&
+              cs.visibility !== 'hidden' &&
+              e.getBoundingClientRect().width > 0
+            )
+          })
+          .map((e) => {
+            const r = e.getBoundingClientRect()
+            return {
+              label:
+                (e as HTMLElement).innerText.replace(/\s+/g, ' ').trim().slice(0, 24) || e.tagName,
+              x: Math.round(r.x),
+              right: Math.round(r.right),
+            }
+          })
+          .sort((a, b) => a.x - b.x)
+
+        const overlaps: string[] = []
+        for (let i = 0; i < controls.length - 1; i++) {
+          const a = controls[i]!
+          const b = controls[i + 1]!
+          if (a.right > b.x + 0.5) {
+            overlaps.push(`"${a.label}" ends at ${a.right}, "${b.label}" starts at ${b.x}`)
+          }
+        }
+        return {
+          overlaps,
+          pastEdge: controls
+            .filter((c) => c.right > window.innerWidth + 1)
+            .map((c) => `"${c.label}" ends at ${c.right} in a ${window.innerWidth}px viewport`),
+        }
+      })
+
+      expect(
+        geometry.overlaps,
+        `Topbar controls overlap at ${width}px — one is painting outside its own slot:\n  ${geometry.overlaps.join('\n  ')}`,
+      ).toEqual([])
+      expect(
+        geometry.pastEdge,
+        `Topbar controls sit off-screen at ${width}px. Carry FEWER things, not smaller ones:\n  ${geometry.pastEdge.join('\n  ')}`,
+      ).toEqual([])
     })
   }
 })

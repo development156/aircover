@@ -1,7 +1,12 @@
 import { Suspense } from 'react'
 import type { Channel } from '@sahoda/shared'
 
+import { SquarePen } from 'lucide-react'
+
 import { CreateFlow } from '@/components/create/create-flow'
+import { EmptyState } from '@/components/empty-state'
+import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
+import { readActiveWorkspace } from '@/lib/workspaces'
 import { listConnectedChannels } from '@/lib/connections/read'
 import { getPost, listMedia, listVariants } from '@/lib/posts/read'
 import { signMediaPreviews } from '@/lib/posts/media-url'
@@ -33,6 +38,28 @@ export default async function CreatePostPage({
   searchParams: Promise<{ post?: string; step?: string }>
 }) {
   const { post: postId } = await searchParams
+
+  /**
+   * ── THE FIVE-STEP FLOW OFFERED TO AN ACCOUNT THAT CANNOT SAVE A POST ────────
+   * MEASURED on a seeded account with no workspace: /create/post rendered all
+   * five steps and every channel chip. `createPost` refuses with "Create a
+   * workspace first." — correctly — but only AFTER the channels are picked and
+   * Continue is pressed, so the refusal arrives at the end of the work rather
+   * than before it. That is the same surprise `ConnectFirstNote` exists to
+   * prevent one layer up, and the same one this page's own comment describes
+   * about learning at Publish that no account was attached.
+   */
+  const workspace = await readActiveWorkspace()
+  if (workspace.status === 'none') {
+    return (
+      <EmptyState
+        icon={SquarePen}
+        title="Create a workspace to start writing"
+        body="A post belongs to a workspace and you don't have one yet. Nothing failed — there is simply nowhere to keep what you write until one exists."
+        action={<CreateWorkspaceButton variant="primary" />}
+      />
+    )
+  }
 
   // `listConnectedChannels` already answers "what can publish right now" —
   // active rows only, null-safe. Re-filtering listConnections() here would be a

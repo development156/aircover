@@ -17,12 +17,27 @@ export function SettingRow({
   control?: React.ReactNode
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-line-soft py-[13px] last:border-b-0">
+    /**
+     * `flex-wrap` and a `min-w-0` control slot, because the control slot holds
+     * CUSTOMER DATA and `flex-none` sizes to it unconditionally.
+     *
+     * MEASURED at 390px on a seeded account: a 48-character sign-in address ran
+     * the row 3px past the card and the whole page scrolled sideways. The QA
+     * account's address is 29 characters, which is why four passes never saw it
+     * — the same blind spot the no-workspace states sit in.
+     *
+     * This is run 20's guard note read in the other direction: `flex-none` is
+     * the cure for a label that wraps, and applied to an item that can be any
+     * length it stops the wrap by pushing the row off-screen instead. A value
+     * that will not fit drops to its own line; a button, which is short and
+     * fixed, never reaches that point and keeps its size.
+     */
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-line-soft py-[13px] last:border-b-0">
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-[650] text-ink">{label}</p>
         {hint ? <p className="mt-1 text-[12px] text-muted">{hint}</p> : null}
       </div>
-      {control ? <div className="flex-none">{control}</div> : null}
+      {control ? <div className="min-w-0 max-w-full break-words">{control}</div> : null}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { SlidersHorizontal } from 'lucide-react'
 import { WorkspaceNameField } from '@/components/settings/workspace-name-field'
 
 import { EmptyState } from '@/components/empty-state'
+import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { SettingCard, SettingRow } from '@/components/settings/setting-row'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
@@ -23,6 +24,11 @@ export default async function SettingsPage() {
         icon={SlidersHorizontal}
         title="Nothing to configure yet"
         body="Settings belong to a workspace and you don't have one yet. Nothing failed — there is simply nothing to show until one exists."
+        // MEASURED across all 19 routes on a seeded account: this was the ONE
+        // no-workspace screen that named the remedy and then did not offer it.
+        // /home, /posts, /planner, /wallet, /connections and /sites all put the
+        // button right there; here the reader had to know to go elsewhere.
+        action={<CreateWorkspaceButton variant="primary" />}
       />
     )
   }

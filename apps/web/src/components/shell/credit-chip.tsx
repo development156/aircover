@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import type { BalanceRead } from '@/lib/wallet/read'
+import { cn } from '@/lib/utils'
 
 // Credit chip per docs/08 §6: pill, 1.5px --p border, tabular number, click →
 // wallet. The number is AVAILABLE credits (total − held) — the same figure the
@@ -49,6 +50,31 @@ function contentFor(balance: BalanceRead): ChipContent {
 export function CreditChip({ balance }: { balance: BalanceRead }) {
   const content = contentFor(balance)
 
+  /**
+   * ── TWO CONTROLS SAYING THE SAME THING, IN 390px ─────────────────────────────
+   * MEASURED on a seeded account with no workspace: "Create workspace" painted to
+   * x=212 while this pill starts at x=161 — 51px of the button covered, 11px at
+   * 430px. Neither element is at fault on its own. `min-w-0` lets the switcher
+   * slot shrink; the button inside is `shrink-0` and does not, so it spills past
+   * its own wrapper and this pill, painted later, lands on top of it.
+   *
+   * That is the second half of a trap this repo already wrote down: the cure for
+   * a wrapping label is `whitespace-nowrap` + `shrink-0`, and applied to a row
+   * that is already full it converts the wrap into an overflow. Run 20 fixed the
+   * wrap on this exact button; this is what the fix turned into.
+   *
+   * Run 13's rule — carry FEWER things, not smaller ones. On a phone with no
+   * workspace, "No wallet yet" and "Create workspace" are the same sentence twice
+   * and only one of them can be pressed to fix it. The brain ring already
+   * disappears entirely in this state for the same reason (see topbar.test.tsx:
+   * "a nudge here would point at a page that cannot work yet"); this is the
+   * sibling that kept its place.
+   *
+   * NARROW ONLY. At ≥700px both fit with room to spare and the pill is a useful
+   * standing reminder, so nothing is taken away where nothing was wrong.
+   */
+  const hideOnNarrow = balance.status === 'no-workspace'
+
   // `flex-none whitespace-nowrap` below for the same reason as the brain ring
   // beside it — see that component. This chip reads "100 credits" for a funded
   // workspace and never wrapped in testing, but its `no-workspace` state is the
@@ -61,7 +87,10 @@ export function CreditChip({ balance }: { balance: BalanceRead }) {
       data-guide="topbar.credits"
       aria-live="polite"
       aria-label={content.label}
-      className="flex flex-none items-center gap-[7px] rounded-pill border-[1.5px] border-primary bg-bg px-[13px] py-1.5 font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] max-narrow:min-h-[44px] dark:hover:bg-s2"
+      className={cn(
+        'flex flex-none items-center gap-[7px] rounded-pill border-[1.5px] border-primary bg-bg px-[13px] py-1.5 font-semibold whitespace-nowrap transition-micro hover:bg-tint-50 active:scale-[.97] max-narrow:min-h-[44px] dark:hover:bg-s2',
+        hideOnNarrow && 'max-narrow:hidden',
+      )}
     >
       {/* `.num` (tokens.css v3: mono + tabular-nums) only where there is a
           number to align — v3 puts mono in exactly three places and the topbar
