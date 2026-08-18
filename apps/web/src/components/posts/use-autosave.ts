@@ -228,9 +228,42 @@ export function useAutosave(postId: string, post: Post): AutosaveApi {
     evaluateRead(post)
   }, [post, evaluateRead])
 
+  /**
+   * ── THE CLEANUP CANCELLED THE WRITE INSTEAD OF MAKING IT ─────────────────────
+   * This used to `clearTimeout` and stop, which throws away whatever was typed
+   * inside the debounce window. MEASURED on a real post: type into the body,
+   * press browser Back within 2s, come back — the field is EMPTY. Wait past the
+   * 2s and do exactly the same thing and the text is there. A client-routed Back
+   * fires no unload event, so nothing else was ever going to catch it.
+   *
+   * Flushing here is safe rather than racy: `flush` cancels the timer itself and
+   * `enqueue` serialises on the same promise chain every other write uses, so
+   * this cannot overtake or duplicate an in-flight save.
+   *
+   * ── WHAT THIS DOES *NOT* CLOSE, MEASURED ─────────────────────────────────────
+   * The browser case is STILL LOST and this is not the fix for it. With this in
+   * place, typing into the body and pressing browser Back inside the 2s window
+   * still comes back empty. A direct `savePost` in the cleanup, bypassing the
+   * chain, did not change that either — so the likeliest reading is that a Back
+   * out of /posts/[id] does not unmount this hook at all (Next keeps the segment
+   * in its router cache), which means no teardown hook of any kind can catch it.
+   * Reported, not claimed fixed.
+   *
+   * What this DOES change is that the cleanup no longer DISCARDS a pending
+   * write. It used to `clearTimeout` and stop, so any genuine unmount inside the
+   * window threw the edit away; now it writes it. That is strictly safer and is
+   * unit-proven both ways — it writes what is pending, and writes nothing when
+   * nothing is.
+   *
+   * `flushRef` rather than `flush` in the dependency list on purpose: the effect
+   * must run ONCE and its cleanup must call the CURRENT flush, not the one that
+   * existed at mount.
+   */
+  const flushRef = useRef(flush)
+  flushRef.current = flush
   useEffect(() => {
     return () => {
-      if (timer.current !== null) clearTimeout(timer.current)
+      void flushRef.current()
     }
   }, [])
 

@@ -267,3 +267,52 @@ describe('useAutosave — divergence', () => {
     expect(patch).toMatchObject({ body: post.body })
   })
 })
+
+/**
+ * WHAT A BACK PRESS COSTS THE PERSON WRITING.
+ *
+ * The cleanup used to `clearTimeout` the pending write and stop, which is not
+ * cancelling a save — it is discarding what the writer typed. MEASURED in a
+ * browser on a real post: type into the body, press browser Back within the 2s
+ * debounce, come back — the field is EMPTY. Wait past the 2s, do exactly the
+ * same thing, and the text is there. That pair is what makes it the WINDOW and
+ * not a mis-aimed selector.
+ *
+ * A client-routed Back fires no unload event, so `pagehide` was never going to
+ * catch this. What is asserted below is the TEARDOWN contract, and it is real:
+ * a genuine unmount inside the window now writes instead of discarding. The
+ * BROWSER case is NOT closed by it and is not claimed to be — measured again
+ * after this change and after a direct-`savePost` variant, the Back still comes
+ * back empty, which points at the segment not unmounting at all. Reported.
+ * Found by
+ * enumerating the sibling of the create flow's blur-only save rather than by
+ * waiting for it to be reported — the two surfaces where a person types a post
+ * body both dropped work, in two different ways.
+ */
+describe('useAutosave — leaving the page inside the debounce window', () => {
+  test('writes the pending edit on unmount instead of discarding it', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<Harness current={post} />)
+
+    await user.click(press('edit'))
+    // Still inside the debounce: nothing has been written yet, which is the
+    // trade the debounce exists for and is kept.
+    expect(savePost).not.toHaveBeenCalled()
+
+    unmount()
+
+    await waitFor(() => expect(savePost).toHaveBeenCalledTimes(1))
+    expect(savePost).toHaveBeenCalledWith(post.id, expect.objectContaining({ body: MY_TEXT }))
+  })
+
+  test('unmounting with nothing pending writes nothing', async () => {
+    const { unmount } = render(<Harness current={post} />)
+
+    unmount()
+
+    // `runSave` compares against the last confirmed snapshot, so a teardown with
+    // no edit must not put a redundant write on the wire — every mounted editor
+    // in the app would otherwise save on every navigation.
+    await waitFor(() => expect(savePost).not.toHaveBeenCalled())
+  })
+})
