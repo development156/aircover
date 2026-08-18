@@ -7,8 +7,38 @@ import type { Channel, ConstraintViolation } from '@sahoda/shared'
  * every route importing the action (LEARNINGS.md:21).
  */
 
+/**
+ * The version already in the row, from the SAME read that detected the clash.
+ *
+ * Carried with the refusal rather than fetched by the client afterwards: a second
+ * read is a second race, and the text the customer is shown must be the text the
+ * database actually refused to overwrite.
+ */
+export interface SaveConflict {
+  channel: Channel
+  /** What is stored now. Named "theirs" everywhere the UI speaks about it. */
+  theirs: string
+  /** Send this back to win the retry. Meaningless to the customer; never shown. */
+  version: number
+}
+
+/**
+ * ── THE `conflict` ARM IS INERT AND DELIBERATELY PRESENT ─────────────────────
+ * Nothing produces it yet: detecting a concurrent edit needs a version column on
+ * `post_variants` and a compare-and-set, which is a migration, and migrations
+ * apply straight to production. See docs/23_Concurrent_Edit_Plan.md for the SQL.
+ *
+ * The shape ships first on purpose. If the migration landed while the UI could
+ * only render `message`, a version mismatch would show a generic save error with
+ * the box still dirty and a Retry that fails for as long as the other tab holds
+ * the newer row — worse than today, where the work is lost silently. Building
+ * the refusal the UI can already read makes the migration the only step left.
+ *
+ * OPTIONAL, so every existing consumer that reads `message` is untouched.
+ */
 export type SaveState =
-  { ok: true; postId: string; updatedAt: string } | { ok: false; message: string }
+  | { ok: true; postId: string; updatedAt: string }
+  | { ok: false; message: string; conflict?: SaveConflict }
 
 export type DeleteState = { ok: true } | { ok: false; message: string }
 

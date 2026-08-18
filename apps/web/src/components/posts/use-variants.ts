@@ -6,6 +6,7 @@ import { ChannelSchema, type Channel, type PostVariant } from '@sahoda/shared'
 import { saveVariant } from '@/app/actions/posts'
 import type { GeneratedVariant } from '@/lib/posts/state'
 import { parseExtras, type VariantExtras } from '@/lib/posts/variant-extras'
+import type { SaveConflict } from '@/lib/posts/state'
 
 export interface VariantState {
   body: string
@@ -14,6 +15,13 @@ export interface VariantState {
   dirty: boolean
   saving: boolean
   error: string | null
+  /**
+   * Another writer saved this channel while this one was editing. INERT until
+   * `post_variants` has a version column — see docs/23_Concurrent_Edit_Plan.md.
+   * Carried on the state rather than derived, because the losing tab has to keep
+   * showing its own text alongside the stored one.
+   */
+  conflict: SaveConflict | null
   /**
    * The live URL on the platform, once it exists. Server-owned and never edited
    * here — it is written by the publisher, and its PRESENCE is the only thing that
@@ -31,6 +39,7 @@ const EMPTY: VariantState = {
   dirty: false,
   saving: false,
   error: null,
+  conflict: null,
   permalink: null,
 }
 
@@ -50,6 +59,7 @@ function seed(variants: readonly PostVariant[]): VariantStates {
             dirty: false,
             saving: false,
             error: null,
+            conflict: null,
             permalink: row.permalink,
           }
   }
@@ -139,9 +149,14 @@ export function useVariants(postId: string, variants: readonly PostVariant[]): V
           [channel]: {
             ...now,
             saving: false,
-            // Still dirty if the write failed, or if the draft moved on.
+            // Still dirty if the write failed, or if the draft moved on. A
+            // conflict is emphatically a failed write: the row was NOT updated,
+            // so clearing `dirty` here would mark unsaved work as saved.
             dirty: !result.ok || !unchanged,
-            error: result.ok ? null : result.message,
+            error: result.ok || result.conflict !== undefined ? null : result.message,
+            // The notice replaces the generic error rather than joining it — two
+            // messages about one refusal is how a writer learns to read neither.
+            conflict: result.ok ? null : (result.conflict ?? null),
           },
         }
       })
