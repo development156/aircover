@@ -21,6 +21,21 @@ import type { PlatformSpec } from '@sahoda/shared'
  * a writer who meant text-only and left a stray image attached publishes the
  * image. Neither is caught anywhere, because nothing records what was intended.
  *
+ * ── AND IT IS A LEAF, WHICH IS LOAD-BEARING ─────────────────────────────────
+ * `@sahoda/publishing/format` is exported as its own entry point so a BROWSER
+ * bundle can reach these rules without reaching the package barrel. The barrel
+ * pulls `oauth/x.ts`, which imports `node:crypto`; a client component that
+ * value-imports from it fails the production build with
+ * `UnhandledSchemeError: Reading from "node:crypto" is not handled by plugins`.
+ *
+ * That is not hypothetical — it broke the 2026-08-19 deploy, and nothing caught
+ * it, because `turbo build` sits OUTSIDE `pnpm gate`. A type-only import from the
+ * barrel is erased and harmless, which is why the inbox has done it for months;
+ * a value import is not. `no-client-barrel.test.ts` now fails on the value form.
+ *
+ * So the only import here is a TYPE, and nothing may be added to this file that
+ * is not.
+ *
  * Pure: no I/O, no clock, no database.
  */
 

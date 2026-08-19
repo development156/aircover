@@ -7,7 +7,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Check, Image as ImageIcon, MapPin, SquarePen } from 'lucide-react'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { CONSTRAINTS, type Channel, type ChannelSet } from '@sahoda/shared'
-import { formatsFor, type PostFormat } from '@sahoda/publishing'
+// The LEAF entry point, not the barrel. This file is `'use client'`, and the
+// barrel reaches `node:crypto` through the X OAuth helper — which fails the
+// production build, not the gate. See packages/publishing/src/format.ts.
+import { formatsFor, type PostFormat } from '@sahoda/publishing/format'
 import type { PostMedia } from '@sahoda/shared'
 
 import { createPost, savePost, saveVariant, setVariantFormat } from '@/app/actions/posts'
