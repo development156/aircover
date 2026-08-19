@@ -201,6 +201,28 @@ the same distinction WhatsApp itself draws, so the pair needs no legend.
 not just the pairs someone remembered to list — so a new `PostStatus` that duplicates an
 existing look fails the gate rather than shipping.
 
+### 3.4 A rung is an element-scale signature, not a surface treatment
+
+Rungs go on **chips, badges and small blocks**. Never on a page-width card.
+
+`.is-real` is a solid brand fill, and §1.1 permits that on "a button, chip, badge, active
+nav wash" — a card is none of those. Put it on one and you get a ~1,000px orange block,
+which is verbatim the defect `docs/27_Design_Audit.md` §3.2 names about `/wallet`'s checkout
+bar. That is how it happened on `/settings/plan` while this section was being written: the
+plan you are on is obviously the most real thing on the screen, `.is-real` is obviously the
+right class, and the rendered page was the loudest object in the product sitting on the
+money screen.
+
+**And the deeper rule, which is the one to remember:** certainty marking only informs where
+certainty **varies**. Nobody is asking whether the plan they are on is real. Marking the
+obvious is noise, and it spends the orange ration on a fact nobody needed. On that screen
+the rungs earn their place two sections down, where a scheduled change (`.is-committed`)
+and a priced-but-unagreed preview (`.is-proposed`) genuinely differ in how real they are —
+and pressing the button is the act that moves a claim from one rung to the next.
+
+Before reaching for a rung, ask what it is being distinguished FROM. If the answer is
+"nothing on this screen", it does not belong.
+
 ---
 
 ## 4. The absence vocabulary
@@ -333,6 +355,27 @@ it is the single most common way this system goes wrong.
 - **Labels never collapse.** When the rail collapses to 64px the label goes `sr-only`, never
   `display:none` — `display:none` removes the node from the accessibility tree and takes the
   link's name with it. Nine unnamed links is what that bug looked like.
+
+### 9.1 There are exactly two breakpoints, and `sm:` is not one of them
+
+`globals.css` sets `--breakpoint-*: initial`, which **deletes Tailwind's default breakpoint
+set**. What exists is:
+
+| variant | width | |
+|---|---|---|
+| `narrow` / `max-narrow` | 700px | the phone boundary |
+| `wide` / `max-wide` | 1180px | the wide-desktop boundary |
+
+`sm:`, `md:`, `lg:`, `xl:` and `2xl:` **do not exist**. They are not errors either: Tailwind
+emits nothing for an unknown variant, so `sm:grid-cols-2 lg:grid-cols-4` compiles, passes
+typecheck, passes lint, ships, and does absolutely nothing. It cost a plan-picker grid that
+rendered as four full-width stacked tiles at 1280px, and the only thing that showed it was a
+screenshot.
+
+Two breakpoints is a deliberate density decision, not an omission — most of this app is one
+column on a phone and a fixed-max content column above it. If a layout genuinely needs a
+third step, add the token to `globals.css` and note it here; do not reach for a default that
+was removed on purpose.
 
 ---
 
