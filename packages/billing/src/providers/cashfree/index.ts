@@ -105,6 +105,14 @@ export function createCashfreeProvider(opts: CashfreeProviderOptions): CashfreeP
 
     const orderId = `sah_${newId()}`
 
+    // A mid-period upgrade charges the PRORATED amount, not the catalogue price. Computed by
+    // `computeProration` before we get here; converted to rupees because that is the unit
+    // Cashfree's `order_amount` is in, and rounded to two decimals so the figure sent, the
+    // figure tagged and the figure the webhook reconciles are byte-identical.
+    const amountInr = input.planChange
+      ? Math.round(input.planChange.amountPaise) / 100
+      : plan.priceInr
+
     const res = await transport({
       method: 'POST',
       url: `${env.baseUrl}/orders`,
@@ -117,7 +125,7 @@ export function createCashfreeProvider(opts: CashfreeProviderOptions): CashfreeP
       },
       body: JSON.stringify({
         order_id: orderId,
-        order_amount: plan.priceInr,
+        order_amount: amountInr,
         order_currency: 'INR',
         customer_details: {
           customer_id: input.workspaceId,
@@ -126,11 +134,20 @@ export function createCashfreeProvider(opts: CashfreeProviderOptions): CashfreeP
         order_meta: {
           return_url: input.successUrl,
         },
-        // The ONLY carrier of workspace/plan/period into the webhook.
+        // The ONLY carrier of workspace/plan/period into the webhook. Cashfree types
+        // order_tags as map[string]string, so every value is stringified here and coerced
+        // back on the way in.
         order_tags: {
           workspace_id: input.workspaceId,
           plan_id: input.planId,
           period,
+          ...(input.planChange
+            ? {
+                change_id: input.planChange.changeId,
+                change_credits: String(input.planChange.credits),
+                change_amount_inr: String(amountInr),
+              }
+            : {}),
         },
       }),
     })

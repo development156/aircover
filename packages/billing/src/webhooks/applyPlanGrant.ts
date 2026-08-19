@@ -1,5 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { appError, err, monthlyGrantKey, ok, PLAN_CATALOG, type Result } from '@sahoda/shared'
+import {
+  appError,
+  err,
+  monthlyGrantKey,
+  ok,
+  PLAN_CATALOG,
+  planChangeGrantKey,
+  type Result,
+} from '@sahoda/shared'
 import type { LedgerPort } from '../ledger/port'
 import { isPeriod } from '../period'
 import type { ParsedWebhookEvent } from '../providers/types'
@@ -24,8 +32,14 @@ import type { ParsedWebhookEvent } from '../providers/types'
 export interface PlanGrantResult {
   /** Credits the plan's monthly allotment grants for this period. See the caveat above. */
   granted: number
-  /** Balance after the entry that stands. On replay this is the ORIGINAL entry's balance. */
-  balanceAfter: number
+  /**
+   * Balance after the entry that stands. On replay this is the ORIGINAL entry's balance.
+   *
+   * NULL when no entry was written at all — a plan change whose prorated credits round to
+   * zero. Deliberately null rather than `0`: the balance is not zero, we simply did not
+   * touch it, and a zero here would be a figure no query can produce.
+   */
+  balanceAfter: number | null
   /**
    * True when the ledger replayed this grant — a redelivery, or a genuinely distinct second
    * payment for the same plan+period. The latter means real money produced no credits, which
@@ -93,8 +107,26 @@ export function createApplyPlanGrant(
       )
     }
 
-    const amount = plan.monthlyCredits
-    const key = monthlyGrantKey(event.planId, event.period, event.workspaceId)
+    /**
+     * A mid-period PLAN CHANGE grants the prorated difference and is keyed on the CHANGE.
+     *
+     * Keying it on `monthlyGrantKey` would be the obvious thing and it is a money bug: that
+     * key is (plan, period, workspace) with no change in it, so upgrading to a plan already
+     * granted this month would REPLAY — the ledger would return `replayed: true`, grant
+     * nothing, and the route would report success for a payment that produced no credits.
+     * Two upgrades in one month is not an exotic case; it is what a growing customer does.
+     */
+    const amount = event.planChange ? event.planChange.credits : plan.monthlyCredits
+    const key = event.planChange
+      ? planChangeGrantKey(event.planChange.changeId)
+      : monthlyGrantKey(event.planId, event.period, event.workspaceId)
+
+    // A zero-credit change is a real event (an upgrade in the last minutes of a period, where
+    // the prorated difference rounds to nothing) and `apply_ledger_entry` rejects a zero
+    // amount outright. Report it honestly rather than driving a refusal into the ledger.
+    if (amount <= 0) {
+      return ok({ granted: 0, balanceAfter: null, replayed: false })
+    }
 
     // Never reject on an infra failure — this returns a Result the webhook handler branches on
     // (same contract as withCredits). The grant is idempotent by `key`, so a caller retry
@@ -111,6 +143,7 @@ export function createApplyPlanGrant(
           planId: event.planId,
           period: event.period,
           mode: event.mode,
+          ...(event.planChange ? { planChangeId: event.planChange.changeId } : {}),
         },
       })
       return ok({ granted: amount, balanceAfter: res.entry.balanceAfter, replayed: res.replayed })
