@@ -73,19 +73,39 @@ export function InertRow({
  * A picture of a media slot — the box a creative will sit in.
  *
  * `aspect` names the placement's real shape (a Story is 9:16, a feed post is
- * 1:1), because the shape IS the information on a creative screen: it is what
- * makes "one ad, four placements, four crops" legible without a word of copy.
+ * 1:1, a Search ad is a wide strip with no picture at all), because the shape IS
+ * the information on a creative screen: it is what makes "one ad, four
+ * placements, four crops" legible without a word of copy.
+ *
+ * ── THE HEIGHT IS FIXED AND THE WIDTH FOLLOWS, WHICH IS THE OPPOSITE OF THE ──
+ * ── OBVIOUS WAY TO DO THIS, AND THE OBVIOUS WAY WAS TRIED AND LOOKED WRONG ──
+ * Letting each slot fill its grid cell's WIDTH and take whatever height the
+ * aspect ratio implied put a 9:16 Story nearly four times the height of a 1:1
+ * Feed in the same row. The row then sized to the tallest, and the short slots
+ * left several hundred pixels of ragged emptiness beside them — the exact
+ * "content stopped and the page did not" failure `docs/27` §3.4 names on three
+ * other screens.
+ *
+ * Pinning the HEIGHT and deriving the width keeps every shape at one comparable
+ * scale: a Story reads as narrow-and-tall, a Search ad as wide-and-short, and
+ * the row has a single flat baseline. The proportion — the only thing this is
+ * communicating — survives intact, because an aspect ratio is a ratio and does
+ * not care which side is the given one.
  */
 export function InertMediaSlot({ label, aspect }: { label: string; aspect: string }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <div
-        data-inert-control
-        aria-hidden
-        className="is-proposed grid place-items-center rounded-card"
-        style={{ aspectRatio: aspect }}
-      >
-        <span className="type-eyebrow text-muted">{label}</span>
+      {/* The band every slot is measured in. One height for the whole row, so
+          the shapes are comparable and the row cannot go ragged. */}
+      <div className="flex h-[168px] items-end justify-center">
+        <div
+          data-inert-control
+          aria-hidden
+          className="is-proposed grid h-full max-w-full place-items-center rounded-card"
+          style={{ aspectRatio: aspect }}
+        >
+          <span className="type-eyebrow text-muted">{label}</span>
+        </div>
       </div>
       <span className="type-sm text-muted">{label}</span>
     </div>

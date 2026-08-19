@@ -58,7 +58,15 @@ export function Drawer({
         if (e.target === ref.current) onClose()
       }}
       className={cn(
-        'max-h-none border border-line bg-surface p-0 text-ink shadow-lg backdrop:bg-black/40',
+        // `text-left` is LOAD-BEARING, not a default restated. A `<dialog>` is
+        // promoted to the browser's top layer but stays where it was MOUNTED in the
+        // DOM, so it inherits typography from whatever contains it. `EmptyState` is
+        // `text-center`, so a Modal opened from an empty state's action rendered
+        // every field label, hint and helper centred over a left-aligned input —
+        // measured on /campaigns, `getComputedStyle(panel).textAlign === 'center'`
+        // with no `text-center` anywhere in this file. An overlay's alignment must
+        // come from the overlay, never from its mount point.
+        'max-h-none border border-line bg-surface p-0 text-left text-ink shadow-lg backdrop:bg-black/40',
         side === 'right'
           ? 'mr-0 ml-auto h-dvh w-[min(420px,calc(100vw-48px))] rounded-l-card'
           : 'mt-auto mb-0 max-h-[80dvh] w-full rounded-t-card',
