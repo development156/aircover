@@ -1,25 +1,41 @@
 import { expect, test } from './fixtures/seeded-user'
 
 /**
- * The four features whose tables now exist, and whose screens must not have moved.
+ * The features whose tables exist and whose screens must not have moved.
  *
  * ── THE RISK A NEW TABLE CREATES ─────────────────────────────────────────────
- * `templates`, `campaigns`, `campaign_posts`, `assets` and `asset_usages` were
- * applied to production on 2026-08-19 and nothing reads them. That is a safe
- * state and a fragile one: a stray query against an empty table returns an empty
- * result, and an empty result rendered as a figure reads as "you have none"
- * rather than "this is not built" — the exact ambiguity two earlier runs were
- * spent removing from every other read in this app.
+ * `templates`, `campaigns` and `campaign_posts` were applied to production on
+ * 2026-08-19 and nothing reads them. That is a safe state and a fragile one: a
+ * stray query against an empty table returns an empty result, and an empty
+ * result rendered as a figure reads as "you have none" rather than "this is not
+ * built" — the exact ambiguity two earlier runs were spent removing from every
+ * other read in this app.
  *
  * So the property under test is that every number on these screens is still an
  * em dash. Not "the page loads" — a page that loaded and quietly started showing
  * `0 campaigns` would pass that and be the defect.
  *
+ * ── WHY `/assets` IS NO LONGER HERE (2026-08-20) ─────────────────────────────
+ * Because it is built. `assets` and `asset_usages` are now read AND written: the
+ * library uploads real files, attaches them to posts, and refuses to delete one a
+ * scheduled post depends on. Every figure it shows — the file count, a byte size —
+ * comes from a row it fetched, so "still an em dash" is no longer the honest
+ * property; it is a description of a screen that no longer exists.
+ *
+ * The GUARANTEE this test held for `/assets` did not go away with it. It moved,
+ * stated as what it always meant: an empty library must say "Your library is
+ * empty" and must never render a count of the customer's files. `assets.spec.ts`
+ * asserts exactly that, on an account with no assets, at both widths.
+ *
+ * Removing a surface from this list is a real decision and must never be done to
+ * make a red test green. It is correct here only because the premise the list is
+ * built on — "nothing reads them" — stopped being true of this one.
+ *
  * Checked at both widths, because the wide layout and the narrow one are
  * different trees and a figure could appear in one and not the other.
  */
 
-const SURFACES = ['/campaigns', '/approvals', '/assets'] as const
+const SURFACES = ['/campaigns', '/approvals'] as const
 
 /** Anything that would read as a measurement of the customer's business. */
 const A_FIGURE = /(?<![\w—–-])\d[\d,]*(?![\w—–-])/
@@ -27,7 +43,7 @@ const A_FIGURE = /(?<![\w—–-])\d[\d,]*(?![\w—–-])/
 test.describe('the coming-soon surfaces did not change @smoke', () => {
   test.slow()
 
-  test('every figure on campaigns, approvals and assets is still an em dash', async ({
+  test('every figure on campaigns and approvals is still an em dash', async ({
     page,
     signedIn,
   }) => {

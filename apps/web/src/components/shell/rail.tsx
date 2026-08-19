@@ -29,6 +29,10 @@ const NAV: ReadonlyArray<{
   // the nav at all — reachable only by finishing onboarding.
   { href: '/brain', label: 'Brand Brain', icon: 'brain-circuit', guide: 'nav.brain' },
   { href: '/posts', label: 'Posts', icon: 'square-pen', guide: 'nav.posts', section: 'Create' },
+  // Under Create because that is when a photo is wanted: the library is where
+  // the composer's picker reaches, and until it appeared here the screen was
+  // reachable only by typing the URL.
+  { href: '/assets', label: 'Assets', icon: 'images', guide: 'nav.assets' },
   { href: '/planner', label: 'Planner', icon: 'calendar-days', guide: 'nav.planner' },
   { href: '/inbox', label: 'Inbox', icon: 'messages-square', guide: 'nav.inbox' },
   { href: '/analytics', label: 'Analytics', icon: 'chart-column', guide: 'nav.analytics' },

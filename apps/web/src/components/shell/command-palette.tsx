@@ -36,6 +36,7 @@ const DESTINATIONS: readonly Destination[] = [
   { href: '/home', label: 'Home', hint: 'Today, and what needs you' },
   { href: '/brain', label: 'Brand Brain', hint: 'What Sahoda knows about you' },
   { href: '/posts', label: 'Posts', hint: 'Draft, approve, publish' },
+  { href: '/assets', label: 'Assets', hint: 'Photos you can reuse on any post' },
   { href: '/planner', label: 'Planner', hint: 'The schedule' },
   { href: '/inbox', label: 'Inbox', hint: 'Comments, messages, reviews' },
   { href: '/analytics', label: 'Analytics', hint: 'How it performed' },

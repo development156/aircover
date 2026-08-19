@@ -6,6 +6,7 @@ import { PostMetricsPanel } from '@/components/posts/post-metrics-panel'
 import { readPostMetrics } from '@/lib/analytics/post-metrics'
 import { variantStatusRows } from '@/lib/posts/variant-status'
 import { signMediaPreviews } from '@/lib/posts/media-url'
+import { readLibraryNames } from '@/lib/assets/read'
 import { getPost, listMedia, listVariants, readVariantVersions } from '@/lib/posts/read'
 import { assembleSnapshot } from '@/lib/posts/live-state'
 import { PublishStateProvider } from '@/components/posts/live/publish-state-provider'
@@ -64,6 +65,14 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   // row rather than throwing, so a signing hiccup costs previews, not the page.
   const previews = await signMediaPreviews(media)
 
+  // The library's own names for whichever attachments came from it. A photo the
+  // owner called "shopfront.png" showed on the post as its storage uuid until
+  // this read existed. Degrades to an empty map, which is the pre-library
+  // behaviour, so a hiccup costs a nicer label and nothing else.
+  const libraryNames = Object.fromEntries(
+    await readLibraryNames(media.map((row) => row.storage_path)),
+  )
+
   // Also sequential on the rows: the analytics key lives on them. Degrades to
   // stated "not available" states, so a metrics failure never 404s or blanks the
   // editor — the post is the page, the numbers are an annotation on it.
@@ -84,6 +93,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           versions={versions}
           media={media}
           previews={previews}
+          libraryNames={libraryNames}
           autoPublish={autoPublishEnabled()}
           connected={connectedChannels}
         />

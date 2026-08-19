@@ -33,6 +33,8 @@ export interface PostEditorProps {
    * still lists, showing its "preview unavailable" placeholder.
    */
   previews?: MediaPreview[]
+  /** `assets.title` by `storage_path`, for attachments that came from the library. */
+  libraryNames?: Record<string, string>
   /**
    * Whether the scheduled dispatcher is switched on in this environment. Read on
    * the server via `autoPublishEnabled()`; the copy under the picker is a promise
@@ -77,6 +79,7 @@ export function PostEditor({
   variants,
   media,
   previews,
+  libraryNames,
   autoPublish = false,
   connected,
   versions = VERSIONS_UNSUPPORTED,
@@ -178,7 +181,13 @@ export function PostEditor({
       ) : null}
 
       <div className="grid gap-grid wide:grid-cols-[minmax(0,230px)_minmax(0,1fr)_minmax(0,370px)]">
-        <MediaPane media={media} channels={draft.channels} postId={post.id} previews={previews} />
+        <MediaPane
+          media={media}
+          channels={draft.channels}
+          postId={post.id}
+          previews={previews}
+          libraryNames={libraryNames}
+        />
 
         <section className="space-y-3" data-guide="post-body">
           {/* min-h-5 pins the header row so all three column labels share a
