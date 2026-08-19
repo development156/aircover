@@ -1,3 +1,5 @@
+import type { Page } from '@playwright/test'
+
 import { expect, test } from './fixtures/seeded-user'
 
 /**
@@ -14,8 +16,94 @@ import { expect, test } from './fixtures/seeded-user'
  * the channel column, the stage — and the two that matter most check that two
  * different states do not render the same words.
  *
+ * ── WHERE THESE ROWS LIVE, AND WHY A PEER'S RUN CANNOT SEE THEM ──────────
+ * This file writes campaigns, posts and membership rows into the DEV database,
+ * which several lanes share. Isolation is therefore stated with its evidence
+ * rather than assumed. MEASURED, three links:
+ *
+ *   1. `fixtures/seeded-user.ts` mints a FRESH Clerk user per test — a unique
+ *      `+clerk_test` address — and deletes it in a `finally`, so every test in
+ *      this file runs in a workspace that did not exist when the run started.
+ *   2. `bootstrap_workspace` inserts `created_by = v_user`, the Clerk id off the
+ *      JWT. Teardown deletes `workspaces where created_by = <that id>`, so the
+ *      root it removes is exactly the root this run created.
+ *   3. Every `workspace_id` foreign key in the schema is `on delete cascade` —
+ *      `campaigns` and `campaign_posts` included — so that one delete takes
+ *      everything below it. Nothing here is cleaned up by name.
+ *
+ * Two things this file adds on top, because per-run isolation should not be the
+ * only thing between an assertion and somebody else's row:
+ *
+ *   · Every name it writes carries `RUN`. No assertion here can match a row this
+ *     run did not create, and anything a failed teardown leaves behind is
+ *     attributable to the run that left it.
+ *   · Counts are read from the campaign's OWN row, never from anywhere in the
+ *     table — a bare `1` is satisfied by any row that happens to hold one.
+ *
  * Every row this touches is created by the run and removed after it.
  */
+
+/**
+ * Unique per run. `Date.now()` is legitimate here: this is scaffolding choosing
+ * a name, not product code inventing a figure.
+ */
+const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+const CAMPAIGN = `Diwali week ${RUN}`
+const OVERFLOW_CAMPAIGN = `Overflow check ${RUN}`
+
+/**
+ * Write a real post on two channels, and hand back its id.
+ *
+ * ── WHY THERE IS NO "CONTINUE" HERE ANY MORE ─────────────────────────
+ * The step wizard this spec was first written against is gone. One route writes a
+ * post now (docs/26 §10.3), `/posts/new` is the same screen `/posts/<id>` is, and
+ * FOUR selectors died with the old flow, each traceable to one deleted file:
+ *
+ *   · `getByRole('button', {name: /^continue/i})`  — create-flow.tsx, deleted
+ *   · `waitForURL(/[?&]post=…/)` and `searchParams.get('post')` — the id travels in
+ *     the PATH now; `replaceState` rewrites it and nothing emits a query parameter
+ *   · `getByLabel('Body')`             — the writing pane's label reads `Your post`
+ *   · `getByText('All changes saved')` — post-editor.tsx:62, deleted. The commit
+ *     bar says `Post saved`, and says it about the POST alone, because each
+ *     version is saved on its own
+ *
+ * The last of those is not in the merge plan's table (docs/28 §5.3 lists three);
+ * it is a fourth failure the same deletion caused, found by resolving every
+ * selector in this file rather than only the ones already written down.
+ *
+ * ── WHY THE BODY IS TYPED AFTER THE CHANNELS, NOT BEFORE ────────────────
+ * Creation is LAZY — opening the screen writes nothing, and the row appears on the
+ * first save that has something to write. So the keystroke that creates the post
+ * is the one that also carries the channels picked before it, in a single save.
+ *
+ * That is what makes the address a fact rather than a coincidence: the composer
+ * rewrites it only once that save is CONFIRMED, so an id in the path means the
+ * write carrying both channels landed. The proof that it really did is downstream
+ * and unavoidable — the grid's COLUMNS are the union of `posts.channels` across
+ * the campaign's members (`lib/campaigns/rollup.ts`), read back on the server. A
+ * channel that never reached the row is a column that never appears.
+ */
+async function writePostOnTwoChannels(page: Page, body: string): Promise<string> {
+  await page.goto('/posts/new')
+  await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 90_000 })
+
+  await page.locator('[data-channel-tile="instagram"]').click()
+  await page.locator('[data-channel-tile="linkedin"]').click()
+  // Both picked, before a word is written. These cards are the picker's answer,
+  // not the row's — the row does not exist yet.
+  await expect(page.locator('[data-version-card="instagram"]')).toBeVisible()
+  await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
+
+  await page.getByLabel('Your post').fill(body)
+
+  // Read the id off the PATH. Nothing emits `?post=` any more, and a spec that
+  // waits for one waits until its timeout.
+  await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
+  const postId = new URL(page.url()).pathname.split('/').pop() as string
+  expect(postId).toMatch(/^[0-9a-f-]{36}$/)
+
+  return postId
+}
 
 test.describe('campaigns @smoke', () => {
   test('a campaign can be named, filled with a post, and read per channel', async ({
@@ -50,24 +138,12 @@ test.describe('campaigns @smoke', () => {
     // ── 3. Write a real post first, so the campaign has something to group.
     //      Two channels, because one body per channel is the thing the grid is
     //      for and a single-channel post would not show it.
-    await page.goto('/create/post')
-    await page.locator('[data-channel-tile="instagram"]').click()
-    await page.locator('[data-channel-tile="linkedin"]').click()
-    await page.getByRole('button', { name: /^continue/i }).click()
-    await page.waitForURL(/[?&]post=[0-9a-f-]{36}/, { timeout: 30_000 })
-    const postId = new URL(page.url()).searchParams.get('post')
-    expect(postId).toMatch(/^[0-9a-f-]{36}$/)
-
-    await page.goto(`/posts/${postId}`)
-    const body = page.getByLabel('Body')
-    await expect(body).toBeVisible()
-    await body.fill('Diwali sweets, boxed and ready from Friday.')
-    await expect(page.getByText('All changes saved')).toBeVisible({ timeout: 20_000 })
+    await writePostOnTwoChannels(page, 'Diwali sweets, boxed and ready from Friday.')
 
     // ── 4. Create the campaign. A real insert under RLS.
     await page.goto('/campaigns')
     await page.getByRole('button', { name: /^create campaign$/i }).click()
-    await page.getByLabel('Name').fill('Diwali week')
+    await page.getByLabel('Name').fill(CAMPAIGN)
     await page.getByLabel('What it is for').fill('Fill the Saturday lunch slot')
     // The dialog's own submit, not the trigger that opened it.
     await page
@@ -78,7 +154,7 @@ test.describe('campaigns @smoke', () => {
     // Straight into the campaign, because the next thing anyone wants is to put
     // posts in it.
     await page.waitForURL(/\/campaigns\/[0-9a-f-]{36}/, { timeout: 30_000 })
-    await expect(page.getByRole('heading', { name: 'Diwali week', level: 1 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: CAMPAIGN, level: 1 })).toBeVisible()
     await expect(page.getByText('Fill the Saturday lunch slot')).toBeVisible()
 
     // Empty campaign: a real sentence, not a grid of dashes.
@@ -120,7 +196,7 @@ test.describe('campaigns @smoke', () => {
 
     // ── 7. The campaign shows up on the planner, on the post it groups.
     await page.goto('/planner')
-    await expect(page.getByRole('link', { name: /Diwali week/i }).first()).toBeVisible({
+    await expect(page.getByRole('link', { name: CAMPAIGN }).first()).toBeVisible({
       timeout: 30_000,
     })
 
@@ -128,8 +204,12 @@ test.describe('campaigns @smoke', () => {
     //      uses the value the column accepts.
     await page.goto('/campaigns')
     const table = page.getByRole('table', { name: /your campaigns/i })
-    await expect(table.getByRole('link', { name: 'Diwali week' })).toBeVisible()
-    await expect(table.getByText('1', { exact: true })).toBeVisible()
+    const row = table.getByRole('row').filter({ hasText: CAMPAIGN })
+    await expect(row.getByRole('link', { name: CAMPAIGN })).toBeVisible()
+    // Read from THIS campaign's ROW. `table.getByText('1')` is satisfied by any
+    // row in the table that happens to hold a one, which on a shared database is
+    // a count this run did not produce.
+    await expect(row.getByText('1', { exact: true })).toBeVisible()
 
     // "Finished" is the label; `finished` is the value. The chip that stood here
     // before said "Completed", which the check constraint has never accepted.
@@ -137,10 +217,10 @@ test.describe('campaigns @smoke', () => {
     await page.waitForURL(/stage=finished/, { timeout: 15_000 })
     // Filtered to a stage this campaign is not in, so it is gone — proof the
     // filter matched a real value rather than nothing.
-    await expect(page.getByRole('link', { name: 'Diwali week' })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: CAMPAIGN })).toHaveCount(0)
 
     await page.getByRole('link', { name: /^All/ }).click()
-    await expect(page.getByRole('link', { name: 'Diwali week' })).toBeVisible()
+    await expect(page.getByRole('link', { name: CAMPAIGN })).toBeVisible()
   })
 
   test('the grid scrolls inside its own box and never sideways-scrolls the page', async ({
@@ -165,15 +245,13 @@ test.describe('campaigns @smoke', () => {
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
 
     // A post on two channels, so the grid has more columns than a phone can hold.
-    await page.goto('/create/post')
-    await page.locator('[data-channel-tile="instagram"]').click()
-    await page.locator('[data-channel-tile="linkedin"]').click()
-    await page.getByRole('button', { name: /^continue/i }).click()
-    await page.waitForURL(/[?&]post=[0-9a-f-]{36}/, { timeout: 30_000 })
+    // A BODY is written here where the old flow needed none: creation is lazy, so
+    // a post with channels and no words is a post that was never created.
+    await writePostOnTwoChannels(page, 'Two channels, so the grid has a column to scroll to.')
 
     await page.goto('/campaigns')
     await page.getByRole('button', { name: /^create campaign$/i }).click()
-    await page.getByLabel('Name').fill('Overflow check')
+    await page.getByLabel('Name').fill(OVERFLOW_CAMPAIGN)
     await page
       .getByRole('dialog')
       .getByRole('button', { name: /^create campaign$/i })

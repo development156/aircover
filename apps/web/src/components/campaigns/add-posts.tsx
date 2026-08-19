@@ -24,10 +24,10 @@ export interface AddablePost {
  *
  * ── WHY THIS PICKS EXISTING POSTS RATHER THAN CREATING ONE ───────────────────
  * Membership is the whole feature. A campaign that could only hold posts written
- * from inside it would be a second, parallel place to write — and the writing
- * surface is `/create/post`, which knows about channels, the Brand Brain, the
- * constraint meter and the refusal gate. None of that should be rebuilt behind a
- * campaign, so this screen groups what exists and links to that one for the rest.
+ * from inside it would be a second, parallel place to write — and there is exactly
+ * one writing surface, `/posts/[id]`, which knows about channels, the Brand Brain,
+ * the constraint meter and the refusal gate. None of that should be rebuilt behind
+ * a campaign, so this screen groups what exists and links to that one for the rest.
  *
  * ── THE LIST SHOWS WHAT A POST TARGETS, BECAUSE THAT IS WHAT GETS GROUPED ────
  * Each row carries its channels. That is not decoration: adding a LinkedIn-only
