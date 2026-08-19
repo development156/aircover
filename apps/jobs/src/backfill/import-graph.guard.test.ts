@@ -30,8 +30,24 @@ function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 }
 
+/**
+ * Every module specifier, in every shape a file can write one.
+ *
+ * ── WHAT `from`-ONLY MISSED, MEASURED 2026-08-19 ────────────────────────────
+ * A side-effect `import './x'`, a dynamic `import('./x')` and a `require('./x')`
+ * were all invisible, and any of them reaches the publish path this guard exists
+ * to prove UNREACHABLE. A backfill that could publish would walk every published
+ * variant and re-post it.
+ *
+ * `from` keeps its required whitespace so a `.from('table')` call is never read as
+ * a module; the paren shapes are matched under `import`/`require` instead.
+ */
 function specifiersIn(src: string): string[] {
-  return [...src.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1] as string)
+  return [
+    ...src.matchAll(
+      /\bfrom\s+['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]|\bimport\s+['"]([^'"]+)['"]|\brequire\s*\(\s*['"]([^'"]+)['"]/g,
+    ),
+  ].map((m) => (m[1] ?? m[2] ?? m[3] ?? m[4]) as string)
 }
 
 function resolveLocal(fromFile: string, spec: string): string | null {

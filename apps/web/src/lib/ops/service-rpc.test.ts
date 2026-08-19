@@ -28,11 +28,60 @@ function rpcNamesIn(source: string): string[] {
   return [...source.matchAll(/\.rpc\(\s*'([^']+)'/g)].map((match) => match[1]!)
 }
 
+/**
+ * Every `.rpc(` call whose argument this file cannot read as a plain literal.
+ *
+ * ── WHY AN UNREADABLE CALL MUST FAIL RATHER THAN BE IGNORED ─────────────────
+ * `rpcNamesIn` matches a SINGLE-QUOTED literal and nothing else, so three forms
+ * were invisible to it — and invisible meant "absent" to every assertion below:
+ *
+ *   .rpc("apply_ledger_entry")     double quotes
+ *   .rpc(`apply_ledger_entry`)     template literal
+ *   .rpc(name)                     a variable, which defeats an allowlist entirely
+ *
+ * The equality check above then compares a set that silently excluded them
+ * against the declared allowlist, and passes. That is precisely the shape of the
+ * `wiring.test.ts` gap: a parse that could not see the thing being asserted.
+ *
+ * The honest rule is not a wider regex — a wider regex still cannot read
+ * `.rpc(name)` — it is that anything unreadable is REFUSED. If a call cannot be
+ * checked against the allowlist, the allowlist is not a guarantee, and this says
+ * so instead of quietly narrowing what it covers.
+ */
+function unreadableRpcCalls(source: string): string[] {
+  return [...source.matchAll(/\.rpc\(\s*([^)]*)/g)]
+    .map((match) => (match[1] ?? '').trim())
+    .filter((argument) => !/^'[^']+'/.test(argument))
+}
+
 describe('the service-role surface is exactly what it says it is', () => {
   it('calls only the three RPCs on the declared allowlist', () => {
     // Not a subset check. Equality, so a new .rpc() call fails here rather than
     // riding along unnoticed.
     expect(new Set(rpcNamesIn(SOURCE))).toEqual(new Set(SERVICE_RPCS))
+  })
+
+  it('has no .rpc() call this test cannot read', () => {
+    // The check that makes the equality above mean something. Without it, a call
+    // written in any form but a single-quoted literal is not "allowed" — it is
+    // unseen, which reads identically to absent and is the opposite of it.
+    expect(
+      unreadableRpcCalls(SOURCE),
+      'a .rpc() call here is not a plain single-quoted literal, so the allowlist\n' +
+        'assertion above silently skipped it. An RPC that cannot be read cannot be\n' +
+        'guaranteed not to reach the ledger.',
+    ).toEqual([])
+  })
+
+  it('detects each unreadable form, so the check above is not vacuous', () => {
+    // PROVEN, not assumed. Each of these passed the old parser as if it were not
+    // there at all.
+    expect(unreadableRpcCalls(`.rpc("apply_ledger_entry")`)).toHaveLength(1)
+    expect(unreadableRpcCalls('.rpc(`apply_ledger_entry`)')).toHaveLength(1)
+    expect(unreadableRpcCalls(`.rpc(name)`)).toHaveLength(1)
+    expect(unreadableRpcCalls(`.rpc('ops_ingest')`)).toEqual([])
+    // And the old parser really was blind to them — the reason this exists.
+    expect(rpcNamesIn(`.rpc("apply_ledger_entry")`)).toEqual([])
   })
 
   it('names each allowlisted RPC in the constant AND uses it', () => {

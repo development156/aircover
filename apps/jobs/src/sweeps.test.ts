@@ -35,9 +35,16 @@ function reachableFiles(entry: string): Map<string, string> {
 }
 
 function importSpecifiers(source: string): string[] {
-  // Covers `import … from 'x'`, `export … from 'x'` and `import('x')`.
-  const pattern = /(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g
-  return [...source.matchAll(pattern)].map((m) => m[1]!)
+  // Covers `import … from 'x'`, `export … from 'x'`, `import 'x'`, `import('x')`
+  // and `require('x')`. The last was added 2026-08-19 after an audit printed what
+  // each guard in this repo actually parses: this one saw every shape but CJS.
+  //
+  // NOTE the asymmetry with the webhook guards, which require whitespace after
+  // `from`. This file walks apps/jobs, where `pool.query` is the database call and
+  // `supabase.from(` does not appear — so the looser form costs nothing here and
+  // would cost a great deal in apps/web.
+  const pattern = /(?:from|import)\s*\(?\s*['"]([^'"]+)['"]|\brequire\s*\(\s*['"]([^'"]+)['"]/g
+  return [...source.matchAll(pattern)].map((m) => (m[1] ?? m[2])!)
 }
 
 function resolveLocal(fromDir: string, spec: string): string | null {

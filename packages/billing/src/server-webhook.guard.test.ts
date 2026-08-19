@@ -30,6 +30,37 @@ function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 }
 
+/**
+ * Every module specifier in a file, comments removed first.
+ *
+ * ── WHAT THIS USED TO MISS, MEASURED 2026-08-19 ─────────────────────────────
+ * It matched `from '…'` and nothing else, so three real import shapes were
+ * invisible to it:
+ *
+ *   import './providers/fixture'              — side effect, no `from`
+ *   await import('./providers/fixture')       — dynamic
+ *   require('./providers/fixture')            — CJS
+ *
+ * Any one of them reaches a module this guard exists to prove UNREACHABLE, and
+ * the guard would have stayed green. That is the same failure `wiring.test.ts`
+ * had: a parse that could not see the thing it was asserting about.
+ *
+ * `from` keeps its REQUIRED whitespace, deliberately. `from\s*\(` would read
+ * every `supabase.from('posts')` in this repo as a module specifier — and there
+ * are hundreds. The paren forms are matched under `import` and `require` instead.
+ *
+ * One known false POSITIVE remains: the word `import` inside a quoted string
+ * followed by another quoted string. It fails closed (the guard goes red when it
+ * need not), which is the safe direction, and closing it properly needs a real
+ * tokeniser rather than a regex.
+ */
+const MODULE_SPECIFIER =
+  /\bfrom\s+['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]|\bimport\s+['"]([^'"]+)['"]|\brequire\s*\(\s*['"]([^'"]+)['"]/g
+
+function allSpecifiers(src: string): string[] {
+  return [...src.matchAll(MODULE_SPECIFIER)].map((m) => m[1] ?? m[2] ?? m[3] ?? m[4] ?? '')
+}
+
 /** Follow relative imports from a file and return every module reachable from it. */
 function importGraph(entry: string, seen = new Set<string>()): Set<string> {
   const abs = resolve(entry)
@@ -41,7 +72,7 @@ function importGraph(entry: string, seen = new Set<string>()): Set<string> {
   } catch {
     return seen
   }
-  const specs = [...src.matchAll(/from\s+['"](\.[^'"]+)['"]/g)].map((m) => m[1] as string)
+  const specs = allSpecifiers(src).filter((spec) => spec.startsWith('.'))
   for (const spec of specs) {
     const base = resolve(dirname(abs), spec)
     for (const cand of [`${base}.ts`, join(base, 'index.ts'), base]) {

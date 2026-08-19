@@ -217,7 +217,12 @@ describe('planMyWeek', () => {
     const result = await planMyWeek('', ['x'])
 
     expect(state.calls.insertedRows).toBeNull()
-    expect(result.ok).toBe(false)
+    // BOTH discriminants, not just `ok`. Asserting only `ok: false` left
+    // `insufficient` free — and an action that answered `insufficient: true` would
+    // skip every assertion in the branch below and pass, having checked neither
+    // that the customer was told they were not charged nor that provider text
+    // stayed out of the message. Those are the two things these tests exist for.
+    expect(result).toMatchObject({ ok: false, insufficient: false })
     if (!result.ok && !result.insufficient) {
       expect(result.message).toContain('not charged')
       // Provider text must never surface.
@@ -230,7 +235,12 @@ describe('planMyWeek', () => {
 
     const result = await planMyWeek('', ['x'])
 
-    expect(result.ok).toBe(false)
+    // BOTH discriminants, not just `ok`. Asserting only `ok: false` left
+    // `insufficient` free — and an action that answered `insufficient: true` would
+    // skip every assertion in the branch below and pass, having checked neither
+    // that the customer was told they were not charged nor that provider text
+    // stayed out of the message. Those are the two things these tests exist for.
+    expect(result).toMatchObject({ ok: false, insufficient: false })
     if (!result.ok && !result.insufficient) {
       expect(result.message).toContain('not charged')
     }

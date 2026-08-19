@@ -38,9 +38,35 @@ interface Edge {
   specifier: string
 }
 
-/** Every `from '…'` specifier in a file, with comments removed first. */
+/**
+ * Every module specifier in a file, comments removed first.
+ *
+ * ── WHAT THIS USED TO MISS, MEASURED 2026-08-19 ─────────────────────────────
+ * It matched `from '…'` and nothing else, so three real import shapes were
+ * invisible to it:
+ *
+ *   import './providers/fixture'              — side effect, no `from`
+ *   await import('./providers/fixture')       — dynamic
+ *   require('./providers/fixture')            — CJS
+ *
+ * Any one of them reaches a module this guard exists to prove UNREACHABLE, and
+ * the guard would have stayed green. That is the same failure `wiring.test.ts`
+ * had: a parse that could not see the thing it was asserting about.
+ *
+ * `from` keeps its REQUIRED whitespace, deliberately. `from\s*\(` would read
+ * every `supabase.from('posts')` in this repo as a module specifier — and there
+ * are hundreds. The paren forms are matched under `import` and `require` instead.
+ *
+ * One known false POSITIVE remains: the word `import` inside a quoted string
+ * followed by another quoted string. It fails closed (the guard goes red when it
+ * need not), which is the safe direction, and closing it properly needs a real
+ * tokeniser rather than a regex.
+ */
+const MODULE_SPECIFIER =
+  /\bfrom\s+['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]|\bimport\s+['"]([^'"]+)['"]|\brequire\s*\(\s*['"]([^'"]+)['"]/g
+
 function specifiersIn(src: string): string[] {
-  return [...src.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1] as string)
+  return [...src.matchAll(MODULE_SPECIFIER)].map((m) => m[1] ?? m[2] ?? m[3] ?? m[4] ?? '')
 }
 
 /** Resolve a relative or `@/`-aliased specifier to a file on disk, or null if external. */

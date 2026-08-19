@@ -138,6 +138,10 @@ describe('building the days', () => {
       row('2026-08-17', 1),
       row('2026-08-18', 2),
     ])
+    // Guarded, and it was not: with no assertion on `kind`, a change that made
+    // this input `sparse` would skip the sort check entirely and the test would go
+    // on passing while proving nothing about sorting.
+    expect(series.kind).toBe('ready')
     if (series.kind === 'ready') {
       expect(series.points.map((p) => p.day)).toEqual(['2026-08-17', '2026-08-18', '2026-08-19'])
     }

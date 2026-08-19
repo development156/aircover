@@ -266,7 +266,12 @@ describe('generateSite', () => {
     const result = await generateSite('A', '')
 
     expect(state.calls.siteRows).toHaveLength(0)
-    expect(result.ok).toBe(false)
+    // BOTH discriminants, not just `ok`. Asserting only `ok: false` left
+    // `insufficient` free — and an action that answered `insufficient: true` would
+    // skip every assertion in the branch below and pass, having checked neither
+    // that the customer was told they were not charged nor that provider text
+    // stayed out of the message. Those are the two things these tests exist for.
+    expect(result).toMatchObject({ ok: false, insufficient: false })
     if (!result.ok && !result.insufficient) {
       expect(result.message).toContain('not charged')
       expect(result.message).not.toContain('provider text')
@@ -279,7 +284,12 @@ describe('generateSite', () => {
     const result = await generateSite('A', '')
 
     expect(state.calls.siteDeletes).toEqual([SITE_ID])
-    expect(result.ok).toBe(false)
+    // BOTH discriminants, not just `ok`. Asserting only `ok: false` left
+    // `insufficient` free — and an action that answered `insufficient: true` would
+    // skip every assertion in the branch below and pass, having checked neither
+    // that the customer was told they were not charged nor that provider text
+    // stayed out of the message. Those are the two things these tests exist for.
+    expect(result).toMatchObject({ ok: false, insufficient: false })
     if (!result.ok && !result.insufficient) {
       expect(result.message).toContain('not charged')
     }
@@ -318,7 +328,12 @@ describe('generateSite', () => {
 
     const result = await generateSite('A', '')
 
-    expect(result.ok).toBe(false)
+    // BOTH discriminants, not just `ok`. Asserting only `ok: false` left
+    // `insufficient` free — and an action that answered `insufficient: true` would
+    // skip every assertion in the branch below and pass, having checked neither
+    // that the customer was told they were not charged nor that provider text
+    // stayed out of the message. Those are the two things these tests exist for.
+    expect(result).toMatchObject({ ok: false, insufficient: false })
     if (!result.ok && !result.insufficient) {
       // The orphan row is unpaid; "not charged" must stay true even when the
       // compensating delete dies too.
@@ -385,6 +400,12 @@ describe('generateSite — the plan gate', () => {
     expect(state.calls.limitChecks).toHaveLength(0)
     expect(state.calls.configs).toHaveLength(0)
     expect(state.calls.meshRuns).toBe(0)
+    // BOTH discriminants, not just `ok`. Asserting only `ok: false` left
+    // `insufficient` free — and an action that answered `insufficient: true` would
+    // skip every assertion in the branch below and pass, having checked neither
+    // that the customer was told they were not charged nor that provider text
+    // stayed out of the message. Those are the two things these tests exist for.
+    expect(result).toMatchObject({ ok: false, insufficient: false })
     if (!result.ok && !result.insufficient) {
       expect(result.message).toMatch(/couldn't check how many sites/i)
       expect(result.message).toContain('you were not charged')
@@ -398,6 +419,12 @@ describe('generateSite — the plan gate', () => {
 
     expect(state.calls.configs).toHaveLength(0)
     expect(state.calls.meshRuns).toBe(0)
+    // BOTH discriminants, not just `ok`. Asserting only `ok: false` left
+    // `insufficient` free — and an action that answered `insufficient: true` would
+    // skip every assertion in the branch below and pass, having checked neither
+    // that the customer was told they were not charged nor that provider text
+    // stayed out of the message. Those are the two things these tests exist for.
+    expect(result).toMatchObject({ ok: false, insufficient: false })
     if (!result.ok && !result.insufficient) {
       expect(result.message).toMatch(/couldn't check your plan/i)
       // Naming a plan here would send them to buy an upgrade for OUR outage.

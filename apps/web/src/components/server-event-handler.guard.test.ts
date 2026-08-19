@@ -44,7 +44,16 @@ const stripComments = (src: string): string =>
   src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
 const specifiersIn = (src: string): string[] =>
-  [...src.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1] as string)
+  // `from` keeps its required whitespace — `supabase.from('posts')` is everywhere
+  // in apps/web and a looser form would read every one as a module. The paren
+  // shapes are matched separately: an audit on 2026-08-19 printed what each guard
+  // in this repo actually parses, and every `from`-only walker was blind to a
+  // side-effect import, a dynamic `import()` and a `require()`.
+  [
+    ...src.matchAll(
+      /\bfrom\s+['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]|\bimport\s+['"]([^'"]+)['"]|\brequire\s*\(\s*['"]([^'"]+)['"]/g,
+    ),
+  ].map((m) => (m[1] ?? m[2] ?? m[3] ?? m[4]) as string)
 
 function resolveLocal(fromFile: string, spec: string): string | null {
   let base: string
