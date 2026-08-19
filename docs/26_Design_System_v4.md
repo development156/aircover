@@ -341,10 +341,25 @@ it is the single most common way this system goes wrong.
 Every one is on `/design-system` with every state it ships. **A primitive with no disabled
 state on that page does not have one** — do not invent it at a call site.
 
-`Button` · `Input` · `Textarea` · `Select` · `Tabs` · `DataTable` · `Card` · `Badge` ·
-`StatusBadge` · `SkeletonBar` · `EmptyState` · `ComingSoon` · `Progress` · `CostLabel`
+`Button` · `Input` · `Textarea` · `Select` · `Tabs` · `DataTable` · `Card` · `Tile` · `Chip` ·
+`Badge` · `StatusBadge` · `Modal` · `Drawer` · `SkeletonBar` · `EmptyState` · `ErrorFallback` ·
+`ComingSoon` · `Progress` · `CostLabel` · toast (`sonner`, mounted in both layouts)
 
-Three rules that are load-bearing:
+### 10.1 The pairs people confuse
+
+| this | not this | because |
+|---|---|---|
+| **Tile** — a selectable option | Card | a card is a container and is not an answer to a question; a tile IS an option, so it must be a control, show selection, and be reachable by keyboard |
+| **Chip** — data the *user* put there | Badge | a badge is a status the *system* computed and the user cannot remove; a chip is an input they chose and usually can |
+| **Modal** — demands an answer | Drawer | a drawer is a side surface consulted while the page behind stays the subject; if the user must answer it, it is a modal |
+| **DataTable** — values compared across records | a list of cards | see below |
+| **Toast** — an outcome you can walk away from | Modal | a toast must never carry the only copy of something important, or the only way to undo it |
+
+`Modal` and `Drawer` are both the native `<dialog>` — the focus trap, Escape, document
+inertness and the top layer come from the browser rather than from us. Backdrop-click and
+state sync are handled once, inside the primitives, so no call site reimplements them.
+
+### 10.2 Three rules that are load-bearing:
 
 **Coming-soon is a `<div>`/`<span>`, never `<button disabled>`.** A disabled button is still
 announced as a button: a screen reader offers the action, the user takes it, nothing happens,
@@ -359,6 +374,17 @@ does none of that.
 `DataTable`. If they read one record at a time, it is a list. `/posts` rendering eight records
 as eight equal-weight cards, and `/home` and `/wallet` rendering the *same* dataset two
 different ways, are the failures this rule exists to stop.
+
+**`disabled` never means "coming soon".** A disabled `Tile` or `Button` means *this real
+option is temporarily unavailable* — something the user could fix. An unbuilt feature is a
+`<span>`. The gallery's own guard caught this exact mistake while this document was being
+written: a disabled tile labelled "Coming soon" made `getByRole('button', {name: /coming
+soon/i})` match, which is precisely the thing the rule forbids.
+
+**An interactive primitive is a client component, and its handler must originate in one.**
+A server component cannot hand a function to a client component. Passing `onRemove` to a
+`Chip` from the server-rendered gallery returned a 500 — the same mistake any screen session
+would make, so the working example lives in `overlay-demo.tsx` rather than being deleted.
 
 ---
 

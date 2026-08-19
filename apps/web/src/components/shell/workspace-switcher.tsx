@@ -126,9 +126,16 @@ export function WorkspaceSwitcher({
 
             `sr-only`, never `hidden`: `display:none` removes the node from the
             accessibility tree, and this span IS the button's accessible name —
-            hiding it would leave the switcher announced as an unnamed button. */}
-        <span className="max-w-[16ch] truncate max-narrow:sr-only">{active.name}</span>
-        <ChevronsUpDown size={15} className="shrink-0 text-muted max-narrow:hidden" aria-hidden />
+            hiding it would leave the switcher announced as an unnamed button.
+
+            THE BREAKPOINT IS `wide` (1180), NOT `narrow` (700). Fixing only the
+            phone left 768px broken by 91px — the command palette appears at 700
+            and the row gains an item exactly where the rail has not yet given
+            any width back. `wide` is where the RAIL collapses to icons, so the
+            switcher now collapses with it: one breakpoint, one story, and the
+            crowded 700-1179 band is covered rather than stepped over. */}
+        <span className="max-w-[16ch] truncate max-wide:sr-only">{active.name}</span>
+        <ChevronsUpDown size={15} className="shrink-0 text-muted max-wide:hidden" aria-hidden />
       </button>
 
       {open ? (

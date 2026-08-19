@@ -53,41 +53,51 @@ async function measure(page: Page): Promise<{ pastEdge: string[]; controls: stri
   }, SELECTOR)
 }
 
-test.describe('topbar at 390, both account states @smoke', () => {
-  test.setTimeout(4 * 60_000)
+/** Every width the shell is claimed to work at, not just the phone. */
+const WIDTHS = [360, 390, 768, 1024, 1440, 1920] as const
+
+async function sweep(page: Page, label: string): Promise<Record<number, string[]>> {
+  const out: Record<number, string[]> = {}
+  for (const width of WIDTHS) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/home')
+    await page.waitForLoadState('networkidle')
+    const m = await measure(page)
+    out[width] = m.pastEdge
+    console.log(`\n──── ${label} · ${width}px ────`)
+    m.controls.forEach((c) => console.log('   ' + c))
+    console.log(`   past the edge: ${m.pastEdge.length}`)
+    m.pastEdge.forEach((x) => console.log('   ! ' + x))
+  }
+  return out
+}
+
+test.describe('topbar at every width, both account states @smoke', () => {
+  test.setTimeout(6 * 60_000)
 
   test('fits the viewport with AND without a workspace', async ({ page, signedIn }) => {
     expect(signedIn).toBeTruthy()
-    await page.setViewportSize({ width: 390, height: 900 })
 
-    // ── STATE A: no workspace. What the existing guard measures.
+    // ── STATE A: no workspace. The only shape the pre-existing guard measures.
+    const before = await sweep(page, 'STATE A · no workspace')
+
+    // ── STATE B: bootstrap a workspace, exactly as a real account does. This is
+    //    where the credit pill and the brain ring appear.
+    await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/home')
-    await page.waitForLoadState('networkidle')
-    const before = await measure(page)
-    console.log('\n──── STATE A · no workspace (what the green guard sees) ────')
-    before.controls.forEach((c) => console.log('   ' + c))
-    console.log(`   past the edge: ${before.pastEdge.length}`)
-
-    // ── STATE B: bootstrap a workspace, exactly as a real account does.
     await page
       .locator('#main')
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
-    await page.goto('/home')
-    await page.waitForLoadState('networkidle')
-    const after = await measure(page)
-    console.log('\n──── STATE B · workspace present (what every real user sees) ────')
-    after.controls.forEach((c) => console.log('   ' + c))
-    console.log(`   past the edge: ${after.pastEdge.length}`)
-    after.pastEdge.forEach((p) => console.log('   ! ' + p))
+    const after = await sweep(page, 'STATE B · workspace present')
 
-    // BOTH states, asserted. State A alone is what the pre-existing guard
-    // checks, and it is the one that never broke.
-    expect(before.pastEdge, 'the topbar overflows at 390 with NO workspace').toEqual([])
-    expect(
-      after.pastEdge,
-      'the topbar overflows at 390 WITH a workspace — the state every real user is in',
-    ).toEqual([])
+    for (const width of WIDTHS) {
+      expect(before[width], `topbar overflows at ${width}px with NO workspace`).toEqual([])
+      expect(
+        after[width],
+        `topbar overflows at ${width}px WITH a workspace — the state every real user is in`,
+      ).toEqual([])
+    }
   })
 })

@@ -5,6 +5,9 @@ import { ComingSoon } from '@/components/design-system/coming-soon-chip'
 import { DataTable } from '@/components/ui/data-table'
 import { Tabs } from '@/components/ui/tabs'
 import { Select } from '@/components/ui/select'
+import { Tile } from '@/components/ui/tile'
+import { Chip } from '@/components/ui/chip'
+import { OverlayDemo, RemovableChipDemo } from '@/components/design-system/overlay-demo'
 
 /**
  * Every primitive, in every state it ships with.
@@ -128,6 +131,47 @@ export function PrimitiveRack() {
             <SkeletonBar className="h-4 w-[220px]" />
             <SkeletonBar className="h-4 w-[320px]" />
           </div>
+        </Cell>
+      </Rack>
+
+      <Rack
+        name="Tile"
+        note="A tile is a selectable OPTION. A card is a container. Selection shows in three ways — aria-pressed, a ring, and weight — because a tint alone is nearly invisible against its surface."
+      >
+        <Cell label="rest">
+          <Tile title="Instagram" meta="Not connected" />
+        </Cell>
+        <Cell label="selected">
+          <Tile title="LinkedIn" meta="Connected" selected />
+        </Cell>
+        <Cell label="disabled">
+          {/* NOT "coming soon". A disabled tile is still a button, so it must
+              only ever mean "this real option is temporarily unavailable" —
+              something the user could fix. An unbuilt feature is a <span>
+              (see the Coming soon rack), and the gallery's own guard caught
+              this exact mistake when the tile was first labelled that way. */}
+          <Tile title="Instagram" meta="Reconnect to use this" disabled />
+        </Cell>
+      </Rack>
+
+      <Rack
+        name="Chip"
+        note="A chip is data the USER put there — a channel, a filter, a tag. A badge is a status the SYSTEM computed. Do not dress one as the other."
+      >
+        <Cell label="static">
+          <Chip>Instagram</Chip>
+        </Cell>
+        <Cell label="removable">
+          <RemovableChipDemo />
+        </Cell>
+      </Rack>
+
+      <Rack
+        name="Modal and drawer"
+        note="Both are the native <dialog>, so the focus trap, Escape and the top layer come from the browser. A modal demands an answer; a drawer is consulted."
+      >
+        <Cell label="live" wide>
+          <OverlayDemo />
         </Cell>
       </Rack>
 
