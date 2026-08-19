@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
  * The distinction is not cosmetic and it is the one this app kept blurring:
  * a card holds content and is not itself an answer to a question; a tile IS an
  * option, so it must be a real control, must show selection, and must be
- * reachable by keyboard. `/create/post`'s channel grid is the canonical use.
+ * reachable by keyboard. The composer's format select and the create chooser are the canonical uses.
  *
  * `disabled` means "this real option is temporarily unavailable" — something
  * the user could fix. It must NEVER mean "coming soon": a disabled button is

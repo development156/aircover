@@ -98,13 +98,12 @@ const CONTROLS: ReadonlyArray<{
       const user = userEvent.setup()
       render(
         <GeneratePanel
-          postId="p1"
           channels={toChannelSet(['instagram'])}
-          flush={async () => true}
+          flush={async () => 'p1'}
           onGenerated={() => {}}
         />,
       )
-      await user.click(screen.getByRole('button', { name: /write.*channel|generate/i }))
+      await user.click(screen.getByRole('button', { name: /adapt for/i }))
     },
   },
   {

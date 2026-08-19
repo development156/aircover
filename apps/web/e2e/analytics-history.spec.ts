@@ -1,3 +1,4 @@
+import { bootstrapWorkspace, startPost } from './fixtures/compose'
 import { adminClient, expect, test } from './fixtures/seeded-user'
 
 /**
@@ -59,18 +60,8 @@ test.describe('the performance-over-time card @smoke', () => {
     const admin = adminClient()
     test.skip(admin === null, 'no service key in this environment')
 
-    await page.goto('/home')
-    await page
-      .locator('#main')
-      .getByRole('button', { name: /create workspace/i })
-      .click()
-    await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
-
-    await page.goto('/create/post')
-    await page.locator('[data-channel-tile="instagram"]').click()
-    await page.getByRole('button', { name: /^continue/i }).click()
-    await page.waitForURL(/[?&]post=[0-9a-f-]{36}/, { timeout: 30_000 })
-    const postId = new URL(page.url()).searchParams.get('post') as string
+    await bootstrapWorkspace(page)
+    const postId = await startPost(page, 'instagram')
 
     const { data: post } = await admin!
       .from('posts')

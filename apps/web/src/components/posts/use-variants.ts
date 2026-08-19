@@ -5,90 +5,12 @@ import { ChannelSchema, type Channel, type PostVariant } from '@sahoda/shared'
 
 import { saveVariant } from '@/app/actions/posts'
 import type { GeneratedVariant } from '@/lib/posts/state'
-import { parseExtras, type VariantExtras } from '@/lib/posts/variant-extras'
-import type { SaveConflict } from '@/lib/posts/state'
-import {
-  expectedVersionFor,
-  VERSIONS_UNSUPPORTED,
-  type VariantVersions,
-} from '@/lib/posts/variant-version'
+import type { VariantExtras } from '@/lib/posts/variant-extras'
+import { VERSIONS_UNSUPPORTED, type VariantVersions } from '@/lib/posts/variant-version'
 
-export interface VariantState {
-  body: string
-  extras: VariantExtras
-  /** Local edits not yet written to `post_variants`. */
-  dirty: boolean
-  saving: boolean
-  error: string | null
-  /**
-   * Another writer saved this channel while this one was editing. Reachable only
-   * once migration 20260819000000 gives `post_variants` its version column; before
-   * that the save cannot detect a clash and this stays null.
-   * Carried on the state rather than derived, because the losing tab has to keep
-   * showing its own text alongside the stored one.
-   */
-  conflict: SaveConflict | null
-  /**
-   * What this channel's stored copy is at, for the compare-and-set save.
-   *
-   * `undefined` is the ordinary state until migration 20260819000000 is applied:
-   * the column is not there, so there is nothing to compare and the save behaves
-   * exactly as it always has. `null` means the column IS there and this channel
-   * has no copy yet — a save then creates one, and a second tab creating at the
-   * same moment loses and is told.
-   *
-   * Kept on the state rather than in a ref because it changes on every successful
-   * save and on every refusal, and both of those already rebuild this object.
-   */
-  version: number | null | undefined
-  /**
-   * The live URL on the platform, once it exists. Server-owned and never edited
-   * here — it is written by the publisher, and its PRESENCE is the only thing that
-   * makes a post real (doc 13 §5). Local edits do not clear it: the post that went
-   * out is still out.
-   */
-  permalink: string | null
-}
+import { seed, type VariantState, type VariantStates } from './variant-state'
 
-export type VariantStates = Record<Channel, VariantState>
-
-const EMPTY: Omit<VariantState, 'version'> = {
-  body: '',
-  extras: {},
-  dirty: false,
-  saving: false,
-  error: null,
-  conflict: null,
-  permalink: null,
-}
-
-function seed(variants: readonly PostVariant[], versions: VariantVersions): VariantStates {
-  const byChannel = new Map<Channel, PostVariant>()
-  for (const variant of variants) byChannel.set(variant.channel, variant)
-
-  const states = {} as VariantStates
-  for (const channel of ChannelSchema.options) {
-    const row = byChannel.get(channel)
-    // Read from `versions` rather than from the row: `PostVariantSchema` is frozen
-    // and strips the column, so the row genuinely does not have it. See
-    // `lib/posts/variant-version.ts`.
-    const version = expectedVersionFor(versions, channel)
-    states[channel] =
-      row === undefined
-        ? { ...EMPTY, version }
-        : {
-            body: row.body,
-            extras: parseExtras(row.extras),
-            dirty: false,
-            saving: false,
-            error: null,
-            conflict: null,
-            version,
-            permalink: row.permalink,
-          }
-  }
-  return states
-}
+export type { VariantState, VariantStates } from './variant-state'
 
 export interface VariantsApi {
   states: VariantStates
@@ -98,6 +20,13 @@ export interface VariantsApi {
   /** Save one channel and wait for the answer. Resolves false when the write failed. */
   saveNow: (channel: Channel) => Promise<boolean>
   applyGenerated: (items: readonly GeneratedVariant[]) => void
+  /**
+   * The post's body moved. Every channel still FOLLOWING it moves with it;
+   * every channel that has been written independently is left alone.
+   */
+  mirrorSource: (body: string) => void
+  /** Channels with unsaved local edits, in schema order. */
+  dirtyChannels: (channels: readonly Channel[]) => Channel[]
   /** Re-send this channel's local text against the version the refusal carried. */
   keepMine: (channel: Channel) => void
   /** Load the stored text INTO THE BOX. Writes nothing — see the notice's rule 3. */
@@ -116,7 +45,16 @@ export interface VariantsApi {
  * transition body executes, so snapshotting from inside one would race.
  */
 export function useVariants(
-  postId: string,
+  /**
+   * Which row these variants belong to, read AT CALL TIME.
+   *
+   * A getter rather than a string because a post is created by its first save:
+   * pressing Save on a brand new post creates the row and writes the variant in
+   * the same tick, and a value captured at render time would still be null.
+   * Returns null only when there is genuinely nowhere to write yet, which is
+   * reported rather than swallowed.
+   */
+  getPostId: () => string | null,
   variants: readonly PostVariant[],
   /**
    * What each channel is at, from the server read. Defaults to "not tracked",
@@ -124,8 +62,14 @@ export function useVariants(
    * caller that has no way to find out — every save then behaves as it always has.
    */
   versions: VariantVersions = VERSIONS_UNSUPPORTED,
+  /**
+   * The post's body at first render. Seeds every channel that has no copy of its
+   * own — see `following` on `VariantState`. Read once; later changes arrive
+   * through `mirrorSource`.
+   */
+  canonicalBody = '',
 ): VariantsApi {
-  const [states, setStates] = useState<VariantStates>(() => seed(variants, versions))
+  const [states, setStates] = useState<VariantStates>(() => seed(variants, versions, canonicalBody))
   const latest = useRef<VariantStates>(states)
   const [, startTransition] = useTransition()
 
@@ -143,8 +87,36 @@ export function useVariants(
   )
 
   const setBody = useCallback(
-    (channel: Channel, body: string) => patch(channel, { body, dirty: true, error: null }),
+    // Typing here ends the following relationship for good. It is not restored by
+    // deleting the text again: an emptied channel is a deliberate choice, and
+    // silently refilling it from the post would undo it on the next keystroke
+    // anywhere else on the screen.
+    (channel: Channel, body: string) =>
+      patch(channel, { body, dirty: true, error: null, following: false }),
     [patch],
+  )
+
+  const mirrorSource = useCallback(
+    (body: string) => {
+      commit((current) => {
+        let changed = false
+        const next = { ...current }
+        for (const channel of ChannelSchema.options) {
+          const state = current[channel]
+          if (!state.following || state.body === body) continue
+          next[channel] = { ...state, body, dirty: true, error: null }
+          changed = true
+        }
+        return changed ? next : current
+      })
+    },
+    [commit],
+  )
+
+  const dirtyChannels = useCallback(
+    (channels: readonly Channel[]): Channel[] =>
+      channels.filter((channel) => latest.current[channel].dirty),
+    [],
   )
 
   const setExtras = useCallback(
@@ -169,6 +141,14 @@ export function useVariants(
    */
   const write = useCallback(
     async (channel: Channel): Promise<boolean> => {
+      const postId = getPostId()
+      if (postId === null) {
+        patch(channel, {
+          saving: false,
+          error: 'This post has not been saved yet, so there is nowhere to keep this copy.',
+        })
+        return false
+      }
       const draft = latest.current[channel]
       patch(channel, { saving: true, error: null })
 
@@ -209,7 +189,7 @@ export function useVariants(
       })
       return result.ok
     },
-    [commit, patch, postId],
+    [commit, getPostId, patch],
   )
 
   const save = useCallback(
@@ -273,7 +253,10 @@ export function useVariants(
    */
   const useTheirs = useCallback(
     (channel: Channel, theirs: string) => {
-      patch(channel, { body: theirs, conflict: null, error: null, dirty: true })
+      // `following: false` for the same reason `setBody` sets it: adopting the
+      // stored copy is a decision about THIS channel, and a later edit to the
+      // post must not overwrite the version just chosen.
+      patch(channel, { body: theirs, conflict: null, error: null, dirty: true, following: false })
     },
     [patch],
   )
@@ -288,6 +271,9 @@ export function useVariants(
             body: item.body,
             dirty: true,
             error: null,
+            // A generated variant is written FOR this channel. It is the clearest
+            // possible statement that this one is no longer the post's body.
+            following: false,
           }
         }
         return next
@@ -296,5 +282,16 @@ export function useVariants(
     [commit],
   )
 
-  return { states, setBody, setExtras, save, saveNow, applyGenerated, keepMine, useTheirs }
+  return {
+    states,
+    setBody,
+    setExtras,
+    save,
+    saveNow,
+    applyGenerated,
+    keepMine,
+    useTheirs,
+    mirrorSource,
+    dirtyChannels,
+  }
 }

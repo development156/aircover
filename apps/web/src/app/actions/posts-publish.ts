@@ -45,7 +45,7 @@ import { getActiveWorkspace } from '@/lib/workspaces'
  * handing it a 600-character X variant would report "would have been accepted"
  * for a post X rejects at 280, directly contradicting the red MAX_CHARS meter on
  * the same screen. Every variant therefore goes through `validateVariant` FIRST,
- * built from the same three fields the live meter uses (`variant-panel.tsx`:
+ * built from the same three fields the live meter uses (`version-card.tsx`:
  * body, hashtags, hasLink) so the preview and the meter cannot drift apart.
  */
 export async function simulatePublish(postId: string): Promise<PublishState> {

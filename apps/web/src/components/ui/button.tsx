@@ -28,7 +28,7 @@ export const buttonVariants = cva(
         // with `hover:text-white` paints white on white and the label vanishes
         // the moment the pointer lands. The dark pair below is the convention
         // six other components already follow (channel-picker, pick-chips,
-        // conversation-list, step-rail, variant-tabs, badge); these variants were
+        // conversation-list, step-rail, badge); these variants were
         // the ones that missed it.
         primary:
           'bg-primary text-primary-foreground hover:bg-ink hover:text-white dark:hover:bg-white dark:hover:text-[var(--canvas)] disabled:bg-line disabled:text-white disabled:opacity-100',

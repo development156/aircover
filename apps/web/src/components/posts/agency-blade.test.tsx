@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from 'vitest'
 
 // PostCard nests DeletePostButton, which calls `useRouter` — no app-router
 // context exists in jsdom, so it needs a stand-in (same pattern as
-// post-editor.test.tsx and auto-publish-note.test.tsx).
+// auto-publish-note.test.tsx).
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 
 import { PostCard } from './post-card'

@@ -82,7 +82,28 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: `pnpm dev --port ${PORT}`,
+    /**
+     * Dev by default, but overridable — and the override is not a convenience.
+     *
+     * Turbopack compiles each route on first request, so a dev run's readiness
+     * probe and its first few tests are paying for compilation. MEASURED with
+     * four worktrees running dev servers on one machine: 92s to "Ready", then
+     * `/sign-in` still compiling past a 300s webServer timeout, and single route
+     * loads at ~50s. A production build has none of that, and it is also closer
+     * to what a customer meets.
+     *
+     *   pnpm turbo build
+     *   E2E_SERVER_CMD='pnpm --filter @sahoda/web start -p 3210' pnpm exec playwright test
+     *
+     * The build is not optional in that pair, and it is not optional a second
+     * time either: a `next dev` run in the same directory rewrites `.next`, and a
+     * later `next start` against it dies with
+     * `TypeError: routesManifest.dataRoutes is not iterable` — which surfaces
+     * through Playwright as "Process from config.webServer was not able to
+     * start", a message that says nothing about the cause. Rebuild after any dev
+     * run before using this.
+     */
+    command: process.env.E2E_SERVER_CMD ?? `pnpm dev --port ${PORT}`,
     // Readiness MUST probe a public route. Everything else is protected, and
     // Clerk answers a non-document request (which this probe is — no
     // `sec-fetch-dest: document`) with 404 rather than a redirect. Pointing this
@@ -90,7 +111,18 @@ export default defineConfig({
     // minutes with no clue why.
     url: `${BASE_URL}/sign-in`,
     reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
+    /**
+     * Five minutes, and the number is measured.
+     *
+     * The probe above is a route, so readiness is not "the process started" — it
+     * is "Turbopack has compiled instrumentation, middleware and `/sign-in`".
+     * MEASURED on 2026-08-19 with four worktrees running dev servers at once:
+     * 32.9s for instrumentation, 12.5s for the edge build, 8.4s for middleware,
+     * 92.1s to "Ready", and `/sign-in` still compiling when the old 180s ran out.
+     * The whole suite then failed with `Timed out waiting from config.webServer`,
+     * which reads as a broken app and is a cold cache.
+     */
+    timeout: 300_000,
     stdout: 'pipe',
     stderr: 'pipe',
   },

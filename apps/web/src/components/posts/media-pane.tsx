@@ -148,7 +148,7 @@ export function MediaPane({ media, channels, postId, previews = [] }: MediaPaneP
   return (
     <section className="space-y-3" data-guide="post-media">
       {/* min-h-5 pins the header row so all three column labels share a baseline
-          regardless of what trails them — see variant-tabs.tsx. */}
+          regardless of what trails them. */}
       <div className="flex min-h-5 items-center justify-between gap-2">
         <CardLabel className="mb-0">Media</CardLabel>
         <span className="tabular-nums text-[12px] text-muted">{media.length}</span>

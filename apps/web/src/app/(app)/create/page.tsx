@@ -36,7 +36,7 @@ export const metadata = { title: 'Create' }
  */
 
 const REAL = {
-  href: '/create/post',
+  href: '/posts/new',
   icon: SquarePen,
   title: 'Post',
   note: 'Write once, adapt per channel',

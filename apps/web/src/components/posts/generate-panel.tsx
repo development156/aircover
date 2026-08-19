@@ -28,11 +28,24 @@ type Outcome =
   | { kind: 'failed'; message: string }
 
 export interface GeneratePanelProps {
-  postId: string
   channels: ChannelSet
-  /** Flush the debounced body autosave. Resolves false when the save failed. */
-  flush: () => Promise<boolean>
+  /**
+   * Write the post NOW and report which row it landed in.
+   *
+   * Resolves to the post id, or null when the save failed. It returns the ID
+   * rather than a boolean because the row may not have existed when this button
+   * was rendered: a post is created by its first save, so a writer who types and
+   * immediately presses Generate would otherwise hold a `postId` prop captured
+   * as null and generate against nothing.
+   */
+  flush: () => Promise<string | null>
   onGenerated: (variants: GeneratedVariant[]) => void
+  /**
+   * How loudly this reads. `primary` while adapting IS the next thing to do;
+   * `secondary` once every channel already has copy — docs/26 §1.5 allows one
+   * primary action per view and the composer moves it as the work progresses.
+   */
+  emphasis?: 'primary' | 'secondary'
 }
 
 /**
@@ -40,7 +53,12 @@ export interface GeneratePanelProps {
  * `creditCost('post_variants')` BEFORE the click, never after, and a partial
  * result names the channels that came back empty instead of quietly dropping them.
  */
-export function GeneratePanel({ postId, channels, flush, onGenerated }: GeneratePanelProps) {
+export function GeneratePanel({
+  channels,
+  flush,
+  onGenerated,
+  emphasis = 'primary',
+}: GeneratePanelProps) {
   const [pending, startTransition] = useTransition()
   const [outcome, setOutcome] = useState<Outcome | null>(null)
 
@@ -51,8 +69,8 @@ export function GeneratePanel({ postId, channels, flush, onGenerated }: Generate
     setOutcome(null)
 
     startTransition(async () => {
-      const saved = await flush()
-      if (!saved) {
+      const postId = await flush()
+      if (postId === null) {
         // Component-owned copy, and the one failure where this side can speak to
         // the charge: we never reached the action, so nothing was spent. It
         // carries its own retry prompt because the shared branch below no longer
@@ -93,9 +111,9 @@ export function GeneratePanel({ postId, channels, flush, onGenerated }: Generate
       {pending ? (
         <PendingLines lines={PENDING_LINES} />
       ) : (
-        <Button onClick={() => run(channels)} disabled={channels.length === 0} className="w-full">
+        <Button variant={emphasis} onClick={() => run(channels)} disabled={channels.length === 0}>
           <Sparkles size={14} aria-hidden />
-          Generate variants for <span className="tabular-nums">{channels.length}</span>
+          Adapt for <span className="tabular-nums">{channels.length}</span>
           {channels.length === 1 ? ' channel' : ' channels'} ·{' '}
           <span className="tabular-nums">{cost}</span> credits
         </Button>

@@ -32,7 +32,7 @@ export interface CreatePostButtonProps {
 export function CreatePostButton({ size = 'default', className }: CreatePostButtonProps) {
   return (
     <Link
-      href="/create/post"
+      href="/posts/new"
       data-guide="posts.new_button"
       className={cn(buttonVariants({ variant: 'primary', size }), className)}
     >

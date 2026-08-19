@@ -77,7 +77,7 @@ export function BottomNav() {
           fifth destination. */}
       <div className="relative flex w-[64px] shrink-0 justify-center">
         <Link
-          href="/create/post"
+          href="/posts/new"
           aria-label="Create a post"
           className="absolute -top-[18px] grid size-[50px] place-items-center rounded-full bg-primary text-primary-foreground shadow-pop transition-micro active:translate-y-[0.5px]"
         >

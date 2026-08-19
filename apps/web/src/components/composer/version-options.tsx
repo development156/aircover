@@ -1,0 +1,109 @@
+'use client'
+
+import { CONSTRAINTS, type Channel } from '@sahoda/shared'
+import { formatsFor, type PostFormat } from '@sahoda/publishing/format'
+
+import { Label } from '@/components/ui/label'
+import { gbpCtaTypes, isValidGbpCta } from '@/lib/posts/variant-extras'
+import type { VariantExtras } from '@/lib/posts/variant-extras'
+
+/** The word a person uses, per stored value. Never the enum. */
+const FORMAT_LABEL: Readonly<Record<PostFormat, string>> = {
+  text: 'Text only',
+  image: 'One photo',
+  carousel: 'A set to swipe',
+  video: 'Video',
+}
+
+const SELECT_CLASS =
+  'h-input w-full rounded-sm bg-s1 px-2.5 text-[13px] text-ink transition-micro shadow-[inset_0_0_0_1px_var(--line)] focus:bg-surface focus:outline-none max-narrow:min-h-[44px]'
+
+export interface VersionOptionsProps {
+  channel: Channel
+  format: PostFormat | null
+  onFormatChange: (format: PostFormat | null) => void
+  extras: VariantExtras
+  onExtrasChange: (patch: VariantExtras) => void
+}
+
+/**
+ * The per-channel settings that are not the text: what KIND of post this is, and
+ * Google's call-to-action.
+ *
+ * ── FORMAT IS PER CHANNEL, AND WAS NOT ──────────────────────────────────────
+ * `post_variants.format` has always been a per-channel column, but the deleted
+ * wizard collected ONE answer on a Format step and wrote it to every variant, so
+ * choosing a carousel for Instagram forced a carousel on X. It lives here now,
+ * beside the body it describes.
+ *
+ * ── WHAT IS OFFERED IS WHAT CAN PUBLISH ─────────────────────────────────────
+ * `formatsFor` derives the list from the channel's own spec — `mediaTypes`,
+ * `requiresMedia`, `maxMediaCount` — so a format that publishing would refuse is
+ * never a choice rather than a choice that fails days later. Instagram has no
+ * "Text only" here because Instagram has no text-only post.
+ */
+export function VersionOptions({
+  channel,
+  format,
+  onFormatChange,
+  extras,
+  onExtrasChange,
+}: VersionOptionsProps) {
+  const spec = CONSTRAINTS[channel]
+  const available = formatsFor(spec)
+  const storedCta = extras.gbpCta
+  const ctaUnknown = storedCta !== undefined && storedCta !== '' && !isValidGbpCta(storedCta)
+
+  return (
+    <div className="grid gap-3 narrow:grid-cols-2">
+      <div className="space-y-1.5">
+        <Label htmlFor={`format-${channel}`}>Kind of post</Label>
+        <select
+          id={`format-${channel}`}
+          data-variant-format={channel}
+          value={format ?? ''}
+          onChange={(event) =>
+            onFormatChange(event.target.value === '' ? null : (event.target.value as PostFormat))
+          }
+          className={SELECT_CLASS}
+        >
+          {/* Nobody has said, and that is a real answer: every variant written
+              before the column existed is in it, and none of them is held to
+              anything. Clearing back to it must stay possible. */}
+          <option value="">Not stated</option>
+          {available.map((option) => (
+            <option key={option} value={option}>
+              {FORMAT_LABEL[option]}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {spec.gbp !== undefined ? (
+        <div className="space-y-1.5">
+          <Label htmlFor={`cta-${channel}`}>Call to action</Label>
+          <select
+            id={`cta-${channel}`}
+            value={storedCta ?? ''}
+            onChange={(event) =>
+              onExtrasChange({ gbpCta: event.target.value === '' ? undefined : event.target.value })
+            }
+            className={SELECT_CLASS}
+          >
+            <option value="">No call to action</option>
+            {gbpCtaTypes().map((cta) => (
+              <option key={cta} value={cta}>
+                {cta}
+              </option>
+            ))}
+          </select>
+          {ctaUnknown ? (
+            <p className="text-[12.5px] text-warn">
+              The saved call to action is not one Google accepts — pick one from the list.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}

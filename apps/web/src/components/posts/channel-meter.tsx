@@ -28,6 +28,14 @@ export function ChannelMeterView({ meter, fixes }: ChannelMeterViewProps) {
           className={cn('text-[12.5px] font-semibold', meter.over ? 'text-danger' : 'text-muted')}
         >
           <span className="tabular-nums">{meter.charCount.toLocaleString('en-IN')}</span>
+          {/* ── THE SEPARATOR WAS THE ONLY THING KEEPING THESE TWO NUMBERS APART ──
+              MEASURED from a Playwright accessibility snapshot: with the slash
+              `aria-hidden` and nothing in its place, X's meter read out as
+              "Characters 55280" and LinkedIn's as "4413,000". Every digit was
+              correct and the sentence was nonsense — the same class of defect as
+              a regression that passed every numeric check and rendered "S Sah".
+              The slash stays visual; a real word carries the reading. */}
+          <span className="sr-only"> of </span>
           <span aria-hidden> / </span>
           <span className="tabular-nums">{meter.maxChars.toLocaleString('en-IN')}</span>
         </span>
