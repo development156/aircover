@@ -84,5 +84,8 @@ export function publishPostDeps(): ClaimedPublishDeps {
     writeLog: store.writeLog,
     markVariant: store.markVariant,
     markConnection: store.markConnection,
+    // The X spending cap's numerator. Same pool as everything else in this
+    // object: one `count(*)` per X publish, and only on X.
+    countLiveSends: store.countLiveSends,
   }
 }

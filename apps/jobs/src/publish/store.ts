@@ -1,6 +1,6 @@
 import { isPostFormat } from '@sahoda/publishing'
 import type { Pool } from 'pg'
-import { assertPlatformPostId, type PublishPostPayload } from '@sahoda/shared'
+import { assertPlatformPostId, type Channel, type PublishPostPayload } from '@sahoda/shared'
 import type { PublishLogEntry, PublishVariant, VariantUpdate } from './runPublishPost'
 import type { StoredConnection } from './tokens'
 
@@ -358,6 +358,47 @@ export function createPublishStore(opts: PublishStoreOptions) {
     }
   }
 
+  /**
+   * Live X sends for this workspace since `since` — the numerator of the X ration.
+   *
+   * ── `mode = 'live'` IS THE WHOLE POINT OF THIS QUERY ─────────────────────────
+   * The obvious counter is `post_variants where channel='x' and publish_status =
+   * 'published'`. MEASURED against production on 2026-08-19 that returns 3, and
+   * every one of the three is a FIXTURE run whose permalink begins `fixture://`.
+   * Nothing reached X and nothing was billed. A ration fed from there would refuse
+   * a customer over money nobody spent.
+   *
+   * `status = 'succeeded'` for the mirror reason: X bills for a request that
+   * SUCCEEDS in creating a post. A failed attempt is a different conversation with
+   * X's billing and is not this meter's to guess at.
+   *
+   * `created_at`, not `published_at`: X bills at the moment of the request, and
+   * `published_at` is nullable — counting it would silently drop billed requests
+   * whose timestamp never arrived, which errs in the permissive direction. A cap
+   * must never be wrong in the direction that spends more.
+   */
+  async function countLiveSends(args: {
+    workspaceId: string
+    channel: Channel
+    since: Date
+  }): Promise<number> {
+    const r = await pool.query<{ n: string }>(
+      `select count(*)::text as n from post_publish_logs
+        where workspace_id = $1
+          and channel = $2
+          and mode = 'live'
+          and status = 'succeeded'
+          and created_at >= $3`,
+      [args.workspaceId, args.channel, args.since.toISOString()],
+    )
+    // `count(*)` never returns no rows, but a null here would become NaN and NaN
+    // compares false against every ration, which reads as "allowed" — the one
+    // failure mode a spending cap may not have.
+    const n = Number(r.rows[0]?.n)
+    if (!Number.isFinite(n)) throw new Error('post_publish_logs count returned no number')
+    return n
+  }
+
   return {
     isZernioConnection,
     loadVariant,
@@ -367,6 +408,7 @@ export function createPublishStore(opts: PublishStoreOptions) {
     markVariant,
     markConnection,
     loadConnection,
+    countLiveSends,
   }
 }
 

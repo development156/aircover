@@ -186,3 +186,20 @@ export {
   ZERNIO_PLATFORM_NAME,
   type ZernioAdapterDeps,
 } from './adapters/zernio'
+
+// ── X's per-post economics ────────────────────────────────────────────────────
+// X is the only channel that bills per post, and 13.3× more when the post carries
+// a link. Both the /connections meter (apps/web) and the pre-spend refusal
+// (apps/jobs) read these, so the ration exists exactly once.
+export {
+  X_API_PRICE_USD,
+  X_RATE_LIMIT,
+  X_MONTHLY_RATION,
+  X_RATION_EXHAUSTED_CODE,
+  X_RATION_UNREADABLE_CODE,
+  xRationWindowStart,
+  xPostPriceUsd,
+  checkXRation,
+  xRationRefusalMessage,
+  type XRationVerdict,
+} from './x-cost'
