@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { fetchFollowingCookies } from './lib/cookie-jar.mjs'
 import { DOCUMENT_HEADERS, EXPECTED_ROUTES, judge, summarise } from './lib/probe-routes.mjs'
 
 /**
@@ -9,13 +10,27 @@ import { DOCUMENT_HEADERS, EXPECTED_ROUTES, judge, summarise } from './lib/probe
  * Exits 0 when every route behaves, non-zero otherwise, so CI can gate on it
  * (SL-033) and a human can run it by hand after a deploy.
  *
- * It follows redirects with a cookie jar of one, because a Clerk DEVELOPMENT
- * instance answers every first hop with a handshake to
+ * It follows redirects with a REAL cookie jar (`lib/cookie-jar.mjs`), because a
+ * Clerk DEVELOPMENT instance answers every first hop with a handshake to
  * `…clerk.accounts.dev/v1/client/handshake?…__clerk_hs_reason=dev-browser-missing`
  * before the app is reached at all. Asserting on the first status would
  * therefore be asserting on Clerk's plumbing. A production Clerk instance skips
  * that hop and redirects straight to /sign-in — this probe passes on both,
  * because it only judges where the chain ENDS.
+ *
+ * ── THE FIX THIS FILE NEEDED, AND THE ASSUMPTION THAT COST IT ───────────────
+ * This header used to say the handshake "sets its dev-browser cookie via the
+ * redirect URL itself, so the chain still resolves". It does not. The cookie is
+ * set with `Set-Cookie`, `fetch` has no cookie jar, and the app therefore sees a
+ * missing dev browser on every hop and hands out another handshake.
+ *
+ * MEASURED 2026-08-19: with plain `redirect: 'follow'` this probe reported
+ * **0/6 routes behave** and `fetch failed` on every one, against a production
+ * that a real browser loaded correctly at the same minute. The underlying error
+ * was `redirect count exceeded`. With the jar: **6/6**, in 4-5 hops.
+ *
+ * A post-deploy check that fails on a healthy deployment is worse than no check,
+ * because the first thing anyone does with it is stop reading it.
  *
  * KNOWN LIMITATION: some sandboxes block Node's fetch egress while allowing
  * curl. There the runner reports `fetch failed` on every route — that is the
@@ -36,19 +51,18 @@ async function probe(path) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    // `redirect: 'follow'` handles the handshake chain; fetch carries no cookie
-    // jar, but Clerk's handshake sets its dev-browser cookie via the redirect
-    // URL itself, so the chain still resolves.
-    const response = await fetch(`${HOST}${path}`, {
+    // Hop by hop, carrying cookies. `hops` is kept because it is a measurement
+    // worth having: a chain that settles in one or two hops means production has
+    // moved to a Clerk PRODUCTION instance, and four or five means it has not.
+    const { response, trail } = await fetchFollowingCookies(`${HOST}${path}`, {
       headers: DOCUMENT_HEADERS,
-      redirect: 'follow',
       signal: controller.signal,
     })
     return {
       status: response.status,
       contentType: response.headers.get('content-type') ?? '',
       body: await response.text(),
-      finalUrl: response.url || `${HOST}${path}`,
+      finalUrl: response.url || trail.at(-1)?.url || `${HOST}${path}`,
     }
   } catch (error) {
     // A network failure is a probe failure, never a silent pass.

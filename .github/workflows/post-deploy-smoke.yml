@@ -1,0 +1,69 @@
+# Probe a deployment AFTER it goes live, and fail loudly.
+#
+# WHY THIS IS THE FIRST WORKFLOW IN THIS REPO. There is no CI here. `.github`
+# contained one issue template and nothing else, so every check this project has
+# ever run has run on a developer's laptop, at a time of that developer's
+# choosing. Run 27 found a production BUILD error that the local gate could not
+# reach for 27 runs; a deployment that builds and then serves a broken site is
+# the same blindness one layer further out.
+#
+# WHAT IT ACTUALLY CHECKS, stated plainly so nobody reads more into a green tick
+# than it earns: the six routes in `scripts/lib/probe-routes.mjs`, signed out.
+# It proves the deployment is up, that protected routes send you to sign-in and
+# keep your destination, that /sign-in renders, and that /admin 404s rather than
+# advertising itself. It does NOT sign in, publish, spend a credit, or touch the
+# database.
+#
+# The full 58-test `@smoke` Playwright suite is deliberately NOT run here. It
+# drives a signed-in browser against a dev server with a stored Clerk session,
+# and pointing it at a remote deployment needs Clerk test credentials as repo
+# secrets plus a Vercel protection-bypass token for previews. Those are the
+# founder's to add. Wiring a suite that would fail on a missing secret and read
+# as a broken deployment is exactly the cry-wolf failure this file exists to end.
+
+name: post-deploy smoke
+
+on:
+  # Vercel's GitHub integration posts a deployment status when a build finishes,
+  # so this fires on the real event rather than on a timer that hopes.
+  deployment_status:
+  # And by hand, against any URL — the path a human uses to check a rollback.
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Deployment URL to probe
+        required: true
+        default: https://sahodalabs.vercel.app
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    # `deployment_status` fires for every state including `pending` and `error`.
+    # Probing a deployment that has not finished would fail for the one reason
+    # that is not a defect, so the success state is the only one worth a run.
+    if: github.event_name == 'workflow_dispatch' || github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # No install step, and that is deliberate: the probe is plain Node with no
+      # imports outside `scripts/`. A `pnpm install` here would make a check that
+      # exists to be fast and boring depend on the whole dependency graph.
+      - name: Probe the deployment
+        env:
+          PROBE_HOST: ${{ github.event.inputs.url || github.event.deployment_status.target_url }}
+        run: |
+          if [ -z "$PROBE_HOST" ]; then
+            echo "No deployment URL to probe — refusing to pass by default."
+            exit 1
+          fi
+          echo "Probing $PROBE_HOST"
+          node scripts/probe-production.mjs "$PROBE_HOST"

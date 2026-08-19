@@ -67,3 +67,39 @@ export async function sendApprovalCode(input: {
 
   return send(input.to, `Approve ${input.amount} credits for ${input.workspace}?`, text)
 }
+
+/**
+ * An operational alert, to whoever is seeded as an admin.
+ *
+ * ── WHO IT GOES TO, AND WHY IT IS NOT A CONFIGURABLE LIST ───────────────────
+ * `ADMIN_BOOTSTRAP_EMAILS` — the same env var that seeds `ops_admins`. Reusing
+ * it means there is exactly one answer to "who runs this system", so an alert
+ * can never be routed somewhere nobody reads while the console shows a
+ * different set of people. A second list would be a second thing to keep in
+ * sync, and the failure mode of getting it wrong is silence.
+ *
+ * ── UNCONFIGURED IS REPORTED, NEVER TREATED AS SENT ─────────────────────────
+ * No key or no recipients returns `not_configured`. The caller must not count
+ * that as delivered: an alerting path that reports success while sending
+ * nothing is worse than having no alerting at all, because it is believed.
+ *
+ * Addresses are sent as separate messages rather than one multi-recipient
+ * message, so one bad address cannot suppress everyone else's copy.
+ */
+export async function sendOpsEmail(input: { subject: string; text: string }): Promise<SendOutcome> {
+  const recipients = (env.ADMIN_BOOTSTRAP_EMAILS ?? '')
+    .split(',')
+    .map((address) => address.trim())
+    .filter((address) => address !== '')
+
+  if (recipients.length === 0) return { ok: false, reason: 'not_configured' }
+
+  const outcomes = await Promise.all(
+    recipients.map((address) => send(address, input.subject, input.text)),
+  )
+  // One delivery is enough to call it reported. Requiring all of them would let
+  // a single stale address turn every alert into a failure.
+  const delivered = outcomes.find((outcome) => outcome.ok)
+  if (delivered) return delivered
+  return outcomes[0] ?? { ok: false, reason: 'not_configured' }
+}
