@@ -1,74 +1,149 @@
 import Link from 'next/link'
+import { dunningPolicy } from '@sahoda/billing'
 
+import { PageTitle } from '@/components/page-title'
+import { BillingDetailsForm } from '@/components/billing/billing-details-form'
+import { CurrentPlan, PlanNoWorkspace, PlanUnreadable } from '@/components/billing/current-plan'
+import { DunningBanner } from '@/components/billing/dunning-banner'
+import { InvoiceTable, InvoicingUnavailable } from '@/components/billing/invoice-table'
+import { PlanPicker } from '@/components/billing/plan-picker'
 import { SettingCard, SettingRow } from '@/components/settings/setting-row'
 import { buttonVariants } from '@/components/ui/button'
+import { readBillingProfile, readInvoices, readSubscription } from '@/lib/billing/read'
 import { readBalance, type BalanceRead } from '@/lib/wallet/read'
 
-export const metadata = { title: 'Plan & credits' }
+export const metadata = { title: 'Plan & billing' }
 
 /**
- * Plan & credits — ONE tab, where the reference has two.
+ * Plan & billing — ONE tab, where the reference has two.
  *
- * The reference separates "Billing" (invoices, plan) from "Credits" (balance,
- * costs). This product has no invoice store, so a Billing tab would be a plan
- * name and nothing else. Merging them is honest; two half-empty tabs are not.
+ * The reference separates "Billing" from "Credits". This product's plan, its credits and its
+ * invoices are one story: a payment buys a month's credits and produces a tax invoice, and
+ * splitting them puts half of each answer on a different screen.
  *
- * READ-ONLY, and deliberately so: this pass changes nothing in the ledger,
- * billing or credit accounting. The balance is READ, never restated — an
- * unreadable balance says so rather than showing a zero, which is the whole
- * point of the three-way split this read returns.
+ * ── HOW THIS SCREEN IS ORDERED ───────────────────────────────────────────────
+ * Descending certainty, which is also descending urgency:
+ *
+ *   1. What needs you now      — the dunning banner, and only when there IS something
+ *   2. What is true now        — the plan you are on            (.is-real)
+ *   3. What is already decided — a scheduled change             (.is-committed)
+ *   4. What you are considering— a proration preview            (.is-proposed)
+ *   5. What already happened   — invoices
+ *   6. What you can set        — billing details, credits
+ *
+ * `/analytics` is the cautionary tale: five empty states in five visual languages, with the
+ * largest, loudest element on the page carrying the least information. Nothing here renders
+ * unless it has something to say.
  */
+export default async function SettingsPlanPage() {
+  const [subscription, invoices, profile, balance] = await Promise.all([
+    readSubscription(),
+    readInvoices(),
+    readBillingProfile(),
+    readBalance(),
+  ])
+
+  if (subscription.status === 'no-workspace') {
+    return (
+      <div className="space-y-grid">
+        <PageTitle>Plan &amp; billing</PageTitle>
+        <PlanNoWorkspace />
+      </div>
+    )
+  }
+
+  if (subscription.status === 'unreadable') {
+    return (
+      <div className="space-y-grid">
+        <PageTitle>Plan &amp; billing</PageTitle>
+        <PlanUnreadable />
+      </div>
+    )
+  }
+
+  // Read the clock ONCE, on the server, and pass the result down. The components stay pure
+  // and the dunning stage cannot drift between two renders of the same page.
+  const policy = dunningPolicy(subscription.data, new Date())
+
+  return (
+    <div className="space-y-grid">
+      <PageTitle>Plan &amp; billing</PageTitle>
+
+      <DunningBanner policy={policy} planId={subscription.data.planId} />
+
+      <CurrentPlan subscription={subscription.data} policy={policy} />
+
+      <PlanPicker subscription={subscription.data} />
+
+      <section data-guide="plan.invoices" className="space-y-3">
+        <h2 className="type-h2">Invoices</h2>
+        {invoices.status === 'ok' ? (
+          <InvoiceTable invoices={invoices.data} />
+        ) : invoices.status === 'unavailable' ? (
+          // The invoice store is not deployed here. Payments and credits work; the paperwork
+          // does not exist yet. A different claim from a failed read, and a different remedy.
+          <InvoicingUnavailable />
+        ) : (
+          // Unreadable is not "no invoices". Telling a customer they have never been
+          // invoiced, because a query failed, is a claim about their records that we have no
+          // basis for.
+          <p role="alert" className="type-body text-muted">
+            Sahoda could not read your invoices just now — reload to try again. Nothing has changed
+            and no document has been lost.
+          </p>
+        )}
+      </section>
+
+      {/*
+        No form while the invoice store is undeployed. A form whose Save cannot succeed is
+        a control that does not work, and offering one is worse than offering nothing — the
+        failure reads as a broken app rather than a feature that is not switched on.
+      */}
+      {profile.status === 'unavailable' ? null : (
+        <BillingDetailsForm profile={profile.status === 'ok' ? profile.data : null} />
+      )}
+
+      <SettingCard title="Credits">
+        <SettingRow
+          label="Available"
+          hint={AVAILABLE_HINT[balance.status]}
+          control={
+            <span className="type-h3 num text-ink">
+              {balance.status === 'ok' ? balance.balance.available : '—'}
+            </span>
+          }
+        />
+        {balance.status === 'ok' && balance.balance.held > 0 ? (
+          <SettingRow
+            label="Held"
+            hint="Reserved by actions in progress. Returned in full if they do not complete."
+            control={<span className="type-h3 num text-ink">{balance.balance.held}</span>}
+          />
+        ) : null}
+        <SettingRow
+          label="Activity and top-ups"
+          hint="Every entry, what it was for, and what it cost."
+          control={
+            <Link href="/wallet" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              Open wallet
+            </Link>
+          }
+        />
+      </SettingCard>
+    </div>
+  )
+}
+
 /**
  * `readBalance` answers in THREE parts and this tab used to render two.
  *
- * `no-workspace` fell into the same arm as `unreadable`, so a brand-new account
- * was told "We could not read your balance just now" — a failure that had not
- * happened, attached to a remedy (reload) that cannot produce a wallet. The
- * union in lib/wallet/read.ts was introduced to end exactly that sentence on
- * /home and the credit chip; this consumer flattened it straight back.
- *
- * Each arm now carries its own remedy, and only one of them is a reload.
+ * `no-workspace` fell into the same arm as `unreadable`, so a brand-new account was told "We
+ * could not read your balance just now" — a failure that had not happened, attached to a
+ * remedy (reload) that cannot produce a wallet. Each arm carries its own remedy, and only
+ * one of them is a reload.
  */
 const AVAILABLE_HINT: Record<BalanceRead['status'], string> = {
   ok: 'What you can spend right now.',
   'no-workspace': 'Credits belong to a workspace and you don’t have one yet.',
   unreadable: 'We could not read your balance just now — this is not a zero.',
-}
-
-export default async function SettingsPlanPage() {
-  const balance = await readBalance()
-
-  return (
-    <SettingCard title="Credits">
-      <SettingRow
-        label="Available"
-        hint={AVAILABLE_HINT[balance.status]}
-        control={
-          <span className="text-[15px] font-[650] text-ink tabular-nums">
-            {balance.status === 'ok' ? balance.balance.available : '—'}
-          </span>
-        }
-      />
-      {balance.status === 'ok' && balance.balance.held > 0 ? (
-        <SettingRow
-          label="Held"
-          hint="Reserved by actions in progress. Returned in full if they do not complete."
-          control={
-            <span className="text-[15px] font-[650] text-ink tabular-nums">
-              {balance.balance.held}
-            </span>
-          }
-        />
-      ) : null}
-      <SettingRow
-        label="Activity and top-ups"
-        hint="Every entry, what it was for, and what it cost."
-        control={
-          <Link href="/wallet" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-            Open wallet
-          </Link>
-        }
-      />
-    </SettingCard>
-  )
 }

@@ -45,7 +45,54 @@ const activeWorkspaceId = cache(
 )
 
 export type Read<T> =
-  { status: 'ok'; data: T } | { status: 'no-workspace' } | { status: 'unreadable' }
+  | { status: 'ok'; data: T }
+  | { status: 'no-workspace' }
+  | { status: 'unreadable' }
+  /**
+   * The part of the schema this read needs is NOT DEPLOYED YET.
+   *
+   * A fourth arm, added after the screen was seen in a browser saying "Sahoda could not read
+   * your plan" on a perfectly healthy account. `20260819213000_billing_lifecycle.sql` is not
+   * applied — migrations are applied by the founder, by hand — so PostgREST answered
+   * `42P01 undefined_table` and the read collapsed it into `unreadable`.
+   *
+   * That is a false diagnosis attached to a remedy that cannot work, which is the exact bug
+   * class `e2e/no-impossible-remedy.spec.ts` exists to catch. "We asked and got nothing
+   * back" and "this feature is not switched on here" are different claims and need different
+   * sentences. Distinguishing them also means the migration can be applied on its own
+   * schedule instead of needing a lockstep deploy.
+   */
+  | { status: 'unavailable' }
+
+/**
+ * Codes that mean "the schema does not have this yet", not "the read failed".
+ *
+ * MEASURED against the live project rather than assumed, because the two cases come from
+ * different layers and only one of them is a Postgres error:
+ *
+ *   missing TABLE  → HTTP 404, `PGRST205`, "Could not find the table 'public.invoices' in
+ *                    the schema cache" — PostgREST resolves the table from its OWN cache and
+ *                    never reaches Postgres, so the obvious `42P01` never appears.
+ *   missing COLUMN → HTTP 400, `42703`, "column subscriptions.pending_plan_id does not
+ *                    exist" — this one does reach Postgres.
+ *
+ * `42P01` is kept for a direct-SQL path that would produce it. Guessing at this set is how a
+ * screen ends up saying "could not read" about a feature that is simply not switched on.
+ */
+const NOT_DEPLOYED = new Set(['PGRST205', '42703', '42P01'])
+
+const isNotDeployed = (error: { code?: string } | null): boolean =>
+  error?.code !== undefined && NOT_DEPLOYED.has(error.code)
+
+/**
+ * A read that CANNOT report a schema gap, because the columns it needs have always existed.
+ *
+ * Narrower on purpose rather than for tidiness: `readSubscription` splits its select
+ * precisely so a missing lifecycle column degrades to "nothing recorded" instead of failing.
+ * Typing it with the wider union would force every caller to write an `unavailable` branch
+ * that can never run — dead UI, which is its own kind of dishonesty.
+ */
+export type SettledRead<T> = Exclude<Read<T>, { status: 'unavailable' }>
 
 /** How many documents the plan screen lists. Exported so the UI can state its own window. */
 export const INVOICE_LIMIT = 24
@@ -59,19 +106,32 @@ export const INVOICE_LIMIT = 24
  * other direction would be worse: reporting `unreadable` for every free workspace would put
  * an error on the plan screen of every user who has not paid yet, which is most of them.
  */
-export async function readSubscription(): Promise<Read<SubscriptionView>> {
+export async function readSubscription(): Promise<SettledRead<SubscriptionView>> {
   try {
     const ws = await activeWorkspaceId()
     if (ws.status === 'unreadable') return { status: 'unreadable' }
     if (ws.status === 'none') return { status: 'no-workspace' }
 
     const supabase = createServerSupabase()
-    const { data, error } = await supabase
+
+    /**
+     * TWO SELECTS, and the split is the point.
+     *
+     * The BASE columns have been in `subscriptions` since the first migration. The lifecycle
+     * columns arrive with `20260819213000_billing_lifecycle.sql`, which the founder applies
+     * by hand. Naming all of them in one select means a database without the second set
+     * fails the whole read — and a screen that says "could not read your plan" while the
+     * plan sits right there in the row is a false diagnosis.
+     *
+     * So the plan is read on its own and always succeeds; the lifecycle fields are read
+     * separately and are simply ABSENT until the migration lands. Absent is the truth: a
+     * column that does not exist records no grace window and no pending change.
+     */
+    const base = await supabase
       .from('subscriptions')
       .select(
         'workspace_id, plan_id, status, current_period_start, current_period_end, ' +
-          'cancel_at_period_end, pending_plan_id, pending_plan_effective_at, ' +
-          'grace_ends_at, dunning_attempts, last_failure_at, last_failure_code',
+          'cancel_at_period_end',
       )
       .eq('workspace_id', ws.id)
       // `subscriptions_one_live` bounds the LIVE ones, not the closed ones, so a workspace
@@ -80,7 +140,26 @@ export async function readSubscription(): Promise<Read<SubscriptionView>> {
       .order('created_at', { ascending: false })
       .limit(1)
 
-    if (error) return { status: 'unreadable' }
+    if (base.error) return { status: 'unreadable' }
+
+    const lifecycle = await supabase
+      .from('subscriptions')
+      .select(
+        'pending_plan_id, pending_plan_effective_at, grace_ends_at, ' +
+          'dunning_attempts, last_failure_at, last_failure_code',
+      )
+      .eq('workspace_id', ws.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    // A missing COLUMN is "not deployed yet". Any other failure is a genuine read failure
+    // and must not be quietly reported as "no dunning, no pending change" — that would tell
+    // a customer with a scheduled downgrade that nothing is scheduled.
+    if (lifecycle.error && !isNotDeployed(lifecycle.error)) return { status: 'unreadable' }
+
+    const data = base.data
+    const extra = (lifecycle.error ? undefined : lifecycle.data?.[0]) as
+      Record<string, unknown> | undefined
 
     /**
      * Read through `unknown`, and let zod be the boundary.
@@ -104,12 +183,15 @@ export async function readSubscription(): Promise<Read<SubscriptionView>> {
       currentPeriodStart: row.current_period_start,
       currentPeriodEnd: row.current_period_end,
       cancelAtPeriodEnd: row.cancel_at_period_end,
-      pendingPlanId: row.pending_plan_id,
-      pendingPlanEffectiveAt: row.pending_plan_effective_at,
-      graceEndsAt: row.grace_ends_at,
-      dunningAttempts: row.dunning_attempts ?? 0,
-      lastFailureAt: row.last_failure_at,
-      lastFailureCode: row.last_failure_code,
+      // Null and zero here mean "nothing is recorded", which is exactly what a database
+      // without these columns records. `advanceStage` already refuses to suspend on a null
+      // grace window, so the fallback cannot cost anyone their entitlements.
+      pendingPlanId: extra?.pending_plan_id ?? null,
+      pendingPlanEffectiveAt: extra?.pending_plan_effective_at ?? null,
+      graceEndsAt: extra?.grace_ends_at ?? null,
+      dunningAttempts: extra?.dunning_attempts ?? 0,
+      lastFailureAt: extra?.last_failure_at ?? null,
+      lastFailureCode: extra?.last_failure_code ?? null,
     })
     // A row we cannot parse is UNREADABLE, never a silent fall back to Free. Falling back
     // would hand a paying customer the free tier's limits because of a schema drift.
@@ -155,6 +237,9 @@ export async function readInvoices(): Promise<Read<Invoice[]>> {
       .order('issued_at', { ascending: false })
       .limit(INVOICE_LIMIT)
 
+    // The table arrives with the billing-lifecycle migration. Until then Sahoda is not
+    // issuing invoices at all, which is a different sentence from "we could not read them".
+    if (isNotDeployed(error)) return { status: 'unavailable' }
     if (error) return { status: 'unreadable' }
 
     // Parse each row and DROP the ones that do not fit, rather than failing the page. A
@@ -184,6 +269,7 @@ export async function readBillingProfile(): Promise<Read<BillingProfile | null>>
       .eq('workspace_id', ws.id)
       .maybeSingle()
 
+    if (isNotDeployed(error)) return { status: 'unavailable' }
     if (error) return { status: 'unreadable' }
     if (!data) return { status: 'ok', data: null }
 
@@ -203,7 +289,7 @@ export async function readBillingProfile(): Promise<Read<BillingProfile | null>>
  * `unreadable`; there is deliberately no `?? 0`, because a zero here would silently report
  * that nothing is over the limit.
  */
-export async function readUsage(): Promise<Read<WorkspaceUsage>> {
+export async function readUsage(): Promise<SettledRead<WorkspaceUsage>> {
   try {
     const ws = await activeWorkspaceId()
     if (ws.status === 'unreadable') return { status: 'unreadable' }
