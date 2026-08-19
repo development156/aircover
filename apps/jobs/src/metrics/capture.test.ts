@@ -190,7 +190,39 @@ describe('the metric-history pass', () => {
 
     const report = await runMetricCapture(h.deps)
 
-    expect(report).toMatchObject({ targets: 1, measured: 0, pending: 0, unreadable: 1 })
+    expect(report).toMatchObject({
+      targets: 1,
+      measured: 0,
+      pending: 0,
+      unreadable: 1,
+      unresolved: 0,
+    })
+    expect(h.written).toEqual([])
+  })
+
+  it('counts the platform’s own “cannot resolve this” apart from a failed call', async () => {
+    // One is a permanent state on their side, the other is an outage on ours. A
+    // retry fixes one and will never fix the other, so a report that merged them
+    // could not tell anyone which night they were looking at.
+    const orphaned = {
+      status: 200,
+      post: {
+        status: 'published',
+        syncStatus: 'orphaned',
+        analytics: {
+          impressions: 0,
+          reach: 0,
+          likes: 0,
+          comments: 0,
+          lastUpdated: '2026-08-19 01:30:00',
+        },
+      },
+    } as unknown as ZernioPostAnalyticsResult
+    const h = harness([target()], async () => orphaned)
+
+    const report = await runMetricCapture(h.deps)
+
+    expect(report).toMatchObject({ measured: 0, unresolved: 1, unreadable: 0 })
     expect(h.written).toEqual([])
   })
 

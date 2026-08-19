@@ -71,6 +71,21 @@ export interface SeriesPoint {
 export type MetricSeries =
   | { kind: 'unavailable' }
   | { kind: 'unreadable' }
+  /**
+   * There is no workspace, so there is nothing this history could belong to.
+   *
+   * ── WHY THIS IS NOT `unreadable` ────────────────────────────────────────────
+   * It was, and `e2e/no-impossible-remedy.spec.ts` caught it: the card told a
+   * brand-new account "Sahoda could not read the history — reload to try again",
+   * on an account where nothing had failed and where reloading cannot produce a
+   * workspace. That is the same "could not look" / "looked and found nothing"
+   * collapse `lib/inbox/emptiness.ts` exists to keep apart, arriving through a new
+   * read that had not learned the rule.
+   *
+   * A remedy that cannot work is worse than no remedy: it sends someone to press a
+   * button forever instead of telling them what is actually true.
+   */
+  | { kind: 'no-workspace' }
   | { kind: 'empty' }
   | { kind: 'sparse'; days: number }
   | { kind: 'ready'; points: SeriesPoint[]; minSeries: number; maxSeries: number }
@@ -180,6 +195,10 @@ export async function readMetricSeries(
     }
 
     const workspace = await activeWorkspaceRead()
+    // Three answers, and they are three different sentences. `none` is an account
+    // that has not made a workspace yet — nothing failed. `unreadable` is a read
+    // that did fail, and only that one earns a retry.
+    if (workspace.status === 'none') return { kind: 'no-workspace' }
     if (workspace.status !== 'ok') return { kind: 'unreadable' }
 
     const supabase = createServerSupabase()

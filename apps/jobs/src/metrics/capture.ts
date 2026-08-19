@@ -105,8 +105,23 @@ export interface MetricCaptureReport {
   measured: number
   /** Not measured YET — inside a reporting window, or still processing. */
   pending: number
-  /** The call failed, or the answer could not be used. NOT the same as pending. */
+  /**
+   * The call itself failed — a network error, a refused request. OURS to fix.
+   */
   unreadable: number
+  /**
+   * The platform answered and said it cannot tie this post to a live account.
+   *
+   * ── WHY THIS IS COUNTED APART FROM `unreadable` ─────────────────────────────
+   * They were one number until 2026-08-19, and the first production run showed why
+   * that was not good enough: one of seven targets came back uncountable on both
+   * runs, with a `platform_post_id` the same shape as its five working siblings.
+   * Merged, there was no way to tell whether Sahoda could not reach Zernio or
+   * Zernio could not find the post — an outage on our side and a permanent state
+   * on theirs, which need opposite responses. A retry fixes one and will never fix
+   * the other.
+   */
+  unresolved: number
   /** Numbers built from those measurements. Several per measured channel. */
   collected: number
   /**
@@ -169,6 +184,7 @@ export async function runMetricCapture(deps: MetricCaptureDeps): Promise<MetricC
   let measured = 0
   let pending = 0
   let unreadable = 0
+  let unresolved = 0
   const rows: MetricSnapshot[] = []
 
   for (const target of targets) {
@@ -211,6 +227,10 @@ export async function runMetricCapture(deps: MetricCaptureDeps): Promise<MetricC
     }
 
     if (state.kind === 'pending') pending += 1
+    // `unresolved` is the platform's own verdict — it answered, and said it cannot
+    // resolve this post to an account. `unavailable` covers the cases where no
+    // useful call could be made at all, which is the same kind of gap as a failure.
+    else if (state.kind === 'unresolved') unresolved += 1
     else unreadable += 1
   }
 
@@ -232,6 +252,7 @@ export async function runMetricCapture(deps: MetricCaptureDeps): Promise<MetricC
     unreadable,
     collected: rows.length,
     written: inserted,
+    unresolved,
     newestMeasuredAt: stamps.length === 0 ? null : stamps.reduce((a, b) => (a > b ? a : b)),
     daysInBatch: days.size,
     storage,

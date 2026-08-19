@@ -24,12 +24,19 @@ const vercelConfig = JSON.parse(readFileSync(resolve(WEB, 'vercel.json'), 'utf8'
 const middleware = readFileSync(resolve(WEB, 'src/middleware.ts'), 'utf8')
 
 describe('cron wiring', () => {
-  it('schedules exactly one sweep job, every five minutes', () => {
-    expect(vercelConfig.crons).toHaveLength(1)
-    expect(vercelConfig.crons![0]).toEqual({
-      path: '/api/cron/sweeps',
-      schedule: '*/5 * * * *',
-    })
+  it('schedules exactly the two jobs, on their own cadences', () => {
+    // Pinned as a SET of exact entries rather than a count, so a THIRD job cannot
+    // arrive quietly and so a schedule cannot be edited without a decision.
+    //
+    // The two cadences are not interchangeable, and the second one is why the
+    // metric pass is a separate job at all: `post_metric_snapshots` is keyed by
+    // DAY, so riding the five-minute tick would spend one Zernio request per
+    // published channel, 288 times a day, to write nothing on 287 of them.
+    // 01:20 UTC is 06:50 IST — past midnight in India, before the working day.
+    expect(vercelConfig.crons).toEqual([
+      { path: '/api/cron/sweeps', schedule: '*/5 * * * *' },
+      { path: '/api/cron/metrics', schedule: '20 1 * * *' },
+    ])
   })
 
   it('points at a route handler that exists on disk', () => {
@@ -48,8 +55,22 @@ describe('cron wiring', () => {
   it('exempts them as exact paths, never as a prefix pattern', () => {
     // A `/api/cron(.*)` entry would make every future route under that prefix public the
     // moment it lands - the standing hole the middleware's own comment warns about.
+    // ── THE COMMENT STRIP IS LOAD-BEARING, AND ITS ABSENCE HID TWO ENTRIES ──
+    // This used to split the captured block on commas and keep whatever started
+    // with `/api`. An entry preceded by an explanatory comment lands in the same
+    // comma-separated segment as that comment, so after `trim()` the segment starts
+    // with `//` and was filtered straight out.
+    //
+    // MEASURED 2026-08-19: `/api/webhooks/cashfree` — a PUBLIC endpoint that takes
+    // payment webhooks — has a comment above it and was therefore invisible to this
+    // guard for as long as it has existed, while the note below claimed adding a
+    // public /api route "still fails here first". It did not. The strip is what
+    // makes that sentence true.
     const publicList = middleware.match(/createRouteMatcher\(\[([^\]]*)\]\)/)?.[1] ?? ''
     const apiEntries = publicList
+      .split('\n')
+      .map((line) => line.replace(/\/\/.*$/, ''))
+      .join('\n')
       .split(',')
       .map((entry) => entry.trim().replace(/^['"]|['"]$/g, ''))
       .filter((entry) => entry.startsWith('/api'))
@@ -57,29 +78,38 @@ describe('cron wiring', () => {
     // Pinned as a SET, not a count. Widened on 2026-07-28 when the wt-admin merge brought
     // three more public /api routes, each authenticating itself in-route (Turnstile on the
     // beta form, a constant-time x-ops-token compare on ingest, the Clerk webhook
-    // signature). The guard's teeth are unchanged: adding a public /api route still fails
-    // here first, so it stays a deliberate act rather than a quiet one.
+    // signature). Adding a public /api route fails here first, so it stays a deliberate
+    // act rather than a quiet one — which, as the note above records, was the intent
+    // from the start and only became true of a COMMENTED entry on 2026-08-19.
     expect(new Set(apiEntries)).toEqual(
       new Set([
         '/api/cron/sweeps',
+        '/api/cron/metrics',
         '/api/public/beta-apply',
         '/api/admin/devops/ingest',
         '/api/webhooks/clerk',
+        // Present in middleware.ts since the 2026-07-28 merge and absent from this
+        // set until 2026-08-19 — not because anyone decided it, but because the
+        // parse above could not see it. Listed now, which is the point.
+        '/api/webhooks/cashfree',
       ]),
     )
     for (const entry of apiEntries) expect(entry).not.toContain('(.*)')
   })
 
-  it('the route checks the shared secret before anything else', () => {
+  it('every cron route checks the shared secret before anything else', () => {
     // Placement is the property: a header read or a query above this line would be
-    // reachable by anyone on the internet.
-    const route = readFileSync(resolve(WEB, 'src/app/api/cron/sweeps/route.ts'), 'utf8')
-    const body = route.slice(route.indexOf('export async function GET'))
-    const firstStatement = body.indexOf('if (')
-    const firstAwait = body.indexOf('await')
+    // reachable by anyone on the internet. Driven off the schedule rather than
+    // naming one file, so a new job cannot be added without inheriting the check.
+    for (const cron of vercelConfig.crons ?? []) {
+      const route = readFileSync(resolve(WEB, 'src/app', `.${cron.path}`, 'route.ts'), 'utf8')
+      const body = route.slice(route.indexOf('export async function GET'))
+      const firstStatement = body.indexOf('if (')
+      const firstAwait = body.indexOf('await')
 
-    expect(firstStatement).toBeGreaterThan(-1)
-    expect(body.slice(firstStatement, firstStatement + 200)).toContain('isAuthorizedCronRequest')
-    expect(firstAwait).toBeGreaterThan(firstStatement)
+      expect(firstStatement, `${cron.path} has no guard at all`).toBeGreaterThan(-1)
+      expect(body.slice(firstStatement, firstStatement + 200)).toContain('isAuthorizedCronRequest')
+      expect(firstAwait, `${cron.path} awaits before it authorises`).toBeGreaterThan(firstStatement)
+    }
   })
 })

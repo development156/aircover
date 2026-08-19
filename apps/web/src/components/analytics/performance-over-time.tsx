@@ -115,6 +115,17 @@ export function PerformanceOverTime({
     )
   }
 
+  if (series.kind === 'no-workspace') {
+    // NO REMEDY, deliberately. Nothing failed here and reloading cannot make a
+    // workspace, so offering a retry would send someone to press a button forever.
+    // Caught by `e2e/no-impossible-remedy.spec.ts` when this said "could not read".
+    return (
+      <Container>
+        <Note>A history belongs to a workspace, and this account does not have one yet.</Note>
+      </Container>
+    )
+  }
+
   if (series.kind === 'unreadable') {
     // NOT "there is no history" — that is a claim about the workspace's data, and
     // this read did not establish it. What failed was the reading.

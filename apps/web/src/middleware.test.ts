@@ -33,6 +33,7 @@ const PUBLIC_PATTERNS = [
   '/api/webhooks/clerk',
   '/api/webhooks/cashfree',
   '/api/cron/sweeps',
+  '/api/cron/metrics',
 ]
 
 /**
@@ -45,10 +46,16 @@ const PUBLIC_PATTERNS = [
  * **500 MIDDLEWARE_INVOCATION_FAILED** on EVERY matched path, public ones included.
  * Reproduced on /sign-in, /embed/beta, /api/public/beta-apply and all three below.
  *
- * These three authenticate themselves — CRON_SECRET, and an HMAC/Svix signature — and
- * gain nothing from Clerk, so the honest fix is for Clerk not to see them at all.
+ * These four authenticate themselves — two CRON_SECRET compares, and an HMAC/Svix
+ * signature — and gain nothing from Clerk, so the honest fix is for Clerk not to see
+ * them at all.
  */
-const CLERK_BYPASS_PATHS = ['/api/cron/sweeps', '/api/webhooks/cashfree', '/api/webhooks/clerk']
+const CLERK_BYPASS_PATHS = [
+  '/api/cron/sweeps',
+  '/api/cron/metrics',
+  '/api/webhooks/cashfree',
+  '/api/webhooks/clerk',
+]
 
 /** Paths that MUST keep reaching clerkMiddleware. A bypass that widens is a hole. */
 const CLERK_MATCHED_PATHS = [
@@ -85,7 +92,13 @@ describe('middleware routing contract', () => {
       expect(isPublicRoute(req('/api/cron/sweeps'))).toBe(true)
     })
 
-    it('does not expose anything else under /api/cron — the entry is exact, not a prefix', () => {
+    it('treats /api/cron/metrics as public for the same reason', () => {
+      // The nightly metric pass. Redirected, it would report a green run every night
+      // while collecting nothing — and a day of measurements cannot be collected later.
+      expect(isPublicRoute(req('/api/cron/metrics'))).toBe(true)
+    })
+
+    it('does not expose anything else under /api/cron — the entries are exact, not a prefix', () => {
       expect(isPublicRoute(req('/api/cron/other'))).toBe(false)
       expect(isPublicRoute(req('/api/cron'))).toBe(false)
     })

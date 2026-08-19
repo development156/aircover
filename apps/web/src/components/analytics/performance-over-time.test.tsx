@@ -66,6 +66,16 @@ describe('what the card says', () => {
     expect(screen.queryByText(/does not keep a history/i)).toBeNull()
   })
 
+  test('an account with no workspace is told that, and offered no retry', () => {
+    // `e2e/no-impossible-remedy.spec.ts` caught this saying "could not read the
+    // history — reload to try again" on an account where nothing had failed. A
+    // remedy that cannot work is worse than none: reloading cannot make a workspace.
+    render(<PerformanceOverTime series={{ kind: 'no-workspace' }} />)
+
+    expect(screen.getByText(/belongs to a workspace/i)).toBeVisible()
+    expect(screen.queryByText(/reload|try again|refresh|could not read/i)).toBeNull()
+  })
+
   test('a table with nothing in it yet says so, and does not claim a fault', () => {
     render(<PerformanceOverTime series={{ kind: 'empty' }} />)
     expect(screen.getByText(/has started keeping a history/i)).toBeVisible()

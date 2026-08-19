@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/sweeps",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/metrics",
+      "schedule": "20 1 * * *"
     }
   ]
 }

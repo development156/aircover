@@ -1,6 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { setupClerkTestingToken } from '@clerk/testing/playwright'
-import { test as base, type Page } from '@playwright/test'
+import { test as base, type Browser, type Page } from '@playwright/test'
 
 /**
  * A signed-in user that seeds ITSELF.
@@ -138,6 +138,47 @@ async function signIn(page: Page, user: SeededUser): Promise<void> {
 
   await page.goto(`/sign-in?__clerk_ticket=${token}`)
   await page.waitForURL((url) => !url.pathname.startsWith('/sign-in'), { timeout: 30_000 })
+}
+
+/**
+ * A SECOND browser context, signed in as the same person.
+ *
+ * ── WHY A CONTEXT AND NOT A SECOND TAB ───────────────────────────────────────
+ * docs/23's test plan is explicit about this: two tabs in one context share a
+ * cookie jar and a storage state, so a defect that only appears when two
+ * SESSIONS hold different beliefs about the same row would be masked. A concurrent
+ * edit is a race between two independent clients; the test has to be two
+ * independent clients.
+ *
+ * A fresh sign-in ticket is minted rather than the first one reused: Clerk tickets
+ * are single-use, and reusing one fails in a way that looks like an auth outage
+ * rather than a spent token.
+ *
+ * Exported as a plain function rather than a fixture because only the specs that
+ * genuinely need two clients should pay for a second sign-in.
+ */
+export async function signInSecondContext(browser: Browser, user: SeededUser): Promise<Page> {
+  const context = await browser.newContext()
+  const page = await context.newPage()
+  await signIn(page, user)
+  return page
+}
+
+/**
+ * Service-role client, for READING BACK what the app wrote.
+ *
+ * Test scaffolding only — `apps/web` itself must never gain one of these. It is
+ * here because the strongest available proof that the compare-and-set is live is
+ * the `version` column moving, and nothing on any screen renders that number.
+ *
+ * Returns null when the environment has no service key, so a spec can skip its
+ * database assertions rather than fail on a missing credential.
+ */
+export function adminClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return null
+  return createClient(new URL(url).origin, key, { auth: { persistSession: false } })
 }
 
 export const test = base.extend<{ signedIn: SeededUser }>({
