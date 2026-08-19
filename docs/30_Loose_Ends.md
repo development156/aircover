@@ -393,3 +393,116 @@ Stated so a silent gap does not read as coverage.
 - **No database write of any kind.** The runner used is read-only by construction.
 - **P3b and P3c were reported, not changed** — reasons above, both about immutable or shared code.
 - **P7a was reported, not changed** — it lives on another branch.
+
+---
+
+## P4c · The dead-letter view — blocked, and not on a migration I should write
+
+Failed jobs do **not** vanish. MEASURED: `post_publish_logs` retains them — 7 rows with
+`status = 'failed'` in production, 6 live and 1 fixture, each carrying `error` jsonb, `attempt`,
+`channel` and `job_run_id`. What is missing is a way to LOOK at them.
+
+**Why the view cannot be built from `apps/web` today.** MEASURED from `pg_policies`:
+`post_publish_logs` has exactly one policy —
+
+```
+t_select  SELECT  (workspace_id IN (SELECT app.member_workspace_ids()))
+```
+
+An ops admin is authorised against `ops_admins` and **need not be a member of the workspace whose
+job failed**, so the rows return empty for exactly the person who needs them. `ops-reset.ts` already
+documents this identity mismatch as one of its three reasons for using an RPC.
+
+And there is no way around it: `lib/supabase/server.ts` states "No service-role client in apps/web —
+RLS is the security boundary." Adding one for an admin panel would put a key that bypasses every
+tenant boundary into the web app, to render a list.
+
+**What it needs:** one migration adding an ops-visible SELECT policy, e.g.
+`create policy t_select_ops on post_publish_logs for select using (app.is_ops_admin())` — the same
+predicate `ops_admins` already uses elsewhere. That is `wt-db`'s directory, four sessions were live,
+and shipping an inert panel plus an unapplied migration is precisely the state
+`ops_workspace_reset` has been in for weeks (see docs/31). Specified rather than half-built.
+
+---
+
+## P7b · NOTIFY-ME on coming-soon screens — cut, and stated
+
+Deferred in run 12 for needing a migration; it still needs one. An additive table with
+`workspace_id`, RLS and four policies is small, but it is `wt-db`'s to write, and — like P4c — a
+table nobody has applied plus a button that writes nowhere is worse than the absence.
+
+**One thing worth knowing before it is built.** The value proposed for it was "which coming-soon
+features people actually click". MEASURED: `templates`, `campaigns`, `campaign_posts`, `assets` and
+`asset_usages` are all at **0 rows**, and `/campaigns`, `/assets` and `/approvals` still render an em
+dash for every figure. There is no traffic to measure yet, because there are no beta users on this
+branch — it has never been merged to the branch production builds from. The instrument is worth
+having; it is not urgent until somebody is there to be measured.
+
+---
+
+## P7c · The 44px touch floor — the probe cannot confirm anything, and that is the finding
+
+Run 13 fixed six shell controls that fell under the 44px touch floor. The brief asks whether they
+are still fixed after the design system landed.
+
+**They are not verifiable, and nothing protects them.** `apps/web/e2e/shell-probe.spec.ts` exists and
+measures exactly this — "does anything overflow the viewport at 390, and which controls fall under
+the 44px touch floor" — but:
+
+- it **asserts nothing**. Its own header says so: "A read-only probe. Asserts nothing; PRINTS what
+  the shell actually is." It `console.log`s a count and a list.
+- it is `test.skip` unless `DESIGN_AUDIT=1`.
+- it carries no `@smoke` tag, so `pnpm gate` never runs it.
+
+So the six fixes from run 13 are held in place by nothing at all. A probe that prints is a
+measurement of one moment; the regression it was written to find can return the next day and no
+check anywhere will say so. **This is the same shape as P4d's probe and P4a's missing heartbeat: an
+instrument that reports and an instrument that ENFORCES are different objects, and this project keeps
+building the first and counting it as the second.**
+
+**Not measured on this run, and why.** Running it needs a signed-in browser against a local dev
+server. Five other worktrees were running full Playwright suites against one machine for the whole
+session — load average 19-57, 13 of 15 GB resident, eight Next dev servers — and this session's own
+dev server was OOM-killed mid-run (`ECONNREFUSED` on its port; `turbo build` separately exited 137,
+SIGKILL). A number produced under that contention would not be worth quoting. Stated rather than
+guessed.
+
+**The fix worth making is not a re-measurement.** It is to turn the probe into an assertion, tag it
+`@smoke`, and let the gate hold the floor — measuring the current value first, so the threshold that
+ships is one the design system actually meets rather than one that lands red.
+
+---
+
+## The gate, honestly
+
+`pnpm gate` is five parts. Four of them are deterministic and all four are **green** on every commit
+in this branch:
+
+| stage | result |
+| --- | --- |
+| `turbo run typecheck lint test` | **27/27 tasks**, 3,221 tests in apps/web plus every package |
+| root `vitest run` (scripts/) | **174 passed** |
+| `prettier --check .` | **clean** |
+| `turbo run build` | **passes** |
+
+The fifth, `turbo run test:smoke` (58 Playwright tests), **could not produce a trustworthy result**
+and is reported as unrun rather than as passed or failed. The evidence that it is the environment
+and not the code:
+
+- the failures begin partway through and then affect **83 specs**, most failing in **1.8-2.0 s** —
+  the signature of a server that is not answering, not of assertion failures;
+- they include `design-system.spec.ts`, `no-impossible-remedy.spec.ts` and `/assets` — surfaces none
+  of this branch's changes touch;
+- **the dev server was dead**: `fetch http://127.0.0.1:3206/sign-in` → `ECONNREFUSED`, while a
+  sibling session's server on 3400 was still listening;
+- `turbo run build` exited **137** (SIGKILL, the OOM killer) on the first attempt and **0** on the
+  retry, with no code change in between.
+
+Root cause: five worktrees — `wt-composer`, `wt-conn`, `wt-money`, `wt-signal`, `wt-camp` — each ran
+a full Playwright suite with its own Next dev server, concurrently, on one 15 GB machine. Load
+average peaked at 57.7.
+
+**What that leaves unverified:** whether the schedule-status change (P6) renders correctly in a real
+browser. Its logic carries 46 unit tests and four mutants, and it touches one pure function's
+boundary, but the on-screen result was not seen. Anyone re-running this should run
+`E2E_PORT=<free> pnpm turbo run test:smoke` on a quiet machine before trusting the label change.
