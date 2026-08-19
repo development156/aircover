@@ -142,6 +142,74 @@ test.describe('campaigns @smoke', () => {
     await page.getByRole('link', { name: /^All/ }).click()
     await expect(page.getByRole('link', { name: 'Diwali week' })).toBeVisible()
   })
+
+  test('the grid scrolls inside its own box and never sideways-scrolls the page', async ({
+    page,
+    signedIn: _signedIn,
+  }) => {
+    test.slow()
+
+    // ── WHY THIS ASSERTS A SCROLL AND NOT A WIDTH ────────────────────────────
+    // A guard on this app once asserted widths, offsets and overflow flags at six
+    // viewports, went green everywhere, and shipped a rail rendering "S Sah".
+    // `documentElement.scrollWidth` is also the wrong number here specifically:
+    // it read 414 against a 380 client width even in states that were fine,
+    // because a table inside a scroll box contributes to it either way. The only
+    // honest question is the one a person on a phone asks — CAN I PUSH THE PAGE
+    // SIDEWAYS — so this pushes it and reads how far it went.
+    await page.goto('/home')
+    await page
+      .locator('#main')
+      .getByRole('button', { name: /create workspace/i })
+      .click()
+    await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+
+    // A post on two channels, so the grid has more columns than a phone can hold.
+    await page.goto('/create/post')
+    await page.locator('[data-channel-tile="instagram"]').click()
+    await page.locator('[data-channel-tile="linkedin"]').click()
+    await page.getByRole('button', { name: /^continue/i }).click()
+    await page.waitForURL(/[?&]post=[0-9a-f-]{36}/, { timeout: 30_000 })
+
+    await page.goto('/campaigns')
+    await page.getByRole('button', { name: /^create campaign$/i }).click()
+    await page.getByLabel('Name').fill('Overflow check')
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /^create campaign$/i })
+      .click()
+    await page.waitForURL(/\/campaigns\/[0-9a-f-]{36}/, { timeout: 30_000 })
+
+    await page.getByRole('button', { name: /^add posts$/i }).click()
+    const picker = page.getByRole('dialog')
+    await picker.getByText('Untitled post').first().click()
+    await picker.getByRole('button', { name: /add to campaign/i }).click()
+    await expect(page.getByRole('table', { name: /every post in this campaign/i })).toBeVisible({
+      timeout: 30_000,
+    })
+
+    await page.setViewportSize({ width: 390, height: 844 })
+
+    const measured = await page.evaluate(() => {
+      const box = document.querySelector('#main table')!.parentElement!
+      // Push the DOCUMENT as far right as it will go, then read where it landed.
+      window.scrollTo(9999, 0)
+      const pageMoved = window.scrollX
+      window.scrollTo(0, 0)
+      // And the box must still scroll on its own — the fix must not have been
+      // "make the grid narrower", which would hide columns instead of showing them.
+      box.scrollLeft = 9999
+      const boxMoved = box.scrollLeft
+      box.scrollLeft = 0
+      return { pageMoved, boxMoved }
+    })
+
+    expect(measured.pageMoved, 'the page must not scroll sideways on a phone').toBe(0)
+    expect(
+      measured.boxMoved,
+      'the grid itself must still scroll to reach its columns',
+    ).toBeGreaterThan(0)
+  })
 })
 
 /**

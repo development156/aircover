@@ -56,7 +56,27 @@ export function CampaignGrid({
     // The grid scrolls INSIDE its own box. At 390px five columns cannot fit, and
     // the alternative — a second stacked rendering behind `max-narrow:hidden` —
     // would put every post's name in the accessibility tree twice.
-    <div className="overflow-x-auto rounded-card border border-line-soft">
+    //
+    // ── `relative` IS LOAD-BEARING AND WAS FOUND BY MEASUREMENT ──────────────
+    // Without it this page scrolled sideways 34px at 390px: the table's
+    // scrollable overflow reached the VIEWPORT instead of stopping at this box,
+    // so the whole layout — topbar and bottom bar included — slid left and left
+    // a band of dead space. MEASURED in a real browser at 390px:
+    // `window.scrollTo(9999,0)` moved the document by 34px, and hiding this one
+    // box took it to 0 while `/home` measured 0 throughout.
+    //
+    // The one-line fix was found by bisection, not by reasoning: `overflow: auto`
+    // on both axes, `overflow-y: hidden`, `contain: inline-size`, a `minmax(0,1fr)`
+    // grid parent and `max-width: 100%` all left it at 34. `position: relative`
+    // on this box alone took it to 0 while the box still scrolled internally by
+    // 73px, which is the property that must survive.
+    //
+    // It is NOT needed on `DataTable`, which has the same class list: forcing a
+    // header wide enough to overflow that primitive left the page at 0. The
+    // difference is this table's `max-w-[280px]` row header, whose intrinsic
+    // contribution is what escapes. Recorded because "add relative to every
+    // scroll box" would be cargo-culting a fix whose cause is narrower.
+    <div className="relative overflow-x-auto rounded-card border border-line-soft">
       <table className="w-full border-collapse">
         <caption className="sr-only">
           Every post in this campaign, and what each one is doing on each channel
