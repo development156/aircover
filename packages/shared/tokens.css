@@ -243,6 +243,29 @@
   --dur-base: 180ms;
   --dur-slow: 280ms;
 
+  /* The stagger step. Content arriving all at once reads as a flash; content
+     arriving one item at a time reads as a list being dealt. 40ms is the step
+     between successive items, and --stagger-cap is how many items are allowed
+     to carry a delay — beyond that they share the last one, so a 40-row table
+     does not take 1.6s to finish arriving. Both are tokens because a stagger
+     hand-written per screen is exactly how eleven screens end up with eleven
+     rhythms (docs/26 §8.1). */
+  --stagger: 40ms;
+  --stagger-cap: 8;
+
+  /* How far an entering element travels. Small on purpose: an entrance that
+     moves far enough to notice is an entrance you wait for. */
+  --enter-lift: 6px;
+
+  /* The ONE duration longer than --dur-slow, and it is not a transition.
+     §8 rules that nothing longer than 280ms ships, and that rule is about
+     moving between two states — at 280ms a four-digit count is a flicker,
+     not a count, so it would buy the cost of animating a number without the
+     legibility that justifies it. A count-up is a REVEAL of one settled
+     value (docs/26 §8.1), so it is allowed its own step. Read from JS by
+     CountUp rather than duplicated there. */
+  --dur-count: 560ms;
+
   /* ---------- L3 · LEGACY ALIASES ----------
      Existing components only. Remove one at a time as surfaces migrate.
      NOTE --s1/--s2 stay SURFACE COLOURS here. That is deliberate. */
@@ -466,6 +489,46 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ============================================================
+   ENTRANCE — how content arrives (docs/26 §8.1)
+   ------------------------------------------------------------
+   ONE keyframe for the whole product. A screen that fades, a
+   screen that slides and a screen that scales read as three
+   products; the audit's core finding was every screen answering
+   the same question by itself, and "how does content arrive" is
+   one of those questions.
+
+   Travel is --enter-lift (6px) and it is deliberately small. An
+   entrance you can watch is an entrance you are waiting for.
+   ============================================================ */
+@keyframes sl-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--enter-lift));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* An element that arrives. `both` fill so it is hidden BEFORE its
+   delay elapses rather than flashing at full opacity first. */
+.enter {
+  animation: sl-enter var(--dur-base) var(--ease) both;
+}
+
+/* The stagger ladder. Applied by the Stagger component via
+   --i (the item's index, already capped at --stagger-cap), so a
+   call site never hand-writes a delay. */
+.enter-step {
+  animation: sl-enter var(--dur-base) var(--ease) both;
+  /* The cap lives HERE, in CSS, not mirrored in TypeScript. A call site
+     passes its raw index and min() clamps it, so --stagger-cap stays the
+     one place the ceiling is written. */
+  animation-delay: calc(min(var(--i, 0), var(--stagger-cap)) * var(--stagger));
+}
+
 /* ---------- REDUCED MOTION — suppresses blade-sweep, mascot, confetti ---------- */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -475,5 +538,13 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+
+    /* MUST be here. Zeroing the DURATION alone leaves the DELAY intact,
+       so a staggered row with `animation-delay: 320ms` and `fill: both`
+       stays invisible for 320ms and then snaps in — the person who asked
+       for less motion gets a slower, jumpier screen than everyone else.
+       A stagger is a motion, and its delay has to die with it. */
+    animation-delay: 0ms !important;
+    transition-delay: 0ms !important;
   }
 }

@@ -316,9 +316,63 @@ it is the single most common way this system goes wrong.
 **What must never animate:**
 
 - **A number changing.** A credit balance that counts up is a balance you cannot read.
+  Narrowed, not repealed, by §8.1 — read it before assuming either way.
 - **Anything on the crash path.** An error must arrive, not ease in.
 - **Layout on first paint.** The theme is set before paint for exactly this reason.
 - **Anything at all** under `prefers-reduced-motion` — already enforced in `tokens.css`.
+
+### 8.1 AMENDMENT — arrival, stagger, and the one number that may count
+
+Added 2026-08-20 by the `wt-redesign` lane, which was briefed to build "every load and
+every click animated", including numbers counting up when they land. That brief and §8 as
+written contradicted each other. Recorded here rather than resolved silently on eleven
+screens, because a rule bent at a call site is a rule nobody can find.
+
+**The ruling: a number may animate on arrival, never on change — and never if it is
+authoritative.**
+
+The original rule's reasoning is sound and survives intact: *a balance you cannot read*.
+That harm has two ingredients, and both have to be present.
+
+| | may count | why |
+|---|---|---|
+| A settled historical figure arriving for the first time — Reach for a closed period, credits spent last month | **yes** | It is finished. It will not move again while you look at it. The count is a *reveal* of one fixed value, and the value it lands on is the only value it ever had. |
+| **An authoritative live quantity — the credit balance, the wallet hero, the rail foot, the credit chip** | **NO** | This is the number you act on. It changes under you as actions spend, so an animation is ambiguous with a real update, and mid-flight it displays a figure that is not your balance. §8's original case, unchanged. |
+| Any number **updating** in place after it has landed | **NO** | Then the motion carries no information and the digits are unreadable exactly when they changed. |
+
+Two constraints on the implementation, both load-bearing:
+
+- **The value must never be invented.** A count-up interpolates toward a figure the server
+  returned; it may not run without one, and it may not run on an `Unmeasured` or
+  `Unreadable` slot (§4) — animating toward a number we do not have is the precise thing
+  this product may never do. `CountUp` therefore takes a `number`, never a nullable.
+- **It must be suppressed in JavaScript, not only in CSS.** `tokens.css` kills CSS
+  animation under `prefers-reduced-motion`, but a `requestAnimationFrame` counter is not a
+  CSS animation and that rule does not reach it. `CountUp` reads the media query itself and
+  renders the final value on first paint. Guarded by `count-up.test.tsx`.
+
+**Stagger.** §8 had three durations and one curve, and no answer for *sequence* — so a
+screen wanting content to arrive in order had to invent a delay. Two tokens now:
+
+| token | value | for |
+|---|---|---|
+| `--stagger` | 40ms | the delay step between successive items in one group |
+| `--stagger-cap` | 8 | how many items carry a distinct delay before they share the last |
+| `--enter-lift` | 6px | how far an entering element travels |
+
+The cap is not a detail. Without it a 40-row table finishes arriving 1.6s after it started,
+which is not a stagger, it is a wait. Use the `Stagger` / `StaggerItem` components in
+`components/motion/stagger.tsx`; they set `--i` for you. **Never hand-write an
+`animation-delay`** — that is the same failure mode as a hand-written font shorthand (§5).
+
+**One keyframe for the product.** `sl-enter` (fade + 6px rise) is the only entrance. A
+screen that fades beside a screen that scales reads as two products.
+
+**`animation-delay` is reset under `prefers-reduced-motion`, and that is a fix, not
+tidiness.** The reduced-motion block zeroed `animation-duration` only. With
+`animation-fill-mode: both`, a staggered row still waited out its full delay invisible and
+then snapped in — so the person who asked for *less* motion got a slower, jumpier screen
+than everyone else. `animation-delay` and `transition-delay` are now zeroed alongside.
 
 ---
 
