@@ -17,6 +17,8 @@ import {
   type PublishRequestMedia,
   type RuleTier,
 } from '@sahoda/shared'
+import { refuseFormat, type PostFormat } from '@sahoda/publishing'
+import type { PublishMode } from './mode'
 
 /**
  * The refusal gate could not be reached — so nothing about this post is in
@@ -38,7 +40,7 @@ export class GateUnavailableError extends Error {
 /** Auth-class failures the user can only fix by reconnecting the account. */
 const RECONNECT_CODES = new Set(['UNAUTHORIZED', 'FORBIDDEN'])
 
-export type PublishMode = 'live' | 'fixture'
+export type { PublishMode } from './mode'
 
 /** The post_variants row being published, plus its attachments. */
 export interface PublishVariant {
@@ -47,6 +49,19 @@ export interface PublishVariant {
   hashtags?: string[]
   hasLink?: boolean
   media: PublishRequestMedia[]
+  /**
+   * What kind of post this was written as, from `post_variants.format`.
+   *
+   * Null for every variant written before migration 20260819000200, which is most
+   * of them, and null states no intent — so nothing is held to anything and no
+   * existing post changes behaviour.
+   *
+   * Carried on THIS type rather than on `PublishRequest`, and that is not a
+   * preference: `PublishRequest` and `FormattedContent` are in @sahoda/shared,
+   * which is a frozen contract with no format field. The refusal therefore sits
+   * one layer above the adapter — see the guard in `runPublishPost`.
+   */
+  format?: PostFormat | null
 }
 
 /** Connection identity + the in-memory-only access token. Never persisted from here. */
@@ -293,6 +308,34 @@ export async function runPublishPost(
   if (violations.length > 0) {
     const first = violations[0]!
     return fail(first.code, first.message, null)
+  }
+
+  // ── THE POST IS NOT WHAT IT SAYS IT IS ──────────────────────────────────────
+  // A format is a DECLARATION OF INTENT, and this is the only place in the pipeline
+  // that can check the post against it. `validateVariant` above checks the media
+  // against the CHANNEL and finds an image perfectly legal on X; only the declared
+  // format knows the writer did not mean to send one. The mirror case matters more:
+  // a photo post with no photo publishes today as bare text on x, gbp and linkedin
+  // and reports success.
+  //
+  // ── WHY HERE AND NOT INSIDE THE ADAPTER ─────────────────────────────────────
+  // The adapter's own guards would be the natural home, beside MEDIA_REQUIRED. It
+  // cannot go there: an adapter is handed a `PublishRequest` carrying a
+  // `FormattedContent`, both of which live in @sahoda/shared — a frozen contract
+  // with no format field and no arm that could carry one. Reaching the adapter
+  // would mean changing that contract. So the refusal sits one layer up, on the
+  // one function every entry into publishing passes through, which is the same
+  // property that makes the gate below trustworthy.
+  //
+  // Placed AFTER `validateVariant` for its stated reason — the words and the media
+  // checked here are ones that could actually be published — and BEFORE the gate,
+  // so a post that is already refused never spends a model call.
+  //
+  // PERMANENT, not transient: no retry makes an absent image appear. It is the
+  // writer's to fix, and the message says what they wrote versus what is attached.
+  const formatRefusal = refuseFormat(spec, variant.format, variant.media.length)
+  if (formatRefusal) {
+    return fail(formatRefusal.code, formatRefusal.message, null)
   }
 
   // ── THE REFUSAL GATE (doc 18 §8) ────────────────────────────────────────────

@@ -13,6 +13,7 @@ import {
   listMedia,
   listVariants,
   readVariantVersions,
+  readVariantFormats,
   readVariantVersionSupport,
 } from '@/lib/posts/read'
 import { signMediaPreviews } from '@/lib/posts/media-url'
@@ -87,6 +88,9 @@ export default async function CreatePostPage({
   // put the very first save of a new post back on last-write-wins, which is the
   // save two tabs are most likely to make at the same moment.
   const versions = post ? await readVariantVersions(post.id) : await readVariantVersionSupport()
+  // Free: the same memoised rows the line above reads. Salvages the second column
+  // the frozen row schema strips, so a reload does not lose the chosen format.
+  const formats = post ? await readVariantFormats(post.id) : {}
   // Media travels with the post so the flow's panel is the SAME panel the
   // editor shows — same rows, same signed previews, same per-channel
   // attachment rules. Two media surfaces reading different sources is how one
@@ -106,6 +110,7 @@ export default async function CreatePostPage({
         previews={previews}
         postChannels={post?.channels ?? null}
         versions={versions}
+        initialFormats={formats}
       />
     </Suspense>
   )

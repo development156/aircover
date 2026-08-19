@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Channel, PostStatus, VariantPublishStatus } from '@sahoda/shared'
-import type { PublishMode } from '../publish/runPublishPost'
+import type { PublishMode } from '../publish/mode'
 import { classifyCandidate, type DispatchCandidate, type CandidateVariant } from './classify'
 
 const GRACE = 3600

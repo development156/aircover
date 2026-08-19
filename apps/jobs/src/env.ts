@@ -1,4 +1,4 @@
-import type { PublishMode } from './publish/runPublishPost'
+import type { PublishMode } from './publish/mode'
 
 /**
  * How long past its TTL a HOLD must sit before the reaper releases it. The TTL is 10

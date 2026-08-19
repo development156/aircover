@@ -1,4 +1,5 @@
 import type { Channel, ConstraintViolation } from '@sahoda/shared'
+import type { PostFormat } from '@sahoda/publishing'
 
 /**
  * Action state types live here, not in the `'use server'` modules that return
@@ -60,6 +61,18 @@ export type SaveState =
       version?: number
     }
   | { ok: false; message: string; conflict?: SaveConflict }
+
+/**
+ * The result of setting a channel version's format.
+ *
+ * Carries what is STORED, not what was asked for. The two can differ — another
+ * tab may have chosen something else in between — and a screen that echoed the
+ * request back would show a choice the row does not hold. This write is the one
+ * place in the editor that is NOT a compare-and-set (`save_post_variant` has a
+ * fixed signature with no format argument), so last-write-wins is the real
+ * behaviour and the honest response is to say what actually landed.
+ */
+export type FormatState = { ok: true; format: PostFormat | null } | { ok: false; message: string }
 
 export type DeleteState = { ok: true } | { ok: false; message: string }
 

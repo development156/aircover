@@ -15,6 +15,7 @@ import { cache } from 'react'
 
 import { createServerSupabase } from '@/lib/supabase/server'
 import { variantStatusRow, type VariantStatusRow } from '@/lib/posts/variant-status'
+import { formatsFromRows, type VariantFormats } from '@/lib/posts/variant-format'
 import {
   inconclusive,
   versionsFromRows,
@@ -173,6 +174,20 @@ export async function listVariants(postId: string): Promise<PostVariant[]> {
     const parsed = PostVariantSchema.safeParse(row)
     return parsed.success ? [parsed.data] : []
   })
+}
+
+/**
+ * What kind of post each channel's version was written as.
+ *
+ * Free alongside `listVariants`: both read the same memoised rows, and this one
+ * salvages the second column the frozen contract strips. See `variant-format.ts`.
+ */
+export async function readVariantFormats(postId: string): Promise<VariantFormats> {
+  try {
+    return formatsFromRows(await variantRows(postId))
+  } catch {
+    return {}
+  }
 }
 
 /**

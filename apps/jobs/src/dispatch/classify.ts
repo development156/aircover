@@ -5,7 +5,7 @@ import {
   type PostStatus,
   type VariantPublishStatus,
 } from '@sahoda/shared'
-import type { PublishMode } from '../publish/runPublishPost'
+import type { PublishMode } from '../publish/mode'
 
 /** One post_variants row, plus the mode proven by its publish log. */
 export interface CandidateVariant {

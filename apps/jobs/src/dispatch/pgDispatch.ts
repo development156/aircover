@@ -1,6 +1,6 @@
 import { DISPATCHABLE_STATUSES, type Channel, type VariantPublishStatus } from '@sahoda/shared'
 import type { PostStatus } from '@sahoda/shared'
-import type { PublishMode } from '../publish/runPublishPost'
+import type { PublishMode } from '../publish/mode'
 import type { CandidateVariant, DispatchCandidate } from './classify'
 
 /** Never sweep an unbounded set — a backlog drains across runs, not in one statement. */

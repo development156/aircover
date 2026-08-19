@@ -554,3 +554,84 @@ describe('runPublishPost — an unreachable gate is transient, an unsure one is 
     expect(out).toMatchObject({ status: 'failed', classification: 'permanent' })
   })
 })
+
+describe('a post that is not what it says it is', () => {
+  /**
+   * ── THE PROPERTY, AND WHY IT NEEDS ITS OWN TESTS ────────────────────────────
+   * `packages/publishing/src/format.test.ts` proves the RULES. These prove the
+   * publish path actually consults them, and — the part that matters more —
+   * consults them BEFORE anything irreversible or expensive happens: before the
+   * refusal gate spends a model call, and before an adapter touches a network.
+   *
+   * Asserting only the returned code would pass against an implementation that
+   * refused after publishing. `adapterCalls` and `gateChecks` are what make these
+   * about the ORDER rather than about the message.
+   *
+   * NOTHING HERE PUBLISHES. The fixture adapter is counted, never reached.
+   */
+
+  it('publishes a variant with no format exactly as before', async () => {
+    // Every variant written before migration 20260819000200 is in this state, and
+    // none of them may change behaviour. No format states no intent.
+    const h = harness({ variant: { format: null } })
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toMatchObject({ status: 'succeeded' })
+    expect(h.adapterCalls).toBe(1)
+  })
+
+  it('refuses a photo post with no photo, before the gate and before the adapter', async () => {
+    // On X this publishes today as a bare text post and reports success — the
+    // engine has no complaint, because an X post with no media is perfectly legal.
+    // Only the declared format knows that is not what was written.
+    const h = harness({ variant: { format: 'image', media: [] } })
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toMatchObject({ status: 'failed', classification: 'permanent' })
+    expect(out).toHaveProperty('code', 'FORMAT_NEEDS_MEDIA')
+    // The order is the point. A refusal after either of these is a refusal that
+    // cost something it did not need to.
+    expect(h.gateChecks).toEqual([])
+    expect(h.adapterCalls).toBe(0)
+  })
+
+  it('refuses a text-only post that has an image attached', async () => {
+    const h = harness({
+      variant: {
+        format: 'text',
+        media: [{ storagePath: 'w/p/a.jpg', mime: 'image/jpeg', bytes: 1000 }],
+      },
+    })
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toHaveProperty('code', 'FORMAT_CONTRADICTED')
+    expect(h.adapterCalls).toBe(0)
+  })
+
+  it('refuses video, which no channel can publish today', async () => {
+    const h = harness({ variant: { format: 'video', media: [] } })
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toHaveProperty('code', 'FORMAT_UNSUPPORTED')
+    expect(h.adapterCalls).toBe(0)
+  })
+
+  it('publishes a text post that really is text-only', async () => {
+    const h = harness({ variant: { format: 'text', media: [] } })
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toMatchObject({ status: 'succeeded' })
+    expect(h.adapterCalls).toBe(1)
+  })
+
+  it('refuses AFTER the channel limits, so the first complaint is the cheaper one', async () => {
+    // A 600-character X post declared as a photo post breaks both rules. The
+    // engine's answer comes first because it is about words that could never be
+    // published at all — the same ordering `validateVariant` already has with the
+    // gate, for the same reason.
+    const h = harness({ variant: { format: 'image', media: [], body: 'x'.repeat(600) } })
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toHaveProperty('code', 'MAX_CHARS')
+  })
+})

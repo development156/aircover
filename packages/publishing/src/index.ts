@@ -167,6 +167,20 @@ export {
 } from './zernio/media'
 
 export { createInstagramAdapter, type InstagramAdapterDeps } from './adapters/instagram'
+
+// The format dimension. Lives here rather than in the frozen Constraint Engine,
+// and every rule is DERIVED from the spec fields that engine already has — so a
+// contract that one day admits a video mime stops refusing video on its own.
+export {
+  POST_FORMATS,
+  isPostFormat,
+  acceptsVideo,
+  acceptsTextOnly,
+  acceptsMultipleMedia,
+  formatsFor,
+  refuseFormat,
+} from './format'
+export type { PostFormat, FormatRefusal } from './format'
 export {
   createZernioAdapter,
   ZERNIO_PLATFORM_NAME,

@@ -1,3 +1,4 @@
+import { isPostFormat } from '@sahoda/publishing'
 import type { Pool } from 'pg'
 import { assertPlatformPostId, type PublishPostPayload } from '@sahoda/shared'
 import type { PublishLogEntry, PublishVariant, VariantUpdate } from './runPublishPost'
@@ -22,8 +23,18 @@ export function createPublishStore(opts: PublishStoreOptions) {
   const { pool } = opts
 
   async function loadVariant(payload: PublishPostPayload): Promise<PublishVariant | null> {
-    const r = await pool.query<{ id: string; body: string; extras: unknown }>(
-      `select id, body, extras from post_variants
+    const r = await pool.query<{
+      id: string
+      body: string
+      extras: unknown
+      format: string | null
+    }>(
+      // `format` joined the select on 2026-08-19. Without it the column exists, the
+      // writer picks a format, and the publisher never learns what they picked — a
+      // choice collected and ignored, which is the fake-success state this product
+      // refuses. Null for every row written before the column, and null means the
+      // variant states no intent.
+      `select id, body, extras, format from post_variants
         where id = $1 and post_id = $2 and workspace_id = $3`,
       [payload.variantId, payload.postId, payload.workspaceId],
     )
@@ -55,6 +66,11 @@ export function createPublishStore(opts: PublishStoreOptions) {
       // until the vault opener exists — so this costs nothing today and must be
       // revisited with X. See REQUESTS.md.
       hashtags: readHashtags(row.extras),
+      // Validated rather than cast. The column carries a CHECK constraint, but a
+      // value this code does not recognise must not be handed to the refusal rules
+      // as if it were one of theirs — an unknown format states no intent we can
+      // hold the post to, so it is read as none.
+      format: isPostFormat(row.format) ? row.format : null,
       media: media.rows.map((m) => ({
         storagePath: m.storage_path,
         mime: m.mime ?? 'application/octet-stream',

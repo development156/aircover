@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { Channel, VariantPublishStatus } from '@sahoda/shared'
-import type { PublishMode } from '../publish/runPublishPost'
+import type { PublishMode } from '../publish/mode'
 import type { CandidateVariant, DispatchCandidate } from './classify'
 import { runDispatchSweep, type DispatchSweepDeps } from './sweep'
 import { PublishQueueUnavailableError } from './queue'

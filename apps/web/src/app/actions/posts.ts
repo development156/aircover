@@ -15,9 +15,10 @@ import {
 import { reportServerError } from '@/lib/observability/report'
 import { mapPostError } from '@/lib/posts/post-error'
 import { hasLink } from '@/lib/posts/detect-link'
+import { isPostFormat, refuseFormat } from '@sahoda/publishing'
 import { casSaveVariant } from '@/lib/posts/cas-save'
 import { parseExtras } from '@/lib/posts/variant-extras'
-import type { DeleteState, SaveState } from '@/lib/posts/state'
+import type { DeleteState, FormatState, SaveState } from '@/lib/posts/state'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 
@@ -299,6 +300,89 @@ export async function saveVariant(
   } catch (error) {
     reportServerError(error, { action: 'saveVariant', workspaceId })
     return { ok: false, message: 'Could not save this variant — try again.' }
+  }
+}
+
+/**
+ * Record what kind of post one channel's version is.
+ *
+ * ── WHY THIS IS NOT PART OF `saveVariant` ────────────────────────────────────
+ * It would be, if it could. `save_post_variant` — the compare-and-set that makes
+ * the body safe against a second writer — has a fixed eight-argument signature
+ * with no format among them, and that function is APPLIED to production, so
+ * changing it is a new migration rather than an edit. Adding format to the frozen
+ * `PostVariantUpdateSchema` is not an option either.
+ *
+ * So this is a separate, deliberately narrow write, and its concurrency story is
+ * different from the body's: last write wins. That trade is acceptable HERE and
+ * would not be for the words. A format is one value chosen from a short list, once,
+ * and losing it costs a click; a paragraph is not recoverable. The response carries
+ * what is actually stored rather than what was asked for, so a writer whose choice
+ * lost sees the winner instead of being told their own choice landed.
+ *
+ * A null format is a legitimate value — it means nobody has said — and clearing it
+ * puts the variant back to publishing whatever is attached.
+ */
+export async function setVariantFormat(
+  postId: string,
+  channel: string,
+  format: string | null,
+): Promise<FormatState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to set this format.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const parsedChannel = ChannelSchema.safeParse(channel)
+    if (!parsedChannel.success) return { ok: false, message: 'That channel is not supported.' }
+
+    if (format !== null && !isPostFormat(format)) {
+      return { ok: false, message: 'That format is not one Sahoda knows.' }
+    }
+
+    // REFUSED BEFORE IT IS WRITTEN, not at publish time. `refuseFormat` is the same
+    // function the publisher consults, so a format this channel cannot publish
+    // cannot be stored in the first place — the alternative is a row that saves
+    // cleanly and fails days later, which is the fake-success state this product
+    // refuses. Media count is deliberately 0 here: only the channel-capability
+    // refusals can be judged now, and the contradictions (a photo post with no
+    // photo) are about a moment that has not happened yet.
+    if (format !== null) {
+      const capability = refuseFormat(CONSTRAINTS[parsedChannel.data], format, 1)
+      if (capability && capability.code === 'FORMAT_UNSUPPORTED') {
+        return { ok: false, message: capability.message }
+      }
+      if (format === 'text' && CONSTRAINTS[parsedChannel.data].requiresMedia === true) {
+        return { ok: false, message: capability?.message ?? 'That channel needs a photo.' }
+      }
+    }
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('post_variants')
+      .update({ format })
+      .eq('post_id', postId)
+      .eq('workspace_id', workspaceId)
+      .eq('channel', parsedChannel.data)
+      .select('format')
+      .maybeSingle()
+
+    if (error) return { ok: false, message: mapPostError(error) }
+    // No row is not an error here: the variant has not been written yet, and the
+    // format will be applied with the first save. Reported as "nothing stored",
+    // which is true, rather than as a failure that did not happen.
+    if (!data) return { ok: true, format: null }
+
+    revalidatePath('/posts')
+    const stored = (data as { format?: unknown }).format
+    return { ok: true, format: isPostFormat(stored) ? stored : null }
+  } catch (error) {
+    reportServerError(error, { action: 'setVariantFormat', workspaceId })
+    return { ok: false, message: 'Could not set the format — try again.' }
   }
 }
 

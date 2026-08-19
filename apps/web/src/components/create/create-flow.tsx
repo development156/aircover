@@ -7,9 +7,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Check, Image as ImageIcon, MapPin, SquarePen } from 'lucide-react'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { CONSTRAINTS, type Channel, type ChannelSet } from '@sahoda/shared'
+import { formatsFor, type PostFormat } from '@sahoda/publishing'
 import type { PostMedia } from '@sahoda/shared'
 
-import { createPost, savePost, saveVariant } from '@/app/actions/posts'
+import { createPost, savePost, saveVariant, setVariantFormat } from '@/app/actions/posts'
 import { ComingSoonTile } from '@/components/create/coming-soon-tile'
 import { StepIndicator } from '@/components/create/step-indicator'
 import { Badge } from '@/components/ui/badge'
@@ -115,6 +116,7 @@ export function CreateFlow({
   previews,
   postChannels,
   versions = VERSIONS_UNSUPPORTED,
+  initialFormats = {},
 }: {
   connected: readonly Channel[]
   postId: string | null
@@ -133,6 +135,11 @@ export function CreateFlow({
    * does today.
    */
   versions?: VariantVersions
+  /**
+   * What each channel's version was already written as. Read at the render edge,
+   * because the frozen row schema strips the column.
+   */
+  initialFormats?: Partial<Record<Channel, PostFormat>>
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -175,6 +182,26 @@ export function CreateFlow({
     Object.fromEntries(REAL_CHANNELS.map((c) => [c, expectedVersionFor(versions, c)])),
   )
   const [conflicts, setConflicts] = useState<Partial<Record<Channel, SaveConflict>>>({})
+
+  /**
+   * The kind of post being written, or null for "nobody has said".
+   *
+   * ── NULL IS THE DEFAULT AND MUST STAY THE DEFAULT ───────────────────────────
+   * Publishing now REFUSES a post that contradicts its format — a photo post with
+   * no photo, a text post with an image attached. Preselecting anything here would
+   * write an intent the customer never expressed onto every post they create, and
+   * the first one to break would be an ordinary text post on X that has published
+   * fine for months. Not choosing is a real answer: Sahoda publishes whatever is
+   * attached, exactly as it does today.
+   *
+   * Seeded from the row when one exists, so a reload does not lose the choice.
+   */
+  const [format, setFormat] = useState<PostFormat | null>(
+    () => initialChannels.map((c) => initialFormats[c]).find((f) => f !== undefined) ?? null,
+  )
+  const [formatError, setFormatError] = useState<string | null>(null)
+  /** What each channel's row is known to hold, so the format is not re-sent per keystroke. */
+  const formatApplied = useRef<Partial<Record<Channel, PostFormat | null>>>({ ...initialFormats })
 
   const connectedSet = new Set(connected)
 
@@ -266,6 +293,24 @@ export function CreateFlow({
       // leave `undefined` standing — writing it in would make the next save claim
       // to compare against something this database does not have.
       if (result.version !== undefined) variantVersions.current[channel] = result.version
+
+      // ── THE FORMAT IS WRITTEN AFTER THE BODY, AND ONLY THEN ──────────────────
+      // The row has to exist before a format can be put on it, and the body save
+      // is what creates it. Applied on every successful save rather than once, so
+      // a choice made before any typing still lands — it is one small update and
+      // only when the row does not already agree.
+      if (format !== null && formatApplied.current[channel] !== format) {
+        const stored = await setVariantFormat(postId, channel, format)
+        if (stored.ok) {
+          // What LANDED, not what was asked for. This write is not a compare-and-set,
+          // so another tab can have won — and echoing the request back would show a
+          // choice the row does not hold.
+          formatApplied.current[channel] = stored.format
+          if (stored.format !== null && stored.format !== format) setFormat(stored.format)
+        } else {
+          setFormatError(stored.message)
+        }
+      }
       setConflicts((prev) => {
         if (prev[channel] === undefined) return prev
         const next = { ...prev }
@@ -381,7 +426,28 @@ export function CreateFlow({
             }
           />
         ) : null}
-        {current === 'format' ? <StepFormat /> : null}
+        {current === 'format' ? (
+          <StepFormat
+            channels={channels}
+            format={format}
+            error={formatError}
+            onChange={(next) => {
+              setFormat(next)
+              setFormatError(null)
+              // Applied immediately where a row already exists; where none does, the
+              // first body save carries it. Both paths go through the same action.
+              if (postId) {
+                startTransition(async () => {
+                  for (const channel of channels) {
+                    const stored = await setVariantFormat(postId, channel, next)
+                    if (stored.ok) formatApplied.current[channel] = stored.format
+                    else setFormatError(stored.message)
+                  }
+                })
+              }
+            }}
+          />
+        ) : null}
         {current === 'content' ? (
           <StepContent
             channels={channels}
@@ -530,36 +596,128 @@ function StepChannel({
    linkedin:146, instagram:160 — no video mime anywhere) and PublishDraft
    (:53-63) is one shape per channel with no format discriminator. Validation
    branches on maxChars, maxMediaCount, requiresMedia and mediaTypes only. */
-function StepFormat() {
+/**
+ * What every selected channel can genuinely publish, and nothing more.
+ *
+ * The INTERSECTION, not the union: a format offered here is written onto every
+ * selected channel's version, so one that Instagram cannot publish must not be
+ * offerable at all when Instagram is selected. Offering it and refusing later is
+ * the fake-success state this product does not ship.
+ *
+ * With no channel picked yet there is nothing to intersect, so nothing is offered.
+ */
+function availableFormats(channels: readonly Channel[]): PostFormat[] {
+  if (channels.length === 0) return []
+  return channels
+    .map((channel) => formatsFor(CONSTRAINTS[channel]))
+    .reduce((shared, next) => shared.filter((format) => next.includes(format)))
+}
+
+/** What each format is called, and what it means, in the customer's words. */
+const FORMAT_COPY: Readonly<Record<PostFormat, { title: string; hint: string }>> = {
+  text: { title: 'Text only', hint: 'Words, no picture' },
+  image: { title: 'Photo', hint: 'Words and one picture' },
+  carousel: { title: 'Set of photos', hint: 'Words and several to swipe' },
+  video: { title: 'Video', hint: 'Words and a clip' },
+}
+
+/** The formats the reference shows that no channel here can publish yet. */
+const FORMAT_SOON: readonly { key: string; title: string }[] = [
+  { key: 'story', title: 'Story' },
+  { key: 'reel', title: 'Reel' },
+]
+
+function StepFormat({
+  channels,
+  format,
+  error,
+  onChange,
+}: {
+  channels: readonly Channel[]
+  format: PostFormat | null
+  error: string | null
+  onChange: (format: PostFormat | null) => void
+}) {
+  const available = availableFormats(channels)
+  // Everything the product knows about, minus what these channels can do. Shown as
+  // coming-soon rather than hidden, so the absence is explained rather than silent.
+  const soon = (['carousel', 'video'] as PostFormat[]).filter((f) => !available.includes(f))
+
+  if (channels.length === 0) {
+    return (
+      <p className="text-[13px] text-muted">Pick a channel first and its formats appear here.</p>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <p className="text-[13px] text-muted">
         Choose a format. Each channel&rsquo;s limits are applied automatically.
       </p>
 
-      <div className="grid grid-cols-5 gap-2 max-wide:grid-cols-3 max-narrow:grid-cols-1">
-        <div
-          data-format="post"
-          aria-current="true"
-          className="surface-ring flex flex-col items-start gap-2 rounded-card bg-brand-wash px-3 py-3 shadow-[inset_0_0_0_1.5px_var(--brand)]"
-        >
-          <span aria-hidden className="grid size-7 place-items-center text-accent">
-            <SquarePen size={16} strokeWidth={1.7} />
-          </span>
-          <span className="text-[13px] font-semibold">Post</span>
-          <span className="text-[11.5px] text-muted">Text and images</span>
-          <Badge rung="active">Selected</Badge>
-        </div>
+      <div
+        role="radiogroup"
+        aria-label="Post format"
+        className="grid grid-cols-5 gap-2 max-wide:grid-cols-3 max-narrow:grid-cols-1"
+      >
+        {available.map((key) => {
+          const selected = format === key
+          return (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              data-format={key}
+              onClick={() => onChange(selected ? null : key)}
+              className={`surface-ring flex flex-col items-start gap-2 rounded-card px-3 py-3 text-left transition-micro ${
+                selected
+                  ? 'bg-brand-wash shadow-[inset_0_0_0_1.5px_var(--brand)]'
+                  : 'bg-surface hover:bg-s1'
+              }`}
+            >
+              <span aria-hidden className="grid size-7 place-items-center text-accent">
+                {key === 'text' ? (
+                  <SquarePen size={16} strokeWidth={1.7} />
+                ) : (
+                  <ImageIcon size={16} strokeWidth={1.7} />
+                )}
+              </span>
+              <span className="text-[13px] font-semibold">{FORMAT_COPY[key].title}</span>
+              <span className="text-[11.5px] text-muted">{FORMAT_COPY[key].hint}</span>
+              {selected ? <Badge rung="active">Selected</Badge> : null}
+            </button>
+          )
+        })}
 
-        {['Carousel', 'Story', 'Reel', 'Video'].map((f) => (
-          <ComingSoonTile key={f} icon={<ImageIcon size={16} strokeWidth={1.7} />} title={f} />
+        {[...soon.map((f) => FORMAT_COPY[f].title), ...FORMAT_SOON.map((f) => f.title)].map((t) => (
+          <ComingSoonTile key={t} icon={<ImageIcon size={16} strokeWidth={1.7} />} title={t} />
         ))}
       </div>
 
+      {error !== null ? <InlineError>{error}</InlineError> : null}
+
+      {/* ── WHAT NOT CHOOSING MEANS, SAID OUT LOUD ─────────────────────────────
+          Skipping this step is a real answer and the one every post written before
+          today gives. Publishing refuses a post that CONTRADICTS its format — a
+          photo post with no photo — so leaving it unset is what keeps an ordinary
+          post behaving exactly as it always has. A screen that implied a choice
+          was required would push people into a promise they did not need to make. */}
       <p className="text-[12.5px] text-muted">
-        Post is the only format Sahoda publishes today. A post can carry more than one image on the
-        channels that allow it.
+        {format === null
+          ? 'Nothing chosen — Sahoda will publish whatever you attach. Choose a format and it checks the post matches before it goes out.'
+          : `Sahoda checks the post matches ${FORMAT_COPY[format].title.toLowerCase()} before it goes out. Press it again to clear it.`}
       </p>
+
+      {/* Only ever true because the intersection above removed it. Instagram is the
+          only channel with no text-only post, and saying which channel narrowed the
+          list is more use than a shorter list with no explanation. */}
+      {channels.includes('instagram') ? (
+        <p className="text-[12px] text-muted">
+          Instagram has no text-only post, so that option is not offered while Instagram is
+          selected.
+        </p>
+      ) : null}
     </div>
   )
 }
