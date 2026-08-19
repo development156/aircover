@@ -1,7 +1,11 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "stream",
-  "globalDependencies": ["pricing.config.json"],
+  "globalDependencies": [
+    "pricing.config.json",
+    "scripts/design/design-lint.mjs",
+    "scripts/design/design-lint-baseline.json"
+  ],
   "tasks": {
     "typecheck": {
       "dependsOn": ["^typecheck"]
