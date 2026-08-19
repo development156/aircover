@@ -15,6 +15,8 @@ import type { PostMedia } from '@sahoda/shared'
 
 import { createPost, savePost, saveVariant, setVariantFormat } from '@/app/actions/posts'
 import { ComingSoonTile } from '@/components/create/coming-soon-tile'
+import { TemplateCard } from '@/components/create/template-card'
+import type { TemplatesRead } from '@/lib/templates/read'
 import { StepIndicator } from '@/components/create/step-indicator'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -120,6 +122,7 @@ export function CreateFlow({
   postChannels,
   versions = VERSIONS_UNSUPPORTED,
   initialFormats = {},
+  templates = { status: 'unreadable' },
 }: {
   connected: readonly Channel[]
   postId: string | null
@@ -143,6 +146,11 @@ export function CreateFlow({
    * because the frozen row schema strips the column.
    */
   initialFormats?: Partial<Record<Channel, PostFormat>>
+  /**
+   * The saved templates, read on the server. Defaults to `unreadable`, which shows
+   * no count — a caller that forgot to pass them must not claim the library is empty.
+   */
+  templates?: TemplatesRead
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -460,6 +468,7 @@ export function CreateFlow({
               scheduleVariant(ch, value)
             }}
             onCommit={commitVariant}
+            templates={templates}
             conflicts={conflicts}
             onKeepMine={(ch) => commitVariant(ch, bodies[ch] ?? '')}
             onUseTheirs={(ch, theirs) => {
@@ -734,6 +743,7 @@ function StepContent({
   bodies,
   onChange,
   onCommit,
+  templates,
   conflicts,
   onKeepMine,
   onUseTheirs,
@@ -746,6 +756,8 @@ function StepContent({
   bodies: Record<string, string>
   onChange: (channel: Channel, value: string) => void
   onCommit: (channel: Channel, value: string) => void
+  /** The saved templates, read on the server. See `TemplateCard` for the count rule. */
+  templates: TemplatesRead
   /** Channels another writer saved while this one was typing. Empty is the norm. */
   conflicts: Partial<Record<Channel, SaveConflict>>
   onKeepMine: (channel: Channel) => void
@@ -799,9 +811,22 @@ function StepContent({
             Select text in the editor after saving
           </span>
         </div>
-        {/* The reference says "14 templates matched to your industry". There is
-            no templates table, so the card exists and the COUNT does not. */}
-        <ComingSoonTile title="Use a template" note="Starting points for common posts" />
+        {/* The reference says "14 templates matched to your industry". The table
+            exists now (20260819000300) and so does the count — but only on a read
+            that earned it: a failed read shows no number rather than a zero, and an
+            empty library gets an empty state rather than `0 templates`. */}
+        <TemplateCard
+          read={templates}
+          body={bodies[channels[0] ?? 'x'] ?? ''}
+          channel={channels[0] ?? null}
+          onUse={(template) => {
+            // Through the SAME `onChange` a keystroke goes through, so a template
+            // lands in the boxes exactly as typing would — debounced, undoable, and
+            // never written straight to the rows. A second write path here would be
+            // a second set of rules about when work becomes durable.
+            for (const channel of channels) onChange(channel, template.body)
+          }}
+        />
       </div>
 
       {/* ── MEDIA ────────────────────────────────────────────────────────────

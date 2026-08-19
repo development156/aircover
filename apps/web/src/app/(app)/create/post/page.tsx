@@ -17,6 +17,7 @@ import {
   readVariantVersionSupport,
 } from '@/lib/posts/read'
 import { signMediaPreviews } from '@/lib/posts/media-url'
+import { readTemplates } from '@/lib/templates/read'
 
 export const metadata = { title: 'New post' }
 
@@ -91,6 +92,7 @@ export default async function CreatePostPage({
   // Free: the same memoised rows the line above reads. Salvages the second column
   // the frozen row schema strips, so a reload does not lose the chosen format.
   const formats = post ? await readVariantFormats(post.id) : {}
+  const templates = await readTemplates()
   // Media travels with the post so the flow's panel is the SAME panel the
   // editor shows — same rows, same signed previews, same per-channel
   // attachment rules. Two media surfaces reading different sources is how one
@@ -111,6 +113,7 @@ export default async function CreatePostPage({
         postChannels={post?.channels ?? null}
         versions={versions}
         initialFormats={formats}
+        templates={templates}
       />
     </Suspense>
   )

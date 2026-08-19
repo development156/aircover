@@ -74,6 +74,9 @@ export type SaveState =
  */
 export type FormatState = { ok: true; format: PostFormat | null } | { ok: false; message: string }
 
+/** Saving or deleting a template. The id is returned so a caller can select it. */
+export type TemplateState = { ok: true; templateId: string } | { ok: false; message: string }
+
 export type DeleteState = { ok: true } | { ok: false; message: string }
 
 /** A variant the model produced, already filtered to the requested channels. */
