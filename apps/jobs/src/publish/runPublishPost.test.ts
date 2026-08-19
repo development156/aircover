@@ -149,6 +149,10 @@ function harness(over: Partial<PublishPostDeps> & { variant?: Partial<PublishVar
     markConnection: async (connectionId, status) => {
       connectionUpdates.push({ connectionId, status })
     },
+    // Default: this workspace has sent nothing this month, so the X ration never
+    // fires and every existing case still exercises what it was written for. A
+    // test that wants the cap overrides this.
+    countLiveSends: async () => 0,
     ...over,
     // AFTER the spread on purpose: `over.gate` is already wrapped above, and
     // letting the raw one back in would lose the recording.

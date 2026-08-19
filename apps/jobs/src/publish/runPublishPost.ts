@@ -17,7 +17,15 @@ import {
   type PublishRequestMedia,
   type RuleTier,
 } from '@sahoda/shared'
-import { refuseFormat, type PostFormat } from '@sahoda/publishing'
+import {
+  X_RATION_EXHAUSTED_CODE,
+  X_RATION_UNREADABLE_CODE,
+  checkXRation,
+  refuseFormat,
+  xRationRefusalMessage,
+  xRationWindowStart,
+  type PostFormat,
+} from '@sahoda/publishing'
 import type { PublishMode } from './mode'
 
 /**
@@ -187,6 +195,16 @@ export interface PublishPostDeps {
    * skipped the check.
    */
   gate: PublishGate
+  /**
+   * Live, succeeded sends for one workspace on one channel since an instant.
+   *
+   * REQUIRED, for exactly the reason stated above about `gate`. An optional
+   * counter is a spending cap that silently does not run in whichever call site
+   * forgets it — and a publish path with no cap does not look broken, it looks
+   * generous. Required means every deps-constructing site fails to COMPILE until
+   * it supplies one.
+   */
+  countLiveSends(args: { workspaceId: string; channel: Channel; since: Date }): Promise<number>
   loadVariant(payload: PublishPostPayload): Promise<PublishVariant | null>
   resolveConnection(payload: PublishPostPayload): Promise<ResolvedConnection>
   adapterFor(channel: Channel, viaZernio: boolean): PublishAdapter
@@ -336,6 +354,61 @@ export async function runPublishPost(
   const formatRefusal = refuseFormat(spec, variant.format, variant.media.length)
   if (formatRefusal) {
     return fail(formatRefusal.code, formatRefusal.message, null)
+  }
+
+  // ── THE X RATION — REFUSED BEFORE ANYTHING IS SPENT ─────────────────────────
+  // X is the only channel that bills per POST: $0.015, and $0.200 when the post
+  // carries a link — 13.3x — quoted from https://docs.x.com/x-api/getting-started/pricing
+  // on 2026-08-19. Every other channel costs a flat per-account fee, so one more
+  // post is free at the margin; on X it is not.
+  //
+  // ── WHY EXACTLY HERE ────────────────────────────────────────────────────────
+  // Three spends sit between this line and the platform, and this refusal is
+  // upstream of all of them:
+  //   · the GATE below, which runs a model call,
+  //   · `resolveConnection`, which decrypts a token,
+  //   · the ADAPTER, which is the $0.20 itself.
+  // "Refuse before spending, never after" is only true if it is refused before the
+  // FIRST of those, not merely before the last. It sits after `validateVariant`
+  // and `refuseFormat` for the reason those two give: a post that could never be
+  // published should not consume an allowance on its way to being rejected.
+  //
+  // The allowance is counted in POSTS, so it needs no price and quotes none —
+  // see `checkXRation`. What a given post would have cost depends on whether it
+  // carries a link, and `PublishVariant.hasLink` is optional, so that is a figure
+  // this path frequently could not state truthfully.
+  if (payload.channel === 'x') {
+    let used: number
+    try {
+      used = await deps.countLiveSends({
+        workspaceId: payload.workspaceId,
+        channel: 'x',
+        since: xRationWindowStart(now()),
+      })
+    } catch {
+      // ── AN UNREADABLE CAP IS NOT AN EXHAUSTED ONE, AND NOT A PASS ───────────
+      // Two wrong answers are available here and both ship silently. Treating the
+      // failure as "0 used" spends real money off a failed read. Treating it as
+      // "exhausted" tells a customer they are out of posts when the truth is we
+      // could not count — a fabricated reason, and PERMANENT, so the post dies.
+      //
+      // So: refuse, TRANSIENTLY, in its own code. Nothing is sent, nothing is
+      // claimed about the allowance, and the next tick counts again.
+      const error: PublishLogError = {
+        code: X_RATION_UNREADABLE_CODE,
+        classification: 'transient',
+        message: 'The X post allowance could not be read, so nothing was sent.',
+      }
+      await deps.writeLog(logRow(payload, ctx, deps.mode, 'failed', { error, connectionId: null }))
+      throw new Error('x ration unreadable')
+    }
+
+    const ration = checkXRation({ used })
+    if (!ration.allowed) {
+      // PERMANENT: no retry inside this month makes the allowance reappear, and a
+      // transient classification would have the runner burn its attempts on it.
+      return fail(X_RATION_EXHAUSTED_CODE, xRationRefusalMessage(ration), null)
+    }
   }
 
   // ── THE REFUSAL GATE (doc 18 §8) ────────────────────────────────────────────
