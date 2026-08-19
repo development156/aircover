@@ -260,12 +260,29 @@
 /* v3 type scale as utilities, so components never hand-write a font shorthand. */
 @utility type-display {
   font: var(--t-display);
+  letter-spacing: var(--ls-display);
 }
 @utility type-h1 {
   font: var(--t-h1);
+  letter-spacing: var(--ls-display);
 }
 @utility type-h2 {
   font: var(--t-h2);
+  letter-spacing: var(--ls-heading);
+}
+/* The rung that was missing — card and section titles. Before this they were
+   hand-written `text-[15px] font-semibold` at each call site, which is how
+   headings drifted between routes. */
+@utility type-h3 {
+  font: var(--t-h3);
+  letter-spacing: var(--ls-heading);
+}
+/* The one big number per view. Tabular by construction: a balance that
+   reflows its digits as it changes reads as unstable. */
+@utility type-hero-num {
+  font: var(--t-hero-num);
+  letter-spacing: var(--ls-hero-num);
+  font-variant-numeric: tabular-nums;
 }
 @utility type-body {
   font: var(--t-body);
@@ -342,4 +359,12 @@
     padding-left: 0;
     padding-right: 0;
   }
+}
+
+/* The design-system gallery's greyscale check. Scoped to a class on <html> so
+   nothing in the app can pick it up by accident, and applied to the ROOT rather
+   than to a wrapper — a filter on an ancestor creates a containing block and
+   would reposition every `position: fixed` element on the page. */
+.ds-greyscale {
+  filter: grayscale(1);
 }

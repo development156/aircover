@@ -1,6 +1,21 @@
 import type { PostStatus } from '@sahoda/shared'
 
-import { certaintyFor, type CertaintyLevel } from '@/lib/posts/certainty'
+import {
+  Check,
+  CheckCheck,
+  CalendarClock,
+  CalendarX,
+  Contrast,
+  Lightbulb,
+  LoaderCircle,
+  PencilLine,
+  TriangleAlert,
+  UserRound,
+  type LucideIcon,
+} from 'lucide-react'
+
+import { CERTAINTY_CLASS, certaintyFor } from '@/lib/posts/certainty'
+import { STATUS_MARK, type StatusMarkName } from '@/lib/posts/status-mark'
 import type { PostOutcome } from '@/lib/posts/publish-evidence'
 import { cn } from '@/lib/utils'
 
@@ -35,27 +50,6 @@ export const STATUS_STYLES = {
   failed: { label: 'Failed', className: 'bg-danger-bg text-danger' },
   expired: { label: 'Expired', className: 'bg-s2 text-muted' },
 } satisfies Record<PostStatus, StatusStyle>
-
-/**
- * Certainty level → the structural signature from tokens.css.
- *
- * These carry the meaning. `.is-real` is a solid fill, `.is-committed` a
- * hairline and tint, `.is-proposed` a dash, `.is-simulated` a hatch — each
- * survives recolour, greyscale and colour blindness, which the old
- * colour-only chips did not.
- *
- * `failed` is deliberately NOT one of them: a danger stroke on a transparent
- * surface, because failure is a different axis from how-real-a-thing-is.
- * `neutral` is the terminal/no-claim case.
- */
-const CERTAINTY_CLASS: Record<CertaintyLevel, string> = {
-  real: 'is-real',
-  committed: 'is-committed',
-  proposed: 'is-proposed',
-  simulated: 'is-simulated',
-  failed: 'border border-danger bg-transparent text-danger',
-  neutral: 'border border-line bg-transparent text-muted',
-}
 
 /**
  * The status this chip may SAY, which is not always the one on the post row.
@@ -107,10 +101,30 @@ export interface StatusBadgeProps {
   className?: string
 }
 
+/**
+ * Name → component. The names live in `status-mark.ts`, which stays JSX-free so
+ * the distinctness guard can assert it from the `lib` test project; this file is
+ * the only place that turns one into a glyph.
+ */
+const MARK_ICON: Record<StatusMarkName, LucideIcon> = {
+  lightbulb: Lightbulb,
+  'pencil-line': PencilLine,
+  'user-round': UserRound,
+  check: Check,
+  'calendar-clock': CalendarClock,
+  'loader-circle': LoaderCircle,
+  'check-check': CheckCheck,
+  contrast: Contrast,
+  'triangle-alert': TriangleAlert,
+  'calendar-x': CalendarX,
+}
+
 export function StatusBadge({ intent, outcome, className }: StatusBadgeProps) {
   const shown = displayStatus(intent, outcome)
   const style = STATUS_STYLES[shown]
   const certainty = certaintyFor(intent, outcome)
+  const mark = STATUS_MARK[shown]
+  const MarkIcon = MARK_ICON[mark.name]
 
   return (
     <span
@@ -124,7 +138,14 @@ export function StatusBadge({ intent, outcome, className }: StatusBadgeProps) {
         className,
       )}
     >
+      {/* The second structural axis. Certainty carries the fill and the edge;
+          this carries what happens next. Both survive greyscale, which is the
+          requirement — the palette has no red, so hue can never be the signal.
+          `aria-hidden` because the visible word already names the status; the
+          glyph's extra meaning is spoken by the hint below it. */}
+      <MarkIcon aria-hidden size={12} strokeWidth={2.25} className="shrink-0" />
       {style.label}
+      <span className="sr-only"> — {mark.hint}</span>
       {/* UI_RULES_v3: `.is-simulated` ALWAYS carries a visible text label. The
           label comes from the mapping rather than from this call site, so it
           cannot be forgotten — and it is rendered text, not a title attribute,

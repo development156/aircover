@@ -114,3 +114,24 @@ export function certaintyFor(intent: PostStatus, outcome: PostOutcome): Certaint
       return { level: 'neutral', label: null }
   }
 }
+
+/**
+ * Certainty level → the structural signature from tokens.css.
+ *
+ * These carry the meaning. `.is-real` is a solid fill, `.is-committed` a
+ * hairline and tint, `.is-proposed` a dash, `.is-simulated` a hatch — each
+ * survives recolour, greyscale and colour blindness, which the old
+ * colour-only chips did not.
+ *
+ * `failed` is deliberately NOT one of them: a danger stroke on a transparent
+ * surface, because failure is a different axis from how-real-a-thing-is.
+ * `neutral` is the terminal/no-claim case.
+ */
+export const CERTAINTY_CLASS: Record<CertaintyLevel, string> = {
+  real: 'is-real',
+  committed: 'is-committed',
+  proposed: 'is-proposed',
+  simulated: 'is-simulated',
+  failed: 'border border-danger bg-transparent text-danger',
+  neutral: 'border border-line bg-transparent text-muted',
+}

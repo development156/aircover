@@ -28,6 +28,13 @@ const PUBLIC_PATTERNS = [
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/embed/beta',
+  // The design-system gallery. Added deliberately, and this pinned list is why
+  // that had to be deliberate: it reads NO workspace, NO session and NO tenant
+  // row — it renders `packages/shared/tokens.css` and the primitives, nothing
+  // else. It is public so reviewers and every UI session can open the reference
+  // without an account, and so its greyscale/contrast checks can run without a
+  // Clerk fixture. If it ever grows a database read, it must leave this list.
+  '/design-system',
   '/api/public/beta-apply',
   '/api/admin/devops/ingest',
   '/api/webhooks/clerk',

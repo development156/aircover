@@ -33,6 +33,11 @@ const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/embed/beta',
+  // The design-system gallery. Public because it renders NOTHING but tokens and
+  // primitives — no workspace, no session, no tenant row is read on this route,
+  // and it is the reference every UI session and reviewer needs to open without
+  // an account. If it ever needs a database read, it stops being public.
+  '/design-system',
   '/api/public/beta-apply',
   '/api/admin/devops/ingest',
   '/api/webhooks/clerk',

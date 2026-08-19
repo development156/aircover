@@ -111,8 +111,24 @@ export function WorkspaceSwitcher({
         className="flex min-w-0 items-center gap-2 rounded-input border border-line bg-bg px-3 py-[7px] font-semibold transition-micro hover:bg-s1 max-narrow:min-h-[44px] max-narrow:px-2"
       >
         <WorkspaceBadge name={active.name} />
-        <span className="max-w-[16ch] truncate max-narrow:max-w-[7ch]">{active.name}</span>
-        <ChevronsUpDown size={15} className="shrink-0 text-muted" aria-hidden />
+        {/* ── THE NAME STEPS ASIDE ON A PHONE, IT DOES NOT SHRINK ────────────
+            MEASURED at 390px WITH a workspace: the topbar row ran to 407px and
+            the user menu sat 17px off-screen, so the document scrolled
+            sideways. The existing @smoke guard was green throughout because it
+            signs in and never bootstraps a workspace — and with no workspace
+            there is no credit pill, so it measured a row three items short.
+
+            `no-truncated-labels.spec.ts` says it in its own failure message:
+            "Carry FEWER things, not smaller ones." Squeezing the label to 4ch
+            would have bought the pixels and rendered "saho…", which is the
+            "S Sah" failure again. The badge already identifies the workspace by
+            its initial, and the full name is one tap away in the menu.
+
+            `sr-only`, never `hidden`: `display:none` removes the node from the
+            accessibility tree, and this span IS the button's accessible name —
+            hiding it would leave the switcher announced as an unnamed button. */}
+        <span className="max-w-[16ch] truncate max-narrow:sr-only">{active.name}</span>
+        <ChevronsUpDown size={15} className="shrink-0 text-muted max-narrow:hidden" aria-hidden />
       </button>
 
       {open ? (

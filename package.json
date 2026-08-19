@@ -16,7 +16,7 @@
     "test": "turbo run test && vitest run",
     "test:e2e": "pnpm --filter @sahoda/web test:e2e",
     "test:smoke": "turbo run test:smoke",
-    "gate": "turbo run typecheck lint test && turbo run test:smoke && prettier --check .",
+    "gate": "turbo run typecheck lint test && vitest run && turbo run test:smoke && prettier --check . && turbo run build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:new": "supabase --workdir packages/db migration new",

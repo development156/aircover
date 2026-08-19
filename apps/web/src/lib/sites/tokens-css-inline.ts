@@ -19,13 +19,22 @@
  * Regenerate with scripts/gen-tokens-inline.mjs rather than patching by hand.
  */
 export const TOKENS_CSS = `/* ============================================================
-   SAHODA LABS — Design Tokens v4.0 "The Kit"
-   Supersedes v3.0 "The Ledger" (warm neutrals + Outfit).
+   SAHODA LABS — Design Tokens v4.0
 
-   Lives at: packages/shared/tokens.css
-   Reference: docs/ui-package/sahoda-labs/ — the RENDERED output of
-              theme/sahoda-tokens.css + theme/sahoda-components.css.
-   Retheme guide: docs/ui-package/sahoda-labs/theme/RETHEME.md
+   Lives at: packages/shared/tokens.css — the SOURCE OF TRUTH for values.
+
+   ── THE CANON, IN ONE PLACE ──────────────────────────────────────────
+   SPEC:       docs/26_Design_System_v4.md  ← read this first
+   AUDIT:      docs/27_Design_Audit.md      ← why the values changed
+   LIVE REF:   /design-system               ← the real primitives, with a
+                                              greyscale toggle
+   docs/26 SUPERSEDES both docs/08_Design_System_SAHODA_LABS.md and
+   docs/ui-package/sahoda-labs/ (the ported kit and its RETHEME.md).
+   Those two are historical. If either disagrees with docs/26, docs/26
+   wins — this note exists because one session read the ported kit and
+   another read docs/08 and they built different screens.
+
+   Supersedes v3.0 "The Ledger" (warm neutrals + Outfit).
 
    WHAT CHANGED FROM v3 — values only, no names.
    Every token NAME in v3 survives, so every \`bg-s1\` / \`text-muted\` /
@@ -69,11 +78,23 @@ export const TOKENS_CSS = `/* ==================================================
 :root {
   /* ---------- L1 · BRAND SOURCES (7 names — never rename) ---------- */
   --p: #ff6600; /* Sahoda Orange — the one brand colour */
-  --pfg: #ffffff; /* text/icon ON primary. 3.13:1 — see NOTE below */
+  --pfg: #000000; /* text/icon ON primary. MEASURED 7.15:1 (was #ffffff at
+     2.94:1 — below AA, and below even the 3:1 floor for UI boundaries).
+     This is not a taste call: \`brandSkinVars()\` — the Readability Guard every
+     CUSTOMER theme already passes through — returns \`var(--ink)\` when handed
+     Sahoda's own orange. The default theme was the one theme exempt from it.
+     \`own-medicine.test.ts\` now grades this file against that guard. */
   --pstrong: #000000; /* primary hovers to BLACK, not a darker orange:
                              orange is the resting state, black is the
                              commitment (RETHEME.md §3) */
-  --acc: #ff6600; /* links, accent text, FOCUS RING */
+  /* Accent TEXT — links, and any orange word on a light surface.
+     NOT --p. #ff6600 measures 2.94:1 on white; this is the darkest step along
+     the SAME hue that clears AA body text, solved by
+     scripts/design/contrast.mjs → 4.51:1. The brand orange is not weakened,
+     it is RATIONED: --p still paints every fill, chip and focus halo, and in
+     dark mode --acc returns to #ff6600 (6.32:1 there) because the constraint
+     only ever existed on light. */
+  --acc: #c95100; /* accent TEXT on light. 4.51:1 on --surface. */
   /* Tints are orange AT ALPHA, not solid steps: they composite correctly on
      white, on --surface-2 and on dark without a second set of values.
 
@@ -168,10 +189,28 @@ export const TOKENS_CSS = `/* ==================================================
   --t-display: 700 30px/36px var(--sans);
   --t-h1: 600 24px/30px var(--sans);
   --t-h2: 600 20px/26px var(--sans);
+  /* THE MISSING RUNG. Between h2 (20px) and body (13px) there was a 7px cliff,
+     so every card title in the app hand-wrote \`text-[15px] font-semibold\`
+     instead of using the scale — which is how headings came to drift between
+     routes. A card title is not a page title; it now has a name. */
+  --t-h3: 650 15px/20px var(--sans);
   --t-body: 400 13px/20px var(--sans);
   --t-sm: 400 12px/18px var(--sans);
   --t-eyebrow: 600 11px/14px var(--sans);
   --t-eyebrow-ls: 0.06em;
+  /* The ONE big number per view — a balance, a total. Not a heading: it is set
+     in tabular figures so digits do not shuffle when the value changes, and it
+     is the only step above --t-display. Pair with \`.num\`. */
+  --t-hero-num: 650 44px/44px var(--sans);
+
+  /* ---------- L2 · TRACKING ----------
+     Optical, not decorative: type set large needs NEGATIVE tracking to stop
+     looking loose, and type set at 11px uppercase needs positive tracking to
+     stop looking cramped. One value per size band, never per component. */
+  --ls-display: -0.022em; /* >=24px */
+  --ls-heading: -0.011em; /* 15-20px */
+  --ls-body: 0em; /* 12-13px — Inter is already correct here */
+  --ls-hero-num: -0.03em; /* figures are wide; the hero number needs the most */
 
   /* ---------- L2 · SPACE (4pt scale) ----------
      --space-N. Do NOT introduce --s1/--s2 — see header. */
@@ -210,6 +249,12 @@ export const TOKENS_CSS = `/* ==================================================
   --rail-w: 280px; /* Home only */
   --control-h: 34px; /* buttons, segmented controls */
   --input-h: 38px; /* text inputs, selects */
+  /* The touch floor. 34px and 38px are correct for a mouse and too small for a
+     thumb, so at narrow widths every INTERACTIVE control grows to this. It is a
+     token rather than a literal because it has to be the same number in the
+     button, the input, the tab and the icon button — \`max-narrow:min-h-[44px]\`
+     scattered by hand is how three of them end up at 40. */
+  --control-h-touch: 44px;
 
   /* ---------- L2 · MOTION ---------- */
   --ease: cubic-bezier(0.2, 0, 0.2, 1);
@@ -245,7 +290,12 @@ export const TOKENS_CSS = `/* ==================================================
 [data-theme='dark'],
 .dark {
   --canvas: #0b0b0c;
-  --surface: #131315;
+  /* Raised from #131315. Against the canvas that step was ΔL 3.2/1000; this is
+     5.3/1000 — 66% more separation, so a card reads as a card before its
+     hairline is noticed. Dark surfaces cannot separate by fill ALONE (sRGB is
+     compressed near black: even this pair is only 1.10:1), so fill and hairline
+     work together here in a way they do not have to on light. */
+  --surface: #17171a;
   --surface-2: #17171a;
   --surface-3: #1f1f23;
   --line: rgba(255, 255, 255, 0.14);
@@ -253,7 +303,14 @@ export const TOKENS_CSS = `/* ==================================================
   --line-soft: rgba(255, 255, 255, 0.1);
   --ink: #ffffff;
   --ink-body: #ffffff;
-  --ink-mute: #dcdcdc; /* not #575756 — grey dies on black */
+  /* SOLVED, not picked — scripts/design/dark-ladder.mjs.
+     Light earns its hierarchy from the GAP between ink and mute: 21.0:1 vs
+     7.23:1, a 2.90x ratio-of-ratios. Dark shipped #dcdcdc, which measures
+     13.53:1 against 18.56:1 — a 1.37x gap, so secondary text was almost as
+     loud as primary and every card read flat. #979797 restores the light
+     theme's SEPARATION (2.92x) while still clearing AA body at 6.35:1.
+     The old comment was right that grey dies on black; it over-corrected. */
+  --ink-mute: #979797;
   --ink-faint: rgba(255, 255, 255, 0.45);
 
   /* Orange does not shift between themes — the one fixed point. It is
@@ -276,10 +333,22 @@ export const TOKENS_CSS = `/* ==================================================
   --sh-lg: 0 16px 48px rgba(0, 0, 0, 0.7);
 }
 
-/* ---------- GLOBAL FOCUS — one treatment, no per-component overrides ---------- */
+/* ---------- GLOBAL FOCUS — one treatment, no per-component overrides ----------
+   TWO-TONE, and that is a requirement rather than a flourish. WCAG 1.4.11 asks
+   3:1 of a focus indicator against what surrounds it, and the brand orange
+   measures 2.94:1 on white — it misses by 0.06. A near-identical darker orange
+   (#fb6500, 3.02:1) would pass the letter of the rule while being invisibly
+   different, which is gaming the check, not clearing it.
+
+   So the ring is an INK core with an orange halo. The core carries the
+   contrast (21:1 on white, and the halo carries it on dark), the halo carries
+   the brand. It also reads on top of an orange fill, where a pure orange ring
+   would disappear entirely — the one case a single-colour ring can never
+   solve. */
 :focus-visible {
-  outline: 2px solid var(--acc);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--brand-lift);
   border-radius: var(--r-sm);
 }
 
@@ -339,6 +408,64 @@ export const TOKENS_CSS = `/* ==================================================
   background-image: repeating-linear-gradient(-45deg, transparent 0 5px, var(--hatch) 5px 6px);
   color: var(--ink-mute);
   border: 1px solid var(--line-firm);
+}
+
+/* ============================================================
+   THE ABSENCE VOCABULARY — three states, three treatments.
+
+   The most-rendered glyph in this product was an em dash meaning
+   "nothing", and it was doing three different jobs at once. They are
+   not the same claim and a user has to be able to tell them apart:
+
+     1. NOT YET MEASURED  the slot is real, the reading has not arrived.
+                          Reach on a workspace with no published post.
+     2. UNREADABLE        we asked and the answer did not come back.
+                          \`readBalance\` returning \`unreadable\`.
+     3. DOES NOT EXIST    there is no such quantity. Omit the slot.
+
+   Rendering 1 and 2 identically is the defect: "you have nothing yet"
+   and "something is broken" led to the same dash, so a failed read
+   looked like a quiet Tuesday. Rendering 3 at all is the other defect —
+   \`100 of —\` invents a fraction that has no denominator. If the
+   quantity does not exist, DELETE THE SLOT. There is no class for it,
+   on purpose.
+
+   Both marks are RULES, not characters: a solid rule reads as "not
+   yet", a broken rule reads as "the line to this number is cut". The
+   difference is structural, so it survives greyscale and does not
+   depend on the one brand colour this palette has.
+
+   Both REQUIRE an accessible name. A rule with no name is a decoration
+   that a screen reader skips, which would make the absence invisible
+   rather than legible.
+   ============================================================ */
+
+/* 1 · NOT YET MEASURED — a quiet solid rule. */
+.is-unmeasured {
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  vertical-align: middle;
+  border-radius: 1px;
+  background: var(--line);
+}
+
+/* 2 · UNREADABLE — the same rule, BROKEN. Something is wrong, said
+   quietly: this is not an error state, it is an honest gap. Pair it
+   with words wherever there is room for them. */
+.is-unreadable {
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  vertical-align: middle;
+  background-image: linear-gradient(
+    to right,
+    var(--line-firm) 0 4px,
+    transparent 4px 6px,
+    var(--line-firm) 6px 10px,
+    transparent 10px 12px,
+    var(--line-firm) 12px 14px
+  );
 }
 
 /* The blade marks AGENCY — Sahoda acted, rather than the user.

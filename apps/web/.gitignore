@@ -9,3 +9,11 @@
 /playwright-report/
 /blob-report/
 /.playwright/
+
+# Design-audit evidence. Regenerated on demand by e2e/design-audit.spec.ts and
+# e2e/shell-widths.spec.ts — screenshots are large, mechanically reproducible,
+# and go stale the moment a token changes, so the harness is the artefact that
+# is version-controlled, not its output.
+/design-audit/
+/shell-proof/
+/design-system-proof/
