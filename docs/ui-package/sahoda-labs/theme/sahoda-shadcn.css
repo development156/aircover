@@ -1,0 +1,210 @@
+/*  SAHODA LABS → shadcn/ui BRIDGE  (Tailwind v3 · HSL-triplet era)
+    =====================================================================
+    This is the zero-markup-change path.
+
+    shadcn components read their colours from CSS variables. Redefine the
+    variables and every Button, Card, Table, Dialog, Badge and Input you
+    already shipped becomes Sahoda — without editing one component file.
+
+    HOW TO TELL IF THIS IS YOUR VERSION
+    Open your globals.css. If it looks like this:
+
+        --background: 0 0% 100%;          <- bare numbers, no hsl()
+
+    …and your tailwind.config.js wraps them, like this:
+
+        background: "hsl(var(--background))"
+
+    then this is the right file. If your variables hold real colour values
+    (`--background: oklch(1 0 0)` or a hex), use sahoda-shadcn-v4.css.
+    Mixing the two produces an all-black or all-transparent app.
+
+    INSTALL
+    Import AFTER your globals.css so these win:
+
+        @import "./globals.css";
+        @import "../theme/sahoda-tokens.css";
+        @import "../theme/sahoda-shadcn.css";
+
+    Keep sahoda-tokens.css in the chain — the values below are duplicated
+    as literals only because Tailwind v3 needs bare triplets, and a token
+    reference cannot be composed into `hsl()` per-channel.               */
+
+
+@layer base {
+
+    :root {
+        /* Ground and ink */
+        --background: 0 0% 100%;        /* #FFFFFF */
+        --foreground: 0 0% 0%;          /* #000000 */
+
+        /* Cards and popovers sit ON the ground, not above it — same white,
+           separated by a hairline ring rather than a shadow. */
+        --card: 0 0% 100%;
+        --card-foreground: 0 0% 0%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 0 0% 0%;
+
+        /* Primary is orange — and it is rationed. See the note below. */
+        --primary: 24 100% 50%;         /* #FF6600 */
+        --primary-foreground: 0 0% 100%;
+
+        /* Secondary / muted are the achromatic surface steps */
+        --secondary: 0 0% 98%;          /* #FAFAFA */
+        --secondary-foreground: 0 0% 0%;
+        --muted: 0 0% 96%;              /* #F4F4F4 */
+        --muted-foreground: 60 1% 34%;  /* #575756 */
+
+        /* shadcn's --accent is a HOVER WASH, not the brand accent.
+           Keeping it achromatic is deliberate: if every menu item hover
+           turned orange, orange would stop meaning "act on this". */
+        --accent: 0 0% 96%;
+        --accent-foreground: 0 0% 0%;
+
+        /*  ⚠ There is no red in this palette.
+            Destructive maps to orange, and severity is carried by fill
+            weight + glyph + label instead of hue. A destructive Button
+            still reads as dangerous because it is solid and it says
+            "Delete" — not because it is a different colour.
+            If you need red, that is a palette decision, not a CSS one. */
+        --destructive: 24 100% 50%;
+        --destructive-foreground: 0 0% 100%;
+
+        --border: 0 0% 86%;             /* #DCDCDC */
+        --input: 0 0% 86%;
+        --ring: 24 100% 50%;
+
+        /* 8px — matches --sl-r. shadcn derives sm/md/lg from this. */
+        --radius: 0.5rem;
+
+        /*  Charts. One hue, then achromatic. A five-colour categorical
+            ramp would import five colours the brand does not own; this
+            ramp separates series by lightness, which also survives
+            greyscale printing and colour-blind viewers.               */
+        --chart-1: 24 100% 50%;         /* orange — the series that matters */
+        --chart-2: 0 0% 0%;             /* ink */
+        --chart-3: 60 1% 34%;           /* grey */
+        --chart-4: 24 100% 72%;         /* orange tint, not a new hue */
+        --chart-5: 0 0% 86%;            /* gainsboro */
+
+        /*  Sidebar. Slightly off the page ground so the shell reads as
+            chrome. The active item is orange text on an orange wash —
+            never a filled orange block, which would shout at you from
+            every screen. */
+        --sidebar-background: 0 0% 98%;
+        --sidebar-foreground: 60 1% 34%;
+        --sidebar-primary: 24 100% 50%;
+        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-accent: 0 0% 96%;
+        --sidebar-accent-foreground: 0 0% 0%;
+        --sidebar-border: 0 0% 86%;
+        --sidebar-ring: 24 100% 50%;
+    }
+
+    .dark,
+    [data-theme="dark"] {
+        --background: 240 4% 5%;        /* #0B0B0C */
+        --foreground: 0 0% 100%;
+
+        --card: 240 5% 8%;              /* #131315 */
+        --card-foreground: 0 0% 100%;
+        --popover: 240 5% 8%;
+        --popover-foreground: 0 0% 100%;
+
+        /* Orange does not shift between themes. It is the one fixed point
+           in the system, and moving it would break brand recognition. */
+        --primary: 24 100% 50%;
+        --primary-foreground: 0 0% 100%;
+
+        --secondary: 240 6% 10%;        /* #17171A */
+        --secondary-foreground: 0 0% 100%;
+        --muted: 240 6% 13%;            /* #1F1F23 */
+        --muted-foreground: 0 0% 86%;   /* #DCDCDC — not grey; grey dies here */
+
+        --accent: 240 6% 13%;
+        --accent-foreground: 0 0% 100%;
+
+        --destructive: 24 100% 50%;
+        --destructive-foreground: 0 0% 100%;
+
+        /* Solid equivalent of rgba(255,255,255,0.14) over #131315.
+           HSL triplets cannot carry alpha, so it is pre-composited. */
+        --border: 240 3% 21%;
+        --input: 240 3% 21%;
+        --ring: 24 100% 50%;
+
+        --chart-1: 24 100% 50%;
+        --chart-2: 0 0% 100%;
+        --chart-3: 0 0% 86%;
+        --chart-4: 24 100% 72%;
+        --chart-5: 60 1% 34%;
+
+        --sidebar-background: 240 5% 8%;
+        --sidebar-foreground: 0 0% 86%;
+        --sidebar-primary: 24 100% 50%;
+        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-accent: 240 6% 13%;
+        --sidebar-accent-foreground: 0 0% 100%;
+        --sidebar-border: 240 3% 21%;
+        --sidebar-ring: 24 100% 50%;
+    }
+}
+
+
+/*  ---------------------------------------------------------------------
+    SHAPE CORRECTIONS
+
+    Colour alone gets you ~70% of the way. These four rules close most of
+    the remaining gap, because shadcn's defaults are softer and puffier
+    than this system. Each is scoped to shadcn's own data-attributes and
+    class hooks, so nothing else in your app is touched.
+
+    Delete any rule that fights a component you have already customised.
+    --------------------------------------------------------------------- */
+
+@layer components {
+
+    /*  1. Hairline rings, not borders + shadows.
+        A resting card here has an inset ring and no shadow. Shadow is
+        reserved for things that genuinely float, which is what makes a
+        dialog read as "above" instead of just "bigger". */
+    [data-slot="card"] {
+        border: none;
+        box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.55);
+        border-radius: 12px;
+    }
+
+    /*  2. Controls are 34px, not 40px. This is the single biggest
+        difference in feel: the reference build fits ~30% more on screen
+        because every control is one step shorter and the type is 13px.
+        If your app is genuinely touch-first, skip this rule. */
+    [data-slot="button"]:not([data-size="lg"]):not([data-size="icon"]) {
+        height: 34px;
+        padding-inline: 12px;
+        font-size: 13px;
+        font-weight: 550;
+        border-radius: 6px;
+    }
+
+    [data-slot="input"],
+    [data-slot="select-trigger"],
+    [data-slot="textarea"] {
+        font-size: 13px;
+        border-radius: 6px;
+    }
+
+    /*  3. The primary button's hover goes to BLACK, not to a darker
+        orange. Orange is the resting state; black is the commitment.
+        It also guarantees the hover is legible on both themes. */
+    [data-slot="button"][data-variant="default"]:hover {
+        background: hsl(var(--foreground));
+    }
+
+    /*  4. Focus is a 2px orange ring at 2px offset, everywhere, with no
+        exceptions. Accessibility is not negotiable per-component. */
+    :where([data-slot]):focus-visible {
+        outline: 2px solid hsl(var(--ring));
+        outline-offset: 2px;
+        box-shadow: none;
+    }
+}

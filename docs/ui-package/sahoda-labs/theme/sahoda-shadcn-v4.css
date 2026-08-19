@@ -1,0 +1,173 @@
+/*  SAHODA LABS → shadcn/ui BRIDGE  (Tailwind v4 · real colour values)
+    =====================================================================
+    Same job as sahoda-shadcn.css, for the newer variable format.
+
+    HOW TO TELL IF THIS IS YOUR VERSION
+    Open your globals.css. If it starts with `@import "tailwindcss";`
+    and the variables hold real colours:
+
+        --background: oklch(1 0 0);       <- a colour, not bare numbers
+
+    …and there is an `@theme inline { --color-background: var(--background) }`
+    block, this is the right file.
+
+    If your variables are bare triplets (`--background: 0 0% 100%`), use
+    sahoda-shadcn.css instead. Loading both, or the wrong one, gives you
+    an all-black or all-transparent app.
+
+    INSTALL — paste these two blocks over the :root and .dark blocks that
+    shadcn generated. Leave the @theme inline block alone; it already
+    points at these names.
+
+    Values are hex rather than oklch on purpose: hex is exactly the brand
+    palette, byte for byte, and an oklch round-trip would put #FF6600 a
+    perceptible step off. Tailwind v4 accepts any CSS colour here.      */
+
+
+:root {
+    --radius: 0.625rem;
+
+    /* Ground and ink */
+    --background: #FFFFFF;
+    --foreground: #000000;
+
+    /* Cards sit ON the ground — same white, separated by a hairline. */
+    --card: #FFFFFF;
+    --card-foreground: #000000;
+    --popover: #FFFFFF;
+    --popover-foreground: #000000;
+
+    /* Primary is orange, and it is rationed. */
+    --primary: #FF6600;
+    --primary-foreground: #FFFFFF;
+
+    --secondary: #FAFAFA;
+    --secondary-foreground: #000000;
+    --muted: #F4F4F4;
+    --muted-foreground: #575756;
+
+    /*  --accent is shadcn's HOVER WASH, not the brand accent. It stays
+        achromatic deliberately: if every menu hover turned orange,
+        orange would stop meaning "act on this". */
+    --accent: #F4F4F4;
+    --accent-foreground: #000000;
+
+    /*  ⚠ There is no red in this palette. Destructive maps to orange;
+        severity is carried by fill weight + glyph + label, not hue.
+        A destructive button reads as dangerous because it is solid and
+        it says "Delete". If you need red, that is a palette decision. */
+    --destructive: #FF6600;
+    --destructive-foreground: #FFFFFF;
+
+    --border: #DCDCDC;
+    --input: #DCDCDC;
+    --ring: #FF6600;
+
+    /*  Charts separate by lightness, not hue — one brand colour, then
+        achromatic. Survives greyscale and colour-blind viewers. */
+    --chart-1: #FF6600;
+    --chart-2: #000000;
+    --chart-3: #575756;
+    --chart-4: #FF9B57;   /* orange tint, not a new hue */
+    --chart-5: #DCDCDC;
+
+    /* Sidebar reads as chrome — a step off the page ground. */
+    --sidebar: #FAFAFA;
+    --sidebar-foreground: #575756;
+    --sidebar-primary: #FF6600;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #F4F4F4;
+    --sidebar-accent-foreground: #000000;
+    --sidebar-border: #DCDCDC;
+    --sidebar-ring: #FF6600;
+}
+
+.dark {
+    --background: #0B0B0C;
+    --foreground: #FFFFFF;
+
+    --card: #131315;
+    --card-foreground: #FFFFFF;
+    --popover: #131315;
+    --popover-foreground: #FFFFFF;
+
+    /* Orange does not shift between themes — the one fixed point. */
+    --primary: #FF6600;
+    --primary-foreground: #FFFFFF;
+
+    --secondary: #17171A;
+    --secondary-foreground: #FFFFFF;
+    --muted: #1F1F23;
+    --muted-foreground: #DCDCDC;   /* not #575756 — grey dies on black */
+
+    --accent: #1F1F23;
+    --accent-foreground: #FFFFFF;
+
+    --destructive: #FF6600;
+    --destructive-foreground: #FFFFFF;
+
+    /* This format carries alpha, so the border can stay translucent —
+       it then sits correctly on card, popover and page alike. */
+    --border: rgba(255, 255, 255, 0.14);
+    --input: rgba(255, 255, 255, 0.14);
+    --ring: #FF6600;
+
+    --chart-1: #FF6600;
+    --chart-2: #FFFFFF;
+    --chart-3: #DCDCDC;
+    --chart-4: #FF9B57;
+    --chart-5: #575756;
+
+    --sidebar: #131315;
+    --sidebar-foreground: #DCDCDC;
+    --sidebar-primary: #FF6600;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #1F1F23;
+    --sidebar-accent-foreground: #FFFFFF;
+    --sidebar-border: rgba(255, 255, 255, 0.14);
+    --sidebar-ring: #FF6600;
+}
+
+
+/*  ---------------------------------------------------------------------
+    SHAPE CORRECTIONS — see sahoda-shadcn.css for the reasoning.
+    Colour gets you ~70% of the way; these close most of the rest.
+    --------------------------------------------------------------------- */
+
+@layer components {
+
+    [data-slot="card"] {
+        border: none;
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 55%, transparent);
+        border-radius: 12px;
+    }
+
+    /* 34px controls, 13px type — the density difference is most of the
+       "it looks like the new design" feeling. Skip if you are touch-first. */
+    [data-slot="button"]:not([data-size="lg"]):not([data-size="icon"]) {
+        height: 34px;
+        padding-inline: 12px;
+        font-size: 13px;
+        font-weight: 550;
+        border-radius: 6px;
+    }
+
+    [data-slot="input"],
+    [data-slot="select-trigger"],
+    [data-slot="textarea"] {
+        font-size: 13px;
+        border-radius: 6px;
+    }
+
+    /* Primary hovers to black, not to a darker orange. Orange is the
+       resting state; black is the commitment. */
+    [data-slot="button"][data-variant="default"]:hover {
+        background: var(--foreground);
+    }
+
+    :where([data-slot]):focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+        box-shadow: none;
+    }
+}

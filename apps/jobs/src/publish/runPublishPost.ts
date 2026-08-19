@@ -404,7 +404,28 @@ export async function runPublishPost(
     connection = await deps.resolveConnection(payload)
   } catch (e) {
     // No token ⇒ nothing was attempted. Still logged, and never presented as success.
-    return fail('CONNECTION_UNAVAILABLE', messageOf(e), null)
+    //
+    // ── A TENANT REFUSAL IS NOT AN OUTAGE, AND USED TO BE FILED AS ONE ────────
+    // The pre-flight assertion lives in the DATABASE — `assert_account_for_scheduled_post`,
+    // which re-derives the workspace FROM THE POST and refuses unless an active
+    // connection on the same channel, in that workspace, under that workspace's
+    // Zernio profile, owns the account id. It refuses by RAISING, so it arrives
+    // here as a thrown error, and everything thrown here was recorded as
+    // `CONNECTION_UNAVAILABLE`.
+    //
+    // That flattening is the audit defect. A deliberate attempt to publish one
+    // customer's post through another customer's account looked, in
+    // `post_publish_logs`, exactly like the token vault being briefly unreachable —
+    // so the one event anybody would want to find after the fact was the one event
+    // no filter could distinguish. MEASURED 2026-08-19 against production: zero rows
+    // in that table carry a cross-tenant code, and the refusal has always been
+    // logged under the outage code.
+    //
+    // The codes below are RAISED BY NAME in the applied migrations
+    // (20260801000004, 20260801000005), so they are matched exactly rather than
+    // sniffed for. Anything else keeps the old code, because an error this file
+    // does not recognise is not one it may re-label.
+    return fail(preflightCodeOf(e) ?? 'CONNECTION_UNAVAILABLE', messageOf(e), null)
   }
 
   try {
@@ -545,6 +566,37 @@ export async function runPublishPost(
       publishedAt: status === 'succeeded' ? (extra.publishedAt ?? now().toISOString()) : null,
     }
   }
+}
+
+/**
+ * The pre-flight refusals the database raises BY NAME, or null for anything else.
+ *
+ * Every one of these is a `raise exception '<CODE>'` in an applied migration, so the
+ * set is closed and the match is exact. A substring sniff would re-label a message
+ * that merely mentioned one — and a wrongly-labelled audit row is worse than a
+ * coarse one, because it invites a search that finds the wrong thing.
+ *
+ * `CROSS_TENANT_ACCOUNT` is the one that matters: it means a publish was attempted
+ * with an account id that does not belong to the post's workspace.
+ */
+const PREFLIGHT_CODES = new Set([
+  'CROSS_TENANT_ACCOUNT',
+  'NO_PROFILE_MAPPING',
+  'POST_NOT_PUBLISHABLE',
+  'INVALID_ACCOUNT',
+  'INVALID_VARIANT',
+  'INVALID_POST',
+])
+
+function preflightCodeOf(e: unknown): string | null {
+  const message = messageOf(e)
+  for (const code of PREFLIGHT_CODES) {
+    // The driver prefixes the raised text, so the code is a WORD in the message
+    // rather than the whole of it. Anchored on word boundaries so `INVALID_POST`
+    // cannot match inside a longer token.
+    if (new RegExp(`\\b${code}\\b`).test(message)) return code
+  }
+  return null
 }
 
 function messageOf(e: unknown): string {

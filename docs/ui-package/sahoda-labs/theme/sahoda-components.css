@@ -1,0 +1,1020 @@
+/*  SAHODA LABS — COMPONENT KIT (portable)
+    =====================================================================
+    Every class is prefixed `sl-` so this cannot collide with Tailwind,
+    Bootstrap, MUI or your own CSS. Import it and nothing changes until
+    you put an `sl-` class on something.
+
+        <link rel="stylesheet" href="theme/sahoda-tokens.css">
+        <link rel="stylesheet" href="theme/sahoda-components.css">
+
+    Requires sahoda-tokens.css. On its own this file renders unstyled.
+
+    IF YOU ARE ON shadcn: you do not need most of this. The bridge file
+    already restyles Button/Card/Input/Table. What you DO want from here
+    are the pieces shadcn has no equivalent for, and they are the pieces
+    that make the product look like itself:
+
+        .sl-badge--*    the four-rung status ladder
+        .sl-tile--brand platform logos with the container removed
+        .sl-delta       change indicators that do not rely on colour
+        .sl-ai-note     the AI reasoning surface
+        .sl-state       empty / error states that carry a recovery action
+        .sl-mface       the mascot's four expressions
+
+    Icons: this kit assumes 1.6px-stroke outline icons on a 24 viewBox
+    (Lucide, Feather, Phosphor Regular all match). Sizing is handled per
+    context below — do not size icons at the call site.                */
+
+
+/* ================================================================ button */
+
+.sl-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: var(--sl-control-h);
+    padding: 0 12px;
+    border: none;
+    border-radius: var(--sl-r-sm);
+    font-family: inherit;
+    font-size: var(--sl-fs-13);
+    font-weight: 550;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    color: var(--sl-text);
+    background: var(--sl-surface);
+
+    /*  An inset ring, not a border. Borders change the box size and make
+        a hover that thickens the edge shift the layout by a pixel; an
+        inset shadow paints inside the box and never reflows.          */
+    box-shadow: inset 0 0 0 1px var(--sl-border);
+    transition: background var(--sl-d-fast) var(--sl-ease),
+                box-shadow var(--sl-d-fast) var(--sl-ease),
+                color var(--sl-d-fast) var(--sl-ease);
+}
+
+.sl-btn:hover { background: var(--sl-surface-2); box-shadow: inset 0 0 0 1px var(--sl-text-3); }
+.sl-btn:active { transform: translateY(0.5px); }
+.sl-btn svg { width: 15px; height: 15px; flex: none; }
+
+/*  Primary hovers to BLACK, not to a darker orange. Orange is the
+    resting state; black is the commitment. It also means the hover is
+    legible on either theme without a second rule.                    */
+.sl-btn--primary { color: var(--sl-white); background: var(--sl-orange); box-shadow: none; }
+.sl-btn--primary:hover { background: var(--sl-black); box-shadow: none; }
+
+.sl-btn--ink { color: var(--sl-white); background: var(--sl-black); box-shadow: none; }
+.sl-btn--ink:hover { background: var(--sl-orange); box-shadow: none; }
+[data-theme="dark"] .sl-btn--ink,
+.dark .sl-btn--ink { background: var(--sl-white); color: var(--sl-black); }
+
+.sl-btn--ghost { background: transparent; box-shadow: none; color: var(--sl-text-2); }
+.sl-btn--ghost:hover { background: var(--sl-black-04); box-shadow: none; color: var(--sl-text); }
+[data-theme="dark"] .sl-btn--ghost:hover,
+.dark .sl-btn--ghost:hover { background: var(--sl-white-06); }
+
+.sl-btn--accent-ghost {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--sl-orange);
+    color: var(--sl-orange);
+}
+.sl-btn--accent-ghost:hover { background: var(--sl-orange); color: var(--sl-white); }
+
+.sl-btn--sm { height: 28px; padding: 0 9px; font-size: var(--sl-fs-12); }
+.sl-btn--sm svg { width: 13px; height: 13px; }
+.sl-btn--lg { height: 40px; padding: 0 16px; font-size: var(--sl-fs-14); }
+.sl-btn--block { width: 100%; }
+.sl-btn--icon { width: var(--sl-control-h); padding: 0; }
+.sl-btn--icon.sl-btn--sm { width: 28px; }
+
+.sl-btn:disabled,
+.sl-btn[aria-disabled="true"] {
+    color: var(--sl-text-3);
+    background: var(--sl-surface-2);
+    box-shadow: inset 0 0 0 1px var(--sl-border);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.sl-btn--primary:disabled { background: var(--sl-gainsboro); color: var(--sl-white); }
+
+/*  Busy state. The width is pinned by JS before the label is swapped —
+    see RETHEME.md §6. Without pinning, "Approve" → "Approving…" moves
+    every control to its right, which is what makes async UI feel cheap. */
+.sl-btn.is-busy { pointer-events: none; color: transparent; position: relative; }
+.sl-btn.is-busy::after {
+    content: "";
+    position: absolute;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 1.6px solid currentColor;
+    border-top-color: transparent;
+    color: var(--sl-text-2);
+    animation: sl-spin 0.6s linear infinite;
+}
+.sl-btn--primary.is-busy::after,
+.sl-btn--ink.is-busy::after { color: var(--sl-white); }
+
+@keyframes sl-spin { to { transform: rotate(360deg); } }
+
+/* Icon-only header / toolbar button */
+.sl-iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: none;
+    border-radius: var(--sl-r-sm);
+    color: var(--sl-text-2);
+    cursor: pointer;
+    position: relative;
+    transition: background var(--sl-d-fast) var(--sl-ease), color var(--sl-d-fast) var(--sl-ease);
+}
+
+.sl-iconbtn:hover { background: var(--sl-black-04); color: var(--sl-text); }
+[data-theme="dark"] .sl-iconbtn:hover,
+.dark .sl-iconbtn:hover { background: var(--sl-white-06); }
+.sl-iconbtn svg { width: 17px; height: 17px; }
+
+.sl-iconbtn__dot {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    border-radius: var(--sl-r-full);
+    background: var(--sl-orange);
+    color: var(--sl-white);
+    font-size: 9px;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 0 0 2px var(--sl-surface);
+}
+
+
+/* ================================================================= input */
+
+.sl-field { display: flex; flex-direction: column; gap: 6px; }
+.sl-label { font-size: var(--sl-fs-12); font-weight: 550; color: var(--sl-text-2); }
+
+.sl-input,
+.sl-select,
+.sl-textarea {
+    width: 100%;
+    height: var(--sl-input-h);
+    padding: 0 11px;
+    border: none;
+    outline: none;
+    border-radius: var(--sl-r-sm);
+    background: var(--sl-surface);
+    color: var(--sl-text);
+    font-family: inherit;
+    font-size: var(--sl-fs-13);
+    box-shadow: inset 0 0 0 1px var(--sl-border);
+    transition: box-shadow var(--sl-d-fast) var(--sl-ease);
+}
+
+.sl-textarea { height: auto; padding: 10px 11px; resize: vertical; line-height: 1.55; }
+.sl-input::placeholder,
+.sl-textarea::placeholder { color: var(--sl-text-3); }
+
+.sl-input:focus,
+.sl-select:focus,
+.sl-textarea:focus {
+    box-shadow: inset 0 0 0 1px var(--sl-orange), 0 0 0 3px var(--sl-orange-16);
+    outline: none;
+}
+
+.sl-select {
+    appearance: none;
+    padding-right: 30px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23575756' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    background-size: 15px;
+    cursor: pointer;
+}
+
+[data-theme="dark"] .sl-select,
+.dark .sl-select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23DCDCDC' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+}
+
+.sl-input-wrap { position: relative; display: flex; align-items: center; }
+.sl-input-wrap svg {
+    position: absolute;
+    left: 10px;
+    width: 15px;
+    height: 15px;
+    color: var(--sl-text-3);
+    pointer-events: none;
+}
+.sl-input-wrap .sl-input { padding-left: 32px; }
+
+.sl-hint { font-size: var(--sl-fs-11); color: var(--sl-text-3); }
+.sl-hint--error { color: var(--sl-orange); font-weight: 550; }
+.sl-input--error { box-shadow: inset 0 0 0 1px var(--sl-orange); }
+
+.sl-check {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border: none;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1px var(--sl-border);
+    background: var(--sl-surface);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    flex: none;
+    transition: background 0.12s var(--sl-ease), box-shadow 0.12s var(--sl-ease);
+}
+
+.sl-check:checked {
+    background: var(--sl-orange) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6.5'/%3E%3C/svg%3E") center / 13px no-repeat;
+    box-shadow: none;
+}
+
+.sl-check:indeterminate {
+    background: var(--sl-orange) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M4 8h8'/%3E%3C/svg%3E") center / 13px no-repeat;
+    box-shadow: none;
+}
+
+.sl-check--radio { border-radius: 50%; }
+.sl-check--radio:checked {
+    background: var(--sl-orange);
+    box-shadow: inset 0 0 0 3px var(--sl-surface), inset 0 0 0 12px var(--sl-orange);
+}
+
+.sl-switch {
+    appearance: none;
+    width: 34px;
+    height: 20px;
+    border: none;
+    border-radius: var(--sl-r-full);
+    background: var(--sl-gainsboro);
+    position: relative;
+    cursor: pointer;
+    flex: none;
+    transition: background 0.16s var(--sl-ease);
+}
+
+.sl-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--sl-white);
+    box-shadow: var(--sl-shadow-sm);
+    transition: transform 0.16s var(--sl-ease);
+}
+
+.sl-switch:checked { background: var(--sl-orange); }
+.sl-switch:checked::after { transform: translateX(14px); }
+
+
+/* ================================================================== card */
+
+/*  Resting cards get a hairline ring and NO shadow. Shadow is reserved
+    for layers that genuinely float, which is what lets a dialog read as
+    "above" rather than merely "bigger".                               */
+
+.sl-card {
+    background: var(--sl-surface);
+    border-radius: var(--sl-r-lg);
+    box-shadow: inset 0 0 0 1px var(--sl-border-soft);
+}
+
+.sl-card--line { box-shadow: inset 0 0 0 1px var(--sl-border); }
+.sl-card--pad { padding: var(--sl-s4); }
+
+.sl-card__head {
+    display: flex;
+    align-items: center;
+    gap: var(--sl-s3);
+    padding: 12px var(--sl-s4);
+    border-bottom: 1px solid var(--sl-border-soft);
+    min-height: 46px;
+}
+
+.sl-card__body { padding: var(--sl-s4); }
+.sl-card__body--tight { padding: var(--sl-s3) var(--sl-s4); }
+.sl-card__foot { padding: 10px var(--sl-s4); border-top: 1px solid var(--sl-border-soft); }
+
+/* Cards that are clickable lift; cards that are not, do not. */
+.sl-card--link { cursor: pointer; transition: box-shadow var(--sl-d) var(--sl-ease), transform var(--sl-d) var(--sl-ease); }
+.sl-card--link:hover { box-shadow: inset 0 0 0 1px var(--sl-text-3), var(--sl-shadow-sm); transform: translateY(-1px); }
+
+.sl-link {
+    color: var(--sl-text-2);
+    font-size: var(--sl-fs-12);
+    font-weight: 550;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    transition: color var(--sl-d-fast) var(--sl-ease);
+}
+.sl-link:hover { color: var(--sl-orange); }
+.sl-link svg { width: 13px; height: 13px; }
+
+
+/* ============================================== the four-rung ladder =====
+
+    THE MOST IMPORTANT COMPONENT IN THE KIT.
+
+    A five-colour palette has no red/amber/green, so status cannot be
+    carried by hue. It is carried by three stacked signals instead:
+
+        fill weight  — how much ink the badge spends
+        a glyph      — a shape you can name
+        a label      — words, always
+
+    Four rungs, loudest to quietest:
+
+        1  urgent   solid orange     needs you now
+        2  active   solid ink        running / current
+        3  pending  orange outline   waiting on review
+        4  calm     grey outline     done, scheduled, informational
+
+    This is not a workaround. It survives greyscale, colour-blindness and
+    a photocopier, and every rung still carries its meaning in words —
+    which the traffic-light convention it replaced never did.
+
+    THE ONE RULE: never add a fifth rung. If something does not fit,
+    it belongs on an existing rung and the label does the work.       */
+
+.sl-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: var(--sl-r-sm);
+    font-size: var(--sl-fs-11);
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.sl-badge svg { width: 11px; height: 11px; }
+
+.sl-badge--urgent { background: var(--sl-orange); color: var(--sl-white); }
+
+.sl-badge--active { background: var(--sl-black); color: var(--sl-white); }
+[data-theme="dark"] .sl-badge--active,
+.dark .sl-badge--active { background: var(--sl-white); color: var(--sl-black); }
+
+.sl-badge--pending {
+    color: var(--sl-orange);
+    background: var(--sl-orange-06);
+    box-shadow: inset 0 0 0 1px var(--sl-orange-40);
+}
+
+.sl-badge--calm {
+    color: var(--sl-text-2);
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--sl-border);
+}
+
+.sl-badge--soft { color: var(--sl-text-2); background: var(--sl-black-04); }
+[data-theme="dark"] .sl-badge--soft,
+.dark .sl-badge--soft { background: var(--sl-white-06); }
+
+.sl-badge--lg { height: 22px; padding: 0 8px; font-size: var(--sl-fs-12); }
+
+/* Count pill beside a section title */
+.sl-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--sl-r-full);
+    background: var(--sl-orange-10);
+    color: var(--sl-orange);
+    font-size: var(--sl-fs-11);
+    font-weight: 700;
+}
+
+.sl-count--ink { background: var(--sl-black-06); color: var(--sl-text-2); }
+[data-theme="dark"] .sl-count--ink,
+.dark .sl-count--ink { background: var(--sl-white-10); }
+
+/* Status dot — ALWAYS paired with a text label, never used alone. */
+.sl-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--sl-text-3); flex: none; }
+.sl-dot--on { background: var(--sl-black); }
+[data-theme="dark"] .sl-dot--on,
+.dark .sl-dot--on { background: var(--sl-white); }
+.sl-dot--off { background: var(--sl-orange); }
+
+/*  Delta. Direction comes from the ARROW, not the colour — orange means
+    "look at this", not "bad". A drop in bounce rate is good news in
+    orange, and the arrow is what tells you which way it went.        */
+.sl-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: var(--sl-fs-11);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--sl-text-2);
+}
+.sl-delta svg { width: 11px; height: 11px; }
+.sl-delta--up { color: var(--sl-text); }
+.sl-delta--down { color: var(--sl-orange); }
+
+
+/* ================================================================== tabs */
+
+/* Segmented — switching the VIEW of the same data */
+.sl-seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--sl-r);
+    background: var(--sl-black-04);
+}
+[data-theme="dark"] .sl-seg,
+.dark .sl-seg { background: var(--sl-white-06); }
+
+.sl-seg__i {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 11px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: var(--sl-r-sm);
+    font-family: inherit;
+    font-size: var(--sl-fs-12);
+    font-weight: 550;
+    color: var(--sl-text-2);
+    transition: background var(--sl-d-fast) var(--sl-ease), color var(--sl-d-fast) var(--sl-ease);
+}
+
+.sl-seg__i svg { width: 14px; height: 14px; }
+.sl-seg__i:hover { color: var(--sl-text); }
+.sl-seg__i.is-on { background: var(--sl-surface); color: var(--sl-orange); box-shadow: var(--sl-shadow-sm); }
+
+/* Underline — navigating SECTIONS of a page */
+.sl-utabs {
+    display: flex;
+    gap: var(--sl-s5);
+    border-bottom: 1px solid var(--sl-border-soft);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.sl-utabs::-webkit-scrollbar { display: none; }
+
+.sl-utabs__i {
+    padding: 9px 0 10px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: var(--sl-fs-13);
+    font-weight: 550;
+    color: var(--sl-text-2);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    white-space: nowrap;
+    transition: color var(--sl-d-fast) var(--sl-ease), border-color var(--sl-d-fast) var(--sl-ease);
+}
+
+.sl-utabs__i:hover { color: var(--sl-text); }
+.sl-utabs__i.is-on { color: var(--sl-orange); border-bottom-color: var(--sl-orange); }
+
+/* Filter chips */
+.sl-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.sl-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 10px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: var(--sl-r-full);
+    font-family: inherit;
+    font-size: var(--sl-fs-12);
+    font-weight: 550;
+    color: var(--sl-text-2);
+    box-shadow: inset 0 0 0 1px var(--sl-border);
+    transition: all var(--sl-d-fast) var(--sl-ease);
+}
+
+.sl-chip:hover { color: var(--sl-text); box-shadow: inset 0 0 0 1px var(--sl-text-3); }
+.sl-chip.is-on { color: var(--sl-white); background: var(--sl-black); box-shadow: none; }
+[data-theme="dark"] .sl-chip.is-on,
+.dark .sl-chip.is-on { background: var(--sl-white); color: var(--sl-black); }
+
+/*  Chips carry their own counts. A filter that says how many rows it
+    will leave you with is a filter people actually use.              */
+.sl-chip__n { font-size: var(--sl-fs-11); opacity: 0.7; }
+
+
+/* ================================================= table and list rows */
+
+.sl-table { font-size: var(--sl-fs-13); border-collapse: collapse; width: 100%; }
+
+.sl-table th {
+    text-align: left;
+    font-size: var(--sl-fs-11);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sl-text-3);
+    padding: 8px var(--sl-s3);
+    border-bottom: 1px solid var(--sl-border-soft);
+    white-space: nowrap;
+}
+
+.sl-table td {
+    padding: 10px var(--sl-s3);
+    border-bottom: 1px solid var(--sl-border-soft);
+    vertical-align: middle;
+}
+
+.sl-table tbody tr { transition: background 0.12s var(--sl-ease); }
+.sl-table tbody tr:hover { background: var(--sl-black-02); }
+[data-theme="dark"] .sl-table tbody tr:hover,
+.dark .sl-table tbody tr:hover { background: var(--sl-white-06); }
+.sl-table tbody tr:last-child td { border-bottom: none; }
+.sl-table th:first-child, .sl-table td:first-child { padding-left: var(--sl-s4); }
+.sl-table th:last-child, .sl-table td:last-child { padding-right: var(--sl-s4); }
+
+/* Numbers right-align and use tabular figures so columns actually line up. */
+.sl-table .sl-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Wrap every table in this. The page body must never scroll sideways. */
+.sl-scroll-x { overflow-x: auto; }
+
+.sl-lrow {
+    display: flex;
+    align-items: center;
+    gap: var(--sl-s3);
+    padding: 11px var(--sl-s4);
+    border-bottom: 1px solid var(--sl-border-soft);
+    transition: background 0.12s var(--sl-ease);
+    cursor: pointer;
+}
+
+.sl-lrow:last-child { border-bottom: none; }
+.sl-lrow:hover { background: var(--sl-black-02); }
+[data-theme="dark"] .sl-lrow:hover,
+.dark .sl-lrow:hover { background: var(--sl-white-06); }
+.sl-lrow.is-on { background: var(--sl-accent-wash); }
+
+/* Row leaving after an optimistic approve/delete. Collapse the height as
+   well as fading, or the list snaps closed after the fade finishes. */
+.sl-lrow.is-going {
+    animation: sl-row-out 260ms var(--sl-ease) forwards;
+    pointer-events: none;
+}
+
+@keyframes sl-row-out {
+    to { opacity: 0; transform: translateX(10px); max-height: 0; padding-block: 0; }
+}
+
+
+/* ============================================== avatars and brand tiles */
+
+.sl-av {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: var(--sl-fs-11);
+    font-weight: 650;
+    color: var(--sl-white);
+    background: var(--sl-black);
+    flex: none;
+    overflow: hidden;
+    position: relative;
+}
+
+.sl-av--accent { background: var(--sl-orange); }
+.sl-av--sm { width: 22px; height: 22px; font-size: 9px; }
+.sl-av--lg { width: 36px; height: 36px; font-size: var(--sl-fs-13); }
+.sl-av--xl { width: 56px; height: 56px; font-size: var(--sl-fs-18); }
+.sl-av img { width: 100%; height: 100%; object-fit: cover; }
+
+.sl-av-stack { display: flex; }
+.sl-av-stack .sl-av { box-shadow: 0 0 0 2px var(--sl-surface); margin-left: -7px; }
+.sl-av-stack .sl-av:first-child { margin-left: 0; }
+
+/* Square tile holding a UI icon */
+.sl-tile {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--sl-r-sm);
+    display: grid;
+    place-items: center;
+    background: var(--sl-surface-2);
+    box-shadow: inset 0 0 0 1px var(--sl-border-soft);
+    flex: none;
+}
+
+.sl-tile svg { width: 18px; height: 18px; }
+.sl-tile--sm { width: 24px; height: 24px; border-radius: 5px; }
+.sl-tile--sm svg { width: 14px; height: 14px; }
+.sl-tile--lg { width: 40px; height: 40px; border-radius: var(--sl-r); }
+.sl-tile--lg svg { width: 22px; height: 22px; }
+
+/*  A tile holding a PLATFORM LOGO is not a container — the logo *is* the
+    object. Instagram, LinkedIn and the rest already ship their own
+    plate, radius and colour, so a second grey bordered well around them
+    reads as a box inside a box and makes a strong mark look tentative.
+
+    Drop the chrome and let the mark fill its slot. The footprint is
+    unchanged, so list rhythm and alignment are unaffected.
+
+    This is also the one place brand colour is allowed into the UI:
+    platform marks are identity, not chrome. It never leaks into
+    buttons, text or surfaces.                                        */
+
+.sl-tile--brand { background: none; box-shadow: none; border-radius: 0; }
+
+/* Doubled class so this outranks the sizing rules above regardless of
+   the order the rules end up in after bundling. */
+.sl-tile.sl-tile--brand > svg,
+.sl-tile.sl-tile--brand > img { width: 100%; height: 100%; object-fit: contain; }
+
+
+/* ============================================================== progress */
+
+.sl-bar { height: 4px; border-radius: var(--sl-r-full); background: var(--sl-black-08); overflow: hidden; }
+[data-theme="dark"] .sl-bar,
+.dark .sl-bar { background: var(--sl-white-10); }
+
+.sl-bar__f {
+    height: 100%;
+    border-radius: var(--sl-r-full);
+    background: var(--sl-orange);
+    transition: width 0.4s var(--sl-ease);
+}
+
+.sl-bar__f--ink { background: var(--sl-black); }
+[data-theme="dark"] .sl-bar__f--ink,
+.dark .sl-bar__f--ink { background: var(--sl-white); }
+
+/*  Ring — value in the middle. Markup:
+    <span class="sl-ring">
+      <svg width="34" height="34" viewBox="0 0 34 34">
+        <circle class="sl-ring__bg" cx="17" cy="17" r="14" fill="none" stroke-width="3"/>
+        <circle class="sl-ring__v"  cx="17" cy="17" r="14" fill="none" stroke-width="3"
+                pathLength="1" stroke-dasharray="1" stroke-dashoffset="0.35"/>
+      </svg>
+      <b class="sl-ring__t">65</b>
+    </span>
+
+    pathLength="1" is the trick worth stealing: it normalises the
+    circumference to 1, so stroke-dashoffset is just `1 - pct` and you
+    never measure the path or recompute 2πr when the size changes.    */
+
+.sl-ring { position: relative; display: grid; place-items: center; flex: none; }
+.sl-ring svg { transform: rotate(-90deg); }
+.sl-ring__t {
+    position: absolute;
+    font-size: var(--sl-fs-11);
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+}
+.sl-ring__bg { stroke: var(--sl-black-08); }
+[data-theme="dark"] .sl-ring__bg,
+.dark .sl-ring__bg { stroke: var(--sl-white-10); }
+.sl-ring__v { stroke: var(--sl-orange); stroke-linecap: round; transition: stroke-dashoffset 0.5s var(--sl-ease); }
+
+
+/* ============================================================== skeleton */
+
+/*  Skeletons mirror the SHAPE of what is coming — a row of three cards
+    loads as three card-shaped blocks, not one grey rectangle. A spinner
+    tells you to wait; a skeleton tells you what you are waiting for. */
+
+.sl-sk {
+    border-radius: var(--sl-r-sm);
+    background: linear-gradient(90deg, var(--sl-black-04) 25%, var(--sl-black-08) 37%, var(--sl-black-04) 63%);
+    background-size: 400% 100%;
+    animation: sl-sk 1.3s ease infinite;
+}
+
+[data-theme="dark"] .sl-sk,
+.dark .sl-sk {
+    background: linear-gradient(90deg, var(--sl-white-06) 25%, var(--sl-white-10) 37%, var(--sl-white-06) 63%);
+    background-size: 400% 100%;
+}
+
+@keyframes sl-sk { from { background-position: 100% 50%; } to { background-position: 0 50%; } }
+
+.sl-sk--line { height: 10px; }
+.sl-sk--title { height: 14px; width: 40%; }
+.sl-sk--text { height: 9px; }
+.sl-sk--av { width: 28px; height: 28px; border-radius: 50%; }
+.sl-sk--tile { width: 32px; height: 32px; border-radius: var(--sl-r-sm); }
+.sl-sk--block { height: 100px; border-radius: var(--sl-r); }
+
+
+/* ==================================================== empty and error ===
+
+    Both use the same component, because an empty state and an error
+    state answer the same two questions: what is this, and what do I do
+    next. An empty state without `.sl-state__a` is a dead end, and an
+    error without one is just an apology.                             */
+
+.sl-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: var(--sl-s8) var(--sl-s5);
+    gap: var(--sl-s2);
+}
+
+.sl-state__ic {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--sl-r-md);
+    display: grid;
+    place-items: center;
+    background: var(--sl-surface-2);
+    box-shadow: inset 0 0 0 1px var(--sl-border-soft);
+    color: var(--sl-text-3);
+    margin-bottom: var(--sl-s2);
+}
+
+.sl-state__ic svg { width: 21px; height: 21px; }
+.sl-state__ic--accent { background: var(--sl-orange-06); color: var(--sl-orange); box-shadow: inset 0 0 0 1px var(--sl-orange-24); }
+.sl-state__t { font-size: var(--sl-fs-14); font-weight: 600; }
+.sl-state__d { font-size: var(--sl-fs-13); color: var(--sl-text-2); max-width: 340px; }
+.sl-state__a { margin-top: var(--sl-s3); display: flex; gap: var(--sl-s2); }
+
+/* Inline banner — differentiated by icon and weight, not by hue. */
+.sl-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 11px var(--sl-s3);
+    border-radius: var(--sl-r);
+    background: var(--sl-surface-2);
+    box-shadow: inset 0 0 0 1px var(--sl-border-soft);
+    font-size: var(--sl-fs-13);
+}
+
+.sl-banner svg { width: 16px; height: 16px; flex: none; margin-top: 1px; color: var(--sl-text-2); }
+.sl-banner--alert { background: var(--sl-orange-06); box-shadow: inset 0 0 0 1px var(--sl-orange-24); }
+.sl-banner--alert svg { color: var(--sl-orange); }
+.sl-banner__t { font-weight: 600; }
+.sl-banner__d { color: var(--sl-text-2); margin-top: 1px; }
+
+
+/* ================================================================ toasts */
+
+.sl-toasts {
+    position: fixed;
+    bottom: var(--sl-s5);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: var(--sl-s2);
+    pointer-events: none;
+}
+
+.sl-toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px var(--sl-s3);
+    border-radius: var(--sl-r);
+    background: var(--sl-black);
+    color: var(--sl-white);
+    font-size: var(--sl-fs-13);
+    box-shadow: var(--sl-shadow-lg);
+    pointer-events: auto;
+    animation: sl-toast-in 220ms var(--sl-ease-out);
+}
+
+[data-theme="dark"] .sl-toast,
+.dark .sl-toast { background: var(--sl-surface-3); box-shadow: var(--sl-shadow-lg), inset 0 0 0 1px var(--sl-border); }
+
+.sl-toast svg { width: 15px; height: 15px; flex: none; }
+.sl-toast.is-going { animation: sl-toast-out 160ms var(--sl-ease) forwards; }
+
+/*  Undo lives IN the toast. This is what lets an approve be optimistic
+    and instant instead of gated behind "Are you sure?" — the cost of
+    being wrong drops to one click, so the confirm dialog is not needed. */
+.sl-toast__act {
+    padding: 3px 8px;
+    border: none;
+    cursor: pointer;
+    border-radius: var(--sl-r-sm);
+    font-family: inherit;
+    font-size: var(--sl-fs-12);
+    font-weight: 600;
+    color: var(--sl-orange);
+    background: var(--sl-orange-16);
+    white-space: nowrap;
+}
+
+.sl-toast__act:hover { background: var(--sl-orange); color: var(--sl-white); }
+
+@keyframes sl-toast-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
+@keyframes sl-toast-out { to { opacity: 0; transform: translateY(6px); } }
+
+
+/* ============================================================ AI surfaces */
+
+/* The sparkle is the product's one consistent "this was machine-made"
+   signal. Use it everywhere AI acted, and nowhere else. */
+.sl-ai-mark { color: var(--sl-orange); flex: none; }
+.sl-ai-mark svg { width: 15px; height: 15px; }
+
+.sl-ai-note {
+    display: flex;
+    gap: 9px;
+    padding: 11px var(--sl-s3);
+    border-radius: var(--sl-r);
+    background: var(--sl-orange-06);
+    box-shadow: inset 0 0 0 1px var(--sl-orange-24);
+    font-size: var(--sl-fs-13);
+}
+
+.sl-ai-note__t { font-weight: 600; }
+.sl-ai-note__d { color: var(--sl-text-2); margin-top: 2px; }
+
+/* Three dots, not a spinner. A spinner says "wait"; this says "thinking". */
+.sl-thinking {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--sl-orange);
+    font-size: var(--sl-fs-12);
+    font-weight: 600;
+}
+.sl-thinking i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: sl-blink 1.2s infinite; }
+.sl-thinking i:nth-child(2) { animation-delay: 0.18s; }
+.sl-thinking i:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes sl-blink { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
+
+/*  Mascot face — a drawn screen holding the character's expression.
+    Bezel and body are palette colours; only the face inside carries the
+    character's own display colours.
+
+    Four faces map to four states and are picked by ONE function reading
+    the same store the pages read. That is why the mascot can never
+    contradict the UI. Do not let the faces become decorative.        */
+
+.sl-mface {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 30px;
+    border-radius: 9px;
+    background: var(--sl-black);
+    box-shadow: inset 0 0 0 1.5px var(--sl-gainsboro);
+    flex: none;
+    overflow: hidden;
+    position: relative;
+}
+
+[data-theme="dark"] .sl-mface,
+.dark .sl-mface { box-shadow: inset 0 0 0 1.5px var(--sl-white-16); }
+
+.sl-mface img { width: 62%; height: auto; display: block; }
+.sl-mface--sm { width: 30px; height: 26px; border-radius: 8px; }
+.sl-mface--lg { width: 52px; height: 46px; border-radius: 14px; }
+.sl-mface--xl { width: 84px; height: 74px; border-radius: 20px; }
+
+/* Breathing ONLY while genuinely mid-task. Idle animation is noise. */
+.sl-mface.is-live img { animation: sl-breathe 1.8s var(--sl-ease) infinite; }
+
+@keyframes sl-breathe {
+    0%, 100% { transform: scale(1); opacity: 0.94; }
+    50%      { transform: scale(1.045); opacity: 1; }
+}
+
+
+/* ================================================================== misc */
+
+.sl-sep { height: 1px; background: var(--sl-border-soft); }
+.sl-vsep { width: 1px; align-self: stretch; background: var(--sl-border-soft); }
+
+.sl-kbd {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    height: 19px;
+    padding: 0 5px;
+    border-radius: 5px;
+    background: var(--sl-black-06);
+    color: var(--sl-text-3);
+    font-size: var(--sl-fs-11);
+    font-weight: 600;
+}
+
+[data-theme="dark"] .sl-kbd,
+.dark .sl-kbd { background: var(--sl-white-10); }
+
+.sl-tip { position: relative; }
+.sl-tip::after {
+    content: attr(data-tip);
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 7px;
+    border-radius: 5px;
+    background: var(--sl-black);
+    color: var(--sl-white);
+    font-size: var(--sl-fs-11);
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s var(--sl-ease);
+    z-index: 70;
+}
+.sl-tip:hover::after { opacity: 1; }
+
+
+/* ================================================================ motion
+
+    Only `transform` and `opacity` are animated — they are the two
+    properties the compositor can handle without a layout pass, so this
+    stays smooth on a mid-range Android while animating a full page.
+
+    The budget: 140ms for state, 180ms default, 280ms for page entry.
+    Anything over 400ms reads as lag rather than polish.              */
+
+/*  Page entry. Put this on the CONTENT only — the shell must not move.
+    A sidebar that re-animates on every navigation makes the app feel
+    like it is reloading instead of responding.                       */
+.sl-page-in { animation: sl-page-in 280ms var(--sl-ease-out) both; }
+
+@keyframes sl-page-in {
+    from { opacity: 0; transform: translateY(6px); }
+}
+
+/*  Stagger. Capped at six — beyond that the last item waits long enough
+    that the list reads as slow rather than choreographed.            */
+.sl-stagger > * { animation: sl-page-in 260ms var(--sl-ease-out) both; }
+.sl-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.sl-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.sl-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.sl-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.sl-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.sl-stagger > *:nth-child(n + 6) { animation-delay: 200ms; }
+
+/* A value that just changed. Fires once, on the number only. */
+.sl-tick { animation: sl-tick 420ms var(--sl-ease); }
+
+@keyframes sl-tick {
+    0%   { transform: translateY(0); }
+    35%  { transform: translateY(-3px); color: var(--sl-orange); }
+    100% { transform: translateY(0); }
+}
+
+/*  Reduced motion is handled globally in sahoda-tokens.css: decoration
+    is removed, state transitions are kept. A user who asked for less
+    motion still needs to see that the drawer opened.                 */
+
+
+/* ============================================================== mobile ==
+
+    Below 720px the UI RECOMPOSES rather than shrinking: drawers become
+    bottom sheets, tables become cards, and every interactive target
+    grows to 44px. A desktop layout scaled down is not a mobile UI. */
+
+@media (max-width: 720px) {
+    .sl-btn,
+    .sl-iconbtn,
+    .sl-chip,
+    .sl-seg__i { min-height: 44px; }
+
+    .sl-btn--sm { min-height: 38px; }
+    .sl-input, .sl-select { height: 44px; }
+
+    /* 16px stops iOS Safari zooming the viewport on focus. */
+    .sl-input, .sl-select, .sl-textarea { font-size: 16px; }
+
+    .sl-toasts { bottom: calc(var(--sl-s4) + env(safe-area-inset-bottom)); width: calc(100% - var(--sl-s6)); }
+    .sl-toast { width: 100%; }
+}

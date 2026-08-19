@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sahoda Retheme Kit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;550;600;650;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sahoda-tokens.css">
+<link rel="stylesheet" href="sahoda-components.css">
+<style>
+  /*  Page chrome only — nothing here is part of the kit. Everything
+      styled below uses sl- classes exclusively, so if a component looks
+      right on this page it will look right in your app.              */
+  body { padding: 0; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 32px 24px 96px; }
+  .top { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .sec { margin-top: 44px; }
+  .sec > h2 {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--sl-text-3);
+    padding-bottom: 8px; margin-bottom: 16px;
+    border-bottom: 1px solid var(--sl-border-soft);
+  }
+  .demo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+  .note { font-size: 12px; color: var(--sl-text-2); margin-bottom: 14px; max-width: 60ch; }
+  .sw { display: flex; flex-direction: column; gap: 6px; }
+  .sw i { height: 46px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--sl-border); display: block; }
+  .sw b { font-size: 11px; font-weight: 600; }
+  .sw span { font-size: 11px; color: var(--sl-text-3); font-variant-numeric: tabular-nums; }
+  .rung { display: grid; grid-template-columns: 128px 1fr; gap: 12px; align-items: center; }
+  .rung p { font-size: 12px; color: var(--sl-text-2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <span class="sl-badge sl-badge--pending">Retheme kit</span>
+    <button class="sl-btn sl-btn--sm sl-btn--ghost push" id="tog" style="margin-left:auto">Toggle theme</button>
+  </div>
+  <h1 class="sl-page-title">Every component in the kit</h1>
+  <p class="sl-page-sub">
+    Only <code>sahoda-tokens.css</code> and <code>sahoda-components.css</code> are
+    loaded. If it renders correctly here, it will render correctly in your app.
+  </p>
+
+  <!-- palette ------------------------------------------------------- -->
+  <section class="sec">
+    <h2>Palette</h2>
+    <p class="note">
+      Five colours. Everything else in the system is one of them at reduced
+      alpha. Orange is an accent, not a brand wash — it appears where you
+      are meant to act.
+    </p>
+    <div class="cols">
+      <div class="sw"><i style="background:#FF6600"></i><b>Orange</b><span>#FF6600</span></div>
+      <div class="sw"><i style="background:#000000"></i><b>Black</b><span>#000000</span></div>
+      <div class="sw"><i style="background:#575756"></i><b>Grey</b><span>#575756</span></div>
+      <div class="sw"><i style="background:#DCDCDC"></i><b>Gainsboro</b><span>#DCDCDC</span></div>
+      <div class="sw"><i style="background:#FFFFFF"></i><b>White</b><span>#FFFFFF</span></div>
+    </div>
+  </section>
+
+  <!-- ladder -------------------------------------------------------- -->
+  <section class="sec">
+    <h2>The four-rung status ladder</h2>
+    <p class="note">
+      No red, amber or green. Status is carried by fill weight, a glyph and a
+      label — loudest to quietest is <em>urgency</em>, not good to bad. Print
+      this page in greyscale: every rung is still readable.
+    </p>
+    <div class="stack">
+      <div class="rung">
+        <span class="sl-badge sl-badge--urgent">! Needs approval</span>
+        <p><b>Rung 1</b> — needs you now. Solid orange.</p>
+      </div>
+      <div class="rung">
+        <span class="sl-badge sl-badge--active">● Running</span>
+        <p><b>Rung 2</b> — active, current. Solid ink.</p>
+      </div>
+      <div class="rung">
+        <span class="sl-badge sl-badge--pending">◷ In review</span>
+        <p><b>Rung 3</b> — waiting on someone. Orange outline.</p>
+      </div>
+      <div class="rung">
+        <span class="sl-badge sl-badge--calm">✓ Published</span>
+        <p><b>Rung 4</b> — done, scheduled, informational. Grey outline.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- buttons ------------------------------------------------------- -->
+  <section class="sec">
+    <h2>Buttons</h2>
+    <p class="note">
+      One primary per view. Everything else is the white workhorse — that
+      restraint is what makes the orange mean something.
+    </p>
+    <div class="demo" style="margin-bottom:14px">
+      <button class="sl-btn sl-btn--primary">Approve</button>
+      <button class="sl-btn sl-btn--ink">Publish</button>
+      <button class="sl-btn">Edit</button>
+      <button class="sl-btn sl-btn--accent-ghost">Regenerate</button>
+      <button class="sl-btn sl-btn--ghost">Cancel</button>
+      <button class="sl-btn" disabled>Unavailable</button>
+    </div>
+    <div class="demo">
+      <button class="sl-btn sl-btn--sm">Small</button>
+      <button class="sl-btn">Default</button>
+      <button class="sl-btn sl-btn--lg">Large</button>
+      <button class="sl-btn sl-btn--primary" id="busy" style="min-width:104px">Click for busy</button>
+      <span class="sl-kbd">⌘K</span>
+    </div>
+  </section>
+
+  <!-- inputs -------------------------------------------------------- -->
+  <section class="sec">
+    <h2>Inputs</h2>
+    <div class="cols">
+      <label class="sl-field">
+        <span class="sl-label">Campaign name</span>
+        <input class="sl-input" value="Monsoon Dental Check-up">
+      </label>
+      <label class="sl-field">
+        <span class="sl-label">Objective</span>
+        <select class="sl-select"><option>Leads</option><option>Awareness</option></select>
+      </label>
+      <label class="sl-field">
+        <span class="sl-label">Daily budget</span>
+        <input class="sl-input sl-input--error" value="-200">
+        <span class="sl-hint sl-hint--error">Budget must be above ₹0.</span>
+      </label>
+    </div>
+    <div class="demo" style="margin-top:16px">
+      <label class="demo" style="gap:7px"><input type="checkbox" class="sl-check" checked><span>Checked</span></label>
+      <label class="demo" style="gap:7px"><input type="checkbox" class="sl-check"><span>Unchecked</span></label>
+      <label class="demo" style="gap:7px"><input type="checkbox" class="sl-switch" checked><span>Auto-publish</span></label>
+    </div>
+  </section>
+
+  <!-- filters ------------------------------------------------------- -->
+  <section class="sec">
+    <h2>Filters and tabs</h2>
+    <p class="note">
+      Segmented switches the <em>view</em> of one dataset. Underlined navigates
+      <em>sections</em> of a page. Chips carry counts, because a filter that
+      tells you how many rows it leaves is one people actually use.
+    </p>
+    <div class="demo" style="margin-bottom:16px">
+      <div class="sl-seg">
+        <button class="sl-seg__i is-on">Board</button>
+        <button class="sl-seg__i">Calendar</button>
+        <button class="sl-seg__i">List</button>
+      </div>
+      <div class="sl-chips">
+        <button class="sl-chip is-on">All <span class="sl-chip__n">24</span></button>
+        <button class="sl-chip">Pending <span class="sl-chip__n">7</span></button>
+        <button class="sl-chip">High priority <span class="sl-chip__n">3</span></button>
+      </div>
+    </div>
+    <nav class="sl-utabs">
+      <button class="sl-utabs__i is-on">Overview</button>
+      <button class="sl-utabs__i">Channels</button>
+      <button class="sl-utabs__i">Audience</button>
+    </nav>
+  </section>
+
+  <!-- card + table -------------------------------------------------- -->
+  <section class="sec">
+    <h2>Cards, tables, metrics</h2>
+    <p class="note">
+      Resting cards get a hairline ring and no shadow — shadow is reserved for
+      layers that genuinely float. Deltas take their direction from the arrow,
+      never from colour.
+    </p>
+    <div class="cols" style="margin-bottom:16px">
+      <div class="sl-card sl-card--pad">
+        <div class="sl-eyebrow">Reach</div>
+        <div style="font-size:24px;font-weight:650;letter-spacing:-0.02em;margin:4px 0 2px" class="sl-num">18.2K</div>
+        <span class="sl-delta sl-delta--up">↑ 12.5%</span>
+      </div>
+      <div class="sl-card sl-card--pad">
+        <div class="sl-eyebrow">Cost per lead</div>
+        <div style="font-size:24px;font-weight:650;letter-spacing:-0.02em;margin:4px 0 2px">₹214</div>
+        <span class="sl-delta sl-delta--down">↓ 8.1%</span>
+      </div>
+      <div class="sl-card sl-card--pad">
+        <div class="sl-eyebrow">Brand completeness</div>
+        <div style="font-size:24px;font-weight:650;letter-spacing:-0.02em;margin:4px 0 8px">72%</div>
+        <div class="sl-bar"><div class="sl-bar__f" style="width:72%"></div></div>
+      </div>
+    </div>
+
+    <div class="sl-card">
+      <div class="sl-card__head">
+        <b class="sl-sec-title">Channels</b>
+        <span class="sl-count">4</span>
+        <a class="sl-link" href="#" style="margin-left:auto">View all →</a>
+      </div>
+      <div class="sl-scroll-x">
+        <table class="sl-table">
+          <thead><tr><th>Channel</th><th>Status</th><th class="sl-num">Reach</th><th class="sl-num">Revenue</th></tr></thead>
+          <tbody>
+            <tr><td>Instagram</td><td><span class="sl-badge sl-badge--active">● Running</span></td><td class="sl-num">8,420</td><td class="sl-num">₹94,200</td></tr>
+            <tr><td>LinkedIn</td><td><span class="sl-badge sl-badge--pending">◷ In review</span></td><td class="sl-num">3,110</td><td class="sl-num">₹28,400</td></tr>
+            <tr><td>WhatsApp</td><td><span class="sl-badge sl-badge--urgent">! Reconnect</span></td><td class="sl-num">—</td><td class="sl-num">—</td></tr>
+            <tr><td>Google Ads</td><td><span class="sl-badge sl-badge--calm">✓ Completed</span></td><td class="sl-num">6,680</td><td class="sl-num">₹71,900</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ai ------------------------------------------------------------ -->
+  <section class="sec">
+    <h2>AI surfaces</h2>
+    <p class="note">
+      The reasoning line is what makes an item reviewable without opening it.
+      Three dots rather than a spinner: a spinner says <em>wait</em>, this says
+      <em>thinking</em>.
+    </p>
+    <div class="stack">
+      <div class="sl-ai-note">
+        <span class="sl-ai-mark">✦</span>
+        <div>
+          <div class="sl-ai-note__t">Scheduled for Thursday 10:00</div>
+          <div class="sl-ai-note__d">Your last four Thursday-morning posts outperformed the weekly average by 34%.</div>
+        </div>
+      </div>
+      <div class="demo">
+        <span class="sl-thinking"><i></i><i></i><i></i> Drafting caption</span>
+        <span class="sl-vsep" style="height:16px"></span>
+        <span class="sl-badge sl-badge--soft">17 tasks today</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- states -------------------------------------------------------- -->
+  <section class="sec">
+    <h2>Empty, loading, error</h2>
+    <p class="note">
+      Empty and error are the same component, because both answer the same two
+      questions: what is this, and what do I do next. The action is not
+      optional.
+    </p>
+    <div class="cols">
+      <div class="sl-card">
+        <div class="sl-state">
+          <div class="sl-state__ic sl-state__ic--accent">✦</div>
+          <div class="sl-state__t">Nothing waiting on you</div>
+          <div class="sl-state__d">Approved work appears in the Planner. New drafts land here as the AI makes them.</div>
+          <div class="sl-state__a"><button class="sl-btn sl-btn--sm">Open Planner</button></div>
+        </div>
+      </div>
+      <div class="sl-card sl-card--pad">
+        <div class="sl-banner sl-banner--alert" style="margin-bottom:14px">
+          <span>!</span>
+          <div>
+            <div class="sl-banner__t">WhatsApp disconnected</div>
+            <div class="sl-banner__d">Publishing is paused. Scheduled posts are held, not lost.</div>
+          </div>
+        </div>
+        <button class="sl-btn sl-btn--primary sl-btn--sm">Reconnect WhatsApp</button>
+      </div>
+      <div class="sl-card sl-card--pad">
+        <div class="stack" style="gap:9px">
+          <div class="demo" style="gap:10px">
+            <div class="sl-sk sl-sk--av"></div>
+            <div class="sl-sk sl-sk--title" style="width:120px"></div>
+          </div>
+          <div class="sl-sk sl-sk--line"></div>
+          <div class="sl-sk sl-sk--text" style="width:70%"></div>
+          <div class="sl-sk sl-sk--block"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- misc ---------------------------------------------------------- -->
+  <section class="sec">
+    <h2>Avatars, tiles, rows</h2>
+    <p class="note">
+      A platform logo gets no container — the mark already ships its own plate
+      and colour, so a grey bordered well around it is a box inside a box.
+      Platform marks are the one place brand colour enters the UI.
+    </p>
+    <div class="demo" style="margin-bottom:16px">
+      <span class="sl-av">MP</span>
+      <span class="sl-av sl-av--accent">SL</span>
+      <span class="sl-av sl-av--lg">MP</span>
+      <span class="sl-av-stack"><span class="sl-av">AK</span><span class="sl-av">RS</span><span class="sl-av">DV</span></span>
+      <span class="sl-vsep" style="height:22px"></span>
+      <span class="sl-tile sl-tile--brand"><img src="../icons/icons8-instagram-logo-100.png" alt="Instagram"></span>
+      <span class="sl-tile sl-tile--brand"><img src="../icons/icons8-linkedin-100.png" alt="LinkedIn"></span>
+      <span class="sl-tile sl-tile--brand"><img src="../icons/icons8-whatsapp-logo-100.png" alt="WhatsApp"></span>
+      <span class="sl-tile sl-tile--brand sl-tile--lg"><img src="../icons/icons8-youtube-logo-100.png" alt="YouTube"></span>
+    </div>
+    <div class="sl-card">
+      <div class="sl-lrow">
+        <span class="sl-tile sl-tile--brand"><img src="../icons/icons8-instagram-logo-100.png" alt=""></span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600">Monsoon check-up carousel</div>
+          <div style="font-size:12px;color:var(--sl-text-2)">Ready to publish · reaches ~74K</div>
+        </div>
+        <span class="sl-badge sl-badge--urgent">! Due in 3h</span>
+        <button class="sl-btn sl-btn--sm sl-btn--primary">Approve</button>
+      </div>
+      <div class="sl-lrow">
+        <span class="sl-tile sl-tile--brand"><img src="../icons/icons8-linkedin-100.png" alt=""></span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600">Clinic hiring announcement</div>
+          <div style="font-size:12px;color:var(--sl-text-2)">Draft · needs a photo</div>
+        </div>
+        <span class="sl-badge sl-badge--pending">◷ In review</span>
+        <button class="sl-btn sl-btn--sm">Open</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div class="sl-toasts" id="toasts"></div>
+
+<script>
+/*  Demo wiring only — three of the four behaviours from RETHEME.md §6,
+    so you can see what the CSS alone does not give you.              */
+
+document.getElementById('tog').onclick = () => {
+  const dark = document.documentElement.dataset.theme !== 'dark';
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.documentElement.classList.toggle('dark', dark);
+};
+
+document.getElementById('busy').onclick = (e) => {
+  const b = e.currentTarget;
+  b.style.width = b.offsetWidth + 'px';      // pin BEFORE the swap
+  b.classList.add('is-busy');
+  setTimeout(() => {
+    b.classList.remove('is-busy');
+    b.style.width = '';
+    toast('Approved', 'Undo');
+  }, 1100);
+};
+
+function toast(text, action) {
+  const t = document.createElement('div');
+  t.className = 'sl-toast';
+  t.innerHTML = '<span>' + text + '</span>';
+  if (action) {
+    const a = document.createElement('button');
+    a.className = 'sl-toast__act';
+    a.textContent = action;
+    a.onclick = () => close();
+    t.appendChild(a);
+  }
+  document.getElementById('toasts').appendChild(t);
+  const timer = setTimeout(close, 3600);
+  function close() {
+    clearTimeout(timer);
+    t.classList.add('is-going');
+    setTimeout(() => t.remove(), 160);
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,609 @@
+/*  Motion & interaction layer
+    ---------------------------------------------------------------------
+    Every animation here answers one of: what changed, where did it come
+    from, where did it go, what is happening, what needs me, what worked.
+    Nothing animates decoratively.
+
+    Only `transform` and `opacity` are animated — both composite on the
+    GPU and never trigger layout. Width/height/shadow are transitioned
+    only where the element is small and isolated.                        */
+
+:root {
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease: cubic-bezier(0.2, 0, 0.2, 1);
+    --spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+
+    --t-fast: 150ms;
+    --t: 200ms;
+    --t-mid: 280ms;
+    --t-slow: 340ms;
+}
+
+
+/* ======================================================= page transition */
+
+/*  Only the content area moves. The sidebar and header stay put, so
+    navigation reads as continuous rather than as a new page load.       */
+
+@keyframes page-in {
+    from { opacity: 0; transform: translateY(6px); }
+}
+
+.page-in {
+    animation: page-in var(--t-mid) var(--ease-out) both;
+}
+
+/*  Rows/cards inside a freshly painted list settle in a short stagger.
+    Capped at 8 items — beyond that the delay would feel like lag.       */
+
+@keyframes item-in {
+    from { opacity: 0; transform: translateY(4px); }
+}
+
+.stagger > * {
+    animation: item-in var(--t) var(--ease-out) both;
+}
+
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 22ms; }
+.stagger > *:nth-child(3) { animation-delay: 44ms; }
+.stagger > *:nth-child(4) { animation-delay: 66ms; }
+.stagger > *:nth-child(5) { animation-delay: 88ms; }
+.stagger > *:nth-child(6) { animation-delay: 110ms; }
+.stagger > *:nth-child(7) { animation-delay: 132ms; }
+.stagger > *:nth-child(n + 8) { animation-delay: 154ms; }
+
+
+/* ============================================================== buttons */
+
+.btn {
+    transition: background var(--t-fast) var(--ease),
+                box-shadow var(--t-fast) var(--ease),
+                color var(--t-fast) var(--ease),
+                transform 90ms var(--ease);
+    position: relative;
+}
+
+.btn:active:not(:disabled):not([aria-disabled="true"]) {
+    transform: scale(0.98);
+}
+
+.iconbtn,
+.chip,
+.seg__i,
+.nav__i,
+.snav__i,
+.mbar__i {
+    transition: background var(--t-fast) var(--ease),
+                color var(--t-fast) var(--ease),
+                box-shadow var(--t-fast) var(--ease),
+                transform 90ms var(--ease);
+}
+
+.iconbtn:active,
+.chip:active,
+.mbar__i:active { transform: scale(0.94); }
+
+.mbar__fab { transition: transform 120ms var(--spring), box-shadow var(--t) var(--ease); }
+.mbar__fab:active { transform: scale(0.92); }
+
+/* Loading — the label is replaced, the button keeps its width so the
+   surrounding layout never shifts. */
+
+.btn.is-busy,
+.btn.is-done { pointer-events: none; }
+
+.spinner {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    animation: spin 620ms linear infinite;
+    flex: none;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Success — a brief confirmation, then back to normal. */
+
+.btn.is-done {
+    background: var(--black);
+    border-color: var(--black);
+    color: var(--white);
+    box-shadow: none;
+}
+
+[data-theme="dark"] .btn.is-done { background: var(--white); color: var(--black); }
+
+@keyframes tick-in {
+    from { opacity: 0; transform: scale(0.7); }
+}
+
+.btn.is-done svg { animation: tick-in 220ms var(--spring) both; }
+
+
+/* ================================================================ cards */
+
+/*  Only cards that actually do something get a hover response.          */
+
+.card--int {
+    cursor: pointer;
+    transition: box-shadow var(--t) var(--ease), transform var(--t) var(--ease-out);
+    will-change: transform;
+}
+
+.card--int:hover {
+    box-shadow: inset 0 0 0 1px var(--border), 0 4px 14px rgba(0, 0, 0, 0.07);
+    transform: translateY(-1px);
+}
+
+.card--int:active { transform: translateY(0); }
+
+[data-theme="dark"] .card--int:hover {
+    box-shadow: inset 0 0 0 1px var(--border), 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+.att,
+.asset,
+.kb__card,
+.bb,
+.conn {
+    transition: box-shadow var(--t) var(--ease), transform var(--t) var(--ease-out);
+}
+
+.att:hover,
+.asset:hover,
+.bb:hover,
+.conn:hover { transform: translateY(-1px); }
+
+
+/* ========================================================= rows & lists */
+
+.lrow {
+    transition: background var(--t-fast) var(--ease), opacity var(--t) var(--ease),
+                transform var(--t) var(--ease-out);
+}
+
+/* An item that has been acted on leaves the list rather than blinking out. */
+
+.lrow.is-leaving,
+.kb__card.is-leaving {
+    opacity: 0;
+    transform: translateX(18px);
+    pointer-events: none;
+}
+
+/* The item the keyboard is on. */
+
+.lrow.is-cursor {
+    background: var(--accent-wash);
+    box-shadow: inset 2px 0 0 var(--orange);
+}
+
+.check { transition: background var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
+.check:active { transform: scale(0.9); }
+
+/* Contextual bulk bar — slides in from the top of the content area. */
+
+@keyframes bulk-in {
+    from { opacity: 0; transform: translateY(-8px); }
+}
+
+.bulkbar { animation: bulk-in var(--t) var(--ease-out) both; }
+
+
+/* ====================================================== overlays: scrim */
+
+/*  Deliberately light. A heavy blur detaches the drawer from the page it
+    belongs to; the point of a drawer is that you are still on that page. */
+
+.scrim {
+    background: rgba(0, 0, 0, 0.28);
+    backdrop-filter: none;
+    animation: fade var(--t) var(--ease) both;
+}
+
+.scrim.is-closing { animation: fade var(--t-fast) var(--ease) reverse both; }
+
+
+/* ============================================================== drawers */
+
+.drawer { animation: slide-in var(--t-mid) var(--ease-out) both; }
+.drawer.is-closing { animation: slide-in var(--t) var(--ease) reverse both; }
+
+@keyframes slide-in { from { transform: translateX(100%); } }
+
+
+/* =============================================================== modals */
+
+.modal { animation: modal-in 200ms var(--ease-out) both; }
+.modal.is-closing { animation: modal-in var(--t-fast) var(--ease) reverse both; }
+
+@keyframes modal-in {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.98); }
+}
+
+.cmdk { animation: cmdk-in 170ms var(--ease-out) both; }
+.cmdk.is-closing { animation: cmdk-in 120ms var(--ease) reverse both; }
+
+@keyframes cmdk-in {
+    from { opacity: 0; transform: translateX(-50%) scale(0.985) translateY(-6px); }
+}
+
+
+/* ========================================================= bottom sheet */
+
+.sheet { animation: sheet-in var(--t-mid) var(--ease-out) both; }
+.sheet.is-closing { animation: sheet-in var(--t) var(--ease) reverse both; }
+
+@keyframes sheet-in { from { transform: translateY(100%); } }
+
+/* While a finger is on the sheet it tracks the drag, so animation is off. */
+.sheet.is-dragging,
+.drawer.is-dragging { animation: none; transition: none; }
+
+.sheet__grip {
+    cursor: grab;
+    touch-action: none;
+}
+
+.sheet__grip:active { cursor: grabbing; }
+
+/* Larger grab target than the visual bar. */
+.sheet__grab {
+    padding: 8px 0 4px;
+    display: flex;
+    justify-content: center;
+    touch-action: none;
+    flex: none;
+}
+
+
+/* ============================================================== popover */
+
+.pop { animation: pop-in 140ms var(--ease-out) both; transform-origin: top right; }
+
+@keyframes pop-in {
+    from { opacity: 0; transform: scale(0.97) translateY(-4px); }
+}
+
+.pop--left { transform-origin: top left; }
+
+
+/* =============================================================== toasts */
+
+@keyframes toast-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.98); }
+}
+
+.toast {
+    animation: toast-in var(--t) var(--ease-out) both;
+    transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+
+.toast.is-leaving { opacity: 0; transform: translateY(6px) scale(0.98); }
+
+
+/* ================================================================== AI */
+
+/*  The sparkle is the product's one AI signal. It breathes while work is
+    in flight and stops the moment it is done — the change of state is the
+    information, not the animation itself.                               */
+
+@keyframes ai-breathe {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.65; transform: scale(0.93); }
+}
+
+.ai-mark.is-live svg { animation: ai-breathe 1.6s var(--ease) infinite; }
+
+.ai-glow { position: relative; }
+
+.ai-glow::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: inherit;
+    background: radial-gradient(circle, var(--orange-16), transparent 70%);
+    opacity: 0;
+    animation: ai-pulse 2s var(--ease) infinite;
+    pointer-events: none;
+}
+
+@keyframes ai-pulse {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+}
+
+/* AI task panel — one row per step. */
+
+.aitask { display: flex; flex-direction: column; gap: 2px; }
+
+.aitask__s {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 0;
+    font-size: var(--fs-13);
+    color: var(--text-3);
+    transition: color var(--t) var(--ease);
+}
+
+.aitask__s.is-done { color: var(--text-2); }
+.aitask__s.is-live { color: var(--text); font-weight: 600; }
+
+.aitask__m {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    flex: none;
+    box-shadow: inset 0 0 0 1.5px var(--border);
+    transition: background var(--t) var(--ease), box-shadow var(--t) var(--ease);
+}
+
+.aitask__m svg { width: 10px; height: 10px; }
+
+.aitask__s.is-done .aitask__m {
+    background: var(--black);
+    color: var(--white);
+    box-shadow: none;
+    animation: tick-in 240ms var(--spring) both;
+}
+
+[data-theme="dark"] .aitask__s.is-done .aitask__m { background: var(--white); color: var(--black); }
+
+.aitask__s.is-live .aitask__m {
+    background: var(--orange);
+    color: var(--white);
+    box-shadow: none;
+}
+
+.aitask__s.is-live .aitask__m::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: ai-breathe 1.2s var(--ease) infinite;
+}
+
+.aitask__s.is-live .aitask__m svg { display: none; }
+
+/* Streamed text — the caret marks the write head, then disappears. */
+
+.stream::after {
+    content: "";
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    margin-left: 1px;
+    vertical-align: -2px;
+    background: var(--orange);
+    animation: caret 1s steps(2) infinite;
+}
+
+.stream.is-done::after { display: none; }
+
+@keyframes caret { 50% { opacity: 0; } }
+
+.ai-sig {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--fs-11);
+    color: var(--text-3);
+    font-weight: 550;
+}
+
+.ai-sig svg { width: 12px; height: 12px; color: var(--orange); }
+
+
+/* ============================================================== charts */
+
+/*  Lines draw once on entry so the eye follows the trend. Bars grow from
+    the axis. Neither repeats — this is an entrance, not an idle loop.   */
+
+/*  The path carries pathLength="1", so the dash maths is resolution- and
+    length-independent — no measuring in JS.                             */
+
+@keyframes draw { from { stroke-dashoffset: 1; } }
+
+.chart-line {
+    stroke-dasharray: 1;
+    animation: draw 700ms var(--ease-out) both;
+}
+
+@keyframes area-in { from { opacity: 0; } }
+.chart-area { animation: area-in 600ms 200ms var(--ease) both; }
+
+.bar__f { transition: width var(--t-slow) var(--ease-out); }
+.ring__v { transition: stroke-dashoffset 600ms var(--ease-out); }
+
+.chart-hit { fill: transparent; cursor: pointer; }
+.chart-hit:hover + .chart-dot,
+.chart-hit:focus-visible + .chart-dot { opacity: 1; }
+
+.chart-dot { opacity: 0; transition: opacity 120ms var(--ease); pointer-events: none; }
+
+.charttip {
+    position: fixed;
+    z-index: 130;
+    padding: 7px 9px;
+    border-radius: var(--r-sm);
+    background: var(--black);
+    color: var(--white);
+    font-size: var(--fs-11);
+    line-height: 1.45;
+    pointer-events: none;
+    box-shadow: var(--shadow);
+    transition: opacity 120ms var(--ease);
+}
+
+[data-theme="dark"] .charttip {
+    background: var(--surface-3);
+    box-shadow: var(--shadow), inset 0 0 0 1px var(--border);
+}
+
+.charttip b { font-weight: 650; }
+.charttip i { font-style: normal; color: var(--gainsboro); }
+
+
+/* ================================================== metric value change */
+
+/*  When a number updates in place, it ticks rather than swapping, so the
+    change is noticed without a reload.                                  */
+
+@keyframes num-in {
+    from { opacity: 0; transform: translateY(-5px); }
+}
+
+.num-tick { animation: num-in var(--t) var(--ease-out) both; }
+
+
+/* ============================================================ autosave */
+
+.saved {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--fs-11);
+    color: var(--text-3);
+    transition: opacity var(--t) var(--ease);
+}
+
+.saved svg { width: 12px; height: 12px; }
+.saved .spinner { width: 10px; height: 10px; border-width: 1.5px; }
+
+
+/* ========================================================= focus states */
+
+/*  Visible, consistent, and never on mouse click — only keyboard.       */
+
+:focus-visible {
+    outline: 2px solid var(--orange);
+    outline-offset: 2px;
+    border-radius: var(--r-sm);
+}
+
+.lrow:focus-visible,
+.cal__e:focus-visible,
+.kb__card:focus-visible { outline-offset: -2px; }
+
+.input:focus-visible,
+.textarea:focus-visible,
+.select:focus-visible { outline: none; }
+
+/*  Dialog containers take focus so screen readers land inside them. That
+    is an announcement, not an affordance — it must not draw a ring.     */
+.drawer:focus,
+.drawer:focus-visible,
+.modal:focus,
+.modal:focus-visible,
+.sheet:focus,
+.sheet:focus-visible,
+.cmdk:focus,
+.cmdk:focus-visible,
+.page:focus,
+.page:focus-visible { outline: none; }
+
+
+/* ================================================= shortcut help dialog */
+
+.keys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--s6); }
+
+.keys__r {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s3);
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: var(--fs-13);
+}
+
+
+/* ======================================================= mobile touch */
+
+@media (max-width: 767px) {
+    /*  Desktop can be dense; a finger cannot. Every tappable row and
+        control clears 44px on touch screens.                            */
+    .lrow { min-height: 52px; }
+    .btn { height: 40px; padding: 0 14px; }
+    .btn--sm { height: 34px; }
+    .iconbtn { width: 40px; height: 40px; }
+    .chip { height: 34px; padding: 0 13px; }
+    .seg__i { height: 34px; }
+    .snav__i { height: 40px; }
+    .pop__i { padding: 11px 10px; }
+    .utabs__i { padding: 12px 0 13px; }
+    .check { width: 20px; height: 20px; }
+    .switch { width: 40px; height: 24px; }
+    .switch::after { width: 20px; height: 20px; }
+    .switch:checked::after { transform: translateX(16px); }
+
+    .toasts { left: var(--s3); right: var(--s3); bottom: 78px; align-items: stretch; }
+
+    /*  Approval rows are recomposed rather than squeezed. On a phone the
+        title gets a full line, the meta sits under it, and the actions
+        become a full-width pair — no truncating a title to "Insta…".
+        Bulk select and keyboard hints are desktop concerns and step out. */
+    .lrow--ap {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-areas:
+            "tile main"
+            "meta meta"
+            "acts acts";
+        align-items: start;
+        gap: 10px;
+        padding: 14px var(--page-pad);
+    }
+
+    .ap-check { display: none; }
+    .lrow--ap .ap-tile { grid-area: tile; }
+    .lrow--ap .ap-main { grid-area: main; }
+    .lrow--ap .ap-ai { display: none; }
+
+    .lrow--ap .ap-meta {
+        grid-area: meta;
+        flex-direction: row;
+        align-items: center;
+        gap: var(--s3);
+    }
+
+    .lrow--ap .ap-acts { grid-area: acts; }
+    .lrow--ap .ap-acts .btn { flex: 1; }
+
+    .ap-hint { display: none; }
+}
+
+
+/* ======================================================= reduced motion */
+
+/*  Essential state changes stay (a drawer must still appear); decorative
+    motion is removed entirely.                                          */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .ai-mark.is-live svg,
+    .ai-glow::after,
+    .aitask__s.is-live .aitask__m::after,
+    .stream::after { animation: none !important; }
+
+    .ai-glow::after { opacity: 0; }
+    .stream::after { display: none; }
+    .chart-line { stroke-dasharray: none; }
+    .btn:active { transform: none; }
+    .card--int:hover, .att:hover, .asset:hover, .bb:hover, .conn:hover { transform: none; }
+}

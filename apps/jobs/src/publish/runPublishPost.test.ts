@@ -635,3 +635,99 @@ describe('a post that is not what it says it is', () => {
     expect(out).toHaveProperty('code', 'MAX_CHARS')
   })
 })
+
+describe('workspace A publishing through workspace B’s connection', () => {
+  /**
+   * ── WHERE THE GUARD ACTUALLY LIVES, AND WHY THAT MATTERS ────────────────────
+   * Not in this file. `public.assert_account_for_scheduled_post` (applied
+   * 2026-08-01) re-derives the workspace FROM THE POST and returns an account id
+   * only if an ACTIVE connection, on the same channel, in that workspace, under
+   * that workspace's Zernio profile, owns it. `store.ts` calls it and treats the
+   * id it just read as a candidate until the database says otherwise.
+   *
+   * That placement is the point. A guard in this function would hold for today's
+   * four entries into publishing and for no future one; a guard in the database
+   * holds for a caller, a job, a script, and the service role alike — the same
+   * property proven for `save_post_variant`, whose `where workspace_id =` refused
+   * a cross-tenant write even when RLS was bypassed entirely.
+   *
+   * PROVEN AGAINST PRODUCTION 2026-08-19, with workspace A's real post and
+   * workspace B's real, active Instagram account id: `CROSS_TENANT_ACCOUNT`.
+   * A well-formed id belonging to nobody, a variant from another post, a post from
+   * another workspace, a null and a SQL-shaped string were all refused too.
+   *
+   * ── WHAT THESE TESTS ADD ────────────────────────────────────────────────────
+   * The database refuses by RAISING, so what this file owns is what happens to
+   * that raise: the attempt must be recorded under its own name rather than as an
+   * outage, and NOTHING may reach an adapter. `adapterCalls` is the assertion that
+   * makes the second half real — a refusal after the network is not a refusal.
+   *
+   * NOTHING HERE PUBLISHES. The fixture adapter is counted, never reached.
+   */
+
+  /** Exactly how the assertion surfaces: the driver prefixes the raised code. */
+  const raises = (code: string): PublishPostDeps['resolveConnection'] => {
+    return async () => {
+      throw new Error(`error: ${code}`)
+    }
+  }
+
+  it('records a cross-tenant attempt under its OWN code, not as an outage', async () => {
+    // The audit defect this closes. Filed as CONNECTION_UNAVAILABLE, a deliberate
+    // cross-tenant attempt is indistinguishable from the vault being briefly down,
+    // and the one event anyone would search for is the one no filter can find.
+    const h = harness({ resolveConnection: raises('CROSS_TENANT_ACCOUNT') })
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toMatchObject({ status: 'failed', classification: 'permanent' })
+    expect(out).toHaveProperty('code', 'CROSS_TENANT_ACCOUNT')
+    expect(h.adapterCalls).toBe(0)
+  })
+
+  it('writes that attempt to the publish log, with the workspace and the channel', async () => {
+    // Without a row there is no answer to "did this ever happen before the guard",
+    // which is the first question anybody asks.
+    const h = harness({ resolveConnection: raises('CROSS_TENANT_ACCOUNT') })
+    await runPublishPost(payload, ctx, h.deps)
+
+    expect(h.logs).toHaveLength(1)
+    expect(h.logs[0]).toMatchObject({
+      workspaceId: payload.workspaceId,
+      postId: payload.postId,
+      channel: payload.channel,
+      status: 'failed',
+    })
+    expect(h.logs[0]?.error).toMatchObject({ code: 'CROSS_TENANT_ACCOUNT' })
+  })
+
+  it('keeps every other pre-flight refusal distinguishable too', async () => {
+    for (const code of ['NO_PROFILE_MAPPING', 'POST_NOT_PUBLISHABLE', 'INVALID_ACCOUNT']) {
+      const h = harness({ resolveConnection: raises(code) })
+      const out = await runPublishPost(payload, ctx, h.deps)
+      expect(out).toHaveProperty('code', code)
+      expect(h.adapterCalls).toBe(0)
+    }
+  })
+
+  it('still calls a genuine outage an outage', async () => {
+    // The other direction, and the reason the codes are matched by name rather
+    // than sniffed for: a real vault failure must NOT be dressed as a tenant event.
+    const h = harness({
+      resolveConnection: async () => {
+        throw new Error('connection to the token vault timed out')
+      },
+    })
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toHaveProperty('code', 'CONNECTION_UNAVAILABLE')
+    expect(h.adapterCalls).toBe(0)
+  })
+
+  it('does not re-label a message that merely mentions a code', async () => {
+    // Anchored matching. `INVALID_POSTCODE` is not `INVALID_POST`.
+    const h = harness({ resolveConnection: raises('INVALID_POSTCODE_LOOKUP') })
+    const out = await runPublishPost(payload, ctx, h.deps)
+
+    expect(out).toHaveProperty('code', 'CONNECTION_UNAVAILABLE')
+  })
+})

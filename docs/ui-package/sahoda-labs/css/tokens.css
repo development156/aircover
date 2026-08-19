@@ -1,0 +1,366 @@
+/*  Sahoda Labs — Design tokens, reset, base type, utilities
+    ---------------------------------------------------------------------
+    Palette is five colours. Everything else is one of them at reduced
+    alpha. Platform marks (Instagram, LinkedIn, …) keep their own brand
+    colours because they are identity, not UI chrome — that is the only
+    exception, and it never leaks into buttons, text or surfaces.       */
+
+:root {
+    /* Brand */
+    --orange: #FF6600;
+    --black: #000000;
+    --grey: #575756;
+    --gainsboro: #DCDCDC;
+    --white: #FFFFFF;
+
+    /* Orange at alpha — accent washes */
+    --orange-06: rgba(255, 102, 0, 0.06);
+    --orange-10: rgba(255, 102, 0, 0.10);
+    --orange-16: rgba(255, 102, 0, 0.16);
+    --orange-24: rgba(255, 102, 0, 0.24);
+    --orange-40: rgba(255, 102, 0, 0.40);
+
+    /* Black at alpha — neutrals, dividers, scrims */
+    --black-02: rgba(0, 0, 0, 0.02);
+    --black-04: rgba(0, 0, 0, 0.04);
+    --black-06: rgba(0, 0, 0, 0.06);
+    --black-08: rgba(0, 0, 0, 0.08);
+    --black-12: rgba(0, 0, 0, 0.12);
+    --black-30: rgba(0, 0, 0, 0.30);
+    --black-45: rgba(0, 0, 0, 0.45);
+    --black-60: rgba(0, 0, 0, 0.60);
+
+    /* White at alpha — for dark surfaces */
+    --white-06: rgba(255, 255, 255, 0.06);
+    --white-10: rgba(255, 255, 255, 0.10);
+    --white-16: rgba(255, 255, 255, 0.16);
+    --white-45: rgba(255, 255, 255, 0.45);
+    --white-70: rgba(255, 255, 255, 0.70);
+
+    /* Semantic roles */
+    --bg: var(--white);
+    --surface: var(--white);
+    --surface-2: #FAFAFA;
+    --surface-3: #F4F4F4;
+    --text: var(--black);
+    --text-2: var(--grey);
+    --text-3: var(--black-45);
+    --border: var(--gainsboro);
+    --border-soft: var(--black-08);
+    --accent: var(--orange);
+    --accent-ink: var(--white);
+    --accent-wash: var(--orange-06);
+
+    /* Spacing — 4px base, 8px rhythm */
+    --s1: 4px;
+    --s2: 8px;
+    --s3: 12px;
+    --s4: 16px;
+    --s5: 20px;
+    --s6: 24px;
+    --s7: 32px;
+    --s8: 40px;
+    --s9: 48px;
+
+    /* Radius */
+    --r-sm: 6px;
+    --r: 8px;
+    --r-md: 10px;
+    --r-lg: 12px;
+    --r-full: 999px;
+
+    /* Type */
+    --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --fs-11: 11px;
+    --fs-12: 12px;
+    --fs-13: 13px;
+    --fs-14: 14px;
+    --fs-16: 16px;
+    --fs-18: 18px;
+    --fs-20: 20px;
+    --fs-24: 24px;
+    --fs-30: 30px;
+
+    /* Elevation — hairline first, shadow only for floating layers */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.14);
+
+    /* Frame */
+    --sidebar-w: 232px;
+    --sidebar-w-collapsed: 64px;
+    --header-h: 56px;
+    --page-pad: 24px;
+    --control-h: 34px;
+    --input-h: 38px;
+
+    --ease: cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+[data-theme="dark"] {
+    --bg: #0B0B0C;
+    --surface: #131315;
+    --surface-2: #17171A;
+    --surface-3: #1F1F23;
+    --text: var(--white);
+    --text-2: var(--gainsboro);
+    --text-3: var(--white-45);
+    --border: rgba(255, 255, 255, 0.14);
+    --border-soft: var(--white-10);
+    --accent-wash: rgba(255, 102, 0, 0.12);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.7);
+}
+
+
+/* ---------------------------------------------------------------- reset */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    font-family: var(--font);
+    font-size: var(--fs-13);
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    outline: none;
+}
+
+button {
+    cursor: pointer;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+ul,
+ol {
+    list-style: none;
+}
+
+img,
+svg {
+    display: block;
+    max-width: 100%;
+}
+
+svg {
+    flex: none;
+}
+
+
+/*  Default icon size. Every context rule (.btn svg, .tile svg, .nav__i svg …)
+    is more specific and overrides this, so icons dropped into plain text
+    still come out the right size instead of filling their container.     */
+
+.ic {
+    width: 15px;
+    height: 15px;
+}
+
+.bic {
+    width: 18px;
+    height: 18px;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+:focus-visible {
+    outline: 2px solid var(--orange);
+    outline-offset: 2px;
+    border-radius: var(--r-sm);
+}
+
+::selection {
+    background: var(--orange-16);
+    color: var(--text);
+}
+
+
+/* ------------------------------------------------------------ scrollbar */
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--black-12) transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: var(--black-12);
+    border-radius: var(--r-full);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: var(--black-30);
+}
+
+[data-theme="dark"] *::-webkit-scrollbar-thumb {
+    background: var(--white-16);
+}
+
+
+/* ----------------------------------------------------------------- type */
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    color: var(--text);
+}
+
+h1 { font-size: var(--fs-24); letter-spacing: -0.02em; }
+h2 { font-size: var(--fs-20); }
+h3 { font-size: var(--fs-16); }
+h4 { font-size: var(--fs-14); }
+h5 { font-size: var(--fs-13); }
+
+.page-title {
+    font-size: var(--fs-20);
+    font-weight: 650;
+    letter-spacing: -0.02em;
+}
+
+.page-sub {
+    font-size: var(--fs-13);
+    color: var(--text-2);
+    margin-top: 2px;
+}
+
+.sec-title {
+    font-size: var(--fs-14);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.eyebrow {
+    font-size: var(--fs-11);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-3);
+}
+
+
+/* ------------------------------------------------------------ utilities */
+
+.t-2 { color: var(--text-2); }
+.t-3 { color: var(--text-3); }
+.t-accent { color: var(--orange); }
+.t-11 { font-size: var(--fs-11); }
+.t-12 { font-size: var(--fs-12); }
+.t-13 { font-size: var(--fs-13); }
+.t-14 { font-size: var(--fs-14); }
+.t-16 { font-size: var(--fs-16); }
+.t-18 { font-size: var(--fs-18); }
+.t-20 { font-size: var(--fs-20); }
+.t-24 { font-size: var(--fs-24); }
+.w-500 { font-weight: 500; }
+.w-600 { font-weight: 600; }
+.w-650 { font-weight: 650; }
+.tabnum { font-variant-numeric: tabular-nums; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.row { display: flex; align-items: center; }
+.row-t { display: flex; align-items: flex-start; }
+.col { display: flex; flex-direction: column; }
+.between { justify-content: space-between; }
+.center { justify-content: center; }
+.wrap { flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+.push { margin-left: auto; }
+
+.g1 { gap: var(--s1); }
+.g2 { gap: var(--s2); }
+.g3 { gap: var(--s3); }
+.g4 { gap: var(--s4); }
+.g5 { gap: var(--s5); }
+.g6 { gap: var(--s6); }
+
+.mt1 { margin-top: var(--s1); }
+.mt2 { margin-top: var(--s2); }
+.mt3 { margin-top: var(--s3); }
+.mt4 { margin-top: var(--s4); }
+.mt5 { margin-top: var(--s5); }
+.mt6 { margin-top: var(--s6); }
+.mb2 { margin-bottom: var(--s2); }
+.mb3 { margin-bottom: var(--s3); }
+.mb4 { margin-bottom: var(--s4); }
+
+.hide { display: none !important; }
+.sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+
+/* Layout grids used across pages */
+
+.grid { display: grid; gap: var(--s4); }
+.g-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.g-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.g-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.g-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+
+
+/* Reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

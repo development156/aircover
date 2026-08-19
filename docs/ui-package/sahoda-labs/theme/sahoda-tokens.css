@@ -1,0 +1,227 @@
+/*  SAHODA LABS — DESIGN TOKENS (portable)
+    =====================================================================
+    Drop this into an existing dashboard as the FIRST stylesheet. It sets
+    no layout and claims no class names, so it cannot break a working app.
+    On its own it does nothing visible — it is the vocabulary the rest of
+    the kit speaks.
+
+    Palette is five colours. Everything else is one of them at reduced
+    alpha. Platform marks (Instagram, LinkedIn, …) keep their own brand
+    colours because they are identity, not UI chrome — that is the only
+    exception, and it never leaks into buttons, text or surfaces.
+
+    Dark mode responds to THREE selectors so it works whatever the host
+    app already uses:
+      <html data-theme="dark">   the reference build
+      <html class="dark">        Tailwind / shadcn / next-themes
+      <body class="dark">        older Bootstrap-era toggles
+    Wire your existing toggle to any one of them. Do not run two.      */
+
+
+/* ------------------------------------------------------------- light */
+
+:root {
+    /* Brand — the whole palette. Nothing else is a brand colour. */
+    --sl-orange: #FF6600;
+    --sl-black: #000000;
+    --sl-grey: #575756;
+    --sl-gainsboro: #DCDCDC;
+    --sl-white: #FFFFFF;
+
+    /* Orange at alpha — accent washes */
+    --sl-orange-06: rgba(255, 102, 0, 0.06);
+    --sl-orange-10: rgba(255, 102, 0, 0.10);
+    --sl-orange-16: rgba(255, 102, 0, 0.16);
+    --sl-orange-24: rgba(255, 102, 0, 0.24);
+    --sl-orange-40: rgba(255, 102, 0, 0.40);
+
+    /* Black at alpha — neutrals, dividers, scrims */
+    --sl-black-02: rgba(0, 0, 0, 0.02);
+    --sl-black-04: rgba(0, 0, 0, 0.04);
+    --sl-black-06: rgba(0, 0, 0, 0.06);
+    --sl-black-08: rgba(0, 0, 0, 0.08);
+    --sl-black-12: rgba(0, 0, 0, 0.12);
+    --sl-black-30: rgba(0, 0, 0, 0.30);
+    --sl-black-45: rgba(0, 0, 0, 0.45);
+    --sl-black-60: rgba(0, 0, 0, 0.60);
+
+    /* White at alpha — for dark surfaces */
+    --sl-white-06: rgba(255, 255, 255, 0.06);
+    --sl-white-10: rgba(255, 255, 255, 0.10);
+    --sl-white-16: rgba(255, 255, 255, 0.16);
+    --sl-white-45: rgba(255, 255, 255, 0.45);
+    --sl-white-70: rgba(255, 255, 255, 0.70);
+
+    /*  Semantic roles — THESE are what components reference.
+        Never let a component reach past these to a raw brand colour;
+        that is what makes a single token flip retheme the whole app.  */
+    --sl-bg: var(--sl-white);
+    --sl-surface: var(--sl-white);
+    --sl-surface-2: #FAFAFA;
+    --sl-surface-3: #F4F4F4;
+    --sl-text: var(--sl-black);
+    --sl-text-2: var(--sl-grey);
+    --sl-text-3: var(--sl-black-45);
+    --sl-border: var(--sl-gainsboro);
+    --sl-border-soft: var(--sl-black-08);
+    --sl-accent: var(--sl-orange);
+    --sl-accent-ink: var(--sl-white);
+    --sl-accent-wash: var(--sl-orange-06);
+
+    /* Spacing — 4px base, 8px rhythm */
+    --sl-s1: 4px;
+    --sl-s2: 8px;
+    --sl-s3: 12px;
+    --sl-s4: 16px;
+    --sl-s5: 20px;
+    --sl-s6: 24px;
+    --sl-s7: 32px;
+    --sl-s8: 40px;
+    --sl-s9: 48px;
+
+    /* Radius */
+    --sl-r-sm: 6px;
+    --sl-r: 8px;
+    --sl-r-md: 10px;
+    --sl-r-lg: 12px;
+    --sl-r-full: 999px;
+
+    /*  Type. Inter at six weights — 550 and 650 are load-bearing, not
+        decoration: the UI leans on half-steps to separate a label from
+        a value without jumping to bold. If you subset the font, keep
+        400 / 500 / 550 / 600 / 650 / 700.                             */
+    --sl-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --sl-fs-11: 11px;
+    --sl-fs-12: 12px;
+    --sl-fs-13: 13px;
+    --sl-fs-14: 14px;
+    --sl-fs-16: 16px;
+    --sl-fs-18: 18px;
+    --sl-fs-20: 20px;
+    --sl-fs-24: 24px;
+    --sl-fs-30: 30px;
+
+    /*  Elevation — hairline first. A shadow means "this floats above the
+        page", so only overlays get one. Resting cards use an inset ring,
+        which is why the UI reads flat and dense rather than puffy.     */
+    --sl-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --sl-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    --sl-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.14);
+
+    /* Frame */
+    --sl-sidebar-w: 232px;
+    --sl-sidebar-w-collapsed: 64px;
+    --sl-header-h: 56px;
+    --sl-page-pad: 24px;
+    --sl-control-h: 34px;
+    --sl-input-h: 38px;
+
+    /* Motion */
+    --sl-ease: cubic-bezier(0.2, 0, 0.2, 1);
+    --sl-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --sl-d-fast: 140ms;
+    --sl-d: 180ms;
+    --sl-d-slow: 280ms;
+}
+
+
+/* -------------------------------------------------------------- dark */
+
+[data-theme="dark"],
+.dark,
+body.dark {
+    --sl-bg: #0B0B0C;
+    --sl-surface: #131315;
+    --sl-surface-2: #17171A;
+    --sl-surface-3: #1F1F23;
+    --sl-text: var(--sl-white);
+    --sl-text-2: var(--sl-gainsboro);
+    --sl-text-3: var(--sl-white-45);
+    --sl-border: rgba(255, 255, 255, 0.14);
+    --sl-border-soft: var(--sl-white-10);
+    --sl-accent-wash: rgba(255, 102, 0, 0.12);
+    --sl-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --sl-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+    --sl-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.7);
+}
+
+
+/* ---------------------------------------------------- optional base
+
+   Everything above is inert. This block is the smallest set of global
+   changes that make an existing app *feel* like Sahoda before you touch
+   a single component: the typeface, the base size, the focus ring, the
+   selection colour, the scrollbars.
+
+   It deliberately does NOT include a reset. A `* { margin: 0 }` dropped
+   into a working dashboard will move things you did not intend to move.
+
+   If your host app must not inherit the body font, delete this block
+   and put `font-family: var(--sl-font)` on your app root instead.    */
+
+body {
+    font-family: var(--sl-font);
+    font-size: var(--sl-fs-13);
+    line-height: 1.5;
+    color: var(--sl-text);
+    background: var(--sl-bg);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+:focus-visible {
+    outline: 2px solid var(--sl-orange);
+    outline-offset: 2px;
+    border-radius: var(--sl-r-sm);
+}
+
+::selection {
+    background: var(--sl-orange-16);
+    color: var(--sl-text);
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--sl-black-12) transparent;
+}
+
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+*::-webkit-scrollbar-thumb {
+    background: var(--sl-black-12);
+    border-radius: var(--sl-r-full);
+}
+
+*::-webkit-scrollbar-thumb:hover { background: var(--sl-black-30); }
+
+[data-theme="dark"] *::-webkit-scrollbar-thumb,
+.dark *::-webkit-scrollbar-thumb { background: var(--sl-white-16); }
+
+
+/* ------------------------------------------------------------- type */
+
+.sl-page-title { font-size: var(--sl-fs-20); font-weight: 650; letter-spacing: -0.02em; }
+.sl-page-sub   { font-size: var(--sl-fs-13); color: var(--sl-text-2); margin-top: 2px; }
+.sl-sec-title  { font-size: var(--sl-fs-14); font-weight: 600; letter-spacing: -0.01em; }
+
+.sl-eyebrow {
+    font-size: var(--sl-fs-11);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sl-text-3);
+}
+
+
+/* -------------------------------------------------- reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
