@@ -151,6 +151,8 @@ export function VariantTabs({ channels, canonicalBody, variants, mediaCount }: V
           onBodyChange={(body) => variants.setBody(active, body)}
           onExtrasChange={(patch) => variants.setExtras(active, patch)}
           onSave={() => variants.save(active)}
+          onKeepMine={() => variants.keepMine(active)}
+          onUseTheirs={(theirs) => variants.useTheirs(active, theirs)}
         />
       </div>
     </section>

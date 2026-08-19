@@ -25,6 +25,7 @@ function states(bodies: Partial<Record<Channel, string>> = {}): VariantStates {
       saving: false,
       error: null,
       conflict: null,
+      version: undefined,
       permalink: null,
     }
   }
@@ -39,6 +40,8 @@ function api(overrides: Partial<VariantsApi> = {}): VariantsApi {
     save: vi.fn(),
     saveNow: vi.fn(async () => true),
     applyGenerated: vi.fn(),
+    keepMine: vi.fn(),
+    useTheirs: vi.fn(),
     ...overrides,
   }
 }

@@ -8,7 +8,13 @@ import { EmptyState } from '@/components/empty-state'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { readActiveWorkspace } from '@/lib/workspaces'
 import { listConnectedChannels } from '@/lib/connections/read'
-import { getPost, listMedia, listVariants } from '@/lib/posts/read'
+import {
+  getPost,
+  listMedia,
+  listVariants,
+  readVariantVersions,
+  readVariantVersionSupport,
+} from '@/lib/posts/read'
 import { signMediaPreviews } from '@/lib/posts/media-url'
 
 export const metadata = { title: 'New post' }
@@ -75,6 +81,12 @@ export default async function CreatePostPage({
 
   const post = postId ? await getPost(postId) : null
   const variants = post ? await listVariants(post.id) : []
+  // With a post, the versions come out of the rows already read. WITHOUT one —
+  // the first visit, before Continue has created anything — there are no rows to
+  // read, so the question is asked of the table itself. Skipping that case would
+  // put the very first save of a new post back on last-write-wins, which is the
+  // save two tabs are most likely to make at the same moment.
+  const versions = post ? await readVariantVersions(post.id) : await readVariantVersionSupport()
   // Media travels with the post so the flow's panel is the SAME panel the
   // editor shows — same rows, same signed previews, same per-channel
   // attachment rules. Two media surfaces reading different sources is how one
@@ -93,6 +105,7 @@ export default async function CreatePostPage({
         media={media}
         previews={previews}
         postChannels={post?.channels ?? null}
+        versions={versions}
       />
     </Suspense>
   )

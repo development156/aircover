@@ -13,6 +13,7 @@ import { gbpCtaTypes, isValidGbpCta } from '@/lib/posts/variant-extras'
 import { CHANNEL_LABELS } from './channel-label'
 import { ChannelMeterView } from './channel-meter'
 import { InlineError } from './inline-error'
+import { VariantConflictNotice } from './variant-conflict-notice'
 import type { VariantState } from './use-variants'
 
 export interface VariantPanelProps {
@@ -24,6 +25,10 @@ export interface VariantPanelProps {
   onBodyChange: (body: string) => void
   onExtrasChange: (patch: { gbpCta?: string; hashtags?: string[] }) => void
   onSave: () => void
+  /** Re-send the local text against the version the refusal carried. */
+  onKeepMine: () => void
+  /** Load the stored text into the box. Writes nothing. */
+  onUseTheirs: (theirs: string) => void
 }
 
 const MAX_TRIM_PASSES = 200
@@ -58,6 +63,8 @@ export function VariantPanel({
   onBodyChange,
   onExtrasChange,
   onSave,
+  onKeepMine,
+  onUseTheirs,
 }: VariantPanelProps) {
   const spec = CONSTRAINTS[channel]
   const hashtags = state.extras.hashtags
@@ -165,6 +172,19 @@ export function VariantPanel({
             </p>
           ) : null}
         </div>
+      ) : null}
+
+      {/* ── ABOVE THE SAVE BUTTON, AND ONLY ONE OF THE TWO EVER SHOWS ─────────
+          A clash is not an error and must not be dressed as one: the writer has
+          a choice to make, and `use-variants` already clears `error` whenever it
+          sets `conflict` so the two cannot stack. Placed directly above the
+          button that was just pressed, because that is where the eye already is. */}
+      {state.conflict !== null ? (
+        <VariantConflictNotice
+          conflict={state.conflict}
+          onKeepMine={onKeepMine}
+          onUseTheirs={onUseTheirs}
+        />
       ) : null}
 
       {state.error !== null ? <InlineError>{state.error}</InlineError> : null}

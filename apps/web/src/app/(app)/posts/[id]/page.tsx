@@ -6,7 +6,7 @@ import { PostMetricsPanel } from '@/components/posts/post-metrics-panel'
 import { readPostMetrics } from '@/lib/analytics/post-metrics'
 import { variantStatusRows } from '@/lib/posts/variant-status'
 import { signMediaPreviews } from '@/lib/posts/media-url'
-import { getPost, listMedia, listVariants } from '@/lib/posts/read'
+import { getPost, listMedia, listVariants, readVariantVersions } from '@/lib/posts/read'
 import { assembleSnapshot } from '@/lib/posts/live-state'
 import { PublishStateProvider } from '@/components/posts/live/publish-state-provider'
 import { LivePhaseNote } from '@/components/posts/live/live-phase-note'
@@ -27,8 +27,11 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   const post = await getPost(id)
   if (!post) notFound()
 
-  const [variants, media, connected] = await Promise.all([
+  const [variants, versions, media, connected] = await Promise.all([
     listVariants(post.id),
+    // Free alongside the line above: both read the same memoised query, and this
+    // one salvages the `version` column the frozen contract strips out.
+    readVariantVersions(post.id),
     listMedia(post.id),
     // Read here so the composer can say "not connected" while the post is being
     // written, instead of at the moment Publish fails with the work already done.
@@ -78,6 +81,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
         <PostEditor
           post={post}
           variants={variants}
+          versions={versions}
           media={media}
           previews={previews}
           autoPublish={autoPublishEnabled()}

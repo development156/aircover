@@ -8,11 +8,20 @@ import type { Channel, ConstraintViolation } from '@sahoda/shared'
  */
 
 /**
- * The version already in the row, from the SAME read that detected the clash.
+ * What is stored now, carried with the refusal so the client does not have to ask.
  *
- * Carried with the refusal rather than fetched by the client afterwards: a second
- * read is a second race, and the text the customer is shown must be the text the
- * database actually refused to overwrite.
+ * ── AN EARLIER VERSION OF THIS COMMENT WAS WRONG, AND THE CORRECTION MATTERS ─
+ * It said this came from "the SAME read that detected the clash". It cannot. The
+ * compare-and-set returns NO ROW precisely because the clash happened, so there is
+ * nothing to carry back and the server reads a second time to fill this in.
+ *
+ * That second read can go stale if a third writer lands between the two. Harmless,
+ * and worth being exact about why: what is shown is always a version that was
+ * really stored, so it is never a false claim, only possibly an old one — and
+ * nothing is decided from it, because "Keep mine" re-sends against `version` and
+ * is refused again if that has moved. Losing repeatedly costs round trips, never
+ * words. `lib/posts/cas-save.ts` holds the read; the three-writer sequence is
+ * executed in `packages/db/tests/post_variant_cas.pglite.test.ts`.
  */
 export interface SaveConflict {
   channel: Channel
@@ -23,21 +32,33 @@ export interface SaveConflict {
 }
 
 /**
- * ── THE `conflict` ARM IS INERT AND DELIBERATELY PRESENT ─────────────────────
- * Nothing produces it yet: detecting a concurrent edit needs a version column on
- * `post_variants` and a compare-and-set, which is a migration, and migrations
- * apply straight to production. See docs/23_Concurrent_Edit_Plan.md for the SQL.
+ * ── THE `conflict` ARM IS NOW PRODUCED, BUT ONLY WHERE IT CAN BE ─────────────
+ * `saveVariant` returns it when the compare-and-set refuses. That needs the
+ * `version` column from migration 20260819000000, which applies to production and
+ * is the founder's to run — so until it is applied nothing reaches this arm, and
+ * every save behaves exactly as it did before.
  *
- * The shape ships first on purpose. If the migration landed while the UI could
- * only render `message`, a version mismatch would show a generic save error with
- * the box still dirty and a Retry that fails for as long as the other tab holds
- * the newer row — worse than today, where the work is lost silently. Building
- * the refusal the UI can already read makes the migration the only step left.
+ * Both halves ship together on purpose. A migration landing on a UI that could
+ * only render `message` would show a generic save error with the box still dirty
+ * and a Retry that fails for as long as the other tab holds the newer row — worse
+ * than losing the work silently, which is what happens today.
  *
  * OPTIONAL, so every existing consumer that reads `message` is untouched.
  */
 export type SaveState =
-  | { ok: true; postId: string; updatedAt: string }
+  | {
+      ok: true
+      postId: string
+      updatedAt: string
+      /**
+       * What the row is at now, so the next save can compare against it.
+       *
+       * OPTIONAL, and absent is the ordinary answer today: the save path that does
+       * not compare-and-set has no version to report. A caller that gets none keeps
+       * whatever it had, which for that path is nothing.
+       */
+      version?: number
+    }
   | { ok: false; message: string; conflict?: SaveConflict }
 
 export type DeleteState = { ok: true } | { ok: false; message: string }

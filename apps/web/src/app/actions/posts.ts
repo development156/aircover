@@ -15,6 +15,7 @@ import {
 import { reportServerError } from '@/lib/observability/report'
 import { mapPostError } from '@/lib/posts/post-error'
 import { hasLink } from '@/lib/posts/detect-link'
+import { casSaveVariant } from '@/lib/posts/cas-save'
 import { parseExtras } from '@/lib/posts/variant-extras'
 import type { DeleteState, SaveState } from '@/lib/posts/state'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -190,6 +191,17 @@ export async function saveVariant(
   channel: string,
   body: string,
   extras: unknown,
+  /**
+   * What the caller believes is stored, for the compare-and-set.
+   *
+   *   `undefined` — this database has no version column (or the caller could not
+   *                 tell). Save exactly the way this action always has.
+   *   `null`      — the column is there and this channel has no copy yet. Create.
+   *   a number    — the column is there. Change it only if it is still at this.
+   *
+   * `null` and `undefined` mean opposite things here, so neither is defaulted.
+   */
+  expectedVersion?: number | null,
 ): Promise<SaveState> {
   let workspaceId: string | undefined
   try {
@@ -224,6 +236,47 @@ export async function saveVariant(
     })
 
     const supabase = createServerSupabase()
+
+    // ── THE COMPARE-AND-SET, WHEN THERE IS ONE ────────────────────────────────
+    // Only when the caller supplied a belief about what is stored. Without one
+    // this stays on the upsert below, byte for byte as it has always been — which
+    // is what lets this code ship BEFORE the migration rather than after it.
+    //
+    // ── WHY A FAILED CALL HERE IS NOT QUIETLY DOWNGRADED ─────────────────────
+    // The tempting extra safety net is: if the compare-and-set function turns out
+    // not to exist, fall back to the upsert. It was written and then removed.
+    //
+    // Deciding "the function is missing" means matching an error code, and the two
+    // layers involved report a missing function differently — Postgres one way,
+    // the API in front of it another. Nothing in this run could observe the second
+    // one, so that branch would have been guesswork, and guessing WRONG means
+    // every genuine failure silently becomes a last-write-wins save: the exact
+    // defect this whole change exists to remove, reintroduced by its own safety
+    // net and invisible because the save appears to succeed.
+    //
+    // The state it guarded against also cannot really arise: the column and the
+    // function are created by ONE migration file, and a migration file applies as
+    // a unit. A caller only reaches this branch because it READ the column, which
+    // means that file ran.
+    //
+    // So a failed call is reported as a failed save. Visible, and losing nothing.
+    if (expectedVersion !== undefined) {
+      const cas = await casSaveVariant(supabase, {
+        postId,
+        workspaceId: workspace.id,
+        channel: parsedChannel.data,
+        body,
+        extras: patch.extras,
+        charCount: patch.char_count ?? null,
+        expectedVersion,
+      })
+      if (cas.ok) {
+        revalidatePath('/posts')
+        revalidatePath('/planner')
+      }
+      return cas
+    }
+
     const { data, error } = await supabase
       .from('post_variants')
       .upsert(

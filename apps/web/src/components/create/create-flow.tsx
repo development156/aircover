@@ -18,6 +18,13 @@ import { InlineError } from '@/components/posts/inline-error'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 import { MediaPane } from '@/components/posts/media-pane'
 import type { MediaPreview } from '@/lib/posts/media-url'
+import { VariantConflictNotice } from '@/components/posts/variant-conflict-notice'
+import type { SaveConflict } from '@/lib/posts/state'
+import {
+  expectedVersionFor,
+  VERSIONS_UNSUPPORTED,
+  type VariantVersions,
+} from '@/lib/posts/variant-version'
 
 /**
  * The five-step create flow, as FULL-SCREEN PAGES, backed by a real row.
@@ -107,6 +114,7 @@ export function CreateFlow({
   media,
   previews,
   postChannels,
+  versions = VERSIONS_UNSUPPORTED,
 }: {
   connected: readonly Channel[]
   postId: string | null
@@ -117,6 +125,14 @@ export function CreateFlow({
   previews: MediaPreview[]
   /** The post's OWN channels, branded. MediaPane validates attachments per channel. */
   postChannels: ChannelSet | null
+  /**
+   * What each channel's stored copy is at, so a save can compare against it.
+   *
+   * Defaults to "not tracked", which is production's answer until migration
+   * 20260819000000 is applied — and with it every save here behaves exactly as it
+   * does today.
+   */
+  versions?: VariantVersions
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -140,6 +156,25 @@ export function CreateFlow({
   const [channels, setChannels] = useState<Channel[]>([...initialChannels])
   const [bodies, setBodies] = useState<Record<string, string>>(initialBodies)
   const [savedAt, setSavedAt] = useState<string | null>(null)
+
+  /**
+   * What each channel's row is at, and the clash if one has been refused.
+   *
+   * ── WHY THE CREATE FLOW NEEDS THIS AT ALL ────────────────────────────────────
+   * This is where the loss was actually MEASURED (docs/23): two tabs on the same
+   * post's Content step, both typing, both blurring, and the second one wins with
+   * neither told. The editor next door had at least a divergence notice for the
+   * canonical body; this screen had nothing for any of it.
+   *
+   * Held in a ref rather than state because `persistVariant` runs inside a
+   * transition and from an unmount cleanup, and both need the CURRENT number at
+   * call time — a state updater is not guaranteed to have run by then. The
+   * conflicts are state, because they are rendered.
+   */
+  const variantVersions = useRef<Partial<Record<Channel, number | null | undefined>>>(
+    Object.fromEntries(REAL_CHANNELS.map((c) => [c, expectedVersionFor(versions, c)])),
+  )
+  const [conflicts, setConflicts] = useState<Partial<Record<Channel, SaveConflict>>>({})
 
   const connectedSet = new Set(connected)
 
@@ -211,11 +246,32 @@ export function CreateFlow({
   function persistVariant(channel: Channel, body: string) {
     if (!postId) return
     startTransition(async () => {
-      const result = await saveVariant(postId, channel, body, {})
+      const result = await saveVariant(postId, channel, body, {}, variantVersions.current[channel])
       if (!result.ok) {
+        // ── A CLASH IS NOT A SAVE ERROR ───────────────────────────────────────
+        // The generic error line says "could not save" and offers nothing to do
+        // about it. A clash has two real choices and both of them keep the text,
+        // so it gets the notice instead — and the version the refusal carried is
+        // adopted, which is what lets "Keep mine" win rather than fail forever.
+        if (result.conflict) {
+          variantVersions.current[channel] = result.conflict.version
+          setConflicts((prev) => ({ ...prev, [channel]: result.conflict }))
+          setError(null)
+          return
+        }
         setError(result.message)
         return
       }
+      // `version` is absent on a database without the column, and absent must
+      // leave `undefined` standing — writing it in would make the next save claim
+      // to compare against something this database does not have.
+      if (result.version !== undefined) variantVersions.current[channel] = result.version
+      setConflicts((prev) => {
+        if (prev[channel] === undefined) return prev
+        const next = { ...prev }
+        delete next[channel]
+        return next
+      })
       setError(null)
       setSavedAt(new Date().toISOString())
     })
@@ -335,6 +391,21 @@ export function CreateFlow({
               scheduleVariant(ch, value)
             }}
             onCommit={commitVariant}
+            conflicts={conflicts}
+            onKeepMine={(ch) => commitVariant(ch, bodies[ch] ?? '')}
+            onUseTheirs={(ch, theirs) => {
+              // Into the box, never into the row — the notice's third rule. The
+              // debounce is deliberately started rather than a write forced: the
+              // writer can still edit or undo before anything lands, exactly as
+              // if they had typed it themselves.
+              setBodies((prev) => ({ ...prev, [ch]: theirs }))
+              setConflicts((prev) => {
+                const next = { ...prev }
+                delete next[ch]
+                return next
+              })
+              scheduleVariant(ch, theirs)
+            }}
             postId={postId}
             media={media}
             previews={previews}
@@ -502,6 +573,9 @@ function StepContent({
   bodies,
   onChange,
   onCommit,
+  conflicts,
+  onKeepMine,
+  onUseTheirs,
   postId,
   media,
   previews,
@@ -511,6 +585,10 @@ function StepContent({
   bodies: Record<string, string>
   onChange: (channel: Channel, value: string) => void
   onCommit: (channel: Channel, value: string) => void
+  /** Channels another writer saved while this one was typing. Empty is the norm. */
+  conflicts: Partial<Record<Channel, SaveConflict>>
+  onKeepMine: (channel: Channel) => void
+  onUseTheirs: (channel: Channel, theirs: string) => void
   postId: string | null
   media: PostMedia[]
   previews: MediaPreview[]
@@ -616,6 +694,18 @@ function StepContent({
               placeholder={`Write the ${CHANNEL_LABELS[channel]} version.`}
               className="w-full rounded-input border border-line bg-bg px-3 py-2 text-[13px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
+            {/* Directly under the box the words were typed into, because the
+                notice shows the OTHER text and the two have to be read together. */}
+            {conflicts[channel] !== undefined ? (
+              <div className="mt-2">
+                <VariantConflictNotice
+                  conflict={conflicts[channel]}
+                  onKeepMine={() => onKeepMine(channel)}
+                  onUseTheirs={(theirs) => onUseTheirs(channel, theirs)}
+                />
+              </div>
+            ) : null}
+
             <div className="mt-1 flex items-center justify-between gap-3">
               <span className="text-[11.5px] text-muted">
                 {CONSTRAINTS[channel].requiresMedia === true

@@ -20,6 +20,7 @@ import { InlineRewrite } from './inline-rewrite'
 import { MediaPane } from './media-pane'
 import { useAutosave, type AutosaveStatus } from './use-autosave'
 import { useVariants } from './use-variants'
+import { VERSIONS_UNSUPPORTED, type VariantVersions } from '@/lib/posts/variant-version'
 import { VariantTabs } from './variant-tabs'
 
 export interface PostEditorProps {
@@ -44,6 +45,14 @@ export interface PostEditorProps {
    * rather than at the moment Publish fails with the work already done.
    */
   connected?: ReadonlySet<Channel>
+  /**
+   * What each channel's stored copy is at, so a save can compare against it.
+   *
+   * Optional, and its default is "not tracked" — which is exactly what production
+   * reports until migration 20260819000000 is applied. Read on the server because
+   * the frozen `PostVariantSchema` strips the column before the client can see it.
+   */
+  versions?: VariantVersions
 }
 
 const STATUS_COPY: Readonly<Record<AutosaveStatus, string>> = {
@@ -70,9 +79,10 @@ export function PostEditor({
   previews,
   autoPublish = false,
   connected,
+  versions = VERSIONS_UNSUPPORTED,
 }: PostEditorProps): React.JSX.Element {
   const autosave = useAutosave(post.id, post)
-  const variantsApi = useVariants(post.id, variants)
+  const variantsApi = useVariants(post.id, variants, versions)
   // Server-owned publish state, straight off the rows — deliberately NOT from
   // `variantsApi`, which holds the writer's unsaved drafts. What a channel is
   // doing on a platform is not something the editor may have an opinion about.

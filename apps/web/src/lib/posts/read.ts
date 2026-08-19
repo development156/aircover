@@ -15,6 +15,12 @@ import { cache } from 'react'
 
 import { createServerSupabase } from '@/lib/supabase/server'
 import { variantStatusRow, type VariantStatusRow } from '@/lib/posts/variant-status'
+import {
+  inconclusive,
+  versionsFromRows,
+  VERSIONS_UNSUPPORTED,
+  type VariantVersions,
+} from '@/lib/posts/variant-version'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
 /**
@@ -131,7 +137,17 @@ export async function getPost(postId: string): Promise<Post | null> {
   }
 }
 
-export async function listVariants(postId: string): Promise<PostVariant[]> {
+/**
+ * The raw `post_variants` rows for one post, before anything parses them.
+ *
+ * Memoised per request so `listVariants` and `readVariantVersions` — which the
+ * post editor calls together — share ONE query rather than two. The two need
+ * different things from the same rows: the parse produces the typed variant, and
+ * the version read salvages the one column the frozen contract discards.
+ *
+ * Returns `[]` on any failure, exactly as the read it replaced did.
+ */
+const variantRows = cache(async (postId: string): Promise<Record<string, unknown>[]> => {
   try {
     const workspaceId = await activeWorkspaceId()
     if (workspaceId === null) return []
@@ -145,14 +161,109 @@ export async function listVariants(postId: string): Promise<PostVariant[]> {
       .order('channel', { ascending: true })
 
     if (error || !data) return []
-    return data.flatMap((row) => {
-      const parsed = PostVariantSchema.safeParse(row)
-      return parsed.success ? [parsed.data] : []
-    })
+    return data as Record<string, unknown>[]
   } catch {
     return []
   }
+})
+
+export async function listVariants(postId: string): Promise<PostVariant[]> {
+  const rows = await variantRows(postId)
+  return rows.flatMap((row) => {
+    const parsed = PostVariantSchema.safeParse(row)
+    return parsed.success ? [parsed.data] : []
+  })
 }
+
+/**
+ * What each channel's copy is at, for the compare-and-set save.
+ *
+ * ── THE ONLY EXTRA QUERY, AND WHEN IT RUNS ───────────────────────────────────
+ * Normally none: the rows already fetched either carry a `version` field or they
+ * do not, and looking is free. The exception is a post with NO channel copy yet,
+ * where there are no rows to look at — see `inconclusive`. Only then does this
+ * ask the database a direct question, and it asks the cheapest one there is:
+ * select the column and see whether the request is refused.
+ *
+ * That probe reads WHETHER it failed, never WHY. Branching on an error code would
+ * mean matching strings nobody here has observed — Postgres and the API layer in
+ * front of it report a missing column differently — and a mismatched code sends
+ * the save down the wrong path silently. "It was refused" is a fact this code can
+ * actually establish.
+ *
+ * A refusal for some other reason — a dropped connection mid-probe — is therefore
+ * read as "not supported", and the save falls back to the path the app uses today.
+ * That is the safe direction: it is never worse than the current behaviour.
+ */
+export async function readVariantVersions(postId: string): Promise<VariantVersions> {
+  try {
+    const rows = await variantRows(postId)
+    const fromRows = versionsFromRows(rows)
+    if (fromRows.supported || !inconclusive(rows)) return fromRows
+
+    return await readVariantVersionSupport()
+  } catch {
+    return VERSIONS_UNSUPPORTED
+  }
+}
+
+/**
+ * Does this database track versions at all? Asked without naming a post.
+ *
+ * The create flow needs exactly this and cannot use the read above: it renders
+ * before any post exists, so there are no rows to look at and no id to look them
+ * up by. Without it, the FIRST save of a brand-new post would silently fall back
+ * to last-write-wins — which is the save two tabs are most likely to make at the
+ * same moment.
+ *
+ * Reads WHETHER the request was refused, never why. See `readVariantVersions`.
+ */
+/**
+ * How long a capability answer is trusted before it is asked again.
+ *
+ * ── WHY THIS IS MEMOISED ACROSS REQUESTS AND NOT JUST WITHIN ONE ─────────────
+ * Before the migration is applied the probe below is REFUSED, every time, and a
+ * post with no channel copy yet is an ordinary state — so per-render probing
+ * would mean a rejected request on every fresh post someone opens, for however
+ * many weeks the migration sits unapplied. That is real log noise for a question
+ * whose answer changes at most once, ever.
+ *
+ * The cost of caching it is staleness in one direction: for up to this long after
+ * the founder applies the migration, a running instance still believes the column
+ * is absent and saves the way it always has. That is the safe direction — it is
+ * exactly today's behaviour — and it clears itself without a deployment.
+ */
+const CAPABILITY_TTL_MS = 5 * 60 * 1000
+
+let capability: { at: number; value: VariantVersions } | null = null
+
+export const readVariantVersionSupport = cache(async (): Promise<VariantVersions> => {
+  const now = Date.now()
+  if (capability !== null && now - capability.at < CAPABILITY_TTL_MS) return capability.value
+
+  try {
+    const workspaceId = await activeWorkspaceId()
+    // NOT cached: without a workspace this read learned nothing about the column,
+    // and storing "unsupported" here would answer for every later request too.
+    if (workspaceId === null) return VERSIONS_UNSUPPORTED
+
+    const supabase = createServerSupabase()
+    const { error } = await supabase
+      .from('post_variants')
+      .select('version')
+      .eq('workspace_id', workspaceId)
+      .limit(1)
+
+    // No rows is a fine answer here. The question was whether the column can be
+    // named at all, and it was answered by the request not being refused.
+    const value: VariantVersions = error ? VERSIONS_UNSUPPORTED : { supported: true, byChannel: {} }
+    capability = { at: now, value }
+    return value
+  } catch {
+    // A throw says nothing about the column either — it is not remembered.
+    return VERSIONS_UNSUPPORTED
+  }
+})
 
 /**
  * The lifecycle columns of a page of posts, and NOTHING ELSE.
