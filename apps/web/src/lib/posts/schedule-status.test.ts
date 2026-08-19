@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { Channel, VariantPublishStatus } from '@sahoda/shared'
 
+import { SCHEDULE_DELIVERY_WINDOW_MS } from './delivery-window'
 import { autoPublishTruth, AUTO_PUBLISH_COPY, AUTO_PUBLISH_COPY_LIVE } from './schedule-status'
 import type { VariantStatusRow } from './variant-status'
 
@@ -17,7 +18,25 @@ import type { VariantStatusRow } from './variant-status'
  */
 
 const NOW = new Date('2026-07-25T12:00:00.000Z')
-const EARLIER = '2026-07-25T11:59:00.000Z'
+
+/**
+ * Past the DELIVERY WINDOW, not merely past due.
+ *
+ * This was `11:59` — one minute before `NOW` — and it asserted `overdue`, which
+ * PINNED THE DEFECT: publishing runs on a five-minute cron and every measured
+ * production delivery landed 73-199 s after its time, so one-minute-past is what
+ * a perfectly healthy post looks like. The test was green and the behaviour it
+ * protected was wrong. Moved to 30 minutes past, which is late by any reading.
+ *
+ * Every other use of this constant asserts an evidence-driven verdict (`none`,
+ * `partial`, `simulated`) that the clock does not decide, so widening it changes
+ * nothing about what those tests mean.
+ */
+const EARLIER = '2026-07-25T11:30:00.000Z'
+
+/** One minute past due: inside the window, and therefore not late. */
+const JUST_PAST = '2026-07-25T11:59:00.000Z'
+
 const LATER = '2026-07-25T12:01:00.000Z'
 
 function row(
@@ -107,6 +126,45 @@ describe('a scheduled post whose time has not come', () => {
     // Strictly past, matching `staleHoldNote`. A post due this very second has
     // not yet been missed, and claiming otherwise is a race we would lose.
     expect(autoPublishTruth('scheduled', NOW.toISOString(), NOW, WAITING)).toBe('awaiting')
+  })
+})
+
+/**
+ * The delivery window (`delivery-window.ts`). Publishing polls every five
+ * minutes, so "past due" and "late" are different facts, and the gap between
+ * them is every healthy post's normal life.
+ *
+ * The old code had no window, so all four of the production deliveries below —
+ * the only ones that have ever happened — rendered a warning triangle and
+ * "Late · check" while working exactly as designed.
+ */
+describe('a scheduled post that is past due but still inside the delivery window', () => {
+  test('is not called late one minute past its time', () => {
+    expect(autoPublishTruth('scheduled', JUST_PAST, NOW, WAITING)).toBe('awaiting')
+    expect(autoPublishTruth('approved', JUST_PAST, NOW, WAITING)).toBe('awaiting')
+  })
+
+  test('is not called late at any lag production has actually produced', () => {
+    // MEASURED from post_publish_logs, every `cron:` delivery: 73, 73, 110, 199s.
+    for (const lag of [73, 110, 199]) {
+      const due = new Date(NOW.getTime() - lag * 1000).toISOString()
+      expect(autoPublishTruth('scheduled', due, NOW, WAITING), `${lag}s late`).toBe('awaiting')
+    }
+  })
+
+  test('IS called late once the window has passed — the claim still exists', () => {
+    // The counter-guard. A window that swallowed the verdict entirely would
+    // satisfy every assertion above and leave a genuinely failed post silent.
+    const past = new Date(NOW.getTime() - SCHEDULE_DELIVERY_WINDOW_MS - 1000).toISOString()
+    expect(autoPublishTruth('scheduled', past, NOW, WAITING)).toBe('overdue')
+  })
+
+  test('the window does not override evidence that something published', () => {
+    // Evidence outranks the clock in both directions; the window must not have
+    // become a second, competing authority on what happened.
+    expect(autoPublishTruth('scheduled', JUST_PAST, NOW, [row('instagram', 'published')])).toBe(
+      'none',
+    )
   })
 })
 

@@ -1,5 +1,6 @@
 import type { PostStatus } from '@sahoda/shared'
 
+import { isPastDeliveryWindow } from '@/lib/posts/delivery-window'
 import { publishEvidence } from '@/lib/posts/publish-evidence'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
 
@@ -195,7 +196,18 @@ export function autoPublishTruth(
   const due = Date.parse(scheduledAt)
   if (!Number.isFinite(due)) return 'awaiting'
 
-  // Strictly past, matching `staleHoldNote`: a post due this very second has not
-  // yet been missed, and "nothing was published" must be a claim we can prove.
-  return due < now.getTime() ? 'overdue' : 'awaiting'
+  // ── PAST DUE IS NOT LATE, AND THE DIFFERENCE IS THE WHOLE POINT ────────────
+  // This read `due < now`, so a post rendered "Late · check" under a warning
+  // triangle from the second it came due. Publishing runs on a five-minute cron,
+  // and MEASURED in production every scheduler delivery landed 73-199 s after
+  // its scheduled time — so the warning fired on EVERY healthy post, every time,
+  // for the whole time the system was working correctly. The picker two inches
+  // away already said "at around that time"; this line was the one contradicting
+  // it. See `delivery-window.ts` for how long healthy takes and why the
+  // allowance errs long.
+  //
+  // Inside the window the claim stays `awaiting` — "goes out on its own at this
+  // time" is still true of a post that is on its way — rather than becoming a
+  // fourth state. A post that is merely in transit has nothing to correct.
+  return isPastDeliveryWindow(due, now.getTime()) ? 'overdue' : 'awaiting'
 }
