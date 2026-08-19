@@ -3,11 +3,13 @@ import { ChartColumn } from 'lucide-react'
 import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
-import { BestPerforming, PerformanceOverTime } from '@/components/analytics/best-performing'
+import { BestPerforming } from '@/components/analytics/best-performing'
+import { PerformanceOverTime } from '@/components/analytics/performance-over-time'
 import { AccountPanel } from '@/components/analytics/account-panel'
 import { ChannelTable } from '@/components/analytics/channel-table'
 import { PostTable } from '@/components/analytics/post-table'
 import { ANALYTICS_METRIC_CALLS, readAnalyticsPage } from '@/lib/analytics/page-data'
+import { readMetricSeries } from '@/lib/analytics/series'
 
 export const metadata = { title: 'Analytics' }
 
@@ -33,6 +35,12 @@ export const metadata = { title: 'Analytics' }
  */
 export default async function AnalyticsPage() {
   const { rows, posts, account, hasPublished } = await readAnalyticsPage()
+
+  // A FOURTH independent read, for the same reason the other three are independent:
+  // the history lives in its own table and, until the founder applies migration
+  // 20260819000100, that table does not exist. A read that cannot happen must cost
+  // this one card and nothing else on the page.
+  const series = await readMetricSeries('reach')
 
   return (
     <div className="space-y-grid">
@@ -60,11 +68,13 @@ export default async function AnalyticsPage() {
       <AccountPanel analytics={account} />
 
       {/* The reference's two remaining containers, side by side beneath the
-          account panel. Best performing is WIRED — rankBy already refuses to
-          rank an unmeasured row. Performance over time is a container only:
-          nothing in this product stores a metric history. See the component. */}
+          account panel. Best performing is WIRED — rankBy already refuses to rank
+          an unmeasured row. Performance over time is wired too now, and draws
+          nothing until there is a history to draw: before the migration it renders
+          the same container it always did. See the component for the five things
+          it refuses to plot. */}
       <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-grid max-wide:grid-cols-1">
-        <PerformanceOverTime />
+        <PerformanceOverTime series={series} />
         <BestPerforming rows={rows} />
       </div>
 

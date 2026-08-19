@@ -50,6 +50,17 @@ export type {
 } from './dispatch/classify'
 export { createDispatchStore } from './dispatch/pgDispatch'
 
+export { runMetricCapture, CAPTURED_METRICS } from './metrics/capture'
+export type {
+  CapturedMetric,
+  MetricCaptureDeps,
+  MetricCaptureReport,
+  MetricSnapshot,
+  MetricTarget,
+  SnapshotStorage,
+} from './metrics/capture'
+export { createMetricStore } from './metrics/store'
+
 export { runPlanWeek } from './ai/plan-week'
 export { runPlanWeekJob } from './ai/plan-week-job'
 export type { BriefInsert, PlanWeekJobDeps, PlanWeekJobResult } from './ai/plan-week-job'
@@ -62,3 +73,4 @@ export { publishPostTask, triggerPublishPost, PUBLISH_POST_TASK_ID } from './tri
 export { holdSweepTask, HOLD_SWEEP_TASK_ID } from './trigger/holdSweep'
 export { dispatchSweepTask, DISPATCH_SWEEP_TASK_ID } from './trigger/dispatchSweep'
 export { planWeekTask, triggerPlanWeek, PLAN_WEEK_TASK_ID } from './trigger/planWeek'
+export { metricCaptureTask, METRIC_CAPTURE_TASK_ID } from './trigger/metricCapture'

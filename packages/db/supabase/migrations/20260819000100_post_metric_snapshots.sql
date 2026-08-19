@@ -150,9 +150,9 @@ create trigger block_mutations before update or delete on post_metric_snapshots
 
 
 -- ── 5 of 5 ───────────────────────────────────────────────────────────────────
--- THE QUERY THIS TABLE EXISTS TO ANSWER, written out so the shape above can be
--- checked against it rather than taken on trust. This is what the analytics page
--- runs to draw "Performance over time":
+-- THE QUESTION THIS TABLE EXISTS TO ANSWER, written out so the shape above can be
+-- checked against it rather than taken on trust. This is what "Performance over
+-- time" needs, expressed as the SQL it would be:
 --
 --   select measured_on,
 --          sum(value)                       as total,
@@ -179,3 +179,11 @@ create trigger block_mutations before update or delete on post_metric_snapshots
 -- A day with no measurements produces NO ROW, and the chart leaves a gap there. It
 -- does not draw a zero. This table can distinguish "nothing was measured" from
 -- "the measurement was zero", and every reader of it is required to keep them apart.
+--
+-- ONE HONEST FOOTNOTE ON WHERE THAT QUERY ACTUALLY RUNS. The data API the
+-- application talks to has no GROUP BY, so the application fetches the filtered
+-- rows and adds them up itself (`apps/web/src/lib/analytics/series.ts`). The shape
+-- above is still exactly what decided the columns, and the index in section 2 is
+-- still what serves the filtered part — which is the expensive part. Doing the
+-- grouping in the app rather than in a database function is what keeps this file
+-- to one table and no new SQL for the founder to review.

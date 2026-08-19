@@ -1,5 +1,5 @@
 import type { PGlite } from '@electric-sql/pglite'
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
 
 import { bootSchema, applyMigration, CONTENT_FOUNDATION } from './helpers/pglite-schema'
 
@@ -56,13 +56,29 @@ describe('A2 · post_metric_snapshots (real Postgres, in-process)', () => {
     return r.affectedRows ?? 0
   }
 
-  beforeEach(async () => {
+  /**
+   * ONE Postgres for the file, not one per test.
+   *
+   * Each boot is a fresh WebAssembly Postgres costing about three seconds of CPU;
+   * per-test booting made this file start thirteen of them, and under the full gate
+   * — every package's suite at once — that starved the web suite into timeouts.
+   *
+   * `truncate` rather than `delete`, and not only for speed: this table carries an
+   * append-only guard that refuses DELETE outright, which is one of the things the
+   * file asserts. Truncate is a different statement and the row-level guard does
+   * not see it, so the cleanup cannot quietly depend on the rule being absent.
+   */
+  beforeAll(async () => {
     db = await bootSchema(CONTENT_FOUNDATION)
     await applyMigration(db, MIGRATION)
+  })
+
+  beforeEach(async () => {
+    await db.exec('truncate post_metric_snapshots, post_variants, posts, workspaces cascade')
     await seed()
   })
 
-  afterEach(async () => {
+  afterAll(async () => {
     await db.close()
   })
 

@@ -32,7 +32,8 @@ one file precisely so that ordering cannot be got wrong.
 | A6  | `20260819000500_campaigns.sql`             | Grouping posts under one named push                           | Structure yes, data no         |
 
 **A2 is listed first even though its file name sorts second**, and that is the one piece of
-advice on this page that is time-sensitive. Sahoda currently asks the platforms for your numbers
+advice on this page that is time-sensitive — with the caveat below about what actually starts
+the clock. Sahoda currently asks the platforms for your numbers
 every time a screen opens, shows them, and keeps nothing. Every day that table does not exist is
 a day of history that can never be recovered — no platform will tell you what a post's reach was
 last Tuesday. Everything else on this list can wait a month at no cost. That one cannot.
@@ -56,6 +57,23 @@ background job, read by the "Performance over time" card. The application checks
 at runtime, so before it exists the analytics page renders exactly as it does today. If it is
 wrong, no history is collected and nothing else is affected.
 
+> **Applying A2 does not start the collecting on its own, and this is the one thing on this
+> page you must not skip.** The job that fills the table is written and tested
+> (`apps/jobs/src/metrics/`), but **nothing runs it yet.** Background jobs in this repo were
+> written for a service (Trigger.dev) that has never been deployed from here; the two jobs that
+> genuinely run are invoked by a scheduled web request instead
+> (`apps/web/src/app/api/cron/sweeps/route.ts`, every five minutes).
+>
+> This job cannot simply join that five-minute tick: it makes one request per published channel
+> and stores one row per DAY, so running it 288 times a day would spend the whole rate limit to
+> write nothing 287 of those times. It needs its own scheduled request, roughly daily.
+>
+> **What that means for you:** apply A2 whenever you like — it is safe, and it is what unblocks
+> everything else. But the clock only starts when the daily runner is wired, so that wiring is
+> the actual urgent item, not the migration. Until then the table sits empty and the analytics
+> card correctly says nothing has been measured yet. Wiring it is about an hour's work and needs
+> a decision from you, because it adds a scheduled job to the deployment.
+
 **A3 · format.** One column recording whether a version is meant to be a photo, a set, a video,
 or text alone. **Applying it is safe and changes nothing.** The warning is in the file and worth
 repeating: publishing hard-codes a single photo today
@@ -76,6 +94,21 @@ table is roughly a tenth of what "campaigns" means to a customer — budgets are
 because money needs the same care the credit ledger already gets, and paid ads on Meta and
 Google sit behind review queues nobody here controls. Apply it if grouping posts is worth having
 on its own. It is, and it is honest. Do not read it as campaigns being nearly done.
+
+## What was deliberately not done
+
+Three things the standing rules in `packages/db/CLAUDE.md` ask for on a new table are **not** in
+this batch, and each is left out for a reason rather than forgotten:
+
+- **A row schema in `packages/shared` for each new table.** That package is a frozen contract in
+  this repo. The two columns the application already needs — the edit counter and, later, the
+  format — are read at the render edge instead, which is the pattern this repo already uses for
+  exactly this situation.
+- **A cross-account test run through a real signed-in client.** Those tests need a live database
+  and are off unless explicitly switched on. What IS proven, by executing the migration files
+  against a real Postgres engine, is that every new table has its protection switched on, that
+  every rule names the customer, and that the indexes those rules need exist.
+- **A runner for A2's job.** See the note under A2.
 
 ## Two things to expect
 

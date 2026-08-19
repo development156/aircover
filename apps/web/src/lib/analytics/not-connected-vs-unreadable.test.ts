@@ -75,6 +75,21 @@ function connectionsRows(rows: unknown[]) {
 const AT = new Date('2026-08-16T00:00:00Z')
 
 describe('a missing connection is not a failed read', () => {
+  /**
+   * ── WHY THIS FILE NEEDS MORE THAN THE 5s DEFAULT ─────────────────────────────
+   * `vi.resetModules()` above every test is load-bearing — it is what keeps
+   * `ScopeError` one class rather than two — but it means each test re-transforms
+   * `@sahoda/publishing` from scratch. That is CPU work, not waiting, so it grows
+   * with whatever else the machine is doing.
+   *
+   * MEASURED 2026-08-19: under `turbo run test`, where every package's suite runs
+   * at once, one or two tests here exceed 5s and fail as timeouts. It reproduces
+   * with unrelated suites removed, so it is this file's own cost rather than
+   * anything a neighbour introduced. Every assertion is unchanged; only the budget
+   * is, and it is sized for the contended case.
+   */
+  vi.setConfig({ testTimeout: 30_000 })
+
   beforeEach(() => {
     vi.resetModules()
     activeWorkspace.mockResolvedValue({ id: 'ws_1', name: 'Test', slug: 'test' })

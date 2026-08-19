@@ -14,8 +14,10 @@ import { METRIC_LABELS, rankBy, type ComparableRow, type MetricKey } from '@/lib
  * the bottom has been called the worst performer without a zero ever being
  * drawn, which is the refusal `compare.ts` exists for.
  *
- * "Performance over time" needs the SAME metric at SEVERAL POINTS IN TIME, and
- * nothing in this product stores that. See the note on the container beside it.
+ * "Performance over time" needs the SAME metric at SEVERAL POINTS IN TIME, which
+ * nothing stored until `post_metric_snapshots` (migration 20260819000100). It now
+ * lives in its own file — `performance-over-time.tsx` — and draws nothing until
+ * that history exists.
  *
  * ── WHAT IT WILL NOT DO ──────────────────────────────────────────────────────
  * Rank unmeasured rows, and pad the list to a fixed length. Three real rows are
@@ -62,39 +64,6 @@ export function BestPerforming({
           ))}
         </ol>
       )}
-    </Card>
-  )
-}
-
-/**
- * Performance over time — the container, with no series behind it.
- *
- * ── SCHEMA-REQUIRED, AND WHY NOTHING CAN STAND IN ────────────────────────────
- * A trend needs the same metric measured repeatedly. This product measures
- * LIVE: `readPostMetrics` asks Zernio for each post's current numbers on every
- * page load and stores none of them. The only timestamp that IS persisted is
- * `post_publish_logs.published_at`, which says when a post went out — not what
- * it scored a week later.
- *
- * Plotting current lifetime totals against publish dates would produce a line
- * that LOOKS like a trend and is not one: each point would be a different post
- * measured once, at a different age. That is the single most misleading chart
- * this screen could draw, so it draws none.
- *
- * NEEDED: `post_metric_snapshots` (workspace_id, post_id, channel, metric,
- * value, measured_at) written on a schedule, so one metric acquires a history.
- * Migrations apply to production, so this run logs it rather than writing it.
- */
-export function PerformanceOverTime() {
-  return (
-    <Card className="space-y-3">
-      <CardLabel className="mb-0">Performance over time</CardLabel>
-      <div className="is-proposed grid min-h-[132px] place-items-center rounded-card px-3">
-        <p className="max-w-[38ch] text-center text-[12.5px] text-muted">
-          Sahoda reads your numbers fresh each time and does not keep a history yet, so there is no
-          trend to draw. This is where it will go.
-        </p>
-      </div>
     </Card>
   )
 }

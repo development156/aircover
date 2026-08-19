@@ -1,5 +1,5 @@
 import type { PGlite } from '@electric-sql/pglite'
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
 
 import { bootSchema, applyMigration, CONTENT_FOUNDATION } from './helpers/pglite-schema'
 
@@ -83,14 +83,27 @@ describe('A1 · post_variants version CAS (real Postgres, in-process)', () => {
     return r.rows[0]
   }
 
-  afterEach(async () => {
-    await db.close()
-  })
+  /**
+   * ONE Postgres per block, not one per test.
+   *
+   * Each boot is a fresh WebAssembly Postgres and costs about three seconds of CPU.
+   * Booting per test made this file alone start fourteen of them, and under the
+   * full gate — where every package's suite runs at once — that starved the web
+   * suite into timeouts. Truncating between tests gives the same isolation for a
+   * fraction of the cost: every table these tests touch is emptied and re-seeded.
+   */
+  async function reset(): Promise<void> {
+    await db.exec('truncate post_variants, posts, workspaces cascade')
+    await seed()
+  }
 
   describe('before the migration — the schema as production has it today', () => {
-    beforeEach(async () => {
+    beforeAll(async () => {
       db = await bootSchema(CONTENT_FOUNDATION)
-      await seed()
+    })
+    beforeEach(reset)
+    afterAll(async () => {
+      await db.close()
     })
 
     it('has no version column at all', async () => {
@@ -114,10 +127,13 @@ describe('A1 · post_variants version CAS (real Postgres, in-process)', () => {
   })
 
   describe('after the migration', () => {
-    beforeEach(async () => {
+    beforeAll(async () => {
       db = await bootSchema(CONTENT_FOUNDATION)
       await applyMigration(db, MIGRATION)
-      await seed()
+    })
+    beforeEach(reset)
+    afterAll(async () => {
+      await db.close()
     })
 
     it('backfills every existing row to version 1', async () => {
