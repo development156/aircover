@@ -7,6 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MIN_SENTENCE_CHARS } from '@/lib/onboarding/door'
+import {
+  doorErrorCode,
+  doorTransportFailure,
+  type DoorTransportFailure,
+} from '@/lib/onboarding/door-transport-failure'
 
 export interface DoorResult {
   text: string
@@ -74,12 +79,29 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
     if (state) setDirty(false)
   }, [state])
 
+  /**
+   * A request that never produced a verdict about the document, held SEPARATELY
+   * from a read that produced a negative one.
+   *
+   * They are two different situations and they need two different remedies. A
+   * failed READ leaves "go on without it" open — the rest of onboarding needs
+   * the intake sentence and the refusal, and the door is enrichment, so
+   * resolving from less is a real and legitimate choice.
+   *
+   * A failed REQUEST does not. On `no_workspace` there is nowhere to save
+   * anything, so "Continue without it" walks the user into a resolve that
+   * returns "Create a workspace first" — a dead end dressed as a way forward.
+   * On `signed_out` the same is true. So this branch never offers it.
+   */
+  const [blocked, setBlocked] = useState<DoorTransportFailure | null>(null)
+
   // Announce the outcome once, when it arrives.
   const [announced, setAnnounced] = useState('')
   useEffect(() => {
     if (state?.ok) setAnnounced(`Read ${state.label}.`)
     else if (state) setAnnounced(state.message)
-  }, [state])
+    else if (blocked) setAnnounced(blocked.message)
+  }, [state, blocked])
 
   /**
    * Elapsed seconds while a read runs.
@@ -108,6 +130,9 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
   const read = state?.ok ? state : null
   // Suppressed while a new read is running or the form has moved on.
   const failure = state && !state.ok && !isPending && !dirty ? state : null
+  // Same rule, same reason: a message about an attempt nobody is making any
+  // more is a lie about the current state.
+  const stopped = blocked && !isPending && !dirty ? blocked : null
 
   async function submit(): Promise<void> {
     const data = new FormData()
@@ -118,13 +143,24 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
     setPending(true)
     setStages([])
     setState(null)
+    setBlocked(null)
     try {
       const res = await fetch('/api/onboarding/door', { method: 'POST', body: data })
       if (!res.ok || !res.body) {
-        setState({
-          ok: false,
-          message: 'We could not read that — tell us in your own words instead.',
-        })
+        /**
+         * THE DOCUMENT WAS NEVER OPENED ON THIS PATH, so nothing here may say
+         * it was unreadable. The route names its cause — `signed_out`,
+         * `no_workspace`, `workspace_unreadable`, `failed` — and this used to
+         * discard all four for one sentence about the customer's website.
+         * See `lib/onboarding/door-transport-failure.ts` for what each arm may
+         * and may not claim.
+         *
+         * The body is read defensively: a platform 502 in front of the app
+         * carries HTML, so `res.json()` rejects, and the crash path must not
+         * crash. No body simply means no named cause.
+         */
+        const body = await res.json().catch(() => null)
+        setBlocked(doorTransportFailure(res.status, doorErrorCode(body)))
         return
       }
       // NDJSON: one event per line. A chunk may split a line, so the tail is
@@ -311,6 +347,32 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
         result: the reveal must be resolved from less, not from a document we
         never read.
       */}
+      {/*
+        A REQUEST THAT NEVER REACHED THE DOCUMENT.
+
+        Separate from the block below on purpose. That one is Sahoda reporting
+        it read something and could not use it, and the honest way on is to
+        resolve from less. This one is Sahoda reporting it never looked — so it
+        offers no verdict on the link or PDF, and it does not offer to continue
+        without a document it has not established anything about. The form above
+        still holds the URL and the file, so pressing Read this again resends
+        exactly what was submitted.
+      */}
+      {stopped ? (
+        <div role="alert" className="rounded-card border border-danger bg-danger-bg p-4">
+          <p className="text-[13px] font-semibold text-danger">{stopped.message}</p>
+          <p className="mt-1 text-[12.5px] text-muted">
+            Nothing was charged — reading is always free. Your link and PDF are still attached
+            above.
+          </p>
+          <p className="mt-2 text-[12.5px] text-muted">
+            {stopped.retryable
+              ? 'Press Read this again when you are ready. Nothing about your document needs to change.'
+              : 'Fix the sign-in or the workspace first — pressing Read this again now would fail the same way.'}
+          </p>
+        </div>
+      ) : null}
+
       {failure ? (
         <div className="rounded-card border border-danger bg-danger-bg p-4">
           <p className="text-[13px] font-semibold text-danger">{failure.message}</p>

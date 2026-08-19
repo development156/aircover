@@ -174,6 +174,7 @@ describe('Topbar', () => {
         provenance: new Map(),
         meta: undefined,
         intake: undefined,
+        source: 'resolved',
       })
 
       render(await Topbar())

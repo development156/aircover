@@ -73,6 +73,22 @@ export type BrainRead =
        * workspace whose regime was only ever assumed.
        */
       intake: BrandIntake | undefined
+      /**
+       * `brand_memory.source` — `resolved`, `manual` or `system`, validated by
+       * the RPC against exactly those three.
+       *
+       * The SELECT below has always fetched this column and the read has always
+       * dropped it. It is the only stored fact about how a version came to
+       * exist, and it carries the one distinction a Brand Brain screen must
+       * never blur: `system` means a model fallback saved an EXAMPLE brain, not
+       * a reading of this customer's business. `saveBrandMemory` states that
+       * contract; nothing rendered it until the resolution console.
+       *
+       * `null` for a row whose value is absent or outside the three — see
+       * `brainOrigin`, which reports that as "not recorded" rather than
+       * guessing the common case.
+       */
+      source: string | null
     }
   | { status: 'no-workspace' }
   | { status: 'no-brain' }
@@ -108,7 +124,7 @@ export const readBrain = cache(async (): Promise<BrainRead> => {
     }
     if (!data) return { status: 'no-brain' }
 
-    const row = data as { version?: unknown; payload?: unknown }
+    const row = data as { version?: unknown; payload?: unknown; source?: unknown }
     const stored = StoredBrandMemorySchema.safeParse(row.payload)
     if (!stored.success) return { status: 'unreadable' }
 
@@ -121,6 +137,7 @@ export const readBrain = cache(async (): Promise<BrainRead> => {
       provenance: provenanceOf(meta),
       meta,
       intake,
+      source: typeof row.source === 'string' ? row.source : null,
     }
   } catch (error) {
     console.error('[brain] active read threw', error instanceof Error ? error.message : 'unknown')

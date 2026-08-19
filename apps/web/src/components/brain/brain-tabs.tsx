@@ -20,6 +20,12 @@ import { cn } from '@/lib/utils'
  */
 const TABS: ReadonlyArray<{ href: Route; label: string }> = [
   { href: '/brain', label: 'Overview' },
+  /**
+   * The Signal Resolution Console. Second, not last: on a freshly resolved
+   * brain every field is a guess, so this is the tab with all the work in it,
+   * and a route with no nav entry is a dead end by the product's own rule.
+   */
+  { href: '/brain/resolve', label: 'Resolve' },
   // Two tabs the app HAS data for, and which the flat grid used to bury:
   // five sections sat in one undifferentiated list.
   { href: '/brain/identity', label: 'Identity' },
