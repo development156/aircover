@@ -262,15 +262,25 @@ professional chrome wrapped around a loose template:
 Naming this because a rewrite that discards it would be a regression:
 
 - **`/create/post` is the best screen in the app.** The stepper is clear, and the
-  solid-vs-dashed channel treatment makes "live" versus "coming soon" readable in a glance
-  without relying on colour. This is the Certainty System working. §26 generalises *this*.
+  solid-vs-dashed channel treatment makes "live" versus "coming soon" readable at a glance
+  without relying on colour.
+
+  It is worth being precise about *why* it reads better than `/posts`, because the obvious
+  reading is wrong: it is **not** that one screen uses the Certainty System and the other
+  does not. Both use it. `/create/post` puts its two options on rungs that are far apart —
+  solid versus dashed, a whole edge treatment — while `/posts` put three statuses on **one**
+  rung, where nothing structural was left to separate them. Same system; the difference is
+  the size of the gap. That is the lesson §26 generalises: a rung is only a signal when
+  something is on a different one.
 - **The copy is unusually disciplined.** "Account insights come from the connected account,
   not from your posts, so there's nothing to show until one is linked" is a genuinely good
   sentence. The distinction between "we never asked" and "we asked and got nothing" is
   maintained rigorously in prose.
-- **The rail's accessible-name handling is already correct** — labels go `sr-only` rather
+- **The rail's accessible-name handling was already correct** — labels go `sr-only` rather
   than `display:none` when it collapses, so all nine destinations keep their names at 768px
-  and 1024px. Verified at six widths in both themes (§4).
+  and 1024px. Verified at six widths in both themes (§4). That pattern is pre-existing and
+  good; the workspace switcher's collapse added in this branch follows it deliberately, for
+  the same reason — `display:none` would have taken the button's accessible name with it.
 - **The honesty rules are load-bearing and must not be designed away.** `—` for an
   unreadable balance rather than `0`, no ratio bar without a denominator, "Won't post
   itself" on a scheduled post. The fix for these is better *vocabulary*, never a prettier lie.
