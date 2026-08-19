@@ -106,6 +106,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
             campaignId={campaign.id}
             posts={addable.status === 'ok' ? addable.posts : []}
             unreadable={addable.status === 'unreadable'}
+            capped={addable.status === 'ok' && addable.capped}
           />
         </div>
       </div>

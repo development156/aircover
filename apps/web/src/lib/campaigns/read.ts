@@ -285,8 +285,18 @@ export async function readCampaignsByPost(
   if (postIds.length === 0) return new Map()
 
   try {
-    const workspaceId = await activeWorkspaceId()
-    if (workspaceId === null) return new Map()
+    // The THREE-WAY read, not the memoised `activeWorkspaceId` the rest of this
+    // file uses. That helper folds `unreadable` into `null` on purpose, and its
+    // own comment says only callers who cannot render the difference should take
+    // it — this one can. Through it, a failed WORKSPACE read returned an empty
+    // Map, which is the claim "none of these posts is in a campaign": exactly
+    // the lie the null return below exists to prevent, arriving one branch
+    // earlier. An account with genuinely no workspace has no memberships either,
+    // so that arm keeps the empty Map and is a true statement.
+    const workspace = await activeWorkspaceRead()
+    if (workspace.status === 'unreadable') return null
+    if (workspace.status === 'none') return new Map()
+    const workspaceId = workspace.workspace.id
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -327,7 +337,21 @@ export async function readCampaignsByPost(
  * membership on the same screen.
  */
 export type AddablePostsRead =
-  | { status: 'ok'; posts: Array<Pick<Post, 'id' | 'title' | 'status' | 'channels'>> }
+  | {
+      status: 'ok'
+      posts: Array<Pick<Post, 'id' | 'title' | 'status' | 'channels'>>
+      /**
+       * The read hit `LIST_LIMIT` — there are posts this picker is not offering.
+       *
+       * Carried because the picker's empty message is "every post you have is
+       * already in this campaign", and that sentence is FALSE the moment a cap
+       * hid the non-members. `lib/posts/read.ts` exports its own limit for this
+       * exact reason: "the list screen must be able to SAY it is capped — a
+       * truncated list rendered as if it were the whole set is a lie about the
+       * workspace's contents."
+       */
+      capped: boolean
+    }
   | { status: 'unreadable' }
 
 export async function readAddablePosts(excludeIds: readonly string[]): Promise<AddablePostsRead> {
@@ -349,6 +373,10 @@ export async function readAddablePosts(excludeIds: readonly string[]): Promise<A
     const shape = PostSchema.pick({ id: true, title: true, status: true, channels: true })
     return {
       status: 'ok',
+      // Measured on the ROWS RETURNED, before the member filter. Checking the
+      // filtered length would report "not capped" whenever the cap happened to
+      // be full of members, which is the case the warning exists for.
+      capped: data.length >= LIST_LIMIT,
       posts: data.flatMap((row) => {
         const parsed = shape.safeParse(row)
         if (!parsed.success || exclude.has(parsed.data.id)) return []

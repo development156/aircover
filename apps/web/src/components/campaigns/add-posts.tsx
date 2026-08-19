@@ -39,11 +39,14 @@ export function AddPosts({
   campaignId,
   posts,
   unreadable,
+  capped,
 }: {
   campaignId: string
   posts: readonly AddablePost[]
   /** True when the post list could not be read. Never rendered as "no posts". */
   unreadable: boolean
+  /** True when the read hit its cap, so this list is not everything. */
+  capped: boolean
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -103,8 +106,11 @@ export function AddPosts({
           </p>
         ) : posts.length === 0 ? (
           <p className="type-body text-muted">
-            Every post you have is already in this campaign. Write another one from Posts and it
-            will show up here.
+            {capped
+              ? // The list was truncated, so "you have nothing left" is not a
+                // claim this read can make. Say what is actually known.
+                'Nothing to add from the most recent posts Sahoda looked at. Older posts are not shown here yet — open one from Posts to add it.'
+              : 'Every post you have is already in this campaign. Write another one from Posts and it will show up here.'}
           </p>
         ) : (
           <ul className="flex max-h-[46vh] flex-col gap-1 overflow-y-auto">
@@ -149,6 +155,7 @@ export function AddPosts({
         <div className="mt-4 flex items-center justify-between gap-2">
           <p className="type-sm text-muted">
             {picked.size > 0 ? `${picked.size} picked` : 'Nothing picked yet'}
+            {capped ? ' · showing your most recent posts only' : null}
           </p>
           <div className="flex items-center gap-2">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>

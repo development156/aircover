@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { Megaphone } from 'lucide-react'
 
 import { CHANNEL_SHORT } from '@/components/posts/channel-label'
 import { Badge } from '@/components/ui/badge'
@@ -118,6 +117,3 @@ function day(iso: string): string {
     timeZone: 'UTC',
   })
 }
-
-/** The marker for the campaigns empty state — one glyph, used in both places. */
-export const CampaignIcon = Megaphone
