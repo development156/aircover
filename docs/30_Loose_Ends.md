@@ -460,12 +460,22 @@ check anywhere will say so. **This is the same shape as P4d's probe and P4a's mi
 instrument that reports and an instrument that ENFORCES are different objects, and this project keeps
 building the first and counting it as the second.**
 
-**Not measured on this run, and why.** Running it needs a signed-in browser against a local dev
-server. Five other worktrees were running full Playwright suites against one machine for the whole
-session — load average 19-57, 13 of 15 GB resident, eight Next dev servers — and this session's own
-dev server was OOM-killed mid-run (`ECONNREFUSED` on its port; `turbo build` separately exited 137,
-SIGKILL). A number produced under that contention would not be worth quoting. Stated rather than
-guessed.
+**Not measured on this run, and the attempt is worth recording.** It needs a signed-in browser
+against a local dev server. Two runs were made against a server started by hand and confirmed
+serving `/sign-in` with a 200. Both failed in `e2e/fixtures/seeded-user.ts:140` — the Clerk ticket
+sign-in never left `/sign-in` inside its **hardcoded 30 s** `waitForURL`, which `--timeout` cannot
+raise.
+
+It is not a Clerk failure and not a rate limit. The dev-server log shows every request SUCCEEDING
+and simply being slow: `GET /sign-in?__clerk_ticket=…` **200 in 9,535 ms**,
+`GET /sign-in/SignIn_clerk_catchall_check_…` **200 in 4,630 ms**,
+`POST /sign-in?__clerk_ticket=…` **200 in 2,064 ms**. Dev-mode compilation under five-way
+contention spends the budget before the redirect chain finishes. A number produced in that state
+would not be worth quoting.
+
+For the same reason the earlier full-suite attempt is unusable: this session's dev server was
+OOM-killed mid-run (`ECONNREFUSED` on its port) and `turbo build` exited 137 (SIGKILL) once and 0 on
+retry with no change in between.
 
 **The fix worth making is not a re-measurement.** It is to turn the probe into an assertion, tag it
 `@smoke`, and let the gate hold the floor — measuring the current value first, so the threshold that
