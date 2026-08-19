@@ -2,7 +2,7 @@
   "name": "sahoda",
   "private": true,
   "version": "0.1.0-alpha.0",
-  "description": "SAHODA LABS \u2014 AI Marketing OS (monorepo)",
+  "description": "SAHODA LABS — AI Marketing OS (monorepo)",
   "packageManager": "pnpm@11.3.0",
   "engines": {
     "node": ">=20"
@@ -16,7 +16,7 @@
     "test": "turbo run test && vitest run",
     "test:e2e": "pnpm --filter @sahoda/web test:e2e",
     "test:smoke": "turbo run test:smoke",
-    "gate": "turbo run typecheck lint test && vitest run && turbo run test:smoke && prettier --check . && turbo run build",
+    "gate": "node scripts/gate.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:new": "supabase --workdir packages/db migration new",
@@ -26,7 +26,8 @@
     "ops:sync": "node scripts/ops-sync.mjs",
     "test:ops": "vitest run",
     "ops:ship-check": "node scripts/ops-card.mjs ship-check",
-    "probe:prod": "node scripts/probe-production.mjs"
+    "probe:prod": "node scripts/probe-production.mjs",
+    "gate:verdict": "node scripts/gate-verdict.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

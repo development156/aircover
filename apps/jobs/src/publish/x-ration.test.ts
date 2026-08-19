@@ -31,6 +31,10 @@ import {
 
 const ctx: PublishJobContext = { attempt: 1, jobRunId: 'run_ration' }
 
+/** The monthly ration's window is the only one that starts on the 1st at midnight. */
+const isMonthWindow = (since: Date): boolean =>
+  since.getUTCDate() === 1 && since.getUTCHours() === 0
+
 const RULE_SET: RuleSet = {
   ruleSetVersion: 'regime-_floor@2026.08',
   packs: [{ id: 'regime-_floor', version: '2026.08' }],
@@ -57,8 +61,17 @@ interface Spend {
 /**
  * `count` is a function so a case can make the read THROW, which is the third
  * state — neither "allowed" nor "exhausted" but "we could not find out".
+ *
+ * It receives the ARGS since 2026-08-20, because `runPublishPost` now asks
+ * `countLiveSends` TWICE on X — once for the Constraint Engine's per-day cap and
+ * once for the monthly X ration — and a case that wants to fail only one of them
+ * has to be able to tell which it is being asked. `isMonthWindow` below is the
+ * discriminator: the monthly window always starts on the 1st.
  */
-function harness(count: () => Promise<number>, channel: PublishPostPayload['channel'] = 'x') {
+function harness(
+  count: (args: { workspaceId: string; channel: string; since: Date }) => Promise<number>,
+  channel: PublishPostPayload['channel'] = 'x',
+) {
   const spend: Spend = {
     gateChecks: [],
     adapterCalls: 0,
@@ -96,7 +109,7 @@ function harness(count: () => Promise<number>, channel: PublishPostPayload['chan
     gate,
     countLiveSends: async (args) => {
       spend.countedFor.push(args)
-      return count()
+      return count(args)
     },
     loadVariant: async () => ({
       variantId: payloadFor(channel).variantId,
@@ -195,31 +208,54 @@ describe('the X monthly ration, on the publish path', () => {
     expect(out.status === 'failed' && out.message).toContain('nothing was charged')
   })
 
-  it('counts only this workspace, only X, and only the current month', async () => {
+  it('counts only this workspace and only X — over TWO windows, the day and the month', async () => {
+    // Two counts since 2026-08-20, and the second is the one this file is about.
+    // Asserting a length of 1 was correct until the Constraint Engine's per-day cap
+    // was wired; it is recorded here as two named windows rather than a number, so
+    // the next reader can see WHICH question each one asks.
     const { deps, spend } = harness(async () => 0)
 
     await runPublishPost(payloadFor('x'), ctx, deps)
 
-    expect(spend.countedFor).toHaveLength(1)
-    const asked = spend.countedFor[0]!
-    expect(asked.workspaceId).toBe(payloadFor('x').workspaceId)
-    expect(asked.channel).toBe('x')
-    // The first instant of a UTC month: day 1, midnight.
-    expect(asked.since.getUTCDate()).toBe(1)
-    expect(asked.since.getUTCHours()).toBe(0)
+    expect(spend.countedFor).toHaveLength(2)
+    for (const asked of spend.countedFor) {
+      expect(asked.workspaceId).toBe(payloadFor('x').workspaceId)
+      expect(asked.channel).toBe('x')
+      expect(asked.since.getUTCHours()).toBe(0)
+    }
+    const months = spend.countedFor.filter((a) => isMonthWindow(a.since))
+    // Exactly one MONTH window — the ration's. (On the 1st of a month the day
+    // window coincides with it, so this asserts on the count of distinct windows
+    // rather than on which slot each landed in.)
+    expect(new Set(spend.countedFor.map((a) => a.since.getTime())).size).toBe(
+      months.length === 2 ? 1 : 2,
+    )
+    expect(months.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('never counts, and never refuses, a channel that does not bill per post', async () => {
-    // ONE BODY PER CHANNEL. LinkedIn's variant publishes independently of X's, so
-    // an exhausted X allowance may not touch it — and LinkedIn must not even be
-    // COUNTED, or a second channel silently starts consuming X's budget.
-    const { deps, spend } = harness(async () => X_MONTHLY_RATION * 10, 'linkedin')
+  it("never charges a channel that does not bill per post against X's monthly ration", async () => {
+    // ONE BODY PER CHANNEL. LinkedIn's variant publishes independently of X's, so an
+    // exhausted X allowance may not touch it.
+    //
+    // The original form of this test asserted LinkedIn was never COUNTED AT ALL, and
+    // that stopped being the right claim on 2026-08-20: LinkedIn is now counted, but
+    // against its OWN per-day cap, over a DAY window. What must still never happen —
+    // and is what this test now says — is LinkedIn being asked about a MONTH window,
+    // which is the only way it could start consuming X's budget.
+    const { deps, spend } = harness(async () => 0, 'linkedin')
 
     const out = await runPublishPost(payloadFor('linkedin'), ctx, deps)
 
     expect(out.status).toBe('succeeded')
-    expect(spend.countedFor).toHaveLength(0)
     expect(spend.adapterCalls).toBe(1)
+    expect(spend.countedFor).toHaveLength(1)
+    expect(spend.countedFor[0]!.channel).toBe('linkedin')
+    const asked = spend.countedFor[0]!.since
+    // Today at UTC midnight, never the 1st — unless today IS the 1st, in which case
+    // the two windows coincide and the discriminator is the CHANNEL, asserted above.
+    expect(asked.getTime()).toBe(
+      Date.UTC(asked.getUTCFullYear(), asked.getUTCMonth(), asked.getUTCDate()),
+    )
   })
 
   it('an UNREADABLE count refuses transiently — it neither spends nor gives up', async () => {
@@ -227,8 +263,12 @@ describe('the X monthly ration, on the publish path', () => {
     // the failure as "0 used" spends real money off a failed read, and reading it
     // as "exhausted" tells a customer they are out of posts when we simply could
     // not count. The third answer is: retry, having sent nothing.
-    const { deps, spend } = harness(async () => {
-      throw new Error('pool is gone')
+    // Only the MONTH read fails. The per-day read runs first now, so a counter that
+    // threw unconditionally would be caught by the per-day guard and this file would
+    // stop testing the ration's own unreadable path without saying so.
+    const { deps, spend } = harness(async ({ since }) => {
+      if (isMonthWindow(since)) throw new Error('pool is gone')
+      return 0
     })
 
     await expect(runPublishPost(payloadFor('x'), ctx, deps)).rejects.toThrow()

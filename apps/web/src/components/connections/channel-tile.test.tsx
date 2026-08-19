@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
+import { X_MONTHLY_RATION } from '@sahoda/publishing'
 import type { Connection } from '@sahoda/shared'
 
 import { ChannelTile } from './channel-tile'
@@ -103,12 +104,20 @@ describe('the two axes', () => {
 describe('the X spend meter', () => {
   it('appears only where it is passed', () => {
     render(
-      <ChannelTile entry={ENTRY.x} ration={{ status: 'ok', used: 3, remaining: 37 }} now={NOW} />,
+      <ChannelTile
+        entry={ENTRY.x}
+        ration={{ status: 'ok', used: 3, remaining: X_MONTHLY_RATION - 3 }}
+        now={NOW}
+      />,
     )
 
     const meter = screen.getByText(/X posts this month/i).parentElement!
     expect(within(meter).getByText(/^3$/)).toBeInTheDocument()
-    expect(within(meter).getByText(/of 40/)).toBeInTheDocument()
+    // The CONSTANT, never the literal. This line read `/of 40/` and was the only
+    // thing in the repo still pinning the old ration — a grep of the meter component
+    // and its data source both missed it, and the gate did not. A denominator test
+    // that hardcodes the denominator asserts nothing about the denominator.
+    expect(within(meter).getByText(new RegExp(`of ${X_MONTHLY_RATION}`))).toBeInTheDocument()
   })
 
   it('is absent from every other channel', () => {
@@ -122,19 +131,23 @@ describe('the X spend meter', () => {
     // API is pay-per-use. Attributing the number to X would invent a limit X does
     // not impose.
     render(
-      <ChannelTile entry={ENTRY.x} ration={{ status: 'ok', used: 0, remaining: 40 }} now={NOW} />,
+      <ChannelTile
+        entry={ENTRY.x}
+        ration={{ status: 'ok', used: 0, remaining: X_MONTHLY_RATION }}
+        now={NOW}
+      />,
     )
 
     expect(screen.getByText(/allowance is ours rather than X’s/i)).toBeInTheDocument()
   })
 
   it('renders an unreadable count as a gap, NEVER as zero', () => {
-    // "0 of 40 used" off a failed read tells a customer they have spent nothing
+    // "0 of N used" off a failed read tells a customer they have spent nothing
     // when the truth is we could not find out.
     render(<ChannelTile entry={ENTRY.x} ration={{ status: 'unreadable' }} now={NOW} />)
 
     expect(screen.getByText(/couldn’t read your x count/i)).toBeInTheDocument()
-    expect(screen.queryByText(/of 40/)).toBeNull()
+    expect(screen.queryByText(new RegExp(`of ${X_MONTHLY_RATION}`))).toBeNull()
     // The absence mark must carry an accessible name — a bare rule is decoration
     // a screen reader skips, which makes the gap invisible rather than legible.
     expect(screen.getByText(/could not be read/i)).toBeInTheDocument()

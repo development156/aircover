@@ -3,8 +3,13 @@ import {
   CONSTRAINTS,
   GATE_BLOCKED_CODE,
   GATE_HELD_CODE,
+  PER_DAY_CAP_EXHAUSTED_CODE,
+  PER_DAY_CAP_UNREADABLE_CODE,
+  checkPerDayCap,
   formatForPlatform,
   gateHoldIsTransient,
+  perDayCapRefusalMessage,
+  perDayCapWindowStart,
   publishIdempotencyKey,
   publishedTextOf,
   validateVariant,
@@ -354,6 +359,50 @@ export async function runPublishPost(
   const formatRefusal = refuseFormat(spec, variant.format, variant.media.length)
   if (formatRefusal) {
     return fail(formatRefusal.code, formatRefusal.message, null)
+  }
+
+  // ── THE PER-DAY CAP — THE CONSTRAINT ENGINE'S OTHER LIMIT, NOW READ ─────────
+  // `PlatformSpec.perDayCap` has been declared on all four channels since the engine
+  // was written and, until this line existed, was referenced by nothing. Four numbers
+  // that looked like a limit and refused nothing.
+  //
+  // ── WHY IT RUNS BEFORE THE X RATION AND NOT AFTER ───────────────────────────
+  // Both are counts and both are cheap, so the order is decided by what each one
+  // protects. This cap is the PLATFORM's and applies to every channel; the X ration
+  // is Sahoda's money and applies to one. Refusing on the universal rule first means
+  // a post that could not be accepted today never consumes a paid allowance on its
+  // way to being rejected — the same reasoning that puts both of them after
+  // `validateVariant` and before the gate.
+  {
+    let usedToday: number
+    try {
+      usedToday = await deps.countLiveSends({
+        workspaceId: payload.workspaceId,
+        channel: payload.channel,
+        since: perDayCapWindowStart(now()),
+      })
+    } catch {
+      // Same discipline as the ration below, and for the same two wrong answers.
+      // "0 used" publishes past a platform limit off a failed read; "exhausted" tells
+      // a customer the channel refused them when the truth is we could not count, and
+      // that verdict is PERMANENT so the post dies on a fabricated reason.
+      const error: PublishLogError = {
+        code: PER_DAY_CAP_UNREADABLE_CODE,
+        classification: 'transient',
+        message: "This channel's daily post count could not be read, so nothing was sent.",
+      }
+      await deps.writeLog(logRow(payload, ctx, deps.mode, 'failed', { error, connectionId: null }))
+      throw new Error('per-day cap unreadable')
+    }
+
+    const perDay = checkPerDayCap({ channel: payload.channel, used: usedToday })
+    if (!perDay.allowed) {
+      // PERMANENT for THIS attempt, which is the honest classification even though
+      // tomorrow would succeed: `transient` tells the runner to retry, and every
+      // retry inside today burns an attempt on a verdict that cannot change. The
+      // message says when it can be sent instead.
+      return fail(PER_DAY_CAP_EXHAUSTED_CODE, perDayCapRefusalMessage(perDay), null)
+    }
   }
 
   // ── THE X RATION — REFUSED BEFORE ANYTHING IS SPENT ─────────────────────────

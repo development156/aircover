@@ -32,7 +32,7 @@ import { createServerSupabase } from '@/lib/supabase/server'
  * `null` is not a number and must not be rendered as one.
  *
  * `unreadable` and a count of zero are different claims — the wallet's rule, and
- * the reason `readConnections` exists in the shape it does. "0 of 40 used" off a
+ * the reason `readConnections` exists in the shape it does. "0 of 12 used" off a
  * failed read is a fabricated reading of the customer's own spend.
  */
 export type XUsageRead =

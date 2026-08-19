@@ -22,3 +22,8 @@ brand/
 # the documented format gate fails on generated JSON it does not own.
 apps/web/test-results/
 apps/web/playwright-report/
+
+# The gate runner writes .gate/verdict.json and one log per stage. Prettier does
+# not read .gitignore, so without this line stage 4 lints the artifact stage 1
+# wrote — the gate failing on its own output.
+.gate/

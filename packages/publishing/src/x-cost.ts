@@ -60,17 +60,62 @@ export const X_RATE_LIMIT = {
 /**
  * How many live X posts Sahoda will pay for, per workspace, per calendar month.
  *
- * ── HOW THIS NUMBER WAS CHOSEN, SO IT CAN BE ARGUED WITH ─────────────────────
- * At the with-a-link rate of $0.200, 40 posts is a worst case of **$8.00 per
- * workspace per month** of X spend. That is the whole derivation; there is no
- * modelling behind it and it is not tuned to observed usage, because there is no
- * observed usage — zero live X posts have ever been sent (see `x-usage.ts`).
+ * ── 40 WAS A GUESS. THIS IS THE ARITHMETIC THAT REPLACED IT ──────────────────
+ * The previous value said so itself: "a defensible starting ration, not a
+ * researched one". Researched 2026-08-20 against X's own announcement of the
+ * current rates (https://x.com/XDevelopers/status/2044919377544261979 — "API
+ * Posting will increase to $0.015 per post from $0.01. API Posting URL will be
+ * $0.20 except for summoned replies") and confirmed against
+ * https://docs.x.com/x-api/introduction, which states pay-per-usage with no
+ * subscription and lists no free tier.
  *
- * ⚠ THIS NEEDS AN OWNER DECISION before X publishing is switched on. It is a
- * defensible starting ration, not a researched one, and it is deliberately in one
- * named constant so changing it is a one-line decision rather than an excavation.
+ * WHAT 40 COSTS, at the rate an SMB marketing post actually pays:
+ *
+ *     40 x $0.200  =  $8.00  per workspace per month   (every post carries a link)
+ *     40 x $0.015  =  $0.60                            (no post carries a link)
+ *
+ * The first line is the real one. The brief for this product is small-business
+ * marketing, and a marketing post without a link is the exception.
+ *
+ * WHAT $8.00 IS, AGAINST THE PLANS IN `@sahoda/shared`'s PLAN_CATALOG:
+ *
+ *     Free    $0/mo   ->  an $8.00 monthly LOSS per workspace
+ *     Starter $12/mo  ->  67% of gross revenue, on one channel
+ *     Growth  $29/mo  ->  27%
+ *     Agency  $79/mo  ->  10%
+ *
+ * Sixty-seven per cent of an entry plan's revenue, spent on one channel, before
+ * the aggregator fee that already dominates marginal cost and before a single
+ * model call. That is not a ration; it is an unbounded liability with a number
+ * written next to it.
+ *
+ * ── SO: TWELVE ──────────────────────────────────────────────────────────────
+ *
+ *     12 x $0.200  =  $2.40 worst case
+ *       Free     an unfunded $2.40 -- still a loss, and still the wrong shape (below)
+ *       Starter  20% of $12
+ *       Growth    8% of $29
+ *       Agency    3% of $79
+ *
+ * Twelve is about three X posts a week, which is a real SMB cadence rather than a
+ * number chosen to be small. It keeps the worst case inside a fifth of the
+ * cheapest paid plan, which leaves room for the per-connected-account aggregator
+ * fee that is the larger cost on every other channel.
+ *
+ * ── AND THE HONEST CAVEAT: ONE CONSTANT IS THE WRONG SHAPE ───────────────────
+ * A single global number has to be safe for the WEAKEST plan that can reach X,
+ * and that plan is Free, where any number above zero is a loss. Twelve is the
+ * best available answer while the ration is one constant; the right answer is a
+ * per-plan ration on `PlanLimits`, where Free could be 0 and Agency 39 without
+ * either being a compromise. That is a frozen-contract change and is NOT made
+ * here.
+ *
+ * ⚠ STILL AN OWNER DECISION. Nothing here says what the business is willing to
+ * spend — it says what the spend IS, so the decision can be made against numbers
+ * instead of against a feeling. Zero live X posts have ever been sent
+ * (`x-usage.ts`), so lowering this today refuses nothing that exists.
  */
-export const X_MONTHLY_RATION = 40
+export const X_MONTHLY_RATION = 12
 
 /** What one X post will cost, given whether it carries a link. */
 export function xPostPriceUsd(hasLink: boolean): number {

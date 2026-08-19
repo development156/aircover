@@ -42,7 +42,7 @@ export function XRationMeter(props: XRationMeterProps) {
       <div className="mt-3 rounded-input bg-s2 px-3 py-2">
         <p className="type-eyebrow text-muted">X posts this month</p>
         <p className="type-sm mt-1 flex items-center gap-2 text-muted">
-          {/* NOT "0 of 40". A failed read is not a reading of zero — that would
+          {/* NOT "0 of 12". A failed read is not a reading of zero — that would
               tell a customer they have spent nothing when the truth is we could
               not find out, and it is the permissive direction, which a spending
               cap must never be wrong in. */}

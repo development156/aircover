@@ -10,6 +10,12 @@ allowBuilds:
   # prebuilt package — allowing it would add a CDN fetch to every install for a
   # file we already have. Source-map upload still works when it is configured.
   '@sentry/cli': false
+  # Allowed. `pnpm add -D tsx` (2026-08-20) pulled esbuild@0.28.2, a version this
+  # workspace had not seen, and pnpm 11 wrote a PLACEHOLDER here — the literal string
+  # "set this to true or false". That is not a boolean, so every `pnpm <script>` in the
+  # repo exited 1 on the deps check until it was answered. `esbuild` was already in
+  # onlyBuiltDependencies below for the same reason it is allowed here.
+  esbuild: true
   sharp: true
 
 # Allow only these dependencies to run install/postinstall build scripts
