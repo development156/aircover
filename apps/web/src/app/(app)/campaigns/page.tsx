@@ -1,123 +1,189 @@
-import { MoreHorizontal, Sparkles, SlidersHorizontal } from 'lucide-react'
+import Link from 'next/link'
+import { Megaphone } from 'lucide-react'
+import { CampaignStatusSchema, type CampaignStatus } from '@sahoda/shared'
 
+import { CampaignForm } from '@/components/campaigns/campaign-form'
+import { CampaignTable } from '@/components/campaigns/campaign-table'
+import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
-import { InertButton, InertChip, RoadmapBanner } from '@/components/roadmap/inert'
+import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
+import { Unreadable } from '@/components/design-system/absence-row'
+import { readCampaigns } from '@/lib/campaigns/read'
+import { CAMPAIGN_STATUS_LABEL } from '@/lib/campaigns/status-label'
+import { cn } from '@/lib/utils'
 
 export const metadata = { title: 'Campaigns' }
 
 /**
- * Campaigns, as the reference designs it — built, marked, and empty of figures.
+ * CAMPAIGNS — a real screen over real rows.
  *
- * ── WHAT THE REFERENCE SHOWS, AND WHAT IS WITHHELD ───────────────────────────
- * Its card is: name + status badge · channel tiles + dates · "Spent ₹x / ₹y"
- * with a share bar · a three-up of Reach / Conv. / ROAS · a foot reading
- * "✦ Health 80" and an Open button. Its toolbar carries chips reading
- * "All 4 · Active 2 · Draft 1 · Completed 1".
+ * ── WHAT THIS REPLACED, AND WHY IT HAD TO GO ─────────────────────────────────
+ * The page here until now was a drawing: three fictional cards reading "A
+ * campaign you launched" / "One still being written" / "One that has finished",
+ * with an em dash in every figure slot and a comment explaining that there was
+ * no campaigns table. There is one. `campaigns` and `campaign_posts` are applied
+ * to production with row-level security and four policies each, and nothing was
+ * reading them.
  *
- * EVERY ONE of those numbers is a claim about the reader's business, and there
- * is no campaigns table in this product to make any of them from. So the card
- * keeps its shape and its labels — Spent, Reach, Conversions, ROAS, Health are
- * the things this screen will show — and each reads an em dash. The chips keep
- * their names and lose their counts, because a "0" would assert that the
- * collection exists and is empty.
+ * Two things about that drawing were wrong even as a drawing, and both are worth
+ * naming so they do not come back:
  *
- * The share bar is omitted rather than drawn at 0%. A bar encodes a ratio; with
- * no spend and no budget there is no ratio, and an empty track reads as "you
- * have spent nothing of a real budget" rather than as "there is no budget".
+ *   1. IT RENDERED AN EM DASH FOR EVERY MISSING FIGURE — Spent, Reach,
+ *      Conversions, ROAS, Health. The absence vocabulary has no mark for "there
+ *      is no such quantity": you delete the slot. A dash in a Spend row claims
+ *      there is a spend figure and it is merely unknown, which is a stronger and
+ *      falser claim than saying nothing.
+ *
+ *   2. ITS FILTER CHIPS READ "Completed" — a word the status column has never
+ *      accepted. It says `finished`. A filter built from that label would have
+ *      matched nothing forever while looking exactly like an empty workspace.
+ *
+ * ── THE FIGURES THIS SCREEN IS ALLOWED ───────────────────────────────────────
+ * A count of rows in `campaign_posts`, the union of the member posts' channels,
+ * and the dates and stage the customer typed. That is all, and every one of them
+ * is selected rather than modelled. There is no budget, no spend, no ROAS and no
+ * health score anywhere on this route, because there is no table behind any of
+ * them — see `packages/shared/src/db/campaigns.ts` for the full argument.
  */
 
-/** The card's own labels — the shape of what a campaign will report. */
-const METRICS = ['Reach', 'Conversions', 'ROAS'] as const
+/** `all` is not a status; it is the absence of the filter. Kept out of the enum. */
+type Filter = 'all' | CampaignStatus
 
-/** Three cards, because the reference's grid is three across. Named by state. */
-const PREVIEW_CARDS = [
-  { title: 'A campaign you launched', status: 'Active' },
-  { title: 'One still being written', status: 'Draft' },
-  { title: 'One that has finished', status: 'Completed' },
-] as const
+function readFilter(raw: string | undefined): Filter {
+  if (raw === undefined || raw === 'all') return 'all'
+  const parsed = CampaignStatusSchema.safeParse(raw)
+  // An unknown value in the URL falls back to `all` rather than filtering to
+  // nothing: a mistyped query string should not look like an empty workspace.
+  return parsed.success ? parsed.data : 'all'
+}
 
-export default function CampaignsPage() {
+export default async function CampaignsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ stage?: string }>
+}) {
+  const { stage } = await searchParams
+  const filter = readFilter(stage)
+  const read = await readCampaigns()
+
   return (
     <div className="space-y-grid">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <PageTitle>Campaigns</PageTitle>
-          <p className="mt-1 text-[13px] text-muted">Plan, launch and optimise campaigns.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <InertButton>
-            <Sparkles size={14} strokeWidth={1.8} aria-hidden />
-            Improve campaign
-          </InertButton>
-          <InertButton>
-            <SlidersHorizontal size={14} strokeWidth={1.8} aria-hidden />
-            Filter
-          </InertButton>
-          <InertButton primary>Create campaign</InertButton>
-        </div>
+        <PageTitle sub="Group posts under one push, and read them together.">Campaigns</PageTitle>
+        {/* THE one primary action on this view — and only ever one of it.
+            Rendered here when there IS a list to add to. On the empty screen the
+            empty state's own button is the primary, and showing both would put
+            two identical primaries on one view, which means neither is the main
+            action. Playwright caught exactly that: a by-name lookup matched two
+            elements on the empty screen.
+
+            It is also absent for the other two reads: with no workspace there is
+            nothing to create a campaign in, and after a failed read the list may
+            already hold the name you are about to collide with. */}
+        {read.status === 'ok' && read.rollups.length > 0 ? <CampaignForm /> : null}
       </div>
 
-      <RoadmapBanner what="A campaign groups posts and paid spend under one goal, with one report." />
-
-      {/* The reference's chips, with their counts removed. */}
-      <div className="flex flex-wrap gap-1.5">
-        <InertChip on>All</InertChip>
-        <InertChip>Active</InertChip>
-        <InertChip>Draft</InertChip>
-        <InertChip>Completed</InertChip>
-      </div>
-
-      <div className="grid grid-cols-3 gap-3 max-wide:grid-cols-2 max-narrow:grid-cols-1">
-        {PREVIEW_CARDS.map((card) => (
-          <article
-            key={card.title}
-            className="is-proposed flex flex-col rounded-card"
-            aria-label={`${card.title} — coming soon`}
-          >
-            <div className="flex items-center gap-2 border-b border-line-soft px-3 py-2.5">
-              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-muted">
-                {card.title}
-              </span>
-              <span className="shrink-0 text-[11px] font-[550] text-muted">{card.status}</span>
-            </div>
-
-            <div className="flex flex-col gap-3 px-3 py-3">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[11px] text-muted">Channels</span>
-                <span className="text-[11px] text-muted">Dates &mdash;</span>
-              </div>
-
-              {/* Spend keeps its label and shows no ratio. See the note above. */}
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[11px] text-muted">Spent</span>
-                <span className="text-[12px] font-[550] text-muted tabular-nums">&mdash;</span>
-              </div>
-
-              <dl className="grid grid-cols-3 gap-2">
-                {METRICS.map((m) => (
-                  <div key={m} className="min-w-0">
-                    <dt className="truncate text-[11px] text-muted">{m}</dt>
-                    <dd className="text-[13px] font-[550] text-muted tabular-nums">&mdash;</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-
-            <div className="flex items-center gap-2 border-t border-line-soft px-3 py-2.5">
-              <span className="flex items-center gap-1 text-[11px] text-muted">
-                <Sparkles size={12} strokeWidth={1.8} aria-hidden />
-                Health &mdash;
-              </span>
-              <span className="ml-auto flex items-center gap-1.5">
-                <InertButton className="px-2 py-[3px] text-[12px]">Open</InertButton>
-                <span data-inert-control aria-hidden className="text-muted">
-                  <MoreHorizontal size={15} strokeWidth={1.8} />
-                </span>
-              </span>
-            </div>
-          </article>
-        ))}
-      </div>
+      {read.status === 'no-workspace' ? (
+        <EmptyState
+          icon={Megaphone}
+          title="Create a workspace first"
+          body="Campaigns belong to a workspace. Make one and this screen fills up."
+          action={<CreateWorkspaceButton />}
+        />
+      ) : read.status === 'unreadable' ? (
+        // NOT an empty state. "You have no campaigns" and "we could not read
+        // your campaigns" are different claims, and offering Create as the
+        // remedy for the second one is how a customer ends up with two.
+        <section className="surface-ring flex flex-col items-center gap-2 rounded-card bg-surface px-5 py-10 text-center">
+          <Unreadable what="Your campaigns" />
+          <h2 className="type-h3 mt-1">Sahoda could not read your campaigns</h2>
+          <p className="type-body max-w-[42ch] text-muted">
+            The list did not come back this time. Reload — this is not a sign that you have none,
+            and making a new one would not help.
+          </p>
+        </section>
+      ) : read.rollups.length === 0 ? (
+        <EmptyState
+          icon={Megaphone}
+          title="No campaigns yet"
+          body="A campaign is a named push — Diwali week, a new menu — that a handful of posts belong to, so you can plan and read them together."
+          action={<CampaignForm />}
+          tip="Name it after the thing you would say out loud. You can add posts straight after."
+        />
+      ) : (
+        <>
+          <StageFilter rollups={read.rollups} active={filter} />
+          <CampaignTable
+            rollups={read.rollups.filter(
+              (rollup) => filter === 'all' || rollup.campaign.status === filter,
+            )}
+          />
+          {/* The one honest note about what this screen does NOT do. Without it
+              a stage column reads as something that keeps itself current. */}
+          <p className="type-sm text-muted">
+            Nothing moves a campaign between stages on its own — you set the stage when you are
+            ready.
+          </p>
+        </>
+      )}
     </div>
+  )
+}
+
+/**
+ * The stage filter, as LINKS.
+ *
+ * Each one changes the URL, so each is an anchor: cmd-click opens a new tab, the
+ * choice survives a reload, and a screen reader finds them in the page's link
+ * list. `router.push` from a button does none of that.
+ *
+ * ── THE COUNTS ARE REAL, WHICH IS WHY THEY ARE ALLOWED ───────────────────────
+ * The screen this replaced dropped its counts, correctly, because there was no
+ * table to count. There is one now, the rows are in hand, and every number here
+ * is `rollups.filter(…).length` — a count of what is on this page. A stage with
+ * no campaigns shows `0`, and that zero is a fact rather than a guess.
+ */
+function StageFilter({
+  rollups,
+  active,
+}: {
+  rollups: readonly { campaign: { status: CampaignStatus } }[]
+  active: Filter
+}) {
+  const options: ReadonlyArray<{ value: Filter; label: string; count: number }> = [
+    { value: 'all', label: 'All', count: rollups.length },
+    ...CampaignStatusSchema.options.map((status) => ({
+      value: status as Filter,
+      label: CAMPAIGN_STATUS_LABEL[status],
+      count: rollups.filter((rollup) => rollup.campaign.status === status).length,
+    })),
+  ]
+
+  return (
+    <nav aria-label="Filter campaigns by stage">
+      <ul className="flex flex-wrap gap-1.5">
+        {options.map((option) => {
+          const current = option.value === active
+          return (
+            <li key={option.value}>
+              <Link
+                href={option.value === 'all' ? '/campaigns' : `/campaigns?stage=${option.value}`}
+                aria-current={current ? 'page' : undefined}
+                className={cn(
+                  'type-sm inline-flex items-center gap-1.5 rounded-pill px-3 py-[5px] font-[550] transition-micro',
+                  'max-narrow:min-h-[44px]',
+                  current
+                    ? 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'
+                    : 'text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink',
+                )}
+              >
+                {option.label}
+                <span className="num tabular-nums">{option.count}</span>
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
+    </nav>
   )
 }

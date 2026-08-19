@@ -225,6 +225,16 @@ skips, which makes the absence invisible rather than legible. Use the `Unmeasure
 word "of", and a dash — inventing a fraction with no denominator. If the quantity does not
 exist, delete the slot.
 
+**When the slot CANNOT be deleted — a grid cell — render nothing visible and name it
+`sr-only`.** Added 2026-08-19 by the campaigns session, because this document did not answer
+it and the honest answer is not obvious. A matrix (posts down, channels across) has a cell at
+every intersection whether or not the quantity exists: a post that never targeted LinkedIn has
+no LinkedIn status, but the table still has to emit a `<td>`. Deleting the slot is impossible;
+filling it is forbidden. So the cell renders **no mark at all** — the column header still names
+the channel, so the gap reads correctly at a glance — plus one `sr-only` sentence saying which
+quantity does not exist. A silent cell would make the absence invisible rather than legible,
+which is the same failure as an unnamed rule. The visible answer is still nothing.
+
 ---
 
 ## 5. Type
@@ -374,6 +384,21 @@ does none of that.
 `DataTable`. If they read one record at a time, it is a list. `/posts` rendering eight records
 as eight equal-weight cards, and `/home` and `/wallet` rendering the *same* dataset two
 different ways, are the failures this rule exists to stop.
+
+**A MATRIX is not a `DataTable`, and the reason is one attribute.** Added 2026-08-19 by the
+campaigns session. `DataTable` renders every body cell as `<td>`, which is right for a list of
+records. In a matrix the row's own label is a *header for that row*: without
+`<th scope="row">`, a screen reader on cell 3 of row 4 announces the column and not which
+record it belongs to, so the grid becomes unnavigable exactly where it is most useful. Hand-roll
+the table in that one case (`components/campaigns/campaign-grid.tsx` is the worked example) and
+keep everything else — the caption, the `type-eyebrow` headers, the hairline rows, the
+`overflow-x-auto` box — identical to the primitive, so the two read as one component.
+
+**An empty `DataTable` is the right way to show a column a feature will report.** Its empty
+state renders *inside* the table so the headers stay on screen, which is exactly what a
+coming-soon screen needs: a column header is a promise about Sahoda, which is allowed, while a
+figure in a cell would be a claim about the reader's business, which is not. `/ads` and
+`/ads/budget` use it for precisely this.
 
 **`disabled` never means "coming soon".** A disabled `Tile` or `Button` means *this real
 option is temporarily unavailable* — something the user could fix. An unbuilt feature is a
