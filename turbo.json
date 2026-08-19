@@ -14,7 +14,15 @@
     "test:smoke": {
       "dependsOn": ["^typecheck"],
       "cache": false,
-      "env": ["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "CLERK_SECRET_KEY", "SUPABASE_DB_URL"]
+      "env": [
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "CLERK_SECRET_KEY",
+        "SUPABASE_DB_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "E2E_PORT",
+        "E2E_SERVER_CMD"
+      ]
     },
     "build": {
       "dependsOn": ["^build"],

@@ -114,6 +114,39 @@ test.describe('the composer across widths @smoke', () => {
         // came to be written up as a bug that did not exist (docs/27 §0).
         await p.screenshot({ path: `${dir}/composer-${width}.png` })
 
+        // ── NOTHING OF OURS SITS ON TOP OF THE PHONE'S FIRST TAB ──────────────
+        // The composer's commit bar is `sticky bottom-[56px]`, and 56px is the
+        // bottom navigation's height — a number that has to be right rather than
+        // approximately right, because being wrong by a few pixels covers the one
+        // control at the corner of the screen. Asked of the browser rather than
+        // asserted from the CSS: what is actually AT that point?
+        //
+        // docs/27 §0 records that a black badge appears there in dev screenshots
+        // and is Next's own indicator, not ours. This probe tells the two apart
+        // instead of assuming which one is on screen.
+        if (width < 700) {
+          const atHomeTab = await p.evaluate(() => {
+            // Two points, because the tab is an icon over a label and a badge
+            // could cover one without the other: the icon's centre and the
+            // label's line.
+            const describe = (y: number) => {
+              const el = document.elementFromPoint(38, window.innerHeight - y)
+              if (el === null) return 'nothing'
+              const named = el.closest('a,button')
+              const owner = named
+                ? (named.getAttribute('aria-label') ?? named.textContent?.trim() ?? '?')
+                : el.tagName.toLowerCase()
+              return `${el.tagName.toLowerCase()}/${owner}`
+            }
+            return `${describe(40)} + ${describe(20)}`
+          })
+          if (!/home/i.test(atHomeTab)) {
+            findings.push(
+              `${theme} ${width}px: the bottom bar's first tab is covered — found ${atHomeTab}`,
+            )
+          }
+        }
+
         const overflow = await horizontalOverflow(p)
         if (overflow > 0) {
           findings.push(`${theme} ${width}px: the page scrolls sideways by ${overflow}px`)

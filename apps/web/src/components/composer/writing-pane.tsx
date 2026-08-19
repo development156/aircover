@@ -57,6 +57,16 @@ export function WritingPane({ body, onBodyChange }: WritingPaneProps) {
         <Textarea
           id="post-body"
           rows={10}
+          /**
+           * Shorter on a phone, and the number is measured rather than guessed.
+           *
+           * MEASURED at 360x800 with `rows={10}`: the writing box ran to y=570 and
+           * the first version card's body was below the fold, so the screen that
+           * exists to show you each version showed you none of them until you
+           * scrolled. `resize-y` is still on, so anyone who wants the taller box
+           * drags it — the default is what a phone opens to, not a ceiling.
+           */
+          className="max-narrow:h-[150px]"
           value={body}
           placeholder="Write it the way you would say it. Sahoda adapts it per channel."
           onChange={(event) => onBodyChange(event.target.value)}
