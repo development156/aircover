@@ -52,8 +52,12 @@ export function SectionCardEmpty({ section }: { section: BrainSection }) {
                 The name is the point. A dash has none, so a screen reader
                 skipped straight from the field label to the next label and the
                 absence was invisible rather than legible — on the six Brand
-                Brain tabs, in the no-brain state, which is exactly what a new
-                account sees. This file predates the absence vocabulary and
+                Brain tabs that render this card — /brain/identity and
+                /brain/voice — in the no-brain state, which is what a new
+                account sees. (/brain's hub carried the same dash in its own
+                section list and is fixed alongside; /brain/audience,
+                /competitors and /knowledge are ComingSoon pages and never
+                reach this component.) This file predates the absence vocabulary and
                 nothing brought it forward; docs/27 §3.1 counted five of these
                 on /brain and no lane owned them. */}
             <dd className="shrink-0">

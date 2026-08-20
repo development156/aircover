@@ -83,12 +83,12 @@
     "components/onboarding/brand-card.tsx": 1,
     "components/onboarding/reveal-step.tsx": 1
   },
-  "typesize_total": 836,
+  "typesize_total": 835,
   "typesize": {
     "app/(app)/analytics/page.tsx": 2,
     "app/(app)/approvals/page.tsx": 11,
     "app/(app)/assets/page.tsx": 3,
-    "app/(app)/brain/page.tsx": 5,
+    "app/(app)/brain/page.tsx": 4,
     "app/(app)/campaigns/page.tsx": 11,
     "app/(app)/connections/page.tsx": 4,
     "app/(app)/create/page.tsx": 3,

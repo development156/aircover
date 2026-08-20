@@ -161,6 +161,37 @@ taller.
 
 ---
 
+## 2b. `/create` and `/create/post` — photographed, audited, NOT changed
+
+Both have frames at two widths in both themes. Neither was restructured, and saying so plainly
+because §0 promises coverage and a reader would otherwise assume silence meant nothing was
+found.
+
+`/create/post` was **sampled by docs/27** and named "the best screen in the app" — the
+solid-versus-dashed channel treatment reads at a glance and survives greyscale. MEASURED on
+`light-390/create-post.png`: the stepper, the four real channels and the five coming-soon tiles
+all hold at 390 with no overflow. Audited, not touched, which is what docs/27's assessment
+earns it.
+
+**`/create` has two findings, recorded and not acted on:**
+
+1. **The one real option does not lead.** `Post` is the only tile that can be pressed and it
+   sits as 1 of 9 equal cells in a 3-column grid, separated from the eight coming-soon tiles
+   only by a brand-wash icon and the absence of a chip. docs/26 §1.5 gives each view one
+   primary action; here the primary action is the same size and weight as eight things that do
+   nothing. The page's own comment claims "The one real option leads", which is true of reading
+   order and not of visual weight.
+2. **Card titles run at body size.** All nine use `text-[13px] font-semibold` where §5 makes
+   `type-h3` (650 · 15/20) the card and row title. This is the drift `type-h3` was added to
+   collect, and on this screen it is nine call sites at once.
+
+Both are in the rule 5 baseline. They are left because fixing (1) honestly means deciding what
+"leads" should look like on a chooser whose other eight cells are deliberately inert — a design
+decision worth making once, with a frame to check it against, rather than at the end of a lane
+that has already spent its verification budget on `/posts/[id]`.
+
+---
+
 ## 3. Nine assertions required the defect to exist
 
 Removing the disabled "Saved" button broke three smoke tests, and not incidentally.
@@ -191,13 +222,28 @@ mark carrying an accessible name.
 The CLAIM was never wrong — the field is real and has no value yet, which the file's own
 comment argues correctly. It was **unnameable**: a dash has no accessible name, so a screen
 reader went from one field label straight to the next and the absence never reached the reader.
-This renders on `/brain`, `/brain/identity` and the four `/brain` sub-routes in the `no-brain`
-state — what every new account sees. The file predates the absence vocabulary; docs/27 §3.1
-counted five of these on `/brain` and no lane owned them.
 
-**PROVED BY MUTATION:** putting the em dash back turns two of the four new tests red — the
-accessible name disappears and the glyph returns. Restored, 19/19 green across
-`components/brain`.
+**Which routes, exactly.** An earlier draft of this report and the commit message both said
+"the four `/brain` sub-routes". MEASURED, that is wrong: `BrainSections` — the only caller of
+`SectionCardEmpty` — is imported by **two** pages, `/brain/identity` and `/brain/voice`.
+`/brain/audience`, `/brain/competitors` and `/brain/knowledge` are `ComingSoon` pages and never
+reach this component. The claim is corrected here rather than left standing.
+
+**A second instance, found by checking that claim.** `/brain/page.tsx:93` rendered the same
+bare `&mdash;` once per row in its own Sections list, in the same `no-brain` state. That is
+where docs/27 §3.1's count of five on `/brain` actually lives. Fixed alongside, with the same
+mark. So the fix covers three routes: `/brain`, `/brain/identity`, `/brain/voice`.
+
+**The guard covers every section, and that was not free.** It was first written against
+`BRAIN_SECTIONS[0]` only — one fifth of what its name claimed, which is the sibling-shape hole
+this lane found twice in product code, reproduced in the check written to catch it. Looping it
+over all five keys immediately failed on `taboo`: that section is TITLED "Red lines" and also
+holds a FIELD called "Red lines", so an exact-match single query throws on a legitimate
+arrangement. Not a component defect — a naive assertion, now `getAllByText`.
+
+**PROVED BY MUTATION:** putting the em dash back turns **10 of the 20** tests red, two per
+section. The single-section version killed the same mutant with 2, which is the coverage
+difference stated as a number. Restored, 35/35 green across `components/brain`.
 
 ---
 
@@ -272,6 +318,18 @@ Naming these because an audit that reports only its edits reads as if it found n
   `/settings/profile`, `/settings/integrations` and `/settings/plan`. Left as recorded debt:
   `/settings/plan` may be live under the billing lane today, and a type change there is a
   visual change to another lane's screen.
+- **No blanket "no lone em dash" lint rule**, though the temptation was real. Two files still
+  render one as an element's entire content — `/assets` and `/campaigns` — and
+  `e2e/coming-soon-unchanged.spec.ts` exists specifically to assert that "every figure on
+  campaigns, approvals and assets is still an em dash". Those dashes are coming-soon markers,
+  not missing values, and a rule that could not tell the two apart would break a spec written
+  to defend the distinction. Both files also belong to lanes hot today.
+- **`/embed/beta`'s `<h1>` is an invented step and is left alone.**
+  `text-[20px] leading-7 font-[650] tracking-[-0.02em]` is a hand-written shorthand close to,
+  but not equal to, `type-h2` (600 · 20/26 · −0.011em). It is recorded in the rule 5 baseline
+  rather than changed: the route renders inside a partner's landing page with no app chrome, so
+  a weight and leading change there is a visual change to somebody else's page, and this lane
+  never got a frame of it to check against.
 - **`/settings/profile` and `/settings/integrations` are sound.** Both already inherit
   `--measure-form` from `settings/layout.tsx` (docs/28's §6.1 fix), and integrations is a
   deliberate summary that hands over to `/connections` rather than duplicating its controls.
