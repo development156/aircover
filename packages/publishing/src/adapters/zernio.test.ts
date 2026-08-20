@@ -206,3 +206,143 @@ describe('Zernio adapter — the settle loop re-reads for the platform id', () =
     expect(reads()).toBe(1)
   })
 })
+
+/**
+ * ── THE OTHER HALF OF THE SEAM ──────────────────────────────────────────────
+ * `platform-data.test.ts` proves the builder returns the right object. That
+ * proves nothing on its own: the state this work found was a composer writing
+ * `extras.gbpCta` into a database and NOTHING between there and Google reading
+ * it, and a builder with no caller reproduces that exactly.
+ *
+ * So these assert the WIRE BODY — the argument `createPost` was actually handed.
+ */
+function capturingClient(post: ZernioPost): {
+  client: ZernioClient
+  sent: () => Record<string, unknown> | null
+} {
+  let sent: Record<string, unknown> | null = null
+  const base = stubClient(post)
+  return {
+    client: {
+      ...base,
+      createPost: async (input) => {
+        sent = input as unknown as Record<string, unknown>
+        return { post }
+      },
+    },
+    sent: () => sent,
+  }
+}
+
+type SentPlatforms = { platforms: { platform: string; platformSpecificData?: unknown }[] }
+
+describe('the per-channel half actually reaches the request', () => {
+  it('puts contentType story on the platform entry, not at the root', async () => {
+    const { client, sent } = capturingClient(igPost({ platformPostUrl: PERMALINK }))
+    await createZernioAdapter('instagram', {
+      client,
+      format: 'story',
+      poll: { attempts: 1, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    }).publish(igRequest())
+
+    const body = sent() as unknown as SentPlatforms & Record<string, unknown>
+    expect(body.platforms[0]!.platformSpecificData).toEqual({ contentType: 'story' })
+    // Zernio has no root-level equivalent; a value there would be ignored.
+    expect(body.platformSpecificData).toBeUndefined()
+  })
+
+  it('sends no platformSpecificData key at all for an ordinary post', async () => {
+    const { client, sent } = capturingClient(igPost({ platformPostUrl: PERMALINK }))
+    await createZernioAdapter('instagram', {
+      client,
+      format: 'image',
+      poll: { attempts: 1, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    }).publish(igRequest())
+
+    const entry = (sent() as unknown as SentPlatforms).platforms[0]!
+    expect('platformSpecificData' in entry).toBe(false)
+  })
+
+  it('carries the Google button through to the wire', async () => {
+    const post: ZernioPost = {
+      _id: ZERNIO_POST_ID,
+      status: 'published',
+      platforms: [
+        { platform: 'google', status: 'published', platformPostUrl: 'https://g.example/p/1' },
+      ],
+    }
+    const { client, sent } = capturingClient(post)
+    await createZernioAdapter('gbp', {
+      client,
+      format: 'text',
+      poll: { attempts: 1, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    }).publish({
+      workspaceId: 'ws-1',
+      postId: 'post-1',
+      variantId: 'var-1',
+      content: {
+        channel: 'gbp',
+        summary: 'Open till 9 today',
+        media: [],
+        ctaType: 'ORDER',
+        ctaUrl: 'https://chai.example/order',
+      },
+      media: [],
+      auth: { connectionId: 'conn-1', accessToken: '', externalAccountId: ACCOUNT_ID },
+    } as PublishRequest)
+
+    expect((sent() as unknown as SentPlatforms).platforms[0]!.platformSpecificData).toEqual({
+      callToAction: { type: 'ORDER', url: 'https://chai.example/order' },
+    })
+  })
+
+  it('refuses a Google button with no destination instead of publishing without it', async () => {
+    const { client, sent } = capturingClient(igPost({ platformPostUrl: PERMALINK }))
+    await expect(
+      createZernioAdapter('gbp', {
+        client,
+        format: 'text',
+        poll: { attempts: 1, intervalMs: 0 },
+        sleep: async () => {},
+        now: () => FIXED_NOW,
+      }).publish({
+        workspaceId: 'ws-1',
+        postId: 'post-1',
+        variantId: 'var-1',
+        content: { channel: 'gbp', summary: 'Open till 9', media: [], ctaType: 'ORDER' },
+        media: [],
+        auth: { connectionId: 'conn-1', accessToken: '', externalAccountId: ACCOUNT_ID },
+      } as PublishRequest),
+    ).rejects.toMatchObject({ code: 'GBP_CTA_NEEDS_URL', classification: 'permanent' })
+    // And nothing was sent. A refusal that still posts is not a refusal.
+    expect(sent()).toBeNull()
+  })
+
+  it('types a GIF as a gif, which the hardcoded literal could never do', async () => {
+    const { client, sent } = capturingClient(igPost({ platformPostUrl: PERMALINK }))
+    await createZernioAdapter('instagram', {
+      client,
+      format: 'image',
+      poll: { attempts: 1, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    }).publish(
+      igRequest({
+        content: {
+          channel: 'instagram',
+          caption: 'chai',
+          media: [{ url: 'https://media.zernio.com/media/x.gif', mime: 'image/gif' }],
+        },
+      }),
+    )
+
+    const body = sent() as unknown as { mediaItems: { type: string }[] }
+    expect(body.mediaItems[0]!.type).toBe('gif')
+  })
+})

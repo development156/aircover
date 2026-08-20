@@ -8,6 +8,7 @@ import {
   type ReadMedia,
   type Transport,
 } from '@sahoda/publishing'
+import type { PostFormat } from '@sahoda/publishing'
 import type { PublishMode } from './runPublishPost'
 
 export interface AdapterSelectorDeps {
@@ -46,8 +47,8 @@ export interface AdapterSelectorDeps {
  */
 export function createAdapterSelector(
   deps: AdapterSelectorDeps,
-): (c: Channel, viaZernio: boolean) => PublishAdapter {
-  return (channel: Channel, viaZernio: boolean): PublishAdapter => {
+): (c: Channel, viaZernio: boolean, format: PostFormat | null) => PublishAdapter {
+  return (channel: Channel, viaZernio: boolean, format: PostFormat | null): PublishAdapter => {
     if (deps.mode === 'fixture') return createFixtureAdapter(channel, { now: deps.now })
 
     // The rail first, when the resolved connection is one of Zernio's. Checked
@@ -56,6 +57,12 @@ export function createAdapterSelector(
     if (viaZernio && deps.zernioApiKey) {
       return createZernioAdapter(channel, {
         client: createZernioClient({ transport: deps.transport, apiKey: deps.zernioApiKey }),
+        // The rail is the only adapter that can act on a format: the native x and
+        // gbp adapters speak their platforms' own APIs and have no
+        // `platformSpecificData` to put it in. `runPublishPost` refuses a variant
+        // that contradicts its format before any adapter is reached, so a native
+        // publish is never left claiming a format it did not send.
+        format,
         now: deps.now,
       })
     }

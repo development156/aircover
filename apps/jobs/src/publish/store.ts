@@ -52,6 +52,10 @@ export function createPublishStore(opts: PublishStoreOptions) {
       [payload.postId, payload.workspaceId],
     )
 
+    // Computed once: the spread below would otherwise call it twice, and a reader
+    // would reasonably wonder whether the two answers could differ.
+    const cta = readCta(row.extras)
+
     return {
       variantId: row.id,
       body: row.body,
@@ -66,6 +70,11 @@ export function createPublishStore(opts: PublishStoreOptions) {
       // until the vault opener exists — so this costs nothing today and must be
       // revisited with X. See REQUESTS.md.
       hashtags: readHashtags(row.extras),
+      // The Google button. Written to `extras` by the composer since the CTA
+      // picker shipped and read by NOTHING until now — the writer chose "ORDER",
+      // saw it saved, and Google showed no button. Both halves or neither: Zernio
+      // marks `callToAction` as requiring `type` AND `url`.
+      ...(cta ? { cta } : {}),
       // Validated rather than cast. The column carries a CHECK constraint, but a
       // value this code does not recognise must not be handed to the refusal rules
       // as if it were one of theirs — an unknown format states no intent we can
@@ -378,6 +387,29 @@ export function createPublishStore(opts: PublishStoreOptions) {
  * More than one lane writes this column, so a shape we do not recognise is a
  * reason to ignore the field, not to fail the publish.
  */
+/**
+ * The Google Business call-to-action stored on `post_variants.extras`.
+ *
+ * Returns undefined unless BOTH halves are present and non-empty. A type with no
+ * URL is not carried forward as a half-CTA to be dropped later — it reaches
+ * `buildPlatformData`, which refuses the publish with a sentence about the
+ * missing web address, because a button that goes nowhere is a payload Zernio
+ * rejects rather than a feature that partly works.
+ *
+ * Value validation is deliberately NOT here. `isValidGbpCtaType` runs against the
+ * frozen Constraint Engine's own list inside the builder, and a second check
+ * against a second copy of that list is how the two would eventually disagree.
+ */
+function readCta(extras: unknown): { type: string; url: string } | undefined {
+  if (typeof extras !== 'object' || extras === null || Array.isArray(extras)) return undefined
+  const raw = extras as Record<string, unknown>
+  const type = raw.gbpCta
+  const url = raw.ctaUrl
+  if (typeof type !== 'string' || type.trim() === '') return undefined
+  if (typeof url !== 'string' || url.trim() === '') return { type, url: '' }
+  return { type, url }
+}
+
 function readHashtags(extras: unknown): string[] | undefined {
   if (typeof extras !== 'object' || extras === null || Array.isArray(extras)) return undefined
   const raw = (extras as Record<string, unknown>).hashtags

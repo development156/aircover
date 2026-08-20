@@ -10,7 +10,7 @@ describe('createAdapterSelector', () => {
     const select = createAdapterSelector({ mode: 'fixture', transport })
 
     for (const channel of ['x', 'gbp'] as const) {
-      const adapter = select(channel, false)
+      const adapter = select(channel, false, null)
       expect(adapter.channel).toBe(channel)
       const result = await adapter.publish({
         workspaceId: 'w',
@@ -32,8 +32,8 @@ describe('createAdapterSelector', () => {
   it('returns the real X and GBP adapters in live mode', () => {
     const select = createAdapterSelector({ mode: 'live', transport })
 
-    expect(select('x', false).channel).toBe('x')
-    expect(select('gbp', false).channel).toBe('gbp')
+    expect(select('x', false, null).channel).toBe('x')
+    expect(select('gbp', false, null).channel).toBe('gbp')
   })
 
   it('refuses a live channel that has no adapter, rather than silently faking one', () => {
@@ -41,9 +41,9 @@ describe('createAdapterSelector', () => {
     // adapter for it. Downgrading to the fixture here would be mock-success in a prod path.
     const select = createAdapterSelector({ mode: 'live', transport })
 
-    expect(() => select('linkedin', false)).toThrow(AdapterError)
+    expect(() => select('linkedin', false, null)).toThrow(AdapterError)
     try {
-      select('linkedin', false)
+      select('linkedin', false, null)
     } catch (e) {
       expect(e).toMatchObject({ code: 'NO_ADAPTER', classification: 'permanent' })
     }
@@ -55,7 +55,7 @@ describe('createAdapterSelector', () => {
     // fall through to the fixture.
     const select = createAdapterSelector({ mode: 'live', transport })
 
-    expect(() => select('instagram', false)).toThrow(AdapterError)
+    expect(() => select('instagram', false, null)).toThrow(AdapterError)
   })
 
   it('takes the Zernio rail for any channel whose connection is a Zernio one', () => {
@@ -69,14 +69,14 @@ describe('createAdapterSelector', () => {
     })
 
     for (const channel of ['x', 'gbp', 'linkedin', 'instagram'] as const) {
-      expect(select(channel, true).channel).toBe(channel)
+      expect(select(channel, true, null).channel).toBe(channel)
     }
   })
 
   it('refuses the rail when the key is absent, rather than faking a publish', () => {
     const select = createAdapterSelector({ mode: 'live', transport })
 
-    expect(() => select('linkedin', true)).toThrow(AdapterError)
+    expect(() => select('linkedin', true, null)).toThrow(AdapterError)
   })
 })
 
@@ -116,8 +116,8 @@ describe('a Zernio-fronted connection reaches the Zernio adapter', () => {
     const connection = await resolve(payload)
 
     // The exact expression runPublishPost.ts uses at its call site.
-    expect(() => select(payload.channel, connection.viaZernio === true)).not.toThrow()
-    expect(select(payload.channel, connection.viaZernio === true).channel).toBe('instagram')
+    expect(() => select(payload.channel, connection.viaZernio === true, null)).not.toThrow()
+    expect(select(payload.channel, connection.viaZernio === true, null).channel).toBe('instagram')
   })
 
   /**
@@ -127,13 +127,13 @@ describe('a Zernio-fronted connection reaches the Zernio adapter', () => {
    */
   it('still throws NO_ADAPTER when the connection is not Zernio-fronted', () => {
     const select = createAdapterSelector({ mode: 'live', transport, zernioApiKey: ZERNIO_KEY })
-    expect(() => select('instagram', false)).toThrow(AdapterError)
+    expect(() => select('instagram', false, null)).toThrow(AdapterError)
   })
 
   it('still throws NO_ADAPTER when the rail is not provisioned', async () => {
     const resolve = createConnectionResolver({ loadConnection: async () => zernioRow })
     const select = createAdapterSelector({ mode: 'live', transport })
     const connection = await resolve(payload)
-    expect(() => select(payload.channel, connection.viaZernio === true)).toThrow(AdapterError)
+    expect(() => select(payload.channel, connection.viaZernio === true, null)).toThrow(AdapterError)
   })
 })

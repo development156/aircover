@@ -62,6 +62,21 @@ export interface PublishVariant {
    * one layer above the adapter — see the guard in `runPublishPost`.
    */
   format?: PostFormat | null
+  /**
+   * The Google Business call-to-action button, from `post_variants.extras`.
+   *
+   * ── WHY THIS TRAVELS SEPARATELY FROM THE BODY ───────────────────────────────
+   * `FormattedContent`'s gbp arm has declared `ctaType` and `ctaUrl` since the
+   * Constraint Engine was written, and `formatForPlatform` — which is in the
+   * frozen contract — takes a `VariantDraft` that has no room for either. So the
+   * fields exist, the formatter cannot fill them, and the composer's CTA picker
+   * has been writing to `extras` and reaching nothing at all.
+   *
+   * Both halves are required together because Zernio's own schema marks
+   * `callToAction` as `required: ['type', 'url']`. A button with no destination
+   * is a payload that is rejected, not a partial one.
+   */
+  cta?: { type: string; url: string }
 }
 
 /** Connection identity + the in-memory-only access token. Never persisted from here. */
@@ -189,7 +204,17 @@ export interface PublishPostDeps {
   gate: PublishGate
   loadVariant(payload: PublishPostPayload): Promise<PublishVariant | null>
   resolveConnection(payload: PublishPostPayload): Promise<ResolvedConnection>
-  adapterFor(channel: Channel, viaZernio: boolean): PublishAdapter
+  /**
+   * The adapter for this attempt.
+   *
+   * `format` is REQUIRED, and that is the point. It was tempting to make it
+   * optional so existing callers kept compiling — and an optional argument that
+   * silently defaults is the exact shape of two defects this repo shipped in two
+   * days. A required third parameter means a caller that has a format and forgets
+   * to pass it does not typecheck, rather than publishing a feed post where a
+   * Story was asked for.
+   */
+  adapterFor(channel: Channel, viaZernio: boolean, format: PostFormat | null): PublishAdapter
   /**
    * Turn `post_media` attachments into URLs the platform can fetch.
    *
@@ -438,11 +463,22 @@ export async function runPublishPost(
       ? await deps.hostMedia(payload.channel, variant.media)
       : []
 
+    // ── THE CTA, PUT BACK INTO CONTENT THE FORMATTER CANNOT CARRY IT IN ──────
+    // `formatForPlatform` is frozen and takes a draft with no CTA on it, so the
+    // two fields its own gbp arm declares are filled here instead. A spread, not
+    // a mutation: the formatter's result is the base, and this adds the one thing
+    // it structurally could not produce.
+    const formatted = formatForPlatform(spec, draft, hosted)
+    const content =
+      formatted.channel === 'gbp' && variant.cta
+        ? { ...formatted, ctaType: variant.cta.type, ctaUrl: variant.cta.url }
+        : formatted
+
     const request = {
       workspaceId: payload.workspaceId,
       postId: payload.postId,
       variantId: variant.variantId,
-      content: formatForPlatform(spec, draft, hosted),
+      content,
       media: variant.media,
       auth: {
         connectionId: connection.connectionId,
@@ -456,7 +492,7 @@ export async function runPublishPost(
     }
 
     const result = await deps
-      .adapterFor(payload.channel, connection.viaZernio === true)
+      .adapterFor(payload.channel, connection.viaZernio === true, variant.format ?? null)
       .publish(request)
 
     // The adapter's own mode is authoritative: a fixture result is recorded as a fixture

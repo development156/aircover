@@ -1,11 +1,17 @@
 'use client'
 
 import { CONSTRAINTS, type Channel } from '@sahoda/shared'
-import { formatsFor, type PostFormat } from '@sahoda/publishing/format'
+import {
+  defaultFormatFor,
+  formatsFor,
+  mediaRuleFor,
+  type PostFormat,
+} from '@sahoda/publishing/format'
 
 import { Label } from '@/components/ui/label'
-import { gbpCtaTypes, isValidGbpCta } from '@/lib/posts/variant-extras'
 import type { VariantExtras } from '@/lib/posts/variant-extras'
+
+import { GbpOptions } from './gbp-options'
 
 /** The word a person uses, per stored value. Never the enum. */
 const FORMAT_LABEL: Readonly<Record<PostFormat, string>> = {
@@ -33,19 +39,26 @@ export interface VersionOptionsProps {
 
 /**
  * The per-channel settings that are not the text: what KIND of post this is, and
- * Google's call-to-action.
+ * Google's button.
  *
  * ── FORMAT IS PER CHANNEL, AND WAS NOT ──────────────────────────────────────
  * `post_variants.format` has always been a per-channel column, but the deleted
  * wizard collected ONE answer on a Format step and wrote it to every variant, so
  * choosing a carousel for Instagram forced a carousel on X. It lives here now,
- * beside the body it describes.
+ * beside the body it describes, and changing it changes THIS card's media rules
+ * and nothing else.
  *
  * ── WHAT IS OFFERED IS WHAT CAN PUBLISH ─────────────────────────────────────
  * `formatsFor` derives the list from the channel's own spec — `mediaTypes`,
- * `requiresMedia`, `maxMediaCount` — so a format that publishing would refuse is
- * never a choice rather than a choice that fails days later. Instagram has no
- * "Text only" here because Instagram has no text-only post.
+ * `requiresMedia`, `maxMediaCount` — and adds the channel formats that have a
+ * Zernio field behind them. A format that publishing would refuse is never a
+ * choice rather than a choice that fails days later. Instagram has no "Text only"
+ * here because Instagram has no text-only post, and only Instagram has a story.
+ *
+ * ── AND WHAT IT NEEDS IS SAID BEFORE ANYTHING GOES WRONG ────────────────────
+ * The sentence under the picker is the format's own media rule, resolved against
+ * this channel's cap — so "Two or more photos, in order" appears next to a set
+ * before the writer attaches anything, rather than as a refusal afterwards.
  */
 export function VersionOptions({
   channel,
@@ -56,8 +69,7 @@ export function VersionOptions({
 }: VersionOptionsProps) {
   const spec = CONSTRAINTS[channel]
   const available = formatsFor(spec)
-  const storedCta = extras.gbpCta
-  const ctaUnknown = storedCta !== undefined && storedCta !== '' && !isValidGbpCta(storedCta)
+  const rule = format === null ? null : mediaRuleFor(spec, format)
 
   return (
     <div className="grid gap-3 narrow:grid-cols-2">
@@ -79,35 +91,29 @@ export function VersionOptions({
           {available.map((option) => (
             <option key={option} value={option}>
               {FORMAT_LABEL[option]}
+              {option === defaultFormatFor(spec) ? ' · usual' : ''}
             </option>
           ))}
         </select>
+        {rule === null ? (
+          <p className="text-[12.5px] text-muted">
+            Nothing is checked against a kind until you pick one.
+          </p>
+        ) : (
+          <p className="text-[12.5px] text-muted" data-format-need={channel}>
+            {rule.need}
+            {rule.maxItems > 1 ? (
+              <>
+                {' '}
+                Up to <span className="tabular-nums">{rule.maxItems}</span> here.
+              </>
+            ) : null}
+          </p>
+        )}
       </div>
 
       {spec.gbp !== undefined ? (
-        <div className="space-y-1.5">
-          <Label htmlFor={`cta-${channel}`}>Call to action</Label>
-          <select
-            id={`cta-${channel}`}
-            value={storedCta ?? ''}
-            onChange={(event) =>
-              onExtrasChange({ gbpCta: event.target.value === '' ? undefined : event.target.value })
-            }
-            className={SELECT_CLASS}
-          >
-            <option value="">No call to action</option>
-            {gbpCtaTypes().map((cta) => (
-              <option key={cta} value={cta}>
-                {cta}
-              </option>
-            ))}
-          </select>
-          {ctaUnknown ? (
-            <p className="text-[12.5px] text-warn">
-              The saved call to action is not one Google accepts — pick one from the list.
-            </p>
-          ) : null}
-        </div>
+        <GbpOptions extras={extras} onExtrasChange={onExtrasChange} />
       ) : null}
     </div>
   )
