@@ -105,9 +105,25 @@ export async function Rail() {
         </Link>
       </div>
 
+      {/* ── THE RAIL SCROLLS, AND IT HAS TO SAY SO ────────────────────────────
+          MEASURED at 1440x900 on 2026-08-20: twenty-one items at 34px, five
+          group headings, the brand block and the foot come to roughly 1050px
+          against a 900px viewport, so `Automate` and all three foot links sat
+          below the fold with NO visual cue that anything was down there. An
+          overflow container that looks like a finished list is worse than a
+          short list.
+
+          Two answers together, and neither is "show fewer sections": the
+          headings lost 6px of padding each, and `.scroll-visible` forces a
+          classic, always-painted scrollbar (`scrollbar-width: thin` alone was
+          tried and measured at ZERO layout width — an overlay bar that does
+          not appear until you already know to scroll). The house style hides scrollbars on horizontal tab
+          rows (`brain-tabs`, `ads-tabs`) because a tab row that overflows is
+          still obviously a row; a vertical list that overflows is
+          indistinguishable from one that ended. */}
       <nav
         aria-label="Main"
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-2 max-wide:px-2"
+        className="scroll-visible scroll-fade flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-2 max-wide:px-2"
       >
         {NAV_GROUPS.map((group, index) => (
           // A real <section> per group, labelled by its own heading, so the
@@ -133,7 +149,7 @@ export async function Rail() {
               // same mistake that once left nine nav links unnamed.
               <h2
                 id={`nav-group-${index}`}
-                className="type-eyebrow px-[9px] pt-4 pb-[5px] text-muted max-wide:sr-only"
+                className="type-eyebrow px-[9px] pt-3 pb-[3px] text-muted max-wide:sr-only"
               >
                 {group.title}
               </h2>

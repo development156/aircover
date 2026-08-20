@@ -66,9 +66,30 @@ export function Drawer({
         // measured on /campaigns, `getComputedStyle(panel).textAlign === 'center'`
         // with no `text-center` anywhere in this file. An overlay's alignment must
         // come from the overlay, never from its mount point.
-        'max-h-none border border-line bg-surface p-0 text-left text-ink shadow-lg backdrop:bg-black/40',
+        // ── TWO UA DEFAULTS THAT HAD TO BE BEATEN, BOTH MEASURED ─────────────
+        // The user-agent stylesheet gives `dialog` BOTH
+        //   max-width:  calc((100% - 6px) - 2em)
+        //   max-height: calc((100% - 6px) - 2em)
+        // and neither is obvious from this file, because `w-full` and
+        // `max-h-[80dvh]` both LOOK like they win. They do not.
+        //
+        // WIDTH: shot at 390px on 2026-08-20, a `side="bottom"` drawer rendered
+        // ~352px wide with the page showing down its right edge — `w-full` set
+        // 100% and the UA cap took 38px straight back off. `max-w-none` is what
+        // makes a bottom sheet a bottom sheet. The right-hand drawer never
+        // noticed because its own width is already under the cap.
+        //
+        // HEIGHT: `max-h-none` used to sit in this BASE string beside
+        // `max-h-[80dvh]` in the side string. Two utilities for one property at
+        // equal specificity, so the winner is Tailwind's emitted order and not
+        // the order written here — and `max-h-none` won. The sheet grew to its
+        // content, `mt-auto` pinned its BOTTOM to the viewport, and its header
+        // and first two groups were off the top of the screen. It is now
+        // per-side: the right drawer is a full-height panel, the bottom one is
+        // capped and scrolls inside itself.
+        'max-w-none border border-line bg-surface p-0 text-left text-ink shadow-lg backdrop:bg-black/40',
         side === 'right'
-          ? 'mr-0 ml-auto h-dvh w-[min(420px,calc(100vw-48px))] rounded-l-card'
+          ? 'mr-0 ml-auto h-dvh max-h-none w-[min(420px,calc(100vw-48px))] rounded-l-card'
           : 'mt-auto mb-0 max-h-[80dvh] w-full rounded-t-card',
         className,
       )}

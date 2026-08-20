@@ -118,7 +118,16 @@ function SheetLink({ item }: { item: (typeof NAV_GROUPS)[number]['items'][number
         )}
       >
         <span className="min-w-0 flex-1">
-          <span className={cn('block text-[14px] font-[550]', active ? 'text-accent' : 'text-ink')}>
+          {/* `truncate` on the LABEL as well as the hint. Without it a long
+              label sets the row's minimum width and pushes the "Soon" marker
+              past the right edge — measured at 390px, where "The Loop" and
+              "Playbooks" rendered their marker clipped to "SOO". */}
+          <span
+            className={cn(
+              'block truncate text-[14px] font-[550]',
+              active ? 'text-accent' : 'text-ink',
+            )}
+          >
             {item.label}
           </span>
           <span className="type-sm block truncate text-muted">{item.hint}</span>

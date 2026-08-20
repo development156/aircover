@@ -460,6 +460,25 @@ destinations behind a state the user has to remember setting.
 button, and **More** — a `Drawer` holding the full map, grouped exactly as the rail groups it.
 It is a drawer and not a modal because consulting a menu does not demand an answer (§10.1).
 
+**A scroll region says it scrolls.** MEASURED at 1440×900: the rail's nav holds **938px** of
+content in a **718px** box, and `offsetWidth - clientWidth` came back **0** — Linux Chromium
+paints an overlay scrollbar that takes no layout width and does not appear until you already
+know to scroll, so 220px of destinations were hidden with no cue. `scrollbar-width: thin`,
+that property scoped away, and a forced `::-webkit-scrollbar` width each measured 0 as well.
+
+So the affordance is a **mask**: `.scroll-fade` fades the last 20px of the region into its
+background, and a fading edge reads as "this continues" the way a hard edge reads as "this
+ended". `.scroll-visible` still styles the bar for the engines that honour it. The fade is
+static, so it also softens the final 20px at the bottom of the scroll — the region's own
+bottom padding absorbs 8px of that, and the alternative is a list that lies about ending.
+
+**A bottom `Drawer` needs `max-w-none`.** The UA stylesheet caps every `dialog` at
+`calc((100% - 6px) - 2em)` in BOTH axes. `w-full` sets 100% and the cap takes 38px straight
+back, so a bottom sheet rendered 352px wide on a 390px phone with the page showing down its
+right edge. Never put `max-h-none` in the shared part of that class string either: it and
+`max-h-[80dvh]` are one property at equal specificity, the emitted order decides, and the
+sheet grew past the top of the screen.
+
 **A built screen nobody links to is the same as a screen that does not exist.**
 `src/lib/nav/reachable.test.ts` asserts every top-level route under `(app)` is either in the
 map or declared with the other way it is reached. Three finished features — Approvals,

@@ -368,3 +368,63 @@
 .ds-greyscale {
   filter: grayscale(1);
 }
+
+/* ── A SCROLL REGION THAT SAYS IT SCROLLS ────────────────────────────────────
+   MEASURED at 1440x900 on 2026-08-20: the rail's nav holds 938px of content in
+   a 718px box — 220px of destinations below the fold — and
+   `offsetWidth - clientWidth` came back as **0**. Chromium's default overlay
+   scrollbar takes no layout width and does not paint until you scroll, so a
+   list that continues is indistinguishable from a list that ended. Five
+   sections and all three account links were invisible with no cue.
+
+   `scrollbar-width: thin` alone does NOT fix that — it was tried first, and the
+   measurement above is from the tree that had it. The `::-webkit-scrollbar`
+   rules force a classic, space-taking, always-painted scrollbar in Chromium and
+   WebKit; `scrollbar-width`/`scrollbar-color` do the same job in Firefox.
+
+   Tokens only: the thumb is `--line-firm`, the same hairline every resting edge
+   in the app uses, so the bar reads as structure rather than as chrome. */
+/* `scrollbar-width` is scoped to engines WITHOUT ::-webkit-scrollbar, because
+   Chromium ignores the pseudo-element styling entirely once the standard
+   property is set — and its `thin` on Linux is an overlay bar of ZERO layout
+   width, which is the thing being fixed. MEASURED both ways: with
+   `scrollbar-width` unscoped, `offsetWidth - clientWidth` stayed 0. */
+@supports not selector(::-webkit-scrollbar) {
+  .scroll-visible {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-firm) transparent;
+  }
+}
+.scroll-visible::-webkit-scrollbar {
+  width: 8px;
+}
+.scroll-visible::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-visible::-webkit-scrollbar-thumb {
+  background: var(--line-firm);
+  border: 2px solid transparent;
+  background-clip: content-box;
+  border-radius: var(--r-full);
+}
+
+/* ── AND THE PART THAT DOES NOT DEPEND ON THE ENGINE'S SCROLLBAR ─────────────
+   The rules above are correct and were NOT enough: measured in headless
+   Chromium, `offsetWidth - clientWidth` stayed 0 with `scrollbar-width: thin`,
+   with it scoped away, and with the `::-webkit-scrollbar` width forced. Linux
+   Chromium paints an overlay bar regardless, so on the machine this app is
+   demoed from there is still no cue at rest.
+
+   So the affordance is a mask, which nothing can opt out of: the last 20px of a
+   `.scroll-fade` region fades into its background, and a fading edge reads as
+   "this continues" the way a hard edge reads as "this ended".
+
+   It is static, so it also fades the final 20px when you HAVE reached the
+   bottom. That is a real cost and it is the right trade: the region's own
+   bottom padding is 8px of it, so at full scroll the fade falls mostly on empty
+   space, and the alternative measured above is 220px of destinations hidden
+   with no signal whatsoever. */
+.scroll-fade {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent 100%);
+}

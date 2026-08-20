@@ -29,10 +29,21 @@ import { getActiveWorkspaceSlug, listWorkspaces, resolveActiveWorkspace } from '
  * exists, but pairing the two would invent a relationship the ledger does not
  * have — a Free workspace that tops up 500 credits would render "600 of 100".
  *
- * So the numerator is real and the denominator is an em dash, and the ratio BAR
- * is omitted entirely rather than drawn empty. A bar encodes a fraction; with no
- * denominator there is no fraction, and an unfilled track is not a neutral
- * container, it is a 0% claim.
+ * So the ratio BAR is omitted entirely rather than drawn empty — a bar encodes a
+ * fraction, and an unfilled track is not a neutral container, it is a 0% claim.
+ *
+ * AND THE WORDS "of —" ARE GONE TOO, which is the half this file originally got
+ * wrong while arguing itself into the right answer. It reasoned the denominator
+ * out of existence and then printed a slot for it: `100 of —` renders a
+ * numerator, the word "of", and an absence mark, which together assert that a
+ * fraction EXISTS and its denominator is merely unknown. That is a stronger
+ * claim than saying nothing, and it is false — there is no allowance to be a
+ * remainder of.
+ *
+ * docs/26 §4 names this exact string as the reason there is deliberately no
+ * absence class for "does not exist": if the quantity is not a quantity, delete
+ * the slot. So the number stands on its own under its own label, which is what
+ * a balance is.
  */
 
 /** One read, degraded rather than thrown — the rail renders on every page. */
@@ -95,7 +106,6 @@ export async function RailFoot() {
           <span className="num text-[19px] leading-none font-[650] tracking-[-0.02em]">
             {creditsText(balance)}
           </span>
-          <span className="text-[12px] text-muted">of &mdash;</span>
         </div>
         <div className="mt-1.5 flex items-center justify-between">
           <span className="text-[12px] text-muted">Credits left</span>
