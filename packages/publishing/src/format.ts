@@ -58,7 +58,12 @@ export {
 // banned barrels are `@sahoda/publishing`, `@sahoda/billing` and `@sahoda/mesh`
 // (see `no-client-barrel.test.ts`), and a `'use client'` component already
 // value-imports `CONSTRAINTS` from shared today.
-export { splitIntoThread, describeThread, countCodePoints, type ThreadSegment } from './thread-split'
+export {
+  splitIntoThread,
+  describeThread,
+  countCodePoints,
+  type ThreadSegment,
+} from './thread-split'
 // The per-channel controls, and the rules that make each valid. Reachable from
 // the browser so the composer runs the SAME refusal the publish path runs — a
 // second copy of "2 to 4 answers" is how an editor and a publisher come to

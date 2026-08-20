@@ -90,7 +90,8 @@ export interface ThreadPlan {
   limit: number
 }
 
-export type ThreadPlanResult = { ok: true; plan: ThreadPlan } | { ok: false; refusal: FormatRefusal }
+export type ThreadPlanResult =
+  { ok: true; plan: ThreadPlan } | { ok: false; refusal: FormatRefusal }
 
 /**
  * Plan the thread this text publishes as, or say why it cannot.

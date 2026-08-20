@@ -234,8 +234,7 @@ export function refuseGbpTopic(options: VariantOptions): FormatRefusal | null {
       // what it says it is. Refusing is the same rule the format column enforces.
       return {
         code: 'GBP_OFFER_EMPTY',
-        message:
-          'An offer needs at least one of a coupon code, a link to redeem it, or its terms.',
+        message: 'An offer needs at least one of a coupon code, a link to redeem it, or its terms.',
       }
     }
     return null

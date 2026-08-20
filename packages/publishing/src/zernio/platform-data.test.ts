@@ -332,7 +332,10 @@ describe('the Google topic on the wire', () => {
       channel: 'gbp',
       format: 'text',
       content: gbp(),
-      options: { gbpTopic: 'OFFER', gbpOffer: { couponCode: 'SAVE10', redeemUrl: '  ', terms: '' } },
+      options: {
+        gbpTopic: 'OFFER',
+        gbpOffer: { couponCode: 'SAVE10', redeemUrl: '  ', terms: '' },
+      },
     })
     expect(r).toEqual({ ok: true, data: { topicType: 'OFFER', offer: { couponCode: 'SAVE10' } } })
   })

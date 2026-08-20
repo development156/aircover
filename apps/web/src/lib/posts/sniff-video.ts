@@ -37,8 +37,7 @@ export type VideoSniffResult =
   | { ok: true; video: SniffedVideo }
   | { ok: false; reason: 'unknown_format' | 'truncated'; message: string }
 
-const UNKNOWN_FORMAT_MESSAGE =
-  'Upload an MP4 — this file is not a video type the channels accept.'
+const UNKNOWN_FORMAT_MESSAGE = 'Upload an MP4 — this file is not a video type the channels accept.'
 
 /**
  * ── "WE COULD NOT READ IT" IS NOT "IT IS TOO LONG" ─────────────────────────

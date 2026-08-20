@@ -159,8 +159,8 @@ export function VersionOptions({
       {channel === 'x' && format === 'thread' ? (
         <div className="narrow:col-span-2">
           <NotBuiltYet>
-            Photos on a chosen step of the thread are not built yet. Any photos you attach go on
-            the first post.
+            Photos on a chosen step of the thread are not built yet. Any photos you attach go on the
+            first post.
           </NotBuiltYet>
         </div>
       ) : null}

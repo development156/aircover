@@ -68,7 +68,9 @@ describe('poll bounds, at the edges Zernio actually refuses at', () => {
     [140, null],
     [141, 'POLL_QUESTION_TOO_LONG'],
   ])('linkedin: a question of %i characters → %s', (length, code) => {
-    expect(refusePoll('linkedin', liPoll({ question: 'q'.repeat(length) }))?.code ?? null).toBe(code)
+    expect(refusePoll('linkedin', liPoll({ question: 'q'.repeat(length) }))?.code ?? null).toBe(
+      code,
+    )
   })
 
   it('linkedin: needs a question of its own, unlike X', () => {
@@ -80,7 +82,9 @@ describe('poll bounds, at the edges Zernio actually refuses at', () => {
     for (const durationCode of LINKEDIN_POLL_DURATIONS) {
       expect(refusePoll('linkedin', liPoll({ durationCode }))).toBeNull()
     }
-    expect(refusePoll('linkedin', liPoll({ durationCode: 'TWO_YEARS' }))?.code).toBe('POLL_DURATION')
+    expect(refusePoll('linkedin', liPoll({ durationCode: 'TWO_YEARS' }))?.code).toBe(
+      'POLL_DURATION',
+    )
     expect(refusePoll('linkedin', liPoll({ durationCode: 'ONE_HOUR' }))?.code).toBe('POLL_DURATION')
   })
 
@@ -142,7 +146,8 @@ describe('the Google topic, checked by us because nobody else does', () => {
 
   it('refuses an event with no start date — the one Google 400s on', () => {
     expect(
-      refuseGbpTopic({ gbpTopic: 'EVENT', gbpEvent: { title: 'Diwali sale', startDate: '' } })?.code,
+      refuseGbpTopic({ gbpTopic: 'EVENT', gbpEvent: { title: 'Diwali sale', startDate: '' } })
+        ?.code,
     ).toBe('GBP_EVENT_NEEDS_DATE')
   })
 

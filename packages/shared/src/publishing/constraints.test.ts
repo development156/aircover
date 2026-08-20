@@ -63,18 +63,15 @@ describe('constraint engine v0', () => {
     [749, 1000, true, '0.7490 — one pixel narrower, refused'],
     [1910, 1000, false, '1.9100 — the ceiling itself, accepted'],
     [1911, 1000, true, '1.9110 — one pixel wider, refused'],
-  ])(
-    'instagram aspect %ix%i → refused=%s (%s)',
-    (width, height, refused) => {
-      const res = validateMedia([CONSTRAINTS.instagram], {
-        mime: 'image/jpeg',
-        bytes: 1_000_000,
-        width,
-        height,
-      })
-      expect(res[0]!.violations.some((v) => v.code === 'MEDIA_ASPECT')).toBe(refused)
-    },
-  )
+  ])('instagram aspect %ix%i → refused=%s (%s)', (width, height, refused) => {
+    const res = validateMedia([CONSTRAINTS.instagram], {
+      mime: 'image/jpeg',
+      bytes: 1_000_000,
+      width,
+      height,
+    })
+    expect(res[0]!.violations.some((v) => v.code === 'MEDIA_ASPECT')).toBe(refused)
+  })
 
   it('instagram refuses a non-JPEG/PNG at compose time', () => {
     const res = validateMedia([CONSTRAINTS.instagram], {

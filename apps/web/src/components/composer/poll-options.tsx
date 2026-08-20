@@ -79,7 +79,8 @@ export function PollOptions({ channel, extras, onExtrasChange, mediaCount }: Pol
   const filled = answers.filter((answer) => answer.trim() !== '')
   // The publisher's own verdict, not a local re-derivation. Only shown once the
   // writer has started answering — an empty poll is unfinished, not wrong.
-  const refusal = on && filled.length > 0 ? refusePoll(channel, { ...poll, options: answers }) : null
+  const refusal =
+    on && filled.length > 0 ? refusePoll(channel, { ...poll, options: answers }) : null
 
   return (
     <div className="narrow:col-span-2 space-y-2">
@@ -167,7 +168,9 @@ export function PollOptions({ channel, extras, onExtrasChange, mediaCount }: Pol
               id="poll-duration"
               data-poll-duration
               className={SELECT_CLASS}
-              value={channel === 'x' ? String(poll?.durationMinutes ?? '') : (poll?.durationCode ?? '')}
+              value={
+                channel === 'x' ? String(poll?.durationMinutes ?? '') : (poll?.durationCode ?? '')
+              }
               onChange={(event) =>
                 setPoll(
                   channel === 'x'

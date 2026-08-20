@@ -69,7 +69,9 @@ describe('readOptions', () => {
   it('ignores a Google topic it does not recognise', () => {
     // 'BANANA' passes Zernio's own dry run (MEASURED, docs/32 §4.3). It does not
     // pass here, and a topic we cannot act on states no intent to act on.
-    expect(readOptions({ gbpTopic: 'BANANA', gbpEvent: { title: 'x', startDate: 'y' } })).toBeUndefined()
+    expect(
+      readOptions({ gbpTopic: 'BANANA', gbpEvent: { title: 'x', startDate: 'y' } }),
+    ).toBeUndefined()
   })
 
   it('keeps an event with missing halves so the builder can say which is missing', () => {

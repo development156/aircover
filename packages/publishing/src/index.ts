@@ -215,6 +215,17 @@ export {
 // collaborators, AI disclosure. Rules live beside the parse because for most of
 // these NOBODY ELSE CHECKS: Zernio validates Google's platformSpecificData not at
 // all, and polls are the one block it fully enforces (docs/32 §4).
+// The per-platform half of a publish payload. Exported so the chain from a
+// composer control to the wire can be followed END TO END in one test — the
+// Google button had tests at both ends and died in the middle.
+export {
+  buildPlatformData,
+  zernioMediaType,
+  type PlatformData,
+  type PlatformDataInput,
+  type PlatformDataResult,
+} from './zernio/platform-data'
+
 // What can be done to a post AFTER it is live. The platform vocabulary here is
 // NOT the publish one — gbp is `googlebusiness`, not `google`, and edit accepts
 // only twitter of our four. Both measured from the endpoints' own 400s.

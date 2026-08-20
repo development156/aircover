@@ -143,7 +143,10 @@ export function VersionCard({
   // It removes exactly MAX_CHARS and nothing else, the same single swap
   // `runPublishPost` makes — so a thread with too many hashtags is still red.
   const meter = asThread(
-    withFormat(withFormat(meterFor(channel, draft), refuseFormat(spec, format, mediaCount)), shapeRefusal),
+    withFormat(
+      withFormat(meterFor(channel, draft), refuseFormat(spec, format, mediaCount)),
+      shapeRefusal,
+    ),
     thread,
   )
 

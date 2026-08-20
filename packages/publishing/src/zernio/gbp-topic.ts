@@ -15,7 +15,10 @@ import type { PlatformData, PlatformDataResult } from './platform-data'
  * quoted in their schema description (docs/31 §2.4). Sending a string here is
  * the kind of mistake that returns 200 and produces an event with no date.
  */
-export function withGbpTopic(base: PlatformData, options: VariantOptions | undefined): PlatformDataResult {
+export function withGbpTopic(
+  base: PlatformData,
+  options: VariantOptions | undefined,
+): PlatformDataResult {
   const refusal = refuseGbpTopic(options ?? {})
   if (refusal !== null) return { ok: false, refusal }
 

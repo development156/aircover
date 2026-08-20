@@ -45,7 +45,10 @@ describe('splitIntoThread', () => {
     for (const body of bodies) {
       for (const limit of [12, 25, 60, 140]) {
         const joined = splitIntoThread(body, limit).join('')
-        const strip = (s: string) => Array.from(s).filter((c) => !/\s/.test(c)).join('')
+        const strip = (s: string) =>
+          Array.from(s)
+            .filter((c) => !/\s/.test(c))
+            .join('')
         expect(strip(joined)).toBe(strip(body))
       }
     }
@@ -95,7 +98,9 @@ describe('splitIntoThread', () => {
     const segments = splitIntoThread('😀'.repeat(200), 50)
     for (const s of segments) {
       expect(countCodePoints(s)).toBeLessThanOrEqual(50)
-      expect(s).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/)
+      expect(s).not.toMatch(
+        /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/,
+      )
     }
     expect(segments.join('')).toBe('😀'.repeat(200))
   })
