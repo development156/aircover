@@ -1,165 +1,237 @@
 import Link from 'next/link'
-import { Mail, MessageCircle, Monitor } from 'lucide-react'
 
 import { PageTitle } from '@/components/page-title'
-import { InertButton, InertChip, RoadmapBanner } from '@/components/roadmap/inert'
-import { NotRunningNote } from '@/components/roadmap/parts'
+import { reflectionWindow } from '@/lib/loop/iso-week'
+import { readLoopSnapshot } from '@/lib/loop/read'
+import { readCycleLearnings, readRanking } from '@/lib/loop/report'
+import { getActiveWorkspace } from '@/lib/workspaces'
 
 export const metadata = { title: 'CMO Report' }
 
 /**
- * THE CMO REPORT — drawn as a document, because that is what it is.
+ * THE CMO REPORT — the Monday read, from what the cycle actually produced.
  *
- * ── WHY THIS IS NOT A DASHBOARD, AND THE DIFFERENCE IS THE WHOLE POINT ───────
- * Every competitor's "weekly summary" is a grid of tiles: reach, followers,
- * engagement rate, four sparklines. A grid of tiles asks the reader to do the
- * analysis. The CMO Report is the analysis — the thing a marketing employee
- * would hand you on a Monday: here is what worked, here is what did not, here is
- * what I changed my mind about, here is what I am doing this week.
+ * ── STILL A DOCUMENT, NOT A DASHBOARD, AND THAT IS THE WHOLE POINT ───────────
+ * wt-ia's reasoning holds and the form is unchanged: a single column of prose
+ * blocks at reading measure, not cards in a grid. Every competitor's weekly
+ * summary is a grid of tiles, and a grid of tiles asks the reader to do the
+ * analysis. This is the analysis — the thing a marketing employee would hand you
+ * on a Monday.
  *
- * So it is set as a single column of prose blocks at reading measure, not as
- * cards in a grid. The form carries the claim: this is something you READ.
- * PRD §5.3 removed the 3D globe from the dashboard and named this as its
- * replacement for exactly this reason.
+ * ── WHAT CHANGED: THE BLOCKS ARE FILLED, OR THEY SAY WHY NOT ─────────────────
+ * The roadmap version described what would fill each block and showed nothing,
+ * and it closed with a note saying no report had been produced. That note is
+ * false the moment a cycle finishes, so it is gone — replaced by an empty state
+ * that says the same thing only when it is still true.
  *
- * ── THE SLOTS ARE NAMED AND EMPTY, AND THE EMPTINESS IS LOAD-BEARING ─────────
- * "Your best post last week" is a real thing this report will name — but naming
- * one requires a post, a metric read, and a comparison, none of which has
- * happened. A specimen ("Diwali offer — 2,400 reach") would be the single most
- * damaging invented figure in this app, because it would look exactly like the
- * real thing. Each block therefore states what will fill it and shows nothing.
- *
- * There is no date on this page either. A report has a week; this one has none,
- * because no week has been reported.
+ * ── EVERY FIGURE IS FROM A QUERY, OR ABSENT ──────────────────────────────────
+ * Absent, not zero and not a dash. A zero is a measurement of nothing, which is
+ * a claim about the reader's business; a dash is a zero in a costume. Where
+ * there is no ranking to make — fewer than two posts measured — the block says
+ * so, because one post is simultaneously the best and the worst and printing
+ * that is worse than printing nothing.
  */
+export default async function ReportPage() {
+  const workspace = await getActiveWorkspace()
+  if (!workspace) {
+    return (
+      <div className="space-y-grid">
+        <PageTitle sub="The Monday read: what last week did, what Sahoda learned from it, and what it plans to do next.">
+          CMO Report
+        </PageTitle>
+        <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
+          Finish setting up your workspace and your reports appear here.
+        </p>
+      </div>
+    )
+  }
 
-const DELIVERY = [
-  {
-    icon: Monitor,
-    where: 'Here, in the app',
-    note: 'The full report, with every post it names linked.',
-  },
-  {
-    icon: Mail,
-    where: 'Your email',
-    note: 'The same report, so it is waiting when you open your inbox.',
-  },
-  {
-    icon: MessageCircle,
-    where: 'WhatsApp',
-    note: 'A short card with the headline and a link, once your number is verified.',
-  },
-] as const
+  const snapshot = await readLoopSnapshot(workspace.id)
+  const cycle = snapshot.cycle
 
-/** A block of the report. Titled, explained, and empty of readings. */
-function ReportBlock({
-  eyebrow,
-  title,
-  what,
-  children,
-}: {
-  eyebrow: string
-  title: string
-  what: string
-  children?: React.ReactNode
-}) {
-  return (
-    <section className="is-proposed rounded-card p-4">
-      <p className="type-eyebrow text-muted">{eyebrow}</p>
-      <h3 className="type-h3 mt-1 text-ink">{title}</h3>
-      <p className="type-body mt-1 max-w-[68ch] text-muted">{what}</p>
-      {children}
-    </section>
-  )
-}
+  if (!cycle) {
+    return (
+      <div className="space-y-grid">
+        <PageTitle sub="The Monday read: what last week did, what Sahoda learned from it, and what it plans to do next.">
+          CMO Report
+        </PageTitle>
+        <section className="surface-ring rounded-card bg-surface p-4">
+          <h2 className="type-h2">No week has been reported yet</h2>
+          <p className="type-body mt-1 max-w-[68ch] text-muted">
+            A report is written at the end of each Loop cycle. Run one from{' '}
+            <Link href="/loop" className="font-[550] text-accent underline underline-offset-2">
+              The Loop
+            </Link>{' '}
+            and this page fills in. What you can read today is on{' '}
+            <Link href="/analytics" className="font-[550] text-accent underline underline-offset-2">
+              Analytics
+            </Link>
+            , which reports what actually went out.
+          </p>
+        </section>
+      </div>
+    )
+  }
 
-export default function ReportPage() {
+  const window = reflectionWindow(new Date(cycle.startedAt))
+  const [ranking, learnings] = await Promise.all([
+    readRanking(workspace.id, window.fromIso, window.toIso),
+    readCycleLearnings(workspace.id, cycle.id),
+  ])
+
+  const written = snapshot.briefs.filter((b) => b.postId !== null)
+
   return (
     <div className="space-y-grid">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <PageTitle sub="The Monday read: what last week did, what Sahoda learned from it, and what it plans to do next.">
           CMO Report
         </PageTitle>
-        <InertButton>Send me a copy</InertButton>
+        {/* A real week, so a real date. The roadmap version had none, and said
+            so — "a report has a week; this one has none". This one has one. */}
+        <p className="type-sm num mt-1 text-muted">
+          Week {cycle.isoWeek}, {cycle.isoYear}
+        </p>
       </div>
 
-      <RoadmapBanner what="A short written report every Monday morning, produced by the Loop at the end of each week." />
-
-      {/* Week chips with no weeks in them: a date range would name a week that
-          was never reported on. */}
-      <div className="flex flex-wrap gap-1.5">
-        <InertChip on>Latest</InertChip>
-        <InertChip>Earlier weeks</InertChip>
-      </div>
-
-      {/* Reading measure, single column, on every width. A report is read top to
-          bottom; putting these side by side would turn it back into a dashboard. */}
       <div className="flex max-w-[860px] flex-col gap-3">
-        <ReportBlock
-          eyebrow="Opens with"
-          title="One sentence about your week"
-          what="Not a number. The thing you would tell a friend who asked how the shop's marketing went — whether it was quiet, whether something landed, whether something broke."
-        />
-        <ReportBlock
-          eyebrow="Then"
-          title="The post that did best, and why"
-          what="One post, named and linked, with a short reason: the hour it went out, the format, the thing it was about. The reason is the useful half — a winner with no explanation teaches nothing."
-        />
-        <ReportBlock
-          eyebrow="And"
-          title="The one that did worst, said plainly"
-          what="The same treatment, without softening. A report that only prints good news is a report nobody acts on."
-        />
-        <ReportBlock
-          eyebrow="The part that changes things"
-          title="What Sahoda learned"
-          what="One or two learnings, each written as a proposed change to your Brand Brain. You accept or reject each one. Nothing is written into your brand behind your back."
-        >
-          <p className="type-sm mt-2 text-muted">
-            This is the step that makes next week&rsquo;s writing different from this week&rsquo;s.
+        {/* ── LAST WEEK ─────────────────────────────────────────────────── */}
+        <Block eyebrow="Last week" title="How it went">
+          {ranking ? (
+            <p className="type-body max-w-[68ch] text-muted">
+              <span className="num">{ranking.postsMeasured}</span> of your posts were measured
+              between {window.fromIso} and {window.toIso}.
+            </p>
+          ) : (
+            <p className="type-body max-w-[68ch] text-muted">
+              {cycle.reflectSkippedNoHistory
+                ? 'Nothing of yours has been measured yet, so there is nothing to report on last week. This fills in once posts have gone out and the numbers have come back.'
+                : 'Fewer than two of your posts were measured last week, so there is no best and worst to name — with one post, the same post is both.'}
+            </p>
+          )}
+        </Block>
+
+        {ranking ? (
+          <>
+            <Block eyebrow="Then" title="The post that reached the most people">
+              <p className="type-body max-w-[68ch] text-ink">{ranking.top.title}</p>
+              <p className="type-sm mt-1 text-muted">
+                <span className="num">{ranking.top.value}</span> {ranking.top.metric} on{' '}
+                {ranking.top.channel}.
+              </p>
+            </Block>
+            <Block eyebrow="And" title="The one that reached the fewest">
+              <p className="type-body max-w-[68ch] text-ink">{ranking.bottom.title}</p>
+              <p className="type-sm mt-1 text-muted">
+                <span className="num">{ranking.bottom.value}</span> {ranking.bottom.metric} on{' '}
+                {ranking.bottom.channel}.
+              </p>
+              {/* NO REASON IS GIVEN, and its absence is deliberate. wt-ia's
+                  version promised "a short reason: the hour it went out, the
+                  format, the thing it was about". Every one of those would be
+                  Sahoda asserting a CAUSE, and nothing here has tested one — a
+                  post did worse and why is not something this query knows. */}
+              <p className="type-sm mt-2 text-muted">
+                Sahoda has not worked out why, and will not guess.
+              </p>
+            </Block>
+          </>
+        ) : null}
+
+        {/* ── WHAT IT LEARNED ───────────────────────────────────────────── */}
+        <Block eyebrow="The part that changes things" title="What Sahoda learned">
+          {learnings.length === 0 ? (
+            <p className="type-body max-w-[68ch] text-muted">
+              {cycle.reflectSkippedNoHistory
+                ? 'Nothing — there was nothing to learn from. No post of yours has been measured, so Sahoda ran no insight pass at all rather than inventing one.'
+                : 'Nothing this week. Sahoda read your numbers and found no difference big enough to be worth acting on, which is a real answer and not a failure.'}
+            </p>
+          ) : (
+            <ul className="grid gap-2">
+              {learnings.map((learning, index) => (
+                <li key={index} className="rounded-input bg-subtle p-3">
+                  <p className="type-body text-ink">{learning.summary}</p>
+                  <p className="type-sm mt-1 text-muted">
+                    {learning.status === 'accepted'
+                      ? `You added this to your Brand Brain${learning.appliedVersion !== null ? ` — version ${learning.appliedVersion}` : ''}.`
+                      : learning.status === 'rejected'
+                        ? 'You turned this down. Your Brand Brain is unchanged.'
+                        : 'Waiting for you on the Loop screen. Nothing has been written into your brand.'}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Block>
+
+        {/* ── THIS WEEK ─────────────────────────────────────────────────── */}
+        <Block eyebrow="Ends with" title="This week's plan">
+          {written.length === 0 ? (
+            <p className="type-body max-w-[68ch] text-muted">
+              Nothing has been written for this week yet.
+            </p>
+          ) : (
+            <ul className="grid gap-2">
+              {written.map((brief) => (
+                <li key={brief.id} className="rounded-input bg-subtle p-3">
+                  <p className="type-body text-ink">{brief.title}</p>
+                  <p className="type-sm mt-1 text-muted">
+                    {brief.channels.join(' · ')}
+                    {brief.stageOutcome === 'awaiting_approval'
+                      ? ' — scheduled, waiting for your approval'
+                      : ' — a draft in your Planner'}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Block>
+
+        {/* ── THE MONEY ─────────────────────────────────────────────────── */}
+        <Block eyebrow="And what it cost" title="Credits used">
+          <dl className="grid gap-1">
+            <div className="flex justify-between gap-4">
+              <dt className="type-body text-muted">Spent on this week</dt>
+              <dd className="type-body num text-ink">{cycle.spentCredits} cr</dd>
+            </div>
+            {cycle.budgetCredits !== null ? (
+              <div className="flex justify-between gap-4">
+                <dt className="type-body text-muted">Your weekly budget</dt>
+                <dd className="type-body num text-muted">{cycle.budgetCredits} cr</dd>
+              </div>
+            ) : null}
+            {cycle.approvedCredits !== null && cycle.estimatedCredits !== null ? (
+              <p className="type-sm mt-1 text-muted">
+                Sahoda proposed <span className="num">{cycle.estimatedCredits}</span> credits of
+                writing; you approved <span className="num">{cycle.approvedCredits}</span>.
+              </p>
+            ) : null}
+          </dl>
+          <p className="type-sm mt-3">
+            <Link href="/wallet" className="font-[550] text-accent underline underline-offset-2">
+              See every charge in your wallet
+            </Link>
           </p>
-        </ReportBlock>
-        <ReportBlock
-          eyebrow="Ends with"
-          title="This week's plan"
-          what="The briefs the Loop intends to write, on the days it intends to publish them, with what it will cost before anything is spent. You can cut any of them here."
-        />
+        </Block>
       </div>
-
-      <section
-        aria-labelledby="report-delivery"
-        className="surface-ring rounded-card bg-surface p-4"
-      >
-        <h2 id="report-delivery" className="type-h3">
-          Where it arrives
-        </h2>
-        <ul className="mt-2 grid gap-2 wide:grid-cols-3">
-          {DELIVERY.map((row) => (
-            <li key={row.where} className="flex gap-2">
-              <row.icon
-                size={15}
-                strokeWidth={1.8}
-                aria-hidden
-                className="mt-[3px] shrink-0 text-muted"
-              />
-              <span className="min-w-0">
-                <span className="type-h3 block">{row.where}</span>
-                <span className="type-sm block text-muted">{row.note}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <NotRunningNote>
-        No report has been produced. The Loop that writes it is not running, so this page has no
-        week to show &mdash; which is why every block above describes what will fill it rather than
-        showing an example. What you CAN read today is on{' '}
-        <Link href="/analytics" className="font-[550] text-accent underline underline-offset-2">
-          Analytics
-        </Link>
-        , which reports what actually went out.
-      </NotRunningNote>
     </div>
+  )
+}
+
+function Block({
+  eyebrow,
+  title,
+  children,
+}: {
+  eyebrow: string
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="surface-ring rounded-card bg-surface p-4">
+      <p className="type-eyebrow text-muted">{eyebrow}</p>
+      <h3 className="type-h3 mt-1 text-ink">{title}</h3>
+      <div className="mt-2">{children}</div>
+    </section>
   )
 }

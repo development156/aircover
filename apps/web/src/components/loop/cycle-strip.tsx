@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
+import type { LoopCycleStatus } from '@sahoda/shared'
+
 /**
  * THE SEVEN STAGES OF ONE WEEK — the Loop section's signature.
  *
@@ -31,7 +33,39 @@ import type { LucideIcon } from 'lucide-react'
  * NOT ONE STAGE CARRIES A FIGURE. No durations, no counts, no "5–7 posts". The
  * plan stage will produce briefs; how many is a decision about the reader's
  * week, and no query behind this screen has made it.
+ *
+ * ── AND NOW IT MARKS WHERE A REAL CYCLE IS ───────────────────────────────────
+ * wt-ia drew this with no stage marked, and said so plainly: there was no cycle,
+ * so any highlight would have been a claim about the reader's week with nothing
+ * behind it. There is a cycle now, `loop_cycles.status` names a stage of exactly
+ * this machine, and the marker reads that column.
+ *
+ * Passing no `status` still draws the strip unmarked, which is the correct
+ * rendering for a workspace that has never run one — the honest empty state did
+ * not stop being honest.
  */
+
+/**
+ * Which stage a cycle status is showing. The halt is drawn ON the plan stage
+ * rather than as a stage of its own: `awaiting_cost_approval` is not a seventh
+ * thing Sahoda does, it is the plan stage finished and waiting for a person,
+ * and giving it its own marker would make the strip disagree with the diagram
+ * the FSD describes.
+ */
+const STATUS_STAGE: Record<LoopCycleStatus, number> = {
+  collecting: 0,
+  reflecting: 1,
+  planning: 2,
+  awaiting_cost_approval: 2,
+  creating: 3,
+  testing: 4,
+  staging: 5,
+  reported: 6,
+  // A cycle that ended badly has no current stage. Marking one would say it is
+  // still working on something it stopped doing.
+  cancelled: -1,
+  failed: -1,
+}
 
 const STAGES: ReadonlyArray<{ icon: LucideIcon; name: string; what: string }> = [
   {
@@ -71,7 +105,13 @@ const STAGES: ReadonlyArray<{ icon: LucideIcon; name: string; what: string }> = 
   },
 ]
 
-export function CycleStrip() {
+export interface CycleStripProps {
+  /** The live cycle's status, or undefined when no cycle has ever run. */
+  status?: LoopCycleStatus
+}
+
+export function CycleStrip({ status }: CycleStripProps = {}) {
+  const current = status ? STATUS_STAGE[status] : -1
   return (
     <section aria-labelledby="loop-cycle" className="flex flex-col gap-3">
       <div>
@@ -85,23 +125,44 @@ export function CycleStrip() {
       </div>
 
       <ol className="grid gap-2 wide:grid-cols-7 max-wide:grid-cols-2 max-narrow:grid-cols-1">
-        {STAGES.map((stage, index) => (
-          <li
-            key={stage.name}
-            className="is-proposed flex flex-col gap-1.5 rounded-card p-3"
-            data-inert-control
-          >
-            <span className="flex items-center gap-2">
-              <stage.icon size={15} strokeWidth={1.8} aria-hidden className="shrink-0 text-muted" />
-              <span className="type-eyebrow num text-muted">
-                {index + 1}
-                <span className="sr-only"> of 7</span>
+        {STAGES.map((stage, index) => {
+          const isCurrent = index === current
+          const isDone = current >= 0 && index < current
+          return (
+            <li
+              key={stage.name}
+              // `aria-current="step"` rather than colour alone: the marker is a
+              // fact about the reader's week and has to reach someone who
+              // cannot see the accent.
+              aria-current={isCurrent ? 'step' : undefined}
+              className={[
+                'flex flex-col gap-1.5 rounded-card p-3',
+                isCurrent
+                  ? 'bg-accent-subtle ring-1 ring-[var(--accent)]'
+                  : isDone
+                    ? 'surface-ring bg-surface'
+                    : 'is-proposed',
+              ].join(' ')}
+              data-inert-control={current < 0 ? '' : undefined}
+            >
+              <span className="flex items-center gap-2">
+                <stage.icon
+                  size={15}
+                  strokeWidth={1.8}
+                  aria-hidden
+                  className={['shrink-0', isCurrent ? 'text-accent' : 'text-muted'].join(' ')}
+                />
+                <span className="type-eyebrow num text-muted">
+                  {index + 1}
+                  <span className="sr-only"> of 7</span>
+                </span>
+                {isCurrent ? <span className="type-eyebrow text-accent">Now</span> : null}
               </span>
-            </span>
-            <span className="type-h3 text-ink">{stage.name}</span>
-            <span className="type-sm text-muted">{stage.what}</span>
-          </li>
-        ))}
+              <span className="type-h3 text-ink">{stage.name}</span>
+              <span className="type-sm text-muted">{stage.what}</span>
+            </li>
+          )
+        })}
       </ol>
 
       {/* The return edge, stated rather than drawn. This is the sentence a
