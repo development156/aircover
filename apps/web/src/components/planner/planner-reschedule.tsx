@@ -81,7 +81,12 @@ export function PlannerReschedule({
         onClick={() => setOpen((wasOpen) => !wasOpen)}
         aria-expanded={open}
       >
-        {open ? 'Close' : 'Reschedule'}
+        {/* "Reschedule" states that a schedule exists. MEASURED on the
+            /planner list: seven of eight rows read "Not scheduled" and offered
+            "Reschedule" — a verb for an event that had never happened. The
+            control is the same; the word now matches what the row says about
+            itself two columns to the left. */}
+        {open ? 'Close' : current ? 'Reschedule' : 'Schedule'}
       </Button>
       {open ? (
         <div className="w-64" aria-busy={pending}>
