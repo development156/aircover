@@ -113,7 +113,30 @@ export {
   type ZernioPlatformFilter,
   type ZernioMessagePage,
   type MessageSortOrder,
+  type ZernioDemographicBucket,
+  type ZernioInstagramDemographics,
 } from './zernio/reads'
+
+// ── What an audience read is ALLOWED to claim ────────────────────────────────
+// Its sibling `analytics-state` exists because Zernio answers with ZEROES where
+// nothing was measured. This exists because it answers with an EMPTY ARRAY in four
+// situations that need four different sentences — and one of them, an account under
+// Meta's 100-follower floor, is byte-identical to "the platform reported nothing".
+// Nothing outside this module may decide which it was.
+export {
+  classifyAudience,
+  breakdownFrom,
+  bucketsFrom,
+  mayOfferRetry,
+  AUDIENCE_DIMENSIONS,
+  DEMOGRAPHICS_FOLLOWER_FLOOR,
+  POPULATION_METRIC,
+  type AudienceState,
+  type AudienceBreakdown,
+  type AudienceBucket,
+  type AudienceDimension,
+  type AudiencePopulation,
+} from './zernio/audience-state'
 
 // ── The inbox WRITE surface, deliberately a separate handle ──────────────────
 // `ZernioReads` has no method that can post, and screens that display a conversation
