@@ -100,3 +100,51 @@ describe('a control the writer fills in reaches the wire', () => {
     expect(optionsFromExtras(parseExtras({ hashtags: ['#chai'] }))).toBeUndefined()
   })
 })
+
+/**
+ * ── THE PATCH IS A PATCH, AND A SHARED COLUMN DEPENDS ON IT ─────────────────
+ * `use-variants` merges shallowly — `{ ...current.extras, ...patch }` — and every
+ * panel here passes a patch naming only its own keys. If any of them passed a
+ * whole object instead, ticking the poll checkbox would wipe `gbpCta` and
+ * `hashtags` from the same row: the shared-column clobber `parseExtras`'s
+ * `.loose()` exists to prevent, one layer up and out of its reach.
+ *
+ * These assert the two halves of that contract at the seam the panels write to.
+ */
+describe('a control writes a patch, not a replacement', () => {
+  const merge = (extras: Record<string, unknown>, patch: Record<string, unknown>) =>
+    parseExtras({ ...extras, ...patch })
+
+  it('adding a poll leaves the hashtags and the Google button alone', () => {
+    const before = { hashtags: ['#chai'], gbpCta: 'ORDER', ctaUrl: 'https://x.example' }
+    const after = merge(before, { poll: { options: ['a', 'b'], durationMinutes: 60 } })
+    expect(after.hashtags).toEqual(['#chai'])
+    expect(after.gbpCta).toBe('ORDER')
+    expect(after.ctaUrl).toBe('https://x.example')
+    expect(after.poll).toBeDefined()
+  })
+
+  it('removing a poll clears it and nothing else', () => {
+    // The checkbox patches `{ poll: undefined }`. A shallow merge leaves the KEY
+    // present holding undefined; jsonb serialisation drops it. Both steps have to
+    // hold, so both are asserted.
+    const before = { hashtags: ['#chai'], poll: { options: ['a', 'b'] } }
+    const after = merge(before, { poll: undefined })
+    expect(after.poll).toBeUndefined()
+    expect(after.hashtags).toEqual(['#chai'])
+    expect(JSON.parse(JSON.stringify(after))).not.toHaveProperty('poll')
+  })
+
+  it('switching the Google topic clears the other kind’s fields', () => {
+    // Or an offer's coupon rides out on a post that is now an event.
+    const before = { gbpTopic: 'OFFER' as const, gbpOffer: { couponCode: 'SAVE10' } }
+    const after = merge(before, {
+      gbpTopic: 'EVENT',
+      gbpEvent: { title: 'Sale', startDate: '2026-11-01' },
+      gbpOffer: undefined,
+    })
+    expect(after.gbpOffer).toBeUndefined()
+    expect(optionsFromExtras(after)).toMatchObject({ gbpTopic: 'EVENT' })
+    expect(optionsFromExtras(after)?.gbpOffer).toBeUndefined()
+  })
+})
