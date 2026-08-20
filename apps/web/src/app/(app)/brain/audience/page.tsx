@@ -8,7 +8,11 @@ import { FollowerThreshold } from '@/components/audience/threshold'
 import { FollowerTrend } from '@/components/audience/trend'
 import { EmptyState } from '@/components/empty-state'
 import { buttonVariants } from '@/components/ui/button'
-import { readAudiencePage, type CollectedHistory } from '@/lib/audience/page-data'
+import {
+  readAudiencePage,
+  type AudiencePageData,
+  type CollectedHistory,
+} from '@/lib/audience/page-data'
 
 export const metadata = { title: 'Audience' }
 
@@ -61,7 +65,7 @@ function CollectionNote({ history }: { history: CollectedHistory }) {
 }
 
 export default async function BrainAudiencePage() {
-  const { state, history, username, floor } = await readAudiencePage()
+  const { state, history, lastCollected, username, floor } = await readAudiencePage()
 
   const heading = (
     <div className="flex flex-col gap-1">
@@ -139,6 +143,7 @@ export default async function BrainAudiencePage() {
           <CollectionNote history={history} />
         </section>
         {history.followers.length > 0 ? <Kept history={history} floor={floor} /> : null}
+        <LastCollected collected={lastCollected} followers={null} />
       </div>
     )
   }
@@ -165,6 +170,7 @@ export default async function BrainAudiencePage() {
           <CollectionNote history={history} />
         </section>
         {history.followers.length > 0 ? <Kept history={history} floor={floor} /> : null}
+        <LastCollected collected={lastCollected} followers={null} />
       </div>
     )
   }
@@ -184,6 +190,7 @@ export default async function BrainAudiencePage() {
           <CollectionNote history={history} />
         </section>
         {history.followers.length > 0 ? <Kept history={history} floor={floor} /> : null}
+        <LastCollected collected={lastCollected} followers={null} />
       </div>
     )
   }
@@ -272,6 +279,45 @@ export default async function BrainAudiencePage() {
       <InferredLine />
       <PaceToFloor days={history.followers} floor={floor} />
     </div>
+  )
+}
+
+/**
+ * What was last COLLECTED, shown only when the live read could not be made.
+ *
+ * ── WHY IT CARRIES A DATE IN THE HEADING ─────────────────────────────────────
+ * These figures are not current and the screen must not let them be read as if
+ * they were. The day is in the heading rather than a footnote, because a stale
+ * number with its date buried underneath is a stale number being presented as a
+ * fresh one. `lastCollected` is null whenever the live read succeeded, so a fresh
+ * breakdown and a stored one can never appear on the same screen.
+ */
+function LastCollected({
+  collected,
+  followers,
+}: {
+  collected: AudiencePageData['lastCollected']
+  followers: number | null
+}) {
+  if (collected === null) return null
+  const reported = AUDIENCE_DIMENSIONS.filter((d) => collected.breakdown[d] !== undefined)
+  if (reported.length === 0) return null
+  return (
+    <section aria-labelledby="audience-last-collected" className="flex flex-col gap-3">
+      <h3 id="audience-last-collected" className="type-h3 text-ink">
+        What Sahoda last collected, on <span className="num">{collected.day}</span>
+      </h3>
+      <div className="grid gap-3 narrow:grid-cols-2">
+        {reported.map((dimension) => (
+          <BreakdownCard
+            key={dimension}
+            dimension={dimension}
+            buckets={collected.breakdown[dimension] ?? []}
+            followers={followers}
+          />
+        ))}
+      </div>
+    </section>
   )
 }
 

@@ -36,6 +36,7 @@ const NO_HISTORY: CollectedHistory = {
   lastDay: null,
   days: 0,
   storing: false,
+  truncated: false,
 }
 
 /** The record the production collector actually wrote, 2026-08-20. Four flat days. */
@@ -50,6 +51,7 @@ const REAL_HISTORY: CollectedHistory = {
   lastDay: '2026-08-20',
   days: 4,
   storing: true,
+  truncated: false,
 }
 
 /** Zernio's own documented `allBreakdowns` example. DOCUMENTED, never measured. */
@@ -83,16 +85,24 @@ const EVERY_STATE: AudienceState[] = [
   POPULATED,
 ]
 
-function page(state: AudienceState, history: CollectedHistory = NO_HISTORY): AudiencePageData {
-  return { state, history, username: 'testingg53', floor: 100 }
+function page(
+  state: AudienceState,
+  history: CollectedHistory = NO_HISTORY,
+  lastCollected: AudiencePageData['lastCollected'] = null,
+): AudiencePageData {
+  return { state, history, lastCollected, username: 'testingg53', floor: 100 }
 }
 
 beforeEach(() => {
   mockedRead.mockReset()
 })
 
-async function renderState(state: AudienceState, history?: CollectedHistory): Promise<void> {
-  mockedRead.mockResolvedValue(page(state, history))
+async function renderState(
+  state: AudienceState,
+  history?: CollectedHistory,
+  lastCollected?: AudiencePageData['lastCollected'],
+): Promise<void> {
+  mockedRead.mockResolvedValue(page(state, history, lastCollected ?? null))
   render(await BrainAudiencePage())
 }
 
@@ -207,6 +217,7 @@ describe('the line between measured and worked out', () => {
       lastDay: '2026-08-20',
       days: 10,
       storing: true,
+      truncated: false,
     }
     await renderState({ kind: 'suppressed', followers: 58, floor: 100 }, growing)
     const text = document.body.textContent ?? ''
@@ -261,5 +272,42 @@ describe('what Sahoda kept is stated, never implied', () => {
     await renderState({ kind: 'suppressed', followers: 1, floor: 100 }, REAL_HISTORY)
     expect(document.body.textContent).toMatch(/2026-08-17/)
     expect(document.body.textContent).toMatch(/2026-08-20/)
+  })
+})
+
+describe('what was last collected, shown only when the platform could not be reached', () => {
+  const COLLECTED = {
+    day: '2026-08-18',
+    breakdown: { age: [{ label: '25-34', value: 40 }] },
+  }
+
+  test.each(['not-configured', 'unresolved', 'unreadable'] as const)(
+    '%s shows it, with the day it was collected on IN THE HEADING',
+    async (kind) => {
+      // A stale number whose date is buried underneath is a stale number being
+      // presented as a fresh one.
+      await renderState({ kind }, NO_HISTORY, COLLECTED)
+      const heading = screen.getByRole('heading', { name: /What Sahoda last collected/i })
+      expect(heading.textContent).toContain('2026-08-18')
+      expect(screen.getByRole('heading', { name: 'Age' })).toBeInTheDocument()
+    },
+  )
+
+  test('a fresh breakdown and a stored one never appear together', async () => {
+    // `readAudiencePage` returns null for `lastCollected` whenever the live read
+    // succeeded. Asserted here too, because the rule is about what a READER can be
+    // asked to work out, and a page that rendered both would ask them to work out
+    // which is which.
+    await renderState(POPULATED, NO_HISTORY, COLLECTED)
+    expect(
+      screen.queryByRole('heading', { name: /What Sahoda last collected/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  test('renders nothing at all when there is nothing collected', async () => {
+    await renderState({ kind: 'unreadable' }, NO_HISTORY, null)
+    expect(
+      screen.queryByRole('heading', { name: /What Sahoda last collected/i }),
+    ).not.toBeInTheDocument()
   })
 })

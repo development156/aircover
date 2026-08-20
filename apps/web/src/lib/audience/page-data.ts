@@ -57,16 +57,43 @@ export interface CollectedHistory {
    * an empty chart, which would read as "no followers".
    */
   storing: boolean
+  /**
+   * True when the read hit its ceiling, so older days exist and are not drawn.
+   *
+   * Carried rather than swallowed: a chart that silently stops at a limit is a
+   * chart that states a start date it does not mean.
+   */
+  truncated: boolean
 }
 
 export interface AudiencePageData {
   state: AudienceState
   history: CollectedHistory
+  /**
+   * The last demographics Sahoda collected, when the LIVE read could not be made.
+   *
+   * Null in every other case, including when the live read succeeded — the screen
+   * must never show a stale copy beside a fresh one and leave the reader to work
+   * out which is which. It exists so that a connected workspace on a deployment
+   * with no key, or one whose account stopped resolving, still sees what was
+   * already collected, with the day it was collected on stated.
+   */
+  lastCollected: { breakdown: AudienceBreakdown; day: string } | null
   /** The handle, when the connection carries one. Never invented. */
   username: string | null
   /** Meta's documented floor, passed down so the screen never hard-codes it. */
   floor: number
 }
+
+/**
+ * How many days of follower record one page draws.
+ *
+ * Two years. A ceiling has to exist — an unbounded select against an append-only
+ * table gets slower every night forever — and this one is chosen so that it is
+ * never reached in the product's lifetime so far, rather than being a number that
+ * quietly starts truncating in month two.
+ */
+export const MAX_TREND_DAYS = 730
 
 const EMPTY_HISTORY: CollectedHistory = {
   followers: [],
@@ -74,6 +101,7 @@ const EMPTY_HISTORY: CollectedHistory = {
   lastDay: null,
   days: 0,
   storing: false,
+  truncated: false,
 }
 
 /** A finite, non-negative count out of a `bigint` that arrives as a string. */
@@ -141,13 +169,32 @@ export async function readCollectedHistory(
   accountId: string,
 ): Promise<CollectedHistory> {
   const supabase = createServerSupabase()
+
+  // ── THE FILTER IS IN THE QUERY, NOT IN THE LOOP, AND THAT IS THE WHOLE FIX ──
+  // The first version selected EVERY row for the account and picked the follower
+  // series out in JavaScript. On a populated account one day is four dimensions
+  // times up to forty-five buckets times two populations — about 360 rows — plus
+  // three follower rows. A 2000-row ceiling is therefore roughly five DAYS, and
+  // `ascending` means the ceiling keeps the OLDEST five.
+  //
+  // The chart would have frozen on the first week and never moved again, and the
+  // note under it would have said "Kept by Sahoda: 5 days, <first> to <fifth>"
+  // while the table held a month. That is a false statement about the customer's
+  // own data, degrading in the direction that reads as "nothing is happening" —
+  // the one class of claim this product may never make.
+  //
+  // NEWEST FIRST, then reversed, so the ceiling drops the OLDEST days rather than
+  // the current ones. A trend missing last year is a shorter line; a trend missing
+  // this week is a wrong one.
   const { data, error } = await supabase
     .from('audience_snapshots')
-    .select('dimension, bucket, value, measured_on')
+    .select('value, measured_on')
     .eq('workspace_id', workspaceId)
     .eq('account_id', accountId)
-    .order('measured_on', { ascending: true })
-    .limit(2000)
+    .eq('dimension', 'follower_count')
+    .eq('bucket', 'total')
+    .order('measured_on', { ascending: false })
+    .limit(MAX_TREND_DAYS)
 
   // A missing table and a failed read are DIFFERENT, but neither one may render as
   // "no followers". Both collapse to `storing: false`, which the screen states as
@@ -155,26 +202,29 @@ export async function readCollectedHistory(
   if (error || !Array.isArray(data)) return EMPTY_HISTORY
 
   const followers: FollowerDay[] = []
-  const allDays = new Set<string>()
   for (const raw of data as Array<Record<string, unknown>>) {
     const day = typeof raw.measured_on === 'string' ? raw.measured_on.slice(0, 10) : null
     if (day === null) continue
-    allDays.add(day)
-    if (raw.dimension !== 'follower_count' || raw.bucket !== 'total') continue
     const value = count(raw.value)
     // A row that cannot be narrowed is DROPPED, never coerced to 0 — a dropped
     // point shortens the line, a coerced one draws a collapse that never happened.
     if (value === null) continue
     followers.push({ day, followers: value })
   }
+  followers.reverse() // back to oldest-first, which is how a chart reads
 
-  const days = [...allDays].sort()
+  const first = followers[0]
+  const last = followers[followers.length - 1]
   return {
     followers,
-    firstDay: days[0] ?? null,
-    lastDay: days[days.length - 1] ?? null,
-    days: days.length,
+    // Stated from the SAME rows the chart is drawn from, so the sentence under it
+    // can never describe a wider window than the line above it. When the ceiling
+    // bites, both shrink together and the note stays true.
+    firstDay: first?.day ?? null,
+    lastDay: last?.day ?? null,
+    days: followers.length,
     storing: true,
+    truncated: followers.length >= MAX_TREND_DAYS,
   }
 }
 
@@ -250,6 +300,7 @@ export async function readAudiencePage(): Promise<AudiencePageData> {
   const nothing = (state: AudienceState): AudiencePageData => ({
     state,
     history: EMPTY_HISTORY,
+    lastCollected: null,
     username: null,
     floor,
   })
@@ -287,8 +338,21 @@ export async function readAudiencePage(): Promise<AudiencePageData> {
   // to read. It is still not `unreadable` — nothing was attempted, so nothing
   // failed, and "try again" is advice that cannot work when the key is absent from
   // the deployment rather than late.
+  /**
+   * The stored fallback, fetched ONCE and used only by the branches that could not
+   * reach the platform. A live answer always wins: showing a fresh breakdown and a
+   * stored one on the same screen would leave the reader to work out which is which.
+   */
+  const degraded = async (state: AudienceState): Promise<AudiencePageData> => ({
+    state,
+    history,
+    lastCollected: await readStoredBreakdown(workspaceId, account),
+    username,
+    floor,
+  })
+
   const reads = zernioClientReads()
-  if (reads === null) return { state: { kind: 'not-configured' }, history, username, floor }
+  if (reads === null) return degraded({ kind: 'not-configured' })
 
   // The follower count FIRST. Suppression cannot be claimed without it, and asking
   // for demographics before having one leaves a branch with nothing to judge by.
@@ -316,5 +380,8 @@ export async function readAudiencePage(): Promise<AudiencePageData> {
     state = classifyAudience({ result: { ok: false, error }, followers, floor })
   }
 
-  return { state, history, username, floor }
+  // A state that never reached the platform shows what was already collected; a
+  // state that did shows only what it was just told.
+  if (state.kind === 'unresolved' || state.kind === 'unreadable') return degraded(state)
+  return { state, history, lastCollected: null, username, floor }
 }
