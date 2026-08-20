@@ -339,7 +339,7 @@ can distinguish a present column from an absent one.
 |---|---|---|---|---|---|
 | Instagram | Feed image | yes | `image` | yes | **PUBLISHES TODAY** |
 | Instagram | Carousel | yes | `carousel` | yes | **PUBLISHES TODAY** |
-| Instagram | Story | yes | **no** | `contentType:'story'` | ZERNIO SUPPORTS, WE DON'T CALL IT |
+| Instagram | Story | yes | **yes** (20260820144500) | `contentType:'story'` | **PUBLISHES TODAY** — shipped in this lane |
 | Instagram | Reel | yes | `video` | yes | BLOCKED — media ingest, §5.1 |
 | LinkedIn | Text | yes | `text` | yes | **PUBLISHES TODAY** |
 | LinkedIn | Image | yes | `image` | yes | **PUBLISHES TODAY** |
@@ -349,11 +349,11 @@ can distinguish a present column from an absent one.
 | LinkedIn | Poll | yes | **no** | `linkedin.poll` | ZERNIO SUPPORTS, WE DON'T CALL IT |
 | X | Post | yes | `text` | yes | **PUBLISHES TODAY** |
 | X | Media | yes | `image` / `carousel` | yes (≤4) | **PUBLISHES TODAY** |
-| X | Thread | yes | **no** | `x.threadItems` | ZERNIO SUPPORTS, WE DON'T CALL IT |
+| X | Thread | yes | **yes** (20260820144500) | `x.threadItems` | STORABLE, NOT OFFERED — §6.2 |
 | X | Poll | yes | **no** | `x.poll` | ZERNIO SUPPORTS, WE DON'T CALL IT |
 | X | Article | yes | **no** | `x.article` | ZERNIO SUPPORTS — Premium only, out of scope |
 | GBP | What's new | yes | `text` / `image` | `topicType:'STANDARD'` | **PUBLISHES TODAY** |
-| GBP | + CTA button | yes | n/a | `callToAction {type,url}` | **COLLECTED AND DROPPED**, §6.1 |
+| GBP | + CTA button | yes | n/a | `callToAction {type,url}` | **PUBLISHES TODAY** — fixed in this lane, §6.1 |
 | GBP | Event | yes | **no** | `topicType:'EVENT'` | ZERNIO SUPPORTS, WE DON'T CALL IT |
 | GBP | Offer | yes | **no** | `topicType:'OFFER'` | ZERNIO SUPPORTS, WE DON'T CALL IT |
 | Facebook | post / story / reel / link | **no** | — | yes | NOT A CHANNEL HERE |
@@ -384,26 +384,41 @@ sniffer, a size ceiling four orders of magnitude higher than
 not run through a server action's body limit. **They stay coming-soon, and the
 reason shown to a writer is the true one.**
 
-### 5.2 What Phase 2 may therefore build
+### 5.2 What Phase 2 built, and what it did not
 
-Storable today, publishable today, enforceable today:
+**Built and offered**: `text`, `image`, `carousel`, and **`story`** — the last one
+needing migration `20260820144500`, applied to production 20 Aug 2026 (§5.3).
 
-- `text`, `image`, `carousel` — per channel, with per-format media rules.
+**Storable and deliberately NOT offered**: `video` (§5.1) and **`thread`** (§6.2).
+The column accepts both; nothing in the app can select either. That distinction
+is the whole discipline: a ready column is not a dead end, an offered format that
+publishes something else is.
 
-Needs the `CHECK` widened by one additive migration, and nothing else:
+### 5.3 The aspect range is a FORMAT rule wearing a channel's clothes
 
-- **`story`** (Instagram) — one image, 9:16, `contentType: 'story'`.
-- **`thread`** (X) — text plus per-segment media, `threadItems`.
+Found while wiring attach-time validation, and it changed the design.
 
-Both are reachable with the image-only ingest we have. Both are the highest-value
-format on their channel. Everything else in §5 stays coming-soon with the reason
-stated where the control would be.
+`CONSTRAINTS.instagram.imageDims.aspectRange` is `[0.8, 1.91]`. A Story is 9:16,
+i.e. **0.56**. So the frozen engine refuses the exact photo a Story requires —
+and stacked with a format check, a Story would have been unattachable while every
+message on screen told the writer their upright picture was the wrong shape for
+an upright format.
+
+That range is not a channel rule at all. **It is the FEED format's rule**, living
+on the channel because the frozen contract has nowhere else to put it. A format
+that declares its own aspect rule is declaring the one that applies, so
+`decideAttach` drops the engine's `MEDIA_ASPECT` verdict for that attachment and
+nothing else of the engine's.
+
+If `PlatformSpec` were ever unfrozen, the field this actually wants is
+`aspectRange` **per format** rather than per channel. That is the one shared-type
+change this lane would ask for.
 
 ---
 
 ## 6. Defects found while reading, in severity order
 
-### 6.1 The GBP call-to-action is a control that does nothing `[CODE]`
+### 6.1 The GBP call-to-action was a control that does nothing `[CODE]` — FIXED
 
 `apps/web/src/components/composer/version-options.tsx:85-99` renders a `<select>`
 of the six CTA types and writes the choice to `post_variants.extras.gbpCta`.
@@ -420,9 +435,16 @@ So: the writer picks "ORDER", sees it saved, and Google shows no button.
 **Against NO DEAD ENDS this is worse than the control being absent** — an absent
 control makes no promise.
 
-And the fix is not just plumbing: `callToAction.url` is `required` alongside
-`type` `[SPEC]`, and there is no URL field anywhere in the composer. A CTA
+And the fix was not just plumbing: `callToAction.url` is `required` alongside
+`type` `[SPEC]`, and there was no URL field anywhere in the composer. A CTA
 without a URL is not a partial feature; it is a payload Zernio rejects.
+
+**Fixed 20 Aug 2026.** The URL field exists, `platforms[].platformSpecificData`
+is now sent, and a button with no destination REFUSES the publish rather than
+being dropped. The path is
+`extras.gbpCta` + `extras.ctaUrl` → `store.readCta` → `PublishVariant.cta` →
+spread into the frozen `FormattedContent` gbp arm → `buildPlatformData` →
+`platforms[0].platformSpecificData.callToAction`.
 
 ### 6.2 The refusal gate cannot see a thread `[CODE]`
 
@@ -437,6 +459,25 @@ nobody will read.
 
 **Threads must not ship until the gate reads every segment.** A guard that
 silently narrows its input is the failure this product's rules name explicitly.
+
+**Decision, 20 Aug 2026: threads are storable and not offered.** Three things
+have to be true first, and none of them could be made true in this lane:
+
+1. **The gate reads every segment.** Above.
+2. **The character limit means something.** X's 280 applies PER SEGMENT, and
+   `validateVariant` measures the whole body — so a perfectly legal three-tweet
+   thread is refused with `MAX_CHARS` before `refuseFormat` is even reached.
+   Fixing that means changing how the publish path validates, for one format, on
+   the one function every publish goes through.
+3. **`threadItems[].mediaItems` is verified.** It is `[SPEC]`-only (§7 item 6)
+   and this lane may not publish, so it cannot be confirmed.
+
+The X version card says all of this to the writer in one sentence, rendered as a
+`div` — never a disabled control, which is still announced as a control.
+
+This inverts the brief's emphasis: threads were named the highest-value
+channel-specific feature, and Story shipped instead. Story is the format whose
+enforcement could actually be completed.
 
 ### 6.3 Constraint Engine values that disagree with the vendor `[DOC]` vs `[CODE]`
 
