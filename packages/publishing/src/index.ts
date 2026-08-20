@@ -215,6 +215,16 @@ export {
 // collaborators, AI disclosure. Rules live beside the parse because for most of
 // these NOBODY ELSE CHECKS: Zernio validates Google's platformSpecificData not at
 // all, and polls are the one block it fully enforces (docs/32 §4).
+// What can be done to a post AFTER it is live. The platform vocabulary here is
+// NOT the publish one — gbp is `googlebusiness`, not `google`, and edit accepts
+// only twitter of our four. Both measured from the endpoints' own 400s.
+export {
+  canRecover,
+  recoveryPlatform,
+  recoveryUnavailableReason,
+  type RecoveryAction,
+} from './zernio/recovery'
+
 export {
   refusePoll,
   refuseGbpTopic,

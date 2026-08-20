@@ -46,6 +46,14 @@ function stubClient(post: ZernioPost): ZernioClient {
     presignMedia: unexpected('presignMedia') as never,
     uploadMedia: unexpected('uploadMedia') as never,
     headMedia: unexpected('headMedia') as never,
+    // ── THE RECOVERY SURFACE, WIRED TO THROW ──────────────────────────────────
+    // A publish must never edit, unpublish or retry, and these make that an
+    // assertion rather than an assumption: every test in this file fails loudly
+    // if the adapter reaches one. TypeScript required them to be added; what they
+    // are wired TO is the choice that makes them worth something.
+    editPost: unexpected('editPost') as never,
+    unpublishPost: unexpected('unpublishPost') as never,
+    retryPost: unexpected('retryPost') as never,
   }
 }
 

@@ -266,6 +266,35 @@ export interface ZernioClient {
   headMedia(publicUrl: string): Promise<ZernioHeadResult>
   createPost(input: ZernioCreatePostInput, requestId?: string): Promise<ZernioCreatePostResponse>
   getPost(postId: string): Promise<ZernioPost>
+  /**
+   * Rewrite a post that is already live, on one platform.
+   *
+   * ── `platform` IS A THIRD VOCABULARY AND IT IS SHORT ────────────────────────
+   * MEASURED 2026-08-20: this endpoint's own 400 names its whole enum —
+   * *"expected one of \"twitter\"|\"discord\"|\"facebook\"|\"reddit\""*. Of
+   * this product's four channels only X is in it, and `x` is NOT the accepted
+   * spelling even though `POST /v1/posts` takes it. Callers must go through
+   * `recoveryPlatform`, never `ZERNIO_PLATFORM_NAME`.
+   */
+  editPost(postId: string, platform: string, content: string): Promise<ZernioPost>
+  /**
+   * Take a live post down, on one platform.
+   *
+   * A DIFFERENT list again, also read out of its own 400: facebook, youtube,
+   * linkedin, twitter, threads, pinterest, reddit, bluesky, googlebusiness,
+   * telegram, whatsapp, discord, slack. Note `googlebusiness` — the publish
+   * endpoint's `google` is refused here by name — and note that Instagram is
+   * absent from it entirely.
+   */
+  unpublishPost(postId: string, platform: string): Promise<ZernioPost>
+  /**
+   * Ask Zernio to attempt a failed post again.
+   *
+   * Post-level: it takes NO platform and no body (MEASURED — a nonexistent id
+   * 404s before any body is read). So it retries whatever legs failed, which is
+   * why the caller must be the publish path and not a button that fires blind.
+   */
+  retryPost(postId: string): Promise<ZernioPost>
 }
 
 export type ZernioJsonCaller = <T>(
@@ -348,6 +377,37 @@ export function createZernioClient(deps: ZernioClientDeps): ZernioClient {
         })
       }
       return profile
+    },
+
+    async editPost(postId, platform, content) {
+      const { data } = await json<{ post?: ZernioPost } & ZernioPost>(
+        'POST',
+        `/posts/${encodeURIComponent(postId)}/edit`,
+        'editPost',
+        { platform, content },
+      )
+      return data.post ?? (data as ZernioPost)
+    },
+
+    async unpublishPost(postId, platform) {
+      const { data } = await json<{ post?: ZernioPost } & ZernioPost>(
+        'POST',
+        `/posts/${encodeURIComponent(postId)}/unpublish`,
+        'unpublishPost',
+        { platform },
+      )
+      return data.post ?? (data as ZernioPost)
+    },
+
+    async retryPost(postId) {
+      const { data } = await json<{ post?: ZernioPost } & ZernioPost>(
+        'POST',
+        `/posts/${encodeURIComponent(postId)}/retry`,
+        'retryPost',
+        // No body. The endpoint takes none, and sending `{}` would be a claim
+        // that we considered a platform and chose none.
+      )
+      return data.post ?? (data as ZernioPost)
     },
 
     async connectUrl(platform, profileId, redirectUrl) {
