@@ -386,16 +386,40 @@ the one pair docs/26 §1.2 forbids by name. Caught by grepping the compiled CSS
 
 **Sweeping every colour utility the same way found a live one:**
 
-> **Every Modal and Drawer in the product opened over an undimmed page.**
+> **Every Modal and Drawer in the product dimmed at the browser's default 10%, not the
+> designed 40%.**
 
 Both asked for `backdrop:bg-black/40`. `globals.css:41` also does `--color-*: initial`, and
 only `--color-white` is redefined (line 148) — so `bg-black` was never generated. MEASURED:
-the compiled CSS contains exactly **two `::backdrop` rules and both are Tailwind preflight**.
-There is no scrim rule at all.
+the compiled CSS contained exactly **two `::backdrop` rules and both were Tailwind
+preflight**. No author scrim rule existed at all.
+
+**The first draft of this finding said "opened over an undimmed page", and that was wrong.**
+Measured on composited pixels, the broken state is `rgba(0, 0, 0, 0.1)` — Chromium's UA
+default for a modal dialog — against `rgba(0, 0, 0, 0.4)` once fixed. Still a real defect (4×
+too light, at a value nobody chose and no theme could reach), but a quarter of the drama. It
+is corrected here because the overstatement was found the same way the bug was: by running the
+thing rather than reasoning about it.
 
 Fixed with a new `--scrim` token, and **dark gets its own value** (0.62 vs 0.40) rather than
 the same one: black at 40% over a `#0b0b0c` canvas is close to no scrim, and §2 makes dark a
-peer rather than an inversion.
+peer rather than an inversion. Recorded as docs/26 **§7.1**, which also corrects §7's claim
+that `--sh-lg` was "the only rung implying a scrim" — a shadow cannot imply one, and there was
+none to imply.
+
+**The fix is measured too, not just the bug.** In the production CSS `--scrim` is defined with
+both values and a third `::backdrop` rule now exists:
+`.backdrop\:bg-\[var\(--scrim\)\]::backdrop { background-color: var(--scrim) }`. Note
+`dead-classes.mjs` could never have covered this — its pattern excludes arbitrary values by
+construction — so `e2e/motion.spec.ts` now asserts the open dialog's `::backdrop` alpha
+matches `--scrim`. A source-level check would not have caught the original bug either: the
+source looked correct. Only the composited pixel knows whether a class exists.
+
+**That guard was hollow on its first attempt**, and only a mutation found it. It asserted "not
+transparent", which the UA default already satisfies, so reverting the fix left it GREEN — a
+test passing for a reason unrelated to the thing it names, written by the session that spent
+the day removing exactly that. Rewritten to compare alpha against the token, it now reports
+`Received: 0.1` on the mutant and passes on the fix.
 
 The sweep is now `scripts/design/dead-classes.mjs`. It is a **report, not a gate leg**: it
 needs a build to be truthful, and prose inside comments trips the class pattern

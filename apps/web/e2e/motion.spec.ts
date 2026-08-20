@@ -94,3 +94,56 @@ test.describe('@smoke entrance', () => {
     expect(Number(opacity)).toBeGreaterThan(0.99)
   })
 })
+
+/**
+ * The scrim, on rendered pixels.
+ *
+ * Both overlay primitives asked for `backdrop:bg-black/40`. `globals.css` opens
+ * @theme with `--color-*: initial`, wiping the stock palette, and redefines only
+ * `--color-white` — so `bg-black` was a class Tailwind never generated.
+ *
+ * ── WHAT THAT ACTUALLY LOOKED LIKE, MEASURED ─────────────────────────────────
+ * NOT an undimmed page. Chromium's UA stylesheet paints `dialog::backdrop` at
+ * `rgba(0, 0, 0, 0.1)` for a modal dialog, so every overlay in the product got
+ * the browser's default 10% wash where the design called for 40% — a 4x
+ * difference in dimming, and a value nobody chose.
+ *
+ * ── THE FIRST VERSION OF THIS TEST WAS HOLLOW ────────────────────────────────
+ * It asserted the backdrop was "not transparent", which the UA default already
+ * satisfies. Reverting the fix left it GREEN. It is the exact failure this
+ * repo keeps writing down — a test that passes for a reason unrelated to the
+ * thing it names — and only a mutation caught it.
+ *
+ * So it asserts the composited value EQUALS the token. Measured both ways:
+ *   fixed   rgba(0, 0, 0, 0.4)   the --scrim value
+ *   broken  rgba(0, 0, 0, 0.1)   the browser's default
+ */
+test.describe('@smoke scrim', () => {
+  test('an open dialog dims the page by the token, not by the browser default', async ({
+    page,
+    signedIn,
+  }) => {
+    void signedIn
+    await page.goto('/design-system')
+    await page.getByRole('button', { name: 'Open modal' }).click()
+
+    const { backdrop, token } = await page.evaluate(() => {
+      const dialog = document.querySelector('dialog[open]')
+      if (!dialog) return { backdrop: '', token: '' }
+      return {
+        // ::backdrop is not an element — it is read through the dialog.
+        backdrop: getComputedStyle(dialog, '::backdrop').backgroundColor,
+        token: getComputedStyle(document.documentElement).getPropertyValue('--scrim').trim(),
+      }
+    })
+
+    expect(backdrop).not.toBe('')
+    // Compare by ALPHA rather than by string: the token is authored
+    // `rgb(0 0 0 / .4)` and composites as `rgba(0, 0, 0, 0.4)`, so a literal
+    // match would fail on formatting rather than on the thing being tested.
+    const alphaOf = (c: string) => Number(c.match(/[\d.]+\s*\)$/)?.[0].replace(')', '') ?? '1')
+    expect(alphaOf(backdrop)).toBeCloseTo(alphaOf(token), 2)
+    // And explicitly not the browser default the bug produced.
+    expect(alphaOf(backdrop)).toBeGreaterThan(0.15)
+  })
+})

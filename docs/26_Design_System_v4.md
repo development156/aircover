@@ -317,7 +317,46 @@ redefining them turns `background: var(--s1)` into `background: 4px` and blanks 
 | `surface-ring` | inset hairline | a resting card |
 | `--sh-card` | 0 1px 2px / 4% | a card that must lift off a busy background |
 | `--sh-pop` | 0 4px 16px / 8% | popovers, menus — floating and dismissable |
-| `--sh-lg` | 0 16px 48px / 14% | modals and drawers; the only rung implying a scrim |
+| `--sh-lg` | 0 16px 48px / 14% | modals and drawers; the shadow that sits above a scrim |
+| `--scrim` | `rgb(0 0 0 / .4)` light · `rgb(0 0 0 / .62)` dark | the wash BEHIND a modal or drawer |
+
+### 7.1 AMENDMENT — the scrim is a token, and it did not exist
+
+Added 2026-08-20 by `wt-redesign`. §7 described `--sh-lg` as "the only rung implying a scrim",
+which was wrong twice: a shadow cannot imply a scrim, and there was no scrim to imply.
+
+`modal.tsx` and `drawer.tsx` both asked for `backdrop:bg-black/40`. `globals.css` opens
+`@theme` with `--color-*: initial` — which removes the stock palette — and redefines only
+`--color-white`. So `bg-black` was a class Tailwind never generated.
+
+**MEASURED on composited pixels**, and be precise about this, because the obvious phrasing
+overstates it: the page was not undimmed. Chromium's UA stylesheet paints `dialog::backdrop`
+at `rgba(0, 0, 0, 0.1)` for a modal dialog, so every overlay in the product got the
+**browser's default 10% wash where the design called for 40%** — a 4× difference in dimming,
+at a value nobody chose and no theme could reach.
+
+| | composited backdrop |
+|---|---|
+| before | `rgba(0, 0, 0, 0.1)` — the UA default |
+| after | `rgba(0, 0, 0, 0.4)` — `--scrim` |
+
+In the compiled CSS, before: exactly two `::backdrop` rules, both Tailwind preflight. After: a
+third, `.backdrop\:bg-\[var\(--scrim\)\]::backdrop { background-color: var(--scrim) }`.
+
+**Dark takes its own value, not the same one.** Black at 40% over a `#0b0b0c` canvas is close
+to no scrim at all, and §2 makes dark a designed peer rather than a flip. The overlay has to
+separate from the page it covers, and in dark the fill cannot do that alone.
+
+Guarded on rendered pixels by `e2e/motion.spec.ts`, which reads the dialog's `::backdrop`
+computed background and compares its **alpha to the token**. A source-level check could not
+have caught the original bug, because the source was *correct-looking*; only the composited
+pixel knows whether a class exists.
+
+**The first version of that guard was hollow and a mutation caught it.** It asserted the
+backdrop was "not transparent" — which the UA default already satisfies — so reverting the fix
+left it green. That is the failure mode this repo keeps writing down: a test that passes for a
+reason unrelated to the thing it names. Any new pixel guard here should be reverted once
+before it is believed.
 
 Use an **inset ring**, not a border, on surfaces: a border changes the box size, so a hover
 that thickens the edge shifts the layout by a pixel. **Never use border and ring together** —
