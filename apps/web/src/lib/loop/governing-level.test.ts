@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { AutonomyLevel, Channel } from '@sahoda/shared'
 
-import { governingLevel } from '@/app/actions/loop-create'
+import { governingLevel } from './governing-level'
 
 const dial = (entries: Array<[Channel, AutonomyLevel]>) => new Map(entries)
 

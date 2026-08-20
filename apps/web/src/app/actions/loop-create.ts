@@ -12,6 +12,7 @@ import {
 } from '@sahoda/shared'
 
 import { BRIEF_ACTION } from '@/lib/loop/cost'
+import { governingLevel } from '@/lib/loop/governing-level'
 import { isLoopRef, newLoopBriefRef } from '@/lib/loop/object-ref'
 import * as store from '@/lib/loop/store'
 import { reportServerError } from '@/lib/observability/report'
@@ -68,27 +69,6 @@ async function readDial(workspaceId: string): Promise<Map<Channel, AutonomyLevel
   const dial = new Map<Channel, AutonomyLevel>()
   for (const row of data ?? []) dial.set(row.channel as Channel, row.level as AutonomyLevel)
   return dial
-}
-
-/**
- * The level governing a brief: the LOWEST of its channels' levels.
- *
- * A brief going to Instagram at L2 and LinkedIn at L0 must not publish to
- * Instagram — one body, one post, one schedule, and scheduling it would act at
- * L2 on a post that also carries a channel the customer wanted only suggested.
- * Taking the minimum means the most cautious setting on any channel governs the
- * whole brief, which is the only reading that cannot surprise someone.
- */
-export function governingLevel(
-  channels: readonly Channel[],
-  dial: Map<Channel, AutonomyLevel>,
-  fallback: AutonomyLevel = 1,
-): AutonomyLevel {
-  if (channels.length === 0) return fallback
-  return channels.reduce<AutonomyLevel>((lowest, channel) => {
-    const level = dial.get(channel) ?? fallback
-    return level < lowest ? level : lowest
-  }, 2 as AutonomyLevel)
 }
 
 export async function runCreateStage(cycleId: string): Promise<CreateStageState> {
