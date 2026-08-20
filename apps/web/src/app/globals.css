@@ -54,6 +54,13 @@
      here rather than written as `gap-[2px]` at each of the two <section>s that
      need it — one value, one place, and design-lint's spacing rule stays real. */
   --spacing-nav: 2px;
+  /* The kit's chip inset. 10px is the recurring one (five sites), and a chip
+     whose label is LED BY A MARK takes 6px on that side instead — an optical
+     correction, not a second opinion about spacing. Named so the pair reads as
+     one decision; the four remaining `px-[10px]` sites are still in the
+     design-lint register and can adopt `pr-chip` as the ratchet tightens. */
+  --spacing-chip: 10px;
+  --spacing-chip-mark: 6px;
 }
 
 /* MUST be `inline`: every value below references a :root var from tokens.css;

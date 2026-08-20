@@ -78,7 +78,7 @@ export function ChannelPicker({
               className={cn(
                 // The kit's `.sl-chip`: 28px, pill, INSET RING not a border —
                 // a border makes toggling one chip reflow the whole row.
-                'inline-flex h-7 items-center gap-1.5 rounded-full py-0 pr-[10px] pl-[6px] text-[13px] font-[550] transition-micro max-narrow:h-11',
+                'inline-flex h-7 items-center gap-1.5 rounded-full py-0 pr-chip pl-chip-mark text-[13px] font-[550] transition-micro max-narrow:h-11',
                 'disabled:pointer-events-none disabled:opacity-45',
                 isOn
                   ? 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'
