@@ -33,6 +33,15 @@ const ROUTES: ReadonlyArray<{ path: string; slug: string; archetype: string }> =
   { path: '/wallet', slug: 'wallet', archetype: 'money' },
   { path: '/connections', slug: 'connections', archetype: 'integrations' },
   { path: '/inbox', slug: 'inbox', archetype: 'list + detail' },
+  // docs/27 §0 named the four /inbox sub-routes as NOT sampled. These two have
+  // static paths and are added here. The other two are
+  // /inbox/comments/[accountId]/[platformPostId] and
+  // /inbox/threads/[accountId]/[conversationId]: they need a real connected
+  // account and a real conversation id, which this harness does not seed, so
+  // they stay unsampled rather than being shot in their not-found state and
+  // filed as evidence of a design.
+  { path: '/inbox/comments', slug: 'inbox-comments', archetype: 'list + detail' },
+  { path: '/inbox/reviews', slug: 'inbox-reviews', archetype: 'list + detail' },
   { path: '/campaigns', slug: 'campaigns', archetype: 'collection' },
   { path: '/sites', slug: 'sites', archetype: 'empty' },
   { path: '/assets', slug: 'assets', archetype: 'gallery' },
