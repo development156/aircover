@@ -83,7 +83,9 @@ function compiledCss() {
 
 const css = compiledCss()
 if (css.length === 0) {
-  console.error('  no compiled CSS found under apps/web/.next — build or start the dev server first')
+  console.error(
+    '  no compiled CSS found under apps/web/.next — build or start the dev server first',
+  )
   process.exit(2)
 }
 const haystack = css.map((f) => readFileSync(f, 'utf8')).join('\n')
@@ -92,9 +94,23 @@ const PREFIX =
   '(?:bg|text|border|ring|fill|stroke|from|to|via|outline|decoration|shadow|accent|caret|divide)'
 const CLASS = new RegExp(`(?<![\\w-])${PREFIX}-(?!\\[)[a-z][a-z0-9-]*`, 'g')
 
+/**
+ * Comments stripped, newlines kept — the same fix design-lint.mjs needed.
+ *
+ * Without it this script reported `text-primary-fg` and `bg-black` as still
+ * dead AFTER both were fixed, because the files that fixed them now carry a
+ * comment NAMING the bad class so the next session understands why. A tool that
+ * fires on its own post-mortem teaches people to delete the post-mortem.
+ */
+function stripComments(src) {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:])\/\/.*$/gm, '$1')
+}
+
 const used = new Map()
 for (const file of walk(SRC)) {
-  const src = readFileSync(file, 'utf8')
+  const src = stripComments(readFileSync(file, 'utf8'))
   for (const m of src.matchAll(CLASS)) {
     if (!used.has(m[0])) used.set(m[0], file.slice(SRC.length + 1))
   }

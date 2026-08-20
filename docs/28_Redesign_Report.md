@@ -383,7 +383,55 @@ needs a build to be truthful, and prose inside comments trips the class pattern
 
 ## 9. The gate
 
-GATE_RESULTS_PLACEHOLDER
+Run **unpiped**, each leg echoing its own `$?`, because `pnpm gate | tail` returns *tail's*
+exit code. Script: `gate.sh`/`gate2.sh` in the session scratchpad.
+
+| leg | command | result |
+|---|---|---|
+| 1/5 | `turbo run typecheck lint test --concurrency=1` | **EXIT=0** |
+| 2/5 | `vitest run` (root) | **EXIT=0** |
+| 3/5 | `turbo run test:smoke --concurrency=1` (port 3211) | **EXIT=0** — 0 failures |
+| 4/5 | `prettier --check .` | **EXIT=1**, one file → fixed → **EXIT=0** |
+| 5/5 | `turbo run build --concurrency=1` | **EXIT=0** — 1 successful |
+
+### Leg 3 was tested against another worktree's build the first two times
+
+This is the most important line in this section.
+
+`playwright.config.ts` defaults to `E2E_PORT=3100` with `reuseExistingServer: !CI`. Another
+session's dev server held 3100, so `turbo run test:smoke` attached to **`wt-assets`'s build**
+and ran 60 tests against somebody else's code. Setting `E2E_PORT` did not fix it: turbo's
+default env mode is strict and the task declared only three variables, so the value never
+reached playwright.
+
+**It did not look like an infrastructure problem.** It looked like exactly one plausible test
+failure — *"every figure on campaigns, approvals and assets is still an em dash"* — which
+failed twice, including on retry, which is normally how you tell a real failure from a flake.
+
+The proof was in the failure's page snapshot, not in any log line: it showed an **`Add
+photos` upload on `/assets`**, which does not exist on this branch, and a rail foot reading
+**`100 of —`**, which this branch deleted in its first commit. Neither is our code. The
+failure belongs to the lane that owns `/assets`.
+
+Fixed by adding `E2E_PORT` to the task's `env` list in `turbo.json`, re-running on 3211, and
+**verifying with `readlink /proc/<pid>/cwd`** that the server was this worktree before
+trusting a single result. Without that, two worktrees can never both run the gate: the one
+that loses the race gets a green or a red that is about somebody else's code.
+
+### Post-build verification
+
+`node scripts/design/dead-classes.mjs` against the **production** build:
+`text-primary-fg` and `bg-black` are both gone. Five candidates remain and all five are prose
+inside strings, which the script documents as candidates rather than verdicts.
+
+### Unit-suite honesty
+
+A full `vitest run` under load 26 reported **4 failures**; all four passed standalone
+(23/23, exit 0) and one kernel OOM kill was confirmed in `journalctl -k` — the victim was
+this lane's own `next-server`. A later run under load reported 2 failures: one was a genuine
+consequence of this lane's change (`approve-button`, fixed by correcting the test to its own
+stated intent) and one was a 5000ms timeout that passed standalone. The leg-1 and leg-2
+results in the table above are from the quiet run.
 
 ---
 
