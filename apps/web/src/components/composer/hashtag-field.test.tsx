@@ -100,11 +100,15 @@ describe('Google Business gets no box, and is told why', () => {
 })
 
 describe('the AI affordance that does not exist', () => {
-  test('says so, and is not a control', () => {
+  test('is NOT mentioned here, because it would be mentioned once per channel', () => {
+    // It used to be. MEASURED in a 1440 screenshot: the same paragraph printed on
+    // every version card — four identical apologies on one screen. docs/27 §1
+    // counted six different ways of saying "nothing yet" and called it the
+    // problem; repeating one way six times is the same problem. It is said once,
+    // in the writing pane, with the other two AI things this screen cannot do.
     setup()
-    const note = screen.getByText(/cannot suggest hashtags yet/i)
-    expect(note).toBeInTheDocument()
-    // A disabled button is still announced as a button. This is a sentence.
+    expect(screen.queryByText(/cannot suggest hashtags/i)).not.toBeInTheDocument()
+    // And it is certainly not a control anywhere.
     expect(screen.queryByRole('button', { name: /suggest/i })).not.toBeInTheDocument()
   })
 })

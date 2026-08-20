@@ -70,6 +70,23 @@ export function meterFor(channel: Channel, draft: VariantDraft): ChannelMeter {
  */
 export function withFormat(meter: ChannelMeter, refusal: FormatRefusal | null): ChannelMeter {
   if (refusal === null) return meter
+
+  // ── ONE PROBLEM, ONE SENTENCE ───────────────────────────────────────────────
+  // MEASURED in a 1440 screenshot of an Instagram carousel with nothing
+  // attached: the card showed BOTH "Instagram needs at least one photo — there
+  // is no text-only post." and "A set needs at least two images." Two rules, two
+  // sources, and to the person reading them one problem — there are no photos.
+  //
+  // The channel's rule is the more fundamental of the two and it is the one the
+  // engine emits, so the format's version is dropped rather than stacked. The
+  // moment a photo IS attached, `MEDIA_REQUIRED` clears and the format's own
+  // "a set needs at least two" appears on its own, which is when it is the
+  // sentence that helps.
+  const alreadySaid =
+    refusal.code === 'FORMAT_NEEDS_MEDIA' &&
+    meter.violations.some((v) => v.code === 'MEDIA_REQUIRED')
+  if (alreadySaid) return meter
+
   return {
     ...meter,
     violations: [...meter.violations, { code: refusal.code, message: refusal.message }],

@@ -89,9 +89,10 @@ export function WritingPane({ body, onBodyChange }: WritingPaneProps) {
           takes `rewrite | shorten | hookify` and nothing else, and no mesh
           task writes a body from a brief — both are frozen contracts. */}
       <NotBuiltYet>
-        Sahoda can rewrite, shorten or hook up a piece you select. Writing a first draft from a
-        brief, changing the tone and expanding a line are not built — each needs a new kind of AI
-        task, and the list of tasks it can run is fixed for now.
+        Sahoda can rewrite, shorten or sharpen the hook of any piece you select. Writing a first
+        draft from a brief, changing the tone, expanding a line, suggesting hashtags and describing
+        a picture are not built — each needs a new kind of AI task, and the list of tasks it can run
+        is fixed for now.
       </NotBuiltYet>
 
       <InlineRewrite

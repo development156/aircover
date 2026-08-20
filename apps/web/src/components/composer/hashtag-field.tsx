@@ -103,13 +103,15 @@ export function HashtagField({ channel, label, hashtags, onChange }: HashtagFiel
           ? `They are published at the end of the ${label} copy, and count towards its limit.`
           : `Published at the end, and already counted in the ${label} limit above.`}
       </p>
-      {/* The AI affordance that does NOT exist, named where it would be. The
-          mesh contract in @sahoda/shared lists seven task names and none of them
-          suggests a hashtag; adding one means editing a frozen contract. */}
-      <NotBuiltYet>
-        Sahoda cannot suggest hashtags yet — it would need a new kind of AI task, and the list of
-        tasks it can run is fixed for now.
-      </NotBuiltYet>
+      {/* ── NO "cannot suggest hashtags" NOTE HERE, AND THAT IS DELIBERATE ──
+          It was here, and MEASURED in a 1440 screenshot it printed the same
+          paragraph on every version card — four identical apologies on one
+          screen with four channels selected. docs/27 §1 counted six different
+          ways of saying "nothing yet" on one screen and called it the problem;
+          repeating ONE way six times is the same problem.
+
+          It is said once, in the writing pane, alongside the other two AI
+          things this screen cannot do. */}
     </div>
   )
 }

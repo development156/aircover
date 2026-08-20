@@ -59,6 +59,13 @@ test.describe('composer screenshots', () => {
           path: join(OUT, `composer-${size.name}-${theme}.png`),
           fullPage: true,
         })
+        // ── AND ONE AT VIEWPORT SIZE ─────────────────────────────────────────
+        // The commit bar is `position: sticky`, and a full-page capture renders
+        // sticky and fixed chrome at its SCROLL OFFSET — mid-document, on top of
+        // whatever happens to be there. docs/27 §0 records a mobile bottom bar
+        // written up as a bug that did not exist for exactly this reason. A
+        // viewport shot photographs it where a person actually sees it.
+        await page.screenshot({ path: join(OUT, `composer-${size.name}-${theme}-viewport.png`) })
       }
     }
 
