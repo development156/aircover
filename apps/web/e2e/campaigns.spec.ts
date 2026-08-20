@@ -54,66 +54,64 @@ const OVERFLOW_CAMPAIGN = `Overflow check ${RUN}`
 /**
  * Write a real post on two channels, and hand back its id.
  *
- * ── THIS HELPER DESCRIBED A COMPOSER THAT IS NOT IN THIS TREE ────────────
- * Its previous version drove `/posts/new` and waited on `[data-composer]`,
- * `[data-version-card="…"]` and a label reading `Your post`, explaining in a long
- * note that `create-flow.tsx` had been "deleted". MEASURED on 2026-08-20 across
- * every branch in this repo: `data-composer` and `data-version-card` exist ONLY in
- * `components/composer/` on `wt-composer` and `wt-editor2`, which have never been
- * merged into this lineage. Here `create-flow.tsx` is alive, `components/composer/`
- * does not exist, and `/posts/new` resolves through `/posts/[id]` to `getPost('new')`
- * → null → `notFound()`.
+ * ── THE COMPOSER REWRITE LANDED, AND THIS FLIPPED BACK ───────────────────
+ * The previous version of this note said, at length, that `[data-composer]` and
+ * `[data-version-card]` existed only on `wt-composer` and `wt-editor2` and that
+ * "whoever merges wt-composer should expect to restore it". That is this commit.
+ * The helper drove `/create/post` -> tile -> **Continue** because on that tree
+ * `create-flow.tsx` was alive; here it is deleted, `/create/post` is a redirect,
+ * and there is no Continue to wait for. MEASURED before the change: both @smoke
+ * tests in this file failed at `getByRole('button', {name: /^continue/i})` after
+ * the full 180s timeout, twice each.
  *
- * So the spec was not flaky and it was not broken by a change. It was written
- * against a tree that also held the composer rewrite, and on this one its very
- * first assertion waited ninety seconds on a selector that has never existed —
- * twice, at 1.8 minutes each. Both @smoke tests in this file could not pass here.
- *
- * ── WHAT THIS TREE ACTUALLY DOES, AND WHERE THAT IS PROVEN ──────────────
- * `/create/post` renders the step flow; a channel tile plus **Continue** writes the
- * row and puts its id in the query string; `/posts/<id>` is the editor and its
- * writing pane is labelled `Body`. That is not deduced — `golden-path.spec.ts`
- * drives exactly this sequence and passes in the same run.
- *
- * ── WHEN THE COMPOSER REWRITE LANDS, THIS FLIPS BACK ─────────────────────
- * The old version of this helper is the correct one for that tree. Whoever merges
- * `wt-composer` should expect to restore it, and the note above is here so that is
- * a decision rather than a rediscovery.
+ * ── WHAT THIS TREE DOES ──────────────────────────────────────────────────
+ * `/posts/new` IS the composer; the row is created by the first save that has
+ * something to write, which picking a channel is, and the id then arrives in the
+ * PATH — not in a `?post=` query string, which nothing emits any more.
  *
  * ── AND WHY THE CHANNELS ARE READ BACK RATHER THAN REASONED ABOUT ───────
  * The grid this spec exists to check takes its COLUMNS from `posts.channels`
- * (`lib/campaigns/rollup.ts#channelUnion`), a server read of the row — so the row is
- * asked directly rather than argued about from a debounce window. After a reload the
- * variant tabs are rendered from that column, and they are located BY NAME rather
- * than by a data attribute: a tab row that rendered the right count of the wrong
- * channels would pass a structural check and fail a reader.
+ * (`lib/campaigns/rollup.ts#channelUnion`), a server read of the row — so the row
+ * is asked directly rather than argued about from a debounce window. The reload
+ * at the end of the helper is that question, and it survived the rewrite: only
+ * the selector changed, from a channel TAB to a version CARD, because docs/26
+ * §10.4 makes the versions a stack rather than tabs.
  */
 async function writePostOnTwoChannels(page: Page, body: string): Promise<string> {
-  await page.goto('/create/post')
-  await expect(page.locator('[data-channel-tile="instagram"]')).toBeVisible({ timeout: 90_000 })
+  await page.goto('/posts/new')
+  await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 90_000 })
 
   await page.locator('[data-channel-tile="instagram"]').click()
   await page.locator('[data-channel-tile="linkedin"]').click()
-  await page.getByRole('button', { name: /^continue/i }).click()
 
-  // The id arrives in the query string on THIS flow. Taking it from the URL
-  // rather than guessing keeps the spec and the app in step.
-  await page.waitForURL(/[?&]post=[0-9a-f-]{36}/, { timeout: 60_000 })
-  const postId = new URL(page.url()).searchParams.get('post') as string
+  // Both picked, before a word is written. These cards are the PICKER's answer,
+  // not the row's — the row does not exist yet, because opening a screen is not
+  // intent.
+  await expect(page.locator('[data-version-card="instagram"]')).toBeVisible()
+  await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
+
+  await page.getByLabel('Your post').fill(body)
+
+  // Read the id off the PATH. Nothing emits `?post=` any more, and a spec that
+  // waits for one waits until its timeout.
+  await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
+  const postId = new URL(page.url()).pathname.split('/').pop() as string
   expect(postId).toMatch(/^[0-9a-f-]{36}$/)
 
-  await page.goto(`/posts/${postId}`)
-  const pane = page.getByLabel('Body')
-  await expect(pane).toBeVisible({ timeout: 30_000 })
-  await pane.fill(body)
-
-  // THE ROW, not the screen that wrote it. After a reload these tabs are rendered
-  // from `posts.channels` on the server, so this is the postcondition every
-  // assertion downstream actually depends on.
+  // ── THE GUARANTEE THIS HELPER CARRIES, RETARGETED AND NOT DROPPED ──────────
+  // The previous version ended by reloading and finding a channel TAB per
+  // channel, with the note that this is "THE ROW, not the screen that wrote it":
+  // the grid downstream takes its COLUMNS from `posts.channels`
+  // (lib/campaigns/rollup.ts#channelUnion), so what matters is that the SERVER
+  // believes both channels are on the post. The composer has no tabs — docs/26
+  // §10.4 makes the per-channel versions a STACK on purpose, because a control
+  // showing one version at a time hides the one thing this product does. So the
+  // reload stays and the selector moves: two version cards after a round trip
+  // are the same claim about the same column, read through a surface that did
+  // not write it.
   await page.reload()
-  const tabs = page.getByRole('tablist', { name: /channel variants/i })
-  await expect(tabs.getByRole('tab', { name: /instagram/i })).toBeVisible({ timeout: 30_000 })
-  await expect(tabs.getByRole('tab', { name: /linkedin/i })).toBeVisible()
+  await expect(page.locator('[data-version-card="instagram"]')).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
 
   return postId
 }

@@ -1,3 +1,4 @@
+import { startPost } from './fixtures/compose'
 import { makePng } from './fixtures/png'
 import { adminClient, expect, test } from './fixtures/seeded-user'
 
@@ -94,17 +95,19 @@ test.describe('media library', () => {
     })
 
     // ── 5. A post to put it on ───────────────────────────────────────────────
-    await page.goto('/create/post')
-    await page.locator('[data-channel-tile="instagram"]').click()
-    await page.getByRole('button', { name: /^continue/i }).click()
-    await page.waitForURL(/[?&]post=[0-9a-f-]{36}/, { timeout: 30_000 })
-    const postId = new URL(page.url()).searchParams.get('post')
-    expect(postId).toMatch(/^[0-9a-f-]{36}$/)
+    // Through the shared helper, not hand-rolled. This block drove
+    // `/create/post` -> tile -> **Continue** and read the id out of a `?post=`
+    // query string; wt-composer deleted that wizard, made `/create/post` a
+    // redirect and moved the id into the PATH. Neither of this file's two
+    // wizard blocks is inside an @smoke describe, so the gate would never have
+    // reported them — they would have sat broken and unrun.
+    const postId = await startPost(page, 'instagram')
 
-    await page.goto(`/posts/${postId}`)
     const title = page.getByLabel(/title/i).first()
     await title.fill('Diwali offer')
-    await expect(page.getByText('All changes saved')).toBeVisible({ timeout: 30_000 })
+    // The composer names the POST, because the bar reports the post and its
+    // versions separately: "All changes saved" is the deleted editor's copy.
+    await expect(page.getByText('Post saved')).toBeVisible({ timeout: 30_000 })
 
     // ── 6. Attach FROM THE LIBRARY, through the composer's media panel ───────
     await page.getByRole('button', { name: /choose from library/i }).click()
@@ -296,12 +299,9 @@ test.describe('media library · widths and themes', () => {
         await page.keyboard.press('Escape')
 
         // ── The composer's media panel, the other screen this changed ─────────
-        await page.goto('/create/post')
-        await page.locator('[data-channel-tile="instagram"]').click()
-        await page.getByRole('button', { name: /^continue/i }).click()
-        await page.waitForURL(/[?&]post=[0-9a-f-]{36}/, { timeout: 30_000 })
-        const postId = new URL(page.url()).searchParams.get('post')
-        await page.goto(`/posts/${postId}`)
+        // Same retarget as above: the composer IS the post screen, so there is
+        // no second navigation to it.
+        await startPost(page, 'instagram')
         await page.evaluate((mode) => {
           document.documentElement.setAttribute('data-theme', mode)
         }, theme)
