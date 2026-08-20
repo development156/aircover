@@ -1,4 +1,4 @@
-# 28 · How `assets` and `post_media` coexist
+# 30 · How `assets` and `post_media` coexist
 
 **Status:** ruling. Written 2026-08-20, with the library screen built and in front of the
 author. Supersedes the note in `20260819000400_assets.sql` that deferred this decision

@@ -33,7 +33,7 @@
 -- `post_media` rows in this database keep working exactly as they do, with
 -- `asset_id` null, which is the "uploaded straight to this post, not from the
 -- library" case and stays supported indefinitely. See
--- `docs/28_Assets_and_post_media.md` for the coexistence plan.
+-- `docs/30_Assets_and_post_media.md` for the coexistence plan.
 --
 -- IF THIS FILE IS WRONG: nothing that works today stops working. Every object it
 -- creates is new, and the one column it adds is nullable with no default.
