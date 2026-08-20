@@ -23,6 +23,7 @@ import {
   refuseFormat,
   type PostFormat,
   type ThreadPlan,
+  type VariantOptions,
 } from '@sahoda/publishing'
 import type { PublishMode } from './mode'
 
@@ -83,6 +84,17 @@ export interface PublishVariant {
    * is a payload that is rejected, not a partial one.
    */
   cta?: { type: string; url: string }
+  /**
+   * The per-channel controls — poll, Google topic, first comment, collaborators,
+   * AI label — from `post_variants.extras`.
+   *
+   * Travels here for the same reason `cta` does: the frozen `FormattedContent`
+   * has no arm that could carry them, and `formatForPlatform` takes a
+   * `VariantDraft` with no room for any of it. The VALUES are checked inside
+   * `buildPlatformData` by `refusePoll` / `refuseGbpTopic` — the same functions
+   * the composer runs — so the card and the publisher cannot reach two answers.
+   */
+  options?: VariantOptions
 }
 
 /** Connection identity + the in-memory-only access token. Never persisted from here. */
@@ -236,6 +248,7 @@ export interface PublishPostDeps {
     viaZernio: boolean,
     format: PostFormat | null,
     thread?: ThreadPlan | null,
+    options?: VariantOptions | null,
   ): PublishAdapter
   /**
    * Turn `post_media` attachments into URLs the platform can fetch.
@@ -573,7 +586,13 @@ export async function runPublishPost(
     }
 
     const result = await deps
-      .adapterFor(payload.channel, connection.viaZernio === true, variant.format ?? null, thread)
+      .adapterFor(
+        payload.channel,
+        connection.viaZernio === true,
+        variant.format ?? null,
+        thread,
+        variant.options ?? null,
+      )
       .publish(request)
 
     // The adapter's own mode is authoritative: a fixture result is recorded as a fixture

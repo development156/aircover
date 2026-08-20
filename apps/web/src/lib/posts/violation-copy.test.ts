@@ -2,7 +2,7 @@ import { CONSTRAINTS, validateMedia, validateVariant } from '@sahoda/shared'
 import type { ConstraintViolation } from '@sahoda/shared'
 import { describe, expect, test } from 'vitest'
 
-import { planThread } from '@sahoda/publishing/format'
+import { planThread, segmentLimitFor } from '@sahoda/publishing/format'
 
 import { describeViolation, summarizeViolations } from './violation-copy'
 
@@ -295,19 +295,23 @@ describe('summarizeViolations', () => {
  */
 describe('the thread refusals reach the screen as themselves', () => {
   const refusalFor = (body: string): { code: string; message: string } => {
-    const result = planThread(CONSTRAINTS.x, body, false)
+    const result = planThread(CONSTRAINTS.x, body)
     if (result.ok) throw new Error('fixture did not produce a refusal')
     return result.refusal
   }
 
   test('an unbreakable link keeps its own sentence and its numbers', () => {
-    const refusal = refusalFor(`Read this https://example.com/${'a'.repeat(400)}`)
+    const body = `Read this https://example.com/${'a'.repeat(400)}`
+    const refusal = refusalFor(body)
     expect(refusal.code).toBe('THREAD_UNBREAKABLE')
 
     const display = describeViolation(refusal)
     expect(display.code).toBe('THREAD_UNBREAKABLE')
     expect(display.message).toBe(refusal.message)
-    expect(display.message).toContain('280')
+    // 257, not 280 — the body carries a link, so every segment pays X's flat
+    // 23-character weight. Asked of the engine rather than written down, because
+    // a literal here would pin whichever number happened to be right that day.
+    expect(display.message).toContain(String(segmentLimitFor(CONSTRAINTS.x, body)))
     // The proof it was not silently downgraded.
     expect(display.message).not.toContain('does not meet the channel rules')
   })

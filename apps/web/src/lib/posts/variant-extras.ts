@@ -1,12 +1,37 @@
 import { CONSTRAINTS } from '@sahoda/shared'
 import { z } from 'zod'
 
+const PollSchema = z.object({
+  question: z.string().optional(),
+  options: z.array(z.string()),
+  durationMinutes: z.number().optional(),
+  durationCode: z.string().optional(),
+})
+
+const GbpEventSchema = z.object({
+  title: z.string(),
+  startDate: z.string(),
+  endDate: z.string().optional(),
+})
+
+const GbpOfferSchema = z.object({
+  couponCode: z.string().optional(),
+  redeemUrl: z.string().optional(),
+  terms: z.string().optional(),
+})
+
 /**
  * Shape of `post_variants.extras`, which is untyped jsonb in the database.
  *
  * `formatForPlatform` in the frozen Constraint Engine drops the GBP CTA, the
  * offer text and media ids, so apps/web parks them here. The declared fields
  * stay compatible with the mesh output shape `{ hashtags?, gbpCta? }`.
+ *
+ * It is also where every per-channel CONTROL lives — the poll, Google's topic,
+ * the first comment, the collaborators, the AI label. None of those is a FORMAT:
+ * a poll is a text post with a poll on it, and Google's topic is a variation on a
+ * standard post. Putting them in `post_variants.format` would have meant a
+ * migration widening a CHECK constraint for something that is not a format.
  *
  * LOOSE, not strict, and this is deliberate. `extras` is a single shared jsonb
  * column that more than one lane writes to. Any read-modify-write through this
@@ -20,6 +45,19 @@ export const VariantExtrasSchema = z
     gbpCta: z.string().optional(),
     ctaUrl: z.string().optional(),
     offer: z.string().optional(),
+    // ── THE PER-CHANNEL CONTROLS ────────────────────────────────────────────
+    // Shape-checked only. The VALUE rules — a poll's 2-4 answers, X's 25-character
+    // answers, Google's date — live in `@sahoda/publishing`'s `refusePoll` and
+    // `refuseGbpTopic`, which are the same functions the publish path runs. A
+    // second copy of a bound here is how the editor and the publisher come to
+    // disagree, which is the thing this whole column has already done once.
+    poll: PollSchema.optional(),
+    firstComment: z.string().optional(),
+    collaborators: z.array(z.string()).optional(),
+    aiGenerated: z.boolean().optional(),
+    gbpTopic: z.enum(['EVENT', 'OFFER']).optional(),
+    gbpEvent: GbpEventSchema.optional(),
+    gbpOffer: GbpOfferSchema.optional(),
   })
   .loose()
 
@@ -31,6 +69,13 @@ const FIELD_SCHEMAS = {
   gbpCta: z.string(),
   ctaUrl: z.string(),
   offer: z.string(),
+  poll: PollSchema,
+  firstComment: z.string(),
+  collaborators: z.array(z.string()),
+  aiGenerated: z.boolean(),
+  gbpTopic: z.enum(['EVENT', 'OFFER']),
+  gbpEvent: GbpEventSchema,
+  gbpOffer: GbpOfferSchema,
 } as const
 
 const isPlainObject = (raw: unknown): raw is Record<string, unknown> =>

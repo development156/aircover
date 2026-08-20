@@ -8,7 +8,7 @@ import {
   type ReadMedia,
   type Transport,
 } from '@sahoda/publishing'
-import type { PostFormat, ThreadPlan } from '@sahoda/publishing'
+import type { PostFormat, ThreadPlan, VariantOptions } from '@sahoda/publishing'
 import type { PublishMode } from './runPublishPost'
 
 export interface AdapterSelectorDeps {
@@ -52,12 +52,14 @@ export function createAdapterSelector(
   viaZernio: boolean,
   format: PostFormat | null,
   thread?: ThreadPlan | null,
+  options?: VariantOptions | null,
 ) => PublishAdapter {
   return (
     channel: Channel,
     viaZernio: boolean,
     format: PostFormat | null,
     thread?: ThreadPlan | null,
+    options?: VariantOptions | null,
   ): PublishAdapter => {
     if (deps.mode === 'fixture') return createFixtureAdapter(channel, { now: deps.now })
 
@@ -79,6 +81,7 @@ export function createAdapterSelector(
         // native adapters speak their platforms' own APIs and have no
         // `platformSpecificData` to put it in.
         ...(thread ? { thread } : {}),
+        ...(options ? { options } : {}),
         now: deps.now,
       })
     }

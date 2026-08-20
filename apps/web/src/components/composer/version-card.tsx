@@ -260,6 +260,7 @@ export function VersionCard({
         onFormatChange={onFormatChange}
         extras={state.extras}
         onExtrasChange={onExtrasChange}
+        mediaCount={mediaCount}
       />
 
       {/* ── ONLY ONE OF THE TWO EVER SHOWS ──────────────────────────────────────

@@ -855,3 +855,59 @@ describe('a thread is the one body, split', () => {
     expect(seen).toBeNull()
   })
 })
+
+/**
+ * ── THE CHECK THE GOOGLE BUTTON NEVER HAD ─────────────────────────────────────
+ * The CTA picker wrote `extras.gbpCta` to the database for months and NOTHING
+ * between there and Google read it: the writer chose "ORDER", saw it saved, and
+ * no button appeared. A test asserting the composer stores the value would have
+ * passed the whole time.
+ *
+ * So every control added since is tested at the seam that actually broke — what
+ * the adapter factory was HANDED — not at the one that was always fine.
+ */
+describe('the per-channel controls reach the adapter', () => {
+  const seenOptions = () => {
+    let seen: unknown = 'never called'
+    const h = harness({
+      variant: {
+        options: {
+          poll: { options: ['Chai', 'Coffee'], durationMinutes: 1440 },
+          firstComment: '#chai',
+          aiGenerated: true,
+        },
+      },
+      adapterFor: (channel, _via, _format, _thread, options) => {
+        seen = options
+        return createFixtureAdapter(channel)
+      },
+    })
+    return { h, get: () => seen }
+  }
+
+  it('hands the stored options through, unchanged', async () => {
+    const { h, get } = seenOptions()
+    const res = await runPublishPost(payload, ctx, h.deps)
+    expect(res.status).toBe('succeeded')
+    expect(get()).toEqual({
+      poll: { options: ['Chai', 'Coffee'], durationMinutes: 1440 },
+      firstComment: '#chai',
+      aiGenerated: true,
+    })
+  })
+
+  it('hands null when the version carries none, never an empty object', async () => {
+    // `{}` would be a claim that we considered the controls and chose nothing,
+    // which is a different thing from a version that has none — and it is what
+    // decides whether `platformSpecificData` appears on the wire at all.
+    let seen: unknown = 'never called'
+    const h = harness({
+      adapterFor: (channel, _via, _format, _thread, options) => {
+        seen = options
+        return createFixtureAdapter(channel)
+      },
+    })
+    await runPublishPost(payload, ctx, h.deps)
+    expect(seen).toBeNull()
+  })
+})

@@ -59,6 +59,28 @@ export {
 // (see `no-client-barrel.test.ts`), and a `'use client'` component already
 // value-imports `CONSTRAINTS` from shared today.
 export { splitIntoThread, describeThread, countCodePoints, type ThreadSegment } from './thread-split'
+// The per-channel controls, and the rules that make each valid. Reachable from
+// the browser so the composer runs the SAME refusal the publish path runs — a
+// second copy of "2 to 4 answers" is how an editor and a publisher come to
+// disagree. Only a TYPE crosses from outside this package.
+export {
+  refusePoll,
+  refuseGbpTopic,
+  parseIsoDate,
+  LINKEDIN_POLL_DURATIONS,
+  POLL_MIN_OPTIONS,
+  POLL_MAX_OPTIONS,
+  X_POLL_OPTION_MAX,
+  X_POLL_MIN_MINUTES,
+  X_POLL_MAX_MINUTES,
+  LINKEDIN_POLL_QUESTION_MAX,
+  INSTAGRAM_MAX_COLLABORATORS,
+  type VariantOptions,
+  type PollOption,
+  type GbpEventOption,
+  type GbpOfferOption,
+} from './zernio/variant-options'
+
 export {
   planThread,
   segmentLimitFor,

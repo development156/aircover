@@ -11,8 +11,11 @@ import {
 import { Label } from '@/components/ui/label'
 import type { VariantExtras } from '@/lib/posts/variant-extras'
 
+import { ChannelExtras } from './channel-extras'
 import { GbpOptions } from './gbp-options'
+import { GbpTopicOptions } from './gbp-topic-options'
 import { NotBuiltYet } from './not-built-yet'
+import { PollOptions } from './poll-options'
 
 /** The word a person uses, per stored value. Never the enum. */
 const FORMAT_LABEL: Readonly<Record<PostFormat, string>> = {
@@ -36,6 +39,8 @@ export interface VersionOptionsProps {
   onFormatChange: (format: PostFormat | null) => void
   extras: VariantExtras
   onExtrasChange: (patch: VariantExtras) => void
+  /** Files on the POST. Only the poll rules read it — a poll cannot carry one. */
+  mediaCount: number
 }
 
 /**
@@ -67,6 +72,7 @@ export function VersionOptions({
   onFormatChange,
   extras,
   onExtrasChange,
+  mediaCount,
 }: VersionOptionsProps) {
   const spec = CONSTRAINTS[channel]
   const available = formatsFor(spec)
@@ -114,8 +120,31 @@ export function VersionOptions({
       </div>
 
       {spec.gbp !== undefined ? (
-        <GbpOptions extras={extras} onExtrasChange={onExtrasChange} />
+        <>
+          <GbpOptions extras={extras} onExtrasChange={onExtrasChange} />
+          <GbpTopicOptions extras={extras} onExtrasChange={onExtrasChange} />
+        </>
       ) : null}
+
+      {/* ── ONLY WHERE THE CHANNEL REALLY HAS IT ──────────────────────────────
+          Someone posting one caption to two channels must never meet seven
+          option panels, so each of these renders on exactly the channels that
+          carry it — and each returns null rather than an empty box elsewhere. */}
+      {channel === 'x' || channel === 'linkedin' ? (
+        <PollOptions
+          channel={channel}
+          extras={extras}
+          onExtrasChange={onExtrasChange}
+          mediaCount={mediaCount}
+        />
+      ) : null}
+
+      <ChannelExtras
+        channel={channel}
+        format={format}
+        extras={extras}
+        onExtrasChange={onExtrasChange}
+      />
 
       {/* ── WHAT A THREAD DOES NOT CARRY, SAID ON THE CARD THAT OFFERS IT ─────
           Threads publish now. One capability behind them does not, and saying so
