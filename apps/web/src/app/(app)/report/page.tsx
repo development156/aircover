@@ -100,7 +100,7 @@ export default async function ReportPage() {
           {ranking ? (
             <p className="type-body max-w-[68ch] text-muted">
               <span className="num">{ranking.postsMeasured}</span> of your posts were measured
-              between {window.fromIso} and {window.toIso}.
+              between {fullDay(window.fromIso)} and {fullDay(window.toIso)}.
             </p>
           ) : (
             <p className="type-body max-w-[68ch] text-muted">
@@ -216,6 +216,22 @@ export default async function ReportPage() {
       </div>
     </div>
   )
+}
+
+/**
+ * A date the way a person writes one.
+ *
+ * `timeZone: 'UTC'` because the window boundaries are calendar DAYS derived in
+ * UTC. Rendering them in the reader's local zone would show the previous day
+ * anywhere west of Greenwich — a report claiming to cover a week it did not.
+ * Same reasoning, same call, as the campaign page's `fullDay`.
+ */
+function fullDay(isoDay: string): string {
+  return new Date(`${isoDay}T00:00:00Z`).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  })
 }
 
 function Block({
