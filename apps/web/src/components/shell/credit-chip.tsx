@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { Unreadable } from '@/components/design-system/absence-row'
 import type { BalanceRead } from '@/lib/wallet/read'
 import { cn } from '@/lib/utils'
 
@@ -15,15 +16,19 @@ import { cn } from '@/lib/utils'
 //   no-workspace  no number at all. There is no wallet yet, so an em dash
 //                 ("we could not read it") points at a fault that does not
 //                 exist, and a 0 would invent a balance outright.
-//   unreadable    an em dash. Deliberately NOT 0: "we could not read your
-//                 balance" and "you have no credits" are different claims and
-//                 only one is true — a funded user shown 0 stops working.
+//   unreadable    the UNREADABLE MARK (docs/26 §4) — a broken rule, not a bare
+//                 dash. Deliberately NOT 0: "we could not read your balance"
+//                 and "you have no credits" are different claims and only one
+//                 is true — a funded user shown 0 stops working. It is not a
+//                 dash either, because a dash is also what "not yet measured"
+//                 looked like, and those are different claims too. The mark is
+//                 structural, so the two are told apart without reading.
 
 const NO_WALLET_TEXT = 'No wallet yet'
 
 interface ChipContent {
-  /** What the pill shows. */
-  text: string
+  /** What the pill shows. `null` renders the Unreadable mark instead. */
+  text: string | null
   /** Rendered in the muted suffix slot, or null when the text stands alone. */
   suffix: string | null
   label: string
@@ -44,7 +49,7 @@ function contentFor(balance: BalanceRead): ChipContent {
     }
   }
 
-  return { text: '—', suffix: 'credits', label: 'Credit balance unavailable. Open wallet' }
+  return { text: null, suffix: 'credits', label: 'Credit balance unavailable. Open wallet' }
 }
 
 export function CreditChip({ balance }: { balance: BalanceRead }) {
@@ -95,10 +100,10 @@ export function CreditChip({ balance }: { balance: BalanceRead }) {
       {/* `.num` (tokens.css v3: mono + tabular-nums) only where there is a
           number to align — v3 puts mono in exactly three places and the topbar
           credit pill is one of them. "No wallet yet" is prose, so it stays sans. */}
-      <span
-        className={balance.status === 'ok' || balance.status === 'unreadable' ? 'num' : undefined}
-      >
-        {content.text}
+      <span className={balance.status === 'ok' ? 'num' : undefined}>
+        {/* The link already carries the accessible name, so this mark is
+            aria-hidden via the Unreadable component's own markup. */}
+        {content.text ?? <Unreadable what="Your credit balance" />}
       </span>
       {content.suffix !== null ? (
         <span className="text-[13px] font-medium text-muted">{content.suffix}</span>

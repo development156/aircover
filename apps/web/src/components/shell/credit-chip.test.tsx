@@ -64,10 +64,18 @@ describe('a user with no workspace', () => {
 })
 
 describe('a balance we genuinely could not read', () => {
-  test('keeps the em dash and the unavailable wording — both true here', () => {
+  test('says it could not be read, in a form a screen reader reaches', () => {
     render(<CreditChip balance={{ status: 'unreadable' }} />)
 
-    expect(screen.getByText('—')).toBeInTheDocument()
+    // Asserts the CLAIM, not the glyph. This used to require the literal '—',
+    // which docs/26 §4 replaced with the Unreadable MARK — a broken rule, so
+    // "we asked and got nothing back" is structurally distinct from "not yet
+    // measured", which the same dash also used to mean.
+    //
+    // The new assertion is strictly stronger: a bare dash satisfied the old one
+    // while being invisible to a screen reader, and a mark with no accessible
+    // name cannot satisfy this one.
+    expect(screen.getByText(/your credit balance could not be read/i)).toBeInTheDocument()
     expect(screen.getByRole('link')).toHaveAccessibleName(/unavailable/i)
   })
 

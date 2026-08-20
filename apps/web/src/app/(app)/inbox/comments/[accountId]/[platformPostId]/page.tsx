@@ -1,3 +1,4 @@
+import { CardEmpty } from '@/components/empty-state'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -74,7 +75,9 @@ export default async function PostCommentsPage({
           <PaneScroll className="p-4">
             <SurfaceBanner state={decision.state} />
             {rows.length === 0 ? (
-              <p className="py-6 text-center text-[13px] text-muted">{decision.state.body}</p>
+              // One language across all five inbox routes (docs/26 §4.1). The
+              // claim is the classifier's; only the treatment moved.
+              <CardEmpty body={decision.state.body} />
             ) : (
               <ul className="space-y-2" data-guide="inbox.post-comments">
                 {rows.map((comment) => (

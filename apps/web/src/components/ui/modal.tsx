@@ -69,7 +69,13 @@ export function Modal({
       }}
       className={cn(
         'm-auto w-[min(560px,calc(100vw-32px))] rounded-card border border-line bg-surface p-0 text-ink shadow-lg',
-        'backdrop:bg-black/40',
+        // `bg-[var(--scrim)]`, not `bg-black/40`. globals.css opens @theme with
+        // `--color-*: initial`, which wipes the stock palette, and only
+        // `--color-white` is redefined — so `bg-black` was a class Tailwind
+        // never generated and this dialog opened over an UNDIMMED page. PROVEN
+        // in the compiled CSS: no `backdrop:bg-black/40` rule exists, and the
+        // only two `::backdrop` rules are preflight.
+        'backdrop:bg-[var(--scrim)]',
         className,
       )}
     >

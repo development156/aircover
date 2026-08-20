@@ -26,10 +26,17 @@ import { cn } from '@/lib/utils'
  */
 
 /** One shimmering bar. `w`/`h` are Tailwind classes so callers control the shape. */
-export function SkeletonBar({ className }: { className?: string }) {
+export function SkeletonBar({
+  className,
+  style,
+}: {
+  className?: string
+  style?: React.CSSProperties
+}) {
   return (
     <span
       aria-hidden
+      style={style}
       className={cn('block animate-pulse rounded-sm bg-s2', className)}
       // `bg-s2` (--surface-2), never `bg-s1`: --s1 is var(--canvas), which is the
       // same #ffffff as --surface in light mode, so a skeleton drawn in s1 on a

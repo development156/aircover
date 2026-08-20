@@ -1,3 +1,4 @@
+import { CardEmpty } from '@/components/empty-state'
 import { PaneHeader, PaneScroll } from '@/components/inbox/inbox-panes'
 
 /**
@@ -38,10 +39,12 @@ export function ContextPane() {
         <h2 className="text-[14px] font-semibold tracking-[-0.01em]">Customer</h2>
       </PaneHeader>
 
-      <PaneScroll className="p-4">
-        <p className="text-[13px] text-muted">
-          Open something from the list and what Sahoda knows about that person appears here.
-        </p>
+      <PaneScroll>
+        {/* The third of three empty states this screen used to say in three
+            different visual languages. Quiet, like the list pane: the loud one
+            is the thread pane, because that is the one carrying the reason the
+            inbox is empty and the button that fixes it (docs/26 §4.1). */}
+        <CardEmpty body="Open something from the list and what Sahoda knows about that person appears here." />
       </PaneScroll>
     </>
   )

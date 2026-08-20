@@ -1,3 +1,4 @@
+import { CardEmpty } from '@/components/empty-state'
 import { PaneHeader, PaneScroll } from '@/components/inbox/inbox-panes'
 
 /**
@@ -45,7 +46,11 @@ export function SurfaceList({
 
       <PaneScroll>
         {isEmpty ? (
-          <p className="px-3 py-4 text-[12px] text-muted">{emptyLine}</p>
+          // One language for the whole inbox. This single line covers
+          // /inbox/comments and /inbox/reviews, which both route their empty
+          // state through here — the list pane is quiet and the thread pane
+          // beside it carries the reason and the remedy (docs/26 §4.1).
+          <CardEmpty body={emptyLine} />
         ) : (
           <ul>{children}</ul>
         )}

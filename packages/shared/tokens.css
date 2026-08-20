@@ -236,12 +236,62 @@
      scattered by hand is how three of them end up at 40. */
   --control-h-touch: 44px;
 
+  /* ---------- L2 · SCRIM ----------
+     The wash behind a modal or a drawer.
+
+     It did not exist, and neither did the scrim. `modal.tsx` and `drawer.tsx`
+     both asked for `backdrop:bg-black/40`, and `globals.css` opens @theme with
+     `--color-*: initial` — which wipes the stock palette. Only `--color-white`
+     was redefined, so `bg-black` was never generated and EVERY overlay in the
+     product opened over an untouched page. PROVEN: the compiled CSS contains
+     two `::backdrop` rules and both are Tailwind preflight.
+
+     Dark is a PEER, not an inversion (§2): black at 40% over a near-black
+     canvas barely reads, so dark takes a heavier value rather than the same
+     one. */
+  --scrim: rgb(0 0 0 / 0.4);
+
+  /* ---------- L2 · MEASURE ----------
+     How wide a thing is allowed to get before it stops being readable.
+     Space (--space-N) is the gap BETWEEN things; measure is the cap on ONE
+     thing, and the app had no vocabulary for it — which is why a two-row
+     settings form stretched to 1150px with its label and its control ~900px
+     apart, reading as an unfinished page rather than a short one. */
+
+  /* A label/control pair. Past this the two halves stop reading as one row. */
+  --measure-form: 720px;
+  /* Running prose. Roughly 68ch at the 13px base. */
+  --measure-prose: 620px;
+
   /* ---------- L2 · MOTION ---------- */
   --ease: cubic-bezier(0.2, 0, 0.2, 1);
   --ease-sweep: cubic-bezier(0.16, 1, 0.3, 1); /* blade-sweep signature only */
   --dur-fast: 140ms;
   --dur-base: 180ms;
   --dur-slow: 280ms;
+
+  /* The stagger step. Content arriving all at once reads as a flash; content
+     arriving one item at a time reads as a list being dealt. 40ms is the step
+     between successive items, and --stagger-cap is how many items are allowed
+     to carry a delay — beyond that they share the last one, so a 40-row table
+     does not take 1.6s to finish arriving. Both are tokens because a stagger
+     hand-written per screen is exactly how eleven screens end up with eleven
+     rhythms (docs/26 §8.1). */
+  --stagger: 40ms;
+  --stagger-cap: 8;
+
+  /* How far an entering element travels. Small on purpose: an entrance that
+     moves far enough to notice is an entrance you wait for. */
+  --enter-lift: 6px;
+
+  /* The ONE duration longer than --dur-slow, and it is not a transition.
+     §8 rules that nothing longer than 280ms ships, and that rule is about
+     moving between two states — at 280ms a four-digit count is a flicker,
+     not a count, so it would buy the cost of animating a number without the
+     legibility that justifies it. A count-up is a REVEAL of one settled
+     value (docs/26 §8.1), so it is allowed its own step. Read from JS by
+     CountUp rather than duplicated there. */
+  --dur-count: 560ms;
 
   /* ---------- L3 · LEGACY ALIASES ----------
      Existing components only. Remove one at a time as surfaces migrate.
@@ -276,6 +326,10 @@
      compressed near black: even this pair is only 1.10:1), so fill and hairline
      work together here in a way they do not have to on light. */
   --surface: #17171a;
+  /* Heavier than light's 0.4. Black at 40% over a #0b0b0c canvas is close to
+     no scrim at all; the overlay has to separate from the page it covers, and
+     in dark the fill cannot do that on its own (§2). */
+  --scrim: rgb(0 0 0 / 0.62);
   --surface-2: #17171a;
   --surface-3: #1f1f23;
   --line: rgba(255, 255, 255, 0.14);
@@ -466,6 +520,46 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ============================================================
+   ENTRANCE — how content arrives (docs/26 §8.1)
+   ------------------------------------------------------------
+   ONE keyframe for the whole product. A screen that fades, a
+   screen that slides and a screen that scales read as three
+   products; the audit's core finding was every screen answering
+   the same question by itself, and "how does content arrive" is
+   one of those questions.
+
+   Travel is --enter-lift (6px) and it is deliberately small. An
+   entrance you can watch is an entrance you are waiting for.
+   ============================================================ */
+@keyframes sl-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--enter-lift));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* An element that arrives. `both` fill so it is hidden BEFORE its
+   delay elapses rather than flashing at full opacity first. */
+.enter {
+  animation: sl-enter var(--dur-base) var(--ease) both;
+}
+
+/* The stagger ladder. Applied by the Stagger component via
+   --i (the item's index, already capped at --stagger-cap), so a
+   call site never hand-writes a delay. */
+.enter-step {
+  animation: sl-enter var(--dur-base) var(--ease) both;
+  /* The cap lives HERE, in CSS, not mirrored in TypeScript. A call site
+     passes its raw index and min() clamps it, so --stagger-cap stays the
+     one place the ceiling is written. */
+  animation-delay: calc(min(var(--i, 0), var(--stagger-cap)) * var(--stagger));
+}
+
 /* ---------- REDUCED MOTION — suppresses blade-sweep, mascot, confetti ---------- */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -475,5 +569,13 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+
+    /* MUST be here. Zeroing the DURATION alone leaves the DELAY intact,
+       so a staggered row with `animation-delay: 320ms` and `fill: both`
+       stays invisible for 320ms and then snaps in — the person who asked
+       for less motion gets a slower, jumpier screen than everyone else.
+       A stagger is a motion, and its delay has to die with it. */
+    animation-delay: 0ms !important;
+    transition-delay: 0ms !important;
   }
 }

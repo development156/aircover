@@ -140,20 +140,30 @@ describe('Topbar', () => {
     render(await Topbar())
 
     expect(screen.getByRole('banner')).toBeInTheDocument()
-    // An em dash, not a zero. "We could not read your balance" and "you have no
-    // credits" are different claims and only one of them is true — telling a
-    // funded user they have 0 credits would stop them working for no reason.
+    // The UNREADABLE MARK, not a zero. "We could not read your balance" and
+    // "you have no credits" are different claims and only one of them is true —
+    // telling a funded user they have 0 credits would stop them working for no
+    // reason.
     //
-    // Scoped to the credit chip by its aria-label rather than matched globally:
-    // the brain ring uses the same em dash for the same reason, and an unscoped
-    // getByText would now find two and fail without either one being wrong.
+    // Asserted by its accessible name rather than by the glyph. Both controls
+    // used to render a bare '—', which docs/26 §4 retired: the same dash also
+    // meant "not yet measured", so the two claims were indistinguishable, and a
+    // dash with no name is a decoration a screen reader skips entirely.
+    //
+    // Still scoped by aria-label rather than matched globally: the ring degrades
+    // the same way, so an unscoped query would find two and fail without either
+    // one being wrong.
     expect(
-      within(screen.getByLabelText('Credit balance unavailable. Open wallet')).getByText('—'),
+      within(screen.getByLabelText('Credit balance unavailable. Open wallet')).getByText(
+        /could not be read/i,
+      ),
     ).toBeInTheDocument()
     // The ring degrades the same way, and to the same claim: not 0/15, which
     // would report every confirmed field as unconfirmed.
     expect(
-      within(screen.getByLabelText('Brand Brain unavailable. Open Brand Brain')).getByText('—'),
+      within(screen.getByLabelText('Brand Brain unavailable. Open Brand Brain')).getByText(
+        /could not be read/i,
+      ),
     ).toBeInTheDocument()
     // Each failure reported on its own, so the tags say which subsystem is down
     // rather than collapsing four outages into one anonymous event.

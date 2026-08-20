@@ -15,5 +15,6 @@
 # and go stale the moment a token changes, so the harness is the artefact that
 # is version-controlled, not its output.
 /design-audit/
+/design-audit-*/
 /shell-proof/
 /design-system-proof/

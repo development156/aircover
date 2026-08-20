@@ -1,7 +1,11 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "stream",
-  "globalDependencies": ["pricing.config.json"],
+  "globalDependencies": [
+    "pricing.config.json",
+    "scripts/design/design-lint.mjs",
+    "scripts/design/design-lint-baseline.json"
+  ],
   "tasks": {
     "typecheck": {
       "dependsOn": ["^typecheck"]
@@ -14,7 +18,12 @@
     "test:smoke": {
       "dependsOn": ["^typecheck"],
       "cache": false,
-      "env": ["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "CLERK_SECRET_KEY", "SUPABASE_DB_URL"]
+      "env": [
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "CLERK_SECRET_KEY",
+        "SUPABASE_DB_URL",
+        "E2E_PORT"
+      ]
     },
     "build": {
       "dependsOn": ["^build"],

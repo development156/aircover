@@ -1,3 +1,5 @@
+import { CountUp } from '@/components/motion/count-up'
+import { Unmeasured } from '@/components/design-system/absence-row'
 import Link from 'next/link'
 
 import { Card } from '@/components/ui/card'
@@ -91,23 +93,46 @@ export function PerformanceStrip({ analytics }: { analytics: AccountAnalytics })
           return (
             <div key={label} className="min-w-0">
               <dt className="truncate text-[12px] text-muted">{label}</dt>
-              <dd className="text-[19px] leading-7 font-[650] tracking-[-0.02em] tabular-nums text-ink">
-                {value === undefined ? '—' : value.toLocaleString('en-IN')}
+              {/* `type-h2`, not `text-[19px] leading-7 font-[650] tracking-[-0.02em]`.
+                  19px is not a step on the scale and never was — docs/26 §5
+                  exists because sizes hand-written at a call site drift from
+                  every other call site that hand-wrote one. */}
+              <dd className="type-h2 tabular-nums text-ink">
+                {value === undefined ? (
+                  // The UNMEASURED mark, not a bare em dash. The slot is real
+                  // and the reading has not arrived (docs/26 §4) — and unlike a
+                  // dash it carries an accessible name, so the absence is
+                  // legible to a screen reader instead of being skipped.
+                  <Unmeasured what={label} />
+                ) : (
+                  // THE call site docs/26 §8.1 was written for. These are
+                  // SETTLED account readings for a closed period: finished, and
+                  // they will not move again while you look at them. Contrast
+                  // the credit balance, which may not count and is guarded
+                  // against it by count-up.guard.test.ts.
+                  <CountUp value={value} />
+                )}
               </dd>
             </div>
           )
         })}
       </dl>
 
-      {/* The reference's Marketing Score ring. There is no score in this product
-          — no inputs, no formula, nothing that could compute one — so the slot
-          keeps its label and says so, rather than showing a ring at 0% that
-          would read as a real and very bad score. */}
-      <div className="flex items-baseline justify-between gap-3 border-t border-line-soft pt-3">
-        <span className="text-[12px] text-muted">Marketing score</span>
-        <span className="text-[13px] font-[650] tabular-nums text-muted">—</span>
-      </div>
+      {/* ── MARKETING SCORE IS GONE, AND THAT IS THE THIRD TIME ────────────
+          The reference has a Marketing Score ring. This comment used to argue
+          that "there is no score in this product — no inputs, no formula,
+          nothing that could compute one — so the slot keeps its label and says
+          so". The premise is right and the conclusion was wrong, in exactly the
+          way `100 of —` was wrong and the four Brand Brain tiles were wrong.
 
+          docs/26 §4 has three absence states and this is the THIRD: the
+          quantity does not exist. It renders NOTHING. A dash is the mark for a
+          slot that is real and not yet filled, so using it here told every
+          reader their marketing score was pending when in fact this product has
+          no such number and never had one.
+
+          Not showing a ring at 0% was the right instinct. Deleting the row is
+          the same instinct carried one step further. */}
       {reason ? <p className="text-[12px] text-muted">{reason}</p> : null}
     </Card>
   )

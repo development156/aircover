@@ -8,10 +8,11 @@ import { BrainCard, ConnectionsCard } from '@/components/home/rail-cards'
 import { InstagramInsights } from '@/components/home/instagram-insights'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
 import { SahodaRail } from '@/components/home/sahoda-rail'
-import { SpendArea } from '@/components/home/spend-area'
-import { SpendBars } from '@/components/home/spend-bars'
+import { SpendCard } from '@/components/home/spend-card'
 import { WeekStrip } from '@/components/home/week-strip'
 import { Card, CardLabel } from '@/components/ui/card'
+import { StaggerItem } from '@/components/motion/stagger'
+import { Unreadable } from '@/components/design-system/absence-row'
 import { ActivityFeed } from '@/components/home/activity-feed'
 import { readInstagramAnalytics } from '@/lib/analytics/account-insights'
 import { readBrain } from '@/lib/brand/read-brain'
@@ -40,6 +41,34 @@ export const metadata = { title: 'Home' }
  * full-bleed as the hero, a 2-column split, then a dense table. The density
  * contrast — a lot of air above, tight rows below — is what stops it reading as
  * a grid of equal cards.
+ *
+ * ── ONE THING LEADS, AND IT IS THE QUEUE (2026-08-20 restructure) ────────────
+ * docs/27 §1 found "two competing heroes" and no focal point. Both heroes were
+ * real: the greeting, and `Available credits` at `type-display` with a brand
+ * shadow in the rail. docs/26 §5 allows ONE `type-display` per view and says it
+ * may never sit beside another hero.
+ *
+ * The credits number lost. Not because it matters less, but because it was
+ * already on this screen TWICE MORE — the topbar chip and the rail foot both
+ * render the same figure — so the biggest type on the page was its third copy.
+ * It is now a compact stat in the rail, and the greeting is the page's only
+ * display-weight element.
+ *
+ * What leads instead is `Needs your attention`. The four questions
+ * (SPECIFICATION.md §1) are what happened · what is happening · what needs me ·
+ * what next, and that is the order they are ANSWERED in, not the order of
+ * importance. A shop owner checking this between customers is answering "what
+ * needs me" — so the queue moved from fourth in the left column, below two
+ * charts and a spend card, to directly under the greeting. Everything that was
+ * above it is a report, and a report can wait for a scroll.
+ *
+ * ── ARRIVAL ─────────────────────────────────────────────────────────────────
+ * The nine reads stay in ONE `Promise.all`. That is one wait, not nine, and
+ * splitting it into per-section Suspense boundaries would trade a single
+ * skeleton for nine independent pop-ins. `loading.tsx` holds the shape while it
+ * resolves and the regions then arrive in sequence via `StaggerItem` — one
+ * ladder down the left column and on into the rail, so the page deals itself
+ * rather than flashing (docs/26 §8.1).
  *
  * Every number comes from a table or from a platform that reported it. No
  * placeholder figures and no seeded demo values.
@@ -120,70 +149,96 @@ export default async function HomePage() {
           row and the stack read as a leftovers column. */}
       <div className="grid grid-cols-[minmax(0,1fr)_380px] items-start gap-4 max-wide:grid-cols-1">
         <div className="flex min-w-0 flex-col gap-4">
-          {/* 2 — WHAT IS HAPPENING. The reference opens this column with the
-                  performance strip, and this page had no metric container at
-                  all — not an empty one, none. Its four slots read "—" until
-                  something is connected, which is the honest answer; showing
-                  nothing left the reader unable to tell "we measured nothing"
-                  from "this product does not measure". */}
-          <PerformanceStrip analytics={instagram} />
+          {/* WHAT NEEDS ME — the lead. See the header note: this is the question
+              someone actually opened the app to ask, and it used to sit fourth,
+              below two charts and a spend card. */}
+          <StaggerItem i={0}>
+            <NeedsAttention posts={displayPosts} />
+          </StaggerItem>
+
+          {/* WHAT IS HAPPENING. This page had no metric container at all — not
+              an empty one, none. Its four slots stay unmeasured until something
+              is connected, which is the honest answer; showing nothing left the
+              reader unable to tell "we measured nothing" from "this product
+              does not measure". */}
+          <StaggerItem i={1}>
+            <PerformanceStrip analytics={instagram} />
+          </StaggerItem>
 
           {/* Instagram's own series sits below the strip: the strip carries the
               headline numbers, this carries the one real chart. */}
-          <InstagramInsights analytics={instagram} />
+          <StaggerItem i={2}>
+            <InstagramInsights analytics={instagram} />
+          </StaggerItem>
 
-          <Card className="space-y-4">
-            <div className="flex items-baseline justify-between gap-3">
-              <CardLabel>Credits spent · last 30 days</CardLabel>
-              <span className="num text-[13px] font-semibold">{spend.total}</span>
-            </div>
-            <SpendArea spend={spend} />
-            <SpendBars spend={spend} />
-          </Card>
+          <StaggerItem i={3}>
+            <SpendCard spend={spend} />
+          </StaggerItem>
 
-          {/* 3 — WHAT NEEDS ME. The question this page did not answer. */}
-          <NeedsAttention posts={displayPosts} />
-
-          {/* 4a — the week, now third in the left column rather than the hero. */}
-          <WeekStrip buckets={buckets} variantStates={variantStates} />
+          <StaggerItem i={4}>
+            <WeekStrip buckets={buckets} variantStates={variantStates} />
+          </StaggerItem>
         </div>
 
         <div className="flex flex-col gap-4">
           {/* 1 — WHAT HAPPENED. The reference puts the activity feed at the
                   top of the rail; this app had it as a full-width table at the
                   very bottom, which is the least-read position on the page. */}
-          <section className="surface-ring rounded-card bg-surface">
-            <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
-              <h2 className="text-[14px] font-semibold tracking-[-0.01em]">Recent activity</h2>
-              <Link
-                href="/wallet"
-                className="card-link ml-auto text-[12px] font-[550] text-muted hover:text-accent"
-              >
-                View all
-              </Link>
-            </header>
-            <ActivityFeed entries={ledger.entries.slice(0, 4)} />
-          </section>
+          {/* WHAT HAPPENED. */}
+          <StaggerItem i={5}>
+            <section className="surface-ring rounded-card bg-surface">
+              <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
+                <h2 className="text-[14px] font-semibold tracking-[-0.01em]">Recent activity</h2>
+                <Link
+                  href="/wallet"
+                  className="card-link ml-auto text-[12px] font-[550] text-muted hover:text-accent"
+                >
+                  View all
+                </Link>
+              </header>
+              <ActivityFeed entries={ledger.entries.slice(0, 4)} />
+            </section>
+          </StaggerItem>
 
-          <Card className="shadow-brand">
-            <CardLabel>Available credits</CardLabel>
-            <p className="type-display num text-ink">
-              {balance.status === 'ok' ? balance.balance.available : '\u2014'}
-            </p>
-            <p className="mt-1 text-[13px] text-muted">
-              {balance.status === 'ok' && balance.balance.held > 0
-                ? `${balance.balance.held} held by actions in progress`
-                : 'credits to spend'}
-            </p>
-          </Card>
+          {/* The balance, DEMOTED. It was `type-display` with a brand shadow —
+              the second hero docs/27 §1 found — while the identical figure was
+              already rendering in the topbar chip and the rail foot. Third copy,
+              biggest type. It is now a `type-h2` stat: still readable at a
+              glance, no longer competing with the greeting for the fold.
 
-          {/* 4b — WHAT NEXT: what Sahoda knows, and what it can post to. */}
-          <BrainCard brain={brain} />
-          <ConnectionsCard connections={connections} />
+              It does NOT count up. Authoritative live balance, docs/26 §8.1,
+              enforced by count-up.guard.test.ts. */}
+          <StaggerItem i={6}>
+            <Card>
+              <CardLabel>Available credits</CardLabel>
+              <p className="type-h2 num mt-1 text-ink">
+                {balance.status === 'ok' ? (
+                  balance.balance.available.toLocaleString('en-IN')
+                ) : (
+                  <Unreadable what="Your credit balance" />
+                )}
+              </p>
+              <p className="mt-1 text-[13px] text-muted">
+                {balance.status === 'ok' && balance.balance.held > 0
+                  ? `${balance.balance.held} held by actions in progress`
+                  : 'credits to spend'}
+              </p>
+            </Card>
+          </StaggerItem>
 
-          <Card>
-            <SahodaRail drafted={draftedThisWeek} planCost={creditCost('loop_cycle')} />
-          </Card>
+          {/* WHAT NEXT: what Sahoda knows, and what it can post to. */}
+          <StaggerItem i={7}>
+            <BrainCard brain={brain} />
+          </StaggerItem>
+          <StaggerItem i={8}>
+            <ConnectionsCard connections={connections} />
+          </StaggerItem>
+
+          <StaggerItem i={9}>
+            <Card>
+              <SahodaRail drafted={draftedThisWeek} planCost={creditCost('loop_cycle')} />
+            </Card>
+          </StaggerItem>
         </div>
       </div>
     </div>

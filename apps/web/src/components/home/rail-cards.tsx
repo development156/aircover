@@ -1,3 +1,4 @@
+import { Unmeasured } from '@/components/design-system/absence-row'
 import Link from 'next/link'
 import type { Channel, Connection } from '@sahoda/shared'
 
@@ -70,34 +71,41 @@ export function BrainCard({ brain }: { brain: BrainRead }) {
             it found.
           </p>
 
-          {/* ── THE REFERENCE'S SIX TILES ────────────────────────────────────
-              Reference card: 380x231 with six — Brand Voice, Writing Style,
-              Primary Color, Audience, Competitors "12 tracked", Knowledge
-              "120 docs". This app's card was 380x151 and had none of them.
+          {/* ── TWO TILES, NOT THE REFERENCE'S SIX ───────────────────────────
+              Reference card: six tiles — Brand Voice, Writing Style, Primary
+              Color, Audience, Competitors "12 tracked", Knowledge "120 docs".
 
-              TWO of the six have a real source and are filled from the brain:
-              voice.descriptor and voice.formality_label.
+              TWO of those six have a real source here and are filled from the
+              brain: voice.descriptor and voice.formality_label.
 
-              THE OTHER FOUR RENDER AN EM DASH, AND THAT IS THE POINT.
-                Primary color   the workspace theme is not applied here, and a
-                                swatch would claim one exists
-                Audience        customer_persona holds a one-liner, a pain point,
-                                a fear and a desired identity — no age range.
-                                "25–45 yrs" has no field to come from
-                Competitors     there is no competitors table. "12 tracked" would
-                                be a count of a thing that does not exist
-                Knowledge       there is no document library. Same.
-              A container with a label and a dash is honest; the reference's
-              numbers here are fixture data about a business we cannot read. */}
+              THE OTHER FOUR ARE DELETED, and this is a reversal. They used to
+              render a permanent em dash, on the argument that "a container with
+              a label and a dash is honest". docs/26 §4 rules otherwise, and it
+              is right: a dash is the mark for a slot that is REAL and not yet
+              filled, so using it for a quantity that does not exist tells the
+              reader their brand is incomplete when in fact this product has
+              nowhere to put the answer.
+
+                Primary colour  the workspace theme is not applied here
+                Audience        customer_persona holds a one-liner, a pain
+                                point, a fear and a desired identity — there is
+                                no age range field for "25–45 yrs" to come from
+                Competitors     there is no competitors table
+                Knowledge       there is no document library
+
+              These are docs/26 §4's third state — "there is no such quantity" —
+              which renders NOTHING. Four permanent dashes on the most-visited
+              screen in the product, gone. It is the same defect as `100 of —`
+              (P2a) in a second file.
+
+              The two that remain are the FIRST state when unset: the slot is
+              real, the reading has not arrived, so they carry the `Unmeasured`
+              mark and its accessible name. */}
           <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-line-soft pt-3">
             {(
               [
                 ['Brand voice', brain.active.voice?.descriptor?.trim() || null],
                 ['Writing style', brain.active.voice?.formality_label?.trim() || null],
-                ['Primary colour', null],
-                ['Audience', null],
-                ['Competitors', null],
-                ['Knowledge', null],
               ] as ReadonlyArray<readonly [string, string | null]>
             ).map(([label, value]) => (
               <div key={label} className="min-w-0">
@@ -106,7 +114,7 @@ export function BrainCard({ brain }: { brain: BrainRead }) {
                   className={`truncate text-[12.5px] ${value ? 'font-[550] text-ink' : 'text-muted'}`}
                   title={value ?? undefined}
                 >
-                  {value ?? '—'}
+                  {value ?? <Unmeasured what={label} />}
                 </dd>
               </div>
             ))}

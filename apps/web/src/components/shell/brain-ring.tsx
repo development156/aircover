@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { Unreadable } from '@/components/design-system/absence-row'
 import { brainRing, ringAriaLabel, ringHoverLine } from '@/lib/brand/brain-ring'
 import type { BrainRead } from '@/lib/brand/read-brain'
 
@@ -115,7 +116,13 @@ export function BrainRing({ brain }: { brain: BrainRead }) {
         className={shell}
       >
         <Dial percent={0} />
-        <span className="num text-[13px] text-muted">&mdash;</span>
+        {/* The UNREADABLE mark (docs/26 §4), not a dash: a dash is also what
+            "not yet measured" rendered as, and a Brand Brain that has not been
+            filled in is a completely different situation from one we could not
+            read. The enclosing link carries the accessible name. */}
+        <span className="text-[13px] text-muted">
+          <Unreadable what="Your Brand Brain score" />
+        </span>
         <HoverLine>
           Could not read your Brand Brain just now — reload to try again. Nothing has changed.
         </HoverLine>

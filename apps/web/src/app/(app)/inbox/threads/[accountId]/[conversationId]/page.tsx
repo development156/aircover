@@ -1,3 +1,4 @@
+import { CardEmpty } from '@/components/empty-state'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -85,9 +86,11 @@ export default async function ThreadPage({
           <PaneScroll className="p-4">
             <SurfaceBanner state={thread.decision.state} />
             {thread.messages.length === 0 ? (
-              <p className="py-6 text-center text-[13px] text-muted">
-                {thread.decision.state.body}
-              </p>
+              // One language across all five inbox routes (docs/26 §4.1). The
+              // CLAIM is the classifier's own — `lib/inbox/emptiness.ts` keeps
+              // eight of these sentences apart on purpose — and only the
+              // treatment moved.
+              <CardEmpty body={thread.decision.state.body} />
             ) : (
               <MessageList messages={thread.messages} />
             )}

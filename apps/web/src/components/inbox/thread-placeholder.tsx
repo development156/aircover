@@ -1,3 +1,4 @@
+import { CardEmpty, EmptyState } from '@/components/empty-state'
 import Link from 'next/link'
 import { MessagesSquare } from 'lucide-react'
 
@@ -37,41 +38,37 @@ export function ThreadPlaceholder({
 }) {
   return (
     <PaneScroll className="grid place-items-center p-6">
-      <div className="max-w-[380px] text-center">
-        <span
-          aria-hidden
-          className="mx-auto mb-3 grid size-11 place-items-center rounded-md bg-brand-wash text-accent shadow-[inset_0_0_0_1px_var(--brand-lift)]"
-        >
-          <MessagesSquare size={21} strokeWidth={1.7} />
-        </span>
-
-        {hasConversations ? (
-          <>
-            <h2 className="text-[14px] font-semibold">Nothing selected</h2>
-            <p className="mt-1 text-[13px] text-muted">{selectLine}</p>
-          </>
-        ) : (
-          <>
-            {/* The classifier's own words — its headline and body are already
-                written per state and are the only account of why this is
-                empty. */}
-            <h2 className="text-[14px] font-semibold">{emptiness.headline}</h2>
-            <p className="mt-1 text-[13px] text-muted">{emptiness.body}</p>
-            {/* One action, and only when connecting is actually the remedy.
-                Telling someone to connect a channel when the real problem is
-                that we could not reach the provider sends them to fix
-                something that is not broken. */}
-            {emptiness.state === 'never_connected' ? (
-              <Link
-                href="/connections"
-                className={`${buttonVariants({ variant: 'primary' })} mt-4`}
-              >
+      {hasConversations ? (
+        /* "Nothing selected" is NOT an empty state and it used to be dressed as
+           one — the same 44px brand-washed marker tile as the state below. It
+           carries no remedy and needs none: the list is right there, and the
+           answer is to pick from it. Loud has to mean something, so it is kept
+           for the one state on this screen that has an action (docs/26 §4.1). */
+        <CardEmpty body={selectLine} />
+      ) : (
+        /* The primitive, not a hand-built copy of it. This block reproduced
+           EmptyState's markup — the tile, the heading, the body, the action —
+           which is precisely the "same question answered independently on every
+           screen" that docs/27 §4 diagnoses. The classifier's own words are
+           kept verbatim: its headline and body are written per state and are
+           the only account of why this is empty. */
+        <EmptyState
+          icon={MessagesSquare}
+          title={emptiness.headline}
+          body={emptiness.body}
+          /* One action, and only when connecting is actually the remedy.
+             Telling someone to connect a channel when the real problem is that
+             we could not reach the provider sends them to fix something that is
+             not broken. */
+          action={
+            emptiness.state === 'never_connected' ? (
+              <Link href="/connections" className={buttonVariants({ variant: 'primary' })}>
                 Connect a channel
               </Link>
-            ) : null}
-          </>
-        )}
-      </div>
+            ) : undefined
+          }
+        />
+      )}
     </PaneScroll>
   )
 }

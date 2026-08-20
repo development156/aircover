@@ -1,5 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 
+import { cn } from '@/lib/utils'
+
 // Empty state per docs/06 §4.10: icon in --t50 circle + one sentence + ONE
 // primary action + optional Sahoda tip. `action` is optional by design — a
 // page with no real destination renders none (no fake affordances).
@@ -36,5 +38,77 @@ export function EmptyState({
       {action ? <div className="mt-3">{action}</div> : null}
       {tip ? <p className="mt-1 text-[12px] text-muted">Sahoda: {tip}</p> : null}
     </section>
+  )
+}
+
+/**
+ * The SECTION-level empty state — what one card says when it has nothing,
+ * inside a page that has plenty (docs/26 §4.1).
+ *
+ * ── WHY THIS IS NOT `EmptyState` ─────────────────────────────────────────────
+ * `EmptyState` is a PAGE answering "there is nothing here at all": a 44px
+ * marker tile, a heading, a sentence and the one action that fixes it. Rendered
+ * inside a card it inverts the page's hierarchy, because the loudest, most
+ * saturated object on the screen ends up being the one carrying the least
+ * information. MEASURED on /analytics: six empty treatments in six visual
+ * languages on one screen, and the eye landed on the emptiest thing first.
+ *
+ * So this is the quiet one. No marker tile, no heading, no ring — it lives
+ * inside a card that already has one, and `border + ring` together is the most
+ * common way this system goes wrong (docs/26 §7).
+ *
+ * ── THE THREE LEVELS, SO NOBODY INVENTS A FOURTH ─────────────────────────────
+ *   page  — the route has nothing            → `EmptyState`
+ *   card  — one section has nothing          → `CardEmpty`  (this)
+ *   slot  — one NUMBER is not there          → `Unmeasured` / `Unreadable`
+ *
+ * ── IT STATES THE CLAIM, NOT A MOOD ──────────────────────────────────────────
+ * "We never asked" and "we asked and got nothing back" are different sentences
+ * and `lib/inbox/emptiness.ts` exists to keep eight of them apart. `body` is the
+ * claim. Keep it to one sentence — a card that apologises at length reads as a
+ * product apologising for itself, which is what five variants of "nothing yet"
+ * on one screen already did.
+ */
+export function CardEmpty({
+  lead,
+  body,
+  action,
+  className,
+}: {
+  /**
+   * The one emphasised sentence, when the card has a REMEDY to lead with —
+   * "Connect Instagram to see followers and reach." Optional because most
+   * empty cards have no remedy and a heading with nothing behind it is worse
+   * than none. When present it is the claim; `body` becomes the explanation.
+   */
+  lead?: React.ReactNode
+  /**
+   * One sentence, stating precisely what is and is not known.
+   *
+   * `ReactNode`, not `string`. The first version took a string and a caller
+   * with an interpolated sentence — `{n === 1 ? 'One day' : `${n} days`} measured
+   * so far…` — passes React an ARRAY of children, which `String()` joins with
+   * COMMAS. It would have rendered "One day, measured so far. A trend needs at
+   * least ,3, because…" and every type, lint and unit check would have passed.
+   */
+  body: React.ReactNode
+  /** At most one, and only when it actually leads somewhere that works. */
+  action?: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      data-testid="card-empty"
+      // Vertically centred in the space the real content would have taken, so a
+      // card does not visibly change height when its first row arrives.
+      className={cn(
+        'flex min-h-[96px] flex-col items-center justify-center gap-2 px-4 py-6 text-center',
+        className,
+      )}
+    >
+      {lead ? <p className="type-body max-w-[42ch] text-ink">{lead}</p> : null}
+      <p className="type-sm max-w-[38ch] text-muted">{body}</p>
+      {action ?? null}
+    </div>
   )
 }

@@ -1,3 +1,4 @@
+import { CardEmpty } from '@/components/empty-state'
 import Link from 'next/link'
 
 import { Card, CardLabel } from '@/components/ui/card'
@@ -22,41 +23,41 @@ import type { AccountAnalytics } from '@/lib/analytics/account-insights'
  * shorter one under the older figures would claim a freshness Instagram never
  * offered.
  */
+/** One remedy link, written once — four states used to carry four copies. */
+function ConnectionsLink() {
+  return (
+    <Link
+      href="/connections"
+      className="inline-flex items-center rounded-sm text-[13px] font-semibold text-accent underline-offset-2 hover:underline max-narrow:min-h-[44px]"
+    >
+      Open connections
+    </Link>
+  )
+}
+
 export function AccountPanel({ analytics }: { analytics: AccountAnalytics }) {
   if (analytics.kind === 'not-connected') {
     return (
-      <Card className="space-y-2">
+      <Card>
         <CardLabel>Instagram account</CardLabel>
-        <p className="text-[14px] text-ink">Connect Instagram to see followers and reach.</p>
-        <p className="text-[12.5px] text-muted">
-          Account insights come from the connected account, not from your posts, so there’s nothing
-          to show until one is linked.
-        </p>
-        <Link
-          href="/connections"
-          className="inline-flex items-center text-[13px] font-semibold text-accent underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-narrow:min-h-[44px]"
-        >
-          Open connections
-        </Link>
+        <CardEmpty
+          lead="Connect Instagram to see followers and reach."
+          body="Account insights come from the connected account, not from your posts, so there’s nothing to show until one is linked."
+          action={<ConnectionsLink />}
+        />
       </Card>
     )
   }
 
   if (analytics.kind === 'reconnect') {
     return (
-      <Card className="space-y-2">
+      <Card>
         <CardLabel>Instagram account</CardLabel>
-        <p className="text-[14px] text-ink">Reconnect Instagram to see followers and reach.</p>
-        <p className="text-[12.5px] text-muted">
-          The connection expired, so we can’t read metrics until it’s renewed. Your posts and their
-          own metrics are unaffected.
-        </p>
-        <Link
-          href="/connections"
-          className="inline-flex items-center text-[13px] font-semibold text-accent underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-narrow:min-h-[44px]"
-        >
-          Open connections
-        </Link>
+        <CardEmpty
+          lead="Reconnect Instagram to see followers and reach."
+          body="The connection expired, so we can’t read metrics until it’s renewed. Your posts and their own metrics are unaffected."
+          action={<ConnectionsLink />}
+        />
       </Card>
     )
   }
@@ -66,26 +67,27 @@ export function AccountPanel({ analytics }: { analytics: AccountAnalytics }) {
   // for the first and useless for the second, so this branch does not offer it.
   if (analytics.kind === 'not-configured') {
     return (
-      <Card className="space-y-2">
+      <Card>
         <CardLabel>Instagram account</CardLabel>
-        <p className="text-[14px] text-ink">Sahoda can’t read account insights here.</p>
-        <p className="text-[12.5px] text-muted">
-          Your account is connected. This environment has no metrics connection, so no request went
-          out. Your posts and their own metrics are unaffected.
-        </p>
+        <CardEmpty
+          lead="Sahoda can’t read account insights here."
+          body="Your account is connected. This environment has no metrics connection, so no request went out. Your posts and their own metrics are unaffected."
+        />
       </Card>
     )
   }
 
   if (analytics.kind === 'unreadable') {
     return (
-      <Card className="space-y-2">
+      <Card>
         <CardLabel>Instagram account</CardLabel>
         {/* Says we could not look. Pointedly does NOT say the account is empty —
             an unreadable call and an account with no followers are the same
             blank space and completely different facts. */}
-        <p className="text-[14px] text-ink">Couldn’t read your account insights just now.</p>
-        <p className="text-[12.5px] text-muted">Refresh to try again.</p>
+        <CardEmpty
+          lead="Couldn’t read your account insights just now."
+          body="Refresh to try again."
+        />
       </Card>
     )
   }

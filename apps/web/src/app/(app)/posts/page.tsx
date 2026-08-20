@@ -14,10 +14,18 @@ import { LivePhaseNote } from '@/components/posts/live/live-phase-note'
 import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
 import { readConnectedChannels } from '@/lib/connections/read'
 import { ConnectFirstNote } from '@/components/connections/connect-first-note'
+import { PostFilters, POST_FILTERS, filterFor } from '@/components/posts/post-filters'
+import { StaggerItem } from '@/components/motion/stagger'
+import { CardEmpty } from '@/components/empty-state'
 
 export const metadata = { title: 'Posts' }
 
-export default async function PostsPage() {
+export default async function PostsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>
+}) {
+  const { filter: filterSlug } = await searchParams
   // THREE answers, and this page used to render one sentence for all of them.
   // "Nothing drafted yet · Create post" was shown to a workspace with forty posts
   // whose read hiccuped, and to an account with no workspace at all — where the
@@ -60,7 +68,15 @@ export default async function PostsPage() {
 
   // Converted at the page boundary, in the open: past this line no component can
   // reach `post.status` at all. See `display-post.ts`.
-  const shown = posts.map(forDisplay)
+  const all = posts.map(forDisplay)
+
+  // Filtering is over the LOADED page, not a second query — see post-filters.tsx
+  // for why the counts are honest at that scope and what keeps them so.
+  const active = filterFor(filterSlug)
+  const shown = all.filter((post) => active.match(post.intent))
+  const counts = Object.fromEntries(
+    POST_FILTERS.map((f) => [f.slug, all.filter((post) => f.match(post.intent)).length]),
+  )
 
   return (
     <div className="space-y-grid">
@@ -94,19 +110,38 @@ export default async function PostsPage() {
         />
       ) : (
         <PublishStateProvider initial={liveSeed}>
-          <ul className="space-y-grid" data-guide="posts.list">
-            {shown.map((post) => (
-              <li key={post.id}>
-                <PostCard
-                  post={post}
-                  now={now}
-                  variantStates={variantStates.get(post.id) ?? []}
-                  metrics={metrics.get(post.id)}
-                  autoPublish={autoPublish}
-                />
-              </li>
-            ))}
-          </ul>
+          <PostFilters active={active.slug} counts={counts} />
+
+          {shown.length === 0 ? (
+            // A filter that matches nothing is NOT the page's empty state: the
+            // workspace has posts, this bucket does not. Saying "Nothing drafted
+            // yet" here would be false, and offering "Create post" would answer
+            // a question the reader did not ask.
+            <div className="surface-ring rounded-card bg-surface">
+              <CardEmpty
+                body={`No posts in ${active.label.toLowerCase()} right now. The other filters still have your ${all.length} post${all.length === 1 ? '' : 's'}.`}
+              />
+            </div>
+          ) : (
+            <ul className="space-y-grid" data-guide="posts.list">
+              {shown.map((post, i) => (
+                <li key={post.id}>
+                  {/* One ladder down the list — the rows deal rather than
+                      flashing. Capped in CSS at --stagger-cap, so a full page
+                      of posts does not take a second and a half to arrive. */}
+                  <StaggerItem i={i}>
+                    <PostCard
+                      post={post}
+                      now={now}
+                      variantStates={variantStates.get(post.id) ?? []}
+                      metrics={metrics.get(post.id)}
+                      autoPublish={autoPublish}
+                    />
+                  </StaggerItem>
+                </li>
+              ))}
+            </ul>
+          )}
 
           <LivePhaseNote />
 

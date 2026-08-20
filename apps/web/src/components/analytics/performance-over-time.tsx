@@ -1,3 +1,4 @@
+import { CardEmpty } from '@/components/empty-state'
 import { Card, CardLabel } from '@/components/ui/card'
 import { METRIC_LABELS, type MetricKey } from '@/lib/analytics/compare'
 import { MIN_SERIES_DAYS, type MetricSeries, type SeriesPoint } from '@/lib/analytics/series'
@@ -83,12 +84,23 @@ function Container({ children }: { children: React.ReactNode }) {
   )
 }
 
+/**
+ * What this card says when it has no series to draw.
+ *
+ * ── IT USED TO WEAR `.is-proposed`, AND THAT WAS A CATEGORY ERROR ────────────
+ * The empty box was literally `className="is-proposed …"` — a dashed edge, which
+ * in this product is not decoration. docs/26 §3 makes it one of four CERTAINTY
+ * rungs, and `.is-proposed` means "Sahoda suggests it. Nobody agreed." Applied
+ * to "nothing has been measured yet" it says the opposite of the truth: it
+ * dresses an ABSENCE as a PROPOSAL, and it spends a load-bearing signature on a
+ * state that is not on the ladder at all.
+ *
+ * docs/27 §1 counted this as one of five empty treatments in five visual
+ * languages on this screen. It is now `CardEmpty` (docs/26 §4.1), the same one
+ * every other card on the page uses.
+ */
 function Note({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="is-proposed grid min-h-[132px] place-items-center rounded-card px-3">
-      <p className="max-w-[38ch] text-center text-[12.5px] text-muted">{children}</p>
-    </div>
-  )
+  return <CardEmpty className="min-h-[132px]" body={children} />
 }
 
 export interface PerformanceOverTimeProps {

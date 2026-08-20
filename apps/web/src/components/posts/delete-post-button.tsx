@@ -23,9 +23,24 @@ export interface DeletePostButtonProps {
   postId: string
   /** Shown in the confirm prompt so the user knows WHICH post is armed. */
   title: string
+  /**
+   * Icon-only trigger, for a LIST ROW.
+   *
+   * docs/26 §1.5: a destructive action never gets standing real estate in a
+   * list row. MEASURED on /posts: eight cards each spent a full-width rule and
+   * ~55px of footer on one right-aligned `Delete`, and it was the only action
+   * with dedicated space anywhere on the screen — no Open, no Edit, no
+   * Schedule, no Approve.
+   *
+   * Compact drops the WORD, not the control and not its name: `aria-label`
+   * still reads "Delete {title}", so the scan path loses a destructive verb
+   * repeated eight times while a screen reader loses nothing. The confirm step
+   * is unchanged and still spells the title out in full.
+   */
+  compact?: boolean
 }
 
-export function DeletePostButton({ postId, title }: DeletePostButtonProps) {
+export function DeletePostButton({ postId, title, compact = false }: DeletePostButtonProps) {
   const router = useRouter()
   const [armed, setArmed] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -100,9 +115,11 @@ export function DeletePostButton({ postId, title }: DeletePostButtonProps) {
           onClick={() => setArmed(true)}
           data-guide="posts.delete"
           aria-label={`Delete ${title}`}
+          // The touch floor is a TOKEN class, not a literal 44 — docs/26 §9.
+          className={compact ? 'text-muted max-narrow:min-h-[44px] max-narrow:min-w-[44px]' : ''}
         >
           <Trash2 size={15} strokeWidth={1.8} aria-hidden />
-          Delete
+          {compact ? null : 'Delete'}
         </Button>
 
         {error ? (

@@ -1,6 +1,7 @@
 import { ChartColumn } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
+import { CreatePostButton } from '@/components/posts/create-post-button'
 import { PageTitle } from '@/components/page-title'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
 import { BestPerforming } from '@/components/analytics/best-performing'
@@ -95,10 +96,30 @@ export default async function AnalyticsPage() {
           ) : null}
         </>
       ) : (
+        /* ── THE HIERARCHY INVERSION ────────────────────────────────────────
+           docs/27 §1: "the largest, highest-contrast, most colour-saturated
+           element on the page carries the LEAST information. The eye lands on
+           the emptiest thing first."
+
+           That was literally true. This block — a 44px orange marker tile, a
+           bold heading and centred prose — was the loudest object on /analytics
+           and it offered NO action at all: `EmptyState`'s `action` was simply
+           omitted, so the one element the eye went to first was the one element
+           you could not do anything with.
+
+           It keeps its size. What changes is that it now carries the most
+           information on the screen instead of the least: the remedy. Loudest
+           and most useful are the same object again, which is the only
+           arrangement in which loud is correct.
+
+           The action is `CreatePostButton` — the route that works ON THIS
+           BRANCH. `/posts/[id]` does not handle `id="new"` here, so linking a
+           reader there would be a dead end. */
         <EmptyState
           icon={ChartColumn}
           title="Nothing published yet"
           body="Analytics start once a post goes out on a channel. Until then there is nothing to measure — which is different from measuring nothing."
+          action={<CreatePostButton />}
         />
       )}
     </div>
