@@ -436,9 +436,15 @@ exit code. Script: `gate.sh`/`gate2.sh` in the session scratchpad.
 |---|---|---|
 | 1/5 | `turbo run typecheck lint test --concurrency=1` | **EXIT=0** — 27/27 tasks |
 | 2/5 | `vitest run` (root) | **EXIT=0** — 162 tests |
-| 3/5 | `turbo run test:smoke --concurrency=1` (port 3211) | **EXIT=0** — 0 failures |
+| 3/5 | `turbo run test:smoke --concurrency=1` (port 3213) | **EXIT=0** — 8/8 tasks, 0 failures |
 | 4/5 | `prettier --check .` | **EXIT=1**, one file → fixed → **EXIT=0** |
 | 5/5 | `turbo run build --concurrency=1` | **EXIT=0** — 1 successful |
+
+All five re-run after the final code change. The port was verified with
+`readlink /proc/<pid>/cwd` before the smoke result was believed.
+
+The scrim guard was added after that smoke run started, so it was verified on its own:
+3 passed, plus a mutation showing it reports `Received: 0.1` when the fix is reverted.
 
 ### Leg 3 was tested against another worktree's build the first two times
 
