@@ -256,6 +256,21 @@ export const TOKENS_CSS = `/* ==================================================
      scattered by hand is how three of them end up at 40. */
   --control-h-touch: 44px;
 
+  /* ---------- L2 · SCRIM ----------
+     The wash behind a modal or a drawer.
+
+     It did not exist, and neither did the scrim. \`modal.tsx\` and \`drawer.tsx\`
+     both asked for \`backdrop:bg-black/40\`, and \`globals.css\` opens @theme with
+     \`--color-*: initial\` — which wipes the stock palette. Only \`--color-white\`
+     was redefined, so \`bg-black\` was never generated and EVERY overlay in the
+     product opened over an untouched page. PROVEN: the compiled CSS contains
+     two \`::backdrop\` rules and both are Tailwind preflight.
+
+     Dark is a PEER, not an inversion (§2): black at 40% over a near-black
+     canvas barely reads, so dark takes a heavier value rather than the same
+     one. */
+  --scrim: rgb(0 0 0 / 0.4);
+
   /* ---------- L2 · MEASURE ----------
      How wide a thing is allowed to get before it stops being readable.
      Space (--space-N) is the gap BETWEEN things; measure is the cap on ONE
@@ -331,6 +346,10 @@ export const TOKENS_CSS = `/* ==================================================
      compressed near black: even this pair is only 1.10:1), so fill and hairline
      work together here in a way they do not have to on light. */
   --surface: #17171a;
+  /* Heavier than light's 0.4. Black at 40% over a #0b0b0c canvas is close to
+     no scrim at all; the overlay has to separate from the page it covers, and
+     in dark the fill cannot do that on its own (§2). */
+  --scrim: rgb(0 0 0 / 0.62);
   --surface-2: #17171a;
   --surface-3: #1f1f23;
   --line: rgba(255, 255, 255, 0.14);

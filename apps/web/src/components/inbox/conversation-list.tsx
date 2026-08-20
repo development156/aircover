@@ -1,5 +1,6 @@
 'use client'
 
+import { CardEmpty } from '@/components/empty-state'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Search } from 'lucide-react'
@@ -118,13 +119,16 @@ export function ConversationList({
 
       <PaneScroll>
         {conversations.length === 0 ? (
-          <p className="px-3 py-4 text-[12px] text-muted">{emptyLine}</p>
+          // `CardEmpty`, not bare prose. MEASURED on /inbox: this pane, the
+          // thread pane and the context pane each said "nothing" in a DIFFERENT
+          // visual language on the same screen — the same failure docs/27 §1
+          // found on /analytics. The thread pane stays loud because it carries
+          // the REASON and the REMEDY; these two are quiet because they do not.
+          <CardEmpty body={emptyLine} />
         ) : shown.length === 0 ? (
           // Filtered to nothing is a DIFFERENT state from having nothing, and
           // it has a different remedy: change the filter, not connect a channel.
-          <p className="px-3 py-4 text-[12px] text-muted">
-            Nothing matches that. Clear the search or pick another channel.
-          </p>
+          <CardEmpty body="Nothing matches that. Clear the search or pick another channel." />
         ) : (
           <ul>
             {shown.map((conversation) => {

@@ -43,11 +43,20 @@ describe('ApproveButton', () => {
     expect(state.toasts.success).toHaveLength(1)
   })
 
-  test('an approved post shows state, not a live control', () => {
-    render(<ApproveButton postId={POST_ID} status="approved" />)
+  test('an approved post offers no control at all, not a disabled one', () => {
+    const { container } = render(<ApproveButton postId={POST_ID} status="approved" />)
 
-    const button = screen.getByRole('button', { name: 'Approved' })
-    expect(button).toBeDisabled()
+    // This used to assert a DISABLED button named "Approved", under a test name
+    // that already said what it should have been: "state, not a live control".
+    // A disabled button is still a control — a screen reader announces it, the
+    // reader takes the action, and nothing happens (docs/26 §10.2). The old
+    // assertion contradicted its own title.
+    //
+    // It was also the word twice: the /planner row renders "Approved" in its
+    // status chip AND rendered it again in the dead button beside it. The chip
+    // is the state, so there is nothing left here to say.
+    expect(container).toBeEmptyDOMElement()
+    expect(screen.queryByRole('button')).toBeNull()
   })
 
   test('pipeline-owned statuses render no approve affordance at all', () => {

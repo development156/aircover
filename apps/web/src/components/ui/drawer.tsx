@@ -58,7 +58,7 @@ export function Drawer({
         if (e.target === ref.current) onClose()
       }}
       className={cn(
-        'max-h-none border border-line bg-surface p-0 text-ink shadow-lg backdrop:bg-black/40',
+        'max-h-none border border-line bg-surface p-0 text-ink shadow-lg backdrop:bg-[var(--scrim)]',
         side === 'right'
           ? 'mr-0 ml-auto h-dvh w-[min(420px,calc(100vw-48px))] rounded-l-card'
           : 'mt-auto mb-0 max-h-[80dvh] w-full rounded-t-card',

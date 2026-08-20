@@ -83,7 +83,19 @@ export function PostFilters({
               selected
                 ? // A brand FILL with INK on it — docs/26 §1.2. Never white on
                   // orange (2.94:1) and never orange text on a light surface.
-                  'bg-primary text-primary-fg'
+                  //
+                  // `text-primary-foreground`, NOT `text-primary-fg`. The first
+                  // draft wrote the short name and it does not exist: the theme
+                  // maps --color-primary-foreground: var(--pfg). An unknown
+                  // utility is not an error — Tailwind emits nothing and the
+                  // label inherits its colour, which on a brand fill is white on
+                  // orange at 2.94:1, the one pair §1.2 forbids by name.
+                  //
+                  // Caught by grepping the COMPILED CSS: `text-primary-fg` -> 0
+                  // occurrences, `bg-primary` -> 4. Same silent-class failure as
+                  // the `sm:` breakpoint two commits ago, in code written by the
+                  // session that found it.
+                  'bg-primary text-primary-foreground'
                 : 'text-muted hover:bg-s2 hover:text-ink',
             )}
           >
