@@ -70,12 +70,28 @@ export function EmptyState({
  * on one screen already did.
  */
 export function CardEmpty({
+  lead,
   body,
   action,
   className,
 }: {
-  /** One sentence, stating precisely what is and is not known. */
-  body: string
+  /**
+   * The one emphasised sentence, when the card has a REMEDY to lead with —
+   * "Connect Instagram to see followers and reach." Optional because most
+   * empty cards have no remedy and a heading with nothing behind it is worse
+   * than none. When present it is the claim; `body` becomes the explanation.
+   */
+  lead?: React.ReactNode
+  /**
+   * One sentence, stating precisely what is and is not known.
+   *
+   * `ReactNode`, not `string`. The first version took a string and a caller
+   * with an interpolated sentence — `{n === 1 ? 'One day' : `${n} days`} measured
+   * so far…` — passes React an ARRAY of children, which `String()` joins with
+   * COMMAS. It would have rendered "One day, measured so far. A trend needs at
+   * least ,3, because…" and every type, lint and unit check would have passed.
+   */
+  body: React.ReactNode
   /** At most one, and only when it actually leads somewhere that works. */
   action?: React.ReactNode
   className?: string
@@ -86,10 +102,11 @@ export function CardEmpty({
       // Vertically centred in the space the real content would have taken, so a
       // card does not visibly change height when its first row arrives.
       className={cn(
-        'flex min-h-[96px] flex-col items-center justify-center gap-3 px-4 py-6 text-center',
+        'flex min-h-[96px] flex-col items-center justify-center gap-2 px-4 py-6 text-center',
         className,
       )}
     >
+      {lead ? <p className="type-body max-w-[42ch] text-ink">{lead}</p> : null}
       <p className="type-sm max-w-[38ch] text-muted">{body}</p>
       {action ?? null}
     </div>

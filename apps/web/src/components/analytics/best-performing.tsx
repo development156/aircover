@@ -1,3 +1,4 @@
+import { CardEmpty } from '@/components/empty-state'
 import Link from 'next/link'
 
 import { Card, CardLabel } from '@/components/ui/card'
@@ -42,9 +43,9 @@ export function BestPerforming({
       {ranked.length === 0 ? (
         // NOT "no posts performed well" — that is a claim about the posts. This
         // is a statement about the measurement, which is what we actually know.
-        <p className="text-[12.5px] text-muted">
-          Nothing has been measured yet, so there is nothing to rank.
-        </p>
+        // The CLAIM is unchanged; only the treatment moved, to the one language
+        // every empty card on this page now speaks (docs/26 §4.1).
+        <CardEmpty body="Nothing has been measured yet, so there is nothing to rank." />
       ) : (
         <ol className="space-y-2">
           {ranked.map((row, i) => (
