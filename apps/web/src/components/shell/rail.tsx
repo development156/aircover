@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/nextjs'
 
 import { NavItem } from '@/components/shell/nav-item'
 import { RailFoot } from '@/components/shell/rail-foot'
+import { approvalCount } from '@/lib/approvals/read'
 import { NAV_FOOT, NAV_GROUPS } from '@/lib/nav/sections'
 import { getOpsAdmin } from '@/lib/ops/guard'
 
@@ -63,6 +64,12 @@ async function showsAdminItem(): Promise<boolean> {
 
 export async function Rail() {
   const isOpsAdmin = await showsAdminItem()
+  // THE ONLY BADGE IN THE RAIL, and it is derived rather than sent.
+  // `readApprovalQueue` is `cache()`-wrapped, so this share the SAME select the
+  // /approvals page runs in the same request — the badge and the header it
+  // labels cannot disagree. `undefined` on a failed read, never 0: a zero here
+  // would claim nothing is waiting when nothing was counted.
+  const waiting = await approvalCount()
 
   return (
     <aside
@@ -139,6 +146,7 @@ export async function Rail() {
                 icon={item.icon}
                 guide={item.guide}
                 soon={item.state === 'soon'}
+                count={item.href === '/approvals' ? waiting : undefined}
               />
             ))}
           </section>
