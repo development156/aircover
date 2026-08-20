@@ -51,7 +51,9 @@ const ROUTES: ReadonlyArray<{ path: string; slug: string; archetype: string }> =
   { path: '/studio', slug: 'studio', archetype: 'roadmap · gallery' },
   { path: '/remix', slug: 'remix', archetype: 'roadmap · fan-out' },
   { path: '/ads', slug: 'ads', archetype: 'roadmap · table' },
-  { path: '/brain/audience', slug: 'brain-audience', archetype: 'roadmap · in a tab' },
+  // No longer a roadmap screen. It reads a workspace, a connection and a live
+  // platform call, and its most common state is one the platform imposes.
+  { path: '/brain/audience', slug: 'brain-audience', archetype: 'two-layer evidence' },
   { path: '/brain/knowledge', slug: 'brain-knowledge', archetype: 'roadmap · empty table' },
 ]
 
