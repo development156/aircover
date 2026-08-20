@@ -159,9 +159,16 @@ export default function StudioPage() {
         </p>
       </section>
 
+      {/* THE `templates` TABLE IS READ, AND IT IS NOT THIS.
+          `lib/templates/read.ts` powers the composer's saved starting points —
+          WORDS, a caption you keep and reuse. Studio is a renderer for pictures.
+          Two different things under one English word, and a reader who has used
+          the composer's templates would fairly wonder why this page says there
+          are none. So the note names both and says which one is missing. */}
       <NotRunningNote>
-        Nothing here renders yet. There is no template gallery to browse and no design saved to your
-        library. Pictures you already have live in{' '}
+        Nothing here renders yet. There is no gallery of designs to browse and no picture saved to
+        your library &mdash; the starting points you can save in the composer are captions, not
+        layouts. Pictures you already have live in{' '}
         <Link href="/assets" className="font-[550] text-accent underline underline-offset-2">
           Assets
         </Link>
