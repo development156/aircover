@@ -156,9 +156,14 @@ export function InlineRewrite({ body, selection, onReplace }: InlineRewriteProps
         <InlineError>
           {failure.kind === 'insufficient' ? (
             <>
-              This rewrite needs <span className="tabular-nums">{failure.required}</span> credits
-              and you have <span className="tabular-nums">{failure.available}</span>. Nothing was
-              charged.{' '}
+              {/* The plural is computed, not assumed. MEASURED by rendering the
+                  refusal: a caption rewrite costs exactly 1, so this sentence
+                  has ALWAYS read "needs 1 credits" — the one branch nobody
+                  sees, because a fresh workspace has 100 credits and never
+                  reaches it. */}
+              This rewrite needs <span className="tabular-nums">{failure.required}</span>{' '}
+              {failure.required === 1 ? 'credit' : 'credits'} and you have{' '}
+              <span className="tabular-nums">{failure.available}</span>. Nothing was charged.{' '}
               <Link href="/wallet" className="font-semibold underline underline-offset-2">
                 Top up your wallet
               </Link>

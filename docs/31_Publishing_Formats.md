@@ -339,7 +339,7 @@ can distinguish a present column from an absent one.
 |---|---|---|---|---|---|
 | Instagram | Feed image | yes | `image` | yes | **PUBLISHES TODAY** |
 | Instagram | Carousel | yes | `carousel` | yes | **PUBLISHES TODAY** |
-| Instagram | Story | yes | **yes** (20260820144500) | `contentType:'story'` | **PUBLISHES TODAY** — shipped in this lane |
+| Instagram | Story | yes | **yes** (20260820144500) | `contentType:'story'` | **SENT, NOT YET OBSERVED** — §5.4 |
 | Instagram | Reel | yes | `video` | yes | BLOCKED — media ingest, §5.1 |
 | LinkedIn | Text | yes | `text` | yes | **PUBLISHES TODAY** |
 | LinkedIn | Image | yes | `image` | yes | **PUBLISHES TODAY** |
@@ -353,7 +353,7 @@ can distinguish a present column from an absent one.
 | X | Poll | yes | **no** | `x.poll` | ZERNIO SUPPORTS, WE DON'T CALL IT |
 | X | Article | yes | **no** | `x.article` | ZERNIO SUPPORTS — Premium only, out of scope |
 | GBP | What's new | yes | `text` / `image` | `topicType:'STANDARD'` | **PUBLISHES TODAY** |
-| GBP | + CTA button | yes | n/a | `callToAction {type,url}` | **PUBLISHES TODAY** — fixed in this lane, §6.1 |
+| GBP | + CTA button | yes | n/a | `callToAction {type,url}` | **SENT, NOT YET OBSERVED** — §5.4, §6.1 |
 | GBP | Event | yes | **no** | `topicType:'EVENT'` | ZERNIO SUPPORTS, WE DON'T CALL IT |
 | GBP | Offer | yes | **no** | `topicType:'OFFER'` | ZERNIO SUPPORTS, WE DON'T CALL IT |
 | Facebook | post / story / reel / link | **no** | — | yes | NOT A CHANNEL HERE |
@@ -393,6 +393,33 @@ needing migration `20260820144500`, applied to production 20 Aug 2026 (§5.3).
 The column accepts both; nothing in the app can select either. That distinction
 is the whole discipline: a ready column is not a dead end, an offered format that
 publishes something else is.
+
+### 5.4 "SENT, NOT YET OBSERVED" is a fourth verdict, and it is the honest one
+
+Two rows above carry it, and the distinction matters more than it looks.
+
+**PUBLISHES TODAY** means a post of that kind has gone out and there is a link
+to it. Instagram feed and carousel earned that on 31 July 2026 `[LIVE]`.
+
+**SENT, NOT YET OBSERVED** means the payload is now BUILT and HANDED TO THE
+CLIENT, proven by unit tests over the builder and by an assertion on the captured
+wire body — and that nobody has watched Zernio, Google or Meta accept it. The
+lane that built it was not permitted to publish, by design.
+
+It would have been easy to write PUBLISHES TODAY. It would also have contradicted
+§7 `[OPEN]` item 5, which is still open **in this same document**: *"does Zernio
+accept a 9:16 image at 1080×1920 through the same `mediaItems` path, or is Story
+media upload separate?"* Marking Story as publishing while the question that
+settles it is unanswered three sections later is exactly the
+`[DOC]`-promoted-to-design-assumption failure §0 exists to prevent.
+
+The same caution applies to §4's `x` vs `twitter` asymmetry: it is flagged as
+something that must be tested before any validate call ships, and nothing tests
+it yet.
+
+**What would move both rows to `[LIVE]`:** one publish each, to a real account,
+reading back `platformPostUrl` — a Story that appears as a Story, and a Google
+post that shows the button.
 
 ### 5.3 The aspect range is a FORMAT rule wearing a channel's clothes
 
@@ -439,9 +466,10 @@ And the fix was not just plumbing: `callToAction.url` is `required` alongside
 `type` `[SPEC]`, and there was no URL field anywhere in the composer. A CTA
 without a URL is not a partial feature; it is a payload Zernio rejects.
 
-**Fixed 20 Aug 2026.** The URL field exists, `platforms[].platformSpecificData`
-is now sent, and a button with no destination REFUSES the publish rather than
-being dropped. The path is
+**Built 20 Aug 2026 — SENT, NOT YET OBSERVED (§5.4).** The URL field exists,
+`platforms[].platformSpecificData` is now sent, and a button with no destination
+REFUSES the publish rather than being dropped. No Google post has been made with
+one, because this lane may not publish. The path is
 `extras.gbpCta` + `extras.ctaUrl` → `store.readCta` → `PublishVariant.cta` →
 spread into the frozen `FormattedContent` gbp arm → `buildPlatformData` →
 `platforms[0].platformSpecificData.callToAction`.
