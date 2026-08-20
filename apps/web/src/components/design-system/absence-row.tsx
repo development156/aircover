@@ -26,7 +26,7 @@ export function Unreadable({ what }: { what: string }) {
 
 export function AbsenceRow() {
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    <div className="grid gap-3 narrow:grid-cols-3">
       <Case
         title="Not yet measured"
         rule="The slot is real. The reading has not arrived."

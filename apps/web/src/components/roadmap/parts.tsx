@@ -1,7 +1,17 @@
 import type { LucideIcon } from 'lucide-react'
 
 /**
- * The shapes Ads needs that `roadmap/inert.tsx` does not already have.
+ * The larger shapes a roadmap screen needs, beyond the controls in `inert.tsx`.
+ *
+ * ── WHY THIS MOVED OUT OF `components/ads/` ──────────────────────────────────
+ * It was written for Ads and it was never about Ads. A panel, a row, a media
+ * slot and the closing note are the vocabulary EVERY designed-but-unbuilt
+ * section needs, and eight of them now exist. Leaving these under `ads/` meant
+ * the next section either imported across a sibling feature folder or wrote its
+ * own — and two vocabularies for one idea is how the certainty system drifts.
+ *
+ * `inert.tsx` holds the control-sized shapes (a button, a chip, a field, the
+ * banner). This file holds the block-sized ones. Both obey the same two rules.
  *
  * ── EVERYTHING HERE IS A `div` OR A `span`, WITHOUT EXCEPTION ────────────────
  * A `<button disabled>` is still announced as a button, so it still offers an
@@ -120,4 +130,54 @@ export function InertMediaSlot({ label, aspect }: { label: string; aspect: strin
  */
 export function NotRunningNote({ children }: { children: React.ReactNode }) {
   return <p className="type-sm max-w-[68ch] text-muted">{children}</p>
+}
+
+/**
+ * A column of a pipeline that has no cards in it.
+ *
+ * ── WHY IT IS NOT AN EMPTY LIST WITH A "0" HEADER ────────────────────────────
+ * A kanban column's header normally carries a count, and that count is the first
+ * thing a reader trusts. `New 0` on a leads board says "nobody has enquired",
+ * which is a claim about the reader's business; the true claim is "nothing can
+ * enquire yet, because no form is wired to this". So the column keeps its NAME —
+ * the stage names are real, they are the `leads.status` CHECK constraint — and
+ * carries a sentence about what lands in it instead of a number.
+ */
+export function InertColumn({
+  name,
+  what,
+  children,
+}: {
+  name: string
+  /** What a card in this column would mean. One short sentence. */
+  what: string
+  children?: React.ReactNode
+}) {
+  return (
+    <section className="is-proposed flex min-h-[168px] flex-col gap-2 rounded-card p-3">
+      <h3 className="type-eyebrow text-muted">{name}</h3>
+      <p className="type-sm text-muted">{what}</p>
+      {children}
+    </section>
+  )
+}
+
+/**
+ * A switch-shaped thing that cannot be flipped.
+ *
+ * Deliberately NOT `<input type="checkbox" disabled>` and not `role="switch"`:
+ * both announce a control, and a disabled one announces a control that exists
+ * and is momentarily unavailable. Neither is true here. It is a picture of a
+ * switch, drawn in the off position because "off" is what an unbuilt automation
+ * actually is.
+ */
+export function InertToggle({ label }: { label: string }) {
+  return (
+    <span data-inert-control className="inline-flex items-center gap-2 select-none">
+      <span aria-hidden className="is-proposed block h-[18px] w-[32px] rounded-pill">
+        <span className="mt-[3px] ml-[3px] block size-[12px] rounded-full bg-surface-3" />
+      </span>
+      <span className="type-sm text-muted">{label}</span>
+    </span>
+  )
 }

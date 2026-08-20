@@ -155,7 +155,7 @@ export function QaComposer({ openDraft, restoredThumbs, taskCodes }: QaComposerP
         </span>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_1fr]">
+      <div className="grid gap-3 narrow:grid-cols-[minmax(0,12rem)_1fr]">
         <div>
           <label className="block text-[12px] font-semibold" htmlFor="qa-task">
             Task

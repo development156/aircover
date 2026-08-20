@@ -1,4 +1,4 @@
-import { InertMediaSlot, InertPanel, NotRunningNote } from '@/components/ads/inert-parts'
+import { InertMediaSlot, InertPanel, NotRunningNote } from '@/components/roadmap/parts'
 import { InertButton, InertField } from '@/components/roadmap/inert'
 
 export const metadata = { title: 'Ad creative' }
@@ -77,7 +77,7 @@ export default function AdsCreativePage() {
         title="The words"
         what="A headline and a body per placement — not one caption stretched over four shapes."
       >
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 narrow:grid-cols-2">
           <div className="flex flex-col gap-2">
             <span className="type-eyebrow text-muted">Headline</span>
             <InertField label="Thirty characters, and Search will cut it there" />

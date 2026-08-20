@@ -90,7 +90,7 @@ export function TopUpPanel() {
         onClick={start}
         loading={pending}
         data-guide="wallet.topup-start"
-        className="w-full sm:w-auto"
+        className="w-full narrow:w-auto"
       >
         Start checkout
       </Button>

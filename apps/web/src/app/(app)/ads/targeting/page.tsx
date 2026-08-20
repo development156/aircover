@@ -1,6 +1,6 @@
 import { Building2, MapPin, Repeat, Users } from 'lucide-react'
 
-import { InertPanel, InertRow, NotRunningNote } from '@/components/ads/inert-parts'
+import { InertPanel, InertRow, NotRunningNote } from '@/components/roadmap/parts'
 import { InertButton, InertChip, InertField } from '@/components/roadmap/inert'
 
 export const metadata = { title: 'Ad audience' }
@@ -66,7 +66,7 @@ export default function AdsTargetingPage() {
       </div>
 
       <InertPanel title="Where they are" what="A place and how far around it to go.">
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 narrow:grid-cols-2">
           <div className="flex flex-col gap-2">
             <span className="type-eyebrow text-muted">Place</span>
             <InertField label="A city, a neighbourhood, or a pin on a map" />
@@ -86,7 +86,7 @@ export default function AdsTargetingPage() {
         title="Who they are"
         what="Four ways to name an audience. The second one you have already done."
       >
-        <div className="grid gap-2 md:grid-cols-2">
+        <div className="grid gap-2 narrow:grid-cols-2">
           {SOURCES.map((source) => (
             <InertRow key={source.name} icon={source.icon} name={source.name} note={source.note} />
           ))}

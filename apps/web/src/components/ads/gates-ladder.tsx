@@ -58,7 +58,7 @@ export function GatesLadder() {
       {/* An ordered list, because the order is real: the permission comes before
           the review, and the review comes before a rupee can move. Numbering
           that encodes nothing would be decoration; this encodes a sequence. */}
-      <ol className="grid gap-3 md:grid-cols-3">
+      <ol className="grid gap-3 narrow:grid-cols-3">
         {GATES.map((gate, index) => (
           <li key={gate.title} className="surface-ring flex flex-col rounded-card bg-surface p-4">
             <span className="mb-3 flex items-center gap-2">

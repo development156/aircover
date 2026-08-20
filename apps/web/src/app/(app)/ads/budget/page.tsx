@@ -1,4 +1,4 @@
-import { InertPanel, NotRunningNote } from '@/components/ads/inert-parts'
+import { InertPanel, NotRunningNote } from '@/components/roadmap/parts'
 import { InertButton, InertChip, InertField } from '@/components/roadmap/inert'
 import { DataTable } from '@/components/ui/data-table'
 
@@ -45,7 +45,7 @@ export default function AdsBudgetPage() {
       </div>
 
       <InertPanel title="What you will spend" what="A ceiling and a pace. Both are yours to set.">
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 narrow:grid-cols-2">
           <div className="flex flex-col gap-2">
             <span className="type-eyebrow text-muted">Amount</span>
             <InertField label="The most this campaign may ever spend" />

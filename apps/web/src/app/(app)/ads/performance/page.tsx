@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-import { InertPanel, NotRunningNote } from '@/components/ads/inert-parts'
+import { InertPanel, NotRunningNote } from '@/components/roadmap/parts'
 import { InertButton, InertChip } from '@/components/roadmap/inert'
 import { DataTable } from '@/components/ui/data-table'
 

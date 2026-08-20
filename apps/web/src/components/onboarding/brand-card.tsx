@@ -40,7 +40,7 @@ export function BrandCard({
   children,
 }: BrandCardProps) {
   return (
-    <Card data-guide={guide} className={cn('flex flex-col gap-3', full && 'sm:col-span-2')}>
+    <Card data-guide={guide} className={cn('flex flex-col gap-3', full && 'narrow:col-span-2')}>
       <div className="flex items-center justify-between gap-2">
         <CardLabel className="mb-0">{title}</CardLabel>
         <Button

@@ -48,8 +48,8 @@ export const buttonVariants = cva(
       // max-narrow only and every size keeps its exact desktop height.
       size: {
         default: 'h-control px-3 text-[13px] max-narrow:min-h-[44px]',
-        sm: 'h-7 px-[9px] text-[12px] [&_svg]:size-[13px] max-narrow:min-h-[44px]',
-        lg: 'h-10 px-4 text-[14px] max-narrow:min-h-[44px]',
+        narrow: 'h-7 px-[9px] text-[12px] [&_svg]:size-[13px] max-narrow:min-h-[44px]',
+        wide: 'h-10 px-4 text-[14px] max-narrow:min-h-[44px]',
       },
     },
     defaultVariants: { variant: 'primary', size: 'default' },

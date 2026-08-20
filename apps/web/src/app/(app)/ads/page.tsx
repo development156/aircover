@@ -4,7 +4,7 @@ import { Image as ImageIcon, LineChart, Target, Wallet } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { GatesLadder } from '@/components/ads/gates-ladder'
-import { NotRunningNote } from '@/components/ads/inert-parts'
+import { NotRunningNote } from '@/components/roadmap/parts'
 import { InertButton, InertChip } from '@/components/roadmap/inert'
 import { DataTable } from '@/components/ui/data-table'
 
@@ -95,7 +95,7 @@ export default function AdsPage() {
         <h2 id="ads-areas" className="type-h2">
           What Ads will be
         </h2>
-        <ul className="grid gap-3 md:grid-cols-2">
+        <ul className="grid gap-3 narrow:grid-cols-2">
           {AREAS.map((area) => (
             <li key={area.href}>
               <Link
