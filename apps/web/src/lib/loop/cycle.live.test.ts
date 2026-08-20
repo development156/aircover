@@ -152,6 +152,7 @@ describe('THE LOOP, END TO END, AGAINST PRODUCTION', () => {
     const { createPgLedgerPort, createWithCredits, loadBillingEnv } = await import('@sahoda/billing')
     const { createMesh, planWeekTask } = await import('@sahoda/mesh')
     const { toChannelSet, MESH_TASK_ACTION } = await import('@sahoda/shared')
+    const { normalizeSlot } = await import('@/lib/planner/slots')
 
     const now = new Date()
     const week = planningWeekFor(now)
@@ -207,7 +208,17 @@ describe('THE LOOP, END TO END, AGAINST PRODUCTION', () => {
         try {
           const result = await mesh.runTask(
             planWeekTask.def,
-            { goals: '', channels: [...channels] },
+            // `nowIso` IS NOT OPTIONAL IN PRACTICE. The first live run omitted
+            // it, plan-week.ts's buildMessages dropped the date line, and the
+            // model returned slots in JUNE 2025 — fourteen months in the past.
+            // Four posts were then written with status='approved' and a past
+            // slot, which is exactly the dispatcher's gate. Only the absent
+            // SAHODA_PUBLISH_ENABLED stood between that and a real publish.
+            //
+            // The server action always passed it; this harness did not, and the
+            // divergence is the whole reason a harness that "does what the
+            // action does" has to actually do it.
+            { goals: '', channels: [...channels], nowIso: now.toISOString() },
             {
               workspaceId: WORKSPACE,
               traceId: opened.cycle.id,
@@ -224,12 +235,18 @@ describe('THE LOOP, END TO END, AGAINST PRODUCTION', () => {
                 (channels as readonly string[]).includes(c),
               ) as Array<(typeof channels)[number]>,
             )
+            const use = kept.length > 0 ? kept : toChannelSet([...channels])
+            // normalizeSlot, same as the action: it clamps anything past, too
+            // soon, unparseable or beyond the horizon to a real future instant.
+            // Belt to nowIso's braces — even with the date line present, a
+            // model's slot is a suggestion and this is what makes it true.
+            const slot = normalizeSlot(brief.suggestedSlot, [...use], now, index)
             return {
               priority: index + 1,
               title: brief.title.slice(0, 120),
               body: brief.body.slice(0, 500),
-              channels: kept.length > 0 ? kept : toChannelSet([...channels]),
-              suggestedSlot: brief.suggestedSlot,
+              channels: use,
+              suggestedSlot: slot.scheduledAt,
               rationale: brief.rationale ?? null,
               estimatedCredits: priced,
             }
@@ -272,6 +289,16 @@ describe('THE LOOP, END TO END, AGAINST PRODUCTION', () => {
         `  [${b.priority}] ${b.title}\n        ${b.channels.join(', ')}  ·  ${b.estimated_credits} cr  ·  ${b.suggested_slot}`,
       )
     }
+    // THE ASSERTION THE FIRST RUN DID NOT HAVE. A brief scheduled in the past
+    // becomes a post that satisfies the dispatcher's gate the instant it is
+    // written, which is the one state this session must never leave behind.
+    for (const b of briefs) {
+      expect(
+        b.suggested_slot === null || new Date(b.suggested_slot).getTime() > Date.now(),
+        `brief ${b.priority} is scheduled at ${b.suggested_slot}, which is in the past`,
+      ).toBe(true)
+    }
+
     console.log(
       `  ─────────────────────────────────────────────────────────\n` +
         `  writing ${preview.includedCount} posts  = ${preview.creationCredits} cr\n` +
@@ -389,4 +416,92 @@ describe('THE LOOP, END TO END, AGAINST PRODUCTION', () => {
     console.log(`CYCLE    status=${cycles[0]?.status}  spent_credits=${cycles[0]?.spent_credits}`)
     expect(cycles[0]?.status).toBe('reported')
   }, 120_000)
+
+  it('PROPOSES a learning and lets it be REJECTED without touching the Brand Brain', async () => {
+    if (!LIVE || !state.cycleId) return
+    const store = await import('@/lib/loop/store')
+    const { createPgLedgerPort, loadBillingEnv } = await import('@sahoda/billing')
+    const { databaseUrl } = loadBillingEnv()
+    const ledger = createPgLedgerPort({ connectionString: databaseUrl })
+
+    const brainBefore = await ledger.pool.query<{
+      id: string
+      version: number
+      updated_at: string
+      payload: unknown
+    }>(
+      `select id, version, updated_at::text as updated_at, payload
+         from brand_memory where workspace_id = $1 and status = 'active'`,
+      [WORKSPACE],
+    )
+    const before = brainBefore.rows[0]!
+    const countBefore = await ledger.pool.query<{ n: string }>(
+      `select count(*) as n from brand_memory where workspace_id = $1`,
+      [WORKSPACE],
+    )
+    console.log(
+      `\nBRAIN    before: version=${before.version} updated_at=${before.updated_at} rows=${countBefore.rows[0]!.n}`,
+    )
+
+    // Propose one, through the SAME function the Reflect stage uses.
+    const eventId = await store.proposeLearning(
+      WORKSPACE,
+      {
+        kind: 'brand_memory_patch',
+        summary: 'A proposal made by the live run, to be turned down.',
+        loop_cycle_id: state.cycleId,
+        evidence: { sample_size: 6, window_days: 7, post_ids: [], metric: 'impressions' },
+        patch: { alignment: { note: 'THIS MUST NEVER REACH THE BRAND BRAIN' } },
+      },
+      { loop_cycle_id: state.cycleId },
+    )
+    console.log(`LEARNING proposed: ${eventId}`)
+    state.learningId = eventId
+
+    // Reject it, as a real signed-in member.
+    const out = await asUser<{ resolve_memory_event: Record<string, unknown> }>(
+      `select public.resolve_memory_event($1, 'rejected') as resolve_memory_event`,
+      [eventId],
+    )
+    console.log(`REJECT   ${JSON.stringify(out.resolve_memory_event)}`)
+    expect(out.resolve_memory_event.status).toBe('rejected')
+    expect(out.resolve_memory_event.brand_memory_changed).toBe(false)
+
+    // ── THE ASSERTION THAT MATTERS ────────────────────────────────────────
+    // Not "no error was raised" — a silent write raises nothing. The active
+    // brain is compared field by field against what it was.
+    const brainAfter = await ledger.pool.query<{
+      id: string
+      version: number
+      updated_at: string
+      payload: unknown
+    }>(
+      `select id, version, updated_at::text as updated_at, payload
+         from brand_memory where workspace_id = $1 and status = 'active'`,
+      [WORKSPACE],
+    )
+    const after = brainAfter.rows[0]!
+    const countAfter = await ledger.pool.query<{ n: string }>(
+      `select count(*) as n from brand_memory where workspace_id = $1`,
+      [WORKSPACE],
+    )
+    console.log(
+      `BRAIN    after:  version=${after.version} updated_at=${after.updated_at} rows=${countAfter.rows[0]!.n}`,
+    )
+    expect(after.id).toBe(before.id)
+    expect(after.version).toBe(before.version)
+    expect(after.updated_at).toBe(before.updated_at)
+    expect(after.payload).toEqual(before.payload)
+    // And no new version anywhere in the history, active or superseded.
+    expect(countAfter.rows[0]!.n).toBe(countBefore.rows[0]!.n)
+    // The phrase from the rejected patch appears nowhere in the brain.
+    expect(JSON.stringify(after.payload)).not.toContain('THIS MUST NEVER REACH')
+
+    const ev = await ledger.pool.query<{ status: string; applied_memory_version: number | null }>(
+      `select status, applied_memory_version from memory_events where id = $1`,
+      [eventId],
+    )
+    expect(ev.rows[0]!.status).toBe('rejected')
+    expect(ev.rows[0]!.applied_memory_version).toBeNull()
+  }, 60_000)
 })
