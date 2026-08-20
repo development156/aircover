@@ -80,10 +80,38 @@ function sourceFiles(dir: string): string[] {
   return out
 }
 
+/**
+ * The corpus, read ONCE so the count below and the ban below it are the same set.
+ *
+ * MEASURED 2026-08-20: with `WEB_SRC` re-pointed at a directory holding no `.tsx`
+ * at all, the ban still reported `Tests 2 passed` — the emptiness assertion was
+ * being handed an empty list by an empty walk and could not tell that from a
+ * clean tree. The defect this file exists for is the most expensive one the
+ * design system has had (fifteen classes across thirteen files permanently
+ * single-column, emitting no CSS and no warning), and its guard was passing by
+ * not looking.
+ */
+const SOURCES = sourceFiles(WEB_SRC)
+
+/**
+ * apps/web/src held 700+ .tsx/.ts files when this was written. The floor is set
+ * far below that on purpose: it must catch a walker that returns nothing or
+ * nearly nothing, not fail every time somebody deletes a component.
+ */
+const MIN_EXPECTED_SOURCES = 200
+
 describe('only the two declared breakpoints exist', () => {
+  test('the walker finds the source tree, so the ban below is not vacuous', () => {
+    expect(
+      SOURCES.length,
+      `Only ${SOURCES.length} source files found under ${WEB_SRC}. The ban below ` +
+        'asserts a list is empty; an empty walk satisfies it without reading a byte.',
+    ).toBeGreaterThan(MIN_EXPECTED_SOURCES)
+  })
+
   test('no source file uses a stock Tailwind breakpoint prefix', () => {
     const offenders: string[] = []
-    for (const file of sourceFiles(WEB_SRC)) {
+    for (const file of SOURCES) {
       const matches = readFileSync(file, 'utf8').match(DEAD_VARIANT)
       if (!matches) continue
       const rel = relative(join(repoRoot(), 'apps/web'), file).split('\\').join('/')
