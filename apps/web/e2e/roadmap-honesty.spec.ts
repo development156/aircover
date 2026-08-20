@@ -73,7 +73,20 @@ const ALLOWED: ReadonlyArray<readonly [string, readonly number[]]> = [
   ['/leads', []],
   ['/studio', [price('carousel')]],
   ['/remix', [price('remix_pack')]],
-  ['/brain/audience', [price('twin_preflight')]],
+  // `/brain/audience` IS NOT IN THIS LIST ANY MORE, and the removal is the point
+  // rather than a loosening. This guard exists to stop screens that are DRAWINGS
+  // from inventing figures. That tab is no longer a drawing: it reads
+  // `audience_snapshots` and Instagram, and every number on it — a follower count,
+  // Meta's 100-follower floor, a collection date — came from a platform or from a
+  // published rule. Widening its allowance to admit them would have turned a guard
+  // about roadmap screens into a guard about nothing.
+  //
+  // What replaces it is narrower and stronger, because it can assert PROVENANCE
+  // rather than a permitted set of digits: `page.test.tsx` holds the screen to a
+  // figure per state, `audience-layers.spec.ts` measures the measured/inferred
+  // split, and the collector refuses to store a number no platform reported.
+  // `twin_preflight` stays in pricing.config.json — the price is still real, the
+  // screen that quoted it is not.
   ['/brain/knowledge', []],
 ]
 
