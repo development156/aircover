@@ -71,17 +71,29 @@ const OVERFLOW_CAMPAIGN = `Overflow check ${RUN}`
  * it is a fourth failure the same deletion caused, found by resolving every
  * selector in this file rather than only the ones already written down.
  *
- * ── WHY THE BODY IS TYPED AFTER THE CHANNELS, NOT BEFORE ────────────────
- * Creation is LAZY — opening the screen writes nothing, and the row appears on the
- * first save that has something to write. So the keystroke that creates the post
- * is the one that also carries the channels picked before it, in a single save.
+ * ── WHAT ACTUALLY CREATES THE ROW, WHICH IS NOT THE BODY ────────────────
+ * Creation is LAZY — opening the screen writes nothing — but "something to write"
+ * is not the same as "words". A CHANNEL PICK is a save like any other
+ * (`composer.tsx`: `onChannelsChange` → `autosave.update({ channels })`), and
+ * `golden-path.spec.ts:57` proves it with one click and no body at all: the id
+ * lands in the address bar anyway. So the row here is created by the first
+ * channel pick, not by the keystroke that follows it.
  *
- * That is what makes the address a fact rather than a coincidence: the composer
- * rewrites it only once that save is CONFIRMED, so an id in the path means the
- * write carrying both channels landed. The proof that it really did is downstream
- * and unavoidable — the grid's COLUMNS are the union of `posts.channels` across
- * the campaign's members (`lib/campaigns/rollup.ts`), read back on the server. A
- * channel that never reached the row is a column that never appears.
+ * The body is still typed last, because a post with no words is not what the rest
+ * of this file is about. But that ordering is a convenience, not the mechanism.
+ *
+ * ── AND WHY THE CHANNELS ARE READ BACK RATHER THAN REASONED ABOUT ───────
+ * The address is rewritten only once a save is CONFIRMED, so an id in the path
+ * does mean a write landed. WHICH write is a question about a 2000ms debounce:
+ * both clicks below fall inside one window, so one save carries both channels —
+ * on a machine that is not busy. That is an argument about timing, and the grid
+ * this spec exists to check takes its COLUMNS from `posts.channels`
+ * (`lib/campaigns/rollup.ts#channelUnion`), a server read of the row.
+ *
+ * So the row is asked directly. A reload re-renders the version cards from
+ * `posts.channels`, which is the only version of this claim that does not depend
+ * on how loaded the box was. Nothing is claimed here about the BODY reaching the
+ * row — this file never reads it back, and saying so is cheaper than pretending.
  */
 async function writePostOnTwoChannels(page: Page, body: string): Promise<string> {
   await page.goto('/posts/new')
@@ -89,8 +101,8 @@ async function writePostOnTwoChannels(page: Page, body: string): Promise<string>
 
   await page.locator('[data-channel-tile="instagram"]').click()
   await page.locator('[data-channel-tile="linkedin"]').click()
-  // Both picked, before a word is written. These cards are the picker's answer,
-  // not the row's — the row does not exist yet.
+  // The picker's own answer, before a word is written. This says the two clicks
+  // registered; it says nothing yet about any row.
   await expect(page.locator('[data-version-card="instagram"]')).toBeVisible()
   await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
 
@@ -101,6 +113,13 @@ async function writePostOnTwoChannels(page: Page, body: string): Promise<string>
   await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
   const postId = new URL(page.url()).pathname.split('/').pop() as string
   expect(postId).toMatch(/^[0-9a-f-]{36}$/)
+
+  // THE ROW, not the screen that wrote it. After a reload these cards are
+  // rendered from `posts.channels` on the server, so this is the postcondition
+  // every assertion downstream actually depends on.
+  await page.reload()
+  await expect(page.locator('[data-version-card="instagram"]')).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
 
   return postId
 }
@@ -219,7 +238,13 @@ test.describe('campaigns @smoke', () => {
     // filter matched a real value rather than nothing.
     await expect(page.getByRole('link', { name: CAMPAIGN })).toHaveCount(0)
 
+    // Waited for, like the step above it. Without this the assertion can be made
+    // against the FILTERED page that has not navigated yet, and its 15s of retries
+    // are spent on a list that is correctly empty — MEASURED once on a production
+    // server, where the click and the assertion land closer together than a dev
+    // server ever let them.
     await page.getByRole('link', { name: /^All/ }).click()
+    await page.waitForURL((url) => !url.search.includes('stage='), { timeout: 15_000 })
     await expect(page.getByRole('link', { name: CAMPAIGN })).toBeVisible()
   })
 
