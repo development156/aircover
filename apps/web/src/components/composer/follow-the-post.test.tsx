@@ -60,6 +60,9 @@ function Harness() {
             onSave={() => api.save(channel)}
             onKeepMine={() => {}}
             onUseTheirs={() => {}}
+            canonicalBody=""
+            onRelink={() => {}}
+            onUndoRelink={() => {}}
           />
         </div>
       ))}

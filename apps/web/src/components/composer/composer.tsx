@@ -229,6 +229,7 @@ export function Composer({
         <div className="wide:col-start-2 wide:row-span-2 wide:row-start-1">
           <VersionsPane
             channels={draft.channels}
+            canonicalBody={draft.body}
             variants={variantsApi}
             formats={formats}
             mediaCount={media.length}

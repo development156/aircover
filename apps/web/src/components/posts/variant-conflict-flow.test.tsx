@@ -93,6 +93,9 @@ function Harness({ versions }: { versions: VariantVersions }) {
       onSave={() => api.save(CHANNEL)}
       onKeepMine={() => api.keepMine(CHANNEL)}
       onUseTheirs={(theirs: string) => api.useTheirs(CHANNEL, theirs)}
+      canonicalBody=""
+      onRelink={() => {}}
+      onUndoRelink={() => {}}
     />
   )
 }

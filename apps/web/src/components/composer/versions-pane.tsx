@@ -12,6 +12,8 @@ import type { VariantFormatApi } from './use-variant-format'
 
 export interface VersionsPaneProps {
   channels: ChannelSet
+  /** The post's body right now, for the relink control on each card. */
+  canonicalBody: string
   variants: VariantsApi
   formats: VariantFormatApi
   mediaCount: number
@@ -38,6 +40,7 @@ export interface VersionsPaneProps {
  */
 export function VersionsPane({
   channels,
+  canonicalBody,
   variants,
   formats,
   mediaCount,
@@ -86,6 +89,9 @@ export function VersionsPane({
                 onSave={() => onSaved(channel)}
                 onKeepMine={() => variants.keepMine(channel)}
                 onUseTheirs={(theirs) => variants.useTheirs(channel, theirs)}
+                canonicalBody={canonicalBody}
+                onRelink={() => variants.relink(channel, canonicalBody)}
+                onUndoRelink={() => variants.undoRelink(channel)}
               />
             ))}
           </div>

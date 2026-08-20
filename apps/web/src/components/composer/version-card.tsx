@@ -20,6 +20,7 @@ import { selectedText, spliceSelection, type SelectionRange } from '@/lib/posts/
 import type { VariantExtras } from '@/lib/posts/variant-extras'
 import type { VariantState } from '@/components/posts/use-variants'
 
+import { RelinkControl } from './relink-control'
 import { trimToFit } from './trim-to-fit'
 import { VersionOptions } from './version-options'
 import { VersionState } from './version-state'
@@ -36,6 +37,10 @@ export interface VersionCardProps {
   onSave: () => void
   onKeepMine: () => void
   onUseTheirs: (theirs: string) => void
+  /** The post's body right now — what "Follow the post again" would bring across. */
+  canonicalBody: string
+  onRelink: () => void
+  onUndoRelink: () => void
 }
 
 /**
@@ -68,6 +73,9 @@ export function VersionCard({
   onSave,
   onKeepMine,
   onUseTheirs,
+  canonicalBody,
+  onRelink,
+  onUndoRelink,
 }: VersionCardProps) {
   const spec = CONSTRAINTS[channel]
   const label = CHANNEL_LABELS[channel]
@@ -214,6 +222,17 @@ export function VersionCard({
       ) : null}
 
       {state.error !== null ? <InlineError>{state.error}</InlineError> : null}
+
+      {/* Below the editor and the options, above Save: relinking replaces what
+          is in the box, so it belongs next to the decision to keep it, not next
+          to the words it would overwrite. */}
+      <RelinkControl
+        label={label}
+        state={state}
+        canonicalBody={canonicalBody}
+        onRelink={onRelink}
+        onUndo={onUndoRelink}
+      />
 
       <div className="flex items-center gap-3">
         <Button

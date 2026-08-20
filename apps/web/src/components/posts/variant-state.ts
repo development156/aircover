@@ -66,6 +66,27 @@ export interface VariantState {
    * out is still out.
    */
   permalink: string | null
+  /**
+   * The words relinking replaced, kept so they can be put back.
+   *
+   * ── WHY RELINK MAY NOT SIMPLY OVERWRITE ─────────────────────────────────────
+   * FSD §3.1 says "relink re-syncs from canonical" and stops there, which reads
+   * as a one-way overwrite of copy the writer may have spent ten minutes on. A
+   * control that silently discards written words is not a feature, so the words
+   * are held here and an Undo puts them back exactly.
+   *
+   * Two things make this safe rather than merely reversible. Nothing is WRITTEN
+   * by a relink — the mirrored body lands in the box marked unsaved, the same
+   * rule "Use the saved version" already follows — so the row still holds the
+   * original until the writer chooses to save. And this field survives as long
+   * as the card does, so the Undo is there after the writer has looked away and
+   * looked back.
+   *
+   * `null` means nothing has been replaced. It is cleared when the writer types
+   * (they have moved on) and when the Undo is taken (there is nothing left to
+   * restore).
+   */
+  relinkedFrom: string | null
 }
 
 export type VariantStates = Record<Channel, VariantState>
@@ -76,6 +97,7 @@ const EMPTY: Omit<VariantState, 'version' | 'body' | 'dirty' | 'following'> = {
   error: null,
   conflict: null,
   permalink: null,
+  relinkedFrom: null,
 }
 
 export function seed(
