@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import type { Channel, ChannelSet } from '@sahoda/shared'
 
+import { CardEmpty } from '@/components/empty-state'
 import { CardLabel } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { blockingChannels, meterFor } from '@/lib/posts/counters'
@@ -26,8 +27,23 @@ export interface VariantTabsProps {
 }
 
 /**
- * Per-channel variant tabs. Hand-built pills (docs/08 §6 delegates the look to
- * `sahoda_brand_brain_demo.html` `.tab`) — there is no tabs primitive in the repo.
+ * Per-channel variant tabs.
+ *
+ * ── WHY THESE ARE BUTTONS, AND NOT THE `Tabs` PRIMITIVE ──────────────────────
+ * This note used to read "there is no tabs primitive in the repo", citing
+ * docs/08, which docs/26 supersedes. `components/ui/tabs.tsx` exists — but it is
+ * NAVIGATION: `TabItem` requires an `href` and it renders `<Link>`s, because
+ * docs/26 §10.2 rules that a tab which changes the URL must be a link.
+ *
+ * These tabs change no URL. They switch which per-channel draft the editor is
+ * showing, and those drafts hold UNSAVED text. Routing here would put a
+ * writer's unsaved caption behind a navigation, and reload — the property
+ * §10.2 wants links for — is precisely the event that would destroy it. So the
+ * rule's rationale points the other way for this one control, and a `role=
+ * "tablist"` of buttons with a roving tabindex is the correct shape.
+ *
+ * They still owe everything else the primitive provides, and one of those was
+ * missing until 2026-08-20: the `max-narrow:min-h-[44px]` touch floor.
  *
  * Blocking is strictly per channel: `blockingChannels` marks only the tabs whose
  * own draft violates its own spec, so an over-limit X post never blocks GBP.
@@ -67,9 +83,13 @@ export function VariantTabs({ channels, canonicalBody, variants, mediaCount }: V
     return (
       <section className="space-y-3" data-guide="post-variants">
         <CardLabel className="mb-0">Channel variants</CardLabel>
-        <p className="rounded-card border border-line bg-bg p-4 text-[13px] text-muted">
-          Pick a channel below and Sahoda opens a tab for it here.
-        </p>
+        {/* `CardEmpty` — the SECTION level of the absence vocabulary (docs/26
+            §4.1). This was a hand-built paragraph, which is one more visual
+            language for "nothing here" on a screen that already has several.
+            The claim is unchanged; only the treatment moved. */}
+        <div className="rounded-card border border-line bg-bg">
+          <CardEmpty body="Pick a channel below and Sahoda opens a tab for it here." />
+        </div>
       </section>
     )
   }
@@ -114,7 +134,15 @@ export function VariantTabs({ channels, canonicalBody, variants, mediaCount }: V
                 // PER-CHANNEL VARIANTS — one body and one publish state each —
                 // so the selected tab has to read as "you are editing this one",
                 // which solid ink does more plainly than a wash.
-                'inline-flex h-7 items-center gap-2 rounded-full px-[10px] text-[13px] font-[550] transition-micro',
+                // The touch floor (docs/26 §9: "at narrow widths EVERY
+                // interactive control grows to it"). These tabs are h-7 — 28px,
+                // 16px under the floor — and they are how a phone user reaches
+                // any channel but the first, so they were the most important
+                // controls on the screen to have missed it. The `Tabs` primitive
+                // already carries this line; these tabs cannot use it because it
+                // is navigation-only (links with an href), and a variant tab
+                // switches an editing pane holding unsaved text.
+                'inline-flex h-7 items-center gap-2 rounded-full px-[10px] text-[13px] font-[550] transition-micro max-narrow:min-h-[44px]',
                 isActive
                   ? 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'
                   : 'text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink hover:shadow-[inset_0_0_0_1px_var(--line-firm)]',

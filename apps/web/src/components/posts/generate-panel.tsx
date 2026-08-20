@@ -95,9 +95,24 @@ export function GeneratePanel({ postId, channels, flush, onGenerated }: Generate
       ) : (
         <Button onClick={() => run(channels)} disabled={channels.length === 0} className="w-full">
           <Sparkles size={14} aria-hidden />
-          Generate variants for <span className="tabular-nums">{channels.length}</span>
-          {channels.length === 1 ? ' channel' : ' channels'} ·{' '}
-          <span className="tabular-nums">{cost}</span> credits
+          {/* ONE span, so the label is ONE flex item.
+              `Button` is `inline-flex … gap-[6px]`, and a flex container wraps
+              every run of bare text in its own anonymous item. Written as loose
+              children, this label was SIX items — icon, "Generate variants for",
+              the count, "channels ·", the cost, "credits" — with 6px inserted at
+              every seam and each item free to wrap inside itself.
+              MEASURED on design-audit-before/light-390/posts-detail.png: the
+              button rendered "Generate variants / for | 3 | channels / · | 3 |
+              credits" as one row of internally-wrapped fragments. Every box was
+              the right size; the sentence was unreadable. At 1440 the same seams
+              showed as odd gaps around the numbers.
+              brand-card.tsx already carries this fix and its reasoning; this is
+              the sibling that walked through. */}
+          <span>
+            Generate variants for <span className="tabular-nums">{channels.length}</span>
+            {channels.length === 1 ? ' channel' : ' channels'} ·{' '}
+            <span className="tabular-nums">{cost}</span> credits
+          </span>
         </Button>
       )}
 

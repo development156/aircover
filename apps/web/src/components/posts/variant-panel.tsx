@@ -4,7 +4,9 @@ import { EyeOff } from 'lucide-react'
 import { CONSTRAINTS, type Channel } from '@sahoda/shared'
 
 import { Button } from '@/components/ui/button'
+import { Chip } from '@/components/ui/chip'
 import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { meterFor } from '@/lib/posts/counters'
 import { hasLink } from '@/lib/posts/detect-link'
@@ -93,7 +95,7 @@ export function VariantPanel({
   return (
     <div className="space-y-3">
       {!spec.publishable ? (
-        <p className="flex items-start gap-2 rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
+        <p className="flex items-start gap-2 rounded-input bg-warn-bg px-3 py-2.5 type-body text-warn">
           <EyeOff size={14} className="mt-0.5 shrink-0" aria-hidden />
           <span>
             {CHANNEL_LABELS[channel]} is preview-only in Alpha. I can draft and check this caption,
@@ -115,7 +117,7 @@ export function VariantPanel({
       </div>
 
       {state.body === '' ? (
-        <p className="text-[12.5px] text-muted">
+        <p className="type-sm text-muted">
           Nothing drafted for this channel yet.{' '}
           {canonicalBody.trim() !== '' ? (
             <button
@@ -135,13 +137,15 @@ export function VariantPanel({
 
       {hashtags !== undefined && hashtags.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
+          {/* `Chip`, not a hand-rolled pill. docs/26 §10.1: a chip is data the
+              USER put there and a badge is a status the SYSTEM computed. A
+              hashtag is the writer's own input, so it is a chip — and rendering
+              it as a bespoke pill is how the same object ends up with three
+              looks across three screens. No `onRemove`: this panel cannot edit
+              the list one tag at a time, and a remove affordance that does
+              nothing is worse than none. */}
           {hashtags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-pill bg-s2 px-2.5 py-1 text-[12px] font-semibold text-ink"
-            >
-              {tag}
-            </span>
+            <Chip key={tag}>{tag}</Chip>
           ))}
         </div>
       ) : null}
@@ -149,7 +153,12 @@ export function VariantPanel({
       {spec.gbp !== undefined ? (
         <div className="space-y-1.5">
           <Label htmlFor={`cta-${channel}`}>Call to action</Label>
-          <select
+          {/* The `Select` primitive, not a hand-rolled `<select>`. The local copy
+              set `text-[14px]`, which is not a step on the scale (docs/26 §5),
+              and carried no `max-narrow:min-h-[44px]` — so on a phone the one
+              control whose hit area is exactly its box was under the 44px floor
+              (§9). Both come free from the primitive. */}
+          <Select
             id={`cta-${channel}`}
             value={storedCta ?? ''}
             onChange={(event) =>
@@ -157,7 +166,6 @@ export function VariantPanel({
                 gbpCta: event.target.value === '' ? undefined : event.target.value,
               })
             }
-            className="w-full rounded-input border border-line bg-s1 px-3 py-2.5 text-[14px] text-ink transition-micro focus:bg-bg focus:outline-none"
           >
             <option value="">No call to action</option>
             {gbpCtaTypes().map((cta) => (
@@ -165,9 +173,9 @@ export function VariantPanel({
                 {cta}
               </option>
             ))}
-          </select>
+          </Select>
           {ctaUnknown ? (
-            <p className="text-[12.5px] text-warn">
+            <p className="type-sm text-warn">
               The saved call to action is not one Google accepts — pick one from the list.
             </p>
           ) : null}
@@ -189,17 +197,41 @@ export function VariantPanel({
 
       {state.error !== null ? <InlineError>{state.error}</InlineError> : null}
 
+      {/* ── ONE THING PER STATE, AND NEVER A CLAIM ABOUT A WRITE THAT DID NOT
+             HAPPEN ─────────────────────────────────────────────────────────
+          This was a single `<Button>` whose label was chosen by `dirty` and
+          which went `disabled` when there was nothing to save. Two defects,
+          and the second is the serious one:
+
+          1. It rendered STATE as a disabled control. A disabled button is
+             still announced as a button (docs/26 §10.2), so a screen reader
+             offers "Saved, button", the reader takes it, and nothing happens.
+             This is the defect docs/28 removed from /planner; it survived here.
+
+          2. `!dirty` chose the word "Saved" — and a channel that has never
+             been written to seeds as `{ body: '', dirty: false }`
+             (`use-variants.ts` EMPTY). So an untouched channel said "Saved"
+             directly beneath this panel's own "Nothing drafted for this
+             channel yet." One screen, two contradictory sentences, and the
+             wrong one was a claim about the database.
+
+          Now: an action when there IS something to save, a plain status when
+          there is not, and nothing at all when nothing has ever been written —
+          the sentence above already covers that case, and saying it twice is
+          what /home was demoted for. */}
       <div className="flex items-center gap-3">
-        <Button
-          size="sm"
-          onClick={onSave}
-          loading={state.saving}
-          disabled={!state.dirty || state.body === ''}
-        >
-          {state.saving ? 'Saving' : state.dirty ? 'Save variant' : 'Saved'}
-        </Button>
-        {state.dirty && !state.saving ? (
-          <span className="text-[12px] text-muted">Not saved yet</span>
+        {state.saving ? (
+          <Button size="sm" onClick={onSave} loading>
+            Saving
+          </Button>
+        ) : state.dirty && state.body !== '' ? (
+          // The ENABLED button is itself the "not saved" signal, so it carries
+          // no companion line repeating it.
+          <Button size="sm" onClick={onSave}>
+            Save variant
+          </Button>
+        ) : state.body !== '' ? (
+          <p className="type-sm text-muted">Saved</p>
         ) : null}
       </div>
     </div>
