@@ -62,10 +62,15 @@ export function previewThread(
 
   const spec = CONSTRAINTS[channel]
   const text = publishedTextOf(formatForPlatform(spec, draft))
-  const hasLink = draft.hasLink === true
-  const limit = segmentLimitFor(spec, hasLink)
+  // ── THE LINK IS DERIVED FROM THE TEXT, NOT TAKEN FROM `draft.hasLink` ──────
+  // `draft.hasLink` comes from apps/web's `detect-link`, which the publish path
+  // cannot reach — `store.ts` never populates it. Reading it here would make this
+  // preview split at 257 while the publisher split at 280: five posts shown, four
+  // published. `planThread` derives the answer from the string both sides hold,
+  // so they cannot disagree.
+  const limit = segmentLimitFor(spec, text)
 
-  const planned = planThread(spec, text, hasLink)
+  const planned = planThread(spec, text)
   if (!planned.ok) {
     return { segments: [], limit, refusal: planned.refusal }
   }

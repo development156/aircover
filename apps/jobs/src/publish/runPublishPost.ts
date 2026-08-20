@@ -425,7 +425,12 @@ export async function runPublishPost(
   // and the number of posts that went out would be two independent answers.
   let thread: ThreadPlan | null = null
   if (isThread) {
-    const planned = planThread(spec, publishedText, variant.hasLink === true)
+    // No `hasLink` argument, and that absence is load-bearing: `store.ts`
+    // deliberately never populates `PublishVariant.hasLink` (it would need
+    // apps/web's 300-line TLD list), so passing it would have split at 280 here
+    // while the editor split at 257 — a preview showing five posts and a publish
+    // producing four. `planThread` derives it from the text both sides hold.
+    const planned = planThread(spec, publishedText)
     if (!planned.ok) {
       return fail(planned.refusal.code, planned.refusal.message, null)
     }

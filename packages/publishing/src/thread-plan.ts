@@ -49,9 +49,38 @@ export function linkWeightOf(spec: PlatformSpec): number {
   )
 }
 
-/** How many characters one post of a thread may carry on this channel. */
-export function segmentLimitFor(spec: PlatformSpec, hasLink: boolean): number {
-  return threadLimitFor(spec.maxChars, hasLink, linkWeightOf(spec))
+/**
+ * Does this text carry a link, for the purpose of charging the channel's weight?
+ *
+ * ── DELIBERATELY NARROW, AND DELIBERATELY NOT apps/web's DETECTOR ───────────
+ * `apps/web/src/lib/posts/detect-link` is a far better link detector and it is in
+ * the WRONG PACKAGE for this: it is browser code behind a 300-line TLD list, and
+ * `runPublishPost` cannot reach it. That is not a hypothetical — `store.ts`
+ * documents refusing to copy it, which is why `PublishVariant.hasLink` is never
+ * populated at publish time at all.
+ *
+ * So the thread path does not ASK for a flag. Both the editor and the publisher
+ * derive the answer from the SAME string with THIS function, and therefore split
+ * into the same posts. A flag would have made the preview show five posts and the
+ * publish produce four, because the editor sets it and the store never does.
+ *
+ * Only an explicit scheme or a `www.` prefix counts. Under-detecting costs at most
+ * the flat weight on a text whose segments are already inside the raw limit;
+ * over-detecting would refuse posts that are fine.
+ */
+export function textHasLink(text: string): boolean {
+  return /(?:https?:\/\/|www\.)\S/i.test(text)
+}
+
+/**
+ * How many characters one post of a thread may carry on this channel.
+ *
+ * The weight is charged to EVERY segment when the text carries a link ANYWHERE.
+ * That is conservative — only one segment really owes it — and it is the only
+ * reading that survives the split being decided before the segments exist.
+ */
+export function segmentLimitFor(spec: PlatformSpec, text: string): number {
+  return threadLimitFor(spec.maxChars, textHasLink(text), linkWeightOf(spec))
 }
 
 export interface ThreadPlan {
@@ -70,6 +99,10 @@ export type ThreadPlanResult = { ok: true; plan: ThreadPlan } | { ok: false; ref
  * `variant.body`, for the same reason the refusal gate reads the formatted string:
  * a thread whose tags push the last post over the limit is a thread that fails at
  * X, and only the formatted text knows.
+ *
+ * It is the ONLY input besides the spec, and that is what makes the editor's
+ * preview and the publisher's payload the same arithmetic rather than two
+ * implementations that happen to agree.
  */
 /** The longest run of non-whitespace in `text`, or null if there is none. */
 function longestUnbreakableToken(text: string): string | null {
@@ -80,12 +113,8 @@ function longestUnbreakableToken(text: string): string | null {
   return longest === null || longest === '' ? null : longest
 }
 
-export function planThread(
-  spec: PlatformSpec,
-  publishedText: string,
-  hasLink: boolean,
-): ThreadPlanResult {
-  const limit = segmentLimitFor(spec, hasLink)
+export function planThread(spec: PlatformSpec, publishedText: string): ThreadPlanResult {
+  const limit = segmentLimitFor(spec, publishedText)
 
   if (limit < 1) {
     // Reachable only if a link's weight meets or exceeds the whole channel limit.

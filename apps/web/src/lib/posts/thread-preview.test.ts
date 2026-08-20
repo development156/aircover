@@ -45,7 +45,7 @@ describe('previewThread', () => {
 
     const spec = CONSTRAINTS.x
     const published = publishedTextOf(formatForPlatform(spec, d))
-    const planned = planThread(spec, published, false)
+    const planned = planThread(spec, published)
     if (!planned.ok) throw new Error('expected a plan')
 
     expect(preview.segments.map((s) => s.text)).toEqual(planned.plan.segments)
@@ -54,9 +54,35 @@ describe('previewThread', () => {
   })
 
   it('tightens the limit when the body carries a link', () => {
-    const withLink = previewThread('x', draft({ hasLink: true }), true)!
+    const withLink = previewThread('x', draft({ body: `${LONG} https://example.com/x` }), true)!
     const without = previewThread('x', draft(), true)!
     expect(withLink.limit).toBeLessThan(without.limit)
+  })
+
+  /**
+   * ── THE DISAGREEMENT THIS TEST EXISTS TO CATCH ────────────────────────────
+   * The first draft passed `draft.hasLink` into the plan. That flag is set by
+   * apps/web's `detect-link` and is NEVER set at publish time — `store.ts`
+   * declines to copy a 300-line TLD list into apps/jobs and says so. So the
+   * editor split at 257 and the publisher split at 280: a preview showing five
+   * posts and a publish producing four, on the exact bodies a small business
+   * writes, since almost every promotion carries a link.
+   *
+   * `draft.hasLink` is set to the WRONG value here on purpose. The plans must
+   * still match, because neither side is allowed to read it.
+   */
+  it('splits identically to the publisher even when hasLink disagrees', () => {
+    const body = `${LONG} Book here https://example.com/booking`
+    const spec = CONSTRAINTS.x
+
+    for (const flag of [true, false, undefined]) {
+      const d = draft({ body, hasLink: flag })
+      const preview = previewThread('x', d, true)!
+      const published = publishedTextOf(formatForPlatform(spec, d))
+      const planned = planThread(spec, published)
+      if (!planned.ok) throw new Error('expected a plan')
+      expect(preview.segments.map((s) => s.text)).toEqual(planned.plan.segments)
+    }
   })
 
   it('carries the publish path’s own refusal code and words', () => {

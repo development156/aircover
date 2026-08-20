@@ -26,16 +26,17 @@ describe('linkWeightOf', () => {
 })
 
 describe('segmentLimitFor', () => {
-  it('is the channel limit, less the link weight when there is a link', () => {
-    expect(segmentLimitFor(X, false)).toBe(X.maxChars)
-    expect(segmentLimitFor(X, true)).toBe(X.maxChars - linkWeightOf(X))
+  it('is the channel limit, less the link weight when the TEXT carries a link', () => {
+    expect(segmentLimitFor(X, 'no link here at all')).toBe(X.maxChars)
+    expect(segmentLimitFor(X, 'see https://example.com')).toBe(X.maxChars - linkWeightOf(X))
+    expect(segmentLimitFor(X, 'see www.example.com')).toBe(X.maxChars - linkWeightOf(X))
   })
 })
 
 describe('planThread', () => {
   it('plans a long body into posts that each fit', () => {
     const body = Array.from({ length: 40 }, (_, i) => `Point ${i} about the shop.`).join(' ')
-    const result = planThread(X, body, false)
+    const result = planThread(X, body)
     if (!result.ok) throw new Error(`expected a plan, got ${result.refusal.code}`)
     expect(result.plan.segments.length).toBeGreaterThan(1)
     expect(result.plan.limit).toBe(280)
@@ -43,7 +44,7 @@ describe('planThread', () => {
   })
 
   it('plans a short body as a single post', () => {
-    const result = planThread(X, 'Open today until six.', false)
+    const result = planThread(X, 'Open today until six.')
     if (!result.ok) throw new Error('expected a plan')
     expect(result.plan.segments).toEqual(['Open today until six.'])
   })
@@ -57,21 +58,21 @@ describe('planThread', () => {
   it('accepts a body the whole-body limit refuses', () => {
     const body = 'A sentence about chai that runs on. '.repeat(20).trim()
     expect(charCountFor(X, { body })).toBeGreaterThan(X.maxChars)
-    const result = planThread(X, body, false)
+    const result = planThread(X, body)
     expect(result.ok).toBe(true)
   })
 
   it('charges the link weight to every segment, tightening the split', () => {
     const body = 'word '.repeat(200).trim()
-    const withLink = planThread(X, body, true)
-    const without = planThread(X, body, false)
+    const withLink = planThread(X, `${body} https://example.com/x`)
+    const without = planThread(X, body)
     if (!withLink.ok || !without.ok) throw new Error('expected plans')
     expect(withLink.plan.limit).toBeLessThan(without.plan.limit)
     expect(withLink.plan.segments.length).toBeGreaterThanOrEqual(without.plan.segments.length)
   })
 
   it('refuses a body with nothing written in it', () => {
-    const result = planThread(X, '   \n\n ', false)
+    const result = planThread(X, '   \n\n ')
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.refusal.code).toBe('THREAD_EMPTY')
@@ -86,21 +87,23 @@ describe('planThread', () => {
    */
   it('refuses an unbreakable token rather than cutting it in half', () => {
     const url = `https://example.com/${'a'.repeat(400)}`
-    const result = planThread(X, `Read this ${url}`, false)
+    const result = planThread(X, `Read this ${url}`)
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.refusal.code).toBe('THREAD_UNBREAKABLE')
-    expect(result.refusal.message).toContain('280')
+    // 257, not 280: the text carries a link, so every segment pays X's flat
+    // 23-character weight. The refusal quotes the limit actually in force.
+    expect(result.refusal.message).toContain(String(X.maxChars - linkWeightOf(X)))
   })
 
   it('accepts a long token that still fits inside one post', () => {
     const url = `https://example.com/${'a'.repeat(200)}`
-    expect(planThread(X, `Read this ${url}`, false).ok).toBe(true)
+    expect(planThread(X, `Read this ${url}`).ok).toBe(true)
   })
 
   it('puts the hashtag tail in the last post, because that is what it is given', () => {
     const body = 'A sentence about chai. '.repeat(20).trim()
-    const result = planThread(X, `${body}\n\n#chai #pune`, false)
+    const result = planThread(X, `${body}\n\n#chai #pune`)
     if (!result.ok) throw new Error('expected a plan')
     const last = result.plan.segments[result.plan.segments.length - 1]!
     expect(last).toContain('#chai #pune')
