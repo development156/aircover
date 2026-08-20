@@ -54,72 +54,66 @@ const OVERFLOW_CAMPAIGN = `Overflow check ${RUN}`
 /**
  * Write a real post on two channels, and hand back its id.
  *
- * ── WHY THERE IS NO "CONTINUE" HERE ANY MORE ─────────────────────────
- * The step wizard this spec was first written against is gone. One route writes a
- * post now (docs/26 §10.3), `/posts/new` is the same screen `/posts/<id>` is, and
- * FOUR selectors died with the old flow, each traceable to one deleted file:
+ * ── THIS HELPER DESCRIBED A COMPOSER THAT IS NOT IN THIS TREE ────────────
+ * Its previous version drove `/posts/new` and waited on `[data-composer]`,
+ * `[data-version-card="…"]` and a label reading `Your post`, explaining in a long
+ * note that `create-flow.tsx` had been "deleted". MEASURED on 2026-08-20 across
+ * every branch in this repo: `data-composer` and `data-version-card` exist ONLY in
+ * `components/composer/` on `wt-composer` and `wt-editor2`, which have never been
+ * merged into this lineage. Here `create-flow.tsx` is alive, `components/composer/`
+ * does not exist, and `/posts/new` resolves through `/posts/[id]` to `getPost('new')`
+ * → null → `notFound()`.
  *
- *   · `getByRole('button', {name: /^continue/i})`  — create-flow.tsx, deleted
- *   · `waitForURL(/[?&]post=…/)` and `searchParams.get('post')` — the id travels in
- *     the PATH now; `replaceState` rewrites it and nothing emits a query parameter
- *   · `getByLabel('Body')`             — the writing pane's label reads `Your post`
- *   · `getByText('All changes saved')` — post-editor.tsx:62, deleted. The commit
- *     bar says `Post saved`, and says it about the POST alone, because each
- *     version is saved on its own
+ * So the spec was not flaky and it was not broken by a change. It was written
+ * against a tree that also held the composer rewrite, and on this one its very
+ * first assertion waited ninety seconds on a selector that has never existed —
+ * twice, at 1.8 minutes each. Both @smoke tests in this file could not pass here.
  *
- * The last of those is not in the merge plan's table (docs/28 §5.3 lists three);
- * it is a fourth failure the same deletion caused, found by resolving every
- * selector in this file rather than only the ones already written down.
+ * ── WHAT THIS TREE ACTUALLY DOES, AND WHERE THAT IS PROVEN ──────────────
+ * `/create/post` renders the step flow; a channel tile plus **Continue** writes the
+ * row and puts its id in the query string; `/posts/<id>` is the editor and its
+ * writing pane is labelled `Body`. That is not deduced — `golden-path.spec.ts`
+ * drives exactly this sequence and passes in the same run.
  *
- * ── WHAT ACTUALLY CREATES THE ROW, WHICH IS NOT THE BODY ────────────────
- * Creation is LAZY — opening the screen writes nothing — but "something to write"
- * is not the same as "words". A CHANNEL PICK is a save like any other
- * (`composer.tsx`: `onChannelsChange` → `autosave.update({ channels })`), and
- * `golden-path.spec.ts:57` proves it with one click and no body at all: the id
- * lands in the address bar anyway. So the row here is created by the first
- * channel pick, not by the keystroke that follows it.
- *
- * The body is still typed last, because a post with no words is not what the rest
- * of this file is about. But that ordering is a convenience, not the mechanism.
+ * ── WHEN THE COMPOSER REWRITE LANDS, THIS FLIPS BACK ─────────────────────
+ * The old version of this helper is the correct one for that tree. Whoever merges
+ * `wt-composer` should expect to restore it, and the note above is here so that is
+ * a decision rather than a rediscovery.
  *
  * ── AND WHY THE CHANNELS ARE READ BACK RATHER THAN REASONED ABOUT ───────
- * The address is rewritten only once a save is CONFIRMED, so an id in the path
- * does mean a write landed. WHICH write is a question about a 2000ms debounce:
- * both clicks below fall inside one window, so one save carries both channels —
- * on a machine that is not busy. That is an argument about timing, and the grid
- * this spec exists to check takes its COLUMNS from `posts.channels`
- * (`lib/campaigns/rollup.ts#channelUnion`), a server read of the row.
- *
- * So the row is asked directly. A reload re-renders the version cards from
- * `posts.channels`, which is the only version of this claim that does not depend
- * on how loaded the box was. Nothing is claimed here about the BODY reaching the
- * row — this file never reads it back, and saying so is cheaper than pretending.
+ * The grid this spec exists to check takes its COLUMNS from `posts.channels`
+ * (`lib/campaigns/rollup.ts#channelUnion`), a server read of the row — so the row is
+ * asked directly rather than argued about from a debounce window. After a reload the
+ * variant tabs are rendered from that column, and they are located BY NAME rather
+ * than by a data attribute: a tab row that rendered the right count of the wrong
+ * channels would pass a structural check and fail a reader.
  */
 async function writePostOnTwoChannels(page: Page, body: string): Promise<string> {
-  await page.goto('/posts/new')
-  await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 90_000 })
+  await page.goto('/create/post')
+  await expect(page.locator('[data-channel-tile="instagram"]')).toBeVisible({ timeout: 90_000 })
 
   await page.locator('[data-channel-tile="instagram"]').click()
   await page.locator('[data-channel-tile="linkedin"]').click()
-  // The picker's own answer, before a word is written. This says the two clicks
-  // registered; it says nothing yet about any row.
-  await expect(page.locator('[data-version-card="instagram"]')).toBeVisible()
-  await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
+  await page.getByRole('button', { name: /^continue/i }).click()
 
-  await page.getByLabel('Your post').fill(body)
-
-  // Read the id off the PATH. Nothing emits `?post=` any more, and a spec that
-  // waits for one waits until its timeout.
-  await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
-  const postId = new URL(page.url()).pathname.split('/').pop() as string
+  // The id arrives in the query string on THIS flow. Taking it from the URL
+  // rather than guessing keeps the spec and the app in step.
+  await page.waitForURL(/[?&]post=[0-9a-f-]{36}/, { timeout: 60_000 })
+  const postId = new URL(page.url()).searchParams.get('post') as string
   expect(postId).toMatch(/^[0-9a-f-]{36}$/)
 
-  // THE ROW, not the screen that wrote it. After a reload these cards are
-  // rendered from `posts.channels` on the server, so this is the postcondition
-  // every assertion downstream actually depends on.
+  await page.goto(`/posts/${postId}`)
+  const pane = page.getByLabel('Body')
+  await expect(pane).toBeVisible({ timeout: 30_000 })
+  await pane.fill(body)
+
+  // THE ROW, not the screen that wrote it. After a reload these tabs are rendered
+  // from `posts.channels` on the server, so this is the postcondition every
+  // assertion downstream actually depends on.
   await page.reload()
-  await expect(page.locator('[data-version-card="instagram"]')).toBeVisible({ timeout: 30_000 })
-  await expect(page.locator('[data-version-card="linkedin"]')).toBeVisible()
+  const tabs = page.getByRole('tablist', { name: /channel variants/i })
+  await expect(tabs.getByRole('tab', { name: /instagram/i })).toBeVisible({ timeout: 30_000 })
+  await expect(tabs.getByRole('tab', { name: /linkedin/i })).toBeVisible()
 
   return postId
 }

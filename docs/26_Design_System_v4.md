@@ -343,6 +343,14 @@ it is the single most common way this system goes wrong.
 - **Labels never collapse.** When the rail collapses to 64px the label goes `sr-only`, never
   `display:none` — `display:none` removes the node from the accessibility tree and takes the
   link's name with it. Nine unnamed links is what that bug looked like.
+- **There are exactly two breakpoints, and the stock ones compile to nothing.** `globals.css`
+  wipes the default scale with `--breakpoint-*: initial` and declares `narrow` (700px) and
+  `wide` (1180px). Tailwind does not warn about an unknown variant — it emits no CSS at all,
+  so `grid md:grid-cols-2` is a one-column grid at every width, forever. MEASURED 2026-08-20:
+  `md:grid-cols-2` produced zero bytes against this app's own `@theme`; fifteen such classes
+  were live across thirteen files, five of them on Ads. Use `narrow:` / `wide:` and their
+  `max-` counterparts. `src/lib/design/breakpoints.test.ts` bans the rest, and fails on its
+  own premise first if a third breakpoint is ever declared.
 
 ---
 
@@ -410,6 +418,52 @@ soon/i})` match, which is precisely the thing the rule forbids.
 A server component cannot hand a function to a client component. Passing `onRemove` to a
 `Chip` from the server-rendered gallery returned a 500 — the same mistake any screen session
 would make, so the working example lives in `overlay-demo.tsx` rather than being deleted.
+
+---
+
+## 10.3 The navigation, and how a section says "not yet"
+
+The app has twenty-one sections and roughly a third of them are designed rather than built.
+Both facts have to survive contact with a 64px rail and a 390px phone.
+
+**One map, three surfaces.** `src/lib/nav/sections.ts` is the only list. The rail, the phone's
+More sheet and the command palette all project it. Before that each held its own array, and
+the palette carried a comment explaining that it omitted `/sites` "for the same reason the
+rail does" — a comment that exists only because two lists can disagree.
+
+**Grouped by the job, not by the module.** `Create · Publish · Customers · Results ·
+Automate`, with Home and Brand Brain above the groups because the Brain belongs to all five.
+Not "Engage" and "Measure": those are what a marketing tool calls these, not what somebody
+running a bakery calls them. Within a group, built sections come before unbuilt ones.
+
+**A coming-soon section is a REAL LINK.** Not `disabled`, not `aria-disabled`, not a `<span>`.
+§10.2's `<div>`-not-`<button>` rule governs CONTROLS that would do nothing; the screen behind
+a roadmap nav item exists, loads, and says plainly that the feature does not run — so the link
+keeps every promise it makes. Greying it out makes the roadmap unreachable rather than legible.
+
+It reads as not-yet three ways, none of them a colour:
+
+| width | mark | why |
+|---|---|---|
+| expanded rail, sheet, palette | the word **Soon**, `type-eyebrow`, muted | the whole claim in one word; muted so it cannot compete with the active item |
+| collapsed rail (64px) | a **hollow** ring, 7px | the label is `sr-only` and the word has nowhere to sit |
+| every width | `", not built yet"` in the accessible name | learned before the link is followed, not after |
+
+The hollow ring is deliberately the count badge's shape **without its fill**. Filled means
+something is waiting for you; hollow means nothing is there yet. Fill versus no-fill survives
+greyscale, which two hues would not.
+
+**Group headings are labels, never controls.** They do not collapse. A collapsible group hides
+destinations behind a state the user has to remember setting.
+
+**A phone reaches every section.** The bottom bar carries three destinations, the create
+button, and **More** — a `Drawer` holding the full map, grouped exactly as the rail groups it.
+It is a drawer and not a modal because consulting a menu does not demand an answer (§10.1).
+
+**A built screen nobody links to is the same as a screen that does not exist.**
+`src/lib/nav/reachable.test.ts` asserts every top-level route under `(app)` is either in the
+map or declared with the other way it is reached. Three finished features — Approvals,
+Campaigns, Assets — were reachable only by typing a URL when that test was written.
 
 ---
 
