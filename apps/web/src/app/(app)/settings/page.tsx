@@ -4,6 +4,7 @@ import { WorkspaceNameField } from '@/components/settings/workspace-name-field'
 import { EmptyState } from '@/components/empty-state'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { SettingCard, SettingRow } from '@/components/settings/setting-row'
+import { Enter } from '@/components/motion/stagger'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
 export const metadata = { title: 'Settings' }
@@ -11,9 +12,19 @@ export const metadata = { title: 'Settings' }
 /**
  * Workspace — the default settings tab.
  *
- * READ-ONLY on purpose. Renaming a workspace is a mutation and this pass writes
- * none, so the rows state what is stored and offer no control. A disabled input
- * would imply an edit that is not coming.
+ * NOT read-only any more. This comment used to say "READ-ONLY on purpose …the
+ * rows state what is stored and offer no control", which stopped being true
+ * when `WorkspaceNameField` landed with a real input and a Save. Corrected
+ * rather than left, because a stale comment about what a screen refuses to do
+ * is exactly the kind a later session trusts without re-deriving.
+ *
+ * Name is editable. Address is genuinely read-only — the slug is a stable
+ * identifier used in links and never reused, so there is no control to offer
+ * and none is rendered. A disabled input there would imply an edit that is not
+ * coming (docs/26 §10.2).
+ *
+ * The pane's width cap lives in `layout.tsx` — see docs/26 §6.1 for why a form
+ * this short looked unfinished at 1440 without one.
  */
 export default async function SettingsPage() {
   const workspace = await getActiveWorkspace()
@@ -34,17 +45,19 @@ export default async function SettingsPage() {
   }
 
   return (
-    <SettingCard title="Workspace">
-      <SettingRow
-        label="Name"
-        hint="What this workspace is called in the switcher."
-        control={<WorkspaceNameField workspaceId={workspace.id} initialName={workspace.name} />}
-      />
-      <SettingRow
-        label="Address"
-        hint="Its stable identifier. Used in links and never reused."
-        control={<span className="text-[13px] font-[550] text-ink">{workspace.slug}</span>}
-      />
-    </SettingCard>
+    <Enter>
+      <SettingCard title="Workspace">
+        <SettingRow
+          label="Name"
+          hint="What this workspace is called in the switcher."
+          control={<WorkspaceNameField workspaceId={workspace.id} initialName={workspace.name} />}
+        />
+        <SettingRow
+          label="Address"
+          hint="Its stable identifier. Used in links and never reused."
+          control={<span className="text-[13px] font-[550] text-ink">{workspace.slug}</span>}
+        />
+      </SettingCard>
+    </Enter>
   )
 }

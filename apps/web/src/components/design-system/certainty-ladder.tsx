@@ -52,7 +52,7 @@ const STATUSES: readonly PostStatus[] = [
 export function CertaintyLadder() {
   return (
     <div className="grid gap-6">
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2 narrow:grid-cols-2 wide:grid-cols-4">
         {RUNGS.map((rung) => (
           <div key={rung.cls} className="rounded-card border border-line-soft p-3">
             <span

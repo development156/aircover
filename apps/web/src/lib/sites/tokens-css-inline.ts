@@ -256,6 +256,18 @@ export const TOKENS_CSS = `/* ==================================================
      scattered by hand is how three of them end up at 40. */
   --control-h-touch: 44px;
 
+  /* ---------- L2 · MEASURE ----------
+     How wide a thing is allowed to get before it stops being readable.
+     Space (--space-N) is the gap BETWEEN things; measure is the cap on ONE
+     thing, and the app had no vocabulary for it — which is why a two-row
+     settings form stretched to 1150px with its label and its control ~900px
+     apart, reading as an unfinished page rather than a short one. */
+
+  /* A label/control pair. Past this the two halves stop reading as one row. */
+  --measure-form: 720px;
+  /* Running prose. Roughly 68ch at the 13px base. */
+  --measure-prose: 620px;
+
   /* ---------- L2 · MOTION ---------- */
   --ease: cubic-bezier(0.2, 0, 0.2, 1);
   --ease-sweep: cubic-bezier(0.16, 1, 0.3, 1); /* blade-sweep signature only */

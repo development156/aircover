@@ -277,6 +277,27 @@ A 4pt scale. The step is chosen by **relationship**, not by eye.
 If you want more than 48px, you want a **divider**, not more space. Large empty gaps are why
 `/create/post` and `/connections` read as unfinished: content stopped and the page did not.
 
+### 6.1 AMENDMENT — measure
+
+Added 2026-08-20 by `wt-redesign`. §6 covered the gap BETWEEN things and nothing covered the
+cap on ONE thing, so every page stretched its content to whatever the grid gave it.
+
+MEASURED on `/settings` at 1440: a two-row workspace form ran the full 1150px content pane,
+putting each label at the far left and its control at the far right — about **900px apart**.
+Nothing was mis-spaced; every gap was on the 4pt scale. The row had simply stopped reading as
+a row, because a label and the control it names have to be close enough to be one object.
+That is what made the screen read as unfinished rather than merely short, and it is a
+different failure from the dead space §6 already describes.
+
+| token | value | applies to |
+|---|---|---|
+| `--measure-form` | 720px | a label/control pair; past this the two halves stop reading as one row |
+| `--measure-prose` | 620px | running prose — roughly 68ch at the 13px base |
+
+Wide layouts do not become narrow layouts. The PAGE still fills the viewport; the readable
+CONTENT inside it is capped. A table, a chart or a grid of cards is not prose and is not a
+form — none of these apply to it.
+
 **Spacing is `--space-N`.** Never `--s1`/`--s2` — those are *surface colours* here, and
 redefining them turns `background: var(--s1)` into `background: 4px` and blanks every card.
 

@@ -18,6 +18,9 @@
  *   3 · no disabled button    docs/26 §10.2 — coming-soon is a <span>, never
  *                             <button disabled>, which a screen reader still
  *                             announces as an action the user can take
+ *   4 · no dead breakpoint    globals.css does `--breakpoint-*: initial`, so
+ *                             `sm:` `md:` `lg:` `xl:` `2xl:` DO NOT EXIST. A
+ *                             class using one is silently never generated
  *
  * Scope is apps/web/src. Two allowlists, both narrow and both justified below.
  *
@@ -59,20 +62,63 @@ const files = []
 
 /** Comments are stripped everywhere: a rule that fires on its own documentation
  *  teaches the next session to delete the explanation, not to keep the rule. */
+/**
+ * Comments removed, LINE NUMBERS PRESERVED.
+ *
+ * The first version replaced a block comment with '', which deleted its
+ * newlines — so every reported line number after the first comment in a file
+ * was wrong, and this codebase has long header comments in almost every file.
+ * A rule that points at the wrong line is worse than no rule: it sends the
+ * reader to innocent code and teaches them the tool is noise. Each comment is
+ * now replaced by the newlines it contained.
+ *
+ * TRAILING line comments go too, not just whole-line ones. brand-theme.ts
+ * annotates each neutral with the token hex it mirrors — real documentation
+ * that guard-neutrals.test.ts enforces — and a rule that fired on it would be
+ * answered by deleting the annotation. The `[^:]` guard keeps `https://`.
+ */
 function stripComments(src) {
-  return (
-    src
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      // TRAILING line comments too, not just whole-line ones. brand-theme.ts
-      // annotates each neutral with the token hex it mirrors — real
-      // documentation that guard-neutrals.test.ts enforces — and a rule that
-      // fired on it would be answered by deleting the annotation.
-      // The `[^:]` guard keeps `https://` intact.
-      .replace(/(^|[^:])\/\/.*$/gm, '$1')
-  )
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
 
-const violations = { hex: [], spacing: [], disabled: [] }
+const violations = { hex: [], spacing: [], disabled: [], breakpoint: [] }
+
+/* ── RULE 4 · DEAD BREAKPOINT VARIANTS ────────────────────────────────────────
+   `apps/web/src/app/globals.css` opens `@theme` with `--breakpoint-*: initial`,
+   which REMOVES every stock Tailwind breakpoint, and then defines exactly two:
+   `narrow` (700px) and `wide` (1180px). Anything written as `sm:` / `md:` /
+   `lg:` / `xl:` / `2xl:` is therefore a variant Tailwind does not know, so the
+   rule is never emitted and the base class wins at every width.
+
+   PROVEN, not assumed: `sm:w-auto` appears 0 times in the compiled CSS while
+   `max-narrow:` appears 48 times.
+
+   This is not a style rule. `top-up-panel.tsx` carried `w-full sm:w-auto` on
+   `Start checkout`, so the loudest object in the product — a brand-filled
+   button, on the money screen — rendered as a ~1000px bar at 1440px. Someone
+   wrote the fix; it simply never existed. Nothing could catch it: the class is
+   spelled correctly, it type-checks, and it reads right in review.
+
+   The allowed names are READ FROM globals.css rather than restated here, so
+   adding a breakpoint cannot leave this rule stale. */
+const GLOBALS = join(ROOT, 'apps/web/src/app/globals.css')
+const DEFINED_BREAKPOINTS = new Set(
+  [...readFileSync(GLOBALS, 'utf8').matchAll(/--breakpoint-([a-z0-9-]+)\s*:/g)]
+    .map((m) => m[1])
+    .filter((n) => n !== '*'),
+)
+/** Any `word:` variant that looks like a breakpoint but is not a defined one. */
+/**
+ * The trailing `[a-z0-9[-]` is load-bearing. A Tailwind variant is `sm:` glued
+ * to the class it modifies (`sm:w-auto`); a TypeScript object KEY is `sm:`
+ * followed by a space (`sm: 'h-7 px-[9px]'`). Without it this rule flagged
+ * button.tsx's CVA size variants, which are not classes at all — a false
+ * positive on the most-used primitive in the app, which is exactly how a new
+ * rule gets switched off in its first week.
+ */
+const BREAKPOINT_LIKE = /(?:^|[\s"'`])(?:(max)-)?(sm|md|lg|xl|2xl):(?=[a-z0-9[-])/g
 
 /** 3, 4, 6 or 8 digit hex, as a colour — not a hash-route or an id. */
 const HEX = /#[0-9a-fA-F]{3,8}\b/g
@@ -94,6 +140,14 @@ for (const file of files) {
     }
     for (const m of line.matchAll(SPACING)) {
       violations.spacing.push({ rel, line: i + 1, text: m[0] })
+    }
+    for (const m of line.matchAll(BREAKPOINT_LIKE)) {
+      if (DEFINED_BREAKPOINTS.has(m[2])) continue
+      violations.breakpoint.push({
+        rel,
+        line: i + 1,
+        text: `${m[1] ? `${m[1]}-` : ''}${m[2]}: is not a breakpoint here (have: ${[...DEFINED_BREAKPOINTS].join(', ')})`,
+      })
     }
   })
 
@@ -135,9 +189,9 @@ for (const file of files) {
    loosen: a file that gained violations is reported, never absorbed. */
 const BASELINE_PATH = join(ROOT, 'scripts/design/design-lint-baseline.json')
 
-function loadBaseline() {
+function loadBaseline(key) {
   try {
-    return JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).spacing ?? {}
+    return JSON.parse(readFileSync(BASELINE_PATH, 'utf8'))[key] ?? {}
   } catch {
     return {}
   }
@@ -171,47 +225,66 @@ for (const [key, name, why] of [
   if (!REPORT && found.length > 12) console.log(`          … ${found.length - 12} more (--report)`)
 }
 
-/* Rule 2 · ratcheted. */
-const current = countByFile(violations.spacing)
-const baseline = loadBaseline()
+/* Rules 2 and 4 · ratcheted, same mechanism.
+   Rule 4's eight hits were all REAL. Three sat in files this lane owns and are
+   fixed. The other five are in /admin and /onboarding, and "fixing" a dead
+   class there is not a no-op — it turns a one-column layout into two at 700px,
+   on a screen this lane has neither seen nor shot. That is a visual change to
+   another lane's work, so it is written down instead. */
+const RATCHETED = [
+  ['spacing', 'hardcoded spacing', 'docs/26 §6 — use --space-N / the 4pt scale'],
+  ['breakpoint', 'dead breakpoint variant', 'globals.css defines narrow/wide only'],
+]
 
 if (process.argv.includes('--update-baseline')) {
-  const merged = {}
-  for (const rel of Object.keys(current).sort()) merged[rel] = current[rel]
-  writeFileSync(
-    BASELINE_PATH,
-    `${JSON.stringify({ _: 'docs/26 §6 debt register. Counts may only go DOWN — see design-lint.mjs.', total: violations.spacing.length, spacing: merged }, null, 2)}\n`,
-  )
-  console.log(`  baseline written — ${violations.spacing.length} hardcoded spacing values`)
-} else {
-  const regressed = []
-  for (const [rel, n] of Object.entries(current)) {
-    const allowed = baseline[rel] ?? 0
-    if (n > allowed) regressed.push({ rel, n, allowed })
+  const out = {
+    _: 'Debt register for the ratcheted rules. Counts may only go DOWN — see design-lint.mjs.',
   }
-  const improved = Object.entries(baseline).filter(([rel, n]) => (current[rel] ?? 0) < n)
-  const total = violations.spacing.length
-  const baseTotal = Object.values(baseline).reduce((a, b) => a + b, 0)
-
-  if (regressed.length === 0) {
-    console.log(`  ok    hardcoded spacing — ${total} known, none new (baseline ${baseTotal})`)
-    if (improved.length > 0) {
-      console.log(
-        `        ${improved.length} file(s) improved — run --update-baseline to tighten it`,
-      )
+  for (const [key] of RATCHETED) {
+    const counts = countByFile(violations[key])
+    out[`${key}_total`] = violations[key].length
+    out[key] = Object.fromEntries(
+      Object.keys(counts)
+        .sort()
+        .map((r) => [r, counts[r]]),
+    )
+  }
+  writeFileSync(BASELINE_PATH, `${JSON.stringify(out, null, 2)}\n`)
+  for (const [key, name] of RATCHETED) {
+    console.log(`  baseline written — ${violations[key].length} ${name}`)
+  }
+} else
+  for (const [key, name, why] of RATCHETED) {
+    const current = countByFile(violations[key])
+    const baseline = loadBaseline(key)
+    const regressed = []
+    for (const [rel, n] of Object.entries(current)) {
+      const allowed = baseline[rel] ?? 0
+      if (n > allowed) regressed.push({ rel, n, allowed })
     }
-  } else {
-    failed += regressed.length
-    console.log(`  FAIL  hardcoded spacing — NEW in ${regressed.length} file(s)`)
-    console.log(`        docs/26 §6 — spacing is --space-N / the 4pt scale, never a px literal`)
-    for (const r of regressed) {
-      console.log(`          ${r.rel}  ${r.n} (baseline allows ${r.allowed})`)
-      for (const v of violations.spacing.filter((v) => v.rel === r.rel)) {
-        console.log(`            :${v.line}  ${v.text}`)
+    const improved = Object.entries(baseline).filter(([rel, n]) => (current[rel] ?? 0) < n)
+    const total = violations[key].length
+    const baseTotal = Object.values(baseline).reduce((a, b) => a + b, 0)
+
+    if (regressed.length === 0) {
+      console.log(`  ok    ${name} — ${total} known, none new (baseline ${baseTotal})`)
+      if (improved.length > 0) {
+        console.log(
+          `        ${improved.length} file(s) improved — run --update-baseline to tighten it`,
+        )
+      }
+    } else {
+      failed += regressed.length
+      console.log(`  FAIL  ${name} — NEW in ${regressed.length} file(s)`)
+      console.log(`        ${why}`)
+      for (const r of regressed) {
+        console.log(`          ${r.rel}  ${r.n} (baseline allows ${r.allowed})`)
+        for (const v of violations[key].filter((v) => v.rel === r.rel)) {
+          console.log(`            :${v.line}  ${v.text}`)
+        }
       }
     }
   }
-}
 
 console.log(`\n  ${files.length} files scanned in apps/web/src`)
 process.exit(failed > 0 ? 1 : 0)

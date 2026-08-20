@@ -32,14 +32,24 @@ export function BalanceHero({ balance, staleNote }: BalanceHeroProps) {
 
       {/* docs/08 §8: a credit change must be announced, not merely repainted. */}
       <p aria-live="polite" className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        {/* Display treatment. `.num` from tokens.css v3 is mono + tabular — the
-            Credits balance is one of the three places v3 allows mono, and the
-            total/held line below stays sans and only aligns its digits.
-            `text-ink` is load-bearing: without it the figure inherits --ink-body
-            from <body> and lands at the same weight as the label beside it. */}
-        <span className="num text-ink text-[44px] leading-[52px] font-extrabold">
-          {formatCredits(balance.available)}
-        </span>
+        {/* `type-hero-num` — THE token for this, and this is the case it was
+            written for: "the ONE big number per view" (docs/26 §5). It was
+            hand-written as `text-[44px] leading-[52px] font-extrabold`, which is
+            the exact drift §5 exists to stop: a size band spelled out at a call
+            site diverges from every other call site that spelled it out too. The
+            token is 44/44 at weight 650 with −0.03em tracking, so this also
+            picks up the optical tracking large type needs and loses 8px of
+            leading it did not.
+
+            `.num` is mono + tabular — the balance is one of the three places
+            mono is allowed, and the total/held line below stays sans and only
+            aligns its digits. `text-ink` is load-bearing: without it the figure
+            inherits --ink-body from <body> and lands at the same weight as the
+            label beside it.
+
+            It does NOT count up. Authoritative live balance — docs/26 §8.1,
+            enforced by count-up.guard.test.ts. */}
+        <span className="type-hero-num num text-ink">{formatCredits(balance.available)}</span>
         <span className="text-muted">
           {balance.available === 1 ? 'credit to spend' : 'credits to spend'}
         </span>
