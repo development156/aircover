@@ -34,6 +34,7 @@ const LOOP_BATCH = [
   '20260820000300_loop_cycles.sql',
   '20260820000400_loop_rpcs.sql',
   '20260820000500_loop_brief_channel_set.sql',
+  '20260820000600_loop_kill_switch_reported.sql',
 ] as const
 
 /** Everything the Loop files reference. `billing_ledger` is here for the kill switch's hold read. */
@@ -671,6 +672,56 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       const led = await db.query<{ n: number }>(
         `select count(*)::int as n from credit_ledger where workspace_id=$1 and entry_type='RELEASE'`, [WS_A])
       expect(led.rows[0].n).toBe(0)
+    })
+
+    // ── THE DEFECT THE FIRST VERSION HAD ───────────────────────────────────
+    it('unschedules the posts of a REPORTED cycle too', async () => {
+      // A cycle whose orchestration finished keeps its posts on the calendar —
+      // their slots are days away by design. The first version scoped the post
+      // update through `c.status = 'cancelled'`, so it walked straight past
+      // them: the commonest reason to press this button ("the Loop planned my
+      // week and I want it stopped") did nothing at all.
+      //
+      // Found on a live run by asking which rows still satisfied the
+      // dispatcher's gate after a completed cycle. Four did. Every unit test
+      // passed, because every one of them cancelled a LIVE cycle — the fixture
+      // shared the blind spot with the code.
+      const RC = 'dddddddd-0001-4ddd-8ddd-dddddddddddd'
+      const RP = 'dddddddd-0002-4ddd-8ddd-dddddddddddd'
+      const RHAND = 'dddddddd-0003-4ddd-8ddd-dddddddddddd'
+      await db.exec(`
+        insert into loop_cycles (id, workspace_id, iso_year, iso_week, status, reported_at)
+          values ('${RC}', '${WS_A}', 2026, 45, 'reported', now());
+        insert into posts (id, workspace_id, title, body, status, scheduled_at, origin, channels) values
+          ('${RP}',    '${WS_A}', 'reported cycle post', 'b', 'approved',  now() + interval '4 days', 'plan_week', '{x}'),
+          ('${RHAND}', '${WS_A}', 'hand scheduled two',  'b', 'scheduled', now() + interval '5 days', 'plan_week', '{x}');
+        insert into loop_briefs (workspace_id, cycle_id, title, body, priority, post_id, stage_outcome)
+          values ('${WS_A}', '${RC}', 'b', 'x', 1, '${RP}', 'awaiting_approval');
+      `)
+
+      await asUser(db, USER_A)
+      const r = await db.query<{ o: Record<string, number> }>(
+        `select public.loop_kill_switch($1, false) as o`, [WS_A])
+      expect(r.rows[0].o.posts_unscheduled).toBe(1)
+
+      const after = await db.query<{ id: string; status: string; scheduled_at: string | null }>(
+        `select id, status, scheduled_at from posts where id in ($1, $2)`, [RP, RHAND])
+      const byId = Object.fromEntries(after.rows.map((x) => [x.id, x]))
+      // The reported cycle's post is off the calendar.
+      expect(byId[RP].status).toBe('draft')
+      expect(byId[RP].scheduled_at).toBeNull()
+      // And the customer's own hand-scheduled post, same origin, is untouched.
+      expect(byId[RHAND].status).toBe('scheduled')
+      expect(byId[RHAND].scheduled_at).not.toBeNull()
+
+      // The reported cycle itself is NOT rewritten — its week happened, and its
+      // brief still records that it was drafted rather than skipped.
+      const c = await db.query<{ status: string }>(
+        `select status from loop_cycles where id = $1`, [RC])
+      expect(c.rows[0].status).toBe('reported')
+      const b = await db.query<{ stage_outcome: string }>(
+        `select stage_outcome from loop_briefs where cycle_id = $1`, [RC])
+      expect(b.rows[0].stage_outcome).toBe('awaiting_approval')
     })
 
     it('lets a new cycle be planned for the same week after a kill', async () => {

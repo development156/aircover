@@ -180,7 +180,21 @@ export async function readObservations(
   return r.rows
 }
 
-/** Write the plan's briefs. One statement, so a half-written plan cannot exist. */
+/**
+ * Write the plan's briefs. ONE statement, so a half-written plan cannot exist.
+ *
+ * ── A PLAIN MULTI-ROW INSERT, AFTER A `VALUES`-DERIVED ONE FAILED LIVE ───────
+ * The first version built a `from (values (...)) as v (workspace_id, ...)`
+ * subquery. It parsed, it typechecked, and it threw against the real database:
+ * columns derived from a bare VALUES list have no declared type, so `v.workspace_id`
+ * arrives as text and the `uuid` column refuses it. A plain
+ * `insert ... values ($1,$2,...), ($9,$10,...)` takes its types from the TARGET
+ * COLUMNS instead, which is both simpler and the reason it works.
+ *
+ * Worth recording because the failure was invisible until a live run: the model
+ * call had already succeeded and been logged `ok`, so the whole thing surfaced
+ * as a PROVIDER_ERROR pointing at the provider, which was blameless.
+ */
 export async function writeBriefs(
   cycleId: string,
   workspaceId: string,
@@ -197,7 +211,7 @@ export async function writeBriefs(
   if (briefs.length === 0) return []
   const values: unknown[] = []
   const tuples = briefs.map((b, i) => {
-    const o = i * 8
+    const o = i * 9
     // `channels` goes in as an array parameter, already a ChannelSet — so the
     // de-duplication happened at the boundary and the database's own
     // loop_briefs_channels_is_set check is the second of two guards, not the only.
@@ -210,17 +224,14 @@ export async function writeBriefs(
       [...b.channels],
       b.suggestedSlot,
       b.rationale,
+      b.estimatedCredits,
     )
-    return `($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4}, $${o + 5}, $${o + 6}::text[], $${o + 7}::timestamptz, $${o + 8})`
+    return `($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4}, $${o + 5}, $${o + 6}, $${o + 7}, $${o + 8}, $${o + 9})`
   })
-  // estimated_credits is appended once, after the tuples, because every brief
-  // costs the same and repeating it per row would invite two prices in one plan.
-  values.push(briefs[0]!.estimatedCredits)
   const r = await getPool().query(
     `insert into loop_briefs
        (workspace_id, cycle_id, priority, title, body, channels, suggested_slot, rationale, estimated_credits)
-     select v.workspace_id, v.cycle_id, v.priority, v.title, v.body, v.channels, v.suggested_slot, v.rationale, $${values.length}
-       from (values ${tuples.join(', ')}) as v (workspace_id, cycle_id, priority, title, body, channels, suggested_slot, rationale)
+     values ${tuples.join(', ')}
      returning *`,
     values,
   )
