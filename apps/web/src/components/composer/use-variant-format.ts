@@ -1,11 +1,11 @@
 'use client'
 
 import { useCallback, useRef, useState } from 'react'
-import type { Channel } from '@sahoda/shared'
+import { CONSTRAINTS, type Channel } from '@sahoda/shared'
 // The LEAF entry point, not the barrel. Anything reachable from a `'use client'`
 // module must not touch `node:crypto`, which the barrel reaches through the X
 // OAuth helper — it fails the production BUILD, not the gate.
-import type { PostFormat } from '@sahoda/publishing/format'
+import { defaultFormatFor, type PostFormat } from '@sahoda/publishing/format'
 
 import { setVariantFormat } from '@/app/actions/posts'
 
@@ -26,6 +26,21 @@ export interface VariantFormatApi {
    * write is exactly the kind of thing that silently does nothing.
    */
   reapply: (channel: Channel) => Promise<void>
+  /**
+   * Open any channel the writer has just ADDED on its most common format.
+   *
+   * ── WHY THIS IS NOT SIMPLY A DEFAULT ────────────────────────────────────────
+   * Because `null` is a real answer and must stay one. Every variant written
+   * before 2026-08-19 has no format, and publishing now holds a version to
+   * whatever it declares — so stamping "One photo" over a stored null would
+   * invent an intent the writer never expressed, on rows that would then start
+   * being refused.
+   *
+   * The distinction is whether a ROW EXISTS. A channel with a variant row was
+   * written at some point and its silence is its own; a channel the writer just
+   * ticked has never been written and has no silence to respect.
+   */
+  seedNew: (channels: readonly Channel[]) => void
 }
 
 /**
@@ -37,7 +52,12 @@ export interface VariantFormatApi {
  * for Instagram forced a carousel on X. The same body/format/limit split that
  * makes this product different applies here.
  */
-export function useVariantFormat(postId: string | null, initial: VariantFormats): VariantFormatApi {
+export function useVariantFormat(
+  postId: string | null,
+  initial: VariantFormats,
+  /** Channels that already have a `post_variants` row. Their silence is theirs. */
+  existing: ReadonlySet<Channel>,
+): VariantFormatApi {
   const [chosen, setChosen] = useState<VariantFormats>(initial)
   const [error, setError] = useState<string | null>(null)
   /** What each row is KNOWN to hold, so a choice is not re-sent per render. */
@@ -82,5 +102,27 @@ export function useVariantFormat(postId: string | null, initial: VariantFormats)
     [chosen, postId, write],
   )
 
-  return { chosen, error, set, reapply }
+  /**
+   * Channels this hook has already answered for, so a re-render or a channel
+   * being toggled off and on again does not overwrite a deliberate "Not stated".
+   * A ref rather than state: seeding must not itself cause a render, and the
+   * decision has to be readable inside the same tick it is made.
+   */
+  const seeded = useRef<Set<Channel>>(new Set(Object.keys(initial) as Channel[]))
+
+  const seedNew = useCallback(
+    (channels: readonly Channel[]) => {
+      for (const channel of channels) {
+        if (seeded.current.has(channel)) continue
+        seeded.current.add(channel)
+        // A row already exists, so this channel has been written before and its
+        // absent format is an answer rather than a gap.
+        if (existing.has(channel)) continue
+        set(channel, defaultFormatFor(CONSTRAINTS[channel]))
+      }
+    },
+    [existing, set],
+  )
+
+  return { chosen, error, set, reapply, seedNew }
 }

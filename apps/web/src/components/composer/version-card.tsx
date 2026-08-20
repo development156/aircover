@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { EyeOff } from 'lucide-react'
 import { CONSTRAINTS, type Channel } from '@sahoda/shared'
-import type { PostFormat } from '@sahoda/publishing/format'
+import { refuseFormat, type PostFormat } from '@sahoda/publishing/format'
 
 import { Button } from '@/components/ui/button'
 import { ChannelMark } from '@/components/posts/channel-mark'
@@ -15,7 +15,7 @@ import { LiveLink } from '@/components/posts/live-link'
 import { Textarea } from '@/components/ui/textarea'
 import { VariantConflictNotice } from '@/components/posts/variant-conflict-notice'
 import { hasLink } from '@/lib/posts/detect-link'
-import { meterFor } from '@/lib/posts/counters'
+import { meterFor, withFormat } from '@/lib/posts/counters'
 import { selectedText, spliceSelection, type SelectionRange } from '@/lib/posts/splice-selection'
 import type { VariantExtras } from '@/lib/posts/variant-extras'
 import type { VariantState } from '@/components/posts/use-variants'
@@ -74,12 +74,20 @@ export function VersionCard({
   const [selection, setSelection] = useState<SelectionRange | null>(null)
 
   const hashtags = state.extras.hashtags
-  const meter = meterFor(channel, {
-    body: state.body,
-    hashtags,
-    hasLink: hasLink(state.body),
-    mediaCount,
-  })
+  // ── TWO VERDICTS, FROM TWO SOURCES, ON ONE CARD ─────────────────────────────
+  // The engine says what this CHANNEL allows; the format says what the WRITER
+  // meant. `runPublishPost` asks them in exactly this order and so does this
+  // card, so what the writer sees here is what the publisher will decide — a
+  // photo post with no photo is red before Publish rather than after.
+  const meter = withFormat(
+    meterFor(channel, {
+      body: state.body,
+      hashtags,
+      hasLink: hasLink(state.body),
+      mediaCount,
+    }),
+    refuseFormat(spec, format, mediaCount),
+  )
 
   // MAX_MEDIA_COUNT deliberately gets no entry. Media lives on the post and this
   // card cannot detach a file, so a "Remove extra media" button would do nothing;
@@ -87,6 +95,12 @@ export function VersionCard({
   // which states the problem without faking an affordance.
   const fixes: Partial<Record<string, () => void>> = {
     MAX_CHARS: () => onBodyChange(trimToFit(channel, state.body, hashtags)),
+    // The one format problem this card can resolve in a click: the kind and the
+    // attachments disagree, and the kind is the half that lives here. Clearing it
+    // back to "Not stated" is honest — the writer said something that was not
+    // true of the post, and none of their words or files are touched.
+    FORMAT_CONTRADICTED: () => onFormatChange(null),
+    FORMAT_UNSUPPORTED: () => onFormatChange(null),
   }
   if (spec.maxHashtags !== undefined && hashtags !== undefined) {
     const limit = spec.maxHashtags

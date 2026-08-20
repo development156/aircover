@@ -1,7 +1,8 @@
 import { CONSTRAINTS, charCountFor, type VariantDraft } from '@sahoda/shared'
 import { describe, expect, test } from 'vitest'
 
-import { blockingChannels, meterFor, metersFor } from './counters'
+import { refuseFormat } from '@sahoda/publishing'
+import { blockingChannels, meterFor, metersFor, withFormat } from './counters'
 
 const draft = (over: Partial<VariantDraft> = {}): VariantDraft => ({ body: '', ...over })
 
@@ -308,5 +309,37 @@ describe('never leaks internals', () => {
     for (const code of codes) {
       expect(['MAX_CHARS', 'MAX_HASHTAGS', 'MAX_MEDIA_COUNT']).toContain(code)
     }
+  })
+})
+
+describe('withFormat — the second verdict, from the second source', () => {
+  test('adds nothing when the version states no intent', () => {
+    const meter = meterFor('x', draft({ body: 'Chai' }))
+    expect(withFormat(meter, null)).toBe(meter)
+  })
+
+  test('appends the refusal AFTER the channel’s own rules', () => {
+    // Both wrong at once: over the character limit AND a text post with photos.
+    // The channel's rule is the more fundamental problem and reads first.
+    const meter = meterFor('x', draft({ body: 'a'.repeat(400), mediaCount: 1 }))
+    const merged = withFormat(meter, refuseFormat(CONSTRAINTS.x, 'text', 1))
+    expect(merged.violations.map((v) => v.code)).toEqual(['MAX_CHARS', 'FORMAT_CONTRADICTED'])
+  })
+
+  test('does not mutate the meter it was given', () => {
+    const meter = meterFor('x', draft({ body: 'Chai' }))
+    const before = meter.violations.length
+    withFormat(meter, refuseFormat(CONSTRAINTS.x, 'image', 0))
+    expect(meter.violations.length).toBe(before)
+  })
+
+  test('makes a photo post with no photo BLOCK, which the engine alone never does', () => {
+    // The engine finds a text-only X post entirely legal — it is. This is the
+    // whole reason the format dimension exists.
+    const engineOnly = meterFor('x', draft({ body: 'Chai', mediaCount: 0 }))
+    expect(blockingChannels([engineOnly])).toEqual([])
+
+    const withIntent = withFormat(engineOnly, refuseFormat(CONSTRAINTS.x, 'image', 0))
+    expect(blockingChannels([withIntent])).toEqual(['x'])
   })
 })

@@ -1,3 +1,4 @@
+import type { FormatRefusal } from '@sahoda/publishing/format'
 import {
   CONSTRAINTS,
   validateVariant,
@@ -42,6 +43,36 @@ export function meterFor(channel: Channel, draft: VariantDraft): ChannelMeter {
     over: charCount > spec.maxChars,
     violations,
     publishable: spec.publishable,
+  }
+}
+
+/**
+ * The same meter, with the format's own verdict folded into its violations.
+ *
+ * ── WHY A SECOND FUNCTION AND NOT A THIRD ARGUMENT TO `meterFor` ────────────
+ * Two reasons, and the second is the important one.
+ *
+ * An optional parameter that silently defaults is the exact shape of two defects
+ * this repo shipped in two days — `lagHours?` and `simulated?` — and a call site
+ * that forgot it would go on rendering a green card for a post publishing will
+ * refuse. A separate, named call cannot be forgotten by omission: it is either
+ * in the file or it is not.
+ *
+ * And it mirrors the publish path exactly. `runPublishPost` runs
+ * `validateVariant` and THEN `refuseFormat`, as two verdicts from two sources —
+ * the Constraint Engine says what the channel allows, the format says what the
+ * writer meant. Composing them in one function here would model them as one
+ * thing, which is the confusion the format dimension exists to end.
+ *
+ * The refusal is appended rather than prepended: the channel's own rules are the
+ * more fundamental problem, and a writer who is over the character limit AND has
+ * the wrong number of photos should read them in that order.
+ */
+export function withFormat(meter: ChannelMeter, refusal: FormatRefusal | null): ChannelMeter {
+  if (refusal === null) return meter
+  return {
+    ...meter,
+    violations: [...meter.violations, { code: refusal.code, message: refusal.message }],
   }
 }
 

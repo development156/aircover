@@ -57,9 +57,15 @@ export function refuseFormat(
     // Derived: no `video/*` in this channel's mediaTypes. Every channel is in
     // that position today, which is why the picker never offers video — but the
     // refusal reads the contract rather than repeating that fact.
+    // ── NO CHANNEL NAME MID-SENTENCE ─────────────────────────────────────────
+    // MEASURED: apps/web's `presentViolation` rewrites the channel key into its
+    // display label ONLY when the key LEADS the message, because anchoring is
+    // what stops a channel word inside prose from being rewritten. So
+    // "…video to gbp yet." rendered the raw enum, in lowercase, to a shop owner.
+    // The message sits on that channel's own card, so naming it adds nothing.
     return {
       code: 'FORMAT_UNSUPPORTED',
-      message: `Sahoda can’t publish video to ${channel} yet.`,
+      message: 'Sahoda can’t publish video yet.',
     }
   }
 
@@ -116,6 +122,10 @@ export function refuseFormat(
         message: `This was written as a single photo but has ${mediaCount} attached — choose a set instead.`,
       }
     }
+    // The engine's own sentence for this code, deliberately word for word, so
+    // apps/web's message allowlist recognises it as the shape it already knows.
+    // Its "allows 1 media items" plural is repaired by `presentViolation` on the
+    // way to the screen; `packages/shared` is frozen and cannot be edited.
     return {
       code: 'MAX_MEDIA_COUNT',
       message: `${channel} allows ${rule.maxItems} media items.`,
@@ -155,8 +165,10 @@ export function refuseFormatMedia(
   const aspect = width / height
   if (aspect <= rule.maxAspect) return null
 
+  // Same rule as above: no channel name mid-sentence. "A instagram story" was
+  // wrong twice over — the article and the case — and it rendered exactly like that.
   return {
     code: 'FORMAT_MEDIA_ASPECT',
-    message: `A ${spec.channel} story is taller than it is wide — this photo is ${aspect.toFixed(2)}:1. Crop it upright, or post it to the feed instead.`,
+    message: `A story is taller than it is wide — this photo is ${aspect.toFixed(2)}:1. Crop it upright, or post it to the feed instead.`,
   }
 }

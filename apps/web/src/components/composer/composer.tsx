@@ -138,7 +138,16 @@ export function Composer({
    */
   const readPostId = useCallback(() => postIdRef.current, [])
   const variantsApi = useVariants(readPostId, variants, versions, post?.body ?? '')
-  const formats = useVariantFormat(postId, initialFormats)
+  /**
+   * Which channels already have a row. Computed from the rows this page loaded,
+   * NOT from `live.variants`: a channel whose row appeared while the writer was
+   * typing is still one they never chose a format for in this session, and
+   * widening this set mid-sentence would silently stop seeding it.
+   */
+  const existingVariantChannels = useRef<ReadonlySet<Channel>>(
+    new Set(variants.map((v) => v.channel)),
+  )
+  const formats = useVariantFormat(postId, initialFormats, existingVariantChannels.current)
 
   const { draft } = autosave
 
@@ -186,7 +195,13 @@ export function Composer({
         title={draft.title}
         onTitleChange={(title) => autosave.update({ title })}
         channels={draft.channels}
-        onChannelsChange={(channels: ChannelSet) => autosave.update({ channels })}
+        onChannelsChange={(channels: ChannelSet) => {
+          autosave.update({ channels })
+          // A channel the writer has just ticked opens on the kind of post that
+          // channel usually carries — words everywhere except Instagram, which
+          // has no text-only post. Derived from `requiresMedia`, never tabulated.
+          formats.seedNew(channels)
+        }}
         connected={connected}
       />
 

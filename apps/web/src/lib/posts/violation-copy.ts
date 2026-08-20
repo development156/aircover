@@ -41,6 +41,25 @@ const KNOWN_CODES = [
   'MEDIA_TYPE',
   'MEDIA_SIZE',
   'MEDIA_DIMS',
+  // ── THESE TWO WERE MISSING, AND THEY ARE THE INSTAGRAM ONES ────────────────
+  // MEASURED 2026-08-20 against real `validateVariant` / `validateMedia` output:
+  //   engine: "instagram needs at least one photo — there is no text-only post."
+  //   screen: "This does not meet the channel rules. Review it before publishing."
+  //   engine: "instagram feed photos must be between 0.8:1 and 1.91:1 — this one is 0.56:1."
+  //   screen: "This does not meet the channel rules. Review it before publishing."
+  // Both are the defects doc 13 section 10 said would go live the moment
+  // Instagram became publishable. The engine was fixed and says exactly the
+  // right thing; this allowlist threw both sentences away because nobody added
+  // the codes.
+  'MEDIA_REQUIRED',
+  'MEDIA_ASPECT',
+  // The format layer (packages/publishing/src/format-refusal.ts). Not the
+  // Constraint Engine's, but they arrive at the same list on the same card and
+  // must pass the same gate — one path to the screen, not two.
+  'FORMAT_UNSUPPORTED',
+  'FORMAT_NEEDS_MEDIA',
+  'FORMAT_CONTRADICTED',
+  'FORMAT_MEDIA_ASPECT',
 ] as const
 
 type KnownCode = (typeof KNOWN_CODES)[number]
@@ -58,6 +77,17 @@ const FIX_LABELS: Readonly<Record<KnownCode, string | undefined>> = {
   MEDIA_TYPE: undefined,
   MEDIA_SIZE: undefined,
   MEDIA_DIMS: undefined,
+  // A missing photo needs a file, which this editor cannot conjure. The media
+  // well is right there on the same screen, so a CTA would only point at it.
+  MEDIA_REQUIRED: undefined,
+  MEDIA_ASPECT: undefined,
+  FORMAT_UNSUPPORTED: 'Pick a different kind of post',
+  FORMAT_NEEDS_MEDIA: undefined,
+  // The one format problem the editor CAN fix in a click: the kind says text and
+  // there are photos attached, so changing the kind resolves it without touching
+  // either the words or the files.
+  FORMAT_CONTRADICTED: 'Change the kind of post',
+  FORMAT_MEDIA_ASPECT: undefined,
 }
 
 /**
@@ -72,6 +102,12 @@ const FALLBACK_MESSAGES: Readonly<Record<KnownCode, string>> = {
   MEDIA_TYPE: 'This channel does not accept this file type.',
   MEDIA_SIZE: 'This file is larger than the channel allows.',
   MEDIA_DIMS: 'This image is smaller than the channel allows.',
+  MEDIA_REQUIRED: 'This channel has no text-only post — attach at least one photo.',
+  MEDIA_ASPECT: 'This image is the wrong shape for this channel.',
+  FORMAT_UNSUPPORTED: 'This channel cannot publish this kind of post.',
+  FORMAT_NEEDS_MEDIA: 'This kind of post needs a photo that is not attached yet.',
+  FORMAT_CONTRADICTED: 'This post is not the kind it says it is.',
+  FORMAT_MEDIA_ASPECT: 'This photo is the wrong shape for this kind of post.',
 }
 
 const GENERIC_MESSAGE = 'This does not meet the channel rules. Review it before publishing.'
@@ -115,6 +151,36 @@ const MESSAGE_SHAPES: Readonly<Record<KnownCode, RegExp>> = {
   MEDIA_TYPE: new RegExp(`^(?:${CHANNEL}) does not accept ${MIME}\\.$`, 'i'),
   MEDIA_SIZE: new RegExp(`^(?:${CHANNEL}) media must be ≤ ${DECIMAL} MB\\.$`),
   MEDIA_DIMS: new RegExp(`^(?:${CHANNEL}) images must be ≥ ${NUM}×${NUM}\\.$`),
+  MEDIA_REQUIRED: new RegExp(
+    `^(?:${CHANNEL}) needs at least one photo — there is no text-only post\\.$`,
+  ),
+  MEDIA_ASPECT: new RegExp(
+    `^(?:${CHANNEL}) feed photos must be between ${DECIMAL}:1 and ${DECIMAL}:1 — this one is ${DECIMAL}:1\\.$`,
+  ),
+  // ── THE FORMAT SENTENCES, AS ALTERNATIONS OF CLOSED LITERALS ───
+  // `refuseFormat` emits a fixed set of sentences with the channel and a count
+  // as the only variable parts, so each shape is that set anchored — the same
+  // discipline the engine codes get, for the same reason: nothing reaches a
+  // screen unless it looks exactly like copy this repo wrote.
+  FORMAT_UNSUPPORTED: new RegExp(
+    `^(?:Sahoda can’t publish video yet\\.` +
+      `|(?:${CHANNEL}) has no stories\\.` +
+      `|(?:${CHANNEL}) posts don’t chain into a thread\\.)$`,
+  ),
+  FORMAT_NEEDS_MEDIA: new RegExp(
+    `^(?:(?:${CHANNEL}) has no text-only post — this one needs at least one photo\\.` +
+      `|A story is a picture — this one has none attached\\.` +
+      `|This was written as a photo post but has no image attached\\.` +
+      `|A set needs at least two images\\.)$`,
+  ),
+  FORMAT_CONTRADICTED: new RegExp(
+    `^(?:This was written as a text-only post but has (?:an image|images) attached\\.` +
+      `|This was written as a single photo but has ${NUM} attached — choose a set instead\\.)$`,
+  ),
+  FORMAT_MEDIA_ASPECT: new RegExp(
+    `^A story is taller than it is wide — this photo is ${DECIMAL}:1\\. ` +
+      `Crop it upright, or post it to the feed instead\\.$`,
+  ),
 }
 
 function safeField(field: string | undefined): string | undefined {
@@ -188,6 +254,17 @@ export function presentViolation(
       break
     }
   }
+  // ── ONE GRAMMAR REPAIR, ON A SENTENCE WE CANNOT EDIT AT SOURCE ────────────
+  // The engine emits "gbp allows 1 media items." — `packages/shared` is a frozen
+  // contract, so the plural cannot be fixed where it is written. MEASURED on the
+  // Google Business card, which is the ONLY place it shows: that channel is the
+  // one with `maxMediaCount: 1`.
+  //
+  // Repairing it here is in this function's remit — it already rewrites the
+  // channel key and regroups digits — and it is safe because the shape gate in
+  // `describeViolation` has already matched the message BEFORE this runs.
+  out = out.replace(/ allows 1 media items\./, ' takes one photo per post.')
+
   // Group only bare 4+ digit integers. Shorter numbers (280, 10) read fine
   // unseparated and match how the counter renders them.
   return out.replace(/\b(\d{4,9})\b/g, (n) => Number(n).toLocaleString('en-IN'))
