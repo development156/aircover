@@ -225,3 +225,80 @@ put on the publish path:
    checked* — never as valid.
 3. A validator pass must **never** suppress a Constraint Engine refusal. It
    checks a strict subset, and §1.2 and §4.3 are the measurement that proves it.
+
+---
+
+## 6. `POST /v1/posts/{id}/edit` · `/unpublish` · `/retry`
+
+MEASURED 2026-08-20 by calling each with an ObjectId that cannot exist,
+`ffffffffffffffffffffffff`, so no real post could be reached and nothing could
+publish.
+
+All three exist, and `DELETE /v1/posts/{id}` does too. What matters is that
+**each speaks a different platform vocabulary, and neither is the publish one.**
+
+| Endpoint | Its own words | Accepts, of our four |
+|---|---|---|
+| `POST /v1/posts` | — | `x`, `google`, `linkedin`, `instagram` `[LIVE]` |
+| `/tools/validate/post` | enum in schema | `twitter`, `googlebusiness` only (§1.1) |
+| `/posts/{id}/edit` | *"expected one of `"twitter"`\|`"discord"`\|`"facebook"`\|`"reddit"`"* | **`twitter` only** |
+| `/posts/{id}/unpublish` | *"Supported platforms: facebook, youtube, linkedin, twitter, threads, pinterest, reddit, bluesky, googlebusiness, telegram, whatsapp, discord, slack"* | `twitter`, `linkedin`, `googlebusiness` |
+
+**So of this product's four channels, exactly ONE can have a live post edited.**
+Instagram is absent from BOTH lists.
+
+`ZERNIO_PLATFORM_NAME` maps `gbp` → `google`, which `/unpublish` refuses by name,
+and `x` → `x`, which `/edit` refuses. **Reusing it for recovery is the obvious
+tidy-up and it silently breaks Google.** `recovery.test.ts` asserts the two maps
+disagree so that refactor goes red.
+
+`/retry` is post-level: no platform, no body. A dead id 404s before any body is
+read.
+
+Also re-confirmed incidentally, and still true: **`POST /v1/posts/{id}/<anything>`
+returns `200` with `text/html`** — a Next.js shell, not the API. The client's
+content-type assertion in `parse()` is the only thing between that and a reported
+success.
+
+---
+
+## 7. The two browsers on this machine, measured rather than assumed
+
+Not Zernio, but it belongs beside §1: both findings are the same shape — a tool
+answering successfully about something it never did.
+
+**Lightpanda `1.0.0-nightly.8745`, over `connectOverCDP`:**
+
+| | |
+|---|---|
+| `browser.contexts()[0]` / `ctx.pages()[0]` | **every operation hangs forever** — `goto`, `about:blank`, `setContent`, `evaluate`, all of them |
+| `await browser.newContext()` then `await ctx.newPage()` | everything below works |
+
+The standard `connectOverCDP` idiom is to reuse the existing context and page.
+On this build that produces a page which never errors and never responds. **Always
+create a fresh context AND a fresh page.**
+
+With a fresh context: `goto`, `title`, `textContent`, `locator.count`,
+`evaluate`, `getByRole` and `setViewportSize` all work. A second page in the same
+context fails with `Target.createTarget: TargetAlreadyExists`.
+
+**And two things do not fail, which is worse than failing:**
+
+- **`page.screenshot()` SUCCEEDS.** It writes a valid 1920×1080 PNG, 10,704
+  bytes. The image is a picture of a panda over the words *"No screenshot
+  available, Lightpanda has no graphical rendering engine."* A gate that checks
+  the file exists and is larger than 3 KB **passes on that image**. Never
+  screenshot through Lightpanda; and a size check was never an identity check.
+- **`getBoundingClientRect()` returns numbers.** It reported an `<h1>` on
+  example.com as **5×5**. There is no layout engine, so the geometry is not
+  missing, it is WRONG — and wrong in a way that would quietly clear a 44px
+  tap-target floor. `getComputedStyle` returns an empty string.
+
+`page.accessibility` is **absent entirely** (`undefined`), so `accessibility
+.snapshot()` throws rather than misleading. Accessible names are still reachable
+through `getByRole` and `evaluate`.
+
+**The split therefore holds, for a sharper reason than "screenshots fail":**
+Lightpanda for what a page SAYS, Chromium for anything about where things are or
+what they look like — because Lightpanda answers those questions confidently and
+incorrectly.
