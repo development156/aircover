@@ -1,0 +1,149 @@
+# The nightly AUDIENCE collection.
+#
+# ── READ THIS BEFORE ASSUMING IT RUNS ────────────────────────────────────────
+# IT IS NOT ARMED, AND A LANE CANNOT ARM IT.
+#
+# GitHub fires `schedule` only from a repository's DEFAULT branch. This file is on
+# `wt-audience`, so the `schedule` block below is inert here — it becomes live only
+# when this file is on the default branch. Pushing it there is an owner decision,
+# not a task, and `main` is what the deployed product is cut from.
+#
+# There are two ways to arm it, and the second is better:
+#
+#   1. Copy this file to the default branch, and point `vars.AUDIENCE_REF` at a
+#      branch that carries `apps/jobs/scripts/audience-capture.ts`.
+#
+#   2. BETTER — add the one step at the bottom of this file to the EXISTING
+#      `metrics-nightly.yml`, which is already on the default branch and already
+#      armed, and repoint `vars.METRICS_REF` at a branch carrying both scripts.
+#      One schedule, one checkout, one install, two passes. The install step there
+#      (`--filter @sahoda/jobs...`) already covers everything this needs, and the
+#      four secrets are already wired.
+#
+# Option 2 is preferred for the reason `metrics-nightly.yml` gives about itself: a
+# stopgap that puts a second thing to remember in a second place is worse than one
+# that puts it in the same place. This file exists so the work is not blocked on
+# that decision, and so the decision is a two-line diff rather than an authoring job.
+#
+# ── WHY NOT JUST FOLD IT INTO runMetricCapture ───────────────────────────────
+# They are siblings, not halves. The metric pass's unit is a published CHANNEL and
+# it asks one endpoint; this one's unit is a connected ACCOUNT and it asks three,
+# into a different table with a different day-key rule. As one function, a Zernio
+# outage on either half would be reported as a failure of both.
+name: audience-nightly
+
+on:
+  schedule:
+    # 20:20 UTC = 01:50 IST, twenty minutes after the metric pass so the two never
+    # contend for the same rate-limit window.
+    #
+    # The hour is chosen against the UTC day because that is what the table is keyed
+    # by: `audience_snapshots.measured_on` is a UTC date. Almost four clear hours
+    # before the rollover leaves room for GitHub's own scheduling delay — a
+    # `schedule` trigger is best-effort and is regularly late by 10-30 minutes under
+    # load — without the run sliding into the next day's key and leaving a gap.
+    #
+    # The DEMOGRAPHIC half is dated by the day we asked, so a slipped run genuinely
+    # loses that day. The FOLLOWER half is dated by Instagram and returns ~30 days
+    # each time, so it back-fills a missed night on its own. Only one of the two is
+    # actually fragile to lateness, and it is worth knowing which.
+    - cron: '20 20 * * *'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch or SHA carrying the collector (blank = the AUDIENCE_REF variable)'
+        required: false
+        type: string
+      batch:
+        description: 'How many connected accounts to ask about'
+        required: false
+        default: '50'
+        type: string
+      dryRun:
+        description: 'Call Zernio but store nothing'
+        required: false
+        default: false
+        type: boolean
+
+# One collector at a time. Two concurrent passes would spend the Zernio rate limit
+# twice to write the same day-key once — the second run's rows all lose the conflict.
+concurrency:
+  group: audience-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    # Three Zernio requests per account. Ten minutes is a wall, not a budget: a hang
+    # must not burn an hour of minutes on a private repository.
+    timeout-minutes: 10
+    steps:
+      - name: Check out the collector
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || vars.AUDIENCE_REF || 'wt-audience' }}
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Activate the pinned pnpm
+        # Corepack ships with Node, so the version comes from the repo's own
+        # `packageManager` field rather than a third-party action. `pnpm --version`
+        # is printed deliberately: corepack is deprecated in Node 24 and a silent
+        # activation failure would surface later as a confusing `pnpm: not found`.
+        run: |
+          corepack enable
+          corepack prepare --activate
+          pnpm --version
+
+      - name: Install (jobs and its workspace dependencies only)
+        # ── THE REF THIS CHECKS OUT MUST CARRY `tsx` ─────────────────────────
+        # `wt-audience` does NOT, and that is a deliberate refusal rather than an
+        # oversight. MEASURED 2026-08-20: `pnpm --filter @sahoda/jobs add -D
+        # tsx@4.23.12` rewrites 309 lines of `pnpm-lock.yaml` — vite gains a
+        # `(tsx@4.23.12)` peer suffix at every mention — and it also wrote a broken
+        # placeholder (`esbuild: set this to true or false`) into
+        # `pnpm-workspace.yaml`. With four lanes running in parallel against one
+        # lockfile, that churn is a merge hazard out of all proportion to arming a
+        # workflow a lane cannot arm anyway.
+        #
+        # `wt-collect` already carries `tsx` — it added it for exactly this script's
+        # sibling. So option 2 at the top of this file needs no dependency work at
+        # all: a branch carrying both collectors is a merge that includes
+        # wt-collect, and the dependency arrives with it. Whoever takes option 1
+        # instead must add `tsx` first, and should expect that lockfile diff.
+        run: pnpm install --frozen-lockfile --filter @sahoda/jobs...
+
+      # ── THE ONE STEP TO COPY INTO metrics-nightly.yml ─────────────────────
+      - name: Capture the audience
+        working-directory: apps/jobs
+        env:
+          # Secrets, never echoed. The runner masks them, and the program is also
+          # written not to print them: it names a missing key and classifies the
+          # database host, and prints nothing else about the environment.
+          #
+          # SUPABASE_DB_URL MUST BE THE REGIONAL POOLER. RE-MEASURED 2026-08-20:
+          # `db.<ref>.supabase.co` carries 0 A records and 1 AAAA record, and a
+          # GitHub-hosted runner has no IPv6 route — the direct host hangs here
+          # exactly as it did on Vercel. `aws-1-ap-south-1.pooler.supabase.com:6543`
+          # is the working host. The program prints which family it got, first line,
+          # so a misconfiguration is a one-line diagnosis rather than a five-minute
+          # timeout.
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
+        # `pnpm exec`, not `pnpm run … -- …`. MEASURED on pnpm 11.3.0: the latter
+        # forwards the `--` separator itself as an argument. The program tolerates
+        # it, but one fewer layer between this line and the program is worth more
+        # than the package script's convenience.
+        run: >-
+          pnpm exec tsx scripts/audience-capture.ts
+          --batch "${{ inputs.batch || '50' }}"
+          ${{ inputs.dryRun && '--dry-run' || '' }}
