@@ -1,12 +1,14 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "stream",
-  "globalDependencies": ["pricing.config.json"],
+  "globalDependencies": ["pricing.config.json", "scripts/lint.mjs", "ops/lint-baselines/*.json"],
   "tasks": {
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
-    "lint": {},
+    "lint": {
+      "inputs": ["$TURBO_DEFAULT$", "../../scripts/lint.mjs", "../../ops/lint-baselines/*.json"]
+    },
     "test": {
       "dependsOn": ["^typecheck"],
       "env": ["SAHODA_ALLOW_LIVE_TESTS"]

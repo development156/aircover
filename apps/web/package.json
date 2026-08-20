@@ -9,7 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "lint": "exit 0",
+    "lint": "node ../../scripts/lint.mjs .",
     "verify:sentry": "node ./scripts/verify-sentry.mjs",
     "test:e2e": "playwright test",
     "test:smoke": "playwright test --grep @smoke"
