@@ -516,8 +516,15 @@ describe.skipIf(!LIVE_DB_URL)('the plan lifecycle against the real ledger', () =
    *
    * The supplier fields below are FIXTURE values for a test, never a default the product
    * could fall back on: `loadGstSupplierConfig` has no defaults precisely because inventing
-   * a GSTIN would fabricate a statutory record. The GSTIN used here is the published
-   * checksum-valid sample that @sahoda/shared is already pinned to.
+   * a GSTIN would fabricate a statutory record. The GSTIN is the checksum-valid published
+   * sample `packages/db/tests/billing_lifecycle.pglite.test.ts` already asserts
+   * `app.gstin_is_valid` against — reused rather than minted, so nothing here invents a tax
+   * number even for a test.
+   *
+   * This means the document these tests produce is a FIXTURE invoice. It proves the
+   * numbering, the constraints and the append-only guarantee; it is NOT a real invoice for
+   * a real supply, and cannot be until the ten SAHODA_GST_* values are configured. See
+   * docs/29_GST_Questions.md.
    *
    * `financialYear` is REQUIRED, with no default. An optional one is what put a test into
    * the live series in the first place, and a default here would let the next caller do it

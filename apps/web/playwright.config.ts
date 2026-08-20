@@ -45,6 +45,25 @@ loadEnvLocal()
  * keeps a local iteration loop fast but is off in CI, where a stale server
  * would silently test the wrong build.
  */
+/**
+ * ── E2E_PORT MUST BE DECLARED IN turbo.json OR IT DOES NOT EXIST HERE ────────
+ * Turborepo 2.x defaults to `envMode: "strict"`, so a variable absent from the task's
+ * `env` list is STRIPPED before the task runs. `E2E_PORT` was not on that list.
+ *
+ * MEASURED 2026-08-20: `E2E_PORT=3213 turbo run test:smoke` logged
+ * `next dev --turbopack --port 3100`. After adding E2E_PORT to `test:smoke.env` the same
+ * command logged `--port 3213`. The override had simply never arrived.
+ *
+ * Why that matters, given several worktrees share this machine: every one of them then
+ * lands on 3100, and `reuseExistingServer: !process.env.CI` is true locally — so the
+ * second suite to start ATTACHES to the first worktree's dev server and tests a different
+ * codebase. Nothing in the output would say "wrong app"; the failures would read as
+ * ordinary assertion failures.
+ *
+ * That collision is a hazard this config could not previously avoid, NOT something
+ * observed here — the runs on 3100 each started their own server. Fixing the allowlist is
+ * what makes `E2E_PORT` a usable defence against it.
+ */
 const PORT = Number(process.env.E2E_PORT ?? 3100)
 const BASE_URL = `http://127.0.0.1:${PORT}`
 
