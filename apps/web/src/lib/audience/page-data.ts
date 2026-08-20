@@ -334,14 +334,10 @@ export async function readAudiencePage(): Promise<AudiencePageData> {
     handleFor(workspaceId),
   ])
 
-  // Only NOW does a missing client mean anything about THIS account: there is one
-  // to read. It is still not `unreadable` — nothing was attempted, so nothing
-  // failed, and "try again" is advice that cannot work when the key is absent from
-  // the deployment rather than late.
   /**
-   * The stored fallback, fetched ONCE and used only by the branches that could not
-   * reach the platform. A live answer always wins: showing a fresh breakdown and a
-   * stored one on the same screen would leave the reader to work out which is which.
+   * The stored fallback, used only by the branches that could not reach the
+   * platform. A live answer always wins: showing a fresh breakdown and a stored one
+   * on the same screen would leave the reader to work out which is which.
    */
   const degraded = async (state: AudienceState): Promise<AudiencePageData> => ({
     state,
@@ -351,6 +347,10 @@ export async function readAudiencePage(): Promise<AudiencePageData> {
     floor,
   })
 
+  // Only NOW does a missing client mean anything about THIS account: there is one
+  // to read. It is still not `unreadable` — nothing was attempted, so nothing
+  // failed, and "try again" is advice that cannot work when the key is absent from
+  // the deployment rather than late.
   const reads = zernioClientReads()
   if (reads === null) return degraded({ kind: 'not-configured' })
 
