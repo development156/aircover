@@ -21,6 +21,7 @@ const state = vi.hoisted(() => ({
   insertError: null as { code: string } | null,
   uploadError: null as { message: string } | null,
   deleted: null as { storage_path: string } | null,
+  formats: {} as Record<string, string | null>,
 }))
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -39,6 +40,10 @@ vi.mock('@/lib/workspaces', () => ({
 vi.mock('@/lib/posts/read', () => ({
   getPost: () => Promise.resolve(state.post),
   listMedia: () => Promise.resolve(state.existingMedia),
+  // What each channel's version says it is. `state.formats` is `{}` in every
+  // test below except the format ones — which is the honest reading of a post
+  // whose versions state no intent, and reproduces the pre-format behaviour.
+  readVariantFormats: () => Promise.resolve(state.formats),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -134,6 +139,7 @@ function formWith(file: File): FormData {
 
 beforeEach(() => {
   state.post = { id: POST_ID, channels: ['x'] }
+  state.formats = {}
   state.existingMedia = []
   state.uploads = []
   state.removed = []

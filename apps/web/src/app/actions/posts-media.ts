@@ -10,7 +10,7 @@ import { decideAttach } from '@/lib/posts/attach-decision'
 import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
 import { mediaObjectPath } from '@/lib/posts/media-path'
 import { mapPostError } from '@/lib/posts/post-error'
-import { getPost, listMedia } from '@/lib/posts/read'
+import { getPost, listMedia, readVariantFormats } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import type { AttachMediaState, DetachMediaState } from '@/lib/posts/media-state'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -80,6 +80,9 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
         height: sniffed.image.height,
       },
       existing.length,
+      // Per-channel, from `post_variants.format`. A story will not take a
+      // landscape photo and a version that says one photo will not take a second.
+      await readVariantFormats(postId),
     )
     if (!decision.ok) {
       return { ok: false, message: decision.message, rejections: decision.rejections }

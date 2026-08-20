@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import type { VariantExtras } from '@/lib/posts/variant-extras'
 
 import { GbpOptions } from './gbp-options'
+import { NotBuiltYet } from './not-built-yet'
 
 /** The word a person uses, per stored value. Never the enum. */
 const FORMAT_LABEL: Readonly<Record<PostFormat, string>> = {
@@ -114,6 +115,24 @@ export function VersionOptions({
 
       {spec.gbp !== undefined ? (
         <GbpOptions extras={extras} onExtrasChange={onExtrasChange} />
+      ) : null}
+
+      {/* ── THE FORMAT THAT IS MISSING FROM THIS CHANNEL, NAMED ────────────────
+          Only on X, and only because a thread is genuinely the thing a writer
+          reaches for when 280 characters is not enough. Saying nothing here
+          would leave the most obvious answer to X's limit looking unconsidered.
+
+          A div, never a disabled option in the picker: an option that saves a
+          choice and publishes a single post is the fake-success state, and a
+          disabled control is still announced as a control. */}
+      {channel === 'x' ? (
+        <div className="narrow:col-span-2">
+          <NotBuiltYet>
+            Threads are not built yet. Sahoda would have to check every step of a thread against
+            your brand rules before publishing, and today it can only check one — so a rule broken
+            in step three would go out unseen.
+          </NotBuiltYet>
+        </div>
       ) : null}
     </div>
   )

@@ -1,5 +1,6 @@
 import { CONSTRAINTS, validateMedia } from '@sahoda/shared'
 import type { Channel, ConstraintViolation, MediaAttachment, PlatformSpec } from '@sahoda/shared'
+import { mediaRuleFor, refuseFormatMedia, type PostFormat } from '@sahoda/publishing/format'
 
 import { describeViolation } from './violation-copy'
 
@@ -19,7 +20,16 @@ import { describeViolation } from './violation-copy'
  *     this module applies itself is the per-channel media COUNT, because
  *     `validateMedia` judges a single attachment and cannot know how many are
  *     already on the post. It is emitted as a `MAX_MEDIA_COUNT` violation quoting
- *     `spec.maxMediaCount`, i.e. the same shape `describeViolation` already renders.
+ *     the resolved limit, i.e. the same shape `describeViolation` already renders.
+ *
+ *  3. THE FORMAT IS PART OF THE RULE, per channel. A version that says "One
+ *     photo" takes one, a set takes two or more, and an Instagram story has to be
+ *     upright — none of which the channel's own spec can express, because they are
+ *     properties of the KIND of post, not of the platform. FSD §3.1 puts media
+ *     validation at attach time and this is the only place the pixel dimensions
+ *     exist: `PublishRequestMedia` carries `storagePath`, `mime` and `bytes` and
+ *     no width, so an aspect rule written into the publish path would silently
+ *     pass forever.
  *
  * Pure module: no I/O, no React, no clock.
  */
@@ -86,11 +96,16 @@ function isCountable(existingCount: number): boolean {
 function countViolation(
   spec: PlatformSpec,
   existingCount: number,
+  format: PostFormat | null,
 ): ConstraintViolation | undefined {
-  if (existingCount + 1 <= spec.maxMediaCount) return undefined
+  // The FORMAT's ceiling when the version declares one, the channel's otherwise.
+  // `mediaRuleFor` folds the channel cap in, so this can never widen a platform
+  // limit — only narrow it to what the writer said they were making.
+  const limit = format === null ? spec.maxMediaCount : mediaRuleFor(spec, format).maxItems
+  if (existingCount + 1 <= limit) return undefined
   return {
     code: 'MAX_MEDIA_COUNT',
-    message: `${spec.channel} allows ${spec.maxMediaCount} media items.`,
+    message: `${spec.channel} allows ${limit} media items.`,
     field: 'media',
   }
 }
@@ -137,6 +152,14 @@ export function decideAttach(
   channels: readonly Channel[],
   candidate: AttachCandidate,
   existingCount: number,
+  /**
+   * What each channel's version says it is. REQUIRED, not optional: a caller that
+   * omitted it would go on accepting a landscape photo onto a story and a second
+   * photo onto a version that says "One photo", and would look exactly like a
+   * caller that had checked. `{}` is the honest way to say "no version states an
+   * intent", and it restores the pre-format behaviour precisely.
+   */
+  formats: Readonly<Partial<Record<Channel, PostFormat | null>>>,
 ): AttachDecision {
   if (!isMeasured(candidate) || !isCountable(existingCount)) {
     return { ok: false, rejections: [], message: UNVERIFIABLE }
@@ -158,8 +181,38 @@ export function decideAttach(
   let acceptedBy = 0
 
   for (const { channel, violations } of validateMedia(specs, media)) {
-    const count = countViolation(CONSTRAINTS[channel], existingCount)
-    const all = count === undefined ? [...violations] : [...violations, count]
+    const spec = CONSTRAINTS[channel]
+    const format = formats[channel] ?? null
+    const count = countViolation(spec, existingCount, format)
+
+    // The shape rule that belongs to the KIND of post rather than the platform.
+    const shape = refuseFormatMedia(spec, format, {
+      width: candidate.width,
+      height: candidate.height,
+    })
+
+    // ── THE FORMAT'S ASPECT RULE REPLACES THE ENGINE'S, IT DOES NOT STACK ─────
+    // MEASURED: `CONSTRAINTS.instagram.imageDims.aspectRange` is [0.8, 1.91],
+    // which is the FEED range — and a story is 9:16, i.e. 0.56. Stacked, the
+    // engine refuses the exact photo a story requires, and the writer is told
+    // their upright picture is the wrong shape for an upright format.
+    //
+    // So the channel's range is not really a channel rule; it is the feed
+    // format's rule, sitting on the channel because the frozen contract has
+    // nowhere else to put it. When a format declares its own, the engine's is
+    // dropped for THIS attachment only — never any of its other verdicts.
+    const overridesAspect = format !== null && mediaRuleFor(spec, format).maxAspect !== undefined
+    const engine = overridesAspect
+      ? violations.filter((v) => v.code !== 'MEDIA_ASPECT')
+      : violations
+
+    const all = [
+      ...engine,
+      ...(count === undefined ? [] : [count]),
+      ...(shape === null
+        ? []
+        : [{ code: shape.code, message: shape.message, field: 'dimensions' }]),
+    ]
     if (all.length === 0) {
       acceptedBy += 1
       continue

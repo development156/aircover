@@ -78,9 +78,13 @@ describe('what the four channels can genuinely publish', () => {
     }
     // And the table says what docs/31 §5 says it says.
     expect(CHANNEL_FORMATS.instagram).toEqual(['story'])
-    expect(CHANNEL_FORMATS.x).toEqual(['thread'])
     expect(CHANNEL_FORMATS.linkedin).toBeUndefined()
     expect(CHANNEL_FORMATS.gbp).toBeUndefined()
+    // `thread` is storable and NOT offered. See the comment on CHANNEL_FORMATS:
+    // the refusal gate cannot see a thread's segments and X's 280 is per segment,
+    // so offering it would save a choice and publish a single post.
+    expect(CHANNEL_FORMATS.x).toBeUndefined()
+    expect(POST_FORMATS).toContain('thread')
   })
 
   it('never offers a format whose minimum exceeds what the channel can carry', () => {
@@ -162,7 +166,15 @@ describe('a version that is not what it says it is', () => {
     expect(refuseFormat(CONSTRAINTS.linkedin, 'story', 1)?.code).toBe('FORMAT_UNSUPPORTED')
     expect(refuseFormat(CONSTRAINTS.gbp, 'thread', 0)?.code).toBe('FORMAT_UNSUPPORTED')
     expect(refuseFormat(CONSTRAINTS.instagram, 'story', 1)).toBeNull()
-    expect(refuseFormat(CONSTRAINTS.x, 'thread', 0)).toBeNull()
+  })
+
+  it('refuses a thread on EVERY channel, including the one that will have it', () => {
+    // A row could already hold `thread` — the column accepts it. Until the picker
+    // offers it and publishing sends `threadItems`, publishing such a row must
+    // refuse rather than quietly send a single post.
+    for (const spec of Object.values(CONSTRAINTS)) {
+      expect(refuseFormat(spec, 'thread', 0)?.code).toBe('FORMAT_UNSUPPORTED')
+    }
   })
 
   it('refuses a story with nothing in it, and a story with two things in it', () => {
@@ -269,10 +281,13 @@ describe('the vocabulary and the database agree', () => {
   it('never offers a format that no channel can publish', () => {
     const offered = new Set<PostFormat>()
     for (const spec of Object.values(CONSTRAINTS)) for (const f of formatsFor(spec)) offered.add(f)
-    // `video` is the deliberate exception: storable, never offered, because the
-    // media pipeline cannot ingest a video (docs/31 §5.1).
+    // Two deliberate exceptions, both storable and neither offered:
+    //   video  — the media pipeline cannot ingest one (docs/31 §5.1)
+    //   thread — the refusal gate cannot see its segments (docs/31 §6.2)
+    // A format in the column that nothing offers is a ready column, not a dead
+    // end. A format OFFERED that nothing can publish is the dead end.
     expect([...offered].sort()).toEqual(
-      POST_FORMATS.filter((f) => f !== 'video')
+      POST_FORMATS.filter((f) => f !== 'video' && f !== 'thread')
         .slice()
         .sort(),
     )

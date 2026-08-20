@@ -41,10 +41,35 @@ import { type PostFormat } from './format-vocabulary'
  * refuses: the writer chooses "Story", it saves, and a feed post goes out.
  */
 export const CHANNEL_FORMATS: Readonly<Partial<Record<Channel, readonly PostFormat[]>>> = {
-  // platformSpecificData.instagram.contentType = 'story'
+  // platformSpecificData.instagram.contentType = 'story' — SENT, see
+  // `zernio/platform-data.ts` and the wire assertion in `adapters/zernio.test.ts`.
   instagram: ['story'],
-  // platformSpecificData.x.threadItems = [{ content, mediaItems }, …]
-  x: ['thread'],
+  //
+  // ── `thread` IS DELIBERATELY ABSENT FROM x, AND THIS IS THE REASON ──────────
+  // It is the highest-value format on a 280-character channel and it is the one
+  // format in this table that could not be made SAFE, so it is not offered.
+  // `POST_FORMATS` and the database CHECK still carry it — the column is ready —
+  // but nothing may select it until all three of these are true:
+  //
+  //  1. THE REFUSAL GATE CAN SEE EVERY SEGMENT. `runPublishPost` gates on
+  //     `publishedTextOf(formatForPlatform(spec, draft))`, which returns the ONE
+  //     body. Zernio's spec is explicit that when `threadItems` is present the
+  //     top-level `content` "is NOT published" — so a red line written into
+  //     segment three would go out having never reached the classifier, while the
+  //     classifier returned a clean pass on a string nobody will read. A guard
+  //     that silently narrows its input is worse than no guard.
+  //
+  //  2. THE CHARACTER LIMIT MEANS SOMETHING. X's 280 applies PER SEGMENT, and
+  //     `validateVariant` measures the whole body — so a perfectly legal
+  //     three-tweet thread is refused with MAX_CHARS before `refuseFormat` is
+  //     even reached. Fixing that means changing how the publish path validates,
+  //     for one format, on the path every publish goes through.
+  //
+  //  3. `threadItems[].mediaItems` IS VERIFIED. It is [SPEC]-only (docs/31 §7
+  //     item 6) and this lane may not publish, so it cannot be confirmed here.
+  //
+  // docs/31 §6.2 carries the same finding. The X card says all of this to the
+  // writer in one sentence, as a div — never a disabled button.
 }
 
 /** How many media items a format needs, and what shape they must be. */
@@ -54,8 +79,22 @@ export interface FormatMediaRule {
   /** Most it can carry. `null` means the channel's own `maxMediaCount` is the cap. */
   maxItems: number | null
   /**
-   * Widest an image may be, as width ÷ height, when this format overrides the
-   * channel's own `aspectRange`. Undefined leaves the engine's rule standing.
+   * Widest an image may be, as width ÷ height.
+   *
+   * ── THIS REPLACES THE CHANNEL'S OWN `aspectRange`, IT DOES NOT ADD TO IT ────
+   * MEASURED, and it is the reason this field exists at all:
+   * `CONSTRAINTS.instagram.imageDims.aspectRange` is `[0.8, 1.91]`, which is the
+   * FEED range — and a story is 9:16, i.e. 0.5625. Stacked, the engine's rule
+   * refuses the exact photo a story requires, so a story would be unattachable
+   * while every message on screen said the picture was the wrong shape.
+   *
+   * The channel's range is therefore not a channel rule at all. It is the feed
+   * FORMAT's rule, living on the channel because the frozen contract has nowhere
+   * else to put it. A format that states its own aspect rule is stating the one
+   * that applies, and `decideAttach` drops the engine's verdict accordingly.
+   *
+   * Undefined leaves the engine's rule standing, which is right for every format
+   * that IS a feed post.
    */
   maxAspect?: number
   /** What the media well asks for, in the writer's words. */
@@ -79,8 +118,10 @@ export interface FormatMediaRule {
  * than it is tall. `maxAspect: 1` catches the actual mistake — a feed photo
  * dropped into a Story — and refuses nothing that works.
  *
- * That band is OURS, not the vendor's, and it is deliberately loose. A detector
- * that refuses correct input is worse than the mistake it prevents.
+ * There is deliberately NO lower bound. A very tall photo is a legal story and
+ * an invented floor would refuse one. That band is OURS, not the vendor's, and
+ * it is loose on purpose: a detector that refuses correct input is worse than
+ * the mistake it prevents.
  */
 export const FORMAT_MEDIA: Readonly<Record<PostFormat, FormatMediaRule>> = {
   text: { minItems: 0, maxItems: 0, need: 'No photo — words only.' },
