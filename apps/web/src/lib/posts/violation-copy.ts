@@ -165,7 +165,8 @@ const MESSAGE_SHAPES: Readonly<Record<KnownCode, RegExp>> = {
   FORMAT_UNSUPPORTED: new RegExp(
     `^(?:Sahoda can’t publish video yet\\.` +
       `|(?:${CHANNEL}) has no stories\\.` +
-      `|(?:${CHANNEL}) posts don’t chain into a thread\\.)$`,
+      `|(?:${CHANNEL}) posts don’t chain into a thread\\.` +
+      `|(?:${CHANNEL}) takes one photo per post, so there is no set to swipe through\\.)$`,
   ),
   FORMAT_NEEDS_MEDIA: new RegExp(
     `^(?:(?:${CHANNEL}) has no text-only post — this one needs at least one photo\\.` +

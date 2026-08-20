@@ -1,7 +1,13 @@
 import type { PlatformSpec } from '@sahoda/shared'
 
 import type { PostFormat } from './format-vocabulary'
-import { CHANNEL_FORMATS, acceptsTextOnly, acceptsVideo, mediaRuleFor } from './format-rules'
+import {
+  CHANNEL_FORMATS,
+  acceptsMultipleMedia,
+  acceptsTextOnly,
+  acceptsVideo,
+  mediaRuleFor,
+} from './format-rules'
 
 /**
  * WHY A CHANNEL CANNOT PUBLISH THIS VERSION AS THE KIND IT SAYS IT IS.
@@ -76,6 +82,18 @@ export function refuseFormat(
         format === 'story'
           ? `${channel} has no stories.`
           : `${channel} posts don’t chain into a thread.`,
+    }
+  }
+
+  if (format === 'carousel' && !acceptsMultipleMedia(spec)) {
+    // Restored: my own rewrite of this file dropped it, and without it a gbp
+    // carousel still refused — but as "gbp allows 1 media items", which is a
+    // sentence about a file count rather than about the kind of post the writer
+    // chose. Derived from `maxMediaCount`, so a channel that one day carries
+    // more than one image stops being refused on its own.
+    return {
+      code: 'FORMAT_UNSUPPORTED',
+      message: `${channel} takes one photo per post, so there is no set to swipe through.`,
     }
   }
 

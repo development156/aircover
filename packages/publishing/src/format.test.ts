@@ -168,6 +168,18 @@ describe('a version that is not what it says it is', () => {
     expect(refuseFormat(CONSTRAINTS.instagram, 'story', 1)).toBeNull()
   })
 
+  it('refuses a set on a channel that takes one photo, in those words', () => {
+    // GBP. Without this the refusal still fires — as "gbp allows 1 media items",
+    // a sentence about a file count rather than about the kind of post chosen.
+    const refusal = refuseFormat(CONSTRAINTS.gbp, 'carousel', 2)
+    expect(refusal?.code).toBe('FORMAT_UNSUPPORTED')
+    expect(refusal?.message).toMatch(/set to swipe/)
+    // Derived, not listed: every channel that CAN carry more than one is fine.
+    for (const spec of Object.values(CONSTRAINTS)) {
+      if (spec.maxMediaCount > 1) expect(refuseFormat(spec, 'carousel', 2)).toBeNull()
+    }
+  })
+
   it('refuses a thread on EVERY channel, including the one that will have it', () => {
     // A row could already hold `thread` — the column accepts it. Until the picker
     // offers it and publishing sends `threadItems`, publishing such a row must
