@@ -2,6 +2,8 @@ import { CONSTRAINTS, validateMedia, validateVariant } from '@sahoda/shared'
 import type { ConstraintViolation } from '@sahoda/shared'
 import { describe, expect, test } from 'vitest'
 
+import { planThread } from '@sahoda/publishing/format'
+
 import { describeViolation, summarizeViolations } from './violation-copy'
 
 /**
@@ -279,5 +281,47 @@ describe('summarizeViolations', () => {
         ]),
       )
     }
+  })
+})
+
+/**
+ * ── THE THREAD REFUSALS, AGAINST `planThread`'S REAL OUTPUT ──────────────────
+ * Not a hand-typed sentence. The message shapes in `violation-copy` are anchored
+ * regexes, so one word out of place in `thread-plan.ts` silently downgrades a
+ * precise refusal to "This does not meet the channel rules. Review it before
+ * publishing." — which is exactly how MEDIA_REQUIRED and MEDIA_ASPECT were lost
+ * for months. So these ASK the publish path for its own words and require them
+ * through unchanged.
+ */
+describe('the thread refusals reach the screen as themselves', () => {
+  const refusalFor = (body: string): { code: string; message: string } => {
+    const result = planThread(CONSTRAINTS.x, body, false)
+    if (result.ok) throw new Error('fixture did not produce a refusal')
+    return result.refusal
+  }
+
+  test('an unbreakable link keeps its own sentence and its numbers', () => {
+    const refusal = refusalFor(`Read this https://example.com/${'a'.repeat(400)}`)
+    expect(refusal.code).toBe('THREAD_UNBREAKABLE')
+
+    const display = describeViolation(refusal)
+    expect(display.code).toBe('THREAD_UNBREAKABLE')
+    expect(display.message).toBe(refusal.message)
+    expect(display.message).toContain('280')
+    // The proof it was not silently downgraded.
+    expect(display.message).not.toContain('does not meet the channel rules')
+  })
+
+  test('an empty thread keeps its own sentence', () => {
+    const refusal = refusalFor('   \n  ')
+    expect(refusal.code).toBe('THREAD_EMPTY')
+    const display = describeViolation(refusal)
+    expect(display.message).toBe(refusal.message)
+    expect(display.message).not.toContain('does not meet the channel rules')
+  })
+
+  test('a thread refusal offers no one-click fix, because there is none', () => {
+    const display = describeViolation(refusalFor(`https://example.com/${'a'.repeat(400)}`))
+    expect(display.fixLabel).toBeUndefined()
   })
 })

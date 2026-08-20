@@ -117,20 +117,21 @@ export function VersionOptions({
         <GbpOptions extras={extras} onExtrasChange={onExtrasChange} />
       ) : null}
 
-      {/* ── THE FORMAT THAT IS MISSING FROM THIS CHANNEL, NAMED ────────────────
-          Only on X, and only because a thread is genuinely the thing a writer
-          reaches for when 280 characters is not enough. Saying nothing here
-          would leave the most obvious answer to X's limit looking unconsidered.
+      {/* ── WHAT A THREAD DOES NOT CARRY, SAID ON THE CARD THAT OFFERS IT ─────
+          Threads publish now. One capability behind them does not, and saying so
+          is the difference between a limit and a surprise: Zernio's
+          `threadItems[].mediaItems` would put a photo on a chosen step, and it is
+          [SPEC]-only — their own validator accepts a dead URL and five images on
+          one segment without complaint (docs/32 §3), so nobody can say X will
+          publish it. Photos ride the post instead, where that path is proven.
 
-          A div, never a disabled option in the picker: an option that saves a
-          choice and publishes a single post is the fake-success state, and a
-          disabled control is still announced as a control. */}
-      {channel === 'x' ? (
+          A div, never a disabled control: a disabled control is still announced
+          as a control, and there is nothing here to operate. */}
+      {channel === 'x' && format === 'thread' ? (
         <div className="narrow:col-span-2">
           <NotBuiltYet>
-            Threads are not built yet. Sahoda would have to check every step of a thread against
-            your brand rules before publishing, and today it can only check one — so a rule broken
-            in step three would go out unseen.
+            Photos on a chosen step of the thread are not built yet. Any photos you attach go on
+            the first post.
           </NotBuiltYet>
         </div>
       ) : null}
