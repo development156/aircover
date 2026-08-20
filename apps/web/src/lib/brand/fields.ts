@@ -48,12 +48,7 @@ export interface BrainField {
 }
 
 export type BrainSectionKey =
-  | 'hook'
-  | 'customer_persona'
-  | 'voice'
-  | 'taboo'
-  | 'brand_persona'
-  | 'alignment'
+  'hook' | 'customer_persona' | 'voice' | 'taboo' | 'brand_persona' | 'alignment'
 
 export interface BrainSection {
   key: BrainSectionKey

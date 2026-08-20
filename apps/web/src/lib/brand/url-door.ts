@@ -147,7 +147,6 @@ export function applyExtractedFields(
   return next
 }
 
-
 // ── the UPLOAD door ───────────────────────────────────────────────────────────
 
 /**
@@ -159,11 +158,7 @@ export function applyExtractedFields(
 
 /** Same shape as the crawl's failure taxonomy, for the same reason: each arm is a different sentence. */
 export type UploadFailureReason =
-  | 'no_file'
-  | 'not_pdf'
-  | 'too_large'
-  | 'unreadable'
-  | 'extract_failed'
+  'no_file' | 'not_pdf' | 'too_large' | 'unreadable' | 'extract_failed'
 
 export type UploadDoorOutcome =
   | {
@@ -215,7 +210,11 @@ export async function openUploadDoor(
   opts: UploadDoorOptions,
 ): Promise<UploadDoorOutcome> {
   if (!file || file.dataUrl.length === 0) {
-    return { ok: false, reason: 'no_file', message: 'No document to read — we will ask you instead.' }
+    return {
+      ok: false,
+      reason: 'no_file',
+      message: 'No document to read — we will ask you instead.',
+    }
   }
   if (!isPdfDataUrl(file.dataUrl)) {
     // A DOCX or a scan-as-JPEG is a different door, and pretending otherwise
@@ -230,7 +229,8 @@ export async function openUploadDoor(
     return {
       ok: false,
       reason: 'too_large',
-      message: 'That document is too large to read — send a shorter one, or tell us in your own words.',
+      message:
+        'That document is too large to read — send a shorter one, or tell us in your own words.',
     }
   }
 
@@ -243,7 +243,8 @@ export async function openUploadDoor(
     return {
       ok: false,
       reason: 'extract_failed',
-      message: 'Read your document, but could not turn it into a brand just now — tell us in your own words instead.',
+      message:
+        'Read your document, but could not turn it into a brand just now — tell us in your own words instead.',
     }
   }
 
