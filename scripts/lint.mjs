@@ -41,6 +41,25 @@ import process from 'node:process'
 const REPO_ROOT = resolve(import.meta.dirname, '..')
 const BASELINE_DIR = join(REPO_ROOT, 'ops', 'lint-baselines')
 
+/**
+ * Files that declare tests and correctly contain no `expect(`.
+ *
+ * A NAMED list with a reason, not a count, and the difference matters. A count
+ * of 2 excuses whichever two files happen to violate the rule today — including
+ * the next one somebody adds by accident, as long as another is fixed the same
+ * week. A name cannot drift, and a reason has to be written down and read.
+ *
+ * `staleExceptions()` below fails when a listed file stops violating the rule,
+ * so this file also cannot rot into blanket permission the way a stale baseline
+ * does.
+ */
+function assertionlessExceptions() {
+  const file = join(BASELINE_DIR, 'assertionless-exceptions.json')
+  if (!existsSync(file)) return {}
+  const raw = JSON.parse(readFileSync(file, 'utf8'))
+  return Object.fromEntries(Object.entries(raw).filter(([k]) => !k.startsWith('_')))
+}
+
 // ── source walking ───────────────────────────────────────────────────────────
 
 const SKIP_DIRS = new Set(['node_modules', '.next', 'dist', '.turbo', 'coverage', '.git'])
@@ -120,6 +139,7 @@ const RULES = [
         const tests = (code.match(/\b(?:it|test)(?:\.\w+(?:\([^)]*\))?)*\s*\(/g) ?? []).length
         const expects = (code.match(/\bexpect(?:\.\w+)?\s*\(/g) ?? []).length
         if (tests > 0 && expects === 0) {
+          if (relative(REPO_ROOT, file) in assertionlessExceptions()) continue
           out.push({ file, line: 1, detail: `${tests} test block(s), 0 expect()` })
         }
       }
@@ -198,6 +218,38 @@ function checkCollection(pkgDir) {
   }))
 }
 
+/**
+ * An exception that no longer excuses anything.
+ *
+ * A named exception is only better than a count while it stays true. The moment
+ * the file is deleted, renamed, or given an assertion, the entry stops
+ * describing reality and starts granting permission to a file nobody has looked
+ * at. Every declared-exception list in this repo that lacks this check has, in
+ * time, become a list of things somebody once meant to fix.
+ */
+function staleExceptions(pkgDir) {
+  const out = []
+  for (const rel of Object.keys(assertionlessExceptions())) {
+    const abs = join(REPO_ROOT, rel)
+    // Only the package that owns the file reports on it, or all nine would.
+    if (!abs.startsWith(pkgDir + '/')) continue
+    if (!existsSync(abs)) {
+      out.push({ file: abs, line: 1, detail: 'declared as an exception but does not exist' })
+      continue
+    }
+    const code = stripComments(readFileSync(abs, 'utf8'))
+    const expects = (code.match(/\bexpect(?:\.\w+)?\s*\(/g) ?? []).length
+    if (expects > 0) {
+      out.push({
+        file: abs,
+        line: 1,
+        detail: `declared assertionless but now has ${expects} expect() — delete its exception`,
+      })
+    }
+  }
+  return out
+}
+
 // ── baseline ─────────────────────────────────────────────────────────────────
 
 function baselinePath(pkgName) {
@@ -228,6 +280,7 @@ function main() {
   const found = {}
   for (const rule of RULES) found[rule.name] = rule.check(files)
   found['uncollected-tests'] = checkCollection(pkgDir)
+  found['stale-exception'] = staleExceptions(pkgDir)
 
   const baseline = readBaseline(pkgName)
 
@@ -267,7 +320,11 @@ function main() {
 
   let failed = false
   const lines = []
-  for (const rule of [...RULES, { name: 'uncollected-tests', why: 'See checkCollection().' }]) {
+  for (const rule of [
+    ...RULES,
+    { name: 'uncollected-tests', why: 'See checkCollection().' },
+    { name: 'stale-exception', why: 'See staleExceptions().' },
+  ]) {
     const hits = found[rule.name] ?? []
     const allowed = baseline[rule.name] ?? 0
     const over = hits.length - allowed

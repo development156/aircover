@@ -1,0 +1,4 @@
+{
+  "_why": "A file listed here declares tests and contains no expect(, and that is CORRECT for it. Each entry must say why. A count-only baseline would excuse the same files silently and would also excuse the next one added by accident; a named list with a reason cannot. The linter fails if a listed file no longer exists, or no longer violates the rule, so this file cannot rot into permission.",
+  "apps/web/e2e/design-audit.spec.ts": "Not a test — a screenshot tool that happens to live in the e2e directory. It shoots every sampled route at two widths in both themes and the PNGs ARE its output; there is nothing for it to assert. It is opt-in behind DESIGN_AUDIT=1, carries no @smoke tag, and its own header tells you to run it with --grep-invert @smoke. Declared rather than assertion-padded, because inventing an assertion for a tool is how a tool becomes a test nobody trusts."
+}

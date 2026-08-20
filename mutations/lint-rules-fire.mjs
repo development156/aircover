@@ -23,16 +23,32 @@ export default {
       command: 'pnpm --filter @sahoda/shared run lint',
     },
     {
-      name: 'assertionless-test: a test file with no expect() at all',
-      file: 'packages/shared/src/db/channel-set.test.ts',
-      // Renaming the assertion is what the rule actually looks for: a file whose
-      // test blocks contain no `expect(`. Deleting the assertions instead would
-      // change what the tests check as well, and the mutant must isolate ONE
-      // thing.
-      find: "import { describe, it, expect } from 'vitest'",
-      replace:
-        "import { describe, it, expect as assertThat } from 'vitest'\nconst expect = assertThat // MUTANT: no literal expect( call sites remain",
-      command: 'pnpm --filter @sahoda/shared run lint',
+      // TWO earlier attempts at this mutant SURVIVED, and both times the mutant
+      // was wrong rather than the rule: aliasing `expect` at the import, and
+      // then shadowing it with a stub, each left every call site reading the
+      // literal `expect(` the rule counts. The rule is textual; a mutant that
+      // keeps the text cannot trip it.
+      //
+      // So the mutation is on the excuse instead. `design-audit.spec.ts` really
+      // does declare four test blocks and contain no assertion — it is a
+      // screenshot tool — and it is green only because it is DECLARED. Withdraw
+      // the declaration and the rule must find it.
+      name: 'assertionless-test: an undeclared file with test blocks and no expect()',
+      file: 'ops/lint-baselines/assertionless-exceptions.json',
+      find: '  "apps/web/e2e/design-audit.spec.ts"',
+      replace: '  "apps/web/e2e/design-audit-MUTANT.spec.ts"',
+      command: 'pnpm --filter @sahoda/web run lint',
+    },
+    {
+      // The exception list is only better than a count while its entries stay
+      // true. Point one at a file full of assertions and the staleness check
+      // must say so — otherwise the list quietly becomes permission for files
+      // nobody has looked at since.
+      name: 'stale-exception: an exception pointing at a file that does assert',
+      file: 'ops/lint-baselines/assertionless-exceptions.json',
+      find: '  "apps/web/e2e/design-audit.spec.ts"',
+      replace: '  "apps/web/e2e/golden-path.spec.ts"',
+      command: 'pnpm --filter @sahoda/web run lint',
     },
     {
       name: 'console-log: debug output in shipped source',
