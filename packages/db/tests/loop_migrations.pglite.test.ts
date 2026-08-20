@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
 
 import { bootSchema, CONTENT_FOUNDATION } from './helpers/pglite-schema'
@@ -474,6 +476,83 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       const msg = await raises(() => db.query(
         `update loop_briefs set channels = '{gbp,gbp}' where cycle_id = $1 and priority = 1`, [C]))
       expect(msg).toMatch(/loop_briefs_channels_is_set/)
+    })
+  })
+
+  // ── THE CREATE-STAGE GATE, WHICH IS A WHERE CLAUSE ───────────────────────
+  describe('the orchestrator\'s own approval gate', () => {
+    // apps/web lib/loop/store.ts readApprovedCycleForCreate, character for
+    // character. The RPC's refusal protects the SCREEN; this protects the
+    // ORCHESTRATOR, which writes over an owner connection and could set
+    // status='creating' itself. Pinned here because it is the statement, and a
+    // TypeScript test would only prove the function called something.
+    const GATE = `select * from loop_cycles
+      where id = $1 and workspace_id = $2
+        and cost_approved_at is not null
+        and approved_credits is not null
+        and status = 'creating'`
+
+    const G = 'cccccccc-0001-4ccc-8ccc-cccccccccccc'
+
+    it('matches the statement the orchestrator actually runs', () => {
+      const src = readFileSync(
+        resolve(import.meta.dirname, '../../../apps/web/src/lib/loop/store.ts'),
+        'utf8',
+      )
+      // Whitespace-normalised so formatting cannot break the link, but every
+      // clause compared. Rename a column on either side and this goes red.
+      const flat = (x: string) => x.replace(/\s+/g, ' ').trim()
+      expect(flat(src)).toContain(flat(GATE))
+    })
+
+    it('REFUSES a cycle parked at the halt — nothing may be spent', async () => {
+      await db.query(
+        `insert into loop_cycles (id, workspace_id, iso_year, iso_week, status, estimated_credits)
+         values ($1, $2, 2026, 41, 'awaiting_cost_approval', 30)`, [G, WS_A])
+      const r = await db.query(GATE, [G, WS_A])
+      expect(r.rows).toHaveLength(0)
+    })
+
+    it('still refuses when the status was forced to creating without an approval', async () => {
+      // THE ACTUAL ATTACK THIS GUARDS: an owner connection bypassing the RPC.
+      await db.query(`update loop_cycles set status = 'creating' where id = $1`, [G])
+      const r = await db.query(GATE, [G, WS_A])
+      // Three conditions, and the status is only one of them.
+      expect(r.rows).toHaveLength(0)
+    })
+
+    it('cannot even STORE a half-written approval', async () => {
+      // Stronger than the gate refusing it: the state is unreachable. A write
+      // that stamps the timestamp without the amount is rejected by the row
+      // check, so the gate never has to consider a cycle that claims approval
+      // and cannot say what was approved. Discovered by writing this test
+      // expecting the gate to do the work and watching the SETUP raise.
+      const msg = await raises(() => db.query(
+        `update loop_cycles set cost_approved_at = now(), cost_approved_by = 'u' where id = $1`,
+        [G]))
+      expect(msg).toMatch(/violates check constraint/i)
+
+      // And the reverse half — an amount with no timestamp — is not approval,
+      // so the gate refuses it on the cost_approved_at clause.
+      await db.query(`update loop_cycles set approved_credits = 30 where id = $1`, [G])
+      const r = await db.query(GATE, [G, WS_A])
+      expect(r.rows).toHaveLength(0)
+    })
+
+    it('ADMITS a properly approved cycle', async () => {
+      await db.query(
+        `update loop_cycles
+            set cost_approved_at = now(), cost_approved_by = 'u',
+                approved_credits = 30, status = 'creating'
+          where id = $1`, [G])
+      const r = await db.query<{ id: string }>(GATE, [G, WS_A])
+      expect(r.rows).toHaveLength(1)
+      expect(r.rows[0].id).toBe(G)
+    })
+
+    it("refuses another tenant's approved cycle", async () => {
+      const r = await db.query(GATE, [G, WS_B])
+      expect(r.rows).toHaveLength(0)
     })
   })
 

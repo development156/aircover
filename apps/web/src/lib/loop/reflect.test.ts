@@ -119,7 +119,7 @@ describe('Reflect', () => {
       ...group('linkedin', 4, 100, '2026-08-19'),
     ])
     expect(r.learnings).toHaveLength(1)
-    const [l] = r.learnings
+    const l = r.learnings[0]!
     expect(l.leader).toBe('instagram')
     expect(l.runnerUp).toBe('linkedin')
     expect(l.leaderMean).toBe(400)
@@ -142,7 +142,7 @@ describe('Reflect', () => {
     ])
     // Four eligible channels, three possible pairings, ONE claim.
     expect(r.learnings).toHaveLength(1)
-    expect(r.learnings[0].runnerUp).toBe('linkedin')
+    expect(r.learnings[0]!.runnerUp).toBe('linkedin')
   })
 
   // ── THE COUNTING RULES ───────────────────────────────────────────────────
@@ -158,7 +158,7 @@ describe('Reflect', () => {
     const r = reflect([...many, ...group('linkedin', 3, 100)])
     // Both arms are exactly at the floor of 3, so this DOES clear — the point is
     // the counts, checked directly.
-    expect(r.learnings[0].sampleSize).toBe(MIN_POSTS_PER_GROUP * 2)
+    expect(r.learnings[0]!.sampleSize).toBe(MIN_POSTS_PER_GROUP * 2)
   })
 
   it('averages a post\'s own daily readings before comparing', () => {
@@ -171,7 +171,7 @@ describe('Reflect', () => {
     const r = reflect(swingy)
     // post a averages 500, matching the other two — the leader mean is 500, not
     // dragged to 625 by counting the 1000 twice.
-    expect(r.learnings[0].leaderMean).toBe(500)
+    expect(r.learnings[0]!.leaderMean).toBe(500)
   })
 
   it('ignores metrics it was not asked about', () => {

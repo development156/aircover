@@ -186,7 +186,14 @@ export function reflect(
     return { learnings: [], reason: 'single_group', skippedNoHistory: false }
   }
 
-  const [leader, runnerUp] = eligible
+  const leader = eligible[0]
+  const runnerUp = eligible[1]
+  // `noUncheckedIndexedAccess` is on, and it is right to insist: the length
+  // check above is a separate statement from these reads, and a future edit that
+  // moved one without the other would index past the end silently.
+  if (!leader || !runnerUp) {
+    return { learnings: [], reason: 'single_group', skippedNoHistory: false }
+  }
 
   // ── GATE 3: the numbers must be big enough for a ratio to mean anything ────
   // Before the lift check, because 3-against-1 clears any lift threshold and is

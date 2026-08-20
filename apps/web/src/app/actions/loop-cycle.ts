@@ -1,0 +1,309 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { auth } from '@clerk/nextjs/server'
+import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
+import { createMesh, planWeekTask, PlanWeekInputSchema, type Mesh } from '@sahoda/mesh'
+import {
+  creditCost,
+  MESH_TASK_ACTION,
+  toChannelSet,
+  type Channel,
+  type WithCreditsFn,
+} from '@sahoda/shared'
+
+import { reportPaidActionFailure } from '@/lib/actions/paid-failure'
+import { revalidateBalance } from '@/lib/actions/revalidate-balance'
+import { BRIEF_BODY_MAX_CHARS, BRIEF_TITLE_MAX_CHARS, clampBriefText } from '@/lib/planner/briefs'
+import { CYCLE_ACTION, priceBrief, previewCost } from '@/lib/loop/cost'
+import { planningWeekFor, reflectionWindow } from '@/lib/loop/iso-week'
+import { newLoopCycleRef, isLoopRef } from '@/lib/loop/object-ref'
+import { reflect } from '@/lib/loop/reflect'
+import * as store from '@/lib/loop/store'
+import { normalizeSlot } from '@/lib/planner/slots'
+import { reportServerError } from '@/lib/observability/report'
+import { createServerSupabase } from '@/lib/supabase/server'
+import { workspaceForWrite } from '@/lib/workspaces'
+
+/**
+ * ONE CYCLE, UP TO THE HALT — collect, reflect, plan, then STOP.
+ *
+ * ── WHY THIS FUNCTION ENDS IN THE MIDDLE OF THE MACHINE ──────────────────────
+ * FSD M2 says every credit the cycle will spend is shown "in the plan's cost
+ * preview BEFORE stage 4 runs". So there is no function in this codebase that
+ * runs a cycle end to end, and there must not be: this one produces briefs and
+ * a total and parks at `awaiting_cost_approval`, and `runCreateStage` below
+ * refuses to move until a person has approved that total.
+ *
+ * A cycle that surprises someone with a bill is the worst failure this feature
+ * can have, and the halt is the mechanism that makes it impossible rather than
+ * unlikely.
+ *
+ * ── WHAT IS CHARGED HERE, AND WHAT IS NOT ────────────────────────────────────
+ * 20 credits, once, for the orchestration — collect, reflect, plan and report.
+ * That is the `loop_cycle` price in pricing.config.json, and the plan stage's
+ * model call is what it pays for. The creations inside stage 4 are NOT charged
+ * here; they are what the preview is previewing.
+ *
+ * A resumed cycle is not charged again. `openCycle` reports whether it created
+ * the row, and only a fresh cycle takes the charge — a second Sunday tick, or
+ * someone pressing the button twice, finds the cycle already open and does no
+ * paid work.
+ */
+
+let meshSingleton: Mesh | undefined
+function getMesh(): Mesh {
+  return (meshSingleton ??= createMesh())
+}
+
+let withCreditsSingleton: WithCreditsFn | undefined
+function getWithCredits(): WithCreditsFn {
+  if (withCreditsSingleton) return withCreditsSingleton
+  const { databaseUrl } = loadBillingEnv()
+  withCreditsSingleton = createWithCredits(createPgLedgerPort({ connectionString: databaseUrl }))
+  return withCreditsSingleton
+}
+
+export interface CycleState {
+  ok: boolean
+  cycleId?: string
+  message?: string
+  /** True when nothing was charged and nothing could be. */
+  insufficient?: boolean
+}
+
+/** Which channels this workspace has connected, as a de-duplicated set. */
+async function connectedChannels(workspaceId: string): Promise<Channel[]> {
+  const supabase = createServerSupabase()
+  const { data } = await supabase
+    .from('connections')
+    .select('platform')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'connected')
+  const platforms = (data ?? [])
+    .map((row) => row.platform as Channel)
+    .filter((p): p is Channel => ['x', 'gbp', 'linkedin', 'instagram'].includes(p))
+  return [...toChannelSet(platforms)]
+}
+
+/**
+ * Run collect → reflect → plan and park at the cost preview.
+ *
+ * `now` is a parameter rather than a clock read inside, so the same instant
+ * always produces the same ISO week and the same reflection window — a stage
+ * that read its own clock would answer differently on a Sunday night than on a
+ * Monday morning for what is meant to be one cycle.
+ */
+export async function runCycleToPreview(
+  triggerSource: 'schedule' | 'manual' = 'manual',
+  nowIso?: string,
+): Promise<CycleState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to plan your week.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, insufficient: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const now = nowIso ? new Date(nowIso) : new Date()
+    if (Number.isNaN(now.getTime())) return { ok: false, message: 'Could not read the time.' }
+
+    // ── PAUSE, checked before anything happens ────────────────────────────
+    // FSD M2: "pause Loop (skips cycles, no charge)". Checked first so a paused
+    // workspace does no work at all, rather than doing it and discarding it.
+    const supabase = createServerSupabase()
+    const { data: settings } = await supabase
+      .from('loop_settings')
+      .select('paused, weekly_budget_credits')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle()
+    if (settings?.paused) {
+      return { ok: false, message: 'The Loop is paused. Turn it back on to plan a week.' }
+    }
+    const budget = (settings?.weekly_budget_credits as number | undefined) ?? null
+
+    const { isoYear, isoWeek } = planningWeekFor(now)
+    const opened = await store.openCycle({
+      workspaceId,
+      isoYear,
+      isoWeek,
+      triggerSource,
+      budgetCredits: budget,
+      userId,
+    })
+    const cycle = opened.cycle
+
+    // A cycle that is already past the halt is not re-run. Pressing the button
+    // twice must not plan the week twice or charge twice.
+    if (!opened.created) {
+      return {
+        ok: true,
+        cycleId: cycle.id,
+        message: 'A cycle for this week is already running.',
+      }
+    }
+
+    // ── STAGE 1-2: COLLECT and REFLECT ────────────────────────────────────
+    // Both before the charge, and both free: reading rows costs nothing and
+    // `reflect` calls no model. So a workspace with nothing to reflect on has
+    // spent nothing at this point.
+    await store.setCycleStatus(cycle.id, workspaceId, 'reflecting')
+    const window = reflectionWindow(now)
+    const observations = await store.readObservations(
+      workspaceId,
+      window.fromIso,
+      window.toIso,
+    )
+    const reflection = reflect(observations)
+
+    // Each learning is PROPOSED, never applied. `proposeLearning` writes a
+    // pending memory_events row and touches brand_memory nowhere; accepting is
+    // `public.resolve_memory_event`, which only a person's click reaches.
+    for (const learning of reflection.learnings) {
+      await store.proposeLearning(
+        workspaceId,
+        {
+          kind: 'brand_memory_patch',
+          summary: `Your ${learning.leader} posts reached ${learning.lift}× what your ${learning.runnerUp} posts reached.`,
+          loop_cycle_id: cycle.id,
+          evidence: {
+            sample_size: learning.sampleSize,
+            window_days: learning.windowDays,
+            post_ids: [...learning.postIds],
+            metric: learning.metric,
+          },
+          patch: { alignment: { note: `${learning.leader} is currently your strongest channel.` } },
+        },
+        { loop_cycle_id: cycle.id, post_ids: [...learning.postIds] },
+      )
+    }
+
+    await store.setCycleStatus(cycle.id, workspaceId, 'planning', {
+      reflectSkipped: reflection.skippedNoHistory,
+    })
+
+    // ── STAGE 3: PLAN — the one paid step before the halt ─────────────────
+    const channels = await connectedChannels(workspaceId)
+    if (channels.length === 0) {
+      // FSD M2 edge case: zero connected channels. The cycle does not charge and
+      // does not pretend — it fails honestly and says what to do.
+      await store.setCycleStatus(cycle.id, workspaceId, 'failed', {
+        failureReason: 'NO_CHANNELS',
+      })
+      return {
+        ok: false,
+        cycleId: cycle.id,
+        insufficient: false,
+        message: 'Connect a channel first — Sahoda has nowhere to plan for.',
+      }
+    }
+
+    const action = MESH_TASK_ACTION['plan_week']
+    const objectRef = newLoopCycleRef(cycle.id)
+    // Asserted rather than assumed: a ref without this prefix is a hold the kill
+    // switch cannot find, which is the exact case it exists for. Checked at the
+    // charge site so the failure is loud rather than invisible.
+    if (!isLoopRef(objectRef)) throw new Error('LOOP_REF_INVARIANT')
+
+    let planned = false
+    const credits = await getWithCredits()(
+      { workspaceId, action, objectRef },
+      async (ctx) => {
+        const parsed = PlanWeekInputSchema.safeParse({
+          goals: '',
+          channels,
+          nowIso: now.toISOString(),
+        })
+        if (!parsed.success) throw new Error('PLAN_INPUT')
+
+        const result = await getMesh().runTask(
+          planWeekTask.def,
+          { goals: parsed.data.goals, channels },
+          {
+            workspaceId: workspaceId as string,
+            traceId: cycle.id,
+            userId,
+            actionType: ctx.actionType,
+            creditsCharged: ctx.creditsCharged,
+          },
+        )
+        if (!result.ok) throw new Error('MESH_ERROR') // → RELEASE, no charge
+        const briefs = result.data.briefs
+        if (briefs.length === 0) throw new Error('MESH_EMPTY') // → RELEASE
+
+        const priced = priceBrief()
+        const rows = briefs.map((brief, index) => {
+          // A ChannelSet at the boundary — the same de-duplication `plan-week.ts`
+          // does, through the same shared helper, and the column's own check
+          // refuses a duplicate behind it.
+          const briefChannels = toChannelSet(
+            (brief.channels as Channel[]).filter((c) => channels.includes(c)),
+          )
+          const slot = normalizeSlot(
+            brief.suggestedSlot,
+            [...briefChannels],
+            now,
+            index,
+          )
+          return {
+            priority: index + 1,
+            title: clampBriefText(brief.title, BRIEF_TITLE_MAX_CHARS),
+            body: clampBriefText(brief.body, BRIEF_BODY_MAX_CHARS),
+            channels: briefChannels.length > 0 ? briefChannels : toChannelSet(channels),
+            suggestedSlot: slot.scheduledAt,
+            rationale: brief.rationale ?? null,
+            estimatedCredits: priced,
+          }
+        })
+
+        const written = await store.writeBriefs(cycle.id, workspaceId as string, rows)
+        if (written.length !== rows.length) throw new Error('BRIEF_WRITE_FAILED')
+        planned = true
+        return { count: written.length }
+      },
+    )
+
+    if (!credits.ok) {
+      reportPaidActionFailure('loop-cycle', credits.error)
+      if (!planned) {
+        await store.setCycleStatus(cycle.id, workspaceId, 'failed', {
+          failureReason: 'PLAN_FAILED',
+        })
+      }
+      revalidateBalance()
+      return {
+        ok: false,
+        cycleId: cycle.id,
+        insufficient: credits.error.code === 'CREDIT_INSUFFICIENT',
+        message:
+          credits.error.code === 'CREDIT_INSUFFICIENT'
+            ? 'Not enough credits to plan this week.'
+            : 'Could not plan this week — you were not charged.',
+      }
+    }
+
+    // ── THE HALT ──────────────────────────────────────────────────────────
+    const briefs = await store.readBriefs(cycle.id, workspaceId)
+    const preview = previewCost(
+      briefs.map((b) => ({
+        id: b.id,
+        priority: b.priority,
+        estimated_credits: b.estimated_credits,
+        included: b.included,
+      })),
+      budget,
+    )
+    await store.haltForCostApproval(cycle.id, workspaceId, preview.creationCredits)
+    await store.addSpend(cycle.id, workspaceId, creditCost(CYCLE_ACTION))
+
+    revalidateBalance()
+    revalidatePath('/loop')
+    revalidatePath('/report')
+    return { ok: true, cycleId: cycle.id }
+  } catch (error) {
+    reportServerError(error, { action: 'runCycleToPreview', workspaceId })
+    return { ok: false, message: 'Could not run the cycle — try again.' }
+  }
+}
