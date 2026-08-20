@@ -43,39 +43,14 @@ const MIGRATIONS = resolve(import.meta.dirname, '../../../db/supabase/migrations
 /**
  * What Supabase creates before the first migration runs.
  *
- * The `storage` half is a stub; two migrations write policies against
- * `storage.objects` and will not apply without it. Nothing here reads a storage
- * row, so it decides nothing.
+ * Read from packages/db's own file rather than restated here: three harnesses
+ * boot this schema, and a prelude copied into each is a schema that drifts one
+ * role at a time while all three go on reporting green.
  */
-const PRELUDE = `
-  create role authenticated;
-  create role anon;
-  create role service_role;
-
-  create schema if not exists auth;
-  create schema if not exists storage;
-  grant usage on schema auth, storage to authenticated, anon, service_role;
-
-  create or replace function auth.jwt() returns jsonb language sql stable as $$
-    select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb
-  $$;
-  create or replace function auth.uid() returns uuid language sql stable as $$
-    select nullif(auth.jwt() ->> 'sub', '')::uuid
-  $$;
-
-  create table storage.buckets (
-    id text primary key, name text, public boolean default false,
-    file_size_limit bigint, allowed_mime_types text[],
-    created_at timestamptz default now());
-  create table storage.objects (
-    id uuid primary key default gen_random_uuid(),
-    bucket_id text references storage.buckets(id),
-    name text, owner uuid, metadata jsonb,
-    created_at timestamptz default now());
-  alter table storage.objects enable row level security;
-  create or replace function storage.foldername(name text) returns text[]
-    language sql immutable as $$ select string_to_array(name, '/') $$;
-`
+const PRELUDE = readFileSync(
+  resolve(MIGRATIONS, '../../tests/helpers/supabase-prelude.sql'),
+  'utf8',
+)
 
 export type PglitePool = Pool & { pglite: PGlite }
 

@@ -168,6 +168,105 @@ describe('the harness is capable of failing', () => {
   })
 })
 
+/**
+ * THE APPEND-ONLY GUARANTEE, OVER EVERY TABLE THAT CLAIMS IT.
+ *
+ * "THE LEDGER NEVER LIES. Append-only, compensating entries" is one of this
+ * product's stated non-negotiables, and `app.block_mutations()` is what enforces
+ * it — a trigger that raises on a direct UPDATE or DELETE even for service_role,
+ * while letting a cascade through so a workspace can still be offboarded.
+ *
+ * MEASURED 2026-08-20: dropping that trigger from `credit_ledger` left every
+ * executing test in apps/jobs and packages/billing green. The only running test
+ * that covered the guard at all was
+ * `post_metric_snapshots.pglite.test.ts` — for `post_metric_snapshots`, one
+ * table of several. `ledger.test.ts` covers `credit_ledger` and is
+ * `describe.skipIf(!hasLedgerEnv)`, so it has never run.
+ *
+ * The trigger list is read from `pg_trigger`, not written here, for the reason
+ * this repo keeps rediscovering: a guard that covers element [0] of a collection
+ * it claims to cover in full is how five of these were found passing.
+ */
+describe('every append-only table refuses a direct mutation', () => {
+  let guarded: string[]
+
+  beforeAll(async () => {
+    guarded = (
+      await db.query<{ tablename: string }>(
+        `select distinct rel.relname as tablename
+         from pg_trigger t
+         join pg_class rel on rel.oid = t.tgrelid
+         join pg_proc p on p.oid = t.tgfoid
+         join pg_namespace n on n.oid = rel.relnamespace
+         where n.nspname = 'public' and p.proname = 'block_mutations'
+         order by 1`,
+      )
+    ).rows.map((r) => r.tablename)
+  })
+
+  it('finds the guarded tables, and credit_ledger is one of them', () => {
+    // Named explicitly: the ledger is the table the guarantee is ABOUT, and a
+    // query that silently stopped returning it would leave this suite green
+    // while covering only the incidental ones.
+    expect(guarded.length).toBeGreaterThan(1)
+    expect(guarded).toContain('credit_ledger')
+  })
+
+  /**
+   * A guarded table with no rows proves nothing, and would report a pass.
+   *
+   * `app.block_mutations()` is a FOR EACH ROW trigger: a DELETE matching zero
+   * rows never fires it and succeeds trivially. MEASURED — `ops_audit_log` came
+   * back as "delete was ALLOWED" purely because it was empty, which reads as a
+   * defect and is not one. It carries no `workspace_id`, so the tenant seeder
+   * never reaches it.
+   *
+   * Declared rather than filtered silently: a table that has rows today and none
+   * tomorrow would otherwise drop out of coverage without a word.
+   */
+  const EXPECTED_UNPOPULATED = ['ops_audit_log']
+
+  it('every guarded table has a row to guard, except the declared ones', async () => {
+    const empty: string[] = []
+    for (const table of guarded) {
+      const n = await db.query<{ n: number }>(`select count(*)::int as n from public."${table}"`)
+      if ((n.rows[0]?.n ?? 0) === 0) empty.push(table)
+    }
+    expect(
+      empty.sort(),
+      'A FOR EACH ROW trigger cannot fire on an empty table, so these are NOT covered ' +
+        'by the refusal test below — whatever it reports about them.',
+    ).toEqual([...EXPECTED_UNPOPULATED].sort())
+  })
+
+  it('refuses UPDATE and DELETE on every one of them', async () => {
+    const permissive: string[] = []
+    for (const table of guarded.filter((t) => !EXPECTED_UNPOPULATED.includes(t))) {
+      for (const statement of [
+        `update public."${table}" set workspace_id = workspace_id`,
+        `delete from public."${table}"`,
+      ]) {
+        await db.exec('begin')
+        try {
+          await db.query(statement)
+          permissive.push(`${table}: ${statement.split(' ')[0]} was ALLOWED`)
+        } catch {
+          // Refused, which is the point.
+        } finally {
+          // Rolled back either way: a permitted mutation must not be left behind
+          // to change what the next assertion sees.
+          await db.exec('rollback')
+        }
+      }
+    }
+    expect(
+      permissive,
+      'These tables carry app.block_mutations() and accepted a direct mutation anyway. ' +
+        'For credit_ledger that is the ledger silently becoming rewritable.',
+    ).toEqual([])
+  })
+})
+
 describe('every tenant table refuses the other workspace', () => {
   /** Tables an ordinary member is NOT meant to read — see the three groups above. */
   const excused = (table: string): boolean =>

@@ -2,8 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import type { Pool } from 'pg'
 import { createPgLedgerPort, type PgLedgerPort } from '@sahoda/billing'
 import { expiredReleaseKey } from '@sahoda/shared'
-import { hasLedgerEnv } from './helpers/env'
-import { pgPool } from './helpers/db'
+import { openDbUnderTest, type DbUnderTest } from './helpers/db-under-test'
 import { createExpiredHoldSource } from '../src/holds/pgHolds'
 import { sweepExpiredHolds } from '../src/holds/sweep'
 
@@ -14,7 +13,17 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 // The reaper writes real money state through the live ledger function. These prove the
 // two things unit tests with a fake port cannot: that the candidate query honours the
 // grace margin, and that a late DEBIT racing the sweep settles exactly once.
-describe.skipIf(!hasLedgerEnv)('expired-hold reaper (live ledger)', () => {
+/**
+ * Ported off `describe.skipIf(!hasLedgerEnv)` on 2026-08-20.
+ *
+ * The skip meant this had NEVER executed — MEASURED: apps/jobs reported 264
+ * passed / 16 SKIPPED, and vitest reports a suite that ran nothing exactly as it
+ * reports one that passed. It now runs against a Postgres built from the REAL
+ * migration files in process, and against the live database when
+ * SAHODA_ALLOW_LIVE_TESTS=1.
+ */
+describe('expired-hold reaper (live ledger)', () => {
+  let db: DbUnderTest
   let pool: Pool
   let ledger: PgLedgerPort
   let ws: string
@@ -25,7 +34,8 @@ describe.skipIf(!hasLedgerEnv)('expired-hold reaper (live ledger)', () => {
   const key = (k: string) => `${k}:${ws}`
 
   beforeAll(async () => {
-    pool = pgPool()
+    db = await openDbUnderTest()
+    pool = db.pool
     ledger = createPgLedgerPort({ connectionString: '', pool })
     // Clear litter from runs killed between beforeEach and afterEach.
     await pool.query(
@@ -38,7 +48,7 @@ describe.skipIf(!hasLedgerEnv)('expired-hold reaper (live ledger)', () => {
     if (created.length > 0) {
       await pool.query('delete from workspaces where id = any($1::uuid[])', [created])
     }
-    await pool.end()
+    await db.close()
   })
 
   beforeEach(async () => {

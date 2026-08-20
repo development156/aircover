@@ -49,42 +49,8 @@ import { resolve } from 'node:path'
 
 const MIGRATIONS = resolve(import.meta.dirname, '../../supabase/migrations')
 
-/**
- * Everything Supabase creates before the first migration runs.
- *
- * The `storage` half is a stub and is only here because two migrations write
- * policies against `storage.objects` and would fail to apply without it. It
- * decides nothing: no test in this file reads a storage row.
- */
-const SUPABASE_PRELUDE = `
-  create role authenticated;
-  create role anon;
-  create role service_role;
-
-  create schema if not exists auth;
-  create schema if not exists storage;
-  grant usage on schema auth, storage to authenticated, anon, service_role;
-
-  create or replace function auth.jwt() returns jsonb language sql stable as $$
-    select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb
-  $$;
-  create or replace function auth.uid() returns uuid language sql stable as $$
-    select nullif(auth.jwt() ->> 'sub', '')::uuid
-  $$;
-
-  create table storage.buckets (
-    id text primary key, name text, public boolean default false,
-    file_size_limit bigint, allowed_mime_types text[],
-    created_at timestamptz default now());
-  create table storage.objects (
-    id uuid primary key default gen_random_uuid(),
-    bucket_id text references storage.buckets(id),
-    name text, owner uuid, metadata jsonb,
-    created_at timestamptz default now());
-  alter table storage.objects enable row level security;
-  create or replace function storage.foldername(name text) returns text[]
-    language sql immutable as $$ select string_to_array(name, '/') $$;
-`
+/** Everything Supabase creates before the first migration runs — ONE copy, on disk. */
+const SUPABASE_PRELUDE = readFileSync(resolve(import.meta.dirname, 'supabase-prelude.sql'), 'utf8')
 
 /** Every migration file, in apply order — the real ones, off disk. */
 export function migrationFiles(): string[] {
@@ -349,6 +315,16 @@ export async function seedTwoWorkspaces(
 
   const report: SeedReport = { seeded: [], unseeded: [] }
 
+  /**
+   * Triggers go back on before this function returns — see the finally below.
+   *
+   * MEASURED: leaving them off silently disarmed `app.block_mutations()` on all
+   * eleven append-only tables, so a suite asserting "the ledger refuses a direct
+   * UPDATE" found that it did not. The seeder had globally weakened the database
+   * every later assertion runs against, which is a harness telling its own tests
+   * what to conclude.
+   */
+
   for (const table of tables) {
     const columns = (
       await db.query<Column>(
@@ -470,6 +446,13 @@ export async function seedTwoWorkspaces(
 
     if (failure === null) report.seeded.push(table)
     else report.unseeded.push({ table, reason: failure })
+  }
+
+  // Re-arm everything the seeding turned off. Not in a `finally` around the loop
+  // but here, after it: a half-seeded database is still one that must not be
+  // handed to an assertion with its guards down.
+  for (const { tablename } of allTables) {
+    await db.exec(`alter table public."${tablename}" enable trigger all`)
   }
 
   return report

@@ -76,5 +76,28 @@ export default {
         '  await db.exec(`create policy anon_read on posts for select to anon using (true)`) // MUTANT\n' +
         '  return db',
     },
+    {
+      // The ledger's append-only guarantee, which no EXECUTING test covered
+      // before this suite: `post_metric_snapshots.pglite.test.ts` checked the
+      // guard for one table, and `ledger.test.ts` — which covers credit_ledger —
+      // is describe.skipIf and has never run. Dropping the trigger left every
+      // test in apps/jobs and packages/billing green.
+      name: 'credit_ledger becomes rewritable — the append-only trigger is dropped',
+      file: 'packages/db/tests/helpers/pglite-tenant.ts',
+      find: '  await db.exec(SUPABASE_GRANTS)\n  return db',
+      replace:
+        '  await db.exec(SUPABASE_GRANTS)\n' +
+        '  await db.exec(`drop trigger block_mutations on credit_ledger`) // MUTANT\n' +
+        '  return db',
+    },
+    {
+      // The seeder disables every trigger to insert its rows. If it stops
+      // putting them back, the whole database is handed to later assertions with
+      // its guards down — a harness telling its own tests what to conclude.
+      name: 'the seeder leaves every trigger disabled',
+      file: 'packages/db/tests/helpers/pglite-tenant.ts',
+      find: '    await db.exec(`alter table public."${tablename}" enable trigger all`)',
+      replace: '    void tablename // MUTANT: never re-armed',
+    },
   ],
 }
