@@ -64,6 +64,21 @@ export interface ZernioAdapterDeps {
    * one this adapter has always sent.
    */
   format?: PostFormat | null
+  /**
+   * The posts an X thread publishes as, when `format` is `'thread'`.
+   *
+   * Planned by `planThread` in `runPublishPost`, for the same reason `format`
+   * arrives on the factory: the split needs a `PlatformSpec` and the variant's
+   * `hasLink`, and neither reaches an adapter through the frozen `PublishRequest`.
+   * The publish path has to plan it anyway in order to refuse an unpublishable
+   * thread before a token is decrypted, so this is the one plan travelling on
+   * rather than a second one computed here that could disagree about it.
+   *
+   * OPTIONAL to the type and MANDATORY to the format: `buildPlatformData` refuses
+   * a `'thread'` that arrives without it rather than quietly publishing the body
+   * as one post.
+   */
+  thread?: { segments: readonly string[] } | null
   /** Injected so a caller can bound total wall-clock; defaults suit a serverless job. */
   poll?: { attempts?: number; intervalMs?: number }
   sleep?: (ms: number) => Promise<void>
@@ -253,6 +268,7 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
         channel,
         format: deps.format ?? null,
         content: req.content,
+        ...(deps.thread ? { thread: deps.thread } : {}),
       })
       if (!platformData.ok) {
         throw fail(platformData.refusal.message, platformData.refusal.code, 'permanent')
@@ -268,11 +284,31 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
       // mint the SAME key. See publishIdempotencyKey.
       const requestId = req.idempotencyKey ?? `sahoda:${req.variantId}:${accountId}`
 
+      // ── THE ROOT OF A THREAD IS ITS FIRST POST, AND MUST STILL FIT ──────────
+      // Zernio's spec says the root `content` "is NOT published" when
+      // `threadItems` is present (docs/31 §2.3) — and their validator STILL
+      // measures it against the channel's 280 and refuses a longer one (MEASURED
+      // 2026-08-20, docs/32 §4.1). Both are true at once, so the long body cannot
+      // be parked at the root and the root cannot be left to chance.
+      //
+      // Sending `threadItems[0]` there satisfies both: it is under the limit by
+      // construction, it is refused by nobody, and it is what a reader of the API
+      // log would expect the thread to start with. Verified accepted by the
+      // validator with root and first segment both at exactly 280.
+      //
+      // Conditioned on the FORMAT, not merely on a plan being present. A plan
+      // handed to a non-thread post would otherwise silently replace the body with
+      // its first segment — a caller's mistake turning into a wrong post rather
+      // than into an error. `runPublishPost` passes null unless the format is a
+      // thread; this makes that belt-and-braces rather than load-bearing.
+      const threadRoot = deps.format === 'thread' ? deps.thread?.segments?.[0] : undefined
+      const rootContent = threadRoot ?? bodyOf(req.content)
+
       let created
       try {
         created = await deps.client.createPost(
           {
-            content: bodyOf(req.content),
+            content: rootContent,
             mediaItems,
             platforms: [entry],
             publishNow: true,

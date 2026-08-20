@@ -45,31 +45,37 @@ export const CHANNEL_FORMATS: Readonly<Partial<Record<Channel, readonly PostForm
   // `zernio/platform-data.ts` and the wire assertion in `adapters/zernio.test.ts`.
   instagram: ['story'],
   //
-  // ── `thread` IS DELIBERATELY ABSENT FROM x, AND THIS IS THE REASON ──────────
-  // It is the highest-value format on a 280-character channel and it is the one
-  // format in this table that could not be made SAFE, so it is not offered.
-  // `POST_FORMATS` and the database CHECK still carry it — the column is ready —
-  // but nothing may select it until all three of these are true:
+  // ── `thread` IS NOW OFFERED, AND HERE IS EACH OF THE THREE REASONS IT WAS NOT ─
+  // It was withheld on 2026-08-20 pending three conditions. All three are now met,
+  // and none was met by relaxing the condition.
   //
-  //  1. THE REFUSAL GATE CAN SEE EVERY SEGMENT. `runPublishPost` gates on
-  //     `publishedTextOf(formatForPlatform(spec, draft))`, which returns the ONE
-  //     body. Zernio's spec is explicit that when `threadItems` is present the
-  //     top-level `content` "is NOT published" — so a red line written into
-  //     segment three would go out having never reached the classifier, while the
-  //     classifier returned a clean pass on a string nobody will read. A guard
-  //     that silently narrows its input is worse than no guard.
+  //  1. THE REFUSAL GATE CAN SEE EVERY SEGMENT — because a thread is no longer
+  //     new text. It is the ONE body, split (`thread-split.ts`). Every segment is
+  //     a slice of `publishedTextOf(formatForPlatform(spec, draft))`, which is
+  //     exactly the string the gate already checks, so a red line in segment three
+  //     was in front of the classifier all along. The covering property is
+  //     asserted in `thread-split.test.ts` and the gate is shown to BLOCK on a
+  //     banned line placed in the last segment in `runPublishPost.test.ts` — a
+  //     guard nobody has watched fail is not a guard.
   //
-  //  2. THE CHARACTER LIMIT MEANS SOMETHING. X's 280 applies PER SEGMENT, and
-  //     `validateVariant` measures the whole body — so a perfectly legal
-  //     three-tweet thread is refused with MAX_CHARS before `refuseFormat` is
-  //     even reached. Fixing that means changing how the publish path validates,
-  //     for one format, on the path every publish goes through.
+  //  2. THE CHARACTER LIMIT MEANS SOMETHING — `planThread` splits at the
+  //     per-segment limit, deriving X's flat link weight from the frozen engine
+  //     rather than restating it. `runPublishPost` swaps the whole-body MAX_CHARS
+  //     for that plan and swaps NOTHING else, so every other engine violation
+  //     still stands. MEASURED: Zernio does not apply 280 per segment — a
+  //     400-character segment passes their dry run (docs/32 §4.1) — so this check
+  //     is the only one there is.
   //
-  //  3. `threadItems[].mediaItems` IS VERIFIED. It is [SPEC]-only (docs/31 §7
-  //     item 6) and this lane may not publish, so it cannot be confirmed here.
+  //  3. `threadItems[].mediaItems` IS NOT USED. It remains [SPEC]-only, and the
+  //     validator accepts it without checking anything inside it (docs/32 §3), so
+  //     "accepted on the wire" is all anyone can honestly claim. A thread's media
+  //     therefore stays on the post, where it is already proven, and the X card
+  //     says so. Shipping the unverified half was never necessary to ship threads.
   //
-  // docs/31 §6.2 carries the same finding. The X card says all of this to the
-  // writer in one sentence, as a div — never a disabled button.
+  // What a thread IS still carries an honest caveat: SENT, NOT YET OBSERVED
+  // (docs/31 §5.4). The payload is built and handed to the client, and no thread
+  // has been watched going out.
+  x: ['thread'],
 }
 
 /** How many media items a format needs, and what shape they must be. */
@@ -83,7 +89,7 @@ export interface FormatMediaRule {
    *
    * ── THIS REPLACES THE CHANNEL'S OWN `aspectRange`, IT DOES NOT ADD TO IT ────
    * MEASURED, and it is the reason this field exists at all:
-   * `CONSTRAINTS.instagram.imageDims.aspectRange` is `[0.8, 1.91]`, which is the
+   * `CONSTRAINTS.instagram.imageDims.aspectRange` is `[0.75, 1.91]`, which is the
    * FEED range — and a story is 9:16, i.e. 0.5625. Stacked, the engine's rule
    * refuses the exact photo a story requires, so a story would be unattachable
    * while every message on screen said the picture was the wrong shape.
@@ -111,12 +117,19 @@ export interface FormatMediaRule {
  * pictures picks the set. Nothing existing breaks: every variant written before
  * 2026-08-19 has `format: null`, and null states no intent.
  *
- * ── `story` REFUSES LANDSCAPE AND NOTHING NARROWER ───────────────────────────
+ * ── `story` REFUSES LANDSCAPE AND NOTHING NARROWER, AND THAT IS OUR RULE ─────
  * Zernio documents the Story aspect as 9:16 (0.5625). Enforcing 0.5625 exactly
  * would refuse the 4:5 and 1:1 photos Instagram accepts and letterboxes, so the
  * rule is the one thing the documentation makes certain: a Story is not wider
  * than it is tall. `maxAspect: 1` catches the actual mistake — a feed photo
  * dropped into a Story — and refuses nothing that works.
+ *
+ * MEASURED 2026-08-20, and it settles the vendor's half: with
+ * `contentType: 'story'` Zernio's validator drops the aspect check ENTIRELY.
+ * 1080×1920 (0.5625) passes, and so does 1910×1000 — landscape. So this bound
+ * refuses something the vendor accepts, and it is kept anyway: a landscape photo
+ * in a Story is a mistake far more often than an intention. Recorded as a PRODUCT
+ * decision rather than a platform limit, because that is what it is.
  *
  * There is deliberately NO lower bound. A very tall photo is a legal story and
  * an invented floor would refuse one. That band is OURS, not the vendor's, and
@@ -133,9 +146,13 @@ export const FORMAT_MEDIA: Readonly<Record<PostFormat, FormatMediaRule>> = {
     maxAspect: 1,
     need: 'One upright photo — 9:16 is the shape Instagram fills.',
   },
-  // A thread's media rides on its segments, so the post-level pool is whatever
-  // the channel allows overall and zero is perfectly normal.
-  thread: { minItems: 0, maxItems: null, need: 'Photos are optional, and attach to a step.' },
+  // ── A THREAD'S PHOTOS STAY ON THE POST ─────────────────────────────────────
+  // `threadItems[].mediaItems` exists and is NOT used. It is [SPEC]-only, and
+  // Zernio's validator accepts it while checking nothing inside it — a dead URL
+  // and five images on one segment both pass (MEASURED, docs/32 §3) — so nobody
+  // can honestly say X will publish it. Photos therefore ride the post-level pool,
+  // which is the path already proven, and land on the first post. Zero is normal.
+  thread: { minItems: 0, maxItems: null, need: 'Photos are optional, and go on the first post.' },
   video: { minItems: 1, maxItems: 1, need: 'One video.' },
 }
 

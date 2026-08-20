@@ -191,6 +191,19 @@ export type {
   FormatRefusal,
   PostFormat,
   ResolvedMediaRule,
+  ThreadPlan,
+  ThreadPlanResult,
+  ThreadSegment,
+} from './format'
+// One body, split into the posts X publishes. See thread-split.ts for why a
+// thread is a DERIVATION of the single body and not a second place to author.
+export {
+  countCodePoints,
+  describeThread,
+  linkWeightOf,
+  planThread,
+  segmentLimitFor,
+  splitIntoThread,
 } from './format'
 export {
   createZernioAdapter,

@@ -80,10 +80,12 @@ describe('what the four channels can genuinely publish', () => {
     expect(CHANNEL_FORMATS.instagram).toEqual(['story'])
     expect(CHANNEL_FORMATS.linkedin).toBeUndefined()
     expect(CHANNEL_FORMATS.gbp).toBeUndefined()
-    // `thread` is storable and NOT offered. See the comment on CHANNEL_FORMATS:
-    // the refusal gate cannot see a thread's segments and X's 280 is per segment,
-    // so offering it would save a choice and publish a single post.
-    expect(CHANNEL_FORMATS.x).toBeUndefined()
+    // `thread` is now OFFERED on x, and only on x. It was withheld while the
+    // refusal gate could not see a thread's segments and while X's per-segment 280
+    // was measured against the whole body; both are now answered by making a
+    // thread a SPLIT of the one body rather than separately-authored text
+    // (`thread-split.ts`, `thread-plan.ts`).
+    expect(CHANNEL_FORMATS.x).toEqual(['thread'])
     expect(POST_FORMATS).toContain('thread')
   })
 
@@ -180,11 +182,15 @@ describe('a version that is not what it says it is', () => {
     }
   })
 
-  it('refuses a thread on EVERY channel, including the one that will have it', () => {
-    // A row could already hold `thread` — the column accepts it. Until the picker
-    // offers it and publishing sends `threadItems`, publishing such a row must
-    // refuse rather than quietly send a single post.
+  it('refuses a thread on every channel EXCEPT x, which now offers it', () => {
+    // The column accepts `thread` for any channel, so a row could hold one for
+    // LinkedIn. Publishing such a row must refuse rather than quietly send a
+    // single post — the format is X's and nobody else's.
     for (const spec of Object.values(CONSTRAINTS)) {
+      if (spec.channel === 'x') {
+        expect(refuseFormat(spec, 'thread', 0)).toBeNull()
+        continue
+      }
       expect(refuseFormat(spec, 'thread', 0)?.code).toBe('FORMAT_UNSUPPORTED')
     }
   })
@@ -293,13 +299,17 @@ describe('the vocabulary and the database agree', () => {
   it('never offers a format that no channel can publish', () => {
     const offered = new Set<PostFormat>()
     for (const spec of Object.values(CONSTRAINTS)) for (const f of formatsFor(spec)) offered.add(f)
-    // Two deliberate exceptions, both storable and neither offered:
-    //   video  — the media pipeline cannot ingest one (docs/31 §5.1)
-    //   thread — the refusal gate cannot see its segments (docs/31 §6.2)
+    // ONE deliberate exception, storable and not offered:
+    //   video — the media pipeline cannot ingest one (docs/31 §5.1). `sniff-image`
+    //           recognises four image containers and refuses everything else, so a
+    //           video cannot be stored, let alone published.
+    // `thread` was the second exception until the split made its segments visible
+    // to the refusal gate; it is now offered on x.
+    //
     // A format in the column that nothing offers is a ready column, not a dead
     // end. A format OFFERED that nothing can publish is the dead end.
     expect([...offered].sort()).toEqual(
-      POST_FORMATS.filter((f) => f !== 'video' && f !== 'thread')
+      POST_FORMATS.filter((f) => f !== 'video')
         .slice()
         .sort(),
     )

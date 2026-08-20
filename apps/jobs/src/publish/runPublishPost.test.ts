@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { AdapterError } from '@sahoda/shared'
-import { createFixtureAdapter } from '@sahoda/publishing'
+import { createFixtureAdapter, splitIntoThread } from '@sahoda/publishing'
 import type {
   GateCheckInput,
   GateVerdict,
@@ -729,5 +729,129 @@ describe('workspace A publishing through workspace B’s connection', () => {
     const out = await runPublishPost(payload, ctx, h.deps)
 
     expect(out).toHaveProperty('code', 'CONNECTION_UNAVAILABLE')
+  })
+})
+
+// ── THREADS ────────────────────────────────────────────────────────────────
+describe('a thread is the one body, split', () => {
+  /**
+   * A body that is far past 280 as one post and perfectly legal as several.
+   * The banned phrase is deliberately in the LAST sentence, so it lands in the
+   * final segment and nowhere else.
+   */
+  const LONG =
+    'We open at nine every morning and the chai is fresh. ' +
+    'Come by for samosas at four, they sell out fast. '.repeat(4) +
+    'Parking is easy on the side street behind the shop. '.repeat(3) +
+    'And finally, this last line is the one that matters.'
+
+  it('publishes a body the whole-body limit would have refused', async () => {
+    const h = harness({ variant: { body: LONG, format: 'thread' } })
+    const res = await runPublishPost(payload, ctx, h.deps)
+    expect(res.status).toBe('succeeded')
+    expect(h.adapterCalls).toBe(1)
+  })
+
+  it('still refuses that body when it is NOT declared a thread', async () => {
+    // The swap is earned by the format, not granted to the channel. Without the
+    // declaration the engine's whole-body MAX_CHARS stands, exactly as before.
+    const h = harness({ variant: { body: LONG } })
+    const res = await runPublishPost(payload, ctx, h.deps)
+    expect(res.status).toBe('failed')
+    if (res.status !== 'failed') return
+    expect(res.code).toBe('MAX_CHARS')
+    expect(h.adapterCalls).toBe(0)
+  })
+
+  /**
+   * ── THE GUARD, SHOWN TO FAIL ──────────────────────────────────────────────
+   * docs/31 §6.2 withheld threads because *"a red line written into segment three
+   * would go out having never been put to the classifier, while the classifier
+   * returned a clean pass on a string nobody will read."*
+   *
+   * This is that exact scenario: the offending line is in the LAST segment of a
+   * multi-post thread. It must reach the gate, and the gate must block.
+   */
+  it('puts the LAST segment in front of the refusal gate', async () => {
+    const h = harness({
+      variant: { body: LONG, format: 'thread' },
+      gate: { check: async () => blockVerdict() },
+    })
+    const res = await runPublishPost(payload, ctx, h.deps)
+
+    expect(res.status).toBe('failed')
+    expect(h.adapterCalls).toBe(0)
+
+    // Not merely "the gate ran" — the words from the final post were IN the text
+    // it was given. A gate handed a truncated string would pass this file's other
+    // assertions and fail this one.
+    expect(h.gateChecks).toHaveLength(1)
+    expect(h.gateChecks[0]!.text).toContain('this last line is the one that matters')
+
+    // And every segment the thread will publish is inside what the gate read.
+    const segments = splitIntoThread(h.gateChecks[0]!.text, 280)
+    expect(segments.length).toBeGreaterThan(1)
+    for (const segment of segments) expect(h.gateChecks[0]!.text).toContain(segment)
+  })
+
+  it('gives the gate the hashtag tail as well, so a tag in the last post is read', async () => {
+    const h = harness({
+      variant: { body: LONG, format: 'thread', hashtags: ['#lastword'] },
+      gate: { check: async () => blockVerdict() },
+    })
+    await runPublishPost(payload, ctx, h.deps)
+    expect(h.gateChecks[0]!.text).toContain('#lastword')
+  })
+
+  it('refuses a thread whose link cannot be broken, before the gate is reached', async () => {
+    const h = harness({
+      variant: { body: `Read this https://example.com/${'a'.repeat(400)}`, format: 'thread' },
+    })
+    const res = await runPublishPost(payload, ctx, h.deps)
+    expect(res.status).toBe('failed')
+    if (res.status !== 'failed') return
+    expect(res.code).toBe('THREAD_UNBREAKABLE')
+    // Before the gate, so an unpublishable thread never costs a model call.
+    expect(h.gateChecks).toHaveLength(0)
+    expect(h.adapterCalls).toBe(0)
+  })
+
+  it('refuses a thread on a channel that does not have one', async () => {
+    const h = harness({ variant: { body: 'hello', format: 'thread' } })
+    const res = await runPublishPost({ ...payload, channel: 'linkedin' }, ctx, h.deps)
+    expect(res.status).toBe('failed')
+    if (res.status !== 'failed') return
+    expect(res.code).toBe('FORMAT_UNSUPPORTED')
+    expect(h.adapterCalls).toBe(0)
+  })
+
+  it('hands the planned segments to the adapter factory', async () => {
+    let seen: readonly string[] | undefined
+    const h = harness({
+      variant: { body: LONG, format: 'thread' },
+      adapterFor: (channel, _viaZernio, _format, thread) => {
+        seen = thread?.segments
+        return createFixtureAdapter(channel)
+      },
+    })
+    await runPublishPost(payload, ctx, h.deps)
+    expect(seen).toBeDefined()
+    expect(seen!.length).toBeGreaterThan(1)
+    for (const s of seen!) expect(Array.from(s).length).toBeLessThanOrEqual(280)
+  })
+
+  it('hands no plan to the adapter for an ordinary post', async () => {
+    let called = false
+    let seen: unknown = 'untouched'
+    const h = harness({
+      adapterFor: (channel, _viaZernio, _format, thread) => {
+        called = true
+        seen = thread
+        return createFixtureAdapter(channel)
+      },
+    })
+    await runPublishPost(payload, ctx, h.deps)
+    expect(called).toBe(true)
+    expect(seen).toBeNull()
   })
 })

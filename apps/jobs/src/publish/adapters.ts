@@ -8,7 +8,7 @@ import {
   type ReadMedia,
   type Transport,
 } from '@sahoda/publishing'
-import type { PostFormat } from '@sahoda/publishing'
+import type { PostFormat, ThreadPlan } from '@sahoda/publishing'
 import type { PublishMode } from './runPublishPost'
 
 export interface AdapterSelectorDeps {
@@ -47,8 +47,18 @@ export interface AdapterSelectorDeps {
  */
 export function createAdapterSelector(
   deps: AdapterSelectorDeps,
-): (c: Channel, viaZernio: boolean, format: PostFormat | null) => PublishAdapter {
-  return (channel: Channel, viaZernio: boolean, format: PostFormat | null): PublishAdapter => {
+): (
+  c: Channel,
+  viaZernio: boolean,
+  format: PostFormat | null,
+  thread?: ThreadPlan | null,
+) => PublishAdapter {
+  return (
+    channel: Channel,
+    viaZernio: boolean,
+    format: PostFormat | null,
+    thread?: ThreadPlan | null,
+  ): PublishAdapter => {
     if (deps.mode === 'fixture') return createFixtureAdapter(channel, { now: deps.now })
 
     // The rail first, when the resolved connection is one of Zernio's. Checked
@@ -63,6 +73,12 @@ export function createAdapterSelector(
         // that contradicts its format before any adapter is reached, so a native
         // publish is never left claiming a format it did not send.
         format,
+        // The posts a thread publishes as, planned once in `runPublishPost` and
+        // carried here. The Zernio rail is the only adapter that can act on it,
+        // for the same reason it is the only one that can act on a format: the
+        // native adapters speak their platforms' own APIs and have no
+        // `platformSpecificData` to put it in.
+        ...(thread ? { thread } : {}),
         now: deps.now,
       })
     }

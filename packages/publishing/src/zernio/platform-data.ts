@@ -41,6 +41,17 @@ export interface PlatformDataInput {
   channel: Channel
   format: PostFormat | null | undefined
   content: FormattedContent
+  /**
+   * The posts an X thread publishes as, planned by `planThread` upstream.
+   *
+   * ── PLANNED THERE AND NOT HERE, DELIBERATELY ────────────────────────────────
+   * The split needs the channel's `maxChars` and whether the variant carries a
+   * link — a `PlatformSpec` and a `VariantDraft`, neither of which reaches an
+   * adapter. `runPublishPost` holds both, and it must plan the thread ANYWAY to
+   * refuse an unpublishable one before a token is decrypted. Planning twice
+   * would be two chances to disagree about how many posts go out.
+   */
+  thread?: { segments: readonly string[] } | undefined
 }
 
 /**
@@ -86,6 +97,34 @@ export function buildPlatformData(input: PlatformDataInput): PlatformDataResult 
       }
     }
     return { ok: true, data: { callToAction: { type, url: url.trim() } } }
+  }
+
+  if (channel === 'x' && format === 'thread') {
+    // ── AN ABSENT PLAN IS A REFUSAL, NEVER A SINGLE POST ──────────────────────
+    // This is the whole reason the branch is written before the happy path. If a
+    // caller declares `format: 'thread'` and hands over no segments, the tempting
+    // behaviour is to fall through and publish `content.text` as one tweet: it
+    // succeeds, it looks fine in the log, and the writer's five-part thread went
+    // out as a truncated single post. That is the exact shape of defect this repo
+    // has shipped twice from an optional parameter quietly taking its default.
+    //
+    // So the optional field is optional to the TYPE and mandatory to the FORMAT.
+    const segments = input.thread?.segments
+    if (segments === undefined || segments.length === 0) {
+      return {
+        ok: false,
+        refusal: {
+          code: 'THREAD_NOT_PLANNED',
+          message: 'This was written as a thread but arrived with no parts to post.',
+        },
+      }
+    }
+    // `threadItems[0]` IS the first tweet — Zernio's spec is explicit that the
+    // root `content` "is NOT published" when this is present (docs/31 §2.3). The
+    // root is filled by the adapter with this same segment, because Zernio still
+    // measures it against 280 even while refusing to publish it (MEASURED,
+    // docs/32 §4.1).
+    return { ok: true, data: { threadItems: segments.map((content) => ({ content })) } }
   }
 
   if (channel === 'instagram' && format === 'story') {
