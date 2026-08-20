@@ -41,6 +41,13 @@ const PUBLIC_PATTERNS = [
   '/api/webhooks/cashfree',
   '/api/cron/sweeps',
   '/api/cron/metrics',
+  // The weekly Loop plan, added 2026-08-20. THREE separate guards refused this
+  // change until it was made in all three places — cron/wiring.test.ts's exact-
+  // path set, this list, and the matcher assertion below — which is the
+  // redundancy working, not duplication: each catches a different half-done
+  // edit, and a half-done edit here is a cron that redirects to /sign-in while
+  // its heartbeat reports green.
+  '/api/cron/loop',
 ]
 
 /**
