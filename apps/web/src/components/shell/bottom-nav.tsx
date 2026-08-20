@@ -4,8 +4,9 @@ import type { Route } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BrainCircuit, CalendarDays, House, MessagesSquare, Plus } from 'lucide-react'
+import { CalendarDays, House, MessagesSquare, Plus } from 'lucide-react'
 
+import { MoreSheet } from '@/components/shell/more-sheet'
 import { cn } from '@/lib/utils'
 
 /**
@@ -16,10 +17,17 @@ import { cn } from '@/lib/utils'
  * viewport on chrome, and gives every destination the same weight, which is
  * exactly wrong on the device where you have room for four things.
  *
- * So: four destinations, chosen because they are what someone opens the app on
- * a phone to do — see today, check the inbox, look at the plan, read the brain.
- * Everything else stays one tap away through the header, and nothing is
- * removed from the product, only from this bar.
+ * So: four slots, three of them the destinations someone opens the app on a
+ * phone to reach — see today, check the inbox, look at the plan — and the fourth
+ * a door to everything else.
+ *
+ * THE FOURTH USED TO BE BRAND BRAIN, AND THE BAR WAS THE ONLY WAY TO MOVE.
+ * The rail is `max-narrow:hidden` and the header carries the workspace switcher
+ * and search, not the menu, so those four tabs were the complete map on a phone.
+ * That was survivable at nine sections. At twenty-one it left seventeen
+ * unreachable, including three that are built and working. `MoreSheet` is the
+ * fix and Brand Brain is the tab that gave way: editing your brand is desk work,
+ * and it is now the first row of the sheet — one tap rather than zero.
  *
  * The `+` is dominant on purpose. Creating a post is the one job that starts
  * here rather than continues here, so it gets a 50px orange circle and the
@@ -36,7 +44,6 @@ const LEFT: ReadonlyArray<{ href: Route; label: string; icon: typeof House }> = 
 
 const RIGHT: ReadonlyArray<{ href: Route; label: string; icon: typeof House }> = [
   { href: '/planner', label: 'Planner', icon: CalendarDays },
-  { href: '/brain', label: 'Brain', icon: BrainCircuit },
 ]
 
 function Tab({ href, label, icon: Icon }: { href: Route; label: string; icon: typeof House }) {
@@ -88,6 +95,12 @@ export function BottomNav() {
       {RIGHT.map((item) => (
         <Tab key={item.href} {...item} />
       ))}
+
+      {/* The door to the other seventeen. A button rather than a Tab, because it
+          opens a surface instead of navigating — and it is the only control in
+          this bar that is not a link, which is why it does not pretend to be
+          one with an `aria-current`. */}
+      <MoreSheet />
     </nav>
   )
 }

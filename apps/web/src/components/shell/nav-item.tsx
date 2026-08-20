@@ -4,19 +4,29 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+  BookOpen,
   BrainCircuit,
   CalendarDays,
   ChartColumn,
+  CheckCheck,
+  FileText,
   House,
-  Link2,
-  SlidersHorizontal,
-  Globe,
   Images,
-  Shield,
-  SquarePen,
-  Wallet,
-  type LucideIcon,
+  Link2,
+  Megaphone,
   MessagesSquare,
+  Palette,
+  Radar,
+  RefreshCw,
+  Shield,
+  Shuffle,
+  SlidersHorizontal,
+  SquarePen,
+  Target,
+  UserRoundPlus,
+  Wallet,
+  Globe,
+  type LucideIcon,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -27,13 +37,23 @@ const ICONS = {
   house: House,
   'brain-circuit': BrainCircuit,
   'square-pen': SquarePen,
-  'calendar-days': CalendarDays,
-  'chart-column': ChartColumn,
-  'link-2': Link2,
+  megaphone: Megaphone,
   images: Images,
+  palette: Palette,
+  shuffle: Shuffle,
+  'calendar-days': CalendarDays,
+  'check-check': CheckCheck,
   globe: Globe,
-  wallet: Wallet,
+  target: Target,
   'messages-square': MessagesSquare,
+  'user-round-plus': UserRoundPlus,
+  'chart-column': ChartColumn,
+  'file-text': FileText,
+  radar: Radar,
+  'refresh-cw': RefreshCw,
+  'book-open': BookOpen,
+  'link-2': Link2,
+  wallet: Wallet,
   'sliders-horizontal': SlidersHorizontal,
   shield: Shield,
 } satisfies Record<string, LucideIcon>
@@ -46,6 +66,7 @@ export function NavItem({
   icon,
   guide,
   count,
+  soon = false,
 }: {
   // typedRoutes' Route union — no hand-maintained href list to drift
   href: Route
@@ -58,15 +79,31 @@ export function NavItem({
    * SPECIFICATION.md §7 is explicit that this is DERIVED and never sent — the
    * sidebar badge, the Home count and the page's own header must read one
    * collection, because "a separate pendingCount field will eventually disagree
-   * with it". Nothing passes it yet; the slot exists so that whoever wires the
-   * first one wires it from the collection rather than inventing a field.
-   *
-   * Zero renders nothing. That is the same rule SurfaceList already states — a
-   * "0" badge is noise, not information — and it also means an unwired nav item
-   * is indistinguishable from a genuinely empty one, which is correct: both have
-   * nothing to report.
+   * with it". Zero renders nothing, which is the same rule SurfaceList states: a
+   * "0" badge is noise, not information.
    */
   count?: number
+  /**
+   * The section is designed but not built.
+   *
+   * ── THIS IS STILL A REAL LINK, AND THAT IS THE DESIGN ────────────────────────
+   * It is not disabled, not `aria-disabled` and not a `<span>`. The screen at the
+   * other end EXISTS, loads, and says plainly that the feature does not run yet —
+   * so the link keeps every promise it makes. The `<div>`-not-`<button>` rule
+   * governs CONTROLS that would do nothing; a nav item that navigates somewhere
+   * useful is not one of those, and greying it out would make the roadmap
+   * unreachable rather than legible.
+   *
+   * ── HOW IT READS AS NOT-YET, THREE WAYS, NONE OF THEM A COLOUR ──────────────
+   * · the word "Soon" beside the label, which is the whole claim in one word;
+   * · a HOLLOW ring at the collapsed width, where the label goes `sr-only` and
+   *   the word has nowhere to sit. Hollow against the count badge's FILLED dot:
+   *   filled means something is waiting for you, hollow means nothing is there
+   *   yet. Fill versus no-fill survives greyscale, which hue would not;
+   * · the accessible name, which carries "not built yet" at every width, so a
+   *   screen reader user learns it before following the link rather than after.
+   */
+  soon?: boolean
 }) {
   const pathname = usePathname()
   const active = pathname === href || pathname.startsWith(`${href}/`)
@@ -76,6 +113,7 @@ export function NavItem({
     <Link
       href={href}
       data-guide={guide}
+      data-soon={soon ? '' : undefined}
       aria-current={active ? 'page' : undefined}
       className={cn(
         // 34px tall, 9px inset, 13px/500 — the kit's control height. The density
@@ -105,6 +143,24 @@ export function NavItem({
           the reference's design; losing the name was not. sr-only is absolutely
           positioned, so it leaves the flex row and the centred icon is unmoved. */}
       <span className="max-wide:sr-only">{label}</span>
+
+      {soon ? (
+        <>
+          {/* Expanded: the word, in the trailing slot. Muted, not accented — a
+              roadmap item must not compete with the active one. */}
+          <span aria-hidden className="type-eyebrow ml-auto flex-none text-muted max-wide:hidden">
+            Soon
+          </span>
+          {/* Collapsed: a HOLLOW ring where the count badge puts a filled dot. */}
+          <span
+            aria-hidden
+            className="absolute top-[7px] right-[13px] hidden size-[7px] rounded-full bg-surface ring-[1.5px] ring-line-firm max-wide:block"
+          />
+          {/* The claim, at every width, before the link is followed. */}
+          <span className="sr-only">, not built yet</span>
+        </>
+      ) : null}
+
       {count !== undefined && count > 0 ? (
         <>
           {/* Expanded: the number, pushed to the trailing edge. */}

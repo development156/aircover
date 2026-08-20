@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 
+import { ALL_SECTIONS } from '@/lib/nav/sections'
 import { cn } from '@/lib/utils'
 
 /**
@@ -20,29 +21,39 @@ import { cn } from '@/lib/utils'
  * render twelve links would be the larger change, not the smaller one.
  */
 
-type Destination = { href: Route; label: string; hint: string }
+type Destination = { href: Route; label: string; hint: string; soon?: boolean }
 
 /**
- * Mirrors the rail's NAV. Kept flat and literal so it stays greppable.
+ * PROJECTED FROM `lib/nav/sections.ts`, not hand-written.
  *
- * `/sites` is deliberately absent, for the same reason it is absent from the
- * rail — it is out of BETA scope. A palette that surfaces what the menu hides
- * is not a shortcut, it is a leak. The route stays reachable by URL, as before.
+ * ── WHY IT USED TO BE A SECOND LIST, AND WHY THAT WAS THE BUG ────────────────
+ * This array was maintained by hand beside the rail's, and it carried a comment
+ * explaining that `/sites` was "deliberately absent, for the same reason it is
+ * absent from the rail". That comment is the tell: it existed only because two
+ * lists could disagree, and keeping them in step was a rule somebody had to
+ * remember. Twenty-one sections is more than anybody remembers.
+ *
+ * Now there is one map and this reads it. A section cannot be in the menu and
+ * missing from search, or the reverse.
+ *
+ * ── UNBUILT SECTIONS ARE SEARCHABLE, AND MARKED ─────────────────────────────
+ * Someone typing "playbooks" has a question, and "no results" answers it with
+ * silence — they conclude the app cannot do it, when the truth is that it will.
+ * The row appears, carries the same "Soon" word the rail uses, and lands on a
+ * screen that says the same thing at length.
  */
 const DESTINATIONS: readonly Destination[] = [
   // Creation is the reference's first-class command: the + button, C and ⌘K
-  // all open it, so it leads the list rather than sitting under Posts.
+  // all open it, so it leads the list rather than sitting under Posts. It is not
+  // a nav SECTION — it has no rail item — so it is written here rather than
+  // added to the map for the sake of this one list.
   { href: '/create', label: 'Create', hint: 'Start something new' },
-  { href: '/home', label: 'Home', hint: 'Today, and what needs you' },
-  { href: '/brain', label: 'Brand Brain', hint: 'What Sahoda knows about you' },
-  { href: '/posts', label: 'Posts', hint: 'Draft, approve, publish' },
-  { href: '/assets', label: 'Assets', hint: 'Photos you can reuse on any post' },
-  { href: '/planner', label: 'Planner', hint: 'The schedule' },
-  { href: '/inbox', label: 'Inbox', hint: 'Comments, messages, reviews' },
-  { href: '/analytics', label: 'Analytics', hint: 'How it performed' },
-  { href: '/connections', label: 'Connections', hint: 'Channels and accounts' },
-  { href: '/wallet', label: 'Wallet', hint: 'Credits and spend' },
-  { href: '/settings', label: 'Settings', hint: 'Workspace preferences' },
+  ...ALL_SECTIONS.map((section) => ({
+    href: section.href,
+    label: section.label,
+    hint: section.hint,
+    soon: section.state === 'soon',
+  })),
 ]
 
 function matches(d: Destination, q: string): boolean {
@@ -205,7 +216,20 @@ export function CommandPalette() {
                       )}
                     >
                       <span className="font-medium">{destination.label}</span>
-                      <span className="truncate text-[12px] text-muted">{destination.hint}</span>
+                      <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
+                        {destination.hint}
+                      </span>
+                      {/* The same word the rail and the phone sheet use. A
+                          searchable roadmap section must say so in the result,
+                          or the reader follows it expecting a working feature. */}
+                      {destination.soon ? (
+                        <>
+                          <span aria-hidden className="type-eyebrow flex-none text-muted">
+                            Soon
+                          </span>
+                          <span className="sr-only">, not built yet</span>
+                        </>
+                      ) : null}
                     </Link>
                   </li>
                 ))}
