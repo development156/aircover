@@ -49,6 +49,11 @@
   /* Not token-backed — layout constants the kit does not name. */
   --spacing-page-mobile: 14px;
   --spacing-grid: 18px;
+  /* The gap between adjacent nav rows. --space-1 (4px) is the smallest step the
+     scale has and it is visibly too loose for a 21-item rail, so this is named
+     here rather than written as `gap-[2px]` at each of the two <section>s that
+     need it — one value, one place, and design-lint's spacing rule stays real. */
+  --spacing-nav: 2px;
 }
 
 /* MUST be `inline`: every value below references a :root var from tokens.css;

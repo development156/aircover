@@ -135,7 +135,7 @@ export async function Rail() {
             key={group.title ?? 'top'}
             aria-labelledby={group.title ? `nav-group-${index}` : undefined}
             aria-label={group.title ? undefined : 'Main sections'}
-            className="flex flex-col gap-[2px]"
+            className="flex flex-col gap-nav"
           >
             {group.title ? (
               // A group label, so it must not compete with the active item —
@@ -174,7 +174,7 @@ export async function Rail() {
             different KIND of destination, not a sixth job. */}
         <section
           aria-label="Account and setup"
-          className="mt-3 flex flex-col gap-[2px] border-t border-line-soft pt-3"
+          className="mt-3 flex flex-col gap-nav border-t border-line-soft pt-3"
         >
           {NAV_FOOT.map((item) => (
             <NavItem

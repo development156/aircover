@@ -135,7 +135,15 @@ for (const file of files) {
   const hexExempt = HEX_EXEMPT_FILES.includes(rel) || BRAND_MARK_PATHS.some((re) => re.test(rel))
 
   lines.forEach((line, i) => {
-    if (!hexExempt) {
+    // A hex inside a MASK is not a colour. `mask-image` and its -webkit- alias
+    // read the ALPHA channel and discard the colour channel entirely, so
+    // `#000` there means "opaque", not "black" — no token could express it
+    // better and no colour defect can hide behind this, because a colour
+    // written here has no colour effect at all. Narrower than a file
+    // exemption on purpose: globals.css is exactly where a real raw hex would
+    // do the most damage, so the rest of the file stays enforced.
+    const isMaskStop = /(?:^|[;{\s])-?(?:webkit-)?mask(?:-image)?\s*:/.test(line)
+    if (!hexExempt && !isMaskStop) {
       for (const m of line.matchAll(HEX)) violations.hex.push({ rel, line: i + 1, text: m[0] })
     }
     for (const m of line.matchAll(SPACING)) {
@@ -237,6 +245,47 @@ const RATCHETED = [
 ]
 
 if (process.argv.includes('--update-baseline')) {
+  /* ── THE REFUSAL THIS BLOCK CLAIMED TO HAVE AND DID NOT ─────────────────────
+     The comment above BASELINE_PATH has always said "It refuses to loosen: a
+     file that gained violations is reported, never absorbed." It did not. The
+     old body rewrote the register from the CURRENT counts unconditionally, so
+     `--update-baseline` silently absorbed every regression it was documented to
+     block — a guard that could never fire, in the one command whose whole job
+     is to not be used that way. Found while integrating eleven lanes, where
+     running it would have absorbed 28 violations and a real regression together
+     and reported success.
+
+     Two DIFFERENT things are now distinguished, because they are different:
+
+       · a BASELINED file that got WORSE — always refused. This is the ratchet.
+       · a file the register has never SEEN — refused too, unless `--absorb-new`
+         is passed. That is the integration case: code written on a lane the
+         rule had not reached yet. It is still debt, so it must be recorded
+         deliberately, named on stdout, and visible as a JSON diff in git —
+         never as a side effect of "the gate was red so I re-baselined". */
+  const absorbNew = process.argv.includes('--absorb-new')
+  const refusals = []
+  const absorbing = []
+  for (const [key, name] of RATCHETED) {
+    const baseline = loadBaseline(key)
+    for (const [rel, n] of Object.entries(countByFile(violations[key]))) {
+      if (rel in baseline) {
+        if (n > baseline[rel]) refusals.push(`  REFUSED  ${name}: ${rel} ${baseline[rel]} -> ${n}`)
+      } else if (!absorbNew) {
+        refusals.push(
+          `  REFUSED  ${name}: ${rel} is new to the register with ${n} (need --absorb-new)`,
+        )
+      } else {
+        absorbing.push(`  absorbing  ${name}: ${rel}  ${n}`)
+      }
+    }
+  }
+  if (refusals.length > 0) {
+    console.log('  baseline NOT written — the register only goes down:')
+    for (const r of refusals) console.log(r)
+    process.exit(1)
+  }
+  for (const a of absorbing) console.log(a)
   const out = {
     _: 'Debt register for the ratcheted rules. Counts may only go DOWN — see design-lint.mjs.',
   }
