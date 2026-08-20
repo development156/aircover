@@ -31,6 +31,7 @@ const LOOP_BATCH = [
   '20260820000200_loop_autonomy.sql',
   '20260820000300_loop_cycles.sql',
   '20260820000400_loop_rpcs.sql',
+  '20260820000500_loop_brief_channel_set.sql',
 ] as const
 
 /** Everything the Loop files reference. `billing_ledger` is here for the kill switch's hold read. */
@@ -431,6 +432,48 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       expect(await raises(() => db.query(
         `select public.resolve_memory_event($1, 'rejected')`, [ev.rows[0].id])))
         .toMatch(/NOT_A_MEMBER/)
+    })
+  })
+
+  // ── channels IS A SET, enforced by the database ──────────────────────────
+  describe('loop_briefs.channels', () => {
+    const C = 'bbbbbbbb-0001-4bbb-8bbb-bbbbbbbbbbbb'
+    beforeAll(async () => {
+      await db.query(
+        `insert into loop_cycles (id, workspace_id, iso_year, iso_week) values ($1, $2, 2026, 40)`,
+        [C, WS_A])
+    })
+
+    it('accepts a set of real channels, and an empty one', async () => {
+      await db.query(
+        `insert into loop_briefs (workspace_id, cycle_id, title, body, channels, priority)
+         values ($1, $2, 't', 'b', '{x,linkedin}', 1)`, [WS_A, C])
+      await db.query(
+        `insert into loop_briefs (workspace_id, cycle_id, title, body, channels, priority)
+         values ($1, $2, 't', 'b', '{}', 2)`, [WS_A, C])
+      const r = await db.query<{ n: number }>(
+        `select count(*)::int as n from loop_briefs where cycle_id = $1`, [C])
+      expect(r.rows[0].n).toBe(2)
+    })
+
+    it('REFUSES the same channel twice — the defect that has shipped three times here', async () => {
+      const msg = await raises(() => db.query(
+        `insert into loop_briefs (workspace_id, cycle_id, title, body, channels, priority)
+         values ($1, $2, 't', 'b', '{x,x}', 3)`, [WS_A, C]))
+      expect(msg).toMatch(/loop_briefs_channels_is_set/)
+    })
+
+    it('REFUSES a channel this product does not have', async () => {
+      const msg = await raises(() => db.query(
+        `insert into loop_briefs (workspace_id, cycle_id, title, body, channels, priority)
+         values ($1, $2, 't', 'b', '{tiktok}', 4)`, [WS_A, C]))
+      expect(msg).toMatch(/loop_briefs_channels_is_set/)
+    })
+
+    it('refuses a duplicate arriving by UPDATE, not only by INSERT', async () => {
+      const msg = await raises(() => db.query(
+        `update loop_briefs set channels = '{gbp,gbp}' where cycle_id = $1 and priority = 1`, [C]))
+      expect(msg).toMatch(/loop_briefs_channels_is_set/)
     })
   })
 
