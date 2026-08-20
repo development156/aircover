@@ -340,6 +340,28 @@ describe('the Google topic on the wire', () => {
     expect(r).toEqual({ ok: true, data: { topicType: 'OFFER', offer: { couponCode: 'SAVE10' } } })
   })
 
+  /**
+   * ── THE SECOND LINE OF DEFENCE, SHOWN TO WORK ────────────────────────────
+   * `withGbpTopic` re-checks the date rather than asserting `refuseGbpTopic`
+   * already did. This calls the builder with a shape that would reach the
+   * non-null assertion the first draft used — `gbpTopic: 'EVENT'` with no event
+   * object at all — and requires a REFUSAL rather than a TypeError.
+   *
+   * A crash here is not a worse refusal; it is a different KIND of failure. It
+   * arrives as `ADAPTER_ERROR`, classified transient, and retries forever.
+   */
+  it('refuses rather than throwing when the event object is missing entirely', () => {
+    const r = buildPlatformData({
+      channel: 'gbp',
+      format: 'text',
+      content: gbp(),
+      options: { gbpTopic: 'EVENT' },
+    })
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.refusal.code).toBe('GBP_EVENT_NEEDS_TITLE')
+  })
+
   it('refuses an event with no date, which Google would 400 on', () => {
     const r = buildPlatformData({
       channel: 'gbp',

@@ -28,8 +28,26 @@ export function withGbpTopic(
   }
 
   if (topic === 'EVENT') {
-    const event = options!.gbpEvent!
-    const startDate = parseIsoDate(event.startDate)!
+    // ── RE-CHECKED, NOT ASSERTED ─────────────────────────────────────────────
+    // `refuseGbpTopic` above guarantees both of these are present and valid, so
+    // `!` would be correct today. It would also mean that the day someone
+    // loosens that refusal — reasonably, for a reason unrelated to this file —
+    // the publish path throws a TypeError instead of refusing, on the one path
+    // where a crash is indistinguishable from an outage. The cost of asking
+    // again is two comparisons; the cost of being wrong is a customer's post
+    // failing as `ADAPTER_ERROR` with a transient classification and retrying
+    // forever.
+    const event = options?.gbpEvent
+    const startDate = event === undefined ? null : parseIsoDate(event.startDate)
+    if (event === undefined || startDate === null) {
+      return {
+        ok: false,
+        refusal: {
+          code: 'GBP_EVENT_NEEDS_DATE',
+          message: 'An event needs a start date. Google refuses the post without one.',
+        },
+      }
+    }
     const endRaw = event.endDate?.trim()
     const endDate = endRaw === undefined || endRaw === '' ? null : parseIsoDate(endRaw)
     return {
