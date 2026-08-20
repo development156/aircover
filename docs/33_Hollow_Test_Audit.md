@@ -319,3 +319,95 @@ Recorded in the spec rather than quietly replaced.
 | "RLS policies … must not claim a policy was enforced" | `pglite-schema.ts` | `set local role` drops superuser; policies apply |
 | "the Stop-hook gate … does NOT cover [`scripts/`]" | root `vitest.config.ts` | `pnpm gate` stage 2 is `vitest-root`, which does |
 | the `@smoke` suite is "63 tests" | the brief | 67 tagged, 76 total |
+
+---
+
+## 5. P4 — the Lightpanda split, and why it is not the lever
+
+### 5a. Where the 20 minutes actually go — MEASURED
+
+A clean `--grep @smoke` run, nothing else on the box, `workers: 1`:
+
+| | |
+| --- | ---: |
+| wall clock | **1219 s (20.3 min)** |
+| summed per-test duration | **1001 s — 82% of wall clock** |
+| total Next dev-server response time inside those tests | **861 s** |
+| … of which COLD (first hit of a route) | 254 s over 184 requests |
+| … of which WARM (every later hit) | **607 s over 449 requests** |
+| route compiles (`Compiled …`) | 42, totalling 45 s |
+| peak RSS (chromium + node) | **1518 MB** |
+
+**I predicted the bottleneck would be Turbopack cold-compiling routes. Measured,
+it is not** — compiles are 45 s of 1219. Nor is it Chromium. It is the Next dev
+server answering requests slowly *while warm*: 607 seconds, over half the wall
+clock, on routes it had already built.
+
+A different browser waits exactly as long for those responses. **Swapping
+Chromium for Lightpanda cannot move this number.** The lever the measurement
+points at is running the suite against a production build (`next build` +
+`next start`) rather than `next dev`.
+
+### 5b. What Lightpanda can and cannot do here — MEASURED, not documented
+
+`lightpanda 1.0.0-nightly.8745`, driven over its advertised
+`ws://127.0.0.1:3322/`, against this app on a dev server:
+
+| capability | result |
+| --- | --- |
+| WebSocket CDP, `Target.getTargets`, `Browser.getVersion` | WORKS |
+| `Target.createTarget`, `Target.attachToTarget` | WORKS |
+| `Page.navigate` | WORKS — 3285 ms |
+| `document.title` | WORKS — `"Sign in · Sahoda"` |
+| `Page.captureScreenshot` | returns a PNG, and see below |
+| `getComputedStyle(body).fontSize` | returns `""` — no style engine |
+| `Target.createBrowserContext` | **REFUSED** — `Cannot have more than one browser context at a time` |
+| Playwright `connectOverCDP` then `newContext()` | **HANGS** — the server logs `Target.createBrowserContext` as `not_implemented` |
+
+**The screenshot is a placeholder, and finding that out took the right test.**
+It is 10,704 bytes with valid PNG magic and 1920x1080 dimensions, and my first
+verdict — written by my own probe — was "plausibly rendered" because it cleared
+a size threshold. That is trap #4 in the brief, and a size check is not an
+identity check. Screenshotting `/sign-in`, `/sign-up` and `about:blank` gives
+**one distinct SHA-256 across all three**: byte-identical, so it carries no page
+content at all. A gate asserting "bigger than 3 KB" would pass on every page of
+the app forever.
+
+**The blocking result is JavaScript, not pixels.** Lightpanda loads the page and
+executes *some* of it, but not enough:
+
+| | anchors | buttons | inputs | body text |
+| --- | ---: | ---: | ---: | ---: |
+| immediately after navigate | 0 | 0 | 0 | 63 chars |
+| after 8 s | 1 | 3 | 2 | 126 chars |
+
+`/sign-in` is a client-rendered Clerk component. The things the brief proposes to
+move to Lightpanda — *"does this element exist, what is its text content,
+accessible names, sign-in flows, form submission"* — are precisely the things
+that do not materialise here.
+
+### 5c. The classification, kept for when it becomes useful
+
+Specs with **no** geometry, screenshots, computed styles, or second context —
+the movable set if the JS gap closes:
+
+`analytics-history` · `every-section-loads` · `golden-path` · `post-format` ·
+`roadmap-honesty` · `templates` · `unauthenticated` · `variant-save` — **8 specs,
+15 of the 69 tagged tests.**
+
+Pinned to Chromium: `no-impossible-remedy` (20) and `no-truncated-labels` (15)
+are the bulk of the suite and both measure `scrollWidth` vs `clientWidth`;
+`shell-widths`, `shell-probe`, `topbar-two-states`, `design-system` are geometry;
+`concurrent-edit` needs **two contexts**, which Lightpanda refuses outright.
+
+A mechanical grep for `browser.newContext` scored `concurrent-edit` as
+geometry-free; it uses a helper called `signInSecondContext`, and the constraint
+that decides the whole question was invisible to the classifier. Read what the
+code does, not what the pattern matches.
+
+### 5d. What Lightpanda IS worth here
+
+Memory. The Chromium run peaked at **1518 MB**. Lightpanda's documented ~16x
+lighter footprint is the credible route to four sessions on a 15 GB box — and
+that is a different claim from making the suite faster, which it cannot do while
+861 of 1219 seconds belong to the dev server.
