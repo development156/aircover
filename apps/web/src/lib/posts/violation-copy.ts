@@ -17,10 +17,13 @@ import type { ConstraintViolation } from '@sahoda/shared'
  * table and trips no keyword filter). The shape gate below is closed by
  * construction: nothing reaches the UI unless it looks exactly like engine copy.
  *
- * The cost of an allowlist is silent degradation if engine copy is reworded, so
- * `violation-copy.test.ts` drives every pattern from real `validateVariant` /
- * `validateMedia` output — engine drift fails that test loudly instead of
- * quietly downgrading users to generic text.
+ * The cost of an allowlist is silent degradation, and there are TWO ways to
+ * incur it. `violation-copy.test.ts` drives every pattern from real
+ * `validateVariant` / `validateMedia` output, so a REWORDING fails loudly.
+ * That is what this note used to claim in full, and it was half right: an
+ * ADDITION went unnoticed for months, because a test keyed by the codes
+ * somebody listed cannot miss a code nobody listed. The completeness guard in
+ * that file now reads the engine's source and closes the second way.
  *
  * Pure module: no I/O, no React, no clock.
  */
@@ -34,13 +37,35 @@ export interface ViolationDisplay {
   fixLabel?: string
 }
 
+/**
+ * Every code the engine can emit. This list must be COMPLETE, not merely
+ * correct: an unlisted code does not fail, it degrades to `GENERIC_MESSAGE`.
+ *
+ * MEASURED 2026-08-20, on the first frame ever taken of `/posts/[id]`: a real
+ * Instagram variant with no photo attached rendered "This does not meet the
+ * channel rules. Review it before publishing." The engine had said
+ * `instagram needs at least one photo — there is no text-only post.` and this
+ * list did not carry `MEDIA_REQUIRED`, so the sentence was thrown away and
+ * replaced with one that names nothing the writer can act on. `MEDIA_ASPECT`
+ * was missing the same way.
+ *
+ * That is the most common refusal in the product — Instagram cannot post text
+ * on its own — so the single most-seen error message was the vaguest one.
+ *
+ * `violation-copy.test.ts` now derives the engine's codes from its SOURCE and
+ * fails when one is not listed here. The older test drove real engine output
+ * for each code it named, which proves every listed code renders well and can
+ * never notice a code nobody listed.
+ */
 const KNOWN_CODES = [
   'MAX_CHARS',
   'MAX_HASHTAGS',
   'MAX_MEDIA_COUNT',
+  'MEDIA_REQUIRED',
   'MEDIA_TYPE',
   'MEDIA_SIZE',
   'MEDIA_DIMS',
+  'MEDIA_ASPECT',
 ] as const
 
 type KnownCode = (typeof KNOWN_CODES)[number]
@@ -55,9 +80,13 @@ const FIX_LABELS: Readonly<Record<KnownCode, string | undefined>> = {
   MAX_CHARS: 'Trim to fit',
   MAX_HASHTAGS: 'Remove extra hashtags',
   MAX_MEDIA_COUNT: 'Remove extra media',
+  // No one-click fix: adding a photo means choosing a file, and offering a
+  // button that opens nothing is the affordance this table exists to withhold.
+  MEDIA_REQUIRED: undefined,
   MEDIA_TYPE: undefined,
   MEDIA_SIZE: undefined,
   MEDIA_DIMS: undefined,
+  MEDIA_ASPECT: undefined,
 }
 
 /**
@@ -69,9 +98,11 @@ const FALLBACK_MESSAGES: Readonly<Record<KnownCode, string>> = {
   MAX_CHARS: 'This post is longer than the channel allows.',
   MAX_HASHTAGS: 'This post uses more hashtags than the channel allows.',
   MAX_MEDIA_COUNT: 'This post has more media than the channel allows.',
+  MEDIA_REQUIRED: 'This channel needs at least one photo.',
   MEDIA_TYPE: 'This channel does not accept this file type.',
   MEDIA_SIZE: 'This file is larger than the channel allows.',
   MEDIA_DIMS: 'This image is smaller than the channel allows.',
+  MEDIA_ASPECT: 'This image is a shape the channel does not accept.',
 }
 
 const GENERIC_MESSAGE = 'This does not meet the channel rules. Review it before publishing.'
@@ -112,9 +143,15 @@ const MESSAGE_SHAPES: Readonly<Record<KnownCode, RegExp>> = {
   MAX_CHARS: new RegExp(`^(?:${CHANNEL}) allows ${NUM} characters; this has ${NUM}\\.$`),
   MAX_HASHTAGS: new RegExp(`^(?:${CHANNEL}) allows ${NUM} hashtags\\.$`),
   MAX_MEDIA_COUNT: new RegExp(`^(?:${CHANNEL}) allows ${NUM} media items\\.$`),
+  MEDIA_REQUIRED: new RegExp(
+    `^(?:${CHANNEL}) needs at least one photo — there is no text-only post\\.$`,
+  ),
   MEDIA_TYPE: new RegExp(`^(?:${CHANNEL}) does not accept ${MIME}\\.$`, 'i'),
   MEDIA_SIZE: new RegExp(`^(?:${CHANNEL}) media must be ≤ ${DECIMAL} MB\\.$`),
   MEDIA_DIMS: new RegExp(`^(?:${CHANNEL}) images must be ≥ ${NUM}×${NUM}\\.$`),
+  MEDIA_ASPECT: new RegExp(
+    `^(?:${CHANNEL}) feed photos must be between ${DECIMAL}:1 and ${DECIMAL}:1 — this one is ${DECIMAL}:1\\.$`,
+  ),
 }
 
 function safeField(field: string | undefined): string | undefined {
