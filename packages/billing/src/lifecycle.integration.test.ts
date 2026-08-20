@@ -51,6 +51,11 @@ describe.skipIf(!LIVE_DB_URL)('the plan lifecycle against the real ledger', () =
   })
   afterEach(async () => {
     await ledger.pool.query('delete from workspaces where id = $1', [ws])
+    // `invoice_serials` has no workspace_id, so deleting the workspace does not reach it.
+    // Every test issues into a `zz-` year, so this sweep is total — and it lives on the
+    // OUTER afterEach because the inner one only ever ran for the serial tests, which is
+    // exactly how the chargeback test's counters were left to climb.
+    await ledger.pool.query(`delete from invoice_serials where financial_year like 'zz-%'`)
   })
 
   /** The materialized balance, read from the projection rather than from a return value. */
@@ -453,16 +458,19 @@ describe.skipIf(!LIVE_DB_URL)('the plan lifecycle against the real ledger', () =
       if (!res.ok) return
 
       const paymentId = `pay_${randomUUID()}`
+      const fy = testFinancialYear()
       const invoice = await issueInvoice({
         documentType: 'tax_invoice',
         grossPaise: 149900,
         providerPaymentId: paymentId,
+        financialYear: fy,
       })
 
       const note = await issueInvoice({
         documentType: 'credit_note',
         grossPaise: 149900,
         providerPaymentId: `${paymentId}_cn`,
+        financialYear: fy,
         referencesInvoiceId: invoice.id,
         reason: 'chargeback',
         shortfallCredits: res.data.shortfallCredits,
@@ -489,21 +497,40 @@ describe.skipIf(!LIVE_DB_URL)('the plan lifecycle against the real ledger', () =
   }
 
   /**
+   * A financial year no real document will ever be numbered into.
+   *
+   * `invoice_serials` is keyed on (financial_year, document_type) and has NO workspace_id,
+   * so deleting the test workspace cannot reclaim a number — the counter is global and the
+   * increment is permanent. A test that issued into the live year would therefore consume
+   * a real invoice number on every run.
+   *
+   * MEASURED before this was fixed: the chargeback test issued into the default '26-27'
+   * and both counters climbed by one on each run. It passed anyway, because it asserted
+   * only the serial's PREFIX and was blind to the number — the gapless proof lived on an
+   * isolated year while a sibling walked straight through the live series.
+   */
+  const testFinancialYear = (): string => `zz-${Math.floor(Math.random() * 90 + 10)}`
+
+  /**
    * Issue through `app.issue_invoice`, the only write path to `invoices`.
    *
    * The supplier fields below are FIXTURE values for a test, never a default the product
    * could fall back on: `loadGstSupplierConfig` has no defaults precisely because inventing
    * a GSTIN would fabricate a statutory record. The GSTIN used here is the published
    * checksum-valid sample that @sahoda/shared is already pinned to.
+   *
+   * `financialYear` is REQUIRED, with no default. An optional one is what put a test into
+   * the live series in the first place, and a default here would let the next caller do it
+   * again silently.
    */
   async function issueInvoice(opts: {
     documentType: 'tax_invoice' | 'credit_note'
     grossPaise: number
     providerPaymentId: string
+    financialYear: string
     referencesInvoiceId?: string
     reason?: 'refund' | 'chargeback'
     shortfallCredits?: number
-    financialYear?: string
   }): Promise<IssuedInvoice> {
     const gross = opts.grossPaise
     // 18% inclusive, split into equal intra-state halves so the CHECK constraints hold.
@@ -531,7 +558,7 @@ describe.skipIf(!LIVE_DB_URL)('the plan lifecycle against the real ledger', () =
       [
         ws,
         opts.documentType,
-        opts.financialYear ?? '26-27',
+        opts.financialYear,
         opts.documentType === 'credit_note' ? 'SLC' : 'SL',
         gross,
         taxableAdjusted,
@@ -547,14 +574,8 @@ describe.skipIf(!LIVE_DB_URL)('the plan lifecycle against the real ledger', () =
   }
 
   describe('the invoice serial', () => {
-    afterEach(async () => {
-      // The counter is global, not per-workspace, so it must be reset between the
-      // assertions below or a rerun reads yesterday's numbers.
-      await ledger.pool.query(`delete from invoice_serials where financial_year like 'zz-%'`)
-    })
-
     it('runs the two document types on SEPARATE counters, not one counter with two prefixes', async () => {
-      const fy = `zz-${Math.floor(Math.random() * 90 + 10)}`
+      const fy = testFinancialYear()
 
       const i1 = await issueInvoice({
         documentType: 'tax_invoice',
@@ -596,7 +617,7 @@ describe.skipIf(!LIVE_DB_URL)('the plan lifecycle against the real ledger', () =
     })
 
     it('burns no number when the issue is rolled back — which a sequence would', async () => {
-      const fy = `zz-${Math.floor(Math.random() * 90 + 10)}`
+      const fy = testFinancialYear()
       await issueInvoice({
         documentType: 'tax_invoice',
         grossPaise: 149900,
