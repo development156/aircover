@@ -49,6 +49,29 @@ const ROUTES: ReadonlyArray<{ path: string; slug: string; archetype: string }> =
   { path: '/settings/plan', slug: 'settings-plan', archetype: 'pricing' },
 ]
 
+/**
+ * A per-route filter, so evidence for ONE screen costs 4 frames instead of 72.
+ *
+ * MEASURED: a full pass is 72 frames and took ~40 minutes on a loaded box. At
+ * that price a session shoots once, edits everything, and shoots again — which
+ * is how the 2026-08-20 run ended up with `light-1440/home.png` showing the old
+ * layout and `light-390/home.png` showing the new one IN THE SAME RUN. The
+ * camera points at a live dev server, so anything edited while it runs is
+ * photographed mid-change and filed as evidence of a design that never existed.
+ *
+ * Cheap enough per route, the discipline becomes possible: shoot one route's
+ * before, edit only that route, shoot its after.
+ *
+ *   DESIGN_AUDIT=1 DESIGN_AUDIT_ROUTES=home,posts DESIGN_AUDIT_OUT=... \
+ *     pnpm exec playwright test design-audit
+ */
+const ONLY = (process.env.DESIGN_AUDIT_ROUTES ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+
+const SHOOT = ONLY.length > 0 ? ROUTES.filter((r) => ONLY.includes(r.slug)) : ROUTES
+
 const VIEWPORTS = [
   { w: 1440, h: 900, name: '1440' },
   { w: 390, h: 844, name: '390' },
@@ -162,7 +185,7 @@ test.describe('design audit', () => {
         const dir = `${OUT}/${theme}-${vp.name}`
         mkdirSync(dir, { recursive: true })
 
-        for (const route of ROUTES) {
+        for (const route of SHOOT) {
           try {
             await shot.goto(route.path, { waitUntil: 'domcontentloaded', timeout: 45_000 })
             // Let the route settle; many screens fetch after mount.
