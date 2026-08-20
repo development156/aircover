@@ -11,7 +11,12 @@ import type { VariantExtras } from '@/lib/posts/variant-extras'
 const FORMAT_LABEL: Readonly<Record<PostFormat, string>> = {
   text: 'Text only',
   image: 'One photo',
-  carousel: 'A set to swipe',
+  // NOT "a set to swipe". Swiping is Instagram's word for it; on X the same
+  // format renders as a grid and on LinkedIn as a multi-image post, and one
+  // label sits on all three cards.
+  carousel: 'A set of photos',
+  story: 'A story — gone in 24 hours',
+  thread: 'A thread',
   video: 'Video',
 }
 

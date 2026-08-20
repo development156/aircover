@@ -172,15 +172,26 @@ export { createInstagramAdapter, type InstagramAdapterDeps } from './adapters/in
 // and every rule is DERIVED from the spec fields that engine already has — so a
 // contract that one day admits a video mime stops refusing video on its own.
 export {
+  CHANNEL_FORMATS,
+  FORMAT_MEDIA,
   POST_FORMATS,
-  isPostFormat,
-  acceptsVideo,
-  acceptsTextOnly,
   acceptsMultipleMedia,
+  acceptsTextOnly,
+  acceptsVideo,
+  defaultFormatFor,
   formatsFor,
+  isPostFormat,
+  mediaRuleFor,
   refuseFormat,
+  refuseFormatMedia,
 } from './format'
-export type { PostFormat, FormatRefusal } from './format'
+export type {
+  FormatAttachment,
+  FormatMediaRule,
+  FormatRefusal,
+  PostFormat,
+  ResolvedMediaRule,
+} from './format'
 export {
   createZernioAdapter,
   ZERNIO_PLATFORM_NAME,
