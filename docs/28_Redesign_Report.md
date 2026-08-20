@@ -13,15 +13,26 @@ and nobody owned.
 The camera in `e2e/design-audit.spec.ts` produced **72 "before" frames** (18 routes × 2 widths
 × 2 themes) and they are the evidence for every "before" claim here.
 
-**There are no "after" frames.** The re-shoot was attempted and every one of its 28 captures
-failed on a 45s navigation timeout: the box is shared, three other sessions were running dev
-servers (`verify-camp-composer`, `wt-pay2`, `wt-assets`), and load average reached **41.6**
-with 780MB free. The spec asserts nothing by design, so it reported `1 passed` while writing
-zero PNGs — worth knowing before anyone reads that line as success.
+**"After" frames exist for three routes: `/home`, `/posts`, `/analytics`** — 12 frames, two
+widths, both themes, 0 failed captures.
 
-So: every "before" claim is measured from a frame. Every "after" claim is measured from
-**code, the compiled CSS, and the test suite**, and is marked as such. Nothing here claims a
-screen was looked at when it was not.
+They took two attempts. The first re-shoot lost all 28 of its captures to 45s navigation
+timeouts at load average **41.6** with 780MB free, while three other sessions ran dev servers.
+The spec asserts nothing by design, so it reported `1 passed` having written zero PNGs — worth
+knowing before anyone reads that line as success. The second attempt, at load 3.4 on a port
+verified to be this worktree's, captured all 12.
+
+`/planner`, `/wallet`, `/settings` and the five `/inbox` routes have **before frames only**.
+Their "after" claims are measured from code, the compiled CSS and the test suite, and are
+marked as such. Nothing here claims a screen was looked at when it was not.
+
+**Reading the after-frames caught a defect I had introduced**, which is the whole argument for
+doing it. `light-1440/home.png` showed an absence mark beside *CREDITS SPENT · LAST 30 DAYS*
+on a workspace whose spend had been read successfully. `lib/home/spend.ts:118` returns `EMPTY`
+when `rows.length === 0` after a read that **worked** — so the true answer is zero and we know
+it. My three-way branch claimed we had never measured: the honesty rule running backwards.
+Fixed, and pinned by `spend-card.test.tsx`, which asserts a successful empty read shows `0`
+while an unreadable one never does.
 
 One "before" frame is contaminated and it is called out where it matters:
 `design-audit-before/light-1440/home.png` is a true before, while
@@ -268,7 +279,18 @@ fails two tests.
 
 ## 6. Mobile at 390
 
-**Before** frames exist at 390 for all 18 sampled routes. **After** frames do not (§0).
+**Before** frames exist at 390 for all 18 sampled routes. **After** frames exist at 390 for
+`/home`, `/posts` and `/analytics` (§0).
+
+MEASURED on `after/light-390/posts.png`: the filter row wraps cleanly to two lines, Delete is a
+tappable icon rather than a footer verb, titles wrap at `type-h3` without truncation, and there
+is no horizontal overflow. The bottom bar appearing inlined mid-document is the documented
+full-page-capture artefact (docs/27 §0), not a defect.
+
+MEASURED in the **production** CSS, because a touch target written as a class that does not
+compile is not a touch target: `max-narrow:min-h-[44px]` and `max-narrow:min-w-[44px]` both
+resolve to real rules. Given what §8 documents about silent classes, checking this by eye on a
+screenshot would not have been evidence.
 
 Touch targets use the token, never a literal: `max-narrow:min-h-[44px]` per docs/26 §9. Every
 control this lane added carries it — the `/posts` filter links, the compact delete trigger.

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { CardEmpty } from '@/components/empty-state'
 import { CountUp } from '@/components/motion/count-up'
 import { Card, CardLabel } from '@/components/ui/card'
-import { Unmeasured, Unreadable } from '@/components/design-system/absence-row'
+import { Unreadable } from '@/components/design-system/absence-row'
 import type { SpendRead } from '@/lib/home/spend'
 
 import { SpendArea } from './spend-area'
@@ -28,11 +28,22 @@ import { SpendBars } from './spend-bars'
  * sibling is also empty. Both charts render, or neither does and one sentence
  * explains why.
  *
- * ── THE TOTAL IS A SLOT, NOT A ZERO ──────────────────────────────────────────
- * `spend.total` is 0 in BOTH the empty and the unreadable states, so printing
- * it would state "you spent 0 credits" on the strength of a read that threw.
- * docs/26 §4: those are different claims and they now render as different
- * marks.
+ * ── THE TOTAL: A REAL ZERO IS KNOWLEDGE, AN UNREADABLE ONE IS NOT ────────────
+ * `spend.total` is 0 in BOTH the `empty` and the `unreadable` states, and the
+ * card used to print it for both — so a read that THREW rendered "0", stating
+ * that you spent nothing on the strength of a query that failed.
+ *
+ * Only `unreadable` is an absence. `empty` is `rows.length === 0` after a
+ * SUCCESSFUL read (`lib/home/spend.ts:118`), which means the true answer is
+ * zero and we know it. Rendering the Unmeasured mark there would claim we never
+ * looked, which is the honesty rule running backwards — and it is exactly what
+ * the first version of this card did. Caught by reading the rendered frame, not
+ * the code: `design-audit-after/light-1440/home.png` showed an absence mark
+ * beside "CREDITS SPENT · LAST 30 DAYS" on a workspace whose spend had been
+ * read successfully.
+ *
+ * The rule is the one CreditChip already states: a real zero renders as 0 —
+ * that is knowledge.
  */
 export function SpendCard({ spend }: { spend: SpendRead }) {
   const hasSeries = spend.status === 'ok' && spend.days.length > 0
@@ -42,16 +53,15 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
       <div className="flex items-baseline justify-between gap-3">
         <CardLabel>Credits spent · last 30 days</CardLabel>
         <span className="num text-[13px] font-semibold">
-          {spend.status === 'ok' ? (
-            // Settled and historical — a closed 30-day window that will not move
-            // while you look at it (docs/26 §8.1). NOT the balance: that is the
-            // live figure you act on, it sits in the rail beside this card, and
-            // it does not count.
-            <CountUp value={spend.total} />
-          ) : spend.status === 'unreadable' ? (
+          {spend.status === 'unreadable' ? (
             <Unreadable what="Credits spent in the last 30 days" />
           ) : (
-            <Unmeasured what="Credits spent in the last 30 days" />
+            // `ok` AND `empty` — both are successful reads, so both have a real
+            // number. Settled and historical: a closed 30-day window that will
+            // not move while you look at it (docs/26 §8.1). NOT the balance,
+            // which is the live figure you act on, sits in the rail beside this
+            // card, and does not count.
+            <CountUp value={spend.total} />
           )}
         </span>
       </div>
