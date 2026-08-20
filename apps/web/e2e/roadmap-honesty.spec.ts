@@ -6,6 +6,31 @@ import { expect, test } from './fixtures/seeded-user'
 /**
  * THE SEVEN ROADMAP SECTIONS SHOW NO FIGURE ABOUT THE READER'S BUSINESS.
  *
+ * ── /loop AND /report LEFT THIS LIST ON 2026-08-20, BECAUSE THEY WERE BUILT ──
+ * (Which makes the word SEVEN above true again: the list had grown to nine.)
+ * They are not exceptions to the property below; they are no longer roadmap
+ * sections. The Loop runs — it opens a cycle, prices a plan, charges credits and
+ * writes drafts — so it shows a week number, a credit total and a count of
+ * posts, every one of them out of a query. The first assertion in the loop below
+ * is what caught it: `/loop` no longer says "coming soon", because that sentence
+ * became false.
+ *
+ * WIDENING `ALLOWED` FOR THEM WOULD HAVE BEEN THE WRONG REPAIR, and the more
+ * tempting one. It is the same move this repo already recorded as a mistake in
+ * LEARNINGS (2026-08-13, `ALPHA_GATE.failingCodes`): editing the expected number
+ * until the check passes, rather than recording what actually changed. Every
+ * screen still on this list is still a drawing, and the property is exactly as
+ * strict for them as it was.
+ *
+ * WHERE THE PROPERTY LIVES FOR THEM NOW. `/loop`'s cost preview has its own
+ * digit scan — `components/loop/cost-preview.test.tsx` asserts every number it
+ * renders is a credit price from pricing.config.json, a sum of them, or a count
+ * of rows, and it is verified by injecting a fabricated reach figure. `/report`
+ * has NO equivalent automated guard yet; its figures come from
+ * `lib/loop/report.ts`, which returns null rather than zero when it has nothing,
+ * and it withholds a ranking below two measured posts. That gap is stated here
+ * rather than left for someone to discover.
+ *
  * ── WHY A BLANKET "NO DIGITS" CHECK WOULD BE THE WRONG TEST ──────────────────
  * `/ads` can be tested that way and is (`campaigns.spec.ts`): it has no price to
  * quote and no sequence to number, so every digit on it would be a lie. These
@@ -63,13 +88,9 @@ function price(action: string): number {
  * Loop stage or a sixth Radar slot is a decision someone takes here too.
  */
 const ALLOWED: ReadonlyArray<readonly [string, readonly number[]]> = [
-  // 1–7: the Loop's seven stages, which are a real sequence. Plus the cycle price.
-  ['/loop', [1, 2, 3, 4, 5, 6, 7, price('loop_cycle')]],
   ['/playbooks', [price('playbook_run')]],
   // 1–5: the five competitor slots, which are the cap PRD M9 sets.
   ['/radar', [1, 2, 3, 4, 5, price('radar_scan')]],
-  // The report names nothing countable at all.
-  ['/report', []],
   ['/leads', []],
   ['/studio', [price('carousel')]],
   ['/remix', [price('remix_pack')]],
