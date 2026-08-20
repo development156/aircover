@@ -1,4 +1,4 @@
-import { isPostFormat } from '@sahoda/publishing'
+import { isPostFormat, type VariantOptions } from '@sahoda/publishing'
 import type { Pool } from 'pg'
 import { assertPlatformPostId, type PublishPostPayload } from '@sahoda/shared'
 import type { PublishLogEntry, PublishVariant, VariantUpdate } from './runPublishPost'
@@ -55,6 +55,7 @@ export function createPublishStore(opts: PublishStoreOptions) {
     // Computed once: the spread below would otherwise call it twice, and a reader
     // would reasonably wonder whether the two answers could differ.
     const cta = readCta(row.extras)
+    const options = readOptions(row.extras)
 
     return {
       variantId: row.id,
@@ -75,6 +76,17 @@ export function createPublishStore(opts: PublishStoreOptions) {
       // saw it saved, and Google showed no button. Both halves or neither: Zernio
       // marks `callToAction` as requiring `type` AND `url`.
       ...(cta ? { cta } : {}),
+      // ── THE PER-CHANNEL CONTROLS, WHICH MUST BE READ OR THEY ARE THE CTA ──
+      // The Google button spent months being written to this column by the
+      // composer and read by NOTHING: the writer picked "ORDER", saw it saved,
+      // and Google showed no button. Every control added since ships with this
+      // line, because a control that reaches no reader is worse than an absent
+      // one — an absent control makes no promise.
+      //
+      // Shape-parsed here, VALUE-checked in `buildPlatformData` by the same
+      // `refusePoll` / `refuseGbpTopic` the composer runs. A second copy of a
+      // bound in this file is how the editor and the publisher come to disagree.
+      ...(options ? { options } : {}),
       // Validated rather than cast. The column carries a CHECK constraint, but a
       // value this code does not recognise must not be handed to the refusal rules
       // as if it were one of theirs — an unknown format states no intent we can
@@ -408,6 +420,79 @@ function readCta(extras: unknown): { type: string; url: string } | undefined {
   if (typeof type !== 'string' || type.trim() === '') return undefined
   if (typeof url !== 'string' || url.trim() === '') return { type, url: '' }
   return { type, url }
+}
+
+/**
+ * The per-channel controls stored on `post_variants.extras`.
+ *
+ * Never throws and never returns junk. `extras` is one shared jsonb column that
+ * more than one lane writes, so a shape we do not recognise is a reason to ignore
+ * the field rather than to fail the publish — the same rule `readHashtags` and
+ * `readCta` follow.
+ *
+ * Deliberately shape-only. Whether a poll has enough answers, whether an event
+ * has a date Google will accept — those are `buildPlatformData`'s to refuse, with
+ * the functions the composer already ran. Checking them twice in two places is
+ * how two answers appear.
+ *
+ * EXPORTED so it can be tested without a database. This is the link in the chain
+ * that was dead for the Google button: both ends were proved and the row-to-
+ * variant step in the middle was not, which is precisely where the value was
+ * being dropped.
+ */
+export function readOptions(extras: unknown): VariantOptions | undefined {
+  if (typeof extras !== 'object' || extras === null || Array.isArray(extras)) return undefined
+  const raw = extras as Record<string, unknown>
+  const out: VariantOptions = {}
+
+  const poll = raw.poll
+  if (typeof poll === 'object' && poll !== null && !Array.isArray(poll)) {
+    const p = poll as Record<string, unknown>
+    const answers = Array.isArray(p.options)
+      ? p.options.filter((o): o is string => typeof o === 'string')
+      : []
+    if (answers.length > 0) {
+      out.poll = {
+        options: answers,
+        ...(typeof p.question === 'string' ? { question: p.question } : {}),
+        ...(typeof p.durationMinutes === 'number' ? { durationMinutes: p.durationMinutes } : {}),
+        ...(typeof p.durationCode === 'string' ? { durationCode: p.durationCode } : {}),
+      }
+    }
+  }
+
+  if (typeof raw.firstComment === 'string' && raw.firstComment.trim() !== '') {
+    out.firstComment = raw.firstComment
+  }
+  if (Array.isArray(raw.collaborators)) {
+    const names = raw.collaborators.filter((n): n is string => typeof n === 'string')
+    if (names.length > 0) out.collaborators = names
+  }
+  if (raw.aiGenerated === true) out.aiGenerated = true
+
+  if (raw.gbpTopic === 'EVENT' || raw.gbpTopic === 'OFFER') {
+    out.gbpTopic = raw.gbpTopic
+    const event = raw.gbpEvent
+    if (typeof event === 'object' && event !== null && !Array.isArray(event)) {
+      const e = event as Record<string, unknown>
+      out.gbpEvent = {
+        title: typeof e.title === 'string' ? e.title : '',
+        startDate: typeof e.startDate === 'string' ? e.startDate : '',
+        ...(typeof e.endDate === 'string' ? { endDate: e.endDate } : {}),
+      }
+    }
+    const offer = raw.gbpOffer
+    if (typeof offer === 'object' && offer !== null && !Array.isArray(offer)) {
+      const o = offer as Record<string, unknown>
+      out.gbpOffer = {
+        ...(typeof o.couponCode === 'string' ? { couponCode: o.couponCode } : {}),
+        ...(typeof o.redeemUrl === 'string' ? { redeemUrl: o.redeemUrl } : {}),
+        ...(typeof o.terms === 'string' ? { terms: o.terms } : {}),
+      }
+    }
+  }
+
+  return Object.keys(out).length === 0 ? undefined : out
 }
 
 function readHashtags(extras: unknown): string[] | undefined {

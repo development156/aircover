@@ -17,7 +17,14 @@ import {
   type PublishRequestMedia,
   type RuleTier,
 } from '@sahoda/shared'
-import { refuseFormat, type PostFormat } from '@sahoda/publishing'
+import {
+  CHANNEL_FORMATS,
+  planThread,
+  refuseFormat,
+  type PostFormat,
+  type ThreadPlan,
+  type VariantOptions,
+} from '@sahoda/publishing'
 import type { PublishMode } from './mode'
 
 /**
@@ -77,6 +84,17 @@ export interface PublishVariant {
    * is a payload that is rejected, not a partial one.
    */
   cta?: { type: string; url: string }
+  /**
+   * The per-channel controls — poll, Google topic, first comment, collaborators,
+   * AI label — from `post_variants.extras`.
+   *
+   * Travels here for the same reason `cta` does: the frozen `FormattedContent`
+   * has no arm that could carry them, and `formatForPlatform` takes a
+   * `VariantDraft` with no room for any of it. The VALUES are checked inside
+   * `buildPlatformData` by `refusePoll` / `refuseGbpTopic` — the same functions
+   * the composer runs — so the card and the publisher cannot reach two answers.
+   */
+  options?: VariantOptions
 }
 
 /** Connection identity + the in-memory-only access token. Never persisted from here. */
@@ -214,7 +232,24 @@ export interface PublishPostDeps {
    * to pass it does not typecheck, rather than publishing a feed post where a
    * Story was asked for.
    */
-  adapterFor(channel: Channel, viaZernio: boolean, format: PostFormat | null): PublishAdapter
+  /**
+   * `thread` is the FOURTH parameter and it is OPTIONAL, deliberately.
+   *
+   * Every existing caller — the fixture harnesses, `runClaimedPublish`'s stub,
+   * the gbp-cta test — passes three arguments and keeps compiling. This repo has
+   * broken peer lanes twice by making a new adapter-factory parameter REQUIRED
+   * (`adapterFor` gained a third, `decideAttach` a fourth), and an optional one
+   * costs nothing here because the thing that would go wrong if it were forgotten
+   * is caught elsewhere and loudly: `buildPlatformData` REFUSES a `'thread'` that
+   * arrives with no segments rather than publishing the body as a single post.
+   */
+  adapterFor(
+    channel: Channel,
+    viaZernio: boolean,
+    format: PostFormat | null,
+    thread?: ThreadPlan | null,
+    options?: VariantOptions | null,
+  ): PublishAdapter
   /**
    * Turn `post_media` attachments into URLs the platform can fetch.
    *
@@ -328,10 +363,30 @@ export async function runPublishPost(
     mediaCount: variant.media.length,
   }
 
+  // ── A THREAD IS MEASURED PER POST, AND EVERYTHING ELSE IS MEASURED AS BEFORE ─
+  // docs/31 §6.2's second blocker: `validateVariant` measures the WHOLE body
+  // against 280, so a perfectly legal three-post thread is refused with MAX_CHARS
+  // before `refuseFormat` is even reached.
+  //
+  // The answer is not to weaken the engine. For a thread, MAX_CHARS is asking the
+  // wrong question — the body is not what gets published, the segments are — so
+  // exactly ONE violation code is swapped for the per-segment plan below.
+  // MAX_HASHTAGS, MAX_MEDIA_COUNT and MEDIA_REQUIRED all still stand, which is
+  // why this filters by code rather than skipping `validateVariant` for threads.
+  //
+  // `variant.format === 'thread'` alone is not enough to earn the swap: a variant
+  // could claim a format its channel does not offer, and dropping the length check
+  // on that basis would let an over-long post through on a channel with no threads
+  // at all. `refuseFormat` below is what refuses that, and it runs AFTER this — so
+  // the swap is conditioned on the channel really offering the format.
+  const isThread =
+    variant.format === 'thread' && (CHANNEL_FORMATS[payload.channel] ?? []).includes('thread')
+
   // The channel's own limits. Must run before the adapter, which validates nothing.
   const { violations } = validateVariant(spec, draft)
-  if (violations.length > 0) {
-    const first = violations[0]!
+  const standing = isThread ? violations.filter((v) => v.code !== 'MAX_CHARS') : violations
+  if (standing.length > 0) {
+    const first = standing[0]!
     return fail(first.code, first.message, null)
   }
 
@@ -363,6 +418,38 @@ export async function runPublishPost(
     return fail(formatRefusal.code, formatRefusal.message, null)
   }
 
+  // ── WHAT ACTUALLY GOES OUT, COMPUTED ONCE ───────────────────────────────────
+  // The refusal gate and the thread plan must be looking at the SAME string. Two
+  // calls to `formatForPlatform` would be two chances to disagree about whether
+  // the hashtag tail is in — and the tail is precisely what pushes a last segment
+  // over the limit, so a plan built without it would promise a thread that X
+  // refuses. Media is deliberately omitted from both: it changes `content.media`
+  // and never the text, and the real request re-formats with the hosted URLs.
+  const publishedText = publishedTextOf(formatForPlatform(spec, draft))
+
+  // ── THE THREAD, PLANNED BEFORE ANYTHING IS SPENT ────────────────────────────
+  // Placed here for the same reason the gate sits where it does: after the checks
+  // that are free, before the one that costs a model call, and well before a token
+  // is decrypted. A thread with a 400-character unbreakable URL in it is refused
+  // without Sahoda paying to think about it.
+  //
+  // ONE plan, made here and carried to the adapter. `buildPlatformData` could have
+  // re-derived it from the content, and then the number of posts the gate approved
+  // and the number of posts that went out would be two independent answers.
+  let thread: ThreadPlan | null = null
+  if (isThread) {
+    // No `hasLink` argument, and that absence is load-bearing: `store.ts`
+    // deliberately never populates `PublishVariant.hasLink` (it would need
+    // apps/web's 300-line TLD list), so passing it would have split at 280 here
+    // while the editor split at 257 — a preview showing five posts and a publish
+    // producing four. `planThread` derives it from the text both sides hold.
+    const planned = planThread(spec, publishedText)
+    if (!planned.ok) {
+      return fail(planned.refusal.code, planned.refusal.message, null)
+    }
+    thread = planned.plan
+  }
+
   // ── THE REFUSAL GATE (doc 18 §8) ────────────────────────────────────────────
   // A CONDITION OF PUBLISHING, NOT A PREFLIGHT. It sits on the one function all
   // four entries into publishing pass through — the publish-now route, the cron
@@ -387,7 +474,14 @@ export async function runPublishPost(
     postId: payload.postId,
     variantId: variant.variantId,
     channel: payload.channel,
-    text: publishedTextOf(formatForPlatform(spec, draft)),
+    // ── AND THIS IS WHY A THREAD IS SAFE TO OFFER ────────────────────────────
+    // The gate reads the whole formatted body, and every segment of the thread is
+    // a SLICE of that same body (`thread-split.ts` asserts the covering property).
+    // So a red line written into the last post of a seven-post thread is in front
+    // of the classifier here, exactly as it would be in a single post. docs/31
+    // §6.2 refused to ship threads because a gate reading one body would miss it —
+    // true of separately-authored segments, and not true of a split.
+    text: publishedText,
     jobRunId: ctx.jobRunId,
   })
 
@@ -492,7 +586,13 @@ export async function runPublishPost(
     }
 
     const result = await deps
-      .adapterFor(payload.channel, connection.viaZernio === true, variant.format ?? null)
+      .adapterFor(
+        payload.channel,
+        connection.viaZernio === true,
+        variant.format ?? null,
+        thread,
+        variant.options ?? null,
+      )
       .publish(request)
 
     // The adapter's own mode is authoritative: a fixture result is recorded as a fixture

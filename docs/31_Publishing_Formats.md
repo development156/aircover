@@ -346,16 +346,16 @@ can distinguish a present column from an absent one.
 | LinkedIn | Multi-image | yes | `carousel` | yes (≤20) | **PUBLISHES TODAY** (capped at 9, §6.3) |
 | LinkedIn | Video | yes | `video` | yes | BLOCKED — media ingest, §5.1 |
 | LinkedIn | Document | yes | **no** | `MediaItem.type:'document'` | BLOCKED — media ingest, §5.1 |
-| LinkedIn | Poll | yes | **no** | `linkedin.poll` | ZERNIO SUPPORTS, WE DON'T CALL IT |
+| LinkedIn | Poll | yes | n/a — an OPTION, not a format | `linkedin.poll` | **SENT, NOT YET OBSERVED** — `extras.poll` |
 | X | Post | yes | `text` | yes | **PUBLISHES TODAY** |
 | X | Media | yes | `image` / `carousel` | yes (≤4) | **PUBLISHES TODAY** |
-| X | Thread | yes | **yes** (20260820144500) | `x.threadItems` | STORABLE, NOT OFFERED — §6.2 |
-| X | Poll | yes | **no** | `x.poll` | ZERNIO SUPPORTS, WE DON'T CALL IT |
+| X | Thread | yes | **yes** (20260820144500) | `x.threadItems` | **SENT, NOT YET OBSERVED** — lane `wt-zernio`, §6.2 |
+| X | Poll | yes | n/a — an OPTION, not a format | `x.poll` | **SENT, NOT YET OBSERVED** — `extras.poll` |
 | X | Article | yes | **no** | `x.article` | ZERNIO SUPPORTS — Premium only, out of scope |
 | GBP | What's new | yes | `text` / `image` | `topicType:'STANDARD'` | **PUBLISHES TODAY** |
 | GBP | + CTA button | yes | n/a | `callToAction {type,url}` | **SENT, NOT YET OBSERVED** — §5.4, §6.1 |
-| GBP | Event | yes | **no** | `topicType:'EVENT'` | ZERNIO SUPPORTS, WE DON'T CALL IT |
-| GBP | Offer | yes | **no** | `topicType:'OFFER'` | ZERNIO SUPPORTS, WE DON'T CALL IT |
+| GBP | Event | yes | n/a — an OPTION, not a format | `topicType:'EVENT'` | **SENT, NOT YET OBSERVED** — `extras.gbpTopic` |
+| GBP | Offer | yes | n/a — an OPTION, not a format | `topicType:'OFFER'` | **SENT, NOT YET OBSERVED** — `extras.gbpTopic` |
 | Facebook | post / story / reel / link | **no** | — | yes | NOT A CHANNEL HERE |
 | YouTube | short / video | **no** | — | yes | NOT A CHANNEL HERE |
 | Pinterest | pin / video pin | **no** | — | yes | NOT A CHANNEL HERE |
@@ -383,6 +383,24 @@ sniffer, a size ceiling four orders of magnitude higher than
 `MEDIA_UPLOAD_CAP_BYTES`, a thumbnail story, and a Supabase upload path that does
 not run through a server action's body limit. **They stay coming-soon, and the
 reason shown to a writer is the true one.**
+
+### 5.2b What lane `wt-zernio` built, 20 August 2026
+
+**A poll, an event and an offer are not FORMATS.** A poll is a text post with a
+poll on it; Google's topic is a variation on a standard post. They ride
+`post_variants.extras` beside the CTA, so no migration widened a CHECK constraint
+for something that is not a format. That is why their `Storable in format?`
+column above now reads *n/a* rather than *no*.
+
+**Threads shipped**, and the three conditions in §6.2 were met rather than
+relaxed — see the note appended there.
+
+**Video did not**, and §5.1 is now sharper about why: the sniffer exists
+(`sniff-video.ts` reads mime, dimensions AND duration from the `mvhd`/`tkhd`
+boxes), and the door is still shut because `next.config.ts` sets
+`serverActions.bodySizeLimit: '12mb'` while a Reel is 300 MB — and because
+`MEDIA_UPLOAD_CAP_BYTES` derives from `maxMediaMB`, ONE number per channel that
+cannot say "8 MB for an image, 300 MB for a video". Named precisely in §8.
 
 ### 5.2 What Phase 2 built, and what it did not
 
@@ -488,8 +506,30 @@ nobody will read.
 **Threads must not ship until the gate reads every segment.** A guard that
 silently narrows its input is the failure this product's rules name explicitly.
 
-**Decision, 20 Aug 2026: threads are storable and not offered.** Three things
-have to be true first, and none of them could be made true in this lane:
+> **RESOLVED 20 Aug 2026, lane `wt-zernio`. Threads are offered.** All three
+> conditions below were met, and none by relaxing the condition:
+>
+> 1. **The gate reads every segment** — because a thread stopped being new text.
+>    It is the ONE body, SPLIT (`thread-split.ts`). Every segment is a slice of
+>    `publishedTextOf(formatForPlatform(spec, draft))`, which is exactly the
+>    string the gate already checked. The covering property is asserted over five
+>    bodies and four limits, and `runPublishPost.test.ts` puts a banned line in
+>    the FINAL segment and requires a block — proven by mutation.
+> 2. **The limit means something** — `planThread` splits at the per-segment limit,
+>    deriving X's flat link weight from `charCountFor` rather than restating 23.
+>    `runPublishPost` swaps the whole-body `MAX_CHARS` for that plan and swaps
+>    nothing else.
+> 3. **`threadItems[].mediaItems` is still not used**, and it did not need to be.
+>    A thread's photos ride the post-level pool, where that path is already
+>    proven. docs/32 §3 records what the validator does and does not say about it.
+>
+> Two facts from the validator shaped the payload (docs/32 §4.1): Zernio does NOT
+> apply 280 per segment, and its root `content` IS still measured against 280
+> even though the spec says it is not published — so the root carries
+> `threadItems[0]`.
+
+**Original decision, 20 Aug 2026: threads are storable and not offered.** Three
+things had to be true first, and none of them could be made true in that lane:
 
 1. **The gate reads every segment.** Above.
 2. **The character limit means something.** X's 280 applies PER SEGMENT, and
@@ -523,10 +563,22 @@ something the platform refuses — and both are the exact class doc 13 §10 call
 the root cause: *"`publishable` conflates 'we have a rail' with 'the payload we'd
 send is valid.'*"
 
-They are `[DOC]`-sourced and therefore **not fixed in this lane**; tightening a
-limit on the strength of a summarised page could refuse posts that are fine.
-They belong to whoever runs the `/v1/tools/validate/post` experiment in §4, which
-would answer all six with primary evidence in one call.
+> **RUN 20 Aug 2026, lane `wt-zernio`. It answered ONE of the six, and the
+> reason it could not answer the rest is worth more than the answers.**
+>
+> `instagram.imageDims.aspectRange` is now `[0.75, 1.91]` — measured at the
+> boundary, 750×1000 accepted and 749×1000 refused. Our floor of 0.8 was wrong in
+> the direction that costs a customer a post.
+>
+> **The other five stand unchanged**, including both rows marked bold above. The
+> validator **never fetches media for any platform but Instagram** — a URL that
+> 404s passes on linkedin, googlebusiness, twitter and pinterest — so its silence
+> about a LinkedIn image's dimensions is absence of evidence. Full evidence and
+> controls: **docs/32**.
+
+They were `[DOC]`-sourced and therefore **not fixed in the lane that found them**;
+tightening a limit on the strength of a summarised page could refuse posts that
+are fine.
 
 ### 6.4 Operational facts the adapter does not handle `[SPEC]`
 
@@ -547,19 +599,51 @@ Not format work. Flagged, not fixed.
 
 ---
 
+## 8. The frozen-contract changes this work would ask for
+
+Named precisely, per the brief's instruction to say what field is needed rather
+than to bend around it.
+
+1. **`PlatformSpec.imageDims.aspectRange` wants to be PER FORMAT** (already asked
+   for in §5.3). Story and feed have different ranges on one channel.
+2. **`PlatformSpec` has ONE `maxMediaMB` and needs a video one.** 8 MB is right
+   for an Instagram image and wrong by a factor of 37 for a Reel. Until it
+   exists, `MEDIA_UPLOAD_CAP_BYTES` — which is derived from it — caps every
+   upload at 8 MB, and video cannot be offered. A `videoMaxMB` and a
+   `videoMaxSeconds` on the spec would let `formatsFor` derive `video` the same
+   way it derives everything else.
+3. **Neither is blocking anything that shipped.** Both are the reason video did
+   not.
+
+Not a contract change, and needed alongside (2): the upload path is a server
+action bounded by `serverActions.bodySizeLimit: '12mb'`. Video needs a
+direct-to-storage signed upload, which `next.config.ts`'s own comment already
+names as the answer.
+
+---
+
 ## 7. `[OPEN]`
 
-1. Does `POST /v1/posts` accept `platform: 'x'`, or only `'twitter'`? We publish
-   with `'x'` `[LIVE]`, and the validate enum lists only `'twitter'` `[SPEC]`.
+1. ~~Does `POST /v1/posts` accept `platform: 'x'`, or only `'twitter'`?~~
+   **ANSWERED, and it is worse than an asymmetry — it is FOUR vocabularies.**
+   Publish takes `x` and `google`; validate takes `twitter` and `googlebusiness`
+   and SILENTLY SKIPS the rest; `/edit` takes `twitter` only; `/unpublish` takes
+   `googlebusiness` but refuses `google`. docs/32 §1.1 and §6.
 2. Does `platforms[].platformSpecificData` apply when the array has one entry and
    the content is at the root? (Everything in Phase 2 assumes yes.)
 3. Does `customContent` change the content-hash dedup fingerprint?
 4. What does `/v1/tools/validate/post` return, exactly? Shape unspecified in the
    schema beyond *"errors"* and *"warnings"*.
-5. Instagram Story: does Zernio accept a 9:16 image at 1080×1920 through the same
-   `mediaItems` path, or is a Story media upload separate?
-6. `threadItems[].mediaItems` — is it the full `MediaItem`, and does the root
-   `mediaItems` still apply if omitted?
+5. ~~Instagram Story: does Zernio accept a 9:16 image at 1080×1920 through the
+   same `mediaItems` path?~~ **ANSWERED (docs/32 §3): yes, the same path, and
+   `contentType: 'story'` is what unlocks it.** 1080×1920 is refused as a feed
+   post and accepted as a Story, and Zernio's own feed-refusal message ends
+   *"If you intended to publish a Story, set platformSpecificData.contentType to
+   \"story\"."*
+6. `threadItems[].mediaItems` — **partially answered (docs/32 §3): accepted
+   structurally, and checked NOT AT ALL.** A dead URL passes and five images on
+   one segment pass. That is *accepted on the wire*, not *X will publish it*, so
+   it remains unused and a thread's photos ride the post.
 
 Every one of these is answerable by a single smoke call, and none of them should
 be answered by reading.

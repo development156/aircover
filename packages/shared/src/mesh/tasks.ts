@@ -304,7 +304,9 @@ export const MESH_TASK_ACTION: Record<Exclude<MeshTaskName, 'gate_classify'>, Ac
 /**
  * Feed images default to 1:1.
  *
- * Instagram's accepted aspect range is 0.8–1.91 and a square sits comfortably
+ * Instagram's accepted aspect range is 0.75–1.91 (MEASURED against Zernio's own
+ * validator, 2026-08-20 — see the note on `CONSTRAINTS.instagram.imageDims`) and
+ * a square sits comfortably
  * inside it, so a default that is square is a default that passes everywhere. The
  * generator is asked for a size, not merely a ratio, because an image below
  * 320×320 fails `imageDims` no matter how correct its shape is.

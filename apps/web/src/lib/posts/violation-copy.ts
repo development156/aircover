@@ -45,7 +45,7 @@ const KNOWN_CODES = [
   // MEASURED 2026-08-20 against real `validateVariant` / `validateMedia` output:
   //   engine: "instagram needs at least one photo — there is no text-only post."
   //   screen: "This does not meet the channel rules. Review it before publishing."
-  //   engine: "instagram feed photos must be between 0.8:1 and 1.91:1 — this one is 0.56:1."
+  //   engine: "instagram feed photos must be between 0.75:1 and 1.91:1 — this one is 0.56:1."
   //   screen: "This does not meet the channel rules. Review it before publishing."
   // Both are the defects doc 13 section 10 said would go live the moment
   // Instagram became publishable. The engine was fixed and says exactly the
@@ -60,6 +60,15 @@ const KNOWN_CODES = [
   'FORMAT_NEEDS_MEDIA',
   'FORMAT_CONTRADICTED',
   'FORMAT_MEDIA_ASPECT',
+  // ── THE THREAD LAYER (packages/publishing/src/thread-plan.ts) ──────────────
+  // Same reasoning as the format codes above: a different source, the same card,
+  // the same gate. And the same trap — a code missing from this list is not a
+  // silent no-op, it is the writer being told "This does not meet the channel
+  // rules" about a thread whose actual problem is a 400-character URL nobody can
+  // break. That is precisely how MEDIA_REQUIRED and MEDIA_ASPECT were lost.
+  'THREAD_EMPTY',
+  'THREAD_UNBREAKABLE',
+  'THREAD_NO_ROOM',
 ] as const
 
 type KnownCode = (typeof KNOWN_CODES)[number]
@@ -88,6 +97,12 @@ const FIX_LABELS: Readonly<Record<KnownCode, string | undefined>> = {
   // either the words or the files.
   FORMAT_CONTRADICTED: 'Change the kind of post',
   FORMAT_MEDIA_ASPECT: undefined,
+  // Nothing the editor can do in one click. Every one of these needs the writer
+  // to change words — shorten a link, write something — and a button that
+  // rewrote their post for them is not a fix, it is a guess.
+  THREAD_EMPTY: undefined,
+  THREAD_UNBREAKABLE: undefined,
+  THREAD_NO_ROOM: undefined,
 }
 
 /**
@@ -108,6 +123,9 @@ const FALLBACK_MESSAGES: Readonly<Record<KnownCode, string>> = {
   FORMAT_NEEDS_MEDIA: 'This kind of post needs a photo that is not attached yet.',
   FORMAT_CONTRADICTED: 'This post is not the kind it says it is.',
   FORMAT_MEDIA_ASPECT: 'This photo is the wrong shape for this kind of post.',
+  THREAD_EMPTY: 'A thread needs something written in it.',
+  THREAD_UNBREAKABLE: 'Part of this is too long to split across posts.',
+  THREAD_NO_ROOM: 'A link leaves no room for words on this channel.',
 }
 
 const GENERIC_MESSAGE = 'This does not meet the channel rules. Review it before publishing.'
@@ -182,6 +200,15 @@ const MESSAGE_SHAPES: Readonly<Record<KnownCode, RegExp>> = {
     `^A story is taller than it is wide — this photo is ${DECIMAL}:1\\. ` +
       `Crop it upright, or post it to the feed instead\\.$`,
   ),
+  // ── THE THREAD SENTENCES, AS CLOSED LITERALS WITH BOUNDED NUMBERS ─────────
+  // `planThread` emits a fixed set; the counts are the only variable parts.
+  THREAD_EMPTY: /^A thread needs something written in it\.$/,
+  THREAD_UNBREAKABLE: new RegExp(
+    `^This has ${NUM} characters in a row with no space to break at, and one post ` +
+      `holds ${NUM}\\. Splitting it would cut it in half — shorten it, or put it on ` +
+      `its own line\\.$`,
+  ),
+  THREAD_NO_ROOM: /^A link leaves no room for words on this channel\.$/,
 }
 
 function safeField(field: string | undefined): string | undefined {

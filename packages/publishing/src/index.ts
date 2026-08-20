@@ -191,9 +191,65 @@ export type {
   FormatRefusal,
   PostFormat,
   ResolvedMediaRule,
+  ThreadPlan,
+  ThreadPlanResult,
+  ThreadSegment,
+} from './format'
+// One body, split into the posts X publishes. See thread-split.ts for why a
+// thread is a DERIVATION of the single body and not a second place to author.
+export {
+  countCodePoints,
+  describeThread,
+  linkWeightOf,
+  planThread,
+  segmentLimitFor,
+  splitIntoThread,
 } from './format'
 export {
   createZernioAdapter,
   ZERNIO_PLATFORM_NAME,
   type ZernioAdapterDeps,
 } from './adapters/zernio'
+
+// The per-channel controls a version carries — poll, Google topic, first comment,
+// collaborators, AI disclosure. Rules live beside the parse because for most of
+// these NOBODY ELSE CHECKS: Zernio validates Google's platformSpecificData not at
+// all, and polls are the one block it fully enforces (docs/32 §4).
+// The per-platform half of a publish payload. Exported so the chain from a
+// composer control to the wire can be followed END TO END in one test — the
+// Google button had tests at both ends and died in the middle.
+export {
+  buildPlatformData,
+  zernioMediaType,
+  type PlatformData,
+  type PlatformDataInput,
+  type PlatformDataResult,
+} from './zernio/platform-data'
+
+// What can be done to a post AFTER it is live. The platform vocabulary here is
+// NOT the publish one — gbp is `googlebusiness`, not `google`, and edit accepts
+// only twitter of our four. Both measured from the endpoints' own 400s.
+export {
+  canRecover,
+  recoveryPlatform,
+  recoveryUnavailableReason,
+  type RecoveryAction,
+} from './zernio/recovery'
+
+export {
+  refusePoll,
+  refuseGbpTopic,
+  parseIsoDate,
+  LINKEDIN_POLL_DURATIONS,
+  POLL_MIN_OPTIONS,
+  POLL_MAX_OPTIONS,
+  X_POLL_OPTION_MAX,
+  X_POLL_MIN_MINUTES,
+  X_POLL_MAX_MINUTES,
+  LINKEDIN_POLL_QUESTION_MAX,
+  INSTAGRAM_MAX_COLLABORATORS,
+  type VariantOptions,
+  type PollOption,
+  type GbpEventOption,
+  type GbpOfferOption,
+} from './zernio/variant-options'

@@ -167,7 +167,24 @@ export const CONSTRAINTS: Record<Channel, PlatformSpec> = {
     // `if (spec.imageDims && …)` guard skipped it entirely and `aspectRange` — a
     // field PlatformSpec already declared — was never read for the one channel
     // that needs it. A 1080×1920 phone photo (0.56) used to pass.
-    imageDims: { minW: 320, minH: 320, aspectRange: [0.8, 1.91] },
+    // ── 0.75, NOT 0.8, AND THE VENDOR'S OWN VALIDATOR SETTLED IT ────────────
+    // MEASURED 2026-08-20 against `POST /v1/tools/validate/post`, at the
+    // boundary rather than near it: a 750×1000 image (0.7500) is accepted and a
+    // 749×1000 image (0.7490) is refused with *"Aspect ratio 0.75:1 is outside
+    // Instagram's allowed range (0.75 to 1.91)"*. The upper end is confirmed the
+    // same way — 1910×1000 passes, 1911×1000 does not.
+    //
+    // The old floor of 0.8 was [DOC]-sourced and it was WRONG IN THE DIRECTION
+    // THAT COSTS A CUSTOMER A POST: every image between 0.75 and 0.80 — which
+    // includes plenty of ordinary upright phone crops — was refused by us and
+    // would have been accepted by Instagram. Loosening on primary evidence is
+    // safe in a way that tightening on a summarised page is not, which is why
+    // this is the ONLY bound docs/31 §6.3 listed that this lane changed. The
+    // other five are recorded in docs/32 with the control that shows the
+    // validator never looked at them.
+    //
+    // Reproduce: `node scripts/zernio/validate-probe.mjs` → group `ig-aspect-feed`.
+    imageDims: { minW: 320, minH: 320, aspectRange: [0.75, 1.91] },
     perDayCap: 25,
     scheduleMinLeadMinutes: SCHEDULE_MIN_LEAD_MINUTES,
   },

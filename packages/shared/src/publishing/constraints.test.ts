@@ -41,9 +41,36 @@ describe('constraint engine v0', () => {
       mime: 'image/jpeg',
       bytes: 1_000_000,
       width: 1080,
-      height: 1920, // 0.56 — outside the 0.8–1.91 feed range
+      height: 1920, // 0.56 — outside the 0.75–1.91 feed range
     })
     expect(res[0]!.violations.some((v) => v.code === 'MEDIA_ASPECT')).toBe(true)
+  })
+
+  /**
+   * ── THE FEED RANGE, AT ITS EDGES, ON THE VENDOR'S OWN AUTHORITY ────────────
+   * These four numbers are not chosen to be comfortably inside and outside. They
+   * are the exact pixel dimensions put to `POST /v1/tools/validate/post` on
+   * 2026-08-20, and the pass/fail below is the answer it gave (docs/32 §2,
+   * reproduce with `node scripts/zernio/validate-probe.mjs`).
+   *
+   * A test that asserted 0.9 passes and 0.5 fails would have gone green against
+   * the OLD floor of 0.8 and against the new one, which is to say it would have
+   * been checking nothing about the bound it appears to be about. 749 vs 750 is
+   * the smallest step that can tell the two apart, and it is the whole point.
+   */
+  it.each([
+    [750, 1000, false, '0.7500 — the floor itself, accepted by Instagram'],
+    [749, 1000, true, '0.7490 — one pixel narrower, refused'],
+    [1910, 1000, false, '1.9100 — the ceiling itself, accepted'],
+    [1911, 1000, true, '1.9110 — one pixel wider, refused'],
+  ])('instagram aspect %ix%i → refused=%s (%s)', (width, height, refused) => {
+    const res = validateMedia([CONSTRAINTS.instagram], {
+      mime: 'image/jpeg',
+      bytes: 1_000_000,
+      width,
+      height,
+    })
+    expect(res[0]!.violations.some((v) => v.code === 'MEDIA_ASPECT')).toBe(refused)
   })
 
   it('instagram refuses a non-JPEG/PNG at compose time', () => {

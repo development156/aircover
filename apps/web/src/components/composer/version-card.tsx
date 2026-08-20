@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { VariantConflictNotice } from '@/components/posts/variant-conflict-notice'
 import { hasLink } from '@/lib/posts/detect-link'
 import { meterFor, withFormat } from '@/lib/posts/counters'
+import { asThread, previewThread } from '@/lib/posts/thread-preview'
 import { selectedText, spliceSelection, type SelectionRange } from '@/lib/posts/splice-selection'
 import type { VariantExtras } from '@/lib/posts/variant-extras'
 import type { VariantState } from '@/components/posts/use-variants'
@@ -23,6 +24,7 @@ import type { VariantState } from '@/components/posts/use-variants'
 import { HashtagField } from './hashtag-field'
 import { RelinkControl } from './relink-control'
 import { trimToFit } from './trim-to-fit'
+import { ThreadPreviewView } from './thread-preview'
 import { VersionOptions } from './version-options'
 import { VersionState } from './version-state'
 
@@ -122,17 +124,30 @@ export function VersionCard({
       )
       .find((refusal) => refusal !== null) ?? null
 
-  const meter = withFormat(
+  const draft = {
+    body: state.body,
+    hashtags,
+    hasLink: hasLink(state.body),
+    mediaCount,
+  }
+
+  // ── THE POSTS THIS BECOMES, WHEN IT BECOMES MORE THAN ONE ───────────────────
+  // Null for every version that is not a thread, which is the signal the preview
+  // and the meter both read — an absent plan cannot be rendered by accident.
+  const thread = previewThread(channel, draft, format === 'thread')
+
+  // ── THREE VERDICTS, IN THE ORDER THE PUBLISHER ASKS THEM ────────────────────
+  // `asThread` is OUTERMOST because it is the one that removes a rule rather than
+  // adding one: for a thread the whole-body character limit is the wrong
+  // question, and it must come out after everything that could have added to it.
+  // It removes exactly MAX_CHARS and nothing else, the same single swap
+  // `runPublishPost` makes — so a thread with too many hashtags is still red.
+  const meter = asThread(
     withFormat(
-      meterFor(channel, {
-        body: state.body,
-        hashtags,
-        hasLink: hasLink(state.body),
-        mediaCount,
-      }),
-      refuseFormat(spec, format, mediaCount),
+      withFormat(meterFor(channel, draft), refuseFormat(spec, format, mediaCount)),
+      shapeRefusal,
     ),
-    shapeRefusal,
+    thread,
   )
 
   // MAX_MEDIA_COUNT deliberately gets no entry. Media lives on the post and this
@@ -140,6 +155,9 @@ export function VersionCard({
   // `ChannelMeterView` renders the label as plain text when no handler exists,
   // which states the problem without faking an affordance.
   const fixes: Partial<Record<string, () => void>> = {
+    // Absent for a thread: `asThread` has already removed MAX_CHARS, so this key
+    // is unreachable there — and offering "Trim to fit" on a legal seven-post
+    // thread would tell the writer to cut words that do not need cutting.
     MAX_CHARS: () => onBodyChange(trimToFit(channel, state.body, hashtags)),
     // The one format problem this card can resolve in a click: the kind and the
     // attachments disagree, and the kind is the half that lives here. Clearing it
@@ -211,6 +229,12 @@ export function VersionCard({
 
       <ChannelMeterView meter={meter} fixes={fixes} />
 
+      {/* Directly under the meter, because the meter's numbers are now ABOUT the
+          split — for a thread it reads "the longest post / one post's limit" —
+          and a reader needs the posts in front of them for that to mean anything.
+          Renders nothing when this version is not a thread. */}
+      {thread !== null ? <ThreadPreviewView preview={thread} /> : null}
+
       <HashtagField
         channel={channel}
         label={label}
@@ -239,6 +263,7 @@ export function VersionCard({
         onFormatChange={onFormatChange}
         extras={state.extras}
         onExtrasChange={onExtrasChange}
+        mediaCount={mediaCount}
       />
 
       {/* ── ONLY ONE OF THE TWO EVER SHOWS ──────────────────────────────────────

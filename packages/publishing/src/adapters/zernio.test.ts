@@ -46,6 +46,14 @@ function stubClient(post: ZernioPost): ZernioClient {
     presignMedia: unexpected('presignMedia') as never,
     uploadMedia: unexpected('uploadMedia') as never,
     headMedia: unexpected('headMedia') as never,
+    // ── THE RECOVERY SURFACE, WIRED TO THROW ──────────────────────────────────
+    // A publish must never edit, unpublish or retry, and these make that an
+    // assertion rather than an assumption: every test in this file fails loudly
+    // if the adapter reaches one. TypeScript required them to be added; what they
+    // are wired TO is the choice that makes them worth something.
+    editPost: unexpected('editPost') as never,
+    unpublishPost: unexpected('unpublishPost') as never,
+    retryPost: unexpected('retryPost') as never,
   }
 }
 
@@ -344,5 +352,108 @@ describe('the per-channel half actually reaches the request', () => {
 
     const body = sent() as unknown as { mediaItems: { type: string }[] }
     expect(body.mediaItems[0]!.type).toBe('gif')
+  })
+})
+
+describe('an X thread on the wire', () => {
+  const xPost: ZernioPost = {
+    _id: ZERNIO_POST_ID,
+    status: 'published',
+    platforms: [{ platform: 'x', status: 'published', platformPostUrl: 'https://x.com/s/1' }],
+  }
+  const xRequest = (text: string) => ({
+    workspaceId: 'ws-1',
+    postId: 'post-1',
+    variantId: 'var-1',
+    content: { channel: 'x' as const, text, media: [] },
+    media: [],
+    auth: {
+      connectionId: 'conn-1',
+      accessToken: 'tok',
+      externalAccountId: '0123456789abcdef01234567',
+    },
+  })
+
+  it('sends threadItems, and the ROOT content is the first segment', async () => {
+    const segments = ['First post of the thread.', 'Second post.', 'Third and last.']
+    const { client, sent } = capturingClient(xPost)
+    await createZernioAdapter('x', {
+      client,
+      format: 'thread',
+      thread: { segments },
+      poll: { attempts: 1, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    }).publish(xRequest(segments.join(' ')))
+
+    const body = sent() as unknown as SentPlatforms & Record<string, unknown>
+    expect(body.platforms[0]!.platformSpecificData).toEqual({
+      threadItems: segments.map((content) => ({ content })),
+    })
+
+    // ── THE ROOT IS THE FIRST POST, AND BOTH THINGS ARE TRUE AT ONCE ─────────
+    // Zernio's spec says the root `content` "is NOT published" when threadItems
+    // is present — and their validator STILL measures it against 280 and refuses
+    // a longer one (MEASURED, docs/32 §4.1). Sending the whole body there would
+    // be refused; sending the first segment satisfies both.
+    expect(body.content).toBe(segments[0])
+    expect(body.content).not.toBe(segments.join(' '))
+  })
+
+  /**
+   * ── THE SILENT-DEFAULT DEFECT, AS A TEST ─────────────────────────────────
+   * A `'thread'` that reaches the adapter with no plan must REFUSE. The
+   * tempting behaviour is to fall through and publish the body as one tweet:
+   * it succeeds, the log looks clean, and a five-part thread went out as a
+   * single truncated post. This repo has shipped that shape of defect twice
+   * from an optional parameter quietly taking its default.
+   */
+  it('refuses a thread that arrives with no segments rather than posting the body', async () => {
+    const { client, sent } = capturingClient(xPost)
+    await expect(
+      createZernioAdapter('x', {
+        client,
+        format: 'thread',
+        poll: { attempts: 1, intervalMs: 0 },
+        sleep: async () => {},
+        now: () => FIXED_NOW,
+      }).publish(xRequest('A body that must not go out on its own.')),
+    ).rejects.toThrow(/no parts to post/)
+    // And nothing was sent. A refusal that still hits the network is not a refusal.
+    expect(sent()).toBeNull()
+  })
+
+  it('refuses an empty segment list for the same reason', async () => {
+    const { client } = capturingClient(xPost)
+    await expect(
+      createZernioAdapter('x', {
+        client,
+        format: 'thread',
+        thread: { segments: [] },
+        poll: { attempts: 1, intervalMs: 0 },
+        sleep: async () => {},
+        now: () => FIXED_NOW,
+      }).publish(xRequest('body')),
+    ).rejects.toThrow(/no parts to post/)
+  })
+
+  it('ignores a stray plan when the format is not a thread', async () => {
+    const { client, sent } = capturingClient(xPost)
+    await createZernioAdapter('x', {
+      client,
+      format: 'text',
+      thread: { segments: ['stray', 'segments'] },
+      poll: { attempts: 1, intervalMs: 0 },
+      sleep: async () => {},
+      now: () => FIXED_NOW,
+    }).publish(xRequest('The real body.'))
+
+    const body = sent() as unknown as SentPlatforms & Record<string, unknown>
+    expect('platformSpecificData' in body.platforms[0]!).toBe(false)
+    // And the BODY is still the body. The first draft read the root from the plan
+    // whenever one was present, so a plan handed to a non-thread post replaced the
+    // writer's words with its first segment — a caller's mistake becoming a wrong
+    // post rather than an error. The root now follows the FORMAT.
+    expect(body.content).toBe('The real body.')
   })
 })

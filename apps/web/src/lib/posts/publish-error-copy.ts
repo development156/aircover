@@ -163,6 +163,158 @@ const COPY: Record<string, PublishErrorDisplay> = {
     needsReconnect: false,
   },
 
+  // Found by the coverage sweep in this file's test, not by reading: the format
+  // layer emits MAX_MEDIA_COUNT too, and the engine's own version was mapped
+  // while this one was not.
+  MAX_MEDIA_COUNT: {
+    message: 'This post has more photos than the channel allows. Remove some and try again.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+
+  // ── THE POST IS NOT WHAT IT SAYS IT IS (packages/publishing/format-refusal) ─
+  // These were MISSING, and the gap is the one this whole file exists to close:
+  // a variant declaring "One photo" with nothing attached failed with
+  // FORMAT_NEEDS_MEDIA, and the writer read "Something went wrong sending this
+  // one. Try again" — about a post that will fail identically every time they
+  // try. The refusal already knows exactly what is wrong; only this map did not.
+  FORMAT_UNSUPPORTED: {
+    message: 'This channel cannot publish this kind of post. Change the kind and try again.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  FORMAT_NEEDS_MEDIA: {
+    message: 'This was written as a photo post and has no photo attached.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  FORMAT_CONTRADICTED: {
+    message: 'This post is not the kind it says it is. Check the kind against what is attached.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  FORMAT_MEDIA_ASPECT: {
+    message: 'This photo is the wrong shape for this kind of post.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+
+  // ── The Google button and topic ────────────────────────────────────────────
+  GBP_CTA_NEEDS_URL: {
+    message: 'The Google button has no web address to open. Add one, or remove the button.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  GBP_CTA_UNKNOWN: {
+    message: 'That is not a button Google offers. Pick one from the list, or leave it off.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  GBP_EVENT_NEEDS_TITLE: {
+    message: 'An event needs a name — it is the heading Google shows.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  GBP_EVENT_NEEDS_DATE: {
+    message: 'An event needs a start date. Google refuses the post without one.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  GBP_EVENT_BAD_DATE: {
+    message: 'That event date is not one Google can read. Set it again.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  GBP_EVENT_ENDS_FIRST: {
+    message: 'This event ends before it starts. Check the dates.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  GBP_OFFER_EMPTY: {
+    message: 'An offer needs a coupon code, a link to redeem it, or its terms.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+
+  // ── Threads ────────────────────────────────────────────────────────────────
+  THREAD_EMPTY: {
+    message: 'A thread needs something written in it.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  THREAD_UNBREAKABLE: {
+    message:
+      'Part of this is too long to split across posts, with no space to break at. Shorten it, or put it on its own line.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  THREAD_NO_ROOM: {
+    message: 'A link leaves no room for words on this channel.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  THREAD_SEGMENT_TOO_LONG: {
+    message: 'One part of this thread is longer than a single post can carry.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  // Not a rule the writer broke — a plan that failed to travel. Retrying is
+  // genuinely the right move, and it is the ONE refusal on this list that is.
+  THREAD_NOT_PLANNED: {
+    message: 'Sahoda could not work out how to split this thread. Try sending it again.',
+    worthRetrying: true,
+    needsReconnect: false,
+  },
+
+  // ── Polls ──────────────────────────────────────────────────────────────────
+  POLL_OPTION_COUNT: {
+    message: 'A poll needs between two and four answers.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  POLL_OPTION_TOO_LONG: {
+    message: 'One of the poll answers is longer than the channel allows.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  POLL_NEEDS_QUESTION: {
+    message: 'A poll on LinkedIn needs a question of its own.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  POLL_QUESTION_TOO_LONG: {
+    message: 'The poll question is longer than LinkedIn allows.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  POLL_DURATION: {
+    message: 'That is not a length of time this channel runs a poll for.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  POLL_WITH_MEDIA: {
+    message: 'A poll cannot carry a photo. Remove the photo, or drop the poll.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  POLL_WITH_THREAD: {
+    message: 'A poll cannot be part of a thread. Pick one.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+  POLL_UNSUPPORTED: {
+    message: 'Polls are for X and LinkedIn.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+
+  // ── Instagram ──────────────────────────────────────────────────────────────
+  IG_COLLAB_NOT_ON_STORY: {
+    message: 'A story has no co-authors. Post it to the feed to invite one.',
+    worthRetrying: false,
+    needsReconnect: false,
+  },
+
   POST_NOT_PUBLISHABLE: {
     message: 'This post is no longer in a state that can be published.',
     worthRetrying: false,
