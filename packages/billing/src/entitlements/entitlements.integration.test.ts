@@ -1,18 +1,38 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { LIVE_DB_URL } from '../test-helpers/live-env'
+import { openDbUnderTest, type DbUnderTest } from '../test-helpers/db-under-test'
 import { PLAN_CATALOG, PlanLimitsSchema, type PlanId } from '@sahoda/shared'
 import { createPgPlanResolver, type PgPlanResolver } from './pg'
 import { createCheckEntitlement } from './checkEntitlement'
 
-describe.skipIf(!LIVE_DB_URL)('entitlements against the real database', () => {
+/**
+ * Ported off `describe.skipIf(!LIVE_DB_URL)` on 2026-08-20.
+ *
+ * The skip meant these had NEVER executed: the only DSN the repo has is
+ * production's and the opt-in guarding it is off by default and should stay off.
+ * `vitest --reporter=json` reported packages/billing as 270 passed / 26 SKIPPED,
+ * and vitest reports a suite that ran nothing exactly as it reports one that
+ * passed. They now run against PGlite built from packages/db's real migration
+ * files, and against the live database when SAHODA_ALLOW_LIVE_TESTS=1.
+ */
+describe('entitlements against the real database', () => {
+  let db: DbUnderTest
   let resolver: PgPlanResolver
   let ws: string
 
-  beforeAll(() => {
-    resolver = createPgPlanResolver({ connectionString: LIVE_DB_URL })
+  beforeAll(async () => {
+    db = await openDbUnderTest()
+    resolver = createPgPlanResolver({
+      connectionString: db.connectionString,
+      ...(db.kind === 'pglite' ? { pool: db.pool } : {}),
+    })
   })
   afterAll(async () => {
     await resolver.close()
+    await db.close()
+  })
+
+  it('is running against a real Postgres, and says which one', () => {
+    expect(['pglite', 'live']).toContain(db.kind)
   })
   beforeEach(async () => {
     const r = await resolver.pool.query<{ id: string }>(
@@ -114,14 +134,20 @@ describe.skipIf(!LIVE_DB_URL)('entitlements against the real database', () => {
  * so a hand-edited row or a stale seed could silently make the DB and the product disagree
  * about what a customer paid for. This test is what makes reading the catalog honest.
  */
-describe.skipIf(!LIVE_DB_URL)('plans table matches PLAN_CATALOG', () => {
+describe('plans table matches PLAN_CATALOG', () => {
+  let db: DbUnderTest
   let resolver: PgPlanResolver
 
-  beforeAll(() => {
-    resolver = createPgPlanResolver({ connectionString: LIVE_DB_URL })
+  beforeAll(async () => {
+    db = await openDbUnderTest()
+    resolver = createPgPlanResolver({
+      connectionString: db.connectionString,
+      ...(db.kind === 'pglite' ? { pool: db.pool } : {}),
+    })
   })
   afterAll(async () => {
     await resolver.close()
+    await db.close()
   })
 
   it('has exactly the catalog plans, with matching credits, prices and limits', async () => {
