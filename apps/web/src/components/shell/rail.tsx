@@ -113,14 +113,16 @@ export async function Rail() {
           overflow container that looks like a finished list is worse than a
           short list.
 
-          Two answers together, and neither is "show fewer sections": the
-          headings lost 6px of padding each, and `.scroll-visible` forces a
-          classic, always-painted scrollbar (`scrollbar-width: thin` alone was
-          tried and measured at ZERO layout width — an overlay bar that does
-          not appear until you already know to scroll). The house style hides scrollbars on horizontal tab
-          rows (`brain-tabs`, `ads-tabs`) because a tab row that overflows is
-          still obviously a row; a vertical list that overflows is
-          indistinguishable from one that ended. */}
+          Two answers together, and neither is "show fewer sections". The
+          headings lost 6px of padding each, and `.scroll-fade` masks the last
+          20px of the region so the edge FADES rather than stopping — the cue
+          that does not depend on the engine.
+
+          `.scroll-visible` is there too and it is not what fixed this:
+          `scrollbar-width: thin`, that property scoped away, and a forced
+          `::-webkit-scrollbar` width were each measured at ZERO layout width in
+          headless Chromium. It styles the bar for the engines that honour it,
+          and the mask covers the ones that do not. */}
       <nav
         aria-label="Main"
         className="scroll-visible scroll-fade flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-2 max-wide:px-2"
