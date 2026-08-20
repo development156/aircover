@@ -85,13 +85,10 @@ export function governingLevel(
   fallback: AutonomyLevel = 1,
 ): AutonomyLevel {
   if (channels.length === 0) return fallback
-  return channels.reduce<AutonomyLevel>(
-    (lowest, channel) => {
-      const level = dial.get(channel) ?? fallback
-      return level < lowest ? level : lowest
-    },
-    2 as AutonomyLevel,
-  )
+  return channels.reduce<AutonomyLevel>((lowest, channel) => {
+    const level = dial.get(channel) ?? fallback
+    return level < lowest ? level : lowest
+  }, 2 as AutonomyLevel)
 }
 
 export async function runCreateStage(cycleId: string): Promise<CreateStageState> {

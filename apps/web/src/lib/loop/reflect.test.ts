@@ -2,12 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import {
-  reflect,
-  MIN_POSTS_PER_GROUP,
-  MIN_LEADER_MEAN,
-  type MetricObservation,
-} from './reflect'
+import { reflect, MIN_POSTS_PER_GROUP, MIN_LEADER_MEAN, type MetricObservation } from './reflect'
 
 const obs = (
   post_id: string,
@@ -161,7 +156,7 @@ describe('Reflect', () => {
     expect(r.learnings[0]!.sampleSize).toBe(MIN_POSTS_PER_GROUP * 2)
   })
 
-  it('averages a post\'s own daily readings before comparing', () => {
+  it("averages a post's own daily readings before comparing", () => {
     const swingy = [
       obs('a', 'instagram', 1000, '2026-08-18'),
       obs('a', 'instagram', 0, '2026-08-19'),

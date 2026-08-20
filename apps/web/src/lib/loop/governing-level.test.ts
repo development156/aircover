@@ -6,20 +6,42 @@ import { governingLevel } from '@/app/actions/loop-create'
 const dial = (entries: Array<[Channel, AutonomyLevel]>) => new Map(entries)
 
 describe('governingLevel — the level that rules a multi-channel brief', () => {
-  it('takes the LOWEST level of the brief\'s channels', () => {
+  it("takes the LOWEST level of the brief's channels", () => {
     // Instagram is set to publish-after-approval and LinkedIn to suggest-only.
     // One brief is ONE post with ONE schedule, so scheduling it would act at L2
     // on a post that also carries a channel the customer wanted only suggested.
     expect(
-      governingLevel(['instagram', 'linkedin'], dial([['instagram', 2], ['linkedin', 0]])),
+      governingLevel(
+        ['instagram', 'linkedin'],
+        dial([
+          ['instagram', 2],
+          ['linkedin', 0],
+        ]),
+      ),
     ).toBe(0)
   })
 
   it('is not fooled by the order the channels arrive in', () => {
     // The reduce seeds at 2 and walks down; a version that seeded at the first
     // element would give a different answer for a reversed list.
-    expect(governingLevel(['linkedin', 'instagram'], dial([['instagram', 2], ['linkedin', 0]]))).toBe(0)
-    expect(governingLevel(['instagram', 'linkedin'], dial([['instagram', 0], ['linkedin', 2]]))).toBe(0)
+    expect(
+      governingLevel(
+        ['linkedin', 'instagram'],
+        dial([
+          ['instagram', 2],
+          ['linkedin', 0],
+        ]),
+      ),
+    ).toBe(0)
+    expect(
+      governingLevel(
+        ['instagram', 'linkedin'],
+        dial([
+          ['instagram', 0],
+          ['linkedin', 2],
+        ]),
+      ),
+    ).toBe(0)
   })
 
   it('defaults an unset channel to L1, not to the most permissive level', () => {
@@ -30,7 +52,15 @@ describe('governingLevel — the level that rules a multi-channel brief', () => 
   })
 
   it('returns L2 only when every channel is L2', () => {
-    expect(governingLevel(['instagram', 'linkedin'], dial([['instagram', 2], ['linkedin', 2]]))).toBe(2)
+    expect(
+      governingLevel(
+        ['instagram', 'linkedin'],
+        dial([
+          ['instagram', 2],
+          ['linkedin', 2],
+        ]),
+      ),
+    ).toBe(2)
   })
 
   it('never returns 3 — there is no input that produces autopilot', () => {
@@ -45,7 +75,12 @@ describe('governingLevel — the level that rules a multi-channel brief', () => 
           for (const d of levels) {
             const got = governingLevel(
               channels,
-              dial([['x', a], ['gbp', b], ['linkedin', c], ['instagram', d]]),
+              dial([
+                ['x', a],
+                ['gbp', b],
+                ['linkedin', c],
+                ['instagram', d],
+              ]),
             )
             expect(got).toBe(Math.min(a, b, c, d))
             expect(got).toBeLessThan(3)

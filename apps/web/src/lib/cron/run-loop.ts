@@ -56,7 +56,10 @@ export async function runScheduledLoopCycles(now = new Date()): Promise<LoopCron
     [MAX_WORKSPACES_PER_TICK + 1],
   )
   const rows = eligible.rows.slice(0, MAX_WORKSPACES_PER_TICK)
-  const deferred = eligible.rows.length > MAX_WORKSPACES_PER_TICK ? eligible.rows.length - MAX_WORKSPACES_PER_TICK : 0
+  const deferred =
+    eligible.rows.length > MAX_WORKSPACES_PER_TICK
+      ? eligible.rows.length - MAX_WORKSPACES_PER_TICK
+      : 0
 
   let planned = 0
   let failed = 0
@@ -169,9 +172,7 @@ async function planOneWorkspace(
 
       const priced = priceBrief()
       const rows = result.data.briefs.map((brief, index) => {
-        const kept = toChannelSet(
-          (brief.channels as Channel[]).filter((c) => channels.includes(c)),
-        )
+        const kept = toChannelSet((brief.channels as Channel[]).filter((c) => channels.includes(c)))
         const use = kept.length > 0 ? kept : channels
         const slot = normalizeSlot(brief.suggestedSlot, [...use], now, index)
         return {

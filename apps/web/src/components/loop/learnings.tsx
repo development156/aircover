@@ -83,7 +83,12 @@ function LearningCard({ learning }: { learning: PendingLearning }) {
   return (
     <li className="surface-ring rounded-card bg-surface p-4">
       <div className="flex items-start gap-3">
-        <Lightbulb size={16} strokeWidth={1.8} aria-hidden className="mt-[3px] shrink-0 text-accent" />
+        <Lightbulb
+          size={16}
+          strokeWidth={1.8}
+          aria-hidden
+          className="mt-[3px] shrink-0 text-accent"
+        />
         <div className="min-w-0 flex-1">
           <p className="type-body text-ink">{learning.summary}</p>
           {learning.evidence ? (

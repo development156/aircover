@@ -74,11 +74,7 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
   function approve() {
     setError(null)
     startTransition(async () => {
-      const approved = await approveCycleCost(
-        cycleId,
-        [...excluded],
-        preview.creationCredits,
-      )
+      const approved = await approveCycleCost(cycleId, [...excluded], preview.creationCredits)
       if (!approved.ok) {
         setError(approved.message ?? 'Could not approve that.')
         return
@@ -152,9 +148,7 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
                     </span>
                   ) : null}
                 </span>
-                <span className="type-sm num shrink-0 text-muted">
-                  {brief.estimatedCredits} cr
-                </span>
+                <span className="type-sm num shrink-0 text-muted">{brief.estimatedCredits} cr</span>
               </label>
             </li>
           )

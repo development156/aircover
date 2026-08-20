@@ -72,7 +72,10 @@ export async function approveCycleCost(
       p_expected_credits: expectedCredits,
     })
     if (error) {
-      return { ok: false, message: messageFor(error.message, 'Could not approve that — try again.') }
+      return {
+        ok: false,
+        message: messageFor(error.message, 'Could not approve that — try again.'),
+      }
     }
 
     revalidatePath('/loop')
@@ -140,7 +143,10 @@ export async function killLoop(alsoPause = true): Promise<KillState> {
       p_also_pause: alsoPause,
     })
     if (error) {
-      return { ok: false, message: messageFor(error.message, 'Could not stop the Loop — try again.') }
+      return {
+        ok: false,
+        message: messageFor(error.message, 'Could not stop the Loop — try again.'),
+      }
     }
 
     const out = data as {

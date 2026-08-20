@@ -38,7 +38,12 @@ export interface ReportData {
   /** Learnings this cycle proposed, and what became of each. */
   learnings: ReadonlyArray<{ summary: string; status: string; appliedVersion: number | null }>
   /** What the cycle put in the Planner. */
-  plan: ReadonlyArray<{ title: string; channels: readonly string[]; slot: string | null; outcome: string }>
+  plan: ReadonlyArray<{
+    title: string
+    channels: readonly string[]
+    slot: string | null
+    outcome: string
+  }>
   creditsSpent: number
   budgetCredits: number | null
 }
@@ -77,7 +82,9 @@ export async function readRanking(
     .select('id, title')
     .eq('workspace_id', workspaceId)
     .in('id', [...best.keys()])
-  const titles = new Map((posts ?? []).map((p) => [p.id as string, (p.title as string) ?? 'Untitled']))
+  const titles = new Map(
+    (posts ?? []).map((p) => [p.id as string, (p.title as string) ?? 'Untitled']),
+  )
 
   const ranked = [...best.entries()]
     .map(([postId, v]) => ({

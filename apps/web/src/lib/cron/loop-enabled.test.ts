@@ -35,10 +35,7 @@ describe('the Loop cron flag', () => {
 })
 
 describe('the Sunday route stops where the feature says it stops', () => {
-  const src = readFileSync(
-    resolve(import.meta.dirname, '../../app/api/cron/loop/route.ts'),
-    'utf8',
-  )
+  const src = readFileSync(resolve(import.meta.dirname, '../../app/api/cron/loop/route.ts'), 'utf8')
   const runner = readFileSync(resolve(import.meta.dirname, 'run-loop.ts'), 'utf8')
   const code = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 

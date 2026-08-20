@@ -149,7 +149,8 @@ describe('THE LOOP, END TO END, AGAINST PRODUCTION', () => {
     const { planningWeekFor, reflectionWindow } = await import('@/lib/loop/iso-week')
     const { previewCost, priceBrief, cycleCost } = await import('@/lib/loop/cost')
     const { newLoopCycleRef, isLoopRef } = await import('@/lib/loop/object-ref')
-    const { createPgLedgerPort, createWithCredits, loadBillingEnv } = await import('@sahoda/billing')
+    const { createPgLedgerPort, createWithCredits, loadBillingEnv } =
+      await import('@sahoda/billing')
     const { createMesh, planWeekTask } = await import('@sahoda/mesh')
     const { toChannelSet, MESH_TASK_ACTION } = await import('@sahoda/shared')
     const { normalizeSlot } = await import('@/lib/planner/slots')
@@ -265,7 +266,9 @@ describe('THE LOOP, END TO END, AGAINST PRODUCTION', () => {
 
     expect(charged.ok, `inner error: ${String(innerError)}`).toBe(true)
     if (!charged.ok) return
-    console.log(`PLAN     wrote ${charged.data.data.count} briefs, balanceAfter=${charged.data.balanceAfter}`)
+    console.log(
+      `PLAN     wrote ${charged.data.data.count} briefs, balanceAfter=${charged.data.balanceAfter}`,
+    )
     expect(before.total - charged.data.balanceAfter).toBe(cycleCost())
 
     // ── THE HALT ──────────────────────────────────────────────────────────
@@ -308,7 +311,9 @@ describe('THE LOOP, END TO END, AGAINST PRODUCTION', () => {
 
     // ── THE GATE: nothing may be spent from here without an approval ──────
     const gated = await store.readApprovedCycleForCreate(opened.cycle.id, WORKSPACE)
-    console.log(`\nGATE     readApprovedCycleForCreate → ${gated === null ? 'null → REFUSED' : 'ADMITTED'}`)
+    console.log(
+      `\nGATE     readApprovedCycleForCreate → ${gated === null ? 'null → REFUSED' : 'ADMITTED'}`,
+    )
     expect(gated).toBeNull()
   }, 180_000)
 
@@ -346,7 +351,12 @@ describe('THE LOOP, END TO END, AGAINST PRODUCTION', () => {
     const dropped = all[all.length - 1]!
     const kept = all.filter((b) => b.id !== dropped.id)
     const expected = previewCost(
-      kept.map((b) => ({ id: b.id, priority: b.priority, estimated_credits: b.estimated_credits, included: true })),
+      kept.map((b) => ({
+        id: b.id,
+        priority: b.priority,
+        estimated_credits: b.estimated_credits,
+        included: true,
+      })),
       150,
     ).creationCredits
 
@@ -370,7 +380,8 @@ describe('THE LOOP, END TO END, AGAINST PRODUCTION', () => {
     const store = await import('@/lib/loop/store')
     const { newLoopBriefRef } = await import('@/lib/loop/object-ref')
     const { BRIEF_ACTION, briefCost } = await import('@/lib/loop/cost')
-    const { createPgLedgerPort, createWithCredits, loadBillingEnv } = await import('@sahoda/billing')
+    const { createPgLedgerPort, createWithCredits, loadBillingEnv } =
+      await import('@sahoda/billing')
     const { databaseUrl } = loadBillingEnv()
     const ledger = createPgLedgerPort({ connectionString: databaseUrl })
     const withCredits = createWithCredits(ledger)
@@ -397,7 +408,12 @@ describe('THE LOOP, END TO END, AGAINST PRODUCTION', () => {
       )
       expect(charged.ok).toBe(true)
       if (!charged.ok) continue
-      await store.linkBriefToPost(brief.id, WORKSPACE, charged.data.data.postId, 'awaiting_approval')
+      await store.linkBriefToPost(
+        brief.id,
+        WORKSPACE,
+        charged.data.data.postId,
+        'awaiting_approval',
+      )
       await store.addSpend(state.cycleId, WORKSPACE, briefCost())
       created += 1
       spent += briefCost()

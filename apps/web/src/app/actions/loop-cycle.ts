@@ -151,11 +151,7 @@ export async function runCycleToPreview(
     // spent nothing at this point.
     await store.setCycleStatus(cycle.id, workspaceId, 'reflecting')
     const window = reflectionWindow(now)
-    const observations = await store.readObservations(
-      workspaceId,
-      window.fromIso,
-      window.toIso,
-    )
+    const observations = await store.readObservations(workspaceId, window.fromIso, window.toIso)
     const reflection = reflect(observations)
 
     // Each learning is PROPOSED, never applied. `proposeLearning` writes a
@@ -208,62 +204,54 @@ export async function runCycleToPreview(
     if (!isLoopRef(objectRef)) throw new Error('LOOP_REF_INVARIANT')
 
     let planned = false
-    const credits = await getWithCredits()(
-      { workspaceId, action, objectRef },
-      async (ctx) => {
-        const parsed = PlanWeekInputSchema.safeParse({
-          goals: '',
-          channels,
-          nowIso: now.toISOString(),
-        })
-        if (!parsed.success) throw new Error('PLAN_INPUT')
+    const credits = await getWithCredits()({ workspaceId, action, objectRef }, async (ctx) => {
+      const parsed = PlanWeekInputSchema.safeParse({
+        goals: '',
+        channels,
+        nowIso: now.toISOString(),
+      })
+      if (!parsed.success) throw new Error('PLAN_INPUT')
 
-        const result = await getMesh().runTask(
-          planWeekTask.def,
-          { goals: parsed.data.goals, channels },
-          {
-            workspaceId: workspaceId as string,
-            traceId: cycle.id,
-            userId,
-            actionType: ctx.actionType,
-            creditsCharged: ctx.creditsCharged,
-          },
+      const result = await getMesh().runTask(
+        planWeekTask.def,
+        { goals: parsed.data.goals, channels },
+        {
+          workspaceId: workspaceId as string,
+          traceId: cycle.id,
+          userId,
+          actionType: ctx.actionType,
+          creditsCharged: ctx.creditsCharged,
+        },
+      )
+      if (!result.ok) throw new Error('MESH_ERROR') // → RELEASE, no charge
+      const briefs = result.data.briefs
+      if (briefs.length === 0) throw new Error('MESH_EMPTY') // → RELEASE
+
+      const priced = priceBrief()
+      const rows = briefs.map((brief, index) => {
+        // A ChannelSet at the boundary — the same de-duplication `plan-week.ts`
+        // does, through the same shared helper, and the column's own check
+        // refuses a duplicate behind it.
+        const briefChannels = toChannelSet(
+          (brief.channels as Channel[]).filter((c) => channels.includes(c)),
         )
-        if (!result.ok) throw new Error('MESH_ERROR') // → RELEASE, no charge
-        const briefs = result.data.briefs
-        if (briefs.length === 0) throw new Error('MESH_EMPTY') // → RELEASE
+        const slot = normalizeSlot(brief.suggestedSlot, [...briefChannels], now, index)
+        return {
+          priority: index + 1,
+          title: clampBriefText(brief.title, BRIEF_TITLE_MAX_CHARS),
+          body: clampBriefText(brief.body, BRIEF_BODY_MAX_CHARS),
+          channels: briefChannels.length > 0 ? briefChannels : toChannelSet(channels),
+          suggestedSlot: slot.scheduledAt,
+          rationale: brief.rationale ?? null,
+          estimatedCredits: priced,
+        }
+      })
 
-        const priced = priceBrief()
-        const rows = briefs.map((brief, index) => {
-          // A ChannelSet at the boundary — the same de-duplication `plan-week.ts`
-          // does, through the same shared helper, and the column's own check
-          // refuses a duplicate behind it.
-          const briefChannels = toChannelSet(
-            (brief.channels as Channel[]).filter((c) => channels.includes(c)),
-          )
-          const slot = normalizeSlot(
-            brief.suggestedSlot,
-            [...briefChannels],
-            now,
-            index,
-          )
-          return {
-            priority: index + 1,
-            title: clampBriefText(brief.title, BRIEF_TITLE_MAX_CHARS),
-            body: clampBriefText(brief.body, BRIEF_BODY_MAX_CHARS),
-            channels: briefChannels.length > 0 ? briefChannels : toChannelSet(channels),
-            suggestedSlot: slot.scheduledAt,
-            rationale: brief.rationale ?? null,
-            estimatedCredits: priced,
-          }
-        })
-
-        const written = await store.writeBriefs(cycle.id, workspaceId as string, rows)
-        if (written.length !== rows.length) throw new Error('BRIEF_WRITE_FAILED')
-        planned = true
-        return { count: written.length }
-      },
-    )
+      const written = await store.writeBriefs(cycle.id, workspaceId as string, rows)
+      if (written.length !== rows.length) throw new Error('BRIEF_WRITE_FAILED')
+      planned = true
+      return { count: written.length }
+    })
 
     if (!credits.ok) {
       reportPaidActionFailure('loop-cycle', credits.error)

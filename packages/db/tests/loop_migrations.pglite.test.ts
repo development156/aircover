@@ -48,10 +48,24 @@ const VIEWER = 'user_viewer'
 
 /** A minimally valid brand payload — the six sections resolve_brand_memory pins. */
 const BRAIN = {
-  voice: { descriptor: 'warm', formality_label: 'casual', signature_phrases: ['a', 'b', 'c'], banned_phrases: [] },
+  voice: {
+    descriptor: 'warm',
+    formality_label: 'casual',
+    signature_phrases: ['a', 'b', 'c'],
+    banned_phrases: [],
+  },
   brand_persona: { archetype: 'sage', one_liner: 'we know books', core_values: ['x', 'y', 'z'] },
-  customer_persona: { one_liner: 'readers', primary_pain_point: 'time', primary_fear: 'boredom', desired_identity: 'well-read' },
-  hook: { core_promise: 'a better shelf', primary_emotion: 'calm', sample_hooks: ['h1', 'h2', 'h3'] },
+  customer_persona: {
+    one_liner: 'readers',
+    primary_pain_point: 'time',
+    primary_fear: 'boredom',
+    desired_identity: 'well-read',
+  },
+  hook: {
+    core_promise: 'a better shelf',
+    primary_emotion: 'calm',
+    sample_hooks: ['h1', 'h2', 'h3'],
+  },
   taboo: { red_lines: [] },
   alignment: { signal_lock: 'strong', note: '' },
 }
@@ -99,8 +113,11 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       `select tablename from pg_tables where schemaname = 'public'`,
     )
     const live = new Set(r.rows.map((x) => x.tablename))
-    expect(['loop_settings', 'loop_channel_autonomy', 'loop_cycles', 'loop_briefs']
-      .filter((t) => !live.has(t))).toEqual([])
+    expect(
+      ['loop_settings', 'loop_channel_autonomy', 'loop_cycles', 'loop_briefs'].filter(
+        (t) => !live.has(t),
+      ),
+    ).toEqual([])
   })
 
   it('enables row-level security on all four tables (structural fact only)', async () => {
@@ -117,7 +134,11 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       `select tablename, cmd from pg_policies where schemaname = 'public'
          and tablename in ('loop_settings','loop_channel_autonomy','loop_cycles','loop_briefs')`,
     )
-    const byTable = (t: string) => r.rows.filter((x) => x.tablename === t).map((x) => x.cmd).sort()
+    const byTable = (t: string) =>
+      r.rows
+        .filter((x) => x.tablename === t)
+        .map((x) => x.cmd)
+        .sort()
     // A member may not write the record of what they were charged for.
     expect(byTable('loop_cycles')).toEqual(['SELECT'])
     expect(byTable('loop_briefs')).toEqual(['SELECT'])
@@ -129,51 +150,77 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
   // ── GUARANTEE 1: L3 IS UNSTORABLE ─────────────────────────────────────────
   describe('the Autonomy Dial', () => {
     it('stores L0, L1 and L2', async () => {
-      for (const [channel, level] of [['x', 0], ['gbp', 1], ['linkedin', 2]] as const) {
+      for (const [channel, level] of [
+        ['x', 0],
+        ['gbp', 1],
+        ['linkedin', 2],
+      ] as const) {
         await db.query(
           `insert into loop_channel_autonomy (workspace_id, channel, level) values ($1, $2, $3)`,
           [WS_A, channel, level],
         )
       }
       const r = await db.query<{ n: number }>(
-        `select count(*)::int as n from loop_channel_autonomy where workspace_id = $1`, [WS_A])
+        `select count(*)::int as n from loop_channel_autonomy where workspace_id = $1`,
+        [WS_A],
+      )
       expect(r.rows[0]!.n).toBe(3)
     })
 
     it('REFUSES L3 — autopilot cannot be turned on by any route into this column', async () => {
       const msg = await raises(() =>
-        db.query(`insert into loop_channel_autonomy (workspace_id, channel, level) values ($1,$2,$3)`,
-          [WS_A, 'instagram', 3]))
+        db.query(
+          `insert into loop_channel_autonomy (workspace_id, channel, level) values ($1,$2,$3)`,
+          [WS_A, 'instagram', 3],
+        ),
+      )
       expect(msg).toMatch(/loop_channel_autonomy_level_check|violates check constraint/i)
 
       // And an UPDATE cannot smuggle it in either — the check is on the column,
       // not on the insert path, and this is the route a "just bump it" would take.
       const upd = await raises(() =>
-        db.query(`update loop_channel_autonomy set level = 3 where workspace_id = $1 and channel = 'x'`, [WS_A]))
+        db.query(
+          `update loop_channel_autonomy set level = 3 where workspace_id = $1 and channel = 'x'`,
+          [WS_A],
+        ),
+      )
       expect(upd).toMatch(/violates check constraint/i)
 
       const still = await db.query<{ level: number }>(
-        `select level from loop_channel_autonomy where workspace_id = $1 and channel = 'x'`, [WS_A])
+        `select level from loop_channel_autonomy where workspace_id = $1 and channel = 'x'`,
+        [WS_A],
+      )
       expect(still.rows[0]!.level).toBe(0)
     })
 
     it('defaults to L1 — drafts only, nothing reaches anyone', async () => {
-      await db.query(`insert into loop_channel_autonomy (workspace_id, channel) values ($1,'instagram')`, [WS_A])
+      await db.query(
+        `insert into loop_channel_autonomy (workspace_id, channel) values ($1,'instagram')`,
+        [WS_A],
+      )
       const r = await db.query<{ level: number }>(
-        `select level from loop_channel_autonomy where workspace_id=$1 and channel='instagram'`, [WS_A])
+        `select level from loop_channel_autonomy where workspace_id=$1 and channel='instagram'`,
+        [WS_A],
+      )
       expect(r.rows[0]!.level).toBe(1)
     })
 
     it('refuses a second dial for the same channel', async () => {
       const msg = await raises(() =>
-        db.query(`insert into loop_channel_autonomy (workspace_id, channel, level) values ($1,'x',1)`, [WS_A]))
+        db.query(
+          `insert into loop_channel_autonomy (workspace_id, channel, level) values ($1,'x',1)`,
+          [WS_A],
+        ),
+      )
       expect(msg).toMatch(/duplicate key|unique/i)
     })
 
     it('defaults the weekly budget to 150 credits (FSD M2)', async () => {
       await db.query(`insert into loop_settings (workspace_id) values ($1)`, [WS_A])
       const r = await db.query<{ weekly_budget_credits: number; paused: boolean }>(
-        `select weekly_budget_credits, paused from loop_settings where workspace_id=$1`, [WS_A])
+        `select weekly_budget_credits, paused from loop_settings where workspace_id=$1`,
+        [WS_A],
+      )
       expect(r.rows[0]!.weekly_budget_credits).toBe(150)
       expect(r.rows[0]!.paused).toBe(false)
     })
@@ -188,10 +235,13 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
         insert into posts (id, workspace_id, title, body)
           values ('44444444-4444-4444-8444-444444444444', '${WS_B}', 'beta post', 'b');
       `)
-      const msg = await raises(() => db.query(
-        `insert into loop_briefs (workspace_id, cycle_id, title, body, post_id)
+      const msg = await raises(() =>
+        db.query(
+          `insert into loop_briefs (workspace_id, cycle_id, title, body, post_id)
          values ($1, '33333333-3333-4333-8333-333333333333', 't', 'b', '44444444-4444-4444-8444-444444444444')`,
-        [WS_A]))
+          [WS_A],
+        ),
+      )
       expect(msg).toMatch(/LOOP_BRIEF_CROSS_TENANT/)
     })
 
@@ -206,7 +256,8 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
         delete from posts where id = '55555555-5555-4555-8555-555555555555';
       `)
       const r = await db.query<{ post_id: string | null }>(
-        `select post_id from loop_briefs where id = '66666666-6666-4666-8666-666666666666'`)
+        `select post_id from loop_briefs where id = '66666666-6666-4666-8666-666666666666'`,
+      )
       // The brief SURVIVES the post's deletion — the record of what the Loop
       // planned is not erased by a customer tidying their Planner.
       expect(r.rows).toHaveLength(1)
@@ -232,44 +283,53 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
 
     it('refuses without a signed-in user', async () => {
       await asUser(db, null)
-      expect(await raises(() => db.query(`select public.loop_approve_cost($1)`, [CYCLE])))
-        .toMatch(/AUTH_REQUIRED/)
+      expect(await raises(() => db.query(`select public.loop_approve_cost($1)`, [CYCLE]))).toMatch(
+        /AUTH_REQUIRED/,
+      )
     })
 
-    it("refuses a member of another workspace, with no existence oracle", async () => {
+    it('refuses a member of another workspace, with no existence oracle', async () => {
       await asUser(db, USER_B)
-      expect(await raises(() => db.query(`select public.loop_approve_cost($1)`, [CYCLE])))
-        .toMatch(/NOT_A_MEMBER/)
+      expect(await raises(() => db.query(`select public.loop_approve_cost($1)`, [CYCLE]))).toMatch(
+        /NOT_A_MEMBER/,
+      )
       // A cycle id that does not exist at all gives a DIFFERENT error than
       // "not yours" would need to, and the same one a stranger's cycle gives.
-      expect(await raises(() => db.query(
-        `select public.loop_approve_cost('88888888-8888-4888-8888-888888888888')`)))
-        .toMatch(/INVALID_CYCLE/)
+      expect(
+        await raises(() =>
+          db.query(`select public.loop_approve_cost('88888888-8888-4888-8888-888888888888')`),
+        ),
+      ).toMatch(/INVALID_CYCLE/)
     })
 
     it('refuses a viewer — approving a cost is spending money', async () => {
       await asUser(db, VIEWER)
-      expect(await raises(() => db.query(`select public.loop_approve_cost($1)`, [CYCLE])))
-        .toMatch(/FORBIDDEN_ROLE/)
+      expect(await raises(() => db.query(`select public.loop_approve_cost($1)`, [CYCLE]))).toMatch(
+        /FORBIDDEN_ROLE/,
+      )
     })
 
-    it('refuses when the caller\'s shown total is not what the rows say', async () => {
+    it("refuses when the caller's shown total is not what the rows say", async () => {
       await asUser(db, USER_A)
       // The screen showed 21; caller claims 12. Nothing is approved.
-      expect(await raises(() => db.query(
-        `select public.loop_approve_cost($1, '{}', 12)`, [CYCLE])))
-        .toMatch(/ESTIMATE_CHANGED/)
+      expect(
+        await raises(() => db.query(`select public.loop_approve_cost($1, '{}', 12)`, [CYCLE])),
+      ).toMatch(/ESTIMATE_CHANGED/)
       const r = await db.query<{ cost_approved_at: string | null; status: string }>(
-        `select cost_approved_at, status from loop_cycles where id = $1`, [CYCLE])
+        `select cost_approved_at, status from loop_cycles where id = $1`,
+        [CYCLE],
+      )
       expect(r.rows[0]!.cost_approved_at).toBeNull()
       expect(r.rows[0]!.status).toBe('awaiting_cost_approval')
     })
 
     it('refuses to approve a plan with every brief trimmed out', async () => {
       await asUser(db, USER_A)
-      expect(await raises(() => db.query(
-        `select public.loop_approve_cost($1, $2::uuid[])`, [CYCLE, `{${B1},${B2}}`])))
-        .toMatch(/NOTHING_INCLUDED/)
+      expect(
+        await raises(() =>
+          db.query(`select public.loop_approve_cost($1, $2::uuid[])`, [CYCLE, `{${B1},${B2}}`]),
+        ),
+      ).toMatch(/NOTHING_INCLUDED/)
     })
 
     it('trims and approves in one statement, recomputing the total from the rows', async () => {
@@ -279,13 +339,20 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
         [CYCLE, `{${B2}}`],
       )
       const out = r.rows[0]!.loop_approve_cost
-      expect(out.approved_credits).toBe(12)     // 21 proposed, 9 trimmed away
+      expect(out.approved_credits).toBe(12) // 21 proposed, 9 trimmed away
       expect(out.included_briefs).toBe(1)
       expect(out.excluded_briefs).toBe(1)
       expect(out.replayed).toBe(false)
 
-      const c = await db.query<{ status: string; approved_credits: number; estimated_credits: number; cost_approved_by: string }>(
-        `select status, approved_credits, estimated_credits, cost_approved_by from loop_cycles where id=$1`, [CYCLE])
+      const c = await db.query<{
+        status: string
+        approved_credits: number
+        estimated_credits: number
+        cost_approved_by: string
+      }>(
+        `select status, approved_credits, estimated_credits, cost_approved_by from loop_cycles where id=$1`,
+        [CYCLE],
+      )
       expect(c.rows[0]!.status).toBe('creating')
       // What was PROPOSED and what was APPROVED are both kept — the difference
       // is the record that the customer trimmed it.
@@ -294,7 +361,9 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       expect(c.rows[0]!.cost_approved_by).toBe(USER_A)
 
       const trimmed = await db.query<{ included: boolean; stage_outcome: string }>(
-        `select included, stage_outcome from loop_briefs where id=$1`, [B2])
+        `select included, stage_outcome from loop_briefs where id=$1`,
+        [B2],
+      )
       expect(trimmed.rows[0]!.included).toBe(false)
       expect(trimmed.rows[0]!.stage_outcome).toBe('skipped')
     })
@@ -302,7 +371,9 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
     it('treats a second click as success, not as a failure', async () => {
       await asUser(db, USER_A)
       const r = await db.query<{ o: Record<string, unknown> }>(
-        `select public.loop_approve_cost($1) as o`, [CYCLE])
+        `select public.loop_approve_cost($1) as o`,
+        [CYCLE],
+      )
       expect(r.rows[0]!.o.replayed).toBe(true)
       expect(r.rows[0]!.o.approved_credits).toBe(12)
     })
@@ -313,9 +384,11 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
         insert into loop_cycles (id, workspace_id, iso_year, iso_week, status)
           values ('99999999-9999-4999-8999-999999999999', '${WS_A}', 2026, 36, 'planning');
       `)
-      expect(await raises(() => db.query(
-        `select public.loop_approve_cost('99999999-9999-4999-8999-999999999999')`)))
-        .toMatch(/WRONG_STATUS/)
+      expect(
+        await raises(() =>
+          db.query(`select public.loop_approve_cost('99999999-9999-4999-8999-999999999999')`),
+        ),
+      ).toMatch(/WRONG_STATUS/)
     })
   })
 
@@ -331,7 +404,9 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       )
       const r = await db.query<typeof brainBefore>(
         `select version, updated_at::text as updated_at, payload from brand_memory
-          where workspace_id=$1 and status='active'`, [WS_A])
+          where workspace_id=$1 and status='active'`,
+        [WS_A],
+      )
       brainBefore = r.rows[0]!
     })
 
@@ -339,17 +414,22 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       const ev = await db.query<{ id: string }>(
         `insert into memory_events (workspace_id, source, diff, status)
          values ($1, 'insight', $2::jsonb, 'pending') returning id`,
-        [WS_A, JSON.stringify({
-          kind: 'brand_memory_patch',
-          summary: 'Your calm posts outperform your urgent ones.',
-          patch: { voice: { descriptor: 'calm and unhurried' } },
-        })],
+        [
+          WS_A,
+          JSON.stringify({
+            kind: 'brand_memory_patch',
+            summary: 'Your calm posts outperform your urgent ones.',
+            patch: { voice: { descriptor: 'calm and unhurried' } },
+          }),
+        ],
       )
       const id = ev.rows[0]!.id
 
       await asUser(db, USER_A)
       const out = await db.query<{ o: Record<string, unknown> }>(
-        `select public.resolve_memory_event($1, 'rejected') as o`, [id])
+        `select public.resolve_memory_event($1, 'rejected') as o`,
+        [id],
+      )
       expect(out.rows[0]!.o.status).toBe('rejected')
       expect(out.rows[0]!.o.brand_memory_changed).toBe(false)
 
@@ -357,7 +437,9 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       // what it was. Not "no error was raised" — a silent write raises nothing.
       const after = await db.query<typeof brainBefore>(
         `select version, updated_at::text as updated_at, payload from brand_memory
-          where workspace_id=$1 and status='active'`, [WS_A])
+          where workspace_id=$1 and status='active'`,
+        [WS_A],
+      )
       expect(after.rows).toHaveLength(1)
       expect(after.rows[0]!.version).toBe(brainBefore.version)
       expect(after.rows[0]!.updated_at).toBe(brainBefore.updated_at)
@@ -365,12 +447,17 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
 
       // And no new version was inserted anywhere in the history.
       const n = await db.query<{ n: number }>(
-        `select count(*)::int as n from brand_memory where workspace_id=$1`, [WS_A])
+        `select count(*)::int as n from brand_memory where workspace_id=$1`,
+        [WS_A],
+      )
       expect(n.rows[0]!.n).toBe(1)
 
       // The event itself records the refusal, with no version attached.
-      const e = await db.query<{ status: string; applied_memory_version: number | null; resolved_at: string | null }>(
-        `select status, applied_memory_version, resolved_at from memory_events where id=$1`, [id])
+      const e = await db.query<{
+        status: string
+        applied_memory_version: number | null
+        resolved_at: string | null
+      }>(`select status, applied_memory_version, resolved_at from memory_events where id=$1`, [id])
       expect(e.rows[0]!.status).toBe('rejected')
       expect(e.rows[0]!.applied_memory_version).toBeNull()
       expect(e.rows[0]!.resolved_at).not.toBeNull()
@@ -380,11 +467,15 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       const ev = await db.query<{ id: string }>(
         `insert into memory_events (workspace_id, source, diff, status, resolved_at)
          values ($1, 'insight', '{"patch":{"voice":{"descriptor":"x"}}}'::jsonb, 'rejected', now())
-         returning id`, [WS_A])
+         returning id`,
+        [WS_A],
+      )
       await asUser(db, USER_A)
-      expect(await raises(() => db.query(
-        `select public.resolve_memory_event($1, 'accepted')`, [ev.rows[0]!.id])))
-        .toMatch(/ALREADY_RESOLVED/)
+      expect(
+        await raises(() =>
+          db.query(`select public.resolve_memory_event($1, 'accepted')`, [ev.rows[0]!.id]),
+        ),
+      ).toMatch(/ALREADY_RESOLVED/)
     })
 
     it('ACCEPTING bumps the version and keeps every sibling field', async () => {
@@ -395,12 +486,16 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       )
       await asUser(db, USER_A)
       const out = await db.query<{ o: Record<string, unknown> }>(
-        `select public.resolve_memory_event($1, 'accepted') as o`, [ev.rows[0]!.id])
+        `select public.resolve_memory_event($1, 'accepted') as o`,
+        [ev.rows[0]!.id],
+      )
       expect(out.rows[0]!.o.brand_memory_changed).toBe(true)
       expect(out.rows[0]!.o.brand_memory_version).toBe(2)
 
       const after = await db.query<{ payload: Record<string, Record<string, unknown>> }>(
-        `select payload from brand_memory where workspace_id=$1 and status='active'`, [WS_A])
+        `select payload from brand_memory where workspace_id=$1 and status='active'`,
+        [WS_A],
+      )
       const voice = after.rows[0]!.payload.voice!
       expect(voice.descriptor).toBe('calm and unhurried')
       // THE WHOLE POINT OF THE DEEP MERGE. Postgres's own `||` would have
@@ -413,28 +508,38 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
 
       // Exactly one active row — the old one is superseded, not deleted.
       const rows = await db.query<{ status: string; version: number }>(
-        `select status, version from brand_memory where workspace_id=$1 order by version`, [WS_A])
+        `select status, version from brand_memory where workspace_id=$1 order by version`,
+        [WS_A],
+      )
       expect(rows.rows.map((r) => `${r.version}:${r.status}`)).toEqual(['1:superseded', '2:active'])
     })
 
     it('refuses a diff with no patch object', async () => {
       const ev = await db.query<{ id: string }>(
         `insert into memory_events (workspace_id, source, diff, status)
-         values ($1, 'insight', '{"summary":"no patch here"}'::jsonb, 'pending') returning id`, [WS_A])
+         values ($1, 'insight', '{"summary":"no patch here"}'::jsonb, 'pending') returning id`,
+        [WS_A],
+      )
       await asUser(db, USER_A)
-      expect(await raises(() => db.query(
-        `select public.resolve_memory_event($1, 'accepted')`, [ev.rows[0]!.id])))
-        .toMatch(/INVALID_DIFF/)
+      expect(
+        await raises(() =>
+          db.query(`select public.resolve_memory_event($1, 'accepted')`, [ev.rows[0]!.id]),
+        ),
+      ).toMatch(/INVALID_DIFF/)
     })
 
     it("refuses another tenant's learning", async () => {
       const ev = await db.query<{ id: string }>(
         `insert into memory_events (workspace_id, source, diff, status)
-         values ($1, 'insight', '{"patch":{"voice":{"descriptor":"x"}}}'::jsonb, 'pending') returning id`, [WS_A])
+         values ($1, 'insight', '{"patch":{"voice":{"descriptor":"x"}}}'::jsonb, 'pending') returning id`,
+        [WS_A],
+      )
       await asUser(db, USER_B)
-      expect(await raises(() => db.query(
-        `select public.resolve_memory_event($1, 'rejected')`, [ev.rows[0]!.id])))
-        .toMatch(/NOT_A_MEMBER/)
+      expect(
+        await raises(() =>
+          db.query(`select public.resolve_memory_event($1, 'rejected')`, [ev.rows[0]!.id]),
+        ),
+      ).toMatch(/NOT_A_MEMBER/)
     })
   })
 
@@ -444,44 +549,63 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
     beforeAll(async () => {
       await db.query(
         `insert into loop_cycles (id, workspace_id, iso_year, iso_week) values ($1, $2, 2026, 40)`,
-        [C, WS_A])
+        [C, WS_A],
+      )
     })
 
     it('accepts a set of real channels, and an empty one', async () => {
       await db.query(
         `insert into loop_briefs (workspace_id, cycle_id, title, body, channels, priority)
-         values ($1, $2, 't', 'b', '{x,linkedin}', 1)`, [WS_A, C])
+         values ($1, $2, 't', 'b', '{x,linkedin}', 1)`,
+        [WS_A, C],
+      )
       await db.query(
         `insert into loop_briefs (workspace_id, cycle_id, title, body, channels, priority)
-         values ($1, $2, 't', 'b', '{}', 2)`, [WS_A, C])
+         values ($1, $2, 't', 'b', '{}', 2)`,
+        [WS_A, C],
+      )
       const r = await db.query<{ n: number }>(
-        `select count(*)::int as n from loop_briefs where cycle_id = $1`, [C])
+        `select count(*)::int as n from loop_briefs where cycle_id = $1`,
+        [C],
+      )
       expect(r.rows[0]!.n).toBe(2)
     })
 
     it('REFUSES the same channel twice — the defect that has shipped three times here', async () => {
-      const msg = await raises(() => db.query(
-        `insert into loop_briefs (workspace_id, cycle_id, title, body, channels, priority)
-         values ($1, $2, 't', 'b', '{x,x}', 3)`, [WS_A, C]))
+      const msg = await raises(() =>
+        db.query(
+          `insert into loop_briefs (workspace_id, cycle_id, title, body, channels, priority)
+         values ($1, $2, 't', 'b', '{x,x}', 3)`,
+          [WS_A, C],
+        ),
+      )
       expect(msg).toMatch(/loop_briefs_channels_is_set/)
     })
 
     it('REFUSES a channel this product does not have', async () => {
-      const msg = await raises(() => db.query(
-        `insert into loop_briefs (workspace_id, cycle_id, title, body, channels, priority)
-         values ($1, $2, 't', 'b', '{tiktok}', 4)`, [WS_A, C]))
+      const msg = await raises(() =>
+        db.query(
+          `insert into loop_briefs (workspace_id, cycle_id, title, body, channels, priority)
+         values ($1, $2, 't', 'b', '{tiktok}', 4)`,
+          [WS_A, C],
+        ),
+      )
       expect(msg).toMatch(/loop_briefs_channels_is_set/)
     })
 
     it('refuses a duplicate arriving by UPDATE, not only by INSERT', async () => {
-      const msg = await raises(() => db.query(
-        `update loop_briefs set channels = '{gbp,gbp}' where cycle_id = $1 and priority = 1`, [C]))
+      const msg = await raises(() =>
+        db.query(
+          `update loop_briefs set channels = '{gbp,gbp}' where cycle_id = $1 and priority = 1`,
+          [C],
+        ),
+      )
       expect(msg).toMatch(/loop_briefs_channels_is_set/)
     })
   })
 
   // ── THE CREATE-STAGE GATE, WHICH IS A WHERE CLAUSE ───────────────────────
-  describe('the orchestrator\'s own approval gate', () => {
+  describe("the orchestrator's own approval gate", () => {
     // apps/web lib/loop/store.ts readApprovedCycleForCreate, character for
     // character. The RPC's refusal protects the SCREEN; this protects the
     // ORCHESTRATOR, which writes over an owner connection and could set
@@ -509,7 +633,9 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
     it('REFUSES a cycle parked at the halt — nothing may be spent', async () => {
       await db.query(
         `insert into loop_cycles (id, workspace_id, iso_year, iso_week, status, estimated_credits)
-         values ($1, $2, 2026, 41, 'awaiting_cost_approval', 30)`, [G, WS_A])
+         values ($1, $2, 2026, 41, 'awaiting_cost_approval', 30)`,
+        [G, WS_A],
+      )
       const r = await db.query(GATE, [G, WS_A])
       expect(r.rows).toHaveLength(0)
     })
@@ -528,9 +654,12 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       // check, so the gate never has to consider a cycle that claims approval
       // and cannot say what was approved. Discovered by writing this test
       // expecting the gate to do the work and watching the SETUP raise.
-      const msg = await raises(() => db.query(
-        `update loop_cycles set cost_approved_at = now(), cost_approved_by = 'u' where id = $1`,
-        [G]))
+      const msg = await raises(() =>
+        db.query(
+          `update loop_cycles set cost_approved_at = now(), cost_approved_by = 'u' where id = $1`,
+          [G],
+        ),
+      )
       expect(msg).toMatch(/violates check constraint/i)
 
       // And the reverse half — an amount with no timestamp — is not approval,
@@ -545,7 +674,9 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
         `update loop_cycles
             set cost_approved_at = now(), cost_approved_by = 'u',
                 approved_credits = 30, status = 'creating'
-          where id = $1`, [G])
+          where id = $1`,
+        [G],
+      )
       const r = await db.query<{ id: string }>(GATE, [G, WS_A])
       expect(r.rows).toHaveLength(1)
       expect(r.rows[0]!.id).toBe(G)
@@ -561,7 +692,8 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
     it('merges nested objects key by key, where `||` would discard siblings', async () => {
       const r = await db.query<{ merged: unknown; shallow: unknown }>(
         `select app.jsonb_deep_merge('{"a":{"x":1,"y":2}}'::jsonb, '{"a":{"y":9}}'::jsonb) as merged,
-                ('{"a":{"x":1,"y":2}}'::jsonb || '{"a":{"y":9}}'::jsonb) as shallow`)
+                ('{"a":{"x":1,"y":2}}'::jsonb || '{"a":{"y":9}}'::jsonb) as shallow`,
+      )
       expect(r.rows[0]!.merged).toEqual({ a: { x: 1, y: 9 } })
       // Pinned so the reason this function exists stays visible: the operator
       // it replaces really does lose `x`.
@@ -570,13 +702,15 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
 
     it('replaces arrays wholesale rather than appending', async () => {
       const r = await db.query<{ m: unknown }>(
-        `select app.jsonb_deep_merge('{"l":[1,2,3]}'::jsonb, '{"l":[9]}'::jsonb) as m`)
+        `select app.jsonb_deep_merge('{"l":[1,2,3]}'::jsonb, '{"l":[9]}'::jsonb) as m`,
+      )
       expect(r.rows[0]!.m).toEqual({ l: [9] })
     })
 
     it('keeps an explicit null as a null rather than deleting the key', async () => {
       const r = await db.query<{ m: Record<string, unknown> }>(
-        `select app.jsonb_deep_merge('{"a":1,"b":2}'::jsonb, '{"a":null}'::jsonb) as m`)
+        `select app.jsonb_deep_merge('{"a":1,"b":2}'::jsonb, '{"a":null}'::jsonb) as m`,
+      )
       expect(r.rows[0]!.m).toEqual({ a: null, b: 2 })
     })
   })
@@ -614,24 +748,30 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
 
     it('refuses a non-member and a viewer', async () => {
       await asUser(db, USER_B)
-      expect(await raises(() => db.query(`select public.loop_kill_switch($1)`, [WS_A])))
-        .toMatch(/NOT_A_MEMBER/)
+      expect(await raises(() => db.query(`select public.loop_kill_switch($1)`, [WS_A]))).toMatch(
+        /NOT_A_MEMBER/,
+      )
       await asUser(db, VIEWER)
-      expect(await raises(() => db.query(`select public.loop_kill_switch($1)`, [WS_A])))
-        .toMatch(/FORBIDDEN_ROLE/)
+      expect(await raises(() => db.query(`select public.loop_kill_switch($1)`, [WS_A]))).toMatch(
+        /FORBIDDEN_ROLE/,
+      )
     })
 
     it('cancels the cycle, takes its posts off the calendar, and pauses', async () => {
       await asUser(db, USER_A)
       const r = await db.query<{ o: Record<string, unknown> }>(
-        `select public.loop_kill_switch($1) as o`, [WS_A])
+        `select public.loop_kill_switch($1) as o`,
+        [WS_A],
+      )
       const o = r.rows[0]!.o
-      expect(o.posts_unscheduled).toBe(1)      // the scheduled one only
+      expect(o.posts_unscheduled).toBe(1) // the scheduled one only
       expect(o.variants_unscheduled).toBe(1)
       expect(o.paused).toBe(true)
 
       const p = await db.query<{ id: string; status: string; scheduled_at: string | null }>(
-        `select id, status, scheduled_at from posts where workspace_id=$1 order by title`, [WS_A])
+        `select id, status, scheduled_at from posts where workspace_id=$1 order by title`,
+        [WS_A],
+      )
       const byId = Object.fromEntries(p.rows.map((x) => [x.id, x]))
 
       // BOTH halves of the dispatcher's gate are broken, not one.
@@ -648,7 +788,9 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       expect(byId[P_MANUAL]!.scheduled_at).not.toBeNull()
 
       const paused = await db.query<{ paused: boolean }>(
-        `select paused from loop_settings where workspace_id=$1`, [WS_A])
+        `select paused from loop_settings where workspace_id=$1`,
+        [WS_A],
+      )
       expect(paused.rows[0]!.paused).toBe(true)
     })
 
@@ -662,7 +804,9 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       `)
       await asUser(db, USER_A)
       const r = await db.query<{ o: { outstanding_holds: Array<Record<string, unknown>> } }>(
-        `select public.loop_kill_switch($1) as o`, [WS_A])
+        `select public.loop_kill_switch($1) as o`,
+        [WS_A],
+      )
       const holds = r.rows[0]!.o.outstanding_holds
       expect(holds).toHaveLength(1)
       expect(holds[0]!.action_type).toBe('loop_cycle')
@@ -670,7 +814,9 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
 
       // The ledger is UNTOUCHED by this call: no RELEASE was written.
       const led = await db.query<{ n: number }>(
-        `select count(*)::int as n from credit_ledger where workspace_id=$1 and entry_type='RELEASE'`, [WS_A])
+        `select count(*)::int as n from credit_ledger where workspace_id=$1 and entry_type='RELEASE'`,
+        [WS_A],
+      )
       expect(led.rows[0]!.n).toBe(0)
     })
 
@@ -701,11 +847,15 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
 
       await asUser(db, USER_A)
       const r = await db.query<{ o: Record<string, number> }>(
-        `select public.loop_kill_switch($1, false) as o`, [WS_A])
+        `select public.loop_kill_switch($1, false) as o`,
+        [WS_A],
+      )
       expect(r.rows[0]!.o.posts_unscheduled).toBe(1)
 
       const after = await db.query<{ id: string; status: string; scheduled_at: string | null }>(
-        `select id, status, scheduled_at from posts where id in ($1, $2)`, [RP, RHAND])
+        `select id, status, scheduled_at from posts where id in ($1, $2)`,
+        [RP, RHAND],
+      )
       const byId = Object.fromEntries(after.rows.map((x) => [x.id, x]))
       // The reported cycle's post is off the calendar.
       expect(byId[RP]!.status).toBe('draft')
@@ -716,11 +866,14 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
 
       // The reported cycle itself is NOT rewritten — its week happened, and its
       // brief still records that it was drafted rather than skipped.
-      const c = await db.query<{ status: string }>(
-        `select status from loop_cycles where id = $1`, [RC])
+      const c = await db.query<{ status: string }>(`select status from loop_cycles where id = $1`, [
+        RC,
+      ])
       expect(c.rows[0]!.status).toBe('reported')
       const b = await db.query<{ stage_outcome: string }>(
-        `select stage_outcome from loop_briefs where cycle_id = $1`, [RC])
+        `select stage_outcome from loop_briefs where cycle_id = $1`,
+        [RC],
+      )
       expect(b.rows[0]!.stage_outcome).toBe('awaiting_approval')
     })
 
@@ -729,16 +882,24 @@ describe('The Loop · migrations 20260820000200 / 000300 / 000400', () => {
       // switch does not ban the customer from their own week.
       await db.query(
         `insert into loop_cycles (workspace_id, iso_year, iso_week, status) values ($1, 2026, 37, 'collecting')`,
-        [WS_A])
+        [WS_A],
+      )
       const r = await db.query<{ n: number }>(
-        `select count(*)::int as n from loop_cycles where workspace_id=$1 and iso_week=37`, [WS_A])
+        `select count(*)::int as n from loop_cycles where workspace_id=$1 and iso_week=37`,
+        [WS_A],
+      )
       expect(r.rows[0]!.n).toBe(2)
     })
 
     it('refuses TWO live cycles for the same week', async () => {
-      expect(await raises(() => db.query(
-        `insert into loop_cycles (workspace_id, iso_year, iso_week, status) values ($1, 2026, 37, 'collecting')`,
-        [WS_A]))).toMatch(/loop_cycles_one_live_per_week|duplicate key/i)
+      expect(
+        await raises(() =>
+          db.query(
+            `insert into loop_cycles (workspace_id, iso_year, iso_week, status) values ($1, 2026, 37, 'collecting')`,
+            [WS_A],
+          ),
+        ),
+      ).toMatch(/loop_cycles_one_live_per_week|duplicate key/i)
     })
   })
 })
