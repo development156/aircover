@@ -23,7 +23,7 @@ export interface NotBuiltYetProps {
 export function NotBuiltYet({ children }: NotBuiltYetProps) {
   return (
     <p className="flex items-start gap-2 rounded-sm bg-s1 px-3 py-2 text-[12.5px] text-muted">
-      <Clock3 size={13} className="mt-[3px] shrink-0" aria-hidden />
+      <Clock3 size={13} className="mt-icon-nudge shrink-0" aria-hidden />
       <span>{children}</span>
     </p>
   )

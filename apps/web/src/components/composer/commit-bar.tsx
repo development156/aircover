@@ -93,7 +93,7 @@ export function CommitBar({
             // would not open in a new tab — docs/26 §10.2.
             <a
               href="#finish"
-              className="surface-ring-firm inline-flex h-7 shrink-0 items-center gap-[6px] rounded-sm bg-surface px-[9px] text-[12px] leading-none font-[550] text-ink transition-micro hover:bg-s2 max-narrow:min-h-[44px]"
+              className="surface-ring-firm inline-flex h-7 shrink-0 items-center gap-icon-gap rounded-sm bg-surface px-btn-tight text-[12px] leading-none font-[550] text-ink transition-micro hover:bg-s2 max-narrow:min-h-[44px]"
             >
               <ArrowDown size={13} aria-hidden />
               Send it

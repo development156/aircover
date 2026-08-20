@@ -1,6 +1,6 @@
 {
   "_": "Debt register for the ratcheted rules. Counts may only go DOWN — see design-lint.mjs.",
-  "spacing_total": 146,
+  "spacing_total": 144,
   "spacing": {
     "app/(app)/brain/audience/page.tsx": 2,
     "app/(app)/brain/knowledge/page.tsx": 1,
@@ -40,7 +40,6 @@
     "components/campaigns/campaign-tag.tsx": 1,
     "components/campaigns/channel-cell.tsx": 1,
     "components/coming-soon.tsx": 3,
-    "components/composer/commit-bar.tsx": 2,
     "components/connections/connect-outcome-notice.tsx": 1,
     "components/design-system/certainty-ladder.tsx": 1,
     "components/design-system/coming-soon-chip.tsx": 2,

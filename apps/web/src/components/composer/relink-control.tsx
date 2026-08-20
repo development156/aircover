@@ -55,7 +55,7 @@ export function RelinkControl({
         <button
           type="button"
           onClick={onUndo}
-          className="surface-ring-firm inline-flex h-7 shrink-0 items-center gap-[6px] rounded-sm bg-surface px-[9px] text-[12px] leading-none font-[550] text-ink transition-micro hover:bg-s2 max-narrow:min-h-[44px]"
+          className="surface-ring-firm inline-flex h-7 shrink-0 items-center gap-icon-gap rounded-sm bg-surface px-btn-tight text-[12px] leading-none font-[550] text-ink transition-micro hover:bg-s2 max-narrow:min-h-[44px]"
         >
           <Undo2 size={13} aria-hidden />
           Put my {label} copy back
@@ -72,7 +72,7 @@ export function RelinkControl({
       type="button"
       data-relink={label}
       onClick={onRelink}
-      className="inline-flex items-center gap-[6px] rounded-sm px-1 text-[12.5px] font-[550] text-muted transition-micro hover:text-ink max-narrow:min-h-[44px]"
+      className="inline-flex items-center gap-icon-gap rounded-sm px-1 text-[12.5px] font-[550] text-muted transition-micro hover:text-ink max-narrow:min-h-[44px]"
     >
       <Link2 size={13} aria-hidden />
       Follow the post again

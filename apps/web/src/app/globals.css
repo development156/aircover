@@ -61,6 +61,14 @@
      design-lint register and can adopt `pr-chip` as the ratchet tightens. */
   --spacing-chip: 10px;
   --spacing-chip-mark: 6px;
+  /* Three shapes that recur once a screen has small icon-led controls, named
+     here because absorbing the same three values into the debt register once
+     per new file is how a ratchet stops meaning anything. `commit-bar.tsx` and
+     `relink-control.tsx` carry BYTE-IDENTICAL class strings for the second of
+     these, which is what made it a decision rather than a one-off. */
+  --spacing-icon-gap: 6px; /* a 13px lucide mark and the label beside it */
+  --spacing-btn-tight: 9px; /* the h-7 surface-ring-firm button's inset */
+  --spacing-icon-nudge: 3px; /* optically top-aligning a mark to the first line */
 }
 
 /* MUST be `inline`: every value below references a :root var from tokens.css;
