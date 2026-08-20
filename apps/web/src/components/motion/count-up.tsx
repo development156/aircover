@@ -72,6 +72,13 @@ export function CountUp({
   useIsomorphicLayoutEffect(() => {
     const el = ref.current
     if (!el) return
+    // GUARDED, and the guard is not defensive padding. jsdom does not implement
+    // `matchMedia` at all, so the unguarded call threw and took down every test
+    // that rendered a tree containing this component — `/home`'s page test
+    // started failing the moment PerformanceStrip adopted it. Anywhere the
+    // query cannot be asked, the honest default is NOT to animate: the state is
+    // already the final value, so the number is simply correct.
+    if (typeof window.matchMedia !== 'function') return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     // Nothing to count toward, and counting to zero from zero is a no-op that
     // would still cost a frame.

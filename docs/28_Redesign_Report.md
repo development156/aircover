@@ -410,8 +410,8 @@ exit code. Script: `gate.sh`/`gate2.sh` in the session scratchpad.
 
 | leg | command | result |
 |---|---|---|
-| 1/5 | `turbo run typecheck lint test --concurrency=1` | **EXIT=0** |
-| 2/5 | `vitest run` (root) | **EXIT=0** |
+| 1/5 | `turbo run typecheck lint test --concurrency=1` | **EXIT=0** — 27/27 tasks |
+| 2/5 | `vitest run` (root) | **EXIT=0** — 162 tests |
 | 3/5 | `turbo run test:smoke --concurrency=1` (port 3211) | **EXIT=0** — 0 failures |
 | 4/5 | `prettier --check .` | **EXIT=1**, one file → fixed → **EXIT=0** |
 | 5/5 | `turbo run build --concurrency=1` | **EXIT=0** — 1 successful |
@@ -445,6 +445,18 @@ that loses the race gets a green or a red that is about somebody else's code.
 `node scripts/design/dead-classes.mjs` against the **production** build:
 `text-primary-fg` and `bg-black` are both gone. Five candidates remain and all five are prose
 inside strings, which the script documents as candidates rather than verdicts.
+
+### The gate caught one more defect, on a quiet box
+
+Re-running leg 1 after the last change failed with `window.matchMedia is not a function` from
+`CountUp`, at load average **0.92** — so not a flake. jsdom does not implement `matchMedia`,
+and the unguarded call took down every test that rendered a tree containing the component;
+`/home`'s page test started failing the moment `PerformanceStrip` adopted it.
+
+Fixed in the component rather than stubbed in the tests, because it is a real robustness bug:
+anywhere the query cannot be asked, the honest default is **not to animate**. The state is
+already the final value, so the number is simply correct. Re-run: legs 1, 2, 4 and 5 all
+**EXIT=0**.
 
 ### Unit-suite honesty
 

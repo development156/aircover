@@ -55,6 +55,15 @@ describe('CountUp', () => {
     expect(container.textContent).toBe('77')
   })
 
+  it('renders the value where matchMedia does not exist, instead of throwing', () => {
+    // jsdom has no matchMedia. The unguarded call took down every test that
+    // rendered a tree containing this component; "cannot ask" now means "do not
+    // animate", so the number is simply correct on first paint.
+    vi.stubGlobal('matchMedia', undefined)
+    expect(() => render(<CountUp value={512} />)).not.toThrow()
+    expect(screen.getByText('512')).toBeTruthy()
+  })
+
   it('carries tabular figures so the digits do not jitter as they count', () => {
     setReducedMotion(true)
     const { container } = render(<CountUp value={99} />)
