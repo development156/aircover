@@ -2,7 +2,11 @@ import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { AudienceState } from '@sahoda/publishing'
 
-import { readAudiencePage, type AudiencePageData, type CollectedHistory } from '@/lib/audience/page-data'
+import {
+  readAudiencePage,
+  type AudiencePageData,
+  type CollectedHistory,
+} from '@/lib/audience/page-data'
 
 import BrainAudiencePage from './page'
 
@@ -93,10 +97,13 @@ async function renderState(state: AudienceState, history?: CollectedHistory): Pr
 }
 
 describe('every state renders, and none of them renders the same screen', () => {
-  test.each(EVERY_STATE.map((s) => [s.kind, s] as const))('%s renders a heading', async (_k, state) => {
-    await renderState(state)
-    expect(screen.getByRole('heading', { name: /who follows you/i })).toBeInTheDocument()
-  })
+  test.each(EVERY_STATE.map((s) => [s.kind, s] as const))(
+    '%s renders a heading',
+    async (_k, state) => {
+      await renderState(state)
+      expect(screen.getByRole('heading', { name: /who follows you/i })).toBeInTheDocument()
+    },
+  )
 
   test('the eight states produce eight different screens', async () => {
     // A page that rendered the same words for two states would pass every
@@ -117,16 +124,17 @@ describe('no state offers a remedy it cannot fulfil', () => {
   const RETRY =
     /\breload\b|\btry again\b|\brefresh\b|could ?n[o']?t (read|check|load|reach)|could not (read|check|load|reach)/i
 
-  test.each(
-    EVERY_STATE.filter((s) => s.kind !== 'unreadable').map((s) => [s.kind, s] as const),
-  )('%s promises no retry', async (_k, state) => {
-    // "Reload" cannot add followers, cannot supply a missing environment
-    // variable and cannot reconnect an account. Seven of the eight states must
-    // never say it.
-    await renderState(state, REAL_HISTORY)
-    expect(screen.getByRole('heading', { name: /who follows you/i })).toBeInTheDocument()
-    expect(document.body.textContent ?? '').not.toMatch(RETRY)
-  })
+  test.each(EVERY_STATE.filter((s) => s.kind !== 'unreadable').map((s) => [s.kind, s] as const))(
+    '%s promises no retry',
+    async (_k, state) => {
+      // "Reload" cannot add followers, cannot supply a missing environment
+      // variable and cannot reconnect an account. Seven of the eight states must
+      // never say it.
+      await renderState(state, REAL_HISTORY)
+      expect(screen.getByRole('heading', { name: /who follows you/i })).toBeInTheDocument()
+      expect(document.body.textContent ?? '').not.toMatch(RETRY)
+    },
+  )
 
   test('unreadable — and ONLY unreadable — does promise one', async () => {
     // The other half. Without this, deleting the sentence entirely would pass
@@ -211,7 +219,10 @@ describe('the line between measured and worked out', () => {
 
 describe('the populated state — UNVERIFIED against a live payload', () => {
   test('renders only the dimensions the platform reported', async () => {
-    await renderState({ ...POPULATED, breakdown: { age: POPULATED.kind === 'ready' ? POPULATED.breakdown.age ?? [] : [] } })
+    await renderState({
+      ...POPULATED,
+      breakdown: { age: POPULATED.kind === 'ready' ? (POPULATED.breakdown.age ?? []) : [] },
+    })
     expect(screen.getByRole('heading', { name: 'Age' })).toBeInTheDocument()
     for (const title of ['Gender', 'Top cities', 'Top countries']) {
       expect(screen.queryByRole('heading', { name: title })).not.toBeInTheDocument()

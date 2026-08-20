@@ -274,9 +274,7 @@ export async function readAudiencePage(): Promise<AudiencePageData> {
   } catch (error) {
     if (!(error instanceof ScopeError)) return nothing({ kind: 'unreadable' })
     return nothing(
-      (await inactiveConnection(workspaceId))
-        ? { kind: 'reconnect' }
-        : { kind: 'not-connected' },
+      (await inactiveConnection(workspaceId)) ? { kind: 'reconnect' } : { kind: 'not-connected' },
     )
   }
 

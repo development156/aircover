@@ -50,8 +50,8 @@ export function AudienceLayers() {
           <h3 className="type-h3 text-ink">Followers, day by day</h3>
           <FollowerTrend days={DEMO_DAYS} />
           <p className="type-sm text-muted">
-            The 12th is missing on purpose. A day nothing was collected leaves a break in the
-            line &mdash; it is not drawn as a zero and it is not joined across.
+            The 12th is missing on purpose. A day nothing was collected leaves a break in the line
+            &mdash; it is not drawn as a zero and it is not joined across.
           </p>
         </div>
       </div>
@@ -66,16 +66,15 @@ export function AudienceLayers() {
           evidence="17 followers gained over 6 days"
         >
           <p>
-            At the pace Sahoda has measured you would pass{' '}
-            <span className="num">100</span> followers in about{' '}
-            <span className="num">15</span> days. That is a straight-line guess from a short
-            record, not a forecast.
+            At the pace Sahoda has measured you would pass <span className="num">100</span>{' '}
+            followers in about <span className="num">15</span> days. That is a straight-line guess
+            from a short record, not a forecast.
           </p>
         </InferredPanel>
         <InferredPanel title="The same panel, refusing" evidence="4 days of follower counts">
           <p>
-            Sahoda needs at least <span className="num">7</span> days of follower counts before
-            it will estimate a pace. It has <span className="num">4</span>.
+            Sahoda needs at least <span className="num">7</span> days of follower counts before it
+            will estimate a pace. It has <span className="num">4</span>.
           </p>
         </InferredPanel>
       </div>

@@ -28,11 +28,7 @@
  * environment value. Action logs are readable by anyone with repository access, and
  * a secret printed once is a secret to rotate.
  */
-import {
-  audienceCaptureDeps,
-  runAudienceCapture,
-  type AudienceCaptureReport,
-} from '../src/publish'
+import { audienceCaptureDeps, runAudienceCapture, type AudienceCaptureReport } from '../src/publish'
 
 /**
  * How many accounts one pass asks about.

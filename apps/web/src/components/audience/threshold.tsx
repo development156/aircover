@@ -94,8 +94,8 @@ export function FollowerThreshold({
       <p className="type-body mt-1 max-w-[62ch] text-muted">
         Instagram starts reporting age, gender, cities and countries once an account passes{' '}
         <span className="num">{floor}</span> followers. That is a rule on their side. Nothing is
-        wrong with your account and there is nothing to fix here &mdash; the details appear on
-        their own once you cross.
+        wrong with your account and there is nothing to fix here &mdash; the details appear on their
+        own once you cross.
       </p>
     </section>
   )

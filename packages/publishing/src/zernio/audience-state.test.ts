@@ -140,9 +140,9 @@ describe('classifyAudience · a failed call says nothing about the audience', ()
     [500, 'UNKNOWN', 'unreadable'],
     [429, 'rate_limited', 'unreadable'],
   ])('HTTP %i / %s becomes %s', (status, code, expected) => {
-    expect(classifyAudience({ result: threw(zernioError(status, code)), followers: null }).kind).toBe(
-      expected,
-    )
+    expect(
+      classifyAudience({ result: threw(zernioError(status, code)), followers: null }).kind,
+    ).toBe(expected)
   })
 
   it('never becomes suppressed, whatever the follower count is', () => {
@@ -156,9 +156,9 @@ describe('classifyAudience · a failed call says nothing about the audience', ()
   })
 
   it('treats a non-Zernio throw as unreadable rather than guessing', () => {
-    expect(classifyAudience({ result: threw(new TypeError('fetch failed')), followers: 1 }).kind).toBe(
-      'unreadable',
-    )
+    expect(
+      classifyAudience({ result: threw(new TypeError('fetch failed')), followers: 1 }).kind,
+    ).toBe('unreadable')
   })
 })
 

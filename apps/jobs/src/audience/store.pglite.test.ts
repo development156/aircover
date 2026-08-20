@@ -138,12 +138,10 @@ describe('the audience store (real Postgres, in-process)', () => {
     await db.exec('drop table if exists audience_snapshots cascade')
     await db.exec('truncate connections, zernio_profiles, workspaces cascade')
     await db.query(`insert into workspaces (id) values ($1), ($2)`, [WS, OTHER_WS])
-    await db.query(`insert into zernio_profiles (workspace_id, profile_id) values ($1, $2), ($3, $4)`, [
-      WS,
-      PROFILE,
-      OTHER_WS,
-      OTHER_PROFILE,
-    ])
+    await db.query(
+      `insert into zernio_profiles (workspace_id, profile_id) values ($1, $2), ($3, $4)`,
+      [WS, PROFILE, OTHER_WS, OTHER_PROFILE],
+    )
   })
 
   afterAll(async () => {
@@ -169,12 +167,15 @@ describe('the audience store (real Postgres, in-process)', () => {
       expect(await store.listTargets()).toEqual([])
     })
 
-    it.each(['x', 'gbp', 'linkedin'])('skips %s, which reports no demographics', async (platform) => {
-      // The sibling-shape check: a filter written against one wrong platform would
-      // let the other two through and burn the rate limit on 404s every night.
-      await addConnection({ platform })
-      expect(await store.listTargets()).toEqual([])
-    })
+    it.each(['x', 'gbp', 'linkedin'])(
+      'skips %s, which reports no demographics',
+      async (platform) => {
+        // The sibling-shape check: a filter written against one wrong platform would
+        // let the other two through and burn the rate limit on 404s every night.
+        await addConnection({ platform })
+        expect(await store.listTargets()).toEqual([])
+      },
+    )
 
     it('skips a connection carrying no account id', async () => {
       await addConnection({ external_account: { profileId: PROFILE } })

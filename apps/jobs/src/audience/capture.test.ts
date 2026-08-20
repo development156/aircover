@@ -187,7 +187,12 @@ describe('the day a row lands under', () => {
     const rows = demographicRows(
       TARGET,
       'followers',
-      { kind: 'ready', breakdown: { age: [{ label: '25-34', value: 1 }] }, timeframe: 'this_month', followers: 200 },
+      {
+        kind: 'ready',
+        breakdown: { age: [{ label: '25-34', value: 1 }] },
+        timeframe: 'this_month',
+        followers: 200,
+      },
       NOW,
     )
     expect(rows[0]?.measuredOn).toBe('2026-08-20')
@@ -195,7 +200,10 @@ describe('the day a row lands under', () => {
 
   it('drops a point whose date is not a date rather than dating it with a fallback', () => {
     const rows = followerRows(TARGET, {
-      total: [{ date: 'total', value: 1 }, { date: '2026-08-20', value: 5 }],
+      total: [
+        { date: 'total', value: 1 },
+        { date: '2026-08-20', value: 5 },
+      ],
       gained: [],
       lost: [],
     })

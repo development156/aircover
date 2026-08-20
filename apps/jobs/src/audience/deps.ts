@@ -118,8 +118,7 @@ export function audienceCaptureDeps(opts: AudienceCaptureDepsOptions = {}): Audi
       if (!reads) throw new ZernioNotProvisionedError()
       return reads.instagramDemographics(scoped(accountId), {
         metric: POPULATION_METRIC[population] as
-          | 'follower_demographics'
-          | 'engaged_audience_demographics',
+          'follower_demographics' | 'engaged_audience_demographics',
         // All four breakdowns. Asking for a subset would leave a dimension
         // permanently uncollected, and an uncollected day cannot be recovered.
         breakdown: 'age,city,country,gender',

@@ -35,7 +35,11 @@ import type { FollowerDay } from '@/lib/audience/page-data'
 
 export function InferredLine() {
   return (
-    <div className="flex items-center gap-3" role="separator" aria-label="Below this line, Sahoda is working things out rather than reporting them">
+    <div
+      className="flex items-center gap-3"
+      role="separator"
+      aria-label="Below this line, Sahoda is working things out rather than reporting them"
+    >
       <span aria-hidden className="h-px flex-1 bg-line" />
       <span className="type-eyebrow shrink-0 text-muted">Below here, Sahoda is working it out</span>
       <span aria-hidden className="h-px flex-1 bg-line" />
@@ -126,13 +130,7 @@ export function growthPace(
   }
 }
 
-export function PaceToFloor({
-  days,
-  floor,
-}: {
-  days: FollowerDay[]
-  floor: number
-}) {
+export function PaceToFloor({ days, floor }: { days: FollowerDay[]; floor: number }) {
   const pace = growthPace(days, floor)
 
   if ('refused' in pace) {
@@ -162,8 +160,8 @@ export function PaceToFloor({
         <span className="num">{pace.overDays}</span> days &mdash; you would pass{' '}
         <span className="num">{floor}</span> followers in about{' '}
         <span className="num">{pace.daysToFloor.toLocaleString()}</span> days. That is a
-        straight-line guess from a short record, not a forecast, and it will move every time
-        your following does.
+        straight-line guess from a short record, not a forecast, and it will move every time your
+        following does.
       </p>
     </InferredPanel>
   )

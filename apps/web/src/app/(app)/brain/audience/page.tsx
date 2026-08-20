@@ -54,8 +54,8 @@ function CollectionNote({ history }: { history: CollectedHistory }) {
     <p className="type-sm text-muted">
       Kept by Sahoda: <span className="num">{history.days}</span> day
       {history.days === 1 ? '' : 's'}, <span className="num">{history.firstDay}</span> to{' '}
-      <span className="num">{history.lastDay}</span>. Instagram reports only today; the record
-      is ours.
+      <span className="num">{history.lastDay}</span>. Instagram reports only today; the record is
+      ours.
     </p>
   )
 }
@@ -67,8 +67,8 @@ export default async function BrainAudiencePage() {
     <div className="flex flex-col gap-1">
       <h2 className="type-h2 text-ink">Who follows you</h2>
       <p className="type-body max-w-[68ch] text-muted">
-        Instagram reports the shape of your following{username === null ? '' : ` for @${username}`}
-        , and Sahoda keeps a copy each day so you can watch it change.
+        Instagram reports the shape of your following{username === null ? '' : ` for @${username}`},
+        and Sahoda keeps a copy each day so you can watch it change.
       </p>
     </div>
   )
@@ -132,9 +132,9 @@ export default async function BrainAudiencePage() {
         <section className="surface-ring flex flex-col gap-2 rounded-card bg-surface p-4">
           <h3 className="type-h3 text-ink">This copy of Sahoda cannot reach Instagram</h3>
           <p className="type-body max-w-[62ch] text-muted">
-            Your account is connected. This deployment is missing the credential Sahoda uses to
-            ask Instagram anything, so no request went out. Nothing failed and nothing here is
-            wrong &mdash; it is a setting on our side.
+            Your account is connected. This deployment is missing the credential Sahoda uses to ask
+            Instagram anything, so no request went out. Nothing failed and nothing here is wrong
+            &mdash; it is a setting on our side.
           </p>
           <CollectionNote history={history} />
         </section>
@@ -152,9 +152,12 @@ export default async function BrainAudiencePage() {
         <section className="surface-ring flex flex-col gap-2 rounded-card bg-surface p-4">
           <h3 className="type-h3 text-ink">Instagram no longer recognises this account</h3>
           <p className="type-body max-w-[62ch] text-muted">
-            Sahoda asked and Instagram answered that it cannot find the account this workspace
-            is linked to. That usually means the login behind it changed. Linking it again on{' '}
-            <Link href="/connections" className="font-[550] text-accent underline underline-offset-2">
+            Sahoda asked and Instagram answered that it cannot find the account this workspace is
+            linked to. That usually means the login behind it changed. Linking it again on{' '}
+            <Link
+              href="/connections"
+              className="font-[550] text-accent underline underline-offset-2"
+            >
               Connections
             </Link>{' '}
             restores it. Everything already collected is kept.
@@ -210,7 +213,8 @@ export default async function BrainAudiencePage() {
           <h3 className="type-h3 text-ink">Instagram reported nothing for this period</h3>
           <p className="type-body max-w-[62ch] text-muted">
             The account is connected and Instagram answered, but it sent no age, gender, city or
-            country figures{state.timeframe === null ? '' : ` for ${state.timeframe.replace(/_/g, ' ')}`}.
+            country figures
+            {state.timeframe === null ? '' : ` for ${state.timeframe.replace(/_/g, ' ')}`}.
             {state.followers === null
               ? ' Sahoda has no follower count for this account either, so it will not guess at why.'
               : ` Your ${state.followers.toLocaleString()} followers are above the ${floor} Instagram needs, so that is not the reason. Sahoda will not guess at what is.`}

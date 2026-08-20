@@ -104,7 +104,9 @@ for (const theme of ['light', 'dark'] as const) {
     // HASHED, not size-checked. Two frames that came out byte-identical would
     // pass any "bigger than N kilobytes" gate while proving nothing.
     // eslint-disable-next-line no-console
-    console.log(`  frame ${file} sha256:${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}`)
+    console.log(
+      `  frame ${file} sha256:${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}`,
+    )
 
     const img = decodePng(bytes)
     const px = (x: number, y: number): number => luminanceAt(img, x, y)
@@ -131,10 +133,18 @@ for (const theme of ['light', 'dark'] as const) {
       return seen[Math.floor(seen.length / 2)] ?? 0
     }
 
-    const solidPx = medianRun(b.solid.x + 2, b.solid.y + b.solid.h / 2, Math.max(4, Math.floor(b.solid.w / 3)))
+    const solidPx = medianRun(
+      b.solid.x + 2,
+      b.solid.y + b.solid.h / 2,
+      Math.max(4, Math.floor(b.solid.w / 3)),
+    )
     // 6px below the top edge: past the 1px border, inside the 16px padding, and
     // well above the eyebrow's first baseline.
-    const inferredPx = medianRun(b.inferred.x + 6, b.inferred.y + 6, Math.max(8, Math.floor(b.inferred.w - 12)))
+    const inferredPx = medianRun(
+      b.inferred.x + 6,
+      b.inferred.y + 6,
+      Math.max(8, Math.floor(b.inferred.w - 12)),
+    )
 
     // The dashed edge, read along its top run. A dash and a gap must alternate:
     // an edge that computes as `dashed` and paints flat would pass method 1.
