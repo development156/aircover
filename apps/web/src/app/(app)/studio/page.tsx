@@ -125,8 +125,15 @@ export default function StudioPage() {
               />
             </div>
             <p className="type-sm text-muted">
-              There is no free canvas and no layer panel. FSD M3.4 &mdash; predictable output beats
-              an open editor for a business with no designer.
+              {/* "FSD M3.4" used to be in this sentence. A customer does not
+                  have the FSD and cannot look it up, and a spec reference in
+                  user-facing copy is the implementation jargon CLAUDE.md's copy
+                  style names as the one thing that actually gets caught here.
+                  Caught by roadmap-honesty.spec.ts, which was looking for
+                  invented figures and found the "4". The reasoning stays in the
+                  file's docstring, where the reader who needs it is looking. */}
+              There is no free canvas and no layer panel. Predictable output beats an open editor
+              for a business with no designer.
             </p>
           </InertPanel>
         </div>
@@ -142,7 +149,7 @@ export default function StudioPage() {
           into a slot at its usual price, and a carousel at{' '}
           <span className="num">{creditCost('carousel')}</span> credits.
         </p>
-        {/* The FSD also prices a short MP4 slideshow. That price is NOT in
+        {/* The spec also prices a short MP4 slideshow. That price is NOT in
             pricing.config.json, and a credit figure this app prints must come
             from that file or from nowhere — so the slideshow is named without
             one rather than quoted from a document the ledger does not read. */}
