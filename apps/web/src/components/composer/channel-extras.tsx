@@ -102,7 +102,7 @@ export function ChannelExtras({ channel, format, extras, onExtrasChange }: Chann
             onChange={(event) =>
               onExtrasChange({ aiGenerated: event.target.checked ? true : undefined })
             }
-            className="mt-[3px] size-4 shrink-0 accent-[var(--acc)]"
+            className="mt-icon-nudge size-4 shrink-0 accent-[var(--acc)]"
           />
           <span>
             Label this as made with AI
