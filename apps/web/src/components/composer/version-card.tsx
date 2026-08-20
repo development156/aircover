@@ -20,6 +20,7 @@ import { selectedText, spliceSelection, type SelectionRange } from '@/lib/posts/
 import type { VariantExtras } from '@/lib/posts/variant-extras'
 import type { VariantState } from '@/components/posts/use-variants'
 
+import { HashtagField } from './hashtag-field'
 import { RelinkControl } from './relink-control'
 import { trimToFit } from './trim-to-fit'
 import { VersionOptions } from './version-options'
@@ -173,18 +174,12 @@ export function VersionCard({
 
       <ChannelMeterView meter={meter} fixes={fixes} />
 
-      {hashtags !== undefined && hashtags.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {hashtags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-pill bg-s2 px-2.5 py-1 text-[12px] font-semibold text-ink"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      ) : null}
+      <HashtagField
+        channel={channel}
+        label={label}
+        hashtags={hashtags}
+        onChange={(next) => onExtrasChange({ hashtags: next })}
+      />
 
       {/* Per channel, on this channel's own text. The splice runs against the
           CURRENT body, not the one captured when the rewrite was requested: the

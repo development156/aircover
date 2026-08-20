@@ -196,6 +196,17 @@ export function MediaPane({ media, channels, postId, previews = [] }: MediaPaneP
         There is no workspace media library yet — you can upload a new file here, but not reuse one
         already attached to another post.
       </InlineNote>
+
+      {/* ── ALT TEXT, NAMED WHERE IT WOULD BE ────────────────────────────────
+          Zernio DOES carry it: `MediaItem.altText` reaches Instagram feed
+          images, Facebook, Threads, X, LinkedIn, Bluesky and Pinterest, and the
+          adapter already forwards it. What is missing is a way to write one —
+          `post_media.alt` exists and nothing fills it — and any AI that could
+          suggest one would need a mesh task that is not in the frozen list. */}
+      <InlineNote>
+        Alt text is not built yet. Sahoda can send it to every channel that accepts one, but there
+        is nowhere to write it and no AI task that can describe a picture for you.
+      </InlineNote>
     </section>
   )
 }

@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import { InlineRewrite } from '@/components/posts/inline-rewrite'
 import { Textarea } from '@/components/ui/textarea'
+import { NotBuiltYet } from '@/components/composer/not-built-yet'
 import { selectedText, spliceSelection, type SelectionRange } from '@/lib/posts/splice-selection'
 
 export interface WritingPaneProps {
@@ -72,9 +73,7 @@ export function WritingPane({ body, onBodyChange }: WritingPaneProps) {
           onChange={(event) => onBodyChange(event.target.value)}
           onSelect={captureSelection}
         />
-        <p className="text-[12px] text-muted">
-          Select any part to rewrite just that piece. Tone and expand are not built yet.
-        </p>
+        <p className="text-[12px] text-muted">Select any part to rewrite just that piece.</p>
       </div>
 
       {/* The splice runs against the CURRENT body, not the one captured when the
@@ -83,6 +82,18 @@ export function WritingPane({ body, onBodyChange }: WritingPaneProps) {
           the meantime. If the selected text moved, the rewrite is refused rather
           than applied blind, and the panel shows the paid result so it is not
           thrown away. */}
+      {/* ── THE THREE AI THINGS THIS SCREEN DOES NOT DO ─────────────────────
+          Named where they would be, rather than left out. Leaving them out
+          reads as never planned; a disabled button would be a control that
+          exists and refuses. `CaptionRewriteInputSchema` in @sahoda/shared
+          takes `rewrite | shorten | hookify` and nothing else, and no mesh
+          task writes a body from a brief — both are frozen contracts. */}
+      <NotBuiltYet>
+        Sahoda can rewrite, shorten or hook up a piece you select. Writing a first draft from a
+        brief, changing the tone and expanding a line are not built — each needs a new kind of AI
+        task, and the list of tasks it can run is fixed for now.
+      </NotBuiltYet>
+
       <InlineRewrite
         body={body}
         selection={selection}
