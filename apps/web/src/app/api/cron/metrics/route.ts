@@ -1,6 +1,7 @@
 import { metricCaptureDeps, runMetricCapture } from '@sahoda/jobs/publish'
 
 import { isAuthorizedCronRequest } from '@/lib/cron/authorize'
+import { recordCronRun } from '@/lib/cron/heartbeat-store'
 import { metricCaptureEnabled } from '@/lib/cron/metrics-enabled'
 import { reportServerError } from '@/lib/observability/report'
 
@@ -70,6 +71,13 @@ export async function GET(request: Request): Promise<Response> {
   ) {
     return new Response('Unauthorized', { status: 401 })
   }
+
+  // Stamped BEFORE the enabled check, deliberately. The question the heartbeat
+  // answers is "is the scheduler still calling this route", and a deliberately
+  // disabled job is still being called. Stamping after the switch would make an
+  // intentional pause indistinguishable from the schedule disappearing — which
+  // is the exact confusion that let this route go unnoticed for its whole life.
+  await recordCronRun('metrics')
 
   if (!metricCaptureEnabled()) {
     return Response.json({ ok: true, skipped: 'disabled' })

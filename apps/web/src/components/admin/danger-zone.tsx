@@ -65,7 +65,7 @@ export function DangerZone({ isOwner }: { isOwner: boolean }) {
         first.
       </p>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      <div className="mt-4 grid gap-4 narrow:grid-cols-2">
         <div>
           <p className="type-eyebrow text-danger">This deletes</p>
           <ul className="mt-1.5 space-y-1 text-[12.5px] text-ink">

@@ -18,6 +18,7 @@ import { PublishStateProvider } from '@/components/posts/live/publish-state-prov
 import { LivePhaseNote } from '@/components/posts/live/live-phase-note'
 import { autoPublishEnabled } from '@/lib/posts/auto-publish-server'
 import { readConnectedChannels } from '@/lib/connections/read'
+import { readCampaignsByPost } from '@/lib/campaigns/read'
 import { ConnectFirstNote } from '@/components/connections/connect-first-note'
 
 export const metadata = { title: 'Planner' }
@@ -50,9 +51,14 @@ export default async function PlannerPage({
   // which case every chip renders the weaker claim rather than a solid publish.
   const postIds = posts.map((post) => post.id)
   // Batched for the whole week: one query, not one per row.
-  const [variantStates, connected] = await Promise.all([
+  // Campaign memberships join the SAME batch: one query for the whole page,
+  // never one per row. `readCampaignsByPost` returns null on a failed read, and
+  // `PlannerRow` renders nothing for `undefined` rather than claiming a post is
+  // in no campaign.
+  const [variantStates, connected, campaignsByPost] = await Promise.all([
     listVariantStates(postIds),
     readConnectedChannels(),
+    readCampaignsByPost(postIds),
   ])
   // One instant for the whole screen: the week buckets and the past-due notes
   // must not be computed against two different clocks.
@@ -174,6 +180,7 @@ export default async function PlannerPage({
                     connected={connectedChannels}
                     autoPublish={autoPublish}
                     variantStates={variantStates.get(post.id) ?? []}
+                    campaigns={campaignsByPost?.get(post.id)}
                   />
                 </li>
               ))}

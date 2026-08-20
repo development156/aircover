@@ -172,10 +172,7 @@ describe('applyExtractedFields', () => {
 })
 
 describe('openUploadDoor', () => {
-  const runner = (
-    result: BrandExtractOutput | null,
-    annotations?: unknown[],
-  ): ExtractRunner => ({
+  const runner = (result: BrandExtractOutput | null, annotations?: unknown[]): ExtractRunner => ({
     run: async () => (result ? { ok: true, data: result, annotations } : { ok: false }),
   })
 

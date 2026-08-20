@@ -52,7 +52,11 @@ describe.runIf(LIVE)('the three doors, one brand', () => {
 
     // ── A′ control ───────────────────────────────────────────────────────────
     const aPrime = await mesh.runTask(brandGuidelinesTask.def, control, ctxFor('a'))
-    record.armA = { ok: aPrime.ok, usage: aPrime.usage, payload: aPrime.ok ? aPrime.data : aPrime.error }
+    record.armA = {
+      ok: aPrime.ok,
+      usage: aPrime.usage,
+      payload: aPrime.ok ? aPrime.data : aPrime.error,
+    }
 
     // ── D: tier 1, no vendor ─────────────────────────────────────────────────
     const crawl = await crawlSite(SITE, { client: createDirectSource({ timeoutMs: 20_000 }) })
@@ -69,12 +73,19 @@ describe.runIf(LIVE)('the three doors, one brand', () => {
     if (crawl.ok) {
       const corpus = quarantineCorpus(crawl.pages)
       record.crawlCorpusChars = corpus.length
-      const ex = await mesh.runTask(brandExtractTask.def, { corpus, name: NAME }, ctxFor('d-extract'))
+      const ex = await mesh.runTask(
+        brandExtractTask.def,
+        { corpus, name: NAME },
+        ctxFor('d-extract'),
+      )
       record.extractD = { ok: ex.ok, usage: ex.usage, data: ex.ok ? ex.data : ex.error }
       if (ex.ok) {
         const enriched = applyExtractedFields(
           control,
-          attachProvenance(ex.data.fields, crawl.pages.map((p) => p.url)),
+          attachProvenance(
+            ex.data.fields,
+            crawl.pages.map((p) => p.url),
+          ),
         )
         record.armDInput = enriched
         const d = await mesh.runTask(brandGuidelinesTask.def, enriched, ctxFor('d'))

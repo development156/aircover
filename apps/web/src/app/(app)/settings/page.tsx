@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/empty-state'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { SettingCard, SettingRow } from '@/components/settings/setting-row'
 import { Enter } from '@/components/motion/stagger'
+import { YourDataPanel } from '@/components/settings/your-data-panel'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
 export const metadata = { title: 'Settings' }
@@ -46,18 +47,25 @@ export default async function SettingsPage() {
 
   return (
     <Enter>
-      <SettingCard title="Workspace">
-        <SettingRow
-          label="Name"
-          hint="What this workspace is called in the switcher."
-          control={<WorkspaceNameField workspaceId={workspace.id} initialName={workspace.name} />}
-        />
-        <SettingRow
-          label="Address"
-          hint="Its stable identifier. Used in links and never reused."
-          control={<span className="text-[13px] font-[550] text-ink">{workspace.slug}</span>}
-        />
-      </SettingCard>
+      <div className="space-y-grid">
+        <SettingCard title="Workspace">
+          <SettingRow
+            label="Name"
+            hint="What this workspace is called in the switcher."
+            control={<WorkspaceNameField workspaceId={workspace.id} initialName={workspace.name} />}
+          />
+          <SettingRow
+            label="Address"
+            hint="Its stable identifier. Used in links and never reused."
+            control={<span className="text-[13px] font-[550] text-ink">{workspace.slug}</span>}
+          />
+        </SettingCard>
+
+        {/* Below the workspace rows, not above: taking a copy of everything and
+            asking for deletion are things you come here to do deliberately, not
+            things you should meet on the way to renaming a workspace. */}
+        <YourDataPanel />
+      </div>
     </Enter>
   )
 }

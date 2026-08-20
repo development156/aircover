@@ -24,12 +24,18 @@ const TABS: ReadonlyArray<{ href: Route; label: string }> = [
   // five sections sat in one undifferentiated list.
   { href: '/brain/identity', label: 'Identity' },
   { href: '/brain/voice', label: 'Voice & Tone' },
-  // Three the app does not. They render the coming-soon screen rather than a
+  // Two the app does not. They render a full designed screen rather than a
   // stub, and they are NOT the same thing as the brain fields that resemble
   // them — `customer_persona` is a brand fact the brain already holds and lives
   // under Identity; "Audience Twin" is an unbuilt feature.
+  //
+  // COMPETITORS IS GONE FROM THIS ROW ON PURPOSE. That tab rendered
+  // `<ComingSoon feature="Radar">` — it was Radar, under a second name, in a
+  // second place in the nav. Radar is now a section of its own and owns both
+  // halves of the idea (the watch list and the weekly scan, as PRD M9 has it);
+  // `/brain/competitors` redirects there so no bookmark breaks. The Brand Brain
+  // holds what your business IS; Radar holds what the ones around it are doing.
   { href: '/brain/audience', label: 'Audience' },
-  { href: '/brain/competitors', label: 'Competitors' },
   { href: '/brain/knowledge', label: 'Knowledge' },
 ]
 

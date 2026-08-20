@@ -225,6 +225,16 @@ skips, which makes the absence invisible rather than legible. Use the `Unmeasure
 word "of", and a dash — inventing a fraction with no denominator. If the quantity does not
 exist, delete the slot.
 
+**When the slot CANNOT be deleted — a grid cell — render nothing visible and name it
+`sr-only`.** Added 2026-08-19 by the campaigns session, because this document did not answer
+it and the honest answer is not obvious. A matrix (posts down, channels across) has a cell at
+every intersection whether or not the quantity exists: a post that never targeted LinkedIn has
+no LinkedIn status, but the table still has to emit a `<td>`. Deleting the slot is impossible;
+filling it is forbidden. So the cell renders **no mark at all** — the column header still names
+the channel, so the gap reads correctly at a glance — plus one `sr-only` sentence saying which
+quantity does not exist. A silent cell would make the absence invisible rather than legible,
+which is the same failure as an unnamed rule. The visible answer is still nothing.
+
 ---
 
 ## 5. Type
@@ -447,6 +457,14 @@ than everyone else. `animation-delay` and `transition-delay` are now zeroed alon
 - **Labels never collapse.** When the rail collapses to 64px the label goes `sr-only`, never
   `display:none` — `display:none` removes the node from the accessibility tree and takes the
   link's name with it. Nine unnamed links is what that bug looked like.
+- **There are exactly two breakpoints, and the stock ones compile to nothing.** `globals.css`
+  wipes the default scale with `--breakpoint-*: initial` and declares `narrow` (700px) and
+  `wide` (1180px). Tailwind does not warn about an unknown variant — it emits no CSS at all,
+  so `grid md:grid-cols-2` is a one-column grid at every width, forever. MEASURED 2026-08-20:
+  `md:grid-cols-2` produced zero bytes against this app's own `@theme`; fifteen such classes
+  were live across thirteen files, five of them on Ads. Use `narrow:` / `wide:` and their
+  `max-` counterparts. `src/lib/design/breakpoints.test.ts` bans the rest, and fails on its
+  own premise first if a third breakpoint is ever declared.
 
 ---
 
@@ -489,6 +507,21 @@ does none of that.
 as eight equal-weight cards, and `/home` and `/wallet` rendering the *same* dataset two
 different ways, are the failures this rule exists to stop.
 
+**A MATRIX is not a `DataTable`, and the reason is one attribute.** Added 2026-08-19 by the
+campaigns session. `DataTable` renders every body cell as `<td>`, which is right for a list of
+records. In a matrix the row's own label is a *header for that row*: without
+`<th scope="row">`, a screen reader on cell 3 of row 4 announces the column and not which
+record it belongs to, so the grid becomes unnavigable exactly where it is most useful. Hand-roll
+the table in that one case (`components/campaigns/campaign-grid.tsx` is the worked example) and
+keep everything else — the caption, the `type-eyebrow` headers, the hairline rows, the
+`overflow-x-auto` box — identical to the primitive, so the two read as one component.
+
+**An empty `DataTable` is the right way to show a column a feature will report.** Its empty
+state renders *inside* the table so the headers stay on screen, which is exactly what a
+coming-soon screen needs: a column header is a promise about Sahoda, which is allowed, while a
+figure in a cell would be a claim about the reader's business, which is not. `/ads` and
+`/ads/budget` use it for precisely this.
+
 **`disabled` never means "coming soon".** A disabled `Tile` or `Button` means *this real
 option is temporarily unavailable* — something the user could fix. An unbuilt feature is a
 `<span>`. The gallery's own guard caught this exact mistake while this document was being
@@ -499,6 +532,71 @@ soon/i})` match, which is precisely the thing the rule forbids.
 A server component cannot hand a function to a client component. Passing `onRemove` to a
 `Chip` from the server-rendered gallery returned a 500 — the same mistake any screen session
 would make, so the working example lives in `overlay-demo.tsx` rather than being deleted.
+
+---
+
+## 10.3 The navigation, and how a section says "not yet"
+
+The app has twenty-one sections and roughly a third of them are designed rather than built.
+Both facts have to survive contact with a 64px rail and a 390px phone.
+
+**One map, three surfaces.** `src/lib/nav/sections.ts` is the only list. The rail, the phone's
+More sheet and the command palette all project it. Before that each held its own array, and
+the palette carried a comment explaining that it omitted `/sites` "for the same reason the
+rail does" — a comment that exists only because two lists can disagree.
+
+**Grouped by the job, not by the module.** `Create · Publish · Customers · Results ·
+Automate`, with Home and Brand Brain above the groups because the Brain belongs to all five.
+Not "Engage" and "Measure": those are what a marketing tool calls these, not what somebody
+running a bakery calls them. Within a group, built sections come before unbuilt ones.
+
+**A coming-soon section is a REAL LINK.** Not `disabled`, not `aria-disabled`, not a `<span>`.
+§10.2's `<div>`-not-`<button>` rule governs CONTROLS that would do nothing; the screen behind
+a roadmap nav item exists, loads, and says plainly that the feature does not run — so the link
+keeps every promise it makes. Greying it out makes the roadmap unreachable rather than legible.
+
+It reads as not-yet three ways, none of them a colour:
+
+| width | mark | why |
+|---|---|---|
+| expanded rail, sheet, palette | the word **Soon**, `type-eyebrow`, muted | the whole claim in one word; muted so it cannot compete with the active item |
+| collapsed rail (64px) | a **hollow** ring, 7px | the label is `sr-only` and the word has nowhere to sit |
+| every width | `", not built yet"` in the accessible name | learned before the link is followed, not after |
+
+The hollow ring is deliberately the count badge's shape **without its fill**. Filled means
+something is waiting for you; hollow means nothing is there yet. Fill versus no-fill survives
+greyscale, which two hues would not.
+
+**Group headings are labels, never controls.** They do not collapse. A collapsible group hides
+destinations behind a state the user has to remember setting.
+
+**A phone reaches every section.** The bottom bar carries three destinations, the create
+button, and **More** — a `Drawer` holding the full map, grouped exactly as the rail groups it.
+It is a drawer and not a modal because consulting a menu does not demand an answer (§10.1).
+
+**A scroll region says it scrolls.** MEASURED at 1440×900: the rail's nav holds **938px** of
+content in a **718px** box, and `offsetWidth - clientWidth` came back **0** — Linux Chromium
+paints an overlay scrollbar that takes no layout width and does not appear until you already
+know to scroll, so 220px of destinations were hidden with no cue. `scrollbar-width: thin`,
+that property scoped away, and a forced `::-webkit-scrollbar` width each measured 0 as well.
+
+So the affordance is a **mask**: `.scroll-fade` fades the last 20px of the region into its
+background, and a fading edge reads as "this continues" the way a hard edge reads as "this
+ended". `.scroll-visible` still styles the bar for the engines that honour it. The fade is
+static, so it also softens the final 20px at the bottom of the scroll — the region's own
+bottom padding absorbs 8px of that, and the alternative is a list that lies about ending.
+
+**A bottom `Drawer` needs `max-w-none`.** The UA stylesheet caps every `dialog` at
+`calc((100% - 6px) - 2em)` in BOTH axes. `w-full` sets 100% and the cap takes 38px straight
+back, so a bottom sheet rendered 352px wide on a 390px phone with the page showing down its
+right edge. Never put `max-h-none` in the shared part of that class string either: it and
+`max-h-[80dvh]` are one property at equal specificity, the emitted order decides, and the
+sheet grew past the top of the screen.
+
+**A built screen nobody links to is the same as a screen that does not exist.**
+`src/lib/nav/reachable.test.ts` asserts every top-level route under `(app)` is either in the
+map or declared with the other way it is reached. Three finished features — Approvals,
+Campaigns, Assets — were reachable only by typing a URL when that test was written.
 
 ---
 

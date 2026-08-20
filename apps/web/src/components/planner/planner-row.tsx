@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { CalendarClock } from 'lucide-react'
 import type { Channel } from '@sahoda/shared'
 
+import { CampaignTag } from '@/components/campaigns/campaign-tag'
 import { ApproveButton } from '@/components/planner/approve-button'
 import { PlannerReschedule } from '@/components/planner/planner-reschedule'
 import { AutoPublishNote } from '@/components/posts/auto-publish-note'
@@ -31,6 +32,15 @@ export interface PlannerRowProps {
   now: Date
   /** Channels with a live connection. Passed through to the reschedule control. */
   connected?: ReadonlySet<Channel>
+  /**
+   * The campaigns this post is grouped under, if the membership read succeeded.
+   *
+   * `undefined` — not an empty array — is the shape for "we could not read the
+   * memberships", and it renders nothing. An empty array claims the post is in
+   * no campaign, and a hiccup that silently stripped a label the customer put
+   * there would look like the app losing their grouping.
+   */
+  campaigns?: ReadonlyArray<{ id: string; name: string }>
 }
 
 /**
@@ -44,6 +54,7 @@ export function PlannerRow({
   post,
   now,
   connected,
+  campaigns,
 }: PlannerRowProps) {
   const title = post.title?.trim()
   const scheduledAt = formatScheduledAt(post.scheduled_at)
@@ -67,6 +78,7 @@ export function PlannerRow({
             {title || 'Untitled post'}
           </Link>
           <LiveStatusBadge postId={post.id} intent={post.intent} variants={variantStates} />
+          <CampaignTag campaigns={campaigns} />
           {channels.length > 0 ? (
             <LiveChannelChips
               postId={post.id}

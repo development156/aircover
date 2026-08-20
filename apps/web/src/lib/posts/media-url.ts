@@ -1,7 +1,5 @@
 import 'server-only'
 
-import type { PostMedia } from '@sahoda/shared'
-
 import { createServerSupabase } from '@/lib/supabase/server'
 
 import { MEDIA_BUCKET } from './media-constants'
@@ -22,12 +20,25 @@ export interface MediaPreview {
 }
 
 /**
+ * The only two fields signing needs.
+ *
+ * Deliberately structural rather than `PostMedia`: library `assets` rows carry
+ * the same pair and live in the same private bucket, so a second signer would be
+ * the same twenty lines with one type changed — and the two would drift on the
+ * day the TTL moves. A row from either table satisfies this.
+ */
+export interface SignableObject {
+  id: string
+  storage_path: string
+}
+
+/**
  * Sign every row in one round trip. A row whose URL could not be signed comes
  * back with `url: null` rather than being dropped: the file genuinely exists and
  * the writer needs to see it listed, count it against the channel media caps and
  * be able to remove it. Hiding it would understate the post's media.
  */
-export async function signMediaPreviews(rows: readonly PostMedia[]): Promise<MediaPreview[]> {
+export async function signMediaPreviews(rows: readonly SignableObject[]): Promise<MediaPreview[]> {
   if (rows.length === 0) return []
 
   try {

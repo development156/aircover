@@ -25,7 +25,7 @@
  */
 
 /** Which input a `MediaPathError` is about, so callers branch without parsing prose. */
-export type MediaPathField = 'workspaceId' | 'postId' | 'objectId' | 'mime'
+export type MediaPathField = 'workspaceId' | 'postId' | 'objectId' | 'assetId' | 'mime'
 
 /**
  * Refusal to build a key. Thrown, not returned, because every caller has already
@@ -153,4 +153,48 @@ export function mediaObjectPath(input: {
   }
 
   return `${workspaceId}/${postId}/${objectId}.${extension}`
+}
+
+/**
+ * The folder library files live under, inside a workspace's prefix.
+ *
+ * `<workspaceId>/assets/<assetId>.<ext>` cannot collide with a post's
+ * `<workspaceId>/<postId>/<objectId>.<ext>`, because the second segment there is
+ * always a uuid and `assets` is not one. That is a property of the ALLOWLIST
+ * above rather than a coincidence: no accepted id can spell this word.
+ */
+const ASSET_FOLDER = 'assets'
+
+/**
+ * Build the `media` bucket key for one LIBRARY file:
+ * `<workspaceId>/assets/<assetId>.<ext>`.
+ *
+ * A library file belongs to the workspace, not to a post, so it has no post id
+ * to sit under — which is why this is a sibling of `mediaObjectPath` rather than
+ * a widening of it. Everything that matters is identical: the first segment is
+ * still the workspace uuid, which is the WHOLE tenant boundary the storage
+ * policy reads, and every id still has to be a canonical uuid before it reaches
+ * the string.
+ *
+ * Throws `MediaPathError` on a malformed id or an unsupported mime, for the same
+ * reasons `mediaObjectPath` does.
+ */
+export function assetObjectPath(input: {
+  workspaceId: string
+  /** The `assets` row id. The CALLER mints it, so the row and the object agree. */
+  assetId: string
+  mime: string
+}): string {
+  const workspaceId = normaliseId(input.workspaceId, 'workspaceId')
+  const assetId = normaliseId(input.assetId, 'assetId')
+
+  const extension = extensionForMime(input.mime)
+  if (extension === null) {
+    throw new MediaPathError(
+      'mime',
+      'Cannot build a media path: mime is not an allowed image type.',
+    )
+  }
+
+  return `${workspaceId}/${ASSET_FOLDER}/${assetId}.${extension}`
 }

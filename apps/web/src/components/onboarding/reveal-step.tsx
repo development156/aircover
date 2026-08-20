@@ -117,7 +117,7 @@ export function RevealStep({
 
       <SignalClarityMeter percent={clarity} />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 narrow:grid-cols-2">
         <SignalLockCard
           value={brain.alignment}
           regenerateCost={regenerateCost}

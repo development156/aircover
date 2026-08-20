@@ -354,10 +354,16 @@ export async function listPostLifecycles(postIds: string[]): Promise<PostLifecyc
 }
 
 /**
- * Media attached to THIS post. There is no workspace-level asset library —
- * `post_media.post_id` is `not null` and no `media_library` table exists — so a
- * library picker would have nothing to read. Ordered by `created_at` because the
- * table has no position column (see REQUESTS.md).
+ * Media attached to THIS post.
+ *
+ * A row may have come from the workspace library (`asset_id` set, pointing at
+ * the library's own stored object) or straight from this post's uploader
+ * (`asset_id` null). Both are attachments and both publish identically — the
+ * publisher reads `storage_path` and does not look at `asset_id` at all.
+ *
+ * Ordered by `created_at` because the table has no position column (see
+ * REQUESTS.md); `asset_usages.position` records the order for library files but
+ * is not the publisher's source.
  */
 export async function listMedia(postId: string): Promise<PostMedia[]> {
   try {

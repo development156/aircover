@@ -47,6 +47,21 @@ const ROUTES: ReadonlyArray<{ path: string; slug: string; archetype: string }> =
   { path: '/assets', slug: 'assets', archetype: 'gallery' },
   { path: '/settings', slug: 'settings', archetype: 'form' },
   { path: '/settings/plan', slug: 'settings-plan', archetype: 'pricing' },
+  // The designed-but-unbuilt sections. They belong in this camera for the same
+  // reason they belong in the nav: a roadmap screen that is not looked at drifts
+  // away from the built ones, and the whole claim of this pass is that it is
+  // designed as well as the rest. One per SHAPE — a stage sequence, a recipe
+  // library, a watch list, a document, a pipeline, a gallery, a fan-out.
+  { path: '/loop', slug: 'loop', archetype: 'roadmap · sequence' },
+  { path: '/playbooks', slug: 'playbooks', archetype: 'roadmap · library' },
+  { path: '/radar', slug: 'radar', archetype: 'roadmap · watch list' },
+  { path: '/report', slug: 'report', archetype: 'roadmap · document' },
+  { path: '/leads', slug: 'leads', archetype: 'roadmap · pipeline' },
+  { path: '/studio', slug: 'studio', archetype: 'roadmap · gallery' },
+  { path: '/remix', slug: 'remix', archetype: 'roadmap · fan-out' },
+  { path: '/ads', slug: 'ads', archetype: 'roadmap · table' },
+  { path: '/brain/audience', slug: 'brain-audience', archetype: 'roadmap · in a tab' },
+  { path: '/brain/knowledge', slug: 'brain-knowledge', archetype: 'roadmap · empty table' },
 ]
 
 /**

@@ -3,7 +3,7 @@ import type { Route } from 'next'
 
 import { Badge } from '@/components/ui/badge'
 import { CHANNEL_SHORT } from '@/components/posts/channel-label'
-import { rungFor } from '@/lib/posts/rung'
+import { needsAPerson } from '@/lib/approvals/queue'
 import { STATUS_WORD } from '@/lib/posts/status-word'
 import type { DisplayPost } from '@/lib/posts/display-post'
 
@@ -16,11 +16,17 @@ import type { DisplayPost } from '@/lib/posts/display-post'
  * someone a reason to open the app on a Tuesday.
  *
  * ── WHAT COUNTS AS NEEDING YOU ───────────────────────────────────────────────
- * Only posts whose rung is `urgent` — the ladder's own definition of "needs you
- * now", which is `review`, `failed` and `partial`. A draft is NOT on this list:
- * it is waiting on you in the sense that everything unfinished is, and a queue
- * that includes every unfinished thing is a list of everything, which nobody
- * reads. Drafts have their own home on /posts.
+ * `needsAPerson` — one predicate, in `lib/approvals/queue.ts`, shared with the
+ * rail's badge and with /approvals itself. It used to be `rungFor(intent) ===
+ * 'urgent'` written out here, which was the same answer and the wrong shape:
+ * the moment a second screen counted the same thing, two copies of a filter
+ * could drift exactly as badly as two queries, and less visibly.
+ *
+ * The definition itself is unchanged — the ladder's own "needs you now", which
+ * is `review`, `failed` and `partial`. A draft is NOT on this list: it is
+ * waiting on you in the sense that everything unfinished is, and a queue that
+ * includes every unfinished thing is a list of everything, which nobody reads.
+ * Drafts have their own home on /posts.
  *
  * NO ACTION BUTTONS. The reference's `.att` card carries Approve / Review
  * inline, and approving from the dashboard is a real interaction there. Here
@@ -33,7 +39,7 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
   // `intent` — NOT `status`. `DisplayPost` seals `status` behind an
   // uninhabitable type precisely so a summary screen cannot read it and claim
   // an outcome the variant rows never reported (see display-post.ts).
-  const waiting = posts.filter((post) => rungFor(post.intent) === 'urgent')
+  const waiting = posts.filter((post) => needsAPerson(post.intent))
 
   return (
     <section
@@ -50,8 +56,11 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
             {waiting.length}
           </span>
         ) : null}
+        {/* /approvals, not /posts. This card is a preview of the QUEUE — same
+            collection, same count — and sending "View all" to the full post
+            list would answer a different question with a different number. */}
         <Link
-          href="/posts"
+          href="/approvals"
           className="card-link ml-auto text-[12px] font-[550] text-muted hover:text-accent"
         >
           View all

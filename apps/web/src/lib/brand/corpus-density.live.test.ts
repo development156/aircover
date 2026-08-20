@@ -115,7 +115,12 @@ describe.runIf(LIVE)('corpus token density', () => {
     const rows: unknown[] = []
     for (const v of variants) {
       const corpus = quarantineCorpus(v.pages)
-      const trials: Array<{ tokensIn: number; tokensOut: number; costUsd: number; fields: number }> = []
+      const trials: Array<{
+        tokensIn: number
+        tokensOut: number
+        costUsd: number
+        fields: number
+      }> = []
       let best: { fields: string[]; gaps: string[] } = { fields: [], gaps: [] }
       let bestTokens = Number.POSITIVE_INFINITY
 
@@ -136,7 +141,10 @@ describe.runIf(LIVE)('corpus token density', () => {
         })
         if (ex.ok && u.tokensIn < bestTokens) {
           bestTokens = u.tokensIn
-          best = { fields: ex.data.fields.map((f) => `${f.channel}.${f.key}: ${f.value}`), gaps: ex.data.gaps }
+          best = {
+            fields: ex.data.fields.map((f) => `${f.channel}.${f.key}: ${f.value}`),
+            gaps: ex.data.gaps,
+          }
         }
       }
 
@@ -155,6 +163,7 @@ describe.runIf(LIVE)('corpus token density', () => {
       })
     }
 
-    if (process.env.DENSITY_OUT) writeFileSync(process.env.DENSITY_OUT, JSON.stringify(rows, null, 2))
+    if (process.env.DENSITY_OUT)
+      writeFileSync(process.env.DENSITY_OUT, JSON.stringify(rows, null, 2))
   }, 600_000)
 })

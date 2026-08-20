@@ -1,41 +1,46 @@
-import type { Route } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
 
-import { NavItem, type NavIconName } from '@/components/shell/nav-item'
+import { NavItem } from '@/components/shell/nav-item'
 import { RailFoot } from '@/components/shell/rail-foot'
+import { approvalCount } from '@/lib/approvals/read'
+import { NAV_FOOT, NAV_GROUPS } from '@/lib/nav/sections'
 import { getOpsAdmin } from '@/lib/ops/guard'
 
-// Alpha nav subset only — every href has a real page (typedRoutes enforces it).
-// Full nav (Loop, Measure, …) lands with its modules per docs/06 §3.
-//
-// SITES IS DELIBERATELY ABSENT, not unbuilt. `/sites` still exists, still
-// generates, still previews, and its tests still run — it is out of BETA scope
-// because the deploy half is unowned (no Cloudflare client, `sites.status` never
-// leaves 'draft'), so the module can only ever show a customer a preview of an
-// address they cannot have. The route is left reachable by URL on purpose: the
-// code is not dead, it is waiting. Restoring it is one line here.
-const NAV: ReadonlyArray<{
-  href: Route
-  label: string
-  icon: NavIconName
-  guide: string
-  section?: string
-}> = [
-  { href: '/home', label: 'Home', icon: 'house', guide: 'nav.home' },
-  // Above the Create section on purpose: the Brand Brain is what every screen
-  // below it writes FROM, and until now the core of the product had no entry in
-  // the nav at all — reachable only by finishing onboarding.
-  { href: '/brain', label: 'Brand Brain', icon: 'brain-circuit', guide: 'nav.brain' },
-  { href: '/posts', label: 'Posts', icon: 'square-pen', guide: 'nav.posts', section: 'Create' },
-  { href: '/planner', label: 'Planner', icon: 'calendar-days', guide: 'nav.planner' },
-  { href: '/inbox', label: 'Inbox', icon: 'messages-square', guide: 'nav.inbox' },
-  { href: '/analytics', label: 'Analytics', icon: 'chart-column', guide: 'nav.analytics' },
-  { href: '/connections', label: 'Connections', icon: 'link-2', guide: 'nav.connections' },
-  { href: '/wallet', label: 'Wallet', icon: 'wallet', guide: 'nav.wallet' },
-  { href: '/settings', label: 'Settings', icon: 'sliders-horizontal', guide: 'nav.settings' },
-]
+/**
+ * The rail — every section of the product, grouped by the job it does.
+ *
+ * ── WHAT CHANGED, AND WHY IT HAD TO ──────────────────────────────────────────
+ * This held nine hand-written items and a comment reading "Full nav (Loop,
+ * Measure, …) lands with its modules". Twelve more sections had been built or
+ * designed since, and the only way to reach any of them was to type the URL.
+ * Approvals, Campaigns and Assets were finished features nobody could find.
+ *
+ * The list now lives in `lib/nav/sections.ts` — one map, three surfaces (this,
+ * the phone's More sheet, the command palette). The grouping and its reasoning
+ * are documented there rather than here, because they are a product decision,
+ * not a rendering one.
+ *
+ * ── SITES IS BACK, AND THE OLD REASON IS RECORDED ────────────────────────────
+ * It was hidden because the deploy half is unowned: `sites.status` never leaves
+ * 'draft', so a customer could only ever be shown a preview of an address they
+ * cannot have. That is still true, and it is no longer a reason to hide the
+ * section — the screen says "preview" in every string, renders the contact
+ * section formless because no lead route is mounted, and never claims a URL.
+ * A working generator reachable only by typing a path is a worse answer than a
+ * visible one that is honest about where it stops.
+ *
+ * The second, sharper objection is also gone: `site_generate` could author
+ * testimonials and attribute them to customers who do not exist (docs/22 F3).
+ * The refusal now sits on the write path in `packages/sites/src/normalize/
+ * attested.ts`, proved against output that DOES carry fabricated quotes.
+ *
+ * ── EVERY GROUP HEADING IS A LABEL, NOT A CONTROL ────────────────────────────
+ * They do not collapse. A collapsible group hides destinations behind a state
+ * the user has to remember setting, and the whole point of this pass is that
+ * nothing in the product is unreachable.
+ */
 
 /**
  * Is this viewer an ops admin? Never a reason to break the shell.
@@ -59,6 +64,12 @@ async function showsAdminItem(): Promise<boolean> {
 
 export async function Rail() {
   const isOpsAdmin = await showsAdminItem()
+  // THE ONLY BADGE IN THE RAIL, and it is derived rather than sent.
+  // `readApprovalQueue` is `cache()`-wrapped, so this share the SAME select the
+  // /approvals page runs in the same request — the badge and the header it
+  // labels cannot disagree. `undefined` on a failed read, never 0: a zero here
+  // would claim nothing is waiting when nothing was counted.
+  const waiting = await approvalCount()
 
   return (
     <aside
@@ -93,34 +104,95 @@ export async function Rail() {
           </span>
         </Link>
       </div>
+
+      {/* ── THE RAIL SCROLLS, AND IT HAS TO SAY SO ────────────────────────────
+          MEASURED at 1440x900 on 2026-08-20: twenty-one items at 34px, five
+          group headings, the brand block and the foot come to roughly 1050px
+          against a 900px viewport, so `Automate` and all three foot links sat
+          below the fold with NO visual cue that anything was down there. An
+          overflow container that looks like a finished list is worse than a
+          short list.
+
+          Two answers together, and neither is "show fewer sections". The
+          headings lost 6px of padding each, and `.scroll-fade` masks the last
+          20px of the region so the edge FADES rather than stopping — the cue
+          that does not depend on the engine.
+
+          `.scroll-visible` is there too and it is not what fixed this:
+          `scrollbar-width: thin`, that property scoped away, and a forced
+          `::-webkit-scrollbar` width were each measured at ZERO layout width in
+          headless Chromium. It styles the bar for the engines that honour it,
+          and the mask covers the ones that do not. */}
       <nav
         aria-label="Main"
-        className="flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto px-3 py-2 max-wide:px-2"
+        className="scroll-visible scroll-fade flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-2 max-wide:px-2"
       >
-        {NAV.map((item) => (
-          <div key={item.href}>
-            {/* A group label, so it must not compete with the active item —
-                hence muted rather than accent. The kit puts this at --text-3
-                (black-45); this app uses --ink-mute instead, because
-                ink-faint.test.ts bans --ink-faint as content text and an 11px
-                uppercase eyebrow at 3.5:1 is the exact string that ban exists
-                for. Accessibility floor wins over an exact colour match. */}
-            {item.section ? (
-              <div className="type-eyebrow px-[9px] pt-4 pb-[5px] text-muted max-wide:hidden">
-                {item.section}
-              </div>
+        {NAV_GROUPS.map((group, index) => (
+          // A real <section> per group, labelled by its own heading, so the
+          // twenty-one links arrive as six named regions rather than one long
+          // list — the same structure a sighted reader gets from the eyebrows.
+          <section
+            key={group.title ?? 'top'}
+            aria-labelledby={group.title ? `nav-group-${index}` : undefined}
+            aria-label={group.title ? undefined : 'Main sections'}
+            className="flex flex-col gap-[2px]"
+          >
+            {group.title ? (
+              // A group label, so it must not compete with the active item —
+              // hence muted rather than accent. The kit puts this at --text-3
+              // (black-45); this app uses --ink-mute instead, because
+              // ink-faint.test.ts bans --ink-faint as content text and an 11px
+              // uppercase eyebrow at 3.5:1 is the exact string that ban exists
+              // for. Accessibility floor wins over an exact colour match.
+              //
+              // `sr-only` rather than hidden when the rail collapses: the
+              // heading is what makes the six regions navigable, and
+              // display:none would take it out of the accessibility tree — the
+              // same mistake that once left nine nav links unnamed.
+              <h2
+                id={`nav-group-${index}`}
+                className="type-eyebrow px-[9px] pt-3 pb-[3px] text-muted max-wide:sr-only"
+              >
+                {group.title}
+              </h2>
             ) : null}
-            <NavItem href={item.href} label={item.label} icon={item.icon} guide={item.guide} />
-          </div>
+            {group.items.map((item) => (
+              <NavItem
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                icon={item.icon}
+                guide={item.guide}
+                soon={item.state === 'soon'}
+                count={item.href === '/approvals' ? waiting : undefined}
+              />
+            ))}
+          </section>
         ))}
-        {/* doc 13 §14: visible only to ops admins. Absence is the point — a
-            greyed-out Admin item would tell every tenant the console exists. */}
-        {isOpsAdmin ? (
-          <div className="mt-3 border-t border-line-soft pt-3">
+
+        {/* The plumbing. Separated by a rule rather than by an eyebrow: it is a
+            different KIND of destination, not a sixth job. */}
+        <section
+          aria-label="Account and setup"
+          className="mt-3 flex flex-col gap-[2px] border-t border-line-soft pt-3"
+        >
+          {NAV_FOOT.map((item) => (
+            <NavItem
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              guide={item.guide}
+            />
+          ))}
+          {/* doc 13 §14: visible only to ops admins. Absence is the point — a
+              greyed-out Admin item would tell every tenant the console exists. */}
+          {isOpsAdmin ? (
             <NavItem href="/admin/dev" label="Admin" icon="shield" guide="nav.admin" />
-          </div>
-        ) : null}
+          ) : null}
+        </section>
       </nav>
+
       {/* The reference's third sidebar block. The rail shipped with two. */}
       <RailFoot />
     </aside>

@@ -1,129 +1,155 @@
-import { Check, Eye, MoreHorizontal, Sparkles, SlidersHorizontal, X } from 'lucide-react'
+import Link from 'next/link'
+import type { Route } from 'next'
+import { CheckCheck, TriangleAlert } from 'lucide-react'
 
+import { ReviewQueue } from '@/components/approvals/review-queue'
+import { Badge } from '@/components/ui/badge'
+import { CHANNEL_SHORT } from '@/components/posts/channel-label'
+import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
-import { InertButton, InertChip, RoadmapBanner } from '@/components/roadmap/inert'
+import { Unreadable } from '@/components/design-system/absence-row'
+import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
+import { readApprovalQueue } from '@/lib/approvals/read'
+import { STATUS_WORD } from '@/lib/posts/status-word'
+import type { DisplayPost } from '@/lib/posts/display-post'
 
 export const metadata = { title: 'Approvals' }
 
 /**
- * The supervision queue, as the reference designs it.
+ * APPROVALS — a real queue over real rows.
  *
- * ── WHY IT IS NOT WIRED TO POSTS ─────────────────────────────────────────────
- * The app already HAS an approval path: /posts carries the approve action and
- * /home's "Needs your attention" is the queue that reads it. This screen is the
- * reference's SEPARATE surface, which adds bulk select, keyboard review and an
- * AI review pass — none of which exists. Pointing it at posts would produce a
- * second, competing approvals screen with a different set of actions, which is
- * worse than one honest picture of what the real one will be.
+ * ── WHAT THIS REPLACED ───────────────────────────────────────────────────────
+ * A drawing: three fictional rows reading "A post waiting on you" / "One that is
+ * due soon" / "One Sahoda drafted", with an em dash where a reach figure would
+ * be, and a comment arguing that wiring it to `posts` would produce "a second,
+ * competing approvals screen". That argument was right about the danger and
+ * wrong about the remedy — the answer to two screens disagreeing is one
+ * collection, not one screen fewer. There is a queue, it is `posts`, and nothing
+ * on this route is invented.
  *
- * ── WHAT IS WITHHELD ─────────────────────────────────────────────────────────
- * The reference's header reads "5 awaiting review"; its chips read "All 5 ·
- * Urgent 1 · Content 2 · Campaigns 2 · Ads 1"; each row carries a reach figure.
- * Every one is a count of a queue this screen does not read, so the header keeps
- * its noun and drops its number, the chips keep their names, and the row's reach
- * slot renders an em dash beside its own icon.
+ * ── ITS OWN SECTION, NOT A TAB OF THE PLANNER ────────────────────────────────
+ * Founder's ruling, and the shape of the day agrees with it: at L2 on the
+ * Autonomy Dial, deciding is the ONE thing you open Sahoda to do. The Planner
+ * answers "when is this going out"; this answers "does it go out at all". A tab
+ * would put the second question behind the first.
  *
- * The keyboard hints (A approve · R reject · J K move) are kept because they
- * describe how the built screen will work, and they make no claim about data.
+ * ── ONE COLLECTION, THREE READERS ────────────────────────────────────────────
+ * The rail's badge, this header and Home's "Needs your attention" all call
+ * `readApprovalQueue`, which is `cache()`-wrapped so the layout's tree and the
+ * page's tree share ONE select in a request. `lib/approvals/queue.ts` holds the
+ * predicate so the three cannot filter the same rows differently. That is the
+ * defect `nav-item.tsx` predicted in prose, closed at runtime rather than by
+ * convention.
+ *
+ * ── THE DIAL IS NOT ON THIS SCREEN ───────────────────────────────────────────
+ * The brief calls this "the Autonomy Dial's L2 surface", and it is — but no
+ * autonomy level is stored anywhere in this product, so a control reading "You
+ * are on L2" would be an invented claim about the reader's workspace on the one
+ * screen that must be trustworthy. The note at the foot links to /loop, where
+ * the dial is drawn honestly as unbuilt.
  */
 
-const ROWS = [
-  { title: 'A post waiting on you', meta: 'Someone sent this for review' },
-  { title: 'One that is due soon', meta: 'Scheduled, needs a decision first' },
-  { title: 'One Sahoda drafted', meta: 'Written from your Brand Brain' },
-] as const
+export default async function ApprovalsPage() {
+  const read = await readApprovalQueue()
 
-export default function ApprovalsPage() {
   return (
     <div className="space-y-grid">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <PageTitle>Approvals</PageTitle>
-          <p className="mt-1 text-[13px] text-muted">Everything waiting on you, in one queue.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <InertButton>
-            <Sparkles size={14} strokeWidth={1.8} aria-hidden />
-            Review with AI
-          </InertButton>
-          <InertButton>
-            <SlidersHorizontal size={14} strokeWidth={1.8} aria-hidden />
-            Filter
-          </InertButton>
-          <InertButton>Due date</InertButton>
-        </div>
-      </div>
+      <PageTitle sub="Everything waiting on a decision from you, in one place.">
+        Approvals
+      </PageTitle>
 
-      <RoadmapBanner what="One queue for everything awaiting a decision, with bulk actions and keyboard review." />
+      {read.status === 'no-workspace' ? (
+        <EmptyState
+          icon={CheckCheck}
+          title="Create a workspace first"
+          body="Posts belong to a workspace, and so does the queue of ones waiting on you."
+          action={<CreateWorkspaceButton />}
+        />
+      ) : read.status === 'unreadable' ? (
+        // NOT an empty state. "Nothing needs you" and "we could not read what
+        // needs you" are different claims, and the first one told over the
+        // second is how somebody closes the app with five posts waiting.
+        <section className="surface-ring flex flex-col items-center gap-2 rounded-card bg-surface px-5 py-10 text-center">
+          <Unreadable what="Your queue" />
+          <h2 className="type-h3 mt-1">Sahoda could not read what is waiting on you</h2>
+          <p className="type-body max-w-[42ch] text-muted">
+            The queue did not come back this time. Reload &mdash; this is not a sign that nothing
+            needs you.
+          </p>
+        </section>
+      ) : read.total === 0 ? (
+        <EmptyState
+          icon={CheckCheck}
+          title="Nothing is waiting on you"
+          body="Anything sent for review, and anything that failed to go out, appears here. That is a real answer — not a screen that has yet to load."
+          tip="Posts you are still writing live under Posts. They are not waiting on a decision, so they are not here."
+        />
+      ) : (
+        <>
+          {read.decisions.length > 0 ? <ReviewQueue posts={read.decisions} /> : null}
+          {read.repairs.length > 0 ? <RepairList posts={read.repairs} /> : null}
+        </>
+      )}
 
-      <div className="flex flex-wrap gap-1.5">
-        <InertChip on>All</InertChip>
-        <InertChip>Urgent</InertChip>
-        <InertChip>Content</InertChip>
-        <InertChip>Campaigns</InertChip>
-        <InertChip>Ads</InertChip>
-      </div>
-
-      {/* The bulk bar. Present because it is most of why this screen exists. */}
-      <div className="is-proposed flex flex-wrap items-center gap-2 rounded-card p-4">
-        <span className="text-[12.5px] text-muted">With selected</span>
-        <InertButton className="px-2 py-[3px] text-[12px]">
-          <X size={13} strokeWidth={2} aria-hidden />
-          Reject
-        </InertButton>
-        <InertButton primary className="px-2 py-[3px] text-[12px]">
-          <Check size={13} strokeWidth={2} aria-hidden />
-          Approve
-        </InertButton>
-      </div>
-
-      <section className="is-proposed rounded-card" aria-label="Review queue — coming soon">
-        <div className="flex flex-wrap items-center gap-2 border-b border-line-soft px-3 py-2.5">
-          {/* The noun, without the count. */}
-          <h2 className="text-[14px] font-semibold text-muted">Awaiting review</h2>
-          <span className="ml-auto flex items-center gap-1.5 text-[11px] text-muted max-narrow:hidden">
-            <kbd className="rounded-sm bg-s2 px-[5px] py-[1px] font-medium">A</kbd> approve
-            <kbd className="rounded-sm bg-s2 px-[5px] py-[1px] font-medium">R</kbd> reject
-            <kbd className="rounded-sm bg-s2 px-[5px] py-[1px] font-medium">J</kbd>
-            <kbd className="rounded-sm bg-s2 px-[5px] py-[1px] font-medium">K</kbd> move
-          </span>
-        </div>
-
-        <ul>
-          {ROWS.map((row) => (
-            <li
-              key={row.title}
-              className="flex flex-wrap items-center gap-3 border-b border-line-soft px-3 py-3 last:border-b-0"
-            >
-              <span
-                data-inert-control
-                aria-hidden
-                className="size-4 shrink-0 rounded-[4px] bg-s2 shadow-[inset_0_0_0_1px_var(--line)]"
-              />
-              <span aria-hidden className="size-8 shrink-0 rounded-sm bg-s2" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-semibold text-muted">
-                  {row.title}
-                </span>
-                <span className="mt-[1px] block truncate text-[12px] text-muted">{row.meta}</span>
-              </span>
-              <span className="flex flex-none items-center gap-1 text-[11px] text-muted">
-                <Eye size={12} strokeWidth={1.8} aria-hidden />
-                &mdash;
-              </span>
-              <span className="flex flex-none items-center gap-1.5">
-                <InertButton className="px-2 py-[3px] text-[12px]">Edit</InertButton>
-                <InertButton primary className="px-2 py-[3px] text-[12px]">
-                  Approve
-                </InertButton>
-                <span data-inert-control aria-hidden className="text-muted">
-                  <MoreHorizontal size={15} strokeWidth={1.8} />
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <p className="type-sm text-muted">
+        How much Sahoda may do before asking you is the{' '}
+        <Link href="/loop" className="font-[550] text-accent underline underline-offset-2">
+          autonomy setting
+        </Link>
+        . It is not built yet, so every post reaches this queue.
+      </p>
     </div>
+  )
+}
+
+/**
+ * The other half of the queue: posts that went wrong.
+ *
+ * ── WHY THEY ARE NOT IN THE SAME LIST WITH A CHECKBOX ────────────────────────
+ * They need a person for a different reason and take a different action. The
+ * approve transition does not accept `failed` or `partial` at all
+ * (`APPROVABLE_FROM`), so a checkbox beside one would offer a bulk action that
+ * silently does nothing for it — and `approvePosts` would honestly report it as
+ * "had already moved on", which is a true sentence about a thing the user never
+ * should have been able to select.
+ *
+ * So: no checkboxes, no Approve. Each row opens the post, which is where the
+ * channel that failed can be seen and retried.
+ */
+function RepairList({ posts }: { posts: readonly DisplayPost[] }) {
+  return (
+    <section aria-labelledby="approvals-repairs" className="surface-ring rounded-card bg-surface">
+      <header className="flex flex-wrap items-center gap-2 border-b border-line-soft px-3 py-2.5">
+        <TriangleAlert size={15} strokeWidth={1.8} aria-hidden className="shrink-0 text-muted" />
+        <h2 id="approvals-repairs" className="text-[13px] font-semibold">
+          Did not go out
+        </h2>
+        <span className="type-sm text-muted">
+          <span className="num">{posts.length}</span>
+          {posts.length === 1 ? ' post' : ' posts'}
+        </span>
+      </header>
+      <ul>
+        {posts.map((post) => (
+          <li
+            key={post.id}
+            className="flex flex-wrap items-center gap-3 border-b border-line-soft px-3 py-3 last:border-b-0"
+          >
+            <Link
+              href={`/posts/${post.id}` as Route}
+              className="min-w-0 flex-1 rounded-sm text-[13px] font-[550] text-ink hover:text-accent"
+            >
+              <span className="block truncate">{post.title?.trim() || 'Untitled post'}</span>
+              {post.channels.length > 0 ? (
+                <span className="type-sm block truncate text-muted">
+                  {post.channels.map((channel) => CHANNEL_SHORT[channel]).join(' · ')}
+                </span>
+              ) : null}
+            </Link>
+            <Badge rung="urgent">{STATUS_WORD[post.intent]}</Badge>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
