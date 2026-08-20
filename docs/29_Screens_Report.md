@@ -390,6 +390,32 @@ Every other leg-3 failure is downstream of the same death and was **not** re-run
 does not claim the smoke suite is green. It claims legs 1, 2, 4 and 5 are green, and that the
 specs covering this lane's changes pass on a server proved to be ours.
 
+### The final pass, after the `/brain` hub change
+
+Legs 1, 2, 4 and 5 were re-run once the last code change landed. One header each, so one
+instance:
+
+| leg | result |
+|---|---|
+| 1/5 `turbo run typecheck lint test` | **EXIT=0** — 27/27 tasks; web **3236** tests, 5 skipped |
+| 2/5 `vitest run` (root) | **EXIT=0** — 9 files, 162 tests |
+| 4/5 `prettier --check .` | **EXIT=0** |
+| 5/5 `turbo run build` | **EXIT=0** — compiled in 32.9s, 33/33 static pages |
+
+**Leg 3 was NOT re-run in that pass**, and this report does not claim it was. What was run
+instead, each on a port verified with `readlink /proc/<pid>/cwd` to be this worktree:
+
+- `playwright test variant-save concurrent-edit` — **5 passed, exit 0** (2.2m). The specs that
+  exercise the rewritten save control, against the real database.
+- `playwright test no-truncated-labels` — **15 passed, exit 0** (2.4m), at load ~3. This is the
+  spec holding test #42, the point at which the full leg-3 run lost its server. It passes
+  standalone, which is the discriminator between "failed under load" and "actually broken" and
+  the documented pattern on this box. That is the evidence for the paragraph above; without it
+  the environment diagnosis would have been inference.
+
+The remaining leg-3 failures are all downstream of the same server death and were not
+individually re-run.
+
 ### The first gate run was void, and it was my doing
 
 I launched `gate.sh` detached, then ran `grep gate.log` from a different working directory,
