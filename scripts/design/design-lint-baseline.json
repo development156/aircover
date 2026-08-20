@@ -83,7 +83,7 @@
     "components/onboarding/brand-card.tsx": 1,
     "components/onboarding/reveal-step.tsx": 1
   },
-  "typesize_total": 839,
+  "typesize_total": 836,
   "typesize": {
     "app/(app)/analytics/page.tsx": 2,
     "app/(app)/approvals/page.tsx": 11,
@@ -155,7 +155,6 @@
     "components/brain/field-editor.tsx": 1,
     "components/brain/field-row.tsx": 4,
     "components/brain/field-value.tsx": 1,
-    "components/brain/section-card-empty.tsx": 3,
     "components/brain/section-card.tsx": 1,
     "components/brain/sections-list.tsx": 4,
     "components/coming-soon.tsx": 4,

@@ -63,8 +63,19 @@ test.describe('saving a channel variant @smoke', () => {
     await expect(save).toBeEnabled()
     await save.click()
 
-    // The button's own label is the app's claim that the write landed.
-    await expect(page.getByRole('button', { name: /^saved$/i })).toBeVisible({ timeout: 20_000 })
+    // The app's claim that the write landed. Asserted as the CLAIM, not as a
+    // role: this line used to read `getByRole('button', { name: /^saved$/i })`,
+    // which required the confirmation to BE a disabled button — so the test
+    // pinned docs/26 §10.2's defect in place as the correct behaviour, and any
+    // session fixing it would have been told by a green suite that it had
+    // broken saving. "Saved" is a status; it is now a `<p>`, and this asserts
+    // the sentence the writer actually reads.
+    //
+    // Anchored for the same reason the line above is: the conflict notice's
+    // "Use the saved version" also contains the word.
+    await expect(page.getByText(/^saved$/i)).toBeVisible({ timeout: 20_000 })
+    // And the confirmation must not be offered as an action the reader can take.
+    await expect(page.getByRole('button', { name: /^saved$/i })).toHaveCount(0)
 
     // Nothing was refused. A clash cannot happen here — there is one writer — so
     // this notice appearing would mean the version path fired against a database

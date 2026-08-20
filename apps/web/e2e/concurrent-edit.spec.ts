@@ -68,6 +68,29 @@ async function readVariant(postId: string): Promise<{ body: string; version: num
   return (data as { body: string; version: number } | null) ?? null
 }
 
+/**
+ * ── WHY THE "SAVED" CHECKS ARE `getByText`, NOT `getByRole('button')` ─────────
+ *
+ * Eight assertions in this file read
+ * `getByRole('button', { name: /^saved$/i })`. Each is the line that proves a
+ * write landed, so they were not incidental — the confirmation being a
+ * `<button disabled>` was LOAD-BEARING in the suite that guards variant saving.
+ *
+ * That control was docs/26 §10.2's defect (a disabled button is still announced
+ * as a button, so the reader is offered an action that does nothing), and it
+ * also chose its label from `!dirty` — which made a channel that had never been
+ * written to claim "Saved". Removing it turned these eight red, which is how a
+ * suite invites the next session to revert a correct fix.
+ *
+ * `getByText` is strictly STRONGER here. The old form passed only if the
+ * confirmation was something the reader could try to press; the new one asserts
+ * the sentence they actually read and is indifferent to which element carries
+ * it. `variant-save.spec.ts` additionally asserts that no BUTTON named "Saved"
+ * exists, so the defect cannot come back unnoticed.
+ *
+ * Anchored (`^saved$`) for the reason the "Save variant" locator below is: the
+ * conflict notice's own "Use the saved version" contains the word too.
+ */
 test.describe('concurrent edit, against the real database @smoke', () => {
   // Two contexts, two sign-ins and a dozen navigations. The cost is the journey,
   // not any single assertion.
@@ -87,7 +110,7 @@ test.describe('concurrent edit, against the real database @smoke', () => {
     // be reported as a clash with a writer who does not exist. This is that case,
     // against the real table.
     await saveCopy(page, 'The first draft.')
-    await expect(page.getByRole('button', { name: /^saved$/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/^saved$/i)).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText(/Someone else saved the/i)).toHaveCount(0)
 
     const created = await readVariant(postId)
@@ -101,7 +124,7 @@ test.describe('concurrent edit, against the real database @smoke', () => {
     // MEASURED, not read off the source. The old upsert never touched `version`,
     // so a counter at 2 is only reachable through the new function.
     await saveCopy(page, 'The second draft.')
-    await expect(page.getByRole('button', { name: /^saved$/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/^saved$/i)).toBeVisible({ timeout: 20_000 })
 
     const updated = await readVariant(postId)
     expect(updated?.body).toBe('The second draft.')
@@ -116,7 +139,7 @@ test.describe('concurrent edit, against the real database @smoke', () => {
     const postId = await newPost(page)
     await page.goto(`/posts/${postId}`)
     await saveCopy(page, 'A wrote this first.')
-    await expect(page.getByRole('button', { name: /^saved$/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/^saved$/i)).toBeVisible({ timeout: 20_000 })
 
     // B opens the same post in its OWN session, and reads the row as it is now.
     const other = await signInSecondContext(browser, signedIn)
@@ -125,7 +148,7 @@ test.describe('concurrent edit, against the real database @smoke', () => {
 
     // A saves again. B is now holding a version that no longer exists.
     await saveCopy(page, 'A wrote this second, unaware of B.')
-    await expect(page.getByRole('button', { name: /^saved$/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/^saved$/i)).toBeVisible({ timeout: 20_000 })
 
     // ── (b) B IS REFUSED ──────────────────────────────────────────────────────
     await saveCopy(other, 'B wrote this, unaware of A.')
@@ -154,7 +177,7 @@ test.describe('concurrent edit, against the real database @smoke', () => {
 
     // ── KEEP MINE WINS, rather than failing forever ───────────────────────────
     await notice.getByRole('button', { name: /keep mine/i }).click()
-    await expect(other.getByRole('button', { name: /^saved$/i })).toBeVisible({ timeout: 20_000 })
+    await expect(other.getByText(/^saved$/i)).toBeVisible({ timeout: 20_000 })
 
     const kept = await readVariant(postId)
     expect(kept?.body).toBe('B wrote this, unaware of A.')
@@ -181,7 +204,7 @@ test.describe('concurrent edit, against the real database @smoke', () => {
     const postId = await newPost(page)
     await page.goto(`/posts/${postId}`)
     await saveCopy(page, 'Belongs to the first workspace.')
-    await expect(page.getByRole('button', { name: /^saved$/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/^saved$/i)).toBeVisible({ timeout: 20_000 })
 
     const stamp = Date.now().toString(36)
     // A second workspace owned by the SAME test user, so cleanup removes it with
@@ -231,14 +254,14 @@ test.describe('concurrent edit, against the real database @smoke', () => {
     const postId = await newPost(page)
     await page.goto(`/posts/${postId}`)
     await saveCopy(page, 'A first.')
-    await expect(page.getByRole('button', { name: /^saved$/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/^saved$/i)).toBeVisible({ timeout: 20_000 })
 
     const other = await signInSecondContext(browser, signedIn)
     await other.goto(`/posts/${postId}`)
     await expect(copyBox(other)).toHaveValue('A first.')
 
     await saveCopy(page, 'A second.')
-    await expect(page.getByRole('button', { name: /^saved$/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/^saved$/i)).toBeVisible({ timeout: 20_000 })
 
     await saveCopy(other, 'B stale.')
     const notice = other.getByRole('alert').filter({ hasText: /Someone else saved the/i })
