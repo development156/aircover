@@ -67,8 +67,8 @@ Two structural facts sit above the table:
 | `packages/billing/src/withCredits.integration.test.ts` | the ledger wrapper | 0 of 6 | **HOLLOW — now runs** |
 | `packages/billing/.../webhooks.integration.test.ts` | webhook idempotency | 0 of 6 | **HOLLOW — now runs** |
 | `packages/billing/.../applyPlanGrant.integration.test.ts` | plan grant | 0 of 1 | **HOLLOW — now runs** |
-| `apps/jobs/tests/publishStore.integration.test.ts` | publish store | 0 of 9 | HOLLOW (live-only) |
-| `apps/jobs/tests/holds.integration.test.ts` | expired-hold reaper | 0 of 7 | HOLLOW (live-only) |
+| `apps/jobs/tests/publishStore.integration.test.ts` | publish store column drift | 0 of 9 | **HOLLOW — now runs** |
+| `apps/jobs/tests/holds.integration.test.ts` | expired-hold reaper | 0 of 7 | **HOLLOW — now runs** |
 | `apps/web/src/lib/inbox/live.integration.test.ts` | live Zernio reads | 0 of 4 | HOLLOW (live-only) |
 | `apps/web/src/lib/privacy/export-drift.test.ts` | export drift | 0 of 2 | HOLLOW (live-only) |
 
@@ -138,9 +138,18 @@ tagged. The documented claim is contradicted by the runner.
 | what | mutants | spec |
 | --- | --- | --- |
 | two vacuous design guards | **8/8 killed** | `mutations/hollow-corpus-vacuity.mjs` |
-| RLS enforced on every gate run | **6/6 killed** | `mutations/rls-enforced.mjs` |
+| RLS + the append-only ledger | **8/8 killed** | `mutations/rls-enforced.mjs` |
 | 26 billing integration tests | **6/6 killed** | `mutations/billing-integration-executes.mjs` |
+| 16 jobs integration tests | **3/3 killed**, 2 recorded as wrong-mutants | `mutations/jobs-integration-executes.mjs` |
 | every lint rule + the ratchet | **6/6 killed** | `mutations/lint-rules-fire.mjs` |
+
+Counts, before → after:
+
+| package | before | after |
+| --- | --- | --- |
+| `packages/billing` | 270 passed / **26 skipped** | **302 passed / 0 skipped** |
+| `apps/jobs` | 264 passed / **16 skipped** | **280 passed / 0 skipped** |
+| `packages/db` | 201 passed / 202 skipped | 213 passed / 202 skipped (12 new, always-run) |
 
 ### 2a. RLS: zero executing tests enforced a policy
 
@@ -186,6 +195,52 @@ asserted against declared lists.
 
 The 94 live RLS tests are not deleted. Against production they check things this
 cannot.
+
+### 2a-bis. Two defects in my own harness, both found by mutation
+
+**The seeder disarmed the whole database and never re-armed it.**
+`seedTwoWorkspaces` runs `alter table … disable trigger all` so it can insert
+without fighting foreign keys, and it did not put them back. Every later
+assertion therefore ran against a Postgres with `app.block_mutations()` globally
+disabled — a harness quietly telling its own tests what to conclude. Fixed, and a
+mutant that skips the re-arm is killed.
+
+**That disarming was hiding a real gap.** No EXECUTING test covered the ledger's
+append-only guarantee. `post_metric_snapshots.pglite.test.ts` covers the guard
+for `post_metric_snapshots`; `ledger.test.ts` covers `credit_ledger` and is
+`describe.skipIf(!hasLedgerEnv)`, so it has never run. MEASURED: dropping the
+trigger from `credit_ledger` left every test in `apps/jobs` and
+`packages/billing` green.
+
+Now covered for every table carrying the trigger, the list read from
+`pg_trigger`. `ops_audit_log` is DECLARED unpopulated rather than filtered
+silently: a `FOR EACH ROW` trigger cannot fire on an empty table, so a DELETE
+there succeeds trivially and reads as a defect that is not one.
+
+### 2c. apps/jobs: 264 passed / 16 skipped → 280 passed / 0 skipped
+
+`publishStore.integration.test.ts` describes itself as *"the only thing that
+catches drift between `post_publish_logs`' DDL and the row this job writes"*. It
+had never run. The mutant that drops a column the job writes now kills it.
+
+**Two mutants here were written, SURVIVED, and are recorded in the spec as wrong
+mutants rather than as holes** — because reporting an equivalent mutant as a gap
+is the same error in the other direction:
+
+- *removing the Supabase GRANTs.* These suites connect as PGlite's superuser and
+  never `set role`, exactly as the job does through a service-role pool, so table
+  privileges cannot affect them. The grants were inert setup and are deleted from
+  that helper rather than left there looking like coverage. They ARE load-bearing
+  in `packages/db`'s harness, which drops to `authenticated`.
+- *dropping the append-only trigger.* Out of scope for these two files. It was a
+  real gap in the repo, just not here — now covered where it belongs.
+
+### 2d. One prelude, not three
+
+Three harnesses boot this schema on PGlite. The Supabase prelude was on its way
+to being three copies of one TypeScript template literal, which is exactly how a
+schema drifts one role at a time while all three report green. It is now
+`packages/db/tests/helpers/supabase-prelude.sql`, read from disk by all three.
 
 ### 2b. Billing: 270 passed / 26 skipped → **302 passed / 0 skipped**
 
