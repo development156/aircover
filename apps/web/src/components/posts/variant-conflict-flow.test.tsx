@@ -32,7 +32,16 @@ const calls = vi.hoisted(() => ({
   ) => SaveState,
 }))
 
+// The card carries the selection-rewrite affordance, which value-imports the AI
+// action. Mocked so this file loads nothing that reaches a provider, a vault or
+// `node:crypto` — none of which has anything to do with a save clash.
+vi.mock('@/app/actions/posts-ai', () => ({
+  rewriteCaption: () => Promise.resolve({ ok: false, insufficient: false, message: 'no' }),
+}))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+
 vi.mock('@/app/actions/posts', () => ({
+  setVariantFormat: () => Promise.resolve({ ok: true, format: null }),
   saveVariant: (
     _postId: string,
     channel: string,
@@ -46,7 +55,7 @@ vi.mock('@/app/actions/posts', () => ({
 }))
 
 const { useVariants } = await import('./use-variants')
-const { VariantPanel } = await import('./variant-panel')
+const { VersionCard } = await import('@/components/composer/version-card')
 
 const CHANNEL: Channel = 'instagram'
 
@@ -68,21 +77,22 @@ const storedVariant = (body: string): PostVariant =>
     updated_at: '',
   }) as PostVariant
 
-/** The panel, driven by the real hook — nothing about the wiring is stubbed. */
+/** The card, driven by the real hook — nothing about the wiring is stubbed. */
 function Harness({ versions }: { versions: VariantVersions }) {
-  const api = useVariants('p1', [storedVariant('TAB A wrote this.')], versions)
+  const api = useVariants(() => 'p1', [storedVariant('TAB A wrote this.')], versions, '')
   const state = api.states[CHANNEL]
   return (
-    <VariantPanel
+    <VersionCard
       channel={CHANNEL}
       state={state}
-      canonicalBody=""
       mediaCount={1}
-      onBodyChange={(body) => api.setBody(CHANNEL, body)}
+      format={null}
+      onFormatChange={() => {}}
+      onBodyChange={(body: string) => api.setBody(CHANNEL, body)}
       onExtrasChange={() => {}}
       onSave={() => api.save(CHANNEL)}
       onKeepMine={() => api.keepMine(CHANNEL)}
-      onUseTheirs={(theirs) => api.useTheirs(CHANNEL, theirs)}
+      onUseTheirs={(theirs: string) => api.useTheirs(CHANNEL, theirs)}
     />
   )
 }
@@ -90,10 +100,15 @@ function Harness({ versions }: { versions: VariantVersions }) {
 const TRACKED: VariantVersions = { supported: true, byChannel: { [CHANNEL]: 4 } }
 const UNTRACKED: VariantVersions = { supported: false }
 
-const box = () => screen.getByLabelText(/copy$/i) as HTMLTextAreaElement
-// Anchored, because the notice's own "Use the saved version" contains "saved"
-// and an unanchored match finds two buttons.
-const saveButton = () => screen.getByRole('button', { name: /^(save variant|saved|saving)$/i })
+// BY ROLE, not by label text. The save button's accessible name is "Save
+// <Channel> copy" — deliberately, so four of them on one screen are told apart —
+// and a bare label lookup matches it as well as the box.
+const box = () => screen.getByRole('textbox', { name: /copy$/i }) as HTMLTextAreaElement
+// By its ACCESSIBLE NAME, which carries the channel: four version cards sit on
+// one screen and four buttons reading "Save" would be indistinguishable to
+// anyone navigating by name. The anchor also keeps it away from the notice's own
+// "Use the saved version".
+const saveButton = () => screen.getByRole('button', { name: /^save instagram copy$/i })
 
 beforeEach(() => {
   calls.saves = []
@@ -184,7 +199,7 @@ describe('after the migration — someone else got there first', () => {
 
     await screen.findByRole('alert')
     // Marking it saved would disable the only control that could save it.
-    expect(saveButton()).toHaveTextContent(/save variant/i)
+    expect(saveButton()).toHaveTextContent(/^save$/i)
     expect(saveButton()).not.toBeDisabled()
   })
 
@@ -224,7 +239,7 @@ describe('after the migration — someone else got there first', () => {
     expect(calls.saves).toHaveLength(1)
     // And it is offered as unsaved, because it is: the writer can still edit or
     // undo before any of it lands.
-    expect(saveButton()).toHaveTextContent(/save variant/i)
+    expect(saveButton()).toHaveTextContent(/^save$/i)
     expect(screen.queryByRole('alert')).toBeNull()
   })
 

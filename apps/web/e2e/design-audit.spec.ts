@@ -24,7 +24,7 @@ const OUT = process.env.DESIGN_AUDIT_OUT ?? 'design-audit'
 const ROUTES: ReadonlyArray<{ path: string; slug: string; archetype: string }> = [
   { path: '/home', slug: 'home', archetype: 'dashboard' },
   { path: '/posts', slug: 'posts', archetype: 'dense list' },
-  { path: '/create/post', slug: 'create-post', archetype: 'wizard' },
+  { path: '/posts/new', slug: 'composer', archetype: 'composer' },
   { path: '/approvals', slug: 'approvals', archetype: 'queue' },
   { path: '/planner', slug: 'planner', archetype: 'calendar' },
   { path: '/brain', slug: 'brain', archetype: 'status hub' },

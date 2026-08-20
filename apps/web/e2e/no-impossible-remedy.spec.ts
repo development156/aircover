@@ -66,7 +66,7 @@ const ROUTES = [
   '/posts',
   '/planner',
   '/create',
-  '/create/post',
+  '/posts/new',
   '/connections',
   '/inbox',
   '/inbox/comments',

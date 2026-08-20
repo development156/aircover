@@ -597,6 +597,71 @@ sheet grew past the top of the screen.
 `src/lib/nav/reachable.test.ts` asserts every top-level route under `(app)` is either in the
 map or declared with the other way it is reached. Three finished features — Approvals,
 Campaigns, Assets — were reachable only by typing a URL when that test was written.
+## 10.4 The composer — the one screen that writes a post
+
+Added by the composer session, because this document covered tokens, rungs, absence,
+type and space and said nothing about a multi-pane writing surface. Five sessions
+inventing five answers to the questions below is exactly what §0 exists to stop.
+
+**One route.** `/posts/[id]`, where the id `new` means the row does not exist yet. There
+is no separate "create" screen. Two routes is how this product came to have two editors —
+a five-step wizard that could not generate variants, and a three-pane editor that could
+not be reached without a row.
+
+**The per-channel versions are the CENTRE, and they are a stack.** Not tabs, not a side
+panel. One body per channel is the thing this product does that its competitors do not,
+and a control showing one version at a time hides exactly that. The cost is page height
+and it is paid deliberately: scrolling past four versions is the right amount of work for
+reading four versions.
+
+**The one primary action MOVES.** §1.5 allows one primary per view, and on a writing
+screen the next thing to do genuinely changes:
+
+| state | the primary |
+|---|---|
+| no channel picked | none — the channel row is the only thing to do |
+| channels picked, no channel written | **Adapt for N channels · N credits** |
+| every channel written | publishing, in the finish panel |
+
+A per-channel repetition of ONE action — a `Publish to Instagram` beside a
+`Publish to LinkedIn` — is **one** primary, not two. The split is the product.
+
+**A sticky bar is `position: sticky`, never `fixed`.** Fixed chrome renders at its scroll
+offset in a full-page screenshot (`docs/27` §0) and needs padding compensation on `<main>`
+that every page then has to know about. Sticky participates in layout and photographs
+where it sits. On a phone it stops `56px` short of the floor — the bottom navigation's
+height — or the one control at the end of the page is the one control covered.
+
+**A sticky bar does not carry an irreversible action.** Publishing is per channel and
+needs its warnings, its per-channel status and its retry beside it. The bar links to that
+panel with an anchor, because a link that scrolls is honest navigation and a button that
+opens a sheet containing the real button is not.
+
+**Two save states, never merged.** The post is one row and each version is its own. "All
+changes saved" while three versions sit unwritten is the exact half-truth this product
+refuses; the bar says both.
+
+**A channel that has never been written FOLLOWS the post** — its body is mirrored into the
+version's draft and marked unsaved, and the card says both things. It is real state, not a
+display trick: `runPublishPost` sends `post_variants.body` and has no fallback to
+`posts.body`, so showing the post's words in an empty channel box would describe a publish
+that cannot happen.
+
+**A precondition is not a dead end and not a coming-soon.** "Photos attach to a saved
+post" is a sentence, not a disabled button. §10.2's rule is about unbuilt features;
+something the app will do as soon as there is a row to do it to gets stated plainly.
+
+### What this screen does NOT have, and why
+
+There is no display-weight title field. §5 forbids hand-writing a font shorthand and §10
+lists the primitives that exist; a document-title input is not one of them. It uses
+`Input`. Adding one means adding it to §10 and to `/design-system` first.
+
+There is no tone control and no expand. `CaptionRewriteInputSchema` in `@sahoda/shared` is
+a frozen contract taking `rewrite | shorten | hookify`, and no mesh task writes a body from
+a brief, so all three would be buttons that cannot work. They are named as absent in one
+line of prose rather than rendered — a control the app cannot honour is worse than a
+sentence saying so.
 
 ---
 

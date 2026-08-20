@@ -75,7 +75,7 @@ export async function saveTemplate(
       return { ok: false, message: mapPostError(error) }
     }
 
-    revalidatePath('/create/post')
+    revalidatePath('/posts', 'layout')
     return { ok: true, templateId: (data as { id: string }).id }
   } catch (error) {
     reportServerError(error, { action: 'saveTemplate', workspaceId })
@@ -119,7 +119,7 @@ export async function deleteTemplate(templateId: string): Promise<TemplateState>
     if (error) return { ok: false, message: mapPostError(error) }
     if (!data) return { ok: false, message: mapPostError({ code: 'PGRST116' }) }
 
-    revalidatePath('/create/post')
+    revalidatePath('/posts', 'layout')
     return { ok: true, templateId }
   } catch (error) {
     reportServerError(error, { action: 'deleteTemplate', workspaceId })

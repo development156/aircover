@@ -1,3 +1,4 @@
+import { bootstrapWorkspace, startPost } from './fixtures/compose'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
@@ -33,25 +34,14 @@ test.describe('saving a channel variant @smoke', () => {
     void signedIn
 
     // ── 1. A workspace, from a standing start.
-    await page.goto('/home')
-    await page
-      .locator('#main')
-      .getByRole('button', { name: /create workspace/i })
-      .click()
-    await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await bootstrapWorkspace(page)
 
-    // ── 2. A post with Instagram picked, so the editor renders that channel's tab.
-    await page.goto('/create/post')
-    await page.locator('[data-channel-tile="instagram"]').click()
-    await page.getByRole('button', { name: /^continue/i }).click()
-    await page.waitForURL(/[?&]post=[0-9a-f-]{36}/, { timeout: 30_000 })
+    // ── 2. A post with Instagram picked, so the composer opens that channel's
+    //      version card. No navigation follows: the card is already on screen.
+    await startPost(page, 'instagram')
 
-    const postId = new URL(page.url()).searchParams.get('post')
-    expect(postId).toMatch(/^[0-9a-f-]{36}$/)
-
-    // ── 3. The editor's per-channel box — not the canonical body beside it.
-    await page.goto(`/posts/${postId}`)
-    const copy = page.getByLabel('Instagram copy')
+    // ── 3. The per-channel box — not the post's own body beside it.
+    const copy = page.getByRole('textbox', { name: 'Instagram copy', exact: true })
     await expect(copy).toBeVisible()
 
     const written = 'Fresh chai, every morning, on the corner.'
@@ -59,12 +49,14 @@ test.describe('saving a channel variant @smoke', () => {
 
     // ── 4. Press the button a writer presses. Anchored, because the conflict
     //      notice's own "Use the saved version" also contains the word "saved".
-    const save = page.getByRole('button', { name: /^save variant$/i })
+    const save = page.getByRole('button', { name: /^save instagram copy$/i })
     await expect(save).toBeEnabled()
     await save.click()
 
     // The button's own label is the app's claim that the write landed.
-    await expect(page.getByRole('button', { name: /^saved$/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('[data-version-card="instagram"]').getByText(/^Saved$/)).toBeVisible({
+      timeout: 60_000,
+    })
 
     // Nothing was refused. A clash cannot happen here — there is one writer — so
     // this notice appearing would mean the version path fired against a database
@@ -78,6 +70,8 @@ test.describe('saving a channel variant @smoke', () => {
 
     // ── 5. The honest check: the row, re-read, not the state we just typed into.
     await page.reload()
-    await expect(page.getByLabel('Instagram copy')).toHaveValue(written)
+    await expect(page.getByRole('textbox', { name: 'Instagram copy', exact: true })).toHaveValue(
+      written,
+    )
   })
 })

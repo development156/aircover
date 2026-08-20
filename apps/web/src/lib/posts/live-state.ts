@@ -20,7 +20,7 @@ import type { VariantStatusRow } from '@/lib/posts/variant-status'
  * loop, while the writer is mid-sentence. Worse, adopting that row would replace
  * the draft they are typing.
  *
- * `post-editor.tsx:78` already draws this seam and says why: publish state is
+ * `components/composer/composer.tsx` already draws this seam and says why: publish state is
  * "server-owned ... deliberately NOT from `variantsApi`. What a channel is doing
  * on a platform is not something the editor may have an opinion about." This is
  * the same line, enforced by the shape of the payload rather than by care.

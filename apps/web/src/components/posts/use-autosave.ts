@@ -12,6 +12,22 @@ import { detectConflict, isNewer } from '@/lib/posts/detect-conflict'
 const DEBOUNCE_MS = 2000
 
 /**
+ * Where a draft is buffered before its row exists.
+ *
+ * The stash is keyed by post id so two posts cannot overwrite each other's
+ * recovery buffer, and a post being written for the first time has no id — so it
+ * gets a reserved key. A real key is a uuid, so nothing can collide with this.
+ */
+export const NEW_POST_STASH_KEY = 'new'
+
+/** Create the row this draft belongs to. Called once, from inside the save. */
+export type EnsurePostId = () => Promise<
+  { ok: true; postId: string } | { ok: false; message: string }
+>
+
+const NO_CREATOR_MESSAGE = 'This post has nowhere to be saved yet.'
+
+/**
  * `savePost` is a server action: a dropped connection REJECTS the call instead of
  * resolving to `{ ok: false }`, so there is no server-authored message to show.
  */
@@ -53,7 +69,15 @@ export interface AutosaveApi {
   keepMine: () => void
 }
 
-function toDraft(post: Post): PostDraft {
+const EMPTY_DRAFT: PostDraft = {
+  title: '',
+  body: '',
+  channels: [] as unknown as ChannelSet,
+  scheduledAt: null,
+}
+
+function toDraft(post: Post | null): PostDraft {
+  if (post === null) return EMPTY_DRAFT
   return {
     title: post.title ?? '',
     body: post.body ?? '',
@@ -104,7 +128,25 @@ function sameDraft(a: PostDraft, b: PostDraft): boolean {
  *
  * Writes are serialized on a promise chain so a flush can never race the timer.
  */
-export function useAutosave(postId: string, post: Post): AutosaveApi {
+export function useAutosave(
+  /**
+   * The row this draft belongs to, or null when it does not exist yet.
+   *
+   * NULL IS A FIRST-CLASS STATE, not a placeholder. A post being written for the
+   * first time has no row until the first save creates one — opening a screen is
+   * not intent, and creating on open is what left "Untitled post" debris behind
+   * every abandoned click. The composer therefore renders identically either way
+   * and this hook resolves the id inside the save.
+   */
+  postId: string | null,
+  post: Post | null,
+  /**
+   * Create the row, on the first save that has something to write. Required
+   * whenever `postId` can be null; without it a null id fails the save honestly
+   * rather than silently discarding the text.
+   */
+  ensurePostId?: EnsurePostId,
+): AutosaveApi {
   const [draft, setDraft] = useState<PostDraft>(() => toDraft(post))
   const [status, setStatus] = useState<AutosaveStatus>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -112,7 +154,17 @@ export function useAutosave(postId: string, post: Post): AutosaveApi {
 
   const latest = useRef<PostDraft>(draft)
   const lastSaved = useRef<PostDraft>(draft)
-  const adopted = useRef<string>(post.updated_at)
+  /**
+   * The id this hook is actually writing to.
+   *
+   * A ref, not the prop, because the create happens INSIDE a save: the parent
+   * learns the id one render later, and a second save queued in between would
+   * otherwise create a second row. Writes are serialised on `chain`, so this is
+   * only ever read and written by one save at a time.
+   */
+  const writingTo = useRef<string | null>(postId)
+  if (postId !== null) writingTo.current = postId
+  const adopted = useRef<string>(post?.updated_at ?? '')
   const forceNext = useRef<boolean>(false)
   const inFlight = useRef<number>(0)
   const deferredRead = useRef<Post | null>(null)
@@ -146,11 +198,41 @@ export function useAutosave(postId: string, post: Post): AutosaveApi {
     inFlight.current += 1
 
     try {
+      // ── THE ROW IS CREATED HERE, BY THE FIRST SAVE THAT HAS SOMETHING TO SAY ──
+      // Not on mount, and not by the button that opened the screen. `sameDraft`
+      // above already returned for an untouched draft, so reaching this line
+      // means there are real words (or a real channel choice) to keep.
+      let id = writingTo.current
+      if (id === null) {
+        if (ensurePostId === undefined) {
+          setStatus('error')
+          setError(NO_CREATOR_MESSAGE)
+          return false
+        }
+        const created = await ensurePostId().catch(() => null)
+        if (created === null) {
+          setStatus('error')
+          setError(UNREACHABLE_MESSAGE)
+          return false
+        }
+        if (!created.ok) {
+          setStatus('error')
+          setError(created.message)
+          return false
+        }
+        id = created.postId
+        writingTo.current = id
+        // The pre-row buffer has a new home. Cleared rather than left behind, or
+        // the next visit to a blank composer would restore this post's words
+        // into a different post.
+        clearStash(NEW_POST_STASH_KEY)
+      }
+
       // A server action REJECTS on a transport failure rather than resolving to
       // `{ ok: false }`. Without this catch the status sat on 'saving' forever
       // and `error` stayed null, so the editor showed "Saving…" with no retry —
       // telling the writer their text was on its way when nothing was.
-      const result = await savePost(postId, {
+      const result = await savePost(id, {
         title: snapshot.title === '' ? null : snapshot.title,
         body: snapshot.body,
         channels: snapshot.channels,
@@ -176,7 +258,7 @@ export function useAutosave(postId: string, post: Post): AutosaveApi {
       lastSaved.current = snapshot
       // Confirmed by the server: the buffer has nothing left to protect. Cleared
       // only on the arm where `result.ok` is true, so a failed write keeps it.
-      if (sameDraft(latest.current, snapshot)) clearStash(postId)
+      if (sameDraft(latest.current, snapshot)) clearStash(id)
       setStatus(sameDraft(latest.current, snapshot) ? 'saved' : 'unsaved')
       return true
     } finally {
@@ -187,7 +269,7 @@ export function useAutosave(postId: string, post: Post): AutosaveApi {
       // be judged: our echo compares equal, anything newer is a real divergence.
       if (inFlight.current === 0 && pending !== null) evaluateRead(pending)
     }
-  }, [postId, evaluateRead])
+  }, [ensurePostId, evaluateRead])
 
   const enqueue = useCallback((): Promise<boolean> => {
     const next = chain.current.then(runSave)
@@ -206,7 +288,7 @@ export function useAutosave(postId: string, post: Post): AutosaveApi {
       setStatus('unsaved')
       // Synchronous, local, and impossible to abort. The debounced write below is
       // still the primary path; this is what survives a navigation cancelling it.
-      stashDraft(postId, next)
+      stashDraft(writingTo.current ?? NEW_POST_STASH_KEY, next)
 
       if (timer.current !== null) clearTimeout(timer.current)
       timer.current = setTimeout(() => {
@@ -214,7 +296,7 @@ export function useAutosave(postId: string, post: Post): AutosaveApi {
         void enqueue()
       }, DEBOUNCE_MS)
     },
-    [enqueue, postId],
+    [enqueue],
   )
 
   const flush = useCallback((): Promise<boolean> => {
@@ -230,6 +312,9 @@ export function useAutosave(postId: string, post: Post): AutosaveApi {
   // once our own in-flight write is out of the picture, because `savePost`
   // revalidates this very route.
   useEffect(() => {
+    // No row means nothing can have diverged from anything: there is no other
+    // version of a post that does not exist yet.
+    if (post === null) return
     if (inFlight.current > 0) {
       deferredRead.current = post
       return
@@ -285,10 +370,10 @@ export function useAutosave(postId: string, post: Post): AutosaveApi {
   useEffect(() => {
     if (recovered.current) return
     recovered.current = true
-    const stash = readStash(postId)
+    const stash = readStash(postId ?? NEW_POST_STASH_KEY)
     if (stash === null) return
     if (sameDraft(stash, latest.current)) {
-      clearStash(postId)
+      clearStash(postId ?? NEW_POST_STASH_KEY)
       return
     }
     update(stash)

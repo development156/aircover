@@ -43,43 +43,38 @@ test.describe('golden path @smoke', () => {
     // ── 4. Draft a post. This is a real insert under RLS.
     //
     // A LINK, not a button. `CreatePostButton` was a <button> that wrote an empty
-    // draft and jumped straight to /posts/<id>; commit faded84 ("route every
-    // create entry point into the flow") made it a <Link href="/create/post">.
+    // draft and jumped straight to /posts/<id>; commit faded84 made it a <Link>.
     // Its ARIA role changed with it, so `getByRole('button')` stopped matching
     // and this step had been timing out ever since — invisibly, because the e2e
     // suite has never run inside the gate.
     await page.getByRole('link', { name: /create post/i }).click()
-    await page.waitForURL(/\/create\/post/, { timeout: 30_000 })
+    await page.waitForURL(/\/posts\/new/, { timeout: 30_000 })
 
-    // The flow no longer creates the row on entry. It creates it when the first
-    // step is completed, so the draft this journey is about does not exist until
-    // a channel is picked and Continue is pressed — at which point the post id
-    // arrives in the URL.
+    // There is ONE screen for writing a post, and it does not create a row when
+    // it opens — opening a screen is not intent. The row appears on the first
+    // save that has something to write, which picking a channel is; the id then
+    // arrives in the address bar and the screen does not change.
     await page.locator('[data-channel-tile="instagram"]').click()
-    await page.getByRole('button', { name: /^continue/i }).click()
-    await page.waitForURL(/[?&]post=[0-9a-f-]{36}/, { timeout: 30_000 })
-
-    // Back to the editor the rest of this journey asserts against. Taking the id
-    // from the URL rather than guessing keeps the two in step.
-    const postId = new URL(page.url()).searchParams.get('post')
+    await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
+    const postId = new URL(page.url()).pathname.split('/').pop()
     expect(postId).toMatch(/^[0-9a-f-]{36}$/)
-    await page.goto(`/posts/${postId}`)
 
-    const body = page.getByLabel('Body')
+    const body = page.getByLabel('Your post')
     await expect(body).toBeVisible()
     await body.fill('Fresh chai every morning at the corner shop.')
 
     // Autosave is debounced; the status is the app's own claim that it landed.
     //
-    // Matched EXACTLY. A /saved/i regex also matches "Not saved" — the error
-    // copy — so the loose version of this assertion passes on a failed save,
-    // which is the one outcome it exists to catch.
-    await expect(page.getByText('All changes saved')).toBeVisible({ timeout: 20_000 })
+    // Matched EXACTLY, and it names the POST. A /saved/i regex also matches
+    // "Post not saved" — the error copy — so the loose version of this assertion
+    // passes on a failed save, which is the one outcome it exists to catch. The
+    // bar reports the post and the versions separately and this is the post half.
+    await expect(page.getByText('Post saved')).toBeVisible({ timeout: 20_000 })
 
     // ── 5. The post is really persisted — a reload is the honest check, not
     //      the in-memory state we just typed into.
     await page.reload()
-    await expect(page.getByLabel('Body')).toHaveValue(/Fresh chai every morning/)
+    await expect(page.getByLabel('Your post')).toHaveValue(/Fresh chai every morning/)
 
     // ── 6. It shows up in the list.
     await page.goto('/posts')
