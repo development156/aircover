@@ -20,7 +20,7 @@ const state = vi.hoisted(() => ({
   inserted: [] as Record<string, unknown>[],
   insertError: null as { code: string } | null,
   uploadError: null as { message: string } | null,
-  deleted: null as { storage_path: string } | null,
+  deleted: null as { storage_path: string; asset_id: string | null } | null,
 }))
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -70,13 +70,20 @@ vi.mock('@/lib/supabase/server', () => ({
           }),
         }
       },
-      delete: () => ({
-        eq: () => ({
+      delete: () => {
+        // `eq` returns ITSELF so the chain length is not part of the contract.
+        // The action scopes the delete by id AND workspace_id; a mock that only
+        // modelled one `eq` would fail the moment a second, correct filter was
+        // added — which is a test asserting the query's shape rather than its
+        // behaviour.
+        const chain: Record<string, unknown> = {
           select: () => ({
             maybeSingle: () => Promise.resolve({ data: state.deleted, error: null }),
           }),
-        }),
-      }),
+        }
+        chain.eq = () => chain
+        return chain
+      },
     }),
   }),
 }))
@@ -140,7 +147,7 @@ beforeEach(() => {
   state.inserted = []
   state.insertError = null
   state.uploadError = null
-  state.deleted = { storage_path: `${WORKSPACE}/${POST_ID}/obj.png` }
+  state.deleted = { storage_path: `${WORKSPACE}/${POST_ID}/obj.png`, asset_id: null }
 })
 
 describe('attachMedia', () => {
@@ -302,6 +309,24 @@ describe('detachMedia', () => {
 
     expect(result).toEqual({ ok: true })
     expect(state.removed).toEqual([`${WORKSPACE}/${POST_ID}/obj.png`])
+  })
+
+  test('LEAVES the object alone when the row came from the library', async () => {
+    // A row with an `asset_id` points at the LIBRARY's stored object — the
+    // attach does not copy the bytes, so one upload can serve five posts.
+    // Removing it here would delete the photo from the library and from every
+    // other post using it, while the person believes they took one picture off
+    // one draft. The library's own delete, which has the "used in" read in
+    // front of it, is the only thing allowed to remove those bytes.
+    state.deleted = {
+      storage_path: `${WORKSPACE}/assets/44444444-4444-4444-8444-444444444444.png`,
+      asset_id: '44444444-4444-4444-8444-444444444444',
+    }
+
+    const result = await detachMedia('33333333-3333-4333-8333-333333333333')
+
+    expect(result).toEqual({ ok: true })
+    expect(state.removed).toEqual([])
   })
 
   test('fails honestly when the row was already gone', async () => {

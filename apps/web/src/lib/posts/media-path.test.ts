@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest'
 import {
   ALLOWED_MEDIA_TYPES,
   MediaPathError,
+  assetObjectPath,
   extensionForMime,
   mediaObjectPath,
 } from './media-path'
@@ -441,5 +442,63 @@ describe('mediaObjectPath — accepted limitations, pinned deliberately', () => 
     expect(mediaObjectPath(args({ workspaceId: otherWorkspace }))).toBe(
       `${otherWorkspace}/${POST}/${OBJECT}.png`,
     )
+  })
+})
+
+describe('assetObjectPath — the LIBRARY sibling', () => {
+  const ASSET = '44444444-4444-4444-8444-444444444444'
+
+  test('lands under the workspace prefix, in the assets folder', () => {
+    expect(assetObjectPath({ workspaceId: WORKSPACE, assetId: ASSET, mime: 'image/png' })).toBe(
+      `${WORKSPACE}/assets/${ASSET}.png`,
+    )
+  })
+
+  test('the first segment is the workspace, which is the whole tenant boundary', () => {
+    // The storage policy reads `(storage.foldername(name))[1]` and nothing else.
+    const key = assetObjectPath({ workspaceId: WORKSPACE, assetId: ASSET, mime: 'image/jpeg' })
+    expect(key.split('/')[0]).toBe(WORKSPACE)
+  })
+
+  test('cannot collide with a post key, because the second segment there is a uuid', () => {
+    const postKey = mediaObjectPath(args())
+    const assetKey = assetObjectPath({ workspaceId: WORKSPACE, assetId: ASSET, mime: 'image/png' })
+    expect(postKey.split('/')[1]).not.toBe('assets')
+    expect(assetKey.split('/')[1]).toBe('assets')
+  })
+
+  test('lowercases both ids, so one object has exactly one address', () => {
+    const key = assetObjectPath({
+      workspaceId: HEX_LOWER.toUpperCase(),
+      assetId: HEX_LOWER_B.toUpperCase(),
+      mime: 'image/webp',
+    })
+    expect(key).toBe(`${HEX_LOWER}/assets/${HEX_LOWER_B}.webp`)
+  })
+
+  test.each([
+    ['workspaceId', { workspaceId: '../../etc', assetId: ASSET }],
+    ['assetId', { workspaceId: WORKSPACE, assetId: '../../etc' }],
+    ['workspaceId', { workspaceId: `${WORKSPACE}\n${WORKSPACE}`, assetId: ASSET }],
+  ])('refuses a %s that is not a canonical uuid', (field, ids) => {
+    expect(() => assetObjectPath({ ...ids, mime: 'image/png' } as never)).toThrow(MediaPathError)
+  })
+
+  test('refuses a mime no channel accepts, rather than minting an extensionless key', () => {
+    expect(() =>
+      assetObjectPath({ workspaceId: WORKSPACE, assetId: ASSET, mime: 'application/pdf' }),
+    ).toThrow(MediaPathError)
+  })
+
+  test('accepts every type the Constraint Engine does, and no others', () => {
+    // Same lockstep property `mediaObjectPath` is held to: a type only here would
+    // mint a key for a file every channel rejects.
+    for (const mime of ALLOWED_MEDIA_TYPES) {
+      expect(assetObjectPath({ workspaceId: WORKSPACE, assetId: ASSET, mime })).toContain(
+        `.${extensionForMime(mime)}`,
+      )
+    }
+    const engineTypes = new Set(Object.values(CONSTRAINTS).flatMap((spec) => spec.mediaTypes))
+    expect([...ALLOWED_MEDIA_TYPES].sort()).toEqual([...engineTypes].sort())
   })
 })

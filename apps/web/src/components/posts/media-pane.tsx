@@ -4,12 +4,14 @@ import { AlertTriangle, ImageOff } from 'lucide-react'
 import type { ChannelSet, PostMedia } from '@sahoda/shared'
 
 import { CardLabel } from '@/components/ui/card'
+import { formatBytes } from '@/lib/format-bytes'
 import type { MediaPreview } from '@/lib/posts/media-url'
 import { toAttachment, unverifiableRows, validateAttachments } from '@/lib/posts/to-attachment'
 
 import { ChannelObjections } from './channel-objections'
 import { GenerateImage } from './generate-image'
 import { InlineNote } from './inline-error'
+import { LibraryPicker } from './library-picker'
 import { MediaAttach } from './media-attach'
 import { MediaRemoveButton } from './media-remove-button'
 
@@ -23,23 +25,27 @@ export interface MediaPaneProps {
    * its honest "preview unavailable" placeholder rather than a broken image.
    */
   previews?: MediaPreview[]
+  /**
+   * `assets.title` keyed by `storage_path`, for attachments that came from the
+   * library. Absent is fine — every row then shows its storage key, which is
+   * what this pane showed before a library existed.
+   */
+  libraryNames?: Record<string, string>
 }
 
-const BYTES_PER_KB = 1024
-const BYTES_PER_MB = BYTES_PER_KB * 1024
-
-/** Filename from `storage_path`. Never invented — falls back to the raw path. */
-function fileNameOf(row: PostMedia): string {
+/**
+ * What to call this file.
+ *
+ * The library's own name when the row came from there, otherwise the last
+ * segment of the storage path. Never invented: a direct upload genuinely has no
+ * name beyond its key, and printing a guess would be worse than printing the key.
+ */
+function fileNameOf(row: PostMedia, libraryNames: ReadonlyMap<string, string>): string {
+  const named = libraryNames.get(row.storage_path)
+  if (named !== undefined) return named
   const segments = row.storage_path.split('/')
   const last = segments[segments.length - 1]
   return last !== undefined && last !== '' ? last : row.storage_path
-}
-
-/** Only ever called with a finite, non-negative byte count. */
-function formatBytes(bytes: number): string {
-  if (bytes >= BYTES_PER_MB) return `${(bytes / BYTES_PER_MB).toFixed(1)} MB`
-  if (bytes >= BYTES_PER_KB) return `${Math.round(bytes / BYTES_PER_KB)} KB`
-  return `${bytes} B`
 }
 
 /**
@@ -58,11 +64,12 @@ interface MediaRowProps {
   unverifiable: boolean
   /** null means the URL could not be signed. The FILE still exists. */
   previewUrl: string | null
+  libraryNames: ReadonlyMap<string, string>
 }
 
-function MediaRow({ row, unverifiable, previewUrl }: MediaRowProps) {
+function MediaRow({ row, unverifiable, previewUrl, libraryNames }: MediaRowProps) {
   const result = toAttachment(row)
-  const fileName = fileNameOf(row)
+  const fileName = fileNameOf(row, libraryNames)
 
   return (
     <li className="rounded-input border border-line bg-s1 p-3">
@@ -94,11 +101,7 @@ function MediaRow({ row, unverifiable, previewUrl }: MediaRowProps) {
       <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted">
         <span>{row.mime ?? 'Type unknown'}</span>
         <span aria-hidden>·</span>
-        <span className="tabular-nums">
-          {row.bytes !== null && Number.isFinite(row.bytes) && row.bytes >= 0
-            ? formatBytes(row.bytes)
-            : 'Size unknown'}
-        </span>
+        <span className="tabular-nums">{formatBytes(row.bytes) ?? 'Size unknown'}</span>
         {row.width !== null && row.height !== null ? (
           <>
             <span aria-hidden>·</span>
@@ -126,17 +129,29 @@ function MediaRow({ row, unverifiable, previewUrl }: MediaRowProps) {
 /**
  * Media attached to THIS post.
  *
- * `post_media.post_id` is NOT NULL and there is no workspace asset library
- * table, so the only affordance is uploading a NEW file — reusing one from
- * another post is not something this schema can express yet, and the note says
- * so rather than offering a picker that cannot work.
+ * Two ways in, and they are genuinely different jobs: upload a file that is not
+ * in Sahoda yet, or reach for one that is. The library picker is second because
+ * a writer with a photo on their phone is the ordinary case; it is not hidden
+ * behind the uploader because a writer who has built a library should not have
+ * to re-upload the same logo onto every post.
+ *
+ * A file added from the library POINTS AT the library's stored object rather
+ * than copying it. That is what makes one upload serve five posts — and it is
+ * why `detachMedia` checks `asset_id` before removing an object.
  *
  * A row the Constraint Engine cannot judge (null mime/bytes) is flagged as
  * unverified, never as valid: `validateAttachments` returns an empty
  * `violations` list for such rows precisely because it was handed nothing to
  * check.
  */
-export function MediaPane({ media, channels, postId, previews = [] }: MediaPaneProps) {
+export function MediaPane({
+  media,
+  channels,
+  postId,
+  previews = [],
+  libraryNames = {},
+}: MediaPaneProps) {
+  const names: ReadonlyMap<string, string> = new Map(Object.entries(libraryNames))
   const unverifiableIds = new Set(unverifiableRows(media).map((row) => row.id))
   const verdicts = channels.length > 0 ? validateAttachments(channels, media) : []
   const flagged = verdicts.filter((verdict) => verdict.violations.length > 0)
@@ -175,6 +190,7 @@ export function MediaPane({ media, channels, postId, previews = [] }: MediaPaneP
               row={row}
               unverifiable={unverifiableIds.has(row.id)}
               previewUrl={previewById.get(row.id) ?? null}
+              libraryNames={names}
             />
           ))}
         </ul>
@@ -188,13 +204,14 @@ export function MediaPane({ media, channels, postId, previews = [] }: MediaPaneP
 
       <MediaAttach postId={postId} channels={channels} />
 
-      {/* Below the uploader on purpose: bringing your own photo is the ordinary
-          path and costs nothing; generating one is the paid alternative. */}
+      <LibraryPicker postId={postId} channels={channels} />
+
+      {/* Below both on purpose: bringing your own photo is the ordinary path and
+          costs nothing; generating one is the paid alternative. */}
       <GenerateImage postId={postId} />
 
       <InlineNote>
-        There is no workspace media library yet — you can upload a new file here, but not reuse one
-        already attached to another post.
+        A photo added from your library stays in it. Removing it here takes it off this post only.
       </InlineNote>
     </section>
   )

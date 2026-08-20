@@ -45,7 +45,6 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     if (!ws.ok) return { ok: false, message: ws.message }
     const workspace = ws.workspace
     workspaceId = workspace.id
-    workspaceId = workspace.id
 
     const post = await getPost(postId)
     if (!post) return { ok: false, message: "You don't have access to this post." }
@@ -151,6 +150,18 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
  * the object delete fails we are left with an unreferenced file, which is waste;
  * the reverse order leaves a row pointing at nothing, which renders as a broken
  * image the user cannot remove.
+ *
+ * ── THE OBJECT IS ONLY REMOVED WHEN THIS ROW OWNS IT ─────────────────────────
+ * A row with an `asset_id` came from the LIBRARY. Its `storage_path` is the
+ * library's own object — the attach does not copy the bytes, precisely so that
+ * one upload can serve five posts — so deleting it here would remove the file
+ * from the library and from every other post using it, while the person believes
+ * they took one photo off one draft. That is the same silent data loss the
+ * delete gate exists to stop, arriving through the other door.
+ *
+ * So the object is removed only for a direct upload, where this row is the one
+ * and only thing pointing at it. A library file's bytes are removed by
+ * `deleteAsset`, which is the action that has the "used in" read in front of it.
  */
 export async function detachMedia(mediaId: string): Promise<DetachMediaState> {
   let workspaceId: string | undefined
@@ -161,13 +172,17 @@ export async function detachMedia(mediaId: string): Promise<DetachMediaState> {
     const ws = await workspaceForWrite()
     if (!ws.ok) return { ok: false, message: ws.message }
     const workspace = ws.workspace
+    // Assigned so a throw below is reported against the tenant it happened in;
+    // it was declared for that and never set.
+    workspaceId = workspace.id
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
       .from('post_media')
       .delete()
       .eq('id', mediaId)
-      .select('storage_path')
+      .eq('workspace_id', workspace.id)
+      .select('storage_path, asset_id')
       .maybeSingle()
 
     if (error) return { ok: false, message: mapPostError(error) }
@@ -176,9 +191,20 @@ export async function detachMedia(mediaId: string): Promise<DetachMediaState> {
     if (!data) return { ok: false, message: mapPostError({ code: 'PGRST116' }) }
 
     const storagePath = (data as { storage_path?: unknown }).storage_path
-    if (typeof storagePath === 'string') await removeObject(supabase, storagePath)
+    const fromLibrary = (data as { asset_id?: unknown }).asset_id !== null
+    if (typeof storagePath === 'string' && !fromLibrary) {
+      await removeObject(supabase, storagePath)
+    }
 
     revalidatePath('/posts')
+    // The LIBRARY changed too: the trigger removed the usage record, so this
+    // file's tile goes from "In 1 post" and a padlock back to "Not used yet".
+    // Without this, someone who detaches and then taps Assets in the rail gets
+    // the client router's cached payload and is told the photo is still in use —
+    // which is exactly the sentence the delete gate then contradicts.
+    // `attachAssetToPost` revalidates it for the same reason in the other
+    // direction; a detach that did not was the asymmetry.
+    revalidatePath('/assets')
     return { ok: true }
   } catch (error) {
     reportServerError(error, { action: 'detachMedia', workspaceId })
