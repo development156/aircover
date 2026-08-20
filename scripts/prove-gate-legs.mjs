@@ -86,9 +86,13 @@ const BREAKS = [
     leg: 'turbo-build',
     what: 'a module the production build cannot resolve',
     file: 'apps/web/src/lib/slug.ts',
-    find: 'export',
-    replace: "import 'a-module-that-does-not-exist-MUTANT'\nexport",
-    once: true,
+    // The whole declaration, not the bare word `export`. A substring match can
+    // land inside a comment, where the injected import is inert and the build
+    // stays green — a break that did not break anything, reported as a leg that
+    // cannot fail.
+    find: 'export function slugify(name: string): string {',
+    replace:
+      "import 'a-module-that-does-not-exist-MUTANT'\nexport function slugify(name: string): string {",
   },
 ]
 
