@@ -210,3 +210,25 @@ export {
   ZERNIO_PLATFORM_NAME,
   type ZernioAdapterDeps,
 } from './adapters/zernio'
+
+// The per-channel controls a version carries — poll, Google topic, first comment,
+// collaborators, AI disclosure. Rules live beside the parse because for most of
+// these NOBODY ELSE CHECKS: Zernio validates Google's platformSpecificData not at
+// all, and polls are the one block it fully enforces (docs/32 §4).
+export {
+  refusePoll,
+  refuseGbpTopic,
+  parseIsoDate,
+  LINKEDIN_POLL_DURATIONS,
+  POLL_MIN_OPTIONS,
+  POLL_MAX_OPTIONS,
+  X_POLL_OPTION_MAX,
+  X_POLL_MIN_MINUTES,
+  X_POLL_MAX_MINUTES,
+  LINKEDIN_POLL_QUESTION_MAX,
+  INSTAGRAM_MAX_COLLABORATORS,
+  type VariantOptions,
+  type PollOption,
+  type GbpEventOption,
+  type GbpOfferOption,
+} from './zernio/variant-options'

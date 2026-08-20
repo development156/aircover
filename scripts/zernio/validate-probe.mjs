@@ -197,6 +197,46 @@ async function main() {
   await ask('extras', 'x madeWithAi', post('twitter', { psd: { madeWithAi: true } }))
   await ask('extras', 'li documentTitle + pdf', post('linkedin', { psd: { documentTitle: 'Deck' }, mediaItems: [{ type: 'document', url: 'https://example.com/a.pdf', mimeType: 'application/pdf' }] }))
 
+
+  // ── 10. OUR OWN BUILDER'S OUTPUT, PUT BACK TO THE VENDOR ─────────────────
+  // Every object below is EXACTLY what `buildPlatformData` emits, copied from the
+  // assertions in `platform-data.test.ts`. This is the strongest check available
+  // short of publishing: not "does our shape look right" but "does Zernio accept
+  // the bytes we would send".
+  //
+  // The controls immediately after are not optional. `valid: true` on a Google
+  // payload means NOTHING — §8 measured that Zernio validates none of it — so the
+  // poll cases carry deliberately-broken twins that must go red, and the Google
+  // ones carry the honest caveat instead of a control that cannot exist.
+  const igMediaOk = [{ type: 'image', url: img(1080, 1080), mimeType: 'image/png' }]
+  const ours = [
+    ['x poll', 'twitter', { poll: { options: ['Chai', 'Coffee'], duration_minutes: 1440 } }],
+    ['linkedin poll', 'linkedin', { poll: { question: 'Chai or coffee?', options: ['Chai', 'Coffee'], duration: 'ONE_DAY' } }],
+    ['gbp event (UNCHECKED by them)', 'googlebusiness', { topicType: 'EVENT', event: { title: 'Diwali sale', schedule: { startDate: { year: 2026, month: 11, day: 1 }, endDate: { year: 2026, month: 11, day: 5 } } } }],
+    ['gbp offer + cta (UNCHECKED)', 'googlebusiness', { callToAction: { type: 'ORDER', url: 'https://chai.example/order' }, topicType: 'OFFER', offer: { couponCode: 'SAVE10' } }],
+    ['ig extras', 'instagram', { firstComment: '#chai #pune', collaborators: ['friend', 'other'], isAiGenerated: true }],
+    ['ig story + firstComment', 'instagram', { contentType: 'story', firstComment: '#chai' }],
+    ['x madeWithAi', 'twitter', { madeWithAi: true }],
+    ['x thread + ai', 'twitter', { madeWithAi: true, threadItems: [{ content: 'one' }, { content: 'two' }] }],
+  ]
+  for (const [label, platform, psd] of ours) {
+    await ask('our-payloads', label, post(platform, {
+      psd,
+      content: 'Fresh chai from nine.',
+      ...(platform === 'instagram' ? { mediaItems: igMediaOk } : {}),
+    }), true)
+  }
+  // The controls: the same builder output with ONE bound broken. If these pass,
+  // the group above proved nothing about polls either.
+  const broken = [
+    ['CONTROL x poll, 5 options', 'twitter', { poll: { options: ['a', 'b', 'c', 'd', 'e'], duration_minutes: 1440 } }],
+    ['CONTROL x poll, 4 minutes', 'twitter', { poll: { options: ['a', 'b'], duration_minutes: 4 } }],
+    ['CONTROL li poll, 141-char question', 'linkedin', { poll: { question: 'q'.repeat(141), options: ['a', 'b'], duration: 'ONE_DAY' } }],
+  ]
+  for (const [label, platform, psd] of broken) {
+    await ask('our-payloads', label, post(platform, { psd }), false)
+  }
+
   if (process.argv.includes('--json')) {
     console.log(JSON.stringify(log, null, 2))
     return

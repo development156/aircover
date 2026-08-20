@@ -79,6 +79,15 @@ export interface ZernioAdapterDeps {
    * as one post.
    */
   thread?: { segments: readonly string[] } | null
+  /**
+   * The per-channel controls this version carries (poll, Google topic, first
+   * comment, collaborators, AI disclosure), from `post_variants.extras`.
+   *
+   * Same seam and same reason as `format`: `PublishRequest` is frozen and has
+   * nowhere to put them. `buildPlatformData` places them on the wire and refuses
+   * the combinations Zernio refuses.
+   */
+  options?: import('../zernio/variant-options').VariantOptions | null
   /** Injected so a caller can bound total wall-clock; defaults suit a serverless job. */
   poll?: { attempts?: number; intervalMs?: number }
   sleep?: (ms: number) => Promise<void>
@@ -269,6 +278,8 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
         format: deps.format ?? null,
         content: req.content,
         ...(deps.thread ? { thread: deps.thread } : {}),
+        ...(deps.options ? { options: deps.options } : {}),
+        mediaCount: media.length,
       })
       if (!platformData.ok) {
         throw fail(platformData.refusal.message, platformData.refusal.code, 'permanent')

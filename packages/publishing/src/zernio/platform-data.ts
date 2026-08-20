@@ -3,6 +3,8 @@ import type { Channel, FormattedContent } from '@sahoda/shared'
 import type { PostFormat } from '../format-vocabulary'
 import type { FormatRefusal } from '../format-refusal'
 import { isValidGbpCtaType } from './gbp-cta'
+import { refusePoll, type VariantOptions } from './variant-options'
+import { withGbpTopic } from './gbp-topic'
 
 /**
  * `platforms[].platformSpecificData` — the per-channel half of a Zernio publish,
@@ -52,6 +54,16 @@ export interface PlatformDataInput {
    * would be two chances to disagree about how many posts go out.
    */
   thread?: { segments: readonly string[] } | undefined
+  /**
+   * The per-channel controls this version carries, from `post_variants.extras`.
+   *
+   * Parsed and rule-checked by `variant-options.ts` before it gets here; this
+   * function's job is to place them on the wire and to refuse the COMBINATIONS
+   * that no single option is wrong on its own for.
+   */
+  options?: VariantOptions | undefined
+  /** How many files are attached. Only the poll rules care, and they care a lot. */
+  mediaCount?: number
 }
 
 /**
@@ -62,8 +74,74 @@ export interface PlatformDataInput {
  * version needs no per-channel field, so the entry carries none. It is NOT the
  * same as `{}`, which would be a claim that we considered and chose nothing.
  */
+/**
+ * `platformSpecificData` for an X thread, merged with whatever else X is carrying.
+ *
+ * ── AN ABSENT PLAN IS A REFUSAL, NEVER A SINGLE POST ────────────────────────
+ * If a caller declares `format: 'thread'` and hands over no segments, the
+ * tempting behaviour is to fall through and publish `content.text` as one tweet:
+ * it succeeds, it looks fine in the log, and the writer's five-part thread went
+ * out as a truncated single post. That is the exact shape of defect this repo has
+ * shipped twice from an optional parameter quietly taking its default.
+ *
+ * So the field is optional to the TYPE and mandatory to the FORMAT.
+ *
+ * `threadItems[0]` IS the first tweet — Zernio's spec is explicit that the root
+ * `content` "is NOT published" when this is present (docs/31 §2.3). The adapter
+ * fills the root with that same segment, because Zernio still measures it against
+ * 280 even while refusing to publish it (MEASURED, docs/32 §4.1).
+ */
+function buildThread(input: PlatformDataInput, base: PlatformData): PlatformDataResult {
+  const segments = input.thread?.segments
+  if (segments === undefined || segments.length === 0) {
+    return {
+      ok: false,
+      refusal: {
+        code: 'THREAD_NOT_PLANNED',
+        message: 'This was written as a thread but arrived with no parts to post.',
+      },
+    }
+  }
+  return {
+    ok: true,
+    data: { ...base, threadItems: segments.map((content) => ({ content })) },
+  }
+}
+
 export function buildPlatformData(input: PlatformDataInput): PlatformDataResult {
-  const { channel, format, content } = input
+  const { channel, format, content, options } = input
+
+  // ── THE COMBINATIONS, CHECKED BEFORE ANY SINGLE FIELD ──────────────────────
+  // These are Zernio's own refusals, quoted from their dry-run validator on
+  // 2026-08-20 and reproduced here so the writer meets them in the composer
+  // rather than at publish time (docs/32 §4.2). They are cross-cutting: no single
+  // option is wrong on its own, which is why they cannot live in `refusePoll`.
+  if (options?.poll !== undefined) {
+    const pollRefusal = refusePoll(channel, options.poll)
+    if (pollRefusal !== null) return { ok: false, refusal: pollRefusal }
+
+    if ((input.mediaCount ?? 0) > 0) {
+      // *"Cannot create a poll with media attachments. X/Twitter polls are
+      // mutually exclusive with images and videos."* — and LinkedIn the same.
+      return {
+        ok: false,
+        refusal: {
+          code: 'POLL_WITH_MEDIA',
+          message: 'A poll cannot carry a photo. Remove the photo, or drop the poll.',
+        },
+      }
+    }
+    if (format === 'thread') {
+      // *"Polls cannot be added to threads"*.
+      return {
+        ok: false,
+        refusal: {
+          code: 'POLL_WITH_THREAD',
+          message: 'A poll cannot be part of a thread. Pick one.',
+        },
+      }
+    }
+  }
 
   if (channel === 'gbp') {
     // `content.ctaType` / `ctaUrl` are fields the frozen `FormattedContent` gbp
@@ -76,7 +154,7 @@ export function buildPlatformData(input: PlatformDataInput): PlatformDataResult 
     if (type === undefined || type === '') {
       // A URL with no button is not an error — it is a link in the body, which
       // is the normal way to put one on a Google post.
-      return { ok: true, data: undefined }
+      return withGbpTopic({}, options)
     }
     if (!isValidGbpCtaType(type)) {
       return {
@@ -96,41 +174,74 @@ export function buildPlatformData(input: PlatformDataInput): PlatformDataResult 
         },
       }
     }
-    return { ok: true, data: { callToAction: { type, url: url.trim() } } }
+    return withGbpTopic({ callToAction: { type, url: url.trim() } }, options)
   }
 
-  if (channel === 'x' && format === 'thread') {
-    // ── AN ABSENT PLAN IS A REFUSAL, NEVER A SINGLE POST ──────────────────────
-    // This is the whole reason the branch is written before the happy path. If a
-    // caller declares `format: 'thread'` and hands over no segments, the tempting
-    // behaviour is to fall through and publish `content.text` as one tweet: it
-    // succeeds, it looks fine in the log, and the writer's five-part thread went
-    // out as a truncated single post. That is the exact shape of defect this repo
-    // has shipped twice from an optional parameter quietly taking its default.
-    //
-    // So the optional field is optional to the TYPE and mandatory to the FORMAT.
-    const segments = input.thread?.segments
-    if (segments === undefined || segments.length === 0) {
-      return {
-        ok: false,
-        refusal: {
-          code: 'THREAD_NOT_PLANNED',
-          message: 'This was written as a thread but arrived with no parts to post.',
-        },
+  if (channel === 'x') {
+    const data: PlatformData = {}
+    if (options?.poll !== undefined) {
+      // Shape from Zernio's own error text: `options` and `duration_minutes`
+      // (snake_case, unlike everything around it — MEASURED, not guessed).
+      data.poll = {
+        options: options.poll.options.map((o) => o.trim()).filter((o) => o !== ''),
+        duration_minutes: options.poll.durationMinutes,
       }
     }
-    // `threadItems[0]` IS the first tweet — Zernio's spec is explicit that the
-    // root `content` "is NOT published" when this is present (docs/31 §2.3). The
-    // root is filled by the adapter with this same segment, because Zernio still
-    // measures it against 280 even while refusing to publish it (MEASURED,
-    // docs/32 §4.1).
-    return { ok: true, data: { threadItems: segments.map((content) => ({ content })) } }
+    // X's self-disclosure flag. This product GENERATES images and attaches them
+    // to posts; not setting this on one is a policy gap, not a format gap
+    // (docs/31 §3, last row).
+    if (options?.aiGenerated === true) data.madeWithAi = true
+    if (format !== 'thread') {
+      return { ok: true, data: Object.keys(data).length === 0 ? undefined : data }
+    }
+    return buildThread(input, data)
   }
 
-  if (channel === 'instagram' && format === 'story') {
+  if (channel === 'linkedin') {
+    const data: PlatformData = {}
+    if (options?.poll !== undefined) {
+      data.poll = {
+        question: options.poll.question?.trim(),
+        options: options.poll.options.map((o) => o.trim()).filter((o) => o !== ''),
+        duration: options.poll.durationCode,
+      }
+    }
+    const first = options?.firstComment?.trim()
+    if (first !== undefined && first !== '') data.firstComment = first
+    return { ok: true, data: Object.keys(data).length === 0 ? undefined : data }
+  }
+
+  if (channel === 'instagram') {
+    const data: PlatformData = {}
     // The single documented value of `InstagramPlatformData.contentType`
     // (docs/31 §2.1). Without it a Story publishes as a feed post, silently.
-    return { ok: true, data: { contentType: 'story' } }
+    if (format === 'story') data.contentType = 'story'
+
+    const first = options?.firstComment?.trim()
+    if (first !== undefined && first !== '') data.firstComment = first
+
+    const collaborators = (options?.collaborators ?? [])
+      .map((name) => name.trim().replace(/^@/, ''))
+      .filter((name) => name !== '')
+    if (collaborators.length > 0) {
+      if (format === 'story') {
+        // Collaborators are a feed and Reel feature; a Story has no co-author.
+        // Zernio checks nothing here, so sending them would be a control the
+        // writer filled in that changes nothing — the defect the CTA already was.
+        return {
+          ok: false,
+          refusal: {
+            code: 'IG_COLLAB_NOT_ON_STORY',
+            message: 'A story has no co-authors. Post it to the feed to invite one.',
+          },
+        }
+      }
+      data.collaborators = collaborators
+    }
+
+    if (options?.aiGenerated === true) data.isAiGenerated = true
+
+    return { ok: true, data: Object.keys(data).length === 0 ? undefined : data }
   }
 
   return { ok: true, data: undefined }
