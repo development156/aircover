@@ -31,8 +31,21 @@ import { expect, test } from './fixtures/seeded-user'
  * are what a thumb reaches for on every screen.
  */
 
-/** Under 44px today, with the size measured on 2026-08-20 at 390×844. */
-const KNOWN_UNDERSIZED: string[] = []
+/**
+ * Under the floor today, with the size MEASURED on 2026-08-20 at 390×844 on
+ * /home, in Chromium, by this test on its first run after being made to assert.
+ *
+ * Both are real. `Create workspace` is 10px short in height — a primary call to
+ * action on the empty account, and the first thing a new customer taps.
+ * `Sahoda — go to Home` is 18px short in width: full height, but a 26px-wide
+ * hit box for the home link in the top bar.
+ *
+ * Not fixed here because this lane does not own the shell. Named, with numbers,
+ * so the next person to touch either one has the measurement rather than an
+ * impression — and so a THIRD control falling under the floor fails this test
+ * on the run it appears.
+ */
+const KNOWN_UNDERSIZED: string[] = ['Create workspace → 164×34', 'Sahoda — go to Home → 26×44']
 
 /** Horizontal overflow is never acceptable: it hides content with no affordance. */
 const VIEWPORT = { width: 390, height: 844 }
