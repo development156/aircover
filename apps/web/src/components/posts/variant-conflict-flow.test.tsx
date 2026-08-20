@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { Channel, PostVariant } from '@sahoda/shared'
+import type { Channel, PostMedia, PostVariant } from '@sahoda/shared'
 
 import type { SaveState } from '@/lib/posts/state'
 import type { VariantVersions } from '@/lib/posts/variant-version'
@@ -77,6 +77,31 @@ const storedVariant = (body: string): PostVariant =>
     updated_at: '',
   }) as PostVariant
 
+/**
+ * One photo on the post.
+ *
+ * It was `mediaCount={1}` before the card started taking rows instead of a
+ * count, and the number matters: `CHANNEL` is instagram, which has
+ * `requiresMedia: true`, so an empty post raises MEDIA_REQUIRED — a second
+ * `role="alert"` that every `queryByRole('alert')` in this file would then find
+ * instead of the conflict notice it is asking about. This file is about clashes,
+ * not about media.
+ */
+const ONE_PHOTO = {
+  id: 'm1',
+  workspace_id: 'w',
+  post_id: 'p1',
+  storage_path: 'w/p1/a.jpg',
+  mime: 'image/jpeg',
+  bytes: 1000,
+  width: 1080,
+  height: 1080,
+  alt: null,
+  meta: null,
+  created_at: '',
+  updated_at: '',
+} as PostMedia
+
 /** The card, driven by the real hook — nothing about the wiring is stubbed. */
 function Harness({ versions }: { versions: VariantVersions }) {
   const api = useVariants(() => 'p1', [storedVariant('TAB A wrote this.')], versions, '')
@@ -85,7 +110,7 @@ function Harness({ versions }: { versions: VariantVersions }) {
     <VersionCard
       channel={CHANNEL}
       state={state}
-      mediaCount={1}
+      media={[ONE_PHOTO]}
       format={null}
       onFormatChange={() => {}}
       onBodyChange={(body: string) => api.setBody(CHANNEL, body)}
@@ -93,6 +118,9 @@ function Harness({ versions }: { versions: VariantVersions }) {
       onSave={() => api.save(CHANNEL)}
       onKeepMine={() => api.keepMine(CHANNEL)}
       onUseTheirs={(theirs: string) => api.useTheirs(CHANNEL, theirs)}
+      canonicalBody=""
+      onRelink={() => {}}
+      onUndoRelink={() => {}}
     />
   )
 }

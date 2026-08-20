@@ -1,6 +1,6 @@
 'use client'
 
-import type { Channel, ChannelSet } from '@sahoda/shared'
+import type { Channel, ChannelSet, PostMedia } from '@sahoda/shared'
 import type { PostFormat } from '@sahoda/publishing/format'
 
 import { GeneratePanel } from '@/components/posts/generate-panel'
@@ -12,9 +12,12 @@ import type { VariantFormatApi } from './use-variant-format'
 
 export interface VersionsPaneProps {
   channels: ChannelSet
+  /** The post's body right now, for the relink control on each card. */
+  canonicalBody: string
   variants: VariantsApi
   formats: VariantFormatApi
-  mediaCount: number
+  /** The files on the post — each card scores them against ITS OWN format. */
+  media: readonly PostMedia[]
   /** Write the post now; resolves to the row it landed in, or null. */
   flush: () => Promise<string | null>
   onGenerated: (items: GeneratedVariant[]) => void
@@ -38,9 +41,10 @@ export interface VersionsPaneProps {
  */
 export function VersionsPane({
   channels,
+  canonicalBody,
   variants,
   formats,
-  mediaCount,
+  media,
   flush,
   onGenerated,
   generateIsPrimary,
@@ -78,7 +82,7 @@ export function VersionsPane({
                 key={channel}
                 channel={channel}
                 state={variants.states[channel]}
-                mediaCount={mediaCount}
+                media={media}
                 format={formats.chosen[channel] ?? null}
                 onFormatChange={(format) => formats.set(channel, format)}
                 onBodyChange={(body) => variants.setBody(channel, body)}
@@ -86,6 +90,9 @@ export function VersionsPane({
                 onSave={() => onSaved(channel)}
                 onKeepMine={() => variants.keepMine(channel)}
                 onUseTheirs={(theirs) => variants.useTheirs(channel, theirs)}
+                canonicalBody={canonicalBody}
+                onRelink={() => variants.relink(channel, canonicalBody)}
+                onUndoRelink={() => variants.undoRelink(channel)}
               />
             ))}
           </div>

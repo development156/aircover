@@ -18,7 +18,7 @@ import { decideAttach, type ChannelRejection } from '@/lib/posts/attach-decision
 import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
 import { assetObjectPath } from '@/lib/posts/media-path'
 import { mapPostError } from '@/lib/posts/post-error'
-import { getPost, listMedia } from '@/lib/posts/read'
+import { getPost, listMedia, readVariantFormats } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
@@ -50,7 +50,12 @@ function unusableChannels(candidate: {
   // therefore no channel set. `decideAttach` with the full list returns the
   // objections per channel; the count rule is passed 0 because this is not an
   // attach and nothing is on a post yet.
-  const decision = decideAttach([...ChannelSchema.options], candidate, 0)
+  // `{}` for formats, and that is the honest answer rather than a convenient
+  // one: this judges a file in the LIBRARY, which is on no post, so no version
+  // has said what it is. attach-decision.ts documents `{}` as exactly this —
+  // "no version states an intent" — and it restores the pre-format behaviour
+  // precisely. The real formats are read at the ATTACH, below.
+  const decision = decideAttach([...ChannelSchema.options], candidate, 0, {})
   return decision.ok ? decision.warnings : decision.rejections
 }
 
@@ -415,6 +420,11 @@ export async function attachAssetToPost(
       post.channels,
       { mime: asset.mime, bytes: asset.bytes, width: asset.width, height: asset.height },
       existing.length,
+      // Per-channel, from `post_variants.format` — the same read the upload path
+      // makes. Attaching FROM THE LIBRARY is still an attach, so a story must
+      // refuse a landscape photo here exactly as it does there. `{}` would have
+      // compiled and looked identical while accepting both.
+      await readVariantFormats(postId),
     )
     if (!decision.ok) {
       return { ok: false, message: decision.message, rejections: decision.rejections }

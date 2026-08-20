@@ -31,6 +31,21 @@ export interface VariantsApi {
   keepMine: (channel: Channel) => void
   /** Load the stored text INTO THE BOX. Writes nothing — see the notice's rule 3. */
   useTheirs: (channel: Channel, theirs: string) => void
+  /**
+   * RELINK — this channel follows the post again, from now on.
+   *
+   * FSD §3.1 has specified this since the editor was designed and it has never
+   * existed: once a channel was typed into, `following` went false and nothing
+   * anywhere could set it back. A writer who adapted Instagram, then rewrote the
+   * post, had no way to bring Instagram along short of copying and pasting.
+   *
+   * Writes NOTHING. The post's body lands in the box marked unsaved, which is the
+   * rule "Use the saved version" already follows, so the row keeps the original
+   * until the writer saves. The replaced words are kept for `undoRelink`.
+   */
+  relink: (channel: Channel, canonicalBody: string) => void
+  /** Put back the words a relink replaced, and detach again. */
+  undoRelink: (channel: Channel) => void
 }
 
 /**
@@ -87,12 +102,16 @@ export function useVariants(
   )
 
   const setBody = useCallback(
-    // Typing here ends the following relationship for good. It is not restored by
-    // deleting the text again: an emptied channel is a deliberate choice, and
-    // silently refilling it from the post would undo it on the next keystroke
-    // anywhere else on the screen.
+    // Typing here ends the following relationship. It is not restored by deleting
+    // the text again: an emptied channel is a deliberate choice, and silently
+    // refilling it from the post would undo it on the next keystroke anywhere
+    // else on the screen. `relink` is how a writer asks for it back, on purpose.
+    //
+    // It also clears `relinkedFrom`. Once the writer has typed on top of a
+    // relinked body, an "Undo" that threw those keystrokes away would be a second
+    // silent discard — the exact thing relink is built not to do.
     (channel: Channel, body: string) =>
-      patch(channel, { body, dirty: true, error: null, following: false }),
+      patch(channel, { body, dirty: true, error: null, following: false, relinkedFrom: null }),
     [patch],
   )
 
@@ -256,7 +275,64 @@ export function useVariants(
       // `following: false` for the same reason `setBody` sets it: adopting the
       // stored copy is a decision about THIS channel, and a later edit to the
       // post must not overwrite the version just chosen.
-      patch(channel, { body: theirs, conflict: null, error: null, dirty: true, following: false })
+      patch(channel, {
+        body: theirs,
+        conflict: null,
+        error: null,
+        dirty: true,
+        following: false,
+        relinkedFrom: null,
+      })
+    },
+    [patch],
+  )
+
+  /**
+   * Relink — follow the post again.
+   *
+   * ── THE WORDS ARE NOT THROWN AWAY, AND THAT IS THE WHOLE DESIGN ─────────────
+   * The channel's current text is stashed on `relinkedFrom` before the post's
+   * body replaces it, so `undoRelink` restores it character for character. And
+   * nothing is written: the mirrored body is marked `dirty`, so the row still
+   * holds what it held until the writer saves.
+   *
+   * A channel that is ALREADY following is left completely alone — including its
+   * `relinkedFrom`, so an Undo offered a moment ago is not quietly withdrawn by a
+   * second click on a button that had nothing to do.
+   *
+   * `canonicalBody` is passed in rather than captured at mount: the post's body
+   * changes constantly, and relinking to the version that was on screen when the
+   * page loaded would resync to the wrong words.
+   */
+  const relink = useCallback(
+    (channel: Channel, canonicalBody: string) => {
+      const current = latest.current[channel]
+      if (current.following) return
+      patch(channel, {
+        body: canonicalBody,
+        following: true,
+        // True whatever the two strings are. `dirty` is a claim about the ROW,
+        // and the row still holds this channel's own copy — which is precisely
+        // what relinking is undoing.
+        dirty: true,
+        error: null,
+        relinkedFrom: current.body,
+      })
+    },
+    [patch],
+  )
+
+  const undoRelink = useCallback(
+    (channel: Channel) => {
+      const previous = latest.current[channel].relinkedFrom
+      if (previous === null) return
+      patch(channel, {
+        body: previous,
+        following: false,
+        dirty: true,
+        error: null,
+        relinkedFrom: null,
+      })
     },
     [patch],
   )
@@ -274,6 +350,9 @@ export function useVariants(
             // A generated variant is written FOR this channel. It is the clearest
             // possible statement that this one is no longer the post's body.
             following: false,
+            // And it replaces whatever a relink put here, so an Undo pointing at
+            // a body two steps back would restore something the writer never saw.
+            relinkedFrom: null,
           }
         }
         return next
@@ -291,6 +370,8 @@ export function useVariants(
     applyGenerated,
     keepMine,
     useTheirs,
+    relink,
+    undoRelink,
     mirrorSource,
     dirtyChannels,
   }

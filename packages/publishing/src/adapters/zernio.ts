@@ -13,9 +13,12 @@ import {
   ZERNIO_ID_RE,
   type ZernioClient,
   type ZernioMediaItemInput,
+  type ZernioPlatformEntry,
   type ZernioPlatformResult,
   type ZernioPost,
 } from '../zernio/client'
+import { buildPlatformData, zernioMediaType } from '../zernio/platform-data'
+import type { PostFormat } from '../format-vocabulary'
 
 /**
  * The Zernio rail, for every channel it fronts.
@@ -49,6 +52,18 @@ import {
 
 export interface ZernioAdapterDeps {
   client: ZernioClient
+  /**
+   * What kind of post this version says it is, from `post_variants.format`.
+   *
+   * Passed to the FACTORY rather than riding on the request, and that is forced
+   * rather than chosen: `PublishRequest` lives in `@sahoda/shared`, a frozen
+   * contract with no format field. `runPublishPost` builds one adapter per
+   * publish and already holds the format, so the seam costs nothing.
+   *
+   * Null or absent means the version states no intent, and the payload is the
+   * one this adapter has always sent.
+   */
+  format?: PostFormat | null
   /** Injected so a caller can bound total wall-clock; defaults suit a serverless job. */
   poll?: { attempts?: number; intervalMs?: number }
   sleep?: (ms: number) => Promise<void>
@@ -218,12 +233,36 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
         )
       }
 
+      // `type` from the file's own mime, never the literal 'image'. That literal
+      // was named in migration 20260819000200's header as the first thing that
+      // had to change before a format picker could exist, and it is already wrong
+      // today: X accepts image/gif and the engine allows it.
       const mediaItems: ZernioMediaItemInput[] = media.map((m) => ({
-        type: 'image',
+        type: zernioMediaType(m.mime),
         url: m.url,
         mimeType: m.mime,
         ...(m.altText ? { altText: m.altText } : {}),
       }))
+
+      // ── THE PER-CHANNEL HALF OF THE PAYLOAD ──────────────────────────────────
+      // Refuses rather than drops. A Google button with no destination is a
+      // payload Zernio rejects, and dropping it silently would leave the writer
+      // where they were before this existed: filling in a control that changes
+      // nothing on the platform.
+      const platformData = buildPlatformData({
+        channel,
+        format: deps.format ?? null,
+        content: req.content,
+      })
+      if (!platformData.ok) {
+        throw fail(platformData.refusal.message, platformData.refusal.code, 'permanent')
+      }
+
+      const entry: ZernioPlatformEntry = {
+        platform,
+        accountId,
+        ...(platformData.data === undefined ? {} : { platformSpecificData: platformData.data }),
+      }
 
       // From the caller, never assembled here — two workers racing on one post must
       // mint the SAME key. See publishIdempotencyKey.
@@ -235,7 +274,7 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
           {
             content: bodyOf(req.content),
             mediaItems,
-            platforms: [{ platform, accountId }],
+            platforms: [entry],
             publishNow: true,
             timezone: 'UTC',
           },

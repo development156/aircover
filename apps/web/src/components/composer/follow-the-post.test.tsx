@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
-import { toChannelSet, type Channel } from '@sahoda/shared'
+import { toChannelSet, type Channel, type PostMedia } from '@sahoda/shared'
 
 /**
  * A CHANNEL FOLLOWS THE POST UNTIL SOMEONE WRITES IT, AND THEN NEVER AGAIN.
@@ -52,7 +52,7 @@ function Harness() {
           <VersionCard
             channel={channel}
             state={api.states[channel]}
-            mediaCount={1}
+            media={[ONE_PHOTO]}
             format={null}
             onFormatChange={() => {}}
             onBodyChange={(body: string) => api.setBody(channel, body)}
@@ -60,6 +60,9 @@ function Harness() {
             onSave={() => api.save(channel)}
             onKeepMine={() => {}}
             onUseTheirs={() => {}}
+            canonicalBody=""
+            onRelink={() => {}}
+            onUndoRelink={() => {}}
           />
         </div>
       ))}
@@ -74,6 +77,27 @@ const editor = (channel: string) =>
   document.querySelector(`[data-variant-editor="${channel}"]`) as HTMLTextAreaElement
 
 const stateOf = (channel: string) => screen.getByTestId(`state-${channel}`).textContent
+
+/**
+ * One photo on the post — it was `mediaCount={1}` before the card took rows
+ * instead of a count. The channel under test can be instagram, which has
+ * `requiresMedia: true`, and an empty post would raise a MEDIA_REQUIRED alert
+ * this file is not about.
+ */
+const ONE_PHOTO = {
+  id: 'm1',
+  workspace_id: 'w',
+  post_id: 'p1',
+  storage_path: 'w/p1/a.jpg',
+  mime: 'image/jpeg',
+  bytes: 1000,
+  width: 1080,
+  height: 1080,
+  alt: null,
+  meta: null,
+  created_at: '',
+  updated_at: '',
+} as PostMedia
 
 describe('following the post', () => {
   test('typing the post fills every channel that has not been written', async () => {

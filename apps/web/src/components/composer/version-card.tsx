@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { EyeOff } from 'lucide-react'
-import { CONSTRAINTS, type Channel } from '@sahoda/shared'
-import type { PostFormat } from '@sahoda/publishing/format'
+import { CONSTRAINTS, type Channel, type PostMedia } from '@sahoda/shared'
+import { refuseFormat, refuseFormatMedia, type PostFormat } from '@sahoda/publishing/format'
 
 import { Button } from '@/components/ui/button'
 import { ChannelMark } from '@/components/posts/channel-mark'
@@ -15,11 +15,13 @@ import { LiveLink } from '@/components/posts/live-link'
 import { Textarea } from '@/components/ui/textarea'
 import { VariantConflictNotice } from '@/components/posts/variant-conflict-notice'
 import { hasLink } from '@/lib/posts/detect-link'
-import { meterFor } from '@/lib/posts/counters'
+import { meterFor, withFormat } from '@/lib/posts/counters'
 import { selectedText, spliceSelection, type SelectionRange } from '@/lib/posts/splice-selection'
 import type { VariantExtras } from '@/lib/posts/variant-extras'
 import type { VariantState } from '@/components/posts/use-variants'
 
+import { HashtagField } from './hashtag-field'
+import { RelinkControl } from './relink-control'
 import { trimToFit } from './trim-to-fit'
 import { VersionOptions } from './version-options'
 import { VersionState } from './version-state'
@@ -27,8 +29,21 @@ import { VersionState } from './version-state'
 export interface VersionCardProps {
   channel: Channel
   state: VariantState
-  /** Files on the POST — every channel is scored against the same count. */
-  mediaCount: number
+  /**
+   * The files on the POST — every channel is scored against the same set.
+   *
+   * The ROWS, not a count, and that is the fix for a real fake-green: attach a
+   * landscape photo while this card says "One photo" (legal — it is inside
+   * Instagram's feed range), then change the card to "A story". Attach-time
+   * validation has already run and never runs again, so the card stayed green on
+   * a payload Instagram refuses. `post_media` carries `width` and `height`, so
+   * the answer was one component away the whole time.
+   *
+   * Publishing genuinely cannot make this check — `PublishRequestMedia` has no
+   * pixels — which is exactly why the editor must not be the only place it could
+   * have been made and wasn't.
+   */
+  media: readonly PostMedia[]
   format: PostFormat | null
   onFormatChange: (format: PostFormat | null) => void
   onBodyChange: (body: string) => void
@@ -36,6 +51,10 @@ export interface VersionCardProps {
   onSave: () => void
   onKeepMine: () => void
   onUseTheirs: (theirs: string) => void
+  /** The post's body right now — what "Follow the post again" would bring across. */
+  canonicalBody: string
+  onRelink: () => void
+  onUndoRelink: () => void
 }
 
 /**
@@ -60,7 +79,7 @@ export interface VersionCardProps {
 export function VersionCard({
   channel,
   state,
-  mediaCount,
+  media,
   format,
   onFormatChange,
   onBodyChange,
@@ -68,18 +87,53 @@ export function VersionCard({
   onSave,
   onKeepMine,
   onUseTheirs,
+  canonicalBody,
+  onRelink,
+  onUndoRelink,
 }: VersionCardProps) {
   const spec = CONSTRAINTS[channel]
   const label = CHANNEL_LABELS[channel]
   const [selection, setSelection] = useState<SelectionRange | null>(null)
 
   const hashtags = state.extras.hashtags
-  const meter = meterFor(channel, {
-    body: state.body,
-    hashtags,
-    hasLink: hasLink(state.body),
-    mediaCount,
-  })
+  // ── TWO VERDICTS, FROM TWO SOURCES, ON ONE CARD ─────────────────────────────
+  // The engine says what this CHANNEL allows; the format says what the WRITER
+  // meant. `runPublishPost` asks them in exactly this order and so does this
+  // card, so what the writer sees here is what the publisher will decide — a
+  // photo post with no photo is red before Publish rather than after.
+  const mediaCount = media.length
+
+  // ── THE FORMAT'S SHAPE RULE, RE-RUN WHENEVER THE FORMAT CHANGES ─────────────
+  // `decideAttach` checks a file against the format in force AT ATTACH TIME.
+  // Changing the format afterwards changes the rule, and nothing re-ran it. This
+  // scores the files already on the post against the format on THIS card, so the
+  // verdict follows the choice rather than the upload.
+  //
+  // First offender only: four cards each listing the same three bad photos is
+  // the wall of text docs/27 §1 is about, and one sentence is enough to send the
+  // writer to the media well.
+  const shapeRefusal =
+    media
+      .map((row) =>
+        refuseFormatMedia(spec, format, {
+          ...(row.width === null ? {} : { width: row.width }),
+          ...(row.height === null ? {} : { height: row.height }),
+        }),
+      )
+      .find((refusal) => refusal !== null) ?? null
+
+  const meter = withFormat(
+    withFormat(
+      meterFor(channel, {
+        body: state.body,
+        hashtags,
+        hasLink: hasLink(state.body),
+        mediaCount,
+      }),
+      refuseFormat(spec, format, mediaCount),
+    ),
+    shapeRefusal,
+  )
 
   // MAX_MEDIA_COUNT deliberately gets no entry. Media lives on the post and this
   // card cannot detach a file, so a "Remove extra media" button would do nothing;
@@ -87,6 +141,12 @@ export function VersionCard({
   // which states the problem without faking an affordance.
   const fixes: Partial<Record<string, () => void>> = {
     MAX_CHARS: () => onBodyChange(trimToFit(channel, state.body, hashtags)),
+    // The one format problem this card can resolve in a click: the kind and the
+    // attachments disagree, and the kind is the half that lives here. Clearing it
+    // back to "Not stated" is honest — the writer said something that was not
+    // true of the post, and none of their words or files are touched.
+    FORMAT_CONTRADICTED: () => onFormatChange(null),
+    FORMAT_UNSUPPORTED: () => onFormatChange(null),
   }
   if (spec.maxHashtags !== undefined && hashtags !== undefined) {
     const limit = spec.maxHashtags
@@ -151,18 +211,12 @@ export function VersionCard({
 
       <ChannelMeterView meter={meter} fixes={fixes} />
 
-      {hashtags !== undefined && hashtags.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {hashtags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-pill bg-s2 px-2.5 py-1 text-[12px] font-semibold text-ink"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      ) : null}
+      <HashtagField
+        channel={channel}
+        label={label}
+        hashtags={hashtags}
+        onChange={(next) => onExtrasChange({ hashtags: next })}
+      />
 
       {/* Per channel, on this channel's own text. The splice runs against the
           CURRENT body, not the one captured when the rewrite was requested: the
@@ -200,6 +254,17 @@ export function VersionCard({
       ) : null}
 
       {state.error !== null ? <InlineError>{state.error}</InlineError> : null}
+
+      {/* Below the editor and the options, above Save: relinking replaces what
+          is in the box, so it belongs next to the decision to keep it, not next
+          to the words it would overwrite. */}
+      <RelinkControl
+        label={label}
+        state={state}
+        canonicalBody={canonicalBody}
+        onRelink={onRelink}
+        onUndo={onUndoRelink}
+      />
 
       <div className="flex items-center gap-3">
         <Button

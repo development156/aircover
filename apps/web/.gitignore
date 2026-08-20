@@ -22,3 +22,4 @@
 # assets.spec.ts's width/theme captures — same rule: the harness is the artefact
 # that is version-controlled, not its output.
 /e2e-artifacts/
+e2e-shots/

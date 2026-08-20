@@ -201,10 +201,38 @@ export interface ZernioMediaItemInput {
   altText?: string
 }
 
+/**
+ * One entry of `platforms[]`.
+ *
+ * ── THE THREE OPTIONAL FIELDS ARE THE PER-CHANNEL HALF OF THE API ────────────
+ * This type was `{ platform, accountId }` and nothing else, which made three of
+ * Zernio's five per-platform fields unreachable — not unused, UNREACHABLE, since
+ * `platformSpecificData` has no root-level equivalent. Every channel-specific
+ * format lives behind it (docs/31 §1.2, read out of their OpenAPI document).
+ *
+ * `platformSpecificData` is deliberately `Record<string, unknown>` rather than a
+ * union of fifteen platform schemas. The union is Zernio's, it is large, and
+ * restating it here would be a second copy of a vendor contract that changes
+ * without telling us. `buildPlatformData` is the ONE place that decides what goes
+ * in, and it is exhaustively tested; a wider type here does not widen who may
+ * fill it.
+ */
+export interface ZernioPlatformEntry {
+  platform: string
+  accountId: string
+  /** Per-platform text, overriding the root `content` for this platform only. */
+  customContent?: string
+  /** Per-platform media, overriding the root `mediaItems` for this platform only. */
+  customMedia?: ZernioMediaItemInput[]
+  /** Per-platform scheduled time, overriding the root `scheduledFor`. */
+  scheduledFor?: string
+  platformSpecificData?: Record<string, unknown>
+}
+
 export interface ZernioCreatePostInput {
   content: string
   mediaItems?: ZernioMediaItemInput[]
-  platforms: { platform: string; accountId: string }[]
+  platforms: ZernioPlatformEntry[]
   publishNow?: boolean
   scheduledFor?: string
   timezone?: string

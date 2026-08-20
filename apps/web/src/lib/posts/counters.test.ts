@@ -1,7 +1,8 @@
 import { CONSTRAINTS, charCountFor, type VariantDraft } from '@sahoda/shared'
 import { describe, expect, test } from 'vitest'
 
-import { blockingChannels, meterFor, metersFor } from './counters'
+import { refuseFormat } from '@sahoda/publishing'
+import { blockingChannels, meterFor, metersFor, withFormat } from './counters'
 
 const draft = (over: Partial<VariantDraft> = {}): VariantDraft => ({ body: '', ...over })
 
@@ -308,5 +309,69 @@ describe('never leaks internals', () => {
     for (const code of codes) {
       expect(['MAX_CHARS', 'MAX_HASHTAGS', 'MAX_MEDIA_COUNT']).toContain(code)
     }
+  })
+})
+
+describe('withFormat — the second verdict, from the second source', () => {
+  test('adds nothing when the version states no intent', () => {
+    const meter = meterFor('x', draft({ body: 'Chai' }))
+    expect(withFormat(meter, null)).toBe(meter)
+  })
+
+  test('appends the refusal AFTER the channel’s own rules', () => {
+    // Both wrong at once: over the character limit AND a text post with photos.
+    // The channel's rule is the more fundamental problem and reads first.
+    const meter = meterFor('x', draft({ body: 'a'.repeat(400), mediaCount: 1 }))
+    const merged = withFormat(meter, refuseFormat(CONSTRAINTS.x, 'text', 1))
+    expect(merged.violations.map((v) => v.code)).toEqual(['MAX_CHARS', 'FORMAT_CONTRADICTED'])
+  })
+
+  test('does not mutate the meter it was given', () => {
+    const meter = meterFor('x', draft({ body: 'Chai' }))
+    const before = meter.violations.length
+    withFormat(meter, refuseFormat(CONSTRAINTS.x, 'image', 0))
+    expect(meter.violations.length).toBe(before)
+  })
+
+  test('makes a photo post with no photo BLOCK, which the engine alone never does', () => {
+    // The engine finds a text-only X post entirely legal — it is. This is the
+    // whole reason the format dimension exists.
+    const engineOnly = meterFor('x', draft({ body: 'Chai', mediaCount: 0 }))
+    expect(blockingChannels([engineOnly])).toEqual([])
+
+    const withIntent = withFormat(engineOnly, refuseFormat(CONSTRAINTS.x, 'image', 0))
+    expect(blockingChannels([withIntent])).toEqual(['x'])
+  })
+})
+
+describe('one problem, one sentence', () => {
+  test('drops the format’s missing-photo line when the channel already said it', () => {
+    // MEASURED on a 1440 screenshot: an Instagram carousel with nothing attached
+    // showed both "Instagram needs at least one photo" and "A set needs at least
+    // two images." Two rules, two sources, and to the reader one problem.
+    const meter = meterFor('instagram', draft({ body: 'Chai', mediaCount: 0 }))
+    expect(meter.violations.map((v) => v.code)).toContain('MEDIA_REQUIRED')
+
+    const merged = withFormat(meter, refuseFormat(CONSTRAINTS.instagram, 'carousel', 0))
+    expect(merged.violations.filter((v) => v.code === 'FORMAT_NEEDS_MEDIA')).toHaveLength(0)
+    expect(merged).toBe(meter)
+  })
+
+  test('and says it again as soon as it is the sentence that helps', () => {
+    // One photo attached: the channel is satisfied, the set is not. Now the
+    // format's line is the only one that tells the writer what to do.
+    const meter = meterFor('instagram', draft({ body: 'Chai', mediaCount: 1 }))
+    expect(meter.violations.map((v) => v.code)).not.toContain('MEDIA_REQUIRED')
+
+    const merged = withFormat(meter, refuseFormat(CONSTRAINTS.instagram, 'carousel', 1))
+    expect(merged.violations.map((v) => v.code)).toContain('FORMAT_NEEDS_MEDIA')
+  })
+
+  test('never drops a DIFFERENT format problem', () => {
+    // Only the duplicate is suppressed. A contradiction is its own problem and
+    // must survive even when the channel is complaining about media too.
+    const meter = meterFor('instagram', draft({ body: 'Chai', mediaCount: 0 }))
+    const merged = withFormat(meter, refuseFormat(CONSTRAINTS.instagram, 'story', 2))
+    expect(merged.violations.map((v) => v.code)).toContain('FORMAT_CONTRADICTED')
   })
 })

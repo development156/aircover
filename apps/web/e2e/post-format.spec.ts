@@ -42,11 +42,19 @@ test.describe('the format reaches the row @smoke', () => {
 
     const select = page.locator('[data-variant-format="x"]')
 
-    // NOTHING STATED is the starting answer — the state every post written before
-    // the column existed is in, and the one that leaves publishing behaving
-    // exactly as it did.
+    // ── A CHANNEL JUST TICKED OPENS ON ITS USUAL KIND ────────────────────────
+    // CHANGED 2026-08-20, and this spec is what caught it. Picking a channel used
+    // to leave "Not stated" selected; it now opens on `defaultFormatFor`, which is
+    // derived from `requiresMedia` — words on a channel that can publish words
+    // alone, one photo on Instagram, which cannot.
+    //
+    // The distinction that keeps this honest is WHETHER A ROW EXISTS. A channel
+    // the writer just ticked has never been written and has no silence to
+    // respect. A channel with a row has already had its say, and a stored "Not
+    // stated" is never overwritten — asserted at the end of this test, after a
+    // reload, which is the case that would actually hurt.
     await expect(select).toBeVisible()
-    await expect(select).toHaveValue('')
+    await expect(select).toHaveValue('text')
 
     // Instagram's absent option is asserted from the other side: X offers text,
     // so the list is derived rather than hardcoded.
@@ -63,6 +71,8 @@ test.describe('the format reaches the row @smoke', () => {
       timeout: 60_000,
     })
 
+    // Re-chosen deliberately rather than relied on: the default put `text` on
+    // screen, and this test is about what reaches the ROW.
     await select.selectOption('text')
 
     // ── THE ASSERTION THAT MATTERS: THE COLUMN, NOT THE SCREEN ────────────────
@@ -107,6 +117,29 @@ test.describe('the format reaches the row @smoke', () => {
           return (data as { format: string | null }).format
         },
         { timeout: 20_000, message: 'clearing the format did not reach the row' },
+      )
+      .toBeNull()
+
+    // ── AND THE SMART DEFAULT MUST NOT UNDO IT ───────────────────────────────
+    // The one case where seeding a default would do real harm: a writer who
+    // cleared the format on purpose, reloading, and finding "Text only" chosen
+    // again — with publishing now holding the post to a claim they had removed.
+    // The row exists, so its silence is its own.
+    await page.reload()
+    await expect(page.locator('[data-variant-format="x"]')).toHaveValue('')
+    await expect
+      .poll(
+        async () => {
+          const { data } = await admin!
+            .from('post_variants')
+            .select('format')
+            .eq('post_id', postId)
+            .eq('channel', 'x')
+            .maybeSingle()
+          if (data === null) return 'NO-ROW'
+          return (data as { format: string | null }).format
+        },
+        { timeout: 20_000, message: 'a reload re-stamped a format the writer had cleared' },
       )
       .toBeNull()
   })
