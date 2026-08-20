@@ -17,6 +17,7 @@
  * | `invalid-path:pages[i]` | `normalizePath` refused the path; the page is gone |
  * | `duplicate-path:/x` | a later page claimed a path already taken by a survivor |
  * | `dropped-section:/x[i]:kind` | the section normalizer found nothing renderable |
+ * | `refused-fabricated:/x[i]:kind` | the kind makes a claim the generator cannot source (`attested.ts`) |
  * | `/x[i]:key` | a key the section normalizer discarded, forwarded **verbatim** |
  * | `truncated-sections:/x:n` | sections past {@link MAX_SECTIONS_PER_PAGE}, never scanned |
  * | `empty-page:/x` | every section dropped, so the page would have rendered blank |
@@ -57,6 +58,7 @@
  */
 import { ok, err, appError } from '@sahoda/shared'
 import type { Result, SiteGenerateOutput } from '@sahoda/shared'
+import { fabricatedSection, isUnattestable } from './attested'
 import { normalizePath } from './path'
 import { coerceText, labelToken } from './section-coerce'
 import { normalizeSection } from './section-content'
@@ -182,6 +184,16 @@ const normalizeSections = (
   const kept: NormalizedSection[] = []
 
   scanned.forEach((section, index) => {
+    // BEFORE the content normalizer, deliberately. A fabricated testimonial is refused for
+    // what it claims, not for how well it is written — running the normalizer first would
+    // make a well-formed invented quote reach `kept` on the day someone reorders these two
+    // statements, and would report a perfectly-formed fabrication as "nothing renderable".
+    // The reason is the point; see `attested.ts`.
+    if (isUnattestable(section.kind)) {
+      dropped.push(fabricatedSection(path, index, labelToken(section.kind)))
+      return
+    }
+
     const result = normalizeSection(section.kind, section.content, kept.length)
     if (result === null) {
       dropped.push(`dropped-section:${path}[${index}]:${labelToken(section.kind)}`)

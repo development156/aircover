@@ -13,7 +13,9 @@ import {
 } from '@sahoda/jobs/publish'
 import { loadJobsEnv } from '@sahoda/jobs/sweeps'
 
+import { checkAndAlertHeartbeats } from '@/lib/cron/alert'
 import { isAuthorizedCronRequest } from '@/lib/cron/authorize'
+import { recordCronRun } from '@/lib/cron/heartbeat-store'
 import { publishFromCronEnabled } from '@/lib/cron/publish-enabled'
 import { runCronSweeps } from '@/lib/cron/run-sweeps'
 import { reportServerError } from '@/lib/observability/report'
@@ -115,6 +117,20 @@ export async function GET(request: Request): Promise<Response> {
     return new Response('Unauthorized', { status: 401 })
   }
 
+  // ── THE TRACE, STAMPED BEFORE ANY WORK ────────────────────────────────────
+  // At the START, not the end, and the distinction is the point: the question
+  // this answers is whether the SCHEDULER is still calling us. A tick that
+  // begins and then throws is an error, which Sentry already reports. Stamping
+  // only on success would merge "not scheduled" into "scheduled and broken" —
+  // the two things `lib/cron/heartbeat.ts` exists to keep apart. Never throws.
+  await recordCronRun('sweeps')
+
+  // This tick also checks its SIBLING. A watchdog inside the thing it watches
+  // cannot survive that thing dying, so the crons cross-check: the five-minute
+  // sweep is what notices that the nightly metrics pass has stopped. If the
+  // whole scheduler stops, neither runs and only /admin/dev still says so.
+  const heartbeats = await checkAndAlertHeartbeats()
+
   const outcome = await runCronSweeps({
     // Resolved HERE, from the running deployment's environment, so the answer is
     // measured rather than inferred. `loadJobsEnv()` applies the same default
@@ -173,5 +189,21 @@ export async function GET(request: Request): Promise<Response> {
     onError: (scope, error) => reportServerError(error, { action: `cron:${scope}-sweep` }),
   })
 
-  return Response.json(outcome.body, { status: outcome.status })
+  // The heartbeat verdicts ride the same body. Counts and job names only — no
+  // workspace, no post, no customer text — because this body is returned on a
+  // public URL to whoever holds the cron secret, the rule the rest of this
+  // route already follows. Reporting what was FOUND and what was SENT
+  // separately matters: "we saw a stopped job and mailed nobody" and "nothing
+  // was wrong" would otherwise look identical from outside.
+  return Response.json(
+    {
+      ...outcome.body,
+      heartbeat: {
+        states: heartbeats.checked.map((v) => `${v.job}:${v.state}`),
+        alerted: heartbeats.sent,
+        suppressed: heartbeats.suppressed,
+      },
+    },
+    { status: outcome.status },
+  )
 }
