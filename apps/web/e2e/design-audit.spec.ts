@@ -47,6 +47,34 @@ const ROUTES: ReadonlyArray<{ path: string; slug: string; archetype: string }> =
   { path: '/assets', slug: 'assets', archetype: 'gallery' },
   { path: '/settings', slug: 'settings', archetype: 'form' },
   { path: '/settings/plan', slug: 'settings-plan', archetype: 'pricing' },
+
+  // ── Added by wt-screens ─────────────────────────────────────────────────────
+  // docs/27 §0 listed these under "not sampled" and docs/28 did not reach them,
+  // so nothing has ever photographed them. They are static paths, so the only
+  // reason they were missing is that nobody added the row.
+  { path: '/create', slug: 'create', archetype: 'chooser' },
+  { path: '/brain/voice', slug: 'brain-voice', archetype: 'long form' },
+  { path: '/brain/audience', slug: 'brain-audience', archetype: 'long form' },
+  { path: '/brain/competitors', slug: 'brain-competitors', archetype: 'long form' },
+  { path: '/brain/knowledge', slug: 'brain-knowledge', archetype: 'long form' },
+  { path: '/settings/profile', slug: 'settings-profile', archetype: 'form' },
+  { path: '/settings/integrations', slug: 'settings-integrations', archetype: 'form' },
+  { path: '/design-system', slug: 'design-system', archetype: 'gallery' },
+
+  // DELIBERATELY still unsampled, and the reason is the same one docs/27 gave
+  // for the two /inbox detail routes — a frame of the wrong screen is worse
+  // than no frame:
+  //
+  //   /sign-in, /sign-up  — this fixture is SIGNED IN, so Clerk redirects both
+  //                         away. The camera would file /home as evidence of
+  //                         the sign-in design.
+  //   /onboarding         — the seed bootstraps a workspace before shooting, and
+  //                         onboarding is the screen you see when you do NOT
+  //                         have one. Same failure: it would photograph the
+  //                         completed state and file it as the empty one.
+  //
+  // Both need a fixture whose user is in the state the screen exists to serve.
+  // Auditing them from code is honest; auditing them from a redirect is not.
 ]
 
 /**
