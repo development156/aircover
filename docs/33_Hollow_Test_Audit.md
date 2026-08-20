@@ -115,13 +115,23 @@ gate.
 
 | spec | total | in `@smoke` | verdict |
 | --- | ---: | ---: | --- |
-| `assets.spec.ts` | 8 | 1 | **7 asset tests the gate never runs** |
-| `design-audit.spec.ts` | 1 | 0 | the string `@smoke` is in a COMMENT, not a title |
+| `assets.spec.ts` | 8 | 1 | **honest** — see below |
+| `design-audit.spec.ts` | 1 | 0 | a screenshot tool; its `@smoke` string is in a COMMENT |
 | `shell-probe.spec.ts` | 1 | 0 | no tag at all — **fixed** |
+
+**A correction to my own first reading.** `assets.spec.ts`'s seven untagged tests
+looked like the biggest item here and are not a finding. The file says in its own
+header why: *"It uploads bytes to real storage and it is slower than the gate
+wants. It is run explicitly. The gate's `--grep @smoke` deliberately does not
+pick it up."* A documented, reasoned exclusion is the opposite of a hollow test —
+same class as the six `*.live.test.ts` files. Only `shell-probe.spec.ts` was
+untagged for no stated reason, and only it was changed.
 
 The worktree's own `CLAUDE.md` states *"All 15 e2e tests are tagged `@smoke`, so
 the gate runs every one of them."* The runner reports 76 tests in 19 files, 67
-tagged. The documented claim is contradicted by the runner.
+tagged. The documented claim is contradicted by the runner — and, given the
+paragraph above, tagging the remaining nine is not the fix; correcting the
+sentence is.
 
 ### 1d. Files with test blocks and zero `expect()`
 
