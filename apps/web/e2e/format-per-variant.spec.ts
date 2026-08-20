@@ -124,12 +124,25 @@ test.describe('two channels, two bodies, two limits, two formats @smoke', () => 
     await page.locator('[data-channel-tile="x"]').click()
     const x = page.locator('[data-variant-format="x"]')
     await expect(x.locator('option[value="text"]')).toHaveCount(1)
-    // X has no story, and no thread either — the thread is storable and
-    // deliberately not offered, because the refusal gate cannot read one.
+    // X has no story. It DOES have a thread — offered since the refusal gate was
+    // shown to read every segment, which it can because a thread is the one body
+    // SPLIT rather than separately-authored text.
     await expect(x.locator('option[value="story"]')).toHaveCount(0)
-    await expect(x.locator('option[value="thread"]')).toHaveCount(0)
-    // And it says so, as a sentence rather than a disabled control.
-    await expect(page.locator('[data-version-card="x"]')).toContainText('Threads are not built yet')
+    await expect(x.locator('option[value="thread"]')).toHaveCount(1)
+
+    // ── AND WHAT A THREAD STILL CANNOT DO IS SAID, AS A SENTENCE ────────────
+    // Photos on a chosen step: `threadItems[].mediaItems` is [SPEC]-only and
+    // Zernio's validator accepts a dead URL there without complaint, so nobody
+    // can claim X will publish it. A div, never a disabled control.
+    await x.selectOption('thread')
+    await expect(page.locator('[data-version-card="x"]')).toContainText(
+      'Photos on a chosen step of the thread are not built yet',
+    )
+
+    // The split preview is the feature: one body, shown as the posts it becomes.
+    await page.locator('[data-variant-editor="x"]').fill('Open at nine. '.repeat(40).trim())
+    await expect(page.locator('[data-thread-preview]')).toBeVisible()
+    await expect(page.locator('[data-thread-segment="2"]')).toBeVisible()
   })
 })
 
