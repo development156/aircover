@@ -7,7 +7,12 @@ local PostgreSQL that was created for this session and destroyed at the end of i
 was read or written, and nothing was published to any platform.
 
 All frames are light theme at device pixel ratio 2 — desktop `1440×900` (file 2880×1800) and mobile
-`390×844` (file 780×1688), so they project without softening.
+`390×844` (file 780×1688), so they project without softening. Each is the viewport as a person sees
+it, not a stitched full-page render.
+
+Four frames are deliberately scrolled, because the part of the screen worth showing sits below an
+844px or 900px fold: both mobile post-detail frames are scrolled to the channel variants, and both
+planner month frames are anchored to the month heading. Everything else is at the top of its page.
 
 ---
 
@@ -153,16 +158,23 @@ The numbers are a small shop's numbers on purpose. **All of it is demo data.**
 
 Six, not two. Each of these needs to be known before a slide is built around it.
 
-| Screen | Why it cannot be shown |
-|---|---|
-| **Weekly plan** | The button exists on `/planner` ("Plan my week · 20 credits") but the Loop behind it is unbuilt — `plan-week.ts:116` says so. Pressing it produces nothing to photograph. |
-| **Audience Twin** | `/brain/audience` is a `ComingSoon` component. There is no implementation anywhere in the repository. |
-| **Signal Resolution Console** | `/brain/resolve` returns "This page isn't here" on this branch. It was built on lane `wt-signal` and was never merged here. |
-| **An open inbox thread** | Every inbox read surface — messages, comments and reviews alike — calls the Zernio API. It does not read `inbox_threads`, which the code itself describes as a local table that ships empty. Showing a populated thread would mean pointing the app at live customer accounts and photographing real people's messages. That was not done. |
-| **Campaigns (real)** | Placeholder on this branch, as above. |
-| **Assets (real)** | Placeholder on this branch, as above. |
+| Screen | Why it cannot be shown | What it would take |
+|---|---|---|
+| **Weekly plan** | The button exists on `/planner` ("Plan my week · 20 credits") but the Loop behind it is unbuilt — `plan-week.ts:116` says so. Pressing it produces nothing to photograph. | Implement the Loop behind `plan-week.ts:116` so the action returns five placed drafts. The button, the credit price and the goals field are already there; only the thing they call is missing. |
+| **Audience Twin** | `/brain/audience` is a `ComingSoon` component. There is no implementation anywhere in the repository. | Two pieces, neither of which exists: store the v2 `AudiencesSchema` payload (the contract is written, in `packages/shared/src/brand/audiences.ts`, and nothing writes it — every `brand_memory` row is v1), then build a screen to render it. |
+| **Signal Resolution Console** | `/brain/resolve` returns "This page isn't here" on this branch. It was built on lane `wt-signal` and was never merged here. | Merge `wt-signal`. The screen exists and works; it is on the wrong branch. |
+| **An open inbox thread** | Every inbox read surface — messages, comments and reviews alike — calls the Zernio API. It does not read `inbox_threads`, which the code itself describes as a local table that ships empty. Showing a populated thread would mean pointing the app at live customer accounts and photographing real people's messages. | Either a decision to capture against live Zernio with a real connected account (and accept real customers in the frame), or a read path that can serve the local `inbox_threads` tables. Neither should be chosen casually. |
+| **Campaigns (real)** | Placeholder on this branch, as above. | Merge `wt-camp`. |
+| **Assets (real)** | Placeholder on this branch, as above. | Merge `wt-assets`. |
 
 Nothing above was mocked to fill a gap.
+
+### Audience demographics were asked for and do not exist
+
+Age bands, a gender split and top cities were requested for these images. There is no such feature:
+`age_band`, `gender`, `demograph` and `top_cities` return nothing anywhere in `apps/web` or
+`packages/`. Nothing was seeded for it and nothing is shown. Saying so here rather than staying quiet,
+because silence on a requested item reads as "it is in there somewhere."
 
 ---
 
@@ -199,9 +211,11 @@ with a real account attached — worth deciding deliberately rather than by acci
 
 ## Reproducing these images
 
-The whole environment was disposable and is gone. To rebuild it: run `packages/db/scripts/pgbox.mjs`
-(carried onto this branch from `wt-pay2`) to get a local Postgres with all 42 migrations, apply the
-Supabase-equivalent grants that pgbox does not create, run PostgREST in front of it with Clerk's JWKS
-as its JWT secret, and point `NEXT_PUBLIC_SUPABASE_URL` at a small proxy that strips `/rest/v1`. The
-seed, proxy and capture scripts were session scratch files and are not committed; this document plus
-the pgbox script is what remains.
+The whole environment was disposable and is gone, but the means to rebuild it is committed:
+`docs/deck/harness/` holds every script that produced these frames, with a README and the running
+order. The absolute paths at the top of each file point at a session scratchpad and must be repointed;
+nothing else about them is stale. `packages/db/scripts/pgbox.mjs` was carried onto this branch from
+`wt-pay2` for the same reason.
+
+This matters because the two recommendations above — merge `wt-camp` and `wt-assets`, then re-shoot —
+are otherwise a day's work rather than an hour's.
