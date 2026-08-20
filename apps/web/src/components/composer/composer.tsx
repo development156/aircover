@@ -232,7 +232,7 @@ export function Composer({
             canonicalBody={draft.body}
             variants={variantsApi}
             formats={formats}
-            mediaCount={media.length}
+            media={media}
             flush={actions.flushAndResolve}
             onGenerated={variantsApi.applyGenerated}
             generateIsPrimary={!everyChannelWritten}
