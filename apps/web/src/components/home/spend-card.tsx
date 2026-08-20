@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import { CardEmpty } from '@/components/empty-state'
+import { CountUp } from '@/components/motion/count-up'
 import { Card, CardLabel } from '@/components/ui/card'
 import { Unmeasured, Unreadable } from '@/components/design-system/absence-row'
 import type { SpendRead } from '@/lib/home/spend'
@@ -42,7 +43,11 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
         <CardLabel>Credits spent · last 30 days</CardLabel>
         <span className="num text-[13px] font-semibold">
           {spend.status === 'ok' ? (
-            spend.total.toLocaleString('en-IN')
+            // Settled and historical — a closed 30-day window that will not move
+            // while you look at it (docs/26 §8.1). NOT the balance: that is the
+            // live figure you act on, it sits in the rail beside this card, and
+            // it does not count.
+            <CountUp value={spend.total} />
           ) : spend.status === 'unreadable' ? (
             <Unreadable what="Credits spent in the last 30 days" />
           ) : (
