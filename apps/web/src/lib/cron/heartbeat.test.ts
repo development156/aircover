@@ -129,6 +129,7 @@ describe('the schedules match the crons that actually ship', () => {
   const PATH_BY_JOB: Record<CronJob, string> = {
     sweeps: '/api/cron/sweeps',
     metrics: '/api/cron/metrics',
+    loop: '/api/cron/loop',
   }
 
   function crons(): CronEntry[] {
@@ -136,7 +137,7 @@ describe('the schedules match the crons that actually ship', () => {
     return (JSON.parse(raw) as { crons?: CronEntry[] }).crons ?? []
   }
 
-  /** Period in ms for the two expression shapes this project uses, and no others. */
+  /** Period in ms for the three expression shapes this project uses, and no others. */
   function periodMs(schedule: string): number {
     const f = schedule.trim().split(/\s+/)
     if (f.length !== 5) throw new Error(`not a 5-field cron: "${schedule}"`)
@@ -146,6 +147,19 @@ describe('the schedules match the crons that actually ship', () => {
       if (step && hour === '*') return Number(step[1]) * MINUTE
       // A fixed minute AND a fixed hour is a once-a-day schedule.
       if (/^\d+$/.test(minute ?? '') && /^\d+$/.test(hour ?? '')) return 24 * 60 * MINUTE
+    }
+    // A fixed minute, a fixed hour and a SINGLE day of week is once a week.
+    // Deliberately only a single digit: `0,3` would also be a valid cron and is
+    // NOT weekly, and quietly calling it weekly would put a wrong period into
+    // the heartbeat and mislabel a healthy job as stopped.
+    if (
+      dom === '*' &&
+      month === '*' &&
+      /^\d$/.test(dow ?? '') &&
+      /^\d+$/.test(minute ?? '') &&
+      /^\d+$/.test(hour ?? '')
+    ) {
+      return 7 * 24 * 60 * MINUTE
     }
     throw new Error(`unrecognised schedule: "${schedule}"`)
   }
