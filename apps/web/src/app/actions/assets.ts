@@ -7,6 +7,7 @@ import { AssetSchema, AssetUpdateSchema, ChannelSchema, decideAssetDelete } from
 
 import { kindForProvenMime } from '@/lib/assets/kind'
 import { readAsset } from '@/lib/assets/read'
+import { offerForAsset } from '@/lib/media/offer-asset'
 import type {
   AttachAssetState,
   DeleteAssetState,
@@ -416,6 +417,7 @@ export async function attachAssetToPost(
       return { ok: false, message: 'That file is already on this post.' }
     }
 
+    const formats = await readVariantFormats(postId)
     const decision = decideAttach(
       post.channels,
       { mime: asset.mime, bytes: asset.bytes, width: asset.width, height: asset.height },
@@ -424,10 +426,27 @@ export async function attachAssetToPost(
       // makes. Attaching FROM THE LIBRARY is still an attach, so a story must
       // refuse a landscape photo here exactly as it does there. `{}` would have
       // compiled and looked identical while accepting both.
-      await readVariantFormats(postId),
+      formats,
     )
     if (!decision.ok) {
-      return { ok: false, message: decision.message, rejections: decision.rejections }
+      // The refusal stands exactly as it did. See `AttachMediaState` for why the
+      // offer is an addition to this shape rather than a replacement of it.
+      const offer = await offerForAsset({
+        asset,
+        channels: post.channels,
+        formats,
+        rejections: decision.rejections,
+      })
+      return {
+        ok: false,
+        message: decision.message,
+        rejections: decision.rejections,
+        ...(offer === null
+          ? {}
+          : offer.offered
+            ? { offer: offer.offer }
+            : { noOffer: offer.reason }),
+      }
     }
 
     const supabase = createServerSupabase()

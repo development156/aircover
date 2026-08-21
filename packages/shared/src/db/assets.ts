@@ -87,3 +87,52 @@ export const AssetUsageSchema = z.object({
   created_at: z.string(),
 })
 export type AssetUsage = z.infer<typeof AssetUsageSchema>
+
+// ── asset_derivatives ────────────────────────────────────────────────────────
+/**
+ * A cropped copy of a library file.
+ *
+ * ── A DERIVATIVE IS A CHILD OF ITS ASSET, NOT A SECOND ASSET ────────────────
+ * That is a security property, not a naming preference. The delete gate reads
+ * `asset_usages`, which is derived from `post_media.asset_id` — so it can only
+ * ever see an attachment that names its ORIGINAL. Had a crop been its own
+ * `assets` row with `post_media.asset_id` pointing at it, deleting the original
+ * would have found no usages, the trigger would have refused nothing, and a
+ * scheduled post would have lost its photo silently. `post_media.asset_id`
+ * therefore keeps naming the original and `derivative_id` says which crop of it
+ * is attached; a CHECK forbids the second without the first.
+ *
+ * The original is never modified and never deleted to make one of these.
+ */
+export const AssetDerivativeSchema = z.object({
+  id: z.uuid(),
+  workspace_id: z.uuid(),
+  asset_id: z.uuid(),
+  storage_path: z.string(),
+  /**
+   * Everything that determines the BYTES — the crop rectangle and the output
+   * encoding. The idempotency key: re-running the same crop finds this row and
+   * mints nothing. Deliberately excludes the channel set, because two channel
+   * sets that resolve to the same rectangle produce the same file.
+   */
+  recipe: z.string(),
+  /** Which channels this crop was cut for and verified against. */
+  channels: z.array(ChannelSchema),
+  /** What the version said it was, or null when no version stated an intent. */
+  format: z.string().nullable(),
+  crop_x: z.int(),
+  crop_y: z.int(),
+  crop_w: z.int(),
+  crop_h: z.int(),
+  /** Where the person said the subject was, as fractions of the original. */
+  focal_x: z.number(),
+  focal_y: z.number(),
+  /** Facts about the derivative FILE, sniffed from the bytes sharp produced. */
+  mime: z.string(),
+  bytes: z.number().int(),
+  width: z.int(),
+  height: z.int(),
+  created_by: z.string().nullable(),
+  created_at: z.string(),
+})
+export type AssetDerivative = z.infer<typeof AssetDerivativeSchema>
