@@ -280,6 +280,27 @@
      focus treatment (2px --brand-text, offset 2, --r-sm radius) unlayered, so it
      already outranks anything in @layer base — a copy here would be dead code
      that drifts. One treatment, no per-component overrides. */
+
+  /* A button must look pressable.
+
+     Tailwind v3's Preflight added `cursor: pointer` to buttons; v4 REMOVED it,
+     so buttons fall back to the UA default of `cursor: default` — an arrow. This
+     app never restored it. MEASURED 2026-08-22 across 39 routes in a production
+     build: 209 enabled buttons resolved to `cursor: default` against 38 to
+     `pointer`, and those 38 were `<a>` elements getting the browser's own link
+     cursor. So on /home the NAV LINKS get a hand and the primary call to action
+     gets an arrow — the affordance is exactly inverted. The one shipped
+     stylesheet carried a single `cursor:pointer` declaration in 67KB.
+
+     `:disabled` keeps the arrow deliberately: a control you cannot press should
+     not claim you can. `[aria-disabled='true']` is included because a button
+     that stays focusable while inert is still not pressable. */
+  button:not(:disabled):not([aria-disabled='true']),
+  [role='button']:not([aria-disabled='true']),
+  summary,
+  select:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 /* v3 type scale as utilities, so components never hand-write a font shorthand. */

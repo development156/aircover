@@ -24,6 +24,31 @@ export function Unreadable({ what }: { what: string }) {
   )
 }
 
+/**
+ * The slot has no SUBJECT yet — there is nothing that could have a value.
+ *
+ * Distinct from `Unreadable`, and the distinction is not pedantry. MEASURED
+ * 2026-08-22 on a brand-new account with no workspace: the rail announced
+ * "Your credit balance could not be read" and "Your role in this workspace
+ * could not be read" to a screen reader, while the MAIN PANE of the very same
+ * screen said "Nothing has failed and nothing was charged; there is simply
+ * nothing to show until one exists." Both were describing the same fact and
+ * only the main pane was telling the truth. Nothing had failed. There was no
+ * workspace to have a balance or a role.
+ *
+ * Same neutral visible mark as `Unreadable` — a sighted user is looking at an
+ * absence either way and the shape of the absence is not worth a second glyph.
+ * The claim differs only where a claim is actually made, which is the name.
+ */
+export function NotYet({ what }: { what: string }) {
+  return (
+    <>
+      <span aria-hidden className="is-unreadable" />
+      <span className="sr-only">{what} starts once you create a workspace</span>
+    </>
+  )
+}
+
 export function AbsenceRow() {
   return (
     <div className="grid gap-3 narrow:grid-cols-3">

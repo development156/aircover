@@ -52,6 +52,37 @@ export function IntakeStep({ initialText, initialOverrides, onContinue }: Intake
   )
   const note = assumptionNote(classification)
 
+  /**
+   * ── NOTHING IS CLAIMED BEFORE THERE IS SOMETHING TO CLAIM IT FROM ──────────
+   * MEASURED 2026-08-22 on a fresh account, with the box untouched: this screen
+   * asserted in bold "You're a service business in everyday consumer goods and
+   * services, in India." and then, one line below in grey, "We could not read
+   * any of this from your words — pick below." Both sentences were on screen at
+   * once, two lines apart, and the box was empty. Each of the three chip groups
+   * carried a "guessed" badge next to a pre-selected chip.
+   *
+   * Nothing had been guessed, because nothing had been written. The classifier
+   * is not at fault and is not touched — typing one sentence about a bakery
+   * moves it to local_presence / food / IN and both the false line and the
+   * badges correctly disappear. The fault is asserting a conclusion over an
+   * empty input.
+   *
+   * An override counts as an answer too: someone who clears the box after
+   * picking chips has still told us something, and their picks are choices
+   * rather than guesses.
+   *
+   * ── ONLY THE ASSERTION IS SUPPRESSED. THE DISCLOSURES STAY. ────────────────
+   * A first pass at this also hid the three "guessed" badges while the box was
+   * empty, and `intake-step.test.tsx` caught it: "Nothing typed: all three are
+   * defaults and must say so." That assertion is RIGHT. The badges are the
+   * mechanism by which a default admits to being a default, and removing them
+   * would have made a pre-selected chip look like a confirmed choice — trading
+   * one false impression for a quieter one. What was actually wrong was the
+   * BOLD SENTENCE claiming a conclusion, not the grey text admitting there
+   * wasn't one.
+   */
+  const hasAnswered = text.trim().length > 0 || Object.keys(overrides).length > 0
+
   return (
     <div className="flex flex-col gap-6">
       {/* The seeded Guide tour anchors setup here. It moved from the old Spark
@@ -79,10 +110,21 @@ export function IntakeStep({ initialText, initialOverrides, onContinue }: Intake
       </div>
 
       <div className="rounded-card border border-line bg-s1 p-4">
-        <p aria-live="polite" className="text-[15px] font-semibold text-ink">
-          {readBack(classification)}
-        </p>
-        {note ? <p className="mt-1 text-[13px] text-muted">{note}</p> : null}
+        {hasAnswered ? (
+          <>
+            <p aria-live="polite" className="text-[15px] font-semibold text-ink">
+              {readBack(classification)}
+            </p>
+            {note ? <p className="mt-1 text-[13px] text-muted">{note}</p> : null}
+          </>
+        ) : (
+          // `type-body` rather than a hand-written 13px: the five literals above it
+          // are grandfathered by the design-lint baseline, and adding a sixth is
+          // what the ratchet exists to stop.
+          <p aria-live="polite" className="type-body text-muted">
+            Write a sentence above and Sahoda reads it back here. Nothing is assumed until you do.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-5">

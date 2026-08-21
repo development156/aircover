@@ -2,7 +2,7 @@ import { currentUser } from '@clerk/nextjs/server'
 import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
 
-import { Unreadable } from '@/components/design-system/absence-row'
+import { NotYet, Unreadable } from '@/components/design-system/absence-row'
 import { getWorkspaceRole } from '@/lib/workspace-role'
 import { readBalance, type BalanceRead } from '@/lib/wallet/read'
 import { getActiveWorkspaceSlug, listWorkspaces, resolveActiveWorkspace } from '@/lib/workspaces'
@@ -89,15 +89,39 @@ function creditsText(balance: BalanceRead): string | null {
 }
 
 export async function RailFoot() {
-  const [user, workspaces, activeSlug, balance] = await Promise.all([
+  const [user, workspacesRead, activeSlug, balance] = await Promise.all([
     soft('clerk_user', currentUser, null),
-    soft('workspaces', listWorkspaces, [] as Awaited<ReturnType<typeof listWorkspaces>>),
+    /**
+     * Read with its failure VISIBLE, not swallowed.
+     *
+     * `soft` returns the fallback on a throw, so a failed workspace read and an
+     * account that genuinely has no workspace both arrive as `[]`. Those are two
+     * different claims — "we asked and got nothing back" versus "there is
+     * nothing yet" — and picking the wrong one is how the rail came to announce
+     * a failure to a brand-new account. Anything that cannot tell them apart is
+     * not entitled to make either claim.
+     */
+    (async () => {
+      try {
+        return { value: await listWorkspaces(), failed: false }
+      } catch (error) {
+        Sentry.captureException(error, { tags: { shell_read: 'workspaces' } })
+        return { value: [] as Awaited<ReturnType<typeof listWorkspaces>>, failed: true }
+      }
+    })(),
     soft('active_workspace_slug', getActiveWorkspaceSlug, null as string | null),
     soft<BalanceRead>('available_credits', readBalance, { status: 'unreadable' }),
   ])
+  const workspaces = workspacesRead.value
 
   const credits = creditsText(balance)
   const active = resolveActiveWorkspace(workspaces, activeSlug)
+  /**
+   * True only when we positively know there is no workspace: the read SUCCEEDED
+   * and returned nothing. A failed read stays `Unreadable`, which is the honest
+   * claim there.
+   */
+  const noWorkspaceYet = !workspacesRead.failed && workspaces.length === 0
   const role = active ? await soft('workspace_role', () => getWorkspaceRole(active.id), null) : null
 
   const name =
@@ -117,7 +141,11 @@ export async function RailFoot() {
       <div className="px-3 pt-3 pb-2 max-wide:hidden">
         <div className="flex min-h-[19px] items-baseline gap-1.5">
           {credits === null ? (
-            <Unreadable what="Your credit balance" />
+            noWorkspaceYet ? (
+              <NotYet what="Your credit balance" />
+            ) : (
+              <Unreadable what="Your credit balance" />
+            )
           ) : (
             <span className="num text-[19px] leading-none font-[650] tracking-[-0.02em]">
               {credits}
@@ -150,7 +178,12 @@ export async function RailFoot() {
         <span className="min-w-0 flex-1 max-wide:hidden">
           <span className="block truncate text-[13px] font-semibold">{name}</span>
           <span className="block truncate text-[11px] text-muted">
-            {roleLabel ?? <Unreadable what="Your role in this workspace" />}
+            {roleLabel ??
+              (noWorkspaceYet ? (
+                <NotYet what="Your role" />
+              ) : (
+                <Unreadable what="Your role in this workspace" />
+              ))}
           </span>
         </span>
       </Link>
