@@ -61,12 +61,22 @@ describe('a cost we could not read is not a cost of zero', () => {
   it('returns null while the charge has not been accounted yet', async () => {
     // This is the exact body `?waitForFinish=` returns, measured against a run
     // that had in fact just charged $0.0026.
-    const cost = await readRunCost('run-1', {
-      token: 't',
-      fetch: async () => runResponse({ usageTotalUsd: 0, eventUsage: {} }),
-    })
-    console.log('  cost read from a just-finished run:', cost)
+    let asked = 0
+    const cost = await readRunCost(
+      'run-1',
+      {
+        token: 't',
+        fetch: async () => {
+          asked += 1
+          return runResponse({ usageTotalUsd: 0, eventUsage: {} })
+        },
+      },
+      3,
+      0,
+    )
+    console.log(`  cost after ${asked} attempts on a run that never accounts:`, cost)
     expect(cost).toBeNull()
+    expect(asked).toBe(3)
   })
 
   it('reads the per-event total once the run has settled', async () => {
@@ -85,11 +95,38 @@ describe('a cost we could not read is not a cost of zero', () => {
     expect(cost).toBe(2600)
   })
 
+  it('asks again when the first answer is zero, which is the real sequence', async () => {
+    // MEASURED on a real pass: the first ask, immediately after the run ends,
+    // returns 0; a later ask returns 0.0026. Without the retry the pass recorded
+    // a genuine charge as `estimated` — honest, but a price list rather than a
+    // measurement, and the founder asked for the measurement.
+    const answers = [
+      { usageTotalUsd: 0, eventUsage: {} },
+      { usageTotalUsd: 0, eventUsage: {} },
+      { usageTotalUsd: 0.0026, eventUsage: { profile: { eventTotalUsd: 0.0026 } } },
+    ]
+    let asked = 0
+    const cost = await readRunCost(
+      'run-1',
+      {
+        token: 't',
+        fetch: async () => runResponse(answers[asked++]),
+      },
+      3,
+      0,
+    )
+    console.log(`  cost after ${asked} attempts:`, cost, 'micros')
+    expect(asked).toBe(3)
+    expect(cost).toBe(2600)
+  })
+
   it('returns null rather than zero when Apify will not answer at all', async () => {
-    const cost = await readRunCost('run-1', {
-      token: 't',
-      fetch: async () => ({ ok: false, status: 500 }) as unknown as Response,
-    })
+    const cost = await readRunCost(
+      'run-1',
+      { token: 't', fetch: async () => ({ ok: false, status: 500 }) as unknown as Response },
+      2,
+      0,
+    )
     expect(cost).toBeNull()
   })
 })

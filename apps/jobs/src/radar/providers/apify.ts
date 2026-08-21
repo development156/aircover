@@ -87,20 +87,40 @@ export interface SocialFetch {
  * Separate from the run itself so the delay described above is visible, and so
  * the settlement can happen after the snapshot is safely written.
  */
-export async function readRunCost(runId: string, options: ApifyOptions): Promise<number | null> {
+export async function readRunCost(
+  runId: string,
+  options: ApifyOptions,
+  /**
+   * How many times to ask, and how long to wait between.
+   *
+   * MEASURED 2026-08-22 on a real pass: asking ONCE, immediately after the run
+   * terminates, returns zero — and the pass then recorded a genuine $0.0026 as
+   * `estimated` because the honest fallback is a list price, not a made-up
+   * measurement. Asking again a few seconds later returns the real figure. So the
+   * retry is not defensive padding; it is the difference between a cost report
+   * built on measurements and one built on the price list.
+   */
+  attempts = 3,
+  delayMs = 4000,
+): Promise<number | null> {
   const doFetch = options.fetch ?? fetch
-  const res = await doFetch(`${API}/actor-runs/${runId}`, {
-    headers: { authorization: `Bearer ${options.token}` },
-  })
-  if (!res.ok) return null
-  const body = (await res.json()) as {
-    data?: { usageTotalUsd?: number; eventUsage?: Record<string, { eventTotalUsd?: number }> }
+  let total = 0
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, delayMs))
+    const res = await doFetch(`${API}/actor-runs/${runId}`, {
+      headers: { authorization: `Bearer ${options.token}` },
+    })
+    if (!res.ok) continue
+    const body = (await res.json()) as {
+      data?: { usageTotalUsd?: number; eventUsage?: Record<string, { eventTotalUsd?: number }> }
+    }
+    const events = body.data?.eventUsage
+    const fromEvents = events
+      ? Object.values(events).reduce((sum, e) => sum + (e.eventTotalUsd ?? 0), 0)
+      : 0
+    total = fromEvents > 0 ? fromEvents : (body.data?.usageTotalUsd ?? 0)
+    if (total > 0) break
   }
-  const events = body.data?.eventUsage
-  const fromEvents = events
-    ? Object.values(events).reduce((sum, e) => sum + (e.eventTotalUsd ?? 0), 0)
-    : 0
-  const total = fromEvents > 0 ? fromEvents : (body.data?.usageTotalUsd ?? 0)
   // A genuine zero is indistinguishable here from "not accounted yet", and the
   // honest answer to that ambiguity is null. The reservation's list-price
   // estimate stands, marked `estimated`, rather than being overwritten with a

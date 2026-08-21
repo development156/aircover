@@ -1,0 +1,118 @@
+# The nightly Radar pass — what competitors posted, what changed on their sites.
+#
+# ── WHY A GITHUB ACTION AND NOT TRIGGER.DEV ──────────────────────────────────────────
+# apps/jobs is nominally a Trigger.dev project and nothing in this repository has ever
+# deployed there: the key in the environment is a `tr_dev_` SDK runtime key and
+# `trigger.dev whoami` answers "You must login first". `metrics-nightly.yml` beside this
+# file is the runner that demonstrably works, so Radar uses the same rail rather than
+# inventing a second unproven one. `runRadarPass` imports neither the Trigger.dev SDK nor
+# anything from Next, so it runs here with no deploy of any kind.
+#
+# ── WHERE THIS FILE HAS TO LIVE ──────────────────────────────────────────────────────
+# GitHub fires `schedule` only from a repository's DEFAULT branch. So this file must be on
+# the default branch to be armed at all, and the code it runs is fetched by the checkout
+# step below rather than being whatever the default branch happens to hold. Point the
+# repository variable RADAR_REF at the branch carrying the collector.
+#
+# ⚠ THIS WORKFLOW IS NOT ARMED UNTIL RADAR_REF AND THE SECRETS ARE SET. ⚠ Until then it
+# can only be started by hand from the Actions tab, which is deliberate: the first night
+# it runs it will start spending money, and that should be a decision somebody makes.
+name: radar-nightly
+
+on:
+  schedule:
+    # 19:00 UTC = 00:30 IST. An hour before the metrics collector so the two are not
+    # competing for the same runner minutes, and five clear hours before the UTC rollover
+    # — `competitor_snapshots.captured_on` is a GENERATED column,
+    # `(captured_at AT TIME ZONE 'UTC')::date`, and a `schedule` trigger is best-effort
+    # and routinely late by 10-30 minutes under load. Sliding into the next day's key
+    # would leave a gap in this one and a double entry in the next.
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch or SHA carrying the collector (blank = the RADAR_REF variable)'
+        required: false
+        type: string
+      batch:
+        description: 'How many sources to look at'
+        required: false
+        default: '100'
+        type: string
+
+# ⚠ THE CONCURRENCY GROUP IS PART OF THE SPENDING CAP, NOT A TIDINESS SETTING. ⚠
+#
+# `app.radar_begin_fetch` adds up today's spending and then writes a reservation, holding
+# an advisory lock for the length of that transaction. The lock cannot span the HTTP
+# request that follows, so two SIMULTANEOUS passes could each read the same total and both
+# be allowed through. THIS LINE is what makes that impossible: GitHub runs one Radar pass
+# at a time. Removing it does not make the pass slower, it makes the cap approximate.
+#
+# `cancel-in-progress: false` because a cancelled pass leaves reservations pending, and a
+# pending reservation counts as spent until something settles it.
+concurrency:
+  group: radar-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    # A wall, not a budget. The measured pass is one HTTP request per website and one
+    # Apify run (~12s) per social account; twenty minutes covers a hundred sources with
+    # room to spare, and stops a hang from burning an hour of minutes on a private repo.
+    timeout-minutes: 20
+    steps:
+      - name: Check out the collector
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || vars.RADAR_REF || 'wt-radar' }}
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Activate the pinned pnpm
+        # Corepack ships with Node, so the version comes from the repo's own
+        # `packageManager` field rather than from a third-party action. `pnpm --version`
+        # is printed deliberately: corepack is deprecated in Node 24 and a silent
+        # activation failure would surface three steps later as `pnpm: not found`.
+        run: |
+          corepack enable
+          corepack prepare --activate
+          pnpm --version
+
+      - name: Install (jobs and its workspace dependencies only)
+        run: pnpm install --frozen-lockfile --filter @sahoda/jobs...
+
+      - name: Sweep
+        working-directory: apps/jobs
+        env:
+          # ⚠ SUPABASE_DB_URL MUST BE THE REGIONAL POOLER. ⚠
+          # MEASURED 2026-08-19 and again 2026-08-22: `db.<ref>.supabase.co` resolves to
+          # AAAA records ONLY, and a GitHub-hosted runner has no IPv6 route — the direct
+          # host hangs here exactly as it did on Vercel. `aws-1-ap-south-1.pooler.supabase.com:6543`
+          # carries A records and is verified working. The program prints which family it
+          # got on its FIRST LINE, so a wrong value is one legible line rather than a
+          # twenty-minute silent timeout.
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          # Secrets, never echoed. The runner masks them and the program is also written
+          # not to print them: it names a missing key and prints nothing else about the
+          # environment. A missing provider key is NOT fatal — the sources it would have
+          # served are recorded as gaps in `radar_fetch_log` and the rest of the pass runs.
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          ZYTE_API_KEY: ${{ secrets.ZYTE_API_KEY }}
+        # `pnpm exec`, not `pnpm run … -- …`. MEASURED on pnpm 11.3.0: the latter forwards
+        # the `--` separator itself as an argument.
+        run: pnpm exec tsx scripts/radar-pass.ts --batch "${{ inputs.batch || '100' }}"
+
+      # Exit 3 means the spending cap refused at least one source. That is the cap
+      # WORKING, not a failure — but it must be visible, because a night that ends capped
+      # is a night some competitors went unchecked, and the screen has to say so.
+      - name: Note a capped night
+        if: ${{ failure() }}
+        run: echo "The pass ended non-zero. Exit 3 = the spending cap refused; 2 = no database; 1 = failed."
