@@ -4,13 +4,17 @@
   "globalDependencies": [
     "pricing.config.json",
     "scripts/design/design-lint.mjs",
-    "scripts/design/design-lint-baseline.json"
+    "scripts/design/design-lint-baseline.json",
+    "scripts/lint.mjs",
+    "ops/lint-baselines/*.json"
   ],
   "tasks": {
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
-    "lint": {},
+    "lint": {
+      "inputs": ["$TURBO_DEFAULT$", "../../scripts/lint.mjs", "../../ops/lint-baselines/*.json"]
+    },
     "test": {
       "dependsOn": ["^typecheck"],
       "env": ["SAHODA_ALLOW_LIVE_TESTS"]

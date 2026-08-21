@@ -1,14 +1,23 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import type { Pool } from 'pg'
 import type { PublishPostPayload } from '@sahoda/shared'
-import { hasLedgerEnv } from './helpers/env'
-import { pgPool } from './helpers/db'
+import { openDbUnderTest, type DbUnderTest } from './helpers/db-under-test'
 import { createPublishStore } from '../src/publish/store'
 
 // Proves the store's column mapping against the REAL schema. A unit test with a fake
 // client would happily accept a column that does not exist — this is the only thing that
 // catches drift between post_publish_logs' DDL and the row this job writes.
-describe.skipIf(!hasLedgerEnv)('publish store (live schema)', () => {
+/**
+ * Ported off `describe.skipIf(!hasLedgerEnv)` on 2026-08-20.
+ *
+ * The skip meant this had NEVER executed — MEASURED: apps/jobs reported 264
+ * passed / 16 SKIPPED, and vitest reports a suite that ran nothing exactly as it
+ * reports one that passed. It now runs against a Postgres built from the REAL
+ * migration files in process, and against the live database when
+ * SAHODA_ALLOW_LIVE_TESTS=1.
+ */
+describe('publish store (live schema)', () => {
+  let db: DbUnderTest
   let pool: Pool
   let store: ReturnType<typeof createPublishStore>
   let ws: string
@@ -25,7 +34,8 @@ describe.skipIf(!hasLedgerEnv)('publish store (live schema)', () => {
   })
 
   beforeAll(async () => {
-    pool = pgPool()
+    db = await openDbUnderTest()
+    pool = db.pool
     store = createPublishStore({ pool })
     await pool.query(
       `delete from workspaces
@@ -37,7 +47,7 @@ describe.skipIf(!hasLedgerEnv)('publish store (live schema)', () => {
     if (created.length > 0) {
       await pool.query('delete from workspaces where id = any($1::uuid[])', [created])
     }
-    await pool.end()
+    await db.close()
   })
 
   beforeEach(async () => {

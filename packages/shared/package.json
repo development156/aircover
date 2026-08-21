@@ -11,7 +11,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "lint": "exit 0"
+    "lint": "node ../../scripts/lint.mjs ."
   },
   "dependencies": {
     "zod": "^4.4.3"

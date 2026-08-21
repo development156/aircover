@@ -11,7 +11,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "lint": "exit 0"
+    "lint": "node ../../scripts/lint.mjs ."
   },
   "dependencies": {
     "@sahoda/shared": "workspace:*",
@@ -19,6 +19,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "@types/node": "^26.1.1",
     "@types/pg": "^8.20.0",
     "dotenv": "^17.4.2"

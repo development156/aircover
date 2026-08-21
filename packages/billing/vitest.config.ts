@@ -18,5 +18,13 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/*.live.test.ts'],
+    // The four integration suites each boot an in-process Postgres and apply all
+    // 44 migration files in `beforeAll`. Alone that is ~2s; four vitest workers
+    // doing it at once on this machine went past the 10s default and the suites
+    // failed as HOOK TIMEOUTS while passing individually — a failure about the
+    // box, dressed as a failure about the code. Same reasoning, and the same
+    // number, as packages/db and apps/jobs.
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
   },
 })

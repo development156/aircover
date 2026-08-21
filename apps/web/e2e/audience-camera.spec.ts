@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync } from 'node:fs'
 
-import { adminClient, test } from './fixtures/seeded-user'
+import { adminClient, expect, test } from './fixtures/seeded-user'
 
 /**
  * The camera for `/brain/audience`, and for the three states it can be put into.
@@ -100,7 +100,19 @@ test.describe('audience camera', () => {
             `[camera] ${label.padEnd(14)} ${theme.padEnd(5)} ${vp.name.padEnd(5)} sha256:${hash}` +
               (prior ? `  ** IDENTICAL TO ${prior} **` : ''),
           )
-          if (prior) throw new Error(`${label}/${theme}/${vp.name} is byte-identical to ${prior}`)
+          // `expect`, not `throw`. The check was always real — it just was not
+          // legible to `scripts/lint.mjs`, whose assertionless-test rule reads a
+          // file for `expect(` and reported this one as "runs, reports green, and
+          // checks nothing". It was not; it was checking with the wrong verb. The
+          // fix is to say it in the language the tool reads, never to excuse the
+          // file — an exception here would have retired the one guard that stops
+          // a placeholder PNG being filed as evidence.
+          expect(
+            prior,
+            `${label}/${theme}/${vp.name} is byte-identical to ${prior} — ` +
+              'a size check is not an identity check, and two identical frames ' +
+              'prove nothing about the state each claims to show.',
+          ).toBeUndefined()
           seen.set(hash, `${label}/${theme}/${vp.name}`)
         }
         await context.close()

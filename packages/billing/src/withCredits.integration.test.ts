@@ -1,19 +1,95 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { LIVE_DB_URL } from './test-helpers/live-env'
+import { openDbUnderTest, type DbUnderTest } from './test-helpers/db-under-test'
 import { availableCredits, holdKey, releaseKey } from '@sahoda/shared'
 import { createPgLedgerPort, type PgLedgerPort } from './ledger/pg'
 import { createWithCredits } from './withCredits'
 
-// Real-DB tests against the live ledger function — skipped when no DB URL is present.
-describe.skipIf(!LIVE_DB_URL)('withCredits against the real ledger', () => {
+/**
+ * Real-DB tests against the real `app.apply_ledger_entry`.
+ *
+ * These were `describe.skipIf(!LIVE_DB_URL)` and had therefore never run: the
+ * only DSN this repo has is production's, and the opt-in that guards it is off
+ * by default and should stay off. They now run against PGlite built from the
+ * actual migration files, and against the live database when opted in.
+ */
+describe('withCredits against the real ledger', () => {
+  let db: DbUnderTest
   let port: PgLedgerPort
   let ws: string
 
-  beforeAll(() => {
-    port = createPgLedgerPort({ connectionString: LIVE_DB_URL })
+  beforeAll(async () => {
+    db = await openDbUnderTest()
+    port = createPgLedgerPort({
+      connectionString: db.connectionString,
+      ...(db.kind === 'pglite' ? { pool: db.pool } : {}),
+    })
   })
   afterAll(async () => {
     await port.close()
+    await db.close()
+  })
+
+  /**
+   * THE BACKSTOP UNDER IDEMPOTENCY, WHICH NOTHING WAS CHECKING.
+   *
+   * MEASURED 2026-08-20 by mutation: dropping
+   * `credit_ledger_idempotency_key_key` left all 37 billing tests green. That
+   * is not quite a hole in the replay logic — `app.apply_ledger_entry` takes
+   * `select … for update` on the workspace's `credit_balances` row before it
+   * looks the key up, so two applies for one workspace are serialised and the
+   * second sees the first's row. The UNIQUE index is the layer BELOW that: what
+   * catches a key reused across workspaces, or any future path that reaches the
+   * table without taking the lock.
+   *
+   * It is asserted structurally and not by racing two writers, and the reason is
+   * a limit of the harness rather than a choice: PGlite is one connection, so
+   * `Promise.all` of two applies executes them one after another and would prove
+   * serial replay while claiming to prove a race. Reproducing the real race
+   * needs a multi-connection Postgres and belongs to the live suite.
+   */
+  it('the ledger’s idempotency key is UNIQUE at the database level', async () => {
+    const r = await port.pool.query<{ def: string }>(
+      `select pg_get_constraintdef(c.oid) as def
+       from pg_constraint c
+       join pg_class rel on rel.oid = c.conrelid
+       where rel.relname = 'credit_ledger' and c.contype = 'u'`,
+    )
+    const defs = r.rows.map((row) => row.def.replace(/\s+/g, ' '))
+    expect(defs, 'credit_ledger has no UNIQUE (idempotency_key)').toContain(
+      'UNIQUE (idempotency_key)',
+    )
+  })
+
+  it('a replayed key returns the first entry and charges nothing further', async () => {
+    await grant(100)
+    const before = await port.balance(ws)
+    const key = `replay:${ws}`
+    const first = await port.apply({
+      workspaceId: ws,
+      entryType: 'DEBIT',
+      amount: 5,
+      idempotencyKey: key,
+    })
+    const second = await port.apply({
+      workspaceId: ws,
+      entryType: 'DEBIT',
+      amount: 5,
+      idempotencyKey: key,
+    })
+
+    expect(second.replayed, 'the second apply was treated as a new charge').toBe(true)
+    expect(second.entry.id).toBe(first.entry.id)
+    const after = await port.balance(ws)
+    expect(after.total, 'the workspace was charged twice for one key').toBe(before.total - 5)
+    expect(after.held).toBe(before.held)
+  })
+
+  it('is running against a real Postgres, and says which one', () => {
+    // Without this the suite could silently go back to proving nothing — a
+    // pool that failed to build would surface as a cascade of unrelated errors
+    // rather than as the one fact that matters.
+    expect(['pglite', 'live']).toContain(db.kind)
+    console.log(`[billing] ledger suite running against: ${db.kind}`)
   })
 
   beforeEach(async () => {

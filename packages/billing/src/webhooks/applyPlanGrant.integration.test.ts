@@ -1,18 +1,38 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { LIVE_DB_URL } from '../test-helpers/live-env'
+import { openDbUnderTest, type DbUnderTest } from '../test-helpers/db-under-test'
 import { createPgLedgerPort, type PgLedgerPort } from '../ledger/pg'
 import { createApplyPlanGrant } from './applyPlanGrant'
 import type { ParsedWebhookEvent } from '../providers/types'
 
-describe.skipIf(!LIVE_DB_URL)('applyPlanGrant against the real ledger', () => {
+/**
+ * Ported off `describe.skipIf(!LIVE_DB_URL)` on 2026-08-20.
+ *
+ * The skip meant these had NEVER executed: the only DSN the repo has is
+ * production's and the opt-in guarding it is off by default and should stay off.
+ * `vitest --reporter=json` reported packages/billing as 270 passed / 26 SKIPPED,
+ * and vitest reports a suite that ran nothing exactly as it reports one that
+ * passed. They now run against PGlite built from packages/db's real migration
+ * files, and against the live database when SAHODA_ALLOW_LIVE_TESTS=1.
+ */
+describe('applyPlanGrant against the real ledger', () => {
+  let db: DbUnderTest
   let port: PgLedgerPort
   let ws: string
 
-  beforeAll(() => {
-    port = createPgLedgerPort({ connectionString: LIVE_DB_URL })
+  beforeAll(async () => {
+    db = await openDbUnderTest()
+    port = createPgLedgerPort({
+      connectionString: db.connectionString,
+      ...(db.kind === 'pglite' ? { pool: db.pool } : {}),
+    })
   })
   afterAll(async () => {
     await port.close()
+    await db.close()
+  })
+
+  it('is running against a real Postgres, and says which one', () => {
+    expect(['pglite', 'live']).toContain(db.kind)
   })
   beforeEach(async () => {
     const r = await port.pool.query<{ id: string }>(

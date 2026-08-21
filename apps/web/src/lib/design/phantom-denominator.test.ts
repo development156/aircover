@@ -89,10 +89,31 @@ function withoutComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
 
+/**
+ * The corpus, read once.
+ *
+ * MEASURED 2026-08-20: with `WEB_SRC` re-pointed at a directory holding no
+ * `.tsx`, this file reported `Tests 1 passed`. A guard whose only assertion is
+ * "the offender list is empty" cannot distinguish a clean tree from an unread
+ * one, and nothing here was checking which it had.
+ */
+const SOURCES = sourceFiles(WEB_SRC)
+
+/** Far below the real count (700+), so it catches a dead walk and not a refactor. */
+const MIN_EXPECTED_SOURCES = 200
+
 describe('no phantom denominators', () => {
+  test('the walker finds the source tree, so the ban below is not vacuous', () => {
+    expect(
+      SOURCES.length,
+      `Only ${SOURCES.length} source files found under ${WEB_SRC}. The ban below ` +
+        'asserts a list is empty; an empty walk satisfies it without reading a byte.',
+    ).toBeGreaterThan(MIN_EXPECTED_SOURCES)
+  })
+
   test('no file renders "of" beside an absence mark', () => {
     const offenders: string[] = []
-    for (const file of sourceFiles(WEB_SRC)) {
+    for (const file of SOURCES) {
       const matches = withoutComments(readFileSync(file, 'utf8')).match(PHANTOM)
       if (!matches) continue
       offenders.push(

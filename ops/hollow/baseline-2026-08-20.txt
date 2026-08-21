@@ -1,0 +1,41 @@
+apps-jobs                files=  24  passed=  264  failed=  0  SKIPPED=  16
+apps-web                 files= 245  passed= 3303  failed=  0  SKIPPED=   7
+packages-billing         files=  23  passed=  270  failed=  0  SKIPPED=  26
+packages-db              files=  22  passed=  201  failed=  0  SKIPPED= 202
+packages-mesh            files=  17  passed=  116  failed=  0  SKIPPED=   0
+packages-publishing      files=  16  passed=  261  failed=  0  SKIPPED=   0
+packages-research        files=   7  passed=   67  failed=  0  SKIPPED=   0
+packages-shared          files=  17  passed=  198  failed=  0  SKIPPED=   0
+packages-sites           files=  53  passed= 1566  failed=  0  SKIPPED=   0
+root-scripts             files=  10  passed=  174  failed=  0  SKIPPED=   0
+TOTAL                                   passed= 6420  failed=  0  SKIPPED= 251   (all=6671)
+
+=== FILES WHERE EVERY TEST WAS SKIPPED (suite ran nothing, reported green) ===
+  [apps-jobs] apps/jobs/tests/holds.integration.test.ts  7 skipped / 0 run
+  [apps-jobs] apps/jobs/tests/publishStore.integration.test.ts  9 skipped / 0 run
+  [apps-web] apps/web/src/lib/inbox/live.integration.test.ts  4 skipped / 0 run
+  [apps-web] apps/web/src/lib/privacy/export-drift.test.ts  2 skipped / 0 run
+  [packages-billing] packages/billing/src/withCredits.integration.test.ts  6 skipped / 0 run
+  [packages-billing] packages/billing/src/entitlements/entitlements.integration.test.ts  13 skipped / 0 run
+  [packages-billing] packages/billing/src/webhooks/applyPlanGrant.integration.test.ts  1 skipped / 0 run
+  [packages-billing] packages/billing/src/webhooks/webhooks.integration.test.ts  6 skipped / 0 run
+  [packages-db] packages/db/tests/billing_provider.test.ts  4 skipped / 0 run
+  [packages-db] packages/db/tests/bootstrap.test.ts  9 skipped / 0 run
+  [packages-db] packages/db/tests/brand_memory.test.ts  28 skipped / 0 run
+  [packages-db] packages/db/tests/connections.test.ts  10 skipped / 0 run
+  [packages-db] packages/db/tests/ledger.test.ts  9 skipped / 0 run
+  [packages-db] packages/db/tests/ops_changelog_author.test.ts  5 skipped / 0 run
+  [packages-db] packages/db/tests/ops_credits.test.ts  15 skipped / 0 run
+  [packages-db] packages/db/tests/ops_human_writes.test.ts  18 skipped / 0 run
+  [packages-db] packages/db/tests/ops_qa_import.test.ts  3 skipped / 0 run
+  [packages-db] packages/db/tests/ops_rls.test.ts  49 skipped / 0 run
+  [packages-db] packages/db/tests/rls.test.ts  45 skipped / 0 run
+  [packages-db] packages/db/tests/sweep.test.ts  5 skipped / 0 run
+  (count 20 files, 248 tests)
+
+=== FILES WITH SOME SKIPS ===
+  [apps-web] apps/web/src/components/posts/media-pane.test.tsx  14 ran / 1 skipped
+  [packages-db] packages/db/tests/live-guard.test.ts  3 ran / 1 skipped
+  [packages-db] packages/db/tests/migration_integrity.test.ts  89 ran / 1 skipped
+
+=== FILES THAT COLLECTED ZERO TESTS ===

@@ -55,8 +55,20 @@ try {
   die(`cannot load the spec ${specPath}: ${error.message}`)
 }
 
-if (!spec?.command || !Array.isArray(spec.mutants) || spec.mutants.length === 0) {
+if (!Array.isArray(spec?.mutants) || spec.mutants.length === 0) {
   die(`${specPath} must default-export { command, mutants: [...] } with at least one mutant.`)
+}
+// A mutant may carry its OWN command, so one spec can probe several guards without
+// re-running every unrelated suite for each. `spec.command` remains the default.
+// Named here rather than defaulted silently: a mutant with no command anywhere would
+// otherwise run `undefined` through a shell, which exits non-zero and reads as KILLED —
+// a mutation report earning a verdict from a typo.
+const commandless = spec.mutants.filter((mutant) => !mutant.command && !spec.command)
+if (commandless.length > 0) {
+  die(
+    `${specPath}: no command for ${commandless.map((m) => m.name ?? '(unnamed)').join(', ')}. ` +
+      'Set spec.command, or a command on each mutant.',
+  )
 }
 
 const cwd = resolve(REPO_ROOT, spec.cwd ?? '.')
@@ -87,7 +99,7 @@ try {
     })),
     runTests: async (mutant) => {
       process.stderr.write(`mutation-check: ${mutant.name} … `)
-      const { code, output } = await runCommand(spec.command)
+      const { code, output } = await runCommand(mutant.command ?? spec.command)
       const killed = code !== 0
       process.stderr.write(`${killed ? 'killed' : 'SURVIVED'}\n`)
       return { killed, summary: summarise(output) }
