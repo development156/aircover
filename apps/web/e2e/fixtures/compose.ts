@@ -70,3 +70,39 @@ export function saveVersionButton(page: Page, channel: string, label: string) {
     name: new RegExp(`^save ${label} copy$`, 'i'),
   })
 }
+
+/**
+ * Settle on THIS save, not on one that already happened.
+ *
+ * ── WHAT WAS CLAIMED, AND WHAT WAS MEASURED ──────────────────────────────────
+ * Three specs wrote `await expect(page.getByText('Post saved')).toBeVisible()`
+ * straight after typing, and the composer has ALWAYS saved once before that
+ * point — picking a channel is what creates the row. The stated worry was that
+ * the assertion could therefore be satisfied by the earlier save.
+ *
+ * MEASURED 2026-08-21, with a throwaway spec that read both strings with ZERO
+ * wait immediately after `fill`:
+ *
+ *     savedVisibleImmediately=false   pendingVisibleImmediately=true
+ *
+ * So it was NOT happening. `use-autosave` sets `unsaved` synchronously on change
+ * — its own comment says "Synchronous, local, and impossible to abort" — and
+ * React had already repainted "Post not saved yet" before Playwright's first
+ * poll. The old assertion was winning a race, every time, rather than being
+ * wrong.
+ *
+ * This helper is kept anyway, and the reason is the difference between VERY
+ * LIKELY and CANNOT: the old form depends on a repaint beating a poll, which is
+ * a property of neither the app nor the test, and nothing would report it if it
+ * ever stopped holding. Requiring the pending state first makes the "Post saved"
+ * that follows necessarily the one this edit caused. It also removes the same
+ * assertion triplicated across three files.
+ *
+ * Matched exactly, both of them. `Post saved` is not a substring of
+ * `Post not saved yet`, and the error copy is `Post not saved` — so a /saved/i
+ * regex would pass on the one outcome these assertions exist to catch.
+ */
+export async function expectPostSaved(page: Page): Promise<void> {
+  await expect(page.getByText('Post not saved yet')).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText('Post saved')).toBeVisible({ timeout: 60_000 })
+}

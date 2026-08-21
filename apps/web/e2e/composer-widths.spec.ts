@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 
-import { bootstrapWorkspace, startPost } from './fixtures/compose'
+import { bootstrapWorkspace, expectPostSaved, startPost } from './fixtures/compose'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
@@ -72,8 +72,10 @@ test.describe('the composer across widths @smoke', () => {
     // Waited for, not assumed. The body is written on a debounce, and the loop
     // below opens a SEPARATE browser context — so a capture taken before the
     // write lands photographs an empty composer and proves nothing about how a
-    // full one lays out.
-    await expect(page.getByText('Post saved')).toBeVisible({ timeout: 60_000 })
+    // full one lays out. `expectPostSaved` makes that structural rather than
+    // lucky: it requires the pending state first, so the save it settles on is
+    // necessarily this edit's and not the one picking a channel already did.
+    await expectPostSaved(page)
 
     const cookies = (await page.context().storageState()).cookies
     const findings: string[] = []

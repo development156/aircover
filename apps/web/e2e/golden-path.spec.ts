@@ -1,3 +1,4 @@
+import { expectPostSaved } from './fixtures/compose'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
@@ -63,13 +64,13 @@ test.describe('golden path @smoke', () => {
     await expect(body).toBeVisible()
     await body.fill('Fresh chai every morning at the corner shop.')
 
-    // Autosave is debounced; the status is the app's own claim that it landed.
-    //
-    // Matched EXACTLY, and it names the POST. A /saved/i regex also matches
-    // "Post not saved" — the error copy — so the loose version of this assertion
-    // passes on a failed save, which is the one outcome it exists to catch. The
-    // bar reports the post and the versions separately and this is the post half.
-    await expect(page.getByText('Post saved')).toBeVisible({ timeout: 20_000 })
+    // THIS save, not the one that picking a channel already did. See
+    // `expectPostSaved`: waiting only for "Post saved" was MEASURED not to be
+    // satisfied by the earlier save, but it only held because a synchronous
+    // repaint beat Playwright's first poll — and if that ever stopped holding,
+    // the reload below would ask the database for words never sent to it and
+    // nothing would say why.
+    await expectPostSaved(page)
 
     // ── 5. The post is really persisted — a reload is the honest check, not
     //      the in-memory state we just typed into.

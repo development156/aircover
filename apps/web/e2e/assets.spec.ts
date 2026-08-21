@@ -1,4 +1,4 @@
-import { startPost } from './fixtures/compose'
+import { expectPostSaved, startPost } from './fixtures/compose'
 import { makePng } from './fixtures/png'
 import { adminClient, expect, test } from './fixtures/seeded-user'
 
@@ -106,8 +106,10 @@ test.describe('media library', () => {
     const title = page.getByLabel(/title/i).first()
     await title.fill('Diwali offer')
     // The composer names the POST, because the bar reports the post and its
-    // versions separately: "All changes saved" is the deleted editor's copy.
-    await expect(page.getByText('Post saved')).toBeVisible({ timeout: 30_000 })
+    // versions separately: "All changes saved" is the deleted editor's copy. And
+    // `expectPostSaved` rather than a bare check, because `startPost` has already
+    // saved once to create the row — see that helper for what was measured.
+    await expectPostSaved(page)
 
     // ── 6. Attach FROM THE LIBRARY, through the composer's media panel ───────
     await page.getByRole('button', { name: /choose from library/i }).click()
