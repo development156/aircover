@@ -73,7 +73,14 @@ const SECTIONS: ReadonlyArray<readonly [string, RegExp]> = [
 const BRAIN_TABS: ReadonlyArray<readonly [string, RegExp]> = [
   ['/brain/identity', /identity|brand persona|customer/i],
   ['/brain/voice', /voice/i],
-  ['/brain/audience', /audience twin|panel/i],
+  // WAS `/audience twin|panel/i`, which named the coming-soon screen this tab used
+  // to hold. That screen is gone: the tab now reads a workspace, a connection and a
+  // live platform call. A stale pattern here is a test that PINS A DEFECT — it makes
+  // a correct replacement look like a regression, and it was the only thing standing
+  // between this suite and green. `Who follows you` is the one heading every one of
+  // the screen's eight states renders, so it identifies the tab without pinning any
+  // single state's copy.
+  ['/brain/audience', /who follows you/i],
   ['/brain/knowledge', /knowledge library|where it came from/i],
 ]
 

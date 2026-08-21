@@ -58,8 +58,15 @@ const DETECTOR = `(() => {
 })()`
 
 /**
- * Every in-scope route a brand-new account can reach. /onboarding, /brain and
- * admin/** are out of scope for this run and are deliberately absent.
+ * Every in-scope route a brand-new account can reach. /onboarding and admin/**
+ * are out of scope for this run and are deliberately absent.
+ *
+ * `/brain/*` was out of scope too, because those screens were coming-soon
+ * placeholders with nothing to read and therefore nothing to misreport.
+ * `/brain/audience` is no longer one: it reads a workspace, a connection and a
+ * live platform call, which is exactly the shape that produced all four historic
+ * failures. Added 2026-08-20 by the audience lane. The other three /brain
+ * sub-routes stay out until they read something.
  */
 const ROUTES = [
   '/home',
@@ -72,6 +79,7 @@ const ROUTES = [
   '/inbox/comments',
   '/inbox/reviews',
   '/analytics',
+  '/brain/audience',
   '/sites',
   '/wallet',
   '/approvals',

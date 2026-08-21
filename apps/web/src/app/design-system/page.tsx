@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 
+import { AudienceLayers } from '@/components/design-system/audience-layers'
 import { CertaintyLadder } from '@/components/design-system/certainty-ladder'
 import { AbsenceRow } from '@/components/design-system/absence-row'
 import { PrimitiveRack } from '@/components/design-system/primitive-rack'
@@ -52,6 +53,13 @@ export default function DesignSystemPage() {
         blurb="Three different claims that used to render as one em dash. A solid rule means the reading has not arrived; a broken rule means we asked and got nothing. A quantity that does not exist gets no slot at all."
       >
         <AbsenceRow />
+      </Section>
+
+      <Section
+        title="Measured, and worked out"
+        blurb="The two layers of /brain/audience. Above the line, every figure came from a platform and is drawn with a SOLID fill. Below it, every figure is Sahoda's arithmetic on those figures, drawn .is-proposed — dashed, unfilled — and each panel states the evidence it stands on and refuses when there is not enough. The numbers on this section are demonstration data, taken from Zernio's own published example."
+      >
+        <AudienceLayers />
       </Section>
 
       <Section

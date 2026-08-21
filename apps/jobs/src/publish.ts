@@ -82,3 +82,44 @@ export type {
 export { metricCaptureDeps, ZernioNotProvisionedError } from './metrics/deps'
 export type { MetricCaptureDepsOptions } from './metrics/deps'
 export { createMetricStore } from './metrics/store'
+
+// ── The audience pass, on the same entry point and for the same reason ───────
+//
+// It is a sibling of the metric pass, not a part of it: the unit is a CONNECTED
+// ACCOUNT rather than a published channel, it asks three endpoints rather than one,
+// and it writes into a different table with a different day-key rule. Running them
+// as one function would mean a Zernio outage on either half reported as a failure of
+// both.
+//
+// Same runner problem, same answer: nothing in this package has ever been deployed to
+// Trigger.dev, so this is exported so that a runner which DOES exist can reach it —
+// today, `apps/jobs/scripts/audience-capture.ts` under a scheduled GitHub Action.
+//
+// `ZernioNotProvisionedError` is deliberately NOT re-exported from `./audience/deps`:
+// the metric half already exports a class of that name from this module, and two
+// exports sharing a name is a collision, not a convenience. Callers that need to
+// distinguish them import from the module that threw.
+export {
+  runAudienceCapture,
+  CAPTURED_POPULATIONS,
+  FOLLOWER_BUCKETS,
+  FOLLOWER_SERIES,
+  FOLLOWER_COUNT_DIMENSION,
+  currentFollowers,
+  demographicRows,
+  followerRows,
+  utcDay,
+} from './audience/capture'
+export type {
+  AudienceCaptureDeps,
+  AudienceCaptureReport,
+  AudienceSnapshot,
+  AudienceStorage,
+  AudienceTarget,
+  FollowerBucket,
+  FollowerHistory,
+  FollowerPoint,
+} from './audience/capture'
+export { audienceCaptureDeps } from './audience/deps'
+export type { AudienceCaptureDepsOptions } from './audience/deps'
+export { createAudienceStore, DEMOGRAPHIC_CHANNELS } from './audience/store'

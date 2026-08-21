@@ -136,6 +136,59 @@ export interface ZernioPostAnalytics {
  * interface mirrors the wire body and a synthetic field on it would be a lie about
  * what Zernio sent.
  */
+/**
+ * One bucket of one demographic dimension: `{ dimension: "25-34", value: 4500 }`.
+ *
+ * `dimension` is Meta's own label, unaltered — 'M'/'F'/'U' for gender, '25-34' for
+ * age, a two-letter code for country, 'New York, New York' for city. `value` is a
+ * COUNT OF ACCOUNTS, which is Meta's own wording, and is never a percentage.
+ */
+export interface ZernioDemographicBucket {
+  dimension: string
+  value: number
+}
+
+/**
+ * `GET /analytics/instagram/demographics`.
+ *
+ * ── THE ONE THING TO KNOW BEFORE READING THIS ANSWER `[LIVE 2026-08-20]` ─────
+ * An account Meta will not report demographics for does NOT come back as an error.
+ * It comes back **HTTP 200, `success: true`, every dimension an EMPTY ARRAY**:
+ *
+ *   {"success":true,...,"demographics":{"age":[],"city":[],"country":[],"gender":[]},
+ *    "note":"Demographics show top 45 entries per dimension. Requires 100+ followers."}
+ *
+ * Measured against a real connected account holding 1 follower. Zernio's own OpenAPI
+ * documents a 400 with `code: "instagram_insufficient_followers"` for this case; that
+ * error DID NOT FIRE. Meta's side says the same thing in the passive voice — "Not
+ * returned if the IG User has less than 100 followers" (Instagram Platform, Instagram
+ * User Insights) — and "not returned" is exactly what arrives.
+ *
+ * So an empty answer here is not self-describing, and nothing may guess at it. See
+ * `audience-state.ts`, which refuses to call it suppression without a follower count
+ * in hand.
+ *
+ * Every field is optional because every one of them is a wire fact, not a contract.
+ */
+export interface ZernioInstagramDemographics {
+  success?: boolean
+  accountId?: string
+  platform?: string
+  /** Which population: `follower_demographics` or `engaged_audience_demographics`. */
+  metric?: string
+  /**
+   * The period the figures cover. Read as a plain string, deliberately.
+   *
+   * Zernio's OpenAPI declares the REQUEST parameter as `this_week | this_month`, and
+   * its own documented 200 example echoes `last_30_days` back. A type pinned to the
+   * enum would refuse a body the vendor itself publishes.
+   */
+  timeframe?: string
+  /** Keyed by dimension — only the breakdowns that were asked for are present. */
+  demographics?: Record<string, ZernioDemographicBucket[]>
+  note?: string
+}
+
 export interface ZernioPostAnalyticsResult {
   status: number
   post: ZernioPostAnalytics
@@ -368,6 +421,24 @@ export interface ZernioReads {
     account: ScopedAccountId,
     opts?: { since?: string; until?: string; metricType?: 'total_value' | 'time_series' },
   ): Promise<{ metrics: Record<string, unknown>; dataDelay?: string }>
+  /**
+   * Who follows this account, as Meta breaks it down.
+   *
+   * `breakdown` is a comma-separated subset of `age,city,country,gender`; omitted,
+   * Zernio returns all four. An invalid name is a 400 `invalid_field_value`, not a
+   * silently-dropped dimension — verified live 2026-08-20.
+   *
+   * A 200 with empty arrays is the ordinary answer for a small account and is NOT an
+   * error. Never render it as "we could not read this". See the type's own note.
+   */
+  instagramDemographics(
+    account: ScopedAccountId,
+    opts?: {
+      metric?: 'follower_demographics' | 'engaged_audience_demographics'
+      breakdown?: string
+      timeframe?: 'this_week' | 'this_month'
+    },
+  ): Promise<ZernioInstagramDemographics>
   gbpPerformance(
     account: ScopedAccountId,
     opts?: { startDate?: string; endDate?: string },
@@ -481,6 +552,18 @@ export function createZernioReads(deps: ZernioClientDeps): ZernioReads {
         'instagramFollowerHistory',
       )
       return { metrics: data.metrics ?? {}, dataDelay: data.dataDelay }
+    },
+
+    async instagramDemographics(account, opts) {
+      const { data } = await json<ZernioInstagramDemographics>(
+        'GET',
+        `/analytics/instagram/demographics${qs({ accountId: account, ...opts })}`,
+        'instagramDemographics',
+      )
+      // Returned as it arrived. Narrowing lives in `audience-state.ts`, so the one
+      // place that decides what an empty answer MEANS is also the only place that
+      // can be tested for getting it wrong.
+      return data
     },
 
     async gbpPerformance(account, opts) {
