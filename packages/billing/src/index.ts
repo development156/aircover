@@ -34,6 +34,27 @@ export * from './entitlements/port'
 export * from './entitlements/pg'
 export * from './entitlements/checkEntitlement'
 
+// Plan lifecycle — the pure calculators. No database, no clock of their own, no I/O.
+// Every one of them is a function of (catalog, config, clock) so a screen can show a
+// customer what a change costs BEFORE anything is charged.
+export * from './tax/computeTax'
+export * from './plans/proration'
+export * from './plans/downgradeImpact'
+export * from './dunning/dunning'
+
+// Reversing money — chargebacks and refunds, as COMPENSATING ENTRIES. Never an edit.
+export * from './reversals/applyReversal'
+
+// Free-tier abuse controls. Counts of real rows only — no score, ever.
+export * from './abuse/freeTier'
+
+// GST invoicing — the Indian financial year, the supplier registration (from env, with NO
+// defaults), and the document assembler. The serial is allocated by app.issue_invoice.
+export * from './invoices/financialYear'
+export * from './invoices/gstEnv'
+export * from './invoices/buildInvoice'
+export * from './invoices/pg'
+
 // HTTP port for payment adapters (fixture replay in tests, global fetch in prod)
 export * from './transport'
 

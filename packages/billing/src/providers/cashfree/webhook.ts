@@ -19,6 +19,20 @@ export const CashfreeOrderTagsSchema = z.object({
   workspace_id: z.string().min(1),
   plan_id: PlanIdSchema,
   period: PeriodSchema,
+  /**
+   * A mid-period PLAN CHANGE. All three travel together or not at all.
+   *
+   * These are OUR values, written at create-order and echoed back inside a body whose
+   * signature has already been verified — a customer cannot author them any more than they
+   * can author `plan_id`. They are still bounded below (`assertOrderMatchesPlan`), because
+   * "an attacker cannot set this" and "a bug of ours cannot set this wrongly" are different
+   * claims and only the first one is true.
+   *
+   * Cashfree types order_tags as map[string]string, so the numbers arrive as strings.
+   */
+  change_id: z.string().min(1).optional(),
+  change_credits: z.coerce.number().int().min(0).optional(),
+  change_amount_inr: z.coerce.number().min(0).optional(),
 })
 export type CashfreeOrderTags = z.infer<typeof CashfreeOrderTagsSchema>
 
@@ -78,9 +92,34 @@ export function tagsToEventFields(tags: Record<string, string>): {
   workspaceId: string
   planId: PlanId
   period: string
+  planChange?: { changeId: string; credits: number; amountInr: number }
 } {
   const parsed = CashfreeOrderTagsSchema.parse(tags)
-  return { workspaceId: parsed.workspace_id, planId: parsed.plan_id, period: parsed.period }
+  const base = {
+    workspaceId: parsed.workspace_id,
+    planId: parsed.plan_id,
+    period: parsed.period,
+  }
+
+  // The three plan-change tags are a unit. A partial set means the order was written by a
+  // version of this code that disagrees with this one, and guessing the missing field is how
+  // a grant gets the wrong amount — so it is a parse failure, not a fallback to a full month.
+  const present = [parsed.change_id, parsed.change_credits, parsed.change_amount_inr].filter(
+    (v) => v !== undefined,
+  ).length
+  if (present === 0) return base
+  if (present !== 3) {
+    throw new Error('cashfree order_tags carry a partial plan change (all three or none)')
+  }
+
+  return {
+    ...base,
+    planChange: {
+      changeId: parsed.change_id as string,
+      credits: parsed.change_credits as number,
+      amountInr: parsed.change_amount_inr as number,
+    },
+  }
 }
 
 /**
@@ -108,7 +147,7 @@ export function parseCashfreeWebhook(
   // Reconcile only what we are about to act on. A failed/dropped payment grants nothing, so
   // holding it to the plan price would reject legitimate failure notifications.
   if (eventType === 'payment_succeeded') {
-    assertOrderMatchesPlan(order, fields.planId)
+    assertOrderMatchesPlan(order, fields.planId, fields.planChange)
   }
 
   return {
@@ -119,6 +158,14 @@ export function parseCashfreeWebhook(
     planId: fields.planId,
     period: fields.period,
     mode: opts.mode ?? 'sandbox',
+    ...(fields.planChange
+      ? {
+          planChange: {
+            changeId: fields.planChange.changeId,
+            credits: fields.planChange.credits,
+          },
+        }
+      : {}),
     // The DELIVERED payload, not the zod-parsed one. WebhookSchema is non-strict, so parsing
     // strips everything billing does not read — bank_reference, payment_time, payment_method,
     // customer_details. Those are exactly the fields needed to reconcile a disputed charge from
@@ -134,7 +181,11 @@ export function parseCashfreeWebhook(
  * Compares `order_amount` — the amount WE set — not `payment_amount`, which legitimately comes
  * in lower when an offer applies (the official example shows order 2 / payment 1).
  */
-function assertOrderMatchesPlan(order: z.infer<typeof OrderSchema>, planId: PlanId): void {
+function assertOrderMatchesPlan(
+  order: z.infer<typeof OrderSchema>,
+  planId: PlanId,
+  planChange?: { changeId: string; credits: number; amountInr: number },
+): void {
   const currency = order.order_currency ?? EXPECTED_CURRENCY
   if (currency !== EXPECTED_CURRENCY) {
     throw new Error(`cashfree order currency ${currency} is not ${EXPECTED_CURRENCY}`)
@@ -145,6 +196,26 @@ function assertOrderMatchesPlan(order: z.infer<typeof OrderSchema>, planId: Plan
   // the field out. A success webhook we act on must state its amount.
   if (order.order_amount === undefined) {
     throw new Error(`cashfree success webhook for order ${order.order_id} carried no order_amount`)
+  }
+
+  // A mid-period upgrade is charged a PRORATED amount, so the catalogue price is the wrong
+  // thing to reconcile against. The tagged amount is used instead — and then bounded, because
+  // the tags and the amount both come from us and a bug in our own proration must not be able
+  // to mint a month's credits for a rupee.
+  if (planChange) {
+    if (order.order_amount !== planChange.amountInr) {
+      throw new Error(
+        `cashfree order amount ${order.order_amount} does not match the tagged plan-change amount ${planChange.amountInr}`,
+      )
+    }
+    // A proration can never exceed a full month of the plan being moved to.
+    const ceiling = PLAN_CATALOG[planId].monthlyCredits
+    if (planChange.credits > ceiling) {
+      throw new Error(
+        `cashfree plan change would grant ${planChange.credits} credits, above the ${planId} monthly allotment of ${ceiling}`,
+      )
+    }
+    return
   }
 
   const expected = PLAN_CATALOG[planId].priceInr

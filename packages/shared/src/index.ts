@@ -23,6 +23,8 @@ export * from './jobs/payloads'
 export * from './ledger/pricing'
 export * from './ledger/entries'
 export * from './billing/plans'
+export * from './billing/gst'
+export * from './billing/lifecycle'
 export * from './billing/withCredits'
 // The refusal gate (doc 18 §8) — a CONDITION of publishing, not a preflight.
 // The rules, the deterministic checks and the port; apps/jobs binds the I/O.

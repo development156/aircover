@@ -49,6 +49,33 @@ export interface CreateCheckoutInput {
   successUrl: string
   cancelUrl: string
   customerEmail?: string
+  /**
+   * A mid-period PLAN CHANGE rather than a plain month's purchase.
+   *
+   * Present only for an upgrade, where neither the amount nor the credits are the plan's
+   * catalogue figures: the customer pays for the remainder of the period and receives the
+   * matching part of the credit difference. Both numbers are computed by `computeProration`
+   * BEFORE the order is opened, and they travel to the webhook inside `order_tags` — the
+   * only carrier a Cashfree webhook has.
+   *
+   * Absent for a normal purchase, which keeps the existing catalogue-price path untouched.
+   */
+  planChange?: PlanChangeCheckout
+}
+
+/** The prorated figures an upgrade order carries. Every one of them is ours, not the customer's. */
+export interface PlanChangeCheckout {
+  /**
+   * Identifies THIS change. Becomes the ledger idempotency key via `planChangeGrantKey`,
+   * deliberately NOT `monthlyGrantKey`: that key is (plan, period, workspace) with no change
+   * in it, so a second upgrade to a plan already granted this month would REPLAY — returning
+   * `replayed: true` and granting nothing, while real money had just been taken.
+   */
+  changeId: string
+  /** What the customer actually pays now, in paise. Overrides the catalogue price. */
+  amountPaise: number
+  /** Credits this change grants. Never more than the plan's own monthly allotment. */
+  credits: number
 }
 
 export interface CheckoutSession {
@@ -81,5 +108,13 @@ export interface ParsedWebhookEvent {
   /** Billing period — keys the monthly grant (monthlyGrantKey). */
   period: string
   mode: PaymentMode
+  /**
+   * Set when the order was a mid-period PLAN CHANGE rather than a month's purchase.
+   *
+   * When present the grant is keyed on the change and grants `credits`, not the plan's full
+   * monthly allotment. When absent nothing about the existing path changes — which is why
+   * this is optional rather than a second event type.
+   */
+  planChange?: { changeId: string; credits: number }
   raw: unknown
 }

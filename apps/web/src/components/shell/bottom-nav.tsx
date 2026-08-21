@@ -113,10 +113,14 @@ export function BottomNav() {
  */
 export function MobileHeaderMark() {
   return (
+    /* `min-w` as well as `min-h`. 95ed24f logged this control as "26 -> 44" but
+       raised only the HEIGHT, so it rendered 26x44 — a hit area 18px short across —
+       behind a probe that printed the number and asserted nothing. `justify-center`
+       keeps the 26px glyph centred in the widened box. */
     <Link
       href="/home"
       aria-label="Sahoda — go to Home"
-      className="hidden shrink-0 items-center rounded-sm max-narrow:flex max-narrow:min-h-[44px]"
+      className="hidden shrink-0 items-center justify-center rounded-sm max-narrow:flex max-narrow:min-h-[44px] max-narrow:min-w-[44px]"
     >
       <Image
         src="/brand/favicon-dark.png"

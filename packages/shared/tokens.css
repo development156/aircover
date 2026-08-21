@@ -176,6 +176,9 @@
   --t-h3: 650 15px/20px var(--sans);
   --t-body: 400 13px/20px var(--sans);
   --t-sm: 400 12px/18px var(--sans);
+  /* A chip's own label: the eyebrow's size and weight, without the uppercase.
+     See globals.css `type-chip` for why the step exists. */
+  --t-chip: 600 11px/14px var(--sans);
   --t-eyebrow: 600 11px/14px var(--sans);
   --t-eyebrow-ls: 0.06em;
   /* The ONE big number per view — a balance, a total. Not a heading: it is set

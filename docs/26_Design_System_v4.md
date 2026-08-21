@@ -110,6 +110,14 @@ up the fill ladder and takes a louder glyph — it does not change hue.
 Platform marks (Instagram, LinkedIn, …) keep their own brand colours. That is identity, not
 UI chrome, and it is the only exception. It never leaks into a button, a surface or body text.
 
+**Where the package ships no mark, draw one — do not fall through to a generic glyph.**
+`public/channels/` has no Google Business Profile and no Pinterest asset, and
+`google-ads.png` is a different Google product, so using it would mislabel the channel.
+Both previously rendered as the same grey map-pin, which on a screen whose whole subject
+is telling channels apart made two of eight tiles anonymous. They are now original SVGs
+in `components/connections/drawn-marks.tsx`; the brand hex stays inside those components
+and is never lifted into a token. Replace them with the official assets when licensed.
+
 ---
 
 ## 2. Dark is a peer, not an inversion
@@ -169,6 +177,33 @@ Read that table honestly, because it contains a trap:
 The test asserts all four remain perceptually unique and that the two relying on fill alone
 stay >100/1000 apart. If you change a rung, that test tells you whether you broke it.
 
+### 3.1a The rungs also describe SAHODA, not only the user's content
+
+The four rungs were written for a post. They apply unchanged to a **capability** —
+how real Sahoda's ability to do a thing is — and `/connections` is the case that
+made it explicit:
+
+| readiness | rung | what earns it |
+|---|---|---|
+| **Publishes today** | `.is-real` | a live send has succeeded, in `post_publish_logs` |
+| **Not proven live** | `.is-committed` | an adapter exists; no live send, ever |
+| **Coming soon** | `.is-proposed` | there is no adapter |
+
+Two rules come with it:
+
+- **The evidence is a query, not a belief.** `publish_status = 'published'` does NOT
+  earn `.is-real`: measured on 2026-08-19, X held three such rows and every one was a
+  fixture that never reached the platform. `mode = 'live'` is the column that knows.
+- **A readiness rung may never share a slot with an urgency badge.** They are §3.2's
+  two axes and the reader needs both: a channel that publishes today, whose token
+  expired this morning, is maximally REAL and maximally URGENT at once. On the channel
+  tile the separator is spatial — a hairline, with the channel's claims above it and
+  the customer's below — so it survives greyscale and needs no legend.
+
+`.is-simulated` is deliberately not in that table. It means "a fixture ran", which is
+a claim about ONE RESULT; the hatch belongs beside the fixture output, not on a tile
+describing a capability.
+
 ### 3.2 Certainty is not urgency, and not status
 
 Three different axes. Do not collapse them.
@@ -200,6 +235,28 @@ the same distinction WhatsApp itself draws, so the pair needs no legend.
 `certainty-distinct.test.ts` asserts every status has a unique `(rung, glyph)` signature —
 not just the pairs someone remembered to list — so a new `PostStatus` that duplicates an
 existing look fails the gate rather than shipping.
+
+### 3.4 A rung is an element-scale signature, not a surface treatment
+
+Rungs go on **chips, badges and small blocks**. Never on a page-width card.
+
+`.is-real` is a solid brand fill, and §1.1 permits that on "a button, chip, badge, active
+nav wash" — a card is none of those. Put it on one and you get a ~1,000px orange block,
+which is verbatim the defect `docs/27_Design_Audit.md` §3.2 names about `/wallet`'s checkout
+bar. That is how it happened on `/settings/plan` while this section was being written: the
+plan you are on is obviously the most real thing on the screen, `.is-real` is obviously the
+right class, and the rendered page was the loudest object in the product sitting on the
+money screen.
+
+**And the deeper rule, which is the one to remember:** certainty marking only informs where
+certainty **varies**. Nobody is asking whether the plan they are on is real. Marking the
+obvious is noise, and it spends the orange ration on a fact nobody needed. On that screen
+the rungs earn their place two sections down, where a scheduled change (`.is-committed`)
+and a priced-but-unagreed preview (`.is-proposed`) genuinely differ in how real they are —
+and pressing the button is the act that moves a claim from one rung to the next.
+
+Before reaching for a rung, ask what it is being distinguished FROM. If the answer is
+"nothing on this screen", it does not belong.
 
 ---
 
@@ -251,6 +308,15 @@ Base is **13px**, not 16. The density is most of the look.
 | `type-body` | 400 · 13/20 | Everything a person reads. |
 | `type-sm` | 400 · 12/18 | Secondary. Never the only place a fact appears. |
 | `type-eyebrow` | 600 · 11/14 · +0.06em, uppercase | Label above a group. Never a heading alone. |
+| `type-chip` | 600 · 11/14 | **A chip's own label.** Not uppercase — see below. |
+
+`type-chip` was added by the `/connections` session for the same reason `type-h3`
+exists one rung up: the scale ran 12px `type-sm` straight to 11px **uppercase**
+`type-eyebrow`, with no step for a chip's own label — so `badge.tsx` hand-wrote
+`text-[11px] font-semibold` and every chip after it copied the literal. Uppercase is
+the only thing separating the two steps, and it is exactly the wrong thing on a chip
+whose label is a sentence fragment ("Not proven live"). `badge.tsx` still carries the
+hand-written pair and should move to `type-chip` when a session owns that file.
 
 `type-h3` is new and it is why headings drifted: between `h2` (20px) and body (13px) there
 was a 7px cliff, so card titles were hand-written as `text-[15px] font-semibold` at each call
@@ -465,6 +531,27 @@ than everyone else. `animation-delay` and `transition-delay` are now zeroed alon
   were live across thirteen files, five of them on Ads. Use `narrow:` / `wide:` and their
   `max-` counterparts. `src/lib/design/breakpoints.test.ts` bans the rest, and fails on its
   own premise first if a third breakpoint is ever declared.
+
+### 9.1 There are exactly two breakpoints, and `sm:` is not one of them
+
+`globals.css` sets `--breakpoint-*: initial`, which **deletes Tailwind's default breakpoint
+set**. What exists is:
+
+| variant | width | |
+|---|---|---|
+| `narrow` / `max-narrow` | 700px | the phone boundary |
+| `wide` / `max-wide` | 1180px | the wide-desktop boundary |
+
+`sm:`, `md:`, `lg:`, `xl:` and `2xl:` **do not exist**. They are not errors either: Tailwind
+emits nothing for an unknown variant, so `sm:grid-cols-2 lg:grid-cols-4` compiles, passes
+typecheck, passes lint, ships, and does absolutely nothing. It cost a plan-picker grid that
+rendered as four full-width stacked tiles at 1280px, and the only thing that showed it was a
+screenshot.
+
+Two breakpoints is a deliberate density decision, not an omission — most of this app is one
+column on a phone and a fixed-max content column above it. If a layout genuinely needs a
+third step, add the token to `globals.css` and note it here; do not reach for a default that
+was removed on purpose.
 
 ---
 

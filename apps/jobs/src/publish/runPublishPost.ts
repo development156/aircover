@@ -3,8 +3,13 @@ import {
   CONSTRAINTS,
   GATE_BLOCKED_CODE,
   GATE_HELD_CODE,
+  PER_DAY_CAP_EXHAUSTED_CODE,
+  PER_DAY_CAP_UNREADABLE_CODE,
+  checkPerDayCap,
   formatForPlatform,
   gateHoldIsTransient,
+  perDayCapRefusalMessage,
+  perDayCapWindowStart,
   publishIdempotencyKey,
   publishedTextOf,
   validateVariant,
@@ -19,8 +24,13 @@ import {
 } from '@sahoda/shared'
 import {
   CHANNEL_FORMATS,
+  X_RATION_EXHAUSTED_CODE,
+  X_RATION_UNREADABLE_CODE,
+  checkXRation,
   planThread,
   refuseFormat,
+  xRationRefusalMessage,
+  xRationWindowStart,
   type PostFormat,
   type ThreadPlan,
   type VariantOptions,
@@ -220,6 +230,16 @@ export interface PublishPostDeps {
    * skipped the check.
    */
   gate: PublishGate
+  /**
+   * Live, succeeded sends for one workspace on one channel since an instant.
+   *
+   * REQUIRED, for exactly the reason stated above about `gate`. An optional
+   * counter is a spending cap that silently does not run in whichever call site
+   * forgets it — and a publish path with no cap does not look broken, it looks
+   * generous. Required means every deps-constructing site fails to COMPILE until
+   * it supplies one.
+   */
+  countLiveSends(args: { workspaceId: string; channel: Channel; since: Date }): Promise<number>
   loadVariant(payload: PublishPostPayload): Promise<PublishVariant | null>
   resolveConnection(payload: PublishPostPayload): Promise<ResolvedConnection>
   /**
@@ -448,6 +468,111 @@ export async function runPublishPost(
       return fail(planned.refusal.code, planned.refusal.message, null)
     }
     thread = planned.plan
+  }
+
+  // ── AND THEN THE TWO COUNTS, IN THIS ORDER FOR A STATED REASON ─────────────
+  // The thread plan above is pure computation on a string this function already
+  // holds; the two caps below each cost a database read. So an unplannable thread
+  // is refused without spending either read, and the caps keep their own relative
+  // order (the platform's limit before Sahoda's money) exactly as argued below.
+
+  // ── THE PER-DAY CAP — THE CONSTRAINT ENGINE'S OTHER LIMIT, NOW READ ─────────
+  // `PlatformSpec.perDayCap` has been declared on all four channels since the engine
+  // was written and, until this line existed, was referenced by nothing. Four numbers
+  // that looked like a limit and refused nothing.
+  //
+  // ── WHY IT RUNS BEFORE THE X RATION AND NOT AFTER ───────────────────────────
+  // Both are counts and both are cheap, so the order is decided by what each one
+  // protects. This cap is the PLATFORM's and applies to every channel; the X ration
+  // is Sahoda's money and applies to one. Refusing on the universal rule first means
+  // a post that could not be accepted today never consumes a paid allowance on its
+  // way to being rejected — the same reasoning that puts both of them after
+  // `validateVariant` and before the gate.
+  {
+    let usedToday: number
+    try {
+      usedToday = await deps.countLiveSends({
+        workspaceId: payload.workspaceId,
+        channel: payload.channel,
+        since: perDayCapWindowStart(now()),
+      })
+    } catch {
+      // Same discipline as the ration below, and for the same two wrong answers.
+      // "0 used" publishes past a platform limit off a failed read; "exhausted" tells
+      // a customer the channel refused them when the truth is we could not count, and
+      // that verdict is PERMANENT so the post dies on a fabricated reason.
+      const error: PublishLogError = {
+        code: PER_DAY_CAP_UNREADABLE_CODE,
+        classification: 'transient',
+        message: "This channel's daily post count could not be read, so nothing was sent.",
+      }
+      await deps.writeLog(logRow(payload, ctx, deps.mode, 'failed', { error, connectionId: null }))
+      throw new Error('per-day cap unreadable')
+    }
+
+    const perDay = checkPerDayCap({ channel: payload.channel, used: usedToday })
+    if (!perDay.allowed) {
+      // PERMANENT for THIS attempt, which is the honest classification even though
+      // tomorrow would succeed: `transient` tells the runner to retry, and every
+      // retry inside today burns an attempt on a verdict that cannot change. The
+      // message says when it can be sent instead.
+      return fail(PER_DAY_CAP_EXHAUSTED_CODE, perDayCapRefusalMessage(perDay), null)
+    }
+  }
+
+  // ── THE X RATION — REFUSED BEFORE ANYTHING IS SPENT ─────────────────────────
+  // X is the only channel that bills per POST: $0.015, and $0.200 when the post
+  // carries a link — 13.3x — quoted from https://docs.x.com/x-api/getting-started/pricing
+  // on 2026-08-19. Every other channel costs a flat per-account fee, so one more
+  // post is free at the margin; on X it is not.
+  //
+  // ── WHY EXACTLY HERE ────────────────────────────────────────────────────────
+  // Three spends sit between this line and the platform, and this refusal is
+  // upstream of all of them:
+  //   · the GATE below, which runs a model call,
+  //   · `resolveConnection`, which decrypts a token,
+  //   · the ADAPTER, which is the $0.20 itself.
+  // "Refuse before spending, never after" is only true if it is refused before the
+  // FIRST of those, not merely before the last. It sits after `validateVariant`
+  // and `refuseFormat` for the reason those two give: a post that could never be
+  // published should not consume an allowance on its way to being rejected.
+  //
+  // The allowance is counted in POSTS, so it needs no price and quotes none —
+  // see `checkXRation`. What a given post would have cost depends on whether it
+  // carries a link, and `PublishVariant.hasLink` is optional, so that is a figure
+  // this path frequently could not state truthfully.
+  if (payload.channel === 'x') {
+    let used: number
+    try {
+      used = await deps.countLiveSends({
+        workspaceId: payload.workspaceId,
+        channel: 'x',
+        since: xRationWindowStart(now()),
+      })
+    } catch {
+      // ── AN UNREADABLE CAP IS NOT AN EXHAUSTED ONE, AND NOT A PASS ───────────
+      // Two wrong answers are available here and both ship silently. Treating the
+      // failure as "0 used" spends real money off a failed read. Treating it as
+      // "exhausted" tells a customer they are out of posts when the truth is we
+      // could not count — a fabricated reason, and PERMANENT, so the post dies.
+      //
+      // So: refuse, TRANSIENTLY, in its own code. Nothing is sent, nothing is
+      // claimed about the allowance, and the next tick counts again.
+      const error: PublishLogError = {
+        code: X_RATION_UNREADABLE_CODE,
+        classification: 'transient',
+        message: 'The X post allowance could not be read, so nothing was sent.',
+      }
+      await deps.writeLog(logRow(payload, ctx, deps.mode, 'failed', { error, connectionId: null }))
+      throw new Error('x ration unreadable')
+    }
+
+    const ration = checkXRation({ used })
+    if (!ration.allowed) {
+      // PERMANENT: no retry inside this month makes the allowance reappear, and a
+      // transient classification would have the runner burn its attempts on it.
+      return fail(X_RATION_EXHAUSTED_CODE, xRationRefusalMessage(ration), null)
+    }
   }
 
   // ── THE REFUSAL GATE (doc 18 §8) ────────────────────────────────────────────

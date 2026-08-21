@@ -79,6 +79,11 @@ function capturingDeps(variant: PublishVariant): {
       adapterFor: () => adapter,
       writeLog: async () => {},
       markVariant: async () => {},
+      // 0, so neither the platform's per-day cap nor the X ration fires and this
+      // file keeps testing the one thing it is about: the FormattedContent a GBP
+      // call-to-action hands the adapter. The caps have their own coverage in
+      // runPublishPost.test.ts, which is where a 0 here would be a hole.
+      countLiveSends: async () => 0,
       gate: {
         check: async () => ({
           decision: 'pass' as const,

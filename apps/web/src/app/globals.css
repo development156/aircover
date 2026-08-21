@@ -69,6 +69,11 @@
   --spacing-icon-gap: 6px; /* a 13px lucide mark and the label beside it */
   --spacing-btn-tight: 9px; /* the h-7 surface-ring-firm button's inset */
   --spacing-icon-nudge: 3px; /* optically top-aligning a mark to the first line */
+  /* The gap between a `type-eyebrow` label and the value it labels. Two sites
+     already (a connection tile's kind, the X meter's count) and it is a
+     typographic relationship rather than a layout one, so it gets its own name
+     even though --spacing-nav happens to share the number. */
+  --spacing-label-gap: 2px;
 }
 
 /* MUST be `inline`: every value below references a :root var from tokens.css;
@@ -309,6 +314,16 @@
 }
 @utility type-sm {
   font: var(--t-sm);
+}
+/* The chip step — 11px/600, NOT uppercase.
+   The scale ran 12px `type-sm` straight to 11px uppercase `type-eyebrow`, with no
+   step for a chip's own label, so `badge.tsx` hand-wrote `text-[11px]
+   font-semibold` and every chip after it copied the literal. That is the same
+   drift `type-h3` was added to stop, one rung further down. Uppercase is the only
+   thing separating this from `type-eyebrow`, and it is exactly the wrong thing on
+   a chip whose label is a sentence fragment ("Not proven live"). */
+@utility type-chip {
+  font: var(--t-chip);
 }
 @utility type-eyebrow {
   font: var(--t-eyebrow);

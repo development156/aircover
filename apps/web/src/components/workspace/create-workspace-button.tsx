@@ -21,9 +21,16 @@ import { cn } from '@/lib/utils'
 
 export const CREATE_WORKSPACE_LABEL = 'Create workspace'
 
-// Both wear the kit's control shape: 34px tall, 6px radius, 13px at weight 550.
-// The `quiet` one uses an INSET RING rather than a border so hovering cannot
-// shift the topbar by a pixel.
+// Both wear the kit's control shape: 34px tall, 6px radius, 13px at weight 550 —
+// and, below 700px, the kit's 44px touch floor.
+//
+// ── WHY THE FLOOR HAD TO BE REPEATED HERE ────────────────────────────────────
+// `components/ui/button.tsx` carries `max-narrow:min-h-[44px]` on every size, and
+// this component is NOT that button: it is a bespoke `<button>` with its own class
+// string, so 95ed24f's floor fix went round it. It rendered 164x34 on a phone —
+// the same sibling-shape miss run 8 made with `flex-none`, in the same file, on the
+// same control, for the same reason: this button only exists while the account has
+// NO workspace, a state no funded test account can reach.
 const VARIANTS = {
   /**
    * Topbar: sits among bordered shell controls, so it stays quiet.
@@ -36,10 +43,10 @@ const VARIANTS = {
    * "workspace" beside a correctly single-line "No wallet yet".
    */
   quiet:
-    'surface-ring-firm h-control shrink-0 bg-surface px-3 text-[13px] font-[550] text-ink hover:bg-s2 rounded-sm',
+    'surface-ring-firm h-control shrink-0 bg-surface px-3 text-[13px] font-[550] text-ink hover:bg-s2 rounded-sm max-narrow:min-h-[44px]',
   /** Empty state: the single primary action on the screen, so it leads. */
   primary:
-    'h-control bg-primary px-3 text-[13px] font-[550] text-primary-foreground hover:bg-ink active:translate-y-[0.5px] rounded-sm',
+    'h-control bg-primary px-3 text-[13px] font-[550] text-primary-foreground hover:bg-ink active:translate-y-[0.5px] rounded-sm max-narrow:min-h-[44px]',
 } as const
 
 export interface CreateWorkspaceButtonProps {

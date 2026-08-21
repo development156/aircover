@@ -1,0 +1,118 @@
+# The nightly platform-metrics collection.
+#
+# ── WHY A GITHUB ACTION AND NOT THE VERCEL CRON THAT WAS WRITTEN FOR THIS ────────────
+# `apps/web/src/app/api/cron/metrics/route.ts` is the same job behind a Vercel cron and it
+# has never fired once. MEASURED 2026-08-19 against the live production alias:
+# `/api/cron/sweeps` answers 401 (the route is in the build, its cron-secret guard fired)
+# and `/api/cron/metrics` answers 404, byte-identical to a path that was never written.
+# Production builds from `wt-web`, and neither the route nor its `vercel.json` entry has
+# been merged into it. Vercel cannot schedule a path that is not in the deployed build.
+#
+# Merging is 79 commits and 410 files into the branch that serves customers, and that is a
+# decision for a human, not a task. `runMetricCapture` imports neither the Trigger.dev SDK
+# nor anything from Next, so it runs here tonight with no deploy of any kind.
+#
+# ── THIS IS A STOPGAP AND SHOULD BE DESCRIBED AS ONE ─────────────────────────────────
+# It puts a second thing to remember in a second place. When the metrics route reaches
+# `wt-web`, the Vercel cron takes over and this workflow should be DELETED rather than
+# left running — two collectors on one append-only table is not harmful (the day-key
+# conflict makes the second a no-op) but it is two things to keep true.
+#
+# ── WHERE THIS FILE HAS TO LIVE ──────────────────────────────────────────────────────
+# GitHub fires `schedule` only from a repository's DEFAULT branch. So this file must be on
+# the default branch to be armed at all, and the code it runs is fetched by the checkout
+# step below rather than being whatever the default branch happens to hold. Point the
+# repository variable METRICS_REF at the branch that carries the collector; it defaults to
+# `wt-collect`, and should be moved to `wt-web` the day the route merges there.
+name: metrics-nightly
+
+on:
+  schedule:
+    # 20:00 UTC = 01:30 IST.
+    #
+    # The hour is chosen against the UTC day, not the IST one, because that is what the
+    # table is keyed by: `post_metric_snapshots.measured_on` is a GENERATED column,
+    # `(measured_at AT TIME ZONE 'UTC')::date`. Four clear hours before the UTC rollover
+    # leaves room for GitHub's own scheduling delay — a `schedule` trigger is best-effort
+    # and is regularly late by 10-30 minutes under load — without the run sliding into the
+    # next day's key and leaving a gap in this one.
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch or SHA carrying the collector (blank = the METRICS_REF variable)'
+        required: false
+        type: string
+      batch:
+        description: 'How many published channels to ask about'
+        required: false
+        default: '120'
+        type: string
+
+# One collector at a time. Two concurrent passes would spend the Zernio rate limit twice
+# to write the same day-key once — the second run's rows all lose the conflict.
+concurrency:
+  group: metrics-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    # The pass is one Zernio request per published channel, four minutes at the current
+    # target count. Ten is a wall, not a budget: a hang must not burn an hour of minutes on
+    # a private repository.
+    timeout-minutes: 10
+    steps:
+      - name: Check out the collector
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || vars.METRICS_REF || 'wt-collect' }}
+          # Only this run's tree is needed; the history is not.
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Activate the pinned pnpm
+        # Corepack ships with Node, so the version comes from the repo's own
+        # `packageManager` field rather than from a third-party action.
+        #
+        # `pnpm --version` is printed deliberately: corepack is deprecated in Node 24
+        # and its bundling has been moving, so a silent activation failure would
+        # surface three steps later as a confusing `pnpm: not found`.
+        run: |
+          corepack enable
+          corepack prepare --activate
+          pnpm --version
+
+      - name: Install (jobs and its workspace dependencies only)
+        # `--filter @sahoda/jobs...` installs 5 of the 10 workspace projects. The web app,
+        # Playwright and the Next toolchain are not needed to read numbers and write rows.
+        run: pnpm install --frozen-lockfile --filter @sahoda/jobs...
+
+      - name: Capture
+        working-directory: apps/jobs
+        env:
+          # Secrets, never echoed. The runner masks them in the log, but the program is
+          # also written not to print them: it names a missing key and classifies the
+          # database host, and prints nothing else about the environment.
+          #
+          # SUPABASE_DB_URL MUST BE THE REGIONAL POOLER. MEASURED 2026-08-19:
+          # `db.<ref>.supabase.co` resolves to AAAA records only, and a GitHub-hosted
+          # runner has no IPv6 route — the direct host hangs here exactly as it did on
+          # Vercel. `aws-1-ap-south-1.pooler.supabase.com:6543` carries 3 A records and is
+          # verified working. The program prints which family it got, first line.
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
+        # `pnpm exec`, not `pnpm run … -- …`. MEASURED on pnpm 11.3.0: the latter
+        # forwards the `--` separator itself as an argument. The program tolerates it
+        # now, but one fewer layer between this line and the program is worth more
+        # than the package script's convenience here.
+        run: pnpm exec tsx scripts/metric-capture.ts --batch "${{ inputs.batch || '120' }}"

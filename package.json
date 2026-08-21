@@ -2,7 +2,7 @@
   "name": "sahoda",
   "private": true,
   "version": "0.1.0-alpha.0",
-  "description": "SAHODA LABS \u2014 AI Marketing OS (monorepo)",
+  "description": "SAHODA LABS — AI Marketing OS (monorepo)",
   "packageManager": "pnpm@11.3.0",
   "engines": {
     "node": ">=20"
@@ -27,7 +27,8 @@
     "ops:sync": "node scripts/ops-sync.mjs",
     "test:ops": "vitest run",
     "ops:ship-check": "node scripts/ops-card.mjs ship-check",
-    "probe:prod": "node scripts/probe-production.mjs"
+    "probe:prod": "node scripts/probe-production.mjs",
+    "gate:verdict": "node scripts/gate-verdict.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

@@ -24,6 +24,6 @@ apps/web/test-results/
 apps/web/playwright-report/
 
 # The gate runner writes .gate/verdict.json and one log per stage. Prettier does
-# not own that output, and checking it would mean the gate failing on what it
+# not read .gitignore, so without this line stage 4 lints the artifact stage 1
 # wrote — the gate failing on its own output.
 .gate/

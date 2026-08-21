@@ -26,6 +26,17 @@ export interface PlatformSpec {
   imageDims?: { minW: number; minH: number; aspectRange?: [number, number] }
   gbp?: { ctaTypes: string[]; supportsOffer: boolean }
   surchargeAction?: ActionType
+  /**
+   * The most posts this channel accepts from one account in a UTC day.
+   *
+   * ── IT WAS DECLARED ON ALL FOUR CHANNELS AND READ BY NOTHING ────────────────
+   * From the Constraint Engine's first commit until 2026-08-20 no code path
+   * anywhere referenced this field. A limit that exists and does nothing is worse
+   * than no limit: it reads, to anyone auditing the specs, as a cap that is being
+   * enforced. `checkPerDayCap` and `perDayCapWindowStart` below are what read it,
+   * and `runPublishPost` is what calls them — on the one function every entry into
+   * publishing passes through, so there is no rail around it.
+   */
   perDayCap: number
   scheduleMinLeadMinutes: number
 }
@@ -371,4 +382,87 @@ export function formatForPlatform(
     case 'instagram':
       return { channel: 'instagram', caption: body, media }
   }
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * THE PER-DAY CAP — the half of the Constraint Engine that was never wired
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * `PlatformSpec.perDayCap` has carried a number for every channel since the engine
+ * was written (x 100, gbp 10, linkedin 10, instagram 25) and, until 2026-08-20,
+ * nothing read it. A grep for the identifier returned four declarations and zero
+ * call sites.
+ *
+ * ── WHY THAT IS WORSE THAN HAVING NO CAP ─────────────────────────────────────
+ * An unenforced limit still LOOKS like a limit. Anyone reading the specs — a
+ * reviewer, an adapter author, the person deciding whether a bulk schedule is safe
+ * — reads `perDayCap: 25` as a promise that the 26th Instagram post of a day will
+ * be refused here. It was not. It went to the platform and was refused THERE, or
+ * worse, was accepted and counted against a limit the account holder never saw.
+ *
+ * ── WHOSE LIMIT THIS IS, STATED SO THE COPY CAN BE HONEST ────────────────────
+ * These are PLATFORM caps, unlike `X_MONTHLY_RATION` in @sahoda/publishing, which
+ * is Sahoda's own spending decision. The two must never be described in the same
+ * words: one is "the channel will not take more today", the other is "we will not
+ * pay for more this month". A message that blamed the platform for Sahoda's budget
+ * — or Sahoda for the platform's rule — would be a fabricated reason attached to a
+ * remedy that does not work.
+ */
+
+/** Codes recorded on the refusal. Distinct from anything a platform itself returns. */
+export const PER_DAY_CAP_EXHAUSTED_CODE = 'PER_DAY_CAP_EXHAUSTED'
+
+/** Recorded when the day's count could not be READ. Not the same as exhausted. */
+export const PER_DAY_CAP_UNREADABLE_CODE = 'PER_DAY_CAP_UNREADABLE'
+
+/**
+ * First instant of the UTC day the cap is counted over.
+ *
+ * UTC, and the reason is the same one `xRationWindowStart` gives: a workspace-local
+ * day would make the boundary a per-tenant question nothing in the schema can
+ * answer, and the platforms that publish these limits count them in UTC.
+ *
+ * Exported so the editor and the publish path share ONE window. Two definitions
+ * that drifted by a timezone would show a customer one number and refuse them on
+ * another — which is exactly the defect `xRationWindowStart` was extracted to stop.
+ */
+export function perDayCapWindowStart(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+}
+
+export interface PerDayCapVerdict {
+  /** False means: do not send, and do not spend anything on the way to finding out. */
+  allowed: boolean
+  channel: Channel
+  used: number
+  cap: number
+  /** Never negative — a day that somehow ran over reads as 0 left, not -3. */
+  remaining: number
+}
+
+/**
+ * The cap, answered.
+ *
+ * `used` MUST be a count of LIVE, SUCCEEDED sends. A count of `publish_status =
+ * 'published'` variants would be wrong in the direction that matters: fixtures
+ * carry that status without ever reaching a platform, so the cap would refuse a
+ * customer over posts that were never sent.
+ */
+export function checkPerDayCap(args: { channel: Channel; used: number }): PerDayCapVerdict {
+  const cap = CONSTRAINTS[args.channel].perDayCap
+  // `Math.trunc` on a NEGATIVE would keep it negative and make `remaining` larger
+  // than the cap — a cap that got more generous the more wrong the count was.
+  const used = Math.max(0, Math.trunc(args.used))
+  const remaining = Math.max(0, cap - used)
+  return { allowed: remaining > 0, channel: args.channel, used, cap, remaining }
+}
+
+/** Names the number, names whose number it is, and gives the remedy that works. */
+export function perDayCapRefusalMessage(verdict: PerDayCapVerdict): string {
+  return (
+    `This workspace has already published ${verdict.used} of the ${verdict.cap} posts ` +
+    `${verdict.channel} accepts in a day. It is the channel's own limit, not a Sahoda one — ` +
+    `the post is held until tomorrow, and nothing was sent. Other channels are unaffected.`
+  )
 }
