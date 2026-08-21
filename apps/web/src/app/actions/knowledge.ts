@@ -3,6 +3,15 @@
 import { randomUUID } from 'node:crypto'
 import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
+import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
+import { creditCost, MESH_TASK_ACTION } from '@sahoda/shared'
+import {
+  DEPLOYMENT_CONFIG_MESSAGE,
+  isDeploymentConfigCause,
+  reportPaidActionFailure,
+} from '@/lib/actions/paid-failure'
+import { revalidateBalance } from '@/lib/actions/revalidate-balance'
+import { chargeFailureState, FAILURE_REASON } from '@/lib/posts/charge-failure'
 import { buildEvidenceSet, chunkForIngestion, MAX_CHUNKS_PER_DOCUMENT } from '@sahoda/research'
 
 import { describeImpact } from '@/lib/knowledge/delete-impact'
@@ -513,42 +522,73 @@ export async function readDeleteImpact(
 export interface LibraryResolveState {
   ok: boolean
   message: string
+  /** True only when the wallet was short. Never for any other failure. */
+  insufficient?: boolean
   /** How many proposals were written. Rendered as a number, never as "some". */
   proposed?: number
   /** Documents the evidence came from, named so the receipt is checkable. */
   documents?: string[]
 }
 
+/** One charge, one ref, fresh per invocation. See `lib/planner/object-ref.ts`. */
+function newLibraryResolveRef(workspaceId: string): string {
+  return `${workspaceId}:knowledge_resolve:${randomUUID()}`
+}
+
+type WithCreditsFn = ReturnType<typeof createWithCredits>
+let withCreditsSingleton: WithCreditsFn | undefined
+function getWithCredits(): WithCreditsFn {
+  if (withCreditsSingleton) return withCreditsSingleton
+  const { databaseUrl } = loadBillingEnv()
+  withCreditsSingleton = createWithCredits(createPgLedgerPort({ connectionString: databaseUrl }))
+  return withCreditsSingleton
+}
+
 /**
  * READ THE LIBRARY AND OFFER WHAT IT SAYS — the point of the whole feature.
  *
- * ── WHAT THIS DOES NOT DO ───────────────────────────────────────────────────
- * It does not write the Brand Brain. Every field it produces becomes a PENDING
+ * ── THE ONLY THING ON THIS PATH THAT SPENDS, AND IT GOES THROUGH THE LEDGER ──
+ * Adding, searching and deleting a document call no model and cost nothing. This
+ * one calls `brand_extract`, so it is charged as `brand_research` — the same
+ * action `MESH_TASK_ACTION` already maps that task to — through `withCredits`,
+ * like every other paid action in this app.
+ *
+ * It was written WITHOUT that wrapper first, with a button reading "· 50
+ * credits" above an action that debited nothing. That is a false statement about
+ * the reader's wallet in their favour, which is still false, and it would have
+ * become quietly true the day somebody wired charging and found the label
+ * already there. The house rule is not negotiable: users never pay for failures,
+ * and the ledger is the only place a charge exists.
+ *
+ * THE MODEL CALL AND THE PROPOSAL WRITES BOTH RUN INSIDE THE CALLBACK. So any
+ * failure before the proposals are rows throws, the HOLD is RELEASED, and
+ * "nothing was charged" is verifiably true rather than asserted. The DEBIT lands
+ * only once there are suggestions to look at.
+ *
+ * ── WHAT IT STILL DOES NOT DO ───────────────────────────────────────────────
+ * It does not write the Brand Brain. Every field becomes a PENDING
  * `memory_events` row through `public.propose_memory_event`, which names
- * `brand_memory` nowhere and has no parameter for `status`. The only path from
- * a proposal to the brain is a person pressing Accept.
- *
- * It does not confirm anything. Each patch carries `confirmed: false` beside its
- * value, and there is no code path here that could write `true` — the same
- * structural property `ExtractedFieldWire` has, one layer up.
- *
- * It does not invent. A model that cannot be reached produces nothing and says
- * so; `packages/research/CLAUDE.md` states the rule ("never invent a brand voice
- * and present it as extracted") and it holds identically here.
- *
- * ── THIS ONE DOES SPEND ─────────────────────────────────────────────────────
- * Unlike everything else on the knowledge path, this makes a model call. It is
- * therefore the one control on the screen that carries a cost, and the cost is
- * `brand_research`'s — the same task, the same tier, reading a different corpus.
+ * `brand_memory` nowhere and has no parameter for `status`. It does not confirm
+ * anything: each patch carries `confirmed: false` and no code path here can
+ * write `true`. And it does not invent — a model that cannot be reached produces
+ * nothing and says so, which is `packages/research/CLAUDE.md`'s standing rule.
  */
 export async function resolveFromLibrary(): Promise<LibraryResolveState> {
+  const action = MESH_TASK_ACTION['brand_extract']
+  let workspaceId: string | undefined
   try {
     const { userId } = await auth()
     if (!userId) return { ok: false, message: 'Sign in to read your library.' }
 
     const ws = await workspaceForWrite()
     if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
 
+    /**
+     * READ BEFORE THE CALLBACK. Reserving credits and then discovering the
+     * library is empty would burn a hold on a call that was never going to
+     * happen — the same reason `plan-week` parses its input before reserving.
+     */
     const passages = await readCurrentPassages(MAX_EVIDENCE_CHUNKS)
     if (passages.status !== 'ok') {
       return {
@@ -557,61 +597,138 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
           'Sahoda could not read your library just now. This is not a claim that it is empty — the read did not come back. Try again.',
       }
     }
-
-    const outcome = await proposeFromLibrary({
-      passages: passages.passages,
-      workspaceId: ws.workspace.id,
-      userId,
-      traceId: randomUUID(),
-      businessName: ws.workspace.name,
-    })
-
-    if (outcome.status === 'no-passages') {
+    if (passages.passages.length === 0) {
       return {
         ok: false,
         message: 'There is nothing in your library yet. Add a document and Sahoda can read it.',
       }
     }
-    if (outcome.status === 'model-unavailable') {
-      return {
-        ok: false,
-        message:
-          'Sahoda could not reach the model, so it has nothing to suggest. Nothing was written and nothing was charged — try again.',
-      }
-    }
 
-    const supabase = createServerSupabase()
+    let failure: string | null = null
+    let delivered = false
     let written = 0
-    for (const proposal of outcome.proposals) {
-      const { error } = await supabase.rpc('propose_memory_event', {
-        p_workspace_id: ws.workspace.id,
-        p_diff: { patch: proposal.patch, path: proposal.path },
-        p_evidence_refs: proposal.evidence ? [proposal.evidence] : null,
-        p_source: 'insight',
-      })
-      if (!error) written += 1
+    let documents: string[] = []
+
+    const credits = await getWithCredits()(
+      { workspaceId: ws.workspace.id, action, objectRef: newLibraryResolveRef(ws.workspace.id) },
+      async (ctx) => {
+        const outcome = await proposeFromLibrary({
+          passages: passages.passages,
+          workspaceId: ws.workspace.id,
+          userId,
+          traceId: randomUUID(),
+          businessName: ws.workspace.name,
+        })
+
+        if (outcome.status !== 'ok') {
+          // Our own reason, never a provider string.
+          failure = FAILURE_REASON.MESH_ERROR
+          throw new Error('MESH_ERROR') // → RELEASE, no charge
+        }
+        documents = outcome.documents
+
+        if (outcome.proposals.length === 0) {
+          /**
+           * NOTHING USABLE IS NOT A DELIVERY, and this is the branch a menu of
+           * prices lands in: it says a great deal about what a business sells
+           * and nothing a Brand Brain field can hold. Releasing the hold is the
+           * honest outcome — the owner has nothing to look at, so they pay
+           * nothing, and the message says exactly that.
+           */
+          failure = FAILURE_REASON.NO_PLAN
+          throw new Error('MESH_EMPTY') // → RELEASE
+        }
+
+        failure = FAILURE_REASON.SAVE_FAILED
+        const supabase = createServerSupabase()
+        for (const proposal of outcome.proposals) {
+          const { error } = await supabase.rpc('propose_memory_event', {
+            p_workspace_id: ws.workspace.id,
+            p_diff: { patch: proposal.patch, path: proposal.path },
+            p_evidence_refs: proposal.evidence ? [proposal.evidence] : null,
+            p_source: 'insight',
+          })
+          if (!error) written += 1
+        }
+        if (written === 0) throw new Error('INSERT_FAILED') // → RELEASE
+
+        // Last statement before the return: from here the wrapper owns the
+        // outcome, and any failure it reports may still have debited.
+        delivered = true
+        return { written }
+      },
+    )
+
+    if (delivered) {
+      revalidatePath('/brain/resolve')
+      revalidatePath('/brain')
     }
+    // The credit chip lives in the layout, which a page-scoped revalidate never
+    // reaches.
+    if (credits.ok || delivered) revalidateBalance()
 
-    revalidatePath('/brain/resolve')
-    revalidatePath('/brain')
-
-    if (written === 0) {
-      return {
-        ok: false,
-        documents: outcome.documents,
-        message:
-          'Sahoda read your library and found nothing it could turn into a Brand Brain field. That is an honest outcome — a menu of prices says a lot about what you sell and little about how you sound.',
+    if (!credits.ok) {
+      reportPaidActionFailure('knowledge-resolve', credits.error)
+      if (!delivered && isDeploymentConfigCause(credits.error)) {
+        return { ok: false, insufficient: false, message: DEPLOYMENT_CONFIG_MESSAGE }
       }
+      /**
+       * The two RELEASED branches get their own sentences rather than the
+       * generic charge-failure line, because neither is a fault the owner can
+       * act on by retrying blindly and both are common.
+       */
+      if (!delivered && failure === FAILURE_REASON.NO_PLAN) {
+        return {
+          ok: false,
+          insufficient: false,
+          documents,
+          message:
+            'Sahoda read your library and found nothing it could turn into a Brand Brain field. That is an honest outcome — a menu of prices says a lot about what you sell and little about how you sound. You were not charged.',
+        }
+      }
+      if (!delivered && failure === FAILURE_REASON.MESH_ERROR) {
+        return {
+          ok: false,
+          insufficient: false,
+          message:
+            'Sahoda could not reach the model, so it has nothing to suggest. Nothing was written and you were not charged — try again.',
+        }
+      }
+      const state = chargeFailureState({ error: credits.error, action, delivered, reason: failure })
+      /**
+       * ── AN INSUFFICIENT BALANCE CARRIES NUMBERS, NOT A SENTENCE ───────────
+       * `ChargeFailureState`'s insufficient branch returns `required` and
+       * `available` and NO `message`, deliberately: docs/26 requires the
+       * SHORTFALL to be named rather than "not enough credits", and only the
+       * caller knows how to phrase it for its own screen. The hold raises this
+       * before the callback runs, so nothing was spent and the sentence may say
+       * so plainly.
+       */
+      if (state.insufficient) {
+        const short = Math.max(0, state.required - state.available)
+        return {
+          ok: false,
+          insufficient: true,
+          message: `Reading your library costs ${state.required} credits and you have ${state.available}. You are ${short} short. Nothing was read and nothing was charged.`,
+        }
+      }
+      return { ok: false, insufficient: false, message: state.message }
     }
 
     return {
       ok: true,
       proposed: written,
-      documents: outcome.documents,
-      message: `Sahoda read ${outcome.documents.length} ${outcome.documents.length === 1 ? 'document' : 'documents'} and has ${written} ${written === 1 ? 'suggestion' : 'suggestions'} for you. Nothing has changed in your Brand Brain — each one is waiting for you to agree with it.`,
+      documents,
+      message: `Sahoda read ${documents.length} ${documents.length === 1 ? 'document' : 'documents'} and has ${written} ${written === 1 ? 'suggestion' : 'suggestions'} for you. Nothing has changed in your Brand Brain — each one is waiting for you to agree with it.`,
     }
   } catch (error) {
-    reportServerError(error, { action: 'knowledge.resolveFromLibrary' })
+    reportServerError(error, { action: 'knowledge.resolveFromLibrary', workspaceId })
+    reportPaidActionFailure('knowledge-resolve', error)
+    // The billing env loader throws before any HOLD exists, so a config failure
+    // caught here is verifiably uncharged and a retry cannot fix it.
+    if (isDeploymentConfigCause(error)) {
+      return { ok: false, insufficient: false, message: DEPLOYMENT_CONFIG_MESSAGE }
+    }
     return {
       ok: false,
       message: 'Sahoda broke while reading your library. Nothing was written — try again.',

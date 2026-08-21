@@ -21,6 +21,25 @@ import type { Page } from '@playwright/test'
  * typed on a previous page load is the only evidence that all of them agree.
  */
 
+/**
+ * A document with something a Brand Brain field could actually come from.
+ *
+ * The menu below says a great deal about what the business SELLS and nothing
+ * about how it SOUNDS, which is an honest outcome for a resolve and a poor
+ * fixture for one. This one carries both.
+ */
+const VOICE = [
+  'About Sunrise Dosa Corner',
+  '',
+  'We write to our customers plainly and we never oversell. No superlatives, no',
+  'urgency, no exclamation marks. If a dish is sold out we say so.',
+  '',
+  'Our customers are office workers who have forty minutes for lunch, and their',
+  'biggest complaint is the queue at half past one.',
+  '',
+  'Masala dosa is 90 rupees and comes with sambar.',
+].join('\n')
+
 /** Words chosen so the search below matches a stem rather than the literal. */
 const MENU = [
   'Masala dosa is 90 rupees and comes with sambar.',
@@ -210,6 +229,60 @@ test.describe('knowledge library', () => {
     // `adminClient()` returns null without a service key. The fixture already
     // cleans up after itself; this is the belt to its braces, and a missing key
     // must not fail an otherwise-passing test.
+    await adminClient()?.from('workspaces').delete().eq('created_by', signedIn.clerkUserId)
+  })
+
+  /**
+   * THE RESOLVE BUTTON, PRESSED.
+   *
+   * ── WHY THIS ASSERTS AN OUTCOME SET AND NOT ONE SENTENCE ────────────────────
+   * `resolveFromLibrary` makes a real model call, and THREE of its outcomes are
+   * honest:
+   *
+   *   · it proposed something          → "…has N suggestions for you"
+   *   · it read the library and could map nothing onto a Brand Brain field
+   *                                    → "found nothing it could turn into"
+   *   · the model could not be reached → "could not reach the model"
+   *
+   * A test pinned to the first would be red whenever the provider is slow or a
+   * short menu genuinely says nothing about voice, and it would be red for a
+   * reason that is not a defect. What IS a defect is a fourth outcome: an
+   * unhandled throw, an error boundary, or a button that reports nothing at all.
+   * So the assertion is that one of the three lands and the error boundary does
+   * not — which is exactly the "no dead ends" property, stated as a test.
+   *
+   * It is also the only place the real mesh path runs. Every unit test injects a
+   * fake runner, so without this the wiring from the button through
+   * `brand_extract` to `propose_memory_event` has never executed at all.
+   */
+  test('the resolve button reaches a real outcome and never a dead end', async ({
+    page,
+    signedIn,
+  }) => {
+    test.setTimeout(240_000)
+    await bootstrapWorkspace(page)
+
+    await page.goto('/brain/knowledge')
+    await addTyped(page, 'Voice and menu', VOICE)
+    await page.reload()
+
+    // The control appears only once something is indexed — an offer to read an
+    // empty library is a button that can only disappoint.
+    const button = page.getByRole('button', { name: /read my library/i })
+    await expect(button).toBeVisible({ timeout: 30_000 })
+    // The cost is IN THE LABEL, never a tooltip.
+    await expect(button).toHaveText(/\d+ credits/)
+
+    await button.click()
+
+    const outcome = page.getByText(
+      /has \d+ suggestion|found nothing it could turn into|could not reach the model/i,
+    )
+    await expect(outcome).toBeVisible({ timeout: 180_000 })
+
+    // The fourth outcome, which is the one that would be a defect.
+    await expect(page.getByRole('heading', { name: /didn.t load/i })).toHaveCount(0)
+
     await adminClient()?.from('workspaces').delete().eq('created_by', signedIn.clerkUserId)
   })
 })

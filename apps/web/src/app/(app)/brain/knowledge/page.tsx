@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/empty-state'
 import { buttonVariants } from '@/components/ui/button'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { readLibrary, searchLibrary } from '@/lib/knowledge/store'
-import { creditCost } from '@sahoda/shared'
+import { creditCost, MESH_TASK_ACTION } from '@sahoda/shared'
 
 export const metadata = { title: 'Knowledge' }
 
@@ -105,7 +105,9 @@ export default async function BrainKnowledgePage({
       {/* Only once there is something to read. An offer to read an empty
           library is a button that can only disappoint, and the empty state
           already asks for the one thing that fixes it. */}
-      {indexed > 0 ? <ResolveFromLibrary cost={creditCost('brand_research')} /> : null}
+      {indexed > 0 ? (
+        <ResolveFromLibrary cost={creditCost(MESH_TASK_ACTION['brand_extract'])} />
+      ) : null}
 
       <section aria-labelledby="knowledge-documents" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
