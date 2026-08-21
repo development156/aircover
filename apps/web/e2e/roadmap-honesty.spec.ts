@@ -4,16 +4,39 @@ import { fileURLToPath } from 'node:url'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
- * THE SEVEN ROADMAP SECTIONS SHOW NO FIGURE ABOUT THE READER'S BUSINESS.
+ * THE FIVE ROADMAP SECTIONS SHOW NO FIGURE ABOUT THE READER'S BUSINESS.
  *
- * ── /loop AND /report LEFT THIS LIST ON 2026-08-20, BECAUSE THEY WERE BUILT ──
- * (Which makes the word SEVEN above true again: the list had grown to nine.)
+ * ── THE NUMBER IN THAT SENTENCE IS PART OF THE TEST, AND IT HAD DRIFTED ─────
+ * It read SEVEN while `ALLOWED` held six: `/brain/audience` left in the same
+ * commit that wrote the paragraph about it and the count was not brought with
+ * it. Corrected to FIVE on 2026-08-22, when `/playbooks` left too. A header that
+ * miscounts the list below it is the same class of thing this file exists to
+ * catch, one level up.
+ *
+ * ── /loop, /report AND NOW /playbooks LEFT THIS LIST, BECAUSE THEY WERE BUILT ─
  * They are not exceptions to the property below; they are no longer roadmap
  * sections. The Loop runs — it opens a cycle, prices a plan, charges credits and
  * writes drafts — so it shows a week number, a credit total and a count of
  * posts, every one of them out of a query. The first assertion in the loop below
  * is what caught it: `/loop` no longer says "coming soon", because that sentence
  * became false.
+ *
+ * `/playbooks` LEFT ON 2026-08-22 for the same reason. It runs: it opens a run,
+ * reads a calendar, prices what it found, halts, charges on approval and writes
+ * drafts. So it shows a credit total, a count of proposed drafts and the date a
+ * run started, every one of them out of a query.
+ *
+ * ITS FIRST ASSERTION WOULD HAVE KEPT PASSING, WHICH IS THE TRAP. Four of the
+ * five recipes are still blocked and each names the capability it waits on, so
+ * `getByText(/coming soon|not built yet/i)` still finds a match on that page —
+ * on a CARD, not on the screen. A guard that reads "the screen is a drawing" and
+ * is satisfied by "one card is a drawing" is not a weaker guard, it is a
+ * different one wearing the same name.
+ *
+ * WHERE THE PROPERTY LIVES FOR IT NOW: `components/playbooks/run-preview.test.tsx`
+ * asserts that every digit the cost preview renders is a credit price from
+ * pricing.config.json, a sum of them, or a count of rows — and it is verified by
+ * injecting a fabricated engagement figure and watching the scan fail.
  *
  * WIDENING `ALLOWED` FOR THEM WOULD HAVE BEEN THE WRONG REPAIR, and the more
  * tempting one. It is the same move this repo already recorded as a mistake in
@@ -34,7 +57,7 @@ import { expect, test } from './fixtures/seeded-user'
  * ── WHY A BLANKET "NO DIGITS" CHECK WOULD BE THE WRONG TEST ──────────────────
  * `/ads` can be tested that way and is (`campaigns.spec.ts`): it has no price to
  * quote and no sequence to number, so every digit on it would be a lie. These
- * seven are not like that. They legitimately carry two kinds of number:
+ * five are not like that. They legitimately carry two kinds of number:
  *
  *   · A CREDIT PRICE, read from `pricing.config.json` through `creditCost()`.
  *     A price is a published, checkable fact ABOUT SAHODA — the same class of
@@ -88,7 +111,10 @@ function price(action: string): number {
  * Loop stage or a sixth Radar slot is a decision someone takes here too.
  */
 const ALLOWED: ReadonlyArray<readonly [string, readonly number[]]> = [
-  ['/playbooks', [price('playbook_run')]],
+  // `/playbooks` IS NOT IN THIS LIST ANY MORE, and the removal is the point
+  // rather than a loosening — see the header. `playbook_run` stays in
+  // pricing.config.json and the screen still quotes it; the screen that quoted
+  // it as a promise is now a screen that charges it.
   // 1–5: the five competitor slots, which are the cap PRD M9 sets.
   ['/radar', [1, 2, 3, 4, 5, price('radar_scan')]],
   ['/leads', []],

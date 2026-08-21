@@ -48,8 +48,17 @@
  * no I/O, no env.
  */
 
-/** The jobs declared in `apps/web/vercel.json`. `heartbeat-schedule.test.ts` pins both. */
-export type CronJob = 'sweeps' | 'metrics' | 'loop'
+/**
+ * The jobs declared in `apps/web/vercel.json`.
+ *
+ * The previous version of this comment said `heartbeat-schedule.test.ts` pinned
+ * the two lists together. THAT FILE DID NOT EXIST — found 2026-08-22 while adding
+ * the fourth job, by looking for it. The comment had asserted a guarantee for
+ * long enough that a route could have been added to `vercel.json` with no
+ * heartbeat, or given a heartbeat with no schedule, and nothing would have said
+ * so. The file now exists and does what the sentence claimed.
+ */
+export type CronJob = 'sweeps' | 'metrics' | 'loop' | 'playbooks'
 
 export interface CronSchedule {
   /** How often the job is scheduled, in ms. From the cron expression, not a guess. */
@@ -83,6 +92,12 @@ export const CRON_SCHEDULES: Record<CronJob, CronSchedule> = {
   // does. One miss it is: a weekly job has no delivery-hiccup tolerance to spend,
   // because the hiccup and the outage look identical for seven days.
   loop: { periodMs: 7 * 24 * HOUR, missesBeforeStopped: 1, label: 'Weekly Loop cycle' },
+  // `0 6 * * *` — early morning, once a day.
+  //
+  // Daily rather than weekly because a playbook's window is measured in days: a
+  // seven-day lead time checked once a week would miss a festival entirely
+  // whenever the check landed on the wrong side of it.
+  playbooks: { periodMs: 24 * HOUR, missesBeforeStopped: 2, label: 'Daily Playbook check' },
 }
 
 export type HeartbeatState = 'beating' | 'late' | 'stopped' | 'unknown'
