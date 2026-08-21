@@ -33,13 +33,17 @@ export const DOOR_WAIT_TICKS = 225
  * a button will not put it back. The remedy offered is the one that can
  * actually succeed: add it on the Brand Brain page.
  */
-export const DOOR_TIMED_OUT: DoorOutcome = {
+/* `satisfies`, not a `DoorOutcome` annotation. Annotated as the union, the
+   value widens to it, and reading `.message` off it needs a narrowing step in
+   every caller — including the test whose entire job is to assert what that
+   message may and may not say. */
+export const DOOR_TIMED_OUT = {
   kind: 'blocked',
   message:
     'Sahoda was still reading your website when this was built, so it was built without it. That is not a verdict on your site — open Brand Brain to add what it says.',
   retryable: false,
   fatal: false,
-}
+} as const satisfies DoorOutcome
 
 export interface WaitForDoorOptions {
   /** The CURRENT outcome, re-read every tick. */
