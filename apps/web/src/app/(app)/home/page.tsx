@@ -5,6 +5,7 @@ import { FirstRun } from '@/components/home/first-run'
 import { GreetingBanner } from '@/components/home/greeting-banner'
 import { NeedsAttention } from '@/components/home/needs-attention'
 import { BrainCard, ConnectionsCard } from '@/components/home/rail-cards'
+import { countIndexedDocuments } from '@/lib/knowledge/store'
 import { InstagramInsights } from '@/components/home/instagram-insights'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
 import { SahodaRail } from '@/components/home/sahoda-rail'
@@ -89,20 +90,40 @@ export default async function HomePage() {
   // Connections cards. Both already existed and are already used elsewhere
   // (the topbar ring, /connections), so this adds calls, not queries, and both
   // degrade to a named state rather than throwing.
-  const [posts, spend, counts, publish, balance, ledger, instagram, brain, connections] =
-    await Promise.all([
-      listPosts(),
-      readSpend(now),
-      readPostCounts(),
-      readPublishSummary(now),
-      readBalance(),
-      readLedger(),
-      // Degrades to a named state — never throws, never zeroes. A dead Zernio must
-      // not take Home down with it.
-      readInstagramAnalytics(now),
-      readBrain(),
-      listConnections(),
-    ])
+  const [
+    posts,
+    spend,
+    counts,
+    publish,
+    balance,
+    ledger,
+    instagram,
+    brain,
+    connections,
+    knowledgeDocuments,
+  ] = await Promise.all([
+    listPosts(),
+    readSpend(now),
+    readPostCounts(),
+    readPublishSummary(now),
+    readBalance(),
+    readLedger(),
+    // Degrades to a named state — never throws, never zeroes. A dead Zernio must
+    // not take Home down with it.
+    readInstagramAnalytics(now),
+    readBrain(),
+    listConnections(),
+    /**
+     * The library count for the rail's Brand Brain card.
+     *
+     * `readLibrary` is `cache`d and short-circuits on a null workspace without
+     * touching the database, so this joins the batch rather than adding a
+     * blocking read — the same argument the two reads above it carry. It
+     * returns `null` when the query fails, which renders the Unmeasured mark
+     * rather than a zero: a failed read is not an empty library.
+     */
+    countIndexedDocuments(),
+  ])
 
   // No workspace ⇒ no wallet, no posts, no credits, and nothing on this page can
   // be pressed to fix that. Every read above already short-circuits on a null
@@ -228,7 +249,7 @@ export default async function HomePage() {
 
           {/* WHAT NEXT: what Sahoda knows, and what it can post to. */}
           <StaggerItem i={7}>
-            <BrainCard brain={brain} />
+            <BrainCard brain={brain} knowledgeDocuments={knowledgeDocuments} />
           </StaggerItem>
           <StaggerItem i={8}>
             <ConnectionsCard connections={connections} />

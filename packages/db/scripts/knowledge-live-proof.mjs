@@ -429,15 +429,13 @@ try {
   // ── B: direct writes ──────────────────────────────────────────────────────
   section('B writes directly to the tables — and so does A, who also may not')
 
-  const bInsert = await bClient
-    .from('knowledge_chunks')
-    .insert({
-      workspace_id: A.workspaceId,
-      document_id: docId,
-      index_version: 1,
-      ordinal: 99,
-      text: 'invented',
-    })
+  const bInsert = await bClient.from('knowledge_chunks').insert({
+    workspace_id: A.workspaceId,
+    document_id: docId,
+    index_version: 1,
+    ordinal: 99,
+    text: 'invented',
+  })
   check('B inserting a passage into A’s document is refused', bInsert.error !== null, say(bInsert))
 
   const aUpdate = await aClient

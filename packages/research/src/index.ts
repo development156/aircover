@@ -67,3 +67,26 @@ export type {
 
 export { loadResearchEnv, assertServerOnly, DEFAULT_FIRECRAWL_URL } from './env'
 export type { ResearchEnv } from './env'
+
+// ── The knowledge library's ingestion half ───────────────────────────────────
+// Pure: chunking and evidence-building need no dependency, no network and no
+// filesystem. The PDF reader lives in apps/web because it needs `unpdf`, and
+// keeping it out of here keeps this package installable with nothing.
+export {
+  chunkDocumentText,
+  chunkForIngestion,
+  normaliseDocumentText,
+  CHUNK_TARGET_CHARS,
+  CHUNK_MAX_CHARS,
+  MAX_EVIDENCE_CHUNKS,
+  MAX_CHUNKS_PER_DOCUMENT,
+} from './knowledge/chunk'
+export type { ChunkRefusal } from './knowledge/chunk'
+
+export { buildEvidenceSet, citationFor } from './knowledge/evidence'
+export type {
+  EvidenceChunk,
+  EvidenceCitation,
+  EvidenceSet,
+  AddressedSpan,
+} from './knowledge/evidence'
