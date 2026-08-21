@@ -78,6 +78,17 @@ const guarded = await pool.query(
 console.log('\nblock_mutations guards (' + guarded.rowCount + '):')
 console.log(JSON.stringify(guarded.rows.map((r) => r.t)))
 
+const counts = await pool.query(`
+  select 'competitors' as t, count(*)::int as n from competitors
+  union all select 'competitor_sources', count(*)::int from competitor_sources
+  union all select 'competitor_subscriptions', count(*)::int from competitor_subscriptions
+  union all select 'competitor_snapshots', count(*)::int from competitor_snapshots
+  union all select 'competitor_changes', count(*)::int from competitor_changes
+  union all select 'radar_fetch_log', count(*)::int from radar_fetch_log
+  order by 1`)
+console.log('\nrow counts (should be all zero — no customer uses Radar yet):')
+for (const r of counts.rows) console.log(`  ${r.t.padEnd(26)} ${r.n}`)
+
 const limits = await pool.query(`select * from radar_limits`)
 console.log('\nradar_limits:', JSON.stringify(limits.rows))
 

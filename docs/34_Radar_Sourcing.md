@@ -215,6 +215,15 @@ Radar read the real prices, ₹250 and ₹120, and reported *"Their page added 6
    until it is fixed. The same two values must also be added as GitHub Actions secrets for
    the nightly job.
 
+3. **The five-competitor cap is not enforced in the database.** `/radar`'s own copy says
+   the PRD caps Radar at five competitors per customer, and `app.radar_subscribe` will
+   currently accept a sixth. That cap is a real cost control as well as a product decision
+   — it bounds what one customer can cause to be spent — and it is not the same lever as
+   the daily money cap in §4, which stops a runaway but would happily let one customer
+   track fifty rivals slowly. Adding it means one more migration; it was left out rather
+   than guessed at, because "five" is the founder's number and enforcing a limit nobody
+   asked me to enforce is worse than naming the gap.
+
 Env files are deliberately not edited by this work.
 
 ---
