@@ -82,7 +82,7 @@ test.describe('ux detector self-test', () => {
     // text `var(--p)`, which matches no element and reports a clean screen.
     expect(r.resolved).toBe('rgb(255, 102, 0)')
     expect(r.count).toBe(1)
-    expect(r.items[0].text).toBe('Do the thing')
+    expect(r.items[0]?.text).toBe('Do the thing')
   })
 
   test('contrast: white-on-white is caught, black-on-white is not, a gradient is skipped', async ({
@@ -142,7 +142,7 @@ test.describe('ux detector self-test', () => {
     // One and only one: `#nameless`. The aria-labelled one has a name and the
     // aria-hidden one is not in the accessibility tree at all.
     expect(r.count).toBe(1)
-    expect(r.items[0].tag).toBe('button')
+    expect(r.items[0]?.tag).toBe('button')
   })
 
   test('dead ends: a disabled "Coming soon" is reported as one', async ({ page }) => {
@@ -181,8 +181,8 @@ test.describe('ux detector self-test', () => {
       items: { level: number; text: string; px: number }[]
     }
     expect(r.items[0]).toMatchObject({ level: 1, text: 'The one heading' })
-    expect(r.items[1].level).toBe(2)
-    expect(r.items[0].px).toBeGreaterThan(r.items[1].px)
+    expect(r.items[1]?.level).toBe(2)
+    expect(r.items[0]!.px).toBeGreaterThan(r.items[1]!.px)
   })
 
   test('motion: a page with no animation reports none, rather than reporting nothing', async ({
