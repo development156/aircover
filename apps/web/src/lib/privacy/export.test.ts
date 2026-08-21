@@ -147,6 +147,59 @@ describe('what the export admits it does NOT contain', () => {
   })
 })
 
+describe('a lead is a real person, and the export carries them', () => {
+  /**
+   * VERIFIED, not assumed. `leads` holds a name, an email address and a phone
+   * number belonging to somebody who is NOT the customer — the only personal
+   * data in this database about a third party. Under DPDP the export has to
+   * contain it, and the manifest being manifest-driven is a reason to believe
+   * it does, not evidence.
+   *
+   * So this one runs the export with a lead in it and reads the row back out of
+   * the file. Named on its own rather than left to the completeness sweep above,
+   * because a sweep that goes green tells you nothing about WHICH table it was
+   * green about.
+   */
+  const LEAD = {
+    id: 'lead-1',
+    workspace_id: WORKSPACE,
+    name: 'Priya',
+    email: 'priya@example.com',
+    phone: '+91 90000 00000',
+    message: 'Do you do birthday cakes?',
+    status: 'new',
+  }
+
+  it('includes the lead, with the contact details intact', async () => {
+    const { client } = fakeSupabase((table) =>
+      table === 'leads' ? { data: [LEAD], error: null } : allEmpty(),
+    )
+    const result = await buildWorkspaceExport(client, WORKSPACE, NOW)
+
+    const leads = result.included.find((t) => t.table === 'leads')
+    expect(leads, 'leads must be exported, not omitted').toBeTruthy()
+    expect(leads!.rows).toEqual([LEAD])
+    // And it must NOT be on the omitted list at the same time.
+    expect(result.notIncluded.find((t) => t.table === 'leads')).toBeUndefined()
+  })
+
+  it('describes it in words the person reading the file understands', async () => {
+    const entry = EXPORT_TABLES.find((t) => t.table === 'leads')
+    expect(entry).toMatchObject({ readability: 'readable' })
+    expect(entry!.describes).toMatch(/enquir/i)
+  })
+
+  it('carries the Remix tables too, which were added the same day as this test', async () => {
+    // The other half of the same rule: a table added today must be in the export
+    // today, not the month somebody notices.
+    const { client } = fakeSupabase(allEmpty)
+    const result = await buildWorkspaceExport(client, WORKSPACE, NOW)
+    const included = result.included.map((t) => t.table)
+    expect(included).toContain('remix_batches')
+    expect(included).toContain('remix_derivatives')
+  })
+})
+
 describe('the manifest itself', () => {
   it('describes every table in words a shop owner reads, not column names', async () => {
     for (const entry of EXPORT_TABLES) {

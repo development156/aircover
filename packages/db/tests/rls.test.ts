@@ -472,6 +472,135 @@ describe.skipIf(!hasRlsEnv)('RLS tenant isolation', () => {
       const { data, error } = await anonClient().from('leads').select('id').eq('id', leadA)
       expect({ data, error }).toEqual(denied)
     })
+
+    /**
+     * THE TWO DOORS, from an anon-key client carrying a real member token.
+     *
+     * `packages/db/tests/lead_doors.pglite.test.ts` proves the same refusals
+     * against a real Postgres with no credentials, and it is the one that
+     * executes on every gate run. These are the same questions asked THROUGH
+     * PostgREST, which is the layer a browser actually reaches and the only
+     * layer that can answer for a grant: a function revoked from `authenticated`
+     * is refused HERE, by the API, before Postgres is consulted at all.
+     *
+     * Skipped without a non-production target, like everything else in this
+     * file. Written anyway, because the day a disposable project exists these
+     * are the checks that matter and nobody will remember to write them then.
+     */
+    it('a member cannot call lead_submit — it is service_role only', async () => {
+      const { error } = await userClient(userA).rpc('lead_submit', {
+        p_site_slug: `rls-site-a-${run}`,
+        p_name: 'Forged',
+        p_email: 'forged@example.com',
+        p_phone: null,
+        p_message: null,
+        p_payload: {},
+        p_source_url: null,
+      })
+      // The grant is the whole defence here. A signed-in customer posting as if
+      // a stranger had left an enquiry is lead forgery with a friendly face.
+      expect(error).toBeTruthy()
+      const { count } = await svc()
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('email', 'forged@example.com')
+      expect(count).toBe(0)
+    })
+
+    it('signed-out anon cannot call lead_submit either', async () => {
+      const { error } = await anonClient().rpc('lead_submit', {
+        p_site_slug: `rls-site-a-${run}`,
+        p_name: 'Anon',
+        p_email: 'anon-forged@example.com',
+        p_phone: null,
+        p_message: null,
+        p_payload: {},
+        p_source_url: null,
+      })
+      expect(error).toBeTruthy()
+      const { count } = await svc()
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('email', 'anon-forged@example.com')
+      expect(count).toBe(0)
+    })
+
+    it('member B cannot promote tenant A’s conversation into their own workspace', async () => {
+      // The refusal `lead_from_conversation` exists to make: it takes a
+      // workspace id from the caller, so membership is what stops it being
+      // aimed. Asserted from B naming A — the direction that would leak.
+      const { data, error } = await userClient(userB).rpc('lead_from_conversation', {
+        p_workspace_id: wsA,
+        p_conversation_ref: `rls-cross-${run}`,
+        p_channel: 'instagram',
+        p_author_name: 'Forged',
+        p_author_handle: null,
+        p_message: null,
+        p_permalink: null,
+      })
+      expect(error).toBeNull()
+      expect(data).toMatchObject({ ok: false, reason: 'not_a_member' })
+      // The return value is what it SAYS. This is whether a row landed.
+      const { count } = await svc()
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', wsA)
+        .eq('source->>conversation_ref', `rls-cross-${run}`)
+      expect(count).toBe(0)
+    })
+
+    it('positive control: member A can promote a conversation in their OWN workspace', async () => {
+      // Without this, every refusal above would pass on a function that refuses
+      // everything — which is the way a refusal suite lies.
+      const { data, error } = await userClient(userA).rpc('lead_from_conversation', {
+        p_workspace_id: wsA,
+        p_conversation_ref: `rls-own-${run}`,
+        p_channel: 'instagram',
+        p_author_name: 'Priya',
+        p_author_handle: '@priya',
+        p_message: 'Do you do birthday cakes?',
+        p_permalink: null,
+      })
+      expect(error).toBeNull()
+      expect(data).toMatchObject({ ok: true, existing: false })
+
+      const { data: row } = await svc()
+        .from('leads')
+        .select('workspace_id, email, phone, source')
+        .eq('source->>conversation_ref', `rls-own-${run}`)
+        .single()
+      expect(row!.workspace_id).toBe(wsA)
+      // A handle is not an address and not a number.
+      expect(row!.email).toBeNull()
+      expect(row!.phone).toBeNull()
+      expect(row!.source).toMatchObject({ kind: 'inbox', details: 'from_client' })
+    })
+
+    it('member B cannot promote a thread that belongs to tenant A', async () => {
+      const threadA = await svc()
+        .from('inbox_threads')
+        .insert({
+          workspace_id: wsA,
+          channel: 'instagram',
+          kind: 'dm',
+          platform_thread_id: `rls-thread-${run}`,
+          author_name: 'Priya',
+          body: 'Cakes?',
+        })
+        .select('id')
+        .single()
+
+      const { data, error } = await userClient(userB).rpc('lead_from_inbox', {
+        p_thread_id: threadA.data!.id,
+      })
+      expect(error).toBeNull()
+      expect(data).toMatchObject({ ok: false, reason: 'not_a_member' })
+      const { count } = await svc()
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('source->>thread_id', threadA.data!.id)
+      expect(count).toBe(0)
+    })
   })
 
   describe('workspace_themes', () => {

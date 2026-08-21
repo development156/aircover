@@ -4,10 +4,26 @@ import { fileURLToPath } from 'node:url'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
- * THE SEVEN ROADMAP SECTIONS SHOW NO FIGURE ABOUT THE READER'S BUSINESS.
+ * THE FIVE ROADMAP SECTIONS SHOW NO FIGURE ABOUT THE READER'S BUSINESS.
+ *
+ * ── /remix AND /leads LEFT THIS LIST ON 2026-08-21, BECAUSE THEY WERE BUILT ──
+ * (Which makes the word FIVE above true again: it was seven.)
+ * `/remix` prices a real batch out of pricing.config.json, counts the drafts it
+ * will write, charges credits and refuses at a zero balance. `/leads` has both
+ * of its doors open — a public form endpoint behind a captcha, and a member
+ * promoting a live inbox conversation — so it counts real rows in real columns.
+ * Neither can say "coming soon" without lying, and the first assertion in the
+ * loop below is what would catch it if either tried.
+ *
+ * THE REPLACEMENTS ARE NARROWER AND STRONGER, because they can assert
+ * PROVENANCE rather than a permitted set of digits:
+ * `components/remix/batch-preview.test.tsx` requires every figure on the cost
+ * panel to be a credit price, a sum of prices, or a count of rows;
+ * `components/leads/board.test.tsx` requires every figure on the pipeline to be
+ * a count of rows. Each has been WATCHED FAIL against an injected figure — a
+ * fabricated reach on one, a fabricated conversion rate on the other.
  *
  * ── /loop AND /report LEFT THIS LIST ON 2026-08-20, BECAUSE THEY WERE BUILT ──
- * (Which makes the word SEVEN above true again: the list had grown to nine.)
  * They are not exceptions to the property below; they are no longer roadmap
  * sections. The Loop runs — it opens a cycle, prices a plan, charges credits and
  * writes drafts — so it shows a week number, a credit total and a count of
@@ -91,9 +107,7 @@ const ALLOWED: ReadonlyArray<readonly [string, readonly number[]]> = [
   ['/playbooks', [price('playbook_run')]],
   // 1–5: the five competitor slots, which are the cap PRD M9 sets.
   ['/radar', [1, 2, 3, 4, 5, price('radar_scan')]],
-  ['/leads', []],
   ['/studio', [price('carousel')]],
-  ['/remix', [price('remix_pack')]],
   // `/brain/audience` IS NOT IN THIS LIST ANY MORE, and the removal is the point
   // rather than a loosening. This guard exists to stop screens that are DRAWINGS
   // from inventing figures. That tab is no longer a drawing: it reads

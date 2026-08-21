@@ -56,9 +56,14 @@ const ROUTES: ReadonlyArray<{ path: string; slug: string; archetype: string }> =
   { path: '/playbooks', slug: 'playbooks', archetype: 'roadmap · library' },
   { path: '/radar', slug: 'radar', archetype: 'roadmap · watch list' },
   { path: '/report', slug: 'report', archetype: 'roadmap · document' },
-  { path: '/leads', slug: 'leads', archetype: 'roadmap · pipeline' },
+  // No longer a roadmap screen: both doors into `leads` are open, so this is a
+  // real pipeline over real rows. Kept in the camera because a pipeline is a
+  // SHAPE this pass wants photographed, which is why it was here to begin with.
+  { path: '/leads', slug: 'leads', archetype: 'pipeline' },
   { path: '/studio', slug: 'studio', archetype: 'roadmap · gallery' },
-  { path: '/remix', slug: 'remix', archetype: 'roadmap · fan-out' },
+  // No longer a roadmap screen either: it plans a batch, prices it out of
+  // pricing.config.json and charges for it. Still the fan-out shape.
+  { path: '/remix', slug: 'remix', archetype: 'fan-out · priced' },
   { path: '/ads', slug: 'ads', archetype: 'roadmap · table' },
   // No longer a roadmap screen. It reads a workspace, a connection and a live
   // platform call, and its most common state is one the platform imposes.

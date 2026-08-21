@@ -12,12 +12,18 @@ import { Button } from '@/components/ui/button'
  * ## Why deletion is a paragraph and not a button
  *
  * Deleting a workspace cannot be done from this app. MEASURED from `pg_policies`
- * on 2026-08-19: of the 30 tables carrying a `workspace_id`, **15 have no DELETE
- * policy for members** — and they include the ones holding the most personal
- * data: `brand_memory` (the whole Brand Brain), `inbox_threads` and
- * `inbox_messages` (customer conversations), and `leads` (names, emails, phone
- * numbers from site forms). `apps/web` has no service-role client, deliberately,
- * so there is no route around that.
+ * against the migration files on 2026-08-21: of the **39** tables carrying a
+ * `workspace_id`, **20 have no DELETE policy for members** — and they include
+ * the ones holding the most personal data: `brand_memory` (the whole Brand
+ * Brain), `inbox_threads` and `inbox_messages` (customer conversations), and
+ * `leads` (names, emails and phone numbers belonging to somebody who is not the
+ * customer). `apps/web` has no service-role client, deliberately, so there is no
+ * route around that.
+ *
+ * Both figures were 30 and 15, measured on 2026-08-19, and both had gone stale
+ * by the time anybody looked — which is the reason `packages/db/tests/deletion_reach.pglite.test.ts`
+ * now re-measures them from the migration files on every gate run rather than
+ * leaving a number in a comment to rot.
  *
  * A button would therefore delete about half of it and report success. Under
  * CLAUDE.md's own rule a control that cannot do what it says is a dead end, and

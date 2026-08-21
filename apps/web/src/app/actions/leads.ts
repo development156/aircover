@@ -72,14 +72,35 @@ export interface PromoteState {
   message?: string
 }
 
+export interface PromoteInput {
+  /** Zernio's own id for the conversation. The dedupe key, per workspace. */
+  conversationRef: string
+  channel: string
+  authorName: string | null
+  authorHandle: string | null
+  message: string | null
+}
+
 /**
  * DOOR TWO — an enquiry that arrived in the inbox becomes a lead.
+ *
+ * ── WHY THIS CALLS `lead_from_conversation` AND NOT `lead_from_inbox` ────────
+ * Both exist and both are correct. `lead_from_inbox` derives every field from an
+ * `inbox_threads` row, which is the better function — and NOTHING WRITES THAT
+ * TABLE. It shipped deliberately empty on 2026-08-04 and the inbox a customer
+ * opens reads Zernio live instead, so a button wired to it would be a button
+ * with nothing to press it on.
+ *
+ * So this calls the sibling, which takes the details from the screen and records
+ * that it did. The workspace id is the one thing that does NOT come from the
+ * caller's screen unchecked: the function compares it against the caller's own
+ * memberships, so the only tenants a member can name are ones they belong to.
  *
  * Idempotent in the database rather than here: two people pressing at once must
  * not produce two leads for one conversation, and a duplicated person in a
  * pipeline is worse than a missing one because both get chased.
  */
-export async function promoteThreadToLead(threadId: string): Promise<PromoteState> {
+export async function promoteThreadToLead(input: PromoteInput): Promise<PromoteState> {
   let workspaceId: string | undefined
   try {
     const { userId } = await auth()
@@ -88,8 +109,20 @@ export async function promoteThreadToLead(threadId: string): Promise<PromoteStat
     if (!ws.ok) return { ok: false, message: ws.message }
     workspaceId = ws.workspace.id
 
+    if (input.conversationRef.trim() === '') {
+      return { ok: false, message: 'That conversation has no id, so it cannot be saved.' }
+    }
+
     const supabase = createServerSupabase()
-    const { data, error } = await supabase.rpc('lead_from_inbox', { p_thread_id: threadId })
+    const { data, error } = await supabase.rpc('lead_from_conversation', {
+      p_workspace_id: workspaceId,
+      p_conversation_ref: input.conversationRef,
+      p_channel: input.channel,
+      p_author_name: input.authorName,
+      p_author_handle: input.authorHandle,
+      p_message: input.message,
+      p_permalink: null,
+    })
     if (error) return { ok: false, message: 'Could not save that as a lead — try again.' }
 
     const row = (data ?? {}) as { ok?: boolean; id?: string; existing?: boolean; reason?: string }
