@@ -12,6 +12,24 @@ import {
 import { createServerSupabase } from '@/lib/supabase/server'
 
 /**
+ * The `connections.status` values that mean Sahoda can publish, and the ones
+ * that mean it once could.
+ *
+ * These are spelled out against the CHECK the migration declares —
+ * ('active','expired','revoked','error') — because a filter naming a value the
+ * column cannot hold returns an empty set, and an empty set is exactly what a
+ * workspace with no channels returns. Three sites in this repo filtered on
+ * `status = 'connected'`, which is not one of the four; measured against
+ * production on 2026-08-22 the table held 4 'expired' and 2 'active' rows and
+ * not one 'connected'. `lib/repo/check-constraints.test.ts` now adjudicates
+ * every such comparison in the repo against the schema.
+ */
+const LIVE_STATUS = ['active'] as const
+const LAPSED_STATUS = ['expired', 'revoked', 'error'] as const
+/** The channels the Loop can plan for. Others may be connected and are not planned. */
+const PLANNABLE: readonly string[] = ['x', 'gbp', 'linkedin', 'instagram']
+
+/**
  * EVERYTHING THE LOOP SCREEN READS — through the RLS-scoped client, always.
  *
  * The orchestrator writes over an owner connection because the cycle tables are
@@ -28,6 +46,15 @@ export interface LoopSnapshot {
   /** Only the levels a person actually chose. A missing channel is not L1 — it is unset. */
   dial: Map<Channel, AutonomyLevel>
   connected: ChannelSet
+  /**
+   * Channels this workspace connected and whose authorisation has since lapsed.
+   *
+   * Separate from `connected` because "you have not connected anything" and
+   * "the thing you connected stopped working" have different remedies, and
+   * telling somebody to connect a channel they already connected is the screen
+   * making a claim it has no grounds for.
+   */
+  lapsed: ChannelSet
   cycle: LoopCycleView | null
   briefs: readonly LoopBriefView[]
   learnings: readonly PendingLearning[]
@@ -72,7 +99,7 @@ export interface PendingLearning {
 }
 
 /** The default a workspace that has never opened this screen is running at. */
-export const UNSET_SNAPSHOT: Omit<LoopSnapshot, 'dial' | 'connected'> = {
+export const UNSET_SNAPSHOT: Omit<LoopSnapshot, 'dial' | 'connected' | 'lapsed'> = {
   paused: false,
   weeklyBudgetCredits: DEFAULT_WEEKLY_BUDGET_CREDITS,
   cycle: null,
@@ -92,9 +119,9 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
     supabase.from('loop_channel_autonomy').select('channel, level').eq('workspace_id', workspaceId),
     supabase
       .from('connections')
-      .select('platform')
+      .select('platform, status')
       .eq('workspace_id', workspaceId)
-      .eq('status', 'connected'),
+      .in('status', [...LIVE_STATUS, ...LAPSED_STATUS]),
     supabase
       .from('loop_cycles')
       .select('*')
@@ -117,11 +144,19 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
     dial.set(row.channel as Channel, row.level as AutonomyLevel)
   }
 
-  const connected = toChannelSet(
-    (connRes.data ?? [])
-      .map((r) => r.platform as Channel)
-      .filter((p): p is Channel => ['x', 'gbp', 'linkedin', 'instagram'].includes(p)),
-  )
+  const channelsWith = (statuses: readonly string[]): ChannelSet =>
+    toChannelSet(
+      (connRes.data ?? [])
+        .filter((r) => statuses.includes(r.status as string))
+        .map((r) => r.platform as Channel)
+        .filter((p): p is Channel => PLANNABLE.includes(p)),
+    )
+  const connected = channelsWith(LIVE_STATUS)
+  // Lapsed only where it is not ALSO live: a workspace with two Instagram
+  // accounts, one live and one expired, has a working Instagram. Reporting it
+  // in both sets would put the same channel in the dial and in the "reconnect"
+  // line at once, and only one of those is true.
+  const lapsed = toChannelSet(channelsWith(LAPSED_STATUS).filter((c) => !connected.includes(c)))
 
   const raw = cycleRes.data as Record<string, unknown> | null
   const cycle: LoopCycleView | null = raw
@@ -172,6 +207,7 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
       DEFAULT_WEEKLY_BUDGET_CREDITS,
     dial,
     connected,
+    lapsed,
     cycle,
     briefs,
     learnings: (learnRes.data ?? []).map(toPendingLearning),

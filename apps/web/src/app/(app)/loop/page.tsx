@@ -94,6 +94,7 @@ export default async function LoopPage() {
 
       <AutonomyDial
         connected={snapshot.connected}
+        lapsed={snapshot.lapsed}
         chosen={chosen}
         defaultLevel={DEFAULT_AUTONOMY_LEVEL}
       />
