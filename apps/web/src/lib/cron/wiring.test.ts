@@ -24,10 +24,13 @@ const vercelConfig = JSON.parse(readFileSync(resolve(WEB, 'vercel.json'), 'utf8'
 const middleware = readFileSync(resolve(WEB, 'src/middleware.ts'), 'utf8')
 
 describe('cron wiring', () => {
-  it('schedules exactly the three jobs, on their own cadences', () => {
-    // Pinned as a SET of exact entries rather than a count, so a FOURTH job
-    // cannot arrive quietly and so a schedule cannot be edited without a
-    // decision. It did its job when the third arrived.
+  it('schedules exactly the four jobs, on their own cadences', () => {
+    // Pinned as a SET of exact entries rather than a count, so a job cannot
+    // arrive quietly and so a schedule cannot be edited without a decision. It
+    // did its job when the third arrived, and again when the fourth did — the
+    // sibling assertion below caught that `/api/cron/playbooks` had been given a
+    // schedule and NOT a Clerk exemption, which is the shape where the heartbeat
+    // reports green while every tick is a 307 to /sign-in.
     //
     // The three cadences are not interchangeable. The metric pass is a separate
     // job because `post_metric_snapshots` is keyed by DAY, so riding the
@@ -39,10 +42,17 @@ describe('cron wiring', () => {
     // "Sunday 21:00 workspace-local". 21:00 UTC is the compromise a single
     // global cron forces — per-workspace local time needs a row-driven
     // scheduler, and `loop_settings.plan_at_minute` exists for the day it does.
+    //
+    // The Playbook check is DAILY, and that follows from what a playbook's
+    // window is: a seven-day lead time checked once a week would miss a festival
+    // outright whenever the check landed on the wrong side of it. 06:00 UTC is
+    // 11:30 IST — inside the working day, so a preview waiting for approval is
+    // seen the day it appears rather than the morning after.
     expect(vercelConfig.crons).toEqual([
       { path: '/api/cron/sweeps', schedule: '*/5 * * * *' },
       { path: '/api/cron/metrics', schedule: '20 1 * * *' },
       { path: '/api/cron/loop', schedule: '0 21 * * 0' },
+      { path: '/api/cron/playbooks', schedule: '0 6 * * *' },
     ])
   })
 
@@ -96,6 +106,12 @@ describe('cron wiring', () => {
         // failing is what made it deliberate. It authenticates itself in-route
         // with isAuthorizedCronRequest, which fails closed on an unset secret.
         '/api/cron/loop',
+        // Added 2026-08-22 with the daily Playbook check, for the same reason
+        // and by the same route: this guard's sibling failed first, because the
+        // schedule had been declared in vercel.json and the exemption had not.
+        // The route authenticates itself in-route and spends nothing — it
+        // proposes and halts at the cost preview.
+        '/api/cron/playbooks',
         '/api/public/beta-apply',
         '/api/admin/devops/ingest',
         '/api/webhooks/clerk',

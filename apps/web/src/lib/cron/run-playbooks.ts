@@ -119,10 +119,12 @@ export async function runScheduledPlaybooks(now = new Date()): Promise<Playbooks
         })),
         null,
       )
+      // The ITEM total, matching what `playbook_approve_cost` will compute —
+      // see `actions/playbook-run.ts` for why the two columns must share a unit.
       await store.haltForCostApproval(
         runId,
         playbook.workspace_id,
-        preview.totalCredits,
+        preview.outputCredits,
         proposal.triggerDetail,
       )
       proposed += 1

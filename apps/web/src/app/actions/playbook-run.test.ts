@@ -83,9 +83,7 @@ vi.mock('@sahoda/billing', () => ({
   loadBillingEnv: () => ({ databaseUrl: 'postgres://stub' }),
 }))
 vi.mock('@sahoda/mesh', () => ({
-  createMesh: () => ({
-    runTask: async () => ({ ok: true, data: { variants: [{ channel: 'instagram', body: 'v' }] } }),
-  }),
+  createMesh: () => ({ runTask: async () => ({ ok: true, data: { variants: VARIANTS } }) }),
   contentVariantsTask: { def: {} },
 }))
 vi.mock('@/lib/supabase/server', () => ({
@@ -99,6 +97,12 @@ vi.mock('@/lib/supabase/server', () => ({
 
 /** The dial the mocked Supabase client hands back. Set per test. */
 let LEVEL = 1
+
+/**
+ * What the model answers with. Settable, because "it succeeded" and "it produced
+ * something usable" are different facts and only one of them is worth paying for.
+ */
+let VARIANTS: { channel: string; body: string }[] = [{ channel: 'instagram', body: 'v' }]
 
 import { executeRun, startRun } from './playbook-run'
 
@@ -124,15 +128,31 @@ const APPROVED_RUN = {
   approved_credits: DRAFT,
 }
 
+/**
+ * A FAITHFUL stand-in for `withCredits`: it CATCHES.
+ *
+ * The real wrapper turns a throw inside the wrapped function into a RELEASE and
+ * a typed `{ ok: false }` — that is its whole contract, "users never pay for
+ * failures". A mock that lets the throw escape sends it to the action's outer
+ * catch instead, which is a different code path and answers a different
+ * sentence. The first version of this file did that, and the two tests below
+ * failed for a reason that did not exist in production.
+ */
+const charging = (): ChargeFn => async (_opts, fn) => {
+  try {
+    return { ok: true, data: await fn({ actionType: 'post_variants', creditsCharged: DRAFT }) }
+  } catch {
+    return { ok: false, error: { code: 'PROVIDER_ERROR' } }
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   LEVEL = 1
+  VARIANTS = [{ channel: 'instagram', body: 'v' }]
   h.store.readItems.mockResolvedValue([item('i1')])
   h.store.availableCredits.mockResolvedValue(0)
-  h.withCredits.mockImplementation(async (_opts, fn) => ({
-    ok: true,
-    data: await fn({ actionType: 'post_variants', creditsCharged: DRAFT }),
-  }))
+  h.withCredits.mockImplementation(charging())
 })
 
 describe('executeRun', () => {
@@ -213,7 +233,7 @@ describe('executeRun', () => {
   it('marks an item failed and charges nothing for it when the model call fails', async () => {
     h.store.readApprovedRunForExecute.mockResolvedValue(APPROVED_RUN)
     h.withCredits
-      .mockImplementationOnce(async (_o, fn) => ({ ok: true, data: await fn({}) }))
+      .mockImplementationOnce(charging())
       .mockImplementationOnce(async () => ({ ok: false, error: { code: 'PROVIDER_ERROR' } }))
 
     const out = await executeRun('run-1')
@@ -277,7 +297,7 @@ describe('executeRun', () => {
     h.store.readItems.mockResolvedValue([item('i1'), item('i2')])
     h.store.availableCredits.mockResolvedValue(1)
     h.withCredits
-      .mockImplementationOnce(async (_o, fn) => ({ ok: true, data: await fn({}) }))
+      .mockImplementationOnce(charging())
       .mockImplementationOnce(async () => ({ ok: false, error: { code: 'CREDIT_INSUFFICIENT' } }))
 
     const out = await executeRun('run-1')
@@ -288,6 +308,34 @@ describe('executeRun', () => {
     // Only two charges attempted — the run's and the first item's — not one per
     // remaining item.
     expect(h.withCredits).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not charge for variants when the model returned none', async () => {
+    // `ContentVariantsOutputSchema` has no `.min()`, so `{"variants": []}`
+    // parses clean and arrives as a SUCCESS. Without `filterVariants` in front
+    // of it the post is inserted with no per-channel bodies, the item is marked
+    // `drafted`, and post_variants is charged in full — a bill for work that did
+    // not happen. The default mesh mock always returns one variant, which is
+    // exactly why nothing noticed.
+    h.store.readApprovedRunForExecute.mockResolvedValue(APPROVED_RUN)
+    VARIANTS = []
+
+    const out = await executeRun('run-1')
+
+    expect(out.drafted).toBe(0)
+    expect(out.spent).toBe(RUN)
+    expect(h.store.linkItemToPost).toHaveBeenCalledWith('i1', WS, null, 'failed')
+  })
+
+  it('does not charge for a variant on a channel nobody asked for', async () => {
+    h.store.readApprovedRunForExecute.mockResolvedValue(APPROVED_RUN)
+    // The item targets instagram; the model answered about linkedin.
+    VARIANTS = [{ channel: 'linkedin', body: 'v' }]
+
+    const out = await executeRun('run-1')
+
+    expect(out.drafted).toBe(0)
+    expect(out.spent).toBe(RUN)
   })
 
   it('refuses honestly at zero balance, naming both numbers', async () => {
@@ -335,13 +383,24 @@ describe('executeRun', () => {
       const out = await startRun('pb-1', day(2026, 1, 20))
 
       expect(out.ok).toBe(true)
+      // What the PERSON is asked to agree to is the whole total, because that is
+      // what will be charged.
       expect(out.estimatedCredits).toBe(DRAFT + RUN)
+
+      // ── BUT THE STORED COLUMN IS THE ITEM TOTAL ─────────────────────────
+      // `estimated_credits` and `approved_credits` must share a unit, and
+      // `playbook_approve_cost` can only ever produce the item total: it sums
+      // `estimated_credits` over the included rows, and SQL cannot read
+      // pricing.config.json. Storing the whole total here made
+      // `estimated - approved` equal the trim plus a constant 2 on every run —
+      // so a run with nothing trimmed recorded a trim that never happened.
       const [, , estimate] = h.store.haltForCostApproval.mock.calls[0] as unknown as [
         string,
         string,
         number,
       ]
-      expect(estimate).toBe(DRAFT + RUN)
+      expect(estimate).toBe(DRAFT)
+      expect(estimate).not.toBe(DRAFT + RUN)
       // The whole point of the halt: proposing reads a calendar, so there is no
       // honest reason to take money before the number has been seen.
       expect(h.withCredits).not.toHaveBeenCalled()

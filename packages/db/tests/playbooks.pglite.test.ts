@@ -514,6 +514,41 @@ describe('Playbooks · migrations 20260822030000 / 030100', () => {
       expect(dropped.rows[0]).toEqual({ included: false, outcome: 'skipped' })
     })
 
+    /**
+     * THE CLAIM 20260822030000 MAKES ABOUT ITS OWN TWO COLUMNS.
+     *
+     * The migration says `approved_credits` is stored separately from
+     * `estimated_credits` because "the difference between 'we proposed 11' and
+     * 'they approved 8' is the record that the trim happened and was theirs".
+     * Nothing checked that, and for a while it was false: the app stored the
+     * WHOLE total in `estimated_credits` — items plus the per-run charge — while
+     * the RPC can only ever compute the item total, because it sums the rows and
+     * SQL cannot read pricing.config.json. The difference was the trim plus a
+     * constant, so a run with nothing trimmed recorded a trim of 2.
+     *
+     * Asserted here as arithmetic rather than as a pair of literals, so it holds
+     * whatever the prices become.
+     */
+    it('records a difference that is EXACTLY the trim, and nothing else', async () => {
+      const { run, items } = await halted([3, 3, 5])
+      await db.query(`update playbook_runs set estimated_credits = 11 where id = $1`, [run])
+      await asUser(db, USER_A)
+      await db.query(`select playbook_approve_cost($1, $2::uuid[], 6)`, [run, `{${items[2]}}`])
+
+      const row = await db.query<{ estimated_credits: number; approved_credits: number }>(
+        `select estimated_credits, approved_credits from playbook_runs where id = $1`,
+        [run],
+      )
+      const trimmed = await db.query<{ total: number }>(
+        `select coalesce(sum(estimated_credits), 0)::int as total
+           from playbook_run_items where run_id = $1 and not included`,
+        [run],
+      )
+      expect(row.rows[0]!.estimated_credits - row.rows[0]!.approved_credits).toBe(
+        trimmed.rows[0]!.total,
+      )
+    })
+
     it('replays a second approval as SUCCESS at the original total', async () => {
       const { run } = await halted([2, 2])
       await asUser(db, USER_A)

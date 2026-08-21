@@ -15,6 +15,7 @@ import {
 } from '@sahoda/shared'
 
 import { governingLevel } from '@/lib/loop/governing-level'
+import { filterVariants } from '@/lib/posts/filter-variants'
 import { RUN_ACTION, previewRunCost, shortfallMessage } from '@/lib/playbooks/cost'
 import { isPlaybookRef, newPlaybookItemRef, newPlaybookRunRef } from '@/lib/playbooks/object-ref'
 import { proposeFestivals } from '@/lib/playbooks/propose'
@@ -138,14 +139,30 @@ export async function startRun(playbookId: string, now = new Date()): Promise<St
       })),
       null,
     )
+    // ── `estimated_credits` HOLDS THE ITEM TOTAL, NOT THE WHOLE TOTAL ───────
+    // It has to share a unit with `approved_credits`, and that column can only
+    // ever be the item total: `playbook_approve_cost` derives it with
+    // `sum(estimated_credits)` over the included rows, and SQL cannot read
+    // pricing.config.json, so the run charge is unreachable from there.
+    //
+    // Storing the whole total here made `estimated - approved` equal the trim
+    // PLUS a constant 2 on every run — so a run with nothing trimmed recorded a
+    // two-credit trim that never happened, and 20260822030000's own claim about
+    // this pair ("the difference is the record that the trim happened and was
+    // theirs") was false by construction.
+    //
+    // The invariant, in one line: both columns are the trimmable item total, and
+    // `spent_credits` is that plus the run price.
     await store.haltForCostApproval(
       runId,
       workspaceId,
-      preview.totalCredits,
+      preview.outputCredits,
       proposal.triggerDetail,
     )
 
     revalidatePath('/playbooks')
+    // The number RETURNED is the whole total, because that is what a person is
+    // about to be asked to agree to. Only the stored column is the item half.
     return { ok: true, runId, estimatedCredits: preview.totalCredits }
   } catch (error) {
     reportServerError(error, { action: 'startRun', workspaceId })
@@ -277,6 +294,21 @@ export async function executeRun(runId: string): Promise<ExecuteRunState> {
           // Our own vocabulary, never the provider's text.
           if (!result.ok) throw new Error('MESH_ERROR') // → RELEASE, no charge
 
+          // ── `ok` IS NOT THE SAME AS "IT PRODUCED ANYTHING" ────────────────
+          // `ContentVariantsOutputSchema` carries no channel cross-check and no
+          // `.min()`, so `{"variants": []}` parses clean and arrives here as a
+          // success. Without this the post would be inserted with no per-channel
+          // bodies, the item marked `drafted`, and `post_variants` charged in
+          // full — a bill for work that did not happen.
+          //
+          // `filterVariants` is the guard `actions/posts-ai.ts` already puts in
+          // front of this exact task at this exact price. Reaching for the same
+          // one rather than writing a second is the point: a fix that closes one
+          // path while a sibling walks through it is how three separate defects
+          // shipped in this product.
+          const filtered = filterVariants([...item.channels], result.data)
+          if (filtered.variants.length === 0) throw new Error('NO_VARIANTS') // → RELEASE
+
           const row = PostInsertSchema.parse({
             workspace_id: workspaceId,
             title: item.title,
@@ -290,7 +322,7 @@ export async function executeRun(runId: string): Promise<ExecuteRunState> {
           const { data, error } = await supabase.from('posts').insert(row).select('id').single()
           if (error || !data) throw new Error('INSERT_FAILED') // → RELEASE, no charge
           postId = data.id as string
-          await store.writeVariants(workspaceId as string, postId, result.data.variants)
+          await store.writeVariants(workspaceId as string, postId, filtered.variants)
           return { postId }
         },
       )
