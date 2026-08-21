@@ -85,6 +85,9 @@ export const websiteSnapshotSchema = z.object({
    * The page's readable words, capped. Stored so a change can be shown rather
    * than merely asserted, and capped because a snapshot a day for a year must not
    * become the largest table in the database.
+   *
+   * ⚠ THIS IS `readablePageText`, NOT `normalizePageText`, AND THE DIFFERENCE IS
+   * A SECURITY PROPERTY — see the note on `readablePageText` below. ⚠
    */
   text: z.string().max(20_000),
   /** Every currency amount the page displayed, deduped, in the order found. */
@@ -133,6 +136,49 @@ export function normalizePageText(html: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase()
+}
+
+/**
+ * The same page, kept READABLE — line structure and capitalisation intact.
+ *
+ * ── WHY THERE ARE TWO OF THESE, AND WHY IT IS NOT DUPLICATION ────────────────
+ * `normalizePageText` above flattens a page to one lowercase line on purpose:
+ * that is the right shape for a FINGERPRINT, where every difference that is not
+ * about the words must be crushed out.
+ *
+ * It is the wrong shape for EVIDENCE, and using it for both was a live defect.
+ * `@sahoda/research`'s quarantine wrapper neutralises a forged conversation turn
+ * with a LINE-ANCHORED pattern — `/^\s*(system|assistant|user)\s*:/gim` — so a
+ * page whose text has been flattened to a single line has no line starts, and a
+ * forged `System:` turn sails straight through a defence that appears to be
+ * applied. MEASURED here, against a hostile fixture, before anything shipped.
+ *
+ * So: the hash is taken over the flattened form, and the text a model may one day
+ * read is stored in this one. Two jobs, two functions, and the reason written
+ * down so they are never merged back together.
+ */
+export function readablePageText(html: string): string {
+  return (
+    html
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, ' ')
+      .replace(/<svg\b[\s\S]*?<\/svg>/gi, ' ')
+      // Block-level tags become line breaks, so paragraphs stay paragraphs.
+      .replace(/<\/?(p|div|br|li|tr|h[1-6]|section|article|header|footer)\b[^>]*>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#0?39;|&apos;/gi, "'")
+      .replace(/[^\S\n]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/^[ \t]+|[ \t]+$/gm, '')
+      .trim()
+  )
 }
 
 /**

@@ -225,6 +225,28 @@ create table radar_fetch_log (
   -- a hundredth of a cent and rounding it to zero would hide the bill entirely.
   cost_micros bigint not null default 0 check (cost_micros >= 0),
 
+  -- ⚠ WHERE THAT NUMBER CAME FROM, because the two providers differ and pretending
+  -- otherwise would put an estimate in the founder's cost report wearing the name
+  -- of a measurement.
+  --
+  -- MEASURED 2026-08-22, by asking both:
+  --   'measured'  — Apify returns `usageTotalUsd` on the run itself, so the number
+  --                 below is what Apify says it charged for that exact request.
+  --   'estimated' — Zyte returns NO cost anywhere. Its response carries only
+  --                 url/statusCode/httpResponseBody, no cost header, and
+  --                 /v1/stats, /v1/usage and the app usage path all answer 404.
+  --                 Zyte also assigns a price TIER per target website
+  --                 automatically, so the real figure is a property of that
+  --                 competitor's site and is unknowable from any price list. A
+  --                 Zyte row carries the tier's list price and must be reconciled
+  --                 against the Zyte dashboard before it is quoted to anyone.
+  --   'free'      — a conditional GET from our own server. No provider, no bill.
+  --
+  -- Any total shown to the founder must state the split. A report that adds
+  -- measured and estimated micros into one figure and calls it "what Radar cost"
+  -- is the kind of number this codebase has learned not to print.
+  cost_basis text not null default 'free' check (cost_basis in ('measured', 'estimated', 'free')),
+
   -- HOW MANY WORKSPACES THIS ONE FETCH SERVED, recorded at the moment it was made.
   -- This is what makes a real per-customer number possible: a fetch shared by six
   -- subscribers cost each of them a sixth. It is stored rather than counted later
@@ -367,7 +389,8 @@ create or replace function app.radar_begin_fetch(
   p_source_id uuid,
   p_mode text,
   p_provider text,
-  p_estimate_micros bigint
+  p_estimate_micros bigint,
+  p_cost_basis text default 'free'
 ) returns jsonb
 language plpgsql
 security definer
@@ -445,8 +468,8 @@ begin
     end if;
   end if;
 
-  insert into radar_fetch_log (source_id, mode, provider, cost_micros, subscriber_count)
-  values (p_source_id, p_mode, p_provider, p_estimate_micros, v_subscribers)
+  insert into radar_fetch_log (source_id, mode, provider, cost_micros, subscriber_count, cost_basis)
+  values (p_source_id, p_mode, p_provider, p_estimate_micros, v_subscribers, p_cost_basis)
   returning * into v_log;
 
   return jsonb_build_object(
@@ -464,7 +487,8 @@ create or replace function app.radar_finish_fetch(
   p_reservation_id uuid,
   p_outcome text,
   p_actual_micros bigint,
-  p_detail jsonb default '{}'::jsonb
+  p_detail jsonb default '{}'::jsonb,
+  p_cost_basis text default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -480,6 +504,7 @@ begin
   update radar_fetch_log
      set outcome = p_outcome,
          cost_micros = greatest(coalesce(p_actual_micros, 0), 0),
+         cost_basis = coalesce(p_cost_basis, radar_fetch_log.cost_basis),
          detail = coalesce(p_detail, '{}'::jsonb),
          settled_at = now()
    where id = p_reservation_id
@@ -492,11 +517,11 @@ begin
 end;
 $$;
 
-revoke all on function app.radar_begin_fetch(uuid, text, text, bigint) from public;
-revoke all on function app.radar_finish_fetch(uuid, text, bigint, jsonb) from public;
+revoke all on function app.radar_begin_fetch(uuid, text, text, bigint, text) from public;
+revoke all on function app.radar_finish_fetch(uuid, text, bigint, jsonb, text) from public;
 revoke all on function app.radar_workspace_spend_today(uuid) from public;
-grant execute on function app.radar_begin_fetch(uuid, text, text, bigint) to service_role;
-grant execute on function app.radar_finish_fetch(uuid, text, bigint, jsonb) to service_role;
+grant execute on function app.radar_begin_fetch(uuid, text, text, bigint, text) to service_role;
+grant execute on function app.radar_finish_fetch(uuid, text, bigint, jsonb, text) to service_role;
 grant execute on function app.radar_workspace_spend_today(uuid) to service_role;
 
 
