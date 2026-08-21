@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/empty-state'
 import { buttonVariants } from '@/components/ui/button'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { readBrain } from '@/lib/brand/read-brain'
+import { readCitedPassages } from '@/lib/knowledge/store'
 import { queueTally, resolutionQueue } from '@/lib/brand/resolution-queue'
 
 export const metadata = { title: 'Signal Resolution Console' }
@@ -47,8 +48,22 @@ export const metadata = { title: 'Signal Resolution Console' }
  * owner and doc 05's sentence does not read as describing something else.
  *
  * ── WHAT IT REFUSES TO DO ────────────────────────────────────────────────────
- * It shows no per-field evidence, because none is stored and none can be
- * derived — `lib/brand/brain-origin.ts` carries the argument. It never charges:
+ * ── WHAT IT SHOWS, AND WHAT IT STILL REFUSES TO ─────────────────────────────
+ * This used to read "It shows no per-field evidence, because none is stored and
+ * none can be derived". That was true of the only path that existed, and is now
+ * true of only one of two.
+ *
+ * `brand_guidelines` reads the whole door text and writes fifteen fields in one
+ * object, so a field it wrote has no traceable source and never will —
+ * `lib/brand/brain-origin.ts` carries that argument and it is unchanged.
+ *
+ * A field proposed from the KNOWLEDGE LIBRARY came through `brand_extract`,
+ * which cites a block index that `attachProvenance` resolves against a list
+ * Sahoda built. Those fields name their document and quote their passage. Two
+ * states, both said out loud, rather than one blanket claim printed above a
+ * field that is visibly contradicting it.
+ *
+ * It never charges:
  * confirming is free, and the paid re-resolve is a link with its cost attached,
  * never a button on this page. And it never pre-selects a row, because a bulk
  * accept that arrives pre-ticked is a rubber stamp wearing a checkbox.
@@ -99,6 +114,39 @@ export default async function ResolveConsolePage() {
 
   const tally = queueTally(resolutionQueue(brain.active, brain.provenance))
 
+  /**
+   * ── THE HALF OF THIS SCREEN THAT USED TO BE IMPOSSIBLE ────────────────────
+   * The header above says per-field evidence "is not stored and cannot be
+   * derived", and that remains true of every field `brand_guidelines` wrote.
+   * A field proposed FROM THE KNOWLEDGE LIBRARY is different: its citation was
+   * resolved from a block index against a list Sahoda built, so it names a real
+   * document and a real passage.
+   *
+   * Read in one round trip, keyed by field path. A field with no library
+   * citation gets nothing — which is the ordinary case and is not a degraded
+   * read. A citation whose read FAILED also gets nothing: a partial citation
+   * would be a claim about where a value came from, built from a query that did
+   * not answer.
+   */
+  const sources = Object.entries(brain.meta ?? {}).map(([path, meta]) => ({
+    path,
+    source: meta?.source,
+  }))
+  const cited = await readCitedPassages(
+    sources.map((entry) => entry.source).filter((s): s is string => typeof s === 'string'),
+  )
+  const evidence = new Map(
+    sources
+      .map((entry) => {
+        const passage = entry.source ? cited.get(entry.source) : undefined
+        return passage ? ([entry.path, passage] as const) : null
+      })
+      .filter(
+        (pair): pair is readonly [string, typeof cited extends Map<string, infer V> ? V : never] =>
+          pair !== null,
+      ),
+  )
+
   return (
     <div className="flex flex-col gap-grid">
       <OriginNote
@@ -147,7 +195,7 @@ export default async function ResolveConsolePage() {
         </section>
       ) : null}
 
-      <ResolutionConsole payload={brain.active} provenance={brain.provenance} />
+      <ResolutionConsole payload={brain.active} provenance={brain.provenance} evidence={evidence} />
 
       {/*
         THE PAID PATH, as a link with its price attached and never as a button

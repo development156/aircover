@@ -11,7 +11,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Modal } from '@/components/ui/modal'
 import { Textarea } from '@/components/ui/textarea'
-import { MAX_UPLOAD_BYTES } from '@/lib/knowledge/read-source'
+// From `lib/knowledge/limits`, NOT from `read-source` — that module is
+// `server-only`, and importing it here 500s every route in the app.
+import { MAX_UPLOAD_BYTES } from '@/lib/knowledge/limits'
 import { cn } from '@/lib/utils'
 
 /**

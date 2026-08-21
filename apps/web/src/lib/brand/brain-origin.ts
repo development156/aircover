@@ -157,6 +157,22 @@ export function brainOrigin(
  *
  * Kept here as one exported constant rather than typed at each call site: the
  * moment it exists in two places, one of them gets softened.
+ *
+ * ── IT IS NO LONGER TRUE OF EVERY FIELD, AND THE WORDING SAYS SO ────────────
+ * It was written when one path existed. `brand_guidelines` reads the whole door
+ * text and returns fifteen fields in one object, so nothing links a field to a
+ * passage and nothing can — that half is unchanged and is why this constant
+ * still exists.
+ *
+ * The knowledge library added a SECOND path with a different property.
+ * `brand_extract` cites a block index, `attachProvenance` resolves that index
+ * against a list we built, and an index we did not supply drops the field. So a
+ * library-sourced field CAN show the passage it came from, and does
+ * (`components/brain/field-evidence.tsx`).
+ *
+ * Two states, both named, rather than one claim that is now half wrong. A blanket
+ * "Sahoda cannot show which sentence produced which field" printed above a field
+ * that is showing exactly that would teach the reader to disbelieve the page.
  */
 export const NO_PER_FIELD_EVIDENCE =
-  'Sahoda cannot show which sentence produced which field. It reads everything you give it in one pass and writes the whole Brain at once, so nothing links a field back to a line in your document — and it will not invent one.'
+  'For anything Sahoda worked out from a link or a PDF at signup, it cannot show which sentence produced which field — it read everything in one pass and wrote the whole Brain at once, and it will not invent a source it does not have. A field drawn from your Knowledge library is different: it names the document and quotes the passage, underneath the field itself.'

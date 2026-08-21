@@ -702,3 +702,276 @@ describe('search returns the passage, under the caller’s own policy', () => {
     expect(found).toEqual({ rows: [] })
   })
 })
+
+/**
+ * PROPOSING A LEARNING — the write the web app needed and did not have.
+ *
+ * `memory_events` had exactly one writer (apps/jobs, through a Postgres pool)
+ * and one client-reachable resolver. A library-backed resolve happens inside a
+ * request in apps/web, which has no service-role client at all, so it needed a
+ * function of its own.
+ *
+ * Every test here is about what that function CANNOT do.
+ */
+describe('a proposal is a proposal, and the database enforces it', () => {
+  it('writes a pending row and touches the Brand Brain nowhere', async () => {
+    const before = await db.query<{ n: number }>(
+      `select count(*)::int as n from brand_memory where workspace_id = $1`,
+      [WS_A],
+    )
+
+    const row = await db.query<{ status: string; source: string }>(
+      `select (public.propose_memory_event($1, $2::jsonb, $3::jsonb)).*`,
+      [
+        WS_A,
+        JSON.stringify({ patch: { hook: { core_promise: 'read from a menu' } } }),
+        JSON.stringify([{ document_id: docA }]),
+      ],
+    )
+    const after = await db.query<{ n: number }>(
+      `select count(*)::int as n from brand_memory where workspace_id = $1`,
+      [WS_A],
+    )
+
+    expect(row.rows[0]?.status).toBe('pending')
+    expect(row.rows[0]?.source).toBe('insight')
+    // The brain is byte-identical: not "unchanged as far as a screen can see",
+    // but the same number of rows, because this function names it nowhere.
+    expect(after.rows[0]).toEqual(before.rows[0])
+  })
+
+  it('has no way to write an accepted one — status is not a parameter', async () => {
+    // The signature itself is the guard. A caller cannot ask for `accepted`
+    // because there is nowhere to put the word.
+    const args = await db.query<{ args: string }>(
+      `select pg_get_function_identity_arguments(p.oid) as args
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'propose_memory_event'`,
+    )
+    expect(args.rows[0]?.args).toBe(
+      'p_workspace_id uuid, p_diff jsonb, p_evidence_refs jsonb, p_source text',
+    )
+    expect(args.rows[0]?.args).not.toContain('status')
+  })
+
+  it('refuses a malformed diff at the moment it is made', async () => {
+    // `resolve_memory_event` raises INVALID_DIFF on a patch that is not a
+    // non-empty object. Checking it here means a bad proposal cannot sit in the
+    // queue looking decidable and blow up when somebody presses Accept.
+    const noPatch = await attempt(`select public.propose_memory_event($1, '{}'::jsonb)`, [WS_A])
+    const emptyPatch = await attempt(
+      `select public.propose_memory_event($1, '{"patch":{}}'::jsonb)`,
+      [WS_A],
+    )
+    const notObject = await attempt(
+      `select public.propose_memory_event($1, '{"patch":"words"}'::jsonb)`,
+      [WS_A],
+    )
+    expect([verdict(noPatch), verdict(emptyPatch), verdict(notObject)]).toEqual([
+      'INVALID_DIFF',
+      'INVALID_DIFF',
+      'INVALID_DIFF',
+    ])
+  })
+
+  it('refuses a non-member and a signed-out caller, separately', async () => {
+    const other = await attemptAs(
+      USER_B,
+      `select public.propose_memory_event($1, '{"patch":{"a":1}}'::jsonb)`,
+      [WS_A],
+    )
+    const out = await attemptAs(
+      '',
+      `select public.propose_memory_event($1, '{"patch":{"a":1}}'::jsonb)`,
+      [WS_A],
+    )
+    expect(verdict(other)).toBe('NOT_A_MEMBER')
+    expect(verdict(out)).toBe('AUTH_REQUIRED')
+  })
+
+  it('refuses a source outside the four the table allows', async () => {
+    const bad = await attempt(
+      `select public.propose_memory_event($1, '{"patch":{"a":1}}'::jsonb, null, 'vibes')`,
+      [WS_A],
+    )
+    expect(verdict(bad)).toBe('INVALID_SOURCE')
+  })
+
+  /**
+   * THE ROUND TRIP. A proposal made here, accepted through the EXISTING resolver,
+   * lands in the brain carrying its provenance — because `field_meta` lives
+   * inside `payload` and the patch is deep-merged into it.
+   */
+  it('carries provenance into the brain when a person accepts it', async () => {
+    const ws = '33333333-3333-3333-3333-333333333333'
+    await db.exec(`
+      insert into workspaces (id, name, slug, created_by)
+        values ('${ws}', 'Gamma', 'gamma', 'user_gamma');
+      insert into workspace_members (workspace_id, user_id, role)
+        values ('${ws}', 'user_gamma', 'owner');
+    `)
+    await db.query(`select set_config('request.jwt.claims', $1, false)`, [
+      JSON.stringify({ sub: 'user_gamma', role: 'authenticated' }),
+    ])
+    const doc = await db.query<{ id: string }>(
+      `select (public.create_knowledge_document($1, 'menu', 'text', 'typed')).id`,
+      [ws],
+    )
+    const docId = doc.rows[0]!.id
+    await db.query(`select public.index_knowledge_document($1, $2::text[])`, [
+      docId,
+      ['Masala dosa is 90 rupees.'],
+    ])
+    await db.query(
+      `insert into brand_memory (workspace_id, version, status, payload, source)
+       values ($1, 1, 'active', $2::jsonb, 'resolved')`,
+      [ws, JSON.stringify(BRAIN)],
+    )
+
+    const proposed = await db.query<{ id: string }>(
+      `select (public.propose_memory_event($1, $2::jsonb, $3::jsonb)).id`,
+      [
+        ws,
+        JSON.stringify({
+          patch: {
+            hook: { core_promise: 'a dosa in five minutes' },
+            field_meta: {
+              'hook.core_promise': {
+                kind: 'negotiated',
+                confirmed: false,
+                source: `document:${docId}`,
+              },
+            },
+          },
+        }),
+        JSON.stringify([{ document_id: docId, ordinal: 0 }]),
+      ],
+    )
+
+    const accepted = await db.query<{ r: Record<string, unknown> }>(
+      `select public.resolve_memory_event($1, 'accepted') as r`,
+      [proposed.rows[0]!.id],
+    )
+    const brain = await db.query<{ payload: Record<string, unknown> }>(
+      `select payload from brand_memory where workspace_id = $1 and status = 'active'`,
+      [ws],
+    )
+
+    expect(accepted.rows[0]!.r).toMatchObject({ status: 'accepted', brand_memory_changed: true })
+
+    const payload = brain.rows[0]!.payload as {
+      hook: { core_promise: string }
+      field_meta: Record<string, { confirmed: boolean; source: string }>
+    }
+    expect(payload.hook.core_promise).toBe('a dosa in five minutes')
+    // THE POINT OF THE WHOLE FEATURE: the brain now names the document a value
+    // came from — and still calls it unconfirmed, because accepting a proposal
+    // is not the same act as standing behind the wording.
+    expect(payload.field_meta['hook.core_promise']).toEqual({
+      kind: 'negotiated',
+      confirmed: false,
+      source: `document:${docId}`,
+    })
+    // And the rest of the brain is untouched by the deep merge.
+    expect(payload.hook).toMatchObject({ primary_emotion: 'calm' })
+  })
+})
+
+/**
+ * THE DELETE GATE AND A PASSAGE-LEVEL CITATION.
+ *
+ * `20260822000000` matched a citation exactly — `document:<uuid>` — and the
+ * console needs a narrower one, `document:<uuid>#<ordinal>`, so a field can show
+ * the sentence rather than only the file. An exact match stops seeing that, and
+ * the failure is silent: the gate still runs, reports `brand_fields: 0` about a
+ * document every field came from, and lets the delete through without the
+ * acknowledgement it exists to demand.
+ *
+ * Both shapes are asserted, because a fix that counted only the new one would
+ * have moved the hole rather than closed it.
+ */
+describe('a citation counts whether it names the document or one passage of it', () => {
+  async function documentCitedAs(source: string): Promise<{ id: string; ws: string }> {
+    const ws = `44444444-4444-4444-8444-${Math.floor(Math.random() * 1e12)
+      .toString()
+      .padStart(12, '0')}`
+    const user = `user_cite_${ws.slice(-6)}`
+    await db.exec(`
+      insert into workspaces (id, name, slug, created_by)
+        values ('${ws}', 'Cite ${ws.slice(-6)}', 'cite-${ws.slice(-6)}', '${user}');
+      insert into workspace_members (workspace_id, user_id, role)
+        values ('${ws}', '${user}', 'owner');
+    `)
+    await db.query(`select set_config('request.jwt.claims', $1, false)`, [
+      JSON.stringify({ sub: user, role: 'authenticated' }),
+    ])
+    const doc = await db.query<{ id: string }>(
+      `select (public.create_knowledge_document($1, 'cited doc', 'text', 'typed')).id`,
+      [ws],
+    )
+    const id = doc.rows[0]!.id
+    await db.query(`select public.index_knowledge_document($1, $2::text[])`, [id, ['a passage']])
+    await db.query(
+      `insert into brand_memory (workspace_id, version, status, payload, source)
+       values ($1, 1, 'active', $2::jsonb, 'resolved')`,
+      [
+        ws,
+        JSON.stringify({
+          ...BRAIN,
+          field_meta: {
+            'hook.core_promise': {
+              kind: 'negotiated',
+              confirmed: false,
+              source: source.replace('{id}', id),
+            },
+          },
+        }),
+      ],
+    )
+    return { id, ws }
+  }
+
+  it('refuses when the citation names the whole document', async () => {
+    const { id } = await documentCitedAs('document:{id}')
+    const refused = await attempt(`select public.delete_knowledge_document($1)`, [id])
+    expect(verdict(refused)).toBe('NEEDS_ACKNOWLEDGEMENT')
+  })
+
+  it('refuses when the citation names ONE PASSAGE of it', async () => {
+    const { id } = await documentCitedAs('document:{id}#3')
+    const refused = await attempt(`select public.delete_knowledge_document($1)`, [id])
+    expect(verdict(refused)).toBe('NEEDS_ACKNOWLEDGEMENT')
+    // And the count is right, not merely non-zero.
+    const counted = await db.query<{ r: Record<string, unknown> }>(
+      `select public.delete_knowledge_document($1, true) as r`,
+      [id],
+    )
+    expect(counted.rows[0]!.r).toMatchObject({ brand_fields: 1 })
+  })
+
+  it('does NOT match a different document whose id merely starts the same way', async () => {
+    // The pattern is anchored by construction — a uuid is a fixed 36 characters —
+    // and this asserts it rather than assuming it.
+    const { id } = await documentCitedAs('document:{id}')
+    const other = await db.query<{ id: string }>(
+      `select (public.create_knowledge_document($1, 'unrelated', 'text', 'typed')).id`,
+      [
+        (
+          await db.query<{ w: string }>(
+            `select workspace_id as w from knowledge_documents where id = $1`,
+            [id],
+          )
+        ).rows[0]!.w,
+      ],
+    )
+    await db.query(`select public.index_knowledge_document($1, $2::text[])`, [
+      other.rows[0]!.id,
+      ['nobody cites me'],
+    ])
+    const gone = await db.query<{ r: Record<string, unknown> }>(
+      `select public.delete_knowledge_document($1) as r`,
+      [other.rows[0]!.id],
+    )
+    expect(gone.rows[0]!.r).toMatchObject({ brand_fields: 0, deleted: true })
+  })
+})

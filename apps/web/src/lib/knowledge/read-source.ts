@@ -4,6 +4,7 @@ import { UnsafeUrlError, parsePage, safeFetch, stripCorpusNoise } from '@sahoda/
 
 import { extractPdfText } from './extract-pdf'
 import type { KnowledgeFailureCode } from './failure-copy'
+import { MAX_UPLOAD_BYTES } from './limits'
 
 /**
  * The three doors, reduced to one answer: text, or a named reason there is none.
@@ -30,13 +31,12 @@ export type SourceRead =
   | { ok: false; code: KnowledgeFailureCode }
 
 /**
- * A ceiling on the upload itself, before anything is parsed.
- *
- * The same 2 MB `packages/research` already applies to a fetched page
- * (`DEFAULT_MAX_BYTES`), for the same reason: an uncapped read is a way to
- * exhaust this server's memory, and a document larger than this is not a menu.
+ * Re-exported so a server caller has one import, and DEFINED in `./limits`
+ * because this module is `server-only` and the upload dialog is a client
+ * component that has to show the cap. Importing a `server-only` module from a
+ * client component 500s every route in the app — see the note in `limits.ts`.
  */
-export const MAX_UPLOAD_BYTES = 2_000_000
+export { MAX_UPLOAD_BYTES }
 
 export async function readPdfSource(file: {
   name: string

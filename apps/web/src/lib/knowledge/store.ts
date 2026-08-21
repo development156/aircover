@@ -219,3 +219,106 @@ export async function readCurrentPassages(limit: number): Promise<SearchRead> {
     return { status: 'unreadable' }
   }
 }
+
+/**
+ * A `field_meta.source` string → the document and passage it names.
+ *
+ * ── THE CITATION SHAPE ──────────────────────────────────────────────────────
+ *   `document:<uuid>`            the whole document
+ *   `document:<uuid>#<ordinal>`  one passage of it
+ *
+ * Anything else — `owner`, `model:brand_guidelines`, a URL, a pack path — is not
+ * a library citation and returns nothing. That is the ordinary case and not a
+ * degraded read.
+ */
+export function parseDocumentCitation(
+  source: string | undefined,
+): { documentId: string; ordinal: number | null } | null {
+  if (!source || !source.startsWith('document:')) return null
+  const rest = source.slice('document:'.length)
+  const hash = rest.indexOf('#')
+  if (hash === -1) return { documentId: rest, ordinal: null }
+  const ordinal = Number(rest.slice(hash + 1))
+  return {
+    documentId: rest.slice(0, hash),
+    ordinal: Number.isInteger(ordinal) && ordinal >= 0 ? ordinal : null,
+  }
+}
+
+export interface CitedPassage {
+  documentId: string
+  documentTitle: string
+  ordinal: number | null
+  /** The passage, or `null` when only the document was cited or it has gone. */
+  text: string | null
+  /** True when the document itself is no longer in the library. */
+  missing: boolean
+}
+
+/**
+ * Resolve a batch of citations to what they name, in ONE round trip.
+ *
+ * ── WHY A DELETED DOCUMENT IS `missing` AND NOT AN ERROR ────────────────────
+ * `delete_knowledge_document` deliberately does NOT retract what the brain
+ * learned: a fact the owner confirmed is theirs, and silently unlearning it
+ * would be a second and larger surprise. So a field can outlive its source, and
+ * the console has to say "this came from a document you have since deleted"
+ * rather than either hiding the field or pretending the document is still there.
+ */
+export async function readCitedPassages(
+  sources: readonly string[],
+): Promise<Map<string, CitedPassage>> {
+  const out = new Map<string, CitedPassage>()
+
+  const parsed = sources
+    .map((source) => ({ source, cite: parseDocumentCitation(source) }))
+    .filter((entry): entry is { source: string; cite: NonNullable<typeof entry.cite> } =>
+      Boolean(entry.cite),
+    )
+  if (parsed.length === 0) return out
+
+  try {
+    const workspace = await readActiveWorkspace()
+    if (workspace.status !== 'ok') return out
+
+    const ids = [...new Set(parsed.map((entry) => entry.cite.documentId))]
+    const supabase = createServerSupabase()
+
+    const [documents, passages] = await Promise.all([
+      supabase.from('knowledge_documents').select('id, title').in('id', ids),
+      supabase
+        .from('knowledge_current_chunks')
+        .select('document_id, ordinal, text')
+        .in('document_id', ids),
+    ])
+
+    const titles = new Map(
+      ((documents.data ?? []) as { id: string; title: string }[]).map((d) => [d.id, d.title]),
+    )
+    const text = new Map(
+      ((passages.data ?? []) as { document_id: string; ordinal: number; text: string }[]).map(
+        (c) => [`${c.document_id}#${c.ordinal}`, c.text],
+      ),
+    )
+
+    for (const { source, cite } of parsed) {
+      const title = titles.get(cite.documentId)
+      out.set(source, {
+        documentId: cite.documentId,
+        documentTitle: title ?? 'a document you have deleted',
+        ordinal: cite.ordinal,
+        text:
+          cite.ordinal === null ? null : (text.get(`${cite.documentId}#${cite.ordinal}`) ?? null),
+        missing: title === undefined,
+      })
+    }
+  } catch (error) {
+    // A failed read leaves the map EMPTY, which renders no evidence — the same
+    // as a field that has none. It must never render a partial citation, which
+    // would be a claim about where a value came from built from a query that
+    // did not answer.
+    console.error('[knowledge] citation read threw', error instanceof Error ? error.message : '?')
+  }
+
+  return out
+}

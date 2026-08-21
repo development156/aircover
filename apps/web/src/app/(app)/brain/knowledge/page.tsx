@@ -4,10 +4,12 @@ import { Library } from 'lucide-react'
 import { AddDocument } from '@/components/knowledge/add-document'
 import { DocumentRow } from '@/components/knowledge/document-row'
 import { LibrarySearch } from '@/components/knowledge/library-search'
+import { ResolveFromLibrary } from '@/components/knowledge/resolve-from-library'
 import { EmptyState } from '@/components/empty-state'
 import { buttonVariants } from '@/components/ui/button'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { readLibrary, searchLibrary } from '@/lib/knowledge/store'
+import { creditCost } from '@sahoda/shared'
 
 export const metadata = { title: 'Knowledge' }
 
@@ -99,6 +101,11 @@ export default async function BrainKnowledgePage({
         results={search?.status === 'ok' ? search.passages : []}
         unreadable={search !== null && search.status !== 'ok'}
       />
+
+      {/* Only once there is something to read. An offer to read an empty
+          library is a button that can only disappoint, and the empty state
+          already asks for the one thing that fixes it. */}
+      {indexed > 0 ? <ResolveFromLibrary cost={creditCost('brand_research')} /> : null}
 
       <section aria-labelledby="knowledge-documents" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">

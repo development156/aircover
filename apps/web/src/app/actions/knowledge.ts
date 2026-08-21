@@ -16,6 +16,9 @@ import {
 import type { SourceRead } from '@/lib/knowledge/read-source'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
+import { proposeFromLibrary } from '@/lib/knowledge/propose'
+import { readCurrentPassages } from '@/lib/knowledge/store'
+import { MAX_EVIDENCE_CHUNKS } from '@sahoda/research'
 import { workspaceForWrite } from '@/lib/workspaces'
 
 /**
@@ -489,4 +492,112 @@ export async function readDeleteImpact(
   ).length
 
   return { brandFields, pendingProposals }
+}
+
+export interface LibraryResolveState {
+  ok: boolean
+  message: string
+  /** How many proposals were written. Rendered as a number, never as "some". */
+  proposed?: number
+  /** Documents the evidence came from, named so the receipt is checkable. */
+  documents?: string[]
+}
+
+/**
+ * READ THE LIBRARY AND OFFER WHAT IT SAYS — the point of the whole feature.
+ *
+ * ── WHAT THIS DOES NOT DO ───────────────────────────────────────────────────
+ * It does not write the Brand Brain. Every field it produces becomes a PENDING
+ * `memory_events` row through `public.propose_memory_event`, which names
+ * `brand_memory` nowhere and has no parameter for `status`. The only path from
+ * a proposal to the brain is a person pressing Accept.
+ *
+ * It does not confirm anything. Each patch carries `confirmed: false` beside its
+ * value, and there is no code path here that could write `true` — the same
+ * structural property `ExtractedFieldWire` has, one layer up.
+ *
+ * It does not invent. A model that cannot be reached produces nothing and says
+ * so; `packages/research/CLAUDE.md` states the rule ("never invent a brand voice
+ * and present it as extracted") and it holds identically here.
+ *
+ * ── THIS ONE DOES SPEND ─────────────────────────────────────────────────────
+ * Unlike everything else on the knowledge path, this makes a model call. It is
+ * therefore the one control on the screen that carries a cost, and the cost is
+ * `brand_research`'s — the same task, the same tier, reading a different corpus.
+ */
+export async function resolveFromLibrary(): Promise<LibraryResolveState> {
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to read your library.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+
+    const passages = await readCurrentPassages(MAX_EVIDENCE_CHUNKS)
+    if (passages.status !== 'ok') {
+      return {
+        ok: false,
+        message:
+          'Sahoda could not read your library just now. This is not a claim that it is empty — the read did not come back. Try again.',
+      }
+    }
+
+    const outcome = await proposeFromLibrary({
+      passages: passages.passages,
+      workspaceId: ws.workspace.id,
+      userId,
+      traceId: randomUUID(),
+    })
+
+    if (outcome.status === 'no-passages') {
+      return {
+        ok: false,
+        message: 'There is nothing in your library yet. Add a document and Sahoda can read it.',
+      }
+    }
+    if (outcome.status === 'model-unavailable') {
+      return {
+        ok: false,
+        message:
+          'Sahoda could not reach the model, so it has nothing to suggest. Nothing was written and nothing was charged — try again.',
+      }
+    }
+
+    const supabase = createServerSupabase()
+    let written = 0
+    for (const proposal of outcome.proposals) {
+      const { error } = await supabase.rpc('propose_memory_event', {
+        p_workspace_id: ws.workspace.id,
+        p_diff: { patch: proposal.patch, path: proposal.path },
+        p_evidence_refs: proposal.evidence ? [proposal.evidence] : null,
+        p_source: 'insight',
+      })
+      if (!error) written += 1
+    }
+
+    revalidatePath('/brain/resolve')
+    revalidatePath('/brain')
+
+    if (written === 0) {
+      return {
+        ok: false,
+        documents: outcome.documents,
+        message:
+          'Sahoda read your library and found nothing it could turn into a Brand Brain field. That is an honest outcome — a menu of prices says a lot about what you sell and little about how you sound.',
+      }
+    }
+
+    return {
+      ok: true,
+      proposed: written,
+      documents: outcome.documents,
+      message: `Sahoda read ${outcome.documents.length} ${outcome.documents.length === 1 ? 'document' : 'documents'} and has ${written} ${written === 1 ? 'suggestion' : 'suggestions'} for you. Nothing has changed in your Brand Brain — each one is waiting for you to agree with it.`,
+    }
+  } catch (error) {
+    reportServerError(error, { action: 'knowledge.resolveFromLibrary' })
+    return {
+      ok: false,
+      message: 'Sahoda broke while reading your library. Nothing was written — try again.',
+    }
+  }
 }

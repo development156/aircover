@@ -16,10 +16,20 @@ import type { BrandMemoryPayload } from '@sahoda/shared'
 
 import { CertaintyMark } from './certainty-mark'
 import { ResolutionRow } from './resolution-row'
+import type { CitedPassage } from '@/lib/knowledge/store'
 
 export interface ResolutionConsoleProps {
   payload: BrandMemoryPayload
   provenance: Provenance
+  /**
+   * Field path → the library passage it came from, when it came from one.
+   *
+   * Absent for every field `brand_guidelines` wrote, which is most of them and
+   * is not a degraded read — `brain-origin.ts` explains why that path can never
+   * have per-field evidence. Present only where a citation was resolved from an
+   * index WE supplied.
+   */
+  evidence?: ReadonlyMap<string, CitedPassage>
 }
 
 /**
@@ -29,7 +39,7 @@ export interface ResolutionConsoleProps {
  * with the two ways to settle each one and a single bulk accept for the ones a
  * person has read and agreed with.
  */
-export function ResolutionConsole({ payload, provenance }: ResolutionConsoleProps) {
+export function ResolutionConsole({ payload, provenance, evidence }: ResolutionConsoleProps) {
   const queue = useMemo(() => resolutionQueue(payload, provenance), [payload, provenance])
   const settled = useMemo(() => settledFields(payload, provenance), [payload, provenance])
   const tally = queueTally(queue)
@@ -171,6 +181,7 @@ export function ResolutionConsole({ payload, provenance }: ResolutionConsoleProp
             <ResolutionRow
               key={entry.field.path}
               entry={entry}
+              cited={evidence?.get(entry.field.path) ?? null}
               selected={picked.has(entry.field.path)}
               onSelectedChange={(next) => toggle(entry.field.path, next)}
               onResolved={resolved}
