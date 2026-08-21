@@ -72,6 +72,24 @@ export function AddDocument() {
   const fileRef = useRef<HTMLInputElement>(null)
   const fileId = useId()
   const capId = useId()
+  /**
+   * ── PER-INSTANCE IDS, AND WHY IT IS NOT A DETAIL ─────────────────────────
+   * This component renders TWICE on the empty state — once in the page header
+   * and once inside the empty state itself — which is deliberate: a control that
+   * reports an outcome has to outlive the state change it causes, and
+   * `assets/page.tsx` records the bug that taught it.
+   *
+   * With hardcoded ids that duplication put two elements with the SAME `id` in
+   * one document. That is invalid HTML, and the practical effect is worse than
+   * the standards violation: `<label for="knowledge-text-title">` resolves to the
+   * FIRST match, so every label in the second dialog pointed at a control inside
+   * the first — clicking one focused a field in a different, closed dialog, and
+   * a screen reader announced the wrong association.
+   *
+   * Found by a Playwright locator reporting "resolved to 2 elements", which was a
+   * test being confused by a real defect rather than a flaky selector.
+   */
+  const ids = useId()
 
   const submit = (action: (data: FormData) => Promise<KnowledgeActionState>) => {
     return (event: React.FormEvent<HTMLFormElement>) => {
@@ -180,8 +198,8 @@ export function AddDocument() {
                   so rather than store an empty document.
                 </p>
               </div>
-              <Field label="Name it (optional)" htmlFor="knowledge-pdf-title">
-                <Input id="knowledge-pdf-title" name="title" placeholder="Autumn menu" />
+              <Field label="Name it (optional)" htmlFor={`${ids}-pdf-title`}>
+                <Input id={`${ids}-pdf-title`} name="title" placeholder="Autumn menu" />
               </Field>
               <Submit pending={pending}>Add PDF</Submit>
             </form>
@@ -189,9 +207,9 @@ export function AddDocument() {
 
           {door === 'url' ? (
             <form onSubmit={submit(addUrlDocument)} className="flex flex-col gap-3">
-              <Field label="Address of the page" htmlFor="knowledge-url">
+              <Field label="Address of the page" htmlFor={`${ids}-url`}>
                 <Input
-                  id="knowledge-url"
+                  id={`${ids}-url`}
                   name="url"
                   placeholder="yourshop.com/menu"
                   required
@@ -199,8 +217,8 @@ export function AddDocument() {
                   autoComplete="url"
                 />
               </Field>
-              <Field label="Name it (optional)" htmlFor="knowledge-url-title">
-                <Input id="knowledge-url-title" name="title" placeholder="Menu page" />
+              <Field label="Name it (optional)" htmlFor={`${ids}-url-title`}>
+                <Input id={`${ids}-url-title`} name="title" placeholder="Menu page" />
               </Field>
               <Submit pending={pending}>Read this page</Submit>
             </form>
@@ -208,17 +226,12 @@ export function AddDocument() {
 
           {door === 'text' ? (
             <form onSubmit={submit(addTypedDocument)} className="flex flex-col gap-3">
-              <Field label="Name it" htmlFor="knowledge-text-title">
-                <Input
-                  id="knowledge-text-title"
-                  name="title"
-                  placeholder="Opening hours"
-                  required
-                />
+              <Field label="Name it" htmlFor={`${ids}-text-title`}>
+                <Input id={`${ids}-text-title`} name="title" placeholder="Opening hours" required />
               </Field>
-              <Field label="What Sahoda should know" htmlFor="knowledge-text-body">
+              <Field label="What Sahoda should know" htmlFor={`${ids}-text-body`}>
                 <Textarea
-                  id="knowledge-text-body"
+                  id={`${ids}-text-body`}
                   name="text"
                   rows={6}
                   required

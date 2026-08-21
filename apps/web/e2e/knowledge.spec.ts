@@ -57,27 +57,45 @@ async function bootstrapWorkspace(page: Page): Promise<void> {
   await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
 }
 
+/**
+ * Pick one of the three doors.
+ *
+ * THE LABEL, NOT THE INPUT, AND ADDRESSED BY THE INPUT IT CONTAINS.
+ *
+ * The picker is a card radio: a visually-hidden `<input type="radio">` inside a
+ * `<label>` that carries the whole card. Two things follow, and the first draft
+ * of this helper hit both.
+ *
+ *   - `.check()` targets the input, and Playwright reports "<label> intercepts
+ *     pointer events". That is not a defect: it is the card doing its job.
+ *   - `getByText('Something you type')` is a STRICT MODE VIOLATION, because the
+ *     words appear in the <span> and, by containment, in the <label> around it.
+ *
+ * So the card is addressed by the one thing that is unique to it -- the value of
+ * the input it wraps -- and the radio is then asserted checked rather than the
+ * click being trusted.
+ */
+async function pickDoor(page: Page, value: 'pdf' | 'url' | 'text'): Promise<void> {
+  // Scoped to the OPEN dialog. `AddDocument` renders twice on the empty state,
+  // so an unscoped locator resolves to two — one of them inside a dialog nobody
+  // opened. `getByRole('dialog')` matches only an OPEN `<dialog>`, which is
+  // exactly the disambiguation a person's eyes do.
+  const dialog = page.getByRole('dialog')
+  await dialog.locator(`label:has(input[name="door"][value="${value}"])`).click()
+  await expect(dialog.locator(`input[name="door"][value="${value}"]`)).toBeChecked()
+}
+
 /** Add a typed document through the dialog, exactly as a person would. */
 async function addTyped(page: Page, title: string, body: string): Promise<void> {
   await page
     .getByRole('button', { name: /add to library/i })
     .first()
     .click()
-  /**
-   * THE LABEL, NOT THE INPUT.
-   *
-   * The door picker is a card radio: a visually-hidden `<input type="radio">`
-   * inside a `<label>` that carries the whole card. `.check()` targets the input
-   * and Playwright reports `<label> intercepts pointer events`, which is not a
-   * defect — it is the card doing its job. A person clicks the card, so the test
-   * clicks the card, and then asserts the radio actually became checked rather
-   * than trusting the click landed.
-   */
-  await page.getByText('Something you type', { exact: true }).click()
-  await expect(page.getByRole('radio', { name: /something you type/i })).toBeChecked()
-  await page.getByLabel('Name it', { exact: true }).fill(title)
-  await page.getByLabel(/what sahoda should know/i).fill(body)
-  await page.getByRole('button', { name: /save this/i }).click()
+  await pickDoor(page, 'text')
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Name it', { exact: true }).fill(title)
+  await dialog.getByLabel(/what sahoda should know/i).fill(body)
+  await dialog.getByRole('button', { name: /save this/i }).click()
   await expect(page.getByText(/read and indexed/i)).toBeVisible({ timeout: 60_000 })
   await page.keyboard.press('Escape')
 }

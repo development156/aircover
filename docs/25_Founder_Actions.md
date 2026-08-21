@@ -304,3 +304,71 @@ you just made, which is innocent.
 permanently. It is a one-line change to the root `package.json` and it was
 deliberately NOT made here — the gate script is a repo-wide contract and this
 evidence comes from one machine.
+
+---
+
+## 13. Four migrations applied for the Knowledge Library — 22 August 2026
+
+Applied to the production project (`rloztdhzfliyvpvxsgjl`), one at a time, through
+`packages/db/scripts/apply-one-migration.mjs --apply`. `schema_migrations`: **54 → 58**.
+
+| version | what it does |
+|---|---|
+| `20260822000000_knowledge_library` | `knowledge_documents` + `knowledge_chunks` + the `knowledge_current_chunks` view + five write functions |
+| `20260822000100_knowledge_revoke_anon` | takes EXECUTE on those five away from `anon` |
+| `20260822000200_propose_memory_event` | lets `apps/web` offer a Brand Brain change as a pending proposal |
+| `20260822000300_delete_gate_matches_passage_citations` | the delete gate counts a passage-level citation, not only a document-level one |
+
+**Nothing that was working before can be affected by these.** Both tables are new,
+all six functions are new, and the one function that was REPLACED
+(`delete_knowledge_document`) had existed for four minutes and had no caller in a
+deployed build.
+
+### Three things worth knowing, each measured rather than assumed
+
+**There is no pgvector on this project.** `pg_extension` holds five extensions and
+`vector` is not among them; it is available (0.8.2) and not installed. So the
+library searches with Postgres full-text search — free, deterministic, no model
+call — and `packages/db/CLAUDE.md` was already right that "pgvector HNSW for
+`brand_embeddings` is post-Alpha (not in this schema)". The root `CLAUDE.md`'s
+stack line still says `db(Supabase+RLS+pgvector)`, which describes an intention
+rather than the database.
+
+**The library needs no new storage rules.** `storage.objects` already carries
+`tenant_media_{read,insert,update,delete}` scoped by
+`(storage.foldername(name))[1]::uuid IN app.member_workspace_ids()` for the `media`
+and `brand-assets` buckets. Files go to `media/<workspace_id>/knowledge/<uuid>.pdf`,
+so the same policy rows that protect a customer's photos protect their documents.
+Verified live: workspace B could not download A's file by its exact path, could not
+list A's folder, and could not write into it.
+
+**`revoke all … from public` does not do what it reads like.** It removes the PUBLIC
+pseudo-role's grant and leaves the one Supabase's default privileges hand DIRECTLY to
+`anon`. Measured right after the first file applied: `resolve_brand_memory`,
+`resolve_memory_event` and `upsert_connection` all deny `anon`; all five new functions
+allowed it. `20260822000100` is the correction, and it asserts the resulting
+privileges at apply time because a revoke that targets nothing succeeds silently.
+**`public.delete_asset` has the same gap** and was deliberately left alone: it is
+`security invoker`, so an anon caller is refused by RLS rather than by a membership
+check, and it belongs to another lane. Recorded here rather than quietly changed.
+
+### Two things you may want to decide
+
+**A defect that shipped before this lane and is now fixed.**
+`public.resolve_memory_event` writes new brain versions with `source = 'system'` —
+and so does the model-unreachable fallback. `/brain/resolve` renders `'system'` as
+"A sample, not your brand… These are not answers about your business", in the danger
+palette with an alert role. So accepting a Loop learning told the owner their whole
+Brand Brain was a fabricated placeholder. Measured against production on a throwaway
+workspace. The fix reads `memory_events.applied_memory_version` to tell the two
+apart, rather than adding a fourth value to `BrandMemorySourceSchema` — which would
+have meant moving a frozen contract to correct a rendering bug. If you would rather
+have the fourth value, that is a schema change and a shared-package change, and it
+is your call.
+
+**Ingestion is free and has no entry in `pricing.config.json`.** Parsing is local,
+chunking is arithmetic, and search is the database's own index — no model is called
+when a document is added, searched or deleted. The one control that DOES spend is
+"Read my library", which runs `brand_extract`, and it carries `brand_research`'s
+price in its own label. If you want adding a document to cost credits, that is a
+pricing decision and nothing in the code assumes either answer.
