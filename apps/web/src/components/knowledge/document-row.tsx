@@ -9,9 +9,13 @@ import type { DeleteKnowledgeState } from '@/app/actions/knowledge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
-import { instructionSamples } from '@/lib/knowledge/store'
 import type { KnowledgeDocument } from '@/lib/knowledge/store'
-import { passagePhrase, sourceLabel, statusView } from '@/lib/knowledge/status-view'
+import {
+  instructionSamples,
+  passagePhrase,
+  sourceLabel,
+  statusView,
+} from '@/lib/knowledge/status-view'
 
 /**
  * One document in the library.

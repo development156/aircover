@@ -120,3 +120,31 @@ export function passagePhrase(document: KnowledgeDocument): string | null {
   const n = document.chunk_count
   return `${n.toLocaleString('en-IN')} ${n === 1 ? 'passage' : 'passages'}`
 }
+
+/**
+ * The verbatim spans `neutralize` rewrote, as the row stores them.
+ *
+ * ── WHY IT LIVES HERE AND NOT IN `store.ts` ─────────────────────────────────
+ * It did, and the build refused it: `document-row.tsx` is `'use client'` and
+ * `store.ts` opens with `import 'server-only'`, so importing this VALUE across
+ * that line 500s every route in the app. `client-imports-server-only.test.ts`
+ * named the file and the reason before the build did; it was written earlier
+ * this session for the identical mistake one module over.
+ *
+ * A parser has no server in it. This file is where the row's other rendering
+ * helpers already live and is imported by the client freely.
+ *
+ * Parsed defensively rather than trusted: `instruction_samples` is `jsonb` with a
+ * `'[]'` default and no shape constraint, so a row written by an older build — or
+ * by hand — must degrade to "no samples" and never throw on a render path.
+ */
+export function instructionSamples(raw: unknown): { kind: string; found: string }[] {
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return []
+    const kind = (entry as { kind?: unknown }).kind
+    const found = (entry as { found?: unknown }).found
+    if (typeof found !== 'string' || found.trim().length === 0) return []
+    return [{ kind: typeof kind === 'string' ? kind : 'span', found }]
+  })
+}
