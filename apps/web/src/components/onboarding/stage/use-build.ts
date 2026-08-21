@@ -56,7 +56,6 @@ export interface UseBuildArgs {
   workspaceName: string
   reduced: boolean
   orb: { current: OrbHandle | null }
-  onLeaveProcessing: () => void
   onBuilt: () => void
   /** Called when the build decides the read is not going to land in time. */
   onDoorSettled: (outcome: DoorOutcome) => void
@@ -89,7 +88,6 @@ export function useBuild({
   workspaceName,
   reduced,
   orb,
-  onLeaveProcessing,
   onBuilt,
   onDoorSettled,
 }: UseBuildArgs) {

@@ -142,7 +142,6 @@ export function OnboardingStage({
     workspaceName,
     reduced: reduced.current,
     orb,
-    onLeaveProcessing: () => moveTo(orbWrapRef.current),
     onBuilt: () => go('result', 1),
     onDoorSettled: setDoor,
   })
