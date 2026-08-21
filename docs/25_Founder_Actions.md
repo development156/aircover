@@ -310,7 +310,13 @@ evidence comes from one machine.
 ## 13. Four migrations applied for the Knowledge Library — 22 August 2026
 
 Applied to the production project (`rloztdhzfliyvpvxsgjl`), one at a time, through
-`packages/db/scripts/apply-one-migration.mjs --apply`. `schema_migrations`: **54 → 58**.
+`packages/db/scripts/apply-one-migration.mjs --apply`. These four took
+`schema_migrations` from **54 to 58**.
+
+That is a DELTA, not the current total. Other lanes applied five more the same day
+(`playbooks` ×3, `radar` ×2) and the count read **63** a few hours later — so a
+future reader comparing 58 against the live number will find a gap that is nobody's
+mistake. Compare the version stamps, not the count.
 
 | version | what it does |
 |---|---|
