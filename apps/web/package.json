@@ -40,7 +40,9 @@
   },
   "devDependencies": {
     "@clerk/testing": "^2.2.10",
+    "@electric-sql/pglite": "^0.5.4",
     "@playwright/test": "^1.61.1",
+    "@sahoda/db": "workspace:*",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
