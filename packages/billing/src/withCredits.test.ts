@@ -34,18 +34,27 @@ class FakePort implements LedgerPort {
       if (this.holdOutcome === 'throw') throw new Error('ledger: connection reset')
       this.held += input.amount
       this.holdAmounts.set(id, input.amount)
-      return { entry: { id, balanceAfter: this.total - this.held }, replayed: false }
+      return {
+        entry: { id, balanceAfter: this.total - this.held, amount: input.amount },
+        replayed: false,
+      }
     }
     if (input.entryType === 'DEBIT') {
       if (this.debitOutcome === 'throw') throw new Error('ledger: HOLD_ALREADY_SETTLED')
       this.total -= input.amount
       this.held -= this.holdAmounts.get(input.settlesEntryId ?? '') ?? 0
-      return { entry: { id, balanceAfter: this.total }, replayed: false }
+      return {
+        entry: { id, balanceAfter: this.total, amount: input.amount },
+        replayed: false,
+      }
     }
     if (input.entryType === 'RELEASE') {
       if (this.releaseOutcome === 'throw') throw new Error('ledger: release write failed')
       this.held -= this.holdAmounts.get(input.settlesEntryId ?? '') ?? 0
-      return { entry: { id, balanceAfter: this.total }, replayed: false }
+      return {
+        entry: { id, balanceAfter: this.total, amount: input.amount },
+        replayed: false,
+      }
     }
     throw new Error(`FakePort got unexpected entry type ${input.entryType}`)
   }

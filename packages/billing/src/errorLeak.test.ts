@@ -20,7 +20,7 @@ class ThrowingPort implements LedgerPort {
   constructor(private readonly where: 'latestHold' | 'apply') {}
   async apply(input: ApplyLedgerInput): Promise<LedgerApplyResult> {
     if (this.where === 'apply') throw new Error(LEAKY)
-    return { entry: { id: 'h1', balanceAfter: 100 }, replayed: false }
+    return { entry: { id: 'h1', balanceAfter: 100, amount: input.amount }, replayed: false }
   }
   async latestHold(): Promise<LatestHold | null> {
     if (this.where === 'latestHold') throw new Error(LEAKY)
@@ -33,7 +33,10 @@ class ThrowingPort implements LedgerPort {
 
 class OkPort implements LedgerPort {
   async apply(input: ApplyLedgerInput): Promise<LedgerApplyResult> {
-    return { entry: { id: `e-${input.entryType}`, balanceAfter: 50 }, replayed: false }
+    return {
+      entry: { id: `e-${input.entryType}`, balanceAfter: 50, amount: input.amount },
+      replayed: false,
+    }
   }
   async latestHold(): Promise<LatestHold | null> {
     return null

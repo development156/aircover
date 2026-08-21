@@ -1,0 +1,11 @@
+[
+  {
+    "id": "1",
+    "tenant_id": "default",
+    "at": "1786712944528",
+    "delta": 5000,
+    "reason": "opening balance",
+    "job_id": null,
+    "entry_key": null
+  }
+]

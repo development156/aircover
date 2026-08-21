@@ -146,8 +146,19 @@ export async function updateCampaign(
     if (!parsed.success) return { ok: false, field: 'name', message: 'Give the campaign a name.' }
 
     const supabase = createServerSupabase()
-    const { error } = await supabase.from('campaigns').update(parsed.data).eq('id', campaignId)
+    // `.select('id')` because a PostgREST update matching zero rows returns NO error.
+    // Zero rows is a refusal — an RLS denial or a stale id — not a success, and
+    // reporting it as one tells the customer their change happened when it did not.
+    // Same shape as disconnectConnection and deletePost.
+    const { data, error } = await supabase
+      .from('campaigns')
+      .update(parsed.data)
+      .eq('id', campaignId)
+      .select('id')
     if (error) return { ok: false, message: mapCampaignError(error) }
+    if (!data || data.length === 0) {
+      return { ok: false, message: 'That campaign is no longer here.' }
+    }
 
     revalidatePath('/campaigns')
     revalidatePath(`/campaigns/${campaignId}`)
@@ -188,11 +199,19 @@ export async function setCampaignStatus(
     if (!parsed.success) return { ok: false, message: 'That is not a campaign status.' }
 
     const supabase = createServerSupabase()
-    const { error } = await supabase
+    // `.select('id')` because a PostgREST update matching zero rows returns NO error.
+    // Zero rows is a refusal — an RLS denial or a stale id — not a success, and
+    // reporting it as one tells the customer their change happened when it did not.
+    // Same shape as disconnectConnection and deletePost.
+    const { data, error } = await supabase
       .from('campaigns')
       .update({ status: parsed.data })
       .eq('id', campaignId)
+      .select('id')
     if (error) return { ok: false, message: mapCampaignError(error) }
+    if (!data || data.length === 0) {
+      return { ok: false, message: 'That campaign is no longer here.' }
+    }
 
     revalidatePath('/campaigns')
     revalidatePath(`/campaigns/${campaignId}`)
@@ -274,19 +293,27 @@ export async function removePostFromCampaign(
     if (!ws.ok) return { ok: false, message: ws.message }
     workspaceId = ws.workspace.id
 
+    // `.select('id')` because a PostgREST delete matching zero rows returns NO error.
+    // Zero rows is a refusal — an RLS denial or a stale id — not a success, and
+    // reporting it as one tells the customer their removal happened when it did not.
+    // Same shape as disconnectConnection and deletePost.
     const supabase = createServerSupabase()
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('campaign_posts')
       .delete()
       .eq('campaign_id', campaignId)
       .eq('post_id', postId)
+      .select('post_id')
 
     if (error) return { ok: false, message: mapCampaignError(error) }
+    if (!data || data.length === 0) {
+      return { ok: false, message: 'That post is no longer in this campaign.' }
+    }
 
     revalidatePath('/campaigns')
     revalidatePath(`/campaigns/${campaignId}`)
     revalidatePath('/planner')
-    return { ok: true, changed: 1 }
+    return { ok: true, changed: data.length }
   } catch (error) {
     reportServerError(error, { action: 'removePostFromCampaign', workspaceId })
     return { ok: false, message: 'Could not remove that post — try again.' }
@@ -310,9 +337,20 @@ export async function deleteCampaign(campaignId: string): Promise<CampaignDelete
     if (!ws.ok) return { ok: false, message: ws.message }
     workspaceId = ws.workspace.id
 
+    // `.select('id')` because a PostgREST delete matching zero rows returns NO error.
+    // Zero rows is a refusal — an RLS denial or a stale id — not a success, and
+    // reporting it as one tells the customer their deletion happened when it did not.
+    // Same shape as disconnectConnection and deletePost.
     const supabase = createServerSupabase()
-    const { error } = await supabase.from('campaigns').delete().eq('id', campaignId)
+    const { data, error } = await supabase
+      .from('campaigns')
+      .delete()
+      .eq('id', campaignId)
+      .select('id')
     if (error) return { ok: false, message: mapCampaignError(error) }
+    if (!data || data.length === 0) {
+      return { ok: false, message: 'That campaign is no longer here.' }
+    }
 
     revalidatePath('/campaigns')
     revalidatePath('/planner')

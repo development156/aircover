@@ -55,7 +55,12 @@ function fakeLedger(initial: { total: number; held: number }) {
       state.total = nextTotal
       entrySeq += 1
       const result: LedgerApplyResult = {
-        entry: { id: `entry-${entrySeq}`, balanceAfter: nextTotal - state.held },
+        entry: {
+          id: `entry-${entrySeq}`,
+          balanceAfter: nextTotal - state.held,
+          // signed as the row stores it, so a replay can report what was recorded
+          amount: input.amount,
+        },
         replayed: false,
       }
       applied.set(input.idempotencyKey, result)
@@ -368,5 +373,68 @@ describe('applyReversal — what it refuses', () => {
     })
     expect(res.ok && res.data.reversedCredits).toBe(0)
     expect(fake.calls).toEqual([])
+  })
+})
+
+/**
+ * WHAT A REPLAYED REVERSAL REPORTS.
+ *
+ * `applyReversal` is documented as safe to retry with a DIFFERENT amount under the
+ * SAME idempotency key. That is true of the LEDGER — `app.apply_ledger_entry`
+ * returns the original row untouched with `replayed: true`. It was not true of the
+ * OUTCOME: the returned `reversedCredits` was recomputed from the balance as it
+ * stands now, while `entryId` pointed at the entry that actually exists. The two
+ * described different reversals.
+ *
+ * That matters because `shortfallCredits` is what a credit note bills as a
+ * receivable (ReversalOutcome, lifecycle.ts). Reporting a larger shortfall than the
+ * ledger recorded bills the customer for money that was already taken back.
+ *
+ * The replay here is the ordinary shape, not a contrived one: an acknowledgement is
+ * lost, the provider re-delivers the same dispute, and the balance has moved in
+ * between because the first reversal itself moved it.
+ */
+describe('applyReversal — a replayed reversal reports what the ledger holds', () => {
+  it('reports the original entry’s amount, not a figure recomputed from the new balance', async () => {
+    const fake = fakeLedger({ total: 1500, held: 0 })
+    const apply = reversal(fake.port)
+    const input = {
+      workspaceId: WS,
+      kind: 'chargeback' as const,
+      reference: 'dispute-replay',
+      credits: 1000,
+      actor: 'provider:cashfree',
+    }
+
+    const first = await apply(input)
+    expect(first.ok && first.data.reversedCredits).toBe(1000)
+    expect(first.ok && first.data.shortfallCredits).toBe(0)
+    expect(fake.state.total).toBe(500)
+
+    // The same dispute arrives again. Only 500 is available now — but the ledger
+    // still holds the original 1000 ADJUST, and that is the fact to report.
+    const second = await apply(input)
+    expect(second.ok && second.data.replayed).toBe(true)
+    expect(second.ok && second.data.reversedCredits).toBe(1000)
+    expect(second.ok && second.data.shortfallCredits).toBe(0)
+    // The identity the caller is handed must describe the same entry as the figures.
+    expect(second.ok && second.data.entryId).toBe(first.ok ? first.data.entryId : 'x')
+    // And the balance moved exactly once.
+    expect(fake.state.total).toBe(500)
+  })
+
+  it('still reports the shortfall honestly when the ledger genuinely could not take it all', async () => {
+    // Nothing replays here: one call, a balance too small to cover the dispute.
+    const fake = fakeLedger({ total: 300, held: 0 })
+    const out = await reversal(fake.port)({
+      workspaceId: WS,
+      kind: 'chargeback' as const,
+      reference: 'dispute-short',
+      credits: 1000,
+      actor: 'provider:cashfree',
+    })
+    expect(out.ok && out.data.reversedCredits).toBe(300)
+    expect(out.ok && out.data.shortfallCredits).toBe(700)
+    expect(fake.state.total).toBe(0)
   })
 })

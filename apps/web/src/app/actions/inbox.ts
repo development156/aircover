@@ -80,7 +80,10 @@ export async function setThreadStatus(
     if (!parsed.success) return { ok: false, message: 'That is not a valid status.' }
 
     const supabase = createServerSupabase()
-    const { error } = await supabase
+    // `.select('id')` because a PostgREST update matching zero rows returns NO
+    // error. Zero rows is a refusal — an RLS denial or a stale id — not a
+    // success. Same shape as disconnectConnection and deletePost.
+    const { data, error } = await supabase
       .from('inbox_threads')
       .update({
         status: parsed.data,
@@ -90,8 +93,12 @@ export async function setThreadStatus(
       })
       .eq('id', threadId)
       .eq('workspace_id', workspace.id)
+      .select('id')
 
     if (error) return { ok: false, message: 'Could not update that — try again.' }
+    if (!data || data.length === 0) {
+      return { ok: false, message: 'That conversation is no longer here.' }
+    }
 
     revalidatePath('/inbox')
     return { ok: true }

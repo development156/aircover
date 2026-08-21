@@ -1,0 +1,288 @@
+{
+  "findings": [
+    {
+      "probe": "SELECT public.ledger as anon",
+      "status": 200,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "[]",
+      "note": "saw 0 of 1 rows"
+    },
+    {
+      "probe": "INSERT public.ledger as anon",
+      "status": 401,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"new row violates row-level security policy for table \\\"ledger\\\"\"}"
+    },
+    {
+      "probe": "UPDATE public.ledger row 1 as anon",
+      "status": 200,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "[]",
+      "note": "delta is still 5000 (was 5000)"
+    },
+    {
+      "probe": "DELETE public.ledger row 1 as anon",
+      "status": 200,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "[]"
+    },
+    {
+      "probe": "SELECT public.ledger as member",
+      "status": 200,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "[]",
+      "note": "saw 0 of 1 rows"
+    },
+    {
+      "probe": "INSERT public.ledger as member",
+      "status": 403,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"new row violates row-level security policy for table \\\"ledger\\\"\"}"
+    },
+    {
+      "probe": "UPDATE public.ledger row 1 as member",
+      "status": 200,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "[]",
+      "note": "delta is still 5000 (was 5000)"
+    },
+    {
+      "probe": "DELETE public.ledger row 1 as member",
+      "status": 200,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "[]"
+    },
+    {
+      "probe": "rpc charge_if_affordable(tenant=default) as anon",
+      "status": 200,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "null"
+    },
+    {
+      "probe": "rpc charge_if_affordable(tenant=default) as member",
+      "status": 200,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "null"
+    },
+    {
+      "probe": "ops_admin_upsert(self as owner)",
+      "status": 403,
+      "refused": true,
+      "rowsAfter": 7,
+      "body": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"not permitted\"}",
+      "note": "authorization raised BEFORE the role validation — ordering is correct"
+    },
+    {
+      "probe": "ops_admin_upsert(bad role)",
+      "status": 403,
+      "refused": true,
+      "rowsAfter": 7,
+      "body": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"not permitted\"}",
+      "note": "authorization raised BEFORE the role validation — ordering is correct"
+    },
+    {
+      "probe": "rpc ops_admin_set_role as ordinary member",
+      "status": 403,
+      "refused": true,
+      "rowsAfter": 7,
+      "body": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"not permitted\"}"
+    },
+    {
+      "probe": "rpc ops_credit_request_create as ordinary member",
+      "status": 403,
+      "refused": true,
+      "rowsAfter": 7,
+      "body": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"not permitted\"}"
+    },
+    {
+      "probe": "rpc ops_task_create as ordinary member",
+      "status": 403,
+      "refused": true,
+      "rowsAfter": 7,
+      "body": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"not permitted\"}"
+    },
+    {
+      "probe": "rpc rls_auto_enable as anon (DEFINER, granted to anon)",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": "-",
+      "body": "{\"code\":\"0A000\",\"details\":null,\"hint\":null,\"message\":\"cannot display a value of type event_trigger\"}"
+    },
+    {
+      "probe": "INSERT posts INTO the victim's workspace",
+      "status": 403,
+      "refused": true,
+      "rowsAfter": 24,
+      "body": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"new row violates row-level security policy for table \\\"posts\\\"\"}"
+    },
+    {
+      "probe": "UPDATE a victim's post",
+      "status": 200,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "[]",
+      "note": "title is still \"Filter coffee starts this week\""
+    },
+    {
+      "probe": "DELETE a victim's post",
+      "status": 200,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "[]"
+    },
+    {
+      "probe": "rpc resolve_brand_memory(workspace=victim)",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": 37,
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"INVALID_SOURCE\"}",
+      "note": "brand_memory unchanged at 37"
+    },
+    {
+      "probe": "rpc propose_memory_event(workspace=victim)",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": 3,
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"NOT_A_MEMBER\"}",
+      "note": "memory_events unchanged at 3"
+    },
+    {
+      "probe": "rpc upsert_billing_profile(workspace=victim)",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": 0,
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"NOT_A_MEMBER\"}",
+      "note": "billing_profiles unchanged at 0"
+    },
+    {
+      "probe": "rpc loop_kill_switch(workspace=victim)",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": 2,
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"NOT_A_MEMBER\"}",
+      "note": "loop_settings unchanged at 2"
+    },
+    {
+      "probe": "rpc playbook_kill_switch(workspace=victim)",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": 0,
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"NOT_A_MEMBER\"}",
+      "note": "playbooks unchanged at 0"
+    },
+    {
+      "probe": "rpc bootstrap_workspace(workspace=victim)",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": 27,
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"INVALID_SLUG\"}",
+      "note": "workspaces unchanged at 27"
+    },
+    {
+      "probe": "rpc upsert_connection(workspace=victim)",
+      "status": 404,
+      "refused": true,
+      "rowsAfter": 6,
+      "body": "{\"code\":\"PGRST202\",\"details\":\"Searched for the function public.upsert_connection with parameters p_external_account, p_platform, p_scopes, p_workspace_id or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.\",\"hint\":\"Perhaps you meant to call the function public.upsert_connection(p_access_token_enc, p_expires_at, p_external_account, p_platform, p_refresh_token_enc, p_scopes, p_token_type, p_workspace_id)\",\"message\":\"Could not find the function public.upsert_connection(p_external_account, p_platform, p_scopes, p_workspace_id) in the schema cache\"}",
+      "note": "connections unchanged at 6"
+    },
+    {
+      "probe": "rpc clear_pending_plan_change(workspace=victim)",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"NOT_A_MEMBER\"}",
+      "note": "subscriptions unchanged at 1"
+    },
+    {
+      "probe": "rpc set_pending_plan_change(workspace=victim)",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": 1,
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"NOT_A_MEMBER\"}",
+      "note": "subscriptions unchanged at 1"
+    },
+    {
+      "probe": "rpc ensure_zernio_profile(workspace=victim)",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": 6,
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"INVALID_PROFILE\"}",
+      "note": "zernio_profiles unchanged at 6"
+    },
+    {
+      "probe": "resolve_brand_memory null workspace",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": "all watched tables unchanged",
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"INVALID_WORKSPACE\"}"
+    },
+    {
+      "probe": "resolve_brand_memory nobody workspace",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": "all watched tables unchanged",
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"INVALID_SOURCE\"}"
+    },
+    {
+      "probe": "resolve_brand_memory sql-shaped source",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": "all watched tables unchanged",
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"INVALID_SOURCE\"}"
+    },
+    {
+      "probe": "ensure_zernio_profile sql-shaped id",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": "all watched tables unchanged",
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"INVALID_PROFILE\"}"
+    },
+    {
+      "probe": "ops_workspace_search sql-shaped",
+      "status": 403,
+      "refused": true,
+      "rowsAfter": "all watched tables unchanged",
+      "body": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"not permitted\"}"
+    },
+    {
+      "probe": "cancel_scheduled_post nobody",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": "all watched tables unchanged",
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"INVALID_POST\"}"
+    },
+    {
+      "probe": "delete_asset nobody",
+      "status": 500,
+      "refused": true,
+      "rowsAfter": "all watched tables unchanged",
+      "body": "{\"code\":\"P0002\",\"details\":null,\"hint\":null,\"message\":\"That file is not in your library.\"}"
+    },
+    {
+      "probe": "loop_approve_cost nobody",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": "all watched tables unchanged",
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"INVALID_CYCLE\"}"
+    },
+    {
+      "probe": "playbook_approve_cost nobody",
+      "status": 400,
+      "refused": true,
+      "rowsAfter": "all watched tables unchanged",
+      "body": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"INVALID_RUN\"}"
+    }
+  ],
+  "stray": 0
+}

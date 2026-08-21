@@ -20,7 +20,10 @@ class RecordingPort implements LedgerPort {
 
   async apply(input: ApplyLedgerInput): Promise<LedgerApplyResult> {
     this.calls.push(input)
-    return { entry: { id: `entry-${++this.seq}`, balanceAfter: 97 }, replayed: false }
+    return {
+      entry: { id: `entry-${++this.seq}`, balanceAfter: 97, amount: input.amount },
+      replayed: false,
+    }
   }
   async latestHold(): Promise<LatestHold | null> {
     return null
