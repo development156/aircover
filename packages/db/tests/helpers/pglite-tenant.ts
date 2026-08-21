@@ -176,16 +176,76 @@ type Column = {
   identity_generation: string | null
 }
 
-/** Every `public` table carrying a `workspace_id` — read from the catalog, never listed by hand. */
+/**
+ * Every `public` BASE TABLE carrying a `workspace_id` — read from the catalog,
+ * never listed by hand.
+ *
+ * ── WHY `table_type = 'BASE TABLE'` AND NOT EVERY RELATION ──────────────────
+ * `information_schema.columns` lists VIEWS alongside tables, and until
+ * 2026-08-22 no `public` view carried a `workspace_id`, so the difference never
+ * showed. `knowledge_current_chunks` is the first, and it made the seeder
+ * report `cannot insert into view` and the suite call a covered table unseeded.
+ *
+ * Excluding views here is CORRECT and not a widening of the hole: a view has no
+ * policies of its own, so there is nothing about it for these tests to seed or
+ * probe. What a view CAN do is bypass its base tables' policies by running with
+ * its owner's rights — measured the same day, by removing `security_invoker`
+ * from that view and watching workspace B read workspace A's passages through
+ * it. That is a different property from the ones below, so it gets its own
+ * assertion (`tenantViews`) rather than being smuggled into this one.
+ */
 export async function tenantTables(db: PGlite): Promise<string[]> {
   const rows = (
     await db.query<{ table_name: string }>(
-      `select table_name from information_schema.columns
-       where table_schema = 'public' and column_name = 'workspace_id'
-       order by table_name`,
+      `select c.table_name from information_schema.columns c
+         join information_schema.tables t
+           on t.table_schema = c.table_schema and t.table_name = c.table_name
+        where c.table_schema = 'public'
+          and c.column_name = 'workspace_id'
+          and t.table_type = 'BASE TABLE'
+        order by c.table_name`,
     )
   ).rows
   return rows.map((r) => r.table_name)
+}
+
+/**
+ * Every `public` view carrying a `workspace_id`, with whether it runs as the
+ * CALLER or as its OWNER.
+ *
+ * A view over RLS-protected tables is the quietest way to lose tenant isolation:
+ * the policies underneath are untouched and still read correctly in the
+ * migration, and the view hands the rows over anyway because by default it runs
+ * with the rights of whoever created it. `security_invoker = true` is the option
+ * that stops it, it is off unless spelled, and nothing about a view's definition
+ * hints that it is missing.
+ */
+export async function tenantViews(
+  db: PGlite,
+): Promise<{ view_name: string; security_invoker: boolean }[]> {
+  return (
+    await db.query<{ view_name: string; security_invoker: boolean }>(
+      `select cl.relname as view_name,
+              coalesce(
+                (select option = 'security_invoker=true'
+                   from unnest(cl.reloptions) as option
+                  where option like 'security_invoker=%'
+                  limit 1),
+                false
+              ) as security_invoker
+         from pg_class cl
+         join pg_namespace n on n.oid = cl.relnamespace
+        where n.nspname = 'public'
+          and cl.relkind = 'v'
+          and exists (
+            select 1 from information_schema.columns c
+             where c.table_schema = 'public'
+               and c.table_name = cl.relname
+               and c.column_name = 'workspace_id'
+          )
+        order by cl.relname`,
+    )
+  ).rows
 }
 
 /**
