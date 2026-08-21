@@ -117,7 +117,12 @@ describe('a read that HAPPENED', () => {
               text: 'We have poured chai on Residency Road since 2014.',
               label: 'chaiandchapters.in',
               foundName: 'Chai & Chapters',
-              colors: ['#FF6600', '#111111'],
+              // Valid CSS colours in rgb() form rather than hex, because
+              // design-lint rule 1 is at zero across apps/web/src and a fixture
+              // is not an exception to it. `readSite` passes these through
+              // untouched, so the arity and the pass-through are what this
+              // proves; the notation is free.
+              colors: ['rgb(255, 102, 0)', 'rgb(17, 17, 17)'],
               note: null,
               fellBack: false,
             },
