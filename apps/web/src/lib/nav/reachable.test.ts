@@ -57,6 +57,12 @@ const APP_DIR = join(repoRoot(), 'apps/web/src/app/(app)')
  * way, and that claim is the thing a reviewer should check.
  */
 const NOT_A_NAV_SECTION: Readonly<Record<string, string>> = {
+  billing:
+    'Not a section and deliberately not in the rail: there is no /billing page, only ' +
+    '/billing/checkout/{orderId}. It is where a payment lands — `CheckoutSession.url` ' +
+    "from packages/billing/src/providers/cashfree names it, and the wallet's " +
+    '"Start checkout" is what sends you there. A rail entry would offer a checkout ' +
+    'with no order behind it, which is a door onto nothing.',
   create:
     'The composer entry. Reached from the topbar + button, the phone FAB, the C shortcut and the command palette — four doors already, and a fifth in the rail would make "Create" compete with "Posts" for the same job.',
 }

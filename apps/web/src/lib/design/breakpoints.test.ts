@@ -64,6 +64,26 @@ const WEB_SRC = join(repoRoot(), 'apps/web/src')
  */
 const DEAD_VARIANT = /(?<=["'`\s])(?:sm|md|lg|xl|2xl):(?=[a-z[-])/g
 
+/**
+ * Comments removed, LINE COUNT PRESERVED.
+ *
+ * MEASURED 2026-08-21: `plan-picker.tsx` explains, in a JSX comment, that
+ * `sm:grid-cols-2 lg:grid-cols-4` "compiles, ships, and does absolutely
+ * nothing" — and this test failed on that explanation. `design-lint.mjs` has
+ * stripped comments since it was written, for the reason its own docstring
+ * gives: "a rule that fires on its own documentation teaches the next session
+ * to delete the explanation, not to keep the rule." The two guards check the
+ * same property and disagreed; this one was the one that was wrong.
+ *
+ * Each comment becomes the whitespace it occupied, so a class on the same line
+ * as a trailing comment is still seen. The `[^:]` guard keeps `https://`.
+ */
+function stripComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:])\/\/.*$/gm, '$1')
+}
+
 function sourceFiles(dir: string): string[] {
   const out: string[] = []
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -84,7 +104,7 @@ describe('only the two declared breakpoints exist', () => {
   test('no source file uses a stock Tailwind breakpoint prefix', () => {
     const offenders: string[] = []
     for (const file of sourceFiles(WEB_SRC)) {
-      const matches = readFileSync(file, 'utf8').match(DEAD_VARIANT)
+      const matches = stripComments(readFileSync(file, 'utf8')).match(DEAD_VARIANT)
       if (!matches) continue
       const rel = relative(join(repoRoot(), 'apps/web'), file).split('\\').join('/')
       offenders.push(`${rel} (${[...new Set(matches)].join(' ')})`)
