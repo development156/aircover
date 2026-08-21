@@ -90,7 +90,22 @@ export type PlaybookRunStatus = z.infer<typeof PlaybookRunStatusSchema>
 /** A run that is over. Nothing advances one of these. */
 export const TERMINAL_RUN_STATUSES = ['completed', 'nothing_to_do', 'cancelled', 'failed'] as const
 
-/** A run that is still going, and therefore holds the one-live-run slot. */
+/**
+ * A run that is still going, and therefore holds the one-live-run slot.
+ *
+ * ── A KNOWN STATE, WRITTEN DOWN RATHER THAN LEFT TO BE DISCOVERED ───────────
+ * `awaiting_cost_approval` is in this list, and a run APPROVED BUT NEVER RUN
+ * stays there. So a person who approves a preview and then never presses "Write
+ * the drafts" holds their playbook's only slot indefinitely, and its schedule
+ * quietly stops opening new runs.
+ *
+ * That is the correct behaviour of the two rules that produce it — a preview
+ * waiting on somebody is live work, and one live run per playbook is what stops
+ * a customer being charged twice for one festival — and the scheduled runner
+ * counts it as `alreadyRunning` rather than hiding it. It is still a state
+ * somebody will meet in November and read as a bug, so it is named here. The fix
+ * when it is wanted is an expiry on an un-run approval, not a wider slot.
+ */
 export const LIVE_RUN_STATUSES = ['proposing', 'awaiting_cost_approval', 'running'] as const
 
 export const PlaybookRunSchema = z.object({

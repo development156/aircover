@@ -51,12 +51,16 @@
 /**
  * The jobs declared in `apps/web/vercel.json`.
  *
- * The previous version of this comment said `heartbeat-schedule.test.ts` pinned
- * the two lists together. THAT FILE DID NOT EXIST — found 2026-08-22 while adding
- * the fourth job, by looking for it. The comment had asserted a guarantee for
- * long enough that a route could have been added to `vercel.json` with no
- * heartbeat, or given a heartbeat with no schedule, and nothing would have said
- * so. The file now exists and does what the sentence claimed.
+ * The pinning lives in `heartbeat.test.ts`, under "the schedules match the crons
+ * that actually ship" — it asserts the two lists name the same routes AND that
+ * each period matches the cron expression, with a parser that throws rather than
+ * guessing at a shape it does not recognise.
+ *
+ * This comment used to name a file called `heartbeat-schedule.test.ts`, which
+ * does not exist. Corrected 2026-08-22 while adding the fourth job. The guard was
+ * real all along; only the pointer was wrong — which is its own small hazard,
+ * because the way to check a claim like this is to go and read the file it names,
+ * and doing that here produces "no such file" rather than "no such guard".
  */
 export type CronJob = 'sweeps' | 'metrics' | 'loop' | 'playbooks'
 

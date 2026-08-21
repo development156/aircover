@@ -173,7 +173,7 @@ export function RunPreview({ runId, items, availableCredits, approvedCredits }: 
       {/* The refusal, with BOTH numbers and the promise that nothing moved. */}
       {preview.short && preview.availableCredits !== null ? (
         <p className="type-body mt-3 flex gap-2 text-muted">
-          <AlertTriangle size={15} strokeWidth={1.8} aria-hidden className="mt-[3px] shrink-0" />
+          <AlertTriangle size={15} strokeWidth={1.8} aria-hidden className="mt-1 shrink-0" />
           <span>{shortfallMessage(preview.totalCredits, preview.availableCredits)}</span>
         </p>
       ) : null}

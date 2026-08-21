@@ -90,7 +90,9 @@ describe('what a festival run proposes', () => {
   })
 
   it('refuses parameters that are not this recipe’s shape', () => {
-    expect(() => proposeFestivals({ channels: [] }, dial([]), 'post_variants', new Date())).toThrow()
+    expect(() =>
+      proposeFestivals({ channels: [] }, dial([]), 'post_variants', new Date()),
+    ).toThrow()
   })
 
   it('writes a brief that steers away from a stock greeting', () => {

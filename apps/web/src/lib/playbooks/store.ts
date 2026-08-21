@@ -162,6 +162,27 @@ export async function readPlaybook(
  * cron and a double-clicked button both resolve to ONE run rather than to a
  * constraint error the caller has to interpret. Null here means "there is
  * already one", which is a normal answer and not a failure.
+ *
+ * ── THE ARBITER IS INFERRED, AND IT MUST BE — MEASURED 2026-08-22 ───────────
+ * This was written as `on conflict on constraint
+ * playbook_runs_one_live_per_playbook`, which reads correctly and does not work:
+ * that name belongs to a CREATE UNIQUE INDEX, so it has no `pg_constraint` row,
+ * and Postgres answers
+ *
+ *     constraint "playbook_runs_one_live_per_playbook" for table
+ *     "playbook_runs" does not exist
+ *
+ * Every route into this feature — "Run it now" and the first cron tick — would
+ * have thrown on its first use. Nothing caught it: the migration suite proves
+ * the index with a direct INSERT, the action suite mocks this module wholesale,
+ * and the production walk hand-wrote the same INSERT rather than calling here.
+ * A statement no test executes is a statement nobody has run.
+ *
+ * The index-inference form below is what works, and the WHERE clause has to be
+ * repeated verbatim: it is how Postgres identifies which partial index to use as
+ * the arbiter, so this predicate and the one in 20260822030000_playbooks.sql are
+ * one fact in two files. `playbooks.pglite.test.ts` runs this exact statement
+ * twice and asserts the second returns nothing.
  */
 export async function openRun(input: {
   workspaceId: string
@@ -173,7 +194,8 @@ export async function openRun(input: {
   const r = await getPool().query<{ id: string }>(
     `insert into playbook_runs (workspace_id, playbook_id, recipe_key, trigger_source, created_by)
      values ($1, $2, $3, $4, $5)
-     on conflict on constraint playbook_runs_one_live_per_playbook do nothing
+     on conflict (playbook_id) where status in ('proposing', 'awaiting_cost_approval', 'running')
+       do nothing
      returning id`,
     [input.workspaceId, input.playbookId, input.recipeKey, input.triggerSource, input.userId],
   )

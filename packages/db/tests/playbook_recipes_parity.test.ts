@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { PLAYBOOK_RECIPES, PLAYBOOK_RECIPE_KEYS, isRunnable, playbookRecipe } from './recipes'
+import { PLAYBOOK_RECIPES, PLAYBOOK_RECIPE_KEYS, isRunnable, playbookRecipe } from '@sahoda/shared'
 
 /**
  * THE CATALOGUE AND THE DATABASE REFUSE THE SAME SET.
@@ -18,10 +18,21 @@ import { PLAYBOOK_RECIPES, PLAYBOOK_RECIPE_KEYS, isRunnable, playbookRecipe } fr
  * The failure it prevents is quiet in the worst direction: a recipe added here
  * and not there is a card the customer can fill in and cannot save, and the
  * error they get is a raw constraint violation nobody wrote.
+ *
+ * ── AND WHY IT LIVES IN packages/db RATHER THAN BESIDE THE CATALOGUE ────────
+ * It was written in `packages/shared/src/playbooks/`, next to the list it
+ * checks, and `pnpm gate` refused it: that package has no `@types/node`, so a
+ * test there cannot read a file. Adding the types to satisfy one test would move
+ * the lockfile while several lanes are working in this repo, and it would let
+ * every future file in the source-of-truth package reach the filesystem.
+ *
+ * Here is the better home anyway. The subject is a MIGRATION, `packages/db`
+ * already depends on `@sahoda/shared`, and its suites already read `.sql` off
+ * disk through the same path.
  */
 
 const MIGRATION = readFileSync(
-  resolve(import.meta.dirname, '../../../db/supabase/migrations/20260822030000_playbooks.sql'),
+  resolve(import.meta.dirname, '../supabase/migrations/20260822030000_playbooks.sql'),
   'utf8',
 )
 

@@ -205,10 +205,34 @@ export async function executeRun(runId: string): Promise<ExecuteRunState> {
       async () => ({ ok: true }),
     )
     if (!runCharge.ok) {
-      await store.setRunStatus(runId, workspaceId, 'failed', 'CREDITS')
-      const available = (await store.availableCredits(workspaceId)) ?? 0
+      // ── TWO REASONS A CHARGE FAILS, AND ONLY ONE OF THEM IS THE WALLET ──
+      // `withCredits` answers `CREDIT_INSUFFICIENT` when the balance is short
+      // and `PROVIDER_ERROR` when the HOLD write itself failed — a pooler
+      // hiccup, a failover. Rendering the shortfall sentence for both would
+      // produce "This run needs 8 credits and your workspace has 100 credits",
+      // which contradicts itself and blames the customer for our outage.
+      //
+      // The balance is read ONLY on the branch that is about the balance, and
+      // an unreadable balance stays null rather than becoming zero: "we could
+      // not read your balance" and "you have none" are different sentences and
+      // only one of them is true. See `lib/playbooks/cost.ts`.
+      const reason = runCharge.error.code === 'CREDIT_INSUFFICIENT' ? 'CREDITS' : 'CHARGE_FAILED'
+      await store.setRunStatus(runId, workspaceId, 'failed', reason)
+      if (reason !== 'CREDITS') {
+        return {
+          ok: false,
+          message: 'Sahoda could not reserve the credits for this run. Nothing was charged.',
+        }
+      }
+      const available = await store.availableCredits(workspaceId)
       const needed = (run.approved_credits ?? 0) + creditCost(RUN_ACTION)
-      return { ok: false, message: shortfallMessage(needed, available) }
+      return {
+        ok: false,
+        message:
+          available === null
+            ? `This run needs ${needed} ${needed === 1 ? 'credit' : 'credits'} and Sahoda could not read your balance. Nothing was charged.`
+            : shortfallMessage(needed, available),
+      }
     }
     await store.setRunStatus(runId, workspaceId, 'running')
     await store.addSpend(runId, workspaceId, creditCost(RUN_ACTION))
@@ -273,6 +297,25 @@ export async function executeRun(runId: string): Promise<ExecuteRunState> {
 
       if (!charged.ok || !postId) {
         await store.linkItemToPost(item.id, workspaceId, null, 'failed')
+        // RUNNING OUT OF MONEY MID-RUN STOPS THE RUN. Continuing would take one
+        // futile HOLD per remaining item and then finish `completed` — a run
+        // that wrote nothing, filed beside the runs that worked. The items
+        // already written keep their drafts and their charges; the rest stay
+        // `proposed`, which is what they are.
+        if (!charged.ok && charged.error.code === 'CREDIT_INSUFFICIENT') {
+          await store.setRunStatus(runId, workspaceId, 'failed', 'CREDITS')
+          const available = await store.availableCredits(workspaceId)
+          return {
+            ok: false,
+            drafted,
+            suggested,
+            spent,
+            message:
+              available === null
+                ? 'Sahoda ran out of credits partway through and could not read your balance. Only the drafts already written were charged.'
+                : shortfallMessage(creditCost(recipe.outputAction), available),
+          }
+        }
         continue
       }
 

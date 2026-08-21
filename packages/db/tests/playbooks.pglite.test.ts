@@ -41,7 +41,11 @@ const FOUNDATION = [
   '20260820000600_loop_kill_switch_reported.sql',
 ] as const
 
-const PLAYBOOK_BATCH = ['20260822030000_playbooks.sql', '20260822030100_playbook_rpcs.sql'] as const
+const PLAYBOOK_BATCH = [
+  '20260822030000_playbooks.sql',
+  '20260822030100_playbook_rpcs.sql',
+  '20260822030200_playbooks_policy_roles.sql',
+] as const
 
 const WS_A = '11111111-1111-4111-8111-111111111111'
 const WS_B = '22222222-2222-4222-8222-222222222222'
@@ -207,6 +211,29 @@ describe('Playbooks · migrations 20260822030000 / 030100', () => {
     expect(byTable('playbooks')).toEqual(['INSERT', 'SELECT', 'UPDATE'])
   })
 
+  it('names `authenticated` on every policy, which is how the schema is classified', () => {
+    // MEASURED 2026-08-22: the three `playbooks` policies were written by hand —
+    // that table needs INSERT and UPDATE, and `app.apply_tenant_read_policy`
+    // only grants SELECT — and the `to authenticated` clause was not copied
+    // across. They defaulted to PUBLIC.
+    //
+    // No row was exposed: a PUBLIC policy still covers `authenticated`, and the
+    // body needs a JWT `sub` that `anon` does not have. What it broke is the
+    // classification `rls_tenant_isolation.pglite.test.ts` applies to every
+    // tenant table, which reported `playbooks` as a table nobody may read.
+    return db
+      .query<{ tablename: string; roles: string[] }>(
+        `select tablename, roles from pg_policies where schemaname = 'public'
+           and tablename in ('playbooks','playbook_runs','playbook_run_items')`,
+      )
+      .then((r) => {
+        expect(r.rows).toHaveLength(5)
+        for (const row of r.rows) {
+          expect(row.roles, row.tablename).toContain('authenticated')
+        }
+      })
+  })
+
   it('admits `playbook` as a post origin and still refuses an invented one', async () => {
     await expect(makePost(db, WS_A, 'playbook', 'draft')).resolves.toBeTruthy()
     const msg = await raises(() => makePost(db, WS_A, 'telepathy', 'draft'))
@@ -290,6 +317,38 @@ describe('Playbooks · migrations 20260822030000 / 030100', () => {
       await makeRun(db, ws, pb, 'running')
       const msg = await raises(() => makeRun(db, ws, pb, 'proposing'))
       expect(msg).toMatch(/playbook_runs_one_live_per_playbook/)
+    })
+
+    /**
+     * THE EXACT STATEMENT `store.openRun` SENDS, RUN TWICE.
+     *
+     * MEASURED 2026-08-22: the first version of that function said `on conflict
+     * on constraint playbook_runs_one_live_per_playbook`, and Postgres answers
+     * "constraint … does not exist" — the name belongs to a CREATE UNIQUE INDEX,
+     * which has no `pg_constraint` row. Both routes into the feature would have
+     * thrown on first use.
+     *
+     * The test above did not catch it because it proves the INDEX with a direct
+     * insert, which is a different statement. This one carries the statement
+     * itself, predicate and all, so the two files that hold that predicate
+     * cannot drift apart in silence.
+     */
+    it('runs the exact upsert openRun sends, and the second attempt yields nothing', async () => {
+      const ws = await freshWorkspace(db)
+      const pb = await makePlaybook(db, ws, { recipe: 'festival_calendar' })
+      const open = () =>
+        db.query<{ id: string }>(
+          `insert into playbook_runs (workspace_id, playbook_id, recipe_key, trigger_source, created_by)
+           values ($1, $2, 'festival_calendar', 'manual', null)
+           on conflict (playbook_id) where status in ('proposing', 'awaiting_cost_approval', 'running')
+             do nothing
+           returning id`,
+          [ws, pb],
+        )
+      expect((await open()).rows).toHaveLength(1)
+      // Null to the caller: "one is already going" is a normal answer, not an
+      // error the action has to interpret.
+      expect((await open()).rows).toHaveLength(0)
     })
 
     it('frees the slot once a run ends, including when it was cancelled', async () => {

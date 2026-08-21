@@ -130,6 +130,7 @@ describe('the schedules match the crons that actually ship', () => {
     sweeps: '/api/cron/sweeps',
     metrics: '/api/cron/metrics',
     loop: '/api/cron/loop',
+    playbooks: '/api/cron/playbooks',
   }
 
   function crons(): CronEntry[] {

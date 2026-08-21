@@ -24,23 +24,45 @@ const RUN = creditCost('playbook_run')
 const WS = '11111111-1111-4111-8111-111111111111'
 const POST = '22222222-2222-4222-8222-222222222222'
 
+/**
+ * THE WRAPPER'S TWO SHAPES, WRITTEN OUT RATHER THAN INFERRED.
+ *
+ * A factory that only ever returns the happy path types `withCredits` as always
+ * `{ ok: true }`, and every failure-branch test below becomes a type error. That
+ * is how a suite ends up exercising only the branch that works — `pnpm gate`
+ * caught it here as seven `TS2322`s, which is the friendly version.
+ */
+type ChargeResult = { ok: true; data: unknown } | { ok: false; error: { code: string } }
+type ChargeFn = (opts: unknown, fn: (ctx: unknown) => Promise<unknown>) => Promise<ChargeResult>
+type InsertFn = (row: Record<string, unknown>) => {
+  select: () => { single: () => Promise<{ data: { id: string } | null; error: unknown }> }
+}
+
 const h = vi.hoisted(() => {
   const store = {
     readApprovedRunForExecute: vi.fn(),
     readItems: vi.fn(),
+    readPlaybook: vi.fn(),
+    openRun: vi.fn(),
+    writeItems: vi.fn(),
+    haltForCostApproval: vi.fn(),
+    finishNothingToDo: vi.fn(),
+    markRan: vi.fn(),
     linkItemToPost: vi.fn(),
     addSpend: vi.fn(),
     setRunStatus: vi.fn(),
     finishRun: vi.fn(),
     writeVariants: vi.fn(),
-    availableCredits: vi.fn(async () => 0),
+    availableCredits: vi.fn<() => Promise<number | null>>(async () => 0),
   }
-  const withCredits = vi.fn(async (_opts: unknown, fn: (ctx: unknown) => Promise<unknown>) => ({
+  const withCredits = vi.fn<ChargeFn>(async (_opts, fn) => ({
     ok: true,
-    data: await fn({ actionType: 'post_variants', creditsCharged: DRAFT }),
+    data: await fn({ actionType: 'post_variants', creditsCharged: 0 }),
   }))
-  const insert = vi.fn(() => ({
-    select: () => ({ single: async () => ({ data: { id: '22222222-2222-4222-8222-222222222222' }, error: null }) }),
+  const insert = vi.fn<InsertFn>(() => ({
+    select: () => ({
+      single: async () => ({ data: { id: '22222222-2222-4222-8222-222222222222' }, error: null }),
+    }),
   }))
   return { store, withCredits, insert }
 })
@@ -49,7 +71,10 @@ vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ userId: 'user_a' }
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/observability/report', () => ({ reportServerError: vi.fn() }))
 vi.mock('@/lib/workspaces', () => ({
-  workspaceForWrite: async () => ({ ok: true, workspace: { id: '11111111-1111-4111-8111-111111111111' } }),
+  workspaceForWrite: async () => ({
+    ok: true,
+    workspace: { id: '11111111-1111-4111-8111-111111111111' },
+  }),
 }))
 vi.mock('@/lib/playbooks/store', () => h.store)
 vi.mock('@sahoda/billing', () => ({
@@ -75,7 +100,7 @@ vi.mock('@/lib/supabase/server', () => ({
 /** The dial the mocked Supabase client hands back. Set per test. */
 let LEVEL = 1
 
-import { executeRun } from './playbook-run'
+import { executeRun, startRun } from './playbook-run'
 
 const item = (id: string) => ({
   id,
@@ -161,7 +186,7 @@ describe('executeRun', () => {
     const out = await executeRun('run-1')
 
     expect(out.drafted).toBe(1)
-    const row = h.insert.mock.calls[0]![0] as Record<string, unknown>
+    const row = h.insert.mock.calls[0]![0]
     expect(row.status).toBe('draft')
     expect(row.scheduled_at).toBeNull()
     expect(row.origin).toBe('playbook')
@@ -175,7 +200,7 @@ describe('executeRun', () => {
 
     await executeRun('run-1')
 
-    const row = h.insert.mock.calls[0]![0] as Record<string, unknown>
+    const row = h.insert.mock.calls[0]![0]
     // `approved` is where the dispatcher would pick it up, and the dispatcher is
     // behind its own flag. There is no L3 branch anywhere in this function,
     // because L3 cannot be stored — and that absence is what makes an unattended
@@ -201,6 +226,70 @@ describe('executeRun', () => {
     expect(h.store.linkItemToPost).toHaveBeenCalledWith('i1', WS, null, 'failed')
   })
 
+  it('does NOT blame the wallet when the ledger write itself failed', async () => {
+    // MEASURED 2026-08-22: this branch used to render the shortfall sentence for
+    // EVERY charge failure, so a pooler hiccup produced "This run needs 8 credits
+    // and your workspace has 100 credits" — a sentence that contradicts itself
+    // and blames the customer for our outage.
+    //
+    // The test that missed it set `error.code` and the code never read it, so the
+    // fixture LOOKED discriminating while nothing discriminated. This one changes
+    // only that field, which is the mutation the old test could not feel.
+    h.store.readApprovedRunForExecute.mockResolvedValue(APPROVED_RUN)
+    h.store.availableCredits.mockResolvedValue(100)
+    h.withCredits.mockImplementation(async () => ({
+      ok: false,
+      error: { code: 'PROVIDER_ERROR' },
+    }))
+
+    const out = await executeRun('run-1')
+
+    expect(out.ok).toBe(false)
+    expect(out.message).toMatch(/Nothing was charged\./)
+    // The claim: no balance is quoted, because none was consulted.
+    expect(out.message).not.toMatch(/\d/)
+    expect(h.store.availableCredits).not.toHaveBeenCalled()
+    expect(h.store.setRunStatus).toHaveBeenCalledWith('run-1', WS, 'failed', 'CHARGE_FAILED')
+  })
+
+  it('says the balance is UNREADABLE rather than calling it zero', async () => {
+    // A balance that cannot be read is not a balance of none. Collapsing null to
+    // 0 would tell a funded customer they are broke.
+    h.store.readApprovedRunForExecute.mockResolvedValue(APPROVED_RUN)
+    h.store.availableCredits.mockResolvedValue(null)
+    h.withCredits.mockImplementation(async () => ({
+      ok: false,
+      error: { code: 'CREDIT_INSUFFICIENT' },
+    }))
+
+    const out = await executeRun('run-1')
+
+    expect(out.message).toMatch(/could not read your balance/i)
+    expect(out.message).not.toMatch(/has 0 credits/)
+    expect(out.message).toMatch(/Nothing was charged\./)
+  })
+
+  it('STOPS when the credits run out partway, rather than finishing "completed"', async () => {
+    // Continuing would take one futile HOLD per remaining item and then file the
+    // run beside the ones that worked — a run that wrote nothing, reported as a
+    // success.
+    h.store.readApprovedRunForExecute.mockResolvedValue(APPROVED_RUN)
+    h.store.readItems.mockResolvedValue([item('i1'), item('i2')])
+    h.store.availableCredits.mockResolvedValue(1)
+    h.withCredits
+      .mockImplementationOnce(async (_o, fn) => ({ ok: true, data: await fn({}) }))
+      .mockImplementationOnce(async () => ({ ok: false, error: { code: 'CREDIT_INSUFFICIENT' } }))
+
+    const out = await executeRun('run-1')
+
+    expect(out.ok).toBe(false)
+    expect(h.store.finishRun).not.toHaveBeenCalled()
+    expect(h.store.setRunStatus).toHaveBeenCalledWith('run-1', WS, 'failed', 'CREDITS')
+    // Only two charges attempted — the run's and the first item's — not one per
+    // remaining item.
+    expect(h.withCredits).toHaveBeenCalledTimes(2)
+  })
+
   it('refuses honestly at zero balance, naming both numbers', async () => {
     h.store.readApprovedRunForExecute.mockResolvedValue(APPROVED_RUN)
     h.store.availableCredits.mockResolvedValue(0)
@@ -216,5 +305,83 @@ describe('executeRun', () => {
     expect(out.message).toMatch(/has 0 credits/)
     expect(out.message).toMatch(/Nothing was charged\./)
     expect(h.store.setRunStatus).toHaveBeenCalledWith('run-1', WS, 'failed', 'CREDITS')
+  })
+
+  // ── startRun: the free half ────────────────────────────────────────────
+  //
+  // THIS HALF HAD NO EXECUTION COVERAGE AT ALL until 2026-08-22, and that is how
+  // `openRun`'s broken ON CONFLICT survived every other suite. The tests below
+  // drive the real function; only its I/O is stubbed.
+  describe('startRun', () => {
+    const PLAYBOOK = {
+      id: 'pb-1',
+      workspace_id: WS,
+      recipe_key: 'festival_calendar',
+      enabled: true,
+      params: { channels: ['instagram'], calendars: ['india'], lead_days: 7 },
+      trigger_kind: 'manual',
+      cadence: null,
+      last_run_at: null,
+    }
+    const day = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d))
+
+    beforeEach(() => {
+      h.store.readPlaybook.mockResolvedValue(PLAYBOOK)
+      h.store.openRun.mockResolvedValue('run-1')
+    })
+
+    it('halts at the cost preview with the whole price, having charged nothing', async () => {
+      // 20 January 2026: Republic Day is six days away, inside the window.
+      const out = await startRun('pb-1', day(2026, 1, 20))
+
+      expect(out.ok).toBe(true)
+      expect(out.estimatedCredits).toBe(DRAFT + RUN)
+      const [, , estimate] = h.store.haltForCostApproval.mock.calls[0] as unknown as [
+        string,
+        string,
+        number,
+      ]
+      expect(estimate).toBe(DRAFT + RUN)
+      // The whole point of the halt: proposing reads a calendar, so there is no
+      // honest reason to take money before the number has been seen.
+      expect(h.withCredits).not.toHaveBeenCalled()
+      expect(h.store.writeItems).toHaveBeenCalled()
+    })
+
+    it('ends at nothing_to_do on a quiet week — an ending, not a failure', async () => {
+      const out = await startRun('pb-1', day(2026, 3, 20))
+
+      expect(out.ok).toBe(true)
+      expect(out.nothingToDo).toBe(true)
+      expect(h.store.finishNothingToDo).toHaveBeenCalledWith('run-1', WS)
+      expect(h.store.writeItems).not.toHaveBeenCalled()
+      expect(h.store.haltForCostApproval).not.toHaveBeenCalled()
+      expect(h.withCredits).not.toHaveBeenCalled()
+    })
+
+    it('records that it ran even when it found nothing', async () => {
+      // Otherwise a quiet day leaves the playbook permanently due and the cron
+      // re-opens it on every tick.
+      await startRun('pb-1', day(2026, 3, 20))
+      expect(h.store.markRan).toHaveBeenCalledWith('pb-1', WS)
+    })
+
+    it('says so rather than opening a second run when one is already live', async () => {
+      // `openRun` returns null when the partial unique index refuses. That is a
+      // normal answer — opening a second would charge twice for one festival.
+      h.store.openRun.mockResolvedValue(null)
+      const out = await startRun('pb-1', day(2026, 1, 20))
+      expect(out.ok).toBe(false)
+      expect(out.message).toMatch(/already running/i)
+      expect(h.store.writeItems).not.toHaveBeenCalled()
+    })
+
+    it('refuses a blocked recipe by naming the one thing it needs', async () => {
+      h.store.readPlaybook.mockResolvedValue({ ...PLAYBOOK, recipe_key: 'rss_to_post' })
+      const out = await startRun('pb-1', day(2026, 1, 20))
+      expect(out.ok).toBe(false)
+      expect(out.message).toMatch(/safe to point at any address/i)
+      expect(h.store.openRun).not.toHaveBeenCalled()
+    })
   })
 })
