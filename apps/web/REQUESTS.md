@@ -730,3 +730,39 @@ MEASURED, not read: `e2e/radar-to-draft.spec.ts` staged a connection with
 and are correct. Not changed from this lane: flipping the two lines turns a
 permanently-empty list into a populated one, which is a behaviour change in the Loop's
 feature and wants that lane's own tests run against it.
+
+### 6 · `motion.spec.ts`'s scrim check is wrong under a production build — owed to whoever owns the design system
+
+The test reads `--scrim` off `documentElement` and takes its alpha with
+`/[\d.]+\s*\)$/`, defaulting to `'1'` when that finds nothing.
+
+Next's CSS minifier rewrites the authored `rgb(0 0 0 / .4)` into `#0006` (light) and
+`#0000009e` (dark) — the same 0.4 alpha, hex-encoded, with no parenthesis for the
+regex to find. So `alphaOf(token)` silently returns 1 and the assertion compares the
+correctly-measured backdrop (0.4) against a fabricated 1.
+
+**The app is right in both modes.** The backdrop is 0.4 in dev and in production. It is
+the test that is wrong, and only against a minified stylesheet.
+
+`pnpm gate` runs `test:smoke` against `pnpm dev`, which does not minify, so this can
+never fail in the gate. It fails every time under
+`E2E_SERVER_CMD='pnpm --filter @sahoda/web start -p <port>'`, which
+`playwright.config.ts` documents as the faster and more production-like way to run.
+
+The fix is a parser that understands both forms — or better, comparing the composited
+`::backdrop` colour against the composited value of the token rather than parsing
+either as a string. The `?? '1'` fallback should also go: a parse failure must fail
+loudly, not resolve to a plausible number.
+
+### 7 · The dev server does not survive the smoke suite on this machine
+
+Two runs of `turbo run test:smoke` against `pnpm dev` both died at
+`concurrent-edit.spec.ts` ("against the real database"), producing 78
+`ERR_CONNECTION_REFUSED` and ~70 cascade failures that are one event and its echoes.
+One death had a kernel OOM kill of `next-server` (2.3 GB RSS, 02:28:46); the other had
+none in `journalctl -k` at all.
+
+The same tree, same commit, against `next start`: **88 passed, 1 failed, 0 refusals.**
+
+Worth knowing before reading any smoke failure list: count the `ERR_CONNECTION_REFUSED`
+lines first. If it is non-zero, the run says nothing about the branch.
