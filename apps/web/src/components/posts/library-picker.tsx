@@ -135,9 +135,7 @@ export function LibraryPicker({ postId, channels }: { postId: string; channels: 
 
       {cropped !== null && cropped.ok ? (
         <div className="mt-2 space-y-2">
-          <p className="rounded-input bg-ok-bg px-3 py-2.5 type-body text-ok">
-            {cropped.message}
-          </p>
+          <p className="rounded-input bg-ok-bg px-3 py-2.5 type-body text-ok">{cropped.message}</p>
           {cropped.warnings.length > 0 ? (
             <>
               <p className="rounded-input border border-warn bg-warn-bg px-3 py-2.5 type-body text-warn">

@@ -120,7 +120,10 @@ export type OfferDecision =
  * png is graphics or line art and goes to png, which is lossless; a jpeg or webp
  * is a photograph and goes to jpeg.
  */
-export function outputMimeFor(originalMime: string, targets: readonly MediaTarget[]): string | null {
+export function outputMimeFor(
+  originalMime: string,
+  targets: readonly MediaTarget[],
+): string | null {
   if (targets.length === 0) return null
   let accepted: Set<string> | null = null
   for (const target of targets) {

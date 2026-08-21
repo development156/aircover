@@ -31,24 +31,40 @@ export async function offerForAsset(input: {
   const { mime, bytes, width, height } = input.asset
   if (mime === null || bytes === null || width === null || height === null) return null
 
-  const supabase = createServerSupabase()
-  const download = await supabase.storage.from(MEDIA_BUCKET).download(input.asset.storage_path)
-  if (download.error || !download.data) return { offered: false, reason: 'unreadable' }
+  // ── AN OFFER MAY NEVER DAMAGE THE REFUSAL IT RIDES ON ────────────────────
+  // This runs INSIDE the refusal arm of `attachAssetToPost`, which has already
+  // composed a sentence and a per-channel objection list. A throw here would
+  // escape to that action's catch and replace both with "Could not add that file
+  // — try again": the writer would lose the reason their photo was refused
+  // because an extra feature failed. MEASURED — an existing test
+  // (`assets.test.ts`, "the refusal names the channel rather than failing
+  // anonymously") went red the moment this call was added, for exactly that
+  // reason.
+  //
+  // So the whole body is inside the catch. The worst case is a refusal with no
+  // offer, which is precisely what the screen showed before this lane existed.
+  try {
+    const supabase = createServerSupabase()
+    const download = await supabase.storage.from(MEDIA_BUCKET).download(input.asset.storage_path)
+    if (download.error || !download.data) return { offered: false, reason: 'unreadable' }
 
-  // Signed here rather than on the client: the bucket is private, and a URL that
-  // could not be minted comes back null so the screen says the preview is
-  // unavailable instead of rendering a broken frame.
-  const [preview] = await signMediaPreviews([
-    { id: input.asset.id, storage_path: input.asset.storage_path },
-  ])
+    // Signed here rather than on the client: the bucket is private, and a URL
+    // that could not be minted comes back null so the screen says the preview is
+    // unavailable instead of rendering a broken frame.
+    const [preview] = await signMediaPreviews([
+      { id: input.asset.id, storage_path: input.asset.storage_path },
+    ])
 
-  return offerFor({
-    bytes: new Uint8Array(await download.data.arrayBuffer()),
-    candidate: { mime, bytes, width, height },
-    channels: input.channels,
-    formats: input.formats,
-    rejections: input.rejections,
-    assetId: input.asset.id,
-    previewUrl: preview?.url ?? null,
-  })
+    return await offerFor({
+      bytes: new Uint8Array(await download.data.arrayBuffer()),
+      candidate: { mime, bytes, width, height },
+      channels: input.channels,
+      formats: input.formats,
+      rejections: input.rejections,
+      assetId: input.asset.id,
+      previewUrl: preview?.url ?? null,
+    })
+  } catch {
+    return null
+  }
 }

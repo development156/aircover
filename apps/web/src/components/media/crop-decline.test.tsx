@@ -7,7 +7,9 @@ const attachMedia = vi.fn()
 const acceptCropForUpload = vi.fn()
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
-vi.mock('@/app/actions/posts-media', () => ({ attachMedia: (...a: unknown[]) => attachMedia(...a) }))
+vi.mock('@/app/actions/posts-media', () => ({
+  attachMedia: (...a: unknown[]) => attachMedia(...a),
+}))
 vi.mock('@/app/actions/posts-crop', () => ({
   acceptCropForUpload: (...a: unknown[]) => acceptCropForUpload(...a),
 }))
@@ -77,7 +79,10 @@ async function pickARefusedFile() {
   const user = userEvent.setup()
   render(<MediaAttach postId="p1" channels={toChannelSet(['instagram'])} />)
   const input = screen.getByLabelText(/add media/i, { selector: 'input' })
-  await user.upload(input, new File([new Uint8Array([1, 2, 3])], 'tall.jpg', { type: 'image/jpeg' }))
+  await user.upload(
+    input,
+    new File([new Uint8Array([1, 2, 3])], 'tall.jpg', { type: 'image/jpeg' }),
+  )
   return user
 }
 

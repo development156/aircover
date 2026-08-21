@@ -39,7 +39,6 @@ async function withSubjectAt(
   return new Uint8Array(out)
 }
 
-
 /**
  * A real GIF89a with `frames` image descriptors, written by hand.
  *
@@ -310,13 +309,17 @@ describe('suggestFocal', () => {
 
   test('centres when there is nothing to crop', async () => {
     const input = await jpeg(500, 500)
-    expect(await suggestFocal(input, { width: 500, height: 500 }, { width: 500, height: 500 })).toEqual(
-      CENTRE,
-    )
+    expect(
+      await suggestFocal(input, { width: 500, height: 500 }, { width: 500, height: 500 }),
+    ).toEqual(CENTRE)
   })
 
   test('centres rather than throwing when the bytes cannot be read', async () => {
-    const focal = await suggestFocal(new Uint8Array([9, 9, 9]), { width: 10, height: 10 }, { width: 5, height: 5 })
+    const focal = await suggestFocal(
+      new Uint8Array([9, 9, 9]),
+      { width: 10, height: 10 },
+      { width: 5, height: 5 },
+    )
     expect(focal).toEqual(CENTRE)
   })
 })

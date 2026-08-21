@@ -37,9 +37,9 @@ describe('what a crop is allowed to claim it fixes', () => {
   })
 
   test('a count or a missing photo is not a shape problem at all', () => {
-    expect(isFixable({ channel: 'x', violations: [{ code: 'MAX_MEDIA_COUNT', message: '' }] })).toBe(
-      false,
-    )
+    expect(
+      isFixable({ channel: 'x', violations: [{ code: 'MAX_MEDIA_COUNT', message: '' }] }),
+    ).toBe(false)
     expect(
       isFixable({ channel: 'instagram', violations: [{ code: 'MEDIA_REQUIRED', message: '' }] }),
     ).toBe(false)

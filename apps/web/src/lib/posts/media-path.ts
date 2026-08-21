@@ -26,12 +26,7 @@
 
 /** Which input a `MediaPathError` is about, so callers branch without parsing prose. */
 export type MediaPathField =
-  | 'workspaceId'
-  | 'postId'
-  | 'objectId'
-  | 'assetId'
-  | 'derivativeId'
-  | 'mime'
+  'workspaceId' | 'postId' | 'objectId' | 'assetId' | 'derivativeId' | 'mime'
 
 /**
  * Refusal to build a key. Thrown, not returned, because every caller has already

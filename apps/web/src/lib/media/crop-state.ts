@@ -10,5 +10,4 @@ import type { ChannelRejection } from '../posts/attach-decision'
  * channels it did not work for.
  */
 export type AcceptCropState =
-  | { ok: true; warnings: ChannelRejection[]; message: string }
-  | { ok: false; message: string }
+  { ok: true; warnings: ChannelRejection[]; message: string } | { ok: false; message: string }

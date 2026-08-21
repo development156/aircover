@@ -43,9 +43,7 @@ export function CropOutcomes({ outcomes }: { outcomes: readonly ChannelOutcome[]
             <p className="flex flex-wrap items-baseline gap-x-2 type-body font-[550] text-ink">
               {CHANNEL_LABELS[outcome.channel]}
               {outcome.format === null ? null : (
-                <span className="type-eyebrow font-mono text-muted">
-                  {outcome.format}
-                </span>
+                <span className="type-eyebrow font-mono text-muted">{outcome.format}</span>
               )}
             </p>
             <p className="mt-0.5 type-sm text-muted">{outcome.note}</p>

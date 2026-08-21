@@ -51,9 +51,7 @@ export interface MintInput {
   alt: string | null
 }
 
-export type MintResult =
-  | { ok: true; warnings: ChannelRejection[] }
-  | { ok: false; message: string }
+export type MintResult = { ok: true; warnings: ChannelRejection[] } | { ok: false; message: string }
 
 const CANNOT_READ = 'Sahoda could not read that photo well enough to crop it — try again.'
 const CROP_FAILED = 'That crop did not produce a file the channels accept, so nothing was saved.'
@@ -67,7 +65,11 @@ const CROP_FAILED = 'That crop did not produce a file the channels accept, so no
  * because it is what the quality ladder answers to — the same rectangle under a
  * 5 MB cap and an 8 MB cap can legitimately be two different files.
  */
-function recipeFor(rect: { x: number; y: number; width: number; height: number }, mime: string, maxBytes: number): string {
+function recipeFor(
+  rect: { x: number; y: number; width: number; height: number },
+  mime: string,
+  maxBytes: number,
+): string {
   const ext = extensionForMime(mime) ?? 'bin'
   return `${rect.x}-${rect.y}-${rect.width}-${rect.height}-${ext}-${maxBytes}`
 }

@@ -1,14 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { CONSTRAINTS, validateMedia } from '@sahoda/shared'
 
-import {
-  CENTRE,
-  fitInBand,
-  inBand,
-  intersectBands,
-  placeCrop,
-  planCrop,
-} from './crop-geometry'
+import { CENTRE, fitInBand, inBand, intersectBands, placeCrop, planCrop } from './crop-geometry'
 import { targetFor, targetsFor } from './targets'
 
 const IG = targetFor('instagram', null)

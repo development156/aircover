@@ -519,7 +519,13 @@ describe('A5b · asset delete gate + usage record (real Postgres, in-process)', 
       `insert into post_media
          (workspace_id, post_id, asset_id, derivative_id, storage_path, mime, bytes, width, height)
        values ($1, $2, $3, $4, $5, 'image/jpeg', 900, 1080, 1440) returning id`,
-      [workspace, postId, assetId, derivativeId, `${workspace}/derivatives/${assetId}/${derivativeId}.jpg`],
+      [
+        workspace,
+        postId,
+        assetId,
+        derivativeId,
+        `${workspace}/derivatives/${assetId}/${derivativeId}.jpg`,
+      ],
     )
     return (r.rows[0] as { id: string }).id
   }
@@ -659,5 +665,4 @@ describe('A5b · asset delete gate + usage record (real Postgres, in-process)', 
       expect(raised).not.toBeNull()
     })
   })
-
 })

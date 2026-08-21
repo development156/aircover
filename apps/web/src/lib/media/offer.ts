@@ -27,8 +27,7 @@ import type { CropOfferView } from './offer-state'
  */
 
 export type OfferResult =
-  | { offered: true; offer: CropOfferView }
-  | { offered: false; reason: string }
+  { offered: true; offer: CropOfferView } | { offered: false; reason: string }
 
 export interface OfferInput {
   /** The ORIGINAL's bytes. Read, never written. */
@@ -46,6 +45,18 @@ export interface OfferInput {
 }
 
 export async function offerFor(input: OfferInput): Promise<OfferResult> {
+  try {
+    return await compose(input)
+  } catch {
+    // See `offer-asset.ts`: this runs inside a refusal arm that has already
+    // composed a sentence and a per-channel objection list, and a throw here
+    // would escape to the action's catch and replace both. A refusal with no
+    // offer is the screen that existed before this lane.
+    return { offered: false, reason: 'unreadable' }
+  }
+}
+
+async function compose(input: OfferInput): Promise<OfferResult> {
   const oriented = await orientedSize(input.bytes)
   if (oriented === null) return { offered: false, reason: 'unreadable' }
 
