@@ -1,7 +1,12 @@
 /**
  * HOW MUCH STORAGE CROPPED COPIES ACTUALLY COST.
  *
- * Run from apps/web (it resolves `sharp` from there):  node ../../scripts/media/measure-derivative-storage.mjs
+ * Run:  node apps/web/scripts/measure-derivative-storage.mjs
+ *
+ * It lives under apps/web because that is where `sharp` is installed, and node
+ * resolves a module from the SCRIPT'S OWN path, not from the working directory —
+ * the same file under `scripts/` at the repo root cannot find sharp at all,
+ * however it is invoked.
  *
  * ── WHAT IS REAL HERE AND WHAT IS NOT ──────────────────────────────────────
  * The GEOMETRY is exact: which channel selections force a crop, and how many
@@ -19,10 +24,23 @@
  */
 import sharp from 'sharp'
 import { readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-// The declared bands, restated ONLY here so the script is standalone; they are
-// asserted against CONSTRAINTS by targets.test.ts.
+/** The repo root, from THIS file rather than from wherever it was invoked. */
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+
+// ── A SECOND COPY OF THE LIMITS, AND NOTHING CHECKS IT ─────────────────────
+// These restate the Constraint Engine so this script can run standalone, and
+// NOTHING asserts they still agree with it — an earlier version of this comment
+// claimed `targets.test.ts` did, which was false: that file asserts what
+// `targetFor()` returns, not what is written here.
+//
+// Stated plainly rather than fixed, because this is a one-off measurement whose
+// numbers are quoted with a date beside them. If it is ever run again to inform
+// a decision, CHECK THESE AGAINST packages/shared/src/publishing/constraints.ts
+// first — the repo's standing rule about a second list of limits going stale
+// applies to analysis scripts too.
 const BANDS = { instagram: [0.75, 1.91] }
 const CAP = { x: 5, gbp: 5, linkedin: 5, instagram: 8 }
 
@@ -133,12 +151,12 @@ let realOrig = 0,
 for (const d of dirs) {
   let names = []
   try {
-    names = readdirSync(join('..', '..', d))
+    names = readdirSync(join(ROOT, d))
   } catch {
     continue
   }
   for (const n of names.filter((n) => /\.png$/i.test(n))) {
-    const p = join('..', '..', d, n)
+    const p = join(ROOT, d, n)
     const size = statSync(p).size
     const m = await sharp(p).metadata()
     const f = fit(m.width, m.height, 0.75, 1.91)

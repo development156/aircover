@@ -490,6 +490,10 @@ export async function attachAssetToPost(
   }
 }
 
+/** One page of a storage listing, and the most passes the sweep will make. */
+const SWEEP_PAGE = 100
+const MAX_SWEEP_PASSES = 100
+
 /**
  * Remove every cropped copy of one library file.
  *
@@ -505,18 +509,44 @@ async function removeDerivativeObjects(
 ): Promise<void> {
   try {
     const prefix = derivativePrefix({ workspaceId, assetId })
-    const listed = await supabase.storage.from(MEDIA_BUCKET).list(prefix)
-    if (listed.error) {
-      console.error('[assets] could not list crops to remove', listed.error.message)
-      return
+
+    // PAGED. `list()` returns at most 100 entries by default, and a loop that
+    // took the first page would leave every crop after the hundredth in the
+    // bucket forever while reporting nothing wrong — the same silent-partial
+    // shape this whole lane is about. One photo reaching 100 distinct crops is
+    // unlikely and it is not impossible: every move of the focal point that is
+    // accepted is a new recipe.
+    // Always reads from the START of the folder, never from an advancing
+    // offset: each pass DELETES what it listed, so the remainder shifts down and
+    // an offset would step straight over it. The bound is therefore a count of
+    // passes, not a cursor — and it is a real bound, because a loop that only
+    // stops on a short page would spin forever the day `remove` starts
+    // succeeding without removing.
+    for (let pass = 0; pass < MAX_SWEEP_PASSES; pass += 1) {
+      const listed = await supabase.storage
+        .from(MEDIA_BUCKET)
+        .list(prefix, { limit: SWEEP_PAGE, offset: 0 })
+      if (listed.error) {
+        console.error('[assets] could not list crops to remove', listed.error.message)
+        return
+      }
+      const entries = listed.data ?? []
+      const paths = entries
+        .map((entry) => entry.name)
+        .filter((name): name is string => typeof name === 'string' && name !== '')
+        .map((name) => `${prefix}/${name}`)
+      // Nothing left, or nothing removable: either way there is no next pass
+      // that would do anything a previous one did not.
+      if (paths.length === 0) return
+      const { error } = await supabase.storage.from(MEDIA_BUCKET).remove(paths)
+      if (error) {
+        console.error('[assets] orphan crops left behind', error.message)
+        return
+      }
+      // A short page was the last page.
+      if (entries.length < SWEEP_PAGE) return
     }
-    const paths = (listed.data ?? [])
-      .map((entry) => entry.name)
-      .filter((name): name is string => typeof name === 'string' && name !== '')
-      .map((name) => `${prefix}/${name}`)
-    if (paths.length === 0) return
-    const { error } = await supabase.storage.from(MEDIA_BUCKET).remove(paths)
-    if (error) console.error('[assets] orphan crops left behind', error.message)
+    console.error('[assets] crop sweep hit its pass ceiling; some crops may remain')
   } catch (error) {
     console.error('[assets] orphan crops left behind')
     reportServerError(error, { action: 'removeDerivativeObjects', workspaceId })

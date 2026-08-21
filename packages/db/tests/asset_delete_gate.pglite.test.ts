@@ -652,6 +652,93 @@ describe('A5b · asset delete gate + usage record (real Postgres, in-process)', 
       expect(raised).toContain('post_media_derivative_of_asset_fk')
     })
 
+    it('the SAME crop of the same photo cannot be stored twice', async () => {
+      // "Idempotent: re-running produces no duplicate objects" rests on this
+      // constraint and on the select-before-render in `mintCroppedAttachment`.
+      // The select is a fast path; THIS is the guarantee, because two requests
+      // can both miss the select and only one can win the insert.
+      const asset = await newAsset()
+      const first = await newDerivative(asset)
+      expect(first).toBeTruthy()
+
+      let raised: string | null = null
+      try {
+        // Same asset, same recipe — a second person cropping the same photo the
+        // same way, or the same person opening the crop screen twice.
+        await db.query(
+          `insert into asset_derivatives
+             (workspace_id, asset_id, storage_path, recipe, channels, formats,
+              crop_x, crop_y, crop_w, crop_h, mime, bytes, width, height)
+           values ($1, $2, $3, $4, $5, $6, 0, 240, 1080, 1440, 'image/jpeg', 900, 1080, 1440)`,
+          [
+            WS,
+            asset,
+            `${WS}/derivatives/${asset}/second.jpg`,
+            '0-240-1080-1440-jpg-8388608',
+            ['instagram'],
+            JSON.stringify({ instagram: 'image' }),
+          ],
+        )
+      } catch (error) {
+        raised = error instanceof Error ? error.message : String(error)
+      }
+      expect(raised).toContain('asset_derivatives_asset_id_recipe_key')
+
+      // A DIFFERENT crop of the same photo is a different file and is allowed —
+      // otherwise moving the focal point once would be the last crop anyone gets.
+      const other = await db.query(
+        `insert into asset_derivatives
+           (workspace_id, asset_id, storage_path, recipe, channels, formats,
+            crop_x, crop_y, crop_w, crop_h, mime, bytes, width, height)
+         values ($1, $2, $3, $4, $5, $6, 0, 0, 1080, 1440, 'image/jpeg', 900, 1080, 1440)
+         returning id`,
+        [
+          WS,
+          asset,
+          `${WS}/derivatives/${asset}/third.jpg`,
+          '0-0-1080-1440-jpg-8388608',
+          ['instagram'],
+          JSON.stringify({}),
+        ],
+      )
+      expect(other.rows).toHaveLength(1)
+    })
+
+    it('every crop of one photo shares the prefix the delete sweep looks in', async () => {
+      // `asset_derivatives` cascades, so the ROWS go with the asset. The OBJECTS
+      // do not — no database deletes a file in a bucket — so `deleteAsset`
+      // sweeps `<workspace>/derivatives/<asset>/` by prefix afterwards. That
+      // sweep is only complete if every path genuinely begins with it, which is
+      // what the `asset_derivatives_path_scoped` CHECK and this assertion are
+      // between them for.
+      const asset = await newAsset()
+      await newDerivative(asset)
+      const rows = await db.query<{ storage_path: string }>(
+        `select storage_path from asset_derivatives where asset_id = $1`,
+        [asset],
+      )
+      expect(rows.rows).not.toHaveLength(0)
+      for (const row of rows.rows) {
+        expect(row.storage_path.startsWith(`${WS}/derivatives/${asset}/`)).toBe(true)
+      }
+
+      // …and a path outside the workspace's own prefix cannot be stored at all.
+      let raised: string | null = null
+      try {
+        await db.query(
+          `insert into asset_derivatives
+             (workspace_id, asset_id, storage_path, recipe, channels, formats,
+              crop_x, crop_y, crop_w, crop_h, mime, bytes, width, height)
+           values ($1, $2, 'somewhere/else/x.jpg', 'r2', $3, '{}'::jsonb,
+                   0, 0, 10, 10, 'image/jpeg', 1, 10, 10)`,
+          [WS, asset, ['instagram']],
+        )
+      } catch (error) {
+        raised = error instanceof Error ? error.message : String(error)
+      }
+      expect(raised).toContain('asset_derivatives_path_scoped')
+    })
+
     it('keeps a crop inside its own workspace, by key rather than by convention', async () => {
       const mine = await newAsset(WS)
       let raised: string | null = null

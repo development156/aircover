@@ -125,8 +125,27 @@ export const AssetDerivativeSchema = z.object({
    * once, so a single `format` would be false for every channel but one — and
    * this row's whole job is to record which channel and which format a crop was
    * cut for. A channel whose version stated no intent is simply absent.
+   *
+   * ── `partialRecord`, AND `record` HERE WOULD HAVE BEEN A SILENT DATA BUG ───
+   * Zod 4 made `z.record()` with an ENUM key EXHAUSTIVE — it requires a value
+   * for every member — and moved the old partial behaviour to `partialRecord`.
+   * So `z.record(ChannelSchema, …)` demands all four channels, and EVERY row
+   * this feature writes has fewer: an Instagram-only crop has one key and the
+   * column's own default is `{}`.
+   *
+   * MEASURED: `{instagram:'story'}` failed with three `invalid_type` issues for
+   * x, gbp and linkedin. Typecheck could not see it — `formatMapFor` returns
+   * `Record<string, string>`, assignable either way — and no database test
+   * reaches it, because those insert through raw SQL and never take a row back
+   * out through zod.
+   *
+   * The place it lands is the worst one available. `mintCroppedAttachment`
+   * parses AFTER uploading the derivative and inserting the row, so the failure
+   * would leave the bytes in the bucket and the row in the table, never write
+   * `post_media`, and tell the person the crop did not work — a silent partial
+   * success, which is the exact class this lane was written to close.
    */
-  formats: z.record(ChannelSchema, z.string()),
+  formats: z.partialRecord(ChannelSchema, z.string()),
   crop_x: z.int(),
   crop_y: z.int(),
   crop_w: z.int(),
