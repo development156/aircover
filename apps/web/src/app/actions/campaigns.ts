@@ -30,6 +30,17 @@ import { workspaceForWrite } from '@/lib/workspaces'
  * security measure; adding `.eq('workspace_id')` to a write would be redundant
  * to RLS and would imply the cookie is an authorization grant, which it is not.
  *
+ * ── `.select()` ON EVERY UPDATE AND DELETE, AND WHY IT IS NOT REDUNDANT ──────
+ * The paragraph above is about AUTHORIZATION, and it still stands: RLS is the
+ * boundary and an `.eq('workspace_id')` on a write would only imply the cookie
+ * were a grant. `.select()` answers a different question — EVIDENCE. PostgREST
+ * reports an UPDATE or DELETE that matched zero rows as a success with a null
+ * error, and under RLS a row the caller cannot see IS zero rows. So without the
+ * returned row these actions cannot tell a denied write from a completed one,
+ * and four of them used to report the completed one: "Moved to Running" over an
+ * unchanged stage, "Campaign deleted" then a push to a list still showing it.
+ * See `campaigns.test.ts`, which drives each of them at zero rows.
+ *
  * ── NOTHING HERE SPENDS A CREDIT ─────────────────────────────────────────────
  * Naming a campaign and putting a post in it are database rows, not model calls,
  * so no path in this file touches the ledger and none of them can. If a future
@@ -146,8 +157,14 @@ export async function updateCampaign(
     if (!parsed.success) return { ok: false, field: 'name', message: 'Give the campaign a name.' }
 
     const supabase = createServerSupabase()
-    const { error } = await supabase.from('campaigns').update(parsed.data).eq('id', campaignId)
+    const { data, error } = await supabase
+      .from('campaigns')
+      .update(parsed.data)
+      .eq('id', campaignId)
+      .select('id')
+      .maybeSingle()
     if (error) return { ok: false, message: mapCampaignError(error) }
+    if (!data) return { ok: false, message: mapCampaignError({ code: 'PGRST116' }) }
 
     revalidatePath('/campaigns')
     revalidatePath(`/campaigns/${campaignId}`)
@@ -188,11 +205,17 @@ export async function setCampaignStatus(
     if (!parsed.success) return { ok: false, message: 'That is not a campaign status.' }
 
     const supabase = createServerSupabase()
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('campaigns')
       .update({ status: parsed.data })
       .eq('id', campaignId)
+      .select('id')
+      .maybeSingle()
     if (error) return { ok: false, message: mapCampaignError(error) }
+    // The stage did not move. Saying it did puts "Moved to Running" over a select
+    // that still reads Draft after the refresh — the screen contradicts its
+    // own toast in the same frame.
+    if (!data) return { ok: false, message: mapCampaignError({ code: 'PGRST116' }) }
 
     revalidatePath('/campaigns')
     revalidatePath(`/campaigns/${campaignId}`)
@@ -275,17 +298,25 @@ export async function removePostFromCampaign(
     workspaceId = ws.workspace.id
 
     const supabase = createServerSupabase()
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('campaign_posts')
       .delete()
       .eq('campaign_id', campaignId)
       .eq('post_id', postId)
+      .select('id')
+      .maybeSingle()
 
     if (error) return { ok: false, message: mapCampaignError(error) }
+    // Routed through PGRST116 so "already removed" and "not yours" read
+    // identically, exactly as `deletePost` does — distinguishing them would turn
+    // this button into an existence oracle for campaign ids.
+    if (!data) return { ok: false, message: mapCampaignError({ code: 'PGRST116' }) }
 
     revalidatePath('/campaigns')
     revalidatePath(`/campaigns/${campaignId}`)
     revalidatePath('/planner')
+    // One, because one row came back. It was a literal before, and a literal is
+    // a claim about the database that nothing measured.
     return { ok: true, changed: 1 }
   } catch (error) {
     reportServerError(error, { action: 'removePostFromCampaign', workspaceId })
@@ -311,8 +342,17 @@ export async function deleteCampaign(campaignId: string): Promise<CampaignDelete
     workspaceId = ws.workspace.id
 
     const supabase = createServerSupabase()
-    const { error } = await supabase.from('campaigns').delete().eq('id', campaignId)
+    const { data, error } = await supabase
+      .from('campaigns')
+      .delete()
+      .eq('id', campaignId)
+      .select('id')
+      .maybeSingle()
     if (error) return { ok: false, message: mapCampaignError(error) }
+    // Nothing was deleted. Without this the button says "Campaign deleted — the
+    // posts are still there" and then pushes to /campaigns, where the campaign
+    // it just claimed to delete is still in the list.
+    if (!data) return { ok: false, message: mapCampaignError({ code: 'PGRST116' }) }
 
     revalidatePath('/campaigns')
     revalidatePath('/planner')
