@@ -229,7 +229,25 @@ export function derivativeObjectPath(input: {
     )
   }
 
-  return `${workspaceId}/${DERIVATIVE_FOLDER}/${assetId}/${derivativeId}.${extension}`
+  return `${derivativePrefix({ workspaceId, assetId })}/${derivativeId}.${extension}`
+}
+
+/**
+ * The folder holding every cropped copy of ONE library file.
+ *
+ * Exported because deleting an asset has to sweep its crops out of storage, and
+ * Postgres cannot: `asset_derivatives` cascades so the ROWS go, but no database
+ * deletes a file in a bucket. Sweeping by prefix rather than by a list read
+ * beforehand is what makes that sweep complete — a crop minted between the read
+ * and the commit would not be in such a list, and is in this folder.
+ *
+ * `derivativeObjectPath` builds its key from this, so the two cannot drift into
+ * a sweep that looks in a folder nothing was ever written to.
+ */
+export function derivativePrefix(input: { workspaceId: string; assetId: string }): string {
+  const workspaceId = normaliseId(input.workspaceId, 'workspaceId')
+  const assetId = normaliseId(input.assetId, 'assetId')
+  return `${workspaceId}/${DERIVATIVE_FOLDER}/${assetId}`
 }
 
 export function assetObjectPath(input: {

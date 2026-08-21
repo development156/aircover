@@ -107,12 +107,21 @@ create table asset_derivatives (
   -- reuse extends that array.
   recipe text not null,
 
-  -- ── THE RECORD THE BRIEF ASKS FOR: WHICH CHANNELS, WHICH FORMAT ───────────
-  -- Which channels this crop was cut for and verified against, and what the
-  -- version said it was. `format` is null when no version stated an intent,
-  -- which is the truth about every variant written before the column existed.
+  -- ── THE RECORD: WHICH CHANNELS, AND WHICH FORMAT ON EACH OF THEM ─────────
+  -- Which channels this crop was cut for and verified against.
   channels text[] not null default '{}',
-  format text,
+
+  -- ── A MAP, NOT ONE VALUE, AND THAT IS NOT TIDINESS ───────────────────────
+  -- A post can be an Instagram STORY and a LinkedIn post at once, so a single
+  -- `format` column has to pick one and be wrong about the others. The first
+  -- draft of this table wrote `targets[0].format`, which recorded 'story'
+  -- against linkedin — a fabricated fact in the very record whose job is to say
+  -- which channel and which format a crop was made for.
+  --
+  -- `{"instagram": "story", "linkedin": "text"}`. A channel whose version stated
+  -- no intent is ABSENT rather than mapped to null, because "nobody said" and
+  -- "said nothing" are the same thing here and one key is enough to express it.
+  formats jsonb not null default '{}'::jsonb,
 
   -- The rectangle, in the ORIGINAL's pixel coordinates. Stored rather than
   -- recomputed so the crop can always be explained — and so a future reader can
@@ -225,6 +234,12 @@ comment on table asset_derivatives is
   'never modified or deleted to make one. Cascades from assets, so a derivative '
   'cannot outlive its original — and cannot be deleted ahead of it either, '
   'because the delete gate on assets is a BEFORE trigger that refuses first.';
+
+comment on column asset_derivatives.formats is
+  'Which format each channel''s version declared when this crop was cut, as a '
+  'channel -> format map. A map rather than one column because a post can be an '
+  'Instagram story and a LinkedIn post at once, and a single value would be '
+  'false for every channel but one.';
 
 comment on column asset_derivatives.recipe is
   'Everything that determines the bytes: the crop rectangle and the output '

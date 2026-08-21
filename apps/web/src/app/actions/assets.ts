@@ -17,7 +17,7 @@ import type {
 import { reportServerError } from '@/lib/observability/report'
 import { decideAttach, type ChannelRejection } from '@/lib/posts/attach-decision'
 import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
-import { assetObjectPath } from '@/lib/posts/media-path'
+import { assetObjectPath, derivativePrefix } from '@/lib/posts/media-path'
 import { mapPostError } from '@/lib/posts/post-error'
 import { getPost, listMedia, readVariantFormats } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
@@ -295,6 +295,20 @@ export async function deleteAsset(assetId: string, confirmed = false): Promise<D
     const storagePath = typeof data === 'string' ? data : null
     if (storagePath !== null) await removeObject(supabase, storagePath)
 
+    // ── AND THE CROPPED COPIES, WHICH POSTGRES CANNOT REACH ─────────────────
+    // `asset_derivatives` cascades, so the ROWS went with the asset inside that
+    // transaction. The OBJECTS did not: no database can delete a file in a
+    // bucket. Without this every crop ever made of this photo stays in storage
+    // forever, invisible — nothing points at it, nothing lists it, and it is
+    // still being paid for every month.
+    //
+    // Swept by PREFIX rather than from a list read before the delete, and that
+    // is the difference between complete and nearly complete: a crop minted
+    // between the read and the commit is not in a list taken beforehand, and is
+    // in the folder. `derivativeObjectPath` puts every crop of one photo under
+    // `<workspace>/derivatives/<asset>/`, which is what makes one call enough.
+    await removeDerivativeObjects(supabase, workspace.id, assetId)
+
     revalidatePath('/assets')
     revalidatePath('/posts')
     return { ok: true }
@@ -473,6 +487,39 @@ export async function attachAssetToPost(
   } catch (error) {
     reportServerError(error, { action: 'attachAssetToPost', workspaceId })
     return { ok: false, message: 'Could not add that file to the post — try again.' }
+  }
+}
+
+/**
+ * Remove every cropped copy of one library file.
+ *
+ * Best effort, like `removeObject`: the asset row is already gone and the person
+ * has been told the file was deleted, so a storage failure here is waste to be
+ * reported rather than an error to be shown. It is reported, because nothing else
+ * in the system will ever mention these objects again.
+ */
+async function removeDerivativeObjects(
+  supabase: ReturnType<typeof createServerSupabase>,
+  workspaceId: string,
+  assetId: string,
+): Promise<void> {
+  try {
+    const prefix = derivativePrefix({ workspaceId, assetId })
+    const listed = await supabase.storage.from(MEDIA_BUCKET).list(prefix)
+    if (listed.error) {
+      console.error('[assets] could not list crops to remove', listed.error.message)
+      return
+    }
+    const paths = (listed.data ?? [])
+      .map((entry) => entry.name)
+      .filter((name): name is string => typeof name === 'string' && name !== '')
+      .map((name) => `${prefix}/${name}`)
+    if (paths.length === 0) return
+    const { error } = await supabase.storage.from(MEDIA_BUCKET).remove(paths)
+    if (error) console.error('[assets] orphan crops left behind', error.message)
+  } catch (error) {
+    console.error('[assets] orphan crops left behind')
+    reportServerError(error, { action: 'removeDerivativeObjects', workspaceId })
   }
 }
 

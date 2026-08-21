@@ -39,6 +39,41 @@ async function withSubjectAt(
   return new Uint8Array(out)
 }
 
+
+/**
+ * A real GIF89a with `frames` image descriptors, written by hand.
+ *
+ * Sharp cannot produce one from a raw buffer — given a tall strip it writes a
+ * single tall frame — so a fixture built with sharp contains one frame however
+ * many were intended, and an `animated` check asserted against it proves nothing.
+ * These are the actual bytes: 2×2 pixels, a two-colour global table, and one
+ * Graphic Control Extension plus one Image Descriptor per frame.
+ *
+ * The pixel data is a minimal LZW stream at code size 2 — clear (4), four
+ * literal zeroes, end (5) — packed LSB-first into three bytes.
+ */
+function animatedGif(frames: number): Uint8Array {
+  const bytes: number[] = [
+    // "GIF89a"
+    0x47, 0x49, 0x46, 0x38, 0x39, 0x61,
+    // Logical screen: 2x2, global colour table of 2 entries, no background.
+    0x02, 0x00, 0x02, 0x00, 0xf0, 0x00, 0x00,
+    // The two colours.
+    0x00, 0x00, 0x00, 0xff, 0xff, 0xff,
+  ]
+  for (let frame = 0; frame < frames; frame += 1) {
+    // Graphic Control Extension: no disposal, 10/100s delay, no transparency.
+    bytes.push(0x21, 0xf9, 0x04, 0x00, 0x0a, 0x00, 0x00, 0x00)
+    // Image Descriptor at (0,0), 2x2, no local colour table.
+    bytes.push(0x2c, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x02, 0x00, 0x00)
+    // LZW minimum code size, one sub-block of three bytes, terminator.
+    bytes.push(0x02, 0x03, 0x04, 0x80, 0x02, 0x00)
+  }
+  // Trailer.
+  bytes.push(0x3b)
+  return new Uint8Array(bytes)
+}
+
 describe('the original is never modified', () => {
   test('the input buffer is byte-identical after a crop', async () => {
     // The claim the whole feature rests on, in the form a reader can check.
@@ -182,18 +217,36 @@ describe('orientedSize', () => {
     expect(sniffed.ok && sniffed.image.width).toBe(1200)
   })
 
-  test('a still image is not animated and a multi-frame gif is', async () => {
+  test('a still image is not animated', async () => {
     const still = await orientedSize(await jpeg(100, 100))
     expect(still?.animated).toBe(false)
+  })
 
-    const frames = Buffer.alloc(50 * 100 * 3, 200)
-    const animated = await sharp(frames, { raw: { width: 50, height: 100, channels: 3 } })
-      .gif({ loop: 0 })
-      .toBuffer()
-    const meta = await orientedSize(new Uint8Array(animated))
-    // One frame is still one frame; the assertion that matters is that `pages`
-    // is READ at all, so an animated upload can be kept out of the crop offer.
+  test('a REAL two-frame gif is reported as animated', async () => {
+    // The refusal for moving images is deliberate product behaviour — cropping a
+    // gif would hand the customer back a still of something they uploaded because
+    // it moves. An earlier version of this test built a ONE-frame gif and
+    // asserted only that the read did not fail, which exercised nothing.
+    //
+    // Built byte by byte, because sharp will not WRITE one from a raw strip —
+    // it flattens the frames into a single tall image — and a fixture that
+    // silently contains one frame would let this assertion pass on a build where
+    // `pages` was never read at all. That is what the first version of this test
+    // did.
+    const animated = animatedGif(2)
+    const meta = await orientedSize(animated)
     expect(meta).not.toBeNull()
+    expect(meta?.animated).toBe(true)
+    // The visible size is ONE frame's, which is what a crop would be planned from.
+    expect(meta?.width).toBe(2)
+    expect(meta?.height).toBe(2)
+  })
+
+  test('a ONE-frame gif is not animated, so the refusal is about movement', async () => {
+    // The control. Without it, an `animated` that simply returned true for every
+    // gif would pass the test above and refuse a perfectly croppable still.
+    const meta = await orientedSize(animatedGif(1))
+    expect(meta?.animated).toBe(false)
   })
 
   test('returns null for bytes that are not an image', async () => {

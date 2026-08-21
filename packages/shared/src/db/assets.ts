@@ -118,8 +118,15 @@ export const AssetDerivativeSchema = z.object({
   recipe: z.string(),
   /** Which channels this crop was cut for and verified against. */
   channels: z.array(ChannelSchema),
-  /** What the version said it was, or null when no version stated an intent. */
-  format: z.string().nullable(),
+  /**
+   * Which format each channel's version declared, as a channel -> format map.
+   *
+   * A MAP, not one value. A post can be an Instagram story and a LinkedIn post at
+   * once, so a single `format` would be false for every channel but one — and
+   * this row's whole job is to record which channel and which format a crop was
+   * cut for. A channel whose version stated no intent is simply absent.
+   */
+  formats: z.record(ChannelSchema, z.string()),
   crop_x: z.int(),
   crop_y: z.int(),
   crop_w: z.int(),

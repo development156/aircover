@@ -5,6 +5,8 @@ import {
   ALLOWED_MEDIA_TYPES,
   MediaPathError,
   assetObjectPath,
+  derivativeObjectPath,
+  derivativePrefix,
   extensionForMime,
   mediaObjectPath,
 } from './media-path'
@@ -500,5 +502,120 @@ describe('assetObjectPath — the LIBRARY sibling', () => {
     }
     const engineTypes = new Set(Object.values(CONSTRAINTS).flatMap((spec) => spec.mediaTypes))
     expect([...ALLOWED_MEDIA_TYPES].sort()).toEqual([...engineTypes].sort())
+  })
+})
+
+describe('derivativeObjectPath — the folder cropped copies live in', () => {
+  const WS = '11111111-2222-3333-4444-555555555555'
+  const ASSET = '66666666-7777-8888-9999-aaaaaaaaaaaa'
+  const DERIVATIVE = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff'
+
+  test('the workspace uuid is the FIRST segment, which is the whole tenant boundary', () => {
+    // `storage.objects`' policy reads `(storage.foldername(name))[1]` and nothing
+    // else. A key that did not lead with the workspace uuid would be an object
+    // its owner cannot reach — or, if the prefix were another workspace's, one
+    // THEY could.
+    const path = derivativeObjectPath({
+      workspaceId: WS,
+      assetId: ASSET,
+      derivativeId: DERIVATIVE,
+      mime: 'image/jpeg',
+    })
+    expect(path.split('/')[0]).toBe(WS)
+    expect(path).toBe(`${WS}/derivatives/${ASSET}/${DERIVATIVE}.jpg`)
+  })
+
+  test('every allowed mime produces a key the SQL CHECK accepts', () => {
+    // `asset_derivatives` carries
+    //   check (storage_path like workspace_id::text || '/derivatives/%')
+    // so this module and that constraint have to agree about the shape of a key.
+    // They are two languages stating one rule, which is the drift risk this
+    // assertion exists to close.
+    for (const mime of ALLOWED_MEDIA_TYPES) {
+      const path = derivativeObjectPath({
+        workspaceId: WS,
+        assetId: ASSET,
+        derivativeId: DERIVATIVE,
+        mime,
+      })
+      expect(path.startsWith(`${WS}/derivatives/`)).toBe(true)
+    }
+  })
+
+  test('an uppercase workspace id is lowercased, so the SQL CHECK still matches', () => {
+    // Postgres casts the first segment to `uuid`, which is case-insensitive, but
+    // the CHECK is a `like` against `workspace_id::text` — which Postgres renders
+    // LOWERCASE. An uppercase prefix would pass RLS and fail the constraint.
+    const path = derivativeObjectPath({
+      workspaceId: WS.toUpperCase(),
+      assetId: ASSET.toUpperCase(),
+      derivativeId: DERIVATIVE.toUpperCase(),
+      mime: 'image/png',
+    })
+    expect(path).toBe(`${WS}/derivatives/${ASSET}/${DERIVATIVE}.png`)
+    expect(path.startsWith(`${WS}/derivatives/`)).toBe(true)
+  })
+
+  test('refuses a derivative id that is not a uuid, naming which input it was', () => {
+    for (const bad of ['', 'not-a-uuid', `${DERIVATIVE}\n`, '../../etc/passwd']) {
+      let thrown: unknown
+      try {
+        derivativeObjectPath({
+          workspaceId: WS,
+          assetId: ASSET,
+          derivativeId: bad,
+          mime: 'image/jpeg',
+        })
+      } catch (error) {
+        thrown = error
+      }
+      expect(thrown).toBeInstanceOf(MediaPathError)
+      expect((thrown as MediaPathError).field).toBe('derivativeId')
+    }
+  })
+
+  test('refuses a mime no channel accepts rather than minting an extensionless key', () => {
+    expect(() =>
+      derivativeObjectPath({
+        workspaceId: WS,
+        assetId: ASSET,
+        derivativeId: DERIVATIVE,
+        mime: 'video/mp4',
+      }),
+    ).toThrow(MediaPathError)
+  })
+
+  test('the prefix the delete sweep uses is the folder the path is built in', () => {
+    // If these two drifted, the sweep would list a folder nothing was ever
+    // written to and report cheerfully that there was nothing to remove.
+    const prefix = derivativePrefix({ workspaceId: WS, assetId: ASSET })
+    const path = derivativeObjectPath({
+      workspaceId: WS,
+      assetId: ASSET,
+      derivativeId: DERIVATIVE,
+      mime: 'image/webp',
+    })
+    expect(path.startsWith(`${prefix}/`)).toBe(true)
+    expect(path.slice(prefix.length + 1)).toBe(`${DERIVATIVE}.webp`)
+  })
+
+  test('a crop folder can never collide with a post folder or the assets folder', () => {
+    // Both are properties of the ALLOWLIST rather than coincidences: an accepted
+    // id is hex and dashes, so no id can spell `derivatives` or `assets`.
+    const derivative = derivativeObjectPath({
+      workspaceId: WS,
+      assetId: ASSET,
+      derivativeId: DERIVATIVE,
+      mime: 'image/jpeg',
+    })
+    const post = mediaObjectPath({
+      workspaceId: WS,
+      postId: ASSET,
+      objectId: DERIVATIVE,
+      mime: 'image/jpeg',
+    })
+    const asset = assetObjectPath({ workspaceId: WS, assetId: ASSET, mime: 'image/jpeg' })
+    expect(new Set([derivative, post, asset]).size).toBe(3)
+    expect(derivative.split('/')[1]).toBe('derivatives')
   })
 })

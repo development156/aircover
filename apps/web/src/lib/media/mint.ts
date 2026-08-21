@@ -72,6 +72,31 @@ function recipeFor(rect: { x: number; y: number; width: number; height: number }
   return `${rect.x}-${rect.y}-${rect.width}-${rect.height}-${ext}-${maxBytes}`
 }
 
+/** The channel -> format map this crop was cut for. Absent means "nobody said". */
+function formatMapFor(
+  targets: readonly { channel: Channel; format: PostFormat | null }[],
+): Record<string, string> {
+  const map: Record<string, string> = {}
+  for (const target of targets) {
+    if (target.format !== null) map[target.channel] = target.format
+  }
+  return map
+}
+
+/** The widened record when a reused crop is serving channels it did not record, else null. */
+function mergeChannels(
+  recorded: readonly Channel[],
+  targets: readonly { channel: Channel; format: PostFormat | null }[],
+): { channels: Channel[]; formats: Record<string, string> } | null {
+  const known = new Set<Channel>(recorded)
+  const fresh = targets.filter((target) => !known.has(target.channel))
+  if (fresh.length === 0) return null
+  return {
+    channels: [...recorded, ...fresh.map((target) => target.channel)],
+    formats: formatMapFor(fresh),
+  }
+}
+
 export async function mintCroppedAttachment(input: MintInput): Promise<MintResult> {
   const supabase = createServerSupabase()
 
@@ -145,6 +170,29 @@ export async function mintCroppedAttachment(input: MintInput): Promise<MintResul
 
   let row = existing.data === null ? null : AssetDerivativeSchema.safeParse(existing.data)
 
+  // ── A REUSED CROP RECORDS THE CHANNELS IT IS NOW SERVING TOO ─────────────
+  // The bytes are identical, so the OBJECT is rightly shared — but the record of
+  // what this crop was cut for is not a property of the bytes. A derivative first
+  // made for [instagram] and then reused on an [instagram, x] post that only said
+  // [instagram] would be a row that understates its own audience.
+  if (row !== null && row.success) {
+    const merged = mergeChannels(row.data.channels, decision.offer.targets)
+    if (merged !== null) {
+      const widened = await supabase
+        .from('asset_derivatives')
+        .update({ channels: merged.channels, formats: { ...row.data.formats, ...merged.formats } })
+        .eq('id', row.data.id)
+        .select('*')
+        .single()
+      // A failure to widen the RECORD is not a failure to attach: the file is
+      // correct either way. Kept quiet rather than turned into a refusal.
+      if (!widened.error) {
+        const reparsed = AssetDerivativeSchema.safeParse(widened.data)
+        if (reparsed.success) row = reparsed
+      }
+    }
+  }
+
   if (row === null || !row.success) {
     const rendered = await renderDerivative(originalBytes, rect, outputMime, maxBytes)
     if (!rendered.ok) return { ok: false, message: CROP_FAILED }
@@ -189,7 +237,7 @@ export async function mintCroppedAttachment(input: MintInput): Promise<MintResul
         storage_path: objectPath,
         recipe,
         channels: decision.offer.targets.map((target) => target.channel),
-        format: decision.offer.targets[0]?.format ?? null,
+        formats: formatMapFor(decision.offer.targets),
         crop_x: rect.x,
         crop_y: rect.y,
         crop_w: rect.width,
