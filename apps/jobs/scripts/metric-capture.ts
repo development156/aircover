@@ -92,6 +92,16 @@ function parseArgs(argv: readonly string[]): Args {
   let batch = DEFAULT_BATCH
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
+    // `argv[i]` is `string | undefined` under `noUncheckedIndexedAccess`, which
+    // this file had never been told about: apps/jobs/tsconfig.json only included
+    // `src`, `tests` and `trigger.config.ts`, so everything in `scripts/` — this
+    // job and the audience capture beside it — compiled unchecked. wt-audience
+    // added `scripts` to the include and that is what surfaced it.
+    //
+    // `continue`, not a non-null assertion: the loop is bounded by argv.length so
+    // this cannot actually happen, and the point of the flag is that the compiler
+    // should not have to take my word for that.
+    if (arg === undefined) continue
     // A bare `--` is an argument SEPARATOR, not an argument.
     //
     // MEASURED 2026-08-20 on pnpm 11.3.0: `pnpm run metrics:capture -- --batch 120`
