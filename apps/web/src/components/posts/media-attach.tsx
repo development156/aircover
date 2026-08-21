@@ -5,7 +5,12 @@ import { useRouter } from 'next/navigation'
 import { Paperclip } from 'lucide-react'
 import type { ChannelSet } from '@sahoda/shared'
 
+import { acceptCropForUpload } from '@/app/actions/posts-crop'
 import { attachMedia } from '@/app/actions/posts-media'
+import { CropOfferDialog } from '@/components/media/crop-offer-dialog'
+import type { FocalPoint } from '@/lib/media/crop-geometry'
+import { NO_OFFER_COPY } from '@/lib/media/offer-state'
+import type { AcceptCropState } from '@/lib/media/crop-state'
 import type { AttachMediaState } from '@/lib/posts/media-state'
 import { cn } from '@/lib/utils'
 
@@ -40,6 +45,27 @@ export function MediaAttach({ postId, channels }: MediaAttachProps) {
   const [result, setResult] = useState<AttachMediaState | null>(null)
   const [pending, startTransition] = useTransition()
   const inputRef = useRef<HTMLInputElement>(null)
+  /**
+   * The File the refusal was about, kept so accepting a crop can send the same
+   * bytes back. It is NOT in storage: the attach refused before uploading, which
+   * is exactly the behaviour the offer must not change.
+   */
+  const pickedRef = useRef<File | null>(null)
+  const [cropOpen, setCropOpen] = useState(false)
+  const [cropError, setCropError] = useState<string | null>(null)
+  /**
+   * The outcome of an ACCEPTED crop, kept apart from `result`.
+   *
+   * An earlier version pushed it into `result` as a synthetic success and had to
+   * invent a `PostMedia` row to satisfy the type — a value that does not exist,
+   * waiting for the first reader of `result.media`. A crop is its own outcome
+   * with its own sentence ("the original is in your library"), so it gets its own
+   * field.
+   */
+  const [cropped, setCropped] = useState<AcceptCropState | null>(null)
+  // A blob URL for the picked file, so the preview draws the real photograph
+  // without anything having been uploaded. Revoked when it is replaced.
+  const [localSrc, setLocalSrc] = useState<string | null>(null)
   // Set only while an attach this control started is in flight.
   const reclaimFocus = useRef(false)
   const inputId = useId()
@@ -85,12 +111,23 @@ export function MediaAttach({ postId, channels }: MediaAttachProps) {
     // about to be destroyed by `disabled` is ours to give back.
     reclaimFocus.current = true
     setResult(null)
+    setCropError(null)
+    setCropped(null)
+    pickedRef.current = file
+    setLocalSrc((previous) => {
+      if (previous !== null) URL.revokeObjectURL(previous)
+      return URL.createObjectURL(file)
+    })
     const formData = new FormData()
     formData.append('file', file)
 
     startTransition(async () => {
       const state = await attachMedia(postId, formData)
       setResult(state)
+      // The refusal is rendered either way. The dialog is an ADDITION on top of
+      // it, so dismissing the dialog leaves the writer looking at exactly the
+      // screen they would have seen before this existed.
+      if (!state.ok && state.offer !== undefined) setCropOpen(true)
       // Only a success changed the server's list, and only the server can mint
       // the signed preview URL for the new row. The result stays in state
       // across the refresh so warnings survive the re-render rather than
@@ -144,6 +181,22 @@ export function MediaAttach({ postId, channels }: MediaAttachProps) {
           </p>
         ) : null}
 
+        {!pending && cropped !== null && cropped.ok ? (
+          <div className="space-y-2">
+            <p className="rounded-input bg-ok-bg px-3 py-2.5 type-body text-ok">
+              {cropped.message}
+            </p>
+            {cropped.warnings.length > 0 ? (
+              <>
+                <p className="rounded-input border border-warn bg-warn-bg px-3 py-2.5 type-body text-warn">
+                  These channels still will not use it:
+                </p>
+                <ChannelObjections objections={cropped.warnings} tone="warn" />
+              </>
+            ) : null}
+          </div>
+        ) : null}
+
         {!pending && result !== null && result.ok ? (
           <div className="space-y-2">
             {result.warnings.length > 0 ? (
@@ -178,7 +231,53 @@ export function MediaAttach({ postId, channels }: MediaAttachProps) {
             {result.message}
           </p>
           <ChannelObjections objections={result.rejections ?? []} tone="danger" />
+          {/* Why no crop was offered, when there is a reason worth saying. "Too
+              small to crop" and "these channels want contradictory shapes" are
+              different situations and only one of them is worth a second try. */}
+          {result.noOffer !== undefined && (NO_OFFER_COPY[result.noOffer] ?? '') !== '' ? (
+            <p className="rounded-input bg-s1 px-3 py-2.5 type-body text-muted">
+              {NO_OFFER_COPY[result.noOffer]}
+            </p>
+          ) : null}
+          {result.offer !== undefined ? (
+            <button
+              type="button"
+              onClick={() => setCropOpen(true)}
+              className="rounded-pill border-[1.5px] border-ink px-3 py-1.5 type-body font-semibold text-ink transition-micro hover:bg-ink hover:text-white dark:hover:bg-white dark:hover:text-[var(--canvas)]"
+            >
+              Show the crop Sahoda would make
+            </button>
+          ) : null}
         </div>
+      ) : null}
+
+      {result !== null && !result.ok && result.offer !== undefined ? (
+        <CropOfferDialog
+          offer={result.offer}
+          open={cropOpen}
+          onClose={() => setCropOpen(false)}
+          pending={pending}
+          localSrc={localSrc}
+          error={cropError}
+          onAccept={(focal: FocalPoint) => {
+            const file = pickedRef.current
+            if (file === null) return
+            setCropError(null)
+            const formData = new FormData()
+            formData.append('file', file)
+            startTransition(async () => {
+              const state = await acceptCropForUpload(postId, formData, focal.x, focal.y)
+              if (!state.ok) {
+                setCropError(state.message)
+                return
+              }
+              setCropOpen(false)
+              setResult(null)
+              setCropped(state)
+              router.refresh()
+            })
+          }}
+        />
       ) : null}
     </div>
   )
