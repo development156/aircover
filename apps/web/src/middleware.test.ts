@@ -48,6 +48,13 @@ const PUBLIC_PATTERNS = [
   // edit, and a half-done edit here is a cron that redirects to /sign-in while
   // its heartbeat reports green.
   '/api/cron/loop',
+  // The daily Playbook check, added 2026-08-22. FOUR guards refused it this
+  // time — the three above plus `rls_tenant_isolation`, on an unrelated half of
+  // the same lane — and every one of them was right. The sentence above is worth
+  // re-reading with a fourth entry in hand: the redundancy is not duplication,
+  // because a half-done edit HERE is a schedule that fires, gets a 307, and
+  // reports green forever.
+  '/api/cron/playbooks',
 ]
 
 /**
@@ -58,15 +65,22 @@ const PUBLIC_PATTERNS = [
  * 2026-08-09]` a bearer token of `aaa.bbb.ccc` — three dot-separated parts that are not
  * base64url — makes Clerk throw where nothing catches it, and Vercel answers
  * **500 MIDDLEWARE_INVOCATION_FAILED** on EVERY matched path, public ones included.
- * Reproduced on /sign-in, /embed/beta, /api/public/beta-apply and all three below.
+ * Reproduced on /sign-in, /embed/beta, /api/public/beta-apply and the paths below.
  *
- * These four authenticate themselves — two CRON_SECRET compares, and an HMAC/Svix
- * signature — and gain nothing from Clerk, so the honest fix is for Clerk not to see
- * them at all.
+ * Every one of them authenticates itself — four CRON_SECRET compares, and an
+ * HMAC/Svix signature — and gains nothing from Clerk, so the honest fix is for
+ * Clerk not to see them at all.
  */
 const CLERK_BYPASS_PATHS = [
   '/api/cron/sweeps',
   '/api/cron/metrics',
+  // `/api/cron/loop` was ADDED HERE ON 2026-08-22, not with the Loop. The
+  // matcher in middleware.ts has excluded it since 2026-08-20 — so the bypass
+  // was real and this list, which is what pins it, did not mention it. Found
+  // while adding the fourth cron beneath it. The header above says "all three
+  // below" and "these four"; both counts were already wrong.
+  '/api/cron/loop',
+  '/api/cron/playbooks',
   '/api/webhooks/cashfree',
   '/api/webhooks/clerk',
 ]
