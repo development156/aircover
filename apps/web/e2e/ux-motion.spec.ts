@@ -1,8 +1,8 @@
 import type { Page } from '@playwright/test'
 
-import { test } from './fixtures/seeded-user'
+import { expect, test } from './fixtures/seeded-user'
 import { DETECTORS } from './helpers/ux-detect'
-import { shot, useReducedMotion, useTheme } from './helpers/ux-shot'
+import { framesTaken, shot, useReducedMotion, useTheme } from './helpers/ux-shot'
 
 /**
  * THE MOTION SYSTEM, PHOTOGRAPHED RATHER THAN ASSERTED.
@@ -28,6 +28,23 @@ import { shot, useReducedMotion, useTheme } from './helpers/ux-shot'
 const JOURNEY = 'motion'
 
 const ROUTES = ['/home', '/posts', '/analytics', '/wallet', '/brain', '/inbox', '/campaigns']
+
+/**
+ * EVERY test in this file must capture something.
+ *
+ * These specs assert almost nothing on purpose — their product is frames, and a
+ * dead end is a finding rather than a failure. That trade has one hole in it: a
+ * run whose sign-in silently parked on /sign-in, or whose selectors all missed,
+ * writes zero PNGs and reports green. This closes it in one place rather than
+ * thirteen, and it is the difference between "nothing broke" and "nothing ran".
+ */
+let framesAtStart = 0
+test.beforeEach(() => {
+  framesAtStart = framesTaken()
+})
+test.afterEach(() => {
+  expect(framesTaken()).toBeGreaterThan(framesAtStart)
+})
 
 async function bootstrap(page: Page): Promise<void> {
   await page.goto('/home')

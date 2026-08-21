@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url'
 
 import type { Page } from '@playwright/test'
 
-import { adminClient, signInSecondContext, test } from './fixtures/seeded-user'
-import { shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
+import { adminClient, expect, signInSecondContext, test } from './fixtures/seeded-user'
+import { framesTaken, shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
 
 /**
  * JOURNEY 4 — THE PERSON WHO MAKES A MISTAKE.
@@ -29,6 +29,23 @@ import { shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
  */
 
 const JOURNEY = 'j4-mistakes'
+
+/**
+ * EVERY test in this file must capture something.
+ *
+ * These specs assert almost nothing on purpose — their product is frames, and a
+ * dead end is a finding rather than a failure. That trade has one hole in it: a
+ * run whose sign-in silently parked on /sign-in, or whose selectors all missed,
+ * writes zero PNGs and reports green. This closes it in one place rather than
+ * thirteen, and it is the difference between "nothing broke" and "nothing ran".
+ */
+let framesAtStart = 0
+test.beforeEach(() => {
+  framesAtStart = framesTaken()
+})
+test.afterEach(() => {
+  expect(framesTaken()).toBeGreaterThan(framesAtStart)
+})
 
 async function bootstrap(page: Page): Promise<void> {
   await page.goto('/home')

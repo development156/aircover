@@ -3,7 +3,7 @@ import { join } from 'node:path'
 
 import type { Page } from '@playwright/test'
 
-import { test } from './fixtures/seeded-user'
+import { expect, test } from './fixtures/seeded-user'
 import { DETECTORS } from './helpers/ux-detect'
 import { ROUTES } from './helpers/ux-routes'
 import { UX_OUT, useTheme, type Theme } from './helpers/ux-shot'
@@ -66,6 +66,7 @@ for (const { width, theme } of COMBOS) {
     await useTheme(page, theme)
     await bootstrap(page)
 
+    let written = 0
     for (const route of ROUTES) {
       const t0 = Date.now()
       await page.goto(route, { waitUntil: 'domcontentloaded' }).catch(() => {})
@@ -81,6 +82,7 @@ for (const { width, theme } of COMBOS) {
       const domTheme = await page
         .evaluate(() => document.documentElement.getAttribute('data-theme'))
         .catch(() => null)
+      written += 1
       appendFileSync(
         AUDIT,
         JSON.stringify({
@@ -94,5 +96,10 @@ for (const { width, theme } of COMBOS) {
         }) + '\n',
       )
     }
+    // One row per route. This spec takes no screenshots, so the row count is the
+    // only evidence it did anything at all — and a measurement pass that measured
+    // nothing while reporting green is the exact failure the frames exist to
+    // avoid, arriving through the other door.
+    expect(written).toBe(ROUTES.length)
   })
 }

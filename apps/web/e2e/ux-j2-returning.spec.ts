@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Page } from '@playwright/test'
 
-import { adminClient, test } from './fixtures/seeded-user'
-import { shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
+import { adminClient, expect, test } from './fixtures/seeded-user'
+import { framesTaken, shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
 
 /**
  * JOURNEY 2 — THE RETURNING USER.
@@ -231,6 +231,8 @@ const COMBOS: { width: number; theme: Theme }[] = [
 for (const { width, theme } of COMBOS) {
   test(`ux j2 returning ${width} ${theme}`, async ({ page, signedIn }) => {
     test.setTimeout(300_000)
+    const before = framesTaken()
     await run(page, width, theme, signedIn.clerkUserId)
+    expect(framesTaken() - before).toBe(STOPS.length + 1)
   })
 }

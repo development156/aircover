@@ -1,8 +1,8 @@
 import type { Page } from '@playwright/test'
 
-import { test } from './fixtures/seeded-user'
+import { expect, test } from './fixtures/seeded-user'
 import { ROUTES } from './helpers/ux-routes'
-import { shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
+import { framesTaken, shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
 
 /**
  * JOURNEY 3 — THE PERSON WITH NOTHING, across every route in the product.
@@ -58,6 +58,11 @@ for (const { width, theme } of COMBOS) {
   test(`ux j3 nothing sweep ${width} ${theme}`, async ({ page, signedIn }) => {
     void signedIn
     test.setTimeout(600_000)
+    const before = framesTaken()
     await sweep(page, width, theme)
+    // Exactly one frame per route, no more and no fewer. A route that redirected
+    // still gets a frame; a route that was skipped does not, and this is the only
+    // thing standing between "forty screens audited" and "forty screens listed".
+    expect(framesTaken() - before).toBe(ROUTES.length)
   })
 }

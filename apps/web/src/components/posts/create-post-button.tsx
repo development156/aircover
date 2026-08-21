@@ -27,14 +27,29 @@ import { cn } from '@/lib/utils'
 export interface CreatePostButtonProps {
   size?: 'default' | 'sm'
   className?: string
+  /**
+   * Primary by default, because on Home and /posts this IS the leading action.
+   *
+   * It is overridable because docs/26 §1.5 allows exactly one primary per view,
+   * and there is at least one screen where this is not it: on /analytics with
+   * nothing connected, the leading action is "Connect a channel" — a post that
+   * goes out on no channel is still never measured, so writing one first is the
+   * long way round to the same empty page. Two orange fills there would mean
+   * neither was the primary.
+   */
+  variant?: 'primary' | 'secondary'
 }
 
-export function CreatePostButton({ size = 'default', className }: CreatePostButtonProps) {
+export function CreatePostButton({
+  size = 'default',
+  className,
+  variant = 'primary',
+}: CreatePostButtonProps) {
   return (
     <Link
       href="/posts/new"
       data-guide="posts.new_button"
-      className={cn(buttonVariants({ variant: 'primary', size }), className)}
+      className={cn(buttonVariants({ variant, size }), className)}
     >
       <Plus size={16} strokeWidth={2} aria-hidden />
       {/* The verb stays "create" the whole way through the flow. */}

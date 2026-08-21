@@ -53,6 +53,20 @@ export interface FrameRow {
   d: Record<string, unknown>
 }
 
+/**
+ * How many frames this process has actually written.
+ *
+ * Exists so a capture spec can assert it captured something. Without it a run
+ * whose selectors all missed, or whose account never signed in, writes zero PNGs
+ * and reports green — which is the "a harness that cannot tell nothing-broke from
+ * nothing-ran" failure, and it is the reason apps/web's lint refuses a test file
+ * with no expect() in it.
+ */
+let taken = 0
+export function framesTaken(): number {
+  return taken
+}
+
 export function resetManifest(): void {
   mkdirSync(UX_OUT, { recursive: true })
   writeFileSync(MANIFEST, '')
@@ -146,6 +160,7 @@ export async function shot(page: Page, opts: ShotOptions): Promise<FrameRow> {
   }
   mkdirSync(UX_OUT, { recursive: true })
   appendFileSync(MANIFEST, JSON.stringify(row) + '\n')
+  taken += 1
   return row
 }
 

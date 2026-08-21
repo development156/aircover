@@ -1,7 +1,7 @@
 import type { Locator, Page } from '@playwright/test'
 
-import { test } from './fixtures/seeded-user'
-import { shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
+import { expect, test } from './fixtures/seeded-user'
+import { framesTaken, shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
 
 /**
  * JOURNEY 1 — THE NEW USER.
@@ -202,6 +202,11 @@ for (const { width, theme } of COMBOS) {
   test(`ux j1 new user ${width} ${theme}`, async ({ page, signedIn }) => {
     void signedIn
     test.setTimeout(360_000)
+    const before = framesTaken()
     await run(page, width, theme)
+    // The one thing this file must not do is report green having captured
+    // nothing. Every stop below writes a frame whatever it finds, so a run that
+    // signed in and walked the journey cannot produce fewer than its stops.
+    expect(framesTaken() - before).toBeGreaterThanOrEqual(17)
   })
 }
