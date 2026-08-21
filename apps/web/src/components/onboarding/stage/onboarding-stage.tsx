@@ -142,23 +142,32 @@ export function OnboardingStage({
     workspaceName,
     reduced: reduced.current,
     orb,
-    onEnterProcessing: () => moveTo(procSlotRef.current),
     onLeaveProcessing: () => moveTo(orbWrapRef.current),
     onBuilt: () => go('result', 1),
     onDoorSettled: setDoor,
   })
 
   /**
-   * Put the orb in its column.
+   * Put the orb wherever the flow currently wants it.
    *
    * The canvas is created imperatively (React must not own a node that gets
    * moved between two parents), so SOMETHING has to place it — and it has to be
-   * an effect, because the slot does not exist until after the first render.
-   * Without this the right-hand column renders empty and the whole argument of
-   * the screen, an object that visibly grows as you teach it, is simply absent.
+   * an EFFECT, for two separate reasons that both showed up as rendering bugs.
+   *
+   * Without any placement at all the right-hand column rendered empty and the
+   * whole argument of the screen — an object that visibly grows as you teach
+   * it — was simply absent, while 56 hashed, distinct, passing frames said the
+   * walk was green.
+   *
+   * And placing it imperatively from `build.start()` was worse than not placing
+   * it: `.proc` is `display: none` until it is `.on`, so a measurement taken in
+   * the same tick as `setProcessing(true)` reads 0x0, the backing store is
+   * sized 2x2, and CSS stretches four pixels across 480px — a flat dark
+   * rectangle over the status card. An effect runs after the browser has laid
+   * the screen out, so the box it measures is the box that exists.
    */
   useEffect(() => {
-    if (!build.processing) moveTo(orbWrapRef.current)
+    moveTo(build.processing ? procSlotRef.current : orbWrapRef.current)
   })
 
   /* ───────────────────────────────────────────────── save and exit / end ── */

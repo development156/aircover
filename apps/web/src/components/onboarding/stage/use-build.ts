@@ -56,7 +56,6 @@ export interface UseBuildArgs {
   workspaceName: string
   reduced: boolean
   orb: { current: OrbHandle | null }
-  onEnterProcessing: () => void
   onLeaveProcessing: () => void
   onBuilt: () => void
   /** Called when the build decides the read is not going to land in time. */
@@ -90,7 +89,6 @@ export function useBuild({
   workspaceName,
   reduced,
   orb,
-  onEnterProcessing,
   onLeaveProcessing,
   onBuilt,
   onDoorSettled,
@@ -147,9 +145,13 @@ export function useBuild({
     setFailure(null)
     setProcessing(true)
 
-    // The SAME canvas is moved in, so the thing that collapses is literally the
-    // thing the user grew.
-    onEnterProcessing()
+    /*  The canvas is NOT moved here. `.proc` is `display: none` until it is
+        `.on`, and this runs in the same tick as `setProcessing(true)` — so a
+        measurement taken now reads 0x0 off a hidden element, the backing store
+        is sized 2x2, and CSS then stretches those four pixels across 480px.
+        That renders as a flat dark rectangle over the status card, which is
+        exactly what it did. The move is driven by an effect in the stage, which
+        runs after the browser has laid the screen out. */
     orb.current?.setFacets(FACETS)
     orb.current?.setMode('processing')
     orb.current?.setEnergy(1)
@@ -223,18 +225,16 @@ export function useBuild({
 
     // Only now. The core has actually absorbed something.
     setProcessing(false)
-    onLeaveProcessing()
     orb.current?.setMode('idle')
     onBuilt()
-  }, [data, onBuilt, onEnterProcessing, onLeaveProcessing, orb, reduced, workspaceName])
+  }, [data, onBuilt, onDoorSettled, orb, reduced, workspaceName])
 
   const dismiss = useCallback(() => {
     clearTimers()
     setProcessing(false)
     setFailure(null)
-    onLeaveProcessing()
     orb.current?.setMode('idle')
-  }, [onLeaveProcessing, orb])
+  }, [orb])
 
   /**
    * Save both halves.

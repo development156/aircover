@@ -88,11 +88,18 @@ export function useOrb(data: OnboardingData, reduced: boolean, initialEnergy: nu
     return () => clearTimeout(id)
   }, [caption])
 
-  /** Move the canvas into a slot, then re-measure — its box just changed. */
+  /**
+   * Move the canvas into a slot and re-measure.
+   *
+   * The re-measure happens even when the canvas is ALREADY in that slot,
+   * because the slot's box can change without the canvas moving — the
+   * processing screen is `display: none` until it is `.on`, so the first
+   * measurement taken while it is hidden is 0x0. See the caller.
+   */
   const moveTo = useCallback((slot: HTMLElement | null) => {
     const canvas = canvasRef.current
-    if (!canvas || !slot || canvas.parentElement === slot) return
-    slot.appendChild(canvas)
+    if (!canvas || !slot) return
+    if (canvas.parentElement !== slot) slot.appendChild(canvas)
     handleRef.current?.resize()
   }, [])
 
