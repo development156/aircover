@@ -7,7 +7,7 @@ import { BalanceHero } from '@/components/wallet/balance-hero'
 import { LedgerTable, SkippedNote } from '@/components/wallet/ledger-table'
 import { TopUpPanel } from '@/components/wallet/top-up-panel'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
-import { staleHoldNote } from '@/lib/wallet/balance'
+import { holdReaperFromEnv, staleHoldNote } from '@/lib/wallet/balance'
 import { HISTORY_LIMIT, readBalance, readLedger, readOpenHolds } from '@/lib/wallet/read'
 
 export const metadata = { title: 'Wallet' }
@@ -46,7 +46,15 @@ export default async function WalletPage() {
 
   // Read the clock once, on the server, and pass the result down: the components
   // stay pure and the note cannot drift between two renders.
-  const staleNote = staleHoldNote(openHolds, new Date())
+  // Read here rather than inside the pure function, so the sentence stays a
+  // function of its inputs and the environment is looked at exactly once.
+  // SAHODA_HOLD_SWEEP_MODE is in turbo.json's @sahoda/web#build allowlist; absent
+  // means 'off', which is what apps/jobs itself defaults to.
+  const staleNote = staleHoldNote(
+    openHolds,
+    new Date(),
+    holdReaperFromEnv(process.env.SAHODA_HOLD_SWEEP_MODE),
+  )
 
   return (
     <div className="space-y-grid">
