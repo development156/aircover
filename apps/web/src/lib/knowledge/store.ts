@@ -231,6 +231,24 @@ export async function readCurrentPassages(limit: number): Promise<SearchRead> {
  * a library citation and returns nothing. That is the ordinary case and not a
  * degraded read.
  */
+/**
+ * The verbatim spans `neutralize` rewrote, as the row stores them.
+ *
+ * Parsed defensively rather than trusted: `instruction_samples` is `jsonb` with a
+ * `'[]'` default and no shape constraint, so a row written by an older build — or
+ * by hand — must degrade to "no samples" and never throw on a render path.
+ */
+export function instructionSamples(raw: unknown): { kind: string; found: string }[] {
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return []
+    const kind = (entry as { kind?: unknown }).kind
+    const found = (entry as { found?: unknown }).found
+    if (typeof found !== 'string' || found.trim().length === 0) return []
+    return [{ kind: typeof kind === 'string' ? kind : 'span', found }]
+  })
+}
+
 export function parseDocumentCitation(
   source: string | undefined,
 ): { documentId: string; ordinal: number | null } | null {

@@ -9,6 +9,7 @@ import type { DeleteKnowledgeState } from '@/app/actions/knowledge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import { instructionSamples } from '@/lib/knowledge/store'
 import type { KnowledgeDocument } from '@/lib/knowledge/store'
 import { passagePhrase, sourceLabel, statusView } from '@/lib/knowledge/status-view'
 
@@ -38,6 +39,7 @@ export function DocumentRow({ document }: { document: KnowledgeDocument }) {
   const view = statusView(document)
   const Icon = SOURCE_ICON[document.source_kind]
   const passages = passagePhrase(document)
+  const samples = instructionSamples(document.instruction_samples)
 
   const onDelete = (acknowledge: boolean) => {
     startTransition(async () => {
@@ -111,6 +113,34 @@ export function DocumentRow({ document }: { document: KnowledgeDocument }) {
               {document.addressed_instructions === 1 ? 'place' : 'places'}. Sahoda reads those as
               words on a page, the same as any other sentence in it, and never as instructions.
               Nothing it says can confirm anything about your brand on its own.
+              {/*
+                THE WORDS THEMSELVES, quoted back.
+
+                A count alone asks the owner to take our word for it about their
+                own document. The migration's comment promises the words are
+                quoted and the row has been storing them since it was written;
+                showing them is what turns the line from a claim into something
+                the owner can go and look at.
+
+                At most three, and each truncated: this is a note on a row, not a
+                reader, and a hostile document could otherwise fill the screen
+                with its own text — which is the one thing it would most like to
+                do.
+              */}
+              {samples.length > 0 ? (
+                <span className="mt-1.5 flex flex-col gap-1">
+                  {samples.slice(0, 3).map((sample, index) => (
+                    <span
+                      key={`${sample.kind}-${index}`}
+                      className="border-l-2 border-line pl-2 text-ink italic"
+                    >
+                      &ldquo;
+                      {sample.found.length > 120 ? `${sample.found.slice(0, 120)}…` : sample.found}
+                      &rdquo;
+                    </span>
+                  ))}
+                </span>
+              ) : null}
             </span>
           </p>
         ) : null}

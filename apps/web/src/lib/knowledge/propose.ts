@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { brandExtractTask, createMesh, type Mesh } from '@sahoda/mesh'
+import { brandExtractTask, createMesh, type BrandExtractInput, type Mesh } from '@sahoda/mesh'
 import { attachProvenance, type ExtractedFieldWire } from '@sahoda/shared'
 import { buildEvidenceSet, MAX_EVIDENCE_CHUNKS, type EvidenceSet } from '@sahoda/research'
 
@@ -68,12 +68,32 @@ export interface ExtractRunner {
   run(corpus: string): Promise<{ ok: true; fields: ExtractedFieldWire[] } | { ok: false }>
 }
 
-function meshRunner(workspaceId: string, userId: string, traceId: string): ExtractRunner {
+function meshRunner(
+  workspaceId: string,
+  userId: string,
+  traceId: string,
+  businessName: string,
+): ExtractRunner {
   return {
     async run(corpus: string) {
+      /**
+       * ── TYPED, NOT CAST, AND THE DIFFERENCE WAS A DEFECT ──────────────────
+       * This read `{ corpus } as Parameters<typeof brandExtractTask.buildMessages>[0]`,
+       * which type-checks against anything. `BrandExtractInputSchema` requires
+       * `name` (`z.string().min(1)`), and the crawl branch of `buildMessages`
+       * renders `Business name: ${input.name}` — so the omission would have
+       * failed the input parse, and had it not, the model would have been told
+       * the business is called "undefined".
+       *
+       * `read-door.ts` casts the same way and gets away with it because
+       * `url-door.ts` happens to pass `{ corpus, name }`. A cast that hides a
+       * required field is a typecheck that proves nothing, so the real type is
+       * named here instead.
+       */
+      const input: BrandExtractInput = { corpus, name: businessName }
       const result = await getMesh().runTask(
         brandExtractTask.def,
-        { corpus } as Parameters<typeof brandExtractTask.buildMessages>[0],
+        input,
         // `traceId` is required: `ai_provider_logs` is keyed by it, and a call
         // with none is spend nothing can be traced back to a request.
         { workspaceId, userId, traceId, actionType: 'knowledge_resolve' },
@@ -94,6 +114,11 @@ export async function proposeFromLibrary(input: {
   workspaceId: string
   userId: string
   traceId: string
+  /**
+   * The workspace's name, which `brand_extract` REQUIRES — it is what lets the
+   * extractor tell the brand apart from its suppliers in the text.
+   */
+  businessName: string
   runner?: ExtractRunner
 }): Promise<ProposeOutcome> {
   if (input.passages.length === 0) return { status: 'no-passages' }
@@ -109,7 +134,8 @@ export async function proposeFromLibrary(input: {
     MAX_EVIDENCE_CHUNKS,
   )
 
-  const runner = input.runner ?? meshRunner(input.workspaceId, input.userId, input.traceId)
+  const runner =
+    input.runner ?? meshRunner(input.workspaceId, input.userId, input.traceId, input.businessName)
   const answer = await runner.run(set.corpus)
 
   /**

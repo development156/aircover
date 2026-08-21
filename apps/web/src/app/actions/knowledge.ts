@@ -24,12 +24,28 @@ import { workspaceForWrite } from '@/lib/workspaces'
 /**
  * Adding a document to the library, and taking one out.
  *
- * ── THE ORDER OF OPERATIONS, AND WHY IT IS THIS ORDER ───────────────────────
- * A document is REGISTERED before it is read, not after. So the screen shows it
- * as "Processing" from the moment the upload lands, and a read that fails leaves
- * a row saying what went wrong instead of leaving nothing at all — which would
- * be indistinguishable, to the person who just uploaded a menu, from the upload
+ * ── THE ORDER OF OPERATIONS, AND WHY IT DIFFERS BY DOOR ─────────────────────
+ * A URL and a typed note are REGISTERED before they are read, so the screen
+ * shows them as "Waiting" from the moment they land and a read that fails leaves
+ * a row saying what went wrong — rather than nothing at all, which is
+ * indistinguishable, to the person who just pressed the button, from the press
  * never having happened.
+ *
+ * A PDF is DELIBERATELY THE OTHER WAY ROUND, and this used to be stated as if it
+ * were not. The bytes are parsed BEFORE the object is uploaded and before the row
+ * exists, because the alternative leaves an orphaned file in a customer's storage
+ * folder that nothing ever goes back and cleans up — the same order `attachMedia`
+ * uses and for the same reason.
+ *
+ * The cost of that choice is real and is paid on the likeliest failure there is:
+ * a menu exported as a picture has no text layer, so `no_text` is returned to the
+ * dialog, no row is created, and the sentence explaining it lives only in the
+ * dialog the person is looking at. It is the right trade — a row pointing at a
+ * file that was never stored is worse than a message that closes with the
+ * dialog — but it is a trade, and `failure_code = 'unreadable'` is a value the
+ * PDF door consequently CANNOT write. The column keeps it because a future door
+ * that stores first will need it; nothing reaches it today, and saying so here is
+ * cheaper than the next reader discovering it from a grep that finds no writer.
  *
  * ── NOTHING HERE COSTS A CREDIT ─────────────────────────────────────────────
  * There is no knowledge action in `pricing.config.json` and there must not be
@@ -547,6 +563,7 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
       workspaceId: ws.workspace.id,
       userId,
       traceId: randomUUID(),
+      businessName: ws.workspace.name,
     })
 
     if (outcome.status === 'no-passages') {
