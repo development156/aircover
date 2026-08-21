@@ -1,0 +1,358 @@
+'use client'
+
+import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+
+import { ThemeToggle } from '@/components/shell/theme-toggle'
+
+import { doorColors, doorText, type DoorOutcome } from './door-outcome'
+import { OrbColumn } from './orb-column'
+import { ProcessingOverlay } from './processing-overlay'
+import { ProgressBar } from './progress-bar'
+import { readSite } from './read-site'
+import { useBuild } from './use-build'
+import { useOrb } from './use-orb'
+import {
+  canAdvance,
+  clearState,
+  DEFAULT_COLORS,
+  DEFAULT_DATA,
+  energyOf,
+  loadState,
+  NUMBERED,
+  ORDER,
+  saveState,
+  signalCount,
+  type OnboardingData,
+  type StepId,
+} from './store'
+import { AudienceStep } from './steps/audience-step'
+import { BasicsStep } from './steps/basics-step'
+import { IntroStep } from './steps/intro-step'
+import { KnowledgeStep } from './steps/knowledge-step'
+import { ReferencesStep } from './steps/references-step'
+import { ResultStep } from './steps/result-step'
+import { RivalsStep } from './steps/rivals-step'
+import { VisualStep } from './steps/visual-step'
+import { WhatStep } from './steps/what-step'
+
+export interface OnboardingStageProps {
+  workspaceId: string
+  workspaceName: string
+  /** Server-decided: is the next resolve free? A client flag could say free every time. */
+  isFree: boolean
+  cost: number
+  /** True when this workspace already has a Brand Brain — re-entry, not a first run. */
+  hasSavedBrain: boolean
+}
+
+export function OnboardingStage({
+  workspaceId,
+  workspaceName,
+  isFree,
+  cost,
+  hasSavedBrain,
+}: OnboardingStageProps) {
+  const router = useRouter()
+
+  /**
+   * Hydration. The saved position lives in localStorage, which the server
+   * cannot see, so the first paint is the intro for everyone and the resumed
+   * step is adopted on mount. Rendering the resumed step on the server would be
+   * a hydration mismatch on every returning user's first frame.
+   */
+  const [step, setStep] = useState<StepId>('intro')
+  const [dir, setDir] = useState(1)
+  const [data, setData] = useState<OnboardingData>(() => ({
+    ...DEFAULT_DATA,
+    colors: { ...DEFAULT_COLORS },
+  }))
+  const [hydrated, setHydrated] = useState(false)
+  const [door, setDoor] = useState<DoorOutcome>({ kind: 'none' })
+  const reduced = useRef(false)
+
+  useEffect(() => {
+    reduced.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const saved = loadState(workspaceId)
+    if (saved) {
+      setData(saved.data)
+      // Resume at the step they left. A saved `result` is not resumable —
+      // the brain behind it was never built in this session.
+      setStep(saved.step === 'result' ? 'comp' : saved.step)
+    }
+    setHydrated(true)
+  }, [workspaceId])
+
+  // Persist every move. Cheap, synchronous, and it is what makes Escape safe.
+  useEffect(() => {
+    if (!hydrated) return
+    saveState(workspaceId, { step, data })
+  }, [hydrated, workspaceId, step, data])
+
+  const { orb, caption, moveTo } = useOrb(data, reduced.current, energyOf(data))
+
+  const orbWrapRef = useRef<HTMLDivElement | null>(null)
+  const procSlotRef = useRef<HTMLDivElement | null>(null)
+
+  const patch = useCallback((next: Partial<OnboardingData>) => {
+    setData((current) => ({ ...current, ...next }))
+  }, [])
+
+  /* ─────────────────────────────────────────────────── the step machine ── */
+
+  const go = useCallback((id: StepId, direction: number) => {
+    setDir(direction)
+    setStep(id)
+  }, [])
+
+  const back = useCallback(() => {
+    const i = ORDER.indexOf(step)
+    if (i > 0) go(ORDER[i - 1]!, -1)
+  }, [go, step])
+
+  /**
+   * The website read runs in the BACKGROUND from the moment they leave step 01.
+   *
+   * Measured in production (recorded in `door-step.tsx`): brand_extract p50
+   * 26.3s, p90 37.0s. Blocking step 01 on that would put a half-minute wall in
+   * front of a flow whose own intro promises three minutes. Running it while
+   * they answer steps 02-06 costs them nothing and is finished by the time the
+   * build needs it — and `useBuild` waits for it if it is not.
+   */
+  const readStarted = useRef('')
+  const startSiteRead = useCallback(
+    (url: string) => {
+      const site = url.trim()
+      if (!site || readStarted.current === site) return
+      readStarted.current = site
+      setDoor({ kind: 'reading' })
+      void readSite(site).then(setDoor)
+    },
+    [],
+  )
+
+  const advance = useCallback(() => {
+    if (step === 'intro') return go('1', 1)
+    if (step === '1') startSiteRead(data.site)
+    const i = ORDER.indexOf(step)
+    if (i >= 0 && i < ORDER.length - 1) go(ORDER[i + 1]!, 1)
+  }, [data.site, go, startSiteRead, step])
+
+  const build = useBuild({
+    data,
+    door,
+    workspaceName,
+    reduced: reduced.current,
+    orb,
+    onEnterProcessing: () => moveTo(procSlotRef.current),
+    onLeaveProcessing: () => moveTo(orbWrapRef.current),
+    onBuilt: () => go('result', 1),
+  })
+
+  /* ───────────────────────────────────────────────── save and exit / end ── */
+
+  const saveExit = useCallback(() => {
+    saveState(workspaceId, { step, data })
+    router.push('/home')
+  }, [data, router, step, workspaceId])
+
+  const [launching, setLaunching] = useState(false)
+
+  const enterSahoda = useCallback(
+    (then: 'home' | 'brain') => {
+      void build.finish(async (ok) => {
+        if (!ok) return
+        if (reduced.current) {
+          router.push(then === 'brain' ? '/brain' : '/home')
+          return
+        }
+        // Six beats. The wash scales out from the card's centre so the app is
+        // revealed THROUGH the Brand Brain rather than merely after it.
+        setLaunching(true)
+        orb.current?.setMode('dissolve')
+        window.setTimeout(() => {
+          clearState(workspaceId)
+          router.push(then === 'brain' ? '/brain' : '/home')
+        }, 620)
+      })
+    },
+    [build, orb, router, workspaceId],
+  )
+
+  /* ──────────────────────────────────────────────────────────── keyboard ── */
+
+  const gated = !canAdvance(step, data)
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (build.processing || launching) return
+      if (e.key === 'Escape') {
+        saveExit()
+        return
+      }
+      if (e.key === 'ArrowLeft' && e.altKey) {
+        e.preventDefault()
+        back()
+        return
+      }
+      if (e.key !== 'Enter') return
+
+      const active = document.activeElement as HTMLElement | null
+      // A textarea keeps Enter for its newline; the two URL fields consume it
+      // to add a card; a focused button already has its own Enter.
+      if (active?.tagName === 'TEXTAREA' && !(e.metaKey || e.ctrlKey)) return
+      if (active?.id === 'f-ref' || active?.id === 'f-comp') return
+      if (active?.closest('button')) return
+
+      if (step === 'intro') {
+        e.preventDefault()
+        go('1', 1)
+        return
+      }
+      if (step === 'result') return
+      if (step === 'comp') {
+        e.preventDefault()
+        void build.start()
+        return
+      }
+      if (!gated) {
+        e.preventDefault()
+        advance()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [advance, back, build, gated, go, launching, saveExit, step])
+
+  /* ─────────────────────────────────────────────────────────────── render ── */
+
+  const numbered = NUMBERED.includes(step)
+  const showRail = step !== 'intro' && step !== 'result'
+  const showBack = step !== 'intro' && step !== 'result' && step !== '1'
+
+  const stepBody =
+    step === 'intro' ? (
+      <IntroStep
+        onBegin={() => go('1', 1)}
+        onLater={saveExit}
+        isFree={isFree && !hasSavedBrain}
+        cost={cost}
+      />
+    ) : step === '1' ? (
+      <BasicsStep data={data} patch={patch} />
+    ) : step === '2' ? (
+      <WhatStep data={data} patch={patch} />
+    ) : step === '3' ? (
+      <AudienceStep data={data} patch={patch} />
+    ) : step === '4' ? (
+      <VisualStep data={data} patch={patch} />
+    ) : step === '5' ? (
+      <ReferencesStep data={data} patch={patch} />
+    ) : step === '6' ? (
+      <KnowledgeStep data={data} patch={patch} />
+    ) : step === 'comp' ? (
+      <RivalsStep data={data} patch={patch} />
+    ) : (
+      <ResultStep
+        data={data}
+        door={door}
+        wasFree={build.wasFree}
+        fallbackMessage={build.fallbackMessage}
+        saving={build.saving || launching}
+        saveError={build.saveError}
+        onEnter={() => enterSahoda('home')}
+        onReview={() => enterSahoda('brain')}
+      />
+    )
+
+  return (
+    <div className="onb">
+      <div className="grain" aria-hidden="true" />
+
+      <div className="stage" id="stage">
+        <header className="nav">
+          <div className="wordmark">
+            <span className="onb-word">Sahoda Labs</span>
+          </div>
+          <div className="nav__acts">
+            <ThemeToggle />
+            <button type="button" className="nav__exit" id="exit" onClick={saveExit}>
+              Save &amp; exit
+            </button>
+          </div>
+        </header>
+
+        <ProgressBar step={step} />
+
+        <main className="frame">
+          <div className="pane" id="pane">
+            {/* Keyed so the entry animation restarts on every move — the source
+                strips the class, forces a reflow and re-adds it; a remount is
+                the same thing without touching the DOM by hand. */}
+            <section
+              key={`${step}-${dir}`}
+              className={`step on ${dir > 0 ? 'in-r' : 'in-l'}`}
+              id={`s-${step}`}
+              data-step={step}
+            >
+              {showBack ? (
+                <button type="button" className="back" onClick={back}>
+                  <ArrowLeft size={14} strokeWidth={2} aria-hidden /> Back
+                </button>
+              ) : null}
+              {stepBody}
+            </section>
+          </div>
+
+          <OrbColumn ref={orbWrapRef} caption={caption} />
+        </main>
+
+        {showRail ? (
+          <div className="cta-row" id="rail">
+            <button
+              type="button"
+              className="btn btn--primary"
+              id="next"
+              disabled={gated}
+              onClick={() => (step === 'comp' ? void build.start() : advance())}
+            >
+              <span className="btn__t">
+                {step === 'comp' ? 'Build my Brand Brain' : 'Continue'}
+              </span>
+              <ArrowRight className="arw" size={18} strokeWidth={1.9} aria-hidden />
+            </button>
+            {step === 'comp' ? (
+              <button
+                type="button"
+                className="btn btn--ghost"
+                id="skip"
+                onClick={() => void build.start()}
+              >
+                Skip for now
+              </button>
+            ) : null}
+            <span className="enterkey">
+              Press <b>Enter</b>
+            </span>
+          </div>
+        ) : null}
+      </div>
+
+      <ProcessingOverlay
+        on={build.processing}
+        slotRef={procSlotRef}
+        message={build.message}
+        failure={build.failure}
+        onRetry={() => void build.start()}
+        onBack={build.dismiss}
+      />
+
+      <div className={`wash ${launching ? 'go' : ''}`} id="wash" aria-hidden="true" />
+
+      {/* Read by the resolve. Kept out of the visible tree but in the DOM so the
+          e2e walk can assert what the flow is actually holding. */}
+      <span hidden data-onb-signals={signalCount(data)} data-onb-door={door.kind} />
+    </div>
+  )
+}

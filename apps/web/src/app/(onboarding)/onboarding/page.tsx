@@ -1,8 +1,7 @@
 import { creditCost } from '@sahoda/shared'
 
-import { OnboardingFlow } from '@/components/onboarding/onboarding-flow'
+import { OnboardingStage } from '@/components/onboarding/stage/onboarding-stage'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
-import { activeThemeTokens } from '@/lib/brand/read-theme'
 import { activeBrandMemory } from '@/lib/onboarding/read-brain'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
@@ -44,36 +43,18 @@ export default async function OnboardingPage() {
     )
   }
 
-  // Both reads are workspace-scoped. `activeThemeTokens` defaults to unscoped
-  // for the shell's sake, and unscoped it can answer about a DIFFERENT
-  // workspace of the same user — which would have the reveal telling someone
-  // "the app keeps the colour this workspace already wears" about a workspace
-  // that wears nothing.
-  const [saved, theme] = await Promise.all([
-    activeBrandMemory(workspace.id),
-    activeThemeTokens(workspace.id),
-  ])
+  // Workspace-scoped, and read ONCE. `isFirstResolve` asking again would be a
+  // second query that can disagree with this one — leaving the screen offering
+  // a free build the server is about to charge for, or the reverse.
+  const saved = await activeBrandMemory(workspace.id)
 
   return (
-    <OnboardingFlow
-      savedBrain={
-        saved
-          ? {
-              payload: saved.payload,
-              version: saved.version,
-              source: saved.source,
-              updatedAt: saved.updatedAt,
-            }
-          : null
-      }
-      // Derived from the SAME read, not a second query. Asking `isFirstResolve`
-      // separately meant `activeBrandMemory` ran twice, and two reads can
-      // disagree — leaving the screen holding a saved brain while offering a
-      // free resolve, or the reverse.
+    <OnboardingStage
+      workspaceId={workspace.id}
+      workspaceName={workspace.name}
       isFree={saved === null}
       cost={creditCost('brand_research')}
-      hasSavedTheme={theme !== null}
-      workspaceName={workspace.name}
+      hasSavedBrain={saved !== null}
     />
   )
 }
