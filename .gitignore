@@ -122,3 +122,7 @@ supabase/.temp/
 
 # The gate runner's per-stage logs and verdict. Machine output, not source.
 .gate/
+
+# ux lane capture output (frames + logs) — evidence, not source
+.ux/
+.uxlog/
