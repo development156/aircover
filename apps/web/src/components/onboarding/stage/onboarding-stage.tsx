@@ -145,6 +145,7 @@ export function OnboardingStage({
     onEnterProcessing: () => moveTo(procSlotRef.current),
     onLeaveProcessing: () => moveTo(orbWrapRef.current),
     onBuilt: () => go('result', 1),
+    onDoorSettled: setDoor,
   })
 
   /**
@@ -246,8 +247,11 @@ export function OnboardingStage({
       <IntroStep
         onBegin={() => go('1', 1)}
         onLater={saveExit}
-        isFree={isFree && !hasSavedBrain}
+        onReview={() => router.push('/brain')}
+        isFree={isFree}
         cost={cost}
+        hasSavedBrain={hasSavedBrain}
+        workspaceName={workspaceName}
       />
     ) : step === '1' ? (
       <BasicsStep data={data} patch={patch} />
@@ -271,6 +275,7 @@ export function OnboardingStage({
         fallbackMessage={build.fallbackMessage}
         saving={build.saving || launching}
         saveError={build.saveError}
+        themeError={build.themeError}
         onEnter={() => enterSahoda('home')}
         onReview={() => enterSahoda('brain')}
       />

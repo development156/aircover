@@ -28,7 +28,16 @@ const SHOT_DIR =
 
 async function shoot(page: Page, label: string): Promise<void> {
   mkdirSync(SHOT_DIR, { recursive: true })
+  // Same two reasons as the walk: the pointer leaves the rail in :hover, and
+  // the card rises for ~900ms after it appears.
   await page.mouse.move(0, 0)
+  await page
+    .waitForFunction(
+      () => document.getAnimations().filter((a) => a.playState === 'running').length === 0,
+      undefined,
+      { timeout: 4000 },
+    )
+    .catch(() => {})
   const buf = await page.screenshot()
   const sha = createHash('sha256').update(buf).digest('hex')
   writeFileSync(join(SHOT_DIR, `${label}.png`), buf)
@@ -169,4 +178,65 @@ test('builds, shows a derived confidence, and enters the app', async ({ page, si
   await pwExpect(page.getByText(/free the first time/i)).toHaveCount(0)
   await shoot(page, 'build-reentry')
   expect(signedIn.clerkUserId).toBeTruthy()
+})
+
+/**
+ * A SITE THAT CANNOT BE READ, ALL THE WAY TO THE RESULT CARD.
+ *
+ * Porting the four door sentences is not the same as reaching a screen with
+ * them. `read-site.test.ts` executes all four causes against a stubbed
+ * transport; this drives a real one, so the `Website` cell and the notice above
+ * the card are shown to render at least once with something other than
+ * "Not given" in them.
+ *
+ * The host is `.invalid` — reserved by RFC 2606 and guaranteed never to
+ * resolve — so the outcome is deterministic rather than dependent on some third
+ * party being down today. Which of the two honest arms it lands on (`unread`,
+ * if the server fetched and failed; `blocked`, if the request never produced a
+ * verdict) is not asserted, because BOTH are correct and the product cannot
+ * know in advance. What is asserted is the thing that must never happen: the
+ * card claiming the site was read, or claiming none was given.
+ */
+test('a website that cannot be read is reported without claiming a verdict on the page', async ({
+  page,
+  signedIn,
+}) => {
+  expect(signedIn.clerkUserId).toBeTruthy()
+  await page.goto('/home')
+  const create = page.locator('#main').getByRole('button', { name: /create workspace/i })
+  await pwExpect(create).toBeVisible({ timeout: 30_000 })
+  await create.click()
+  await pwExpect(create).toBeHidden({ timeout: 30_000 })
+
+  const SITE = 'https://sahoda-onboarding-nothing-here.invalid'
+
+  await page.goto('/onboarding')
+  await page.getByRole('button', { name: /build my brand brain/i }).click()
+  await page.locator('#f-name').fill(ANSWERS.name)
+  await page.locator('#f-site').fill(SITE)
+  await page.getByRole('button', { name: /^Continue$/ }).click()
+  await page.locator('#f-what').fill(ANSWERS.what)
+  await page.getByRole('button', { name: /^Continue$/ }).click()
+  await page.locator('#f-aud').fill(ANSWERS.audience)
+  await page.getByRole('button', { name: /^Continue$/ }).click()
+  await page.getByRole('button', { name: /^Continue$/ }).click()
+  await page.getByRole('button', { name: /^Continue$/ }).click()
+  await page.getByRole('button', { name: /^Continue$/ }).click()
+  await page.getByRole('button', { name: /build my brand brain/i }).click()
+
+  await pwExpect(page.getByRole('heading', { name: /your brand brain is ready/i })).toBeVisible({
+    timeout: 300_000,
+  })
+  await shoot(page, 'build-result-unread-site')
+
+  const cell = await page.locator('#bb-grid').innerText()
+  // A site WAS given, so the card may not say otherwise.
+  expect(cell).not.toContain('Not given')
+  // And it may not claim to have read it.
+  expect(cell).toMatch(/not read|read did not run/i)
+
+  // The sentence above the card is the server's own, and it is not a verdict on
+  // anything the customer owns unless a page was actually fetched.
+  const notice = await page.locator('.step.on').innerText()
+  expect(notice).not.toMatch(/we could not read that/i)
 })

@@ -14,7 +14,10 @@ export interface ResultStepProps {
   /** Set when the model could not be reached and a sample was shown instead. */
   fallbackMessage: string | null
   saving: boolean
+  /** The BRAIN failed to save. This blocks entry. */
   saveError: string | null
+  /** The THEME failed to save. The brain is fine; this does not block entry. */
+  themeError: string | null
   onEnter: () => void
   onReview: () => void
 }
@@ -35,6 +38,7 @@ export function ResultStep({
   fallbackMessage,
   saving,
   saveError,
+  themeError,
   onEnter,
   onReview,
 }: ResultStepProps) {
@@ -175,6 +179,11 @@ export function ResultStep({
       </div>
 
       {saveError ? <p className="hint">{saveError}</p> : null}
+      {themeError ? (
+        <p className="hint">
+          {themeError} Your Brand Brain is unaffected — only the workspace colours were not saved.
+        </p>
+      ) : null}
 
       <div className="cta-row">
         <button

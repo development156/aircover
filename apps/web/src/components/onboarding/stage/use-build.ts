@@ -12,6 +12,7 @@ import { storedIntakeFrom } from '@/lib/onboarding/to-stored-intake'
 import { doorColors, doorText, type DoorOutcome } from './door-outcome'
 import type { OrbHandle } from './orb'
 import type { OnboardingData } from './store'
+import { waitForDoor } from './wait-for-door'
 
 /**
  * Six facets, matching the six questions.
@@ -58,6 +59,8 @@ export interface UseBuildArgs {
   onEnterProcessing: () => void
   onLeaveProcessing: () => void
   onBuilt: () => void
+  /** Called when the build decides the read is not going to land in time. */
+  onDoorSettled: (outcome: DoorOutcome) => void
 }
 
 export interface BuildFailure {
@@ -90,6 +93,7 @@ export function useBuild({
   onEnterProcessing,
   onLeaveProcessing,
   onBuilt,
+  onDoorSettled,
 }: UseBuildArgs) {
   const [processing, setProcessing] = useState(false)
   const [message, setMessage] = useState(MSGS[0]!)
@@ -100,6 +104,15 @@ export function useBuild({
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  /**
+   * Held SEPARATELY from `saveError`, because they mean opposite things.
+   *
+   * The first cut wrote a theme failure into `saveError` and then carried on to
+   * save the brain — so a SUCCESSFUL save rendered a failure sentence beside it
+   * and the Enter button was, from the reader's point of view, refusing. Losing
+   * a theme is recoverable and does not block entry; losing the brain does.
+   */
+  const [themeError, setThemeError] = useState<string | null>(null)
 
   const timers = useRef<number[]>([])
   const doorRef = useRef(door)
@@ -110,14 +123,24 @@ export function useBuild({
     timers.current = []
   }
 
-  /** Wait for a background site read that has not landed yet. */
+  /**
+   * Wait for a background site read that has not landed yet — BOUNDED, and
+   * bounded in `wait-for-door.ts`, where the timeout arm can be executed by a
+   * test instead of only by an unusually slow network.
+   */
   async function settleDoor(): Promise<DoorOutcome> {
     if (doorRef.current.kind !== 'reading') return doorRef.current
     setMessage(READING_SITE)
-    for (let i = 0; i < 600 && doorRef.current.kind === 'reading'; i++) {
-      await new Promise((r) => setTimeout(r, 200))
+    const settled = await waitForDoor({
+      read: () => doorRef.current,
+      sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+    })
+    if (settled !== doorRef.current) {
+      // The build is going on without the site, and the card has to say so.
+      onDoorSettled(settled)
+      doorRef.current = settled
     }
-    return doorRef.current
+    return settled
   }
 
   const start = useCallback(async (): Promise<void> => {
@@ -228,6 +251,7 @@ export function useBuild({
       }
       setSaving(true)
       setSaveError(null)
+      setThemeError(null)
 
       // Declared beats derived: swatches the user MOVED are their statement
       // about the brand, and the door's extraction is a guess from a page.
@@ -237,7 +261,7 @@ export function useBuild({
         : doorColors(doorRef.current)
       if (colors.length > 0) {
         const themeState = await saveWorkspaceTheme(colors)
-        if (!themeState.ok) setSaveError(themeState.message)
+        if (!themeState.ok) setThemeError(themeState.message)
       }
 
       /**
@@ -276,6 +300,7 @@ export function useBuild({
     fallbackMessage,
     saving,
     saveError,
+    themeError,
     start,
     dismiss,
     finish,
