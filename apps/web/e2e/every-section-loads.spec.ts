@@ -81,7 +81,17 @@ const BRAIN_TABS: ReadonlyArray<readonly [string, RegExp]> = [
   // the screen's eight states renders, so it identifies the tab without pinning any
   // single state's copy.
   ['/brain/audience', /who follows you/i],
-  ['/brain/knowledge', /knowledge library|where it came from/i],
+  // WAS `/knowledge library|where it came from/i`, which named the coming-soon
+  // screen. That screen is gone: the tab now reads `knowledge_documents` and a
+  // full-text index. Stale for exactly the reason the audience note above gives —
+  // a pattern that pins the old copy makes a correct replacement look like a
+  // regression, and this was one of three smoke failures that were all the same
+  // thing: tests describing a screen that no longer exists.
+  //
+  // The subtitle is chosen because `Shell` renders it in EVERY state the page
+  // has — no workspace, empty, populated, and unreadable — so it identifies the
+  // tab without pinning any one state's copy.
+  ['/brain/knowledge', /documents Sahoda has read/i],
 ]
 
 test.describe('every section loads @smoke', () => {
