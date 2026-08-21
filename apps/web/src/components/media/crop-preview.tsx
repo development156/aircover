@@ -26,6 +26,50 @@ import type { CropOfferView } from '@/lib/media/offer-state'
  * a signed link dead within the hour, so the optimiser would cache an address
  * that expires and serve a broken picture from its own cache.
  */
+
+/**
+ * THE HEIGHT IS CAPPED, AND THE CAP IS LOAD-BEARING.
+ *
+ * MEASURED in Chromium at both widths before this existed. A 9:16 photograph in
+ * a 560px dialog is 995px tall, so:
+ *
+ *   · at 1440 the dialog exceeded the UA's own `max-height` for `<dialog>`, the
+ *     overflow was clipped, and BOTH FOOTER BUTTONS WERE OFF-SCREEN — a dialog
+ *     that cannot be accepted or declined, only escaped.
+ *   · at 390 the "Now" frame alone filled the entire viewport. The after, the
+ *     sliders and the channel rows were all a long scroll away, so the one
+ *     comparison this screen exists to show could not be seen at once.
+ *
+ * Driving HEIGHT and letting `aspect-ratio` compute the width is what keeps the
+ * shape honest: a `max-h` on a `w-full` box clamps the height and leaves the
+ * width alone, which silently draws the crop at the wrong aspect. `max-w-full`
+ * then re-clamps a very wide photo, and the ratio follows that instead.
+ */
+const FRAME = 'relative mx-auto overflow-hidden rounded-input bg-s2'
+
+/** Tallest a frame may be. Beyond this the comparison stops being one. */
+const MAX_H = 'min(30vh, 300px)'
+
+/**
+ * The box for one frame, capped by HEIGHT but expressed as a WIDTH.
+ *
+ * MEASURED, twice, because the two obvious spellings both fail:
+ *   `max-h` on a `w-full` box clamps the height and leaves the width alone, so
+ *   the crop is drawn at the WRONG ASPECT — the one thing this screen may never
+ *   do. `w-auto`/`w-fit` with a height and an `aspect-ratio` gives 0×0, because
+ *   the image inside is absolutely positioned and contributes no intrinsic width.
+ *
+ * So the width is derived from the height cap and the ratio, and `aspect-ratio`
+ * takes the height back from whichever of the two limits actually bound. A very
+ * wide photo hits `100%` first and gets shorter; a tall one hits the cap.
+ */
+function frameStyle(width: number, height: number): React.CSSProperties {
+  return {
+    aspectRatio: `${width} / ${height}`,
+    width: `min(100%, calc(${MAX_H} * ${width} / ${height}))`,
+  }
+}
+
 export function CropPreview({
   offer,
   focal,
@@ -60,10 +104,7 @@ export function CropPreview({
   return (
     <div className="grid gap-3 min-[520px]:grid-cols-2">
       <Frame label="Now" dimensions={`${original.width}×${original.height}`}>
-        <div
-          className="relative w-full overflow-hidden rounded-input bg-s2"
-          style={{ aspectRatio: `${original.width} / ${original.height}` }}
-        >
+        <div className={FRAME} style={frameStyle(original.width, original.height)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={src}
@@ -108,10 +149,7 @@ export function CropPreview({
       </Frame>
 
       <Frame label="After the crop" dimensions={`${size.width}×${size.height}`}>
-        <div
-          className="relative w-full overflow-hidden rounded-input border border-line bg-s2"
-          style={{ aspectRatio: `${size.width} / ${size.height}` }}
-        >
+        <div className={`${FRAME} border border-line`} style={frameStyle(size.width, size.height)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={src}

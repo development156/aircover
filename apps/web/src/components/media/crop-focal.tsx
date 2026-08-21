@@ -82,7 +82,7 @@ function Axis({
   const percent = Math.round(value * 100)
   return (
     <label className="flex items-center gap-3 type-sm text-ink">
-      <span className="w-[124px] shrink-0">{label}</span>
+      <span className="w-[136px] shrink-0 max-narrow:w-[104px]">{label}</span>
       <input
         type="range"
         min={0}
