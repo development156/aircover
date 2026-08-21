@@ -266,3 +266,41 @@ the `supabase_realtime` publication. That is not a schema tidy-up — it turns o
 replication for two tables, which is a behaviour change with a cost. Nothing in this
 integration needs it. It was left unapplied deliberately rather than swept along with a
 `db push`.
+
+---
+
+## 12. `pnpm gate` fabricates failures on this machine — 21 August 2026
+
+Not a code problem and not yours to fix, but it will cost the next person hours if
+nobody writes it down.
+
+`pnpm gate` runs `turbo run typecheck lint test` at turbo's default concurrency: 27
+tasks at once, on a 12-core box, where `@sahoda/web:test` alone spawns about eleven
+vitest workers and several `packages/db` suites boot a real Postgres in-process.
+That oversubscribes the machine, and what comes back looks exactly like broken code.
+
+MEASURED across three gates of one **unchanged** tree during this integration:
+
+| what the log said | what was actually true |
+|---|---|
+| five packages, `Error: Worker exited unexpectedly` | zero crashes re-running the identical command on an idle machine |
+| `@sahoda/db` — 4 failures **and 202 → 233 skipped** | 203 passed / 202 skipped standalone, exit 0 |
+| two web tests, `Hook timed out in 10000ms` | 12/12 passed standalone |
+
+`--concurrency=2` (with root vitest at `--maxWorkers=4`) ran **27/27 successful** on
+the same tree, and every gate from that point on was deterministic.
+
+**The tell is the skip count, not the failure count.** A PGlite suite that cannot
+open its box reports `skipped`, not `failed` — so a run like that is not "4
+failures", it is 4 failures **and 31 tests that silently did not run**, with the
+total unchanged. Always diff passed/skipped against the previous run.
+
+And it is **not** the OOM killer, which is the first thing anyone will suspect here:
+`journalctl -k` showed zero kills with 11–12 GB free, every time. Suspecting memory
+sends you to `free` and the journal, both of which look fine, and then to the merge
+you just made, which is innocent.
+
+**What to do:** decide whether `pnpm gate` should carry `--concurrency=2`
+permanently. It is a one-line change to the root `package.json` and it was
+deliberately NOT made here — the gate script is a repo-wide contract and this
+evidence comes from one machine.
