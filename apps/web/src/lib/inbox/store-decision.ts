@@ -1,4 +1,9 @@
-import { INBOX_SURFACES, type InboxSurfaceKey } from './emptiness'
+import {
+  INBOX_SURFACES,
+  type InboxEmptiness,
+  type InboxEmptinessState,
+  type InboxSurfaceKey,
+} from './emptiness'
 
 /**
  * What a STORE-BACKED inbox surface may claim.
@@ -138,5 +143,58 @@ export function decideStoreSurface(input: StoreDecideInput): StoreDecision {
     showList: false,
     headline: `No ${noun} yet`,
     body: `Sahoda is listening and has been receiving updates — none of them ${noun}.`,
+  }
+}
+
+/**
+ * Present a store decision to the shell, which speaks the LIVE classifier's
+ * vocabulary.
+ *
+ * ── WHY A MAP AND NOT A WIDENED TYPE ─────────────────────────────────────────
+ * Adding `awaiting_first_event` to `InboxEmptinessState` would put a store-only
+ * concept into the type every live surface is written against, and every exhaustive
+ * switch over it would silently gain a branch nobody wrote. The two vocabularies
+ * describe different things — one is about what Zernio answered, the other about
+ * what has been delivered — so they are kept apart and translated once, here.
+ *
+ * THE COPY IS NOT TRANSLATED. `headline` and `body` come through unchanged, so the
+ * reader sees the store's own sentences; only the state TOKEN is mapped, and only so
+ * that the banner and the placeholder know which shape to draw.
+ *
+ * The two mappings that carry a judgement, stated rather than buried:
+ *
+ *   ok_history_unavailable → 'partial'   The banner renders for 'partial', and
+ *                                        partial is exactly right: rows are shown
+ *                                        and some of the record is missing.
+ *   awaiting_first_event   → 'not_read'  NEVER 'empty'. 'empty' is the shell's word
+ *                                        for "we asked and there is nothing", and
+ *                                        nobody asked — a webhook store is told.
+ *                                        'not_read' keeps it out of that claim and
+ *                                        out of the warning banner, which is right:
+ *                                        listening and waiting is not a fault.
+ */
+export function toInboxEmptiness(decision: StoreDecision): InboxEmptiness {
+  const state: InboxEmptinessState =
+    decision.state === 'ok'
+      ? 'ok'
+      : decision.state === 'ok_history_unavailable'
+        ? 'partial'
+        : decision.state === 'never_connected'
+          ? 'never_connected'
+          : decision.state === 'empty'
+            ? 'empty'
+            : decision.state === 'awaiting_first_event'
+              ? 'not_read'
+              : 'unknown'
+
+  return {
+    state,
+    showList: decision.showList,
+    headline: decision.headline,
+    body: decision.body,
+    // No per-account failures exist on this path: the store does not fan out across
+    // accounts, so there is no account that could have failed. An empty array is the
+    // measurement, not a placeholder.
+    failed: [],
   }
 }
