@@ -276,7 +276,26 @@ export async function draftFromRadarChange(
   }
 }
 
-/** Which channels this workspace can actually be written for. */
+/**
+ * Which channels this workspace can actually be written for.
+ *
+ * `status = 'active'`, WHICH IS NOT WHAT THE LOOP QUERIES, and the difference is
+ * not cosmetic. `connections.status` is
+ * `check (status in ('active','expired','revoked','error'))` — migration
+ * 20260718000005 — and `upsert_connection` writes `'active'` on every successful
+ * OAuth return. There is no migration anywhere that adds `'connected'`.
+ *
+ * So `lib/loop/read.ts:97` and `app/actions/loop-cycle.ts:82`, which both filter
+ * `.eq('status', 'connected')`, match NOTHING and always will. MEASURED here: an
+ * insert of `status: 'connected'` is rejected outright by the constraint, which
+ * is how this was found. That belongs to the Loop's lane to fix and to re-run its
+ * own tests against — it is recorded in apps/web/REQUESTS.md rather than changed
+ * from here, because turning a permanently-empty list into a populated one is a
+ * behaviour change in someone else's feature.
+ *
+ * `lib/connections/read.ts` and `lib/audience/page-data.ts` already use
+ * `'active'`. This follows them.
+ */
 export async function connectedChannels(): Promise<readonly Channel[]> {
   const workspace = await getActiveWorkspace()
   if (!workspace) return []
@@ -285,7 +304,7 @@ export async function connectedChannels(): Promise<readonly Channel[]> {
     .from('connections')
     .select('platform')
     .eq('workspace_id', workspace.id)
-    .eq('status', 'connected')
+    .eq('status', 'active')
   return toChannelSet(
     (data ?? [])
       .map((r) => r.platform as Channel)

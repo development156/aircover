@@ -48,7 +48,9 @@ test.describe('a Radar change becomes a draft', () => {
     const { error: connError } = await admin.from('connections').insert({
       workspace_id: workspaceId,
       platform: 'instagram',
-      status: 'connected',
+      // 'active' is the vocabulary the CHECK constraint permits and the value
+      // `upsert_connection` writes. 'connected' is rejected outright.
+      status: 'active',
       external_account: { id: 'c'.repeat(24), profileId: 'd'.repeat(24) },
       created_by: signedIn.clerkUserId,
     })
@@ -60,7 +62,12 @@ test.describe('a Radar change becomes a draft', () => {
     })
 
     // ── 1 · THE PRICE IS ON THE BUTTON BEFORE ANYTHING IS SPENT ───────────
-    const button = page.getByRole('button', { name: /draft a reply to sunrise bakery/i })
+    // Scoped to ONE change. The fixture holds two Sunrise Bakery moves — a
+    // cadence shift and a new offer — so a name-only locator matches both, and
+    // "which draft did the ledger pay for" would then be unanswerable.
+    const card = page.locator('[data-radar-change="chg-sun-weekend"]')
+    await expect(card).toBeVisible({ timeout: 30_000 })
+    const button = card.getByRole('button', { name: /draft a reply to sunrise bakery/i })
     await expect(button).toBeVisible()
     const label = (await button.innerText()).trim()
     const quoted = Number(label.match(/(\d+)\s+credits?/)?.[1])
@@ -75,7 +82,7 @@ test.describe('a Radar change becomes a draft', () => {
 
     // ── 2 · SPEND ─────────────────────────────────────────────────────────
     await button.click()
-    const status = page.getByRole('status').filter({ hasText: /wrote a draft/i })
+    const status = card.getByRole('status').filter({ hasText: /wrote a draft/i })
     await expect(status).toBeVisible({ timeout: 180_000 })
     expect(await status.innerText()).toContain(`${quoted} credit`)
 
@@ -108,6 +115,6 @@ test.describe('a Radar change becomes a draft', () => {
     expect(String(draft.body)).not.toContain('push on weekend footfall')
 
     // ── 5 · AND THE READER IS SENT TO APPROVE IT ──────────────────────────
-    await expect(page.getByRole('link', { name: /read it and approve it/i })).toBeVisible()
+    await expect(card.getByRole('link', { name: /read it and approve it/i })).toBeVisible()
   })
 })

@@ -705,3 +705,28 @@ inference instead.
 Both readings are defensible and they cannot both be house style. Under "not real"
 Radar should move to `.is-proposed`; under "not observed" the rung's description in
 docs/26 §3.1 needs rewording. One decision, one class name in each place.
+
+### 5 · The Loop queries a connection status that cannot exist — owed to the Loop's lane
+
+`connections.status` is `check (status in ('active', 'expired', 'revoked', 'error'))`
+(migration `20260718000005_connections.sql:9`), and `upsert_connection` writes
+`'active'` on every successful OAuth return (`20260719160916:184`). No migration adds
+`'connected'`.
+
+Two places filter on it anyway:
+
+- `apps/web/src/lib/loop/read.ts:97` — the connected-channel list behind the Autonomy Dial
+- `apps/web/src/app/actions/loop-cycle.ts:82` — the cycle's connected-channel check
+
+Both match nothing, always. The Autonomy Dial therefore renders its "Connect a channel
+and its dial appears here" branch for every workspace including fully connected ones,
+and the cycle takes its zero-channels path unconditionally.
+
+MEASURED, not read: `e2e/radar-to-draft.spec.ts` staged a connection with
+`status: 'connected'` and Postgres rejected the row with
+`violates check constraint "connections_status_check"`.
+
+`lib/connections/read.ts:100` and `lib/audience/page-data.ts:148` already use `'active'`
+and are correct. Not changed from this lane: flipping the two lines turns a
+permanently-empty list into a populated one, which is a behaviour change in the Loop's
+feature and wants that lane's own tests run against it.
