@@ -151,6 +151,33 @@ describe('the batch preview', () => {
     expect(screen.getByText(/Remixed from/)).toBeTruthy()
   })
 
+  test('sends the total IT SHOWED as the figure being agreed to', async () => {
+    // The contract that makes the button's number mean something. The server
+    // re-prices from the rows and REFUSES if it disagrees, so a trim still in
+    // flight — or one whose write failed — is caught instead of silently
+    // charging a number nobody saw. `lib/loop/cost.ts`'s panel makes the same
+    // contract; without it, both halves of the runner's price check are
+    // server-side and the screen/ledger disagreement is invisible.
+    render(<BatchPreview batch={view()} />)
+    fireEvent.click(screen.getAllByRole('checkbox')[2]!) // trim the only `short`
+
+    // The trim is written back inside a transition, which disables the button
+    // while it is in flight. Waiting for it is not test hygiene — it is the
+    // scenario: `makeThem` does NOT await that write, so a person who presses
+    // fast enough is exactly the case this contract exists to catch.
+    const button = () => screen.getByRole('button', { name: /Make these drafts/i })
+    await vi.waitFor(() => expect((button() as HTMLButtonElement).disabled).toBe(false))
+    const label = button().textContent ?? ''
+    fireEvent.click(button())
+
+    await vi.waitFor(() => expect(approve).toHaveBeenCalled())
+    const [batchId, expected] = approve.mock.calls[0] as unknown as [string, number]
+    expect(batchId).toBe('b1')
+    expect(expected).toBe(ADAPT + PACK)
+    // And it is the number that was on the button, not a second computation.
+    expect(label).toMatch(new RegExp(`\\b${expected}\\b`))
+  })
+
   test('prints NO figure that is not a price or a count', () => {
     const { container } = render(<BatchPreview batch={view()} />)
     const numbers = (container.textContent ?? '').match(/\d+/g) ?? []
@@ -206,6 +233,18 @@ describe('the refusal at a zero balance, RENDERED', () => {
   test('the plural stays plural for every other number', async () => {
     const alert = await refuseWith(2, 0)
     expect(alert.textContent ?? '').toMatch(/\b2 credits\b/)
+  })
+})
+
+describe('a batch whose run was cut off', () => {
+  test('is reported as stopped, never as made, and does not wedge the screen', () => {
+    // Nothing resumes a batch, so `running` is terminal on read. The screen
+    // shows what became of it and the page renders the planner again — the
+    // alternative is a screen whose only button refuses and whose only message
+    // claims work that may have half happened.
+    render(<BatchPreview batch={view({ status: 'running' })} />)
+    expect(screen.getByText(/stopped part-way/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Make these drafts/i })).toBeNull()
   })
 })
 

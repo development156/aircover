@@ -102,11 +102,27 @@ export async function runRemixBatch(batchId: string): Promise<RunState> {
         message: 'Approve the cost first — nothing has been spent.',
       }
     }
-    if (batch.status === 'done' || batch.status === 'running') {
+    if (batch.status === 'done') {
       return {
         ok: false,
         insufficient: false,
         message: 'This batch has already been made — nothing was charged again.',
+      }
+    }
+    if (batch.status === 'running') {
+      // ── A RUN THAT NEVER FINISHED, AND THE SENTENCE IT MUST NOT SAY ────────
+      // Nothing resumes a batch: a request cut off mid-spend leaves this row at
+      // `running` for ever. Saying "already made" here would be a claim about
+      // work that may have half happened, on a screen whose only button is this
+      // one — a dead end wearing a reassurance. `readCurrentBatch` treats
+      // `running` as terminal for exactly this reason, so the screen offers a
+      // fresh batch and says what became of this one.
+      return {
+        ok: false,
+        insufficient: false,
+        message:
+          'This batch stopped part-way through. Whatever was written is in your posts, and ' +
+          'nothing more will be charged for it — start a new batch when you are ready.',
       }
     }
 
@@ -268,13 +284,7 @@ async function spend(input: {
     if (!charged.ok || postId === null) {
       failedKinds += 1
       for (const derivative of mine) {
-        await store.settleDerivative({
-          derivativeId: derivative.id,
-          workspaceId,
-          status: 'failed',
-          postId: null,
-          failure,
-        })
+        await store.markFailed(derivative.id, workspaceId, failure)
       }
       continue
     }
@@ -285,17 +295,14 @@ async function spend(input: {
     spent += creditCost(charge.action)
     const writtenIds = new Set(written.map((d) => d.id))
     for (const derivative of mine) {
-      const ok = writtenIds.has(derivative.id)
-      if (ok) drafts += 1
-      await store.settleDerivative({
-        derivativeId: derivative.id,
-        workspaceId,
-        status: ok ? 'written' : 'skipped',
-        postId: ok ? postId : null,
-        // A channel the model skipped is SKIPPED and says so — never a blank
-        // draft that reads as one nobody has written yet.
-        failure: ok ? null : 'The model returned nothing for this channel.',
-      })
+      if (writtenIds.has(derivative.id)) {
+        drafts += 1
+        await store.markWritten(derivative.id, workspaceId, postId)
+        continue
+      }
+      // A channel the model skipped is SKIPPED and says so — never a blank draft
+      // that reads as one nobody has written yet.
+      await store.markSkipped(derivative.id, workspaceId)
     }
   }
 

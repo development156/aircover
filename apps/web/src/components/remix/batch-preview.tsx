@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { CostLabel } from '@/components/ui/cost-label'
 import { REMIX_KINDS, needsAPhoto } from '@/lib/remix/catalogue'
 import { previewBatch } from '@/lib/remix/cost'
+import { isSettled } from '@/lib/remix/read'
 import type { BatchView } from '@/lib/remix/read'
 
 /**
@@ -64,7 +65,7 @@ export function BatchPreview({ batch }: BatchPreviewProps) {
     [batch.derivatives, excluded],
   )
 
-  const settled = batch.status === 'done' || batch.status === 'failed'
+  const settled = isSettled(batch.status)
 
   function toggle(id: string) {
     const next = new Set(excluded)
@@ -83,7 +84,10 @@ export function BatchPreview({ batch }: BatchPreviewProps) {
   function makeThem() {
     setOutcome({ kind: 'none' })
     startTransition(async () => {
-      const approved = await approveRemixBatch(batch.id)
+      // The figure on the button is what is sent. The server re-prices from the
+      // rows and refuses if the two disagree, so this is the amount being agreed
+      // to rather than a display of it — see `approveRemixBatch`.
+      const approved = await approveRemixBatch(batch.id, cost.totalCredits)
       if (!approved.ok) {
         setOutcome({ kind: 'failed', message: approved.message ?? 'Could not approve this.' })
         return
@@ -235,11 +239,18 @@ function BatchDone({ batch, outcome }: { batch: BatchView; outcome: Outcome }) {
   const written = batch.derivatives.filter((d) => d.status === 'written')
   const drafts = outcome.kind === 'made' ? outcome.drafts : written.length
   const failedKinds = outcome.kind === 'made' ? outcome.failedKinds : 0
+  // A batch still marked `running` is one whose request was cut off. Nothing
+  // resumes it, so it is reported for what it is rather than as a finished run.
+  const stopped = outcome.kind !== 'made' && batch.status === 'running'
 
   return (
     <section aria-labelledby="remix-done" className="surface-ring rounded-card bg-surface p-4">
       <h2 id="remix-done" className="type-h2">
-        {drafts === 0 ? 'Nothing was written' : 'The drafts are written'}
+        {stopped
+          ? 'This batch stopped part-way'
+          : drafts === 0
+            ? 'Nothing was written'
+            : 'The drafts are written'}
       </h2>
       <p className="type-body mt-1 max-w-[68ch] text-muted">
         {drafts === 0 ? (

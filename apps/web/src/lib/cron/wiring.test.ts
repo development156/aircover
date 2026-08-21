@@ -97,6 +97,14 @@ describe('cron wiring', () => {
         // with isAuthorizedCronRequest, which fails closed on an unset secret.
         '/api/cron/loop',
         '/api/public/beta-apply',
+        // Door one into `leads`, added 2026-08-21. Deliberate for the same reason
+        // /api/cron/loop was: this guard failing is what made it deliberate. It
+        // authenticates itself in-route in three steps before the database is
+        // reached — a per-IP rate limit, a zod schema carrying the honeypot, and
+        // Turnstile — and the service-role RPC underneath takes a site SLUG and
+        // no workspace id, so the elevated write cannot be aimed at a tenant a
+        // caller names.
+        '/api/public/site-lead',
         '/api/admin/devops/ingest',
         '/api/webhooks/clerk',
         // Present in middleware.ts since the 2026-07-28 merge and absent from this

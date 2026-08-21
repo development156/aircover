@@ -196,7 +196,7 @@ export async function setBatchStatus(
     .eq('workspace_id', workspaceId)
 }
 
-export async function settleDerivative(input: {
+async function settleDerivative(input: {
   derivativeId: string
   workspaceId: string
   status: RemixDerivativeStatus
@@ -209,6 +209,46 @@ export async function settleDerivative(input: {
     .update({ status: input.status, post_id: input.postId, failure: input.failure })
     .eq('id', input.derivativeId)
     .eq('workspace_id', input.workspaceId)
+}
+
+/**
+ * ── THREE NAMED OUTCOMES INSTEAD OF ONE `status` ARGUMENT ────────────────────
+ * Not sugar. `remix-run.ts` writes BOTH vocabularies — a `posts.status` when it
+ * inserts a draft, and a `remix_derivatives.status` when it settles one — and
+ * `schedule-status-reachability.test.ts` scans every file that touches `posts`
+ * for `status: '…'` literals, so a derivative settling to `'failed'` in that
+ * file read as apps/web writing a FAILED POST. The guard was right to fail:
+ * two `status` vocabularies spelled the same way in one file is a genuine
+ * ambiguity, and widening its allow-list to admit `failed` would have made a
+ * real `posts.status = 'failed'` write invisible to it forever.
+ *
+ * So the literals live here, in a file that does not touch `posts` at all.
+ */
+export function markWritten(
+  derivativeId: string,
+  workspaceId: string,
+  postId: string,
+): Promise<void> {
+  return settleDerivative({ derivativeId, workspaceId, status: 'written', postId, failure: null })
+}
+
+export function markFailed(
+  derivativeId: string,
+  workspaceId: string,
+  failure: string | null,
+): Promise<void> {
+  return settleDerivative({ derivativeId, workspaceId, status: 'failed', postId: null, failure })
+}
+
+/** A channel the model returned nothing for. Never a blank draft. */
+export function markSkipped(derivativeId: string, workspaceId: string): Promise<void> {
+  return settleDerivative({
+    derivativeId,
+    workspaceId,
+    status: 'skipped',
+    postId: null,
+    failure: 'The model returned nothing for this channel.',
+  })
 }
 
 /** The batches this workspace has run, newest first. */

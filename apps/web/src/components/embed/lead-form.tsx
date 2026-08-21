@@ -215,10 +215,7 @@ export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
       )}
 
       {status.kind === 'error' ? (
-        <p
-          role="alert"
-          className="type-body mt-3 rounded-input bg-danger-bg px-3 py-2 text-danger"
-        >
+        <p role="alert" className="type-body mt-3 rounded-input bg-danger-bg px-3 py-2 text-danger">
           {status.message}
         </p>
       ) : null}

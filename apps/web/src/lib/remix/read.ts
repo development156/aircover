@@ -50,6 +50,19 @@ function toView(derivative: RemixDerivative): DerivativeView {
 }
 
 /**
+ * Is this batch still a decision somebody can take?
+ *
+ * `running` is NOT. Nothing in this codebase resumes a batch — a request cut off
+ * mid-spend leaves the row at `running` for ever — so treating it as live would
+ * wedge the screen: it would render the preview, whose only button refuses a
+ * running batch, and never offer a new one. Terminal here means the person can
+ * start again, which is the only thing that helps them.
+ */
+export function isSettled(status: RemixBatch['status']): boolean {
+  return status === 'done' || status === 'failed' || status === 'running'
+}
+
+/**
  * The newest batch, whatever state it is in — or null when this workspace has
  * never remixed anything.
  *

@@ -7,7 +7,7 @@ import { BatchPreview } from '@/components/remix/batch-preview'
 import { PlanBatch } from '@/components/remix/plan-batch'
 import { Button } from '@/components/ui/button'
 import { MISSING_KINDS } from '@/lib/remix/catalogue'
-import { readCurrentBatch } from '@/lib/remix/read'
+import { isSettled, readCurrentBatch } from '@/lib/remix/read'
 import { listPosts } from '@/lib/posts/read'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
@@ -67,7 +67,7 @@ export default async function RemixPage() {
     <div className="space-y-grid">
       <PageTitle sub="Turn one thing you already wrote into a week of posts.">Remix</PageTitle>
 
-      {batch && batch.status !== 'done' && batch.status !== 'failed' ? (
+      {batch && !isSettled(batch.status) ? (
         <BatchPreview batch={batch} />
       ) : sources.length === 0 ? (
         <EmptyState
@@ -84,9 +84,7 @@ export default async function RemixPage() {
         <PlanBatch posts={sources} />
       )}
 
-      {batch && (batch.status === 'done' || batch.status === 'failed') ? (
-        <BatchPreview batch={batch} />
-      ) : null}
+      {batch && isSettled(batch.status) ? <BatchPreview batch={batch} /> : null}
 
       <Missing />
     </div>

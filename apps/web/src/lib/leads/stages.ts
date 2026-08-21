@@ -20,10 +20,13 @@ import type { LeadStatus } from '@sahoda/shared'
  * `qualified` stays a legal status that nothing writes and no column shows.
  *
  * There is deliberately NO "and qualified rows appear under Contacted" fold-in.
- * The table has never held a row, and no writer in this codebase emits
- * `qualified` — `stages.test.ts` asserts that by grepping the source — so such a
- * row cannot reach the screen. UI for an unreachable state is dead UI, which
- * `lib/billing/read.ts` names as its own kind of dishonesty.
+ * NO WRITER IN THIS CODEBASE EMITS `qualified` — `setLeadStatus` refuses it and
+ * neither door produces it — so no such row can arrive through Sahoda, and UI
+ * for it would be UI for a state nothing reaches. That is the claim, and it is
+ * the whole claim: a row written by hand through the service role would carry
+ * the value, and it would then appear in no column. Recorded rather than
+ * papered over, because the alternative is dead UI, which `lib/billing/read.ts`
+ * names as its own kind of dishonesty.
  */
 
 export interface Stage {

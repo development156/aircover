@@ -152,8 +152,25 @@ export interface ApproveState {
  * is the halt made into a stored fact so that "nothing spends without an
  * approval" can be TESTED by forcing the state and watching the balance stay
  * put, rather than being an `if` inside the function that spends the money.
+ *
+ * ── WHY IT TAKES THE FIGURE THAT WAS ON THE BUTTON ───────────────────────────
+ * `expectedCredits` is not a value this function trusts — it re-prices from the
+ * rows and REFUSES if the two disagree. Without it the screen and the server
+ * could differ and nothing would notice: the button's number comes from a
+ * BROWSER-side `previewBatch` over local trim state, and each trim is written
+ * back in a transition that `makeThem` does not wait for. So a trim still in
+ * flight, or one whose write failed, would show N on the button and charge M —
+ * and the runner's own price check cannot see it, because both halves of that
+ * check are server-side.
+ *
+ * With it, the figure on the button is not a display of the amount. It IS the
+ * amount being agreed to. `lib/loop/cost.ts`'s panel makes the same contract for
+ * the same reason.
  */
-export async function approveRemixBatch(batchId: string): Promise<ApproveState> {
+export async function approveRemixBatch(
+  batchId: string,
+  expectedCredits: unknown,
+): Promise<ApproveState> {
   let workspaceId: string | undefined
   try {
     const { userId } = await auth()
@@ -168,6 +185,15 @@ export async function approveRemixBatch(batchId: string): Promise<ApproveState> 
     const cost = previewBatch(derivatives)
     if (cost.includedCount === 0) {
       return { ok: false, message: 'Everything is trimmed out, so there is nothing to make.' }
+    }
+
+    if (expectedCredits !== cost.totalCredits) {
+      return {
+        ok: false,
+        message:
+          'This batch is not what it was a moment ago. Check the total and approve it again — ' +
+          'nothing has been spent.',
+      }
     }
 
     const approved = await store.approveBatch({

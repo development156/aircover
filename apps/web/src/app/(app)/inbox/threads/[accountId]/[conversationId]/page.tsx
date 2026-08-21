@@ -115,7 +115,12 @@ export default async function ThreadPage({
                 conversationRef={conversationId}
                 channel={newestInbound.platform}
                 authorName={newestInbound.senderName ?? null}
-                authorHandle={newestInbound.senderId ?? null}
+                // NULL, and deliberately. `ZernioMessage` has `senderId` and no
+                // handle field at all, and an id stored under `author_handle`
+                // reads as a handle to every later reader — the same defect as
+                // putting "@cornerbakery" in the email column, which the
+                // function refuses to do for exactly this reason.
+                authorHandle={null}
                 message={newestInbound.message}
               />
             </div>
