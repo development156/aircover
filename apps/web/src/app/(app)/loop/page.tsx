@@ -1,76 +1,200 @@
 import Link from 'next/link'
-import { creditCost } from '@sahoda/shared'
+import {
+  DEFAULT_AUTONOMY_LEVEL,
+  creditCost,
+  type AutonomyLevel,
+  type LoopCycleStatus,
+} from '@sahoda/shared'
 
 import { AutonomyDial } from '@/components/loop/autonomy-dial'
+import { CostPreview } from '@/components/loop/cost-preview'
 import { CycleStrip } from '@/components/loop/cycle-strip'
+import { KillSwitch } from '@/components/loop/kill-switch'
+import { PendingLearnings } from '@/components/loop/learnings'
+import { LoopControls } from '@/components/loop/controls'
 import { PageTitle } from '@/components/page-title'
-import { RoadmapBanner } from '@/components/roadmap/inert'
-import { NotRunningNote } from '@/components/roadmap/parts'
+import { readLoopSnapshot } from '@/lib/loop/read'
+import { getActiveWorkspace } from '@/lib/workspaces'
 
 export const metadata = { title: 'The Loop' }
 
 /**
- * THE LOOP — the product's headline promise, drawn whole and running nowhere.
+ * THE LOOP — the weekly cycle, running.
  *
- * ── WHY THIS SECTION EXISTS BEFORE THE FEATURE DOES ──────────────────────────
- * "Learn → plan → create → test → publish → measure → learn again" is the thesis
- * the whole PRD is built on, and until now it appeared nowhere in the app. A
- * customer could use Sahoda for a month and never learn that the weekly cycle is
- * the point. That is a worse outcome than an honest roadmap screen.
+ * ── WHAT CHANGED FROM THE ROADMAP VERSION, AND WHY THE OLD COPY HAD TO GO ────
+ * wt-ia drew this page whole and said, in four separate places, that nothing on
+ * it was real: no cycle, no Sunday job, no Monday report, and "no autonomy level
+ * is stored anywhere". Every one of those sentences was true and every one is
+ * now false. Leaving them would have been the same failure in the other
+ * direction — a page understating what the product does is as wrong as one
+ * overstating it, and it is the kind of wrong that survives longer because
+ * nobody complains about it.
  *
- * ── WHAT IS ACTUALLY BUILT, AND SAID PLAINLY BELOW ───────────────────────────
- * One piece of the Loop runs today and it is on another screen: "Plan my week"
- * on Home does the `plan` stage once, on demand, for the same 20 credits the
- * whole cycle will cost. That is a real link, not a consolation — it is the one
- * part a reader can go and use, and pretending it lived here would put a working
- * button on a page where nothing else works.
+ * The DESIGN is wt-ia's throughout: the seven-stage line, the ladder, the
+ * reading-measure prose. What is new is state.
  *
- * ── THE PRICE IS ALLOWED; NOTHING ELSE NUMERIC IS ────────────────────────────
- * `creditCost('loop_cycle')` reads pricing.config.json, the single source for
- * every credit price in this product. A price is a fact about Sahoda, published
- * and checkable, in the same class as a channel name. It is NOT in the class of
- * thing this screen may not show — a reach figure, a post count, a predicted
- * score — because none of those is a fact about Sahoda; each would be a claim
- * about the reader's business that no query behind this page has earned.
+ * ── STILL NOT ONE INVENTED FIGURE ────────────────────────────────────────────
+ * Every number on this page is a credit price out of pricing.config.json, a
+ * count of rows, or a sum of the two. There is no predicted reach, no expected
+ * engagement, no score — each would be a claim about the reader's business that
+ * no query behind this page has earned.
  */
-export default function LoopPage() {
+export default async function LoopPage() {
+  const workspace = await getActiveWorkspace()
+  if (!workspace) {
+    return (
+      <div className="space-y-grid">
+        <PageTitle sub="A weekly cycle that plans, writes, tests and reports — as far as you let it go on its own.">
+          The Loop
+        </PageTitle>
+        <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
+          Finish setting up your workspace and the Loop appears here.
+        </p>
+      </div>
+    )
+  }
+
+  const snapshot = await readLoopSnapshot(workspace.id)
+  const cycle = snapshot.cycle
+  const atHalt = cycle?.status === 'awaiting_cost_approval'
+
+  const chosen: Record<string, AutonomyLevel> = {}
+  for (const [channel, level] of snapshot.dial) chosen[channel] = level
+
   return (
     <div className="space-y-grid">
       <PageTitle sub="A weekly cycle that plans, writes, tests and reports — as far as you let it go on its own.">
         The Loop
       </PageTitle>
 
-      <RoadmapBanner what="The Loop will run your week: it plans on Sunday, works through the week, and reports back on Monday." />
+      <CycleStrip status={cycle?.status as LoopCycleStatus | undefined} />
 
-      <CycleStrip />
-      <AutonomyDial />
+      <LoopControls
+        paused={snapshot.paused}
+        weeklyBudgetCredits={snapshot.weeklyBudgetCredits}
+        cycleCost={creditCost('loop_cycle')}
+        hasChannels={snapshot.connected.length > 0}
+        cycleRunning={Boolean(cycle) && !atHalt && !isOver(cycle?.status)}
+      />
 
-      <section aria-labelledby="loop-today" className="surface-ring rounded-card bg-surface p-4">
-        <h2 id="loop-today" className="type-h3">
-          One step of this already works
-        </h2>
-        <p className="type-body mt-1 max-w-[68ch] text-muted">
-          The <strong className="font-[550] text-ink">plan</strong> step runs today, on demand, from
-          Home. It reads your Brand Brain and leaves a week of drafts in your Planner. What is
-          missing is the rest of the circle: nothing collects last week&rsquo;s numbers yet, nothing
-          reflects on them, and nothing reports back on Monday.
-        </p>
-        <p className="type-sm mt-3">
-          <Link href="/home" className="font-[550] text-accent underline underline-offset-2">
-            Plan a week from Home
-          </Link>
-          <span className="ml-2 text-muted">
-            &middot; <span className="num">{creditCost('loop_cycle')}</span> credits, the same as a
-            full cycle will cost
-          </span>
-        </p>
-      </section>
+      {/* The cost preview is the whole point of the halt, so it sits above
+          everything else the moment there is one to look at. */}
+      {atHalt && cycle ? (
+        <CostPreview
+          cycleId={cycle.id}
+          briefs={snapshot.briefs}
+          budgetCredits={cycle.budgetCredits}
+          spentCredits={cycle.spentCredits}
+        />
+      ) : null}
 
-      <NotRunningNote>
-        Nothing on this page is scheduled. There is no cycle running for your workspace, no Sunday
-        job and no Monday report, and no autonomy level is stored anywhere &mdash; which is why none
-        of the four above is marked as yours.
-      </NotRunningNote>
+      {cycle && !atHalt ? <CycleSummary cycle={cycle} briefCount={snapshot.briefs.length} /> : null}
+
+      <PendingLearnings learnings={snapshot.learnings} />
+
+      <AutonomyDial
+        connected={snapshot.connected}
+        chosen={chosen}
+        defaultLevel={DEFAULT_AUTONOMY_LEVEL}
+      />
+
+      <KillSwitch />
     </div>
+  )
+}
+
+function isOver(status: string | undefined): boolean {
+  return status === 'reported' || status === 'cancelled' || status === 'failed'
+}
+
+/**
+ * Where the current cycle got to, in sentences.
+ *
+ * ── THE REFLECT LINE IS THREE DIFFERENT SENTENCES ────────────────────────────
+ * "Sahoda had nothing to reflect on" and "Sahoda reflected and found nothing
+ * worth saying" are different claims, and only one of them is an admission that
+ * the product has no history yet. `reflect_skipped_no_history` is a stored
+ * column precisely so this line is a lookup rather than an inference.
+ */
+function CycleSummary({
+  cycle,
+  briefCount,
+}: {
+  cycle: NonNullable<Awaited<ReturnType<typeof readLoopSnapshot>>['cycle']>
+  briefCount: number
+}) {
+  const failed = cycle.status === 'failed'
+  const cancelled = cycle.status === 'cancelled'
+
+  return (
+    <section aria-labelledby="loop-current" className="surface-ring rounded-card bg-surface p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 id="loop-current" className="type-h2">
+          {cancelled
+            ? 'This week was stopped'
+            : failed
+              ? 'This week did not run'
+              : cycle.status === 'reported'
+                ? 'This week is done'
+                : 'This week is running'}
+        </h2>
+        <p className="type-sm num text-muted">
+          Week {cycle.isoWeek}, {cycle.isoYear}
+        </p>
+      </div>
+
+      {failed && cycle.failureReason === 'NO_CHANNELS' ? (
+        <p className="type-body mt-1 max-w-[68ch] text-muted">
+          Sahoda has nowhere to plan for.{' '}
+          <Link href="/connections" className="font-[550] text-accent underline underline-offset-2">
+            Connect a channel
+          </Link>{' '}
+          and run it again. Nothing was charged.
+        </p>
+      ) : failed ? (
+        <p className="type-body mt-1 max-w-[68ch] text-muted">
+          Sahoda could not finish planning this week, and you were not charged for the part that
+          failed.
+        </p>
+      ) : cancelled ? (
+        <p className="type-body mt-1 max-w-[68ch] text-muted">
+          You stopped this cycle. Anything it had written is still in your Planner.
+        </p>
+      ) : (
+        <p className="type-body mt-1 max-w-[68ch] text-muted">
+          Sahoda planned <span className="num">{briefCount}</span>{' '}
+          {briefCount === 1 ? 'post' : 'posts'} for this week.
+        </p>
+      )}
+
+      {!failed && !cancelled ? (
+        <p className="type-sm mt-2 text-muted">
+          {cycle.reflectSkippedNoHistory
+            ? 'It had nothing to reflect on — no post of yours has been measured yet, so there was nothing to learn from.'
+            : 'It read last week’s numbers before planning.'}
+        </p>
+      ) : null}
+
+      <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1">
+        <div className="flex gap-2">
+          <dt className="type-sm text-muted">Spent this cycle</dt>
+          <dd className="type-sm num text-ink">{cycle.spentCredits} cr</dd>
+        </div>
+        {cycle.budgetCredits !== null ? (
+          <div className="flex gap-2">
+            <dt className="type-sm text-muted">Weekly budget</dt>
+            <dd className="type-sm num text-ink">{cycle.budgetCredits} cr</dd>
+          </div>
+        ) : null}
+      </dl>
+
+      {cycle.status === 'reported' ? (
+        <p className="type-sm mt-3">
+          <Link href="/report" className="font-[550] text-accent underline underline-offset-2">
+            Read the report for this week
+          </Link>
+        </p>
+      ) : null}
+    </section>
   )
 }

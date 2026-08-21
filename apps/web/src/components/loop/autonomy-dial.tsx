@@ -1,74 +1,55 @@
-import { InertToggle } from '@/components/roadmap/parts'
+'use client'
+
+import { useState, useTransition } from 'react'
+import { Check, Lock } from 'lucide-react'
+import { AUTONOMY_LEVELS, type AutonomyLevel, type Channel } from '@sahoda/shared'
+
+import { setChannelAutonomy } from '@/app/actions/loop-dial'
+import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 
 /**
- * THE AUTONOMY DIAL — four levels of how much Sahoda may do without asking.
+ * THE AUTONOMY DIAL — four levels of how much Sahoda may do without asking, and
+ * only three of them are places you can stand.
  *
- * ── WHY A LADDER AND NOT A SLIDER ────────────────────────────────────────────
- * A slider is the obvious control for a "dial" and it is wrong here. A slider's
- * positions are interchangeable points on a continuum; these four are not. Each
- * one adds a specific permission AND carries a specific precondition — L3 needs
- * guardrails to pass, an account older than thirty days and a Growth plan (FSD
- * §0.2) — and a slider has nowhere to put a precondition. Read as a ladder, the
- * rung you are on and the price of the next rung are both legible at a glance.
+ * ── TWO SURFACES, BECAUSE THEY DO TWO JOBS ───────────────────────────────────
+ * The LADDER explains what the levels mean. The PICKER sets one per channel.
+ * They were one widget in the first draft and that forced a bad trade: either
+ * L3 disappears from the control (and the reader never learns autopilot is the
+ * thing this is climbing towards) or a dead fourth cell repeats once per
+ * channel, which is four pieces of noise to make one point.
  *
- * The rungs are numbered because the order is real: each level is a superset of
- * the one below it. That is a sequence, so the numbers encode something.
+ * Split, the ladder says it once, in the place a reader goes to understand the
+ * levels — and the picker offers the three levels that exist, with no gap where
+ * a fourth was removed.
  *
- * ── WHAT IS DELIBERATELY ABSENT ──────────────────────────────────────────────
- * No "you are currently on L1". There is no autonomy setting stored anywhere in
- * this product — no column, no row, no default — so any level shown as selected
- * would be a claim about the reader's workspace with nothing behind it. The
- * ladder shows the four rungs and marks none of them, which is the honest shape
- * of a control that does not exist yet.
+ * ── L3 IS A `div`. IT IS NOT A DISABLED BUTTON. ──────────────────────────────
+ * A `<button disabled>` is still announced as a button: a screen reader offers
+ * it, the reader takes it, nothing happens, and the failure reads as a broken
+ * app rather than as an unbuilt feature. It carries no `aria-disabled` either —
+ * that attribute describes a control that EXISTS and is momentarily unavailable,
+ * which would be a different and untrue claim. The L3 rung is prose with a lock
+ * beside it, and the prose says why.
  *
- * No per-day caps, no credit budgets and no quiet-hour times either. Those are
- * numbers the reader will choose; printing a specimen would read as a setting
- * they already have.
+ * ── WHY A LADDER AND NOT A SLIDER (wt-ia's reasoning, still right) ────────────
+ * A slider's positions are interchangeable points on a continuum; these are not.
+ * Each level adds a specific permission AND carries a specific precondition, and
+ * a slider has nowhere to put a precondition.
  */
 
-const LEVELS: ReadonlyArray<{ code: string; name: string; may: string; needs: string }> = [
-  {
-    code: 'L0',
-    name: 'Suggest',
-    may: 'Sahoda brings you ideas and briefs. It writes nothing.',
-    needs: 'Nothing. This is the quietest setting.',
-  },
-  {
-    code: 'L1',
-    name: 'Draft',
-    may: 'Sahoda writes full drafts and leaves them in your Planner.',
-    needs: 'Nothing. Everything still waits for you to open it.',
-  },
-  {
-    code: 'L2',
-    name: 'Approve to publish',
-    may: 'Sahoda schedules the week and publishes each post once you approve it.',
-    needs:
-      'Your approval, before the slot passes. Anything you leave expires rather than going out.',
-  },
-  {
-    code: 'L3',
-    name: 'Autopilot',
-    may: 'Sahoda publishes without asking, inside the limits you set.',
-    needs:
-      'Every guardrail below passing, an account older than a month, and a plan that includes it.',
-  },
-]
+/** The rungs, split by whether a person can actually stand on one. */
+const STORABLE = AUTONOMY_LEVELS.filter((l) => l.storable)
+const UNREACHABLE = AUTONOMY_LEVELS.filter((l) => !l.storable)
 
-/**
- * The guardrails. Named, never valued — see the note above on why there are no
- * specimen numbers here.
- */
-const GUARDRAILS: readonly string[] = [
-  'Your red lines — topics Sahoda will not write about',
-  'A cap on how many posts a channel may take in a day',
-  'Quiet hours, when nothing goes out',
-  'A weekly credit budget the Loop may not exceed',
-  'No repeat of the same post to the same channel',
-  'A kill switch that cancels everything scheduled, at once',
-]
+export interface AutonomyDialProps {
+  /** Channels this workspace has connected. */
+  connected: readonly Channel[]
+  /** Levels a person actually chose. A channel absent from this map is UNSET. */
+  chosen: Record<string, AutonomyLevel>
+  /** What an unset channel runs at. */
+  defaultLevel: AutonomyLevel
+}
 
-export function AutonomyDial() {
+export function AutonomyDial({ connected, chosen, defaultLevel }: AutonomyDialProps) {
   return (
     <section aria-labelledby="loop-dial" className="flex flex-col gap-3">
       <div>
@@ -81,43 +62,154 @@ export function AutonomyDial() {
         </p>
       </div>
 
-      <ol className="grid gap-2">
-        {LEVELS.map((level) => (
-          <li
-            key={level.code}
-            data-inert-control
-            className="is-proposed grid gap-x-4 gap-y-1 rounded-card p-4 narrow:grid-cols-[80px_1fr]"
-          >
-            <span className="type-eyebrow num self-start text-muted">{level.code}</span>
-            <span className="min-w-0">
-              <span className="type-h3 block text-ink">{level.name}</span>
-              <span className="type-body mt-0.5 block text-muted">{level.may}</span>
-              {/* The precondition is the half a slider cannot carry. */}
-              <span className="type-sm mt-1.5 block text-muted">
-                <span className="type-eyebrow mr-1.5 text-muted">Needs</span>
-                {level.needs}
-              </span>
-            </span>
-          </li>
-        ))}
-      </ol>
-
-      <section aria-labelledby="loop-guardrails" className="is-proposed rounded-card p-4">
-        <h3 id="loop-guardrails" className="type-h3 text-ink">
-          What stops it, at every level
-        </h3>
-        <p className="type-sm mt-0.5 text-muted">
-          These are checked before anything is published, including on autopilot. A post that fails
-          one is parked with the reason on it, never dropped.
+      {connected.length === 0 ? (
+        <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
+          Connect a channel and its dial appears here. Until then there is nothing for the Loop to
+          set a level for.
         </p>
-        <ul className="mt-3 grid gap-2 narrow:grid-cols-2">
-          {GUARDRAILS.map((rail) => (
-            <li key={rail}>
-              <InertToggle label={rail} />
-            </li>
+      ) : (
+        <ul className="grid gap-2">
+          {connected.map((channel) => (
+            <ChannelDial
+              key={channel}
+              channel={channel}
+              chosen={chosen[channel]}
+              defaultLevel={defaultLevel}
+            />
           ))}
         </ul>
-      </section>
+      )}
+
+      {/* The ladder: reference material, and the only place L3 appears. */}
+      <details className="surface-ring rounded-card bg-surface p-4">
+        <summary className="type-h3 cursor-pointer text-ink">What each level means</summary>
+        <ol className="mt-3 grid gap-2">
+          {STORABLE.map((level) => (
+            <li key={level.code} className="grid gap-x-4 gap-y-1 narrow:grid-cols-[52px_1fr]">
+              <span className="type-eyebrow num self-start text-muted">{level.code}</span>
+              <span className="min-w-0">
+                <span className="type-h3 block text-ink">{level.name}</span>
+                <span className="type-body mt-0.5 block text-muted">{level.may}</span>
+                <span className="type-sm mt-1 block text-muted">
+                  <span className="type-eyebrow mr-1.5 text-muted">Needs</span>
+                  {level.needs}
+                </span>
+              </span>
+            </li>
+          ))}
+
+          {/* Not a control. A div, with no aria-disabled — see the header. */}
+          {UNREACHABLE.map((level) => (
+            <li
+              key={level.code}
+              className="grid gap-x-4 gap-y-1 rounded-input bg-subtle p-3 narrow:grid-cols-[52px_1fr]"
+            >
+              <span className="type-eyebrow num flex items-center gap-1.5 self-start text-muted">
+                <Lock size={12} strokeWidth={2} aria-hidden />
+                {level.code}
+              </span>
+              <span className="min-w-0">
+                <span className="type-h3 block text-muted">
+                  {level.name} <span className="type-sm font-normal">— not available</span>
+                </span>
+                <span className="type-body mt-0.5 block text-muted">{level.may}</span>
+                <span className="type-sm mt-1 block text-muted">{level.needs}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      </details>
     </section>
+  )
+}
+
+function ChannelDial({
+  channel,
+  chosen,
+  defaultLevel,
+}: {
+  channel: Channel
+  chosen: AutonomyLevel | undefined
+  defaultLevel: AutonomyLevel
+}) {
+  // Optimistic local state so the row does not flicker back to the old level
+  // while the write is in flight, with the server's refusal replacing it if the
+  // write fails. `chosen` staying undefined matters: the row must keep saying
+  // "not set yet" until a person actually picks, and an initial value of
+  // `defaultLevel` would silently claim they had.
+  const [level, setLevel] = useState<AutonomyLevel | undefined>(chosen)
+  const [error, setError] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+  const current = level ?? defaultLevel
+  const name = `dial-${channel}`
+
+  function pick(next: AutonomyLevel) {
+    if (next === level) return
+    const previous = level
+    setLevel(next)
+    setError(null)
+    startTransition(async () => {
+      const result = await setChannelAutonomy(channel, next)
+      if (!result.ok) {
+        setLevel(previous)
+        setError(result.message ?? 'Could not save that.')
+      }
+    })
+  }
+
+  return (
+    <li className="surface-ring rounded-card bg-surface p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 className="type-h3 text-ink">{CHANNEL_LABELS[channel]}</h3>
+        {level === undefined ? (
+          <span className="type-sm text-muted">
+            Not set — running at {AUTONOMY_LEVELS[defaultLevel]?.name.toLowerCase()}
+          </span>
+        ) : null}
+      </div>
+
+      <fieldset className="mt-3" disabled={pending}>
+        <legend className="sr-only">How much Sahoda may do for {CHANNEL_LABELS[channel]}</legend>
+        <div className="grid gap-1.5 narrow:grid-cols-3">
+          {STORABLE.map((option) => {
+            const active = level !== undefined && option.level === current
+            return (
+              <label
+                key={option.code}
+                className={[
+                  'flex cursor-pointer items-start gap-2 rounded-input p-2.5 transition-colors',
+                  'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent',
+                  active ? 'bg-accent-subtle text-ink' : 'bg-subtle text-muted hover:text-ink',
+                ].join(' ')}
+              >
+                <input
+                  type="radio"
+                  name={name}
+                  className="sr-only"
+                  checked={active}
+                  onChange={() => pick(option.level as AutonomyLevel)}
+                />
+                <span
+                  aria-hidden
+                  className="mt-[3px] flex size-3.5 shrink-0 items-center justify-center"
+                >
+                  {active ? <Check size={13} strokeWidth={2.5} className="text-accent" /> : null}
+                </span>
+                <span className="min-w-0">
+                  <span className="type-h3 block">{option.name}</span>
+                  <span className="type-sm mt-0.5 block text-muted">{option.may}</span>
+                </span>
+              </label>
+            )
+          })}
+        </div>
+      </fieldset>
+
+      {error ? (
+        <p role="alert" className="type-sm mt-2 text-danger">
+          {error}
+        </p>
+      ) : null}
+    </li>
   )
 }

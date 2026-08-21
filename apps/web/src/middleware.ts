@@ -56,6 +56,14 @@ const isPublicRoute = createRouteMatcher([
   // with the same constant-time CRON_SECRET compare, and fails closed when the
   // secret is unset. Exact path — nothing else under /api/cron is exposed by it.
   '/api/cron/metrics',
+  // The Sunday Loop plan. Same reasoning as the two above, and the same reason
+  // it is an EXACT path: Vercel cron presents CRON_SECRET as an Authorization
+  // header and does NOT follow redirects, so without this the weekly tick would
+  // be a 307 to /sign-in and the Loop would silently never run — while the
+  // heartbeat, which records that the schedule FIRED, kept reporting green.
+  // `isAuthorizedCronRequest` is the only thing in front of it, and it fails
+  // closed when CRON_SECRET is unset.
+  '/api/cron/loop',
 ])
 
 // The `/admin` surface and its authenticated APIs. The token-authed ingest route
@@ -252,12 +260,12 @@ export const config = {
   matcher: [
     // Clerk-recommended shape: skip Next internals + static assets unless
     // referenced in search params. (Next 16 renames middleware → proxy; n/a on 15.)
-    '/((?!api/cron/sweeps$|api/cron/metrics$|api/webhooks/cashfree$|api/webhooks/clerk$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/webhooks/cashfree$|api/webhooks/clerk$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Shaped as `/(…)` — ONE group holding the whole expression — because that is the
     // only place Next accepts a raw regex. `'/(?!…)(api|trpc)(.*)'` reads to
     // path-to-regexp as a group opening with invalid content and fails the BUILD with
     // `Error parsing … invalid-route-source`. Loud and before deploy, which is the right
     // direction for this file, but it is why the lookahead lives inside the parentheses.
-    '/((?!api/cron/sweeps$|api/cron/metrics$|api/webhooks/cashfree$|api/webhooks/clerk$)(?:api|trpc).*)',
+    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/webhooks/cashfree$|api/webhooks/clerk$)(?:api|trpc).*)',
   ],
 }

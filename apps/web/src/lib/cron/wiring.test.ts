@@ -24,18 +24,25 @@ const vercelConfig = JSON.parse(readFileSync(resolve(WEB, 'vercel.json'), 'utf8'
 const middleware = readFileSync(resolve(WEB, 'src/middleware.ts'), 'utf8')
 
 describe('cron wiring', () => {
-  it('schedules exactly the two jobs, on their own cadences', () => {
-    // Pinned as a SET of exact entries rather than a count, so a THIRD job cannot
-    // arrive quietly and so a schedule cannot be edited without a decision.
+  it('schedules exactly the three jobs, on their own cadences', () => {
+    // Pinned as a SET of exact entries rather than a count, so a FOURTH job
+    // cannot arrive quietly and so a schedule cannot be edited without a
+    // decision. It did its job when the third arrived.
     //
-    // The two cadences are not interchangeable, and the second one is why the
-    // metric pass is a separate job at all: `post_metric_snapshots` is keyed by
-    // DAY, so riding the five-minute tick would spend one Zernio request per
-    // published channel, 288 times a day, to write nothing on 287 of them.
-    // 01:20 UTC is 06:50 IST — past midnight in India, before the working day.
+    // The three cadences are not interchangeable. The metric pass is a separate
+    // job because `post_metric_snapshots` is keyed by DAY, so riding the
+    // five-minute tick would spend one Zernio request per published channel,
+    // 288 times a day, to write nothing on 287 of them. 01:20 UTC is 06:50 IST
+    // — past midnight in India, before the working day.
+    //
+    // The Loop is weekly and lands on Sunday, which is FSD M2's trigger:
+    // "Sunday 21:00 workspace-local". 21:00 UTC is the compromise a single
+    // global cron forces — per-workspace local time needs a row-driven
+    // scheduler, and `loop_settings.plan_at_minute` exists for the day it does.
     expect(vercelConfig.crons).toEqual([
       { path: '/api/cron/sweeps', schedule: '*/5 * * * *' },
       { path: '/api/cron/metrics', schedule: '20 1 * * *' },
+      { path: '/api/cron/loop', schedule: '0 21 * * 0' },
     ])
   })
 
@@ -85,6 +92,10 @@ describe('cron wiring', () => {
       new Set([
         '/api/cron/sweeps',
         '/api/cron/metrics',
+        // Added 2026-08-20 with the weekly Loop cycle. Deliberate: this guard
+        // failing is what made it deliberate. It authenticates itself in-route
+        // with isAuthorizedCronRequest, which fails closed on an unset secret.
+        '/api/cron/loop',
         '/api/public/beta-apply',
         '/api/admin/devops/ingest',
         '/api/webhooks/clerk',

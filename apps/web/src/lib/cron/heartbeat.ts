@@ -49,7 +49,7 @@
  */
 
 /** The jobs declared in `apps/web/vercel.json`. `heartbeat-schedule.test.ts` pins both. */
-export type CronJob = 'sweeps' | 'metrics'
+export type CronJob = 'sweeps' | 'metrics' | 'loop'
 
 export interface CronSchedule {
   /** How often the job is scheduled, in ms. From the cron expression, not a guess. */
@@ -76,6 +76,13 @@ export const CRON_SCHEDULES: Record<CronJob, CronSchedule> = {
   sweeps: { periodMs: 5 * MINUTE, missesBeforeStopped: 2, label: 'Publishing sweep' },
   // `20 1 * * *` — once a day
   metrics: { periodMs: 24 * HOUR, missesBeforeStopped: 2, label: 'Nightly metric capture' },
+  // `0 21 * * 0` — Sunday evening, once a week (FSD M2: "Sunday 21:00").
+  //
+  // `missesBeforeStopped: 2` would mean a fortnight of silence before anybody was
+  // told, which is long enough for a customer to notice before the monitoring
+  // does. One miss it is: a weekly job has no delivery-hiccup tolerance to spend,
+  // because the hiccup and the outage look identical for seven days.
+  loop: { periodMs: 7 * 24 * HOUR, missesBeforeStopped: 1, label: 'Weekly Loop cycle' },
 }
 
 export type HeartbeatState = 'beating' | 'late' | 'stopped' | 'unknown'
