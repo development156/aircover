@@ -282,11 +282,11 @@ function Settled({ entries }: { entries: readonly QueueEntry[] }) {
 export function QueueLegend({ unearned, proposed }: { unearned: number; proposed: number }) {
   return (
     <ul className="flex flex-wrap gap-x-5 gap-y-1">
-      <li className="type-sm flex items-center gap-[6px] text-muted">
+      <li className="type-sm flex items-center gap-icon-gap text-muted">
         <Sparkles className="size-[13px] shrink-0 text-ink" aria-hidden />
         <span className="num font-[550] text-ink">{unearned}</span> only you can answer
       </li>
-      <li className="type-sm flex items-center gap-[6px] text-muted">
+      <li className="type-sm flex items-center gap-icon-gap text-muted">
         <Check className="size-[13px] shrink-0" aria-hidden />
         <span className="num font-[550]">{proposed}</span> Sahoda is meant to draft
       </li>
