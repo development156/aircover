@@ -3,11 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { bootFullSchema } from '@sahoda/db/testing'
 
-import {
-  STALE_AFTER_SECONDS,
-  applyReconciledStatus,
-  findStaleVariants,
-} from './webhook-reconcile'
+import { STALE_AFTER_SECONDS, applyReconciledStatus, findStaleVariants } from './webhook-reconcile'
 
 /**
  * THE SWEEP THAT CATCHES WHAT NEVER ARRIVED.
@@ -21,7 +17,9 @@ const POST = '22222222-2222-4222-8222-222222222222'
 
 describe('reconciliation sweep (real Postgres, in-process)', () => {
   let db: PGlite
-  const q = (): { query: PGlite['query'] } => ({ query: (s: string, p?: unknown[]) => db.query(s, p) })
+  const q = (): { query: PGlite['query'] } => ({
+    query: (s: string, p?: unknown[]) => db.query(s, p),
+  })
 
   beforeAll(async () => {
     db = await bootFullSchema()
@@ -30,7 +28,10 @@ describe('reconciliation sweep (real Postgres, in-process)', () => {
   beforeEach(async () => {
     await db.exec(`truncate zernio_webhook_events, post_variants, posts, workspaces cascade`)
     await db.query(`insert into workspaces (id,name,slug,created_by) values ($1,'A','a','u')`, [WS])
-    await db.query(`insert into posts (id, workspace_id, title, status) values ($1,$2,'P','publishing')`, [POST, WS])
+    await db.query(
+      `insert into posts (id, workspace_id, title, status) values ($1,$2,'P','publishing')`,
+      [POST, WS],
+    )
   })
 
   /** A variant last touched `ageSeconds` ago. */
@@ -83,7 +84,10 @@ describe('reconciliation sweep (real Postgres, in-process)', () => {
     await db.query(
       `insert into zernio_webhook_events (event_id, event, workspace_id, routing, payload, received_at)
        values ('e1','post.published',$1,'routed',$2::jsonb, now())`,
-      [WS, JSON.stringify({ post: { platforms: [{ platformPostId: 'pp_1', status: 'published' }] } })],
+      [
+        WS,
+        JSON.stringify({ post: { platforms: [{ platformPostId: 'pp_1', status: 'published' }] } }),
+      ],
     )
 
     expect(await stale()).toEqual([])
@@ -161,13 +165,18 @@ describe('reconciliation sweep (real Postgres, in-process)', () => {
         `select publish_status, permalink from post_variants where id = $1::uuid`,
         [id],
       )
-      expect(r.rows[0]).toEqual({ publish_status: 'published', permalink: 'https://example.test/p' })
+      expect(r.rows[0]).toEqual({
+        publish_status: 'published',
+        permalink: 'https://example.test/p',
+      })
     })
 
     it('reports SUPERSEDED rather than resurrecting a variant that moved on', async () => {
       // Between selection and the write, a user can delete, re-draft or reschedule.
       const id = await variant('instagram', 'publishing', STALE_AFTER_SECONDS + 60)
-      await db.query(`update post_variants set publish_status = 'pending' where id = $1::uuid`, [id])
+      await db.query(`update post_variants set publish_status = 'pending' where id = $1::uuid`, [
+        id,
+      ])
 
       const out = await applyReconciledStatus(q() as never, {
         variantId: id,
@@ -188,10 +197,7 @@ describe('reconciliation sweep (real Postgres, in-process)', () => {
       // in the module. A variant nobody could get an answer about simply keeps the
       // status it had, and the sweep will pick it up again next tick.
       const source = await import('node:fs').then((fs) =>
-        fs.readFileSync(
-          new URL('./webhook-reconcile.ts', import.meta.url).pathname,
-          'utf8',
-        ),
+        fs.readFileSync(new URL('./webhook-reconcile.ts', import.meta.url).pathname, 'utf8'),
       )
       // No branch turns an absent or failed READ into a 'failed' STATUS.
       expect(source).not.toMatch(/read_failed[\s\S]{0,200}publish_status\s*=\s*'failed'/)

@@ -43,9 +43,7 @@ export async function projectPostState(
 ): Promise<ProjectionOutcome> {
   const post = args.payload.post
   const platforms =
-    typeof post === 'object' && post !== null
-      ? (post as Record<string, unknown>).platforms
-      : null
+    typeof post === 'object' && post !== null ? (post as Record<string, unknown>).platforms : null
   if (!Array.isArray(platforms)) return { kind: 'referent_absent', what: 'post.platforms' }
 
   let rows = 0

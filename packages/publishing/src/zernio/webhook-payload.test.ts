@@ -159,7 +159,11 @@ describe('account id collection — the routing key', () => {
 
   it('tolerates a platforms entry that is not an object', () => {
     const r = parseZernioWebhook(
-      verified({ id: 'e', event: 'post.published', post: { platforms: [null, 'x', { accountId: 'acc_a' }] } }),
+      verified({
+        id: 'e',
+        event: 'post.published',
+        post: { platforms: [null, 'x', { accountId: 'acc_a' }] },
+      }),
     )
     expect(r.ok && r.parsed.accountIds).toEqual(['acc_a'])
   })

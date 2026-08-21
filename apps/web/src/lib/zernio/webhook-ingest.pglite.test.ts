@@ -187,21 +187,18 @@ describe('zernio webhook ingest (real Postgres, in-process)', () => {
 
       // SIDE ONE: the trigger really does move updated_at on ANY update, so a
       // "harmless" re-upsert would NOT be harmless.
-      const t0 = (
-        await db.query<{ u: string }>(`select updated_at::text as u from inbox_threads`)
-      ).rows[0]!.u
+      const t0 = (await db.query<{ u: string }>(`select updated_at::text as u from inbox_threads`))
+        .rows[0]!.u
       await db.query(`update inbox_threads set body = body`)
-      const t1 = (
-        await db.query<{ u: string }>(`select updated_at::text as u from inbox_threads`)
-      ).rows[0]!.u
+      const t1 = (await db.query<{ u: string }>(`select updated_at::text as u from inbox_threads`))
+        .rows[0]!.u
       expect(t1).not.toBe(t0)
 
       // SIDE TWO: a replay never reaches the upsert at all, so the trigger never
       // fires. THAT is the guarantee — one mechanism, in the ingest, not two.
       await ingest(d)
-      const t2 = (
-        await db.query<{ u: string }>(`select updated_at::text as u from inbox_threads`)
-      ).rows[0]!.u
+      const t2 = (await db.query<{ u: string }>(`select updated_at::text as u from inbox_threads`))
+        .rows[0]!.u
       expect(t2).toBe(t1)
     })
 
@@ -362,7 +359,11 @@ describe('zernio webhook ingest (real Postgres, in-process)', () => {
     it('stores an event type that did not exist when this code was written', async () => {
       // The reason there is no CHECK on `event` and no enum in the parser.
       const out = await ingest(
-        delivery({ id: 'evt_new', event: 'something.zernio.ships.in.2027', account: { accountId: 'acc_a' } }),
+        delivery({
+          id: 'evt_new',
+          event: 'something.zernio.ships.in.2027',
+          account: { accountId: 'acc_a' },
+        }),
       )
       expect(out.status).toBe('stored')
     })
@@ -378,7 +379,13 @@ describe('zernio webhook ingest (real Postgres, in-process)', () => {
           id: 'evt_rev',
           event: 'review.new',
           account: { accountId: 'acc_gbp' },
-          review: { id: 'rev1', platform: 'googlebusiness', rating: 0, text: 'bad', createdAt: '2026-08-21T09:00:00Z' },
+          review: {
+            id: 'rev1',
+            platform: 'googlebusiness',
+            rating: 0,
+            text: 'bad',
+            createdAt: '2026-08-21T09:00:00Z',
+          },
         }),
       )
       const r = await db.query<{ rating: number | null }>(`select rating from inbox_threads`)

@@ -52,8 +52,7 @@ export const ZERNIO_SIGNATURE_HEADER_LEGACY = 'x-late-signature'
 export type VerifiedZernioBody = string & { readonly __zernioVerified: unique symbol }
 
 export type ZernioVerification =
-  | { ok: true; body: VerifiedZernioBody }
-  | { ok: false; reason: 'no_signature' | 'bad_signature' }
+  { ok: true; body: VerifiedZernioBody } | { ok: false; reason: 'no_signature' | 'bad_signature' }
 
 /** Lowercase hex HMAC-SHA256 of `body` under `secret`. Exported for the test's forger. */
 export function signZernioBody(body: string, secret: string): string {

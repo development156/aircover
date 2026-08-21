@@ -128,7 +128,9 @@ export async function readStoredThreads(
     const supabase = createServerSupabase()
     const { data, error } = await supabase
       .from('inbox_threads')
-      .select('id, channel, platform_thread_id, author_name, author_handle, body, posted_at, status, kind')
+      .select(
+        'id, channel, platform_thread_id, author_name, author_handle, body, posted_at, status, kind',
+      )
       .eq('workspace_id', workspaceId)
       .in('kind', SURFACE_KINDS[surface])
       .order('posted_at', { ascending: false, nullsFirst: false })
@@ -165,7 +167,8 @@ export async function readStoredThreads(
   // Only asked when it can change the answer. With rows on screen the distinction
   // between "no events yet" and "events but none of these" is not being rendered,
   // so the count is a query nobody reads.
-  const everReceived = rows.length > 0 ? true : ((await hasEverReceivedEvents(workspaceId)) ?? false)
+  const everReceived =
+    rows.length > 0 ? true : ((await hasEverReceivedEvents(workspaceId)) ?? false)
 
   return {
     rows,

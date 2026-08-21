@@ -106,7 +106,8 @@ describe('verifyZernioWebhook', () => {
     // so re-serialising THAT is byte-identical and would prove nothing. The first
     // version of this test did exactly that and passed vacuously; the assertion
     // below is what caught it.
-    const wire = '{\n  "event": "post.published",\n  "id": "evt_1",\n  "timestamp": "2026-08-21T10:30:00.000Z"\n}'
+    const wire =
+      '{\n  "event": "post.published",\n  "id": "evt_1",\n  "timestamp": "2026-08-21T10:30:00.000Z"\n}'
     const signature = signZernioBody(wire, SECRET)
     const reserialised = JSON.stringify(JSON.parse(wire))
 
@@ -130,9 +131,10 @@ describe('verifyZernioWebhook', () => {
     // Zernio omits the header entirely when the subscription has no secret. That
     // is a fact about the subscription, not permission to skip the check — this
     // endpoint is public, so "unsigned" must mean "rejected".
-    expect(
-      verifyZernioWebhook({ headers: headers({}), rawBody: BODY, secret: SECRET }),
-    ).toEqual({ ok: false, reason: 'no_signature' })
+    expect(verifyZernioWebhook({ headers: headers({}), rawBody: BODY, secret: SECRET })).toEqual({
+      ok: false,
+      reason: 'no_signature',
+    })
   })
 
   it('REJECTS an empty signature header', () => {
