@@ -5,8 +5,8 @@ import type { Page } from '@playwright/test'
 
 import { test } from './fixtures/seeded-user'
 import { DETECTORS } from './helpers/ux-detect'
+import { ROUTES } from './helpers/ux-routes'
 import { UX_OUT, useTheme, type Theme } from './helpers/ux-shot'
-import { ROUTES } from './ux-j3-sweep.spec'
 
 /**
  * THE MEASUREMENT PASS, with no screenshots.

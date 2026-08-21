@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 
 import { test } from './fixtures/seeded-user'
+import { ROUTES } from './helpers/ux-routes'
 import { shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
 
 /**
@@ -18,55 +19,6 @@ import { shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
  */
 
 const JOURNEY = 'j3-nothing'
-
-/**
- * Every route a signed-in person can reach by navigating, in the order the rail
- * lists them. Dynamic segments are excluded — there is no row to put in them
- * for a workspace with nothing, and a fabricated id would photograph a 404
- * while claiming to photograph the screen.
- */
-export const ROUTES: string[] = [
-  '/home',
-  '/create',
-  '/create/post',
-  '/posts',
-  '/posts/new',
-  '/campaigns',
-  '/planner',
-  '/approvals',
-  '/loop',
-  '/playbooks',
-  '/remix',
-  '/studio',
-  '/assets',
-  '/sites',
-  '/leads',
-  '/inbox',
-  '/inbox/comments',
-  '/inbox/reviews',
-  '/radar',
-  '/analytics',
-  '/report',
-  '/brain',
-  '/brain/identity',
-  '/brain/voice',
-  '/brain/audience',
-  '/brain/competitors',
-  '/brain/knowledge',
-  '/brain/resolve',
-  '/ads',
-  '/ads/creative',
-  '/ads/targeting',
-  '/ads/budget',
-  '/ads/performance',
-  '/connections',
-  '/wallet',
-  '/settings',
-  '/settings/profile',
-  '/settings/plan',
-  '/settings/integrations',
-  '/design-system',
-]
 
 async function bootstrap(page: Page): Promise<void> {
   await page.goto('/home')

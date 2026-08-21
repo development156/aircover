@@ -12,11 +12,26 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = new URL('..', import.meta.url).pathname
-const rows = readFileSync(join(ROOT, '.ux', 'manifest.jsonl'), 'utf8')
+const raw = readFileSync(join(ROOT, '.ux', 'manifest.jsonl'), 'utf8')
   .trim()
   .split('\n')
   .filter(Boolean)
   .map((l) => JSON.parse(l))
+
+/**
+ * One row per FILE, last write wins.
+ *
+ * An aborted capture run re-shot part of the j3 sweep before it was stopped, so
+ * the same frame has two rows. Counting both would report 240 screens where 40
+ * exist, and the second row is the one whose measurements match the PNG now on
+ * disk — so the later row is kept rather than the first.
+ */
+const byFile = new Map()
+for (const r of raw) byFile.set(r.file, r)
+const rows = [...byFile.values()]
+if (rows.length !== raw.length) {
+  console.log(`(deduped ${raw.length} manifest rows to ${rows.length} distinct frames)`)
+}
 
 const arg = (name, fallback) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`))
