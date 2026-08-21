@@ -54,7 +54,13 @@ const ROUTES: ReadonlyArray<{ path: string; slug: string; archetype: string }> =
   // library, a watch list, a document, a pipeline, a gallery, a fan-out.
   { path: '/loop', slug: 'loop', archetype: 'roadmap · sequence' },
   { path: '/playbooks', slug: 'playbooks', archetype: 'roadmap · library' },
-  { path: '/radar', slug: 'radar', archetype: 'roadmap · watch list' },
+  // No longer a roadmap drawing. The screen is built — watch list, day-grouped
+  // change feed, a detail view, and a path from an observation to a draft. What
+  // this camera sees is its COLLECTOR-ABSENT state, because the weekly scan is
+  // wt-radar's lane and the `competitors` table is not in this branch. The
+  // populated states are shot separately, off the fixture store, since a route
+  // that needs a competitor id would 404 here.
+  { path: '/radar', slug: 'radar', archetype: 'change feed · collector absent' },
   { path: '/report', slug: 'report', archetype: 'roadmap · document' },
   { path: '/leads', slug: 'leads', archetype: 'roadmap · pipeline' },
   { path: '/studio', slug: 'studio', archetype: 'roadmap · gallery' },

@@ -651,3 +651,57 @@ asks: a held post lands `failed` with `GATE_HELD` and its reason on the variant,
 to go and look. There is no notification, no review queue, and no owner assignment — and the
 approver gap above is the same hole from the other side. A held post inside a scheduled window
 therefore expires quietly once the dispatch grace passes unless a person happens to notice.
+
+## Radar (wt-radar-ui, 2026-08-22)
+
+Three things this lane needed and could not do itself.
+
+### 1 · `posts.origin` cannot say `'radar'` — owed to whoever owns packages/db
+
+Migration `20260718000004_content.sql` declares
+`origin text not null default 'manual' check (origin in ('manual', 'plan_week'))`.
+A draft written from a Radar observation is therefore stored as `'manual'`, which is
+wrong in one specific way: a future query asking "which posts did a person write by
+hand" will count them. `app/actions/radar.ts` carries the same note at the constant.
+
+Widening the CHECK is a schema change and applied migrations are immutable, so this
+lane did not touch it. The value wanted is `'radar'`, and `PostOriginSchema` in
+`packages/shared/src/db/content.ts` moves with it.
+
+### 2 · The change records — owed to the wt-radar lane
+
+`lib/radar/port.ts` is the interface this screen reads through, and its header lists
+the shape wt-radar owes it. The Supabase binding (`lib/radar/store.ts`) reads
+`competitors` today and reports `collector: 'watch-list-only'`, which the screen
+renders as "the readings are not wired in yet" rather than as an empty feed — an empty
+feed would be the claim "nothing changed", which that binding has not earned.
+
+Flipping it to `'reading'` is one change query plus one line. The one requirement that
+is easy to miss: **scan attempts must be stored on FAILURE too.** A scan row written
+only on success makes "we could not check today" unrenderable, and that state is the
+point of the screen.
+
+### 3 · Is there a competitor slot cap, and what is it? — owner ruling
+
+`PlanLimits` (packages/shared) has `channels`, `sites`, `seats`, `loopLevel`,
+`twinSize` — no competitor dimension. The docs disagree with each other:
+
+- PRD §7.1 plan table: "Growth: **Radar (3 comps)**"
+- PRD M9 and FSD M9: "Track **1–5** competitors"
+
+The watch list ships uncapped and states the per-scan price instead. When this is
+ruled on it belongs in `PlanLimits` as a dimension, and
+`cheapestPlanWithAtLeast('competitors', n)` will then derive the upgrade sentence the
+way every other limit's is derived.
+
+### 4 · Does the fourth certainty rung mean NOT REAL, or NOT OBSERVED? — owner ruling
+
+`components/radar/marks.tsx` renders an inference with `.is-simulated` (hatch), per
+this lane's brief. docs/26 §3.1 words that rung "Not real. A fixture.", and three
+files — `brain/certainty-mark.tsx`, `audience/inferred.tsx`, `connections/catalogue.ts`
+— deliberately refuse it to protect that meaning, choosing `.is-proposed` for
+inference instead.
+
+Both readings are defensible and they cannot both be house style. Under "not real"
+Radar should move to `.is-proposed`; under "not observed" the rung's description in
+docs/26 §3.1 needs rewording. One decision, one class name in each place.

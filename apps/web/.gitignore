@@ -23,3 +23,8 @@
 # that is version-controlled, not its output.
 /e2e-artifacts/
 e2e-shots/
+
+# Radar's proof shots: the greyscale luminance pair and the 390/1024/1440 camera
+# (e2e/radar-certainty.spec.ts, e2e/radar-shots.spec.ts). Generated, like every
+# other screenshot dir above — evidence for a review, never a committed artifact.
+/e2e/__artifacts__/

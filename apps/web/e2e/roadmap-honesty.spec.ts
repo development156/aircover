@@ -4,10 +4,12 @@ import { fileURLToPath } from 'node:url'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
- * THE SEVEN ROADMAP SECTIONS SHOW NO FIGURE ABOUT THE READER'S BUSINESS.
+ * THE SIX ROADMAP SECTIONS SHOW NO FIGURE ABOUT THE READER'S BUSINESS.
  *
  * ── /loop AND /report LEFT THIS LIST ON 2026-08-20, BECAUSE THEY WERE BUILT ──
- * (Which makes the word SEVEN above true again: the list had grown to nine.)
+ * (And `/brain/audience` left later for the same reason — see its note below.
+ * The heading said SEVEN until 2026-08-22 while the list held six; the count is
+ * now derived by reading it, which is the only way it stays true.)
  * They are not exceptions to the property below; they are no longer roadmap
  * sections. The Loop runs — it opens a cycle, prices a plan, charges credits and
  * writes drafts — so it shows a week number, a credit total and a count of
@@ -33,14 +35,15 @@ import { expect, test } from './fixtures/seeded-user'
  *
  * ── WHY A BLANKET "NO DIGITS" CHECK WOULD BE THE WRONG TEST ──────────────────
  * `/ads` can be tested that way and is (`campaigns.spec.ts`): it has no price to
- * quote and no sequence to number, so every digit on it would be a lie. These
- * seven are not like that. They legitimately carry two kinds of number:
+ * quote and no sequence to number, so every digit on it would be a lie. The
+ * six below are not like that. They legitimately carry two kinds of number:
  *
  *   · A CREDIT PRICE, read from `pricing.config.json` through `creditCost()`.
  *     A price is a published, checkable fact ABOUT SAHODA — the same class of
  *     thing as a channel name — not a claim about the reader.
- *   · AN ORDINAL: the Loop's seven stages, Radar's five competitor slots. Those
- *     number a sequence and a cap, both of which are facts about the product.
+ *   · AN ORDINAL: the Loop's seven stages. Those number a sequence, which is a
+ *     fact about the product. (Radar's five competitor slots used to be the
+ *     other example. They were a cap nothing defined — see its entry below.)
  *
  * Banning all digits would have forced those out and made the screens vaguer
  * without making them more honest. So the property is stronger and narrower:
@@ -85,12 +88,31 @@ function price(action: string): number {
  * route → every number that may legitimately appear in `#main`.
  *
  * Ordinals are listed explicitly rather than as a range, so adding an eighth
- * Loop stage or a sixth Radar slot is a decision someone takes here too.
+ * Loop stage is a decision someone takes here too.
  */
 const ALLOWED: ReadonlyArray<readonly [string, readonly number[]]> = [
   ['/playbooks', [price('playbook_run')]],
-  // 1–5: the five competitor slots, which are the cap PRD M9 sets.
-  ['/radar', [1, 2, 3, 4, 5, price('radar_scan')]],
+  // `/radar` IS STILL HERE, AND ITS ALLOWANCE JUST GOT NARROWER, NOT WIDER.
+  //
+  // The screen was built (wt-radar-ui): it has a watch list, a day-grouped
+  // change feed, a competitor detail view and a path from an observation to a
+  // draft. What was NOT built in that lane is the weekly scan that fills it —
+  // that is wt-radar's — so with the `competitors` table absent, which is the
+  // state every environment this suite runs in is in, `/radar` renders one
+  // honest panel saying the scan is not built yet. It still says so, so it stays
+  // on this list and this property still holds it.
+  //
+  // The five numbered slots are GONE, and with them the 1–5 allowance. They drew
+  // a cap that the entitlement surface does not define: `PlanLimits` in
+  // packages/shared has channels, sites, seats, loopLevel and twinSize, and no
+  // competitor dimension at all. The two docs that mention one disagree — PRD
+  // §7.1 says "Growth: Radar (3 comps)", PRD/FSD M9 both say "1–5" — so drawing
+  // either was picking an entitlement rather than reading one. An owner ruling
+  // is owed; until it lands the watch list is uncapped and states the per-scan
+  // price instead, which is a fact about Sahoda rather than a claim about anyone.
+  //
+  // What remains is the price, which is what the panel quotes.
+  ['/radar', [price('radar_scan')]],
   ['/leads', []],
   ['/studio', [price('carousel')]],
   ['/remix', [price('remix_pack')]],
@@ -150,9 +172,8 @@ test.describe('the roadmap sections invent nothing @smoke', () => {
       const inert = main.locator('[data-inert-control]')
       for (let i = 0; i < (await inert.count()); i += 1) {
         const text = await inert.nth(i).innerText()
-        // The Loop's stage cards and Radar's slots ARE inert controls and DO
-        // carry their ordinal, so the check here is the same allow-list rather
-        // than a blanket ban.
+        // A roadmap screen's inert controls may carry an ordinal, so the check
+        // here is the same allow-list rather than a blanket ban.
         for (const found of text.match(FIGURE) ?? []) {
           if (!allowed.includes(Number(found.replace(/,/g, '')))) {
             problems.push(`${route}: an inert control carries "${found}" — "${text.slice(0, 60)}"`)
