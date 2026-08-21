@@ -140,7 +140,9 @@ export function ResultStep({
       {door.kind === 'unread' ? <p className="hint">{door.message}</p> : null}
       {door.kind === 'blocked' ? <p className="hint">{door.message}</p> : null}
       {fallbackMessage ? <p className="hint">{fallbackMessage}</p> : null}
-      {wasFree ? <p className="hint">Your first Brand Brain was free — nothing was charged.</p> : null}
+      {wasFree ? (
+        <p className="hint">Your first Brand Brain was free — nothing was charged.</p>
+      ) : null}
 
       <div className="bb" id="bb-card" style={{ marginTop: 30 }}>
         <div className="bb__head">

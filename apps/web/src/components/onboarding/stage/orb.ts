@@ -233,7 +233,14 @@ export function mountOrb(canvas: HTMLCanvasElement, opts: OrbOptions = {}): OrbH
     if (reduced) draw(0)
   }
 
-  function roundRect(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  function roundRect(
+    c: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    r: number,
+  ): void {
     c.beginPath()
     c.moveTo(x + r, y)
     c.arcTo(x + w, y, x + w, y + h, r)
@@ -248,9 +255,7 @@ export function mountOrb(canvas: HTMLCanvasElement, opts: OrbOptions = {}): OrbH
       if (d.a <= 0.004 || d.s <= 0.05) continue
       cx2!.beginPath()
       cx2!.arc(d.x, d.y, d.s, 0, TAU)
-      cx2!.fillStyle = d.warm
-        ? rgba(lift(palette.brand, 0.1), d.a)
-        : rgba(palette.ink, d.a * 0.34)
+      cx2!.fillStyle = d.warm ? rgba(lift(palette.brand, 0.1), d.a) : rgba(palette.ink, d.a * 0.34)
       cx2!.fill()
     }
   }
@@ -269,9 +274,7 @@ export function mountOrb(canvas: HTMLCanvasElement, opts: OrbOptions = {}): OrbH
        than a dot — the intro has to carry a whole screen. The growth term is
        what the user earns. */
     let R =
-      mode === 'processing'
-        ? base * 0.21 * breathe
-        : base * (0.135 + shownEnergy * 0.062) * breathe
+      mode === 'processing' ? base * 0.21 * breathe : base * (0.135 + shownEnergy * 0.062) * breathe
 
     let coreA = 1
     let blow = 0
@@ -407,7 +410,8 @@ export function mountOrb(canvas: HTMLCanvasElement, opts: OrbOptions = {}): OrbH
     if (mode === 'processing' && facets.length) {
       const orbitW = Math.min(W * 0.4, H * 0.4)
       const orbitH = orbitW * 0.56
-      cx2!.font = '600 12px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      cx2!.font =
+        '600 12px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 
       for (const f of facets) {
         if (f.absorbed) f.r = Math.max(0, f.r - 0.065)

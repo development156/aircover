@@ -26,7 +26,11 @@ describe('save and exit → resume', () => {
   it('comes back at the step it was left on, holding the same answers', () => {
     const state = {
       step: '4' as const,
-      data: data({ name: 'Chai & Chapters', audience: 'weekend readers', category: 'Local business' }),
+      data: data({
+        name: 'Chai & Chapters',
+        audience: 'weekend readers',
+        category: 'Local business',
+      }),
     }
     saveState(WS, state)
 

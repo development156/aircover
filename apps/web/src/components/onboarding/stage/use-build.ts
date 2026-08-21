@@ -177,9 +177,7 @@ export function useBuild({
     form.set('refusal', '')
     form.set(
       'name',
-      data.name.trim() ||
-        (settled.kind === 'read' ? settled.foundName : '') ||
-        workspaceName,
+      data.name.trim() || (settled.kind === 'read' ? settled.foundName : '') || workspaceName,
     )
 
     const state = await resolveOnboarding(null, form)

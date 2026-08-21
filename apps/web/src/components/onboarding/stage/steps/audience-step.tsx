@@ -22,7 +22,8 @@ const MORE: { id: string; key: 'age' | 'loc' | 'role' | 'interests'; label: stri
  */
 export function AudienceStep({ data, patch }: StepProps) {
   const audience = data.audience.trim()
-  const earned = audience.length >= 3 || Boolean(data.age || data.loc || data.role || data.interests)
+  const earned =
+    audience.length >= 3 || Boolean(data.age || data.loc || data.role || data.interests)
   const [open, setOpen] = useState(false)
 
   return (

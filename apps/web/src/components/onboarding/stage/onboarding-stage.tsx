@@ -121,16 +121,13 @@ export function OnboardingStage({
    * build needs it — and `useBuild` waits for it if it is not.
    */
   const readStarted = useRef('')
-  const startSiteRead = useCallback(
-    (url: string) => {
-      const site = url.trim()
-      if (!site || readStarted.current === site) return
-      readStarted.current = site
-      setDoor({ kind: 'reading' })
-      void readSite(site).then(setDoor)
-    },
-    [],
-  )
+  const startSiteRead = useCallback((url: string) => {
+    const site = url.trim()
+    if (!site || readStarted.current === site) return
+    readStarted.current = site
+    setDoor({ kind: 'reading' })
+    void readSite(site).then(setDoor)
+  }, [])
 
   const advance = useCallback(() => {
     if (step === 'intro') return go('1', 1)
@@ -148,6 +145,19 @@ export function OnboardingStage({
     onEnterProcessing: () => moveTo(procSlotRef.current),
     onLeaveProcessing: () => moveTo(orbWrapRef.current),
     onBuilt: () => go('result', 1),
+  })
+
+  /**
+   * Put the orb in its column.
+   *
+   * The canvas is created imperatively (React must not own a node that gets
+   * moved between two parents), so SOMETHING has to place it — and it has to be
+   * an effect, because the slot does not exist until after the first render.
+   * Without this the right-hand column renders empty and the whole argument of
+   * the screen, an object that visibly grows as you teach it, is simply absent.
+   */
+  useEffect(() => {
+    if (!build.processing) moveTo(orbWrapRef.current)
   })
 
   /* ───────────────────────────────────────────────── save and exit / end ── */

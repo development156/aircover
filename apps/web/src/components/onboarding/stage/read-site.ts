@@ -81,9 +81,7 @@ export async function readSite(url: string, signal?: AbortSignal): Promise<DoorO
       buffer = lines.pop() ?? ''
       for (const raw of lines) {
         if (!raw.trim()) continue
-        const event = JSON.parse(raw) as
-          | { type: 'stage' }
-          | { type: 'done'; result: DoorState }
+        const event = JSON.parse(raw) as { type: 'stage' } | { type: 'done'; result: DoorState }
         if (event.type === 'done') state = event.result
       }
     }
