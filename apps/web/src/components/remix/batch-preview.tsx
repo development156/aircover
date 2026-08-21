@@ -9,7 +9,10 @@ import { Button } from '@/components/ui/button'
 import { CostLabel } from '@/components/ui/cost-label'
 import { REMIX_KINDS, needsAPhoto } from '@/lib/remix/catalogue'
 import { previewBatch } from '@/lib/remix/cost'
-import { isSettled } from '@/lib/remix/read'
+// A TYPE import from `read.ts` is erased; a VALUE import from it would pull
+// `server-only` into a client bundle and fail the production build. `isSettled`
+// therefore lives in its own pure module — see `lib/remix/status.ts`.
+import { isSettled } from '@/lib/remix/status'
 import type { BatchView } from '@/lib/remix/read'
 
 /**
