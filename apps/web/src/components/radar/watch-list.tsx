@@ -69,8 +69,13 @@ export function WatchList({ competitors }: { competitors: readonly Competitor[] 
   }
 
   function drop(id: string) {
+    setError(null)
     startTransition(async () => {
-      await removeCompetitor(id)
+      // The result is READ. Discarding it left a refused delete looking like a
+      // successful one: the row stayed on screen, nothing was said, and the
+      // obvious next move for the reader is to press it again.
+      const result = await removeCompetitor(id)
+      if (!result.ok) setError(result.message)
     })
   }
 

@@ -129,15 +129,39 @@ export async function addCompetitor(
   }
 }
 
-export async function removeCompetitor(competitorId: unknown): Promise<{ ok: boolean }> {
+/**
+ * Stop watching a business.
+ *
+ * RETURNS A MESSAGE ON EVERY REFUSAL, and the reason is that `addCompetitor`
+ * already did and this did not — the asymmetry was the defect. The store throws
+ * for any Supabase error that is not a missing table, and with no catch here that
+ * throw left the server action entirely: Next renders its generic error boundary,
+ * which reads as a broken app rather than as "that did not delete".
+ *
+ * The bare `{ ok: false }` was the other half of it. A caller cannot tell "you are
+ * signed out" from "the delete failed" from "there is no workspace", so the only
+ * thing it could do with a refusal was ignore it — which `watch-list.tsx` duly did.
+ */
+export async function removeCompetitor(
+  competitorId: unknown,
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const { userId } = await auth()
-  if (!userId) return { ok: false }
-  if (typeof competitorId !== 'string' || competitorId.length === 0) return { ok: false }
+  if (!userId) return { ok: false, message: 'Sign in to change your watch list.' }
+  if (typeof competitorId !== 'string' || competitorId.length === 0) {
+    return { ok: false, message: 'That business is no longer on your watch list.' }
+  }
 
   const ws = await workspaceForWrite()
-  if (!ws.ok) return { ok: false }
+  if (!ws.ok) return { ok: false, message: ws.message }
 
-  await radarStore().remove(ws.workspace.id, competitorId)
+  try {
+    await radarStore().remove(ws.workspace.id, competitorId)
+  } catch (cause) {
+    return {
+      ok: false,
+      message: cause instanceof Error ? cause.message : 'Could not stop watching that business.',
+    }
+  }
   revalidatePath(RADAR_CHANGE_REVALIDATE)
   return { ok: true }
 }

@@ -145,7 +145,13 @@ export function NotChecked({ what, note }: { what: string; note?: string | null 
     // centred non-wrapping version split into two ragged columns.
     <span className="type-sm flex flex-wrap items-baseline gap-x-2 text-muted">
       <span aria-hidden className="is-unreadable" />
-      <span className="sr-only">Could not check {what}.</span>
+      {/* The reason is in BOTH, or the screen-reader name is a worse version of
+          the sentence beside it. tokens.css requires this mark to carry an
+          accessible name; a name that drops "the page did not respond" tells a
+          reader something failed and withholds what. */}
+      <span className="sr-only">
+        Could not check {what}.{note ? ` ${note}` : ''}
+      </span>
       <span aria-hidden>
         Could not check {what}
         {note ? ` — ${note}` : ''}
