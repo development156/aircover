@@ -87,7 +87,7 @@ function LearningCard({ learning }: { learning: PendingLearning }) {
           size={16}
           strokeWidth={1.8}
           aria-hidden
-          className="mt-[3px] shrink-0 text-accent"
+          className="mt-icon-nudge shrink-0 text-accent"
         />
         <div className="min-w-0 flex-1">
           <p className="type-body text-ink">{learning.summary}</p>

@@ -191,7 +191,7 @@ function ChannelDial({
                 />
                 <span
                   aria-hidden
-                  className="mt-[3px] flex size-3.5 shrink-0 items-center justify-center"
+                  className="mt-icon-nudge flex size-3.5 shrink-0 items-center justify-center"
                 >
                   {active ? <Check size={13} strokeWidth={2.5} className="text-accent" /> : null}
                 </span>

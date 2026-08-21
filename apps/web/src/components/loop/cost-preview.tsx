@@ -137,7 +137,7 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
                   checked={on}
                   onChange={() => toggle(brief.id)}
                   disabled={pending}
-                  className="mt-[3px] size-4 shrink-0 accent-[var(--accent)]"
+                  className="mt-icon-nudge size-4 shrink-0 accent-[var(--accent)]"
                 />
                 <span className="min-w-0 flex-1">
                   <span className="type-h3 block text-ink">{brief.title}</span>
