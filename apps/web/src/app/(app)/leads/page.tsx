@@ -1,123 +1,164 @@
 import Link from 'next/link'
-import { FileInput, MessageCircle } from 'lucide-react'
+import { FileInput, Inbox, Users } from 'lucide-react'
 
+import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
-import { InertButton, InertChip, InertField, RoadmapBanner } from '@/components/roadmap/inert'
-import { InertColumn, InertPanel, InertRow, NotRunningNote } from '@/components/roadmap/parts'
+import { Board } from '@/components/leads/board'
+import { LEADS_LIMIT, readLeads } from '@/lib/leads/read'
+import { recentSites } from '@/lib/sites/read'
 
 export const metadata = { title: 'Leads' }
 
 /**
- * LEADS — a pipeline with five real stages and no way in yet.
+ * LEADS — the pipeline, and the two doors, now open.
  *
- * ── THE STAGE NAMES ARE NOT INVENTED, AND THAT IS WHY THEY ARE HERE ──────────
- * `new · contacted · qualified · won · lost` is the CHECK constraint on
- * `leads.status`, applied to production in `20260718000007_sites.sql`. The table
- * exists, it has row-level security and it has never held a row, because nothing
- * writes to it: the public form endpoint that was meant to feed it is not
- * mounted, and Sites renders its contact section formless for that exact reason
- * (a form that discards what you typed is worse than no form).
+ * ── WHAT THIS SCREEN USED TO SAY, AND WHAT CHANGED ──────────────────────────
+ * "There are no leads and there is no way to receive one yet." That was true:
+ * `leads` shipped on 2026-07-18 with row-level security and no writer at all.
+ * Both writers now exist, and both are `SECURITY DEFINER` functions rather than
+ * policies, so a member still cannot insert or delete a lead directly — the two
+ * assertions in `packages/db/tests/rls.test.ts` that pin exactly that are still
+ * true after the migration, which is how the shape was chosen.
  *
- * So this screen draws the pipeline it will be — five columns, correctly named —
- * and states the true blocker rather than a date. The interesting thing to a
- * shop owner is not "when"; it is "what has to happen before an enquiry can
- * reach me", and that answer is short and checkable.
+ *   door one   `public.lead_submit` — a stranger, through /embed/lead, after a
+ *              rate limit, a honeypot and a captcha. Takes a site SLUG and no
+ *              workspace id, so the write cannot be aimed.
+ *   door two   `public.lead_from_inbox` — a member turning a conversation the
+ *              workspace already holds into a lead. Checks membership INSIDE,
+ *              because definer rights bypassed the policy that would have.
  *
- * ── NOT ONE COLUMN CARRIES A COUNT ───────────────────────────────────────────
- * `New 0` reads as "nobody has enquired this week", which is a claim about the
- * reader's business. The true claim is that nothing can enquire yet. Each column
- * says what would land in it instead — see `InertColumn` for the full argument.
+ * ── FOUR STAGES, NOT THE FIVE THE COLUMN ALLOWS ──────────────────────────────
+ * See `lib/leads/stages.ts`. `qualified` stays a legal value nothing writes.
+ *
+ * ── AND NO FIGURE ON THIS SCREEN IS INVENTED ─────────────────────────────────
+ * A count of rows in a column is a fact about rows the customer owns. A
+ * conversion rate, a lead score or an estimated value would be a claim about
+ * their business, and nothing here has earned one. `components/leads/board.test.tsx`
+ * fails on any digit that is not a count.
  */
 
-const STAGES = [
-  { name: 'New', what: 'Somebody left their details and nobody has answered yet.' },
-  { name: 'Contacted', what: 'You replied. The clock is now on them.' },
-  { name: 'Qualified', what: 'They are real and they want the thing you sell.' },
-  { name: 'Won', what: 'They bought, booked or walked in.' },
-  { name: 'Lost', what: 'They did not. Worth knowing why, and Sahoda will ask.' },
-] as const
+export default async function LeadsPage() {
+  // `recentSites` answers null when the read failed, which is NOT the same as
+  // having no site: the embed code simply does not appear, rather than the
+  // screen claiming the customer has nothing to embed into.
+  const [read, sites] = await Promise.all([readLeads(), recentSites(1)])
 
-export default function LeadsPage() {
-  return (
-    <div className="space-y-grid">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+  if (read.status !== 'ok') {
+    return (
+      <div className="space-y-grid">
         <PageTitle sub="Everyone who got in touch, in one list, from first message to whether they bought.">
           Leads
         </PageTitle>
-        <div className="flex flex-wrap gap-2">
-          <InertButton>Export</InertButton>
-          <InertButton primary>Add a lead</InertButton>
-        </div>
+        <EmptyState
+          icon={Users}
+          title={read.status === 'no-workspace' ? 'No workspace yet' : 'Could not read your leads'}
+          body={
+            read.status === 'no-workspace'
+              ? 'Enquiries belong to a workspace, so there has to be one first.'
+              : 'Sahoda asked and got nothing back. This is not the same as having no enquiries — reloading is worth a try.'
+          }
+        />
+        <Doors slug={null} />
       </div>
+    )
+  }
 
-      <RoadmapBanner what="Leads will collect enquiries from your site's forms and your WhatsApp, and track each one to an answer." />
+  const slug = sites?.[0]?.slug ?? null
 
-      <div className="flex flex-wrap items-center gap-2">
-        <InertField label="Search a name, a number or an email" />
-        <InertChip on>All</InertChip>
-        <InertChip>Needs a reply</InertChip>
-        <InertChip>This week</InertChip>
-      </div>
+  return (
+    <div className="space-y-grid">
+      <PageTitle sub="Everyone who got in touch, in one list, from first message to whether they bought.">
+        Leads
+      </PageTitle>
 
-      <section aria-labelledby="leads-pipeline" className="flex flex-col gap-3">
-        <h2 id="leads-pipeline" className="type-h2">
-          The five places a lead can be
-        </h2>
-        {/* Five across on a wide screen, two on a tablet, one on a phone. A
-            horizontal-scrolling board is the usual answer and it hides the last
-            two stages on the device most of these customers use. */}
-        <div className="grid gap-2 wide:grid-cols-5 max-wide:grid-cols-2 max-narrow:grid-cols-1">
-          {STAGES.map((stage) => (
-            <InertColumn key={stage.name} name={stage.name} what={stage.what} />
-          ))}
-        </div>
-      </section>
+      {read.leads.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title="Nobody has enquired yet"
+          body="When somebody fills in your contact form or messages you, they land here — with what they said and what to do next."
+        />
+      ) : (
+        <Board leads={read.leads} />
+      )}
 
-      <section aria-labelledby="leads-doors" className="flex flex-col gap-3">
-        <div>
-          <h2 id="leads-doors" className="type-h2">
-            How someone gets in
-          </h2>
-          <p className="type-body mt-1 max-w-[68ch] text-muted">
-            Two doors, and neither is open yet. This is the honest reason this screen is empty
-            rather than waiting.
-          </p>
-        </div>
+      {read.leads.length >= LEADS_LIMIT ? (
+        <p className="type-sm text-muted">
+          Showing the most recent <span className="num">{LEADS_LIMIT}</span>.
+        </p>
+      ) : null}
 
-        <div className="grid gap-3 wide:grid-cols-2">
-          <InertRow
-            icon={FileInput}
-            name="A form on your Sahoda site"
-            note="Your generated site can carry a contact section. It renders without a form today, because the address that would receive one is not mounted — and a form that quietly drops an enquiry is worse than no form."
-          />
-          <InertRow
-            icon={MessageCircle}
-            name="A WhatsApp message"
-            note="A message to your business number becomes a lead with the conversation attached. This needs the WhatsApp Business number verified, which is a review queue outside this codebase."
-          />
-        </div>
-
-        <InertPanel
-          title="And then what Sahoda does with it"
-          what="A lead is a person waiting, so the useful part is the next move rather than the record."
-        >
-          <ul className="type-body grid gap-1.5 text-muted">
-            <li>&mdash; Tells you it arrived, wherever you are.</li>
-            <li>&mdash; Drafts a reply in your voice, grounded in what you sell. You send it.</li>
-            <li>&mdash; Keeps the thread, so the next person to look knows what was said.</li>
-            <li>&mdash; Asks you why a lost one was lost, and remembers the answer.</li>
-          </ul>
-        </InertPanel>
-      </section>
-
-      <NotRunningNote>
-        There are no leads and there is no way to receive one yet. Your{' '}
-        <Link href="/sites" className="font-[550] text-accent underline underline-offset-2">
-          site
-        </Link>{' '}
-        can be generated and previewed today, but it is not deployed to an address the public can
-        reach, so nothing can submit a form to it.
-      </NotRunningNote>
+      <Doors slug={slug} />
     </div>
+  )
+}
+
+/**
+ * How somebody gets in.
+ *
+ * Both doors are described as what they ARE now, and the one thing that is still
+ * missing is named rather than glossed: a generated Sahoda site cannot post its
+ * own contact form yet, and the reason is specific and checkable.
+ */
+function Doors({ slug }: { slug: string | null }) {
+  const origin = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.sahodalabs.com'
+  return (
+    <section aria-labelledby="leads-doors" className="flex flex-col gap-3">
+      <div>
+        <h2 id="leads-doors" className="type-h2">
+          How someone gets in
+        </h2>
+        <p className="type-body mt-1 max-w-[68ch] text-muted">
+          Two ways, and both of them work.
+        </p>
+      </div>
+
+      <div className="grid gap-3 wide:grid-cols-2">
+        <article className="surface-ring rounded-card bg-surface p-4">
+          <FileInput size={16} strokeWidth={1.8} aria-hidden className="text-muted" />
+          <h3 className="type-h3 mt-1.5 text-ink">A contact form on your site</h3>
+          <p className="type-sm mt-1 text-muted">
+            Paste this into any page you already have. It carries a captcha and a rate limit, and
+            an enquiry lands here the moment it is sent.
+          </p>
+          {slug ? (
+            <pre className="mt-2 overflow-x-auto rounded-input bg-subtle p-2.5 type-sm">
+              <code>{`<iframe src="${origin}/embed/lead?site=${slug}" style="width:100%;height:620px;border:0"></iframe>`}</code>
+            </pre>
+          ) : (
+            <p className="type-sm mt-2 text-muted">
+              The embed code appears once you have a site — it names which site the enquiry
+              belongs to.{' '}
+              <Link href="/sites" className="font-[550] text-accent underline underline-offset-2">
+                Make one
+              </Link>
+              .
+            </p>
+          )}
+          <p className="type-sm mt-2 text-muted">
+            A Sahoda site does not yet carry this form of its own. It needs two things: an address
+            the public can reach, which Sites v0 does not deploy to yet, and a captcha widget
+            inside the generated page — a plain HTML form cannot carry a token, and an enquiry
+            endpoint without one would be open to anybody.
+          </p>
+        </article>
+
+        <article className="surface-ring rounded-card bg-surface p-4">
+          <Inbox size={16} strokeWidth={1.8} aria-hidden className="text-muted" />
+          <h3 className="type-h3 mt-1.5 text-ink">A message in your inbox</h3>
+          <p className="type-sm mt-1 text-muted">
+            A comment, review or message that turns out to be somebody wanting to buy becomes a
+            lead from the{' '}
+            <Link href="/inbox" className="font-[550] text-accent underline underline-offset-2">
+              inbox
+            </Link>
+            , with the conversation attached. Doing it twice does not make two leads.
+          </p>
+          <p className="type-sm mt-2 text-muted">
+            A platform conversation carries a handle rather than an address or a number, so those
+            two stay empty rather than being filled with something that is not one.
+          </p>
+        </article>
+      </div>
+    </section>
   )
 }

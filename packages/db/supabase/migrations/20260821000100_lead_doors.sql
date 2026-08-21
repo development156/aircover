@@ -236,3 +236,111 @@ grant execute on function public.lead_from_inbox(uuid) to authenticated;
 comment on function public.lead_from_inbox(uuid) is
   'Promote an inbox conversation to a lead. Checks membership INSIDE, because '
   'security definer has already bypassed the policy that would have checked it.';
+
+
+-- ══ Door 2b · the inbox a person is actually looking at ══════════════════════
+--
+-- `lead_from_inbox` above is the right function for a stored thread and it has
+-- no traffic, because NOTHING WRITES `inbox_threads`. The table shipped on
+-- 2026-08-04 deliberately empty — "it does not invent a source", says its own
+-- header — and the inbox a customer opens reads Zernio live instead. So a door
+-- keyed on a row that does not exist is a door onto a wall.
+--
+-- This is the same door, for the surface the enquiries are actually on. The
+-- difference between the two is not convenience and it is written into the row:
+--
+--   lead_from_inbox         derives EVERY field from a row this database owns.
+--                           The caller supplies an id and nothing else.
+--   lead_from_conversation  cannot. The conversation lives at Zernio and this
+--                           database has never seen it, so the details come from
+--                           the member's own screen — and `source.details` records
+--                           `from_client`, so nobody later reads a lead as if
+--                           Sahoda had observed it.
+--
+-- ── WHY A CALLER-SUPPLIED WORKSPACE ID IS SAFE HERE AND NOT ON DOOR 1 ────────
+-- Door 1's caller is a stranger, so any tenant they could name would be a tenant
+-- they could write into. This caller is an authenticated member, and the
+-- membership check below means the only workspaces they can name are ones they
+-- already belong to. A member recording an enquiry in their own shop is the
+-- feature; the thing that must be impossible is reaching somebody else's.
+create or replace function public.lead_from_conversation(
+  p_workspace_id uuid,
+  p_conversation_ref text,
+  p_channel text,
+  p_author_name text default null,
+  p_author_handle text default null,
+  p_message text default null,
+  p_permalink text default null
+) returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  existing uuid;
+  fresh_id uuid;
+begin
+  if p_conversation_ref is null or btrim(p_conversation_ref) = '' then
+    return jsonb_build_object('ok', false, 'reason', 'no_conversation');
+  end if;
+
+  -- `exists`, never `not in`: a subquery yielding NULL makes `not in` evaluate to
+  -- NULL, `if NULL` takes the else branch, and the guard waves the row through.
+  if not exists (
+    select 1 from app.member_workspace_ids() as ws where ws = p_workspace_id
+  ) then
+    return jsonb_build_object('ok', false, 'reason', 'not_a_member');
+  end if;
+
+  -- IDEMPOTENT on the conversation, per workspace. Two people pressing at once
+  -- must not chase one person twice.
+  select id into existing
+  from leads
+  where workspace_id = p_workspace_id
+    and source ->> 'kind' = 'inbox'
+    and source ->> 'conversation_ref' = p_conversation_ref
+  limit 1;
+  if existing is not null then
+    return jsonb_build_object('ok', true, 'id', existing, 'existing', true);
+  end if;
+
+  insert into leads (
+    workspace_id, site_id, name, email, phone, message, payload, source, status
+  )
+  values (
+    p_workspace_id,
+    null,
+    nullif(btrim(coalesce(p_author_name, '')), ''),
+    -- A platform conversation carries a handle, never an address or a number.
+    -- Both stay NULL rather than being filled with the handle: an email column
+    -- holding "@cornerbakery" is a column that lies to every reader of it.
+    null,
+    null,
+    nullif(btrim(coalesce(p_message, '')), ''),
+    jsonb_build_object('author_handle', p_author_handle),
+    jsonb_build_object(
+      'kind', 'inbox',
+      'conversation_ref', p_conversation_ref,
+      'channel', p_channel,
+      'permalink', p_permalink,
+      -- THE HONEST PART. These fields came from the caller, not from a row this
+      -- database holds, and a reader six months from now needs to know which.
+      'details', 'from_client'
+    ),
+    'new'
+  )
+  returning id into fresh_id;
+
+  return jsonb_build_object('ok', true, 'id', fresh_id, 'existing', false);
+end;
+$$;
+
+revoke all on function public.lead_from_conversation(uuid, text, text, text, text, text, text)
+  from public, anon;
+grant execute on function public.lead_from_conversation(uuid, text, text, text, text, text, text)
+  to authenticated;
+
+comment on function public.lead_from_conversation(uuid, text, text, text, text, text, text) is
+  'Promote a LIVE inbox conversation to a lead. Membership is checked inside; '
+  'the details come from the caller and source.details records that.';
