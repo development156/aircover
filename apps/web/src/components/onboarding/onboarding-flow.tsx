@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState, useTransition, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { BrandMemoryPayload } from '@sahoda/shared'
+import type { BrandFieldMetaMap, BrandMemoryPayload } from '@sahoda/shared'
 import { toast } from 'sonner'
 
 import {
@@ -36,6 +36,8 @@ export interface SavedBrainSummary {
   version: number
   source: string
   updatedAt: string
+  /** Provenance of the SAVED brain. Undefined once this session resolves a new one. */
+  fieldMeta: BrandFieldMetaMap | undefined
 }
 
 export interface OnboardingFlowProps {
@@ -293,6 +295,13 @@ export function OnboardingFlow({
           {screen === 'reveal' && brain ? (
             <RevealStep
               brain={brain}
+              // The SAVED brain's provenance, and only when the brain on screen
+              // IS the saved one. `door !== null` is the same proof
+              // `canRegenerate` uses: it means screens 1-3 ran in this session,
+              // so what is on screen came out of a fresh resolve and nobody has
+              // confirmed any of it. Passing the saved meta there would credit a
+              // new brain with confirmations made against an old one.
+              fieldMeta={door === null ? savedBrain?.fieldMeta : undefined}
               onChange={(updater) => setBrain((current) => (current ? updater(current) : current))}
               balanceAfter={balanceAfter}
               wasFree={wasFree}

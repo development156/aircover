@@ -63,6 +63,7 @@ export default async function OnboardingPage() {
               version: saved.version,
               source: saved.source,
               updatedAt: saved.updatedAt,
+              fieldMeta: saved.fieldMeta,
             }
           : null
       }

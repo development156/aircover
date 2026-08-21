@@ -1,6 +1,10 @@
 import 'server-only'
 
-import { BrandMemoryPayloadSchema, type BrandMemoryPayload } from '@sahoda/shared'
+import {
+  StoredBrandMemorySchema,
+  type BrandFieldMetaMap,
+  type BrandMemoryPayload,
+} from '@sahoda/shared'
 
 import { createServerSupabase } from '@/lib/supabase/server'
 
@@ -24,6 +28,19 @@ export interface SavedBrain {
   /** 'resolved' | 'manual' | 'system'. A 'system' row is a demo fallback. */
   source: string
   updatedAt: string
+  /**
+   * Per-field provenance, when the stored row carries any.
+   *
+   * Read with `StoredBrandMemorySchema` rather than `BrandMemoryPayloadSchema`
+   * because the second one STRIPS `field_meta` — zod drops unknown keys, and
+   * `field_meta` rides inside the payload with no column of its own. Parsing
+   * with the narrower schema returned a brain whose provenance was silently
+   * absent, so re-entering /onboarding on a brain with confirmed fields would
+   * have shown "0 of 15 confirmed" and understated the customer's own work.
+   * Undefined here means the row genuinely records none, which is the right
+   * answer for every brain written before `field_meta` existed.
+   */
+  fieldMeta: BrandFieldMetaMap | undefined
 }
 
 /**
@@ -68,17 +85,19 @@ export async function activeBrandMemory(workspaceId: string): Promise<SavedBrain
       source: string
       updated_at: string
     }
-    const parsed = BrandMemoryPayloadSchema.safeParse(row.payload)
+    const parsed = StoredBrandMemorySchema.safeParse(row.payload)
     // An unparseable payload degrades to "no saved brain" rather than to a
     // half-populated editor. A row that predates a contract change should send
     // the user through the flow, not hand them cards with fields missing.
     if (!parsed.success) return null
 
+    const { field_meta: fieldMeta, intake: _intake, ...payload } = parsed.data
     return {
-      payload: parsed.data,
+      payload,
       version: row.version,
       source: row.source,
       updatedAt: row.updated_at,
+      fieldMeta,
     }
   } catch {
     return null
