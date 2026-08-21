@@ -82,25 +82,44 @@ function ChannelHeader({ entry }: { entry: CatalogueEntry }) {
   return (
     <div className="flex items-start gap-2">
       <ChannelLogo channel={entry.id} />
+      {/* ── THE NAME NEVER LOSES TO THE CHIP ──────────────────────────────────
+          These were siblings in one row: the chip `shrink-0`, the name
+          `flex-1 truncate`. So the name absorbed all the shrink and MEASURED at
+          1440 on a four-column grid it rendered "Instagr…", "Google …" and
+          "Faceboo…" — on the one screen in the product whose entire subject is
+          telling channels apart. docs/26 §1.6 already made that argument about
+          the drawn marks ("two of eight tiles were anonymous"); the same
+          argument applies to the word underneath them.
+
+          `no-truncated-labels.spec.ts` could not see it, and was right not to
+          by its own rule: it exempts anything wearing `truncate`, because an
+          explicit ellipsis on a long customer string is a decision. A CATALOGUE
+          label is not a customer string. The guard has been extended to say so.
+
+          Wrapping rather than a second fixed row: the chip sits beside the name
+          when there is room for both and drops beneath it when there is not, so
+          one rule holds at 390, 1024 and 1440 without a breakpoint. */}
       <div className="min-w-0 flex-1">
-        <p className="type-h3 truncate">{entry.label}</p>
-        <p className="type-eyebrow mt-label-gap text-muted">{entry.kind}</p>
-      </div>
-      {/* The readiness rung. `.is-proposed` and `.is-committed` are outline
-          treatments, so this chip is quiet by construction on the two channels
-          that need a caveat, and a solid brand fill on the two that have earned
-          it. Ink on the fill, never white (§1.2). */}
-      <span
-        /* A DISTINCT hook from the tile's own `data-readiness`. Both carried the
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="type-h3">{entry.label}</p>
+          {/* The readiness rung. `.is-proposed` and `.is-committed` are outline
+              treatments, so this chip is quiet by construction on the two
+              channels that need a caveat, and a solid brand fill on the two that
+              have earned it. Ink on the fill, never white (§1.2). */}
+          <span
+            /* A DISTINCT hook from the tile's own `data-readiness`. Both carried the
            same attribute, so a `[data-readiness="..."]` query matched the
            <article> on a connectable channel and the chip on a coming-soon one —
            two different elements answering one selector. The dark-mode guard
            below caught it by reading a 0px border off the wrapper. */
-        data-readiness-chip={entry.readiness}
-        className={`${READINESS_CLASS[entry.readiness]} type-chip shrink-0 rounded-sm px-[7px] py-[3px]`}
-      >
-        {READINESS_LABEL[entry.readiness]}
-      </span>
+            data-readiness-chip={entry.readiness}
+            className={`${READINESS_CLASS[entry.readiness]} type-chip shrink-0 rounded-sm px-[7px] py-[3px]`}
+          >
+            {READINESS_LABEL[entry.readiness]}
+          </span>
+        </div>
+        <p className="type-eyebrow mt-label-gap text-muted">{entry.kind}</p>
+      </div>
     </div>
   )
 }

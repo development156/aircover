@@ -280,6 +280,54 @@
      focus treatment (2px --brand-text, offset 2, --r-sm radius) unlayered, so it
      already outranks anything in @layer base — a copy here would be dead code
      that drifts. One treatment, no per-component overrides. */
+
+  /* ── THE POINTER, WHICH TAILWIND v4 TOOK AWAY ──────────────────────────────
+     v3's Preflight carried `button, [role="button"] { cursor: pointer }`.
+     v4's does not — `preflight.css` in tailwindcss@4.3.3 mentions `cursor`
+     exactly once, and only to correct Safari's number-input spinners. Nothing
+     warns; the app simply stops saying "this is pressable" with the one signal
+     a pointing device has.
+
+     MEASURED across the captured frames before this rule existed: `cursor:
+     default` on `Create workspace`, `Continue`, `Resolve my brand`, `Adapt for
+     1 channel · 3 credits`, `Read this`, `Preview publish`, `Save`, `Choose
+     from library`, `Search Sahoda`, the workspace switcher, the channel chips
+     and the bottom bar's `More` — up to 26 on a single screen. Every one of
+     them is a control a shop owner is meant to press.
+
+     Declared here rather than on the Button primitive on purpose: this is not
+     a Button problem. It is every `<button>` in the product, including the ones
+     that will be written next week, and a variant-level fix would leave those
+     out exactly as it left out the twelve above.
+
+     `label` is deliberately NOT included wholesale. A label over a text field
+     is not a pressable thing and the arrow is correct there; a label that
+     CONTAINS a checkbox or radio is the control itself — which is the pattern
+     `pick-chips.tsx` uses, with the real input `sr-only` inside it. */
+  button:not(:disabled),
+  summary,
+  select:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='tab']:not([aria-disabled='true']),
+  [role='switch']:not([aria-disabled='true']),
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled),
+  input[type='submit']:not(:disabled),
+  input[type='reset']:not(:disabled),
+  input[type='color']:not(:disabled),
+  label:has(input[type='checkbox']),
+  label:has(input[type='radio']) {
+    cursor: pointer;
+  }
+  /* A refusal should FEEL like one before it is clicked. Buttons carrying
+     `disabled` already get `pointer-events: none` from the Button primitive, so
+     this reaches the ones that do not. */
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  [role='button'][aria-disabled='true'] {
+    cursor: not-allowed;
+  }
 }
 
 /* v3 type scale as utilities, so components never hand-write a font shorthand. */

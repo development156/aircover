@@ -56,6 +56,16 @@ const FIXTURE = `
   <button class="pointer tall" id="nameless"></button>
   <button class="pointer tall" aria-hidden="true"></button>
 
+  <!-- CURSORS, part two: a text-field label is NOT a finding; a radio label IS. -->
+  <label for="byfor2" class="short">A text field label</label><input class="short" id="byfor2">
+  <label class="short" id="radiolabel">A radio label<input type="radio" name="q"></label>
+
+  <!-- NAMES, the three ways a form control gets one. None of these is a finding. -->
+  <label>Wrapped in a label<input class="short" type="radio" name="r"></label>
+  <label for="byfor">Named by for</label><input class="short" id="byfor">
+  <textarea class="short" placeholder="Named by placeholder"></textarea>
+  <textarea class="short" id="nameless-area"></textarea>
+
   <!-- DEAD END -->
   <button disabled>Coming soon</button>
 
@@ -130,6 +140,12 @@ test.describe('ux detector self-test', () => {
     expect(texts).toContain('Has an arrow')
     expect(texts).not.toContain('Has a pointer')
     expect(texts).not.toContain('Disabled, not a finding')
+    // The ruling this pins: a label over a TEXT field is not a pressable thing
+    // and its arrow is correct, so counting it would inflate every screen in the
+    // product by the number of fields it has. A label that CONTAINS a radio is
+    // the control itself and is counted.
+    expect(texts).not.toContain('A text field label')
+    expect(texts).toContain('A radio label')
   })
 
   test('unnamed: the nameless button is caught, aria-label and aria-hidden are not', async ({
@@ -139,10 +155,17 @@ test.describe('ux detector self-test', () => {
       count: number
       items: { cls: string; tag: string }[]
     }
-    // One and only one: `#nameless`. The aria-labelled one has a name and the
-    // aria-hidden one is not in the accessibility tree at all.
-    expect(r.count).toBe(1)
-    expect(r.items[0]?.tag).toBe('button')
+    // Exactly two: `#nameless` and `#nameless-area`. Everything else is named,
+    // including the three form controls whose name comes from a WRAPPING label,
+    // a `for` label, and a placeholder respectively.
+    //
+    // THE ARTEFACT THIS PINS: pick-chips.tsx renders
+    // `<label><input class="sr-only">Consumer</label>`, and a detector that
+    // only knew `label[for]` reported 204 correctly-named inputs as unnamed.
+    // That is the same shape of mistake as the contrast artefact this file
+    // exists to prevent, arriving from the other direction.
+    expect(r.count).toBe(2)
+    expect(r.items.map((i) => i.tag).sort()).toEqual(['button', 'textarea'])
   })
 
   test('dead ends: a disabled "Coming soon" is reported as one', async ({ page }) => {

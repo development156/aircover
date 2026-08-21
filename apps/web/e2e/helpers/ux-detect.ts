@@ -150,7 +150,14 @@ export const INVISIBLE_TEXT = `${LIB}
 export const ARROW_CURSORS = `${LIB}
 ;(() => {
   const hits = []
-  const els = document.querySelectorAll('button, a[href], [role="button"], summary, label[for], select, input[type="checkbox"], input[type="radio"], input[type="submit"]')
+  /* label[for] is deliberately absent, and its absence is a RULING rather than
+     an oversight: a label over a text field is not a pressable thing, and the
+     arrow is right there. A label that CONTAINS a checkbox or a radio IS the
+     control - pick-chips.tsx renders exactly that, with the input sr-only
+     inside - so those are in.
+     (No backticks in this comment, and that is load-bearing: it lives INSIDE a
+     template literal, and one backtick here terminates the detector.) */
+  const els = document.querySelectorAll('button, a[href], [role="button"], [role="tab"], [role="switch"], summary, select, input[type="checkbox"], input[type="radio"], input[type="submit"], label:has(input[type="checkbox"]), label:has(input[type="radio"])')
   let considered = 0
   for (const el of els) {
     if (!_visible(el)) continue
@@ -192,11 +199,20 @@ export const UNNAMED = `${LIB}
     }
     const ti = el.getAttribute('title')
     if (ti && ti.trim()) return ti.trim()
-    if (el.tagName === 'INPUT') {
+    /* A form control's name can come from three places, and a detector that
+       knows only one of them manufactures findings. MEASURED: pick-chips.tsx
+       renders <label><input class="sr-only"/>Consumer</label>, which is
+       correctly named and was reported 204 times as unnamed until the ancestor
+       label was checked here. */
+    if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') {
       const id = el.getAttribute('id')
       if (id) { const l = document.querySelector('label[for="' + CSS.escape(id) + '"]'); if (l && (l.textContent || '').trim()) return l.textContent.trim() }
+      const wrapping = el.closest('label')
+      if (wrapping && (wrapping.textContent || '').trim()) return wrapping.textContent.trim()
       const ph = el.getAttribute('placeholder')
       if (ph && ph.trim()) return ph.trim()
+      const nm = el.getAttribute('name')
+      if (nm && nm.trim()) return nm.trim()
     }
     return ''
   }
