@@ -101,7 +101,7 @@ export interface ClassifyInput {
    * measurement from `connections`, not a placeholder. It exists to catch the case
    * `meta` alone cannot express: we hold an account and Zernio queried none of them.
    */
-  connectedAccounts: number
+  connectedAccounts: number | null
   /**
    * Whether Zernio says more rows exist beyond this page.
    *
@@ -261,6 +261,19 @@ function classifyFanOut({
   failed,
 }: FanOutInput): InboxEmptiness {
   if (meta.accountsQueried === 0) {
+    // We could not count our own connections, so the two branches below — one of
+    // which tells the customer to connect an account — are both unsupportable.
+    // `null` is NOT 0: `null > 0` is false in JS, so without this the failed
+    // count fell straight through to "nothing is connected".
+    if (connectedAccounts === null) {
+      return {
+        state: 'unknown',
+        showList: false,
+        headline: `Sahoda could not confirm this ${surface.noun} view is complete`,
+        body: `Our publishing partner asked no account, and Sahoda could not check which accounts you have connected — so it cannot tell whether nothing is connected or something needs reconnecting. This is not a reading of your ${surface.noun}. Refresh to try again.`,
+        failed,
+      }
+    }
     // ── THE DIVERGENCE THAT IS NOT A ZERO ────────────────────────────────────
     // We hold at least one connection Zernio could be asked about, and Zernio asked
     // none. That is "cannot resolve", the same distinction `syncStatus: orphaned`

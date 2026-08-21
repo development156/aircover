@@ -19,18 +19,26 @@ const meta = (over: Partial<ZernioInboxMeta> = {}): ZernioInboxMeta => ({
 
 const reviews = INBOX_SURFACES.reviews
 
-/** Most cases are "we hold connections"; the divergence cases override it. */
+/**
+ * Most cases are "we hold connections"; the divergence cases override it.
+ *
+ * `'connectedAccounts' in over`, not `?? 2`: null is now a MEANING here — "we
+ * could not count" — and `??` treats it as absent, so a `?? 2` default silently
+ * substituted 2 for the exact value under test and the null case passed as
+ * `unresolved`. The `in` check is the same one `meta` already needed, for the
+ * same reason.
+ */
 const classify = (over: {
   rows?: number
   meta?: ZernioInboxMeta | undefined
   surface?: typeof reviews
-  connectedAccounts?: number
+  connectedAccounts?: number | null
 }): InboxEmptiness =>
   classifyInboxResult({
     rows: over.rows ?? 0,
     meta: 'meta' in over ? over.meta : meta(),
     surface: over.surface ?? reviews,
-    connectedAccounts: over.connectedAccounts ?? 2,
+    connectedAccounts: 'connectedAccounts' in over ? (over.connectedAccounts ?? null) : 2,
   })
 
 describe('classifyInboxResult', () => {
@@ -87,6 +95,38 @@ describe('accountsQueried === 0 is two different facts', () => {
     const r = classify({ meta: meta({ accountsQueried: 0 }), connectedAccounts: 3 })
     expect(`${r.headline} ${r.body}`).toMatch(/could not resolve/i)
     expect(`${r.headline} ${r.body}`).toMatch(/not a reading of your reviews/i)
+    expect(`${r.headline} ${r.body}`).not.toMatch(/\bno reviews\b/i)
+  })
+
+  /**
+   * THREE facts, not two. `countAccounts` used to `return 0` when its own
+   * `connections` query errored, and this is the one branch where that 0 is
+   * load-bearing: it chooses between "connect an account" and "reconnect the
+   * accounts you have". A failed count therefore inverted the exact branch the
+   * two tests above exist to protect — and inverted it SILENTLY, because
+   * `null > 0` is false in JavaScript, so the null fell through to the zero arm
+   * rather than to an error.
+   */
+  it('is neither when the count itself failed', () => {
+    const r = classify({ meta: meta({ accountsQueried: 0 }), connectedAccounts: null })
+
+    expect(r.state).toBe('unknown')
+    expect(r.showList).toBe(false)
+    // Not the "you have none" sentence...
+    expect(r.state).not.toBe('never_connected')
+    // ...and not the "you have some" sentence either, which would print a count
+    // nothing measured.
+    expect(r.state).not.toBe('unresolved')
+    expect(`${r.headline} ${r.body}`).toMatch(/could not check which accounts/i)
+    expect(`${r.headline} ${r.body}`).toMatch(/not a reading of your reviews/i)
+  })
+
+  it('an unknown count never asks the customer to connect anything', () => {
+    const r = classify({ meta: meta({ accountsQueried: 0 }), connectedAccounts: null })
+
+    // The remedy has to be one that can work. "Connect an account" cannot: we do
+    // not know whether they have one.
+    expect(`${r.headline} ${r.body}`).not.toMatch(/connect an account/i)
     expect(`${r.headline} ${r.body}`).not.toMatch(/\bno reviews\b/i)
   })
 })
