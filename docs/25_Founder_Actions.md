@@ -201,3 +201,68 @@ The order that costs least:
 **A backup restore drill** and **a rollback rehearsal**. Both are on the operations list and both are
 deliberately left to you: proving a backup restores means restoring it, and nothing automated should
 be allowed to practise that on the database your customers are in.
+
+---
+
+## 11. The migration record, repaired — 21 August 2026
+
+`supabase_migrations.schema_migrations` had drifted behind the files. This is what was
+found, what was changed, and the one thing left that is yours to decide.
+
+### What was actually true
+
+The brief for this work said production recorded **36** migrations. It recorded **46**.
+That number had moved since somebody last looked, which is the whole reason this section
+exists: a count written down is a claim about a moment, and the only honest way to use one
+is to re-measure it.
+
+Against the 52 migration files the integrated branch carries, **8** were unrecorded. Each
+was checked against production for whether its objects are actually there — not whether
+its file looks like it ran:
+
+| migration | in production? | action |
+|---|---|---|
+| `20260819000000_post_variant_version_cas` | `save_post_variant` exists | **recorded** |
+| `20260819000100_post_metric_snapshots` | table exists | **recorded** |
+| `20260819000200_post_variant_format` | `post_variants.format` exists | **recorded** |
+| `20260819000300_templates` | table exists | **recorded** |
+| `20260819000400_assets` | `assets` + `asset_usages` exist | **recorded** |
+| `20260819000500_campaigns` | `campaigns` + `campaign_posts` exist | **recorded** |
+| `20260805000000_clerk_id_remap` | **absent** — no `clerk_id_map`, neither function | left alone |
+| `20260811000000_realtime_publish_state` | **absent** — publication exists, neither table added | left alone |
+
+Six rows were inserted. **No DDL was run**, and the script that did it contains none: each
+version's objects were re-checked inside the same transaction as its insert, so there is no
+moment where a check passed and the thing it checked stopped being true. It also refuses to
+write to a database that is not this project, which it proves from the project's own
+fingerprint rather than from the connection string it was handed — the first version of that
+guard read the ref out of `current_user`, and the pooler reports plain `postgres`, so the
+guard refused. A signal that is not there is not a check.
+
+`schema_migrations`: **46 → 52**.
+
+### The count matches and the sets do not, which is the more useful fact
+
+52 files, 52 records. They are not the same 52:
+
+- **2 files are not recorded** — `clerk_id_remap` and `realtime_publish_state`, because they
+  genuinely have not been applied.
+- **2 records have no file** — `20260812000000_ai_provider_logs_repaired` and
+  `20260812000001_resolve_brand_memory_v2`. Both are live in production. Their files exist
+  only on the `wt-db3` branch, which is not part of this integration. **A fresh environment
+  built from this branch would not have them.** That is worth closing, and it is a
+  cherry-pick, not a migration.
+
+### Is `db push` safe now?
+
+**Yes, and here is exactly what it would do:** run those two unrecorded files and nothing
+else. Both are fully guarded — `create table if not exists`, `create or replace function`,
+`alter table … enable row level security` (a no-op when it is already on), and the realtime
+one is a single `do $$ … if not exists … end $$` block. Neither can fail on a database that
+already has the objects, and neither drops or rewrites anything.
+
+**The decision that is yours:** `realtime_publish_state` adds `posts` and `post_variants` to
+the `supabase_realtime` publication. That is not a schema tidy-up — it turns on realtime
+replication for two tables, which is a behaviour change with a cost. Nothing in this
+integration needs it. It was left unapplied deliberately rather than swept along with a
+`db push`.
