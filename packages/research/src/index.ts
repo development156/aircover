@@ -43,7 +43,12 @@ export type { OpenSiteOptions, OpenSiteResult, TierAttempt, TierFlags } from './
 export {
   quarantineCorpus,
   quarantinePage,
+  quarantineBlock,
+  quarantinePreamble,
+  type QuarantineInput,
   neutralize,
+  neutralizeCounting,
+  type NeutralizedSpan,
   truncate,
   MAX_CHARS_PER_PAGE,
 } from './quarantine'
