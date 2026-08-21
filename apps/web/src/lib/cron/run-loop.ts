@@ -90,9 +90,14 @@ async function planOneWorkspace(
   // Only channels the workspace has actually connected. With none, FSD M2 says
   // the cycle produces suggestions rather than a plan — and charging 20 credits
   // to plan for nowhere is the wrong half of that, so it does not open at all.
+  // 'active'. connections.status is check (status in ('active','expired',
+  // 'revoked','error')) — 20260718000005_connections.sql:9. The 'connected' this
+  // used to carry matched no row on any workspace, so `channels` was always
+  // empty and the `return false` below made the Sunday cron skip EVERY
+  // workspace, silently, for as long as it has been deployed.
   const connections = await ledger.pool.query<{ platform: string }>(
     `select distinct platform from connections
-      where workspace_id = $1 and status = 'connected'`,
+      where workspace_id = $1 and status = 'active'`,
     [workspaceId],
   )
   const channels = toChannelSet(

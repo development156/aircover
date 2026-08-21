@@ -149,7 +149,12 @@ function CycleSummary({
         </p>
       </div>
 
-      {failed && cycle.failureReason === 'NO_CHANNELS' ? (
+      {failed && cycle.failureReason === 'CHANNELS_UNREADABLE' ? (
+        <p className="type-body mt-1 max-w-[68ch] text-muted">
+          Sahoda couldn’t check which channels you have connected, so it stopped rather than
+          planning for the wrong ones. Nothing was charged. Run it again.
+        </p>
+      ) : failed && cycle.failureReason === 'NO_CHANNELS' ? (
         <p className="type-body mt-1 max-w-[68ch] text-muted">
           Sahoda has nowhere to plan for.{' '}
           <Link href="/connections" className="font-[550] text-accent underline underline-offset-2">

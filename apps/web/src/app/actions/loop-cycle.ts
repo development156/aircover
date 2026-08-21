@@ -73,13 +73,21 @@ export interface CycleState {
 }
 
 /** Which channels this workspace has connected, as a de-duplicated set. */
-async function connectedChannels(workspaceId: string): Promise<Channel[]> {
+async function connectedChannels(workspaceId: string): Promise<Channel[] | null> {
   const supabase = createServerSupabase()
-  const { data } = await supabase
+  // 'active', not 'connected' — see the CHECK on connections.status
+  // (20260718000005_connections.sql:9). The old value matched nothing, so every
+  // cycle on every workspace ended `failure_reason = 'NO_CHANNELS'` and told the
+  // customer to connect a channel they had already connected.
+  const { data, error } = await supabase
     .from('connections')
     .select('platform')
     .eq('workspace_id', workspaceId)
-    .eq('status', 'connected')
+    .eq('status', 'active')
+  // A read we could not complete is NOT an empty channel list. Returning [] here
+  // makes the caller write NO_CHANNELS into loop_cycles.failure_reason, which is
+  // then rendered as a statement about the customer's account.
+  if (error) return null
   const platforms = (data ?? [])
     .map((row) => row.platform as Channel)
     .filter((p): p is Channel => ['x', 'gbp', 'linkedin', 'instagram'].includes(p))
@@ -182,6 +190,20 @@ export async function runCycleToPreview(
 
     // ── STAGE 3: PLAN — the one paid step before the halt ─────────────────
     const channels = await connectedChannels(workspaceId)
+    if (channels === null) {
+      // We could not read the connections. That is not zero channels, and
+      // writing NO_CHANNELS here would put a claim about the customer's account
+      // into loop_cycles.failure_reason where /loop reads it back for weeks.
+      await store.setCycleStatus(cycle.id, workspaceId, 'failed', {
+        failureReason: 'CHANNELS_UNREADABLE',
+      })
+      return {
+        ok: false,
+        cycleId: cycle.id,
+        insufficient: false,
+        message: 'Sahoda couldn’t check your channels just now — nothing was charged. Try again.',
+      }
+    }
     if (channels.length === 0) {
       // FSD M2 edge case: zero connected channels. The cycle does not charge and
       // does not pretend — it fails honestly and says what to do.

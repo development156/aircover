@@ -157,7 +157,13 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
       .from('connections')
       .select('platform')
       .eq('workspace_id', workspaceId)
-      .eq('status', 'connected'),
+      // 'active'. `connections.status` is check (status in ('active','expired',
+      // 'revoked','error')) — 20260718000005_connections.sql:9 — so the
+      // 'connected' this used to carry matched no row on any workspace, ever,
+      // and the screen read that as "you have no channels". A bad INSERT would
+      // have raised 23514; a bad WHERE is a valid query that finds nothing.
+      // Pinned by lib/connections/status-vocabulary.test.ts.
+      .eq('status', 'active'),
     supabase
       .from('loop_cycles')
       .select('*')
