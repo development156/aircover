@@ -13,8 +13,7 @@ import { KillSwitch } from '@/components/loop/kill-switch'
 import { PendingLearnings } from '@/components/loop/learnings'
 import { LoopControls } from '@/components/loop/controls'
 import { PageTitle } from '@/components/page-title'
-import { readLoopSnapshot } from '@/lib/loop/read'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { readLoop, type LoopSnapshot } from '@/lib/loop/read'
 
 export const metadata = { title: 'The Loop' }
 
@@ -40,21 +39,28 @@ export const metadata = { title: 'The Loop' }
  * no query behind this page has earned.
  */
 export default async function LoopPage() {
-  const workspace = await getActiveWorkspace()
-  if (!workspace) {
+  const read = await readLoop()
+
+  // Two answers, two sentences, two remedies. `getActiveWorkspace()` collapsed
+  // them into one null and this page said "Finish setting up your workspace" to
+  // both — which, on the arm where the read failed, tells a customer who has a
+  // workspace to make another one.
+  if (read.status !== 'ok') {
     return (
       <div className="space-y-grid">
         <PageTitle sub="A weekly cycle that plans, writes, tests and reports — as far as you let it go on its own.">
           The Loop
         </PageTitle>
         <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
-          Finish setting up your workspace and the Loop appears here.
+          {read.status === 'no-workspace'
+            ? 'Finish setting up your workspace and the Loop appears here.'
+            : 'Sahoda couldn’t read your Loop just now, so nothing below would be true. Try again in a moment — your cycle and its settings are unchanged.'}
         </p>
       </div>
     )
   }
 
-  const snapshot = await readLoopSnapshot(workspace.id)
+  const snapshot = read.snapshot
   const cycle = snapshot.cycle
   const atHalt = cycle?.status === 'awaiting_cost_approval'
 
@@ -120,7 +126,7 @@ function CycleSummary({
   cycle,
   briefCount,
 }: {
-  cycle: NonNullable<Awaited<ReturnType<typeof readLoopSnapshot>>['cycle']>
+  cycle: NonNullable<LoopSnapshot['cycle']>
   briefCount: number
 }) {
   const failed = cycle.status === 'failed'
