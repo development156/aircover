@@ -141,7 +141,27 @@ test.describe('@smoke scrim', () => {
     // Compare by ALPHA rather than by string: the token is authored
     // `rgb(0 0 0 / .4)` and composites as `rgba(0, 0, 0, 0.4)`, so a literal
     // match would fail on formatting rather than on the thing being tested.
-    const alphaOf = (c: string) => Number(c.match(/[\d.]+\s*\)$/)?.[0].replace(')', '') ?? '1')
+    //
+    // ── AND IT READS BOTH FORMS THE TOKEN CAN TAKE, WHICH IT DID NOT ────────
+    // MEASURED 2026-08-22: this parsed only `rgb(… / .4)`, so it silently
+    // depended on the BUILD MODE. Against `next dev` the stylesheet is
+    // unminified and `--scrim` reads `rgb(0 0 0 / 0.4)`; against `next start`
+    // the minifier writes `#0006`, the regex misses, the fallback returns 1, and
+    // the test compares a CORRECT backdrop of 0.4 against 1 and fails.
+    //
+    // A green run therefore meant "the scrim is right AND nobody ran this
+    // against a production build" — two claims wearing one result, and the
+    // second is the one the config's own comment recommends for reliability.
+    const alphaOf = (c: string) => {
+      const hex = /^#([0-9a-f]{4}|[0-9a-f]{8})$/i.exec(c.trim())
+      if (hex) {
+        const digits = hex[1]!
+        return digits.length === 4
+          ? parseInt(digits[3]!, 16) / 15
+          : parseInt(digits.slice(6), 16) / 255
+      }
+      return Number(c.match(/[\d.]+\s*\)$/)?.[0].replace(')', '') ?? '1')
+    }
     expect(alphaOf(backdrop)).toBeCloseTo(alphaOf(token), 2)
     // And explicitly not the browser default the bug produced.
     expect(alphaOf(backdrop)).toBeGreaterThan(0.15)
