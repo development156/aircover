@@ -40,6 +40,31 @@ describe('parseZernioWebhook', () => {
     expect(r.ok).toBe(true)
   })
 
+  it.each([
+    ['a bare word', 't'],
+    ['an empty-ish string', '   x'],
+    ['a number-like string that is not a date', 'not-a-date'],
+  ])('nulls %s rather than letting it crash the insert', (_label, stamp) => {
+    // MEASURED: a `webhook.test` fixture carrying `timestamp: "t"` raised
+    // `invalid input syntax for type timestamp with time zone` on insert. The
+    // receiver correctly answered 503 — and a 503 makes Zernio RETRY, seven times
+    // over ~51 hours, each attempt re-raising the same error, and then dead-letter
+    // the event. A decorative field would have cost us a real delivery.
+    const r = parseZernioWebhook(verified({ id: 'e', event: 'webhook.test', timestamp: stamp }))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.parsed.eventAt).toBeNull()
+  })
+
+  it('keeps a well-formed timestamp exactly as sent', () => {
+    // Passed through unchanged, NOT re-formatted. Zernio's value is the claim; a
+    // normalised copy would be ours.
+    const r = parseZernioWebhook(
+      verified({ id: 'e', event: 'post.published', timestamp: '2026-08-21T10:30:00.000Z' }),
+    )
+    expect(r.ok && r.parsed.eventAt).toBe('2026-08-21T10:30:00.000Z')
+  })
+
   it('keeps the payload whole and unedited', () => {
     // What is not lifted into a column must still reach the database, because the
     // store is what makes a missed projection recoverable later.

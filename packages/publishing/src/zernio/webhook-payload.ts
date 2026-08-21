@@ -59,6 +59,30 @@ const EnvelopeSchema = z.object({
   timestamp: z.string().min(1).optional(),
 })
 
+/**
+ * `payload.timestamp`, but only if Postgres could actually store it.
+ *
+ * ── WHY THIS IS NOT JUST PASSED THROUGH ──────────────────────────────────────
+ * MEASURED: a `webhook.test` fixture carrying `timestamp: "t"` made the insert
+ * raise `invalid input syntax for type timestamp with time zone`, which the
+ * receiver correctly reported as a 503 — and a 503 makes Zernio RETRY. Seven
+ * attempts over ~51 hours, every one of them re-raising the same error, and then
+ * the event is dead-lettered. A malformed decorative field would have cost us the
+ * event.
+ *
+ * The event id and the payload are what matter; `event_at` is a convenience column.
+ * So an unparseable stamp becomes NULL and the delivery is stored. Nothing is lost
+ * either way — the raw value is still in `payload` for anyone who wants to argue
+ * with it later.
+ *
+ * `Date.parse` rather than a regex: the column takes anything Postgres understands
+ * and this only has to reject what it does not.
+ */
+function asTimestamp(value: string | undefined): string | null {
+  if (value === undefined) return null
+  return Number.isNaN(Date.parse(value)) ? null : value
+}
+
 /** How the workspace for an event was decided. Mirrors the `routing` column's CHECK. */
 export type ZernioWebhookRouting = 'routed' | 'no_account_id' | 'unknown_account' | 'ambiguous'
 
@@ -145,7 +169,7 @@ export function parseZernioWebhook(body: VerifiedZernioBody): ZernioWebhookParse
     parsed: {
       eventId: envelope.data.id,
       event: envelope.data.event,
-      eventAt: envelope.data.timestamp ?? null,
+      eventAt: asTimestamp(envelope.data.timestamp),
       accountIds: collectAccountIds(payload),
       payload,
     },
