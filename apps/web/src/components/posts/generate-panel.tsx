@@ -113,9 +113,22 @@ export function GeneratePanel({
       ) : (
         <Button variant={emphasis} onClick={() => run(channels)} disabled={channels.length === 0}>
           <Sparkles size={14} aria-hidden />
-          Adapt for <span className="tabular-nums">{channels.length}</span>
-          {channels.length === 1 ? ' channel' : ' channels'} ·{' '}
-          <span className="tabular-nums">{cost}</span> credits
+          {/* ONE span, so the label is ONE flex item — ported from wt-screens,
+              which measured it. `Button` is `inline-flex … gap-[6px]`, and a flex
+              container wraps every run of bare text in its own anonymous item.
+              Written as loose children this label was SIX items — icon, "Adapt
+              for", the count, "channels ·", the cost, "credits" — with 6px at
+              every seam and each item free to wrap inside itself. MEASURED on
+              design-audit-before/light-390/posts-detail.png: it rendered
+              "Generate variants / for | 3 | channels / · | 3 | credits". Every
+              box was the right size and the sentence was unreadable. At 1440 the
+              same seams showed as odd gaps around the numbers. brand-card.tsx
+              already carries this fix; this is the sibling that walked through. */}
+          <span>
+            Adapt for <span className="tabular-nums">{channels.length}</span>
+            {channels.length === 1 ? ' channel' : ' channels'} ·{' '}
+            <span className="tabular-nums">{cost}</span> credits
+          </span>
         </Button>
       )}
 

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { CONSTRAINTS, validateMedia, validateVariant } from '@sahoda/shared'
 import type { ConstraintViolation } from '@sahoda/shared'
 import { describe, expect, test } from 'vitest'
@@ -75,6 +78,14 @@ function mediaViolation(
   return found
 }
 
+/**
+ * One pixel narrower than Instagram's own floor allows, whatever that floor is.
+ * The height clears `minW`/`minH` (320) comfortably, so the only rule this
+ * fixture can trip is the aspect one.
+ */
+const ASPECT_FLOOR = CONSTRAINTS.instagram.imageDims?.aspectRange?.[0] ?? 0.75
+const ASPECT_FIXTURE_HEIGHT = 1_600
+
 const REAL_VIOLATIONS: Record<string, ConstraintViolation> = {
   MAX_CHARS: variantViolation(CONSTRAINTS.x, { body: 'a'.repeat(300) }, 'MAX_CHARS'),
   MAX_HASHTAGS: variantViolation(
@@ -98,6 +109,31 @@ const REAL_VIOLATIONS: Record<string, ConstraintViolation> = {
     { mime: 'image/png', bytes: 1_000, width: 2, height: 2 },
     'MEDIA_DIMS',
   ),
+  // Instagram is the only channel with `requiresMedia`, and this is the most
+  // common refusal in the product: there is no text-only Instagram post.
+  MEDIA_REQUIRED: variantViolation(
+    CONSTRAINTS.instagram,
+    { body: 'hi', mediaCount: 0 },
+    'MEDIA_REQUIRED',
+  ),
+  // DERIVED from the spec, not written as a literal. This fixture used to be
+  // 900x1200 with the note "3:4 is 0.75, below Instagram's 0.8 floor" — and
+  // wt-zernio then moved that floor to exactly 0.75 on primary evidence, because
+  // 0.8 was refusing ordinary upright phone crops Instagram accepts. 0.75 is no
+  // longer below the floor, it IS the floor, so the fixture stopped producing
+  // MEDIA_ASPECT and the whole file threw before one assertion ran. A fixture
+  // that hardcodes the bound it tests against goes stale the moment that bound
+  // moves; one taken FROM the bound cannot.
+  MEDIA_ASPECT: mediaViolation(
+    CONSTRAINTS.instagram,
+    {
+      mime: 'image/jpeg',
+      bytes: 1_000,
+      width: Math.floor(ASPECT_FLOOR * ASPECT_FIXTURE_HEIGHT) - 1,
+      height: ASPECT_FIXTURE_HEIGHT,
+    },
+    'MEDIA_ASPECT',
+  ),
 }
 
 function real(code: keyof typeof REAL_VIOLATIONS): ConstraintViolation {
@@ -105,6 +141,56 @@ function real(code: keyof typeof REAL_VIOLATIONS): ConstraintViolation {
   if (found === undefined) throw new Error(`no fixture for ${code}`)
   return found
 }
+
+/**
+ * ── THE COMPLETENESS GUARD ────────────────────────────────────────────────────
+ *
+ * Every other test in this file is driven by `REAL_VIOLATIONS`, a record keyed
+ * by the codes somebody remembered to list. Each entry is genuine engine output,
+ * so every LISTED code is proved to render well — and nothing in that design can
+ * notice a code nobody listed. It is a per-code allowlist testing a per-code
+ * allowlist.
+ *
+ * MEASURED: the engine gained `MEDIA_REQUIRED` and `MEDIA_ASPECT`, the copy
+ * layer never heard about either, and both degraded to "This does not meet the
+ * channel rules." for months while all twenty tests here stayed green. The
+ * module's own docstring promised that "engine drift fails that test loudly" —
+ * true for a REWORDING, which the shape patterns catch, and false for an
+ * ADDITION, which nothing was watching.
+ *
+ * So this reads the engine's SOURCE and extracts every `code:` literal it can
+ * emit. Text rather than types, for the reason `scripts/design/design-lint.mjs`
+ * gives for the same choice: the thing being checked IS a string literal, and a
+ * regex that says so beats reconstructing it from an AST. A union type would not
+ * help either — `ConstraintViolation.code` is a plain `string`, deliberately, so
+ * that untrusted upstream input has somewhere to land.
+ */
+const ENGINE_SOURCE = readFileSync(
+  fileURLToPath(
+    new URL('../../../../../packages/shared/src/publishing/constraints.ts', import.meta.url),
+  ),
+  'utf8',
+)
+
+const ENGINE_CODES = [...ENGINE_SOURCE.matchAll(/\bcode:\s*'([A-Z_]+)'/g)]
+  .map((m) => m[1])
+  .filter((code): code is string => code !== undefined)
+
+describe('the copy layer knows every code the engine can emit', () => {
+  test('the engine source yields a plausible set of codes', () => {
+    // If this ever reads zero, the file moved or the shape changed and the guard
+    // below would pass by finding nothing — the failure mode this asserts away.
+    expect(ENGINE_CODES.length).toBeGreaterThanOrEqual(8)
+    expect(new Set(ENGINE_CODES)).toContain('MAX_CHARS')
+  })
+
+  test('no engine code degrades to the generic message', () => {
+    const unknown = [...new Set(ENGINE_CODES)].filter(
+      (code) => describeViolation({ code, message: '' }).code === 'UNKNOWN',
+    )
+    expect(unknown, `these engine codes have no copy and fall back to generic text`).toEqual([])
+  })
+})
 
 describe('describeViolation', () => {
   /**
@@ -153,19 +239,26 @@ describe('describeViolation', () => {
     }
   })
 
+  // Both of these assert DISTINCTNESS — that no two codes render the same
+  // sentence. They were written as `toBe(6)`, which is the fixture count wearing
+  // a distinctness test's name: adding a seventh code failed them for arithmetic
+  // rather than for a collision, and a nine-code engine with two duplicate
+  // sentences would still have read 9 and passed. Comparing the set against the
+  // list says the thing the test is called.
   test('produces distinct copy for every known code', () => {
-    const messages = Object.keys(REAL_VIOLATIONS).map((c) => describeViolation(real(c)).message)
-    expect(messages).toHaveLength(6)
-    expect(new Set(messages).size).toBe(6)
+    const codes = Object.keys(REAL_VIOLATIONS)
+    const messages = codes.map((c) => describeViolation(real(c)).message)
+    expect(new Set(messages).size).toBe(codes.length)
   })
 
   test('produces distinct fallback copy for every known code', () => {
     // Fallbacks must stay distinguishable too, or a redacted list reads as one
     // repeated sentence and the user cannot tell the problems apart.
-    const messages = Object.keys(REAL_VIOLATIONS).map(
+    const codes = Object.keys(REAL_VIOLATIONS)
+    const messages = codes.map(
       (code) => describeViolation({ code, message: 'not engine copy' }).message,
     )
-    expect(new Set(messages).size).toBe(6)
+    expect(new Set(messages).size).toBe(codes.length)
   })
 
   test('quotes no limit it cannot verify when it falls back', () => {
@@ -267,7 +360,10 @@ describe('summarizeViolations', () => {
 
   test('counts the issues when there are several', () => {
     const many = Object.keys(REAL_VIOLATIONS).map((c) => real(c))
-    expect(summarizeViolations(many)).toMatch(/^6 issues to fix$/i)
+    // Derived, not the literal 6 this used to assert. That number went stale the
+    // moment two codes were added, so the test would have failed for a reason
+    // that has nothing to do with counting.
+    expect(summarizeViolations(many)).toBe(`${many.length} issues to fix`)
   })
 
   test('never leaks internals in the summary', () => {

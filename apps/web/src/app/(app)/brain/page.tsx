@@ -1,3 +1,4 @@
+import { Unmeasured } from '@/components/design-system/absence-row'
 import Link from 'next/link'
 import { BrainCircuit } from 'lucide-react'
 
@@ -89,8 +90,15 @@ export default async function BrainPage() {
                   <p className="text-[13px] font-semibold">{section.title}</p>
                   <p className="mt-[1px] text-[12.5px] text-muted">{section.blurb}</p>
                 </div>
-                {/* No percentage and no n/n. There is no brain to measure. */}
-                <span className="shrink-0 text-[13px] text-muted">&mdash;</span>
+                {/* No percentage and no n/n — there is no brain to measure —
+                    and no bare em dash either. docs/26 §11 forbids the dash for
+                    a missing value and §4 gives it a mark with an accessible
+                    name; without one this row read out as its title and blurb
+                    and then stopped, so the absence never reached a screen
+                    reader. Same defect, same day, as section-card-empty.tsx. */}
+                <span className="shrink-0">
+                  <Unmeasured what={section.title} />
+                </span>
               </li>
             ))}
           </ul>

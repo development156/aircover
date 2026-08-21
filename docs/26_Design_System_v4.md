@@ -332,6 +332,44 @@ needs positive tracking to stop looking cramped. One value per size band, never 
 **Numbers**: anything countable a user is accountable for gets `.num` (tabular figures). A
 balance whose digits shuffle as it changes reads as unstable.
 
+### 5.1 AMENDMENT — the scale is enforced, and weight is a separate class
+
+Added 2026-08-20 by `wt-screens`. §5 and §11 both forbid hand-writing a size, the scale ships
+as `@utility type-*` in `globals.css` "so components never hand-write a font shorthand", and
+**nothing checked it**.
+
+MEASURED across `apps/web/src` when the check was written: **847 hand-written sizes in 192
+files**, in **eighteen distinct pixel values** against a scale of eight steps, and **49
+distinct (size, weight) pairs**. Eleven of those sizes — 10, 11.5, 12.5, 13.5, 14, 16, 17, 18,
+19, 25, 28 — are on no step at all, so they are not shorthand for a rung, they are invented
+rungs. This is docs/27 §4's diagnosis exactly: the same question answered independently on
+every screen.
+
+**The rule is `design-lint.mjs` rule 5, ratcheted**, on the mechanism docs/28 §7 established
+for spacing and for the same reason — 191 of those files belong to lanes that have not read
+this rule. With type the stakes are higher than with spacing: moving an off-scale call site
+onto a step **changes its rendered size**, which is a visual change to a screen the changing
+lane has not seen. The debt is in `design-lint-baseline.json`, per file, and it only goes down.
+
+**Size comes from the scale; weight does not have to.** §5 forbids a *shorthand* — size,
+weight and leading welded together — and each step carries a default weight. `type-body
+font-semibold` is therefore correct and rule 5 does not flag it: one utility for the step, one
+for the deviation, both legible. Folding weight into the rule would flag correct code, and a
+rule with false positives is switched off in its first week — which rule 4 nearly was.
+
+**There is still no weighted 13px step**, and the 56 `text-[13px] font-semibold` and 10
+`text-[13px] font-[550]` call sites are what that gap looks like. Naming it rather than adding
+a token: a ninth step is a change to `tokens.css`, which five concurrent lanes share, and it
+should be argued from what the ratchet reveals once the invented sizes are gone — not from the
+count of a scale nobody was enforcing yet.
+
+`lib/design/` is exempt. It holds this system's own debt registers, which quote the offending
+class inside a `reason:` string so an entry can be read without opening the file it describes.
+Those quotes are data, not comments, so the comment stripper cannot reach them — and a rule
+that fires on the register documenting the same defect gets answered by deleting the
+documentation, which is the trap docs/28 §7 hit when the first hex pass flagged
+`brand-theme.ts`'s own annotations.
+
 ---
 
 ## 6. Space

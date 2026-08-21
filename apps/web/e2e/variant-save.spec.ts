@@ -53,10 +53,22 @@ test.describe('saving a channel variant @smoke', () => {
     await expect(save).toBeEnabled()
     await save.click()
 
-    // The button's own label is the app's claim that the write landed.
+    // The app's claim that the write landed, SCOPED to this channel's version
+    // card — the composer shows one card per channel, so an unscoped match would
+    // be satisfied by a sibling, and the conflict notice's "Use the saved
+    // version" contains the word too.
     await expect(page.locator('[data-version-card="instagram"]').getByText(/^Saved$/)).toBeVisible({
       timeout: 60_000,
     })
+    // ── AND IT IS A STATUS, NEVER AN ACTION ───────────────────────────────────
+    // Kept from wt-screens, which is where this was found. The line above used to
+    // read `getByRole('button', { name: /^saved$/i })`, which REQUIRED the
+    // confirmation to be a disabled button — so the test pinned docs/26 §10.2's
+    // defect in place as the correct behaviour, and any session fixing it would
+    // have been told by a green suite that it had broken saving. A disabled
+    // button is still announced as a button: the reader is offered "Saved,
+    // button", takes it, and nothing happens.
+    await expect(page.getByRole('button', { name: /^saved$/i })).toHaveCount(0)
 
     // Nothing was refused. A clash cannot happen here — there is one writer — so
     // this notice appearing would mean the version path fired against a database

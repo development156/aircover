@@ -83,7 +83,7 @@ function stripComments(src) {
     .replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
 
-const violations = { hex: [], spacing: [], disabled: [], breakpoint: [] }
+const violations = { hex: [], spacing: [], disabled: [], breakpoint: [], typesize: [] }
 
 /* ── RULE 4 · DEAD BREAKPOINT VARIANTS ────────────────────────────────────────
    `apps/web/src/app/globals.css` opens `@theme` with `--breakpoint-*: initial`,
@@ -120,6 +120,43 @@ const DEFINED_BREAKPOINTS = new Set(
  */
 const BREAKPOINT_LIKE = /(?:^|[\s"'`])(?:(max)-)?(sm|md|lg|xl|2xl):(?=[a-z0-9[-])/g
 
+/* ── RULE 5 · HAND-WRITTEN FONT SIZES ─────────────────────────────────────────
+   docs/26 §11 names this outright — "Do not hand-write a font shorthand or a
+   pixel size" — and §5 ships the whole scale as `@utility type-*` in
+   globals.css precisely "so components never hand-write a font shorthand".
+   Nothing checked it.
+
+   MEASURED when this rule was written: 847 hand-written sizes across 192 files,
+   in EIGHTEEN distinct pixel values against a scale of eight steps, and 49
+   distinct (size, weight) pairs. Eleven of those sizes — 10, 11.5, 12.5, 13.5,
+   14, 16, 17, 18, 19, 25, 28 — are not on the scale at all, so they are not
+   shortcuts for a step, they are invented steps.
+
+   This is the mechanism docs/27 §4 diagnosed: the same question answered
+   independently on every screen. It is also the one docs/28's four rules could
+   not see, and the reason `text-[15px] font-semibold` drifted into being at
+   every call site until `type-h3` was added to collect them.
+
+   SIZE ONLY, deliberately. §5 forbids a font SHORTHAND — size, weight and
+   leading welded together — and the scale's steps carry a default weight. A
+   separate `font-semibold` beside `type-body` is a legal, single-purpose
+   utility, so folding weight into this rule would flag correct code and get the
+   rule switched off in its first week, which is how rule 4 nearly died. */
+const FONT_SIZE = /\btext-\[\d+(?:\.\d+)?px\]/g
+
+/* ── ALLOWLIST 3 · the design debt registers ──────────────────────────────────
+   `lib/design/` is where this system keeps its own registers of hand-rolled
+   typography — `eyebrow-exceptions.ts` names each offending file and quotes the
+   class it spells out, in a `reason:` string, so the entry can be read without
+   opening the file it describes.
+
+   Those quotes are DATA, not comments, so the stripper cannot reach them, and a
+   rule that fires on the register documenting the same defect gets answered by
+   deleting the documentation — the exact failure docs/28 hit when the first hex
+   pass flagged brand-theme.ts's own annotations. Named as a directory, so the
+   exception is visible in the file tree rather than hidden in a list. */
+const TYPE_SIZE_EXEMPT = /^lib\/design\//
+
 /** 3, 4, 6 or 8 digit hex, as a colour — not a hash-route or an id. */
 const HEX = /#[0-9a-fA-F]{3,8}\b/g
 /** Tailwind arbitrary SPACING: padding, margin, gap, space, inset — px literals. */
@@ -148,6 +185,15 @@ for (const file of files) {
     }
     for (const m of line.matchAll(SPACING)) {
       violations.spacing.push({ rel, line: i + 1, text: m[0] })
+    }
+    if (!TYPE_SIZE_EXEMPT.test(rel)) {
+      for (const m of line.matchAll(FONT_SIZE)) {
+        violations.typesize.push({
+          rel,
+          line: i + 1,
+          text: `${m[0]} — use a type-* step (docs/26 §5)`,
+        })
+      }
     }
     for (const m of line.matchAll(BREAKPOINT_LIKE)) {
       if (DEFINED_BREAKPOINTS.has(m[2])) continue
@@ -242,6 +288,14 @@ for (const [key, name, why] of [
 const RATCHETED = [
   ['spacing', 'hardcoded spacing', 'docs/26 §6 — use --space-N / the 4pt scale'],
   ['breakpoint', 'dead breakpoint variant', 'globals.css defines narrow/wide only'],
+  /* Rule 5 is ratcheted for the reason rule 2 is, only more so: its 847 hits
+     span 192 files across every lane running right now. Rewriting another
+     lane's type to satisfy a rule they have not read turns a merge into a
+     regression, and type is not spacing — moving a call site onto a step
+     CHANGES ITS RENDERED SIZE when the old value was off-scale, which is a
+     visual change to a screen this lane has neither seen nor shot. Written
+     down, and it only goes down. */
+  ['typesize', 'hand-written font size', 'docs/26 §5/§11 — use a type-* step'],
 ]
 
 if (process.argv.includes('--update-baseline')) {

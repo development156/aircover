@@ -360,12 +360,12 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
       */}
       {stopped ? (
         <div role="alert" className="rounded-card border border-danger bg-danger-bg p-4">
-          <p className="text-[13px] font-semibold text-danger">{stopped.message}</p>
-          <p className="mt-1 text-[12.5px] text-muted">
+          <p className="type-body font-semibold text-danger">{stopped.message}</p>
+          <p className="mt-1 type-sm text-muted">
             Nothing was charged — reading is always free. Your link and PDF are still attached
             above.
           </p>
-          <p className="mt-2 text-[12.5px] text-muted">
+          <p className="mt-2 type-sm text-muted">
             {stopped.retryable
               ? 'Press Read this again when you are ready. Nothing about your document needs to change.'
               : 'Fix the sign-in or the workspace first — pressing Read this again now would fail the same way.'}

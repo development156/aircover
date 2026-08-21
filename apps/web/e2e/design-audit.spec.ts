@@ -1,7 +1,7 @@
 import { test } from './fixtures/seeded-user'
 import { adminClient } from './fixtures/seeded-user'
 import { mkdirSync } from 'node:fs'
-import type { Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 
 /**
  * The design audit's camera.
@@ -64,6 +64,32 @@ const ROUTES: ReadonlyArray<{ path: string; slug: string; archetype: string }> =
   // platform call, and its most common state is one the platform imposes.
   { path: '/brain/audience', slug: 'brain-audience', archetype: 'two-layer evidence' },
   { path: '/brain/knowledge', slug: 'brain-knowledge', archetype: 'roadmap · empty table' },
+
+  // ── Added by wt-screens ─────────────────────────────────────────────────────
+  // docs/27 §0 listed these under "not sampled" and docs/28 did not reach them,
+  // so nothing has ever photographed them. They are static paths, so the only
+  // reason they were missing is that nobody added the row.
+  { path: '/create', slug: 'create', archetype: 'chooser' },
+  { path: '/brain/voice', slug: 'brain-voice', archetype: 'long form' },
+  { path: '/brain/competitors', slug: 'brain-competitors', archetype: 'long form' },
+  { path: '/settings/profile', slug: 'settings-profile', archetype: 'form' },
+  { path: '/settings/integrations', slug: 'settings-integrations', archetype: 'form' },
+  { path: '/design-system', slug: 'design-system', archetype: 'gallery' },
+
+  // DELIBERATELY still unsampled, and the reason is the same one docs/27 gave
+  // for the two /inbox detail routes — a frame of the wrong screen is worse
+  // than no frame:
+  //
+  //   /sign-in, /sign-up  — this fixture is SIGNED IN, so Clerk redirects both
+  //                         away. The camera would file /home as evidence of
+  //                         the sign-in design.
+  //   /onboarding         — the seed bootstraps a workspace before shooting, and
+  //                         onboarding is the screen you see when you do NOT
+  //                         have one. Same failure: it would photograph the
+  //                         completed state and file it as the empty one.
+  //
+  // Both need a fixture whose user is in the state the screen exists to serve.
+  // Auditing them from code is honest; auditing them from a redirect is not.
 ]
 
 /**
@@ -88,6 +114,51 @@ const ONLY = (process.env.DESIGN_AUDIT_ROUTES ?? '')
   .filter(Boolean)
 
 const SHOOT = ONLY.length > 0 ? ROUTES.filter((r) => ONLY.includes(r.slug)) : ROUTES
+
+/**
+ * Routes whose path does not exist until the workspace has been seeded.
+ *
+ * ── WHY THIS HAD TO BE ADDED ─────────────────────────────────────────────────
+ * `ROUTES` above is a list of literal paths, so the camera could only ever point
+ * at a STATIC route. That silently excluded `/posts/[id]` — the per-channel
+ * variant editor, which is the one screen carrying the thing this product does
+ * that its competitors do not (one body per channel, published independently,
+ * `publish_status` per variant). docs/27 §0 listed it under "not sampled" and
+ * docs/28 did not reach it either, so the most important screen in the app has
+ * never been photographed by anything.
+ *
+ * The seed already creates exactly what such a shot needs. It is resolved AFTER
+ * the insert rather than declared above, because the id is not knowable until
+ * Postgres has minted it.
+ *
+ * A resolver returning `null` SKIPS its route and says so on stdout. It must
+ * never fall back to a literal path: `/posts/undefined` renders the 404, and a
+ * 404 filed in the audit directory is evidence of a design that does not exist.
+ */
+interface SeededPost {
+  id: string
+  channels: string[]
+}
+
+const DYNAMIC: ReadonlyArray<{
+  slug: string
+  archetype: string
+  resolve: (posts: readonly SeededPost[]) => string | null
+}> = [
+  {
+    slug: 'posts-detail',
+    archetype: 'editor',
+    // The post with the MOST channels, so the variant tab strip renders as a
+    // strip. Shooting a single-channel post would photograph the one arrangement
+    // in which per-channel editing looks like ordinary editing.
+    resolve: (posts) => {
+      const richest = [...posts].sort((a, b) => b.channels.length - a.channels.length)[0]
+      return richest ? `/posts/${richest.id}` : null
+    },
+  },
+]
+
+const SHOOT_DYNAMIC = ONLY.length > 0 ? DYNAMIC.filter((r) => ONLY.includes(r.slug)) : DYNAMIC
 
 const VIEWPORTS = [
   { w: 1440, h: 900, name: '1440' },
@@ -187,7 +258,23 @@ test.describe('design audit', () => {
       `[audit] seeded workspace ${workspaceId}: ${rows.length} posts, ${variants.length} variants`,
     )
 
+    // ── Resolve the routes whose path the seed just made knowable.
+    const seededPosts = (inserted ?? []) as SeededPost[]
+    const resolved: { path: string; slug: string; archetype: string }[] = []
+    for (const route of SHOOT_DYNAMIC) {
+      const path = route.resolve(seededPosts)
+      if (path === null) {
+        console.log(`[audit] ${route.slug} SKIPPED: the seed produced nothing to point at`)
+        continue
+      }
+      console.log(`[audit] ${route.slug} resolved to ${path}`)
+      resolved.push({ path, slug: route.slug, archetype: route.archetype })
+    }
+    const shootList = [...SHOOT, ...resolved]
+
     // ── Shoot. A fresh context per theme so the init script actually applies.
+    let written = 0
+    let failed = 0
     for (const theme of THEMES) {
       const context = await browser.newContext()
       const shot = await context.newPage()
@@ -202,18 +289,31 @@ test.describe('design audit', () => {
         const dir = `${OUT}/${theme}-${vp.name}`
         mkdirSync(dir, { recursive: true })
 
-        for (const route of SHOOT) {
+        for (const route of shootList) {
           try {
             await shot.goto(route.path, { waitUntil: 'domcontentloaded', timeout: 45_000 })
             // Let the route settle; many screens fetch after mount.
             await shot.waitForTimeout(1800)
             await shot.screenshot({ path: `${dir}/${route.slug}.png`, fullPage: true })
+            written += 1
           } catch (e) {
+            failed += 1
             console.log(`[audit] ${theme}/${vp.name}${route.path} FAILED: ${(e as Error).message}`)
           }
         }
       }
       await context.close()
     }
+
+    // ── Say how many frames actually reached the disk, and fail if none did.
+    //
+    // This spec asserts nothing ABOUT A DESIGN and still must not. But docs/28
+    // §0 records this exact harness reporting `1 passed` having written ZERO
+    // PNGs: 28 navigations timed out at load average 41.6, every failure was
+    // swallowed by the catch above, and the green line was read as evidence
+    // that frames existed. A run that photographed nothing is a broken camera,
+    // not a passing test, and that is a fact about the harness.
+    console.log(`[audit] frames written: ${written}, failed: ${failed}`)
+    expect(written, 'the audit wrote no frames — nothing was photographed').toBeGreaterThan(0)
   })
 })
