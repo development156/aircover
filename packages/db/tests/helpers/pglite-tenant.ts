@@ -220,6 +220,25 @@ const SHAPE_OVERRIDES: Readonly<Record<string, Readonly<Record<string, string>>>
   // Maharashtra — any two digits satisfy the CHECK, and a real one keeps the
   // fixture readable.
   billing_profiles: { tax_kind: "'unregistered'", gstin: 'null', state_code: "'27'" },
+  // `check (storage_path like workspace_id::text || '/derivatives/%')` — the
+  // storage key's first segment IS the tenant boundary, so the value depends on
+  // the row's own workspace and no fixed literal can satisfy both rows.
+  // `%WORKSPACE%` is replaced with the uuid being seeded.
+  //
+  // The rest are per-column and would eventually be reached by the ladder, but
+  // only after it has stepped off a good value chasing a `> 0` CHECK — which is
+  // the failure mode the ladder cannot recover from, because it only walks
+  // forward. Written down so the table is seeded on the first attempt.
+  asset_derivatives: {
+    storage_path: "'%WORKSPACE%/derivatives/probe.jpg'",
+    crop_w: '1',
+    crop_h: '1',
+    width: '1',
+    height: '1',
+    mime: "'image/jpeg'",
+    bytes: '1',
+    recipe: "'0-0-1-1-jpg-1'",
+  },
 }
 
 function candidates(
@@ -429,7 +448,11 @@ export async function seedTwoWorkspaces(
         const forced = shape[column.column_name]
         if (forced !== undefined) {
           names.push(`"${column.column_name}"`)
-          ladders.push([forced])
+          // `%WORKSPACE%` is substituted with THIS row's workspace uuid. Needed
+          // for a CHECK that ties a column to the tenant rather than to a fixed
+          // vocabulary — `asset_derivatives.storage_path` must begin with its own
+          // workspace's uuid, so one literal cannot serve both rows.
+          ladders.push([forced.split('%WORKSPACE%').join(workspace)])
           continue
         }
         if (column.column_name === 'workspace_id') {
