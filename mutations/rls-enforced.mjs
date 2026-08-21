@@ -91,6 +91,24 @@ export default {
         '  return db',
     },
     {
+      // THE MUTANT THAT PROVES THE APPEND-ONLY PROBE IS ABOUT THE TRIGGER.
+      //
+      // `credit_ledger` above is the same idea on a table that HAS a
+      // `workspace_id`. This one does not — Radar's snapshots hang off a globally
+      // shared competitor — and that difference is the whole point. The probe used
+      // to be `update t set workspace_id = workspace_id`, so on this table Postgres
+      // raised "column does not exist", the catch counted it as the guard REFUSING,
+      // and a table with no trigger at all passed for the same reason. The column
+      // is now read from `pg_index`, and this mutant is what keeps that true.
+      name: 'competitor_snapshots becomes rewritable — a guarded table with no workspace_id',
+      file: 'packages/db/tests/helpers/pglite-tenant.ts',
+      find: '  await db.exec(SUPABASE_GRANTS)\n  return db',
+      replace:
+        '  await db.exec(SUPABASE_GRANTS)\n' +
+        '  await db.exec(`drop trigger block_mutations on competitor_snapshots`) // MUTANT\n' +
+        '  return db',
+    },
+    {
       // The seeder disables every trigger to insert its rows. If it stops
       // putting them back, the whole database is handed to later assertions with
       // its guards down — a harness telling its own tests what to conclude.
