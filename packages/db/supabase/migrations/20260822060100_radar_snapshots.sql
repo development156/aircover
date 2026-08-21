@@ -531,7 +531,7 @@ grant execute on function app.radar_workspace_spend_today(uuid) to service_role;
 -- Neither carries a workspace_id — they hang off a source, which hangs off a
 -- competitor, which is global. So each gets the same hand-written rule as the
 -- registry: visible only if one of my workspaces subscribes to the competitor
--- this belongs to. Read the header of 20260822000000_radar_registry.sql before
+-- this belongs to. Read the header of 20260822060000_radar_registry.sql before
 -- changing either.
 create policy t_select on competitor_snapshots for select to authenticated
   using (
