@@ -46,7 +46,7 @@ export function SeenMark({ className }: { className?: string }) {
       data-radar-certainty="seen"
       title="Radar read this on a public page, on the date shown."
       className={cn(
-        'is-real inline-flex shrink-0 items-center gap-1 rounded-sm px-[7px] py-[2px] text-[11px] leading-[16px] font-semibold',
+        'type-chip is-real inline-flex shrink-0 items-center gap-1 rounded-sm px-2 py-0.5',
         className,
       )}
     >
@@ -71,7 +71,7 @@ export function ReadMark({ className }: { className?: string }) {
       data-radar-certainty="read"
       title="Sahoda's interpretation. Nobody observed this."
       className={cn(
-        'is-simulated inline-flex shrink-0 items-center gap-1 rounded-sm px-[7px] py-[2px] text-[11px] leading-[16px] font-semibold',
+        'type-chip is-simulated inline-flex shrink-0 items-center gap-1 rounded-sm px-2 py-0.5',
         className,
       )}
     >

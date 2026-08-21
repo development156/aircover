@@ -48,7 +48,7 @@ export function ChangeCard({
       {/* ── WHAT WE SAW ───────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-2">
         <div className="flex items-start gap-2">
-          <SeenMark className="mt-[2px]" />
+          <SeenMark className="mt-0.5" />
           <p className="type-body min-w-0 flex-1 text-ink">{change.observation.summary}</p>
         </div>
 
@@ -71,7 +71,7 @@ export function ChangeCard({
           className="is-simulated flex flex-col gap-2 rounded-card p-3"
         >
           <div className="flex items-start gap-2">
-            <ReadMark className="mt-[2px]" />
+            <ReadMark className="mt-0.5" />
             <p className="type-body min-w-0 flex-1 text-ink">{change.reading.text}</p>
           </div>
           {change.reading.brandBasis ? (
