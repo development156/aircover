@@ -108,7 +108,9 @@ const SURFACE_KINDS: Record<InboxSurfaceKey, readonly string[]> = {
  */
 export async function readStoredThreads(
   surface: InboxSurfaceKey,
-  options: { connectedAccounts: number; historyAvailable?: boolean } = { connectedAccounts: 0 },
+  options: { connectedAccounts: number; historyAvailable?: boolean; historyRows?: number } = {
+    connectedAccounts: 0,
+  },
 ): Promise<StoredInboxView> {
   const workspaceId = await activeWorkspaceId()
   if (workspaceId === null) {
@@ -159,6 +161,7 @@ export async function readStoredThreads(
         connectedAccounts: options.connectedAccounts,
         storedRows: 0,
         eventsEverReceived: false,
+        historyRows: options.historyRows,
         storeUnreadable: true,
       }),
     }
@@ -167,8 +170,33 @@ export async function readStoredThreads(
   // Only asked when it can change the answer. With rows on screen the distinction
   // between "no events yet" and "events but none of these" is not being rendered,
   // so the count is a query nobody reads.
-  const everReceived =
-    rows.length > 0 ? true : ((await hasEverReceivedEvents(workspaceId)) ?? false)
+  //
+  // ── THE THIRD VALUE IS USED, NOT COALESCED AWAY ─────────────────────────────
+  // `hasEverReceivedEvents` returns null for "we could not tell", and its own
+  // comment says at length that this differs from "none have arrived". The first
+  // version of this line then wrote `?? false`, discarding exactly that — the same
+  // class of defect as the dead `updated_at` expression deleted from the ingest: a
+  // comment asserting a guarantee the code does not provide.
+  //
+  // A count we could not take is a store we could not fully read, so it reports
+  // `storeUnreadable` and the classifier refuses every claim about the contents.
+  // Coalescing to false would render "nothing has come through yet" on the strength
+  // of a query that failed.
+  const everReceived = rows.length > 0 ? true : await hasEverReceivedEvents(workspaceId)
+
+  if (everReceived === null) {
+    return {
+      rows,
+      decision: decideStoreSurface({
+        surface,
+        connectedAccounts: options.connectedAccounts,
+        storedRows: rows.length,
+        eventsEverReceived: false,
+        historyRows: options.historyRows,
+        storeUnreadable: true,
+      }),
+    }
+  }
 
   return {
     rows,
@@ -178,6 +206,7 @@ export async function readStoredThreads(
       storedRows: rows.length,
       eventsEverReceived: everReceived,
       historyAvailable: options.historyAvailable,
+      historyRows: options.historyRows,
     }),
   }
 }

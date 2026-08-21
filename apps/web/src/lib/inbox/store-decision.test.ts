@@ -137,6 +137,27 @@ describe('the render path cannot be taken down by Zernio', () => {
     expect(source).not.toMatch(/\bfetch\s*\(/)
   })
 
+  it('conversations.ts touches Zernio ONLY through the bounded supplement', () => {
+    // THE GUARD WAS POINTED AT THE WRONG FILE. `store-read.ts` importing nothing
+    // Zernio-shaped is true and not the claim that matters: the module the PAGE
+    // calls is `conversations.ts`, and it does import the live read. What has to be
+    // true there is narrower — that the one Zernio-touching call is DEADLINED, so an
+    // unreachable host cannot hang a server component.
+    //
+    // A try/catch is not enough and this asserts the difference: an unreachable host
+    // hangs rather than rejecting, and an unbounded await never reaches the catch.
+    const source = readFileSync(resolve(import.meta.dirname, 'conversations.ts'), 'utf8')
+
+    // Exactly one call site, and it is inside the raced helper.
+    expect(source.match(/readConversations\(/g) ?? []).toHaveLength(1)
+    expect(source).toMatch(/Promise\.race\(\[readConversations\(\)/)
+    // The deadline is a real number, not an optional argument someone can omit.
+    expect(source).toMatch(/SUPPLEMENT_DEADLINE_MS\s*=\s*[\d_]+/)
+    // And the timer is always cleared, or a fast answer still holds the invocation
+    // open for the whole deadline.
+    expect(source).toMatch(/clearTimeout/)
+  })
+
   it('store-decision.ts is pure — no database, no network, no clock', () => {
     const source = readFileSync(resolve(import.meta.dirname, 'store-decision.ts'), 'utf8')
     expect(source).not.toMatch(/\bfetch\s*\(|createServerSupabase|Date\.now/)

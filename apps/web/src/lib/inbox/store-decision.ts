@@ -65,6 +65,16 @@ export interface StoreDecideInput {
   /** Rows this surface found in the store. */
   storedRows: number
   /**
+   * Rows the live history supplement contributed.
+   *
+   * Load-bearing, and the reason is the state production is in TODAY: with no
+   * subscription registered the store is empty for every workspace, so without this
+   * a customer with two hundred real conversations would be told "nothing has come
+   * through yet" while their history sat on the screen underneath the sentence.
+   * Rows are rows, whichever half of the read found them.
+   */
+  historyRows?: number
+  /**
    * Has ANY webhook event ever been recorded for this workspace?
    *
    * This is the whole point of the module. It is a count of
@@ -98,7 +108,9 @@ export function decideStoreSurface(input: StoreDecideInput): StoreDecision {
     }
   }
 
-  if (input.storedRows > 0) {
+  // Rows from EITHER source mean there is a list. Which half found them decides
+  // only the caveat below, never whether anything is shown.
+  if (input.storedRows > 0 || (input.historyRows ?? 0) > 0) {
     // Rows exist. The only question left is whether the history behind them is
     // complete, and `false` is the one value that means "we tried and could not".
     return input.historyAvailable === false
@@ -125,8 +137,11 @@ export function decideStoreSurface(input: StoreDecideInput): StoreDecision {
     }
   }
 
-  // CONNECTED, NOTHING STORED, AND NOTHING HAS EVER ARRIVED. The state this module
-  // exists for. Claiming "no messages" here would be a measurement nobody took.
+  // CONNECTED, NOTHING FROM EITHER SOURCE, AND NOTHING HAS EVER ARRIVED. The state
+  // this module exists for. Claiming "no messages" here would be a measurement
+  // nobody took. Reachable only when the history read also came back empty or
+  // failed, which is what makes it a statement about delivery rather than a
+  // statement about the customer.
   if (!input.eventsEverReceived) {
     return {
       state: 'awaiting_first_event',

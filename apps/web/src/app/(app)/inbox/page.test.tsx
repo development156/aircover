@@ -17,14 +17,14 @@ import { render, screen } from '@testing-library/react'
 
 const readConversations = vi.fn()
 const readStoredThreads = vi.fn()
-const countAccounts = vi.fn(async () => 1)
+const countAccounts = vi.fn(async (_surface: string) => 1)
 
 vi.mock('@/lib/inbox/read', () => ({
-  readConversations: (...a: unknown[]) => readConversations(...a),
-  countAccounts: (...a: unknown[]) => countAccounts(...a),
+  readConversations: () => readConversations(),
+  countAccounts: (surface: string) => countAccounts(surface),
 }))
 vi.mock('@/lib/inbox/store-read', () => ({
-  readStoredThreads: (...a: unknown[]) => readStoredThreads(...a),
+  readStoredThreads: (surface: string, options: unknown) => readStoredThreads(surface, options),
 }))
 
 const { default: InboxMessagesPage } = await import('./page')
@@ -141,6 +141,90 @@ describe('the inbox with Zernio unreachable', () => {
   })
 })
 
+describe('the history supplement actually supplies history', () => {
+  it('SHOWS existing conversations when the store is empty and Zernio answers', async () => {
+    // THE REGRESSION THIS WHOLE DESIGN EXISTS TO AVOID, and the state production is
+    // in RIGHT NOW: no subscription registered, so the store is empty for every
+    // workspace. A customer with 200 real conversations must not be told "nothing
+    // has come through yet" — that would be permanent, not transitional, because
+    // webhooks never backfill and Zernio has no replay endpoint.
+    readConversations.mockResolvedValue({
+      rows: [
+        { id: 'h1', platform: 'instagram', accountId: 'a', participantName: 'Older' },
+        { id: 'h2', platform: 'instagram', accountId: 'a', participantName: 'Oldest' },
+      ],
+      decision: { showList: true },
+      nextCursor: null,
+    })
+    readStoredThreads.mockImplementation(async (_s, opts) => ({
+      rows: [],
+      decision: decisionFor({
+        surface: 'conversations',
+        connectedAccounts: 1,
+        storedRows: 0,
+        eventsEverReceived: false,
+        historyAvailable: (opts as { historyAvailable?: boolean }).historyAvailable,
+        historyRows: (opts as { historyRows?: number }).historyRows,
+      }),
+    }))
+
+    render(await InboxMessagesPage())
+
+    expect(screen.getByText('Older')).toBeInTheDocument()
+    expect(screen.getByText('Oldest')).toBeInTheDocument()
+  })
+
+  it('puts stored rows FIRST and history behind them, deduped on the thread id', async () => {
+    // The store is authoritative: where both know a thread, the store's row wins,
+    // because it is the one an arriving event keeps current.
+    readConversations.mockResolvedValue({
+      rows: [
+        { id: 'shared', platform: 'instagram', accountId: 'a', participantName: 'StaleCopy' },
+        { id: 'onlyLive', platform: 'instagram', accountId: 'a', participantName: 'Older' },
+      ],
+      decision: { showList: true },
+      nextCursor: null,
+    })
+    readStoredThreads.mockResolvedValue({
+      rows: [storedRow('shared', 'FreshCopy')],
+      decision: decisionFor({
+        surface: 'conversations',
+        connectedAccounts: 1,
+        storedRows: 1,
+        eventsEverReceived: true,
+        historyAvailable: true,
+        historyRows: 2,
+      }),
+    })
+
+    render(await InboxMessagesPage())
+
+    expect(screen.getByText('FreshCopy')).toBeInTheDocument()
+    expect(screen.queryByText('StaleCopy')).not.toBeInTheDocument()
+    expect(screen.getByText('Older')).toBeInTheDocument()
+  })
+
+  it('does not hang the page when the live read never resolves', async () => {
+    // An unreachable host HANGS; it does not reject promptly. The earlier tests
+    // rejected, which is the easy half. A server component awaiting an unbounded
+    // fetch blocks the whole render and no try/catch saves it.
+    readConversations.mockImplementation(() => new Promise(() => {}))
+    readStoredThreads.mockImplementation(async (_s, opts) => ({
+      rows: [storedRow('c1', 'Priya')],
+      decision: decisionFor({
+        surface: 'conversations',
+        connectedAccounts: 1,
+        storedRows: 1,
+        eventsEverReceived: true,
+        historyAvailable: (opts as { historyAvailable?: boolean }).historyAvailable,
+      }),
+    }))
+
+    render(await InboxMessagesPage())
+    expect(screen.getByText('Priya')).toBeInTheDocument()
+  }, 10_000)
+})
+
 describe('what it refuses to claim', () => {
   it('does NOT say the customer has no conversations before the first event', async () => {
     // Webhooks deliver nothing that happened before the subscription, and there is no
@@ -181,9 +265,18 @@ describe('what it refuses to claim', () => {
 })
 
 describe('the store is what the page trusts', () => {
-  it('renders the STORE rows, not the live ones, when both answer', async () => {
+  it('prefers the STORE copy of a thread both halves know', async () => {
+    // NOT "the live rows are discarded" — that is what this test asserted before the
+    // merge existed, and it was pinning a defect: discarding them is precisely the
+    // regression that would have hidden every pre-subscription conversation.
+    //
+    // The real property is narrower and is about COLLISIONS: where both halves know
+    // a thread, the store's row wins, because it is the one an arriving event keeps
+    // current while the live copy is a snapshot of render time.
     readConversations.mockResolvedValue({
-      rows: [{ id: 'live1', platform: 'instagram', accountId: 'a', participantName: 'FromZernio' }],
+      rows: [
+        { id: 's1', platform: 'instagram', accountId: 'a', participantName: 'StaleCopy' },
+      ],
       decision: { showList: true },
       nextCursor: null,
     })
@@ -195,12 +288,13 @@ describe('the store is what the page trusts', () => {
         storedRows: 1,
         eventsEverReceived: true,
         historyAvailable: true,
+        historyRows: 1,
       }),
     })
 
     render(await InboxMessagesPage())
 
     expect(screen.getByText('FromStore')).toBeInTheDocument()
-    expect(screen.queryByText('FromZernio')).not.toBeInTheDocument()
+    expect(screen.queryByText('StaleCopy')).not.toBeInTheDocument()
   })
 })
