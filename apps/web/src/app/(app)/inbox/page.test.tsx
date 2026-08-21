@@ -229,7 +229,11 @@ describe('what it refuses to claim', () => {
   it('does NOT say the customer has no conversations before the first event', async () => {
     // Webhooks deliver nothing that happened before the subscription, and there is no
     // replay endpoint. An empty store on day one is not a reading of the inbox.
-    readConversations.mockResolvedValue({ rows: [], decision: { showList: true }, nextCursor: null })
+    readConversations.mockResolvedValue({
+      rows: [],
+      decision: { showList: true },
+      nextCursor: null,
+    })
     readStoredThreads.mockResolvedValue({
       rows: [],
       decision: decisionFor({
@@ -246,7 +250,11 @@ describe('what it refuses to claim', () => {
   })
 
   it('DOES say empty once events have arrived and none were conversations', async () => {
-    readConversations.mockResolvedValue({ rows: [], decision: { showList: true }, nextCursor: null })
+    readConversations.mockResolvedValue({
+      rows: [],
+      decision: { showList: true },
+      nextCursor: null,
+    })
     readStoredThreads.mockResolvedValue({
       rows: [],
       decision: decisionFor({
@@ -274,9 +282,7 @@ describe('the store is what the page trusts', () => {
     // a thread, the store's row wins, because it is the one an arriving event keeps
     // current while the live copy is a snapshot of render time.
     readConversations.mockResolvedValue({
-      rows: [
-        { id: 's1', platform: 'instagram', accountId: 'a', participantName: 'StaleCopy' },
-      ],
+      rows: [{ id: 's1', platform: 'instagram', accountId: 'a', participantName: 'StaleCopy' }],
       decision: { showList: true },
       nextCursor: null,
     })
