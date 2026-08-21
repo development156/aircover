@@ -48,3 +48,6 @@ export * from './inbox/send-window'
 // Admin Ops — /admin surface + the Claude↔dashboard sync protocol (doc 13)
 export * from './ops/state'
 export * from './ops/qa-export'
+
+export * from './radar/snapshot'
+export * from './radar/diff'
