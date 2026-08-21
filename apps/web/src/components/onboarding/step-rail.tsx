@@ -43,7 +43,7 @@ export function StepRail({ activeIndex }: StepRailProps) {
                 'grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-semibold tabular-nums',
                 // Done is an inked disc, current is the orange one. Only one
                 // step is ever current, so orange stays rationed to it.
-                status === 'done' && 'bg-ink text-white dark:bg-white dark:text-ink',
+                status === 'done' && 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]',
                 status === 'current' && 'bg-primary text-primary-foreground',
                 status === 'upcoming' && 'bg-s2 text-muted',
               )}

@@ -39,12 +39,15 @@ export async function POST(request: Request): Promise<Response> {
      * was not the cause. Run 23 split this at the reader and named the handlers as
      * unaudited; this is one of them.
      *
-     * The caller collapses every non-ok into one sentence — "We could not read
-     * that — tell us in your own words instead" — which is a claim about the SITE
-     * the customer submitted. It is wrong for both arms and it lives in
-     * components/onboarding, which is out of scope for this run, so it is reported
-     * rather than touched. What changes here is the only thing in reach: the
-     * status a log reader sees, and the cause it is given.
+     * The caller USED TO collapse every non-ok into one sentence — "We could not
+     * read that — tell us in your own words instead" — which is a claim about
+     * the SITE the customer submitted, and wrong on every arm below because
+     * none of them opens the document. That report is now actioned: the four
+     * named causes each get their own sentence in
+     * `lib/onboarding/door-transport-failure.ts`, and `door-step.tsx` reads the
+     * code off this body rather than discarding it. Renaming a cause here
+     * without adding it there falls through to the unnamed default, which is
+     * honest but vaguer — so keep the two in step.
      */
     const workspaceRead = await readActiveWorkspace()
     if (workspaceRead.status === 'unreadable') {
@@ -86,11 +89,26 @@ export async function POST(request: Request): Promise<Response> {
           line({ type: 'done', result })
         } catch (error) {
           reportServerError(error, { action: 'door.stream', workspaceId: workspace.id })
+          /**
+           * `readDoorStreaming` RETURNING `{ ok: false }` is a classified
+           * verdict on the document and carries its own sentence. Reaching THIS
+           * catch means it THREW — an unclassified fault in Sahoda, at an
+           * unknown point, possibly before the document was opened at all.
+           *
+           * This used to emit "We could not read that — tell us in your own
+           * words instead", the same claim the caller made on every transport
+           * failure and the reason `lib/onboarding/door-transport-failure.ts`
+           * exists. It is wrong for the same reason here: it is a verdict on
+           * the customer's website issued by a code path that does not know
+           * whether the website was ever fetched, and the remedy it offers
+           * sends someone to retype their business by hand over our own crash.
+           */
           line({
             type: 'done',
             result: {
               ok: false,
-              message: 'We could not read that — tell us in your own words instead.',
+              message:
+                'Sahoda broke part-way through reading, so it cannot say whether your link or PDF is usable. Nothing was charged — try again.',
               stages: [],
               costUsd: 0,
             },

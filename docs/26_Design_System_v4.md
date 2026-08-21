@@ -800,3 +800,108 @@ build error survived 27 runs that the previous four-part gate structurally could
 **Read rendered text, not box sizes.** A regression pass that asserted widths, offsets and
 overflow flags went green at every width and shipped a rail rendering the literal string
 `"S Sah"`. Every number was right; the pixels were not.
+
+---
+
+## 13. The Signal Resolution Console
+
+`/brain/resolve`. Added in `wt-signal`; the name previously appeared in three places
+in the repo and in no route.
+
+### 13.1 RULING: the name belongs to this screen, not to onboarding
+
+`docs/05_Product_Roadmap_SAHODA_LABS.md` §4 says "Onboarding = Signal Resolution Console",
+and `docs/sahoda_brand_brain_demo.html` carries it as its `<title>`. Both are describing the
+**reference**, where the console *was* the intake wizard — six tabs of blank fields you fill
+in before anything is resolved.
+
+The product went a different way and a better one: onboarding asks one question, reads a
+door, and resolves a whole brain in one pass. That half is built and lives at `/onboarding`.
+Doc 05's sentence therefore describes a screen that exists under a different name, and the
+half the name is actually *about* — resolving what the model guessed — had never been built.
+
+**So the name now has exactly one owner: `/brain/resolve`.** Doc 05 §4 is not wrong about
+history; it is describing the port that did not happen that way. Say "onboarding" for the
+intake and "the Signal Resolution Console" for the resolution queue, and do not re-attach
+the name to a third screen.
+
+### 13.2 The two honesty rules the console adds to the system
+
+**A brain-level fact may not be rendered in a field-level slot.** `brand_guidelines` is
+handed the whole door text and returns all fifteen fields in one object. Nothing links a
+field to a passage, so "inferred from acme.com/about" cannot be built truthfully —
+`FieldMeta.source` would accept the string, and the reader would take a claim about the
+*brain* as a claim about the *field*. This is `100 of —` (§4, docs/27 §3.1) in another
+costume: a value rendered against a structure that does not exist. Origin is stated **once**,
+in the header, from `brand_memory.source`; and the absence of per-field evidence is stated
+outright rather than left for the reader to assume it is merely unshown.
+
+**A bulk accept never arrives pre-ticked.** Confirmation is the only signal the Brand Brain
+rests on — the ring counts it, the mesh writes from it, and nothing downstream can tell a
+considered tick from a rubber stamp. Selection starts empty, the primary button always names
+the count on its own face, and a blank field is excluded from select-all because there is
+nothing there to agree with.
+
+### 13.3 Entitlement is a second axis, and it is already in the data
+
+`FieldKindSchema` (`packages/shared`, `brand/audiences.ts`) says of `asked`: *"only they
+know it. NEVER guessed."* Eleven of the registry's fifteen fields are `asked`, and a resolve
+fills all fifteen — so a fresh brain holds eleven model answers to questions the contract
+says the model may not answer. That is not a bug in the resolve; a blank form is worse. It
+**is** the right ordering for a queue, and it is derived rather than asserted.
+
+`negotiated` is the opposite case and must not be ranked beside it: *"they have the instinct,
+we have the craft"*. A model proposal on `voice.descriptor` is the field working as designed.
+
+This is the same move as §3.3 — when one rung cannot separate things that differ, add a
+second **structural** axis rather than loosening the rung. Certainty says how real a field
+is; entitlement says whether Sahoda was entitled to answer it.
+
+### 13.4 There is no Checkbox primitive, and the console does not invent one
+
+§10 lists every primitive and a checkbox is not among them, because nothing before this
+needed multi-select. The console's row selector is a **native `<input type="checkbox">`,
+`sr-only`, with a drawn box beside it** — the exact construction `pick-chips.tsx` uses for
+its radios, and for the same reason: the space-bar toggle, the focus ring, the label
+association and the form semantics all come free and correct, and a hand-rolled
+`aria-checked` div gets at least one of them subtly wrong.
+
+It is deliberately **not** promoted to `components/ui/checkbox.tsx` in this branch. A
+primitive belongs on `/design-system` with every state it ships, four sessions are live, and
+one call site is not enough evidence for the shape. **If a second screen needs multi-select,
+promote it then** — and put it on the gallery in the same commit.
+
+### 13.5 `dark:text-ink` may never sit on `dark:bg-white`
+
+`--ink` **inverts**: `#000000` in light, `#ffffff` in dark. So `dark:text-ink` does not mean
+"strong text" in dark — it means, literally, white. On a dark surface that is the token doing
+its job. On `dark:bg-white` it is white on white, and the label disappears.
+
+`bg-ink text-white dark:bg-white dark:text-ink` reads as a tidy inversion and every one of
+those four tokens is individually right; the defect exists only in the combination, and only
+in one theme. **Measured on rendered pixels** by `e2e/resolution-console.spec.ts` ("the
+repaired pair is legible and the shipped pair is not"), in dark:
+
+| pair | composited | ratio |
+|---|---|---|
+| `dark:text-[var(--canvas)]` on `dark:bg-white` | `rgb(11,11,12)` on `rgb(255,255,255)` | **19.67:1** |
+| `dark:text-ink` on `dark:bg-white` — *as shipped* | `rgb(255,255,255)` on `rgb(255,255,255)` | **1.00:1** |
+
+1.00:1 is not "low contrast". It is the same colour twice. It shipped in `pick-chips.tsx` and `step-rail.tsx` **while `button.tsx`'s own
+comment named both of them as following the correct convention** — a comment asserting
+compliance is not compliance.
+
+The repair is `dark:text-[var(--canvas)]`, and the two neighbours are worth being exact
+about — MEASURED against the built stylesheet, because one of them was asserted wrongly
+while this section was being written:
+
+- `dark:text-canvas` **does** work. `globals.css` registers `--color-canvas: var(--canvas)`
+  in its `@theme` block, so Tailwind 4 generates the utility and it compiles into the *same*
+  rule, with the same `color: var(--canvas)` declaration. The bracket form is the one to use
+  only because `components/ui/button.tsx` already uses it, and one spelling per convention
+  beats two correct ones.
+- `dark:text-[--canvas]` does **not** compile. A bare custom property inside the brackets
+  emits no rule at all, so the class is inert and the element keeps whatever it inherited —
+  a near-miss that fails by looking exactly like the bug it was meant to fix.
+
+Guarded mechanically by `src/lib/design/dark-ink-on-white.test.ts`.

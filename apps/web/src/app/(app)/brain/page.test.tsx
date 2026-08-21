@@ -49,6 +49,10 @@ const OK = {
   provenance: new Map(),
   meta: undefined,
   intake: undefined,
+  // `brand_memory.source`. Added when the resolution console began rendering it;
+  // 'resolved' is what a model resolve actually writes, which is what this
+  // fixture represents.
+  source: 'resolved',
 }
 
 beforeEach(() => {

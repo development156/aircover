@@ -65,7 +65,7 @@ export function PickChips<T extends string>({
                 'inline-flex h-7 cursor-pointer items-center rounded-full px-[10px] text-[13px] font-[550] transition-micro',
                 'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent',
                 checked
-                  ? 'bg-ink text-white dark:bg-white dark:text-ink'
+                  ? 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'
                   : 'text-muted shadow-[inset_0_0_0_1px_var(--line)] hover:text-ink hover:shadow-[inset_0_0_0_1px_var(--line-firm)]',
                 // A guessed-and-still-unconfirmed pick stays visibly provisional.
                 checked && assumed && 'shadow-[inset_0_0_0_1px_var(--line-firm)]',
