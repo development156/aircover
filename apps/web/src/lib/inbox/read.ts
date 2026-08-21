@@ -81,7 +81,7 @@ const activeWorkspaceId = cache(async (): Promise<string | null> => {
  * about is what makes this a measurement rather than a guess, and it stays correct
  * after the migration that widens the platform CHECK.
  */
-async function countAccounts(surface: InboxSurfaceKey): Promise<number> {
+export async function countAccounts(surface: InboxSurfaceKey): Promise<number> {
   try {
     const workspaceId = await activeWorkspaceId()
     if (workspaceId === null) return 0

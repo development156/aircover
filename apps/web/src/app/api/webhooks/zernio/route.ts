@@ -67,7 +67,12 @@ function handler(): Handler | null {
       try {
         await client.query('begin')
         const result = await fn({
-          query: (sql, params) => client.query(sql, params as unknown[]),
+          // `pg` types `query` as returning QueryResult<QueryResultRow>, whose
+          // `rows` is not assignable to the caller's `R[]`. The cast is at the
+          // ADAPTER, where the shape is asserted once, rather than widening
+          // `Queryable` to `any` and losing the types at every call site.
+          query: <R>(sql: string, params?: unknown[]) =>
+            client.query(sql, params as unknown[]) as unknown as Promise<{ rows: R[] }>,
         })
         await client.query('commit')
         return result
