@@ -24,7 +24,7 @@
  * `saveBrandMemory` documents what each value means; this file turns that into
  * something a customer can read.
  */
-export type BrainOriginKind = 'resolved' | 'manual' | 'system' | 'unknown'
+export type BrainOriginKind = 'resolved' | 'manual' | 'system' | 'learned' | 'unknown'
 
 export interface BrainOrigin {
   kind: BrainOriginKind
@@ -49,7 +49,69 @@ export interface BrainOrigin {
  * That is the single worst outcome this console could produce, so it is called
  * out before the queue rather than inside it.
  */
-export function brainOrigin(source: string | null | undefined): BrainOrigin {
+/**
+ * What `brainOrigin` needs beyond the stored column, and why it needs anything.
+ *
+ * ── THE COLLISION, MEASURED AGAINST PRODUCTION 2026-08-22 ───────────────────
+ * `public.resolve_memory_event`'s accept branch writes a new version with
+ * `source = 'system'`. So does the model-unreachable fallback. They are two
+ * entirely different events sharing one stored value, and the column has room
+ * for exactly three:
+ *
+ *     BEFORE  {"version":1,"source":"resolved"}
+ *     ACCEPT  {"status":"accepted","brand_memory_version":2}
+ *     AFTER   {"version":2,"source":"system"}
+ *
+ * The consequence was live before this file was touched: a person who accepted
+ * a learning — the Loop's whole point, wired to a real button in
+ * `app/actions/loop-controls.ts` — was then told by this console that their
+ * entire Brand Brain is "a sample, not your brand… These are not answers about
+ * your business." The most reassuring action in the product produced the most
+ * alarming sentence in it.
+ *
+ * ── WHY THIS AND NOT A FOURTH `source` VALUE ────────────────────────────────
+ * A fourth value means a migration AND a change to `BrandMemorySourceSchema`,
+ * which `public.resolve_brand_memory` validates and which onboarding, the
+ * editor and the fallback all write. That is a frozen contract moved to fix a
+ * rendering bug.
+ *
+ * `memory_events.applied_memory_version` already records exactly this, and it
+ * is a stored fact rather than an inference: an accepted event carrying THIS
+ * version number means this version was written by that accept. The probe above
+ * printed it in the same breath — `[{"status":"accepted","applied_memory_version":2}]`.
+ * So the distinction is read, not guessed, and nothing frozen moves.
+ */
+export interface BrainOriginContext {
+  /**
+   * True when an ACCEPTED `memory_events` row names this exact brain version.
+   *
+   * Only consulted when `source` is `system`, because that is the only value
+   * two different events share. `false` is the honest default: it means no
+   * accepted learning claims this version, which for a real fallback is the
+   * truth.
+   */
+  appliedFromLearning?: boolean
+}
+
+export function brainOrigin(
+  source: string | null | undefined,
+  context: BrainOriginContext = {},
+): BrainOrigin {
+  /**
+   * CHECKED BEFORE THE SWITCH, and only for `system`. A learning accepted onto a
+   * brain that was `resolved` or `manual` cannot arrive here as those values —
+   * the RPC overwrites `source` — so there is no case where this would shadow a
+   * value that is already correct.
+   */
+  if (source === 'system' && context.appliedFromLearning) {
+    return {
+      kind: 'learned',
+      label: 'Updated by a learning you accepted',
+      line: 'This version is the previous one with a change you approved merged into it. Everything else is exactly as it was, and fields nobody has confirmed are still Sahoda’s.',
+      isSample: false,
+    }
+  }
+
   switch (source) {
     case 'resolved':
       return {

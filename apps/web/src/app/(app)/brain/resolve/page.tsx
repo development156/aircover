@@ -101,7 +101,11 @@ export default async function ResolveConsolePage() {
 
   return (
     <div className="flex flex-col gap-grid">
-      <OriginNote source={brain.source} version={brain.version} />
+      <OriginNote
+        source={brain.source}
+        version={brain.version}
+        appliedFromLearning={brain.appliedFromLearning}
+      />
 
       {/*
         THE FINDING, stated before the queue.
