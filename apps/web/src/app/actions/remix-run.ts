@@ -168,11 +168,7 @@ export async function runRemixBatch(batchId: string): Promise<RunState> {
       derivatives,
     })
 
-    await store.setBatchStatus(
-      batchId,
-      workspaceId,
-      outcome.drafts > 0 ? 'done' : 'failed',
-    )
+    await store.setBatchStatus(batchId, workspaceId, outcome.drafts > 0 ? 'done' : 'failed')
 
     revalidateBalance()
     revalidatePath('/remix')

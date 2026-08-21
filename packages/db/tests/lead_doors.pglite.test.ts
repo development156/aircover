@@ -169,7 +169,10 @@ describe('door 1 · lead_submit', () => {
   it('REFUSAL 3 · neither anon nor a signed-in member may call it at all', async () => {
     for (const role of ['anon', 'authenticated'] as const) {
       const result = await asRole(db, role, { sub: USER_A, role }, (tx) =>
-        probe(tx, `select public.lead_submit('corner-bakery','X','x@e.com',null,null,'{}'::jsonb,null)`),
+        probe(
+          tx,
+          `select public.lead_submit('corner-bakery','X','x@e.com',null,null,'{}'::jsonb,null)`,
+        ),
       )
       // service_role only. A signed-in customer posting as if a stranger had
       // left an enquiry is lead forgery with a friendly face.
@@ -308,7 +311,9 @@ describe('the doors did not open anything else', () => {
 
   it('a member still cannot DELETE a lead, even in their own tenant', async () => {
     const before = await leadCount(WS_A)
-    await asMember(db, USER_A, (tx) => probe(tx, `delete from leads where workspace_id = $1`, [WS_A]))
+    await asMember(db, USER_A, (tx) =>
+      probe(tx, `delete from leads where workspace_id = $1`, [WS_A]),
+    )
     // No delete policy means no visible row to delete — a silent no-op, not an
     // error. The count is the only thing that can tell the difference.
     expect(await leadCount(WS_A)).toBe(before)

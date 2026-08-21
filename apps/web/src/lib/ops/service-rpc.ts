@@ -152,8 +152,7 @@ export async function linkClerkUser(email: string, clerkUserId: string): Promise
 }
 
 export type LeadSubmitOutcome =
-  | { ok: true; id: string }
-  | { ok: false; reason: 'no_such_site' | 'no_contact' | 'unavailable' }
+  { ok: true; id: string } | { ok: false; reason: 'no_such_site' | 'no_contact' | 'unavailable' }
 
 /**
  * The public SITE form's only write.

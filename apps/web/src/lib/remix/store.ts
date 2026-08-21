@@ -106,10 +106,7 @@ export async function createBatch(input: {
   return { batch: batch.data, derivatives }
 }
 
-export async function readBatch(
-  batchId: string,
-  workspaceId: string,
-): Promise<RemixBatch | null> {
+export async function readBatch(batchId: string, workspaceId: string): Promise<RemixBatch | null> {
   const supabase = createServerSupabase()
   const { data } = await supabase
     .from('remix_batches')

@@ -32,13 +32,7 @@ export type RemixKind = z.infer<typeof RemixKindSchema>
  * person who saw a total. See the migration header for why the halt is a stored
  * fact rather than a branch.
  */
-export const RemixBatchStatusSchema = z.enum([
-  'planned',
-  'approved',
-  'running',
-  'done',
-  'failed',
-])
+export const RemixBatchStatusSchema = z.enum(['planned', 'approved', 'running', 'done', 'failed'])
 export type RemixBatchStatus = z.infer<typeof RemixBatchStatusSchema>
 
 export const RemixDerivativeStatusSchema = z.enum(['pending', 'written', 'failed', 'skipped'])

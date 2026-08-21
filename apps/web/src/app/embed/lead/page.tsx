@@ -39,7 +39,8 @@ export default async function EmbedLeadPage({
   const slug = typeof rawSite === 'string' && SLUG.test(rawSite.trim()) ? rawSite.trim() : null
 
   const rawSrc = Array.isArray(params.src) ? params.src[0] : params.src
-  const source = typeof rawSrc === 'string' && rawSrc.trim() !== '' ? rawSrc.trim().slice(0, 200) : null
+  const source =
+    typeof rawSrc === 'string' && rawSrc.trim() !== '' ? rawSrc.trim().slice(0, 200) : null
 
   // Read directly rather than through the env schema: Next inlines
   // NEXT_PUBLIC_* by literal text substitution at build time, and routing it
@@ -48,15 +49,15 @@ export default async function EmbedLeadPage({
 
   return (
     <main className="mx-auto w-full max-w-[440px] p-4">
-      <h1 className="text-[20px] leading-7 font-[650] tracking-[-0.02em]">Get in touch</h1>
-      <p className="mt-[2px] mb-4 text-[13px] text-muted">
+      <h1 className="type-h2">Get in touch</h1>
+      <p className="type-body mt-0.5 mb-4 text-muted">
         Leave your details and they will come back to you.
       </p>
 
       {slug === null ? (
         // The embed code is wrong, and saying so plainly is better than a form
         // that takes an enquiry nothing can deliver.
-        <p role="alert" className="rounded-input bg-warn-bg px-3 py-2 text-[13px] text-warn">
+        <p role="alert" className="type-body rounded-input bg-warn-bg px-3 py-2 text-warn">
           This form is missing the site it belongs to, so it cannot take enquiries yet.
         </p>
       ) : (

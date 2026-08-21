@@ -220,13 +220,10 @@ export function BatchPreview({ batch }: BatchPreviewProps) {
  */
 function NotEnough({ required, available }: { required: number; available: number }) {
   return (
-    <p
-      role="alert"
-      className="mt-3 rounded-input bg-warn-subtle p-3 type-sm text-ink"
-    >
+    <p role="alert" className="mt-3 rounded-input bg-warn-subtle p-3 type-sm text-ink">
       This batch needs <span className="num">{required}</span>{' '}
-      {required === 1 ? 'credit' : 'credits'} and you have{' '}
-      <span className="num">{available}</span>. Nothing was written and nothing was charged.{' '}
+      {required === 1 ? 'credit' : 'credits'} and you have <span className="num">{available}</span>.
+      Nothing was written and nothing was charged.{' '}
       <Link href="/wallet" className="font-semibold underline underline-offset-2">
         Top up your wallet
       </Link>
@@ -261,15 +258,14 @@ function BatchDone({ batch, outcome }: { batch: BatchView; outcome: Outcome }) {
       </p>
       {failedKinds > 0 ? (
         <p role="status" className="type-sm mt-2 text-muted">
-          <span className="num">{failedKinds}</span>{' '}
-          {failedKinds === 1 ? 'row' : 'rows'} came back empty and{' '}
-          {failedKinds === 1 ? 'was' : 'were'} not charged.
+          <span className="num">{failedKinds}</span> {failedKinds === 1 ? 'row' : 'rows'} came back
+          empty and {failedKinds === 1 ? 'was' : 'were'} not charged.
         </p>
       ) : null}
       {outcome.kind === 'made' ? (
         <p className="type-sm mt-2 text-muted">
-          <span className="num">{outcome.spent}</span>{' '}
-          {outcome.spent === 1 ? 'credit' : 'credits'} charged.
+          <span className="num">{outcome.spent}</span> {outcome.spent === 1 ? 'credit' : 'credits'}{' '}
+          charged.
         </p>
       ) : null}
     </section>

@@ -155,8 +155,7 @@ export function PlanBatch({ posts }: PlanBatchProps) {
       {/* THE NUMBER, before the batch exists. Same function the runner charges
           from, so it is the figure that will be approved rather than a guess. */}
       <p className="type-body mt-4 text-muted">
-        This would write{' '}
-        <span className="num text-ink">{cost.includedCount}</span>{' '}
+        This would write <span className="num text-ink">{cost.includedCount}</span>{' '}
         {cost.includedCount === 1 ? 'draft' : 'drafts'} for{' '}
         <span className="num text-ink">{cost.totalCredits}</span>{' '}
         {cost.totalCredits === 1 ? 'credit' : 'credits'}. Adding a channel adds a draft, not a

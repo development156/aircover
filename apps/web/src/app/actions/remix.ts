@@ -66,7 +66,10 @@ export async function planRemix(
     const post = await getPost(sourcePostId)
     if (!post) return { ok: false, message: "You don't have access to this post." }
     if ((post.body ?? '').trim() === '') {
-      return { ok: false, message: 'This post has no words in it yet, so there is nothing to remix.' }
+      return {
+        ok: false,
+        message: 'This post has no words in it yet, so there is nothing to remix.',
+      }
     }
 
     const derivatives = planDerivatives(wantedKinds, wantedChannels)

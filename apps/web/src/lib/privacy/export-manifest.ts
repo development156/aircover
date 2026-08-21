@@ -86,7 +86,11 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { table: 'assets', readability: 'readable', describes: 'your picture library' },
   { table: 'audience_snapshots', readability: 'readable', describes: 'who follows you' },
   { table: 'audit_logs', readability: 'readable', describes: 'a record of admin actions' },
-  { table: 'billing_profiles', readability: 'readable', describes: 'who your invoices are made out to' },
+  {
+    table: 'billing_profiles',
+    readability: 'readable',
+    describes: 'who your invoices are made out to',
+  },
   { table: 'brand_memory', readability: 'readable', describes: 'your Brand Brain' },
   { table: 'campaign_posts', readability: 'readable', describes: 'posts inside campaigns' },
   { table: 'campaigns', readability: 'readable', describes: 'your campaigns' },

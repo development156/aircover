@@ -94,9 +94,7 @@ describe('the preview and the runner cannot disagree', () => {
       // Two channels' worth of every chosen kind, so the one-call collapse is
       // actually exercised rather than being trivially true at a count of one.
       const derivatives = chosen.flatMap((kind) => [derivative(kind), derivative(kind)])
-      expect(chargeTotal(plannedCharges(derivatives))).toBe(
-        previewBatch(derivatives).totalCredits,
-      )
+      expect(chargeTotal(plannedCharges(derivatives))).toBe(previewBatch(derivatives).totalCredits)
     },
   )
 

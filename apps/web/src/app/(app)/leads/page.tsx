@@ -107,9 +107,7 @@ function Doors({ slug }: { slug: string | null }) {
         <h2 id="leads-doors" className="type-h2">
           How someone gets in
         </h2>
-        <p className="type-body mt-1 max-w-[68ch] text-muted">
-          Two ways, and both of them work.
-        </p>
+        <p className="type-body mt-1 max-w-[68ch] text-muted">Two ways, and both of them work.</p>
       </div>
 
       <div className="grid gap-3 wide:grid-cols-2">
@@ -117,8 +115,8 @@ function Doors({ slug }: { slug: string | null }) {
           <FileInput size={16} strokeWidth={1.8} aria-hidden className="text-muted" />
           <h3 className="type-h3 mt-1.5 text-ink">A contact form on your site</h3>
           <p className="type-sm mt-1 text-muted">
-            Paste this into any page you already have. It carries a captcha and a rate limit, and
-            an enquiry lands here the moment it is sent.
+            Paste this into any page you already have. It carries a captcha and a rate limit, and an
+            enquiry lands here the moment it is sent.
           </p>
           {slug ? (
             <pre className="mt-2 overflow-x-auto rounded-input bg-subtle p-2.5 type-sm">
@@ -126,8 +124,8 @@ function Doors({ slug }: { slug: string | null }) {
             </pre>
           ) : (
             <p className="type-sm mt-2 text-muted">
-              The embed code appears once you have a site — it names which site the enquiry
-              belongs to.{' '}
+              The embed code appears once you have a site — it names which site the enquiry belongs
+              to.{' '}
               <Link href="/sites" className="font-[550] text-accent underline underline-offset-2">
                 Make one
               </Link>
@@ -136,9 +134,9 @@ function Doors({ slug }: { slug: string | null }) {
           )}
           <p className="type-sm mt-2 text-muted">
             A Sahoda site does not yet carry this form of its own. It needs two things: an address
-            the public can reach, which Sites v0 does not deploy to yet, and a captcha widget
-            inside the generated page — a plain HTML form cannot carry a token, and an enquiry
-            endpoint without one would be open to anybody.
+            the public can reach, which Sites v0 does not deploy to yet, and a captcha widget inside
+            the generated page — a plain HTML form cannot carry a token, and an enquiry endpoint
+            without one would be open to anybody.
           </p>
         </article>
 
@@ -146,8 +144,8 @@ function Doors({ slug }: { slug: string | null }) {
           <Inbox size={16} strokeWidth={1.8} aria-hidden className="text-muted" />
           <h3 className="type-h3 mt-1.5 text-ink">A message in your inbox</h3>
           <p className="type-sm mt-1 text-muted">
-            A comment, review or message that turns out to be somebody wanting to buy becomes a
-            lead from the{' '}
+            A comment, review or message that turns out to be somebody wanting to buy becomes a lead
+            from the{' '}
             <Link href="/inbox" className="font-[550] text-accent underline underline-offset-2">
               inbox
             </Link>

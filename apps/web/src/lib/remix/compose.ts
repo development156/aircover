@@ -105,11 +105,7 @@ export async function composeKind(input: {
   const instruction = INSTRUCTION[kind]
   if (!instruction) throw new ComposeError(COMPOSE_FAILURE.MESH_ERROR)
 
-  const result = await mesh.runTask(
-    captionRewriteTask.def,
-    { text: sourceBody, instruction },
-    ctx,
-  )
+  const result = await mesh.runTask(captionRewriteTask.def, { text: sourceBody, instruction }, ctx)
   if (!result.ok) throw new ComposeError(COMPOSE_FAILURE.MESH_ERROR)
   const text = result.data.text.trim()
   if (text === '') throw new ComposeError(COMPOSE_FAILURE.EMPTY)

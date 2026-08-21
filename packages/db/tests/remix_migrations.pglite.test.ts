@@ -53,9 +53,10 @@ beforeAll(async () => {
  * error for the plain constraint checks below. Autocommit means a refused
  * statement leaves nothing behind to poison the next one.
  */
-async function attempt(sql: string, params: unknown[] = []): Promise<
-  { rows: unknown[] } | { denied: string }
-> {
+async function attempt(
+  sql: string,
+  params: unknown[] = [],
+): Promise<{ rows: unknown[] } | { denied: string }> {
   try {
     const result = await db.query(sql, params)
     return { rows: result.rows }
@@ -204,10 +205,7 @@ describe('tenant isolation, with the policies actually applied', () => {
       // suite that skipped this would report perfect isolation having proven
       // nothing.
       expect((await currentRole(tx)).superuser).toBe('off')
-      return await probe<{ workspace_id: string }>(
-        tx,
-        `select workspace_id from remix_batches`,
-      )
+      return await probe<{ workspace_id: string }>(tx, `select workspace_id from remix_batches`)
     })
     expect(seen).toHaveProperty('rows')
     const rows = (seen as { rows: { workspace_id: string }[] }).rows

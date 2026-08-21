@@ -60,10 +60,7 @@ export default async function RemixPage() {
     )
   }
 
-  const [posts, batch] = await Promise.all([
-    listPosts(),
-    readCurrentBatch(workspace.workspace.id),
-  ])
+  const [posts, batch] = await Promise.all([listPosts(), readCurrentBatch(workspace.workspace.id)])
   const sources = posts.filter((post) => (post.body ?? '').trim() !== '').slice(0, SOURCE_LIMIT)
 
   return (

@@ -33,9 +33,7 @@ export interface SaveAsLeadProps {
 }
 
 type State =
-  | { kind: 'idle' }
-  | { kind: 'saved'; existing: boolean }
-  | { kind: 'failed'; message: string }
+  { kind: 'idle' } | { kind: 'saved'; existing: boolean } | { kind: 'failed'; message: string }
 
 export function SaveAsLead(props: SaveAsLeadProps) {
   const [state, setState] = useState<State>({ kind: 'idle' })

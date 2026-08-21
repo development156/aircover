@@ -35,13 +35,19 @@ type Status =
   | { kind: 'error'; message: string }
 
 // Hand-written rather than imported from the app's component tree: this renders
-// inside a third-party page and must not grow a dependency on it. 16px on the
-// input is deliberate — iOS Safari zooms the viewport on focus below that, and
-// on somebody else's mobile page that zoom cannot be undone.
+// inside a third-party page and must not grow a dependency on it.
+//
+// `type-input-embed` is the 16px step, and it is a step rather than a literal
+// for a reason the design lint is right about: `beta-form.tsx` hand-wrote
+// `text-[16px]` and carries it as baselined debt, and a second copy is how a
+// value drifts. The SIZE itself is a browser constraint — iOS Safari zooms the
+// viewport on focus below 16px, and on a page this application does not own
+// that zoom cannot be undone. See `--t-input-embed` in tokens.css.
 const FIELD =
-  'h-input max-narrow:min-h-[44px] w-full rounded-sm bg-surface px-[11px] text-[16px] text-ink shadow-[inset_0_0_0_1px_var(--line)] transition-micro focus-visible:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus-visible:outline-none aria-invalid:shadow-[inset_0_0_0_1.5px_var(--danger)]'
+  'type-input-embed h-input max-narrow:min-h-11 w-full rounded-sm bg-surface px-3 text-ink shadow-[inset_0_0_0_1px_var(--line)] transition-micro focus-visible:shadow-[inset_0_0_0_1px_var(--brand),0_0_0_3px_var(--t50)] focus-visible:outline-none aria-invalid:shadow-[inset_0_0_0_1.5px_var(--danger)]'
 
-const LABEL = 'mb-[6px] block text-[12px] font-[550] text-muted'
+// The density lives on the LABEL, which is why the field can afford 16px.
+const LABEL = 'type-sm mb-1.5 block font-[550] text-muted'
 
 export interface LeadFormProps {
   /** The site whose workspace this enquiry belongs to. Resolved server-side. */
@@ -118,7 +124,7 @@ export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
   if (status.kind === 'sent') {
     return (
       <div role="status" className="surface-ring rounded-card bg-surface p-4">
-        <p className="text-[15px] text-ink">{status.message}</p>
+        <p className="type-h3 text-ink">{status.message}</p>
       </div>
     )
   }
@@ -190,7 +196,7 @@ export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
       {/* NEITHER email NOR phone is `required`, and the pair is checked instead.
           A shop's customers leave one or the other; demanding an address from
           somebody who only has a number turns them away. */}
-      <p className="mt-2 text-[12px] text-muted">
+      <p className="type-sm mt-2 text-muted">
         Leave an email address or a phone number so they can reply.
       </p>
 
@@ -203,13 +209,16 @@ export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
       {siteKey ? (
         <div className="cf-turnstile mt-4" data-sitekey={siteKey} data-theme="light" />
       ) : (
-        <p className="mt-4 rounded-input bg-warn-bg px-3 py-2 text-[13px] text-warn">
+        <p className="type-body mt-4 rounded-input bg-warn-bg px-3 py-2 text-warn">
           This form is not finished being set up yet, so it cannot take enquiries.
         </p>
       )}
 
       {status.kind === 'error' ? (
-        <p role="alert" className="mt-3 rounded-input bg-danger-bg px-3 py-2 text-[13px] text-danger">
+        <p
+          role="alert"
+          className="type-body mt-3 rounded-input bg-danger-bg px-3 py-2 text-danger"
+        >
           {status.message}
         </p>
       ) : null}
@@ -217,7 +226,7 @@ export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
       <button
         type="submit"
         disabled={sending || !siteKey}
-        className="mt-4 h-10 w-full rounded-sm bg-primary text-[14px] leading-none font-[550] text-primary-foreground transition-micro hover:bg-ink dark:hover:bg-white dark:hover:text-[var(--canvas)] active:translate-y-[0.5px] disabled:pointer-events-none disabled:bg-line disabled:text-white"
+        className="mt-4 h-10 w-full rounded-sm bg-primary type-h3 font-[550] text-primary-foreground transition-micro hover:bg-ink dark:hover:bg-white dark:hover:text-[var(--canvas)] disabled:pointer-events-none disabled:bg-line disabled:text-white"
       >
         {sending ? 'Sending…' : 'Send enquiry'}
       </button>
