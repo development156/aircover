@@ -58,6 +58,18 @@ produce a mismatch that is hard to spot later:
 the budget slider. Campaigns in this product do not have budgets, spend, revenue
 or a health score. See §8.
 
+### One thing about where this was read from
+
+**The product is currently spread across nine branches of the codebase**: a main
+integration branch, plus eight lanes of work finished but not yet merged into it. This
+document describes **the assembled product** — the integration branch plus those eight
+lanes.
+
+The practical consequence: **if you check out the integration branch alone, Radar,
+Playbooks, the Knowledge library, Remix, Leads, the crop offer, the webhook receiver and
+the rebuilt onboarding will look different or absent.** They are built; they are queued.
+Where that changes what a screen shows *today*, the route's entry says so.
+
 ### Two things to know before reading §2
 
 **First: "built" and "in the menu" are two different facts, and on three screens
@@ -1507,6 +1519,185 @@ written from this app.**
   anything implying they could differ.
 - A draft is deliberately not in this queue, which is why the empty state's tip
   line pointing at Posts is load-bearing copy rather than filler.
+
+---
+
+### `/posts/{id}` — THE COMPOSER  · NEW
+
+**BUILT.** **Not in the menu** — the nav entry that covers it is **Posts**. It is
+reached from `/posts`, `/planner`, `/approvals`, `/home`, the phone's **+** button, and
+`/create`.
+
+**This is the product's one real differentiator. §3 is its data model and its limits;
+this entry is the screen.**
+
+#### `new` is a value of the id, not a second route
+
+`/posts/new` and `/posts/{uuid}` are **one screen**. The reason is written into the
+file and is worth carrying:
+
+> *"Because there is one screen, and **two route files is how there came to be two
+> editors**. `/create/post` held a five-step wizard that could not generate variants;
+> `/posts/[id]` held a three-pane editor that could not be reached without a row. Both
+> are gone."*
+
+**And the row is not created when the screen opens.** *"Opening a screen is not intent.
+Creating on open is what left "Untitled post" debris behind every abandoned click."* The
+post is created by **the first save that has something to write**, and **the address bar
+is rewritten from `new` to the real id at that moment.**
+
+#### The anatomy, top to bottom — and the order is the argument
+
+1. **The header** — one field, **"Name this post"**, under the hint **"Only you see
+   this"**.
+2. **Your post** — the source. A ten-row box (see phone), placeholder **"Write it the
+   way you would say it. Sahoda adapts it per channel."**, with the line **"Select any
+   part to rewrite just that piece."** underneath.
+3. **The versions stack — the centre of the screen.**
+4. **Extras**, per channel, where a channel has any.
+5. **Media and templates.**
+6. **Finish** — schedule, dry run, publish.
+7. **A sticky commit bar**, pinned to the bottom at every width.
+
+The vertical order is deliberate and was measured: *"MEASURED at 768px with both in one
+pane: the versions — the only thing on this screen that no competitor has — were the
+last thing on the page, below an empty media well. **Order is the argument, and at every
+width it now reads: write it, see each version, then attach and reuse.**"*
+
+#### The source is its own thing, and is not "the first channel"
+
+> *"Because it is what the writer means, and the channel versions are what each
+> platform will accept. Collapsing the two — writing straight into Instagram and copying
+> outward — is what every competitor does, and it makes the first channel silently
+> authoritative. **Here, the post has no limit, no format and no publish state; only its
+> versions do.**"*
+
+**So there is no character meter on the source box. There is one on every version.**
+
+#### The versions stack — not a tab strip
+
+> *"ONE BODY PER CHANNEL. Instagram's caption is not LinkedIn's; each has its own limit,
+> its own rules and its own publish state, and each publishes on its own. So the
+> per-channel versions are **the CENTRE of the screen — a stack the writer scrolls
+> through — not a side panel and not a tab strip that hides three of four**."*
+
+**This is the structural correction to make.** Every channel's version is on screen at
+once. There is no channel switcher, because nothing is switched away from.
+
+The pane's own statement of purpose: **"I write once, pick channels, and Sahoda shows me
+each version to approve."** And its empty state gets **exactly one sentence** — *"docs/27
+counted six different ways of saying 'nothing yet' on one screen; this pane gets exactly
+one."*
+
+**Each version card carries:**
+- the channel's name and its **format** picker — **the format lives on the card, because
+  it belongs to the version**;
+- its own body box;
+- **a character meter** labelled **Characters**, spoken as *"{n} of {max} characters
+  used"*;
+- **its objections** — the live, per-channel rule violations;
+- **the relink control**, *"Follow the post again"*, when and only when that channel has
+  detached and its text actually differs (§3.4);
+- **its own publish state, its own permalink, and its own last error**;
+- **and it scores the post's attached files against ITS OWN format** — the same photo can
+  be fine on one card and refused on another.
+
+#### Channels
+A **Channels** picker, whose tiles can carry **"not connected"** and **"preview only"**.
+A channel with no live connection is still writable — *"You can write and plan without
+one."*
+
+#### Extras, per channel
+Only where a channel has any: **poll options**, **Google Business Profile options** and
+its **topic type**, a **hashtag field** (normalised so the meter, the validator and the
+published text all count the same tokens), and **thread preview** for X.
+
+#### What AI does here, and what it does not — stated on the screen
+
+**Selection rewriting is real and priced**, with **exactly three instructions** —
+*rewrite*, *shorten*, and *sharpen the hook*. It runs against **the current body, not
+the one captured when the request was made**: the box stays editable while the model
+works, **and if the selected text has moved the rewrite is refused rather than applied
+blind — and the paid result is still shown so it is not thrown away.**
+
+And then a block naming what is absent, verbatim:
+
+> *"Sahoda can rewrite, shorten or sharpen the hook of any piece you select. **Writing a
+> first draft from a brief, changing the tone, expanding a line, suggesting hashtags and
+> describing a picture are not built** — each needs a new kind of AI task, and the list
+> of tasks it can run is fixed for now."*
+
+The reasoning is worth copying: *"Named where they would be, rather than left out.
+**Leaving them out reads as never planned; a disabled button would be a control that
+exists and refuses.**"*
+
+**Generate variants** (3 credits) and **Generate image** (6, or 12 premium) are the
+other paid actions. Every one states its cost in its own label before it runs — §3.6.
+
+#### The commit bar
+Sticky at the bottom at every width. It carries the save state — **"nothing written
+yet"** · **"Saved"** · **"· 2 versions not saved"** — and **Save all versions**.
+
+**And it deliberately does not contain Publish.** It carries a *link* down to the finish
+panel instead:
+
+> *"Publishing is irreversible and per channel, and it needs its own room… **A one-tap
+> Publish floating over the writing surface is how a half-written post goes out on a
+> phone.** The sticky bar links here instead. **A link that scrolls is honest
+> navigation; a button that opens a sheet that contains the real button is not.**"*
+
+#### Finish — three things, in this order
+**Schedule · dry run · publish for real.** *"The rehearsal comes before the performance,
+and the two are never merged."*
+
+- **Schedule** — a time at least five minutes ahead, and **the panel says whether that
+  time will actually fire**, because that depends on a deployment setting (see Planner).
+- **The dry run** — a simulated publish that **writes nothing and sends nothing, and is
+  labelled as a simulation everywhere it reports.** It surfaces each channel's
+  objections without spending anything.
+- **Publish now** — beside it, the per-channel status list, the connection warnings and
+  the retry, **rather than behind it**. When a targeted channel has no connection:
+  *"{Channel} isn't connected yet, so this can't go out there."* / *"{A} and {B} aren't
+  connected yet, so this can't go out there."*
+
+**The pre-publish refusal gate** sits in front of it, and its note offers a way through
+rather than a wall: it names the objection, offers **"Try instead:"** with a concrete
+alternative, and — where the rule is ours rather than the platform's — **"publish
+anyway"**.
+
+#### States
+- **No workspace** — *"Create a workspace to start writing"* / *"A post belongs to a
+  workspace and you don't have one yet. Nothing failed — there is simply nowhere to keep
+  what you write until one exists."* **It is asked only on the new-post path**, and
+  deliberately **before** the work rather than after it — reaching an existing post at
+  all means a workspace exists.
+- **A missing post is the only condition that produces a not-found page.** *"Every other
+  read below degrades to empty rather than throwing — an empty variant or media list is a
+  legitimate state the composer renders on its own."*
+- **Someone else moved this post** — both versions kept, two real choices, neither styled
+  as the safe one (§3.7).
+- **The save failed** — its own retry, because *"the debounced save only re-fires on the
+  next edit"*.
+- **A per-variant conflict** — **"Use the saved version"**.
+- **Publishing / published / partially published / failed** — per channel, never merged.
+
+#### Phone
+The writing box **shrinks to a fixed shorter height below 700px**, and the number was
+measured rather than guessed: *"MEASURED at 360×800 with ten rows: the writing box ran
+to y=570 and **the first version card's body was below the fold, so the screen that
+exists to show you each version showed you none of them until you scrolled**. Resizing is
+still on, so anyone who wants the taller box drags it — **the default is what a phone
+opens to, not a ceiling**."*
+
+The sticky commit bar **lifts to sit above the phone's bottom navigation bar** rather
+than under it.
+
+**Nothing collapses into a sheet or an accordion. The versions stack stays a stack.**
+
+#### What it cannot show
+A predicted result · a "best time to post" · an engagement estimate · a tone or
+readability score · a Twin score (the price exists; the task does not) · a per-post
+metric summed across channels · a preview that shows the platform's own rendering.
 
 ---
 
@@ -5028,7 +5219,7 @@ data exists, and says what the product renders in its place.
 | **`predict: { reach, engage, conv }`** on every approval | Approvals list and detail, marked in the spec as part of "the highest-value contract" | **No.** Same as above. This is the single most load-bearing invention in the reference: the contract marks it non-optional. | The approval surface shows what the post actually is and what it will cost in credits. It makes no claim about how it will perform. |
 | **`reach: '~74K'`** on an approval row | Approvals list | **No.** Reach for an unpublished post does not exist. | Omitted. |
 | **"14 templates matched to your industry"** | Create flow, "Use a template" | **Partly.** A `templates` table exists and holds **2 rows in production**. Nothing matches templates to an industry — there is no industry-matching mechanism at all. | The real count of templates available, or an empty state if there are none. Never a match claim. |
-| **"Your audience peaks between 9:40 and 10:20"** | Create flow, smart defaults; approval AI note | **No.** The per-hour follower-activity figure this needs (`online_followers`) is absent from the entire upstream API. It cannot be fetched. | Nothing. Scheduling offers no "best time" claim. |
+| **"Your audience peaks between 9:40 and 10:20"** | Create flow, smart defaults; approval AI note | **No.** Nothing in the product produces a best-time-to-post figure, and nothing stores per-hour follower activity: the only audience dimension ever written is a daily follower count. *(Whether the upstream partner could supply an hourly figure at all is **UNVERIFIED** — no code in this repository asks for one.)* | Nothing. Scheduling offers no "best time" claim. |
 | **"Instagram drives 38% of your revenue"** | Create flow, smart defaults | **No.** The product holds **no revenue data of any kind** and has no commerce connection. There is no revenue column in any table. | Nothing. Revenue does not appear anywhere in the product. |
 | **"Competitors · 12 tracked"** | Home tile, Brand Brain overview and at-a-glance | **The table exists; it is empty.** `competitors`, `competitor_snapshots` and `competitor_changes` all hold **0 rows in production**. | The real count, which is currently zero, with an empty state inviting the user to name a competitor. A competitor *name* would be the worst invention on that screen — not a number, but the same class of claim. |
 | **"Knowledge · 120 docs"** | Home tile, Brand Brain overview | **The table exists; it is empty.** `knowledge_documents` and `knowledge_chunks` hold **0 rows in production**. | The real count of documents the user uploaded, and an empty library otherwise. |
