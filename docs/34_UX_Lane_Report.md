@@ -625,6 +625,54 @@ about a customer's sign-in address and wrong about the word "Instagram".
 
 ---
 
+## 11a. The gate, and what running it changed
+
+`pnpm gate` had not been run when the first draft of this report was written, and running it
+found two things a partial check could not.
+
+**Stage 3 cannot be trusted against `pnpm dev` on this machine.** The gate's own smoke leg failed
+with **32 × `ERR_CONNECTION_REFUSED`** and **24 × "Could not find the module"** — one dead
+Turbopack server, not fifty-six failures. Re-run against `next start`, the same suite reported:
+
+```
+86 passed · 1 flaky · 2 failed        (14.4m)
+```
+
+- **flaky:** `resolution-console.spec.ts:286` (the dark checkbox) failed once at 1.35:1 and passed
+  on retry. Its selected pair measures correctly in isolation — `rgb(255,255,255)` on
+  `rgb(11,11,12)` — so this is a race on `.check()`, not a regression. **Not mine, not fixed.**
+- **failed:** `motion.spec.ts:122`, the scrim test. Assigned to lane 1 by this lane's brief.
+  **Not chased.**
+- **failed:** `analytics-history.spec.ts:55` — **mine, and the most useful thing the gate did.**
+
+That last one deserves its own paragraph, because the tempting repair was the wrong one.
+
+The spec drafts one post, seeds three days of history, and asserts the performance-over-time card
+moves through its three states — beginning with *"Sahoda has started keeping a history"*, which is
+a different sentence from *"Sahoda does not keep a history yet"* and is precisely the distinction
+that file was rewritten on 2026-08-19 to protect. My first `/analytics` gate collapsed that
+workspace, so the card never rendered.
+
+I first changed the SPEC to reach the card, and then reverted it. **A guard should not be loosened
+to accommodate the change that broke it.** The state I actually measured as broken was a workspace
+with *nothing* — no connection, nothing published, **no posts** — which is what every beta account
+is in for its first hour and where the five stacked apologies were counted. A workspace that has
+drafted something is a step further along and keeps the full page. The gate now carries all three
+conditions, the spec is untouched, and it passes.
+
+**And the ratchet I added to a `@smoke` spec does pass.** `no-truncated-labels.spec.ts` gained a
+rule that fails on any short app-authored label that actually ellipsises, and I had fixed exactly
+one instance of it. Against `next start` all ten routes are green, including `/connections` and
+`/inbox`. Against `pnpm dev` every test in that file times out at
+`waitForLoadState('networkidle')` — line 177, before the detector runs at all — which is a
+property of the file and the dev server, not of the rule.
+
+**Where the gate stands:** stages 1 and 2 green. Stage 3 green under `next start` except lane 1's
+scrim test. Stages 4 and 5 did not run in that invocation because the gate stops at the first
+failure; `prettier --check` and `turbo build` have been run separately and are green.
+
+---
+
 ## 12. The honest verdict
 
 **Would a shop owner enjoy using this? Not yet — but they would trust it, and that is the harder

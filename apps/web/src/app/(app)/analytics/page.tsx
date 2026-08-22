@@ -73,10 +73,31 @@ export default async function AnalyticsPage() {
    * `PerformanceStrip` is ungated on `hasPublished` on purpose and that ruling
    * stands: account insights do not need this workspace to have published. What
    * they DO need is a linked account. So the gate here is not "has published",
-   * it is "could any of this ever have had a value" — and both halves have to be
-   * false before anything is hidden.
+   * it is "could any of this ever have had a value".
+   *
+   * ── AND IT IS NARROWER THAN THAT, ON PURPOSE ─────────────────────────────
+   * `posts.length === 0` is the third condition, and it was added because the
+   * first version of this gate turned `analytics-history.spec.ts` red.
+   *
+   * That spec drafts one post, seeds three days of metric history, and asserts
+   * the performance-over-time card moves through its three states — starting
+   * with "Sahoda has started keeping a history", which is a different sentence
+   * from "Sahoda does not keep a history yet" and is the exact distinction the
+   * 2026-08-19 rewrite of that file exists to protect. With a two-part gate that
+   * workspace collapsed and the card never rendered.
+   *
+   * The tempting repair was to change the spec's setup so it reached the card.
+   * That is backwards: a guard should not be loosened to accommodate the change
+   * that broke it. The state actually MEASURED as broken was a workspace with
+   * NOTHING — no connection, nothing published, no posts — which is what every
+   * beta account is in for its first hour and where five stacked apologies were
+   * counted. A workspace that has drafted something is one step further along
+   * and keeps the full page.
+   *
+   * So the fix covers the state it was written for and not a pixel more.
    */
-  const nothingCanBeMeasured = account.kind === 'not-connected' && !hasPublished
+  const nothingCanBeMeasured =
+    account.kind === 'not-connected' && !hasPublished && posts.length === 0
 
   if (nothingCanBeMeasured) {
     return (
