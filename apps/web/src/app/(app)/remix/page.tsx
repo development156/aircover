@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { BatchPreview } from '@/components/remix/batch-preview'
 import { PlanBatch } from '@/components/remix/plan-batch'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { MISSING_KINDS } from '@/lib/remix/catalogue'
 import { readCurrentBatch } from '@/lib/remix/read'
 import { isSettled } from '@/lib/remix/status'
@@ -76,9 +76,15 @@ export default async function RemixPage() {
           title="Write something first"
           body="Remix works on a post you already have. Write one long enough to be worth splitting up, and it will show up here."
           action={
-            <Button asChild>
-              <Link href="/create/post">Write a post</Link>
-            </Button>
+            // `buttonVariants` on a Link, NOT `<Button asChild>`. Button always
+            // renders a loading-spinner slot beside {children}, so Radix's Slot
+            // receives two children and THROWS at render — "Slot failed to slot
+            // onto its children". Button's own header says so, and four other
+            // call sites already carry this note. MEASURED here: it took /remix
+            // down entirely, and the section-loads smoke test is what caught it.
+            <Link href="/create/post" className={buttonVariants({ variant: 'primary' })}>
+              Write a post
+            </Link>
           }
         />
       ) : (
