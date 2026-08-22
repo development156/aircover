@@ -126,3 +126,109 @@ describe('client components and Node-reaching barrels', () => {
     ).toEqual([])
   })
 })
+
+/**
+ * THE SAME DEFECT ONE LAYER IN: a client component reaching a `server-only` module.
+ *
+ * ── THE BUILD THIS EXISTS BECAUSE OF ─────────────────────────────────────────
+ * On 2026-08-21 `components/remix/batch-preview.tsx` — a client component —
+ * value-imported `isSettled` from `lib/remix/read.ts`, whose first line is
+ * `import 'server-only'`. Typecheck passed, every unit test passed, prettier
+ * passed, and the production build died with
+ *
+ *   You're importing a component that needs "server-only"
+ *
+ * with an import trace of exactly read.ts → batch-preview.tsx.
+ *
+ * It is the same shape as the barrel rule above — a value import that only
+ * bundling can object to — and it is checked here rather than left to the build
+ * leg because the build leg runs once, at the end, for 44 seconds, and this runs
+ * on every save.
+ *
+ * ── THE FIX IS ALWAYS THE SAME ───────────────────────────────────────────────
+ * Put the pure half in its own module. `lib/remix/status.ts` is that file for
+ * the case above. A TYPE import from the server module stays legal and stays
+ * common — types are erased — which is why this reuses `valueImports`.
+ */
+
+/**
+ * `@/x/y` and `./x` both resolve to a file under `src`; returns its source or null.
+ *
+ * `@/` maps to `src/`, so the base is `resolve(SRC, …)` and NOT
+ * `resolve(SRC, '..', …)`. The first draft had the `'..'` and every lookup
+ * silently missed — `readFileSync` threw, the catch swallowed it, and the rule
+ * below reported no offenders while the defect it was written for sat two files
+ * away. Caught by reintroducing that defect and watching the guard stay green,
+ * which is the only reason it is not still wrong. Silence is not success.
+ */
+function localModuleSource(fromFile: string, spec: string): string | null {
+  const base = spec.startsWith('@/')
+    ? resolve(SRC, spec.slice(2))
+    : spec.startsWith('.')
+      ? resolve(fromFile, '..', spec)
+      : null
+  if (base === null) return null
+  for (const candidate of [`${base}.ts`, `${base}.tsx`, `${base}/index.ts`]) {
+    try {
+      return readFileSync(candidate, 'utf8')
+    } catch {
+      // Not this extension. A specifier that resolves to none of them is a
+      // package, a CSS file or a type-only path — none of which can carry
+      // `server-only`, so silence is the right answer.
+    }
+  }
+  return null
+}
+
+/** Is this module marked `server-only`? Its FIRST import, as Next requires. */
+function isServerOnly(source: string): boolean {
+  return /^\s*(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*import\s+['"]server-only['"]/.test(source)
+}
+
+/** Every specifier a file imports from, with the clause, so type-only can be told apart. */
+function importSpecifiers(source: string): string[] {
+  return [...source.matchAll(/^import\s+(?:[^'"]*?from\s+)?['"]([^'"]+)['"]/gm)].map(
+    (m) => m[1] as string,
+  )
+}
+
+describe('client components and server-only modules', () => {
+  it('recognises the server-only directive, including under a comment', () => {
+    expect(isServerOnly("import 'server-only'\n")).toBe(true)
+    expect(isServerOnly("// why\nimport 'server-only'")).toBe(true)
+    expect(isServerOnly("/* block */\n\nimport 'server-only'")).toBe(true)
+    // Not first: Next still objects, but this guard is about the shape the repo
+    // actually writes, and asserting the negative keeps the regex honest.
+    expect(isServerOnly("import x from 'y'\nimport 'server-only'")).toBe(false)
+    expect(isServerOnly("import { a } from './b'")).toBe(false)
+  })
+
+  it('finds at least one server-only module, so the rule below is not vacuous', () => {
+    const serverOnly = FILES.filter(([, source]) => isServerOnly(source))
+    expect(serverOnly.length).toBeGreaterThan(5)
+  })
+
+  it('no client component value-imports one', () => {
+    const offenders = new Set<string>()
+    for (const [file, source] of CLIENT_FILES) {
+      // A SET, because a file importing the same module twice — once for a type,
+      // once for a value — names that specifier twice and would be reported twice.
+      for (const spec of new Set(importSpecifiers(source))) {
+        if (valueImports(source, spec.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).length === 0) continue
+        const target = localModuleSource(file, spec)
+        if (target !== null && isServerOnly(target)) {
+          offenders.add(`${file.replace(SRC, 'src')}  ->  ${spec}`)
+        }
+      }
+    }
+
+    expect(
+      [...offenders],
+      'a client component value-imports a module marked `server-only`.\n' +
+        'The production build fails with "You\'re importing a component that needs\n' +
+        'server-only", and neither typecheck nor any unit test can see it. Move the\n' +
+        'pure half into its own module and import that — `lib/remix/status.ts` is\n' +
+        'the worked example.',
+    ).toEqual([])
+  })
+})

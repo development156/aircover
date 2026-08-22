@@ -33,12 +33,27 @@ const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/embed/beta',
+  // The embeddable contact form — door one into `leads`. Same shape and same
+  // reasoning as /embed/beta: genuinely public by design, framed into a page
+  // this application does not own, and it verifies its own credential —
+  // Turnstile plus a rate limit, inside /api/public/site-lead, before anything
+  // reaches the database.
+  //
+  // NO APOSTROPHE MAY APPEAR IN A COMMENT INSIDE THIS ARRAY. `middleware.test.ts`
+  // reads the declared list by slicing this block and matching quoted strings,
+  // so one lone apostrophe pairs with the next route literal and silently
+  // corrupts the comparison. MEASURED: it did, on the first draft of this entry.
+  '/embed/lead',
   // The design-system gallery. Public because it renders NOTHING but tokens and
   // primitives — no workspace, no session, no tenant row is read on this route,
   // and it is the reference every UI session and reviewer needs to open without
   // an account. If it ever needs a database read, it stops being public.
   '/design-system',
   '/api/public/beta-apply',
+  // Door one into `leads`. Exact path. Rate limit, then zod plus the honeypot,
+  // then Turnstile, then a service-role RPC that takes a site SLUG and no
+  // workspace id — so the elevated write cannot be aimed.
+  '/api/public/site-lead',
   '/api/admin/devops/ingest',
   '/api/webhooks/clerk',
   // Cashfree PG. Obeys all three rules above: `verifyCashfreeWebhook` is the first thing the

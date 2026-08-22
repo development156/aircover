@@ -423,6 +423,14 @@
 @utility type-chip {
   font: var(--t-chip);
 }
+/* The embed field step — see `--t-input-embed` in tokens.css for why 16px is a
+   browser constraint and not a preference. Added when /embed/lead was built:
+   `components/embed/beta-form.tsx` hand-wrote the literal and carries it as
+   baselined debt, and copying the literal into a second file would have been the
+   same drift `type-h3` and `type-chip` were added to stop. */
+@utility type-input-embed {
+  font: var(--t-input-embed);
+}
 @utility type-eyebrow {
   font: var(--t-eyebrow);
   letter-spacing: var(--t-eyebrow-ls);

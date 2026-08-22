@@ -8,9 +8,11 @@ import { InboxShell } from '@/components/inbox/inbox-shell'
 import { PaneHeader, PaneScroll } from '@/components/inbox/inbox-panes'
 import { MessageList } from '@/components/inbox/message-list'
 import { ReplyAffordanceCard } from '@/components/inbox/reply-affordance'
+import { SaveAsLead } from '@/components/leads/save-as-lead'
 import { SurfaceBanner } from '@/components/inbox/surface-notice'
 import { SurfaceList, SurfaceRow } from '@/components/inbox/surface-list'
 import { readConversations, readThread } from '@/lib/inbox/read'
+import { messageDirection } from '@sahoda/publishing'
 
 export const metadata = { title: 'Inbox · Thread' }
 
@@ -41,6 +43,11 @@ export default async function ThreadPage({
   // The account is not this workspace's. A 404 rather than an explanation: confirming
   // that some other tenant's account id exists is itself a disclosure.
   if (thread === null) notFound()
+
+  // The newest message the OTHER side sent. A conversation with none is one
+  // nobody has enquired through, so there is nothing to promote.
+  const newestInbound =
+    thread.messages.find((message) => messageDirection(message) === 'inbound') ?? null
 
   // The sibling list, fetched so the thread opens BESIDE it rather than after
   // navigating away from it — which is the reference's whole point. An extra
@@ -95,6 +102,29 @@ export default async function ThreadPage({
               <MessageList messages={thread.messages} />
             )}
           </PaneScroll>
+
+          {/* DOOR TWO into `leads`, and only where there is something to save:
+              a conversation with no inbound message is not somebody enquiring.
+              `newestInbound` is found with `messageDirection` rather than by
+              comparing the raw field — Zernio says "incoming", doc 13 said
+              "inbound", and two call sites comparing it by hand is the defect
+              that put the customer's words in the shop owner's mouth. */}
+          {newestInbound ? (
+            <div className="flex-none border-t border-line-soft p-3">
+              <SaveAsLead
+                conversationRef={conversationId}
+                channel={newestInbound.platform}
+                authorName={newestInbound.senderName ?? null}
+                // NULL, and deliberately. `ZernioMessage` has `senderId` and no
+                // handle field at all, and an id stored under `author_handle`
+                // reads as a handle to every later reader — the same defect as
+                // putting "@cornerbakery" in the email column, which the
+                // function refuses to do for exactly this reason.
+                authorHandle={null}
+                message={newestInbound.message}
+              />
+            </div>
+          ) : null}
 
           {/* No affordance means no message stated a platform we model, and a
               send window is a per-platform rule — so there is nothing to state

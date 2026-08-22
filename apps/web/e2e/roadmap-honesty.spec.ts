@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
- * THE FIVE ROADMAP SECTIONS SHOW NO FIGURE ABOUT THE READER'S BUSINESS.
+ * THE TWO ROADMAP SECTIONS SHOW NO FIGURE ABOUT THE READER'S BUSINESS.
  *
  * ── THE NUMBER IN THAT SENTENCE IS PART OF THE TEST, AND IT HAD DRIFTED ─────
  * It read SEVEN while `ALLOWED` held six: `/brain/audience` left in the same
@@ -12,6 +12,26 @@ import { expect, test } from './fixtures/seeded-user'
  * it. Corrected to FIVE on 2026-08-22, when `/playbooks` left too. A header that
  * miscounts the list below it is the same class of thing this file exists to
  * catch, one level up.
+ *
+ * ── /remix AND /leads LEFT THIS LIST ON 2026-08-21, BECAUSE THEY WERE BUILT ──
+ * (The lane wrote "which makes the word FIVE above true again" here. It did
+ * not: /brain/knowledge and /playbooks had already left by the time this
+ * merged, so the list is TWO. The word is asserted against the list now —
+ * see the test directly above `ALLOWED`.)
+ * `/remix` prices a real batch out of pricing.config.json, counts the drafts it
+ * will write, charges credits and refuses at a zero balance. `/leads` has both
+ * of its doors open — a public form endpoint behind a captcha, and a member
+ * promoting a live inbox conversation — so it counts real rows in real columns.
+ * Neither can say "coming soon" without lying, and the first assertion in the
+ * loop below is what would catch it if either tried.
+ *
+ * THE REPLACEMENTS ARE NARROWER AND STRONGER, because they can assert
+ * PROVENANCE rather than a permitted set of digits:
+ * `components/remix/batch-preview.test.tsx` requires every figure on the cost
+ * panel to be a credit price, a sum of prices, or a count of rows;
+ * `components/leads/board.test.tsx` requires every figure on the pipeline to be
+ * a count of rows. Each has been WATCHED FAIL against an injected figure — a
+ * fabricated reach on one, a fabricated conversion rate on the other.
  *
  * ── /loop, /report AND NOW /playbooks LEFT THIS LIST, BECAUSE THEY WERE BUILT ─
  * They are not exceptions to the property below; they are no longer roadmap
@@ -162,9 +182,7 @@ const ALLOWED: ReadonlyArray<readonly [string, readonly number[]]> = [
   //
   // What remains is the price, which is what the panel quotes.
   ['/radar', [price('radar_scan')]],
-  ['/leads', []],
   ['/studio', [price('carousel')]],
-  ['/remix', [price('remix_pack')]],
   // `/brain/audience` IS NOT IN THIS LIST ANY MORE, and the removal is the point
   // rather than a loosening. This guard exists to stop screens that are DRAWINGS
   // from inventing figures. That tab is no longer a drawing: it reads
@@ -172,6 +190,36 @@ const ALLOWED: ReadonlyArray<readonly [string, readonly number[]]> = [
 
 /** A standalone run of digits. Excludes ones welded into a word or a dash-run. */
 const FIGURE = /(?<![\w—–-])\d[\d,]*(?![\w—–-])/g
+
+/**
+ * THE HEADER'S NUMBER IS NOW DERIVED, BECAUSE PROSE DRIFTS AND HAS.
+ *
+ * The header opens "THE <N> ROADMAP SECTIONS", and its own paragraph claims that
+ * number "is part of the test". It was not — nothing read it. MEASURED: it said
+ * SEVEN over a list of six, was corrected to FIVE, and by the time
+ * /brain/knowledge, /playbooks, /remix and /leads had all left it would have
+ * said FIVE over a list of TWO. A header that miscounts the list beneath it is
+ * the same class of thing this file exists to catch, one level up, so it is
+ * asserted here rather than merely asserted about.
+ */
+const HEADER_COUNTS: Record<string, number> = {
+  ONE: 1,
+  TWO: 2,
+  THREE: 3,
+  FOUR: 4,
+  FIVE: 5,
+  SIX: 6,
+  SEVEN: 7,
+}
+
+test('@smoke the number in the header is the length of the list below it', () => {
+  const source = readFileSync(fileURLToPath(import.meta.url), 'utf8')
+  const word = /THE ([A-Z]+) ROADMAP SECTIONS SHOW NO FIGURE/.exec(source)?.[1]
+  expect(word, 'the header sentence this test reads has been reworded').toBeDefined()
+  expect(HEADER_COUNTS[word!], `"${word}" is not a number word this test knows`).toBe(
+    ALLOWED.length,
+  )
+})
 
 test.describe('the roadmap sections invent nothing @smoke', () => {
   test.slow()

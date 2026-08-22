@@ -97,6 +97,7 @@
         "ADMIN_BOOTSTRAP_EMAILS",
         "OPS_INGEST_URL",
         "TURNSTILE_SECRET_KEY",
+        "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
         "ZERNIO_API_KEY",
         "NEXT_PUBLIC_APP_URL"
       ]

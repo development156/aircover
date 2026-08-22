@@ -12,12 +12,30 @@
  *   where t.table_type = 'BASE TABLE'
  *     and c.table_schema = 'public' and c.column_name = 'workspace_id'
  *
- * MEASURED against production on 2026-08-19: **30 tables**. `export-drift.test.ts`
- * re-runs that query against the live database and fails if the schema grows a
- * workspace-owned table this file does not know about. Without that guard, a
- * table added next month is silently missing from every export, and the export
- * still says "everything" — which is the one thing an export must never say
- * falsely, because the person reading it has no way to check.
+ * MEASURED against production on 2026-08-19: **30 tables**. Against the
+ * migration files on 2026-08-21: **39**.
+ *
+ * ## The guard that was supposed to catch that, and why it did not
+ *
+ * `export-drift.test.ts` re-runs that query against the live database and fails
+ * on a workspace-owned table this file does not know about. It is
+ * `describe.skip` without `SUPABASE_DB_URL`, the only project this repo has IS
+ * production, and `forbidden-target.ts` refuses that on purpose — so it has
+ * never run, and SEVEN tables were quietly missing from every export:
+ *
+ *   audience_snapshots · billing_profiles · invoices · loop_briefs ·
+ *   loop_channel_autonomy · loop_cycles · loop_settings
+ *
+ * Four of those are the Loop's, which is a record of what a customer was charged
+ * for and what Sahoda decided on their behalf. An export omitting them still
+ * said "everything you own" — the one claim an export must never make falsely,
+ * because the person reading it has no way to check.
+ *
+ * They were found by `packages/db/tests/export_manifest.pglite.test.ts`, which
+ * asks the same two questions of the MIGRATION FILES, in process, with no
+ * credentials, on every gate run. It cannot speak for production; it catches the
+ * thing that actually goes stale, which is somebody adding a table and this file
+ * not moving.
  *
  * ## Why some tables cannot be exported, and why that is stated per table
  *
@@ -49,17 +67,30 @@ export interface ExportTable {
 }
 
 /**
- * Every workspace-owned table, as of 2026-08-19.
+ * Every workspace-owned table, as of 2026-08-21.
  *
  * `no-read-policy` is recorded from `pg_policies`, not guessed: a table with no
  * SELECT policy returns an empty array rather than an error, so this is the only
  * place the difference can be known.
+ *
+ * ── 2026-08-21: `remix_batches` and `remix_derivatives` ────────────────────
+ * Added the day they were written, not the day somebody noticed. Both take the
+ * standard `app.apply_tenant_policies` set, so both are `readable` — read out of
+ * the migration file rather than assumed, and `export_manifest.pglite.test.ts`
+ * checks the whole list against the catalog on every gate run, with no
+ * credentials, so a table added next month cannot go missing quietly.
  */
 export const EXPORT_TABLES: readonly ExportTable[] = [
   { table: 'ai_provider_logs', readability: 'no-read-policy', describes: 'AI usage records' },
   { table: 'asset_usages', readability: 'readable', describes: 'where each picture is used' },
   { table: 'assets', readability: 'readable', describes: 'your picture library' },
+  { table: 'audience_snapshots', readability: 'readable', describes: 'who follows you' },
   { table: 'audit_logs', readability: 'readable', describes: 'a record of admin actions' },
+  {
+    table: 'billing_profiles',
+    readability: 'readable',
+    describes: 'who your invoices are made out to',
+  },
   { table: 'brand_memory', readability: 'readable', describes: 'your Brand Brain' },
   { table: 'campaign_posts', readability: 'readable', describes: 'posts inside campaigns' },
   { table: 'campaigns', readability: 'readable', describes: 'your campaigns' },
@@ -68,7 +99,16 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { table: 'credit_ledger', readability: 'readable', describes: 'every credit movement' },
   { table: 'inbox_messages', readability: 'readable', describes: 'messages and comments' },
   { table: 'inbox_threads', readability: 'readable', describes: 'conversations' },
+  { table: 'invoices', readability: 'readable', describes: 'your tax invoices and credit notes' },
   { table: 'leads', readability: 'readable', describes: 'enquiries from your site' },
+  { table: 'loop_briefs', readability: 'readable', describes: 'what the Loop planned each week' },
+  {
+    table: 'loop_channel_autonomy',
+    readability: 'readable',
+    describes: 'how much the Loop may do on each channel',
+  },
+  { table: 'loop_cycles', readability: 'readable', describes: 'every week the Loop ran' },
+  { table: 'loop_settings', readability: 'readable', describes: 'your Loop settings' },
   { table: 'memory_events', readability: 'readable', describes: 'changes to your Brand Brain' },
   { table: 'ops_credit_requests', readability: 'readable', describes: 'credit top-up requests' },
   { table: 'planner_events', readability: 'readable', describes: 'your planner' },
@@ -81,6 +121,12 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { table: 'post_publish_logs', readability: 'readable', describes: 'every publish attempt' },
   { table: 'post_variants', readability: 'readable', describes: 'the per-channel wording' },
   { table: 'posts', readability: 'readable', describes: 'your posts' },
+  { table: 'remix_batches', readability: 'readable', describes: 'your Remix runs' },
+  {
+    table: 'remix_derivatives',
+    readability: 'readable',
+    describes: 'the drafts each Remix run produced',
+  },
   { table: 'site_pages', readability: 'readable', describes: 'the pages of your sites' },
   { table: 'site_sections', readability: 'readable', describes: 'the sections on those pages' },
   { table: 'sites', readability: 'readable', describes: 'your websites' },

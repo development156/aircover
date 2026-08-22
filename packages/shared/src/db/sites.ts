@@ -105,6 +105,45 @@ export const LeadInsertSchema = z.object({
 })
 export type LeadInsert = z.infer<typeof LeadInsertSchema>
 
+/**
+ * What a stranger may send the public site form.
+ *
+ * ── THE ONE FIELD THAT IS NOT HERE ───────────────────────────────────────────
+ * There is no workspace id, and there must never be one. `public.lead_submit`
+ * runs as `service_role` and resolves the tenant from the SITE SLUG, so no value
+ * a caller sends can steer which workspace the enquiry lands in. A schema that
+ * accepted one would make the whole endpoint cross-tenant lead injection, and
+ * the schema is the first place that has to refuse it.
+ *
+ * ── AND WHY email AND phone ARE BOTH OPTIONAL ────────────────────────────────
+ * A shop's customers leave one or the other, not both, and a form that demands
+ * an address from somebody who only has a number turns them away. The rule that
+ * ONE of them must be present is a rule about the ROW, so it lives in the
+ * function rather than here — every caller the door ever gains has to obey it,
+ * and a zod schema in one route cannot make that true.
+ *
+ * `website` is the honeypot, exactly as `OpsBetaApplyInputSchema` uses it: a bot
+ * that fills every field fails here and never reaches Turnstile or the database.
+ */
+export const SiteLeadSubmitSchema = z.object({
+  site_slug: z
+    .string()
+    .trim()
+    .min(1)
+    .max(80)
+    // The subdomain shape `sites.slug` already holds. A slug that could not be a
+    // subdomain cannot name a real site, so it is refused before any lookup.
+    .regex(/^[a-z0-9][a-z0-9-]*$/, 'That is not a site address.'),
+  name: z.string().trim().max(120).optional(),
+  email: z.email().max(254).optional(),
+  phone: z.string().trim().max(40).optional(),
+  message: z.string().trim().max(4000).optional(),
+  source_url: z.string().trim().max(500).optional(),
+  website: z.string().max(0).optional(),
+  turnstile_token: z.string().min(1).max(4096),
+})
+export type SiteLeadSubmit = z.infer<typeof SiteLeadSubmitSchema>
+
 export const LeadUpdateSchema = z
   .object({
     status: LeadStatusSchema,

@@ -119,20 +119,24 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         hint: 'Photos you can reuse on any post',
         state: 'live',
       },
+      // Remix moved ABOVE Studio on 2026-08-21, and the move is the ordering rule
+      // working rather than a preference: it became `live`, and `reachable.test.ts`
+      // requires everything built to come before everything unbuilt inside a
+      // group. Leaving it in place would have failed that test.
+      {
+        href: '/remix',
+        label: 'Remix',
+        icon: 'shuffle',
+        guide: 'nav.remix',
+        hint: 'Turn one post into a week of them',
+        state: 'live',
+      },
       {
         href: '/studio',
         label: 'Studio',
         icon: 'palette',
         guide: 'nav.studio',
         hint: 'Carousels and quote cards, locked to your brand',
-        state: 'soon',
-      },
-      {
-        href: '/remix',
-        label: 'Remix',
-        icon: 'shuffle',
-        guide: 'nav.remix',
-        hint: 'Turn one long piece into a week of posts',
         state: 'soon',
       },
     ],
@@ -191,7 +195,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: 'user-round-plus',
         guide: 'nav.leads',
         hint: 'Enquiries, from first message to sale',
-        state: 'soon',
+        state: 'live',
       },
     ],
   },

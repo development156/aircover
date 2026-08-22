@@ -10,10 +10,16 @@ import { env } from '@/lib/env'
  *
  * `lib/supabase/server.ts` says it plainly: "No service-role client in
  * apps/web — RLS is the security boundary." That rule holds for everything a
- * signed-in user does. It cannot hold for two endpoints, because neither has a
- * user to act as: the ingest route authenticates a token, and the public beta
- * form authenticates a captcha. Doc 13 §5 is explicit that the form must insert
- * server-side with the service role and that there is no anon-insert RLS path.
+ * signed-in user does. It cannot hold for three endpoints, because none of them
+ * has a user to act as: the ingest route authenticates a token, and the public
+ * beta form and the public SITE FORM each authenticate a captcha. Doc 13 §5 is
+ * explicit that such a form must insert server-side with the service role and
+ * that there is no anon-insert RLS path.
+ *
+ * The site form joined that list on 2026-08-21, and it did not widen the
+ * principle: `public.lead_submit` takes a site SLUG and no workspace id, so the
+ * elevated write cannot be aimed. See the migration header for the full
+ * argument.
  *
  * So the exception is confined to this file, and this file exports FUNCTIONS,
  * never a client. Nothing outside it can obtain a service-role handle and go
@@ -21,7 +27,8 @@ import { env } from '@/lib/env'
  *
  * That bound is what makes doc 13 §16's promise real rather than aspirational:
  * the ingest token cannot reach credits. `public.ops_ingest` touches five ops
- * tables and no ledger function, and there is no second export here through
+ * tables and no ledger function, `public.lead_submit` touches `sites` and
+ * `leads` and no ledger function, and there is no second export here through
  * which a caller could reach one. `service-rpc.test.ts` asserts both halves —
  * that this module names only the allowed RPCs, and that it exports no client.
  */
@@ -31,6 +38,7 @@ export const SERVICE_RPCS = [
   'ops_ingest',
   'ops_application_submit',
   'ops_application_link_user',
+  'lead_submit',
 ] as const
 
 function serviceClient() {
@@ -141,4 +149,58 @@ export async function linkClerkUser(email: string, clerkUserId: string): Promise
 
   const row = (data ?? {}) as { admin_seat?: string | null }
   return { ok: true, linkedSeat: Boolean(row.admin_seat) }
+}
+
+export type LeadSubmitOutcome =
+  { ok: true; id: string } | { ok: false; reason: 'no_such_site' | 'no_contact' | 'unavailable' }
+
+/**
+ * The public SITE form's only write.
+ *
+ * Service-role because there is no user: the caller is a stranger who has just
+ * passed a captcha on somebody's landing page. `lead_submit` is revoked from
+ * `anon` AND from `authenticated` — a signed-in customer must not be able to
+ * post an enquiry as if a stranger had left it.
+ *
+ * NOTE WHAT IS NOT IN THE ARGUMENT LIST: a workspace id. The tenant is resolved
+ * inside the function from the site slug, so this elevated write cannot be
+ * aimed at a workspace the caller names.
+ */
+export async function submitSiteLead(input: {
+  siteSlug: string
+  name?: string
+  email?: string
+  phone?: string
+  message?: string
+  sourceUrl?: string | null
+}): Promise<LeadSubmitOutcome> {
+  const client = serviceClient()
+  if (!client) {
+    console.error('[site-lead] no service-role key configured; nothing was written')
+    return { ok: false, reason: 'unavailable' }
+  }
+
+  const { data, error } = await client.rpc('lead_submit', {
+    p_site_slug: input.siteSlug,
+    p_name: input.name ?? null,
+    p_email: input.email ?? null,
+    p_phone: input.phone ?? null,
+    p_message: input.message ?? null,
+    p_payload: {},
+    p_source_url: input.sourceUrl ?? null,
+  })
+
+  if (error) {
+    console.error('[site-lead] rpc failed:', error.message)
+    return { ok: false, reason: 'unavailable' }
+  }
+
+  const row = (data ?? {}) as { ok?: boolean; id?: string; reason?: string }
+  if (row.ok === true && row.id) return { ok: true, id: row.id }
+  // The function's own refusals, carried through by name. The route decides what
+  // a visitor is told; nothing here invents a sentence for them.
+  if (row.reason === 'no_such_site' || row.reason === 'no_contact') {
+    return { ok: false, reason: row.reason }
+  }
+  return { ok: false, reason: 'unavailable' }
 }

@@ -8,12 +8,14 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
  * ── WHY THIS IS A TEST AND NOT A QA WALK ─────────────────────────────────────
  * The state is unreachable by hand. Emptying the wallet needs either real AI
  * generation — which spends real money to reach a screen — or a ledger write,
- * which is forbidden. So five spend controls have shipped for months with the
- * one outcome nobody has ever seen: the customer runs out mid-task.
+ * which is forbidden. So five spend controls had shipped for months with the
+ * one outcome nobody has ever seen: the customer runs out mid-task. Remix is the
+ * sixth, and it joined this file on the day it was built rather than months
+ * later — which is the only reason it did not ship with the same gap.
  *
  * A zero balance is not an error. It is the most ordinary thing that happens to
  * a paying account, and it has exactly one correct shape, which three of the
- * five already had and this file now holds all five to:
+ * original five already had and this file now holds all six to:
  *
  *   1. state the shortfall with BOTH numbers, so it is a fact and not a scold
  *   2. say plainly that nothing was charged
@@ -39,6 +41,7 @@ const state = vi.hoisted(() => ({
   rewrite: {} as Record<string, unknown>,
   planWeek: {} as Record<string, unknown>,
   site: {} as Record<string, unknown>,
+  remix: {} as Record<string, unknown>,
 }))
 
 vi.mock('@/app/actions/posts-image', () => ({
@@ -54,6 +57,17 @@ vi.mock('@/app/actions/plan-week', () => ({
 vi.mock('@/app/actions/site-generate', () => ({
   generateSite: () => Promise.resolve(state.site),
 }))
+// Remix approves and then runs. The APPROVAL succeeds — it spends nothing and
+// there is nothing for an empty wallet to refuse about it — and the run is what
+// meets the empty wallet. Mocking the approval as a failure instead would have
+// tested a different sentence entirely.
+vi.mock('@/app/actions/remix', () => ({
+  approveRemixBatch: () => Promise.resolve({ ok: true, approvedCredits: 6 }),
+  setDerivativeIncluded: () => Promise.resolve({ ok: true }),
+}))
+vi.mock('@/app/actions/remix-run', () => ({
+  runRemixBatch: () => Promise.resolve(state.remix),
+}))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
@@ -62,7 +76,35 @@ import { GeneratePanel } from './posts/generate-panel'
 import { InlineRewrite } from './posts/inline-rewrite'
 import { PlanWeekPanel } from './planner/plan-week-panel'
 import { GenerateSitePanel } from './sites/generate-site-panel'
+import { BatchPreview } from './remix/batch-preview'
+import { previewBatch } from '@/lib/remix/cost'
+import type { BatchView, DerivativeView } from '@/lib/remix/read'
 import { toChannelSet } from '@sahoda/shared'
+
+/** One planned draft, enough to press the button on. */
+const REMIX_DERIVATIVES: DerivativeView[] = [
+  {
+    id: 'd1',
+    kind: 'short',
+    channel: 'x',
+    format: 'text',
+    included: true,
+    status: 'pending',
+    postId: null,
+    failure: null,
+  },
+]
+
+const REMIX_BATCH: BatchView = {
+  id: 'b1',
+  status: 'planned',
+  sourcePostId: 'p1',
+  sourceTitle: 'The long one',
+  sourceCredit: 'Remixed from “The long one” in this workspace.',
+  approvedCredits: null,
+  derivatives: REMIX_DERIVATIVES,
+  cost: previewBatch(REMIX_DERIVATIVES),
+}
 
 const REFUSAL = { ok: false, insufficient: true, message: 'Not enough credits.', ...INSUFFICIENT }
 
@@ -72,6 +114,7 @@ beforeEach(() => {
   state.rewrite = REFUSAL
   state.planWeek = REFUSAL
   state.site = REFUSAL
+  state.remix = REFUSAL
 })
 
 /**
@@ -135,6 +178,17 @@ const CONTROLS: ReadonlyArray<{
       render(<GenerateSitePanel limitNotice={null} />)
       await user.type(screen.getAllByRole('textbox')[0]!, 'Corner Bakery')
       await user.click(screen.getByRole('button', { name: /generate site/i }))
+    },
+  },
+  {
+    // THE SIXTH. Remix reaches an empty wallet later than the other five — a
+    // person has already picked a source, picked what to make, and trimmed the
+    // batch — which makes the dead end here the most expensive of the six.
+    name: 'Make these drafts',
+    press: async () => {
+      const user = userEvent.setup()
+      render(<BatchPreview batch={REMIX_BATCH} />)
+      await user.click(screen.getByRole('button', { name: /make these drafts/i }))
     },
   },
 ]

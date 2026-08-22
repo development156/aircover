@@ -28,6 +28,13 @@ const PUBLIC_PATTERNS = [
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/embed/beta',
+  // The embeddable CONTACT form, added 2026-08-21 — door one into `leads`.
+  // Public for the same reason /embed/beta is: it is framed into a third
+  // party's page and there is no user to be. It reads no workspace and no
+  // session; the slug in its query string is the public subdomain of a site,
+  // and it is not a capability — `lead_submit` resolves the tenant from it
+  // inside the database.
+  '/embed/lead',
   // The design-system gallery. Added deliberately, and this pinned list is why
   // that had to be deliberate: it reads NO workspace, NO session and NO tenant
   // row — it renders `packages/shared/tokens.css` and the primitives, nothing
@@ -36,6 +43,10 @@ const PUBLIC_PATTERNS = [
   // Clerk fixture. If it ever grows a database read, it must leave this list.
   '/design-system',
   '/api/public/beta-apply',
+  // The form's only endpoint. Verifies its own credential in its first three
+  // steps — rate limit, zod plus honeypot, Turnstile — before the service-role
+  // RPC, which takes a site SLUG and no workspace id.
+  '/api/public/site-lead',
   '/api/admin/devops/ingest',
   '/api/webhooks/clerk',
   '/api/webhooks/cashfree',

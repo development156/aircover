@@ -179,6 +179,14 @@
   /* A chip's own label: the eyebrow's size and weight, without the uppercase.
      See globals.css `type-chip` for why the step exists. */
   --t-chip: 600 11px/14px var(--sans);
+  /* THE EMBED FIELD STEP, and 16px is a constraint rather than a taste.
+     iOS Safari zooms the viewport on focus for any input below 16px, and the
+     embeddable forms (/embed/beta, /embed/lead) render inside somebody else's
+     mobile page where that zoom cannot be undone. `--t-body` is 13px and is
+     right everywhere the app owns the page; this is the one rung that exists
+     because a browser insists on it. Density is carried by the label, not by
+     the field. */
+  --t-input-embed: 400 16px/22px var(--sans);
   --t-eyebrow: 600 11px/14px var(--sans);
   --t-eyebrow-ls: 0.06em;
   /* The ONE big number per view — a balance, a total. Not a heading: it is set
