@@ -45,8 +45,24 @@ export function TeamView({
   const [role, setRole] = useState<OpsRole>('admin')
   const [pending, startTransition] = useTransition()
 
+  /**
+   * OWNERS WHO CAN ACTUALLY SIGN IN — `user_id` is the whole clause.
+   *
+   * A seat is created from an email before that person has ever signed in, and
+   * `user_id` stays null until Clerk's `user.created` webhook links it. The
+   * console authorises on `user_id = auth.jwt() ->> 'sub'`, which null never
+   * satisfies, so an unlinked seat is an owner to nobody.
+   *
+   * Counting it here put this component out of step with the database in the one
+   * direction that matters: with one real owner and one unlinked one, this said
+   * two, so `isLastOwner` came out false and the real last owner was drawn a live
+   * role select and a live Revoke — both of which `ops_admin_revoke` refuses with
+   * OPS_ADMIN_LAST_OWNER. That is exactly the button-that-does-nothing this file's
+   * header says it will not draw. MEASURED in production the same day: the
+   * database's own counter said 5 and four people could sign in.
+   */
   const activeOwners = admins.filter(
-    (admin) => admin.status === 'active' && admin.role === 'owner',
+    (admin) => admin.status === 'active' && admin.role === 'owner' && admin.user_id !== null,
   ).length
 
   function run(work: () => Promise<{ ok: boolean; message?: string }>, success: string) {
@@ -138,8 +154,13 @@ export function TeamView({
             <tbody>
               {admins.map((admin) => {
                 const isSelf = admin.email.toLowerCase() === me.toLowerCase()
+                // `user_id !== null` mirrors the database predicate exactly: an
+                // unlinked seat is never the last owner, so its controls stay live.
                 const isLastOwner =
-                  admin.role === 'owner' && admin.status === 'active' && activeOwners <= 1
+                  admin.role === 'owner' &&
+                  admin.status === 'active' &&
+                  admin.user_id !== null &&
+                  activeOwners <= 1
 
                 return (
                   <tr key={admin.id} className="border-b border-line last:border-b-0">

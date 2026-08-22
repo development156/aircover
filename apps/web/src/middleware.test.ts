@@ -104,6 +104,12 @@ const CLERK_BYPASS_PATHS = [
   '/api/cron/playbooks',
   '/api/webhooks/cashfree',
   '/api/webhooks/clerk',
+  // Added 2026-08-23. It was the ONE self-authenticating webhook still reaching
+  // Clerk, and nothing pinned that either way: it appears in neither this list
+  // nor CLERK_MATCHED_PATHS, so the matcher could have moved in either direction
+  // without a test noticing. The live sweep that found it recorded zero 500s
+  // across 72 routes, so this closes a reachability gap rather than a crash.
+  '/api/webhooks/zernio',
 ]
 
 /** Paths that MUST keep reaching clerkMiddleware. A bypass that widens is a hole. */

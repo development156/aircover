@@ -110,11 +110,26 @@ function runCommand(command, cwd) {
  * the one that turns a green mutation report into fiction: a command that cannot
  * find its tests exits non-zero, which this file reads as KILLED.
  *
- * Returns null when no vitest summary was printed at all. The caller refuses.
+ * Returns null when no vitest summary was printed at all, AND when the summary
+ * it did print records no test actually running.
+ *
+ * ⚠ THE SECOND SHAPE, FOUND 2026-08-23 ⚠
+ * `Tests  6 skipped (6)`. The mutated SQL made `beforeAll` throw, every test was
+ * skipped, the process exited non-zero, and this file called that a kill — a
+ * verdict earned by zero assertions. It is also what a worker crash looks like
+ * when three sessions share a machine and PGlite is the memory-hungry one; the
+ * SKIP COUNT IS THE TELL, and it is now read rather than displayed. A run has to
+ * show at least one test that passed or failed before its exit code means
+ * anything.
  */
 function summarise(output) {
   const match = /^\s*Tests\s+\S[^\n]*/m.exec(output)
-  return match ? match[0].replace(/\s+/g, ' ').trim() : null
+  if (!match) return null
+  const line = match[0].replace(/\s+/g, ' ').trim()
+  const ran = /(\d+) (?:passed|failed)/g
+  let total = 0
+  for (const m of line.matchAll(ran)) total += Number(m[1])
+  return total > 0 ? line : null
 }
 
 try {
@@ -128,6 +143,22 @@ try {
       process.stderr.write(`mutation-check: ${mutant.name} … `)
       const { code, output } = await runCommand(mutant.command ?? spec.command, cwdFor(mutant))
       const summary = summarise(output)
+      /**
+       * ONE MUTANT SHAPE LEGITIMATELY RUNS NO TESTS, AND IT HAS TO SAY SO.
+       *
+       * "the schema is never applied — the suites face an empty database" breaks
+       * the fixture rather than the code: the right outcome is a suite that
+       * cannot boot, and demanding an assertion from it is demanding the
+       * impossible. But that is also indistinguishable from a command that never
+       * started, which is the failure this check exists for — so the exception is
+       * DECLARED on the mutant, in the spec, where a reviewer sees it, rather than
+       * inferred from the output.
+       */
+      if (summary === null && mutant.expectsNoTests === true) {
+        const killed = code !== 0
+        process.stderr.write(`${killed ? 'killed (no tests ran, as declared)' : 'SURVIVED'}\n`)
+        return { killed, summary: 'no tests ran — declared by expectsNoTests' }
+      }
       if (summary === null) {
         // NOT a kill. The command exited without vitest reporting a single test,
         // so nothing was executed against the mutated source and this run proves

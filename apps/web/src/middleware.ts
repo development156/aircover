@@ -271,9 +271,20 @@ export default async function middleware(
 // 2-part token, a 4-part token and a well-formed 3-part token all answer 401 correctly.
 // One header, no credentials, any route. @clerk/nextjs 7.5.20 / @clerk/backend 3.11.7.
 //
-// The four routes below authenticate themselves — two constant-time CRON_SECRET
-// compares, a Cashfree HMAC, a Clerk/Svix signature — and take nothing from
-// clerkMiddleware but that failure mode. Excluding them here is the only bypass that works: the crash happens
+// The routes below authenticate themselves — four constant-time CRON_SECRET compares,
+// a Cashfree HMAC, a Clerk/Svix signature, and a Zernio HMAC — and take nothing from
+// clerkMiddleware but that failure mode.
+//
+// `/api/webhooks/zernio` JOINED THE LIST ON 2026-08-23, and the asymmetry is worth
+// naming rather than quietly correcting. It was public from the day it landed and
+// matched all along, so it alone among the three webhooks paid Clerk's header parse on
+// every delivery and rested on the try/catch above instead of on never being reached.
+// MEASURED the same day, against `next start`: 72 routes on disk, each sent
+// `Authorization: Bearer aaa.bbb.ccc`, a two-part bearer, a well-formed-but-invalid
+// bearer and `Cookie: __session=aaa.bbb.ccc`, by GET and by POST — ZERO 500s. So the
+// catch does hold and this is not a live crash; it is the difference between a route
+// that cannot reach the failure and one that is rescued from it. It meets all three
+// rules below, so it belongs on the side that cannot reach it. Excluding them here is the only bypass that works: the crash happens
 // while Clerk computes the request state, BEFORE our handler runs, so an early return
 // inside the callback would never be reached.
 //
@@ -292,12 +303,12 @@ export const config = {
   matcher: [
     // Clerk-recommended shape: skip Next internals + static assets unless
     // referenced in search params. (Next 16 renames middleware → proxy; n/a on 15.)
-    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Shaped as `/(…)` — ONE group holding the whole expression — because that is the
     // only place Next accepts a raw regex. `'/(?!…)(api|trpc)(.*)'` reads to
     // path-to-regexp as a group opening with invalid content and fails the BUILD with
     // `Error parsing … invalid-route-source`. Loud and before deploy, which is the right
     // direction for this file, but it is why the lookahead lives inside the parentheses.
-    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$)(?:api|trpc).*)',
+    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$)(?:api|trpc).*)',
   ],
 }
