@@ -38,6 +38,13 @@ const OUTCOME: Record<string, string> = {
   proposed: 'proposed',
 }
 
+/**
+ * Statuses in which a run is still LIVE, and therefore occupies its playbook's
+ * one-live-run slot. Taken from the same set the partial unique index uses: a
+ * run is live until it reaches a terminal status.
+ */
+const HOLDS_THE_SLOT = new Set(['proposing', 'awaiting_cost_approval', 'running'])
+
 export function RunHistory({ runs }: { runs: readonly RunWithItems[] }) {
   return (
     <section aria-labelledby="pb-history" className="surface-ring rounded-card bg-surface p-4">
@@ -64,6 +71,25 @@ export function RunHistory({ runs }: { runs: readonly RunWithItems[] }) {
                   {run.trigger_source === 'schedule' ? ' · on its schedule' : ''}
                 </span>
               </div>
+
+              {HOLDS_THE_SLOT.has(run.status) ? (
+                // ── WHY THIS SENTENCE EXISTS ────────────────────────────────
+                // Two rules, each right on its own. A playbook may have one live
+                // run at a time (a partial unique index refuses a second), and a
+                // run that has proposed but not been approved is still live. So
+                // an unopened preview STOPS the schedule from proposing anything
+                // new for that playbook — the daily check counts it as
+                // `alreadyRunning` and moves on, which is correct: opening a
+                // second would charge twice for the same festival.
+                //
+                // Correct, and completely invisible. In November somebody will
+                // see a playbook that has not fired for weeks and read it as
+                // broken. Saying it here is the difference between a bug report
+                // and a decision.
+                <p className="type-sm mt-1 text-muted">
+                  Nothing new will be proposed for this playbook until you approve or stop this run.
+                </p>
+              ) : null}
 
               <p className="type-sm mt-1 text-muted">
                 Started{' '}
