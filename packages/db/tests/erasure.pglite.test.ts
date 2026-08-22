@@ -89,10 +89,10 @@ async function eraseThenVerify<T>(
     ])
     await db.exec('set local role authenticated')
     const result = (
-      await db.query<{ j: Record<string, unknown> }>(
-        `select public.erase_workspace($1, $2) as j`,
-        [workspaceId, typedName],
-      )
+      await db.query<{ j: Record<string, unknown> }>(`select public.erase_workspace($1, $2) as j`, [
+        workspaceId,
+        typedName,
+      ])
     ).rows[0]!.j
     await db.exec('reset role')
     return await verify(db, result)
@@ -234,9 +234,10 @@ describe('the harness can fail', () => {
       // Workspace B's rows are visible only to somebody who is NOT reading
       // through USER_A's membership.
       const b = (
-        await tx.query<{ n: number }>(`select count(*)::int as n from posts where workspace_id = $1`, [
-          WS_B,
-        ])
+        await tx.query<{ n: number }>(
+          `select count(*)::int as n from posts where workspace_id = $1`,
+          [WS_B],
+        )
       ).rows[0]!.n
       return { ...row, b }
     })
@@ -338,8 +339,11 @@ describe('the erasure itself', () => {
   }, 180_000)
 
   it('MEASURES which path removed each table — direct delete or cascade', async () => {
-    const perTable = await eraseThenVerify(USER_C, WS_C, 'Erasure Gamma', async (_tx, run) =>
-      (run as { perTable: Record<string, number> }).perTable,
+    const perTable = await eraseThenVerify(
+      USER_C,
+      WS_C,
+      'Erasure Gamma',
+      async (_tx, run) => (run as { perTable: Record<string, number> }).perTable,
     )
 
     // Workspace C's rows reference each other for real (see `seedRelated`). A
@@ -367,10 +371,13 @@ describe('the erasure itself', () => {
     // absent from the catalog query the erasure is built from. The ONLY thing
     // that removes it is the cascade — and it holds the OAuth tokens, which is
     // the single worst row in this database to leave behind.
-    const left = await eraseThenVerify(USER_C, WS_C, 'Erasure Gamma', async (tx) =>
-      (
-        await tx.query<{ n: number }>(`select count(*)::int as n from connection_secrets`)
-      ).rows[0]!.n,
+    const left = await eraseThenVerify(
+      USER_C,
+      WS_C,
+      'Erasure Gamma',
+      async (tx) =>
+        (await tx.query<{ n: number }>(`select count(*)::int as n from connection_secrets`))
+          .rows[0]!.n,
     )
     expect(left).toBe(0)
   }, 180_000)
@@ -404,7 +411,9 @@ describe('the append-only guard, and the size of its exception', () => {
   it('never permits an UPDATE, exemption set or not', async () => {
     await db.exec('begin')
     await db.query(`select set_config('app.erasing_workspace', $1, true)`, [WS_A])
-    const out = await probe(db, `update audit_logs set action = 'x' where workspace_id = $1`, [WS_A])
+    const out = await probe(db, `update audit_logs set action = 'x' where workspace_id = $1`, [
+      WS_A,
+    ])
     await db.exec('rollback')
     expect('denied' in out ? out.denied : '').toMatch(/append-only/)
   })
@@ -459,13 +468,17 @@ describe('the ledger redaction mechanism is built and INERT', () => {
   it('erasure does not redact — the decision is not taken by an implementation', async () => {
     // Asked of workspace C, which the generic seeder never filled — so a row
     // here could only have been written by the erasure itself.
-    const rows = await eraseThenVerify(USER_C, WS_C, 'Erasure Gamma', async (tx) =>
-      (
-        await tx.query<{ n: number }>(
-          `select count(*)::int as n from ledger_actor_redactions where workspace_id = $1`,
-          [WS_C],
-        )
-      ).rows[0]!.n,
+    const rows = await eraseThenVerify(
+      USER_C,
+      WS_C,
+      'Erasure Gamma',
+      async (tx) =>
+        (
+          await tx.query<{ n: number }>(
+            `select count(*)::int as n from ledger_actor_redactions where workspace_id = $1`,
+            [WS_C],
+          )
+        ).rows[0]!.n,
     )
     expect(rows).toBe(0)
   })

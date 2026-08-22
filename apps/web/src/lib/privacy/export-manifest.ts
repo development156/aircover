@@ -211,3 +211,87 @@ export const EXPORTABLE_TABLES: readonly ExportTable[] = EXPORT_TABLES.filter(
 export const UNEXPORTABLE_TABLES: readonly ExportTable[] = EXPORT_TABLES.filter(
   (t) => t.readability !== 'readable',
 )
+
+/**
+ * ── THE BLIND SPOT THE SWEEP ABOVE CANNOT SEE ────────────────────────────────
+ *
+ * `EXPORT_TABLES` is derived from one question: which base tables carry a
+ * `workspace_id`? That question is exactly right about ownership and structurally
+ * blind to a table that is owned through a JOIN or through a different key. Three
+ * consequences, and every one of them is personal data:
+ *
+ *  · `workspaces` itself. The name of the business, its slug, its settings. It is
+ *    the PARENT of every row in the sweep and it carries no `workspace_id`, so no
+ *    version of that query will ever return it.
+ *  · `users_profile`. Keyed by `user_id`, holding an email address, a display
+ *    name and an avatar. docs/31 said "your name, email and sign-in belong to
+ *    Clerk, our sign-in provider" — a copy lives here, and that sentence was
+ *    wrong for four days.
+ *  · `connection_secrets`. Keyed by `connection_id`. OAuth access and refresh
+ *    tokens for the customer's own social accounts.
+ *
+ * The first two are now EXPORTED, by name, from `export.ts`. The third never
+ * will be, and that is stated below rather than left as an absence.
+ *
+ * ── WHY THE OMISSIONS ARE A LIST AND NOT A SENTENCE ──────────────────────────
+ * An omission a customer cannot see is a lie by silence. `ai_provider_logs` is
+ * already handled that way — RLS on, no policies, so PostgREST answers `[]` and
+ * an export rendering it as an empty array asserts "you have no AI usage
+ * records", which is false. Everything below is the same problem for a table the
+ * sweep never even reaches, so it gets the same treatment: named, in the file,
+ * with the reason, in words the customer can read.
+ */
+export interface OmittedByDesign {
+  readonly table: string
+  readonly describes: string
+  readonly reason: string
+}
+
+export const OMITTED_BY_DESIGN: readonly OmittedByDesign[] = [
+  {
+    table: 'connection_secrets',
+    describes: 'the access keys for your linked accounts',
+    reason:
+      'These are the keys that let Sahoda post on your behalf. They are encrypted, they are never shown to anyone including you, and putting them in a file you download would be the single most dangerous thing in this export. They are deleted the moment you disconnect an account or delete your workspace.',
+  },
+  {
+    table: 'billing_webhook_events',
+    describes: 'what the payment provider told us about your payments',
+    reason:
+      'Raw messages from the card processor. What they say about your payments is in your credit record and your invoices, which are both included. Nothing in the app can read this table.',
+  },
+  {
+    table: 'clerk_id_map',
+    describes: 'a translation table for sign-in accounts',
+    reason:
+      'A one-time engineering record from moving between two sign-in systems. It holds sign-in reference codes and nothing about you.',
+  },
+  {
+    table: 'competitors · competitor_sources · competitor_snapshots · competitor_changes',
+    describes: 'the businesses Radar watches, and what it saw',
+    reason:
+      'These describe OTHER businesses, not you, and they are shared between every customer who watches the same one. Which businesses YOU chose to watch is your data and is included, as “competitor_subscriptions”.',
+  },
+  {
+    table: 'radar_fetch_log · radar_limits',
+    describes: 'what Radar cost us to run',
+    reason: 'Our own running costs and spending limits. Nothing about you is in them.',
+  },
+  {
+    table: 'invoice_serials',
+    describes: 'the invoice numbering counter',
+    reason:
+      'A single counter shared by every invoice we issue. Your own invoices are included in full.',
+  },
+  {
+    table: 'ops_admins · ops_audit_log · ops_tasks · ops_qa_runs and other ops tables',
+    describes: 'how Sahoda is run',
+    reason:
+      'Our own staff, tasks and internal records. Where an admin acted on YOUR workspace, that is recorded in “audit_logs”, which is included.',
+  },
+  {
+    table: 'app_settings · plans · guide_tours',
+    describes: 'how the product is configured',
+    reason: 'The same for every customer. Nothing about you is in them.',
+  },
+] as const

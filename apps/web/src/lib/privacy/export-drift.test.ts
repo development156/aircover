@@ -15,7 +15,37 @@
  * would be red for a reason that is not a defect, which is how a suite gets
  * ignored. A skip is honest; a green pass without a connection would not be.
  *
- * It is read-only: one `select` against `information_schema` and `pg_policies`.
+ * It is read-only: one `select` against `information_schema` and `pg_policies`,
+ * inside a `begin read only` — see the note on that below, which is the reason
+ * this file could be pointed at production at all.
+ *
+ * ── IT HAD NEVER RUN, AND WHAT NOW COVERS THAT ──────────────────────────────
+ * Written 2026-08-19 and first EXECUTED 2026-08-23, against production, from a
+ * worktree that had `SUPABASE_DB_URL`. Four days in which the only guard on the
+ * export manifest was one that never fired — and eight tables went missing from
+ * every export in that window.
+ *
+ * `packages/db/tests/export_manifest.pglite.test.ts` now asks the same two
+ * questions of the MIGRATION FILES, in process, with no credentials, on every
+ * gate run. It cannot speak for production. It catches the thing that actually
+ * goes stale, and it caught `ledger_actor_redactions` on the first gate run
+ * after that table was written — by name, without anybody looking.
+ *
+ * This file remains the ONLY thing that can say what production holds, so it is
+ * kept, fixed, and run by hand when somebody has the credential.
+ *
+ * ── WHAT IT SAID ABOUT PRODUCTION, 2026-08-23 ───────────────────────────────
+ * `missing` was EMPTY: every workspace-owned table in production is in the
+ * manifest, and the readability assertion passed too. So the eight tables found
+ * on 2026-08-22 were the last of them, and the manifest is currently true of the
+ * live database as well as of the migration files.
+ *
+ * `phantom` named `ledger_actor_redactions` — which is correct and expected. It
+ * is created by `20260823000000_dpdp_erasure.sql`, which is written and
+ * deliberately NOT applied. This file will report it until somebody applies that
+ * migration, and that red is the unapplied migration, not a defect in the
+ * manifest. It costs nothing at runtime: the entry is `no-read-policy`, so
+ * `buildWorkspaceExport` never queries the table and lists it by name instead.
  */
 import { createRequire } from 'node:module'
 
@@ -81,8 +111,18 @@ describeWithDb('the export manifest against the live schema', () => {
     })
     await client.connect()
     try {
-      await client.query('set default_transaction_read_only = on')
+      // `begin read only`, NOT `set default_transaction_read_only = on`.
+      //
+      // MEASURED in this repo already: a session-level SET through the
+      // ap-south-1 pooler is handed to the NEXT client that borrows the
+      // connection. The setting is read-only, so the blast radius is "somebody
+      // else's writes start failing" rather than data loss — which is precisely
+      // the kind of fault that gets blamed on the application for a day. A
+      // transaction-scoped `begin read only` ends when this query does and
+      // cannot outlive the connection.
+      await client.query('begin read only')
       const result = await client.query(SCHEMA_QUERY)
+      await client.query('rollback')
       return result.rows
     } finally {
       await client.end()
