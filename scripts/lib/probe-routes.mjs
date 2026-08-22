@@ -43,6 +43,36 @@ export const EXPECTED_ROUTES = [
 const SIGN_IN = '/sign-in'
 
 /**
+ * Did Vercel's deployment protection answer instead of the app?
+ *
+ * ── WHY THIS IS NOT A ROUTE FAILURE ──────────────────────────────────────────
+ * MEASURED 2026-08-22. `post-deploy-smoke.yml` fires on `deployment_status`,
+ * which Vercel posts for PREVIEW deployments too. A protected preview answers
+ * the first hop with `302 → https://vercel.com/sso-api?url=…&nonce=…` and the
+ * chain ends on `vercel.com/login`. Every route then "lands on /login" and
+ * `/admin` renders 200, so the probe reported **0/6 routes behave** and the
+ * workflow went red.
+ *
+ * It has done that six times — every completed run of that workflow, on
+ * 19, 20 and 22 August, from wt-loose-ends, wt-loop and wt-handoff. Not one
+ * green run has ever existed. The file's own header predicted this exact
+ * outcome: "wiring a suite that would fail on a missing secret and read as a
+ * broken deployment is exactly the cry-wolf failure this file exists to end."
+ *
+ * So it is reported as UNMEASURED, which is a third answer beside pass and fail.
+ * The host is the tell and it is not forgeable by the app: we asked a
+ * `*.vercel.app` deployment and ended on `vercel.com`. Nothing our code does can
+ * produce that.
+ */
+export function isVercelProtected(result) {
+  try {
+    return new URL(result.finalUrl).host === 'vercel.com'
+  } catch {
+    return false
+  }
+}
+
+/**
  * Judge one probed route.
  *
  * `result` is what the runner observed after following redirects:
@@ -51,6 +81,18 @@ const SIGN_IN = '/sign-in'
 export function judge(route, result) {
   const fail = (reason) => ({ ok: false, path: route.path, kind: route.kind, reason })
   const pass = (note) => ({ ok: true, path: route.path, kind: route.kind, note })
+
+  // BEFORE anything else. If Vercel's login wall answered, the app was never
+  // reached and every assertion below would be about Vercel's page, not ours.
+  if (isVercelProtected(result)) {
+    return {
+      ok: false,
+      unmeasured: true,
+      path: route.path,
+      kind: route.kind,
+      reason: 'Vercel deployment protection answered — the app was never reached',
+    }
+  }
 
   const path = (() => {
     try {
@@ -98,11 +140,18 @@ export function judge(route, result) {
 }
 
 export function summarise(verdicts) {
-  const failed = verdicts.filter((v) => !v.ok)
+  // Three buckets, not two. "The app is broken" and "we never reached the app"
+  // are different claims and must not share an exit code — a probe that reports
+  // a login wall as an outage is one people learn to ignore, which costs more
+  // than having no probe at all.
+  const unmeasured = verdicts.filter((v) => v.unmeasured)
+  const failed = verdicts.filter((v) => !v.ok && !v.unmeasured)
   return {
-    ok: failed.length === 0,
-    passed: verdicts.length - failed.length,
+    ok: failed.length === 0 && unmeasured.length === 0,
+    measured: unmeasured.length === 0,
+    passed: verdicts.filter((v) => v.ok).length,
     total: verdicts.length,
     failed,
+    unmeasured,
   }
 }

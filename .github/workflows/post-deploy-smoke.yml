@@ -14,12 +14,30 @@
 # advertising itself. It does NOT sign in, publish, spend a credit, or touch the
 # database.
 #
-# The full 58-test `@smoke` Playwright suite is deliberately NOT run here. It
-# drives a signed-in browser against a dev server with a stored Clerk session,
-# and pointing it at a remote deployment needs Clerk test credentials as repo
-# secrets plus a Vercel protection-bypass token for previews. Those are the
-# founder's to add. Wiring a suite that would fail on a missing secret and read
-# as a broken deployment is exactly the cry-wolf failure this file exists to end.
+# The full `@smoke` Playwright suite (99 tests in 30 files, MEASURED 2026-08-22)
+# is deliberately NOT run here, and the reason is now stronger than the original
+# one. That suite does not read; it CREATES. Every spec mints a Clerk user, signs
+# it in, and lets the app create a workspace, a credit ledger and whatever rows it
+# exercises. There is exactly one Supabase project in this account and it is
+# production. Running it on every deploy would not check production — it would
+# write test workspaces into the customer database automatically, which is the
+# accident `src/lib/testing/e2e-target.ts` exists to stop. It stays a deliberate
+# act behind SAHODA_E2E_ACK_TARGET.
+#
+# ── THIS WORKFLOW HAS NEVER PASSED, AND THAT IS THE OTHER HALF ────────────────
+# MEASURED via the Actions API 2026-08-22: 16 runs, 6 completed as `failure`, 10
+# `skipped`, ZERO successes — on 19, 20 and 22 August, from wt-loose-ends, wt-loop
+# and wt-handoff. Every failure was the same thing: `deployment_status` fires for
+# PREVIEW deployments too, a protected preview redirects to
+# `vercel.com/sso-api` and lands on `vercel.com/login`, so all six routes
+# "landed on /login" and the run reported `0/6 routes behave`.
+#
+# The app was fine every time. The probe was measuring Vercel's login page.
+#
+# Two changes close it. The job now runs only for PRODUCTION deployments, and
+# `scripts/lib/probe-routes.mjs` detects the wall by host and exits 2 for "could
+# not measure" rather than 1 for "production is down" — because an alarm that
+# cries wolf is one people mute, which this file's own header said from the start.
 
 name: post-deploy smoke
 
@@ -43,7 +61,14 @@ jobs:
     # `deployment_status` fires for every state including `pending` and `error`.
     # Probing a deployment that has not finished would fail for the one reason
     # that is not a defect, so the success state is the only one worth a run.
-    if: github.event_name == 'workflow_dispatch' || github.event.deployment_status.state == 'success'
+    # `deployment_status` fires for every state including `pending` and `error`,
+    # and for every ENVIRONMENT including Preview. Probing a preview is what made
+    # every previous run of this workflow red: previews sit behind Vercel
+    # deployment protection, so the probe measured a login page. Production only.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment_status.environment == 'Production')
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -57,7 +82,7 @@ jobs:
       # No install step, and that is deliberate: the probe is plain Node with no
       # imports outside `scripts/`. A `pnpm install` here would make a check that
       # exists to be fast and boring depend on the whole dependency graph.
-      - name: Probe the deployment
+      - name: Probe the routes
         env:
           PROBE_HOST: ${{ github.event.inputs.url || github.event.deployment_status.target_url }}
         run: |
@@ -66,4 +91,33 @@ jobs:
             exit 1
           fi
           echo "Probing $PROBE_HOST"
+          set +e
           node scripts/probe-production.mjs "$PROBE_HOST"
+          code=$?
+          set -e
+          # Exit 2 is "could not measure", and on a PRODUCTION deployment that is
+          # itself a misconfiguration worth failing on — production must not sit
+          # behind deployment protection. It is reported with its own sentence so
+          # nobody spends an afternoon debugging an app that was never asked.
+          if [ "$code" = "2" ]; then
+            echo "::error::Could not measure $PROBE_HOST — it answered with Vercel deployment protection, not the app."
+            exit 1
+          fi
+          exit $code
+
+      # ── THE HALF NO ROUTE PROBE CAN SEE ──────────────────────────────────────
+      # A cron path lives in three places that cannot see each other: the schedule
+      # in vercel.json, the Clerk exemption in middleware.ts, and the route file.
+      # `lib/cron/wiring.test.ts` requires all three to agree IN THE REPOSITORY and
+      # can say nothing about the DEPLOYMENT — the deployed branch is not the branch
+      # anyone is standing on. MEASURED 2026-08-22 against the production alias:
+      # 1 of 3 scheduled crons is reachable. The other two answer a Clerk redirect
+      # that Vercel cron does not follow, so their ticks have always done nothing
+      # while the dashboard showed jobs that run.
+      #
+      # No cron secret is sent, so this can never trigger a job. A reachable route
+      # answers 401 and that 401 IS the pass.
+      - name: Probe cron reachability
+        env:
+          PROBE_HOST: ${{ github.event.inputs.url || github.event.deployment_status.target_url }}
+        run: node scripts/probe-crons.mjs "$PROBE_HOST"

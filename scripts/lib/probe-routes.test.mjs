@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { DOCUMENT_HEADERS, EXPECTED_ROUTES, judge, summarise } from './probe-routes.mjs'
+import {
+  DOCUMENT_HEADERS,
+  EXPECTED_ROUTES,
+  isVercelProtected,
+  judge,
+  summarise,
+} from './probe-routes.mjs'
 
 const HOST = 'https://sahodalabs.vercel.app'
 const html =
@@ -137,5 +143,60 @@ describe('summarise', () => {
     const bad = summarise([{ ok: true }, { ok: false, path: '/home' }])
     expect(bad.ok).toBe(false)
     expect(bad.failed).toHaveLength(1)
+  })
+})
+
+describe('a deployment we could not reach at all', () => {
+  // Six red runs of post-deploy-smoke.yml were this and nothing else: Vercel's
+  // preview-protection wall, reported as "0/6 routes behave".
+  const walled = (path) => ({
+    status: 200,
+    contentType: 'text/html',
+    body: '<html><title>Login – Vercel</title></html>',
+    finalUrl: `https://vercel.com/login?next=%2Fsso-api%3Furl%3D…${path}`,
+  })
+
+  it('detects the wall by HOST, which the app cannot forge', () => {
+    expect(isVercelProtected(walled('/home'))).toBe(true)
+    expect(isVercelProtected({ finalUrl: `${HOST}/sign-in` })).toBe(false)
+    // A malformed URL must not read as protected — that would silence a real failure.
+    expect(isVercelProtected({ finalUrl: 'not a url' })).toBe(false)
+  })
+
+  it('marks every route UNMEASURED rather than failed', () => {
+    for (const kind of ['public', 'protected', 'gated']) {
+      const v = judge({ path: '/home', kind }, walled('/home'))
+      expect(v.unmeasured, `${kind} should be unmeasured`).toBe(true)
+      expect(v.ok).toBe(false)
+    }
+  })
+
+  it('checks the wall BEFORE the gated rule, or /admin reads as a 200 leak', () => {
+    // The gated branch fires on a sign-in landing and would otherwise report
+    // "this leaks that /admin exists" about Vercel's own login page.
+    const v = judge({ path: '/admin', kind: 'gated' }, walled('/admin'))
+    expect(v.reason).toMatch(/deployment protection/)
+  })
+
+  it('summarises unmeasured separately, so it cannot share an exit code with broken', () => {
+    const s = summarise([
+      judge({ path: '/home', kind: 'protected' }, walled('/home')),
+      judge({ path: '/posts', kind: 'protected' }, walled('/posts')),
+    ])
+    expect(s.measured).toBe(false)
+    expect(s.ok).toBe(false)
+    expect(s.unmeasured).toHaveLength(2)
+    expect(s.failed).toHaveLength(0)
+  })
+
+  it('a genuinely broken route is still FAILED, not excused as unmeasured', () => {
+    const s = summarise([
+      judge(
+        { path: '/home', kind: 'protected' },
+        { status: 500, contentType: '', body: '', finalUrl: `${HOST}/home` },
+      ),
+    ])
+    expect(s.measured).toBe(true)
+    expect(s.failed).toHaveLength(1)
   })
 })
