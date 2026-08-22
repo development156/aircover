@@ -26,10 +26,24 @@ import { QuestionStep } from './question-step'
 import { RevealStep } from './reveal-step'
 import { SavedBrainBanner } from './saved-brain-banner'
 import { StepRail } from './step-rail'
+import { clearIntakeStash, readIntakeStash, stashIntake } from './intake-recovery'
 
 type Screen = 'intake' | 'door' | 'question' | 'reveal'
 
 const SCREEN_INDEX: Record<Screen, number> = { intake: 0, door: 1, question: 2, reveal: 3 }
+
+/**
+ * Which screens a recovered session may reopen on.
+ *
+ * NOT `reveal`: that screen renders a brain, and a recovered session has none —
+ * the resolve is what produces one, and it had not happened. Reopening there
+ * would show the flow's last step with nothing in it. `door` is excluded too:
+ * its result is a live fetch, not typed input, so it is re-run rather than
+ * restored.
+ */
+function isResumableScreen(value: string | undefined): value is 'intake' | 'question' {
+  return value === 'intake' || value === 'question'
+}
 
 export interface SavedBrainSummary {
   payload: BrandMemoryPayload
@@ -73,10 +87,23 @@ export function OnboardingFlow({
     null,
   )
 
-  const [screen, setScreen] = useState<Screen>(savedBrain ? 'reveal' : 'intake')
+  /**
+   * Recovered on the first client render, once, from `sessionStorage`.
+   *
+   * A lazy `useState` initialiser rather than an effect: an effect would render
+   * the empty box first and then replace it, which reads as "my words were lost,
+   * then came back" — and on a slow paint the customer starts retyping into a
+   * field that is about to be overwritten. A saved brain always wins, because
+   * that is a resolve that finished and this is only what preceded one.
+   */
+  const [recovered] = useState(() => (savedBrain ? null : readIntakeStash()))
+
+  const [screen, setScreen] = useState<Screen>(
+    savedBrain ? 'reveal' : isResumableScreen(recovered?.screen) ? recovered.screen : 'intake',
+  )
   const [intake, setIntake] = useState<Intake>(DEFAULT_INTAKE)
-  const [intakeText, setIntakeText] = useState('')
-  const [overrides, setOverrides] = useState<Partial<Intake>>({})
+  const [intakeText, setIntakeText] = useState(recovered?.text ?? '')
+  const [overrides, setOverrides] = useState<Partial<Intake>>(recovered?.overrides ?? {})
   const [door, setDoor] = useState<DoorResult | null>(null)
   const [refusal, setRefusal] = useState('')
 
@@ -111,6 +138,16 @@ export function OnboardingFlow({
   const [isSaving, startSaving] = useTransition()
   const [saveState, setSaveState] = useState<SaveBrandState | null>(null)
 
+  /**
+   * Every change to the typed answers is written synchronously. `useEffect`
+   * rather than a call inside each setter because three separate callbacks move
+   * this state, and a buffer that one of them forgets is a buffer nobody can
+   * trust — the point of the composer's version is that it cannot be skipped.
+   */
+  useEffect(() => {
+    stashIntake({ screen, text: intakeText, overrides })
+  }, [screen, intakeText, overrides])
+
   useEffect(() => {
     if (!state) return
 
@@ -123,6 +160,9 @@ export function OnboardingFlow({
       setFallbackMessage(state.kind === 'fallback' ? state.message : null)
       setAttemptError(null)
       setScreen('reveal')
+      // The resolve landed, so the brain is the record and this buffer would
+      // only be a stale second copy of what preceded it.
+      clearIntakeStash()
       return
     }
 
