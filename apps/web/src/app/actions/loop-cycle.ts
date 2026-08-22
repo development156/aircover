@@ -22,7 +22,7 @@ import { reflect } from '@/lib/loop/reflect'
 import * as store from '@/lib/loop/store'
 import { normalizeSlot } from '@/lib/planner/slots'
 import { reportServerError } from '@/lib/observability/report'
-import { CHANNEL_LABELS } from '@/components/posts/channel-label'
+import { CHANNELS_UNREADABLE_MESSAGE, noChannelsMessage } from '@/lib/loop/refusal-copy'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
 
@@ -95,13 +95,6 @@ export interface CycleState {
  * needs to reconnect, and sending the second one to do the first is the action
  * telling them something untrue about their own account.
  */
-/** "Instagram", "Instagram and X", "Instagram, X and LinkedIn". */
-function formatChannels(channels: readonly Channel[]): string {
-  const names = channels.map((c) => CHANNEL_LABELS[c])
-  if (names.length <= 1) return names[0] ?? ''
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
-}
-
 async function connectedChannels(
   workspaceId: string,
 ): Promise<{ live: Channel[]; lapsed: Channel[] } | null> {
@@ -237,7 +230,7 @@ export async function runCycleToPreview(
         ok: false,
         cycleId: cycle.id,
         insufficient: false,
-        message: 'Sahoda couldn’t check your channels just now — nothing was charged. Try again.',
+        message: CHANNELS_UNREADABLE_MESSAGE,
       }
     }
     const { live: channels, lapsed } = connected
@@ -251,10 +244,7 @@ export async function runCycleToPreview(
         ok: false,
         cycleId: cycle.id,
         insufficient: false,
-        message:
-          lapsed.length > 0
-            ? `Your ${formatChannels(lapsed)} ${lapsed.length === 1 ? 'connection has' : 'connections have'} lapsed — reconnect ${lapsed.length === 1 ? 'it' : 'them'} and Sahoda has somewhere to plan for again.`
-            : 'Connect a channel first — Sahoda has nowhere to plan for.',
+        message: noChannelsMessage(lapsed),
       }
     }
 
