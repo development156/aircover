@@ -81,7 +81,19 @@ const activeWorkspaceId = cache(async (): Promise<string | null> => {
  * about is what makes this a measurement rather than a guess, and it stays correct
  * after the migration that widens the platform CHECK.
  */
-async function countAccounts(surface: InboxSurfaceKey): Promise<number | null> {
+/**
+ * EXPORTED (wt-webhooks needs it for the stored-thread list) and NULLABLE
+ * (wt-flow made it so, and that is the load-bearing half).
+ *
+ * This used to `return 0` when its own query errored, and 0 is the input that
+ * decides between two OPPOSITE sentences at `accountsQueried === 0`: "connect
+ * an account" and "we could not resolve the accounts you have connected". A
+ * failed count therefore inverted the branch that exists to stop us telling a
+ * customer to connect an account they already connected. `surface.ts` documents
+ * the null arm at length; widening this back to `number` would make that
+ * documentation describe a case that can no longer occur.
+ */
+export async function countAccounts(surface: InboxSurfaceKey): Promise<number | null> {
   try {
     const workspaceId = await activeWorkspaceId()
     // Two meanings behind that null — no workspace, and a workspace read that

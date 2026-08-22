@@ -1,7 +1,8 @@
 import { ConversationList } from '@/components/inbox/conversation-list'
 import { InboxShell } from '@/components/inbox/inbox-shell'
 import { ThreadPlaceholder } from '@/components/inbox/thread-placeholder'
-import { readConversations } from '@/lib/inbox/read'
+import { readConversationsList } from '@/lib/inbox/conversations'
+import { toInboxEmptiness } from '@/lib/inbox/store-decision'
 
 export const metadata = { title: 'Inbox' }
 
@@ -27,15 +28,20 @@ export const metadata = { title: 'Inbox' }
  * the panes stay standing.
  */
 export default async function InboxMessagesPage() {
-  const { rows, decision } = await readConversations()
+  // STORE FIRST. The rows come from this database, filled by the Zernio webhook
+  // receiver; the live call is a history supplement whose failure is a label, not
+  // an exception. Zernio being unreachable degrades this page to what the store
+  // holds and says so — it does not blank it.
+  const { rows, decision } = await readConversationsList()
 
   // `showList` false means the rows cannot be trusted as a reading — treat the
   // list as empty rather than rendering rows the classifier has disowned.
   const conversations = decision.showList ? rows : []
+  const emptiness = toInboxEmptiness(decision)
 
   return (
     <InboxShell
-      emptiness={decision.state}
+      emptiness={emptiness}
       mobileShow={conversations.length > 0 ? 'list' : 'thread'}
       hasSomethingToOpen={conversations.length > 0}
       list={
@@ -46,7 +52,7 @@ export default async function InboxMessagesPage() {
       }
       thread={
         <ThreadPlaceholder
-          emptiness={decision.state}
+          emptiness={emptiness}
           hasConversations={conversations.length > 0}
           selectLine="Pick a conversation to read it and reply."
         />

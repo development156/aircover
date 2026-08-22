@@ -48,6 +48,16 @@ const isPublicRoute = createRouteMatcher([
   // the well-known fixture secret is unreachable rather than merely unused; and every
   // rejection answers a fixed envelope, never a provider or DB message.
   '/api/webhooks/cashfree',
+  // Zernio's inbound events (posts, messages, comments, reviews). Obeys all three
+  // rules above: `verifyZernioWebhook` is the first thing the handler does after the
+  // size check and nothing below it can run on unverified bytes — `ingestZernioWebhook`
+  // accepts only a `VerifiedZernioBody`, which only the verifier can mint, so parsing
+  // unsigned bytes is a compile error rather than a review comment. A MISSING
+  // signature header is a 401, not a skip: the header is optional on Zernio's side,
+  // which is a fact about how the subscription was configured and not permission to
+  // trust an anonymous POST. Every rejection answers a fixed envelope that never
+  // names which half of the check failed.
+  '/api/webhooks/zernio',
   '/api/cron/sweeps',
   // The nightly metric-history pass. Same shape and same reasoning as the sweep
   // above: Vercel invokes it with no user session, so `auth.protect()` would answer

@@ -293,3 +293,28 @@ export {
   xRationRefusalMessage,
   type XRationVerdict,
 } from './x-cost'
+
+// ── Zernio webhooks: the INBOUND half of the integration ────────────────────
+// Everything else in this package asks Zernio for something. These three modules
+// handle Zernio telling US something, which is the direction that makes the inbox
+// local and survivable. The contract they implement is parsed, not summarised, in
+// docs/29_Zernio_Webhooks_Contract.md.
+//
+// `VerifiedZernioBody` is a branded type only `verifyZernioWebhook` can mint, and
+// `parseZernioWebhook` accepts nothing else — so parsing bytes whose signature was
+// never checked is a compile error rather than a review comment.
+export {
+  ZERNIO_SIGNATURE_HEADER,
+  ZERNIO_SIGNATURE_HEADER_LEGACY,
+  signZernioBody,
+  verifyZernioWebhook,
+  type VerifiedZernioBody,
+  type ZernioVerification,
+} from './zernio/webhook-signature'
+export {
+  decideRouting,
+  parseZernioWebhook,
+  type ParsedZernioWebhook,
+  type ZernioWebhookParse,
+  type ZernioWebhookRouting,
+} from './zernio/webhook-payload'

@@ -39,6 +39,16 @@ const PUBLIC_PATTERNS = [
   '/api/admin/devops/ingest',
   '/api/webhooks/clerk',
   '/api/webhooks/cashfree',
+  // Zernio's inbound events, added 2026-08-21. Public because Zernio POSTs with no
+  // session; it authenticates itself with an HMAC-SHA256 over the raw body, checked
+  // before anything reads the payload — `ingestZernioWebhook` accepts only a
+  // `VerifiedZernioBody`, a branded type only the verifier can mint, so parsing
+  // unsigned bytes is a compile error. A MISSING signature is a 401, not a skip.
+  //
+  // This entry is also what proved the comment strip below was needed: the
+  // apostrophe in the first word of this comment was invisible to the parser as
+  // written, and invented two routes out of prose.
+  '/api/webhooks/zernio',
   '/api/cron/sweeps',
   '/api/cron/metrics',
   // The weekly Loop plan, added 2026-08-20. THREE separate guards refused this
@@ -261,12 +271,28 @@ describe('middleware routing contract', () => {
       // BOTH directions. The one-way check let `/api/webhooks/cashfree` be added to
       // middleware.ts while this file asserted it was NOT public — and stay green,
       // because nothing compared the source's list back against this one.
+      //
+      // ── THE COMMENT STRIP IS LOAD-BEARING ──────────────────────────────────
+      // This used to match `/'([^']+)'/g` over the RAW slice. Every entry in that
+      // block is preceded by an explanatory comment, and an APOSTROPHE in one of
+      // those comments — "Zernio's inbound events" — opens a quote that closes on
+      // the next apostrophe, inventing a "route" made of prose.
+      //
+      // MEASURED 2026-08-21: adding one commented entry produced two phantom
+      // patterns and a failure that named neither the real cause nor the real
+      // entry. `lib/cron/wiring.test.ts` learned the same lesson on 2026-08-19 on
+      // the same block of source; this file did not get the fix then.
+      //
+      // Stripping `//…` to end-of-line first is what makes the match see code.
       const declared = [
         ...source
           .slice(
             source.indexOf('createRouteMatcher(['),
             source.indexOf('])', source.indexOf('createRouteMatcher([')),
           )
+          .split('\n')
+          .map((line) => line.replace(/\/\/.*$/, ''))
+          .join('\n')
           .matchAll(/'([^']+)'/g),
       ].map((m) => m[1])
       expect(new Set(declared)).toEqual(new Set(PUBLIC_PATTERNS))

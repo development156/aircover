@@ -119,6 +119,12 @@ describe('cron wiring', () => {
         // set until 2026-08-19 — not because anyone decided it, but because the
         // parse above could not see it. Listed now, which is the point.
         '/api/webhooks/cashfree',
+        // Added 2026-08-21 with the Zernio webhook receiver. Deliberate, and this
+        // guard failing is what made it deliberate — it caught the entry even
+        // though a ten-line comment sits directly above it in middleware.ts, which
+        // is the case the 2026-08-19 comment strip was added for. The note above
+        // is now demonstrated rather than asserted.
+        '/api/webhooks/zernio',
       ]),
     )
     for (const entry of apiEntries) expect(entry).not.toContain('(.*)')
