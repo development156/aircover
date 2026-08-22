@@ -69,7 +69,9 @@ export function ConfirmedFieldsMeter({ fieldMeta }: ConfirmedFieldsMeterProps) {
         value={ring.percent}
         label={`${ring.confirmed} of ${ring.total} fields confirmed by you`}
       />
-      <p className="mt-2 text-[13px] text-muted">
+      {/* `type-body` rather than a hand-written 13px: --t-body IS 13px/20px, and
+          design-lint ratchets hand-written font sizes at zero new. */}
+      <p className="type-body mt-2 text-muted">
         {none ? (
           <>
             Everything below is Sahoda&rsquo;s reading of what it found — none of it came from you

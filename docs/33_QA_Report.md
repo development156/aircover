@@ -371,6 +371,51 @@ is worth quoting.
 | 4 | Three sentence-length brand fields truncate at 1440px | reveal screen | Medium |
 | 5 | `/sites` told a workspace with a fully resolved Brand Brain to "Resolve your Brand Brain first" — the tip rendered whenever no site existed, with no reference to brain state | `/sites` | Medium |
 
+**Addendum, 2026-08-22 — all seventeen dispositioned on `wt-fix1`**
+
+Written by the lane that worked the list, not by the pass that wrote it. Every item below
+either landed, was proven to belong to another branch, or was WITHDRAWN with the measurement
+that killed it. Nothing was closed by assertion.
+
+| # | disposition |
+|---|---|
+| 5 | **Fixed.** The reveal counts CONFIRMED fields via `brainRing`, the same authority `/home`, `/brain` and `/brain/resolve` already read. All four screens now say the same number. `signal-clarity.ts` and its meter are deleted — the reveal was their only consumer. |
+| 6 | **Fixed.** A `useRef` money guard plus a render mirror, released on `[state]` and never on `[isPending]`. The obvious test was a proven FALSE GREEN: React 19 queues actions, so a never-settling mock swallows the second dispatch even with no guard at all. |
+| 7 | **Fixed.** A heading is derived from the first non-blank body line, capped at 60 code points, carrying its provenance so only a genuine placeholder is styled as one. Cards carry a "Saved <age>" stamp. |
+| 8 | **Fixed.** `exampleHint` frames every specimen as an example and drops the terminal full stop, applied at the render because there are twenty-odd specimens across four regimes and two locales. |
+| 9 | **Fixed.** "Continue without it" wears the firm ring and ink text every real choice wears. Secondary, not primary: reading the door is still the better path. |
+| 10 | **Fixed** for the date control — the picker follows the app's theme rather than the OS. |
+| 11 | **Fixed.** Title and chip no longer share a row, with a seven-width e2e spec covering the 768–1279 band this report did not sample. |
+| 12 | **Fixed.** A row is created only when there is content, or when an action genuinely needs one. |
+| 13 | **Fixed.** The display name no longer touches the email address; the slug seed still does, and that is load-bearing rather than tidy. |
+| 14 | **Fixed.** `weak` states the strength; the note keeps the reason. It no longer asserts a conflict over sparse input. |
+| 15 | **Fixed.** The read-back belongs to the url and pdf arms, which are the ones where it is evidence. |
+| 16 | **Not ours, verified.** No `alt` of that shape exists anywhere in `apps/web`; it is generated inside Clerk's own `<UserButton />`. |
+| 17 | **Fixed.** A real multi-size `.ico` plus scheme-aware PNGs. |
+| 18 | **WITHDRAWN — see below.** |
+| 19 | **Fixed.** Said once per group, with the per-field distinction moved into each checkbox's accessible name so a screen reader still hears it. |
+| 20 | **Mostly dissolved, one sentence added.** Those controls were already inert divs rather than disabled buttons, and `design-lint` enforces that at strict zero. What was missing was the denial where a reader looks for the collection. |
+| 21 | **Fixed.** The spatial instruction is gone and the context pane's prompt renders only when there is something to open. |
+
+**Item 18 was a false finding, and the instrument produced it.** `/brain/competitors` was ALREADY
+a `redirect('/radar')` on `wt-integrate` — the exact tree this pass walked. Every clause of the
+finding is a correct description of a working redirect. The real defect was that both audit
+harnesses still listed the path, so the sweep photographed Radar twice and filed half the frames
+under a route that renders nothing. The route is out of both harnesses and a guard now refuses to
+point either camera at a redirect. This belongs in "What I got wrong" as a sixth entry: **a camera
+pointed at a redirect manufactures findings about a screen that does not exist.**
+
+**Two items are not this branch's to fix, established by measurement rather than by argument.**
+The Radar rung ruling needs `components/radar/`, which exists only on unmerged `wt-radar-ui`; the
+docs/26 §3.1b amendment landed here, the two class swaps are owed there. The Playbooks held-slot
+copy needs `wt-playbooks`, which carries 30 playbook files against this branch's single stub page.
+
+**One thing this pass could not have known.** `wt-onboard2` renders `OnboardingStage`, not
+`OnboardingFlow` — so on that branch the whole old onboarding tree, `RevealStep` included, is
+unreachable. The fixes to items 5, 6, 8, 9 and 15 are correct for the tree that is DEPLOYED today
+and will need porting when that lane merges. Its stage already counts "signals the customer
+actually gave", which is the same principle arrived at independently.
+
 **Logged, not fixed**
 
 | # | What | Where | Severity | Why not fixed here |
