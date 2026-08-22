@@ -55,15 +55,112 @@ function isPrivateIpv4(ip: string): boolean {
   return false
 }
 
+/**
+ * Expand an IPv6 literal to its eight 16-bit groups, or null if it is not one.
+ *
+ * PARSING IS THE POINT. The version this replaced matched SPELLINGS — a single
+ * `^::ffff:(\d+\.\d+\.\d+\.\d+)$` regex — so it judged the IPv4-mapped form
+ * only when the mapped address happened to be written in dotted quad. MEASURED
+ * 2026-08-23: `::ffff:169.254.169.254` was blocked and `::ffff:a9fe:a9fe` was
+ * ALLOWED. Those are the same 128 bits. `a9fe:a9fe` is `169.254.169.254`, the
+ * cloud metadata endpoint, and `dns.lookup` may return either spelling.
+ *
+ * A guard that blocks one spelling of an address and admits another blocks
+ * nothing at all, because the spelling is the attacker's to choose.
+ */
+function hextets(input: string): number[] | null {
+  let addr = input.toLowerCase().split('%')[0] ?? ''
+
+  // A dotted-quad tail IS the low 32 bits (`::ffff:1.2.3.4`, `64:ff9b::1.2.3.4`).
+  // Rewritten as two hextets so there is one representation to reason about.
+  const dotted = /^(.*:)(\d{1,3}(?:\.\d{1,3}){3})$/.exec(addr)
+  if (dotted) {
+    const v4 = parseIpv4Bits(dotted[2]!)
+    if (v4 === null) return null
+    addr = `${dotted[1]!}${((v4 >>> 16) & 0xffff).toString(16)}:${(v4 & 0xffff).toString(16)}`
+  }
+
+  const halves = addr.split('::')
+  if (halves.length > 2) return null
+  const part = (text: string): string[] => (text === '' ? [] : text.split(':'))
+  const head = part(halves[0] ?? '')
+  const tail = halves.length === 2 ? part(halves[1] ?? '') : []
+
+  const groups =
+    halves.length === 2
+      ? [...head, ...Array(8 - head.length - tail.length).fill('0'), ...tail]
+      : head
+  if (groups.length !== 8) return null
+
+  const out: number[] = []
+  for (const g of groups) {
+    if (!/^[0-9a-f]{1,4}$/.test(g)) return null
+    out.push(Number.parseInt(g, 16))
+  }
+  return out
+}
+
+/** The 32-bit value of a dotted quad, or null. */
+function parseIpv4Bits(ip: string): number | null {
+  const parts = ip.split('.')
+  if (parts.length !== 4) return null
+  let value = 0
+  for (const p of parts) {
+    if (!/^\d{1,3}$/.test(p)) return null
+    const octet = Number(p)
+    if (octet > 255) return null
+    value = value * 256 + octet
+  }
+  return value
+}
+
+/** Judge 32 bits as the IPv4 address they are, reusing the audited range list. */
+const embeddedV4IsPrivate = (v4: number): boolean =>
+  isPrivateIpv4([(v4 >>> 24) & 255, (v4 >>> 16) & 255, (v4 >>> 8) & 255, v4 & 255].join('.'))
+
 function isPrivateIpv6(ip: string): boolean {
-  const addr = ip.toLowerCase().split('%')[0]!
-  if (addr === '::' || addr === '::1') return true
-  // IPv4-mapped (::ffff:10.0.0.1) — judge it as the v4 address it really is.
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(addr)
-  if (mapped) return isPrivateIpv4(mapped[1]!)
-  if (/^f[cd]/.test(addr)) return true // fc00::/7 unique-local
-  if (/^fe[89ab]/.test(addr)) return true // fe80::/10 link-local
-  if (/^ff/.test(addr)) return true // multicast
+  const h = hextets(ip)
+  // Unparseable is REFUSED, not allowed. Everything reaching here came from a
+  // resolver, so a shape we cannot read is a shape we cannot judge.
+  if (h === null) return true
+
+  const [h0, h1, h2, h3, h4, h5, h6, h7] = h as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ]
+  const low32 = ((h6 << 16) >>> 0) + h7
+  const topSixZero = h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0
+
+  if (topSixZero && low32 === 0) return true // ::           unspecified
+  if (topSixZero && low32 === 1) return true // ::1          loopback
+  // ::a.b.c.d — the deprecated IPv4-compatible form, and it tunnels v4 exactly
+  // like the mapped form does.
+  if (topSixZero) return embeddedV4IsPrivate(low32)
+  // ::ffff:0:0/96 — IPv4-mapped, in EITHER spelling now.
+  if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0xffff) {
+    return embeddedV4IsPrivate(low32)
+  }
+  // 64:ff9b::/96 and 64:ff9b:1::/48 — NAT64. A prefix that exists specifically
+  // to carry the whole IPv4 space, so it inherits every v4 range. Listed by the
+  // onboarding lane's address guard and NOT by this one; deleting that file on
+  // 2026-08-23 is what made this line this file's responsibility.
+  if (h0 === 0x0064 && h1 === 0xff9b) {
+    if (h2 === 0x0001) return true // local-use NAT64: no legitimate crawl target
+    if (h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0) return embeddedV4IsPrivate(low32)
+  }
+  // 2002::/16 — 6to4, where the v4 address sits in the SECOND and THIRD hextets.
+  if (h0 === 0x2002) return embeddedV4IsPrivate((((h1 << 16) >>> 0) + h2) >>> 0)
+
+  if ((h0 & 0xfe00) === 0xfc00) return true // fc00::/7   unique-local
+  if ((h0 & 0xffc0) === 0xfe80) return true // fe80::/10  link-local
+  if ((h0 & 0xff00) === 0xff00) return true // ff00::/8   multicast
+  if (h0 === 0x2001 && h1 === 0x0db8) return true // 2001:db8::/32 documentation
   return false
 }
 
