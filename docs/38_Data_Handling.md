@@ -14,9 +14,15 @@ to have it **erased** (§12). Both are built and both work from a screen in the 
 **Every number here is measured, and none of it is measured by hand.** That matters because the
 document this replaces was measured by hand and three of its figures were wrong within four days of
 being written. The tables, the counts and the retention decisions in §3 and §4 are read out of the
-database's own catalogue by tests that run on every build — `packages/db/tests/export_manifest.pglite.test.ts`,
-`deletion_reach.pglite.test.ts` and `erasure.pglite.test.ts`. If somebody adds a table and does not
-account for it here, the build fails and names it.
+database's own catalogue by tests that run on every build —
+`packages/db/tests/data_handling_doc.pglite.test.ts` checks THIS FILE against the schema, and
+`export_manifest.pglite.test.ts`, `deletion_reach.pglite.test.ts` and `erasure.pglite.test.ts` check
+the code. If somebody adds a table and does not account for it here, the build fails and names it.
+
+**What is NOT measured is §7 — who else receives the data — and §5 and §6, which are decisions.**
+Those were read out of the code by hand on 2026-08-23 and nothing re-checks them. A new outbound
+call to a new company will not fail any build. §7 is therefore the section most likely to be out of
+date, and the one to re-read before anybody relies on it.
 
 ---
 
