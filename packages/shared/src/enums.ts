@@ -42,7 +42,16 @@ export const VariantPublishStatusSchema = z.enum([
 ])
 export type VariantPublishStatus = z.infer<typeof VariantPublishStatusSchema>
 
-export const PostOriginSchema = z.enum(['manual', 'plan_week'])
+/**
+ * WHO MADE THIS POST.
+ *
+ * `playbook` joined on 2026-08-22 with M10. It is a LABEL and never a scope: the
+ * playbook kill switch finds its posts through `playbook_run_items.post_id`, not
+ * through this column, because a post can carry this origin without any run
+ * still pointing at it and destroying that post is the one thing the switch must
+ * not do. `kill-switch.pglite.test.ts` plants exactly that row as a control.
+ */
+export const PostOriginSchema = z.enum(['manual', 'plan_week', 'playbook'])
 export type PostOrigin = z.infer<typeof PostOriginSchema>
 
 /** Durable-job lifecycle (FSD 0.5). */

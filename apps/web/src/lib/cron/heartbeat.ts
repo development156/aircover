@@ -48,8 +48,21 @@
  * no I/O, no env.
  */
 
-/** The jobs declared in `apps/web/vercel.json`. `heartbeat-schedule.test.ts` pins both. */
-export type CronJob = 'sweeps' | 'metrics' | 'loop'
+/**
+ * The jobs declared in `apps/web/vercel.json`.
+ *
+ * The pinning lives in `heartbeat.test.ts`, under "the schedules match the crons
+ * that actually ship" — it asserts the two lists name the same routes AND that
+ * each period matches the cron expression, with a parser that throws rather than
+ * guessing at a shape it does not recognise.
+ *
+ * This comment used to name a file called `heartbeat-schedule.test.ts`, which
+ * does not exist. Corrected 2026-08-22 while adding the fourth job. The guard was
+ * real all along; only the pointer was wrong — which is its own small hazard,
+ * because the way to check a claim like this is to go and read the file it names,
+ * and doing that here produces "no such file" rather than "no such guard".
+ */
+export type CronJob = 'sweeps' | 'metrics' | 'loop' | 'playbooks'
 
 export interface CronSchedule {
   /** How often the job is scheduled, in ms. From the cron expression, not a guess. */
@@ -83,6 +96,12 @@ export const CRON_SCHEDULES: Record<CronJob, CronSchedule> = {
   // does. One miss it is: a weekly job has no delivery-hiccup tolerance to spend,
   // because the hiccup and the outage look identical for seven days.
   loop: { periodMs: 7 * 24 * HOUR, missesBeforeStopped: 1, label: 'Weekly Loop cycle' },
+  // `0 6 * * *` — early morning, once a day.
+  //
+  // Daily rather than weekly because a playbook's window is measured in days: a
+  // seven-day lead time checked once a week would miss a festival entirely
+  // whenever the check landed on the wrong side of it.
+  playbooks: { periodMs: 24 * HOUR, missesBeforeStopped: 2, label: 'Daily Playbook check' },
 }
 
 export type HeartbeatState = 'beating' | 'late' | 'stopped' | 'unknown'

@@ -20,6 +20,10 @@ export * from './brand/field-meta'
 export * from './theme/tokens'
 export * from './guide/tour'
 export * from './jobs/payloads'
+// M10 Playbooks — the CURATED recipe catalogue. The customer picks and fills in;
+// they never author. The `playbooks.recipe_key` CHECK constraint is the fence.
+export * from './playbooks/recipes'
+export * from './playbooks/festivals'
 export * from './ledger/pricing'
 export * from './ledger/entries'
 export * from './billing/plans'

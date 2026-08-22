@@ -64,6 +64,13 @@ const isPublicRoute = createRouteMatcher([
   // `isAuthorizedCronRequest` is the only thing in front of it, and it fails
   // closed when CRON_SECRET is unset.
   '/api/cron/loop',
+  // The daily Playbook check. Same reasoning again, and the same exact-path
+  // form. It is worth noting that this route SPENDS NOTHING — it proposes and
+  // halts at the cost preview — so the failure it would cause without this line
+  // is not a surprise bill but the quieter kind: a festival nobody was reminded
+  // about, with the heartbeat reporting green the whole time because the
+  // schedule did fire and got a 307.
+  '/api/cron/playbooks',
 ])
 
 // The `/admin` surface and its authenticated APIs. The token-authed ingest route
@@ -260,12 +267,12 @@ export const config = {
   matcher: [
     // Clerk-recommended shape: skip Next internals + static assets unless
     // referenced in search params. (Next 16 renames middleware → proxy; n/a on 15.)
-    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/webhooks/cashfree$|api/webhooks/clerk$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Shaped as `/(…)` — ONE group holding the whole expression — because that is the
     // only place Next accepts a raw regex. `'/(?!…)(api|trpc)(.*)'` reads to
     // path-to-regexp as a group opening with invalid content and fails the BUILD with
     // `Error parsing … invalid-route-source`. Loud and before deploy, which is the right
     // direction for this file, but it is why the lookahead lives inside the parentheses.
-    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/webhooks/cashfree$|api/webhooks/clerk$)(?:api|trpc).*)',
+    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$)(?:api|trpc).*)',
   ],
 }
