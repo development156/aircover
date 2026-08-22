@@ -16,8 +16,21 @@ import { cn } from '@/lib/utils'
  *      There is not one. `lib/brand/brain-origin.ts` explains why it cannot be
  *      manufactured.
  */
-export function OriginNote({ source, version }: { source: string | null; version: number }) {
-  const origin = brainOrigin(source)
+export function OriginNote({
+  source,
+  version,
+  appliedFromLearning = false,
+}: {
+  source: string | null
+  version: number
+  /**
+   * See `brain-origin.ts`. Without it a person who accepted a learning is told
+   * their whole brand is a fabricated sample, because the accept RPC and the
+   * model-unreachable fallback both store `source = 'system'`.
+   */
+  appliedFromLearning?: boolean
+}) {
+  const origin = brainOrigin(source, { appliedFromLearning })
 
   return (
     <section

@@ -53,6 +53,9 @@ const OK = {
   // 'resolved' is what a model resolve actually writes, which is what this
   // fixture represents.
   source: 'resolved',
+  // See `brain-origin.ts`: only consulted when source is 'system', where the
+  // accept RPC and the model-unreachable fallback share one stored value.
+  appliedFromLearning: false,
 }
 
 beforeEach(() => {

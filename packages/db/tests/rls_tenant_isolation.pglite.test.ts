@@ -9,6 +9,7 @@ import {
   probe,
   seedTwoWorkspaces,
   tenantTables,
+  tenantViews,
 } from './helpers/pglite-tenant'
 
 /**
@@ -263,6 +264,32 @@ describe('every append-only table refuses a direct mutation', () => {
       permissive,
       'These tables carry app.block_mutations() and accepted a direct mutation anyway. ' +
         'For credit_ledger that is the ledger silently becoming rewritable.',
+    ).toEqual([])
+  })
+})
+
+/**
+ * A VIEW IS THE QUIETEST WAY TO LOSE ALL OF THE ABOVE.
+ *
+ * Everything in this file proves that the POLICIES hold. A view over the same
+ * tables runs, by default, with the rights of whoever created it — so it hands
+ * over every workspace's rows while each policy underneath still reads exactly
+ * as written in the migration. Nothing about the view's own definition shows it.
+ *
+ * MEASURED 2026-08-22 on `knowledge_current_chunks`, the first `public` view in
+ * this schema to carry a `workspace_id`: with `security_invoker = true` removed,
+ * a member of workspace B read workspace A's passages through it. With it, zero.
+ *
+ * Catalog-driven for the same reason the rest of the suite is: the next such
+ * view joins this check the moment it lands.
+ */
+describe('a view cannot be the way around a policy', () => {
+  it('every workspace-scoped view runs as the caller, not as its owner', async () => {
+    const views = await tenantViews(db)
+    const asOwner = views.filter((v) => !v.security_invoker).map((v) => v.view_name)
+    expect(
+      asOwner,
+      'These views run with their creator’s rights and bypass every policy above.',
     ).toEqual([])
   })
 })

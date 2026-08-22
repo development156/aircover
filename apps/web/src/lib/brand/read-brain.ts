@@ -89,6 +89,19 @@ export type BrainRead =
        * guessing the common case.
        */
       source: string | null
+      /**
+       * True when an ACCEPTED `memory_events` row names this exact version.
+       *
+       * `brand_memory.source` cannot tell a learning apart from a model
+       * fallback — `resolve_memory_event` and the fallback both write `system` —
+       * and the two need opposite sentences on screen. `brain-origin.ts` carries
+       * the measurement and the argument.
+       *
+       * READ ONLY WHEN `source` IS `system`, which is the only value the two
+       * events share. Every other brain costs no extra query, and `false` is
+       * then a statement about a question that did not need asking.
+       */
+      appliedFromLearning: boolean
     }
   | { status: 'no-workspace' }
   | { status: 'no-brain' }
@@ -129,15 +142,37 @@ export const readBrain = cache(async (): Promise<BrainRead> => {
     if (!stored.success) return { status: 'unreadable' }
 
     const { field_meta: meta, intake, ...active } = stored.data
+    const version = typeof row.version === 'number' ? row.version : 0
+    const source = typeof row.source === 'string' ? row.source : null
+
+    /**
+     * Only for `system`. See `BrainRead.appliedFromLearning` — every other brain
+     * skips this round trip entirely, and a failed read here degrades to
+     * `false`, which renders the CAUTIOUS sentence rather than the reassuring
+     * one. A read that did not answer must not be able to talk someone out of a
+     * warning.
+     */
+    let appliedFromLearning = false
+    if (source === 'system' && version > 0) {
+      const learned = await supabase
+        .from('memory_events')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .eq('status', 'accepted')
+        .eq('applied_memory_version', version)
+        .limit(1)
+      appliedFromLearning = !learned.error && (learned.data?.length ?? 0) > 0
+    }
 
     return {
       status: 'ok',
       active,
-      version: typeof row.version === 'number' ? row.version : 0,
+      version,
       provenance: provenanceOf(meta),
       meta,
       intake,
-      source: typeof row.source === 'string' ? row.source : null,
+      source,
+      appliedFromLearning,
     }
   } catch (error) {
     console.error('[brain] active read threw', error instanceof Error ? error.message : 'unknown')

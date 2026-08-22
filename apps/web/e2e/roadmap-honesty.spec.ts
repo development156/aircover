@@ -38,6 +38,25 @@ import { expect, test } from './fixtures/seeded-user'
  * pricing.config.json, a sum of them, or a count of rows — and it is verified by
  * injecting a fabricated engagement figure and watching the scan fail.
  *
+ * ── /brain/knowledge LEFT THIS LIST ON 2026-08-22, FOR THE SAME REASON ──────
+ * It has a store now: `knowledge_documents`, `knowledge_chunks` and a full-text
+ * index behind them. So it shows figures — how many documents are ready to quote
+ * from, how many passages a document holds, how many places in it are written as
+ * if to address an assistant — and every one comes out of a query rather than
+ * out of a reference design. The screen it replaced said outright that "no table
+ * in the database holds a document, a fact or a citation"; that sentence is now
+ * false, which is exactly what the first assertion in the loop below detected.
+ *
+ * WIDENING `ALLOWED` FOR IT WOULD HAVE BEEN THE WRONG REPAIR, as it was for
+ * /loop. Where the property lives for it now: `lib/knowledge/store.ts` returns
+ * `null` rather than zero when a read fails, so the count renders the Unmeasured
+ * mark instead of a figure; `page.test.tsx`-style coverage sits in
+ * `lib/knowledge/*.test.ts` and `packages/research/src/knowledge/*`, where the
+ * chunk counts, the passage counts and the instruction count are each asserted
+ * against what was actually stored; and `add-document.test.tsx` holds the one
+ * number on the screen that is NOT from a query — the credit price — to
+ * `pricing.config.json` by deriving it from `MESH_TASK_ACTION`.
+ *
  * WIDENING `ALLOWED` FOR THEM WOULD HAVE BEEN THE WRONG REPAIR, and the more
  * tempting one. It is the same move this repo already recorded as a mistake in
  * LEARNINGS (2026-08-13, `ALPHA_GATE.failingCodes`): editing the expected number
@@ -123,18 +142,6 @@ const ALLOWED: ReadonlyArray<readonly [string, readonly number[]]> = [
   // `/brain/audience` IS NOT IN THIS LIST ANY MORE, and the removal is the point
   // rather than a loosening. This guard exists to stop screens that are DRAWINGS
   // from inventing figures. That tab is no longer a drawing: it reads
-  // `audience_snapshots` and Instagram, and every number on it — a follower count,
-  // Meta's 100-follower floor, a collection date — came from a platform or from a
-  // published rule. Widening its allowance to admit them would have turned a guard
-  // about roadmap screens into a guard about nothing.
-  //
-  // What replaces it is narrower and stronger, because it can assert PROVENANCE
-  // rather than a permitted set of digits: `page.test.tsx` holds the screen to a
-  // figure per state, `audience-layers.spec.ts` measures the measured/inferred
-  // split, and the collector refuses to store a number no platform reported.
-  // `twin_preflight` stays in pricing.config.json — the price is still real, the
-  // screen that quoted it is not.
-  ['/brain/knowledge', []],
 ]
 
 /** A standalone run of digits. Excludes ones welded into a word or a dash-run. */

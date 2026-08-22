@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 
 import { CertaintyMark } from './certainty-mark'
 import { FieldEditor } from './field-editor'
+import { FieldEvidence } from './field-evidence'
 import { FieldValue } from './field-value'
 
 export interface ResolutionRowProps {
@@ -20,6 +21,15 @@ export interface ResolutionRowProps {
   onSelectedChange: (selected: boolean) => void
   /** Fired after a single-row confirm or correction lands, so the parent can drop it. */
   onResolved: (path: string) => void
+  /**
+   * The library passage this guess came from, when it came from one.
+   *
+   * `null` for every field the guidelines pass wrote — see `brain-origin.ts`.
+   * A citation is EVIDENCE and never a confirmation: a field with a perfect
+   * quotation under it is still dashed, still counts against the ring, and still
+   * needs a person to agree with it.
+   */
+  cited?: import('@/lib/knowledge/store').CitedPassage | null
 }
 
 /**
@@ -47,6 +57,7 @@ export function ResolutionRow({
   selected,
   onSelectedChange,
   onResolved,
+  cited,
 }: ResolutionRowProps) {
   const { field, value, state, blank } = entry
   const entitlement = entitlementOf(field)
@@ -339,7 +350,19 @@ export function ResolutionRow({
             ring together" in its other common form, and it would make the rung
             read as two rungs.
           */
-          <FieldValue field={field} value={value} state={state} />
+          <>
+            <FieldValue field={field} value={value} state={state} />
+            {/*
+              WHERE THIS CAME FROM, when Sahoda can actually say.
+
+              BELOW the value and never inside its certainty container: the
+              container's dashed edge is the claim "this is still a guess", and a
+              quotation tucked inside it would read as evidence that settles the
+              guess. It does not. It is evidence FOR a guess, which is a
+              different thing and is why it sits outside.
+            */}
+            {cited ? <FieldEvidence cited={cited} /> : null}
+          </>
         )}
       </div>
     </li>

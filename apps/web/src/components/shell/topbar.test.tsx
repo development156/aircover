@@ -185,6 +185,7 @@ describe('Topbar', () => {
         meta: undefined,
         intake: undefined,
         source: 'resolved',
+        appliedFromLearning: false,
       })
 
       render(await Topbar())

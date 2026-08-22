@@ -78,3 +78,55 @@ describe('NO_PER_FIELD_EVIDENCE', () => {
     expect(NO_PER_FIELD_EVIDENCE).not.toMatch(/coming soon|for now|yet\b|soon\b/i)
   })
 })
+
+/**
+ * THE COLLISION BETWEEN AN ACCEPTED LEARNING AND A MODEL FALLBACK.
+ *
+ * Measured against production 2026-08-22 with a throwaway workspace: an active
+ * brain at `source='resolved'`, one pending `memory_events` row, one call to
+ * `public.resolve_memory_event(..., 'accepted')` — and the active row came back
+ * `{"version":2,"source":"system"}`. `brainOrigin('system')` then renders "A
+ * sample, not your brand… These are not answers about your business", with an
+ * `alert` role and the danger palette, about a brain the owner had just improved.
+ *
+ * The Loop's accept button (`app/actions/loop-controls.ts`) reaches that RPC, so
+ * this was live rather than hypothetical.
+ */
+describe('an accepted learning is not a model fallback', () => {
+  test('reads as a real update, not a sample, when a learning claims the version', () => {
+    const origin = brainOrigin('system', { appliedFromLearning: true })
+    expect(origin.kind).toBe('learned')
+    expect(origin.isSample).toBe(false)
+    expect(origin.label).toBe('Updated by a learning you accepted')
+  })
+
+  test('still says SAMPLE when nothing claims the version — the fallback is unchanged', () => {
+    const origin = brainOrigin('system', { appliedFromLearning: false })
+    expect(origin.kind).toBe('system')
+    expect(origin.isSample).toBe(true)
+    expect(origin.line).toContain('not answers about your business')
+  })
+
+  test('defaults to the cautious answer when the caller says nothing', () => {
+    // A read that failed, an older caller, a component that forgot the prop —
+    // every one of them must land on the WARNING and never on the reassurance.
+    expect(brainOrigin('system').isSample).toBe(true)
+    expect(brainOrigin('system', {}).isSample).toBe(true)
+  })
+
+  test('cannot be used to talk down a warning on any other source', () => {
+    // The flag is consulted for 'system' alone. A caller passing it everywhere
+    // must not be able to relabel a resolved or unrecorded brain.
+    for (const source of ['resolved', 'manual', null, 'nonsense']) {
+      expect(brainOrigin(source, { appliedFromLearning: true }).kind).not.toBe('learned')
+    }
+  })
+
+  test('says what actually happened, without claiming anyone confirmed anything', () => {
+    const { line } = brainOrigin('system', { appliedFromLearning: true })
+    expect(line).toContain('a change you approved')
+    // The ring counts CONFIRMED fields. Accepting one learning does not confirm
+    // the other fourteen, and this sentence must not imply that it did.
+    expect(line).toContain('still Sahoda')
+  })
+})

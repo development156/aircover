@@ -53,7 +53,20 @@ function RailCard({
  * the card leads with `confirmed / total` rather than with six values that
  * would all look equally true.
  */
-export function BrainCard({ brain }: { brain: BrainRead }) {
+export function BrainCard({
+  brain,
+  knowledgeDocuments,
+}: {
+  brain: BrainRead
+  /**
+   * How many documents SEARCH CAN RETURN, from `countIndexedDocuments`.
+   *
+   * `null` is "the read did not answer" and renders the Unmeasured mark. A real
+   * zero renders as 0 — that is knowledge, and the same rule `spend-card.tsx`
+   * and `credit-chip.tsx` already follow.
+   */
+  knowledgeDocuments: number | null
+}) {
   return (
     <RailCard title="Brand Brain" href="/brain" linkLabel="View all">
       {brain.status === 'ok' ? (
@@ -98,9 +111,19 @@ export function BrainCard({ brain }: { brain: BrainRead }) {
               screen in the product, gone. It is the same defect as `100 of —`
               (P2a) in a second file.
 
-              The two that remain are the FIRST state when unset: the slot is
-              real, the reading has not arrived, so they carry the `Unmeasured`
-              mark and its accessible name. */}
+              ── KNOWLEDGE IS BACK, BECAUSE THE QUANTITY NOW EXISTS ──────────
+              `knowledge_documents` was applied 2026-08-22. So "there is no
+              document library" stopped being true, and the tile returns — but
+              as a COUNT OF ROWS A QUERY RETURNED, never the reference design's
+              "120 docs". It counts documents Sahoda has actually READ, not rows
+              in the table: a document that failed to parse is not in the
+              library in any sense the reader means. Zero renders as 0, which is
+              knowledge; a failed read renders the `Unmeasured` mark, which is
+              not the same claim.
+
+              The other two are the FIRST state when unset: the slot is real,
+              the reading has not arrived, so they carry the `Unmeasured` mark
+              and its accessible name. */}
           <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-line-soft pt-3">
             {(
               [
@@ -118,6 +141,21 @@ export function BrainCard({ brain }: { brain: BrainRead }) {
                 </dd>
               </div>
             ))}
+            <div className="min-w-0">
+              <dt className="type-sm truncate text-muted">Knowledge</dt>
+              <dd className="type-sm truncate font-[550] text-ink">
+                {knowledgeDocuments === null ? (
+                  <Unmeasured what="Knowledge" />
+                ) : (
+                  <Link href="/brain/knowledge" className="hover:text-accent">
+                    <span className="num">{knowledgeDocuments}</span>{' '}
+                    <span className="font-normal text-muted">
+                      {knowledgeDocuments === 1 ? 'document' : 'documents'}
+                    </span>
+                  </Link>
+                )}
+              </dd>
+            </div>
           </dl>
         </div>
       ) : (
