@@ -51,6 +51,28 @@ describe('the data-handling document matches the database', () => {
     ).toEqual([])
   })
 
+  it('states a table COUNT that is the real one', () => {
+    /**
+     * The one place a pinned number is right rather than wrong.
+     *
+     * `deletion_reach.pglite.test.ts` deliberately refuses to pin a count,
+     * because failing on every migration trains people to edit the number rather
+     * than think. This is the opposite case: the number is a sentence in a
+     * document handed to a lawyer, so it MUST be right, and the correct response
+     * to a schema change is exactly "go and update the document".
+     *
+     * MEASURED while writing this file: the document said 47 and the branch had
+     * 48, twenty minutes after the document was written, by the person who wrote
+     * the paragraph warning about stale numbers.
+     */
+    const stated = /\*\*MEASURED [0-9-]+: (\d+) tables\.\*\*/.exec(doc)
+    expect(stated, 'docs/38 §2 no longer states a measured table count').not.toBeNull()
+    expect(
+      Number(stated?.[1]),
+      `docs/38 says ${stated?.[1]} workspace-owned tables and the migrations create ${tables.length}`,
+    ).toBe(tables.length)
+  })
+
   it('names the three tables no workspace_id sweep can reach', () => {
     // The blind spot that produced the gap this whole lane closed. If the
     // document ever stops naming them, the next person reading it inherits the
@@ -64,9 +86,20 @@ describe('the data-handling document matches the database', () => {
     const retained = (await db.query<{ t: string[] }>(`select app.erasure_retained_tables() as t`))
       .rows[0]!.t
 
-    // The document's table of what survives a deletion, read back out of it.
-    const section = doc.slice(doc.indexOf('**What is kept, and why:**'))
-    const claimed = [...section.matchAll(/^\| `([a-z_]+)` \|/gm)].map((m) => m[1]!)
+    /**
+     * The document's table of what survives a deletion, read back out of it —
+     * BOUNDED to that one table.
+     *
+     * The first version sliced to the end of the document, which quietly
+     * swallowed every later table whose first cell is a code span: §7.1's list
+     * of storage buckets made this assertion claim the erasure keeps `media`.
+     * An unbounded slice reads correctly right up until somebody adds a section.
+     */
+    const from = doc.indexOf('**What is kept, and why:**')
+    const to = doc.indexOf('Retention under a legal obligation', from)
+    expect(from, 'docs/38 §4.2 no longer has a "what is kept" table').toBeGreaterThan(-1)
+    expect(to, 'the end marker of that table has moved').toBeGreaterThan(from)
+    const claimed = [...doc.slice(from, to).matchAll(/^\| `([a-z_]+)` \|/gm)].map((m) => m[1]!)
 
     expect(claimed.sort(), 'docs/38 §4.2 and app.erasure_retained_tables() disagree').toEqual(
       [...retained].sort(),

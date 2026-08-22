@@ -31,8 +31,10 @@ account for it here, the build fails and names it.
 | Why is that kept? | It is the account of what was paid and charged, and Indian tax and company law requires financial records to be retained for years. |
 | Does the kept record identify the person? | **Yes.** It carries a sign-in reference code, and one row in the whole system carries a plain email address. This is disclosed to the customer in the product, not buried here. See §5. |
 | Does the product delete anything on a schedule? | **No.** Nothing expires. See §6 — this is an open question, not a decision. |
-| Who else receives customer data? | Eleven processors. See §7. |
+| Who else receives customer data? | Fourteen processors, four of them not on anybody's list until this document. See §7. |
 | Is there anything a customer asks for that we cannot give them? | One table, `ai_provider_logs`, which the app has no permission to read. It is named in the export by name rather than shown as empty. See §3. |
+| Is there anything deletion does NOT reach? | **Yes — two things, and both are real.** Zernio still holds the customer's publishing profile and uploaded media, and `billing_webhook_events` still holds the payer's name and phone number. See §4.3. |
+| Is data residency established? | **No.** The database is believed to be in Mumbai and nothing in writing confirms it. See §7.1 — this is the first thing to check if anybody asks. |
 
 ---
 
@@ -43,7 +45,13 @@ not a description somebody wrote down — it is a fact about how the database is
 holding a customer's data carries a `workspace_id` column, and the boundary between two customers is
 enforced by the database itself (PostgreSQL row-level security), not by the application.
 
-**MEASURED 2026-08-23: 47 tables.** They are listed in full in §3.
+**MEASURED 2026-08-23: 48 tables.** They are listed in full in §3, and
+`packages/db/tests/data_handling_doc.pglite.test.ts` fails the build if that number or that list
+stops matching the database.
+
+> **Production holds 47 of those 48 today.** The forty-eighth,
+> `ledger_actor_redactions`, is created by a migration that is written and deliberately not yet
+> applied — see §5. Counted from production directly on 2026-08-23.
 
 Three tables hold personal data and do **not** carry a `workspace_id`, so they are invisible to any
 sweep built on that rule. This was a real gap and it is worth stating plainly because it is the kind
@@ -200,7 +208,7 @@ back. Both are re-checked on the server and the name is checked a third time by 
 because the delete is an addressable endpoint whatever the screen does. Only the **owner** of a
 workspace can do it.
 
-**What is removed:** every row in all 47 tables except the four in the next paragraph, plus every
+**What is removed:** every row in all 48 tables except the four in the next paragraph, plus every
 file in storage, plus the encrypted keys for the linked social accounts, plus the customer's sign-in
 profile if this was their last workspace.
 
@@ -225,6 +233,33 @@ storage that nothing points at any more, which nobody would ever find.
 **What it does NOT do:** it does not close the customer's sign-in account. That account lives with
 Clerk (§7) and closing it is a separate request. The copy of their email that Sahoda held is deleted.
 The product says this on the confirmation screen.
+
+### 4.3 · What deletion does NOT reach — stated because nobody would notice
+
+Deletion is complete inside Sahoda's own database and storage, and that is what the proof in §9
+covers. Two things sit outside it. Neither is a bug in the deletion; both are gaps in what the
+deletion was ever able to touch, and a customer told "everything is gone" is not being told the
+whole truth while they stand.
+
+**1 · Zernio still holds the customer's publishing profile and their uploaded media.** Publishing
+goes through Zernio (§7.2), which stores the pictures and holds the OAuth tokens for the connected
+accounts. **There is no delete call to Zernio anywhere in the code.** Sahoda's copy goes; Zernio's
+does not. The published posts themselves are on the customer's own social accounts and are the
+customer's to remove — the profile and the stored media are not.
+
+*What is needed:* find out whether Zernio offers a delete for a profile and its media, and call it.
+If it does not, that fact belongs in the customer-facing wording, because the current wording implies
+otherwise.
+
+**2 · `billing_webhook_events` keeps the payer's name and phone number.** Sahoda sends Cashfree only
+a workspace id, but Cashfree collects the payer's name and phone on its own checkout page and returns
+them in a webhook, which Sahoda stores unedited. That table carries no `workspace_id`, so the sweep
+that finds a customer's data cannot see it — it is named in the export as an omission, and **the
+erasure does not reach it either**.
+
+*What is needed:* a decision on whether those rows are part of the financial record that must be kept
+(in which case §5's redaction question applies to them too) or an operational log that should be
+pruned. Either answer is defensible; having neither is not.
 
 ---
 
@@ -285,92 +320,195 @@ Stated as open questions rather than left to be assumed.
    customer's own notice is adequate is outside what Sahoda can see or control.
 5. **There is no stated breach-notification process.** DPDP requires notifying the Data Protection
    Board and affected people. Sahoda has error monitoring (§7, Sentry) and no written procedure.
+6. **Data residency is not confirmed in writing.** See §7.1. Believed Mumbai; evidenced only by a
+   comment in a test file. **This is the cheapest item on this list to close and the most likely to
+   be asked about.**
+7. **Deletion does not reach Zernio.** See §4.3. Needs a call to Zernio, or a change to what the
+   product tells the customer.
+8. **`billing_webhook_events` is outside both rights.** See §4.3 and §7.4. Needs a decision on
+   whether it is a financial record or a log.
+9. **Which AI company held a given prompt, and for how long, cannot be answered.** See §7.3. If that
+   matters — and for a customer's Brand Brain and their uploaded documents it may — the request can
+   set a zero-retention preference, at the cost of the model choices that support it. **Nobody has
+   decided this; nothing currently asks for it.**
+10. **Sentry receives the body of a failing request, in the United States.** See §7.5. Keeping it is
+    a deliberate trade for being able to diagnose a crash, and it is the one place customer content
+    knowingly crosses a border outside the AI path. Worth confirming as a decision rather than
+    inheriting it as a default.
 
 ---
 ## 7 · Everybody else who receives customer data
 
 Under DPDP these are **data processors**: they hold or handle personal data on Sahoda's
-instructions. They are listed with what each one actually receives, read out of the code rather than
-from a list somebody kept.
+instructions. Each entry says what it actually receives, read out of the code. Where a fact could
+not be established from the code, it says so rather than guessing — data residency in particular.
 
-### 7.1 · The ones that hold data at rest
+### 7.1 · Where data sits at rest
 
-**Supabase** — the database and the file storage. **Region: `ap-south-1`, Mumbai, India.** This is
-where everything in §3 lives, and where every uploaded picture and PDF lives, in two private
-buckets (`media`, `brand-assets`). Files are stored under a folder named after the workspace, and
-the database enforces that a customer can only reach their own folder. Supabase holds **all** of it.
+**Supabase** — the database and the file storage. Everything in §3 lives here, and so does every
+uploaded picture and PDF.
 
-**Clerk** — sign-in. Clerk holds the customer's email address, name and however they chose to sign
-in. It is the system of record for identity; Sahoda keeps a copy of the email, display name and
-picture in `users_profile` for showing on screen. **Closing a Sahoda workspace does not close a
-Clerk account** — that is a separate request, and the product says so.
+> **⚠ DATA RESIDENCY IS NOT ESTABLISHED IN WRITING.** The project is
+> `rloztdhzfliyvpvxsgjl`. The only evidence in this repository that it is in India is a COMMENT in
+> two test files naming `ap-south-1` (Mumbai), and a pooler hostname used as a test fixture. No
+> configuration file states a region — and `packages/db/supabase/config.toml` contains a
+> commented-out `tenant_region = "us"` which is inert stock template text and must not be read as
+> evidence either way. **Confirm the region in the Supabase dashboard before this document asserts
+> residency to anybody.** If a customer or a regulator asks where their data is, that is the check
+> to run first.
 
-**Upstash (Redis)** — short-lived operational state: rate-limit counters and job heartbeats. No
-customer content.
+Three private buckets. None is public, and no code makes a public URL:
 
-**Vercel** — hosting. Sees whatever an HTTP request carries, in the ordinary way any host does.
+| bucket | what is in it | who can reach it |
+| --- | --- | --- |
+| `media` | post images, AI-generated images, the picture library, per-channel crops, **and knowledge-library PDFs** | a member of that workspace, by folder |
+| `brand-assets` | **nothing — no code writes to it** | same |
+| `qa-artifacts` | Sahoda's own QA screenshots | Sahoda staff only |
 
-### 7.2 · The ones that receive content
+Files are stored under a folder named after the workspace, and the database enforces that a member
+can only reach their own folder. Links to a file are signed and expire after an hour.
 
-**Zernio** — publishing and the inbox. This is the widest flow in the product. Zernio receives the
-**text of every post that is published**, the **pictures attached to it**, and the identifiers of
-the customer's connected social accounts. It sends back what the platforms report: comments, direct
-messages, reviews — which means **other people's names and words** arrive through Zernio and land in
-`inbox_messages` and `inbox_threads`. The OAuth tokens for the connected accounts are stored
-encrypted in Sahoda's own database (`connection_secrets`), never in a log and never in an export.
+**Clerk** — sign-in, and the system of record for identity. Sahoda reads the customer's **email
+address, first and last name, username and profile picture URL**, and copies the email, display name
+and picture into `users_profile` for showing on screen. Sahoda also **sends an email address TO
+Clerk** when inviting a Sahoda staff member or a beta applicant. **Closing a Sahoda workspace does
+not close a Clerk account** — that is a separate request, and the product says so.
 
-**OpenRouter** — every AI call. It is a router: Sahoda sends a prompt, OpenRouter forwards it to
-whichever model provider is chosen and returns the answer.
+**Upstash (Redis)** — rate-limit counters and job heartbeats. **The only personal datum is a
+visitor's or a lead's IP address, and it is part of the key rather than the value.** Retained by a
+timer: two minutes for the short window, **48 hours** for the daily one. No user id, email or
+workspace id is ever in an Upstash key. Its region is not stated anywhere and is not known.
 
-> **What is in a prompt is the thing worth being precise about.** Sahoda's prompts carry the
-> customer's **Brand Brain** (voice, values, who their customers are — written by them, about their
-> business), the **text of posts being written or rewritten**, **documents the customer uploaded to
-> the knowledge library**, and, for inbox replies, **the text of the message being replied to** —
-> which is another person's words. A lead's name, email or phone number is not deliberately put in a
-> prompt, but a customer who pastes an enquiry into the composer puts it there themselves.
+**Vercel** — hosting, and four scheduled jobs. Sees whatever an HTTP request carries, and whatever
+the application writes to its log.
+
+**GitHub Actions** — runs the nightly Radar pass, which is where the two scraping providers below
+are called from. It holds their API keys as repository secrets.
+
+### 7.2 · Publishing and the inbox
+
+**Zernio** — the widest personal-data surface in the product, in both directions.
+
+**Out:** the **text of every published post**, and the **raw bytes of every picture attached to it**
+— uploaded from Sahoda's private bucket to Zernio's storage. Also the identifiers of the customer's
+connected accounts, the workspace's UUID as an idempotency key, and a publishing profile named
+`sahoda:{workspace name}`. For Instagram collaborator tags, **other people's Instagram handles**.
+
+**Back:** comments, direct messages and reviews from the platforms — which means **other people's
+names, handles and words**, stored in `inbox_threads` and `inbox_messages`. Platform webhooks are
+stored **verbatim and unedited** in `zernio_webhook_events`.
+
+> **The OAuth tokens are Zernio's, not Sahoda's.** Sahoda never receives one. The encrypted vault in
+> this codebase belongs to a direct-to-platform path that is written and deliberately not wired up.
+> `connection_secrets` — the table §2 names — is not written by the Zernio flow at all.
 >
-> **MEASURED: the request sets no data-collection or zero-retention preference.** The body is
-> `model`, `messages`, `max_tokens` and the task's own options. Two identifying headers are set on
-> image calls — `http-referer: https://sahoda.site` and `x-title: SAHODA LABS` — which tell
-> OpenRouter which application is calling, not who the customer is.
->
-> **What OpenRouter says it retains** (checked against openrouter.ai/privacy, 2026-08-23): it does
-> not persist prompts and completions by default, and states that image, audio and video files are
-> not kept "beyond the duration necessary to route the request, except as required for abuse
-> detection, security, billing, or legal compliance." **No fixed retention period is published.**
-> Separately, each MODEL PROVIDER behind the router has its own retention policy, and OpenRouter
-> documents that it does not route around those policies. **So Sahoda cannot presently state, for a
-> given prompt, which company held it or for how long.** That is a real gap and it is a decision to
-> take, not a fact to look up — see §6.
+> **⚠ ERASURE DOES NOT REACH ZERNIO.** There is no delete call to Zernio anywhere in the code. When
+> a customer deletes their workspace, Sahoda's copy goes; the publishing profile, the account links,
+> the uploaded media on Zernio's storage and the published posts themselves remain. Published posts
+> are on the customer's own social accounts and are theirs to remove. **The profile and the stored
+> media are not, and there is currently no mechanism and no request to Zernio to remove them.** This
+> is the largest open item in this document — see §6.
 
-**Cashfree** — payments. MEASURED from the order it creates: Cashfree receives the **workspace's id
-as the customer id**, the customer's **email address** where one is known, the amount, and the plan
-and period as tags. Cashfree's own webhooks return payment details including, in some payloads, a
-**phone number** the customer gave Cashfree directly. Sahoda does not see or store card numbers at
-any point.
+### 7.3 · The AI providers
 
-**Resend** — email. Used for operational alerts to Sahoda's own team, not for customer mail.
+**OpenRouter**, with **OpenAI** as a direct fallback in the same attempt. OpenRouter is a router:
+it forwards the prompt to whichever model was chosen — in practice **Anthropic** for text and
+**OpenAI** for images. So a single prompt may be held by OpenRouter, by Anthropic or OpenAI as its
+sub-processor, and on a failure by OpenAI directly. All are US companies.
 
-**Sentry** — error monitoring. Receives crash reports. A scrubber runs on every event before it
-leaves: it drops the whole of `request.cookies`, `request.headers` and `request.query_string`, and
-drops `email`, `ip_address` and `username` from the user object, and redacts any string that looks
-like a credential. **It is not a guarantee that no customer text ever reaches Sentry** — an error
-message that quoted a post's body would carry that body — so the honest statement is: identifiers
-and credentials are removed by construction, and content is removed by not being in error messages.
+**What is in a prompt, measured:**
 
-**Apify and Zyte** — Radar's page fetching, for watching competitors. They receive **URLs of other
-businesses' public pages** that the customer asked Sahoda to watch. Nothing about the customer is
-sent.
+- The **Brand Brain** — voice, signature phrases, banned phrases, values, and the customer's own
+  description of *their* customers: who they are, their main worry, what they want to be seen as.
+- The **business's identity** — name, website and Instagram handle, when brand guidelines are built.
+- The **text of the customer's website**, or a **document they uploaded**, when the Brand Brain is
+  first extracted.
+- The **text of posts** being written or rewritten.
 
-**Cloudflare** — where a customer's generated website would be published. A published site is
-public by definition, and its contents are whatever the customer chose to put on it.
+**What is NOT in a prompt, and this was checked rather than assumed:** nothing in the inbox, the
+leads or the audience surfaces calls a model at all. **A lead's name, email or phone number, and the
+words of a comment or message from a member of the public, do not reach an AI provider.** A customer
+who pastes an enquiry into the composer themselves is the exception, and is their own choice.
 
-### 7.3 · What has not been done
+**MEASURED: no zero-retention or data-collection preference is set on any request.** The body is
+`model`, `messages`, `max_tokens` and the task's options; the only extra headers say which
+application is calling (`sahoda.site`, `SAHODA LABS`), not who the customer is.
+
+**What OpenRouter says it retains** (checked at openrouter.ai/privacy, 2026-08-23): it does not
+persist prompts and completions by default, and states that image, audio and video files are not
+kept "beyond the duration necessary to route the request, except as required for abuse detection,
+security, billing, or legal compliance." **No fixed retention period is published.** Each model
+provider behind the router has its own policy, and OpenRouter documents that it does not route
+around those policies. **So Sahoda cannot presently state, for a given prompt, which company held it
+or for how long.** See §6.
+
+### 7.4 · Payments
+
+**Cashfree.** MEASURED from the order Sahoda creates: Cashfree receives the **workspace's UUID as
+the customer id**, the amount, and the plan and period as tags. **No name, no email and no phone
+number is sent** — the code has a slot for an email address and nothing fills it. Sahoda never sees
+or stores a card number.
+
+> **⚠ WHAT COMES BACK IS WIDER THAN WHAT GOES OUT, AND IT IS OUTSIDE BOTH RIGHTS.** Cashfree
+> collects the payer's name and phone number on its own checkout page. Its webhook then returns
+> them, and Sahoda stores **the whole delivered message, unedited**, in `billing_webhook_events`.
+> That table has **no `workspace_id`**, so it is invisible to the export sweep (it is named in the
+> export as a deliberate omission) **and it is not reached by the erasure either**. A customer who
+> deletes everything leaves their name and phone number in it. This is a real gap. See §6.
+
+### 7.5 · Everything else
+
+**Sentry** — error monitoring. **Hosted in the United States.** A scrubber runs on every event
+before it leaves: it deletes cookies, request headers and query strings entirely, deletes the user's
+email, IP address and username, and redacts anything shaped like a credential or an email address.
+
+Two things are **deliberately kept**, and both should be understood rather than glossed:
+
+- The **sign-in reference code** (`user_…`), so a crash can be tied to a workspace.
+- The **body of the request that failed** — because "the caption that was rejected" is the whole
+  diagnostic value of a crash report. So **customer content can reach Sentry**, and therefore the
+  United States, when a request carrying it fails. Identifiers and credentials are removed by
+  construction; content is removed only by not being in the failing request.
+
+**Resend** — email. **Used only to reach Sahoda's own staff** — an approval code for a credit
+top-up, and an alert when a scheduled job stops. **No email is ever sent to a customer or a lead.**
+
+**Apify and Zyte** — Radar's page fetching, run from the nightly job. Apify receives **an Instagram
+handle** and nothing else. Zyte receives **a URL** and nothing else. Both describe a **competitor**
+the customer chose to watch, not the customer. Nothing identifying the Sahoda customer is sent.
+
+> **⚠ A customer-typed value reaches an outbound fetch with no server-side URL guard.** The
+> onboarding path has a full one — scheme check, private-address blocklist, DNS pinning — and the
+> Radar path has only a pattern check in the database. It is a security matter rather than a privacy
+> one, and it is recorded here because it is the same class of question a reviewer will ask.
+
+**Cloudflare Turnstile** — the anti-bot check on the public lead and beta forms. **It receives the
+visitor's IP address**, including a **lead's** IP address. Cloudflare is a US company.
+
+**Cloudflare (site publishing)** — **not built.** There is no deployment client in the code. When it
+is built, a published site is public by definition and its contents are whatever the customer put
+on it.
+
+**Google Fonts** — a website Sahoda generates for a customer links to Google's font service at page
+load, so **that site's visitors' IP addresses go to Google**. Those visitors are third parties who
+have no relationship with Sahoda at all. Sahoda's own application does not do this — its fonts are
+served from its own servers.
+
+### 7.6 · Present in the code and NOT reached
+
+Named so that reading the dependency list does not produce a false answer. Each of these has code
+and no live path: **Trigger.dev** (never deployed), the **direct X and Google Business Profile
+APIs** (every call stops at an unwired credential store), **Firecrawl** and **Jina Reader** (behind
+a flag that is off, and both would send the customer's own URL), **Stripe** and **Razorpay** (names
+in a database column and nothing more).
+
+### 7.7 · What has not been done
 
 There is no data-processing agreement on file with any of the above. Whether one is required for
 each is a legal question — they are named here so it can be asked. See §6.
 
 ---
+
 ## 8 · What a person must be told when they ask
 
 A customer, a lead, or a regulator may write and ask. This is the answer, and it should be given in
@@ -432,7 +570,7 @@ would be doing the thing it warns about.
 - Every base table carrying a `workspace_id`, from the database's own catalogue, on every build.
 - Whether each one is in the export list, and whether its stated readability matches its actual
   policies.
-- One complete cycle: create a workspace, fill all 47 tables, delete it, and count what is left —
+- One complete cycle: create a workspace, fill all 48 tables, delete it, and count what is left —
   including a second workspace that must be untouched.
 - Whether the deletion writes to the financial ledger. It does not, and that is asserted against the
   function's own source.

@@ -173,14 +173,19 @@ export interface SweepResult {
  * have a DELETE policy on their own prefix (`20260718000009_storage.sql`), so no
  * service role is needed and none exists.
  *
- * ## It re-walks between passes
+ * ## It re-walks between passes, and the re-walk is the MEASUREMENT
  *
  * Not a cursor. Each pass deletes what it listed, so the remainder shifts down
  * and an advancing offset would step straight over it — the mistake
- * `removeDerivativeObjects` already documents in `actions/assets.ts`. The bound
- * is a count of passes, and it is a real bound: a loop that only stopped on an
- * empty listing would spin forever the day `remove` starts succeeding without
- * removing anything.
+ * `removeDerivativeObjects` already documents in `actions/assets.ts`.
+ *
+ * The re-walk is also how progress is counted, and that is the important half.
+ * Counting the paths handed to `remove` counts what the SERVICE CLAIMED. A
+ * backend that answers 200 and removes nothing — which is what a policy change
+ * looks like from this side — would then be reported as a complete sweep, the
+ * erasure would go ahead, and the customer's photographs would still be sitting
+ * in the bucket. MEASURED by a test: the first version of this function did
+ * exactly that, and reported 140 files removed from a bucket it never touched.
  *
  * ## What "failed" means to the caller
  *
@@ -194,52 +199,75 @@ export async function sweepWorkspaceStorage(
   workspaceId: string,
   maxPasses = 20,
 ): Promise<SweepResult> {
-  let removed = 0
-  const failed: SweepResult['failed'] = []
+  const failed = new Map<string, string>()
   let leftUnread: StorageWalk['unreadable'] = []
+  let removed = 0
 
   for (let pass = 0; pass < maxPasses; pass += 1) {
     const walk = await walkWorkspaceStorage(supabase, workspaceId)
     leftUnread = walk.unreadable
-    if (walk.objects.length === 0) return { removed, failed, leftUnread }
+    if (walk.objects.length === 0) {
+      return {
+        removed,
+        failed: [...failed].map(([path, reason]) => ({ path, reason })),
+        leftUnread,
+      }
+    }
 
-    let removedThisPass = 0
     for (const bucket of CUSTOMER_BUCKETS) {
       const paths = walk.objects.filter((o) => o.bucket === bucket).map((o) => o.path)
       if (paths.length === 0) continue
       const { error } = await supabase.storage.from(bucket).remove(paths)
-      if (error) {
-        for (const path of paths) failed.push({ path, reason: error.message })
-        continue
-      }
-      removed += paths.length
-      removedThisPass += paths.length
+      // KEYED BY PATH, not appended. A bucket that refuses is retried on the
+      // next pass and refuses again, so a list would carry the same file once
+      // per pass — and the action turns `failed.length` into a sentence. One
+      // stuck file would have told the customer "20 of your files could not be
+      // deleted", which is both wrong and frightening.
+      if (error) for (const path of paths) failed.set(path, error.message)
     }
 
-    // No progress and objects still listed: something is refusing, and another
-    // identical pass will refuse identically. Report rather than spin.
-    if (removedThisPass === 0) {
-      for (const object of walk.objects) {
-        if (!failed.some((f) => f.path === object.path)) {
-          failed.push({
-            path: object.path,
-            reason: 'still present after a removal that reported success',
-          })
+    // PROGRESS IS MEASURED BY WHAT DISAPPEARED, never by what `remove` claimed.
+    //
+    // A backend that answers 200 and removes nothing is not hypothetical — it is
+    // what a policy change looks like from this side. Counting the paths handed
+    // to `remove` would report every file deleted, hand the erasure a green
+    // light, and leave the customer's photographs exactly where they were. So
+    // the next walk is the measurement.
+    const after = await walkWorkspaceStorage(supabase, workspaceId)
+    const gone = walk.objects.length - after.objects.length
+    removed += Math.max(0, gone)
+
+    if (after.objects.length === 0) {
+      return {
+        removed,
+        failed: [...failed].map(([path, reason]) => ({ path, reason })),
+        leftUnread,
+      }
+    }
+    if (gone <= 0) {
+      // Nothing moved. Another identical pass would move nothing either.
+      for (const object of after.objects) {
+        if (!failed.has(object.path)) {
+          failed.set(object.path, 'still present after a removal that reported success')
         }
       }
-      return { removed, failed, leftUnread }
+      return {
+        removed,
+        failed: [...failed].map(([path, reason]) => ({ path, reason })),
+        leftUnread,
+      }
     }
   }
 
+  const remaining = await walkWorkspaceStorage(supabase, workspaceId)
+  for (const object of remaining.objects) {
+    if (!failed.has(object.path)) {
+      failed.set(object.path, `still present after ${maxPasses} passes`)
+    }
+  }
   return {
     removed,
-    failed: [
-      ...failed,
-      {
-        path: `${workspaceId}/…`,
-        reason: `gave up after ${maxPasses} passes with files remaining`,
-      },
-    ],
-    leftUnread,
+    failed: [...failed].map(([path, reason]) => ({ path, reason })),
+    leftUnread: remaining.unreadable,
   }
 }
