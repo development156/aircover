@@ -13,6 +13,7 @@ import {
   OpsAdminSchema,
   OpsBetaApplicationSchema,
   OpsTaskSchema,
+  PublishDeadLetterSchema,
   type OpsChangelogEntry,
   type OpsQaRun,
   type OpsQaArtifact,
@@ -22,6 +23,7 @@ import {
   type OpsCreditRequest,
   type OpsAdmin,
   type OpsBetaApplication,
+  type PublishDeadLetter,
 } from '@sahoda/shared'
 
 import { newestOf } from '@/lib/ops/freshness'
@@ -354,3 +356,36 @@ export async function readAllQaArtifacts(): Promise<OpsRead<OpsQaArtifact[]>> {
       .limit(5000),
   )
 }
+
+/**
+ * The dead letters: publishes that FAILED and, until now, that nobody outside
+ * the affected workspace could see.
+ *
+ * ── WHY THIS READ EXISTS AT ALL ──────────────────────────────────────────────
+ * `post_publish_logs` has recorded every failure since it was created. It also
+ * carried exactly one select policy, member-scoped, so an operator's view of it
+ * was empty in every tenant — which is why a dead-letter screen could be built
+ * and never shown. Migration 20260822160000 adds `app.is_ops_admin()`.
+ *
+ * This goes through the caller's own Clerk JWT like every other read here, so
+ * the DATABASE decides what comes back, not this file. VERIFIED live 2026-08-22
+ * against production: an ops admin reads 21 rows across 2 workspaces including
+ * all 7 failures; a member who is not an admin reads their own 6 and no others;
+ * a stranger reads 0.
+ *
+ * Failures only. A dead-letter list that also carried successes would need
+ * reading rather than scanning, and the successes are already on the post.
+ */
+export const readPublishDeadLetters = cache(async (): Promise<OpsRead<PublishDeadLetter[]>> => {
+  const supabase = createServerSupabase()
+  return readAll('publish_dead_letters', z.array(PublishDeadLetterSchema), () =>
+    supabase
+      .from('post_publish_logs')
+      .select(
+        'id,workspace_id,post_id,variant_id,channel,attempt,status,mode,error,job_run_id,created_at',
+      )
+      .eq('status', 'failed')
+      .order('created_at', { ascending: false })
+      .limit(100),
+  )
+})

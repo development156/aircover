@@ -103,10 +103,9 @@ function assertCleanupCapable(): { url: string; key: string } {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (url && key) return { url, key }
 
-  const missing = [
-    !url && 'NEXT_PUBLIC_SUPABASE_URL',
-    !key && 'SUPABASE_SERVICE_ROLE_KEY',
-  ].filter(Boolean)
+  const missing = [!url && 'NEXT_PUBLIC_SUPABASE_URL', !key && 'SUPABASE_SERVICE_ROLE_KEY'].filter(
+    Boolean,
+  )
 
   throw new Error(
     [

@@ -1,4 +1,4 @@
-# 34 — Tenant isolation, measured against production
+# 37 — Tenant isolation, measured against production
 
 **Measured 2026-08-22 against `rloztdhzfliyvpvxsgjl`.** Re-run with
 `node packages/db/scripts/rls-live-matrix.mjs`.

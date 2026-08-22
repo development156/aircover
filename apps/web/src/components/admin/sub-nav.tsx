@@ -24,6 +24,11 @@ const SECTIONS: readonly Section[] = [
   { label: 'QA', href: '/admin/qa' },
   { label: 'Applications', href: '/admin/applications' },
   { label: 'Credits', href: '/admin/credits' },
+  // The publishes that failed. Reachable from the nav because a dead-letter list
+  // nobody can find is the same as no dead-letter list — and this one was
+  // invisible for a different reason until migration 20260822160000: the table
+  // had one member-scoped policy, so an operator's view of it was empty.
+  { label: 'Dead letters', href: '/admin/jobs' },
   { label: 'Team', href: '/admin/team' },
 ]
 

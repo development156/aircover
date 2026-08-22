@@ -237,3 +237,32 @@ export const OpsAuditLogSchema = z.object({
   created_at: z.string(),
 })
 export type OpsAuditLog = z.infer<typeof OpsAuditLogSchema>
+
+// ── the publish dead-letter (post_publish_logs, append-only) ─────────────────
+/**
+ * A failed publish, as the ops console reads it.
+ *
+ * Not a new table: `post_publish_logs` has always recorded these. What was
+ * missing was a way for anyone but a member of the affected workspace to SEE
+ * one — MEASURED 2026-08-22, production held 7 failed publishes and the table
+ * carried a single member-scoped policy, so every operator's view was empty.
+ * Migration 20260822160000 adds the `app.is_ops_admin()` select policy.
+ *
+ * `workspace_id` is a UUID and stays one on this screen. Naming the tenant would
+ * need `workspaces` widened to operators too, which is a privacy decision for the
+ * founder rather than a convenience for a dead-letter list.
+ */
+export const PublishDeadLetterSchema = z.object({
+  id: z.uuid(),
+  workspace_id: z.uuid(),
+  post_id: z.uuid().nullable(),
+  variant_id: z.uuid().nullable(),
+  channel: z.string(),
+  attempt: z.number().int(),
+  status: z.string(),
+  mode: z.string(),
+  error: z.string().nullable(),
+  job_run_id: z.string().nullable(),
+  created_at: z.string(),
+})
+export type PublishDeadLetter = z.infer<typeof PublishDeadLetterSchema>
