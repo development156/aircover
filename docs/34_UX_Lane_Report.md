@@ -667,9 +667,21 @@ one instance of it. Against `next start` all ten routes are green, including `/c
 `waitForLoadState('networkidle')` — line 177, before the detector runs at all — which is a
 property of the file and the dev server, not of the rule.
 
-**Where the gate stands:** stages 1 and 2 green. Stage 3 green under `next start` except lane 1's
-scrim test. Stages 4 and 5 did not run in that invocation because the gate stops at the first
-failure; `prettier --check` and `turbo build` have been run separately and are green.
+**Where the gate stands, run stage by stage after the fix:**
+
+| stage | command | result |
+|---|---|---|
+| 1 | `turbo run typecheck lint test --concurrency=1` | **27 of 27 tasks** |
+| 2 | `vitest run` (root) | **174 passed** |
+| 3 | `playwright --grep @smoke` against `next start` | **88 passed · 1 failed** |
+| 4 | `prettier --check .` | **clean** |
+| 5 | `turbo run build --concurrency=1` | **1 of 1** |
+
+The single failure is `motion.spec.ts:122`, the scrim test, which this lane's brief assigns to
+lane 1 and instructs me not to chase. `analytics-history` passes, the truncation ratchet passes on
+all ten routes, and the resolution-console flake did not recur. Stage 3 is quoted against
+`next start` and not against the gate's own `pnpm dev`, for the reason above — that is a
+deviation from how `pnpm gate` runs it, and it is stated rather than glossed.
 
 ---
 
