@@ -6,6 +6,7 @@ import { PostInsertSchema, toChannelSet, type Channel } from '@sahoda/shared'
 
 import { generateVariants } from '@/app/actions/posts-ai'
 import { briefFromChange } from '@/lib/radar/brief'
+import { normalizeUrl } from '@/lib/radar/locator'
 import { radarStore } from '@/lib/radar/read'
 import type { AddCompetitorState, DraftFromChangeState } from '@/lib/radar/state'
 import type { CompetitorKind, RadarChange } from '@/lib/radar/types'
@@ -54,24 +55,6 @@ const ORIGIN_UNTIL_RADAR_EXISTS = 'manual' as const
 
 function isKind(value: unknown): value is CompetitorKind {
   return value === 'website' || value === 'instagram' || value === 'google_business'
-}
-
-/**
- * A public address, or a refusal.
- *
- * Rejects anything that is not http(s). A `javascript:` or `data:` value entered
- * here would be stored and later rendered as a link, and the collector would be
- * handed a scheme it has no business fetching.
- */
-function normalizeUrl(raw: string): string | null {
-  let parsed: URL
-  try {
-    parsed = new URL(raw.trim())
-  } catch {
-    return null
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
-  return parsed.toString()
 }
 
 export async function addCompetitor(

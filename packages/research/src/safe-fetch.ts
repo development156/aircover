@@ -1,5 +1,6 @@
 import { lookup } from 'node:dns/promises'
 
+import { ipLiteral, isPrivateAddress } from './ip'
 import { pinnedFetch } from './pinned-fetch'
 
 /**
@@ -31,45 +32,18 @@ export class UnsafeUrlError extends Error {
   }
 }
 
-/** IPv4 ranges that must never be reachable from a customer-supplied URL. */
-function isPrivateIpv4(ip: string): boolean {
-  const parts = ip.split('.').map(Number)
-  if (parts.length !== 4 || parts.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return true
-  const [a, b, c] = parts as [number, number, number, number]
-  if (a === 0 || a === 127) return true // this-host, loopback
-  if (a === 10) return true // private
-  if (a === 172 && b >= 16 && b <= 31) return true // private
-  if (a === 192 && b === 168) return true // private
-  if (a === 169 && b === 254) return true // link-local — cloud metadata lives here
-  if (a === 100 && b >= 64 && b <= 127) return true // CGNAT
-  if (a >= 224) return true // multicast + reserved
-  // Reserved ranges carried over from the onboarding lane's own address guard,
-  // which listed them and this did not. None is routable, so none can be a real
-  // customer's site — and a range nobody can legitimately be in is one a crawler
-  // should refuse rather than time out on.
-  if (a === 192 && b === 0 && c === 0) return true // IETF protocol assignments
-  if (a === 192 && b === 0 && c === 2) return true // TEST-NET-1
-  if (a === 198 && (b === 18 || b === 19)) return true // benchmarking
-  if (a === 198 && b === 51 && c === 100) return true // TEST-NET-2
-  if (a === 203 && b === 0 && c === 113) return true // TEST-NET-3
-  return false
-}
-
-function isPrivateIpv6(ip: string): boolean {
-  const addr = ip.toLowerCase().split('%')[0]!
-  if (addr === '::' || addr === '::1') return true
-  // IPv4-mapped (::ffff:10.0.0.1) — judge it as the v4 address it really is.
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(addr)
-  if (mapped) return isPrivateIpv4(mapped[1]!)
-  if (/^f[cd]/.test(addr)) return true // fc00::/7 unique-local
-  if (/^fe[89ab]/.test(addr)) return true // fe80::/10 link-local
-  if (/^ff/.test(addr)) return true // multicast
-  return false
-}
-
-export function isPrivateAddress(ip: string, family: number): boolean {
-  return family === 6 ? isPrivateIpv6(ip) : isPrivateIpv4(ip)
-}
+/**
+ * ADDRESS CLASSIFICATION LIVES IN `ip.ts` AND NO LONGER HERE.
+ *
+ * What used to be here were two prefix-regex classifiers, and the IPv6 half had
+ * a hole wide enough to reach the cloud metadata endpoint: its only IPv4-mapped
+ * branch matched `::ffff:169.254.169.254`, a string `new URL` never produces —
+ * it serialises that literal as `::ffff:a9fe:a9fe`, which fell through every test
+ * and was returned as PUBLIC. Fourteen of sixteen hostile IPv6 forms walked
+ * through, MEASURED. `ip.ts` decides with arithmetic instead, and re-exporting
+ * from here keeps `isPrivateAddress` at the import path its callers already use.
+ */
+export { isPrivateAddress, isPrivateIpv4, isPrivateIpv6, ipLiteral } from './ip'
 
 export interface SafeUrlOptions {
   /** Injected in tests so DNS is not a network dependency. */
@@ -94,6 +68,24 @@ export async function assertPublicUrl(raw: string, opts: SafeUrlOptions = {}): P
   }
   if (url.username || url.password) {
     throw new UnsafeUrlError('credentials in URL')
+  }
+
+  /**
+   * AN IP LITERAL IS JUDGED HERE, NOT BY DNS.
+   *
+   * `url.hostname` keeps the brackets on an IPv6 literal, and
+   * `dns.lookup('[::1]')` answers ENOTFOUND — so `http://[::1]/` was refused
+   * with "hostname does not resolve", which is an ACCIDENT rather than a
+   * decision. It reads as a working guard while resting on a DNS error message,
+   * and the moment any caller strips the brackets first the refusal disappears.
+   * Classify the literal directly and the refusal says what it means.
+   */
+  const literal = ipLiteral(url.hostname)
+  if (literal) {
+    if (isPrivateAddress(literal.address, literal.family)) {
+      throw new UnsafeUrlError('resolves to a private address')
+    }
+    return url
   }
 
   const resolver = opts.resolve ?? ((host: string) => lookup(host, { all: true, verbatim: true }))
