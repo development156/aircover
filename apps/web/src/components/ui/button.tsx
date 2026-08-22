@@ -55,8 +55,15 @@ export const buttonVariants = cva(
         // reads as dangerous because it is solid and because it says "Delete" —
         // not because of hue (RETHEME.md §5). Mapping it to --danger would make
         // it identical to primary, since --danger is now the brand orange.
+        // The hover was correct in DARK and wrong in LIGHT, and the asymmetry
+        // is the tell: `dark:hover:text-primary-foreground` was written, its
+        // light counterpart was not. So on light, hovering Delete turned the
+        // button orange while the label stayed `text-white` from the base —
+        // **2.94:1**, on the one control in the product where misreading the
+        // label is most expensive. `hover:text-primary-foreground` gives ink on
+        // orange in both themes (7.15:1) and lets the dark override go.
         destructive:
-          'bg-ink text-white dark:bg-white dark:text-[var(--canvas)] hover:bg-primary dark:hover:bg-primary dark:hover:text-primary-foreground',
+          'bg-ink text-white dark:bg-white dark:text-[var(--canvas)] hover:bg-primary hover:text-primary-foreground dark:hover:bg-primary',
       },
       // SPECIFICATION.md §10: "Every tappable control clears 44px; desktop stays
       // dense." The kit's 34px control height is a DESKTOP number — it is what

@@ -2,6 +2,7 @@ import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 
+import { ThemeAttributeGuard } from '@/components/shell/theme-attribute-guard'
 import { ThemeScript } from '@/components/shell/theme-script'
 import { clerkAppearance } from '@/lib/clerk-appearance'
 // No env import here — validation is LAZY (first `env.X` access, i.e. the first
@@ -43,7 +44,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <head>
           <ThemeScript />
         </head>
-        <body>{children}</body>
+        <body>
+          {/* Puts `data-theme` back when React re-renders <html> instead of
+              hydrating it, which is what the root not-found boundary does —
+              MEASURED: the 404 was light-only in a dark session while
+              localStorage said 'dark'. See the component. */}
+          <ThemeAttributeGuard />
+          {children}
+        </body>
       </html>
     </ClerkProvider>
   )
