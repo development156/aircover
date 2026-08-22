@@ -1,0 +1,67 @@
+{
+  "scale": {
+    "ledger_entries": 202,
+    "balance_rows": 26,
+    "workspaces_with_entries": 26,
+    "credits_outstanding": "3054",
+    "credits_held": "0",
+    "newest_entry": "2026-08-21 21:42:15.767851+00"
+  },
+  "results": [
+    {
+      "id": "total_reconciles",
+      "title": "credit_balances.balance_total equals the signed sum of its ledger entries",
+      "violations": 0,
+      "rows": []
+    },
+    {
+      "id": "held_reconciles",
+      "title": "credit_balances.balance_held equals the sum of HOLDs nothing has settled",
+      "violations": 0,
+      "rows": []
+    },
+    {
+      "id": "held_le_total",
+      "title": "held never exceeds total, and neither is negative",
+      "violations": 0,
+      "rows": []
+    },
+    {
+      "id": "no_double_settlement",
+      "title": "no HOLD is settled twice",
+      "violations": 0,
+      "rows": []
+    },
+    {
+      "id": "settlement_targets_a_hold",
+      "title": "every settling entry points at a HOLD in the same workspace",
+      "violations": 0,
+      "rows": []
+    },
+    {
+      "id": "debit_within_hold",
+      "title": "a settling DEBIT never charges more than the HOLD it settles",
+      "violations": 0,
+      "rows": []
+    },
+    {
+      "id": "amount_sign",
+      "title": "only ADJUST carries a non-positive amount, and ADJUST is never zero",
+      "violations": 0,
+      "rows": []
+    },
+    {
+      "id": "balance_after_replays",
+      "title": "balance_after on every entry equals available (total − held) as of that entry",
+      "violations": 0,
+      "rows": []
+    },
+    {
+      "id": "ledger_without_balance",
+      "title": "no workspace has ledger entries but no balance row",
+      "violations": 0,
+      "rows": []
+    }
+  ],
+  "ok": true
+}
