@@ -394,9 +394,15 @@ round.
 
 **A frame is the authority on what a screen looks like — and a frame taken with a stale pointer
 is authoritative about a state nobody was in.** `shot()` now parks the pointer at (-40, -40)
-before every shutter; re-capturing the sweep with the fix changed the frames it should have and
-nothing else. Any 1440 finding in `.ux/all-findings.json` that turns on the *colour of a control
-near (836, 406)* should be re-read against `.ux2/` rather than `.ux/`.
+before every shutter, proved by a probe that asserts `:hover === false` and 3579 orange pixels.
+
+**How many frames were affected: I cannot say, and I will not guess.** The clean re-capture in
+`.ux2/` differs from `.ux/` in all 175 compared frames, but that diff is confounded — the app
+itself changed between the two runs by twenty-three fixes. Isolating the artefact would need a
+third capture of the *unfixed* build with the *fixed* harness, which is not worth seven minutes
+of a shared machine. What can be said precisely is the population at risk: **any control at 1440
+whose box contains (836, 406) and whose `hover:` variant changes its fill.** `.ux2/` is the clean
+set; read any 1440 finding that turns on the colour of a control near that point against it.
 
 One more worth recording because it is a category, not an instance: **a reader detected that its
 own evidence was stale.** The `j2-returning|analytics` frames document a screen commit `60f0246`
