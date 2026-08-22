@@ -30,12 +30,30 @@ function migrationFiles(): string[] {
     .sort()
 }
 
-/** Statements a migration declares. Names only — enough to look them up. */
+/**
+ * Statements a migration declares. Names only — enough to look them up.
+ *
+ * ── WHY STRING LITERALS ARE REMOVED, NOT JUST COMMENTS ───────────────────────
+ * `20260801000000_rls_auto_enable.sql` compares an event trigger's command tag against
+ * the literal list `('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')`. That is live
+ * SQL, not a comment, so comment-stripping alone left it in — and the table regex read
+ * `'CREATE TABLE AS'` as a DECLARATION of a table called `as`.
+ *
+ * Nothing named `as` can ever exist, so the catalog check below could not pass against
+ * ANY database, production included. It looked healthy only because it had never run:
+ * it gates on `hasLedgerEnv`, and until a non-production Postgres existed there was no
+ * database the suite was permitted to open. MEASURED 2026-08-20: `missingTables: ['as']`.
+ *
+ * A literal can never contain a real declaration, so removing them cannot hide one.
+ */
 function declaredObjects(sql: string) {
   const strip = sql
     .split('\n')
     .filter((line) => !line.trim().startsWith('--'))
     .join('\n')
+    // Single-quoted literals, doubled '' escapes included, replaced by an empty pair so
+    // surrounding statements keep their shape.
+    .replace(/'(?:[^']|'')*'/g, "''")
 
   return {
     tables: [...strip.matchAll(/\bcreate\s+table\s+(?:if\s+not\s+exists\s+)?([a-z_][a-z0-9_]*)/gi)]
@@ -76,6 +94,52 @@ describe('every migration file has content', () => {
       .trim()
 
     expect(executable.length).toBeGreaterThan(0)
+  })
+})
+
+/**
+ * The parser that feeds the catalog check, tested WITHOUT a database.
+ *
+ * The catalog check itself gates on `hasLedgerEnv`, so for as long as no permitted
+ * Postgres existed a broken parser sat undetected — and it was broken: it declared a
+ * table named `as`, which nothing could ever satisfy. These run everywhere, so the
+ * next such break fails in the sandbox rather than waiting for a database.
+ */
+describe('the declaration parser reads statements, not string literals', () => {
+  it('does not mistake a quoted command tag for a table declaration', () => {
+    const sql = `
+      create table real_one (id uuid primary key);
+      create or replace function app.f() returns trigger language plpgsql as $$
+      begin
+        if tg_tag in ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO') then
+          return null;
+        end if;
+      end;
+      $$;
+    `
+
+    const found = declaredObjects(sql)
+
+    expect(found.tables).toEqual(['real_one'])
+    expect(found.functions).toEqual(['app.f'])
+  })
+
+  it('still finds every real declaration across the actual migrations', () => {
+    const tables = new Set<string>()
+    for (const name of migrationFiles()) {
+      for (const t of declaredObjects(readFileSync(resolve(MIGRATIONS, name), 'utf8')).tables) {
+        tables.add(t)
+      }
+    }
+
+    // Anchored on tables this repository cannot lose. A parser that stripped too much
+    // would pass the test above and fail here.
+    expect(tables).toContain('workspaces')
+    expect(tables).toContain('credit_ledger')
+    expect(tables).toContain('invoices')
+    expect(tables).toContain('invoice_serials')
+    // The defect this parser had, named so a regression is unmistakable.
+    expect(tables).not.toContain('as')
   })
 })
 

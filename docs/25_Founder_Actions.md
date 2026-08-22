@@ -9,6 +9,46 @@ reason the nightly numbers job never ran is not the one we thought.
 
 ---
 
+## 0. Get sandbox Cashfree keys — the ones in the repository are production keys
+
+**Blocks: every payment. Nobody can buy anything, and no amount of code fixes it.**
+
+The keys you pasted are **live production keys**, not sandbox ones. Cashfree's secret key
+carries its environment in the key itself, and yours says `prod`. The sandbox refuses a
+production key, which is why the error is `401 authentication Failed`.
+
+Two separate problems, and both need you:
+
+**a. They are the wrong environment.** Sandbox keys look different — the secret starts
+`cfsk_ma_test_` rather than `cfsk_ma_prod_`, and the App ID starts `TEST` rather than `CF`.
+Get them from the Cashfree dashboard with the environment toggle set to **Test/Sandbox**,
+not Production.
+
+**b. They do not work against production either.** MEASURED 2026-08-20: the same pair was
+refused by the production host too, with the same 401. That is a separate thing to chase
+with Cashfree — most likely the merchant account is not fully activated, or the App ID and
+secret are from different key pairs. Worth asking them directly, because it will block go-live
+even after the sandbox keys arrive.
+
+**And they were in the wrong file.** You pasted them into the repository's top-level settings
+file. The app reads its settings from the `apps/web` folder, and that file still held the OLD
+broken pair — the two 40-character values that were identical to each other. So even correct
+keys pasted there would not have reached the app. When you paste the sandbox keys, they need
+to go in **`apps/web`**, and the two values must differ from one another.
+
+**How you will know it worked:** the check reports `HTTP 200` instead of `HTTP 401`. Nothing
+downstream can be tested against a real order until it does — everything else in the payment
+system has been proven against a real database instead, which is as far as it can be taken
+without this.
+
+**Also blocked, separately:** the ten `SAHODA_GST_*` settings are unset, so invoices cannot be
+issued at all. That one is not a bug — see `docs/29_GST_Questions.md`, which is written to be
+handed to an accountant as it stands.
+
+---
+
+## 1. Merge this branch into the one that goes live
+
 ## 1. The nightly numbers job has never run, and every day costs you a day
 
 **Blocks: history that cannot be recovered later. This is the most expensive item on the page.**
