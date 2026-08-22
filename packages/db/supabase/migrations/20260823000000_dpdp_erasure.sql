@@ -357,6 +357,7 @@ declare
   v_last_error text := '';
   v_total      bigint := 0;
   v_orphans    int := 0;
+  v_members    text[];
   -- One list, read from app.erasure_retained_tables(). See the note there.
   v_retained constant text[] := app.erasure_retained_tables();
 begin
@@ -392,6 +393,15 @@ begin
   if lower(btrim(coalesce(p_typed_name, ''))) <> lower(btrim(v_name)) then
     raise exception 'ERASURE_NAME_MISMATCH' using errcode = 'check_violation';
   end if;
+
+  -- 3b) Who is in this workspace, captured BEFORE the deletes remove them.
+  --     `users_profile` is keyed by `user_id`, so the only way to know whose
+  --     profile this erasure might orphan is to look while the memberships are
+  --     still there.
+  select coalesce(array_agg(user_id), '{}')
+    into v_members
+    from workspace_members
+   where workspace_id = p_workspace_id;
 
   -- 4) Announce the erasure to `app.block_mutations`, transaction-locally. The
   --    `true` is what makes it local: a session-level set would be handed to the
@@ -449,17 +459,30 @@ begin
     end if;
   end loop;
 
-  -- 7) The sign-in profile. `users_profile` carries an email, a display name and
-  --    an avatar, and it is keyed by `user_id` rather than `workspace_id` — so
-  --    NO sweep over workspace-owned tables can ever see it. It is removed only
-  --    for a person who, now that this workspace is gone, belongs to no other:
-  --    erasing one workspace must not blank the profile of somebody still using
-  --    another.
+  -- 7) The sign-in profiles. `users_profile` carries an email, a display name
+  --    and an avatar, and it is keyed by `user_id` rather than `workspace_id` —
+  --    so NO sweep over workspace-owned tables can ever see it. It is removed
+  --    for anybody who, now that this workspace is gone, belongs to no other.
+  --
+  --    ── EVERY MEMBER, NOT JUST THE CALLER ─────────────────────────────────
+  --    The first version deleted only `v_user`. An EDITOR whose only workspace
+  --    was this one kept their email address in this database for ever, reachable
+  --    by nothing — which is exactly the class of gap this whole lane exists to
+  --    close, reintroduced by the code that closes it. It survived a test suite
+  --    because the only two profiles in the fixture belonged to the caller and to
+  --    a member of the OTHER workspace, so the narrow and the broad version were
+  --    indistinguishable. `erasure.pglite.test.ts` now seeds a second member of
+  --    this workspace precisely to tell them apart.
+  --
+  --    ── AND ONLY THIS WORKSPACE'S MEMBERS ─────────────────────────────────
+  --    Scoped by `v_members` rather than sweeping every orphaned profile in the
+  --    database. An unrelated abandoned account is somebody else's row, and one
+  --    person's deletion request is not a licence to tidy it up.
   --
   --    This is also why docs/31's line "your name, email and sign-in belong to
   --    Clerk" needed correcting. A copy lives here.
   delete from users_profile p
-   where p.user_id = v_user
+   where p.user_id = any (v_members)
      and not exists (select 1 from workspace_members m where m.user_id = p.user_id);
   get diagnostics v_orphans = row_count;
 

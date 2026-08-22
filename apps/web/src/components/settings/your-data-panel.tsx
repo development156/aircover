@@ -43,6 +43,15 @@ import { eraseConfirmationMatches } from '@/lib/privacy/confirm'
  * database re-checks the name again after that: this is a callable endpoint
  * whatever the screen does.
  *
+ * ## Where a just-erased person is sent, and why it is not the home page
+ *
+ * `/onboarding`, not `/`. The person now belongs to NO workspace, and `/`
+ * redirects to `/home`, whose shell renders every panel against a null workspace
+ * — a state this repo already has on record as reading "could not read balance"
+ * and looking like a fault. `/onboarding` is the one route that handles somebody
+ * with no workspace deliberately: it offers to make one. An erased customer is
+ * exactly a new account, so that is where they belong.
+ *
  * ## The download shows real bytes
  *
  * `fetch` + a stream reader, not a spinner. The archive can carry a customer's
@@ -248,7 +257,7 @@ export function YourDataPanel() {
         }
         footer={
           erase.kind === 'done' ? (
-            <Button onClick={() => window.location.assign('/')}>Done</Button>
+            <Button onClick={() => window.location.assign('/onboarding')}>Done</Button>
           ) : (
             <>
               <Button variant="ghost" onClick={() => setErase({ kind: 'closed' })}>

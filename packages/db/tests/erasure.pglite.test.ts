@@ -59,6 +59,18 @@ const WS_C = '33333333-3333-4333-8333-333333333333'
 const USER_A = 'user_erasure_a'
 const USER_B = 'user_erasure_b'
 const USER_C = 'user_erasure_c'
+/**
+ * A second member of workspace A — an EDITOR, with a profile row and no other
+ * membership anywhere.
+ *
+ * The fixture exists to tell two implementations apart that are otherwise
+ * identical. `erase_workspace` used to delete only the CALLER's profile; the
+ * document said "anybody left with no workspace at all". With only the owner and
+ * a member of the other workspace in the fixture, both versions produced exactly
+ * the same answer, so a test could not see the difference — and the difference is
+ * an editor's email address kept for ever in a table no sweep reaches.
+ */
+const USER_A_EDITOR = 'user_erasure_a_editor'
 
 /** The law's list, and the only thing erasure is allowed to leave behind. */
 const RETAINED = ['credit_balances', 'credit_ledger', 'invoices', 'ledger_actor_redactions']
@@ -180,9 +192,12 @@ beforeAll(async () => {
       ('${WS_A}', 'Erasure Alpha', 'erasure-alpha', '${USER_A}'),
       ('${WS_B}', 'Erasure Beta', 'erasure-beta', '${USER_B}');
     insert into workspace_members (workspace_id, user_id, role) values
-      ('${WS_A}', '${USER_A}', 'owner'), ('${WS_B}', '${USER_B}', 'owner');
+      ('${WS_A}', '${USER_A}', 'owner'),
+      ('${WS_A}', '${USER_A_EDITOR}', 'editor'),
+      ('${WS_B}', '${USER_B}', 'owner');
     insert into users_profile (user_id, email, display_name) values
       ('${USER_A}', 'alpha@example.test', 'Alpha Owner'),
+      ('${USER_A_EDITOR}', 'editor@example.test', 'Alpha Editor'),
       ('${USER_B}', 'beta@example.test', 'Beta Owner');
   `)
 
@@ -325,8 +340,10 @@ describe('the erasure itself', () => {
     expect(result.ws.slug).toBe(`deleted-${WS_A}`)
     expect(result.ws.deleted_at).not.toBeNull()
 
-    // 5 · The sign-in profile of the person left with no workspace. Keyed by
-    //     user_id, so NO sweep over workspace-owned tables could reach it.
+    // 5 · The sign-in profiles of everybody left with no workspace at all —
+    //     the OWNER AND THE EDITOR. Keyed by user_id, so no sweep over
+    //     workspace-owned tables could reach either. Workspace B's owner keeps
+    //     theirs, because they still have a workspace.
     expect(result.profiles).toEqual([USER_B])
 
     // 6 · The result names what it kept, so the caller does not re-derive it.
@@ -380,6 +397,89 @@ describe('the erasure itself', () => {
           .rows[0]!.n,
     )
     expect(left).toBe(0)
+  }, 180_000)
+})
+
+describe('half a deletion is worse than none', () => {
+  /**
+   * THE ROLLBACK, DEMONSTRATED RATHER THAN ASSERTED BY CONSTRUCTION.
+   *
+   * Every other test in this file breaks a GUARD and watches it refuse. None of
+   * them breaks a DELETE — so until this one existed, "it is one transaction, so
+   * a failure undoes everything" rested entirely on the function being written
+   * inside `begin`, which is a claim about the shape of the code rather than
+   * about what Postgres does with it. That is the same class of confidence as a
+   * comment.
+   *
+   * A trigger that refuses is the only way to reach `ERASURE_INCOMPLETE` without
+   * corrupting anything: it makes ONE table permanently undeletable, the retry
+   * loop exhausts its passes against it, the function raises, and the whole
+   * transaction goes. What must then be true is that the other forty-seven
+   * tables are exactly as they were.
+   */
+  it('undoes EVERYTHING when one table refuses, and says which', async () => {
+    await db.exec(`
+      create or replace function pg_temp_refuse() returns trigger
+      language plpgsql as $$ begin
+        raise exception 'this table is not going anywhere' using errcode = 'restrict_violation';
+      end $$;
+      create trigger erasure_atomicity_probe before delete on templates
+        for each row execute function pg_temp_refuse();
+    `)
+
+    let raised = ''
+    try {
+      await db.exec('begin')
+      try {
+        await db.query(`select set_config('request.jwt.claims', $1, true)`, [
+          JSON.stringify({ sub: USER_A, role: 'authenticated' }),
+        ])
+        await db.exec('set local role authenticated')
+        await db.query(`select public.erase_workspace($1, $2)`, [WS_A, 'Erasure Alpha'])
+      } catch (error) {
+        raised = error instanceof Error ? error.message : String(error)
+      } finally {
+        // No `reset role` here: the raise ABORTED the transaction, so every
+        // statement until the rollback answers "current transaction is aborted"
+        // — including that one. The rollback restores the role by itself, and it
+        // is the only thing that can run. The counts below are therefore taken
+        // AFTER the rollback, which is the only place the question can be asked.
+        await db.exec('rollback')
+      }
+    } finally {
+      // In a `finally` of its own. A trigger that refuses every delete on
+      // `templates`, left behind by a failing assertion, would break every test
+      // after this one and report the fault in the wrong place.
+      await db.exec('drop trigger erasure_atomicity_probe on templates')
+    }
+
+    // 1 · It failed, and it NAMED what it could not erase. "3 tables could not
+    //     be erased" sends somebody hunting; the name sends them to the cause.
+    expect(raised).toMatch(/ERASURE_INCOMPLETE/)
+    expect(raised).toMatch(/templates/)
+    expect(raised).toMatch(/this table is not going anywhere/)
+
+    // 2 · And NOTHING was deleted. Not the forty-odd tables whose deletes
+    //     succeeded before `templates` refused, not the workspace's own row,
+    //     not the profiles. This is the assertion the brief's "half a deletion
+    //     is worse than none" actually rests on.
+    const counts = await countAll(db)
+    const lost = tables.filter((t) => (counts.get(t)?.a ?? 0) !== (before.get(t)?.a ?? 0))
+    expect(lost, `these tables lost rows to a deletion that failed: ${lost.join(', ')}`).toEqual([])
+
+    const ws = (
+      await db.query<{ name: string; deleted_at: string | null }>(
+        `select name, deleted_at from workspaces where id = $1`,
+        [WS_A],
+      )
+    ).rows[0]!
+    expect(ws.name).toBe('Erasure Alpha')
+    expect(ws.deleted_at).toBeNull()
+
+    const profiles = (
+      await db.query<{ user_id: string }>(`select user_id from users_profile order by 1`)
+    ).rows.map((r) => r.user_id)
+    expect(profiles).toEqual([USER_A, USER_A_EDITOR, USER_B])
   }, 180_000)
 })
 

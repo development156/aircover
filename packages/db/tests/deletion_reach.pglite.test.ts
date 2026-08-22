@@ -167,6 +167,15 @@ describe('what the screen must say before somebody presses it', () => {
     expect(source).toMatch(/from storage as well as from here/i)
   })
 
+  it('sends a just-erased person somewhere that works', () => {
+    // NO DEAD ENDS. `/` redirects to `/home`, and `/home` renders its whole
+    // shell against a workspace that no longer exists — which this repo already
+    // has on record as reading "could not read balance". `/onboarding` is the
+    // one route written to handle somebody with no workspace.
+    const source = readFileSync(PANEL, 'utf8')
+    expect(source).toMatch(/location\.assign\('\/onboarding'\)/)
+  })
+
   it('requires the workspace name to be TYPED, not merely a second click', () => {
     const source = readFileSync(PANEL, 'utf8')
     expect(source).toMatch(/to confirm/i)
