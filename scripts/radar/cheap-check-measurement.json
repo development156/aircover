@@ -1,0 +1,179 @@
+{
+  "gapSeconds": 240,
+  "one": [
+    {
+      "url": "https://bluetokaicoffee.com/",
+      "outcome": "fetched",
+      "ms": 603,
+      "bytes": 378060,
+      "words": 946,
+      "rawHash": "f2d52c6ad00d829c",
+      "textHash": "994a9c2aea7bfecf",
+      "etag": "\"page_cache:7381409:IndexController:1516d6c04747c776b53812858ca03ed7:2f4b67f774ae23b01fd3488dec7e305b\"",
+      "lastModified": null
+    },
+    {
+      "url": "https://www.thewholetruthfoods.com/",
+      "outcome": "fetched",
+      "ms": 858,
+      "bytes": 454471,
+      "words": 730,
+      "rawHash": "21e58e2a58177d36",
+      "textHash": "bdae12a47de41f66",
+      "etag": "W/\"l34psjcwso9qo7\"",
+      "lastModified": null
+    },
+    {
+      "url": "https://sleepyowl.co/",
+      "outcome": "fetched",
+      "ms": 757,
+      "bytes": 897052,
+      "words": 2584,
+      "rawHash": "033ceda877701ace",
+      "textHash": "a2986155810bc245",
+      "etag": "\"page_cache:13080907:IndexController:0212f25cb83655b434ba48f8668f30e6:505408165a1f766f73b76044f03c12b0\"",
+      "lastModified": null
+    },
+    {
+      "url": "https://bombayshavingcompany.com/",
+      "outcome": "fetched",
+      "ms": 1082,
+      "bytes": 1184655,
+      "words": 4100,
+      "rawHash": "be99a77334f9e0f6",
+      "textHash": "7710e73b545d5f17",
+      "etag": "\"page_cache:45965639834:IndexController:e5e1cd193b0022dd6fe3875e93019f0d:425ca5e7d24a6d2b3f44c08d6874ba06\"",
+      "lastModified": null
+    },
+    {
+      "url": "https://mamaearth.in/",
+      "outcome": "fetched",
+      "ms": 560,
+      "bytes": 951926,
+      "words": 3232,
+      "rawHash": "82a781a42de84736",
+      "textHash": "b1d2ef320dc15f0f",
+      "etag": "\"page_cache:72175583279:IndexController:0e7d2cd561b875f4a9470db003676037:a1f363afe638ae904b21afc77d7de35d\"",
+      "lastModified": null
+    },
+    {
+      "url": "https://chaayos.com/",
+      "outcome": "fetched",
+      "ms": 457,
+      "bytes": 220365,
+      "words": 607,
+      "rawHash": "f9c1e674c74bdb85",
+      "textHash": "35278baa8f359b9b",
+      "etag": "\"page_cache:53711044798:IndexController:be8a4bdfed623e29a6bebdcfd90b7db0:010f056625f2d968fa241f0a9322847d\"",
+      "lastModified": null
+    },
+    {
+      "url": "https://paperboatdrinks.com/",
+      "outcome": "fetched",
+      "ms": 1960,
+      "bytes": 123902,
+      "words": 232,
+      "rawHash": "0e2b64aebec292fe",
+      "textHash": "75e523b6876c313e",
+      "etag": null,
+      "lastModified": null
+    },
+    {
+      "url": "https://www.boat-lifestyle.com/",
+      "outcome": "fetched",
+      "ms": 1039,
+      "bytes": 2633568,
+      "words": 3869,
+      "rawHash": "e22c2e57e3bac687",
+      "textHash": "d82f835c4e33563e",
+      "etag": "\"page_cache:5789384802:IndexController:a2ce7b2aec7c8c20f1fbb848b67123aa:f68f847a9c92c982b386c1ad9f14ef67\"",
+      "lastModified": null
+    }
+  ],
+  "two": [
+    {
+      "url": "https://bluetokaicoffee.com/",
+      "outcome": "fetched",
+      "ms": 295,
+      "bytes": 378060,
+      "words": 946,
+      "rawHash": "d3edb49402ec060a",
+      "textHash": "994a9c2aea7bfecf",
+      "etag": "\"page_cache:7381409:IndexController:1516d6c04747c776b53812858ca03ed7:dafcfdf3722bcd6ce1d6e4752b30c99d\"",
+      "lastModified": null
+    },
+    {
+      "url": "https://www.thewholetruthfoods.com/",
+      "outcome": "unchanged",
+      "via": "304",
+      "ms": 773,
+      "bytes": 0
+    },
+    {
+      "url": "https://sleepyowl.co/",
+      "outcome": "fetched",
+      "ms": 346,
+      "bytes": 897052,
+      "words": 2584,
+      "rawHash": "236e015a34044b7e",
+      "textHash": "a2986155810bc245",
+      "etag": "\"page_cache:13080907:IndexController:0212f25cb83655b434ba48f8668f30e6:a013b5b2a6f3423da474c3f7e752be6f\"",
+      "lastModified": null
+    },
+    {
+      "url": "https://bombayshavingcompany.com/",
+      "outcome": "fetched",
+      "ms": 931,
+      "bytes": 1183470,
+      "words": 4100,
+      "rawHash": "3e35f59c12e09ee4",
+      "textHash": "7710e73b545d5f17",
+      "etag": "\"page_cache:45965639834:IndexController:d3ecb6956923d38504a11acbc4435738:7b7362500290a282cd7349e7d038528a\"",
+      "lastModified": null
+    },
+    {
+      "url": "https://mamaearth.in/",
+      "outcome": "fetched",
+      "ms": 574,
+      "bytes": 951926,
+      "words": 3232,
+      "rawHash": "e8da9e76c17dba03",
+      "textHash": "b1d2ef320dc15f0f",
+      "etag": "\"page_cache:72175583279:IndexController:e5000be04411ff4690252556d1594582:d88b9400282e2a863f3521f5bdc25720\"",
+      "lastModified": null
+    },
+    {
+      "url": "https://chaayos.com/",
+      "outcome": "fetched",
+      "ms": 294,
+      "bytes": 220365,
+      "words": 607,
+      "rawHash": "4082139d6266038c",
+      "textHash": "35278baa8f359b9b",
+      "etag": "\"page_cache:53711044798:IndexController:be8a4bdfed623e29a6bebdcfd90b7db0:e45d3c032dcdb6c7c18f6227c3206c29\"",
+      "lastModified": null
+    },
+    {
+      "url": "https://paperboatdrinks.com/",
+      "outcome": "fetched",
+      "ms": 1245,
+      "bytes": 123902,
+      "words": 232,
+      "rawHash": "0e2b64aebec292fe",
+      "textHash": "75e523b6876c313e",
+      "etag": null,
+      "lastModified": null
+    },
+    {
+      "url": "https://www.boat-lifestyle.com/",
+      "outcome": "fetched",
+      "ms": 368,
+      "bytes": 2633568,
+      "words": 3869,
+      "rawHash": "8daed3b93bcc2381",
+      "textHash": "d82f835c4e33563e",
+      "etag": "\"page_cache:5789384802:IndexController:a2ce7b2aec7c8c20f1fbb848b67123aa:c9df3c428277ebe7925167fe394c4a90\"",
+      "lastModified": null
+    }
+  ]
+}

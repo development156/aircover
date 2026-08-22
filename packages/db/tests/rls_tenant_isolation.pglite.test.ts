@@ -53,6 +53,21 @@ const WS_B = '22222222-2222-2222-2222-222222222222'
 const USER_A = 'user_aaaaaaaaaaaaaaaaaaaaaaaa'
 const USER_B = 'user_bbbbbbbbbbbbbbbbbbbbbbbb'
 
+/**
+ * A THIRD workspace, belonging to neither member, used only by
+ * `seedGuardedNonTenantTables`.
+ *
+ * MEASURED 2026-08-22, and the reason is worth keeping: seeding Radar's guard
+ * fixture under WS_A instead made `a member of A cannot take a row out of
+ * workspace B` FAIL — and fail with a security-shaped message about
+ * competitor_subscriptions. It was a false alarm. That test infers theft from
+ * "A can now see more than one row where it seeded one", so a second LEGITIMATE
+ * row in A is indistinguishable from a stolen one. The fixture belongs to nobody,
+ * so neither member's count moves and the inference stays sound.
+ */
+const WS_GUARD = '33333333-3333-3333-3333-333333333333'
+const USER_GUARD = 'user_cccccccccccccccccccccccc'
+
 let db: PGlite
 let tables: string[]
 let seeded: string[]
@@ -80,6 +95,62 @@ let operatorOnly: string[]
 const EXPECTED_SERVICE_ONLY = ['ai_provider_logs']
 const EXPECTED_OPERATOR_ONLY = ['ops_credit_requests']
 
+/**
+ * Give the append-only guard something to guard on the tables the tenant seeder
+ * cannot reach.
+ *
+ * `seedTwoWorkspaces` walks `information_schema` for tables carrying a
+ * `workspace_id`, which is the right rule for tenant isolation and the wrong one
+ * for the append-only suite below. Radar's `competitor_snapshots` and
+ * `competitor_changes` carry `app.block_mutations()` and deliberately have NO
+ * `workspace_id` — they hang off a globally-shared competitor, which is what
+ * makes one fetch serve every subscriber.
+ *
+ * MEASURED 2026-08-22: with no rows in them, both were reported as "empty, so
+ * not covered". A FOR EACH ROW trigger cannot fire on an empty table, so a
+ * DELETE matching nothing succeeds trivially and the guard would have been
+ * recorded as absent — or, worse, as present when it was not.
+ *
+ * They are SEEDED rather than added to EXPECTED_UNPOPULATED, deliberately. That
+ * list is for tables nothing can reach; using it to quiet a table that could
+ * have been seeded is how a guarantee stops being checked while still being
+ * claimed.
+ */
+async function seedGuardedNonTenantTables(): Promise<void> {
+  // Through the real RPC, because it is the only sanctioned write path and a
+  // hand-built row could have a shape the product can never produce.
+  const sub = (
+    await db.query<{ out: { source_ids: string[] } }>(
+      `select app.radar_subscribe($1::uuid, 'Guard fixture',
+              '[{"kind":"instagram","locator":"guardfixture"}]'::jsonb, $2) as out`,
+      [WS_GUARD, USER_GUARD],
+    )
+  ).rows[0]!.out
+  const sourceId = sub.source_ids[0]!
+
+  // TWO snapshots, a day apart: a change is DERIVED from a pair, so one row
+  // would leave `competitor_changes` empty and back where this started.
+  const snap = async (hash: string, offsetDays: number) =>
+    (
+      await db.query<{ id: string }>(
+        `insert into competitor_snapshots (source_id, payload, content_hash, captured_at)
+         values ($1::uuid, '{"kind":"social","handle":"guardfixture","posts":[]}'::jsonb, $2,
+                 now() - ($3 || ' days')::interval)
+         returning id`,
+        [sourceId, hash, String(offsetDays)],
+      )
+    ).rows[0]!.id
+
+  const from = await snap('guard-1', 1)
+  const to = await snap('guard-2', 0)
+  await db.query(
+    `insert into competitor_changes
+       (source_id, from_snapshot_id, to_snapshot_id, change_kind, day_span, summary)
+     values ($1::uuid, $2::uuid, $3::uuid, 'audience_moved', 1, 'Guard fixture.')`,
+    [sourceId, from, to],
+  )
+}
+
 beforeAll(async () => {
   db = await bootFullSchema()
   tables = await tenantTables(db)
@@ -94,8 +165,19 @@ beforeAll(async () => {
       ('${WS_A}', '${USER_A}', 'owner'), ('${WS_B}', '${USER_B}', 'owner');
   `)
 
+  // Created AFTER the two under test and never joined by either member — see the
+  // note on WS_GUARD. It exists only to own the append-only guard fixture.
+  await db.exec(`
+    insert into workspaces (id, name, slug, created_by) values
+      ('${WS_GUARD}', 'Guard', 'guard', '${USER_GUARD}');
+    insert into workspace_members (workspace_id, user_id, role) values
+      ('${WS_GUARD}', '${USER_GUARD}', 'owner');
+  `)
+
   const report = await seedTwoWorkspaces(db, WS_A, WS_B, { [WS_A]: USER_A, [WS_B]: USER_B })
   seeded = report.seeded
+
+  await seedGuardedNonTenantTables()
 
   // Read from pg_policies, so the classification tracks the migration files
   // rather than anyone's memory of them.
@@ -205,12 +287,61 @@ describe('every append-only table refuses a direct mutation', () => {
     ).rows.map((r) => r.tablename)
   })
 
-  it('finds the guarded tables, and credit_ledger is one of them', () => {
+  /**
+   * EVERY table that carries `app.block_mutations()`, named.
+   *
+   * ── WHY THIS LIST EXISTS WHEN THE REST OF THE FILE IS CATALOG-DRIVEN ────────
+   * `guarded` is derived from `pg_trigger`, and derivation alone has a hole this
+   * suite could not see: DROP a table's trigger and the table simply LEAVES the
+   * list, so it is never probed and everything stays green. MEASURED 2026-08-22 —
+   * `mutations/rls-enforced.mjs` dropped the guard from `competitor_snapshots` and
+   * all twelve tests passed. `credit_ledger` survived the same mutant only
+   * because one line named it; the other eleven tables could lose their
+   * append-only guarantee in silence.
+   *
+   * This is the same argument the file already makes for EXPECTED_SERVICE_ONLY
+   * and EXPECTED_OPERATOR_ONLY — "Deriving alone would be worse than useless: a
+   * table that quietly lost its SELECT policy would be reclassified as service
+   * and excused by the very check meant to catch it" — applied to the one list it
+   * had not been applied to.
+   *
+   * A NEW append-only table failing this assertion is the correct outcome, not an
+   * inconvenience: adding a row here is how a table joins the guarantee
+   * deliberately rather than by accident.
+   *
+   * ── AND WHAT THIS LIST IS *NOT* ─────────────────────────────────────────────
+   * It is not production's list. Production carries TWO more —
+   * `knowledge_chunks` and `zernio_webhook_events` — MEASURED against the live
+   * catalog on 2026-08-22. That is not drift: peer lanes applied those migrations
+   * to the shared project while their files live on their own branches, so this
+   * branch cannot see them. The list is built from THIS branch's migration files,
+   * which is the only thing the suite can execute against. Expect it to grow by
+   * two at merge, and treat a failure here after a merge as the reminder it is.
+   */
+  const EXPECTED_GUARDED = [
+    'ai_provider_logs',
+    'audience_snapshots',
+    'audit_logs',
+    'competitor_changes',
+    'competitor_snapshots',
+    'credit_ledger',
+    'invoices',
+    'ops_audit_log',
+    'post_metric_snapshots',
+    'post_publish_logs',
+  ]
+
+  it('finds every guarded table, and none has quietly dropped out', () => {
     // Named explicitly: the ledger is the table the guarantee is ABOUT, and a
     // query that silently stopped returning it would leave this suite green
     // while covering only the incidental ones.
-    expect(guarded.length).toBeGreaterThan(1)
     expect(guarded).toContain('credit_ledger')
+    expect(
+      [...guarded].sort(),
+      'A table missing from the left-hand side has LOST app.block_mutations() and ' +
+        'silently left this suite’s coverage. One appearing on the right has gained ' +
+        'it — add it above, deliberately.',
+    ).toEqual([...EXPECTED_GUARDED].sort())
   })
 
   /**
@@ -240,11 +371,36 @@ describe('every append-only table refuses a direct mutation', () => {
     ).toEqual([...EXPECTED_UNPOPULATED].sort())
   })
 
+  /**
+   * A column this table really has, that a self-assignment can name.
+   *
+   * The statement used to be `set workspace_id = workspace_id`, which was true of
+   * every guarded table until Radar's two arrived without one. On those, Postgres
+   * would have rejected the UPDATE with "column does not exist" — and the `catch`
+   * below would have counted that as the GUARD REFUSING. A table with no trigger
+   * at all would have passed this test for the same reason. The primary key is
+   * read from the catalog so the statement is always about the trigger.
+   */
+  async function selfAssignableColumn(table: string): Promise<string> {
+    const { rows } = await db.query<{ attname: string }>(
+      `select a.attname
+         from pg_index i
+         join pg_attribute a on a.attrelid = i.indrelid and a.attnum = any (i.indkey)
+        where i.indrelid = $1::regclass and i.indisprimary
+        limit 1`,
+      [table],
+    )
+    const column = rows[0]?.attname
+    if (!column) throw new Error(`${table} has no primary key to self-assign`)
+    return column
+  }
+
   it('refuses UPDATE and DELETE on every one of them', async () => {
     const permissive: string[] = []
     for (const table of guarded.filter((t) => !EXPECTED_UNPOPULATED.includes(t))) {
+      const column = await selfAssignableColumn(table)
       for (const statement of [
-        `update public."${table}" set workspace_id = workspace_id`,
+        `update public."${table}" set "${column}" = "${column}"`,
         `delete from public."${table}"`,
       ]) {
         await db.exec('begin')

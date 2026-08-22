@@ -19,9 +19,11 @@
     "@sahoda/billing": "workspace:*",
     "@sahoda/mesh": "workspace:*",
     "@sahoda/publishing": "workspace:*",
+    "@sahoda/research": "workspace:*",
     "@sahoda/shared": "workspace:*",
     "@trigger.dev/sdk": "^4.5.4",
-    "pg": "^8.22.0"
+    "pg": "^8.22.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.4",
