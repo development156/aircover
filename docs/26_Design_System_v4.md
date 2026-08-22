@@ -149,7 +149,7 @@ Four rungs. How **real** a thing is.
 |---|---|---|
 | `.is-real` | It happened. A platform has it. | solid fill, no edge |
 | `.is-committed` | It will happen. Someone decided. | tint + hairline edge |
-| `.is-proposed` | Sahoda suggests it. Nobody agreed. | dashed edge |
+| `.is-proposed` | Sahoda worked it out. Nobody observed it, and nobody agreed. | dashed edge |
 | `.is-simulated` | Not real. A fixture. | diagonal hatch **+ a visible word** |
 
 ### 3.1 Greyscale proof
@@ -176,6 +176,41 @@ Read that table honestly, because it contains a trap:
 
 The test asserts all four remain perceptually unique and that the two relying on fill alone
 stay >100/1000 apart. If you change a rung, that test tells you whether you broke it.
+
+### 3.1b RULING: the fourth rung means NOT REAL. The third means NOT OBSERVED
+
+`.is-simulated` is for a **fixture** — output that never touched a platform. A figure Sahoda
+worked out FROM readings it actually took is a weak claim, not a false one, and it wears
+`.is-proposed`. If inference and fixture share the hatch, nothing on any screen tells a
+customer that a number never left the building — and that is the single most valuable thing
+the hatch says.
+
+Three files refused the hatch on this reasoning before it was a ruling —
+`audience/inferred.tsx`, `brain/certainty-mark.tsx`, `connections/catalogue.ts`. Radar joins
+them.
+
+**A dash does not promise that approving is possible.** "Approving turns the dash solid"
+(`packages/shared/tokens.css`, the `.is-proposed` comment; `UI_RULES_v3`) is the COMMON case,
+not the definition. Nothing can ratify a claim about a competitor's business, and Radar's
+readings are still `.is-proposed`. The dash means UNRATIFIED. Where an approval exists it
+turns the dash solid; where none exists the dash is permanent, and that is honest.
+
+**The dash is the entire rung, and it is the only edge on the ladder a reader receives.**
+`.is-proposed` sets `background: transparent` — §3.1 measures it at 1000 light and 3 dark,
+identical to `.is-simulated` — and `.is-real`'s edge is `1px solid transparent`, which is
+invisible. So solid-versus-dashed is not a channel a reader receives; VISIBLE-EDGE-versus-NONE
+is. Score the EFFECTIVE signature, never the declared one.
+
+**You cannot delete a rung with a utility class, and that cuts both ways.** `globals.css`
+imports `tokens.css` UNLAYERED after `@import 'tailwindcss'`, so every rung outranks
+`@layer utilities` whatever the specificity — the same fact `globals.css` already records for
+`:focus-visible`. A Tailwind `bg-*` or `border-*` on a rung element is a MEASURED no-op: it
+neither breaks the rung nor is a legitimate way to restyle one. `rounded-*` applies, because
+no rung declares `border-radius`. To change a rung, change `tokens.css` and regenerate
+`apps/web/src/lib/sites/tokens-css-inline.ts` with `node scripts/gen-tokens-inline.mjs`.
+
+§3.1's figures are `getComputedStyle` values. A composited-PNG probe reads `.is-real` at 212,
+not 308 — the same conclusion through a different instrument. Do not "reconcile" them.
 
 ### 3.1a The rungs also describe SAHODA, not only the user's content
 
