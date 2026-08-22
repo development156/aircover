@@ -305,12 +305,29 @@ export async function runCycleToPreview(
       })),
       budget,
     )
-    await store.haltForCostApproval(cycle.id, workspaceId, preview.creationCredits)
+    const halted = await store.haltForCostApproval(cycle.id, workspaceId, preview.creationCredits)
+    // The orchestration is charged either way: it ran, and the plan it produced
+    // is on the row. What changes is what the screen may say next.
     await store.addSpend(cycle.id, workspaceId, creditCost(CYCLE_ACTION))
 
     revalidateBalance()
     revalidatePath('/loop')
     revalidatePath('/report')
+
+    if (!halted) {
+      // The cycle went terminal while the plan stage was waiting on the model —
+      // the kill switch, pressed during exactly the window it exists for.
+      // Without this the halt wrote `awaiting_cost_approval` over `cancelled`
+      // and put the approve button back in front of the person who had just
+      // pressed stop.
+      return {
+        ok: false,
+        cycleId: cycle.id,
+        insufficient: false,
+        message:
+          'This week was stopped while Sahoda was planning it, so nothing is waiting for your approval.',
+      }
+    }
     return { ok: true, cycleId: cycle.id }
   } catch (error) {
     reportServerError(error, { action: 'runCycleToPreview', workspaceId })

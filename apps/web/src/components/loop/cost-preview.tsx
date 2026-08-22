@@ -89,13 +89,21 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
         setError(made.message ?? 'Approved, but the drafts could not be written.')
         return
       }
+      // The cost clause is omitted rather than zeroed when the action could not
+      // say what it spent: "for 0 credits" is a figure nothing measured.
+      const wrote =
+        `Wrote ${made.created} ${made.created === 1 ? 'draft' : 'drafts'}` +
+        (made.spent === undefined ? '' : ` for ${credits(made.spent)}`)
+
       setDone(
-        made.created === 0
-          ? 'Nothing was written — every brief is on a channel set to suggest only.'
-          : // The cost clause is omitted rather than zeroed when the action could
-            // not say what it spent: "for 0 credits" is a figure nothing measured.
-            `Wrote ${made.created} ${made.created === 1 ? 'draft' : 'drafts'}` +
-              (made.spent === undefined ? '.' : ` for ${credits(made.spent)}.`),
+        made.cancelledMidRun
+          ? // The week was stopped while this stage was running. What was
+            // written is kept and was paid for; saying "reported" would tell the
+            // person who pressed stop that it went ahead anyway.
+            `${wrote}, then you stopped the week. They are in your Planner and nothing more will be written.`
+          : made.created === 0
+            ? 'Nothing was written — every brief is on a channel set to suggest only.'
+            : `${wrote}.`,
       )
     })
   }
