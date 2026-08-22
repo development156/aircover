@@ -191,7 +191,7 @@ export function Composer({
         onLoadTheirs={autosave.loadTheirs}
         onKeepMine={autosave.keepMine}
         error={autosave.error}
-        onRetry={() => void autosave.flush()}
+        onRetry={() => void autosave.flush({ create: true })}
       />
 
       <ComposerHeader

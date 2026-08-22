@@ -43,7 +43,7 @@ export function useComposerActions(
   const [savingAll, setSavingAll] = useState(false)
 
   const flushAndResolve = useCallback(async (): Promise<string | null> => {
-    const ok = await autosave.flush()
+    const ok = await autosave.flush({ create: true })
     return ok ? postIdRef.current : null
   }, [autosave, postIdRef])
 

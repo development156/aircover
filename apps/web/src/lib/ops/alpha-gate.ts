@@ -144,7 +144,7 @@ export const ALPHA_GATE: AlphaGateRecord = {
       status: 'partial',
       revisedOn: '2026-08-13',
       evidence:
-        'Colour extraction, the Readability Guard and persistence all work — themeTokensFrom() derives the tokens and saveWorkspaceTheme() writes them, and 5 workspaces wear an active extracted theme. Two halves are missing: the 4 default themes docs/05 asks for do not exist anywhere in the app, and a palette is only ever found when the door is a URL whose page declares a colour. A sentence door yields none, which the door step states on screen ("we did not find a colour here").',
+        'Colour extraction, the Readability Guard and persistence all work — themeTokensFrom() derives the tokens and saveWorkspaceTheme() writes them, and 5 workspaces wear an active extracted theme. Two halves are missing: the 4 default themes docs/05 asks for do not exist anywhere in the app, and a palette is only ever found when the door is a URL whose page declares a colour. A sentence door yields none, which the door step states on screen ("a sentence carries no colour").',
     },
     {
       code: 'A6',

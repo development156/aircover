@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 
+import { exampleHint } from '@/lib/onboarding/example-hint'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import type { Intake } from '@/lib/onboarding/intake'
@@ -68,7 +69,7 @@ export function QuestionStep({
           onChange={(event) => setRefusal(event.target.value)}
           rows={3}
           disabled={isPending}
-          placeholder={question.placeholder}
+          placeholder={exampleHint(question.placeholder)}
           className="w-full surface-ring rounded-card bg-surface p-3 text-[14px] text-ink transition-micro placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         />
       </div>

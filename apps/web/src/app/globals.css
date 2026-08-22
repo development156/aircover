@@ -248,6 +248,52 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
+
+  /* Date and time inputs paint their OWN internals — the field text and the
+     ::-webkit-calendar-picker-indicator are UA chrome no property on the
+     element reaches. Which palette the UA uses for them is `color-scheme`,
+     and this app declared it nowhere (grep: no CSS declaration anywhere, only
+     a JS media query in theme-script.tsx), so those internals stay LIGHT under
+     data-theme='dark'.
+
+     KEYED TO THE THEME, NOT WRITTEN AS `light dark`. That keyword pair defers
+     to prefers-color-scheme — the OS — while this app's theme is an explicit
+     choice that must outrank the OS (theme-script.tsx, "THE THREE STATES").
+     Measured in Chromium at prefers-color-scheme:light, reading the `Field`
+     system colour: `light dark` gives rgb(255,255,255), identical to no
+     declaration at all; `dark` gives rgb(59,59,59). A user who toggles dark on
+     a light-mode OS is the whole point, and `light dark` does nothing for them.
+
+     `.dark` rides along because tokens.css and globals.css both treat the class
+     as a live signal even though the toggle writes only the attribute. The
+     light rule is last so a nested light scope wins over an outer dark one on
+     equal specificity. */
+  [data-theme='dark'] input[type='date'],
+  [data-theme='dark'] input[type='datetime-local'],
+  .dark input[type='date'],
+  .dark input[type='datetime-local'] {
+    color-scheme: dark;
+  }
+  [data-theme='light'] input[type='date'],
+  [data-theme='light'] input[type='datetime-local'] {
+    color-scheme: light;
+  }
+
+  /* The picker glyph is UA-drawn at full strength, which is most of why a
+     designed form reads as browser chrome (33_QA_findings.md J1-N, frame
+     j1-13). Opacity is the one property that reaches it without inventing a
+     colour, so it works in both themes with no token. */
+  input[type='date']::-webkit-calendar-picker-indicator,
+  input[type='datetime-local']::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.55;
+  }
+  input[type='date']:hover::-webkit-calendar-picker-indicator,
+  input[type='datetime-local']:hover::-webkit-calendar-picker-indicator,
+  input[type='date']:focus::-webkit-calendar-picker-indicator,
+  input[type='datetime-local']:focus::-webkit-calendar-picker-indicator {
+    opacity: 1;
+  }
   h1,
   h2,
   h3 {
