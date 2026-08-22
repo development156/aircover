@@ -320,6 +320,14 @@ that refusal is what "the ledger never lies" means in practice.
 deleting the `workspaces` row removes every ledger entry for that workspace, silently, with no
 refusal and no record. The financial record has one guard, and the guard has one door.
 
+**And the check that is supposed to catch this cannot.** `ledger-invariants.mjs` is the script run
+before and after any change to the money, and it passed cleanly on both sides of a real deletion —
+because it verifies that **what is there reconciles**, not that anything is **missing**. The balance
+row cascades away with the entries, so nothing is left inconsistent to detect. A guard that answers
+"all invariants hold" while rows disappear is not a broken guard; it is a guard answering a different
+question, and that is worth knowing before anybody relies on it as assurance that the ledger is
+intact.
+
 This is not hypothetical and it is not new. It is exercised in production today by the automated
 test suite's own cleanup, which does exactly this and says so in its comment: "Deleting the
 workspace cascades to members, posts, variants, media **and the credit ledger**, so this is the
