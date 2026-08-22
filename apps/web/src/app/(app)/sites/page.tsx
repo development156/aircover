@@ -63,7 +63,14 @@ async function buildPreview(): Promise<Preview> {
   // anyone in two workspaces the preview was painted in whichever held the
   // higher theme version. `activeWorkspaceRead` is React-cached, so this shares
   // the one lookup `readRecentSites` above already made.
+  // Not a guard — a narrowing. `readRecentSites` above resolved the SAME
+  // React-cached `activeWorkspaceRead` and its non-ok answers already returned,
+  // so this branch cannot fire; it is here because `activeThemeTokens` now
+  // requires an id and the type has to be narrowed to produce one. Writing it as
+  // a guard would be a confident comment on code that never runs.
   const workspace = await activeWorkspaceRead()
+  // The compiler agrees it cannot fire: narrowing it against `read.status` is a
+  // TS2367, because that is already `'ok'` here.
   if (workspace.status !== 'ok') return 'read-failed'
   const theme = await activeThemeTokens(workspace.workspace.id)
 

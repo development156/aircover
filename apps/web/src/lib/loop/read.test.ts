@@ -25,12 +25,15 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
  * the database going away.
  */
 
-const TABLES = [
+/**
+ * The tables whose empty value the screen turns into a CLAIM. One failing makes
+ * the whole snapshot unreadable.
+ */
+const CLAIMING_TABLES = [
   'loop_settings',
   'loop_channel_autonomy',
   'connections',
   'loop_cycles',
-  'memory_events',
   'loop_briefs',
 ] as const
 
@@ -171,7 +174,27 @@ describe('a healthy database still reads', () => {
   })
 })
 
-describe.each(TABLES)('%s failing alone', (table) => {
+describe('memory_events failing does NOT blank the page', () => {
+  test('the snapshot still answers, with no learnings and no claim about them', async () => {
+    state.failing = 'memory_events'
+
+    const read = await readLoop()
+
+    // `PendingLearnings` renders null for an empty list, so a failed read here
+    // produces no sentence and no figure — there is nothing to be wrong about.
+    // Blanking the page for it would hide the cost-approval halt, which is the
+    // one time-sensitive thing on this screen. An over-broad rule is not a safer
+    // rule.
+    expect(read.status).toBe('ok')
+    if (read.status !== 'ok') return
+    expect(read.snapshot.learnings).toEqual([])
+    // And everything the screen DOES make a claim from is still real.
+    expect(read.snapshot.weeklyBudgetCredits).toBe(50)
+    expect(read.snapshot.cycle?.status).toBe('awaiting_cost_approval')
+  })
+})
+
+describe.each(CLAIMING_TABLES)('%s failing alone', (table) => {
   test('readLoopSnapshot refuses to answer', async () => {
     state.failing = table
     // `loop_briefs` is only reached when a cycle exists, which is the default.

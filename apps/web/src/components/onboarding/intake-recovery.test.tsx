@@ -25,13 +25,13 @@ describe('what was typed comes back', () => {
     stashIntake({
       screen: 'question',
       text: 'We roast filter coffee in Jayanagar and deliver by cycle.',
-      overrides: { model: 'local' },
+      overrides: { model: 'local_presence' },
     })
 
     expect(readIntakeStash()).toEqual({
       screen: 'question',
       text: 'We roast filter coffee in Jayanagar and deliver by cycle.',
-      overrides: { model: 'local' },
+      overrides: { model: 'local_presence' },
     })
   })
 

@@ -51,6 +51,22 @@ export default async function CheckoutBridgePage({
   const { orderId } = await params
 
   const workspace = await activeWorkspaceRead()
+  // TWO answers, and only one of them is a missing page. A workspace read that
+  // merely FAILED used to 404 — telling a customer who has just paid that the
+  // page they were sent to does not exist, on the one screen where that reads as
+  // "my money went nowhere". `none` still 404s: an order belongs to a workspace,
+  // so without one there is genuinely nothing at this address.
+  if (workspace.status === 'unreadable') {
+    return (
+      <Shell>
+        <p className="type-h3">Sahoda couldn’t check your workspace just now</p>
+        <p className="type-body mt-1.5 text-muted">
+          This is not a payment problem and nothing about your order has changed. Reload this page
+          in a moment, or open your wallet to see where it got to.
+        </p>
+      </Shell>
+    )
+  }
   if (workspace.status !== 'ok') notFound()
 
   let cashfree: ReturnType<typeof loadCashfreeEnv>

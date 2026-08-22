@@ -181,10 +181,24 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
       .limit(3),
   ])
 
-  // ANY of the five failing makes the snapshot a guess. `maybeSingle` reports a
-  // missing row as `data: null, error: null`, so this catches transport and RLS
-  // faults without mistaking an empty table for one.
-  for (const res of [settingsRes, dialRes, connRes, cycleRes, learnRes]) {
+  // ── FOUR OF THE FIVE, AND WHY `memory_events` IS NOT ONE OF THEM ──────────
+  // A failed read makes the snapshot a guess only where the screen turns the
+  // empty value into a CLAIM. These four do:
+  //
+  //   loop_settings           the stored weekly budget, shown as a number
+  //   loop_channel_autonomy   the level each channel is running at
+  //   connections             "Connect a channel first", and Plan my week
+  //   loop_cycles             "No week has been reported yet", and the halt
+  //
+  // `memory_events` does not. `PendingLearnings` returns null for an empty list
+  // (learnings.tsx:33), so a failed read renders NOTHING — no sentence, no
+  // figure, nothing to be wrong about. Blanking the whole page for it would buy
+  // no honesty and would hide the cost-approval halt, which is the one thing on
+  // this screen that is time-sensitive. An over-broad rule is not a safer rule.
+  //
+  // `maybeSingle` reports a missing row as `data: null, error: null`, so this
+  // catches transport and RLS faults without mistaking an empty table for one.
+  for (const res of [settingsRes, dialRes, connRes, cycleRes]) {
     if (res.error) return null
   }
 
