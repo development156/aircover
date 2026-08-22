@@ -118,7 +118,15 @@ function renderFlow() {
 }
 
 describe('OnboardingFlow charges once per press', () => {
-  beforeEach(() => resolveOnboarding.mockClear())
+  beforeEach(() => {
+    resolveOnboarding.mockClear()
+    // The intake crash buffer is `sessionStorage`, which jsdom keeps for the
+    // whole FILE. Without this the first test leaves the flow parked on the
+    // question step with text stashed, and the next render resumes there
+    // instead of starting at intake — a leak between tests, not a product
+    // behaviour. A real visit gets its own tab.
+    window.sessionStorage.clear()
+  })
 
   test('a double press dispatches ONE resolve', async () => {
     // THE MONEY: `newResolveObjectRef` mints a fresh ledger key per dispatch, so

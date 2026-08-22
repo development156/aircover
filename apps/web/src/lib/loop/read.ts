@@ -184,18 +184,24 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
       .from('connections')
       .select('platform, status')
       .eq('workspace_id', workspaceId)
-      // BOTH vocabularies, deliberately: `connected` and `lapsed` below are
-      // derived from these same rows, so narrowing this to active would make
-      // `lapsed` permanently empty while every test still passed.
+      // BOTH vocabularies, deliberately. `connected` and `lapsed` below are
+      // derived from these same rows, so narrowing this to 'active' alone would
+      // make `lapsed` permanently empty while every test still passed.
       //
-      // What it used to carry was connected, which `connections.status` cannot
-      // hold — check (status in (active,expired,revoked,error)),
-      // 20260718000005_connections.sql:9 — so it matched no row on any workspace
-      // and the screen read that as "you have no channels". A bad INSERT raises
-      // 23514; a bad WHERE is a valid query that finds nothing. Pinned from two
-      // directions: lib/connections/status-vocabulary.test.ts and
-      // lib/repo/check-constraints.test.ts.
-      .in(status, [...LIVE_STATUS, ...LAPSED_STATUS]),
+      // What it used to carry was 'connected', which `connections.status` cannot
+      // hold — check (status in ('active','expired','revoked','error')),
+      // 20260718000005_connections.sql:9 — so it matched no row on any
+      // workspace and the screen read that as "you have no channels". A bad
+      // INSERT raises 23514; a bad WHERE is a valid query that finds nothing.
+      //
+      // The members are written out rather than spread from LIVE_STATUS /
+      // LAPSED_STATUS: both guards that pin this
+      // (lib/connections/status-vocabulary.test.ts,
+      // lib/repo/check-constraints.test.ts) read the SOURCE TEXT, so a constant
+      // makes this query invisible to them — the file drops out of the very
+      // list that is supposed to be watching it. MEASURED: with the spread here
+      // both scanners reported this file as carrying no comparison at all.
+      .in('status', ['active', 'expired', 'revoked', 'error']),
     supabase
       .from('loop_cycles')
       .select('*')

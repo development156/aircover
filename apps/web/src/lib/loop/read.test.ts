@@ -60,7 +60,16 @@ function rowsFor(table: string): Record<string, unknown>[] {
     case 'loop_channel_autonomy':
       return [{ channel: 'instagram', level: 2 }]
     case 'connections':
-      return [{ platform: 'instagram' }, { platform: 'linkedin' }]
+      // `status` is load-bearing, and was absent until integration. The query
+      // asks for all four members of the vocabulary and splits live from lapsed
+      // in the mapper, so a row without a status is neither — `connected` came
+      // back empty while the query itself was correct. The `expired` row is
+      // here so the split is exercised, not merely satisfied.
+      return [
+        { platform: 'instagram', status: 'active' },
+        { platform: 'linkedin', status: 'active' },
+        { platform: 'x', status: 'expired' },
+      ]
     case 'loop_cycles':
       return state.hasCycle
         ? [
@@ -154,6 +163,9 @@ describe('a healthy database still reads', () => {
     expect(read.snapshot.weeklyBudgetCredits).toBe(50)
     expect(read.snapshot.paused).toBe(true)
     expect([...read.snapshot.connected].sort()).toEqual(['instagram', 'linkedin'])
+    // An expired connection is NOT a connected one, and it is not nothing
+    // either: /loop offers "reconnect it" rather than "connect a channel".
+    expect([...read.snapshot.lapsed]).toEqual(['x'])
     expect(read.snapshot.cycle?.status).toBe('awaiting_cost_approval')
     expect(read.snapshot.briefs).toHaveLength(1)
   })

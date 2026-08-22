@@ -149,6 +149,30 @@ function connectionStatusFilters(): StatusFilter[] {
             value: eq[1]!,
           })
         }
+        /*
+         * AND the `.in('status', [...])` form, which this could not see.
+         *
+         * MEASURED at integration on 2026-08-22: two lanes fixed the same
+         * defect, and the other one moved BOTH call sites — `lib/loop/read.ts`
+         * and `app/actions/loop-cycle.ts` — from `.eq` to `.in`, because the
+         * screen needs to tell a live channel from a lapsed one. This scanner
+         * kept passing and covered NEITHER file any more: the vocabulary
+         * assertion below had nothing left to assert about, and the
+         * "finds the queries it is meant to be checking" test is the only
+         * reason anybody noticed.
+         *
+         * Every member of the array is its own filter, so a single bad literal
+         * among four good ones is still reported.
+         */
+        for (const inCall of chain.matchAll(/\.in\(\s*'status'\s*,\s*\[([^\]]*)\]\s*\)/g)) {
+          for (const member of inCall[1]!.matchAll(/'([^']*)'/g)) {
+            found.push({
+              file: file.slice(REPO.length + 1),
+              line: text.slice(0, start + 1 + (inCall.index ?? 0)).split('\n').length,
+              value: member[1]!,
+            })
+          }
+        }
       }
     }
   }
