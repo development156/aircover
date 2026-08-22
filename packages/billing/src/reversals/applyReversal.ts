@@ -192,11 +192,19 @@ export function createApplyReversal(deps: ApplyReversalDeps): ApplyReversalFn {
           },
         })
 
+        // On a REPLAY the ledger returned the original row untouched, and
+        // `reversible` was recomputed from a balance the first reversal already
+        // moved. Reporting the recomputed figure would describe a different
+        // reversal from the one `entryId` names — and since `shortfallCredits` is
+        // what the credit note bills as a receivable, it would bill the customer
+        // for money that had in fact been taken back. Report the entry.
+        const recorded = res.replayed ? Math.abs(res.entry.amount) : reversible
+
         return ok({
           reference: input.reference,
           requestedCredits: input.credits,
-          reversedCredits: reversible,
-          shortfallCredits: input.credits - reversible,
+          reversedCredits: recorded,
+          shortfallCredits: Math.max(0, input.credits - recorded),
           entryId: res.entry.id,
           replayed: res.replayed,
           attempts: attempt,

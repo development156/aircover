@@ -1,0 +1,2199 @@
+{
+  "serverVersion": [
+    {
+      "v": "PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit",
+      "db": "postgres",
+      "at": "2026-08-21T22:46:10.188Z"
+    }
+  ],
+  "migrations": [
+    {
+      "applied": 63,
+      "latest": "20260822060100"
+    }
+  ],
+  "tables": [
+    {
+      "table_name": "ai_provider_logs",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 0
+    },
+    {
+      "table_name": "app_settings",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 0
+    },
+    {
+      "table_name": "asset_derivatives",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "asset_usages",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "assets",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "audience_snapshots",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "audit_logs",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "billing_profiles",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "billing_webhook_events",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 0
+    },
+    {
+      "table_name": "brand_memory",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "brands",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 0
+    },
+    {
+      "table_name": "campaign_posts",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "campaigns",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "competitor_changes",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "competitor_snapshots",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "competitor_sources",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "competitor_subscriptions",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 3
+    },
+    {
+      "table_name": "competitors",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "connection_secrets",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 0
+    },
+    {
+      "table_name": "connections",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 3
+    },
+    {
+      "table_name": "credit_balances",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "credit_ledger",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "elements",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 0
+    },
+    {
+      "table_name": "guide_tours",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "inbox_messages",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 2
+    },
+    {
+      "table_name": "inbox_threads",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 2
+    },
+    {
+      "table_name": "invoice_serials",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 0
+    },
+    {
+      "table_name": "invoices",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "jobs",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 0
+    },
+    {
+      "table_name": "knowledge_chunks",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "knowledge_documents",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "leads",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 2
+    },
+    {
+      "table_name": "ledger",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 0
+    },
+    {
+      "table_name": "loop_briefs",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "loop_channel_autonomy",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "loop_cycles",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "loop_settings",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "memory_events",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "ops_admins",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "ops_audit_log",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "ops_beta_applications",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "ops_changelog",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "ops_copy_watermarks",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "ops_credit_requests",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "ops_qa_artifacts",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "ops_qa_runs",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "ops_roadmap_items",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "ops_sessions",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "ops_tasks",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "planner_events",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "plans",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 1
+    },
+    {
+      "table_name": "playbook_run_items",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "playbook_runs",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "playbooks",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 3
+    },
+    {
+      "table_name": "post_media",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "post_metric_snapshots",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "post_publish_logs",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "post_variants",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "posts",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "radar_fetch_log",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 0
+    },
+    {
+      "table_name": "radar_limits",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 0
+    },
+    {
+      "table_name": "remix_batches",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "remix_derivatives",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "site_pages",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "site_sections",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "sites",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "subscriptions",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "templates",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "tour_progress",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "users_profile",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 2
+    },
+    {
+      "table_name": "workspace_members",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "workspace_themes",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 4
+    },
+    {
+      "table_name": "workspaces",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": false,
+      "policy_count": 2
+    },
+    {
+      "table_name": "zernio_profiles",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    },
+    {
+      "table_name": "zernio_webhook_events",
+      "rls_enabled": true,
+      "rls_forced": false,
+      "has_workspace_id": true,
+      "policy_count": 1
+    }
+  ],
+  "views": [
+    {
+      "view_name": "knowledge_current_chunks",
+      "kind": "v",
+      "security_invoker": "true",
+      "security_barrier": "NOT SET",
+      "owner": "postgres"
+    }
+  ],
+  "policies": [
+    {
+      "tablename": "asset_derivatives",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "asset_derivatives",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "asset_derivatives",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "asset_derivatives",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "asset_usages",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "asset_usages",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "asset_usages",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "asset_usages",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "assets",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "assets",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "assets",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "assets",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "audience_snapshots",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "audit_logs",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "billing_profiles",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "brand_memory",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "campaign_posts",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "campaign_posts",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "campaign_posts",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "campaign_posts",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "campaigns",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "campaigns",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "campaigns",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "campaigns",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "competitor_changes",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(EXISTS ( SELECT 1\n   FROM (competitor_sources cs\n     JOIN competitor_subscriptions s ON ((s.competitor_id = cs.competitor_id)))\n  WHERE ((cs.id = competitor_changes.source_id) AND (s.workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids)))))",
+      "with_check": null
+    },
+    {
+      "tablename": "competitor_snapshots",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(EXISTS ( SELECT 1\n   FROM (competitor_sources cs\n     JOIN competitor_subscriptions s ON ((s.competitor_id = cs.competitor_id)))\n  WHERE ((cs.id = competitor_snapshots.source_id) AND (s.workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids)))))",
+      "with_check": null
+    },
+    {
+      "tablename": "competitor_sources",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(EXISTS ( SELECT 1\n   FROM competitor_subscriptions s\n  WHERE ((s.competitor_id = competitor_sources.competitor_id) AND (s.workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids)))))",
+      "with_check": null
+    },
+    {
+      "tablename": "competitor_subscriptions",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "competitor_subscriptions",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "competitor_subscriptions",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "competitors",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(EXISTS ( SELECT 1\n   FROM competitor_subscriptions s\n  WHERE ((s.competitor_id = competitors.id) AND (s.workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids)))))",
+      "with_check": null
+    },
+    {
+      "tablename": "connections",
+      "policyname": "conn_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "connections",
+      "policyname": "conn_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "connections",
+      "policyname": "conn_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "credit_balances",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "credit_ledger",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "guide_tours",
+      "policyname": "tours_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "active",
+      "with_check": null
+    },
+    {
+      "tablename": "inbox_messages",
+      "policyname": "inbox_messages_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "((workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids)) AND (direction = 'outbound'::text) AND (platform_message_id IS NULL) AND (sent_at IS NULL))"
+    },
+    {
+      "tablename": "inbox_messages",
+      "policyname": "inbox_messages_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "inbox_threads",
+      "policyname": "inbox_threads_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "inbox_threads",
+      "policyname": "inbox_threads_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "invoices",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "knowledge_chunks",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "knowledge_documents",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "leads",
+      "policyname": "leads_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "leads",
+      "policyname": "leads_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "loop_briefs",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "loop_channel_autonomy",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "loop_channel_autonomy",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "loop_channel_autonomy",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "loop_channel_autonomy",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "loop_cycles",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "loop_settings",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "loop_settings",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "loop_settings",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "loop_settings",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "memory_events",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "ops_admins",
+      "policyname": "ops_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "app.is_ops_admin()",
+      "with_check": null
+    },
+    {
+      "tablename": "ops_audit_log",
+      "policyname": "ops_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "app.is_ops_admin()",
+      "with_check": null
+    },
+    {
+      "tablename": "ops_beta_applications",
+      "policyname": "ops_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "app.is_ops_admin()",
+      "with_check": null
+    },
+    {
+      "tablename": "ops_changelog",
+      "policyname": "ops_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "app.is_ops_admin()",
+      "with_check": null
+    },
+    {
+      "tablename": "ops_copy_watermarks",
+      "policyname": "ops_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(app.is_ops_admin() AND (user_id = ( SELECT (auth.jwt() ->> 'sub'::text))))",
+      "with_check": null
+    },
+    {
+      "tablename": "ops_credit_requests",
+      "policyname": "ops_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "app.is_ops_admin()",
+      "with_check": null
+    },
+    {
+      "tablename": "ops_qa_artifacts",
+      "policyname": "ops_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "app.is_ops_admin()",
+      "with_check": null
+    },
+    {
+      "tablename": "ops_qa_runs",
+      "policyname": "ops_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "app.is_ops_admin()",
+      "with_check": null
+    },
+    {
+      "tablename": "ops_roadmap_items",
+      "policyname": "ops_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "app.is_ops_admin()",
+      "with_check": null
+    },
+    {
+      "tablename": "ops_sessions",
+      "policyname": "ops_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "app.is_ops_admin()",
+      "with_check": null
+    },
+    {
+      "tablename": "ops_tasks",
+      "policyname": "ops_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "app.is_ops_admin()",
+      "with_check": null
+    },
+    {
+      "tablename": "planner_events",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "planner_events",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "planner_events",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "planner_events",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "plans",
+      "policyname": "plans_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "playbook_run_items",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "playbook_runs",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "playbooks",
+      "policyname": "playbooks_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = playbooks.workspace_id) AND (m.user_id = (auth.jwt() ->> 'sub'::text)) AND (m.role = ANY (ARRAY['owner'::text, 'editor'::text, 'approver'::text])))))"
+    },
+    {
+      "tablename": "playbooks",
+      "policyname": "playbooks_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = playbooks.workspace_id) AND (m.user_id = (auth.jwt() ->> 'sub'::text)))))",
+      "with_check": null
+    },
+    {
+      "tablename": "playbooks",
+      "policyname": "playbooks_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(EXISTS ( SELECT 1\n   FROM workspace_members m\n  WHERE ((m.workspace_id = playbooks.workspace_id) AND (m.user_id = (auth.jwt() ->> 'sub'::text)) AND (m.role = ANY (ARRAY['owner'::text, 'editor'::text, 'approver'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "post_media",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "post_media",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "post_media",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "post_media",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "post_metric_snapshots",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "post_publish_logs",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "post_variants",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "post_variants",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "post_variants",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "post_variants",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "posts",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "posts",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "posts",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "posts",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "remix_batches",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "remix_batches",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "remix_batches",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "remix_batches",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "remix_derivatives",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "remix_derivatives",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "remix_derivatives",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "remix_derivatives",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "site_pages",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "site_pages",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "site_pages",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "site_pages",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "site_sections",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "site_sections",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "site_sections",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "site_sections",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "sites",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "sites",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "sites",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "sites",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "subscriptions",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "templates",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "templates",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "templates",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "templates",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "tour_progress",
+      "policyname": "tp_all",
+      "cmd": "ALL",
+      "roles": "{authenticated}",
+      "qual": "((user_id = ( SELECT (auth.jwt() ->> 'sub'::text))) AND (workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids)))",
+      "with_check": "((user_id = ( SELECT (auth.jwt() ->> 'sub'::text))) AND (workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids)))"
+    },
+    {
+      "tablename": "users_profile",
+      "policyname": "up_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(user_id = ( SELECT (auth.jwt() ->> 'sub'::text)))",
+      "with_check": null
+    },
+    {
+      "tablename": "users_profile",
+      "policyname": "up_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(user_id = ( SELECT (auth.jwt() ->> 'sub'::text)))",
+      "with_check": "(user_id = ( SELECT (auth.jwt() ->> 'sub'::text)))"
+    },
+    {
+      "tablename": "workspace_members",
+      "policyname": "wm_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "workspace_themes",
+      "policyname": "t_delete",
+      "cmd": "DELETE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "workspace_themes",
+      "policyname": "t_insert",
+      "cmd": "INSERT",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "workspace_themes",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "workspace_themes",
+      "policyname": "t_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "workspaces",
+      "policyname": "ws_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "workspaces",
+      "policyname": "ws_update",
+      "cmd": "UPDATE",
+      "roles": "{authenticated}",
+      "qual": "(id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": "(id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))"
+    },
+    {
+      "tablename": "zernio_profiles",
+      "policyname": "zernio_profiles_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    },
+    {
+      "tablename": "zernio_webhook_events",
+      "policyname": "t_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(workspace_id IN ( SELECT app.member_workspace_ids() AS member_workspace_ids))",
+      "with_check": null
+    }
+  ],
+  "publicFunctions": [
+    {
+      "proname": "assert_account_for_scheduled_post",
+      "args": "p_post_id uuid, p_variant_id uuid, p_account_id text",
+      "security": "INVOKER",
+      "grantees": "{service_role}"
+    },
+    {
+      "proname": "assert_account_in_workspace_profile",
+      "args": "p_workspace_id uuid, p_account_id text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "bootstrap_workspace",
+      "args": "p_name text, p_slug text, p_email text, p_display_name text, p_avatar_url text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "cancel_scheduled_post",
+      "args": "p_post_id uuid",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "charge_if_affordable",
+      "args": "p_cost integer, p_reason text, p_job_id text, p_tenant text",
+      "security": "INVOKER",
+      "grantees": "{authenticated,anon,service_role}"
+    },
+    {
+      "proname": "clear_pending_plan_change",
+      "args": "p_workspace_id uuid",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "create_knowledge_document",
+      "args": "p_workspace_id uuid, p_title text, p_source_kind text, p_source_ref text, p_storage_path text, p_mime text, p_bytes bigint",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "delete_asset",
+      "args": "p_asset_id uuid, p_detach boolean",
+      "security": "INVOKER",
+      "grantees": "{authenticated,anon,service_role}"
+    },
+    {
+      "proname": "delete_knowledge_document",
+      "args": "p_document_id uuid, p_acknowledge boolean",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ensure_zernio_profile",
+      "args": "p_workspace_id uuid, p_profile_id text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "fail_knowledge_document",
+      "args": "p_document_id uuid, p_code text, p_detail text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "index_knowledge_document",
+      "args": "p_document_id uuid, p_chunks text[], p_content_sha256 text, p_addressed_instructions integer, p_instruction_samples jsonb",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "lead_from_conversation",
+      "args": "p_workspace_id uuid, p_conversation_ref text, p_channel text, p_author_name text, p_author_handle text, p_message text, p_permalink text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "lead_from_inbox",
+      "args": "p_thread_id uuid",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "lead_submit",
+      "args": "p_site_slug text, p_name text, p_email text, p_phone text, p_message text, p_payload jsonb, p_source_url text",
+      "security": "DEFINER",
+      "grantees": "{service_role}"
+    },
+    {
+      "proname": "loop_approve_cost",
+      "args": "p_cycle_id uuid, p_excluded_briefs uuid[], p_expected_credits integer",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "loop_kill_switch",
+      "args": "p_workspace_id uuid, p_also_pause boolean",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_admin_revoke",
+      "args": "p_id uuid",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_admin_set_role",
+      "args": "p_id uuid, p_role text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_admin_upsert",
+      "args": "p_email text, p_role text, p_name text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_application_link_user",
+      "args": "p_email text, p_clerk_user_id text",
+      "security": "DEFINER",
+      "grantees": "{service_role}"
+    },
+    {
+      "proname": "ops_application_set_status",
+      "args": "p_id uuid, p_status text, p_note text, p_clerk_invitation_id text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_application_submit",
+      "args": "p_name text, p_business_name text, p_email text, p_phone text, p_source_url text",
+      "security": "DEFINER",
+      "grantees": "{service_role}"
+    },
+    {
+      "proname": "ops_changelog_mark_copied",
+      "args": "p_seq bigint",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_credit_request_create",
+      "args": "p_workspace_id uuid, p_amount integer, p_reason text, p_approver_email text, p_otp_hash text, p_ttl_seconds integer",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_credit_request_deny",
+      "args": "p_request_id uuid, p_reason text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_credit_request_verify",
+      "args": "p_request_id uuid, p_otp_hash text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_ingest",
+      "args": "p_payload jsonb",
+      "security": "DEFINER",
+      "grantees": "{service_role}"
+    },
+    {
+      "proname": "ops_qa_artifact_add",
+      "args": "p_run_id uuid, p_storage_path text, p_bytes integer, p_mime text, p_caption text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_qa_draft_save",
+      "args": "p_run_id uuid, p_task_code text, p_summary text, p_details text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_qa_finalize",
+      "args": "p_run_id uuid, p_status text, p_summary text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_qa_import",
+      "args": "p_runs jsonb",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_task_archive",
+      "args": "p_code text, p_archived boolean",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_task_create",
+      "args": "p_title text, p_detail text, p_roadmap_code text, p_assignee text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_task_edit",
+      "args": "p_code text, p_title text, p_detail text, p_assignee text, p_roadmap_code text, p_blocked boolean, p_blocked_reason text, p_sort integer",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_task_move",
+      "args": "p_code text, p_column text, p_note text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "ops_workspace_search",
+      "args": "p_query text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "playbook_approve_cost",
+      "args": "p_run_id uuid, p_excluded_items uuid[], p_expected_credits integer",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "playbook_kill_switch",
+      "args": "p_workspace_id uuid, p_also_disable boolean",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "propose_memory_event",
+      "args": "p_workspace_id uuid, p_diff jsonb, p_evidence_refs jsonb, p_source text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "release_post_for_publish",
+      "args": "p_post_id uuid, p_when timestamp with time zone",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "reschedule_post",
+      "args": "p_post_id uuid, p_when timestamp with time zone",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "resolve_brand_memory",
+      "args": "p_workspace_id uuid, p_payload jsonb, p_source text, p_expected_version integer",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "resolve_memory_event",
+      "args": "p_event_id uuid, p_decision text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "rls_auto_enable",
+      "args": "",
+      "security": "DEFINER",
+      "grantees": "{authenticated,anon,service_role}"
+    },
+    {
+      "proname": "save_post_variant",
+      "args": "p_post_id uuid, p_workspace_id uuid, p_channel text, p_body text, p_extras jsonb, p_char_count integer, p_expected_version integer, p_is_linked boolean",
+      "security": "INVOKER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "set_pending_plan_change",
+      "args": "p_workspace_id uuid, p_plan_id text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "start_knowledge_indexing",
+      "args": "p_document_id uuid",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "upsert_billing_profile",
+      "args": "p_workspace_id uuid, p_tax_kind text, p_legal_name text, p_gstin text, p_state_code text, p_country_code text, p_address text, p_billing_email text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "upsert_connection",
+      "args": "p_workspace_id uuid, p_platform text, p_external_account jsonb, p_scopes text[], p_expires_at timestamp with time zone, p_access_token_enc jsonb, p_refresh_token_enc jsonb, p_token_type text",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    },
+    {
+      "proname": "upsert_zernio_connection",
+      "args": "p_workspace_id uuid, p_platform text, p_external_account jsonb, p_profile_id text, p_scopes text[], p_expires_at timestamp with time zone",
+      "security": "DEFINER",
+      "grantees": "{authenticated,service_role}"
+    }
+  ],
+  "anonGrants": [
+    {
+      "table_name": "ai_provider_logs",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "app_settings",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "asset_derivatives",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "asset_usages",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "assets",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "audience_snapshots",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "audit_logs",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "billing_profiles",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "billing_webhook_events",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "brand_memory",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "brands",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "campaign_posts",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "campaigns",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "competitor_changes",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "competitor_snapshots",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "competitor_sources",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "competitor_subscriptions",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "competitors",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "connection_secrets",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "connections",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "credit_balances",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "credit_ledger",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "elements",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "guide_tours",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "inbox_messages",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "inbox_threads",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "invoice_serials",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "invoices",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "jobs",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "knowledge_chunks",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "knowledge_current_chunks",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "knowledge_documents",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "leads",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "ledger",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "loop_briefs",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "loop_channel_autonomy",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "loop_cycles",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "loop_settings",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "memory_events",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "ops_admins",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "ops_audit_log",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "ops_beta_applications",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "ops_changelog",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "ops_copy_watermarks",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "ops_credit_requests",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "ops_qa_artifacts",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "ops_qa_runs",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "ops_roadmap_items",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "ops_sessions",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "ops_tasks",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "planner_events",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "plans",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "playbook_run_items",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "playbook_runs",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "playbooks",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "post_media",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "post_metric_snapshots",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "post_publish_logs",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "post_variants",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "posts",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "radar_fetch_log",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "radar_limits",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "remix_batches",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "remix_derivatives",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "site_pages",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "site_sections",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "sites",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "subscriptions",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "templates",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "tour_progress",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "users_profile",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "workspace_members",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "workspace_themes",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "workspaces",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "zernio_profiles",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    },
+    {
+      "table_name": "zernio_webhook_events",
+      "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+    }
+  ]
+}

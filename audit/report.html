@@ -1,0 +1,1558 @@
+<title>Sahoda Adversarial Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap"
+/>
+
+<style>
+  :root {
+    --ground: #f6f7f4;
+    --surface: #ffffff;
+    --sunk: #f0f2ed;
+    --ink: #15191a;
+    --muted: #5b6560;
+    --faint: #8b938e;
+    --rule: #dde2db;
+    --rule-strong: #c3cbc3;
+    --proven: #3d6b5b;
+    --proven-bg: #e6efe9;
+    --latent: #8a6318;
+    --latent-bg: #f6eeda;
+    --open: #97392e;
+    --open-bg: #f8e7e3;
+    --fixed: #2f5875;
+    --fixed-bg: #e4edf4;
+
+    --serif: 'Newsreader', ui-serif, Georgia, 'Times New Roman', serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    --measure: 68ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --ground: #13171a;
+      --surface: #1a1f22;
+      --sunk: #101416;
+      --ink: #e9ece7;
+      --muted: #96a09b;
+      --faint: #6d7772;
+      --rule: #282e32;
+      --rule-strong: #3a4247;
+      --proven: #79b096;
+      --proven-bg: #1c2a25;
+      --latent: #cd9c4b;
+      --latent-bg: #2b2519;
+      --open: #de8073;
+      --open-bg: #2e1e1c;
+      --fixed: #7fadcd;
+      --fixed-bg: #19242c;
+    }
+  }
+
+  :root[data-theme='dark'] {
+    --ground: #13171a;
+    --surface: #1a1f22;
+    --sunk: #101416;
+    --ink: #e9ece7;
+    --muted: #96a09b;
+    --faint: #6d7772;
+    --rule: #282e32;
+    --rule-strong: #3a4247;
+    --proven: #79b096;
+    --proven-bg: #1c2a25;
+    --latent: #cd9c4b;
+    --latent-bg: #2b2519;
+    --open: #de8073;
+    --open-bg: #2e1e1c;
+    --fixed: #7fadcd;
+    --fixed-bg: #19242c;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 28px 120px;
+  }
+
+  .col {
+    max-width: var(--measure);
+  }
+
+  p,
+  ul,
+  ol {
+    margin: 0 0 1.1em;
+  }
+  li {
+    margin-bottom: 0.4em;
+  }
+  strong {
+    font-weight: 600;
+  }
+
+  code,
+  .m {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    font-variant-numeric: tabular-nums;
+  }
+  code {
+    background: var(--sunk);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+    word-break: break-word;
+  }
+
+  /* ---------- masthead ---------- */
+  header.mast {
+    border-bottom: 2px solid var(--ink);
+    padding: 72px 0 22px;
+    margin-bottom: 44px;
+  }
+  .kicker {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 22px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: clamp(38px, 6.4vw, 64px);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 20px;
+    line-height: 1.5;
+    color: var(--muted);
+    max-width: 58ch;
+    margin: 0 0 26px;
+  }
+  .runline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 26px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--faint);
+  }
+  .runline b {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* ---------- scoreboard ---------- */
+  .board {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin: 0 0 52px;
+  }
+  .cell {
+    background: var(--surface);
+    padding: 18px 16px 16px;
+  }
+  .cell .n {
+    font-family: var(--mono);
+    font-size: 30px;
+    font-weight: 500;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    display: block;
+    margin-bottom: 8px;
+  }
+  .cell .l {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .n.ok {
+    color: var(--proven);
+  }
+  .n.warn {
+    color: var(--latent);
+  }
+  .n.bad {
+    color: var(--open);
+  }
+
+  /* ---------- sections ---------- */
+  section {
+    margin-bottom: 68px;
+  }
+  .shead {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-top: 1px solid var(--rule-strong);
+    padding-top: 14px;
+    margin-bottom: 24px;
+  }
+  .shead .p {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--proven);
+    flex: none;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: clamp(25px, 3.4vw, 33px);
+    line-height: 1.14;
+    letter-spacing: -0.015em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 1.3;
+    margin: 40px 0 12px;
+    text-wrap: balance;
+  }
+
+  /* ---------- finding ---------- */
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--rule-strong);
+    padding: 22px 24px 18px;
+    margin: 26px 0;
+  }
+  .finding.is-open {
+    border-top-color: var(--open);
+  }
+  .finding.is-latent {
+    border-top-color: var(--latent);
+  }
+  .finding.is-fixed {
+    border-top-color: var(--fixed);
+  }
+  .finding.is-proven {
+    border-top-color: var(--proven);
+  }
+  .fhead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px 14px;
+    margin-bottom: 12px;
+  }
+  .fhead h4 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 19px;
+    line-height: 1.28;
+    margin: 0;
+    flex: 1 1 260px;
+  }
+  .chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 2px;
+    white-space: nowrap;
+    flex: none;
+  }
+  .chip.open {
+    background: var(--open-bg);
+    color: var(--open);
+  }
+  .chip.latent {
+    background: var(--latent-bg);
+    color: var(--latent);
+  }
+  .chip.fixed {
+    background: var(--fixed-bg);
+    color: var(--fixed);
+  }
+  .chip.proven {
+    background: var(--proven-bg);
+    color: var(--proven);
+  }
+  .finding p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* claimed / measured */
+  .cm {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin: 16px 0;
+  }
+  .cm > div {
+    background: var(--sunk);
+    padding: 13px 15px;
+  }
+  .cm .lab {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-bottom: 7px;
+  }
+  .cm .val {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  @media (max-width: 620px) {
+    .cm {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* ---------- tables ---------- */
+  .tw {
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    margin: 22px 0;
+    background: var(--surface);
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule-strong);
+    white-space: nowrap;
+    background: var(--sunk);
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  tr:last-child td {
+    border-bottom: 0;
+  }
+  td.num {
+    text-align: right;
+    white-space: nowrap;
+  }
+  .ok {
+    color: var(--proven);
+  }
+  .warn {
+    color: var(--latent);
+  }
+  .bad {
+    color: var(--open);
+  }
+  .dim {
+    color: var(--faint);
+  }
+
+  /* ---------- misc ---------- */
+  pre {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    background: var(--sunk);
+    border: 1px solid var(--rule);
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 18px 0;
+  }
+  .note {
+    border-left: 2px solid var(--rule-strong);
+    padding: 2px 0 2px 18px;
+    color: var(--muted);
+    font-size: 16px;
+    margin: 22px 0;
+  }
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    border: 1px solid var(--rule-strong);
+    border-radius: 2px;
+    padding: 2px 6px;
+    margin: 0 4px 4px 0;
+  }
+  footer {
+    border-top: 2px solid var(--ink);
+    padding-top: 20px;
+    margin-top: 72px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+  a {
+    color: var(--proven);
+  }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <div class="kicker">
+      Adversarial audit · branch wt-audit · production ref rloztdhzfliyvpvxsgjl
+    </div>
+    <h1>What breaks it, and what it does when broken</h1>
+    <p class="standfirst">
+      Every tenant table probed live through PostgREST with RLS under test. Every refusal counted
+      from the database afterwards, never from what the function said.
+    </p>
+    <div class="runline">
+      <span><b>22 Aug 2026</b> · 04:12–07:30 IST</span>
+      <span>base <b>wt-integrate 196c0fd</b></span>
+      <span>prod <b>63 migrations · 75 tables</b></span>
+      <span>ledger <b>9/9 → 9/9, delta 0</b></span>
+    </div>
+  </header>
+
+  <div class="board">
+    <div class="cell">
+      <span class="n ok">0</span><span class="l">Cross-tenant<br />leaks found</span>
+    </div>
+    <div class="cell">
+      <span class="n ok">38</span><span class="l">Hostile probes<br />all refused</span>
+    </div>
+    <div class="cell">
+      <span class="n bad">2</span><span class="l">Open<br />findings</span>
+    </div>
+    <div class="cell">
+      <span class="n" style="color: var(--fixed)">5</span
+      ><span class="l">Defects<br />fixed here</span>
+    </div>
+    <div class="cell">
+      <span class="n warn">16</span><span class="l">Tables never<br />exercised</span>
+    </div>
+    <div class="cell">
+      <span class="n warn">10</span><span class="l">Outside the<br />gate's suite</span>
+    </div>
+  </div>
+
+  <section class="col">
+    <p>
+      This lane assumed the product was hostile to itself. It did not ask whether the tenancy
+      boundary works; it tried to get through it, from an ordinary member's session, against the
+      real production database, and counted rows afterwards to see whether the refusal it was told
+      about had actually happened.
+    </p>
+    <p>
+      The headline is that <strong>the boundary held everywhere it was tested</strong>. Twenty-nine
+      tenant tables were proven with a foreign row that provably existed and was hidden.
+      Thirty-eight hostile RPC and write probes were refused, and a sweep for the marker string
+      every payload carried found nothing anywhere in the schema. Every webhook receiver rejected
+      both a missing signature and a forged one.
+    </p>
+    <p>
+      What the audit is actually worth is in the second half of that sentence —
+      <em>everywhere it was tested</em>. Sixteen tables are empty in production, so &ldquo;the
+      attacker saw nothing&rdquo; is true of them whether the policy is perfect or absent. Ten of
+      those sixteen are also outside the only isolation suite that runs in the gate. That overlap,
+      not any single leak, is the finding this report is built around.
+    </p>
+  </section>
+
+  <!-- ─────────────────────────── P1 ─────────────────────────── -->
+  <section>
+    <div class="shead">
+      <span class="p">P1</span>
+      <h2>Every table, every tenant</h2>
+    </div>
+
+    <div class="col">
+      <p>
+        The table list came from the production catalog, never from an array in a file — 75 base
+        tables, 47 carrying <code>workspace_id</code>, 129 policies. Each table was read three ways
+        through PostgREST: with the anon key alone, with a token for a member of the workspace that
+        owns the rows, and with a token for a member of a different workspace. RLS was the only
+        thing under test; <code>lib/supabase/server.ts</code> refuses a service-role client, so it
+        is also the only boundary the product has.
+      </p>
+      <p>
+        Ground truth — which rows exist, and how many remain after a refusal — came from a separate
+        privileged connection opened <code>begin read only</code>. That separation matters more than
+        it looks: counting rows through the same restricted token that was just refused returns zero
+        whether the write landed or not, and every write-refusal proof would have confirmed itself.
+      </p>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr>
+            <th>Verdict</th>
+            <th class="num">Tables</th>
+            <th>What it means</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="ok">EXERCISED</td>
+            <td class="num">29</td>
+            <td>A foreign row existed, the owner saw it, the attacker and anon saw 0.</td>
+          </tr>
+          <tr>
+            <td class="warn">VACUOUS</td>
+            <td class="num">16</td>
+            <td>
+              The attacker saw 0 because there was nothing to see. Policy present, never exercised.
+            </td>
+          </tr>
+          <tr>
+            <td class="dim">SERVICE-ONLY</td>
+            <td class="num">1</td>
+            <td>
+              <code>ai_provider_logs</code> — RLS on, no SELECT policy for
+              <code>authenticated</code>. Denies everyone, including the owner. Intended.
+            </td>
+          </tr>
+          <tr>
+            <td class="dim">OPERATOR-ONLY</td>
+            <td class="num">1</td>
+            <td>
+              <code>ops_credit_requests</code> — keyed on <code>app.is_ops_admin()</code>. The
+              owning member correctly sees nothing.
+            </td>
+          </tr>
+          <tr>
+            <td class="bad">LEAK</td>
+            <td class="num">0</td>
+            <td>No table returned a foreign row to anon or to a member of another workspace.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="finding is-proven">
+      <div class="fhead">
+        <h4>
+          The sweep's first run accused an innocent table, because the harness shared its blind spot
+        </h4>
+        <span class="chip proven">corrected</span>
+      </div>
+      <p>
+        Run one reported <code>LEAK-CROSS-TENANT</code> on <code>ops_credit_requests</code>: the
+        &ldquo;attacker&rdquo; read a row belonging to another workspace. The attacker was picked as
+        the first member of any workspace other than the owner's — and that member is
+        <code>karunesh@sahodalabs.com</code>, an active platform operator. The
+        <code>ops_select</code> policy is <code>using app.is_ops_admin()</code>, so the read was the
+        policy working exactly as designed.
+      </p>
+      <p>
+        Worth recording because it is the same shape as the defects this audit was looking for: a
+        check whose selection logic cannot distinguish the case it is meant to catch from the case
+        it is meant to permit. Operators are now excluded from the attacker pool and the operator
+        class is reported separately, which is what makes the remaining 29 mean anything.
+      </p>
+    </div>
+
+    <h3>Radar — the highest-risk surface, and the one with no data</h3>
+    <div class="col">
+      <p>
+        Production holds <strong>zero competitor subscriptions</strong>. Every Radar policy was
+        therefore in the VACUOUS class, and the socially explosive case — a business discovering who
+        else is watching a rival — was unobservable. Two throwaway workspaces, one shared competitor
+        with two subscribers from different tenants, and one competitor watched by only one of them
+        made it observable. They carried no ledger entries by design, and were removed by the same
+        script; the schema was verified empty afterwards.
+      </p>
+      <p>
+        The decisive assertion is a count, not a row read. A row-level check passes while an
+        aggregate still leaks the number.
+      </p>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr>
+            <th>Probe</th>
+            <th class="num">Truth</th>
+            <th class="num">A sees</th>
+            <th class="num">B sees</th>
+            <th class="num">Anon</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Subscribers of the shared competitor <span class="dim">(count=exact)</span></td>
+            <td class="num">2</td>
+            <td class="num ok">1</td>
+            <td class="num ok">1</td>
+            <td class="num ok">0</td>
+          </tr>
+          <tr>
+            <td>The same count via an embedded aggregate</td>
+            <td class="num">2</td>
+            <td class="num ok">1</td>
+            <td class="num ok">1</td>
+            <td class="num ok">—</td>
+          </tr>
+          <tr>
+            <td>A's private competitor, by any of five routes</td>
+            <td class="num">1</td>
+            <td class="num ok">1</td>
+            <td class="num ok">0</td>
+            <td class="num ok">0</td>
+          </tr>
+          <tr>
+            <td>B inserts a subscription into A's workspace</td>
+            <td class="num dim">—</td>
+            <td class="num dim">—</td>
+            <td class="num ok">403</td>
+            <td class="num dim">—</td>
+          </tr>
+          <tr>
+            <td>B updates, deletes A's subscriptions; deletes the shared competitor</td>
+            <td class="num dim">—</td>
+            <td class="num dim">—</td>
+            <td class="num ok">0 rows</td>
+            <td class="num dim">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="col">
+      <span class="tag">25 assertions</span><span class="tag">0 failed</span
+      ><span class="tag">fixtures removed, schema verified empty</span>
+    </p>
+
+    <div class="finding is-open">
+      <div class="fhead">
+        <h4>A second subscriber can tell that someone was already watching</h4>
+        <span class="chip open">open</span>
+      </div>
+      <p>
+        <code>app.radar_subscribe</code>'s own header names this as the question the design exists
+        to refuse, and refuses it in the return value: no <code>created</code> flag, no competitor
+        <code>created_at</code>. But the rows a new subscriber becomes entitled to read carry
+        timestamps, and the policies grant the whole row.
+      </p>
+      <div class="cm">
+        <div>
+          <div class="lab">Claimed — radar_registry.sql</div>
+          <div class="val">&ldquo;Never reports whether the competitor already existed.&rdquo;</div>
+        </div>
+        <div>
+          <div class="lab">Measured — B subscribes today</div>
+          <div class="val">
+            competitors.created_at &minus;30d<br />
+            sources.last_seen_at &minus;1d<br />
+            oldest snapshot &minus;2d<br />
+            <span class="bad">3 of 3 tells legible</span>
+          </div>
+        </div>
+      </div>
+      <p>
+        The identity of the other subscriber stays hidden — B reading the shared competitor's
+        subscriptions sees one row when the truth is two. It is the timeline that talks. Severity is
+        bounded by that: B learns <em>somebody</em> was there first, not <em>who</em>. The truly
+        explosive case — A watching B, and B finding out — is closed, and was proven closed.
+      </p>
+    </div>
+
+    <div class="finding is-latent">
+      <div class="fhead">
+        <h4>The competitor fetcher has no SSRF guard, at either layer</h4>
+        <span class="chip latent">latent</span>
+      </div>
+      <p>
+        A competitor <code>locator</code> is a URL a user types and the server later fetches. The
+        only database-side say is
+        <code>CHECK (locator = app.radar_normalize_locator(kind, locator))</code>, and its domain
+        pattern accepts a dotted quad.
+      </p>
+      <div class="cm">
+        <div>
+          <div class="lab">Storable, of 20 hostile inputs</div>
+          <div class="val">
+            169.254.169.254 <span class="dim">(instance metadata)</span><br />
+            metadata.google.internal<br />
+            127.0.0.1 · 10.0.0.5 · 192.168.1.1 · 172.16.0.1<br />
+            rloztdhzfliyvpvxsgjl.supabase.co<br />
+            <span class="dim">— including via</span> https://example.com@169.254.169.254/
+          </div>
+        </div>
+        <div>
+          <div class="lab">Refused</div>
+          <div class="val">
+            localhost · [::1] · file:// · javascript:<br /><br />
+            <span class="bad">16 of 20 storable</span>
+          </div>
+        </div>
+      </div>
+      <p>
+        <code>cheapCheck</code> then calls <code>fetch(url, { redirect: 'follow' })</code> with no
+        host validation anywhere in <code>apps/jobs/src/radar/</code> — a grep for private-range or
+        metadata-address handling across the whole module returns one comment and no code. Because
+        redirects are followed, a database-side host allowlist alone would not close it.
+      </p>
+      <p>
+        <strong>Not currently reachable.</strong> <code>app.radar_subscribe</code> lives in the
+        unexposed <code>app</code> schema, is granted to <code>service_role</code> only, and
+        <code>apps/web</code> has no service-role client — which is why production holds zero
+        subscriptions. This arms the day the subscribe path ships.
+      </p>
+      <p class="note">
+        The first version of this probe was wrong in the way this audit was hunting: a raised
+        exception aborted the read-only transaction, so every later input came back &ldquo;current
+        transaction is aborted&rdquo; and was printed as <em>rejected</em>. It would have reported
+        fifteen refusals when two inputs had been evaluated. Each case now runs inside its own
+        savepoint, and a rolled-back savepoint is reported as an error, never as a refusal.
+      </p>
+    </div>
+
+    <h3>Views</h3>
+    <div class="col">
+      <p>
+        Production holds one view, <code>knowledge_current_chunks</code>, and it is
+        <code>security_invoker = true</code>. A view without it reads as its owner, so RLS on the
+        underlying table is never consulted and workspace B would get every row of workspace A's
+        passages. Read from <code>pg_class.reloptions</code>, and now armed as a catalog-driven test
+        — with a companion case that hands the same detector a deliberately leaky view and requires
+        it to name it, because in this tree the check would otherwise be a pass over zero views.
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── P2 ─────────────────────────── -->
+  <section>
+    <div class="shead">
+      <span class="p">P2</span>
+      <h2>Every guard, proven able to fail</h2>
+    </div>
+
+    <div class="col">
+      <p>
+        No guard is reported here on the strength of reading it. Each was mutated at its decision
+        point and the suite that claims to cover it was run. A mutation whose edit matched nothing
+        is recorded as no verdict rather than as a survival — a harness that cannot tell
+        &ldquo;nothing broke&rdquo; from &ldquo;nothing ran&rdquo; is the failure this section
+        exists to avoid.
+      </p>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr>
+            <th>Guard</th>
+            <th>Mutation applied</th>
+            <th class="num">Result</th>
+            <th>Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>cron/authorize.ts</td>
+            <td>fail OPEN on an unset secret</td>
+            <td class="num ok">2 / 9 red</td>
+            <td class="ok">real guard</td>
+          </tr>
+          <tr>
+            <td>cron/authorize.ts</td>
+            <td>token comparison always true</td>
+            <td class="num ok">4 / 9 red</td>
+            <td class="ok">real guard</td>
+          </tr>
+          <tr>
+            <td>constraints.ts <span class="dim">perDayCap</span></td>
+            <td>cap always allows</td>
+            <td class="num ok">7 / 13 red</td>
+            <td class="ok">counts adapter calls</td>
+          </tr>
+          <tr>
+            <td>x-cost.ts <span class="dim">monthly ration</span></td>
+            <td>ration always allows</td>
+            <td class="num ok">5 / 9 red</td>
+            <td class="ok">counts adapter calls</td>
+          </tr>
+          <tr>
+            <td>withCredits.ts</td>
+            <td>insufficient-balance branch disabled</td>
+            <td class="num ok">2 / 407 red</td>
+            <td class="ok">real guard</td>
+          </tr>
+          <tr>
+            <td>middleware.test.ts</td>
+            <td>remove <code>api/cron/loop$</code> from both matchers</td>
+            <td class="num bad">44 / 44 green</td>
+            <td class="bad">blind</td>
+          </tr>
+          <tr>
+            <td>middleware.test.ts</td>
+            <td><em>add</em> <code>api/onboarding/door$</code> to both matchers</td>
+            <td class="num bad">44 / 44 green</td>
+            <td class="bad">blind</td>
+          </tr>
+          <tr>
+            <td>cron/authorize.ts</td>
+            <td>drop the <code>Bearer</code> prefix requirement</td>
+            <td class="num dim">9 / 9 green</td>
+            <td class="dim">no verdict — mutation was semantically equivalent</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="finding is-latent">
+      <div class="fhead">
+        <h4>A route can be added to the Clerk bypass list and every test stays green</h4>
+        <span class="chip latent">latent</span>
+      </div>
+      <p>
+        <code>middleware.test.ts</code> carries a comment stating that three separate guards refused
+        a change until it was made in all three places. Measured: adding a brand-new path to both
+        <code>config.matcher</code> exclusions — the edit that stops <code>clerkMiddleware</code>
+        running for a route entirely — leaves all 44 tests passing. Removing an existing one does
+        too.
+        <code>/api/cron/loop</code> is currently excluded in <code>middleware.ts</code> and absent
+        from both lists the test iterates.
+      </p>
+      <p>
+        <strong>Bounded, not open.</strong> Every route checked defends itself: the three cron
+        routes verify <code>CRON_SECRET</code>, and <code>/api/onboarding/door</code> calls
+        <code>auth()</code>
+        and 401s without a user. The guard is blind; the routes behind it are not. The exposure is a
+        future route that relies on the middleware instead of its own check.
+      </p>
+    </div>
+
+    <div class="finding is-open">
+      <div class="fhead">
+        <h4>The gate's only executing RLS evidence covers 37 of production's 47 tenant tables</h4>
+        <span class="chip open">open</span>
+      </div>
+      <p>
+        <code>rls_tenant_isolation.pglite.test.ts</code> is genuinely catalog-driven — it reads
+        <code>information_schema</code> from a real database and a new migration joins it the day it
+        lands. But that database is PGlite booted from <code>readdirSync(supabase/migrations)</code>
+        <em>in this tree</em>, and this tree is eleven migrations behind production.
+      </p>
+      <div class="cm">
+        <div>
+          <div class="lab">Claimed — the suite's own header</div>
+          <div class="val">
+            &ldquo;TENANT ISOLATION, ENFORCED, ON EVERY GATE RUN&hellip; The table list comes from
+            information_schema, never from an array in this file.&rdquo;
+          </div>
+        </div>
+        <div>
+          <div class="lab">Measured — by executing it</div>
+          <div class="val">
+            migration files in tree <b>52</b><br />
+            migrations applied in prod <b>63</b><br />
+            tenant tables the suite sees <b>37</b><br />
+            tenant tables in production <span class="bad"><b>47</b></span>
+          </div>
+        </div>
+      </div>
+      <p>
+        The ten it cannot see are <code>asset_derivatives</code>,
+        <code>competitor_subscriptions</code>, <code>knowledge_chunks</code>,
+        <code>knowledge_documents</code>, <code>playbook_run_items</code>,
+        <code>playbook_runs</code>, <code>playbooks</code>, <code>remix_batches</code>,
+        <code>remix_derivatives</code>, <code>zernio_webhook_events</code> — plus six radar tables
+        with no <code>workspace_id</code> that no version of the suite would enumerate.
+      </p>
+      <p>
+        <strong>These are the same ten that came back VACUOUS in the live sweep.</strong> Both the
+        offline guard and the live probe are blind to exactly the same set, for unrelated reasons —
+        the guard because the code has not merged, the probe because the tables have no rows. For
+        those ten, isolation is established by reading policies and by nothing else. Radar was
+        pulled out of that set by building fixtures; the other nine were not.
+      </p>
+      <p>
+        The count is now printed and asserted by a test, so the gap moves with the branch instead of
+        being rediscovered.
+      </p>
+    </div>
+
+    <h3>Assertions that pass without testing</h3>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr>
+            <th>Shape</th>
+            <th class="num">Count</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>skipIf</code> that skips under a plain <code>pnpm gate</code></td>
+            <td class="num warn">19 / 22</td>
+            <td>
+              <b>164</b> test declarations in <code>packages/db</code> alone never execute — 45 in
+              <code>rls.test.ts</code>, 49 in <code>ops_rls.test.ts</code>, 28 in
+              <code>brand_memory</code>, 9 in <code>ledger.test.ts</code>.
+            </td>
+          </tr>
+          <tr>
+            <td>Env vars gating a suite</td>
+            <td class="num warn">12</td>
+            <td>
+              Exactly <b>one</b> (<code>SAHODA_ALLOW_LIVE_TESTS</code>) appears in any committed
+              config, and nothing sets it. The other eleven can never be true in CI.
+            </td>
+          </tr>
+          <tr>
+            <td><code>expect()</code> in a branch that can be empty</td>
+            <td class="num warn">21</td>
+            <td>
+              Five unbraced <code>if</code>s whose condition is not pinned by a prior assertion;
+              sixteen loops over collections with no non-emptiness guard.
+            </td>
+          </tr>
+          <tr>
+            <td><code>.skip</code> / <code>xit</code> / <code>.todo</code> / <code>.only</code></td>
+            <td class="num ok">0</td>
+            <td>Verified across <code>packages/**</code>. Nothing is parked.</td>
+          </tr>
+          <tr>
+            <td>DB error string read as proof of refusal</td>
+            <td class="num warn">2</td>
+            <td>
+              The append-only probe, and <code>analytics/series.ts:250</code> inferring &ldquo;table
+              absent&rdquo; from a second query's success.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="finding is-latent">
+      <div class="fhead">
+        <h4>
+          The append-only probe would score &ldquo;column does not exist&rdquo; as the trigger
+          refusing
+        </h4>
+        <span class="chip latent">latent</span>
+      </div>
+      <p>
+        It derives its table list from <code>pg_trigger</code>, which is right, and it already
+        handles the trap that a <code>FOR EACH ROW</code> trigger cannot fire on an empty table. But
+        the UPDATE arm is <code>set workspace_id = workspace_id</code> inside a bare
+        <code>catch {}</code>, so a guarded table without that column would throw for an unrelated
+        reason and be counted as refused.
+      </p>
+      <p>
+        Measured against production: twelve tables carry <code>app.block_mutations()</code>. Three
+        lack <code>workspace_id</code> — <code>competitor_changes</code> and
+        <code>competitor_snapshots</code> (both empty), and <code>ops_audit_log</code>, which holds
+        <b>9,086</b> rows. That one is already excluded by the suite's
+        <code>EXPECTED_UNPOPULATED</code> list, so the blind spot is masked today, for a reason
+        unrelated to the one that would matter.
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── P3 ─────────────────────────── -->
+  <section>
+    <div class="shead">
+      <span class="p">P3</span>
+      <h2>Hostile input</h2>
+    </div>
+
+    <div class="col">
+      <p>
+        Thirty-eight probes, every one refused, and a sweep of every text column in the schema for
+        the marker string each payload carried found nothing. Refusals were proven separately per
+        operation: an insert can be denied while an update is not.
+      </p>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr>
+            <th>Surface</th>
+            <th>Probe</th>
+            <th class="num">Answer</th>
+            <th class="num">Rows after</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td rowspan="4">
+              <code>public.ledger</code><br /><span class="dim"
+                >anon holds INSERT/SELECT/UPDATE/DELETE/TRUNCATE; zero policies</span
+              >
+            </td>
+            <td>anon SELECT</td>
+            <td class="num ok">0 rows</td>
+            <td class="num">1</td>
+          </tr>
+          <tr>
+            <td>anon INSERT</td>
+            <td class="num ok">42501</td>
+            <td class="num">1</td>
+          </tr>
+          <tr>
+            <td>anon UPDATE row 1</td>
+            <td class="num ok">0 matched</td>
+            <td class="num">1 <span class="dim">delta still 5000</span></td>
+          </tr>
+          <tr>
+            <td>anon DELETE row 1</td>
+            <td class="num ok">0 matched</td>
+            <td class="num">1</td>
+          </tr>
+          <tr>
+            <td><code>rpc/charge_if_affordable</code></td>
+            <td>anon and member, tenant=default</td>
+            <td class="num ok">null</td>
+            <td class="num">1</td>
+          </tr>
+          <tr>
+            <td><code>rpc/ops_admin_upsert</code></td>
+            <td>ordinary member, self as owner</td>
+            <td class="num ok">42501</td>
+            <td class="num">7</td>
+          </tr>
+          <tr>
+            <td>
+              <code>rpc/rls_auto_enable</code> <span class="dim">DEFINER, granted to anon</span>
+            </td>
+            <td>anon</td>
+            <td class="num ok">0A000</td>
+            <td class="num dim">—</td>
+          </tr>
+          <tr>
+            <td><code>posts</code></td>
+            <td>insert into / update / delete a victim's row</td>
+            <td class="num ok">403, 0, 0</td>
+            <td class="num">24, 1, 1</td>
+          </tr>
+          <tr>
+            <td>10 DEFINER RPCs</td>
+            <td>handed the victim's <code>workspace_id</code></td>
+            <td class="num ok">NOT_A_MEMBER</td>
+            <td class="num">unchanged</td>
+          </tr>
+          <tr>
+            <td>9 RPCs</td>
+            <td>nulls, nobody's uuids, SQL-shaped strings</td>
+            <td class="num ok">4xx</td>
+            <td class="num">unchanged</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col">
+      <p>
+        Two of those thirty-eight are not proofs and are recorded as such:
+        <code>upsert_connection</code> returned <code>PGRST202</code> because the argument list did
+        not match a real overload, and <code>bootstrap_workspace</code> raised
+        <code>INVALID_SLUG</code> before reaching any membership check. A validation error is not an
+        authorization proof.
+      </p>
+      <p>
+        Against the deployed app, every public endpoint refused both a <em>missing</em> and a
+        <em>forged</em> signature — Cashfree <code>invalid_signature</code> both times, Clerk
+        <code>missing_headers</code> then <code>invalid</code>, devops ingest <code>401</code> both
+        times, beta-apply <code>400</code>. <code>billing_webhook_events</code> and
+        <code>ops_beta_applications</code> both stayed at zero.
+      </p>
+      <p>
+        <code>isAuthorizedCronRequest</code> deserves a specific note: it fails closed on a missing
+        or empty secret, and compares fixed-width SHA-256 digests rather than raw tokens so a
+        wrong-length token cannot become a 500 that leaks the secret's length. Both properties are
+        proven by mutation above.
+      </p>
+    </div>
+
+    <div class="finding is-fixed">
+      <div class="fhead">
+        <h4>The prompt-injection quarantine fence could be closed from inside a page</h4>
+        <span class="chip fixed">fixed</span>
+      </div>
+      <p>
+        <code>quarantinePage</code> ran <code>page.markdown</code> through
+        <code>neutralize</code> and interpolated <code>page.title</code> raw inside
+        <code>JSON.stringify</code>. <code>JSON.stringify</code> escapes <code>"</code> and
+        <code>\</code>; it does not escape <code>&lt;</code> or <code>&gt;</code>, and the
+        delimiters are made of exactly those.
+      </p>
+      <p>
+        It was reachable. <code>extractTitle</code> takes 300 characters from the page's own
+        <code>&lt;title&gt;</code> and then decodes <code>&amp;lt;</code> and
+        <code>&amp;gt;</code> — so a page serving <code>&amp;gt;&amp;gt;&amp;gt;</code> never
+        contains the literal token, and the forgery exists only after decoding. Nothing inspecting
+        the served HTML would see a delimiter at all.
+      </p>
+      <div class="cm">
+        <div>
+          <div class="lab">Claimed — quarantine.ts</div>
+          <div class="val">
+            &ldquo;Fenced with a token a page cannot forge in markdown text we control.&rdquo;
+          </div>
+        </div>
+        <div>
+          <div class="lab">Measured — executed</div>
+          <div class="val">
+            forged CLOSE in title → <span class="bad">2 closes</span>
+            <span class="dim">(want 1)</span><br />
+            forged OPEN in title → <span class="bad">2 opens</span><br />
+            two-page corpus → <span class="bad">3 closes</span> <span class="dim">(want 2)</span>
+          </div>
+        </div>
+      </div>
+      <p>
+        Everything after the header line then renders outside the fence, in the position the
+        system's own framing occupies. The existing suite could not see it: its page helper
+        hardcodes
+        <code>title: 'About'</code>, so the fence-balance assertion only ever exercised markdown.
+      </p>
+      <p>
+        Title and url now go through <code>neutralize</code>, and <code>Human</code> joins the
+        turn-marker alternation beside <code>assistant</code> — half the classic pair was walking
+        through. Five tests pin it; 72/72 green in <code>packages/research</code>.
+      </p>
+    </div>
+
+    <div class="col">
+      <p>
+        Three weaknesses in the same defence were measured and are <strong>not</strong> fixed here,
+        because each is a judgement call rather than a bug. The turn-marker regex is anchored to
+        line start and covers four English words, so mid-line turns and every ChatML, Llama, Gemma
+        and Mistral marker pass through — and the mesh routes through OpenRouter, so the marker that
+        matters varies by route. Nothing on the prompt path strips bidi or Unicode-tag characters,
+        though <code>packages/sites/src/render/escape.ts</code> already contains a correct stripper.
+        And the 6,000-character page budget is UTF-16 code units sized against Latin text at 2.27
+        chars/token, so Devanagari or Odia copy — which this product explicitly serves — admits
+        roughly 2.3&times; the budgeted tokens per page.
+      </p>
+      <p class="note">
+        The architectural defence is the one that holds, and the file says so: the extraction task
+        has no tools, and its output shape pins <code>confirmed</code> to
+        <code>z.literal(false)</code>. The worst a hostile page achieves is a wrong string in a
+        field a human has not yet approved. The fence is the second line — which is exactly why a
+        break in it is worth fixing and not worth panicking about.
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── P4 ─────────────────────────── -->
+  <section>
+    <div class="shead">
+      <span class="p">P4</span>
+      <h2>What it says when things fail</h2>
+    </div>
+
+    <div class="col">
+      <p>
+        This codebase is unusually good at this. Eighteen read modules distinguish &ldquo;we could
+        not check&rdquo; from &ldquo;there is nothing here&rdquo; as separate states rather than
+        collapsing both to empty. <code>cheapCheck</code> has three outcomes and its header explains
+        why two would be a silent false negative wearing a perfect hit rate. The publish runner
+        classifies every failure transient or permanent and carries
+        <code>reconnectRequired</code> for a disconnected account.
+      </p>
+      <p>The exception was on the most consequential path.</p>
+    </div>
+
+    <div class="finding is-fixed">
+      <div class="fhead">
+        <h4>The publish route told an outage to create a workspace</h4>
+        <span class="chip fixed">fixed</span>
+      </div>
+      <div class="cm">
+        <div>
+          <div class="lab">Claimed — lib/workspaces.ts</div>
+          <div class="val">
+            &ldquo;<code>unreadable</code> means the question did not get an answer, and nothing may
+            be claimed about the account from it.&rdquo;
+          </div>
+        </div>
+        <div>
+          <div class="lab">Measured — with the read failing</div>
+          <div class="val">
+            <span class="bad">400 &ldquo;Create a workspace first.&rdquo;</span><br /><br />
+            now <span class="ok">503 &ldquo;Couldn't check your workspace just now&rdquo;</span>
+          </div>
+        </div>
+      </div>
+      <p>
+        The distinction was fully built and three routes already used it; the publish route still
+        called <code>getActiveWorkspace</code>, the lossy view that answers <code>null</code> to
+        both. A customer with a workspace, watching a post fail to go out, was told to create one —
+        under a client-error status that every 5xx alert filter skips.
+      </p>
+    </div>
+
+    <div class="col">
+      <p>
+        Three sibling reads in that same handler have the same shape and are
+        <strong>not</strong> fixed here: <code>getWorkspaceRole</code> returns <code>null</code> on
+        a query error, so a failed <code>workspace_members</code> read answers
+        <code>403</code> naming the caller's role; <code>getPost</code> returns <code>null</code> on
+        error, so a database failure answers <code>404</code> plus an authorization claim;
+        <code>listVariants</code> returns <code>[]</code>, so a failed read answers
+        <code>400</code> telling the user to write copy that already exists. Fixing those means
+        changing three read helpers' contracts and every caller — a larger change than this lane
+        should make unilaterally, and an owner's call.
+      </p>
+      <p>Two more, measured and left for the owner:</p>
+      <ul>
+        <li>
+          <code>oauth/zernio/return</code> collapses an entitlements <code>unknown</code> to
+          <code>headroom = 0</code> and answers <code>303 zernio=limit</code>. A dependency outage
+          is reported to the customer as a plan decision, under a success status. The sibling
+          <code>start</code> route returns <code>503</code> for the same condition.
+        </li>
+        <li>
+          <code>delete_asset</code> answers <code>500</code> with the user-facing sentence
+          &ldquo;That file is not in your library.&rdquo; A bad id is a client error; returning it
+          as 5xx puts ordinary user mistakes into the outage channel.
+        </li>
+      </ul>
+    </div>
+
+    <div class="finding is-fixed">
+      <div class="fhead">
+        <h4>Five writes reported success for a write that matched nothing</h4>
+        <span class="chip fixed">fixed</span>
+      </div>
+      <p>
+        A PostgREST update or delete matching zero rows returns no error, so an RLS denial and a
+        stale id both arrive looking like a clean write. <code>connections.ts</code> names this —
+        &ldquo;the deletePost lesson&rdquo; — and guards it with <code>.select(...)</code>; five
+        sites did not. One returned <code>changed: 1</code> as a literal for a delete that removed
+        nothing. A sixth site in the same file already had it right, which is what makes this an
+        oversight rather than a decision. Six tests, proven red against the original code before the
+        fix.
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── P5 ─────────────────────────── -->
+  <section>
+    <div class="shead">
+      <span class="p">P5</span>
+      <h2>Money</h2>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr>
+            <th>Ledger invariants</th>
+            <th class="num">Before</th>
+            <th class="num">After</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Invariants holding</td>
+            <td class="num ok">9 / 9</td>
+            <td class="num ok">9 / 9</td>
+          </tr>
+          <tr>
+            <td>Entries</td>
+            <td class="num">202</td>
+            <td class="num">202</td>
+          </tr>
+          <tr>
+            <td>Balance rows</td>
+            <td class="num">26</td>
+            <td class="num">26</td>
+          </tr>
+          <tr>
+            <td>Credits outstanding</td>
+            <td class="num">3,054</td>
+            <td class="num">3,054</td>
+          </tr>
+          <tr>
+            <td>Unsettled holds</td>
+            <td class="num ok">0</td>
+            <td class="num ok">0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col">
+      <p>
+        <strong>Delta zero, and the excursion in between is accounted for exactly.</strong> The
+        audit wrote no ledger entry at any point — the Radar fixtures were inserted directly rather
+        than through <code>bootstrap_workspace</code>, specifically so they would carry none. Three
+        workspaces appeared and vanished mid-run: someone was running the e2e suite against
+        production while this audit was in progress. Each arrived with a
+        <code>signup_grant</code> of 100 and each was torn down by its own suite, cascade-deleting
+        its ledger rows with it.
+      </p>
+      <p>
+        That cascade is worth naming on its own. <code>credit_ledger</code> carries
+        <code>app.block_mutations()</code>, which refuses direct UPDATE and DELETE — but permits
+        cascaded deletes by design, so a workspace can be offboarded.
+        <code>credit_ledger.workspace_id</code> is <code>ON DELETE CASCADE</code>. The ledger is
+        therefore append-only <em>within</em> a workspace's life and not across its deletion: delete
+        the workspace and its entire money history goes with it, leaving no record that credits were
+        ever granted. Deliberate, and the right call for GDPR-style erasure — but it means the
+        ledger cannot answer &ldquo;what did we issue last quarter&rdquo; once a tenant leaves.
+      </p>
+    </div>
+
+    <h3>Caps, proven by counting provider calls</h3>
+    <div class="col">
+      <p>
+        Four of the caps named in the brief do not exist as code in this tree — Radar's daily cap,
+        remix's batch fee, playbook run costs and the knowledge library's ingestion cap are rendered
+        labels on roadmap pages, and their enforcement lives on unmerged branches. Of what is here:
+      </p>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr>
+            <th>Cap</th>
+            <th>Refuses before spending?</th>
+            <th>Test counts provider calls?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Per-day publish cap</td>
+            <td class="ok">yes — before gate, token and adapter</td>
+            <td class="ok">yes, asserts <code>adapterCalls === 0</code></td>
+          </tr>
+          <tr>
+            <td>X monthly ration</td>
+            <td class="ok">yes — same, x only</td>
+            <td class="ok">yes, asserts <code>adapterCalls === 0</code></td>
+          </tr>
+          <tr>
+            <td>Credit balance</td>
+            <td class="ok">yes — HOLD taken before <code>fn</code></td>
+            <td class="ok">enforced in Postgres, proven by mutation</td>
+          </tr>
+          <tr>
+            <td>Loop cost-approval halt</td>
+            <td class="ok">yes — a stored status</td>
+            <td class="warn">DB-level only; the app-level ordering has no test</td>
+          </tr>
+          <tr>
+            <td>Firecrawl page cap</td>
+            <td class="ok">yes</td>
+            <td class="ok">asserts <code>creditsUsed</code> exactly</td>
+          </tr>
+          <tr>
+            <td>Ops ingest, beta-apply rate limits</td>
+            <td class="warn">fails <em>open</em> when Upstash is absent</td>
+            <td class="warn">stubbed; reads a returned value</td>
+          </tr>
+          <tr>
+            <td>Gate classifier</td>
+            <td class="bad">uncharged, outside <code>withCredits</code></td>
+            <td class="bad">call count per post unbounded and untested</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="finding is-open">
+      <div class="fhead">
+        <h4>
+          Free credits can be minted without limit, and the rule written to stop it is mounted
+          nowhere
+        </h4>
+        <span class="chip open">open</span>
+      </div>
+      <p>
+        <code>public.bootstrap_workspace</code> is <code>SECURITY DEFINER</code> and granted to
+        <code>authenticated</code>. Read from the server, its guards are <code>AUTH_REQUIRED</code>,
+        <code>INVALID_NAME</code>, <code>INVALID_SLUG</code>, <code>SLUG_TAKEN</code> and
+        <code>FREE_PLAN_MISSING</code>. There is no per-user workspace count. It then grants 100
+        credits with an idempotency key of <code>'grant:signup:' || v_ws.id</code> — keyed on the
+        <em>workspace</em>, so a new workspace is a new key and a fresh 100 credits.
+      </p>
+      <div class="cm">
+        <div>
+          <div class="lab">Claimed — billing/abuse/freeTier.ts</div>
+          <div class="val">
+            <code>FREE_WORKSPACES_PER_USER = 1</code>, with a disposable-email rule, fully
+            unit-tested across 9 cases.
+          </div>
+        </div>
+        <div>
+          <div class="lab">Measured — grep across apps + packages</div>
+          <div class="val">
+            <span class="bad">0 production call sites.</span><br />
+            Every reference is its own file or its own test.
+          </div>
+        </div>
+      </div>
+      <p>
+        It compounds with a second uncapped path: <code>resolveFree</code> runs a model task with
+        <code>creditsCharged: 0</code> and no <code>withCredits</code> wrapper, and
+        <code>isFirstResolve</code> returns true whenever no <em>active</em>
+        <code>brand_memory</code> row exists — so a user who never approves gets unlimited free
+        resolves. That one is documented as accepted, on the grounds that there was no durable
+        counter to bound it. Together they are the largest unmetered cost surface in the product,
+        and both are reachable by any signed-in user.
+      </p>
+    </div>
+
+    <div class="finding is-fixed">
+      <div class="fhead">
+        <h4>A replayed reversal billed the customer for money already taken back</h4>
+        <span class="chip fixed">fixed</span>
+      </div>
+      <p>
+        <code>applyReversal</code> is documented as safe to retry with a different amount under the
+        same idempotency key, and of the ledger that is true — the RPC returns the original row with
+        <code>replayed: true</code>. The outcome did not follow: <code>reversedCredits</code> was
+        recomputed from a balance the first reversal had already moved, while <code>entryId</code>
+        pointed at the entry that actually exists. Measured on a 1500/1000 dispute:
+        <span class="bad">500 reported against 1000 recorded</span>. Since
+        <code>shortfallCredits</code> is what a credit note bills as a receivable, that bills the
+        customer 500 credits that had already been reversed.
+      </p>
+      <p>
+        The true amount was on the wire the whole time — <code>apply_ledger_entry</code> returns
+        <code>to_jsonb(v_existing)</code>, the whole row — and the port was discarding it.
+        <code>LedgerApplyResult.entry</code> now carries <code>amount</code>; making it required
+        found all nine fakes at compile time, and each now reports the amount it was asked for
+        rather than a placeholder.
+      </p>
+      <p>
+        The clamp itself is correct and was verified: an over-large chargeback clamps to what is
+        available and reports the rest as a shortfall, retrying up to four times on a balance-floor
+        violation rather than aborting. The constraint match is
+        <code>['balance_held_le_total', 'balance_total_nonneg']</code> — the third constraint,
+        <code>balance_held_nonneg</code>, is absent, which is worth knowing because the violation
+        the raw path produces is <code>balance_held_le_total</code> and not the one you would
+        predict.
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────── verdict ─────────────────────────── -->
+  <section>
+    <div class="shead">
+      <span class="p">&#9632;</span>
+      <h2>The honest verdict</h2>
+    </div>
+    <div class="col">
+      <p>
+        <strong>I would put fifty businesses on the tenancy boundary.</strong> It was attacked from
+        an ordinary member's session against real production data and it did not move — not on
+        reads, not on inserts, updates or deletes, not through ten confused-deputy RPC calls, not
+        through embedded aggregates, and not through the one shared-registry design where a leak
+        would have been socially explosive. Every refusal was confirmed by counting rows from a
+        privileged connection afterwards rather than by believing the response.
+      </p>
+      <p>
+        <strong
+          >What I would not want fifty businesses to hit is the money surface, in two specific
+          places.</strong
+        >
+        Any signed-in user can mint unlimited workspaces, each carrying a fresh 100-credit grant,
+        while the abuse rule written for exactly that sits fully implemented and never called. The
+        same user gets unlimited uncharged model calls until they approve a brand. Neither is a
+        security hole — nobody else's data is at risk — and both are the kind of thing that is found
+        by an invoice rather than by an alert.
+      </p>
+      <p>
+        <strong>The thing I would fix before the next lane starts</strong> is not on either list.
+        Ten tenant tables in production are outside the gate's isolation suite and are
+        simultaneously empty, so neither the offline guard nor a live probe has ever exercised them.
+        Their policies read correctly. That is not the same as knowing. The lanes that own those
+        tables — knowledge, playbooks, remix, webhooks, assets — should each prove isolation the way
+        Radar was proven here: with fixtures, a count, and the fixtures removed afterwards.
+      </p>
+      <p>
+        Two habits in this codebase are worth naming because they made the audit harder in the right
+        way. The honest-gap vocabulary — <code>unreadable</code>, <code>could_not_check</code>,
+        <code>unmeasured</code> as first-class states — is adopted across eighteen read modules, and
+        the one place it was missing is the one defect this section of the audit found. And the
+        comments state what a guard is <em>for</em>, which is what let five of them be mutated at
+        exactly the right line. The defects found here were, almost without exception, in the gap
+        between a comment's claim and the code's behaviour — which only exists because the claims
+        were written down at all.
+      </p>
+    </div>
+
+    <h3>What this audit did not cover</h3>
+    <div class="col">
+      <ul>
+        <li>
+          Eleven migrations are applied in production with no file in this tree, so Radar,
+          playbooks, the knowledge library, remix and the Zernio webhook receiver were audited from
+          the catalog and from their own branches, not from the branch under test.
+        </li>
+        <li>
+          The deployed app at <code>app.sahodalabs.com</code> answers <code>404</code> for
+          <code>/api/cron/loop</code>, <code>/api/cron/metrics</code> and
+          <code>/design-system</code> — it is an older build than this branch. Public-endpoint
+          results are true of what is deployed.
+        </li>
+        <li>The Playwright leg was never run; nothing in these fixes touches UI.</li>
+        <li>
+          The e2e suite was actively creating and tearing down workspaces in production throughout,
+          so every row count here is a reading of a moving system, taken at the timestamp given.
+        </li>
+        <li>No publish was executed, and no irreversible SQL was run.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <div>
+      wt-audit · 8856f85, 190199c · pushed to idivasm · gate green: 27/27 turbo tasks + prettier
+    </div>
+    <div>
+      Harness in <code>audit/</code> — read-only against production except the Radar fixtures,
+      created and removed by the same script.
+    </div>
+  </footer>
+</div>

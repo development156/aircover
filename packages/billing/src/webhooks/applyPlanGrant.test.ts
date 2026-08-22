@@ -8,7 +8,10 @@ class RecordingPort implements LedgerPort {
   readonly calls: ApplyLedgerInput[] = []
   async apply(input: ApplyLedgerInput): Promise<LedgerApplyResult> {
     this.calls.push(input)
-    return { entry: { id: 'e1', balanceAfter: input.amount }, replayed: false }
+    return {
+      entry: { id: 'e1', balanceAfter: input.amount, amount: input.amount },
+      replayed: false,
+    }
   }
   async latestHold(): Promise<null> {
     throw new Error('unused')
@@ -86,7 +89,10 @@ describe('applyPlanGrant', () => {
   it('propagates the replayed flag from the ledger', async () => {
     const port = new RecordingPort()
     // Force a replayed response.
-    port.apply = async (input) => ({ entry: { id: 'e1', balanceAfter: 1500 }, replayed: true })
+    port.apply = async (input) => ({
+      entry: { id: 'e1', balanceAfter: 1500, amount: input.amount },
+      replayed: true,
+    })
     const applyPlanGrant = createApplyPlanGrant(port, deps)
     const result = await applyPlanGrant(paidEvent())
     expect(result.ok && result.data.replayed).toBe(true)

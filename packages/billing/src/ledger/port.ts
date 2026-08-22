@@ -18,7 +18,15 @@ export interface LedgerPort {
 
 /** What `app.apply_ledger_entry()` returns: the new entry plus whether the key replayed. */
 export interface LedgerApplyResult {
-  entry: { id: string; balanceAfter: number }
+  /**
+   * `amount` is the value the LEDGER holds, signed exactly as the row stores it —
+   * negative only for ADJUST. On a replay the function returns the ORIGINAL row, so
+   * this is the only way a caller can learn what was really recorded rather than
+   * what it just asked for. `applyReversal` needs precisely that: the amount it
+   * computed and the amount on the entry are different numbers whenever a lost
+   * acknowledgement brings the same dispute back after the balance has moved.
+   */
+  entry: { id: string; balanceAfter: number; amount: number }
   replayed: boolean
 }
 

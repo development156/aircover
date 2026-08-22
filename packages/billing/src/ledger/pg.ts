@@ -13,7 +13,9 @@ import type {
 
 /** The raw JSON `app.apply_ledger_entry()` returns (snake_case columns from the row). */
 interface RawApplyResult {
-  entry: { id: string; balance_after: number }
+  // `to_jsonb(v_new)` / `to_jsonb(v_existing)` — the WHOLE credit_ledger row, so
+  // `amount` is already on the wire and was simply being discarded here.
+  entry: { id: string; balance_after: number; amount: number }
   replayed: boolean
 }
 
@@ -68,7 +70,11 @@ export function createPgLedgerPort(opts: PgLedgerPortOptions): PgLedgerPort {
     )
     const res = r.rows[0]!.res
     return {
-      entry: { id: res.entry.id, balanceAfter: res.entry.balance_after },
+      entry: {
+        id: res.entry.id,
+        balanceAfter: res.entry.balance_after,
+        amount: res.entry.amount,
+      },
       replayed: res.replayed,
     }
   }

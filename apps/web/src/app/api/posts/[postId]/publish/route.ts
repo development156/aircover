@@ -7,7 +7,7 @@ import { reportServerError } from '@/lib/observability/report'
 import { getPost, listVariants } from '@/lib/posts/read'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { canPublish, getWorkspaceRole } from '@/lib/workspace-role'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { readActiveWorkspace } from '@/lib/workspaces'
 
 /**
  * POST /api/posts/{postId}/publish — send one channel's variant now, for real.
@@ -82,8 +82,20 @@ export async function POST(
       return fail('Pick a channel to publish to.', 400)
     }
 
-    const workspace = await getActiveWorkspace()
-    if (!workspace) return fail('Create a workspace first.', 400)
+    /**
+     * `readActiveWorkspace`, not `getActiveWorkspace`: the lossy view answers
+     * `null` for BOTH "this account has no workspace" and "the read did not come
+     * back", and those need opposite advice. Telling someone watching a
+     * scheduled post fail to go out to "create a workspace first" — with a 400,
+     * so every 5xx alert filter misses it — is the outage wearing a client
+     * error. The two OAuth routes and the door route already read it this way.
+     */
+    const workspaceRead = await readActiveWorkspace()
+    if (workspaceRead.status === 'unreadable') {
+      return fail('Couldn’t check your workspace just now — try again.', 503)
+    }
+    if (workspaceRead.status === 'none') return fail('Create a workspace first.', 400)
+    const workspace = workspaceRead.workspace
     workspaceId = workspace.id
 
     // Membership alone is not enough. An approver approves and a viewer reads; neither

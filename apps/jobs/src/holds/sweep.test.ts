@@ -12,8 +12,9 @@ const hold = (over: Partial<ExpiredHold> = {}): ExpiredHold => ({
   ...over,
 })
 
-const applied = (): LedgerApplyResult => ({
-  entry: { id: 'entry-1', balanceAfter: 100 },
+const applied = (amount = 3): LedgerApplyResult => ({
+  // The reaper writes RELEASEs; `amount` is what the ledger row would carry.
+  entry: { id: 'entry-1', balanceAfter: 100, amount },
   replayed: false,
 })
 

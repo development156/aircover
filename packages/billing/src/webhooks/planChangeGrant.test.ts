@@ -32,7 +32,7 @@ function fakeLedger() {
       if (existing) return { entry: existing.entry, replayed: true }
       seq += 1
       const result: LedgerApplyResult = {
-        entry: { id: `entry-${seq}`, balanceAfter: 1000 + input.amount },
+        entry: { id: `entry-${seq}`, balanceAfter: 1000 + input.amount, amount: input.amount },
         replayed: false,
       }
       applied.set(input.idempotencyKey, result)

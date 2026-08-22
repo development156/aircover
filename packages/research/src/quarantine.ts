@@ -38,10 +38,14 @@ export const MAX_CHARS_PER_PAGE = 6000
  * Replacement, not rejection — the words stay readable as evidence.
  */
 export function neutralize(text: string): string {
-  return text
-    .replaceAll(OPEN, '(page printed a delimiter)')
-    .replaceAll(CLOSE, '(page printed a delimiter)')
-    .replace(/^\s*(system|assistant|user)\s*:/gim, '$1 (as written on the page):')
+  return (
+    text
+      .replaceAll(OPEN, '(page printed a delimiter)')
+      .replaceAll(CLOSE, '(page printed a delimiter)')
+      // `Human` belongs beside `assistant`: they are the two halves of the same
+      // turn marker, and leaving one out lets half the pair through.
+      .replace(/^\s*(system|assistant|user|human)\s*:/gim, '$1 (as written on the page):')
+  )
 }
 
 export function truncate(text: string, max = MAX_CHARS_PER_PAGE): string {
@@ -59,8 +63,16 @@ export function quarantinePage(page: CrawledPage, index: number): string {
   // Stripped BEFORE truncation, so the 6,000-character budget is spent on words
   // rather than on hrefs. The url stays on the header line, once, where it is
   // provenance rather than noise repeated on every link.
+  // The header carries two attacker-controlled strings, and they need the same
+  // treatment as the body. `JSON.stringify` escapes `"`, `\` and newlines — it
+  // does NOT escape `<` or `>`, and the delimiters are made of exactly those. A
+  // page that serves `&gt;&gt;&gt;` in its own `<title>` never contains the
+  // literal token, so nothing reading the served HTML sees a delimiter; the
+  // forgery appears only after `extractTitle` decodes the entities. Left raw, a
+  // title could close block 0 on the header line and put the entire page body
+  // outside the fence, in the position our own framing occupies.
   return [
-    `${OPEN} index=${index} url=${JSON.stringify(page.url)} title=${JSON.stringify(page.title)}`,
+    `${OPEN} index=${index} url=${JSON.stringify(neutralize(page.url))} title=${JSON.stringify(neutralize(page.title))}`,
     neutralize(truncate(stripCorpusNoise(page.markdown))),
     CLOSE,
   ].join('\n')

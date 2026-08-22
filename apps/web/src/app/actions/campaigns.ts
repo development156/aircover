@@ -297,6 +297,10 @@ export async function removePostFromCampaign(
     if (!ws.ok) return { ok: false, message: ws.message }
     workspaceId = ws.workspace.id
 
+    // `.select('id')` because a PostgREST delete matching zero rows returns NO error.
+    // Zero rows is a refusal — an RLS denial or a stale id — not a success, and
+    // reporting it as one tells the customer their removal happened when it did not.
+    // Same shape as disconnectConnection and deletePost.
     const supabase = createServerSupabase()
     const { data, error } = await supabase
       .from('campaign_posts')
@@ -341,6 +345,10 @@ export async function deleteCampaign(campaignId: string): Promise<CampaignDelete
     if (!ws.ok) return { ok: false, message: ws.message }
     workspaceId = ws.workspace.id
 
+    // `.select('id')` because a PostgREST delete matching zero rows returns NO error.
+    // Zero rows is a refusal — an RLS denial or a stale id — not a success, and
+    // reporting it as one tells the customer their deletion happened when it did not.
+    // Same shape as disconnectConnection and deletePost.
     const supabase = createServerSupabase()
     const { data, error } = await supabase
       .from('campaigns')

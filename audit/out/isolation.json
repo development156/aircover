@@ -1,0 +1,877 @@
+{
+  "aborted": null,
+  "results": [
+    {
+      "table": "ai_provider_logs",
+      "totalRows": 226,
+      "policies": 0,
+      "authenticatedSelectPolicy": false,
+      "ownerWorkspace": "8846b067-5662-4e1e-9bba-cf1830c01fe5",
+      "ownerRows": 93,
+      "ownerMember": "user_3HokWhA6SKypiQp7XX4BvU93rNP",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 200,
+        "count": 0
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "SERVICE-ONLY (denies all, incl. owner)",
+      "why": "no SELECT policy for authenticated — reads are server-side only"
+    },
+    {
+      "table": "asset_derivatives",
+      "totalRows": 0,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "asset_usages",
+      "totalRows": 0,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "assets",
+      "totalRows": 5,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "8846b067-5662-4e1e-9bba-cf1830c01fe5",
+      "ownerRows": 3,
+      "ownerMember": "user_3HokWhA6SKypiQp7XX4BvU93rNP",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 3
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "3 foreign rows existed; owner saw 3, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "audience_snapshots",
+      "totalRows": 10,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "8073bf58-2a18-4ad0-b8ae-a6477058ded1",
+      "ownerRows": 10,
+      "ownerMember": "user_3GlLVVFncsAIaGH8W0MSZv6CSC0",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 10
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "10 foreign rows existed; owner saw 10, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "audit_logs",
+      "totalRows": 10,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 10,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 10
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "10 foreign rows existed; owner saw 10, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "billing_profiles",
+      "totalRows": 0,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "brand_memory",
+      "totalRows": 37,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "8073bf58-2a18-4ad0-b8ae-a6477058ded1",
+      "ownerRows": 16,
+      "ownerMember": "user_3GlLVVFncsAIaGH8W0MSZv6CSC0",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 16
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "16 foreign rows existed; owner saw 16, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "campaign_posts",
+      "totalRows": 2,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "8846b067-5662-4e1e-9bba-cf1830c01fe5",
+      "ownerRows": 1,
+      "ownerMember": "user_3HokWhA6SKypiQp7XX4BvU93rNP",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 200,
+        "count": 1
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "1 foreign rows existed; owner saw 1, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "campaigns",
+      "totalRows": 2,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "8846b067-5662-4e1e-9bba-cf1830c01fe5",
+      "ownerRows": 1,
+      "ownerMember": "user_3HokWhA6SKypiQp7XX4BvU93rNP",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 200,
+        "count": 1
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "1 foreign rows existed; owner saw 1, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "competitor_subscriptions",
+      "totalRows": 0,
+      "policies": 3,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "connections",
+      "totalRows": 6,
+      "policies": 3,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 2,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 2
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "2 foreign rows existed; owner saw 2, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "credit_balances",
+      "totalRows": 26,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "083ab0ae-9d22-4c3f-9014-56038adcf7bc",
+      "ownerRows": 1,
+      "ownerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "attackerMember": "user_3GkSm0zeVCTqgfoHS1voCrDpUFP",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 200,
+        "count": 1
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "1 foreign rows existed; owner saw 1, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "credit_ledger",
+      "totalRows": 202,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 64,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 64
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "64 foreign rows existed; owner saw 64, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "inbox_messages",
+      "totalRows": 0,
+      "policies": 2,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "inbox_threads",
+      "totalRows": 0,
+      "policies": 2,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "invoices",
+      "totalRows": 0,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "knowledge_chunks",
+      "totalRows": 0,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "knowledge_documents",
+      "totalRows": 0,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "leads",
+      "totalRows": 3,
+      "policies": 2,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 3,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 3
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "3 foreign rows existed; owner saw 3, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "loop_briefs",
+      "totalRows": 20,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 20,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 20
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "20 foreign rows existed; owner saw 20, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "loop_channel_autonomy",
+      "totalRows": 1,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 1,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 200,
+        "count": 1
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "1 foreign rows existed; owner saw 1, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "loop_cycles",
+      "totalRows": 5,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 5,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 5
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "5 foreign rows existed; owner saw 5, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "loop_settings",
+      "totalRows": 2,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "8846b067-5662-4e1e-9bba-cf1830c01fe5",
+      "ownerRows": 1,
+      "ownerMember": "user_3HokWhA6SKypiQp7XX4BvU93rNP",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 200,
+        "count": 1
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "1 foreign rows existed; owner saw 1, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "memory_events",
+      "totalRows": 3,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 3,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 3
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "3 foreign rows existed; owner saw 3, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "ops_credit_requests",
+      "totalRows": 2,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 1,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 200,
+        "count": 0
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "OWNER-BLIND",
+      "why": "owner member saw 0 of its own 1 rows — policy denies the legitimate case"
+    },
+    {
+      "table": "planner_events",
+      "totalRows": 9,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 9,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 9
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "9 foreign rows existed; owner saw 9, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "playbook_run_items",
+      "totalRows": 0,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "playbook_runs",
+      "totalRows": 0,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "playbooks",
+      "totalRows": 0,
+      "policies": 3,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "post_media",
+      "totalRows": 23,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "5f17dad6-35ae-4288-aba1-1e3a4df31189",
+      "ownerRows": 12,
+      "ownerMember": "user_3GrFkWZEcP63riPoPzMadsAzBaP",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 12
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "12 foreign rows existed; owner saw 12, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "post_metric_snapshots",
+      "totalRows": 63,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "5f17dad6-35ae-4288-aba1-1e3a4df31189",
+      "ownerRows": 63,
+      "ownerMember": "user_3GrFkWZEcP63riPoPzMadsAzBaP",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 63
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "63 foreign rows existed; owner saw 63, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "post_publish_logs",
+      "totalRows": 21,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "5f17dad6-35ae-4288-aba1-1e3a4df31189",
+      "ownerRows": 15,
+      "ownerMember": "user_3GrFkWZEcP63riPoPzMadsAzBaP",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 15
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "15 foreign rows existed; owner saw 15, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "post_variants",
+      "totalRows": 47,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 17,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 17
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "17 foreign rows existed; owner saw 17, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "posts",
+      "totalRows": 123,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 24,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 24
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "24 foreign rows existed; owner saw 24, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "remix_batches",
+      "totalRows": 0,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "remix_derivatives",
+      "totalRows": 0,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "site_pages",
+      "totalRows": 6,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 2,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 2
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "2 foreign rows existed; owner saw 2, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "site_sections",
+      "totalRows": 31,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "083ab0ae-9d22-4c3f-9014-56038adcf7bc",
+      "ownerRows": 10,
+      "ownerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "attackerMember": "user_3GkSm0zeVCTqgfoHS1voCrDpUFP",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 10
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "10 foreign rows existed; owner saw 10, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "sites",
+      "totalRows": 5,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "083ab0ae-9d22-4c3f-9014-56038adcf7bc",
+      "ownerRows": 2,
+      "ownerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "attackerMember": "user_3GkSm0zeVCTqgfoHS1voCrDpUFP",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 2
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "2 foreign rows existed; owner saw 2, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "subscriptions",
+      "totalRows": 1,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 1,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 200,
+        "count": 1
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "1 foreign rows existed; owner saw 1, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "templates",
+      "totalRows": 2,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "8846b067-5662-4e1e-9bba-cf1830c01fe5",
+      "ownerRows": 1,
+      "ownerMember": "user_3HokWhA6SKypiQp7XX4BvU93rNP",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 200,
+        "count": 1
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "1 foreign rows existed; owner saw 1, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "tour_progress",
+      "totalRows": 0,
+      "policies": 1,
+      "authenticatedSelectPolicy": false,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    },
+    {
+      "table": "workspace_members",
+      "totalRows": 27,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "6473b616-dbf0-5a27-9d5b-4b67695a9c2c",
+      "ownerRows": 2,
+      "ownerMember": "demo_seed_chai-and-chapters",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 206,
+        "count": 2
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "2 foreign rows existed; owner saw 2, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "workspace_themes",
+      "totalRows": 7,
+      "policies": 4,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "db20bc52-a891-4e29-971d-9e08561e9100",
+      "ownerRows": 1,
+      "ownerMember": "user_3I04ViH94ATpWw0d67l8aapItVs",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 200,
+        "count": 1
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "1 foreign rows existed; owner saw 1, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "zernio_profiles",
+      "totalRows": 6,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "ownerWorkspace": "56d57400-676a-4556-89eb-c7ceacaf7d27",
+      "ownerRows": 1,
+      "ownerMember": "user_3I03SU2kWEWJ6hKseETAbAQXbM5",
+      "attackerMember": "user_3GlRU7zNI8NoiwF1fJpEG71NKoj",
+      "anon": {
+        "status": 200,
+        "count": 0
+      },
+      "owner": {
+        "status": 200,
+        "count": 1
+      },
+      "attacker": {
+        "status": 200,
+        "count": 0
+      },
+      "verdict": "EXERCISED",
+      "why": "1 foreign rows existed; owner saw 1, attacker saw 0, anon saw 0"
+    },
+    {
+      "table": "zernio_webhook_events",
+      "totalRows": 0,
+      "policies": 1,
+      "authenticatedSelectPolicy": true,
+      "verdict": "VACUOUS",
+      "why": "table is empty in production — nothing existed to hide"
+    }
+  ]
+}
