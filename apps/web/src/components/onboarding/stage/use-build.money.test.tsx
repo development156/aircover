@@ -160,6 +160,35 @@ describe('one press, one charge', () => {
     expect(resolveOnboarding).toHaveBeenCalledTimes(2)
   })
 
+  test('a THROWN save releases the save guard rather than latching the screen', async () => {
+    /*
+     * The arm a never-settling mock cannot reach, and the one that matters most:
+     * a rejection used to leave `saveInFlight` true and `saving` true forever.
+     * ResultStep reads `saving`, so both of its buttons would sit in a saving
+     * state showing no error while the ref swallowed every retry — a resolved
+     * brain, permanently unreachable, on a screen that looks like it is working.
+     */
+    resolveOnboarding.mockResolvedValue({ ok: true, kind: 'free', brain: { fields: {} } })
+    saveBrandMemory.mockRejectedValueOnce(new Error('connection lost'))
+    const { result } = build()
+
+    await act(async () => {
+      await result.current.start()
+    })
+    await act(async () => {
+      await result.current.finish(() => {}).catch(() => {})
+    })
+    // The screen is not stuck saying it is saving.
+    expect(result.current.saving).toBe(false)
+
+    // And a retry actually reaches the action.
+    saveBrandMemory.mockReturnValue(new Promise(() => {}))
+    await act(async () => {
+      void result.current.finish(() => {})
+    })
+    expect(saveBrandMemory).toHaveBeenCalledTimes(2)
+  })
+
   test('two finishes in the same tick save the brain ONCE', async () => {
     // Not a charge — `saveBrandMemory` never calls the mesh — but two presses
     // write two `brand_memory` versions and save the theme twice.

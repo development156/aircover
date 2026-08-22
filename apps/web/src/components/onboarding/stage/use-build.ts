@@ -319,42 +319,61 @@ export function useBuild({
       setSaveError(null)
       setThemeError(null)
 
-      // Declared beats derived: swatches the user MOVED are their statement
-      // about the brand, and the door's extraction is a guess from a page.
-      const declared = data.colorsTouched.length > 0
-      const colors = declared
-        ? [data.colors.Primary, data.colors.Secondary]
-        : doorColors(doorRef.current)
-      if (colors.length > 0) {
-        const themeState = await saveWorkspaceTheme(colors)
-        if (!themeState.ok) setThemeError(themeState.message)
-      }
+      try {
+        // Declared beats derived: swatches the user MOVED are their statement
+        // about the brand, and the door's extraction is a guess from a page.
+        const declared = data.colorsTouched.length > 0
+        const colors = declared
+          ? [data.colors.Primary, data.colors.Secondary]
+          : doorColors(doorRef.current)
+        if (colors.length > 0) {
+          const themeState = await saveWorkspaceTheme(colors)
+          if (!themeState.ok) setThemeError(themeState.message)
+        }
 
-      /**
-       * `confirmPaths` is EMPTY, and that is the honest answer rather than an
-       * oversight.
-       *
-       * A path is confirmed when a person wrote the sentence in it. The new
-       * result card is READ-ONLY — every brain field is set on /brain, against
-       * real output, which is what "Review Brand Brain" goes to. Nobody has
-       * confirmed a field here, so nothing may be marked confirmed. Deriving
-       * confirmations from the onboarding answers instead would mark the
-       * model's own words as the customer's.
-       */
-      const result = await saveBrandMemory(
-        brain,
-        brainSource,
-        [],
-        storedIntakeFrom(intakeTextOf(data), doorText(doorRef.current), {}),
-      )
-      setSaving(false)
-      saveInFlight.current = false
-      if (!result.ok) {
-        setSaveError(result.message)
-        then(false)
-        return
+        /**
+         * `confirmPaths` is EMPTY, and that is the honest answer rather than an
+         * oversight.
+         *
+         * A path is confirmed when a person wrote the sentence in it. The new
+         * result card is READ-ONLY — every brain field is set on /brain, against
+         * real output, which is what "Review Brand Brain" goes to. Nobody has
+         * confirmed a field here, so nothing may be marked confirmed. Deriving
+         * confirmations from the onboarding answers instead would mark the
+         * model's own words as the customer's.
+         */
+        const result = await saveBrandMemory(
+          brain,
+          brainSource,
+          [],
+          storedIntakeFrom(intakeTextOf(data), doorText(doorRef.current), {}),
+        )
+        if (!result.ok) {
+          setSaveError(result.message)
+          then(false)
+          return
+        }
+        then(true)
+      } finally {
+        /**
+         * THE SAME `finally` `start` HAS, AND FOR THE SAME REASON.
+         *
+         * This released on the clean return only. `saveWorkspaceTheme` and
+         * `saveBrandMemory` are both `await`ed and both can REJECT — a dropped
+         * connection is enough — and a rejection left `saveInFlight` true and
+         * `saving` true for the rest of the session. `ResultStep` reads
+         * `saving={build.saving || launching}`, so both Enter Sahoda and Review
+         * Brand Brain would sit in a saving state, showing no error, while the
+         * ref swallowed every further press. A brain that was successfully
+         * resolved would be unreachable, and the screen would look like it was
+         * still working.
+         *
+         * A never-settling mock cannot catch this, which is why the test for it
+         * REJECTS rather than hangs.
+         */
+        setSaving(false)
+        saveInFlight.current = false
       }
-      then(true)
     },
     [brain, brainSource, data],
   )
