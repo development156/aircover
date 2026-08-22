@@ -179,7 +179,7 @@ export function CommandPalette() {
             aria-modal="true"
             aria-label="Search Sahoda"
             onClick={(event) => event.stopPropagation()}
-            className="w-full max-w-[520px] overflow-hidden rounded-lg bg-surface shadow-lg"
+            className="glass w-full max-w-[520px] overflow-hidden rounded-xl shadow-lg"
           >
             <div className="flex items-center gap-2 border-b border-line-soft px-3">
               <Search size={15} className="shrink-0 text-muted" aria-hidden />

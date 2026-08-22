@@ -79,7 +79,18 @@ export async function Topbar() {
   return (
     <header
       data-guide="topbar.root"
-      className="sticky top-0 z-5 flex h-topbar flex-none items-center gap-3 border-b border-line-soft bg-surface px-page max-narrow:gap-2 max-narrow:px-page-mobile"
+      /* GLASS, and this is the one surface where the brief's two wishes meet.
+         "Glassy and transparent" and "exactly like the reference" are not the
+         same instruction — the reference's app is not glass anywhere except its
+         auth card. The resolution is by surface ROLE: glass on chrome, opaque
+         on data. A topbar is chrome. It is one fixed element, so its
+         backdrop-filter costs one composited layer for the whole session rather
+         than one per row.
+
+         `border-b` goes: the topbar now separates from the content by BLUR and
+         by the gradient moving behind it, which is the same "separate by fill,
+         not by line" rule the card ladder follows. */
+      className="glass sticky top-0 z-5 flex h-topbar flex-none items-center gap-3 px-page max-narrow:gap-2 max-narrow:px-page-mobile"
     >
       {/* On a phone the rail is gone entirely, and the brand mark went with it —
           so it reappears here. Hidden ≥768px, where the rail carries the full

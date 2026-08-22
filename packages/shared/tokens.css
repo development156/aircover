@@ -233,9 +233,51 @@
      looking loose, type set at 11px uppercase needs positive tracking to stop
      looking cramped. One value per size band, never per component. */
   --ls-display: -0.022em; /* >=24px */
-  --ls-heading: -0.014em; /* 16-20px */
+  --ls-heading: -0.008em; /* 16-20px */
   --ls-body: 0em; /* 12-14px */
   --ls-hero-num: -0.03em; /* figures are wide; the hero number needs the most */
+
+  /* ---------- L2 · WORD SPACING — A CORRECTION, NOT A STYLE ----------
+     THE FACE'S ONE DEFECT, MEASURED AND FIXED.
+
+     Plus Jakarta Sans was chosen for its letterforms. Its WORD SPACE is too
+     narrow to ship as-is, and the measurement is unambiguous — space advance as
+     a fraction of the font size, read off the live document:
+
+        Arial              14px/400              3.89px   27.8%   (a normal face)
+        Plus Jakarta Sans  14px/400              2.00px   14.3%
+        Plus Jakarta Sans  16px/650  -0.014em    2.77px   17.3%
+        Plus Jakarta Sans  16px/650   0          3.00px   18.8%
+
+     At 14.3% of an em the words run together: "Needs your attention" renders as
+     one word at a glance, which was visible in a 3x crop of the shipped frame
+     before this token existed. It matters most for the reader this product is
+     for — someone meeting a marketing tool for the first time, on a phone.
+
+     NEGATIVE TRACKING IS NOT THE CAUSE, and that is why the fix is not "stop
+     tracking". Removing it entirely moves 17.3% -> 18.8%, still far under a
+     normal face. The narrow space is the typeface's own metric.
+
+     So the correction uses the one property that targets word gaps and leaves
+     every letterform alone.
+
+     IT MUST BE RE-DECLARED ON EVERY TYPE STEP, AND THAT IS NOT BELT-AND-BRACES.
+     An `em` length in `word-spacing` computes to ABSOLUTE PIXELS against the
+     element it is declared on, and what inherits is that computed pixel value —
+     not the em. Declared once on `html` (16px) it becomes a flat 1.6px for the
+     whole document, which is a different fraction at every step. MEASURED, and
+     the tell is that three steps came back byte-identical:
+
+        body 14px  3.61px  25.8%     h1  24px  5.08px  21.2%   <- under the floor
+        sm   13px  3.61px  27.8%     meta 12px 3.61px  30.1%   <- and over it
+
+     Three sizes, one advance. So each `@utility type-*` in globals.css carries
+     its own `word-spacing: var(--ws-word)`, where the em resolves against that
+     step's own size, and the root declaration stays only as the baseline for
+     text that uses no type step. `type-space.spec.ts` measures the advance in a
+     real browser — the only place a font's metrics exist — and fails below 22%
+     of the size. It caught this. */
+  --ws-word: 0.1em;
 
   /* ---------- L2 · SPACE (4pt scale) ---------- */
   --space-1: 4px;
@@ -556,6 +598,19 @@
 ::selection {
   background: rgba(255, 102, 0, 0.16);
   color: var(--ink);
+}
+
+/* The word-space correction, applied once at the root so every step inherits it.
+   See --ws-word for the measurement.
+
+   It CANNOT live in the `--t-*` steps: those are `font` shorthands, and the
+   shorthand has no word-spacing slot at all — `font:` sets family, size,
+   line-height, weight, style, stretch and variant, and word-spacing is a CSS
+   Text property that simply is not part of it. Writing it there would not
+   compile. One inherited declaration at the root reaches every step instead,
+   and `type-space.spec.ts` proves it arrives. */
+html {
+  word-spacing: var(--ws-word);
 }
 
 /* ============================================================

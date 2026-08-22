@@ -219,6 +219,11 @@
   /* ---- Shell dims → w-rail, h-topbar, p-page, max-w-content ---- */
   --spacing-rail: var(--sidebar-w);
   --spacing-rail-collapsed: var(--sidebar-w-collapsed);
+  /* The rail FLOATS — measured 10px off every viewport edge on the reference.
+     Named so the shell can write `p-rail-inset` instead of a literal, which
+     design-lint rule 2 would refuse and which would then have to be spelled the
+     same way in three places. */
+  --spacing-rail-inset: var(--rail-inset);
   --spacing-topbar: var(--topbar-h);
   --spacing-page: var(--content-pad);
   --spacing-home-rail: var(--rail-w);
@@ -386,14 +391,17 @@
 @utility type-display {
   font: var(--t-display);
   letter-spacing: var(--ls-display);
+  word-spacing: var(--ws-word);
 }
 @utility type-h1 {
   font: var(--t-h1);
   letter-spacing: var(--ls-display);
+  word-spacing: var(--ws-word);
 }
 @utility type-h2 {
   font: var(--t-h2);
   letter-spacing: var(--ls-heading);
+  word-spacing: var(--ws-word);
 }
 /* The rung that was missing — card and section titles. Before this they were
    hand-written `text-[15px] font-semibold` at each call site, which is how
@@ -401,6 +409,7 @@
 @utility type-h3 {
   font: var(--t-h3);
   letter-spacing: var(--ls-heading);
+  word-spacing: var(--ws-word);
 }
 /* The one big number per view. Tabular by construction: a balance that
    reflows its digits as it changes reads as unstable. */
@@ -408,12 +417,15 @@
   font: var(--t-hero-num);
   letter-spacing: var(--ls-hero-num);
   font-variant-numeric: tabular-nums;
+  word-spacing: var(--ws-word);
 }
 @utility type-body {
   font: var(--t-body);
+  word-spacing: var(--ws-word);
 }
 @utility type-sm {
   font: var(--t-sm);
+  word-spacing: var(--ws-word);
 }
 /* v5 · THE META RUNG — table cells, captions, timestamps, helper text.
    The scale ran `type-sm` straight to an uppercase eyebrow with nothing in
@@ -422,6 +434,7 @@
    single largest block of off-scale type in the app. This is that rung. */
 @utility type-meta {
   font: var(--t-xs);
+  word-spacing: var(--ws-word);
 }
 /* The chip step — 11px/600, NOT uppercase.
    The scale ran 12px `type-sm` straight to 11px uppercase `type-eyebrow`, with no
@@ -432,6 +445,7 @@
    a chip whose label is a sentence fragment ("Not proven live"). */
 @utility type-chip {
   font: var(--t-chip);
+  word-spacing: var(--ws-word);
 }
 /* The embed field step — see `--t-input-embed` in tokens.css for why 16px is a
    browser constraint and not a preference. Added when /embed/lead was built:
@@ -440,11 +454,13 @@
    same drift `type-h3` and `type-chip` were added to stop. */
 @utility type-input-embed {
   font: var(--t-input-embed);
+  word-spacing: var(--ws-word);
 }
 @utility type-eyebrow {
   font: var(--t-eyebrow);
   letter-spacing: var(--t-eyebrow-ls);
   text-transform: uppercase;
+  word-spacing: var(--ws-word);
 }
 
 /* ---- Surface treatments ----
