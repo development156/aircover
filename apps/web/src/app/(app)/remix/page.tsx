@@ -15,6 +15,7 @@ import { creditCost } from '@sahoda/shared'
 import { PageTitle } from '@/components/page-title'
 import { InertButton, InertField, RoadmapBanner } from '@/components/roadmap/inert'
 import { NotRunningNote } from '@/components/roadmap/parts'
+import { creditWord } from '@/lib/credit-words'
 
 export const metadata = { title: 'Remix' }
 
@@ -145,9 +146,10 @@ export default function RemixPage() {
             <SquarePen size={15} strokeWidth={1.8} aria-hidden className="mt-[3px] shrink-0" />
             <span>
               One price for the whole batch &mdash;{' '}
-              <span className="num">{creditCost('remix_pack')}</span> credits &mdash; and you see
-              everything before anything is saved. Discarding a piece costs nothing extra and
-              refunds nothing; the writing has already happened.
+              <span className="num">{creditCost('remix_pack')}</span>{' '}
+              {creditWord(creditCost('remix_pack'))} &mdash; and you see everything before anything
+              is saved. Discarding a piece costs nothing extra and refunds nothing; the writing has
+              already happened.
             </span>
           </li>
         </ul>

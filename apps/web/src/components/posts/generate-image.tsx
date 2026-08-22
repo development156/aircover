@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 
 import { InlineError } from './inline-error'
 import { PendingLines } from './pending-lines'
+import { creditWord } from '@/lib/credit-words'
 
 const PENDING_LINES = [
   'Asking for your picture…',
@@ -100,9 +101,10 @@ export function GenerateImage({ postId, disabled }: { postId: string; disabled?:
         <InlineError>
           {failure.kind === 'insufficient' ? (
             <>
-              An image needs <span className="tabular-nums">{failure.required}</span> credits and
-              you have <span className="tabular-nums">{failure.available}</span>. Nothing was
-              generated and you were not charged.{' '}
+              An image needs <span className="tabular-nums">{failure.required}</span>{' '}
+              {creditWord(failure.required)} and you have{' '}
+              <span className="tabular-nums">{failure.available}</span>. Nothing was generated and
+              you were not charged.{' '}
               <Link href="/wallet" className="font-semibold underline underline-offset-2">
                 Top up your wallet
               </Link>

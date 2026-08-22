@@ -4,6 +4,7 @@ import { PageTitle } from '@/components/page-title'
 import { reflectionWindow } from '@/lib/loop/iso-week'
 import { readLoop } from '@/lib/loop/read'
 import { readCycleLearnings, readRanking } from '@/lib/loop/report'
+import { creditWord } from '@/lib/credit-words'
 
 export const metadata = { title: 'CMO Report' }
 
@@ -210,8 +211,9 @@ export default async function ReportPage() {
             ) : null}
             {cycle.approvedCredits !== null && cycle.estimatedCredits !== null ? (
               <p className="type-sm mt-1 text-muted">
-                Sahoda proposed <span className="num">{cycle.estimatedCredits}</span> credits of
-                writing; you approved <span className="num">{cycle.approvedCredits}</span>.
+                Sahoda proposed <span className="num">{cycle.estimatedCredits}</span>{' '}
+                {creditWord(cycle.estimatedCredits ?? 0)} of writing; you approved{' '}
+                <span className="num">{cycle.approvedCredits}</span>.
               </p>
             ) : null}
           </dl>

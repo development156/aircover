@@ -4,6 +4,7 @@ import type { Post } from '@sahoda/shared'
 import { AgencyBlade } from '@/components/posts/agency-blade'
 import { buttonVariants } from '@/components/ui/button'
 import { CardLabel } from '@/components/ui/card'
+import { creditWord } from '@/lib/credit-words'
 
 /**
  * What Sahoda did this week.
@@ -38,8 +39,7 @@ export function SahodaRail({ drafted, planCost }: SahodaRailProps) {
               40px pill after the control shapes moved to 34px / 6px. */}
           <Link href="/planner" className={buttonVariants({ variant: 'primary' })}>
             <span>
-              Plan my week · <span className="tabular-nums">{planCost}</span>{' '}
-              {planCost === 1 ? 'credit' : 'credits'}
+              Plan my week · <span className="tabular-nums">{planCost}</span> {creditWord(planCost)}
             </span>
           </Link>
         </div>

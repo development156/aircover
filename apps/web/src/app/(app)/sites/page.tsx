@@ -9,6 +9,7 @@ import { SitePreview } from '@/components/sites/site-preview'
 import { siteTreeToOutput } from '@/lib/sites/from-rows'
 import { toPreviewPages, type PreviewPage } from '@/lib/sites/preview'
 import { activeThemeTokens } from '@/lib/brand/read-theme'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { countSites, readRecentSites, readSiteTree } from '@/lib/sites/read'
 import { getActiveWorkspace } from '@/lib/workspaces'
@@ -54,9 +55,17 @@ async function buildPreview(): Promise<Preview> {
   const sites = read.sites
   if (sites.length === 0) return null
 
-  // The workspace's accepted Brand Skin. `null` when no logo was ever uploaded,
-  // which `themeCss` renders as the tokens.css defaults.
-  const theme = await activeThemeTokens()
+  // The ACTIVE workspace's accepted Brand Skin. `null` when no logo was ever
+  // uploaded, which `themeCss` renders as the tokens.css defaults.
+  //
+  // Scoped. This call used to omit the id, and RLS scopes `workspace_themes` to
+  // the caller's MEMBERSHIPS rather than to the workspace they are in — so for
+  // anyone in two workspaces the preview was painted in whichever held the
+  // higher theme version. `activeWorkspaceRead` is React-cached, so this shares
+  // the one lookup `readRecentSites` above already made.
+  const workspace = await activeWorkspaceRead()
+  if (workspace.status !== 'ok') return 'read-failed'
+  const theme = await activeThemeTokens(workspace.workspace.id)
 
   for (const site of sites) {
     const tree = await readSiteTree(site.id)

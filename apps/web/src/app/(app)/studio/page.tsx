@@ -5,6 +5,7 @@ import { creditCost } from '@sahoda/shared'
 import { PageTitle } from '@/components/page-title'
 import { InertButton, InertChip, RoadmapBanner } from '@/components/roadmap/inert'
 import { InertMediaSlot, InertPanel, InertRow, NotRunningNote } from '@/components/roadmap/parts'
+import { creditWord } from '@/lib/credit-words'
 
 export const metadata = { title: 'Studio' }
 
@@ -147,7 +148,8 @@ export default function StudioPage() {
           A PNG or JPEG costs nothing &mdash; drawing it is our own code, not a model call, so there
           is nothing to charge for. Only the parts that call a model cost credits: a generated image
           into a slot at its usual price, and a carousel at{' '}
-          <span className="num">{creditCost('carousel')}</span> credits.
+          <span className="num">{creditCost('carousel')}</span> {creditWord(creditCost('carousel'))}
+          .
         </p>
         {/* The spec also prices a short MP4 slideshow. That price is NOT in
             pricing.config.json, and a credit figure this app prints must come

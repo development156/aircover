@@ -3,6 +3,7 @@ import { Building2, FileText, Megaphone, Timer } from 'lucide-react'
 import { creditCost } from '@sahoda/shared'
 
 import { PageTitle } from '@/components/page-title'
+import { creditWord } from '@/lib/credit-words'
 import { InertButton, InertField, RoadmapBanner } from '@/components/roadmap/inert'
 import { InertPanel, InertRow, NotRunningNote } from '@/components/roadmap/parts'
 
@@ -155,7 +156,8 @@ export default function RadarPage() {
           One scan per business per week, at <span className="num">
             {creditCost('radar_scan')}
           </span>{' '}
-          credits each. A page that will not load is skipped and not charged.
+          {creditWord(creditCost('radar_scan'))} each. A page that will not load is skipped and not
+          charged.
         </p>
       </section>
 

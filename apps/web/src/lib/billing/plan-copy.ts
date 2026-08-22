@@ -8,6 +8,7 @@ import {
   type Proration,
   type TaxTreatment,
 } from '@sahoda/shared'
+import { creditWord } from '@/lib/credit-words'
 
 /**
  * Every sentence and every formatted number the plan screen renders.
@@ -60,7 +61,7 @@ export function onDate(iso: string): string {
  */
 export function planIncludes(planId: PlanId): string[] {
   const plan = PLAN_CATALOG[planId]
-  const lines = [`${count(plan.monthlyCredits)} credits a month`]
+  const lines = [`${count(plan.monthlyCredits)} ${creditWord(plan.monthlyCredits)} a month`]
   if (plan.limits.channels > 0) lines.push(plural(plan.limits.channels, 'channel'))
   if (plan.limits.sites > 0) lines.push(plural(plan.limits.sites, 'site'))
   if (plan.limits.seats > 0) lines.push(plural(plan.limits.seats, 'seat'))
@@ -198,7 +199,9 @@ export function prorationSummary(p: Proration): string[] {
       : `You pay ${rupees(p.amountDuePaise)} today, then ${rupees(PLAN_CATALOG[p.toPlanId].priceInr * 100)} a month.`,
   )
   if (p.creditsGranted > 0) {
-    lines.push(`${count(p.creditsGranted)} credits land as soon as the payment clears.`)
+    lines.push(
+      `${count(p.creditsGranted)} ${creditWord(p.creditsGranted)} land as soon as the payment clears.`,
+    )
   }
   return lines
 }

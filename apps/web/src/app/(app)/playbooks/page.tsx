@@ -13,6 +13,7 @@ import { creditCost } from '@sahoda/shared'
 import { PageTitle } from '@/components/page-title'
 import { InertButton, InertChip, InertField, RoadmapBanner } from '@/components/roadmap/inert'
 import { InertToggle, NotRunningNote } from '@/components/roadmap/parts'
+import { creditWord } from '@/lib/credit-words'
 
 export const metadata = { title: 'Playbooks' }
 
@@ -191,8 +192,9 @@ export default function PlaybooksPage() {
             <ArrowRight size={15} strokeWidth={1.8} aria-hidden className="mt-[3px] shrink-0" />
             <span>
               Every run is written down &mdash; what set it off, what it made, and what it cost. A
-              run costs <span className="num">{creditCost('playbook_run')}</span> credits, plus
-              whatever the thing it writes costs on its own.
+              run costs <span className="num">{creditCost('playbook_run')}</span>{' '}
+              {creditWord(creditCost('playbook_run'))}, plus whatever the thing it writes costs on
+              its own.
             </span>
           </li>
         </ul>

@@ -1,3 +1,5 @@
+import { creditWord } from '@/lib/credit-words'
+
 /**
  * A spending button's label, with its cost in it.
  *
@@ -23,7 +25,7 @@ export interface CostLabelProps {
 export function CostLabel({ action, cost }: CostLabelProps) {
   return (
     <span>
-      {action} · <span className="tabular-nums">{cost}</span> {cost === 1 ? 'credit' : 'credits'}
+      {action} · <span className="tabular-nums">{cost}</span> {creditWord(cost)}
     </span>
   )
 }

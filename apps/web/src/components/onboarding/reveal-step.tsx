@@ -16,6 +16,7 @@ import { SignalLockCard } from './cards/signal-lock-card'
 import { TabooCard } from './cards/taboo-card'
 import { VoiceCard } from './cards/voice-card'
 import { SignalClarityMeter } from './signal-clarity-meter'
+import { creditWord } from '@/lib/credit-words'
 
 export interface RevealStepProps {
   brain: BrandMemoryPayload
@@ -96,7 +97,8 @@ export function RevealStep({
 
         {balanceAfter !== null ? (
           <p className="font-mono text-[12px] font-semibold text-muted">
-            Balance: <span className="tabular-nums text-ink">{balanceAfter}</span> credits
+            Balance: <span className="tabular-nums text-ink">{balanceAfter}</span>{' '}
+            {creditWord(balanceAfter)}
           </p>
         ) : wasFree ? (
           <p className="font-mono text-[12px] font-semibold text-muted">This one was free</p>

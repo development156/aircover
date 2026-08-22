@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Unreadable } from '@/components/design-system/absence-row'
 import type { BalanceRead } from '@/lib/wallet/read'
 import { cn } from '@/lib/utils'
+import { creditWord } from '@/lib/credit-words'
 
 // Credit chip per docs/08 §6: pill, 1.5px --p border, tabular number, click →
 // wallet. The number is AVAILABLE credits (total − held) — the same figure the
@@ -38,7 +39,13 @@ function contentFor(balance: BalanceRead): ChipContent {
   if (balance.status === 'ok') {
     const credits = balance.balance.available.toLocaleString('en-IN')
 
-    return { text: credits, suffix: 'credits', label: `${credits} credits available. Open wallet` }
+    const word = creditWord(balance.balance.available)
+
+    return {
+      text: credits,
+      suffix: word,
+      label: `${credits} ${word} available. Open wallet`,
+    }
   }
 
   if (balance.status === 'no-workspace') {

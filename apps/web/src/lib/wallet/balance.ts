@@ -1,5 +1,6 @@
 import { CreditBalanceSchema, availableCredits } from '@sahoda/shared'
 import type { LedgerEntry } from '@sahoda/shared'
+import { creditWord } from '@/lib/credit-words'
 
 /**
  * The wallet hero number and its held subline.
@@ -83,9 +84,11 @@ export function toBalance(row: unknown): WalletBalance {
 function heldNoteFor(held: number): string {
   const amount = formatCredits(held)
 
+  // One ternary, on the raw number. `amount` is already formatted, so it cannot
+  // be the thing the word is derived from.
   return held === 1
-    ? `${amount} credit held by an action in progress. Released when it finishes or fails.`
-    : `${amount} credits held by actions in progress. Released when they finish or fail.`
+    ? `${amount} ${creditWord(held)} held by an action in progress. Released when it finishes or fails.`
+    : `${amount} ${creditWord(held)} held by actions in progress. Released when they finish or fail.`
 }
 
 /**

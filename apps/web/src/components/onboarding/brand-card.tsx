@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardLabel } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { creditWord } from '@/lib/credit-words'
 
 /**
  * What a Regenerate costs: a number of credits, or `'free'`.
@@ -59,7 +60,8 @@ export function BrandCard({
               'Regenerate · free'
             ) : (
               <>
-                Regenerate · Uses <span className="tabular-nums">{regenerateCost}</span> credits
+                Regenerate · Uses <span className="tabular-nums">{regenerateCost}</span>{' '}
+                {creditWord(regenerateCost)}
               </>
             )}
           </span>
