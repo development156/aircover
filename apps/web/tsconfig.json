@@ -28,7 +28,11 @@
     "vitest.config.ts",
     "vitest.setup.ts",
     "e2e",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    // The perf harness lives under scripts/, which was outside every `include`
+    // — so `tsc --noEmit` had never seen it and a type error there would have
+    // been invisible to the gate for as long as it existed.
+    "scripts"
   ],
   "exclude": ["node_modules"]
 }

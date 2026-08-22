@@ -1,4 +1,6 @@
 import { currentUser } from '@clerk/nextjs/server'
+
+import { SkeletonBar } from '@/components/skeleton'
 import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
 
@@ -187,6 +189,52 @@ export async function RailFoot() {
           </span>
         </span>
       </Link>
+    </div>
+  )
+}
+
+/**
+ * The shape `RailFoot` leaves behind while it streams in.
+ *
+ * ── SHAPED LIKE THE CONTENT, NOT A GREY BLOCK ────────────────────────────────
+ * Every box is the size of the thing that replaces it: the credits number is
+ * 19px tall because that is the type size it becomes, the avatar is the same
+ * 26px circle, and the two identity lines are 13px and 11px. So the rail does
+ * not resize when the real values land — a skeleton whose geometry differs from
+ * its content is a layout shift with extra steps.
+ *
+ * The two STATIC labels — "Credits left" and "Usage" — are rendered for real
+ * rather than skeletonised. They are not waiting on anything, and replacing a
+ * word you could already have read with a grey rectangle makes the page slower
+ * to understand while making it look busier.
+ *
+ * `aria-hidden` on the placeholder geometry with one polite live region: a
+ * screen reader should hear "loading your account" once, not five unlabelled
+ * boxes. `animate-pulse` is left to the shared token layer, which already
+ * respects prefers-reduced-motion.
+ */
+export function RailFootSkeleton() {
+  return (
+    <div className="flex-none border-t border-line-soft">
+      <div className="px-3 pt-3 pb-2 max-wide:hidden">
+        <div className="flex min-h-[19px] items-baseline gap-1.5">
+          <SkeletonBar className="h-[19px] w-16" />
+        </div>
+        <div className="mt-1.5 flex items-center justify-between">
+          <span className="text-[12px] text-muted">Credits left</span>
+          <span className="text-[12px] font-semibold text-accent">Usage</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 px-3 py-2.5 max-wide:justify-center max-wide:px-0">
+        <span aria-hidden className="size-[26px] flex-none rounded-full bg-s2" />
+        <span className="min-w-0 flex-1 max-wide:hidden">
+          <SkeletonBar className="h-[13px] w-24" />
+          <SkeletonBar className="mt-1 h-[11px] w-16" />
+        </span>
+      </div>
+      <span className="sr-only" role="status">
+        Loading your account
+      </span>
     </div>
   )
 }

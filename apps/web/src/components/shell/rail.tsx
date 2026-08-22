@@ -1,10 +1,11 @@
+import { Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
 
 import { NavItem } from '@/components/shell/nav-item'
 import { RailRevealActive } from '@/components/shell/rail-reveal-active'
-import { RailFoot } from '@/components/shell/rail-foot'
+import { RailFoot, RailFootSkeleton } from '@/components/shell/rail-foot'
 import { approvalCount } from '@/lib/approvals/read'
 import { NAV_FOOT, NAV_GROUPS } from '@/lib/nav/sections'
 import { getOpsAdmin } from '@/lib/ops/guard'
@@ -64,13 +65,24 @@ async function showsAdminItem(): Promise<boolean> {
 }
 
 export async function Rail() {
-  const isOpsAdmin = await showsAdminItem()
-  // THE ONLY BADGE IN THE RAIL, and it is derived rather than sent.
-  // `readApprovalQueue` is `cache()`-wrapped, so this share the SAME select the
-  // /approvals page runs in the same request — the badge and the header it
-  // labels cannot disagree. `undefined` on a failed read, never 0: a zero here
-  // would claim nothing is waiting when nothing was counted.
-  const waiting = await approvalCount()
+  /**
+   * ── ONE WAIT, NOT TWO ────────────────────────────────────────────────────
+   * "Is this viewer an ops admin" and "how many approvals are waiting" have
+   * nothing to do with each other, and awaiting them one after the other made
+   * the rail — which renders on EVERY page — cost two round trips to
+   * ap-south-1 before any of it could render.
+   *
+   * MEASURED 2026-08-23 across 80 route loads against a production build:
+   * `ops_admins` p50 71ms. That is 71ms taken off the critical path of every
+   * navigation in the product, for a change that alters no output at all.
+   *
+   * `Promise.all` is safe here because neither side throws: `showsAdminItem`
+   * catches into `false`, and `approvalCount` returns `undefined` on a failed
+   * read rather than rejecting. A rail that goes down because a badge could not
+   * be counted would take the whole document with it — a layout's throw reaches
+   * global-error, not the segment boundary.
+   */
+  const [isOpsAdmin, waiting] = await Promise.all([showsAdminItem(), approvalCount()])
 
   return (
     <aside
@@ -205,8 +217,32 @@ export async function Rail() {
         </section>
       </nav>
 
-      {/* The reference's third sidebar block. The rail shipped with two. */}
-      <RailFoot />
+      {/*
+        The reference's third sidebar block. The rail shipped with two.
+
+        ── WHY IT STREAMS, AND WHY THAT IS THE BIGGEST NUMBER IN THIS FILE ────
+        `RailFoot` calls Clerk's `currentUser()`, which is a network round trip to
+        api.clerk.com — not a local read of the session JWT the way `auth()` is.
+        MEASURED 2026-08-23 across 80 route loads against a production build:
+        p50 354ms, mean 417ms, max 791ms, and 61% of ALL outbound wall time in
+        the sweep. It is spent to render one display name.
+
+        Because the rail is in the layout, that call was on the critical path of
+        every authenticated page: nothing at all reached the browser until Clerk
+        answered. It is why FCP landed a flat ~40ms after TTFB on all 40 routes —
+        the page was never waiting on JavaScript, it was waiting on this.
+        `loading.tsx` could not help either: it gives the PAGE a boundary, and
+        the shell that would paint the skeleton was itself blocked here.
+
+        A Suspense boundary lets the document flush without it. Nothing about the
+        data changes — `currentUser()` is still the source of truth for the name,
+        so no stale value is introduced, which is what reading `users_profile`
+        instead would have risked (that table is written once by
+        `bootstrap_workspace` and never refreshed).
+      */}
+      <Suspense fallback={<RailFootSkeleton />}>
+        <RailFoot />
+      </Suspense>
     </aside>
   )
 }

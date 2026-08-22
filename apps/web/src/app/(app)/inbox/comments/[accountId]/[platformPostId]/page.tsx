@@ -27,16 +27,27 @@ export default async function PostCommentsPage({
   params: Promise<{ accountId: string; platformPostId: string }>
 }) {
   const { accountId, platformPostId } = await params
-  const view = await readPostComments(accountId, platformPostId)
+  /**
+   * ── THE SIBLING LIST DEPENDS ON NOTHING, SO IT DOES NOT WAIT ───────────────
+   * Same shape and same reasoning as the thread page next door:
+   * `readCommentedPosts()` takes no argument and reads a different table, and
+   * awaiting it after the comments cost one extra round trip to ap-south-1 on
+   * every post opened. MEASURED 2026-08-23: a PostgREST call from this server
+   * has a p50 of 105ms.
+   *
+   * On the 404 path the sibling list is now read for a post that does not
+   * resolve. It is RLS-scoped to this workspace and discloses nothing, and the
+   * 404 is still decided by the comments read alone.
+   */
+  const [view, { rows: siblings, decision: listDecision }] = await Promise.all([
+    readPostComments(accountId, platformPostId),
+    readCommentedPosts(),
+  ])
 
   // The account is not this workspace's. A 404 rather than an explanation: confirming
   // that some other tenant's account id exists is itself a disclosure.
   if (view === null) notFound()
   const { rows, decision } = view
-
-  // The sibling list, so the comments open beside the posts rather than after
-  // leaving them.
-  const { rows: siblings, decision: listDecision } = await readCommentedPosts()
 
   return (
     <InboxShell

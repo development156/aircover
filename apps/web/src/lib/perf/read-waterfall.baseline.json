@@ -1,0 +1,251 @@
+[
+  {
+    "route": "/",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/ads",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/ads/budget",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/ads/creative",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/ads/performance",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/ads/targeting",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/analytics",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/approvals",
+    "awaits": ["readApprovalQueue"]
+  },
+  {
+    "route": "/(app)/assets",
+    "awaits": ["readAssets", "signMediaPreviews"]
+  },
+  {
+    "route": "/(app)/billing/checkout/[orderId]",
+    "awaits": ["activeWorkspaceRead", "provider.fetchOrder"]
+  },
+  {
+    "route": "/(app)/brain",
+    "awaits": ["readBrain"]
+  },
+  {
+    "route": "/(app)/brain/audience",
+    "awaits": ["readAudiencePage"]
+  },
+  {
+    "route": "/(app)/brain/competitors",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/brain/identity",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/brain/knowledge",
+    "awaits": ["readLibrary", "searchLibrary"]
+  },
+  {
+    "route": "/(app)/brain/resolve",
+    "awaits": ["readBrain", "readCitedPassages"]
+  },
+  {
+    "route": "/(app)/brain/voice",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/campaigns",
+    "awaits": ["readCampaigns"]
+  },
+  {
+    "route": "/(app)/campaigns/[id]",
+    "awaits": ["readCampaign", "readAddablePosts"]
+  },
+  {
+    "route": "/(app)/connections",
+    "awaits": [
+      "getActiveWorkspace",
+      "readConnectionSlots",
+      "checkCountableLimit",
+      "getActiveWorkspace",
+      "readXUsage"
+    ]
+  },
+  {
+    "route": "/(app)/create",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/create/post",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/home",
+    "awaits": ["listVariantStates"]
+  },
+  {
+    "route": "/(app)/inbox",
+    "awaits": ["readConversationsList"]
+  },
+  {
+    "route": "/(app)/inbox/comments",
+    "awaits": ["readCommentedPosts"]
+  },
+  {
+    "route": "/(app)/inbox/comments/[accountId]/[platformPostId]",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/inbox/reviews",
+    "awaits": ["readReviews"]
+  },
+  {
+    "route": "/(app)/inbox/threads/[accountId]/[conversationId]",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/leads",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/loop",
+    "awaits": ["readLoop"]
+  },
+  {
+    "route": "/(app)/planner",
+    "awaits": ["readPosts"]
+  },
+  {
+    "route": "/(app)/playbooks",
+    "awaits": ["getActiveWorkspace", "readPlaybooksSnapshot"]
+  },
+  {
+    "route": "/(app)/posts",
+    "awaits": ["readPosts", "listPostMetrics"]
+  },
+  {
+    "route": "/(app)/posts/[id]",
+    "awaits": [
+      "readActiveWorkspace",
+      "getPost",
+      "readVariantFormats",
+      "signMediaPreviews",
+      "readLibraryNames",
+      "readPostMetrics"
+    ]
+  },
+  {
+    "route": "/(app)/radar",
+    "awaits": ["getActiveWorkspace"]
+  },
+  {
+    "route": "/(app)/radar/[id]",
+    "awaits": ["getActiveWorkspace"]
+  },
+  {
+    "route": "/(app)/remix",
+    "awaits": ["activeWorkspaceRead"]
+  },
+  {
+    "route": "/(app)/report",
+    "awaits": ["readLoop"]
+  },
+  {
+    "route": "/(app)/settings",
+    "awaits": ["getActiveWorkspace"]
+  },
+  {
+    "route": "/(app)/settings/integrations",
+    "awaits": ["readConnections"]
+  },
+  {
+    "route": "/(app)/settings/plan",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/settings/profile",
+    "awaits": ["currentUser"]
+  },
+  {
+    "route": "/(app)/sites",
+    "awaits": [
+      "readRecentSites",
+      "activeWorkspaceRead",
+      "activeThemeTokens",
+      "readSiteTree",
+      "getActiveWorkspace",
+      "countSites",
+      "checkCountableLimit"
+    ]
+  },
+  {
+    "route": "/(app)/studio",
+    "awaits": []
+  },
+  {
+    "route": "/(app)/wallet",
+    "awaits": []
+  },
+  {
+    "route": "/(auth)/sign-in/[[...sign-in]]",
+    "awaits": []
+  },
+  {
+    "route": "/(auth)/sign-up/[[...sign-up]]",
+    "awaits": []
+  },
+  {
+    "route": "/(onboarding)/onboarding",
+    "awaits": ["getActiveWorkspace", "activeBrandMemory"]
+  },
+  {
+    "route": "/admin",
+    "awaits": []
+  },
+  {
+    "route": "/admin/applications",
+    "awaits": ["requireOpsAdmin", "readApplications"]
+  },
+  {
+    "route": "/admin/credits",
+    "awaits": ["requireOpsAdmin"]
+  },
+  {
+    "route": "/admin/dev",
+    "awaits": []
+  },
+  {
+    "route": "/admin/qa",
+    "awaits": ["requireOpsAdmin", "readQaArtifacts", "signQaArtifactViews"]
+  },
+  {
+    "route": "/admin/team",
+    "awaits": ["requireOpsAdmin", "readOpsAdmins"]
+  },
+  {
+    "route": "/design-system",
+    "awaits": []
+  },
+  {
+    "route": "/embed/beta",
+    "awaits": []
+  },
+  {
+    "route": "/embed/lead",
+    "awaits": []
+  }
+]
