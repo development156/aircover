@@ -191,10 +191,12 @@
   --color-sidebar-ring: var(--acc);
 
   /* ---- Shape — kit names, plus the legacy trio pointing at the same steps ---- */
+  --radius-xs: var(--r-xs);
   --radius-sm: var(--r-sm);
   --radius: var(--r);
   --radius-md: var(--r-md);
   --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
   --radius-full: var(--r-full);
   --radius-input: var(--r-input);
   --radius-card: var(--r-card);
@@ -413,6 +415,14 @@
 @utility type-sm {
   font: var(--t-sm);
 }
+/* v5 · THE META RUNG — table cells, captions, timestamps, helper text.
+   The scale ran `type-sm` straight to an uppercase eyebrow with nothing in
+   between for ordinary small text, and the measurement says what happened:
+   12px was hand-written 211 times and 12.5px another 110, making the pair the
+   single largest block of off-scale type in the app. This is that rung. */
+@utility type-meta {
+  font: var(--t-xs);
+}
 /* The chip step — 11px/600, NOT uppercase.
    The scale ran 12px `type-sm` straight to 11px uppercase `type-eyebrow`, with no
    step for a chip's own label, so `badge.tsx` hand-wrote `text-[11px]
@@ -449,6 +459,67 @@
 /* The firmer ring — controls, and cards that need to separate from a fill. */
 @utility surface-ring-firm {
   box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* ============================================================
+   v5 · GLASS — CHROME ONLY. Read the GLASS block in tokens.css before using.
+
+   ALLOWED   topbar · rail · mobile bottom bar · command palette · modal and
+             drawer panels · toasts
+   FORBIDDEN every card, table, stat, chart, list row, form well — anything
+             carrying a value, a status or a certainty mark
+
+   `backdrop-filter` is the expensive half; `-webkit-` first for Safari, which
+   still needs the prefix. The fallback background is OPAQUE on purpose: a
+   browser without backdrop-filter support gets a solid panel rather than a
+   see-through one, which fails safe instead of illegible.
+   ============================================================ */
+@utility glass {
+  background: var(--surface);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border-color: var(--glass-line);
+}
+
+/* The opaque well a glass surface must give any status-bearing element.
+   The Certainty System separates rungs by FILL WEIGHT, and a translucent
+   ground changes the coverage of everything on it — a hatched inference over a
+   blurred background stops reading as hatched. Wrap the mark in this. */
+@utility glass-well {
+  background: var(--surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* ============================================================
+   v5 · THE GRADIENT GROUND
+
+   Fixed behind everything, built from three radial stops rather than an image:
+   an image cannot follow the theme, bands when scaled to 1920, and costs a
+   request on a phone.
+
+   IT DOES NOT ANIMATE. The brief allows animation if it stops under
+   prefers-reduced-motion, but a permanently animating full-viewport gradient is
+   a permanently animating full-viewport COMPOSITE — the one thing a mid-range
+   Android should never be asked to do while the user is reading. Still is also
+   the honest reading of "must never compete with content".
+
+   `pointer-events: none` and `z-index: -1` keep it out of every hit-test.
+   It paints --grad-base first so the layer is never transparent over the
+   browser's own white during a theme flip.
+   ============================================================ */
+@utility grad-ground {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--grad-base);
+  background-image:
+    radial-gradient(1100px 780px at 8% -6%, var(--grad-1), transparent 62%),
+    radial-gradient(980px 720px at 104% 12%, var(--grad-2), transparent 58%),
+    radial-gradient(900px 900px at 42% 108%, var(--grad-3), transparent 60%);
+  background-repeat: no-repeat;
 }
 
 /* Motion tokens as utilities (docs/08 §5): micro = --dur-1, panels = --dur-2.

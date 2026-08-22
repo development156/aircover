@@ -150,11 +150,13 @@ export function brandSkinVars(colors: string[]): BrandSkinVars {
 // (docs/ui-package/sahoda-labs/theme/RETHEME.md §5).
 export const NEUTRAL_RGB = {
   bg: { r: 255, g: 255, b: 255 }, // --surface   #ffffff
-  s1: { r: 255, g: 255, b: 255 }, // --canvas    #ffffff
-  s2: { r: 250, g: 250, b: 250 }, // --surface-2 #fafafa
-  line: { r: 220, g: 220, b: 220 }, // --line    #dcdcdc
+  // v5: the page ground is NO LONGER white. A card is a card because it is
+  // brighter than the page, not because it has a line around it.
+  s1: { r: 250, g: 250, b: 250 }, // --canvas    #fafafa
+  s2: { r: 242, g: 242, b: 243 }, // --surface-2 #f2f2f3
+  line: { r: 233, g: 233, b: 236 }, // --line    #e9e9ec
   ink: { r: 0, g: 0, b: 0 }, // --ink            #000000
-  muted: { r: 87, g: 87, b: 86 }, // --ink-mute  #575756
+  muted: { r: 87, g: 87, b: 90 }, // --ink-mute  #57575a
   faint: { r: 140, g: 140, b: 140 }, // --ink-faint #8c8c8c
   ok: { r: 0, g: 0, b: 0 }, // --ok              #000000
   warn: { r: 255, g: 102, b: 0 }, // --warn      #ff6600
@@ -191,8 +193,12 @@ export function themeTokensFrom(colors: string[]): ThemeTokens {
     warning: oklchOf(NEUTRAL_RGB.warn),
     danger: oklchOf(NEUTRAL_RGB.danger),
     // tokens.css --r-lg (cards, nav items, wells). Pinned by guard-neutrals.test.ts.
-    radius: '12px',
-    fontHeading: 'Inter',
-    fontBody: 'Inter',
+    // v5: --r-lg. The card radius is load-bearing for the look, so it is
+    // mirrored from tokens.css rather than frozen here — guard-neutrals.test.ts
+    // asserts this equals `token('r-lg')` and caught it at 12px when the ladder
+    // moved to 24px.
+    radius: '24px',
+    fontHeading: 'Plus Jakarta Sans',
+    fontBody: 'Plus Jakarta Sans',
   }
 }
