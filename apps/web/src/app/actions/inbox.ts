@@ -80,7 +80,7 @@ export async function setThreadStatus(
     if (!parsed.success) return { ok: false, message: 'That is not a valid status.' }
 
     const supabase = createServerSupabase()
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('inbox_threads')
       .update({
         status: parsed.data,
@@ -90,8 +90,16 @@ export async function setThreadStatus(
       })
       .eq('id', threadId)
       .eq('workspace_id', workspace.id)
+      // Evidence, not decoration. PostgREST returns a null error for an UPDATE
+      // that matched no row, and under RLS a thread the caller cannot see IS no
+      // row — so without this, moving someone else's thread to `resolved`, or a
+      // thread that has since been swept, reports success. Nothing calls this
+      // action on this branch yet; the guard ships with it rather than after it.
+      .select('id')
+      .maybeSingle()
 
     if (error) return { ok: false, message: 'Could not update that — try again.' }
+    if (!data) return { ok: false, message: 'That conversation is no longer yours to change.' }
 
     revalidatePath('/inbox')
     return { ok: true }

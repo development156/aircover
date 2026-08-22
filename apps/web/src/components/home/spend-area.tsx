@@ -1,5 +1,6 @@
 import { ChartEmpty, CoverageNote } from './chart-empty'
 import type { SpendRead } from '@/lib/home/spend'
+import { credits } from '@/lib/credit-words'
 
 /**
  * Credit spend over the window, as an area chart. Hand-rolled SVG — no chart
@@ -79,7 +80,7 @@ export function SpendArea({ spend }: { spend: SpendRead }) {
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
         role="img"
-        aria-label={`Credit spend over the last ${spend.days.length} days. ${spend.total} credits total.`}
+        aria-label={`Credit spend over the last ${spend.days.length} days. ${credits(spend.total)} total.`}
         className="h-[120px] w-full"
       >
         <path data-testid="spend-area-fill" d={area} fill="var(--brand)" fillOpacity={0.14} />

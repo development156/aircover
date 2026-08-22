@@ -28,8 +28,8 @@ const ASSET_ID = '33333333-3333-4333-8333-333333333333'
 
 const state = vi.hoisted(() => ({
   post: null as { id: string; channels: string[] } | null,
-  existingMedia: [] as unknown[],
-  formats: {} as Record<string, string | null>,
+  existingMedia: [] as unknown[] | null,
+  formats: {} as Record<string, string | null> | null,
   asset: null as Record<string, unknown> | null,
   inserted: [] as Record<string, unknown>[],
 }))
@@ -42,8 +42,13 @@ vi.mock('@/lib/workspaces', () => ({
 }))
 vi.mock('@/lib/posts/read', () => ({
   getPost: () => Promise.resolve(state.post),
-  listMedia: () => Promise.resolve(state.existingMedia),
-  readVariantFormats: () => Promise.resolve(state.formats),
+  // The STRICT readers, which is what the attach gate calls now. `null` from
+  // either means "we could not look", and the gate must refuse rather than
+  // measure a cap against a list it never read.
+  readMedia: () => Promise.resolve(state.existingMedia),
+  listMedia: () => Promise.resolve(state.existingMedia ?? []),
+  readVariantFormatsStrict: () => Promise.resolve(state.formats),
+  readVariantFormats: () => Promise.resolve(state.formats ?? {}),
 }))
 vi.mock('@/lib/assets/read', () => ({
   readAsset: () =>
@@ -142,5 +147,62 @@ describe('attachAssetToPost reads the version formats', () => {
 
     expect(result.ok).toBe(false)
     expect(state.inserted).toEqual([])
+  })
+})
+
+/**
+ * A GATE MEASURED AGAINST A LIST NOBODY READ IS NOT A GATE.
+ *
+ * `listMedia` and `readVariantFormats` answered `[]` / `{}` for a read that
+ * FAILED as readily as for a post with nothing on it, and all three checks below
+ * are measured against those values — so one unreadable read switched every one
+ * of them off and let the write through:
+ *
+ *   the duplicate check   the same photo attached twice, counting twice against
+ *                         every channel's cap
+ *   `existing.length`     an eleventh file admitted to a channel allowing ten
+ *   the per-format rule   a Story accepting a landscape photo — the exact case
+ *                         the comment at the call site was written about
+ */
+describe('an unreadable read refuses the attach rather than admitting it', () => {
+  test('an unreadable media list writes nothing', async () => {
+    state.existingMedia = null
+
+    const result = await attachAssetToPost(POST_ID, ASSET_ID)
+
+    expect(result.ok).toBe(false)
+    expect(state.inserted).toEqual([])
+    // THE MESSAGE, not just the refusal. Without the explicit guard these calls
+    // still failed — `existing.some(…)` on null throws and the outer catch
+    // returns ok:false — so a test that checked only `ok` passed against code
+    // that had no guard at all. An accidental TypeError is not a gate: it logs
+    // an exception, reports to Sentry, and hands the customer a generic
+    // sentence instead of the one that says what happened.
+    if (!result.ok) expect(result.message).toMatch(/could not check that file against the channel/i)
+  })
+
+  test('an unreadable format map writes nothing', async () => {
+    state.formats = null
+
+    const result = await attachAssetToPost(POST_ID, ASSET_ID)
+
+    expect(result.ok).toBe(false)
+    expect(state.inserted).toEqual([])
+    // Same: `decideAttach` does `formats[channel] ?? null`, which throws on
+    // null, so this refusal was a crash wearing a refusal's clothes.
+    if (!result.ok) expect(result.message).toMatch(/could not check that file against the channel/i)
+  })
+
+  test('a genuinely empty post still attaches', async () => {
+    // The other half. A gate that refused everything would satisfy both tests
+    // above and stop the product working — "no media yet" is the normal state of
+    // every new post.
+    state.existingMedia = []
+    state.formats = {}
+
+    const result = await attachAssetToPost(POST_ID, ASSET_ID)
+
+    expect(result.ok).toBe(true)
+    expect(state.inserted).toHaveLength(1)
   })
 })

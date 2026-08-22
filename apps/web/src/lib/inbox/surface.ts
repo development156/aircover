@@ -73,8 +73,18 @@ export interface SurfaceDecision {
 
 export interface DecideInput {
   surface: InboxSurfaceKey
-  /** Active `connections` rows Zernio could be asked about. A real count, never a guess. */
-  connectedAccounts: number
+  /**
+   * Active `connections` rows Zernio could be asked about — a real count, never a
+   * guess, and `null` when we could not take one.
+   *
+   * The null arm is not defensive typing. `countAccounts` used to `return 0` when
+   * its own query errored, and 0 is the input that decides between two OPPOSITE
+   * sentences at `accountsQueried === 0`: "connect an account" and "we could not
+   * resolve the accounts you have connected". A failed count therefore inverted
+   * the very branch that exists to stop us telling a customer to connect an
+   * account they already connected.
+   */
+  connectedAccounts: number | null
   /** Set when no read happened. Mutually exclusive with `result`. */
   failure?: ReadFailure
   /** Present only when a read actually happened. */

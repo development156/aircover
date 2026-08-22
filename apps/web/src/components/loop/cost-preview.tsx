@@ -9,6 +9,7 @@ import { previewCost } from '@/lib/loop/cost'
 import { Button } from '@/components/ui/button'
 import { CostLabel } from '@/components/ui/cost-label'
 import type { LoopBriefView } from '@/lib/loop/read'
+import { creditWord, credits } from '@/lib/credit-words'
 
 /**
  * THE COST PREVIEW — every credit the cycle will spend, before it spends any.
@@ -88,10 +89,21 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
         setError(made.message ?? 'Approved, but the drafts could not be written.')
         return
       }
+      // The cost clause is omitted rather than zeroed when the action could not
+      // say what it spent: "for 0 credits" is a figure nothing measured.
+      const wrote =
+        `Wrote ${made.created} ${made.created === 1 ? 'draft' : 'drafts'}` +
+        (made.spent === undefined ? '' : ` for ${credits(made.spent)}`)
+
       setDone(
-        made.created === 0
-          ? 'Nothing was written — every brief is on a channel set to suggest only.'
-          : `Wrote ${made.created} ${made.created === 1 ? 'draft' : 'drafts'} for ${made.spent} credits.`,
+        made.cancelledMidRun
+          ? // The week was stopped while this stage was running. What was
+            // written is kept and was paid for; saying "reported" would tell the
+            // person who pressed stop that it went ahead anyway.
+            `${wrote}, then you stopped the week. They are in your Planner and nothing more will be written.`
+          : made.created === 0
+            ? 'Nothing was written — every brief is on a channel set to suggest only.'
+            : `${wrote}.`,
       )
     })
   }
@@ -185,8 +197,9 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
         >
           <AlertTriangle size={15} strokeWidth={1.8} aria-hidden className="mt-[2px] shrink-0" />
           <span>
-            This is <span className="num">{preview.overBy}</span> credits over your weekly budget.
-            Uncheck a post to fit, or approve it anyway — the budget is yours to set.
+            This is <span className="num">{preview.overBy}</span> {creditWord(preview.overBy)} over
+            your weekly budget. Uncheck a post to fit, or approve it anyway — the budget is yours to
+            set.
           </span>
         </p>
       ) : null}

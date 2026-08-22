@@ -10,7 +10,7 @@ import { decideAttach } from '@/lib/posts/attach-decision'
 import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
 import { mediaObjectPath } from '@/lib/posts/media-path'
 import { mapPostError } from '@/lib/posts/post-error'
-import { getPost, listMedia, readVariantFormats } from '@/lib/posts/read'
+import { getPost, readMedia, readVariantFormatsStrict } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import type { AttachMediaState, DetachMediaState } from '@/lib/posts/media-state'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -69,7 +69,19 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     const sniffed = sniffImage(bytes)
     if (!sniffed.ok) return { ok: false, message: sniffed.message }
 
-    const existing = await listMedia(postId)
+    // Strict, for the same reason the library attach in `assets.ts` is: both
+    // numbers below are gates, and a read that returned `[]` / `{}` because it
+    // FAILED switches them off rather than tightening them. Nothing is uploaded
+    // against limits we could not check.
+    const existing = await readMedia(postId)
+    const formats = await readVariantFormatsStrict(postId)
+    if (existing === null || formats === null) {
+      return {
+        ok: false,
+        message: 'Sahoda could not check that photo against the channel limits — try again.',
+      }
+    }
+
     const decision = decideAttach(
       post.channels,
       {
@@ -81,7 +93,7 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
       existing.length,
       // Per-channel, from `post_variants.format`. A story will not take a
       // landscape photo and a version that says one photo will not take a second.
-      await readVariantFormats(postId),
+      formats,
     )
     if (!decision.ok) {
       return { ok: false, message: decision.message, rejections: decision.rejections }

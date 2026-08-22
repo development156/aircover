@@ -81,10 +81,14 @@ const activeWorkspaceId = cache(async (): Promise<string | null> => {
  * about is what makes this a measurement rather than a guess, and it stays correct
  * after the migration that widens the platform CHECK.
  */
-async function countAccounts(surface: InboxSurfaceKey): Promise<number> {
+async function countAccounts(surface: InboxSurfaceKey): Promise<number | null> {
   try {
     const workspaceId = await activeWorkspaceId()
-    if (workspaceId === null) return 0
+    // Two meanings behind that null — no workspace, and a workspace read that
+    // failed — and neither is a count. `readContext` tells them apart for the
+    // sentence the surface leads with; here the only honest answer to "how many
+    // accounts" is that we did not find out.
+    if (workspaceId === null) return null
 
     const supabase = createServerSupabase()
     const { count, error } = await supabase
@@ -97,12 +101,14 @@ async function countAccounts(surface: InboxSurfaceKey): Promise<number> {
 
     if (error) {
       console.error('[inbox] connection count failed', error.code, error.message)
-      return 0
+      // NOT 0. Zero is a measurement, and this is its absence — see the null arm
+      // on `DecideInput.connectedAccounts` for the sentence it used to invert.
+      return null
     }
     return count ?? 0
   } catch (error) {
     console.error('[inbox] connection count threw', error instanceof Error ? error.message : '?')
-    return 0
+    return null
   }
 }
 

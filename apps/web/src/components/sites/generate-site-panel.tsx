@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { CostLabel } from '@/components/ui/cost-label'
+import { creditWord } from '@/lib/credit-words'
 
 const PENDING = [
   'Reading your Brand Brain…',
@@ -76,7 +77,8 @@ export function GenerateSitePanel({ limitNotice }: GenerateSitePanelProps) {
         toast.success(
           <span>
             Generated your site draft ·{' '}
-            <span className="tabular-nums">{result.creditsCharged}</span> credits used ·{' '}
+            <span className="tabular-nums">{result.creditsCharged}</span>{' '}
+            {creditWord(result.creditsCharged)} used ·{' '}
             <span className="tabular-nums">{result.balanceAfter}</span> left
           </span>,
         )
@@ -173,9 +175,10 @@ export function GenerateSitePanel({ limitNotice }: GenerateSitePanelProps) {
 
       {outcome?.kind === 'insufficient' ? (
         <InlineError>
-          Generating needs <span className="tabular-nums">{outcome.required}</span> credits and you
-          have <span className="tabular-nums">{outcome.available}</span>. Nothing was generated and
-          you were not charged.{' '}
+          Generating needs <span className="tabular-nums">{outcome.required}</span>{' '}
+          {creditWord(outcome.required)} and you have{' '}
+          <span className="tabular-nums">{outcome.available}</span>. Nothing was generated and you
+          were not charged.{' '}
           <Link href="/wallet" className="font-semibold underline underline-offset-2">
             Top up your wallet
           </Link>

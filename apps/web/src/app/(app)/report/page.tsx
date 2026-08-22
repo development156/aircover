@@ -2,9 +2,9 @@ import Link from 'next/link'
 
 import { PageTitle } from '@/components/page-title'
 import { reflectionWindow } from '@/lib/loop/iso-week'
-import { readLoopSnapshot } from '@/lib/loop/read'
+import { readLoop } from '@/lib/loop/read'
 import { readCycleLearnings, readRanking } from '@/lib/loop/report'
-import { getActiveWorkspace } from '@/lib/workspaces'
+import { creditWord } from '@/lib/credit-words'
 
 export const metadata = { title: 'CMO Report' }
 
@@ -32,21 +32,30 @@ export const metadata = { title: 'CMO Report' }
  * that is worse than printing nothing.
  */
 export default async function ReportPage() {
-  const workspace = await getActiveWorkspace()
-  if (!workspace) {
+  const read = await readLoop()
+
+  // "You have no workspace" and "we could not look" are different claims with
+  // different remedies, and this page used to make the first one on both arms.
+  // The third sentence below matters just as much: a `loop_cycles` read that
+  // failed used to render "No week has been reported yet", which is a statement
+  // about the customer's business that no query had earned.
+  if (read.status !== 'ok') {
     return (
       <div className="space-y-grid">
         <PageTitle sub="The Monday read: what last week did, what Sahoda learned from it, and what it plans to do next.">
           CMO Report
         </PageTitle>
         <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
-          Finish setting up your workspace and your reports appear here.
+          {read.status === 'no-workspace'
+            ? 'Finish setting up your workspace and your reports appear here.'
+            : 'Sahoda couldn’t read your cycles just now, so it can’t say whether a week has been reported. Try again in a moment.'}
         </p>
       </div>
     )
   }
 
-  const snapshot = await readLoopSnapshot(workspace.id)
+  const workspace = { id: read.workspaceId }
+  const snapshot = read.snapshot
   const cycle = snapshot.cycle
 
   if (!cycle) {
@@ -202,8 +211,9 @@ export default async function ReportPage() {
             ) : null}
             {cycle.approvedCredits !== null && cycle.estimatedCredits !== null ? (
               <p className="type-sm mt-1 text-muted">
-                Sahoda proposed <span className="num">{cycle.estimatedCredits}</span> credits of
-                writing; you approved <span className="num">{cycle.approvedCredits}</span>.
+                Sahoda proposed <span className="num">{cycle.estimatedCredits}</span>{' '}
+                {creditWord(cycle.estimatedCredits ?? 0)} of writing; you approved{' '}
+                <span className="num">{cycle.approvedCredits}</span>.
               </p>
             ) : null}
           </dl>

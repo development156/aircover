@@ -19,17 +19,27 @@ import { createServerSupabase } from '@/lib/supabase/server'
  * another workspace's brand. Pass `workspaceId` whenever the answer is about a
  * specific workspace rather than "does this user have any theme at all".
  *
- * The parameter is optional only because the app shell has always called this
- * unfiltered; that call carries the same cross-workspace defect and is a
- * separate fix (`apps/web/REQUESTS.md`). New callers should pass the id.
+ * ── THE PARAMETER IS REQUIRED NOW, AND THAT IS THE FIX ──────────────────────
+ * It used to be optional, "only because the app shell has always called this
+ * unfiltered", with a note asking new callers to pass the id. `/sites` was a new
+ * caller and did not (page.tsx:59) — so the site preview was painted in whichever
+ * of the user's workspaces happened to hold the highest theme version, which for
+ * anyone in two workspaces is a coin toss. The shell caller the note referred to
+ * no longer exists; `/onboarding` was already passing the id.
+ *
+ * A comment asking callers to do the right thing is not a mechanism. Requiring
+ * the parameter makes the next occurrence a type error instead of a wrong colour
+ * nobody notices. (RLS still confines this to the caller's own memberships — it
+ * was never another CUSTOMER's brand, which is why nothing looked wrong.)
  */
-export async function activeThemeTokens(workspaceId?: string): Promise<ThemeTokens | null> {
+export async function activeThemeTokens(workspaceId: string): Promise<ThemeTokens | null> {
   try {
     const supabase = createServerSupabase()
-    let query = supabase.from('workspace_themes').select('tokens').eq('status', 'active')
-    if (workspaceId) query = query.eq('workspace_id', workspaceId)
-
-    const { data, error } = await query
+    const { data, error } = await supabase
+      .from('workspace_themes')
+      .select('tokens')
+      .eq('status', 'active')
+      .eq('workspace_id', workspaceId)
       .order('version', { ascending: false })
       .limit(1)
       .maybeSingle()

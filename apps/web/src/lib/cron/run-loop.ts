@@ -97,6 +97,8 @@ async function planOneWorkspace(
   // EVERY workspace on every run and looked exactly like a fleet with no
   // channels. An expired connection is deliberately not planned for: the plan
   // would be for somewhere Sahoda cannot post.
+  // Pinned by lib/connections/status-vocabulary.test.ts, which parses the CHECK
+  // out of the migration rather than restating it.
   const connections = await ledger.pool.query<{ platform: string }>(
     `select distinct platform from connections
       where workspace_id = $1 and status = 'active'`,

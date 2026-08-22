@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { CostLabel } from '@/components/ui/cost-label'
+import { creditWord } from '@/lib/credit-words'
 
 const PENDING = [
   'Reading your Brand Brain…',
@@ -54,7 +55,8 @@ export function PlanWeekPanel() {
         toast.success(
           <span>
             Planned <span className="tabular-nums">{result.created}</span> drafts ·{' '}
-            <span className="tabular-nums">{result.creditsCharged}</span> credits used ·{' '}
+            <span className="tabular-nums">{result.creditsCharged}</span>{' '}
+            {creditWord(result.creditsCharged)} used ·{' '}
             <span className="tabular-nums">{result.balanceAfter}</span> left
           </span>,
         )
@@ -122,9 +124,10 @@ export function PlanWeekPanel() {
 
       {outcome?.kind === 'insufficient' ? (
         <InlineError>
-          Planning needs <span className="tabular-nums">{outcome.required}</span> credits and you
-          have <span className="tabular-nums">{outcome.available}</span>. Nothing was planned and
-          you were not charged.{' '}
+          Planning needs <span className="tabular-nums">{outcome.required}</span>{' '}
+          {creditWord(outcome.required)} and you have{' '}
+          <span className="tabular-nums">{outcome.available}</span>. Nothing was planned and you
+          were not charged.{' '}
           <Link href="/wallet" className="font-semibold underline underline-offset-2">
             Top up your wallet
           </Link>

@@ -9,6 +9,7 @@ import { Card, CardLabel } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import type { CheckoutState } from '@/lib/wallet/checkout-state'
 import { cn } from '@/lib/utils'
+import { creditWord } from '@/lib/credit-words'
 
 /**
  * Only priced plans are offered. `free` is in `PlanIdSchema` but there is nothing
@@ -70,8 +71,8 @@ export function TopUpPanel() {
                 <span className="block text-[13px] text-muted">
                   ₹<span className="tabular-nums">{inr(entry.priceInr)}</span> per month (about $
                   <span className="tabular-nums">{inr(entry.priceUsd)}</span>) ·{' '}
-                  <span className="tabular-nums">{inr(entry.monthlyCredits)}</span> credits granted
-                  each month
+                  <span className="tabular-nums">{inr(entry.monthlyCredits)}</span>{' '}
+                  {creditWord(entry.monthlyCredits)} granted each month
                 </span>
               </span>
             </label>

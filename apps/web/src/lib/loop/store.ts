@@ -139,20 +139,39 @@ export async function openCycle(input: {
   return { cycle: found, created: false }
 }
 
+/**
+ * A cycle in a terminal status is finished, and nothing may move it.
+ *
+ * `cancelled` is what the kill switch writes; `failed` is what a stage writes
+ * when it gives up. Both are answers to "what happened to this week", and an
+ * orchestrator that is still running when one of them lands has lost the race —
+ * correctly. Every status write in this module carries this clause, and the
+ * functions return whether they won.
+ *
+ * The SQL believed this was an advisory lock's job: 20260820000400_loop_rpcs.sql
+ * says the kill switch takes `pg_advisory_xact_lock('loop_cycle:'||ws)`, "the
+ * same key the cycle writer takes". The cycle writer takes no lock — a grep for
+ * `pg_advisory` across apps/web and apps/jobs finds none. It does not need one:
+ * whichever UPDATE commits second sees the other's status through this clause.
+ */
+const NOT_TERMINAL = `status not in ('cancelled', 'failed')`
+
+/** True when a row moved. False means a terminal status refused the write. */
 export async function setCycleStatus(
   cycleId: string,
   workspaceId: string,
   status: string,
   extra: { failureReason?: string; reflectSkipped?: boolean } = {},
-): Promise<void> {
-  await getPool().query(
+): Promise<boolean> {
+  const r = await getPool().query(
     `update loop_cycles
         set status = $3,
             failure_reason = coalesce($4, failure_reason),
             reflect_skipped_no_history = coalesce($5, reflect_skipped_no_history)
-      where id = $1 and workspace_id = $2`,
+      where id = $1 and workspace_id = $2 and ${NOT_TERMINAL}`,
     [cycleId, workspaceId, status, extra.failureReason ?? null, extra.reflectSkipped ?? null],
   )
+  return (r.rowCount ?? 0) > 0
 }
 
 /**
@@ -255,17 +274,25 @@ export async function readBriefs(cycleId: string, workspaceId: string): Promise<
  * render a preview with no number in it — the one thing the halt exists to
  * prevent.
  */
+/**
+ * True when a row moved. False means the cycle reached a terminal status while
+ * the plan stage was running — almost always the kill switch, pressed during the
+ * seconds-to-minutes a model call takes. Without the clause this write brought a
+ * cancelled cycle back as `awaiting_cost_approval`, approve button and all, and
+ * `loop_approve_cost` re-included every brief the kill switch had skipped.
+ */
 export async function haltForCostApproval(
   cycleId: string,
   workspaceId: string,
   estimatedCredits: number,
-): Promise<void> {
-  await getPool().query(
+): Promise<boolean> {
+  const r = await getPool().query(
     `update loop_cycles
         set status = 'awaiting_cost_approval', estimated_credits = $3
-      where id = $1 and workspace_id = $2`,
+      where id = $1 and workspace_id = $2 and ${NOT_TERMINAL}`,
     [cycleId, workspaceId, estimatedCredits],
   )
+  return (r.rowCount ?? 0) > 0
 }
 
 /**
@@ -321,12 +348,22 @@ export async function addSpend(
   )
 }
 
-export async function finishCycle(cycleId: string, workspaceId: string): Promise<void> {
-  await getPool().query(
+/**
+ * True when the week was really reported.
+ *
+ * This function has always had the terminal guard, and it has never worked,
+ * because `loop-create.ts` calls `setCycleStatus(…, 'staging')` on the line
+ * above — which had no guard, so it moved a cancelled cycle to a status this
+ * clause admits. A guard is worth nothing when the statement before it launders
+ * the value the guard inspects.
+ */
+export async function finishCycle(cycleId: string, workspaceId: string): Promise<boolean> {
+  const r = await getPool().query(
     `update loop_cycles set status = 'reported', reported_at = now()
-      where id = $1 and workspace_id = $2 and status not in ('cancelled', 'failed')`,
+      where id = $1 and workspace_id = $2 and ${NOT_TERMINAL}`,
     [cycleId, workspaceId],
   )
+  return (r.rowCount ?? 0) > 0
 }
 
 /**

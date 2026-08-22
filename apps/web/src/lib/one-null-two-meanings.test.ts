@@ -60,6 +60,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 import { readConnections, readConnectedChannels } from '@/lib/connections/read'
+import { readLoop } from '@/lib/loop/read'
 import { readPosts } from '@/lib/posts/read'
 import { readRecentSites } from '@/lib/sites/read'
 
@@ -73,6 +74,13 @@ describe.each([
   ['readConnections', () => readConnections()],
   ['readConnectedChannels', () => readConnectedChannels()],
   ['readRecentSites', () => readRecentSites()],
+  // Added run 27. /loop and /report resolved their workspace with
+  // `getActiveWorkspace()` — the LOSSY view, whose own doc comment says a
+  // rendered sentence must not use it — and both printed "Finish setting up
+  // your workspace" on the arm where the read had FAILED. `readLoop` replaces
+  // it, and the query-error arm these four cannot express is pinned separately
+  // in `lib/loop/read.test.ts`.
+  ['readLoop', () => readLoop()],
 ])('%s tells "you have none" apart from "we could not look"', (_name, read) => {
   test('an account with no workspace reads no-workspace', async () => {
     state.workspace = 'none'

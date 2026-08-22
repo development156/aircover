@@ -12,6 +12,7 @@ import {
 } from '@/app/actions/ops-credits'
 import type { WorkspaceHit } from '@/lib/ops/credit-state'
 import { cn } from '@/lib/utils'
+import { credits } from '@/lib/credit-words'
 
 /**
  * A3 · Credit allocation, maker-checker (doc 13 §6).
@@ -126,7 +127,7 @@ function RequestForm({ admins, me }: { admins: readonly OpsAdmin[]; me: string }
           />
           {picked ? (
             <p className="mt-1 text-[12px] text-muted tabular-nums">
-              {picked.name} · {picked.available} credits now
+              {picked.name} · {credits(picked.available)} now
             </p>
           ) : hits.length > 0 ? (
             <ul className="mt-1 divide-y divide-line rounded-input border border-line">
@@ -229,9 +230,11 @@ function ApprovalRow({ request, me }: { request: OpsCreditRequest; me: string })
         toast.success(
           result.replayed
             ? 'Already approved — nothing was granted twice.'
-            : `Granted ${result.amount} credits${
-                result.balanceAfter === null ? '' : `. New balance ${result.balanceAfter}.`
-              }`,
+            : `${
+                result.amount === null
+                  ? 'Granted the credits, but Sahoda could not read back how many'
+                  : `Granted ${credits(result.amount)}`
+              }${result.balanceAfter === null ? '' : `. New balance ${result.balanceAfter}.`}`,
         )
       } else {
         toast.error(result.message)

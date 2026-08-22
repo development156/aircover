@@ -5,6 +5,7 @@ import { Info } from 'lucide-react'
 
 import type { SaveBrandState } from '@/app/actions/brand-resolve'
 import { Button } from '@/components/ui/button'
+import { creditWord } from '@/lib/credit-words'
 
 import { AttemptErrorNotice, type AttemptError } from './attempt-error'
 import type { RegenerateCost } from './brand-card'
@@ -102,7 +103,8 @@ export function RevealStep({
 
         {balanceAfter !== null ? (
           <p className="font-mono text-[12px] font-semibold text-muted">
-            Balance: <span className="tabular-nums text-ink">{balanceAfter}</span> credits
+            Balance: <span className="tabular-nums text-ink">{balanceAfter}</span>{' '}
+            {creditWord(balanceAfter)}
           </p>
         ) : wasFree ? (
           <p className="font-mono text-[12px] font-semibold text-muted">This one was free</p>

@@ -14,6 +14,7 @@ import type { GeneratedVariant } from '@/lib/posts/state'
 import { CHANNEL_LABELS } from './channel-label'
 import { InlineError } from './inline-error'
 import { PendingLines } from './pending-lines'
+import { creditWord } from '@/lib/credit-words'
 
 const PENDING_LINES = [
   'Saving your post body first…',
@@ -90,7 +91,8 @@ export function GeneratePanel({
         toast.success(
           <span>
             Generated <span className="tabular-nums">{result.variants.length}</span> variants ·{' '}
-            <span className="tabular-nums">{result.creditsCharged}</span> credits used ·{' '}
+            <span className="tabular-nums">{result.creditsCharged}</span>{' '}
+            {creditWord(result.creditsCharged)} used ·{' '}
             <span className="tabular-nums">{result.balanceAfter}</span> left
           </span>,
         )
@@ -127,7 +129,7 @@ export function GeneratePanel({
           <span>
             Adapt for <span className="tabular-nums">{channels.length}</span>
             {channels.length === 1 ? ' channel' : ' channels'} ·{' '}
-            <span className="tabular-nums">{cost}</span> credits
+            <span className="tabular-nums">{cost}</span> {creditWord(cost)}
           </span>
         </Button>
       )}
@@ -155,9 +157,10 @@ export function GeneratePanel({
 
       {outcome?.kind === 'insufficient' ? (
         <InlineError>
-          Generating needs <span className="tabular-nums">{outcome.required}</span> credits and you
-          have <span className="tabular-nums">{outcome.available}</span>. Nothing was generated and
-          you were not charged.{' '}
+          Generating needs <span className="tabular-nums">{outcome.required}</span>{' '}
+          {creditWord(outcome.required)} and you have{' '}
+          <span className="tabular-nums">{outcome.available}</span>. Nothing was generated and you
+          were not charged.{' '}
           <Link href="/wallet" className="font-semibold underline underline-offset-2">
             Top up your wallet
           </Link>

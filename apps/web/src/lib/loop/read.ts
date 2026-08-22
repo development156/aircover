@@ -10,6 +10,7 @@ import {
 } from '@sahoda/shared'
 
 import { createServerSupabase } from '@/lib/supabase/server'
+import { activeWorkspaceRead } from '@/lib/workspaces'
 
 /**
  * The `connections.status` values that mean Sahoda can publish, and the ones
@@ -38,6 +39,32 @@ const PLANNABLE: readonly string[] = ['x', 'gbp', 'linkedin', 'instagram']
  * their token and lets the database decide. A page that read over the owner
  * connection would render one customer's week to another the first time a
  * workspace id was threaded wrong.
+ *
+ * ── ONE NULL, TWO MEANINGS — WHAT `readLoop` EXISTS TO STOP ──────────────────
+ * `readLoopSnapshot` reads six tables and used to discard every error: `data ??
+ * []`, `data?.paused`, `cycleRes.data as … | null`. An empty answer therefore
+ * meant "nothing here" and "the query failed" at once, and /loop and /report
+ * turn that single value into four sentences that are false on the second
+ * meaning:
+ *
+ *   connections errored  → "Connect a channel first — Sahoda has nowhere to
+ *                          plan for.", with Plan my week DISABLED, to a
+ *                          workspace with four channels connected; and, in a
+ *                          second component, "Connect a channel and its dial
+ *                          appears here."
+ *   loop_settings errored → the DEFAULT weekly budget rendered in the control
+ *                          as though it were the stored one — an unmeasured
+ *                          number on a spending limit
+ *   loop_cycles errored  → "No week has been reported yet" on /report, and on
+ *                          /loop the cost-approval halt simply disappears,
+ *                          taking the approve button with it
+ *
+ * Every one is a claim about the customer's business that no query established,
+ * and the remedy each offers cannot work. So the six reads are checked and ANY
+ * error makes the whole snapshot `unreadable` — one rule rather than six
+ * judgements, and one true sentence instead of four false ones.
+ *
+ * `readLoopSnapshot` is kept as the mechanism and is no longer called by a page.
  */
 
 export interface LoopSnapshot {
@@ -107,7 +134,43 @@ export const UNSET_SNAPSHOT: Omit<LoopSnapshot, 'dial' | 'connected' | 'lapsed'>
   learnings: [],
 }
 
-export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapshot> {
+/**
+ * The three things that can be true of "what is the Loop doing", each with its
+ * own sentence and its own remedy.
+ *
+ * `workspaceId` rides along on the `ok` arm because both pages need it for the
+ * further reads they make (the ranking, the cycle's learnings) — carrying it
+ * here means neither page resolves the workspace a second time and gets a
+ * different answer.
+ */
+export type LoopRead =
+  | { status: 'ok'; workspaceId: string; snapshot: LoopSnapshot }
+  | { status: 'no-workspace' }
+  | { status: 'unreadable' }
+
+/** The Loop for the active workspace, with the reason when there is nothing. */
+export async function readLoop(): Promise<LoopRead> {
+  try {
+    const workspace = await activeWorkspaceRead()
+    if (workspace.status === 'unreadable') return { status: 'unreadable' }
+    if (workspace.status === 'none') return { status: 'no-workspace' }
+
+    const snapshot = await readLoopSnapshot(workspace.workspace.id)
+    if (snapshot === null) return { status: 'unreadable' }
+    return { status: 'ok', workspaceId: workspace.workspace.id, snapshot }
+  } catch {
+    return { status: 'unreadable' }
+  }
+}
+
+/**
+ * The six queries, or `null` when any of them failed.
+ *
+ * Null rather than a throw so the caller decides what an unanswered question
+ * means for its screen — and so this stays one place to look for "which tables
+ * does the Loop read".
+ */
+export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapshot | null> {
   const supabase = createServerSupabase()
 
   const [settingsRes, dialRes, connRes, cycleRes, learnRes] = await Promise.all([
@@ -121,7 +184,18 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
       .from('connections')
       .select('platform, status')
       .eq('workspace_id', workspaceId)
-      .in('status', [...LIVE_STATUS, ...LAPSED_STATUS]),
+      // BOTH vocabularies, deliberately: `connected` and `lapsed` below are
+      // derived from these same rows, so narrowing this to active would make
+      // `lapsed` permanently empty while every test still passed.
+      //
+      // What it used to carry was connected, which `connections.status` cannot
+      // hold — check (status in (active,expired,revoked,error)),
+      // 20260718000005_connections.sql:9 — so it matched no row on any workspace
+      // and the screen read that as "you have no channels". A bad INSERT raises
+      // 23514; a bad WHERE is a valid query that finds nothing. Pinned from two
+      // directions: lib/connections/status-vocabulary.test.ts and
+      // lib/repo/check-constraints.test.ts.
+      .in(status, [...LIVE_STATUS, ...LAPSED_STATUS]),
     supabase
       .from('loop_cycles')
       .select('*')
@@ -138,6 +212,27 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
       .order('created_at', { ascending: false })
       .limit(3),
   ])
+
+  // ── FOUR OF THE FIVE, AND WHY `memory_events` IS NOT ONE OF THEM ──────────
+  // A failed read makes the snapshot a guess only where the screen turns the
+  // empty value into a CLAIM. These four do:
+  //
+  //   loop_settings           the stored weekly budget, shown as a number
+  //   loop_channel_autonomy   the level each channel is running at
+  //   connections             "Connect a channel first", and Plan my week
+  //   loop_cycles             "No week has been reported yet", and the halt
+  //
+  // `memory_events` does not. `PendingLearnings` returns null for an empty list
+  // (learnings.tsx:33), so a failed read renders NOTHING — no sentence, no
+  // figure, nothing to be wrong about. Blanking the whole page for it would buy
+  // no honesty and would hide the cost-approval halt, which is the one thing on
+  // this screen that is time-sensitive. An over-broad rule is not a safer rule.
+  //
+  // `maybeSingle` reports a missing row as `data: null, error: null`, so this
+  // catches transport and RLS faults without mistaking an empty table for one.
+  for (const res of [settingsRes, dialRes, connRes, cycleRes]) {
+    if (res.error) return null
+  }
 
   const dial = new Map<Channel, AutonomyLevel>()
   for (const row of dialRes.data ?? []) {
@@ -179,12 +274,16 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
 
   let briefs: LoopBriefView[] = []
   if (cycle) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('loop_briefs')
       .select('*')
       .eq('workspace_id', workspaceId)
       .eq('cycle_id', cycle.id)
       .order('priority')
+    // The sixth read, and the one whose empty answer costs the most: the cost
+    // preview prices the briefs, so an errored read would show a week that
+    // writes nothing for zero credits and invite an approval of it.
+    if (error) return null
     briefs = (data ?? []).map((row) => ({
       id: row.id as string,
       priority: row.priority as number,

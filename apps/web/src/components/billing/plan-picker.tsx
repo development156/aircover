@@ -20,6 +20,7 @@ import {
   prorationSummary,
   rupees,
 } from '@/lib/billing/plan-copy'
+import { creditWord } from '@/lib/credit-words'
 
 /**
  * Changing plan.
@@ -123,7 +124,7 @@ export function PlanPicker({ subscription }: { subscription: SubscriptionView })
             selected={selected === plan.id}
             onClick={() => choose(plan.id)}
             title={plan.name}
-            meta={`${rupees(plan.priceInr * 100)}${plan.priceInr === 0 ? '' : ' a month'} · ${count(plan.monthlyCredits)} credits`}
+            meta={`${rupees(plan.priceInr * 100)}${plan.priceInr === 0 ? '' : ' a month'} · ${count(plan.monthlyCredits)} ${creditWord(plan.monthlyCredits)}`}
           />
         ))}
       </div>

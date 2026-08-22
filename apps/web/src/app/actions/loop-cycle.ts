@@ -84,6 +84,12 @@ export interface CycleState {
  * as NO_CHANNELS and told people to connect a channel they had already
  * connected. `lib/repo/check-constraints.test.ts` now refuses the whole class.
  *
+ * AND `null` is not `{ live: [], lapsed: [] }`. A read that FAILED is not a
+ * workspace with no channels: returning an empty list makes the caller write
+ * NO_CHANNELS into `loop_cycles.failure_reason`, where /loop renders it back as
+ * a statement about the customer’s account for weeks. Two lanes fixed this
+ * function for different reasons and both fixes are here.
+ *
  * `lapsed` is returned because the refusal message differs: a workspace that
  * never connected needs to connect, and a workspace whose authorisation expired
  * needs to reconnect, and sending the second one to do the first is the action
@@ -98,13 +104,20 @@ function formatChannels(channels: readonly Channel[]): string {
 
 async function connectedChannels(
   workspaceId: string,
-): Promise<{ live: Channel[]; lapsed: Channel[] }> {
+): Promise<{ live: Channel[]; lapsed: Channel[] } | null> {
   const supabase = createServerSupabase()
-  const { data } = await supabase
+  // 'active', not 'connected' — see the CHECK on connections.status
+  // (20260718000005_connections.sql:9). The old value matched nothing, so every
+  // cycle on every workspace ended `failure_reason = 'NO_CHANNELS'` and told the
+  // customer to connect a channel they had already connected.
+  const { data, error } = await supabase
     .from('connections')
     .select('platform, status')
     .eq('workspace_id', workspaceId)
     .in('status', ['active', 'expired', 'revoked', 'error'])
+  // A read we could not complete is NOT an empty channel list — see the note
+  // above. Checked BEFORE anything is derived from `data`.
+  if (error) return null
   const rows = (data ?? []).filter((row) =>
     (['x', 'gbp', 'linkedin', 'instagram'] as const).includes(row.platform as Channel),
   )
@@ -212,7 +225,22 @@ export async function runCycleToPreview(
     })
 
     // ── STAGE 3: PLAN — the one paid step before the halt ─────────────────
-    const { live: channels, lapsed } = await connectedChannels(workspaceId)
+    const connected = await connectedChannels(workspaceId)
+    if (connected === null) {
+      // We could not read the connections. That is not zero channels, and
+      // writing NO_CHANNELS here would put a claim about the customer’s account
+      // into loop_cycles.failure_reason where /loop reads it back for weeks.
+      await store.setCycleStatus(cycle.id, workspaceId, 'failed', {
+        failureReason: 'CHANNELS_UNREADABLE',
+      })
+      return {
+        ok: false,
+        cycleId: cycle.id,
+        insufficient: false,
+        message: 'Sahoda couldn’t check your channels just now — nothing was charged. Try again.',
+      }
+    }
+    const { live: channels, lapsed } = connected
     if (channels.length === 0) {
       // FSD M2 edge case: zero connected channels. The cycle does not charge and
       // does not pretend — it fails honestly and says what to do.
@@ -317,12 +345,29 @@ export async function runCycleToPreview(
       })),
       budget,
     )
-    await store.haltForCostApproval(cycle.id, workspaceId, preview.creationCredits)
+    const halted = await store.haltForCostApproval(cycle.id, workspaceId, preview.creationCredits)
+    // The orchestration is charged either way: it ran, and the plan it produced
+    // is on the row. What changes is what the screen may say next.
     await store.addSpend(cycle.id, workspaceId, creditCost(CYCLE_ACTION))
 
     revalidateBalance()
     revalidatePath('/loop')
     revalidatePath('/report')
+
+    if (!halted) {
+      // The cycle went terminal while the plan stage was waiting on the model —
+      // the kill switch, pressed during exactly the window it exists for.
+      // Without this the halt wrote `awaiting_cost_approval` over `cancelled`
+      // and put the approve button back in front of the person who had just
+      // pressed stop.
+      return {
+        ok: false,
+        cycleId: cycle.id,
+        insufficient: false,
+        message:
+          'This week was stopped while Sahoda was planning it, so nothing is waiting for your approval.',
+      }
+    }
     return { ok: true, cycleId: cycle.id }
   } catch (error) {
     reportServerError(error, { action: 'runCycleToPreview', workspaceId })

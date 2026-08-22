@@ -7,6 +7,7 @@ import { isOpenHold, settledHoldIds } from '@/lib/wallet/hold-settlement'
 import { groupCorrections, type LedgerRow } from '@/lib/wallet/group-entries'
 import { cogsUsd } from '@/lib/wallet/parse-entries'
 import { cn } from '@/lib/utils'
+import { creditWord } from '@/lib/credit-words'
 
 export interface LedgerTableProps {
   entries: readonly LedgerEntry[]
@@ -63,7 +64,12 @@ function netEffectCopy(net: number): string {
 
   const amount = formatCredits(net)
 
-  return net > 0 ? `+${amount} credits to your balance` : `-${amount} credits from your balance`
+  // `amount` is already formatted for display, so the WORD has to come from the
+  // number. Magnitude, not sign: "-1 credits from your balance" is the same slip
+  // one line down from where it was just fixed.
+  const word = creditWord(Math.abs(net))
+
+  return net > 0 ? `+${amount} ${word} to your balance` : `-${amount} ${word} from your balance`
 }
 
 /**

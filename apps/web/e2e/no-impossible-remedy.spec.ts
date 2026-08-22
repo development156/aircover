@@ -89,6 +89,26 @@ const ROUTES = [
   '/settings/plan',
   '/settings/integrations',
   '/settings/profile',
+  // Added run 27, and each of these reads something on this branch:
+  //
+  //   /loop, /report   six Loop tables. Both resolved the workspace with the
+  //                    LOSSY `getActiveWorkspace()` and printed "Finish setting
+  //                    up your workspace" whether the account had none or the
+  //                    read had failed. Fixed at the reader (`readLoop`), and
+  //                    the query-error arm — which no e2e run can produce — is
+  //                    pinned in `src/lib/loop/read.test.ts`. What THIS asserts
+  //                    is the half a browser can: a healthy fresh account is
+  //                    never told to retry.
+  //   /brain,          `readBrain()`, four-way from the start. Here to keep it
+  //   /brain/resolve   that way, and because the resolution console renders a
+  //                    queue whose emptiness has two meanings of its own.
+  //
+  // The other /brain sub-routes (identity, voice, competitors) are still
+  // 16-31 line placeholders that read nothing, so they stay out.
+  '/loop',
+  '/report',
+  '/brain',
+  '/brain/resolve',
 ]
 
 test.describe('no impossible remedy on a healthy new account @smoke', () => {

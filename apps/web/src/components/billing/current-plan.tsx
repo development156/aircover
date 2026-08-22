@@ -2,6 +2,7 @@ import { PLAN_CATALOG, type DunningPolicy, type SubscriptionView } from '@sahoda
 
 import { Unreadable } from '@/components/design-system/absence-row'
 import { count, DUNNING_LABEL, onDate, planIncludes, rupees } from '@/lib/billing/plan-copy'
+import { creditWord } from '@/lib/credit-words'
 
 /**
  * What the customer is on, right now.
@@ -147,7 +148,8 @@ export function PlanNoWorkspace() {
       </p>
       <p className="type-sm mt-2 text-muted">
         Your free signup credits land the moment the workspace exists — that is{' '}
-        <span className="num">{count(PLAN_CATALOG.free.monthlyCredits)}</span> credits, at no cost.
+        <span className="num">{count(PLAN_CATALOG.free.monthlyCredits)}</span>{' '}
+        {creditWord(PLAN_CATALOG.free.monthlyCredits)}, at no cost.
       </p>
     </section>
   )

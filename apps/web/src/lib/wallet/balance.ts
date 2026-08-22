@@ -1,5 +1,6 @@
 import { CreditBalanceSchema, availableCredits } from '@sahoda/shared'
 import type { LedgerEntry } from '@sahoda/shared'
+import { creditWord } from '@/lib/credit-words'
 
 /**
  * The wallet hero number and its held subline.
@@ -83,9 +84,11 @@ export function toBalance(row: unknown): WalletBalance {
 function heldNoteFor(held: number): string {
   const amount = formatCredits(held)
 
+  // One ternary, on the raw number. `amount` is already formatted, so it cannot
+  // be the thing the word is derived from.
   return held === 1
-    ? `${amount} credit held by an action in progress. Released when it finishes or fails.`
-    : `${amount} credits held by actions in progress. Released when they finish or fail.`
+    ? `${amount} ${creditWord(held)} held by an action in progress. Released when it finishes or fails.`
+    : `${amount} ${creditWord(held)} held by actions in progress. Released when they finish or fail.`
 }
 
 /**
@@ -102,9 +105,25 @@ function heldNoteFor(held: number): string {
  *
  * `now` is a parameter so callers stay deterministic and testable.
  */
+/**
+ * Whether the expired-hold reaper is actually running.
+ *
+ * `off` and `report` both write nothing (apps/jobs/src/env.ts readMode), so only
+ * `on` returns credits. An unset variable is `off`, which is the same default the
+ * job itself applies — deploying the reaper must not, by itself, start moving
+ * credits, and this must not claim it did.
+ */
+export type HoldReaper = 'running' | 'not-running'
+
+/** Read the reaper's state from the environment the sweeps cron runs under. */
+export function holdReaperFromEnv(value: string | undefined): HoldReaper {
+  return value === 'on' ? 'running' : 'not-running'
+}
+
 export function staleHoldNote(
   openHolds: ReadonlyArray<Pick<LedgerEntry, 'hold_expires_at'>>,
   now: Date,
+  reaper: HoldReaper,
 ): string | null {
   const cutoff = now.getTime()
 
@@ -123,10 +142,35 @@ export function staleHoldNote(
     return null
   }
 
-  // No reaper exists, so the copy must not imply the credits come back on their
-  // own. "Will be released when it settles" would be the exact false comfort the
-  // note is here to prevent — the user would wait instead of asking for help.
-  return stale === 1
-    ? '1 hold has passed its expiry — those credits are held by a stalled action and are not released automatically. They stay held until that action is settled.'
-    : `${formatCredits(stale)} holds have passed their expiry — those credits are held by stalled actions and are not released automatically. They stay held until those actions are settled.`
+  // ── THE SENTENCE IS DERIVED, BECAUSE THE FACT LIVES SOMEWHERE ELSE ────────
+  // This used to assert "No reaper exists" as a literal. A reaper does exist and
+  // is wired to a cron: apps/web/vercel.json schedules /api/cron/sweeps every
+  // five minutes, and that route calls sweepExpiredHolds (route.ts:177), which
+  // RELEASEs every unsettled HOLD past its TTL through apply_ledger_entry.
+  //
+  // Whether it MOVES anything is a third artifact again — SAHODA_HOLD_SWEEP_MODE,
+  // which is 'off' unless set, and is already in turbo.json's @sahoda/web#build
+  // allowlist. So the true sentence is a function of the mode, and hard-coding
+  // either half is wrong in one direction or the other: today the literal is
+  // right by accident of configuration, and the day someone sets the mode to
+  // `on` it tells a customer their money is stuck when it comes back in five
+  // minutes. `wallet-reaper-seam.test.ts` reads all three artifacts and fails if
+  // they stop agreeing.
+  const one = stale === 1
+  const credits = one ? '1 hold has' : `${formatCredits(stale)} holds have`
+  const expiry = one ? 'passed its expiry' : 'passed their expiry'
+  const action = one ? 'a stalled action' : 'stalled actions'
+
+  if (reaper === 'running') {
+    return (
+      `${credits} ${expiry} — those credits are held by ${action}. Sahoda releases ` +
+      `expired holds every few minutes, so they should come back on their own. If they ` +
+      `are still held in an hour, tell us.`
+    )
+  }
+
+  return (
+    `${credits} ${expiry} — those credits are held by ${action} and are not released ` +
+    `automatically. They stay held until ${one ? 'that action is' : 'those actions are'} settled.`
+  )
 }

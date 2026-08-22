@@ -7,7 +7,13 @@ export type CreditCreateState =
   { ok: true; requestId: string; approverEmail: string } | { ok: false; message: string }
 
 export type CreditVerifyState =
-  | { ok: true; amount: number; balanceAfter: number | null; replayed: boolean }
+  /**
+   * `amount` is `null` when the RPC returned without one. NOT 0: the action used
+   * to coalesce a missing amount to zero and the toast read "Granted 0 credits"
+   * over a grant that had just landed — a figure nothing measured, on the one
+   * screen in the product that moves money by hand.
+   */
+  | { ok: true; amount: number | null; balanceAfter: number | null; replayed: boolean }
   | { ok: false; message: string }
 
 export interface WorkspaceHit {

@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { env } from '@/lib/env'
+import { credits } from '@/lib/credit-words'
 
 /**
  * Resend, over its REST API (doc 13 §6).
@@ -55,7 +56,7 @@ export async function sendApprovalCode(input: {
   reason: string
 }): Promise<SendOutcome> {
   const text = [
-    `${input.requestedBy} is asking to add ${input.amount} credits to ${input.workspace}.`,
+    `${input.requestedBy} is asking to add ${credits(input.amount)} to ${input.workspace}.`,
     '',
     `Their reason: ${input.reason}`,
     '',
@@ -65,7 +66,7 @@ export async function sendApprovalCode(input: {
     'If this was not expected, do not enter it — deny the request in /admin/credits instead.',
   ].join('\n')
 
-  return send(input.to, `Approve ${input.amount} credits for ${input.workspace}?`, text)
+  return send(input.to, `Approve ${credits(input.amount)} for ${input.workspace}?`, text)
 }
 
 /**

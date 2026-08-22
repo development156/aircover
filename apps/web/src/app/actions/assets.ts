@@ -18,7 +18,7 @@ import { decideAttach, type ChannelRejection } from '@/lib/posts/attach-decision
 import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
 import { assetObjectPath } from '@/lib/posts/media-path'
 import { mapPostError } from '@/lib/posts/post-error'
-import { getPost, listMedia, readVariantFormats } from '@/lib/posts/read'
+import { getPost, readMedia, readVariantFormatsStrict } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
@@ -409,7 +409,30 @@ export async function attachAssetToPost(
       }
     }
 
-    const existing = await listMedia(postId)
+    // ── BOTH READS ARE STRICT, BECAUSE BOTH DECIDE WHAT MAY BE WRITTEN ───────
+    // `listMedia` and `readVariantFormats` answer `[]` / `{}` for a read that
+    // FAILED as readily as for a post with nothing on it. Every gate below is
+    // measured against those values, so an unreadable read used to switch all
+    // three off at once and let the write through:
+    //
+    //   the duplicate check         the same photo attached twice, counting
+    //                               twice against every channel's cap
+    //   `existing.length`           an eleventh file admitted to a channel that
+    //                               allows ten
+    //   the per-format rule         a Story accepting a landscape photo — the
+    //                               exact case the comment below was written for
+    //
+    // The refusal already exists a few lines up, for a file whose dimensions are
+    // missing; this is the same sentence for the same reason.
+    const existing = await readMedia(postId)
+    const formats = await readVariantFormatsStrict(postId)
+    if (existing === null || formats === null) {
+      return {
+        ok: false,
+        message: 'Sahoda could not check that file against the channel limits — try again.',
+      }
+    }
+
     // Already on this post: say so rather than writing a second row that would
     // show the same photo twice and count twice against every channel's cap.
     if (existing.some((row) => row.storage_path === asset.storage_path)) {
@@ -424,7 +447,7 @@ export async function attachAssetToPost(
       // makes. Attaching FROM THE LIBRARY is still an attach, so a story must
       // refuse a landscape photo here exactly as it does there. `{}` would have
       // compiled and looked identical while accepting both.
-      await readVariantFormats(postId),
+      formats,
     )
     if (!decision.ok) {
       return { ok: false, message: decision.message, rejections: decision.rejections }

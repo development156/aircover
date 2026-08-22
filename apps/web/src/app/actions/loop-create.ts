@@ -56,6 +56,13 @@ export interface CreateStageState {
   created?: number
   skipped?: number
   spent?: number
+  /**
+   * The cycle went terminal — cancelled or failed — while this stage was
+   * running. The drafts that were written are kept and were paid for, so this is
+   * not a failure; what it is NOT is a reported week, and the screen must not
+   * say one.
+   */
+  cancelledMidRun?: boolean
   message?: string
 }
 
@@ -153,12 +160,25 @@ export async function runCreateStage(cycleId: string): Promise<CreateStageState>
     }
 
     await store.setCycleStatus(cycleId, workspaceId, 'staging')
-    await store.finishCycle(cycleId, workspaceId)
+    // False means the cycle reached `cancelled` or `failed` while this stage was
+    // running — the kill switch, almost always. The drafts that were written are
+    // KEPT (they are in the Planner and the customer paid for them) and the
+    // cancellation stands; what must not happen is reporting the week as done.
+    const reported = await store.finishCycle(cycleId, workspaceId)
 
     revalidatePath('/loop')
     revalidatePath('/report')
     revalidatePath('/planner')
     revalidatePath('/posts')
+    if (!reported) {
+      return {
+        ok: true,
+        created,
+        skipped,
+        spent,
+        cancelledMidRun: true,
+      }
+    }
     return { ok: true, created, skipped, spent }
   } catch (error) {
     reportServerError(error, { action: 'runCreateStage', workspaceId })

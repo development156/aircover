@@ -11,6 +11,7 @@ import { isUsableRefusal, refusalToRule } from '@/lib/onboarding/refusal'
 import { ResolvingPanel } from './resolving-panel'
 
 import { AttemptErrorNotice, type AttemptError } from './attempt-error'
+import { credits } from '@/lib/credit-words'
 
 export interface QuestionStepProps {
   intake: Intake
@@ -104,7 +105,7 @@ export function QuestionStep({
             {/* UI_RULES credits protocol: the cost lives in the label, never in
                 a tooltip — and on the free path there is no number to show. */}
             {!isPending ? (
-              <span className="tabular-nums">{isFree ? '· free' : `· ${cost} credits`}</span>
+              <span className="tabular-nums">{isFree ? '· free' : `· ${credits(cost)}`}</span>
             ) : null}
           </Button>
         </div>

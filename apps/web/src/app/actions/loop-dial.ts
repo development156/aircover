@@ -12,6 +12,7 @@ import {
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
+import { credits } from '@/lib/credit-words'
 
 /**
  * THE AUTONOMY DIAL'S WRITE PATH.
@@ -107,7 +108,7 @@ export async function setLoopSettings(input: {
       if (!Number.isInteger(n) || n < 0 || n > MAX_WEEKLY_BUDGET_CREDITS) {
         return {
           ok: false,
-          message: `Pick a weekly budget between 0 and ${MAX_WEEKLY_BUDGET_CREDITS} credits.`,
+          message: `Pick a weekly budget between 0 and ${credits(MAX_WEEKLY_BUDGET_CREDITS)}.`,
         }
       }
       patch.weekly_budget_credits = n

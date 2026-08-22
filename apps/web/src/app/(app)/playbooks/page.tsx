@@ -12,6 +12,7 @@ import { PlaybookKillSwitch } from '@/components/playbooks/kill-switch'
 import { RunHistory } from '@/components/playbooks/run-history'
 import { RunPreview } from '@/components/playbooks/run-preview'
 import { PageTitle } from '@/components/page-title'
+import { creditWord } from '@/lib/credit-words'
 import { readPlaybooksSnapshot } from '@/lib/playbooks/read'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
@@ -220,8 +221,8 @@ export default async function PlaybooksPage() {
             <ArrowRight size={15} strokeWidth={1.8} aria-hidden className="mt-[3px] shrink-0" />
             <span>
               You see what a run costs before it costs anything, and you approve it. A run costs{' '}
-              <span className="num">{creditCost('playbook_run')}</span> credits, plus whatever each
-              draft costs on its own.
+              <span className="num">{creditCost('playbook_run')}</span>{' '}
+              {creditWord(creditCost('playbook_run'))}, plus whatever each draft costs on its own.
             </span>
           </li>
         </ul>

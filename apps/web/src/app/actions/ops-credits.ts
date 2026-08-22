@@ -189,7 +189,9 @@ export async function verifyCreditOtp(input: {
       revalidatePath('/admin/credits')
       return {
         ok: true,
-        amount: result.amount ?? 0,
+        // Absent, not zero — see CreditOtpState. A grant whose amount did not
+        // come back is still a grant; saying it was zero is the invented figure.
+        amount: typeof result.amount === 'number' ? result.amount : null,
         balanceAfter: result.balance_after ?? null,
         replayed: Boolean(result.replayed),
       }

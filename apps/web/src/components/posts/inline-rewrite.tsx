@@ -12,6 +12,7 @@ import { selectedText, type SelectionRange } from '@/lib/posts/splice-selection'
 
 import { InlineError } from './inline-error'
 import { PendingLines } from './pending-lines'
+import { creditWord } from '@/lib/credit-words'
 
 const INSTRUCTIONS = [
   { value: 'rewrite', label: 'Rewrite' },
@@ -81,7 +82,8 @@ export function InlineRewrite({ body, selection, onReplace }: InlineRewriteProps
         toast.success(
           <span>
             Rewrote the selection · <span className="tabular-nums">{result.creditsCharged}</span>{' '}
-            credits used · <span className="tabular-nums">{result.balanceAfter}</span> left
+            {creditWord(result.creditsCharged)} used ·{' '}
+            <span className="tabular-nums">{result.balanceAfter}</span> left
           </span>,
         )
         return
@@ -162,7 +164,7 @@ export function InlineRewrite({ body, selection, onReplace }: InlineRewriteProps
                   sees, because a fresh workspace has 100 credits and never
                   reaches it. */}
               This rewrite needs <span className="tabular-nums">{failure.required}</span>{' '}
-              {failure.required === 1 ? 'credit' : 'credits'} and you have{' '}
+              {creditWord(failure.required)} and you have{' '}
               <span className="tabular-nums">{failure.available}</span>. Nothing was charged.{' '}
               <Link href="/wallet" className="font-semibold underline underline-offset-2">
                 Top up your wallet
