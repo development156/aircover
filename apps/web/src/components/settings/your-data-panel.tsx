@@ -12,6 +12,7 @@ import { eraseWorkspaceData } from '@/app/actions/erase-workspace'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
+import { eraseConfirmationMatches } from '@/lib/privacy/confirm'
 
 /**
  * "Your data" — the DPDP surface: take a copy, and delete everything.
@@ -78,7 +79,7 @@ function LineList({ lines }: { lines: ErasureLine[] }) {
   return (
     <ul className="mt-1.5 space-y-0.5">
       {lines.map((line) => (
-        <li key={line.table} className="flex justify-between gap-4 text-[13px]">
+        <li key={line.table} className="flex justify-between gap-4 type-body">
           <span className="text-ink">{line.describes}</span>
           <span className="tabular-nums text-muted">{line.rows}</span>
         </li>
@@ -162,25 +163,26 @@ export function YourDataPanel() {
   }, [typed])
 
   const ready = erase.kind === 'ready' ? erase.preview : null
-  const nameMatches =
-    ready !== null && typed.trim().toLowerCase() === ready.workspaceName.trim().toLowerCase()
+  // The SAME comparison the server action and the database use. Written once,
+  // or the button greys itself on a rule the server does not share.
+  const nameMatches = ready !== null && eraseConfirmationMatches(typed, ready.workspaceName)
 
   return (
     <section
       aria-labelledby="your-data"
       className="rounded-card border border-line bg-bg p-5 shadow-card"
     >
-      <h2 id="your-data" className="text-[15px] font-bold">
+      <h2 id="your-data" className="type-h3">
         Your data
       </h2>
 
-      <p className="mt-1 text-[13px] text-muted">
+      <p className="mt-1 type-body text-muted">
         Take a copy of everything in this workspace, or delete all of it.
       </p>
 
       <div className="mt-4 space-y-1.5">
-        <h3 className="text-[13.5px] font-semibold">Download a copy</h3>
-        <p className="text-[13px] text-muted">
+        <h3 className="type-body font-semibold">Download a copy</h3>
+        <p className="type-body text-muted">
           One zip file: your posts and their per-channel wording, your Brand Brain, your
           conversations and enquiries, every credit movement, your pictures and documents, and how
           your posts performed. It opens with a page you can read, and it lists anything it could
@@ -192,7 +194,7 @@ export function YourDataPanel() {
         </Button>
 
         {download.kind === 'working' ? (
-          <p role="status" className="text-[12.5px] text-muted">
+          <p role="status" className="type-sm text-muted">
             {/* Real bytes, from the stream. Never a bar that moves on a timer. */}
             <span className="tabular-nums">{formatBytes(download.received)}</span>
             {download.total === null ? (
@@ -207,27 +209,27 @@ export function YourDataPanel() {
         ) : null}
 
         {download.kind === 'done' ? (
-          <p role="status" className="text-[12.5px] text-muted">
+          <p role="status" className="type-sm text-muted">
             Saved <span className="font-medium">{download.filename}</span>. Open{' '}
             <span className="font-medium">your-data.html</span> inside it first.
           </p>
         ) : null}
 
         {download.kind === 'error' ? (
-          <p role="alert" className="text-[12.5px] text-danger">
+          <p role="alert" className="type-sm text-danger">
             {download.message}
           </p>
         ) : null}
       </div>
 
       <div className="mt-5 space-y-1.5 border-t border-line pt-4">
-        <h3 className="text-[13.5px] font-semibold">Delete everything</h3>
-        <p className="text-[13px] text-muted">
+        <h3 className="type-body font-semibold">Delete everything</h3>
+        <p className="type-body text-muted">
           Your posts, pictures, Brand Brain, conversations, enquiries, websites and linked accounts
           are deleted for good. Your credit and payment record is kept — it is what proves what you
           paid and what you were charged, so it is not ours to erase.
         </p>
-        <p className="text-[13px] text-muted">
+        <p className="type-body text-muted">
           Download a copy first if you want one. Deleting cannot be undone.
         </p>
         <Button variant="destructive" onClick={openErase} className="mt-2">
@@ -264,17 +266,17 @@ export function YourDataPanel() {
         }
       >
         {erase.kind === 'loading' ? (
-          <p className="text-[13px] text-muted">Counting what you have…</p>
+          <p className="type-body text-muted">Counting what you have…</p>
         ) : null}
 
         {erase.kind === 'failed' ? (
-          <p role="alert" className="text-[13px] text-danger">
+          <p role="alert" className="type-body text-danger">
             {erase.message}
           </p>
         ) : null}
 
         {erase.kind === 'done' ? (
-          <div className="space-y-2 text-[13px] text-muted">
+          <div className="space-y-2 type-body text-muted">
             <p>
               <span className="tabular-nums">{erase.rowsRemoved}</span> records and{' '}
               <span className="tabular-nums">{erase.filesRemoved}</span> files were deleted.
@@ -290,23 +292,23 @@ export function YourDataPanel() {
         {ready !== null ? (
           <div className="space-y-4">
             <div>
-              <h4 className="text-[13px] font-semibold text-ink">What is deleted</h4>
+              <h4 className="type-body font-semibold text-ink">What is deleted</h4>
               {ready.removed.length > 0 ? (
                 <LineList lines={ready.removed} />
               ) : (
-                <p className="mt-1 text-[13px] text-muted">
+                <p className="mt-1 type-body text-muted">
                   This workspace holds nothing yet, so there is nothing to delete.
                 </p>
               )}
-              <p className="mt-1.5 text-[13px] text-muted">
+              <p className="mt-1.5 type-body text-muted">
                 Your pictures and documents go too, from storage as well as from here.
               </p>
             </div>
 
             <div>
-              <h4 className="text-[13px] font-semibold text-ink">What is kept</h4>
+              <h4 className="type-body font-semibold text-ink">What is kept</h4>
               <LineList lines={ready.kept} />
-              <p className="mt-1.5 text-[13px] text-muted">
+              <p className="mt-1.5 type-body text-muted">
                 Your credit and payment record. It is the account of what you paid and what you were
                 charged, it can settle a disagreement in your favour as easily as ours, and Indian
                 tax law requires it to be kept for years. It holds a reference to you — for most
@@ -315,7 +317,7 @@ export function YourDataPanel() {
             </div>
 
             <div>
-              <label htmlFor="erase-confirm" className="text-[13px] font-semibold text-ink">
+              <label htmlFor="erase-confirm" className="type-body font-semibold text-ink">
                 Type <span className="font-mono">{ready.workspaceName}</span> to confirm
               </label>
               <Input

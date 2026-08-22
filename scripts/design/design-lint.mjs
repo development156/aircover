@@ -51,6 +51,16 @@ const HEX_EXEMPT_FILES = [
      anything. The stylesheet beside it, `styles/onboarding.css`, carries zero
      raw hex and stays enforced. */
   'components/onboarding/stage/store.ts',
+  /* The DPDP export's readable page. Same class again, and it is the strongest
+     case in the list: this file does not style anything in this app. It
+     GENERATES a standalone HTML document that lands in the customer's Downloads
+     folder, has to open from a folder with no network in two years, and has no
+     stylesheet to import — `var(--surface)` in it resolves to nothing at all.
+     Values are the only thing that renders. It also cannot drift, because it is
+     regenerated from scratch on every download rather than being a copy of
+     anything. The app-facing half of this feature, `your-data-panel.tsx`, uses
+     tokens and stays enforced. */
+  'lib/privacy/readable.ts',
 ]
 
 /* ── ALLOWLIST 2 · platform brand marks ───────────────────────────────────────

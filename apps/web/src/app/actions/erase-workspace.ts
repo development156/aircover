@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server'
 import { z } from 'zod'
 
 import { reportServerError } from '@/lib/observability/report'
+import { eraseConfirmationMatches } from '@/lib/privacy/confirm'
 import { sweepWorkspaceStorage } from '@/lib/privacy/storage'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
@@ -55,11 +56,6 @@ const InputSchema = z.object({
 export type EraseState =
   | { ok: true; rowsRemoved: number; filesRemoved: number; retained: string[] }
   | { ok: false; message: string }
-
-/** Whitespace- and case-insensitive, matching the RPC exactly. */
-export function eraseConfirmationMatches(typed: string, workspaceName: string): boolean {
-  return typed.trim().toLowerCase() === workspaceName.trim().toLowerCase()
-}
 
 function refusal(error: { code?: string | null; message?: string | null }): string {
   const message = error.message ?? ''
