@@ -78,23 +78,106 @@ async function deleteClerkUser(clerkUserId: string): Promise<void> {
 }
 
 /**
- * Remove the rows the run created. Deleting the workspace cascades to members,
- * posts, variants, media and the credit ledger, so this is the single root.
+ * Refuse to CREATE what this process could not delete.
+ *
+ * ── THE DEFECT THIS CLOSES ───────────────────────────────────────────────────
+ * `cleanupSupabase` used to begin `if (!url || !key) return`. The Playwright
+ * runner is a separate process from the app: the APP reads `apps/web/.env` and
+ * has every credential, while the RUNNER only ever had what
+ * `playwright.config.ts` loaded. MEASURED 2026-08-22 across all 19 `.env.local`
+ * files in this repository's worktrees: every one of them holds exactly one
+ * variable, `VERCEL_OIDC_TOKEN`. Not one carries `SUPABASE_SERVICE_ROLE_KEY`.
+ *
+ * So the app created a workspace and the runner's teardown returned, silently,
+ * having done nothing. Production holds five workspaces from this fixture
+ * (19-21 August) with 18 rows between them, including five `credit_ledger`
+ * entries that can never be reconciled to a person because the Clerk user was
+ * deleted afterwards — teardown deletes the user whether or not the rows went.
+ *
+ * Checking at teardown is too late; by then the row exists. This runs BEFORE the
+ * first user is minted, so an under-credentialled run fails having created
+ * nothing at all.
+ */
+function assertCleanupCapable(): { url: string; key: string } {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (url && key) return { url, key }
+
+  const missing = [
+    !url && 'NEXT_PUBLIC_SUPABASE_URL',
+    !key && 'SUPABASE_SERVICE_ROLE_KEY',
+  ].filter(Boolean)
+
+  throw new Error(
+    [
+      `REFUSED: this run cannot clean up after itself (${missing.join(' and ')} absent).`,
+      '',
+      '  The app has these and would create a workspace; this process does not and could',
+      '  not delete it. That is how five workspaces came to be stranded in production.',
+      '',
+      '  Put them in apps/web/.env.local, which playwright.config.ts loads.',
+    ].join('\n'),
+  )
+}
+
+/**
+ * Remove the rows the run created, and PROVE they are gone.
+ *
+ * Deleting the workspace cascades to members, posts, variants, media and the
+ * credit ledger — MEASURED against production 2026-08-22, inside a rolled-back
+ * transaction: the cascade succeeds, because `app.block_mutations` exempts
+ * `pg_trigger_depth() > 1` and an FK cascade runs at depth 2. So the append-only
+ * ledger is not what stops this; nothing was stopping it, because nothing was
+ * running it.
+ *
+ * ── WHY IT COUNTS AFTERWARDS ─────────────────────────────────────────────────
+ * supabase-js RETURNS `{ error }`; it does not throw. The old `try/catch` around
+ * these two statements could therefore never fire, and a refused delete was
+ * indistinguishable from a successful one. Even a checked `error` is only what
+ * the client was told — so the rows are counted again, through the same
+ * service-role client, and the count is the verdict.
+ *
+ * ── AND WHY IT DISTINGUISHES TWO FAILURES ────────────────────────────────────
+ * A transport error is `unknown`: we do not know whether the rows went, and
+ * saying "leak" would fabricate a failure. Rows still present on a re-count is a
+ * confirmed leak and is thrown, because debris in a customer database is not
+ * teardown noise. Same discipline as `lib/cron/heartbeat.ts`: unknown is not
+ * healthy, and it is not failure either.
  *
  * Service-role is legitimate HERE — this is test scaffolding, not app code.
  * `apps/web` itself must never gain a service-role client.
  */
 async function cleanupSupabase(clerkUserId: string): Promise<void> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) return
+  const { url, key } = assertCleanupCapable()
+  const admin = createClient(new URL(url).origin, key, { auth: { persistSession: false } })
 
-  try {
-    const admin = createClient(new URL(url).origin, key, { auth: { persistSession: false } })
-    await admin.from('workspaces').delete().eq('created_by', clerkUserId)
-    await admin.from('users_profile').delete().eq('user_id', clerkUserId)
-  } catch (error) {
-    console.warn(`[e2e] Supabase cleanup failed: ${error instanceof Error ? error.message : '?'}`)
+  const workspaces = await admin.from('workspaces').delete().eq('created_by', clerkUserId)
+  const profiles = await admin.from('users_profile').delete().eq('user_id', clerkUserId)
+
+  const remaining = await admin.from('workspaces').select('id').eq('created_by', clerkUserId)
+
+  if (remaining.error) {
+    // Could not measure. Loud, but not a claim we cannot support.
+    console.warn(
+      `[e2e] cleanup UNVERIFIED for ${clerkUserId}: ${remaining.error.message}. ` +
+        `delete errors: workspaces=${workspaces.error?.message ?? 'none'} ` +
+        `users_profile=${profiles.error?.message ?? 'none'}`,
+    )
+    return
+  }
+
+  if (remaining.data.length > 0) {
+    throw new Error(
+      [
+        `[e2e] LEAKED ${remaining.data.length} workspace(s) into the target database.`,
+        `  created_by : ${clerkUserId}`,
+        `  workspace  : ${remaining.data.map((r) => r.id).join(', ')}`,
+        `  delete said: ${workspaces.error?.message ?? 'no error'}`,
+        '',
+        '  The Clerk user is NOT being deleted, so created_by still resolves to a person.',
+        '  Remove the workspace before deleting the user, or the row is orphaned forever.',
+      ].join('\n'),
+    )
   }
 }
 
@@ -183,11 +266,19 @@ export function adminClient(): SupabaseClient | null {
 
 export const test = base.extend<{ signedIn: SeededUser }>({
   signedIn: async ({ page }, use) => {
+    // Before anything is minted. A run that cannot tear down must not set up.
+    assertCleanupCapable()
+
     const user = await createClerkUser()
     try {
       await signIn(page, user)
       await use(user)
     } finally {
+      // ORDER IS LOAD-BEARING. `cleanupSupabase` throws on a CONFIRMED leak, which
+      // skips the line below — so a workspace that survived keeps a `created_by`
+      // that still resolves to a Clerk user someone can look up. The old order
+      // deleted the user unconditionally, which is why the five stranded
+      // workspaces in production name people who no longer exist.
       await cleanupSupabase(user.clerkUserId)
       await deleteClerkUser(user.clerkUserId)
     }

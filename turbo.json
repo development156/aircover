@@ -29,7 +29,8 @@
         "SUPABASE_SERVICE_ROLE_KEY",
         "NEXT_PUBLIC_SUPABASE_URL",
         "E2E_PORT",
-        "E2E_SERVER_CMD"
+        "E2E_SERVER_CMD",
+        "SAHODA_E2E_ACK_TARGET"
       ]
     },
     "build": {
