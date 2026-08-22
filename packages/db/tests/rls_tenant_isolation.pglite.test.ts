@@ -326,9 +326,23 @@ describe('every append-only table refuses a direct mutation', () => {
     'competitor_snapshots',
     'credit_ledger',
     'invoices',
+    // Added deliberately at integration, 2026-08-22, which is what this list's
+    // own failure message asks for. Both arrived from lanes that branched before
+    // this guard existed, and both are genuinely append-only by their
+    // migration's own argument:
+    //   knowledge_chunks       "a record of what the brain was shown is only
+    //                          worth keeping if it cannot be revised afterwards"
+    //                          (20260822000000_knowledge_library.sql:294)
+    //   zernio_webhook_events  a redelivery must not be able to rewrite what the
+    //                          first delivery said
+    //                          (20260821000000_zernio_webhook_events.sql:232)
+    // `knowledge_documents` deliberately has NO trigger — a document is a living
+    // row — so it is correctly absent from this list.
+    'knowledge_chunks',
     'ops_audit_log',
     'post_metric_snapshots',
     'post_publish_logs',
+    'zernio_webhook_events',
   ]
 
   it('finds every guarded table, and none has quietly dropped out', () => {
