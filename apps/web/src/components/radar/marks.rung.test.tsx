@@ -35,7 +35,7 @@ const CHANGE: RadarChange = {
   id: 'chg_1',
   competitorId: 'cmp_1',
   competitorName: 'Rival Books',
-  kind: 'copy',
+  kind: 'page_changed',
   observedOn: '2026-08-22',
   evidence: [],
   observation: { summary: 'Their homepage headline changed.', figures: [] },
