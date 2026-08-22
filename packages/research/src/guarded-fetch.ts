@@ -36,9 +36,64 @@ export interface GuardedFetchOptions extends SafeUrlOptions {
   maxRedirects?: number
   /** Swapped in tests. Defaults to the DNS-pinned transport. */
   transport?: typeof fetch
+  /** Hard ceiling on the bytes a caller can be handed. */
+  maxBytes?: number
 }
 
 const DEFAULT_MAX_REDIRECTS = 5
+
+/**
+ * The same 2 MB `safeFetch` uses. Far more than any page this reads needs, and
+ * the point is the ceiling rather than the number.
+ */
+export const DEFAULT_MAX_BYTES = 2_000_000
+
+/**
+ * Truncate the body at `maxBytes`, so `res.text()` cannot be a memory kill.
+ *
+ * ── THE HALF-CLOSED DOOR THIS FIXES ─────────────────────────────────────────
+ * `safeFetch` has a byte cap and enforces it against the bytes that ARRIVE,
+ * because a Content-Length header is a claim. The transport under it has none —
+ * it streams — and `cheapCheck`, the caller this file was written for, does a
+ * bare `await res.text()` on an address a customer chose and then normalises the
+ * whole string. So closing SSRF on that path would have left the same door open
+ * to a page that simply never stops sending.
+ *
+ * The cap lives HERE rather than in the caller for the reason the guard does: a
+ * caller that says nothing gets it, and every future caller inherits it without
+ * having to know.
+ */
+function capped(res: Response, maxBytes: number): Response {
+  const body = res.body
+  if (!body) return res
+
+  let total = 0
+  const reader = body.getReader()
+  const limited = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const { done, value } = await reader.read()
+      if (done) return controller.close()
+      if (!value) return
+      total += value.byteLength
+      if (total >= maxBytes) {
+        controller.enqueue(value.subarray(0, value.byteLength - (total - maxBytes)))
+        await reader.cancel().catch(() => {})
+        controller.close()
+        return
+      }
+      controller.enqueue(value)
+    },
+    cancel(reason) {
+      void reader.cancel(reason).catch(() => {})
+    },
+  })
+
+  const headers = new Headers(res.headers)
+  // `content-length` described the body the server meant to send, which is no
+  // longer the body the caller reads.
+  headers.delete('content-length')
+  return new Response(limited, { status: res.status, statusText: res.statusText, headers })
+}
 
 /**
  * Build a `fetch`-shaped function whose every hop is validated.
@@ -51,6 +106,7 @@ const DEFAULT_MAX_REDIRECTS = 5
 export function createGuardedFetch(options: GuardedFetchOptions = {}): typeof fetch {
   const transport = options.transport ?? pinnedFetch
   const maxRedirects = options.maxRedirects ?? DEFAULT_MAX_REDIRECTS
+  const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES
 
   return async (input, init) => {
     let current = typeof input === 'string' ? input : input.toString()
@@ -62,8 +118,9 @@ export function createGuardedFetch(options: GuardedFetchOptions = {}): typeof fe
       const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null
       if (location === null) {
         // A 3xx with no Location is not a redirect, it is the answer.
-        Object.defineProperty(res, 'url', { value: url.toString(), configurable: true })
-        return res
+        const out = capped(res, maxBytes)
+        Object.defineProperty(out, 'url', { value: url.toString(), configurable: true })
+        return out
       }
       current = new URL(location, url).toString()
     }

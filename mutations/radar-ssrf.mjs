@@ -87,6 +87,22 @@ export default {
       replace: '  if (value === null) return false\n  return BLOCKED_V4.some',
     },
     {
+      name: 'the body cap is removed — a page that never stops sending is read whole',
+      cwd: 'packages/research',
+      command: 'pnpm vitest run src/guarded-fetch.test.ts',
+      file: 'packages/research/src/guarded-fetch.ts',
+      find: '        const out = capped(res, maxBytes)',
+      replace: '        const out = res',
+    },
+    {
+      name: 'the cap is applied but never enforced against the arriving bytes',
+      cwd: 'packages/research',
+      command: 'pnpm vitest run src/guarded-fetch.test.ts',
+      file: 'packages/research/src/guarded-fetch.ts',
+      find: '      if (total >= maxBytes) {',
+      replace: '      if (false) {',
+    },
+    {
       name: 'an IP literal in the URL falls back to the DNS accident again',
       cwd: 'packages/research',
       command: 'pnpm vitest run src/guarded-fetch.test.ts',

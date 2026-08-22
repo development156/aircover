@@ -160,3 +160,62 @@ describe('what it must NOT break', () => {
     expect(res.status).toBe(304)
   })
 })
+
+describe('a page that keeps sending', () => {
+  /**
+   * 64 KB per pull, up to 12.8 MB, then closed.
+   *
+   * ⚠ WHY IT IS BOUNDED, WHICH IS NOT THE OBVIOUS CHOICE ⚠
+   * A genuinely endless fixture models the attack better and makes a WORSE test.
+   * MEASURED: the mutant that disables the cap turns an endless body into an
+   * unbounded `res.text()`, and the run does not fail — it allocates until the
+   * machine gives out. It took the box to its knees with two other sessions on
+   * it. A mutant that hangs is indistinguishable from a mutant that is still
+   * thinking, and a suite that cannot terminate cannot report anything.
+   *
+   * Bounded at well over the cap, the same mutant fails in a second on the size.
+   */
+  const CHUNKS = 200
+  function large(): Response {
+    const chunk = new Uint8Array(64 * 1024).fill(0x61)
+    let sent = 0
+    return new Response(
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (sent >= CHUNKS) return controller.close()
+          sent += 1
+          controller.enqueue(chunk)
+        },
+      }),
+      { status: 200, headers: { 'content-length': '999999999999' } },
+    )
+  }
+
+  it('is truncated at the cap rather than read whole', async () => {
+    const transport = (async () => large()) as typeof fetch
+    const fetchGuarded = createGuardedFetch({
+      transport,
+      resolve: resolvePublic,
+      maxBytes: 200_000,
+    })
+    const res = await fetchGuarded('https://competitor.example/')
+    const text = await res.text()
+    expect(text.length).toBe(200_000)
+    // The header described the body the server meant to send, not the one read.
+    expect(res.headers.get('content-length')).toBeNull()
+  })
+
+  it('caps by default, with no caller saying anything', async () => {
+    const transport = (async () => large()) as typeof fetch
+    const fetchGuarded = createGuardedFetch({ transport, resolve: resolvePublic })
+    const text = await (await fetchGuarded('https://competitor.example/')).text()
+    // 12.8 MB offered, 2 MB read.
+    expect(text.length).toBe(2_000_000)
+  })
+
+  it('leaves a body under the cap exactly as it was', async () => {
+    const transport = (async () => new Response('a real page', { status: 200 })) as typeof fetch
+    const fetchGuarded = createGuardedFetch({ transport, resolve: resolvePublic })
+    expect(await (await fetchGuarded('https://competitor.example/')).text()).toBe('a real page')
+  })
+})
