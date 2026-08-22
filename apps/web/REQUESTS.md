@@ -651,3 +651,19 @@ asks: a held post lands `failed` with `GATE_HELD` and its reason on the variant,
 to go and look. There is no notification, no review queue, and no owner assignment — and the
 approver gap above is the same hole from the other side. A held post inside a scheduled window
 therefore expires quietly once the dispatch grace passes unless a person happens to notice.
+
+## For wt-db: `posts.channels` is the only channel column with no vocabulary constraint
+
+`20260718000004_content.sql:12` is `channels text[] not null default '{}'` — no CHECK — while
+`packages/shared` parses the column against a strict four-member enum. Every other channel column
+in the schema is constrained (`connections.platform`, `post_variants.channel`).
+
+MEASURED 2026-08-22, read-only against production: the column currently holds only `gbp`,
+`instagram`, `linkedin` and `x`, so no drift has occurred. A fifth value would be storable, and
+would then be dropped SILENTLY on read — `listPosts` does `flatMap` over `safeParse`, so the post
+would vanish from the list rather than raise.
+
+Asked for rather than written here because only wt-db edits migrations. The parity test that would
+catch a future divergence between the enum and the CHECKs is worth adding at the same time; the
+pattern is `apps/web/src/lib/connections/status-vocabulary.test.ts`, which parses the CHECK out of
+the migration and scans the source for literals compared against it.
