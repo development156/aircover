@@ -14,7 +14,7 @@ const POST_ID = '11111111-1111-4111-8111-111111111111'
 
 const state = vi.hoisted(() => ({
   post: null as { id: string; channels: string[] } | null,
-  existingMedia: [] as unknown[],
+  existingMedia: [] as unknown[] | null,
   uploads: [] as { path: string; contentType: string | undefined }[],
   removed: [] as string[],
   inserted: [] as Record<string, unknown>[],
@@ -23,7 +23,7 @@ const state = vi.hoisted(() => ({
   // `asset_id` is wt-assets' delete gate (a library file in use may not be
   // stripped); `formats` is wt-editor2's per-variant format. Both, not either.
   deleted: null as { storage_path: string; asset_id: string | null } | null,
-  formats: {} as Record<string, string | null>,
+  formats: {} as Record<string, string | null> | null,
 }))
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -41,11 +41,16 @@ vi.mock('@/lib/workspaces', () => ({
 }))
 vi.mock('@/lib/posts/read', () => ({
   getPost: () => Promise.resolve(state.post),
-  listMedia: () => Promise.resolve(state.existingMedia),
+  // The STRICT readers, which is what the attach gate calls now. `null` from
+  // either means "we could not look", and the gate must refuse rather than
+  // measure a cap against a list it never read.
+  readMedia: () => Promise.resolve(state.existingMedia),
+  listMedia: () => Promise.resolve(state.existingMedia ?? []),
   // What each channel's version says it is. `state.formats` is `{}` in every
   // test below except the format ones — which is the honest reading of a post
   // whose versions state no intent, and reproduces the pre-format behaviour.
-  readVariantFormats: () => Promise.resolve(state.formats),
+  readVariantFormatsStrict: () => Promise.resolve(state.formats),
+  readVariantFormats: () => Promise.resolve(state.formats ?? {}),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -345,5 +350,52 @@ describe('detachMedia', () => {
     expect(result.ok).toBe(false)
     // No object removal attempted — we never learned which object it was.
     expect(state.removed).toEqual([])
+  })
+})
+
+/**
+ * The same gate on the UPLOAD path — the sibling of the library attach in
+ * `assets.ts`, with the identical shape and the identical hole.
+ */
+describe('an unreadable read refuses the upload rather than admitting it', () => {
+  test('an unreadable media list uploads nothing and inserts nothing', async () => {
+    state.existingMedia = null
+
+    const result = await attachMedia(POST_ID, formWith(fileFrom(pngBytes(), 'a.png', 'image/png')))
+
+    expect(result.ok).toBe(false)
+    expect(state.inserted).toEqual([])
+    // And the bytes never left the process: refusing after the upload would
+    // leave an orphan object in storage that nothing points at.
+    expect(state.uploads).toEqual([])
+    // THE MESSAGE, not just the refusal. `existing.length` on null throws, so
+    // without the explicit guard this call still returned ok:false — from the
+    // outer catch, with a generic sentence and a Sentry report. A crash is not
+    // a gate.
+    if (!result.ok) {
+      expect(result.message).toMatch(/could not check that photo against the channel/i)
+    }
+  })
+
+  test('an unreadable format map uploads nothing', async () => {
+    state.formats = null
+
+    const result = await attachMedia(POST_ID, formWith(fileFrom(pngBytes(), 'a.png', 'image/png')))
+
+    expect(result.ok).toBe(false)
+    expect(state.uploads).toEqual([])
+    if (!result.ok) {
+      expect(result.message).toMatch(/could not check that photo against the channel/i)
+    }
+  })
+
+  test('a readable, empty post still uploads', async () => {
+    state.existingMedia = []
+    state.formats = {}
+
+    const result = await attachMedia(POST_ID, formWith(fileFrom(pngBytes(), 'a.png', 'image/png')))
+
+    expect(result.ok).toBe(true)
+    expect(state.inserted).toHaveLength(1)
   })
 })

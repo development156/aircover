@@ -148,10 +148,10 @@ export async function getPost(postId: string): Promise<Post | null> {
  *
  * Returns `[]` on any failure, exactly as the read it replaced did.
  */
-const variantRows = cache(async (postId: string): Promise<Record<string, unknown>[]> => {
+const variantRows = cache(async (postId: string): Promise<Record<string, unknown>[] | null> => {
   try {
     const workspaceId = await activeWorkspaceId()
-    if (workspaceId === null) return []
+    if (workspaceId === null) return null
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -161,19 +161,44 @@ const variantRows = cache(async (postId: string): Promise<Record<string, unknown
       .eq('workspace_id', workspaceId)
       .order('channel', { ascending: true })
 
-    if (error || !data) return []
+    // `null` for "we could not look", `[]` for "this post has no channel copy
+    // yet". They used to be the same value, and `attachAssetToPost` turns that
+    // value into a decision about what may be written — see the strict readers
+    // below.
+    if (error || !data) return null
     return data as Record<string, unknown>[]
   } catch {
-    return []
+    return null
   }
 })
 
-export async function listVariants(postId: string): Promise<PostVariant[]> {
-  const rows = await variantRows(postId)
+function parseVariants(rows: Record<string, unknown>[]): PostVariant[] {
   return rows.flatMap((row) => {
     const parsed = PostVariantSchema.safeParse(row)
     return parsed.success ? [parsed.data] : []
   })
+}
+
+/**
+ * The channel versions, or `null` when the read did not get an answer.
+ *
+ * Use this anywhere the answer DECIDES something — the attach gate, a cap, a
+ * refusal. `listVariants` below is the lossy view for display.
+ */
+export async function readVariants(postId: string): Promise<PostVariant[] | null> {
+  const rows = await variantRows(postId)
+  return rows === null ? null : parseVariants(rows)
+}
+
+/**
+ * The lossy view, kept because a LIST that renders empty is a smaller wrong than
+ * a screen that will not render at all — and every display caller already treats
+ * `[]` as "nothing to show".
+ *
+ * It is NOT safe for a decision. `readVariants` is.
+ */
+export async function listVariants(postId: string): Promise<PostVariant[]> {
+  return (await readVariants(postId)) ?? []
 }
 
 /**
@@ -183,10 +208,25 @@ export async function listVariants(postId: string): Promise<PostVariant[]> {
  * salvages the second column the frozen contract strips. See `variant-format.ts`.
  */
 export async function readVariantFormats(postId: string): Promise<VariantFormats> {
+  return (await readVariantFormatsStrict(postId)) ?? {}
+}
+
+/**
+ * The formats, or `null` when the read failed.
+ *
+ * `{}` is the documented value for "no version states an intent", and
+ * `decideAttach` reads it as exactly that — so handing it `{}` for a failed read
+ * makes the per-format rule vanish and a Story accept a landscape photo. The
+ * comment at the attach site already warned that "`{}` would have compiled and
+ * looked identical while accepting both"; it was about a missing ARGUMENT, and
+ * the reader could produce the same value on its own.
+ */
+export async function readVariantFormatsStrict(postId: string): Promise<VariantFormats | null> {
   try {
-    return formatsFromRows(await variantRows(postId))
+    const rows = await variantRows(postId)
+    return rows === null ? null : formatsFromRows(rows)
   } catch {
-    return {}
+    return null
   }
 }
 
@@ -213,6 +253,11 @@ export async function readVariantFormats(postId: string): Promise<VariantFormats
 export async function readVariantVersions(postId: string): Promise<VariantVersions> {
   try {
     const rows = await variantRows(postId)
+    // A read that did not get an answer cannot say whether versions are
+    // supported. Falling through to the capability probe is the same route a
+    // post with no rows takes, and it asks the database directly — which is a
+    // better answer than inferring one from rows we never saw.
+    if (rows === null) return await readVariantVersionSupport()
     const fromRows = versionsFromRows(rows)
     if (fromRows.supported || !inconclusive(rows)) return fromRows
 
@@ -365,10 +410,19 @@ export async function listPostLifecycles(postIds: string[]): Promise<PostLifecyc
  * REQUESTS.md); `asset_usages.position` records the order for library files but
  * is not the publisher's source.
  */
-export async function listMedia(postId: string): Promise<PostMedia[]> {
+/**
+ * The attachments, or `null` when the read did not get an answer.
+ *
+ * The distinction is load-bearing on the WRITE path. `attachAssetToPost` uses
+ * this list for two decisions — the duplicate check and `existing.length`, which
+ * is what every channel's media cap is measured against. An unreadable read
+ * arriving as `[]` switched BOTH off: the same photo could be attached twice,
+ * and an eleventh file admitted to a channel that allows ten.
+ */
+export async function readMedia(postId: string): Promise<PostMedia[] | null> {
   try {
     const workspaceId = await activeWorkspaceId()
-    if (workspaceId === null) return []
+    if (workspaceId === null) return null
 
     const supabase = createServerSupabase()
     const { data, error } = await supabase
@@ -378,14 +432,19 @@ export async function listMedia(postId: string): Promise<PostMedia[]> {
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: true })
 
-    if (error || !data) return []
+    if (error || !data) return null
     return data.flatMap((row) => {
       const parsed = PostMediaSchema.safeParse(row)
       return parsed.success ? [parsed.data] : []
     })
   } catch {
-    return []
+    return null
   }
+}
+
+/** The lossy view, for display only. A decision must use `readMedia`. */
+export async function listMedia(postId: string): Promise<PostMedia[]> {
+  return (await readMedia(postId)) ?? []
 }
 
 /**
