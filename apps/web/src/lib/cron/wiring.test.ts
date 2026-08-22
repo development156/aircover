@@ -108,6 +108,44 @@ describe('cron wiring', () => {
     for (const entry of apiEntries) expect(entry).not.toContain('(.*)')
   })
 
+  /**
+   * ── THE THIRD PLACE, WHICH THIS FILE COULD NOT SEE ─────────────────────────
+   * The header above names three places a cron path is written down. There are
+   * FOUR. `config.matcher` at the bottom of middleware.ts decides whether Clerk
+   * RUNS at all, and `isPublicRoute` only decides what it DOES once it has run.
+   * middleware.ts says so itself, at length: a bearer token of `aaa.bbb.ccc`
+   * throws inside Clerk's decode BEFORE our callback executes, and production
+   * answered 500 MIDDLEWARE_INVOCATION_FAILED on every matched path. The only
+   * bypass that works is exclusion from the matcher.
+   *
+   * So a cron path listed in `isPublicRoute` but absent from `config.matcher`
+   * still ticks correctly — and is crashable by one header from anyone on the
+   * internet. Every assertion in this file passed in that state.
+   *
+   * Both patterns need it: the second matcher catches everything under /api on
+   * its own, so excluding a path from the first alone does nothing.
+   */
+  it('excludes every cron path from BOTH middleware matchers, not just the public list', () => {
+    // COMMENTS STRIPPED FIRST, for the same reason the test above strips them —
+    // and this one earned it on its first run. The config block's own comment
+    // quotes two example patterns, so a naive scan found THREE matchers and
+    // would have been asserting against prose.
+    const matchers = middleware
+      .slice(middleware.indexOf('export const config'))
+      .split('\n')
+      .map((line) => line.replace(/\/\/.*$/, ''))
+      .join('\n')
+    const patterns = [...matchers.matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1]!)
+    expect(patterns.length, `expected 2 matcher patterns, found ${patterns.length}`).toBe(2)
+
+    for (const cron of vercelConfig.crons ?? []) {
+      const anchored = `${cron.path.slice(1)}$`
+      for (const [i, pattern] of patterns.entries()) {
+        expect(pattern, `${cron.path} is not excluded from matcher ${i}`).toContain(anchored)
+      }
+    }
+  })
+
   it('every cron route checks the shared secret before anything else', () => {
     // Placement is the property: a header read or a query above this line would be
     // reachable by anyone on the internet. Driven off the schedule rather than
