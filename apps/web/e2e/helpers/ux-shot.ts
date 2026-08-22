@@ -129,6 +129,7 @@ export interface ShotOptions {
  * settles it, and opening every file is the point of this lane.
  */
 export async function shot(page: Page, opts: ShotOptions): Promise<FrameRow> {
+  await parkPointer(page)
   const d = await measure(page)
   const url = new URL(page.url())
   const domTheme = await page
@@ -162,6 +163,39 @@ export async function shot(page: Page, opts: ShotOptions): Promise<FrameRow> {
   appendFileSync(MANIFEST, JSON.stringify(row) + '\n')
   taken += 1
   return row
+}
+
+/**
+ * MOVE THE VIRTUAL POINTER OUT OF THE PICTURE BEFORE EVERY SHUTTER.
+ *
+ * ── THE ARTEFACT THIS CLOSES, AND IT WAS MINE ────────────────────────────────
+ * Playwright's mouse stays where the last click left it. Every journey in this
+ * lane begins by clicking "Create workspace" on /home, and at 1440 that button
+ * sits at x 754-918, y 389-423 — so the pointer parks at (836, 406) and stays
+ * there for the rest of the run.
+ *
+ * `/posts` then draws its "Create post" button at x 777-895, y 404-438, which
+ * CONTAINS that point. MEASURED:
+ *
+ *   pointer parked   :hover = true    orange 0     black 3574
+ *   pointer at (2,2) :hover = false   orange 3579  black 135
+ *
+ * So three independent captures — the j3 sweep, the motion pass and the verify
+ * pass, hours apart — all photographed the product's primary action as a solid
+ * BLACK button, which is `hover:bg-ink hover:text-white` doing exactly what it
+ * should. `getComputedStyle` read orange every time, because by then the
+ * evaluate had moved nothing and the read happened in a different instant.
+ *
+ * A frame is the authority on what a screen looks like, which is this lane's
+ * whole premise — and a frame taken with a stale pointer is authoritative about
+ * a state no person was in. Parking the pointer costs one CDP message.
+ *
+ * (-40, -40) rather than a corner: any in-viewport coordinate is over
+ * SOMETHING, and on a phone the bottom-right corner is the fixed nav bar.
+ * Chromium accepts a negative coordinate and simply hovers nothing.
+ */
+export async function parkPointer(page: Page): Promise<void> {
+  await page.mouse.move(-40, -40).catch(() => {})
 }
 
 /** Navigate and return how long the page took to settle. */
