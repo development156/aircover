@@ -1,0 +1,2242 @@
+/*  SAHODA LABS — BRAND BRAIN ONBOARDING
+    =====================================================================
+    Warm, editorial, asymmetric. Deliberately not the app's cool-neutral
+    dashboard palette: onboarding is a room you pass through once, and it
+    should feel like paper and light rather than like software.
+
+    THE ORGANISING IDEA
+    The orb on the right IS the Brand Brain, and it visibly gains mass
+    from every answer. Each thing you tell it emits particles that fly in
+    and stay. By the last step it is dense and bright. Nothing here is a
+    progress bar pretending to be art — the growth is literally the data
+    you have contributed, and the count is real.                       */
+
+/* ================================================================ tokens */
+/* ══════════════════════════════════════════════════════ tokens (ported) ══
+
+   THE RULING THIS BLOCK ENCODES
+   The new package is authoritative for onboarding's LAYOUT, MOTION, STRUCTURE
+   and COPY. It is NOT authoritative for colour: its v1.0 palette predates three
+   measured decisions that are now canon in docs/26_Design_System_v4.md, and
+   adopting it verbatim would silently revert all three —
+
+     · --ink #111111        canon is #000000, and --pfg on orange measures
+                            7.15:1 against the old #ffffff's 2.94:1
+     · --muted #737373      canon is #575756, solved to 7.0:1 on white
+     · --confirm #0F7A5A    canon's Certainty System is ACHROMATIC (--ok), and
+                            a green "confirm" is the exact chroma that pass
+                            removed
+
+   So every colour name the package's own :root defined is re-declared here as
+   an `--onb-*` ALIAS onto the canonical token. The prefix is not cosmetic:
+   --ink, --muted, --surface and --border all EXIST in tokens.css, so declaring
+   the package's values under those names would shadow the real tokens for every
+   descendant of the stage.
+
+   The layout, type-scale and motion values below are the package's own, verbatim.
+   They are scoped to the stage and reach nothing else, so the app's type-* steps
+   and the design-lint ratchet are untouched.                                  */
+
+.onb {
+  /* Ground — #fafafa against the package's #FAFAF8 */
+  --onb-ground: var(--surface-2);
+  --onb-paper: var(--surface);
+  --onb-ink: var(--ink);
+  --onb-muted: var(--ink-mute);
+  --onb-hairline: var(--line);
+  --onb-hairline-strong: var(--line-firm);
+
+  /* Brand. --p IS the package's #FF6600 — the one value that needed no mapping. */
+  --onb-orange: var(--p);
+  --onb-orange-2: color-mix(in srgb, var(--p) 78%, white);
+  --onb-peach: var(--brand-wash);
+  --onb-peach-deep: var(--brand-tint);
+
+  /* Achromatic by canon. See the ruling above. */
+  --onb-confirm: var(--ok);
+
+  /* Orange at alpha, expressed as a mix of --p rather than as an rgba() literal,
+     so the ramp tracks the token instead of restating its channels. */
+  --onb-orange-04: color-mix(in srgb, var(--p) 4%, transparent);
+  --onb-orange-08: color-mix(in srgb, var(--p) 8%, transparent);
+  --onb-orange-14: color-mix(in srgb, var(--p) 14%, transparent);
+  --onb-orange-24: color-mix(in srgb, var(--p) 24%, transparent);
+
+  /* Ink at alpha. --ink inverts between themes, so these invert with it — which
+     is what the package's dark block does by hand. */
+  --onb-ink-04: color-mix(in srgb, var(--ink) 4%, transparent);
+  --onb-ink-08: color-mix(in srgb, var(--ink) 8%, transparent);
+  --onb-ink-45: color-mix(in srgb, var(--ink) 45%, transparent);
+
+  --onb-surface: var(--surface);
+  --onb-surface-2: var(--surface-3);
+  --onb-border: var(--line);
+
+  /* ---- Type: the package's, verbatim. Scoped to the stage. ---- */
+  --onb-font: var(--sans);
+  --onb-fs-display: clamp(2rem, 1.15rem + 3.1vw, 3.75rem); /* 32 -> 60 */
+  --onb-fs-lead: clamp(1rem, 0.93rem + 0.31vw, 1.25rem); /* 16 -> 20 */
+  --onb-fs-input: clamp(1.125rem, 1rem + 0.4vw, 1.5rem); /* 18 -> 24 */
+  --onb-fs-body: 15px;
+  --onb-fs-label: 13px;
+  --onb-fs-micro: 11px;
+  --onb-fs-13: 13px;
+
+  /* ---- Frame ---- */
+  --onb-col: 760px;
+  --onb-gutter: clamp(20px, 5vw, 72px);
+  --onb-p-round: 10px;
+  --onb-p-track: -0.035em;
+  --onb-p-weight: 520;
+
+  /* ---- Motion ---- */
+  --onb-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --onb-ease-io: cubic-bezier(0.65, 0, 0.35, 1);
+  --onb-d-step: 520ms;
+  --onb-d-el: 380ms;
+  --onb-d-fast: 200ms;
+}
+
+/* The package deepens the ground and the peaches in dark rather than merely
+   inverting them. Both arms are reproduced; the values come from tokens. */
+[data-theme='dark'] .onb,
+.dark .onb {
+  --onb-ground: var(--canvas);
+  --onb-peach: var(--brand-tint);
+  --onb-peach-deep: color-mix(in srgb, var(--p) 28%, transparent);
+  --onb-ink-04: color-mix(in srgb, var(--ink) 6%, transparent);
+  --onb-ink-08: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+/* ================================================================= reset */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+#stage,
+#proc {
+  font-family: var(--onb-font);
+  font-size: var(--onb-fs-body);
+  line-height: 1.55;
+  color: var(--onb-ink);
+  background: var(--onb-ground);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#stage button,
+#stage input,
+#stage textarea,
+#stage select,
+#proc button,
+#proc input,
+#proc textarea,
+#proc select {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  outline: none;
+}
+
+#stage button,
+#proc button {
+  cursor: pointer;
+}
+#stage a,
+#proc a {
+  color: inherit;
+  text-decoration: none;
+}
+#stage ul,
+#proc ul {
+  list-style: none;
+}
+#stage img,
+#stage svg,
+#stage canvas,
+#proc img,
+#proc svg,
+#proc canvas {
+  display: block;
+  max-width: 100%;
+}
+
+#stage ::selection,
+#proc ::selection {
+  background: var(--onb-peach-deep);
+  color: var(--onb-ink);
+}
+
+#stage :focus-visible,
+#proc :focus-visible {
+  outline: 2px solid var(--onb-orange);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/*  Grain. This is what makes #FAFAF8 read as paper instead of as a hex
+    value — a warm ground with no texture just looks like an off-white
+    div. Fixed so it does not swim when content scrolls, and pinned
+    behind everything interactive.                                    */
+
+.grain {
+  position: fixed;
+  inset: -50%;
+  z-index: 0;
+  pointer-events: none;
+  /*  Kept low deliberately. Grain should be felt at reading distance
+        and invisible at a glance — at 0.4 it greys the warm ground out
+        to a flat #F1F1F0 and the whole page loses its temperature.  */
+  opacity: 0.13;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
+
+/* ================================================================== type */
+
+.display {
+  font-size: var(--onb-fs-display);
+  font-weight: var(--onb-p-weight);
+  line-height: 1.04;
+  letter-spacing: var(--onb-p-track);
+  text-wrap: balance;
+  transition:
+    letter-spacing var(--onb-d-el) var(--onb-ease),
+    font-weight var(--onb-d-el) var(--onb-ease);
+}
+
+.lead {
+  font-size: var(--onb-fs-lead);
+  line-height: 1.5;
+  color: var(--onb-muted);
+  max-width: 34ch;
+  text-wrap: pretty;
+}
+
+.label {
+  font-size: var(--onb-fs-label);
+  font-weight: 550;
+  color: var(--onb-muted);
+}
+
+.micro {
+  font-size: var(--onb-fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--onb-muted);
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+.ink {
+  color: var(--onb-ink);
+}
+.accent {
+  color: var(--onb-orange);
+}
+
+/* ================================================================= shell */
+
+.stage {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- top nav ---- */
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px var(--onb-gutter) 0;
+  flex: none;
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.wordmark .onb-logo {
+  height: 22px;
+  width: auto;
+  max-width: 140px;
+  object-fit: contain;
+  display: block;
+}
+
+.nav__acts {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav__theme {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm, 6px);
+  background: var(--onb-surface);
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+  color: var(--onb-muted);
+  cursor: pointer;
+  transition:
+    color var(--onb-d-fast) var(--onb-ease),
+    background var(--onb-d-fast) var(--onb-ease),
+    box-shadow var(--onb-d-fast) var(--onb-ease);
+}
+
+.nav__theme:hover {
+  color: var(--onb-ink);
+  background: var(--onb-surface-2);
+  box-shadow: inset 0 0 0 1px var(--onb-hairline-strong);
+}
+
+.nav__theme svg {
+  width: 14px;
+  height: 14px;
+}
+
+[data-theme='light'] .theme-icon-sun {
+  display: none;
+}
+[data-theme='light'] .theme-icon-moon {
+  display: block;
+}
+[data-theme='dark'] .theme-icon-sun {
+  display: block;
+}
+[data-theme='dark'] .theme-icon-moon {
+  display: none;
+}
+
+.nav__exit {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--onb-muted);
+  padding: 0 10px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--r-sm, 6px);
+  background: var(--onb-surface);
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+  transition:
+    color var(--onb-d-fast) var(--onb-ease),
+    background var(--onb-d-fast) var(--onb-ease),
+    box-shadow var(--onb-d-fast) var(--onb-ease);
+}
+
+.nav__exit:hover {
+  color: var(--onb-ink);
+  background: var(--onb-surface-2);
+  box-shadow: inset 0 0 0 1px var(--onb-hairline-strong);
+}
+
+/*  Progress. A hairline, not a bar. `01 — 08` carries the count in type
+    and the rule carries it in space; a chunky bar would be the loudest
+    thing on a screen whose whole point is one calm question.        */
+
+.prog {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px var(--onb-gutter) 0;
+  flex: none;
+}
+
+.prog__n {
+  font-size: var(--onb-fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--onb-muted);
+}
+.prog__n b {
+  color: var(--onb-ink);
+  font-weight: 600;
+}
+
+.prog__track {
+  position: relative;
+  height: 1px;
+  width: min(260px, 30vw);
+  background: var(--onb-hairline);
+  overflow: visible;
+}
+
+.prog__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--onb-orange);
+  transition: width var(--onb-d-step) var(--onb-ease);
+}
+
+/* The dot rides the end of the line so progress has a position, not just
+   a length — it reads as "you are here", which a fill alone does not. */
+.prog__dot {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--onb-orange);
+  transition: left var(--onb-d-step) var(--onb-ease);
+}
+
+/* ================================================================ layout
+
+    Asymmetric on purpose. A perfectly centred column with a symmetrical
+    graphic is the house style of every AI-generated landing page; the
+    question sits left of centre and the orb hangs right, so the page has
+    a reading direction instead of a mirror line.                     */
+
+.frame {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, var(--onb-col)) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(24px, 4vw, 72px);
+  padding: clamp(24px, 4vh, 56px) var(--onb-gutter) clamp(96px, 12vh, 140px);
+  max-width: 1560px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.pane {
+  min-width: 0;
+}
+
+/* The orb column. Sticky-centred so it never scrolls out of the frame on
+   the taller steps (references, knowledge). */
+.orbwrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 320px;
+  align-self: center;
+}
+
+#orb {
+  width: 100%;
+  height: 100%;
+  max-width: 560px;
+  aspect-ratio: 1;
+}
+
+/*  Caption under the orb. It is a receipt, not decoration: it names what
+    the orb just absorbed and counts what it holds, so the growth on
+    screen is checkable rather than atmospheric.                      */
+.orbcap {
+  position: absolute;
+  bottom: 4%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--onb-d-el) var(--onb-ease);
+}
+
+.orbcap.on {
+  opacity: 1;
+}
+.orbcap b {
+  font-size: 12px;
+  font-weight: 600;
+}
+.orbcap span {
+  font-size: 12px;
+  color: var(--onb-muted);
+  font-variant-numeric: tabular-nums;
+}
+.orbcap i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--onb-confirm);
+  flex: none;
+}
+
+/* ================================================================= steps */
+
+.step {
+  display: none;
+}
+.step.on {
+  display: block;
+}
+
+/*  Step transition. Current slides left, next enters from the right;
+    Back reverses it. Only transform and opacity — both composited, so
+    this holds 60fps while the canvas is also animating.             */
+
+.step.in-r {
+  animation: in-r var(--onb-d-step) var(--onb-ease) both;
+}
+.step.in-l {
+  animation: in-l var(--onb-d-step) var(--onb-ease) both;
+}
+
+@keyframes in-r {
+  from {
+    opacity: 0;
+    transform: translate3d(34px, 0, 0);
+  }
+}
+@keyframes in-l {
+  from {
+    opacity: 0;
+    transform: translate3d(-34px, 0, 0);
+  }
+}
+
+/* Children rise in sequence behind the question. Capped at 7 — past that
+   the tail waits long enough that the screen reads as slow. */
+.rise > * {
+  animation: rise var(--onb-d-el) var(--onb-ease) both;
+}
+.rise > *:nth-child(1) {
+  animation-delay: 60ms;
+}
+.rise > *:nth-child(2) {
+  animation-delay: 110ms;
+}
+.rise > *:nth-child(3) {
+  animation-delay: 160ms;
+}
+.rise > *:nth-child(4) {
+  animation-delay: 210ms;
+}
+.rise > *:nth-child(5) {
+  animation-delay: 260ms;
+}
+.rise > *:nth-child(6) {
+  animation-delay: 310ms;
+}
+.rise > *:nth-child(n + 7) {
+  animation-delay: 360ms;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 20px, 0);
+  }
+}
+
+.step__head {
+  margin-bottom: clamp(24px, 3.4vh, 40px);
+}
+.step__eyebrow {
+  margin-bottom: 18px;
+}
+.step__lead {
+  margin-top: 16px;
+}
+
+/* ================================================================ inputs
+
+    Underline inputs, not boxes. A boxed field on a warm editorial page
+    reads as a form; a rule under a large sentence reads as a place to
+    write. The rule thickens and turns orange on focus, which is the only
+    state change needed.                                              */
+
+.field {
+  position: relative;
+  margin-bottom: 22px;
+}
+
+.inp {
+  width: 100%;
+  font-size: var(--onb-fs-input);
+  font-weight: 450;
+  letter-spacing: -0.02em;
+  padding: 10px 2px 13px;
+  background: none;
+  border-bottom: 1.5px solid var(--onb-hairline);
+  transition: border-color var(--onb-d-el) var(--onb-ease);
+}
+
+.inp::placeholder {
+  color: var(--ink-faint);
+}
+.inp:focus {
+  border-bottom-color: var(--onb-orange);
+}
+
+/*  The travelling underline. A second rule scales in from the left on
+    focus so the line is *drawn* rather than recoloured — the difference
+    between a field that responds and one that just changes.        */
+.field::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1.5px;
+  background: var(--onb-orange);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--onb-d-el) var(--onb-ease);
+}
+
+.field:focus-within::after {
+  transform: scaleX(1);
+}
+
+.ta {
+  width: 100%;
+  min-height: 118px;
+  font-size: var(--onb-fs-input);
+  font-weight: 450;
+  line-height: 1.42;
+  letter-spacing: -0.02em;
+  padding: 10px 2px 13px;
+  resize: none;
+  border-bottom: 1.5px solid var(--onb-hairline);
+  transition: border-color var(--onb-d-el) var(--onb-ease);
+}
+
+.ta::placeholder {
+  color: var(--ink-faint);
+}
+.ta:focus {
+  border-bottom-color: var(--onb-orange);
+}
+
+.field--sm .inp {
+  font-size: 16px;
+  padding-bottom: 10px;
+}
+.hint {
+  font-size: 12px;
+  color: var(--onb-muted);
+  margin-top: 9px;
+}
+
+/* ================================================================ chips */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border-radius: var(--r-sm, 6px);
+  font-size: 13.5px;
+  font-weight: 550;
+  color: var(--onb-muted);
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+  background: var(--onb-paper);
+  cursor: pointer;
+  transition:
+    transform var(--onb-d-fast) var(--onb-ease),
+    color var(--onb-d-fast) var(--onb-ease),
+    box-shadow var(--onb-d-fast) var(--onb-ease),
+    background var(--onb-d-fast) var(--onb-ease),
+    opacity var(--onb-d-fast) var(--onb-ease);
+}
+
+.chip:hover {
+  color: var(--onb-ink);
+  background: var(--onb-surface-2);
+  box-shadow:
+    inset 0 0 0 1px var(--onb-hairline-strong),
+    0 2px 8px rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
+}
+
+/* Selected expands; the rest recede. Fading the unselected is what makes
+   a choice feel made rather than merely registered. */
+.chip.on {
+  color: var(--onb-ink);
+  background: var(--onb-peach);
+  box-shadow:
+    inset 0 0 0 1.5px var(--onb-orange),
+    0 2px 10px -2px rgba(255, 102, 0, 0.3);
+  font-weight: 600;
+  transform: translateY(-1px);
+}
+
+[data-theme='dark'] .chip.on {
+  color: var(--onb-ink);
+  background: rgba(255, 102, 0, 0.18);
+  box-shadow:
+    inset 0 0 0 1.5px var(--onb-orange),
+    0 0 16px rgba(255, 102, 0, 0.28);
+}
+
+.chips.has-on .chip:not(.on) {
+  opacity: 0.52;
+}
+.chips.has-on .chip:not(.on):hover {
+  opacity: 1;
+}
+
+/* ================================================================== CTA */
+
+.cta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: clamp(20px, 3vh, 32px);
+  flex-wrap: wrap;
+}
+
+.stage .btn,
+.proc .btn,
+.bb .btn,
+.result .btn,
+.cta-row .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--control-h, 34px);
+  padding: 0 14px;
+  border-radius: var(--r-sm, 6px);
+  font-size: var(--onb-fs-13, 13px);
+  font-weight: 550;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--onb-surface);
+  box-shadow: inset 0 0 0 1px var(--onb-border);
+  transition:
+    background 0.14s var(--onb-ease),
+    box-shadow 0.14s var(--onb-ease),
+    color 0.14s var(--onb-ease),
+    transform 0.1s var(--onb-ease);
+}
+
+.stage .btn:hover,
+.proc .btn:hover,
+.bb .btn:hover,
+.result .btn:hover,
+.cta-row .btn:hover {
+  background: var(--onb-surface-2);
+  box-shadow: inset 0 0 0 1px var(--text-3);
+}
+
+.stage .btn:active,
+.proc .btn:active,
+.bb .btn:active,
+.result .btn:active,
+.cta-row .btn:active {
+  transform: translateY(0.5px);
+}
+
+.stage .btn--primary,
+.stage .btn--go,
+.proc .btn--primary,
+.proc .btn--go,
+.bb .btn--go,
+.result .btn--primary,
+.result .btn--go,
+.cta-row .btn--primary,
+.cta-row .btn--go {
+  color: var(--pfg) !important;
+  background: var(--onb-orange) !important;
+  box-shadow: 0 1px 3px rgba(255, 102, 0, 0.28) !important;
+  border: none;
+}
+
+.stage .btn--primary:hover,
+.stage .btn--go:hover,
+.proc .btn--primary:hover,
+.proc .btn--go:hover,
+.bb .btn--go:hover,
+.result .btn--primary:hover,
+.result .btn--go:hover,
+.cta-row .btn--primary:hover,
+.cta-row .btn--go:hover {
+  background: var(--ink) !important;
+  box-shadow: 0 2px 8px rgba(255, 102, 0, 0.42) !important;
+  color: var(--canvas) !important;
+}
+
+.stage .btn--ghost,
+.proc .btn--ghost,
+.bb .btn--ghost,
+.result .btn--ghost,
+.cta-row .btn--ghost {
+  background: var(--onb-paper);
+  color: var(--onb-ink);
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+  height: var(--control-h, 34px);
+  padding: 0 12px;
+}
+
+.stage .btn--ghost:hover,
+.proc .btn--ghost:hover,
+.bb .btn--ghost:hover,
+.result .btn--ghost:hover,
+.cta-row .btn--ghost:hover {
+  color: var(--onb-ink);
+  background: var(--onb-paper);
+  box-shadow:
+    inset 0 0 0 1px var(--onb-hairline-strong),
+    0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.stage .btn[disabled],
+.proc .btn[disabled],
+.cta-row .btn[disabled] {
+  opacity: 0.34;
+  pointer-events: none;
+}
+
+.stage .btn svg,
+.proc .btn svg,
+.cta-row .btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* The arrow leans forward on hover — a 3px nudge that makes the control
+   feel like it is already going where it says it goes. */
+.stage .btn .arw,
+.proc .btn .arw,
+.cta-row .btn .arw {
+  transition: transform var(--onb-d-fast) var(--onb-ease);
+}
+
+.stage .btn:hover .arw,
+.proc .btn:hover .arw,
+.cta-row .btn:hover .arw {
+  transform: translateX(3px);
+}
+
+/*  The action rail sticks to the bottom of the viewport. Steps 04 and 06
+    are genuinely taller than a 900px laptop, and a Continue button that
+    scrolls off the bottom of a one-question screen is the single worst
+    thing that can happen to this flow.                              */
+#rail {
+  position: sticky;
+  bottom: 0;
+  z-index: 15;
+  margin: 0;
+  padding: 14px var(--onb-gutter) clamp(18px, 3vh, 32px);
+  background: linear-gradient(180deg, rgba(250, 250, 248, 0), var(--onb-ground) 34%);
+}
+
+.btn-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--onb-muted);
+  padding: 6px 2px;
+  transition: color var(--onb-d-fast) var(--onb-ease);
+}
+
+.btn-text:hover {
+  color: var(--onb-ink);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--onb-muted);
+  margin-bottom: 20px;
+  transition:
+    color var(--onb-d-fast) var(--onb-ease),
+    transform var(--onb-d-fast) var(--onb-ease);
+}
+
+.back:hover {
+  color: var(--onb-ink);
+  transform: translateX(-3px);
+}
+.back svg {
+  width: 14px;
+  height: 14px;
+}
+
+.enterkey {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.enterkey b {
+  font-weight: 600;
+  color: var(--onb-muted);
+  background: var(--onb-ink-04);
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+
+/* ============================================================ AI message
+
+    Fade + de-blur, per §23. The blur is what separates this from a
+    tooltip: it reads as something resolving into thought rather than a
+    box appearing. It only ever states what was actually derived from
+    what the user typed — it never claims research that did not happen. */
+
+.ai {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--onb-muted);
+  max-width: 46ch;
+}
+
+.ai.show {
+  animation: ai-in 620ms var(--onb-ease) both;
+}
+.ai.hide {
+  display: none;
+}
+
+@keyframes ai-in {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+.ai__mark {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  color: var(--onb-orange);
+  margin-top: 1px;
+}
+
+.ai em {
+  font-style: normal;
+  color: var(--onb-ink);
+  font-weight: 550;
+}
+
+/* =========================================================== disclosure
+
+    Progressive disclosure (§09). The extra fields do not exist until the
+    first answer earns them — asking for a role and an age band before
+    the user has said who they sell to is how a conversation turns back
+    into a form.                                                       */
+
+.more {
+  margin-top: 26px;
+}
+
+.more__t {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--onb-muted);
+  transition: color var(--onb-d-fast) var(--onb-ease);
+}
+
+.more__t:hover {
+  color: var(--onb-ink);
+}
+.more__t svg {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--onb-d-el) var(--onb-ease);
+}
+.more.open .more__t svg {
+  transform: rotate(90deg);
+}
+
+.more__body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition:
+    grid-template-rows var(--onb-d-step) var(--onb-ease),
+    opacity var(--onb-d-step) var(--onb-ease);
+  opacity: 0;
+}
+
+.more.open .more__body {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.more__inner {
+  overflow: hidden;
+}
+.more__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 28px;
+  padding-top: 22px;
+}
+
+/* ================================================== personality sliders
+
+    The most visually alive screen (§10). Each track is a spectrum with
+    two named poles; the thumb is a soft orange disc that leaves a warm
+    trail behind it. Moving any slider retunes --p-round / --p-track /
+    --p-weight, so the page's own typography and corners drift toward the
+    brand being described. The demonstration IS the feedback.        */
+
+.spectra {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2.4vh, 26px);
+}
+
+.spec__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 9px;
+}
+.spec__pole {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--onb-muted);
+  transition:
+    color var(--onb-d-el) var(--onb-ease),
+    font-weight var(--onb-d-el) var(--onb-ease);
+}
+.spec__pole.lead-pole {
+  color: var(--onb-ink);
+  font-weight: 600;
+}
+
+.spec__track {
+  position: relative;
+  height: 26px;
+  display: flex;
+  align-items: center;
+}
+
+.spec__rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--onb-hairline);
+}
+
+/* Warm trail from the centre to the thumb — shows how far from neutral
+   the answer sits, which a bare thumb on a rail does not. */
+.spec__trail {
+  position: absolute;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--onb-orange-24), var(--onb-orange));
+  transition:
+    left 90ms linear,
+    width 90ms linear;
+}
+
+.spec__in {
+  position: relative;
+  width: 100%;
+  height: 26px;
+  appearance: none;
+  background: none;
+  cursor: grab;
+  margin: 0;
+}
+
+.spec__in:active {
+  cursor: grabbing;
+}
+
+.spec__in::-webkit-slider-thumb {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--onb-orange);
+  box-shadow:
+    0 0 0 5px var(--onb-ground),
+    0 4px 14px -3px rgba(255, 102, 0, 0.75);
+  transition: transform 120ms var(--onb-ease);
+}
+
+.spec__in::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: var(--onb-orange);
+  box-shadow:
+    0 0 0 5px var(--onb-ground),
+    0 4px 14px -3px rgba(255, 102, 0, 0.75);
+}
+
+.spec__in:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+.spec__in:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+
+/* ============================================================ voice cards
+
+    Multi-select. Each card carries a written sample line, because "how
+    should your brand sound" is unanswerable in the abstract — you pick a
+    voice by hearing it, not by reading its adjective.                */
+
+.vgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.vcard {
+  text-align: left;
+  padding: 16px 18px;
+  border-radius: var(--r-md, 10px);
+  background: var(--onb-paper);
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+  cursor: pointer;
+  transition:
+    transform var(--onb-d-fast) var(--onb-ease),
+    box-shadow var(--onb-d-fast) var(--onb-ease),
+    background var(--onb-d-fast) var(--onb-ease);
+}
+
+.vcard:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 0 0 1px var(--onb-hairline-strong),
+    0 8px 24px -10px rgba(0, 0, 0, 0.14);
+}
+
+.vcard.on {
+  background: var(--onb-peach);
+  box-shadow:
+    inset 0 0 0 1.5px var(--onb-orange),
+    0 4px 18px -4px rgba(255, 102, 0, 0.32);
+}
+
+[data-theme='dark'] .vcard.on {
+  background: rgba(255, 102, 0, 0.16);
+  box-shadow:
+    inset 0 0 0 1.5px var(--onb-orange),
+    0 4px 20px -4px rgba(255, 102, 0, 0.4);
+}
+
+.vcard__t {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--onb-ink);
+}
+
+.vcard__q {
+  font-size: 13px;
+  color: var(--onb-muted);
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
+.vcard.on .vcard__q {
+  color: var(--onb-ink);
+  opacity: 0.85;
+}
+
+.vcard__tick {
+  margin-left: auto;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--onb-confirm);
+  color: var(--canvas);
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity var(--onb-d-fast) var(--onb-ease),
+    transform var(--onb-d-fast) var(--onb-ease);
+}
+
+.vcard__tick svg {
+  width: 10px;
+  height: 10px;
+}
+.vcard.on .vcard__tick {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ========================================================== visual step */
+
+.drop {
+  display: grid;
+  place-items: center;
+  gap: 7px;
+  padding: clamp(24px, 3.5vh, 36px);
+  border-radius: var(--r-md, 10px);
+  background: var(--onb-paper);
+  box-shadow: inset 0 0 0 1.5px var(--onb-hairline);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background var(--onb-d-fast) var(--onb-ease),
+    box-shadow var(--onb-d-fast) var(--onb-ease),
+    transform var(--onb-d-fast) var(--onb-ease);
+}
+
+.drop:hover,
+.drop.over {
+  background: var(--onb-peach);
+  box-shadow:
+    inset 0 0 0 1.5px var(--onb-orange),
+    0 4px 16px -4px rgba(255, 102, 0, 0.25);
+  transform: translateY(-1px);
+}
+
+[data-theme='dark'] .drop:hover,
+[data-theme='dark'] .drop.over {
+  background: rgba(255, 102, 0, 0.14);
+  box-shadow: inset 0 0 0 1.5px var(--onb-orange);
+}
+
+.drop__ic {
+  width: 26px;
+  height: 26px;
+  color: var(--onb-orange);
+}
+.drop__t {
+  font-size: 15px;
+  font-weight: 550;
+  color: var(--onb-ink);
+}
+.drop__d {
+  font-size: 12.5px;
+  color: var(--onb-muted);
+}
+.drop img {
+  max-height: 62px;
+  width: auto;
+  border-radius: 6px;
+}
+
+.swatches {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sw {
+  position: relative;
+}
+
+.sw__dot {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+  cursor: pointer;
+  transition:
+    transform var(--onb-d-fast) var(--onb-ease),
+    border-radius var(--onb-d-fast) var(--onb-ease);
+}
+
+.sw:hover .sw__dot {
+  transform: scale(1.07);
+  border-radius: 14px;
+}
+.sw__in {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.sw__l {
+  font-size: var(--onb-fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--onb-muted);
+  margin-top: 7px;
+}
+.sw__v {
+  font-size: 12px;
+  color: var(--onb-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.filelist {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.filerow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border-radius: var(--r-sm, 6px);
+  background: var(--onb-paper);
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+  font-size: 13.5px;
+  color: var(--onb-ink);
+  animation: rise var(--onb-d-el) var(--onb-ease) both;
+}
+
+.filerow svg {
+  width: 15px;
+  height: 15px;
+  color: var(--onb-muted);
+  flex: none;
+}
+.filerow b {
+  font-weight: 550;
+}
+.filerow span {
+  color: var(--onb-muted);
+  font-size: 12px;
+  margin-left: auto;
+}
+
+/* ============================================== references / knowledge */
+
+.reflist {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.refcard {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 14px;
+  border-radius: var(--r-sm, 6px);
+  background: var(--onb-paper);
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+  color: var(--onb-ink);
+  animation: rise var(--onb-d-el) var(--onb-ease) both;
+}
+
+.refcard__fav {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  background: var(--onb-peach);
+  color: var(--onb-orange);
+  font-size: 13px;
+  font-weight: 700;
+  flex: none;
+}
+
+.refcard__t {
+  font-size: 13.5px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  color: var(--onb-ink);
+}
+.refcard__d {
+  font-size: 12px;
+  color: var(--onb-muted);
+  margin-top: 1px;
+}
+
+.refcard__x {
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--onb-muted);
+  flex: none;
+  transition:
+    background var(--onb-d-fast) var(--onb-ease),
+    color var(--onb-d-fast) var(--onb-ease);
+}
+
+.refcard__x:hover {
+  background: var(--onb-ink-04);
+  color: var(--onb-ink);
+}
+.refcard__x svg {
+  width: 13px;
+  height: 13px;
+}
+.refcard.out {
+  animation: ref-out 260ms var(--onb-ease) forwards;
+}
+
+@keyframes ref-out {
+  to {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+
+.srcgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 9px;
+}
+
+.src {
+  text-align: left;
+  padding: 15px 16px;
+  border-radius: var(--r-md, 10px);
+  background: var(--onb-paper);
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+  cursor: pointer;
+  transition:
+    transform var(--onb-d-fast) var(--onb-ease),
+    box-shadow var(--onb-d-fast) var(--onb-ease),
+    background var(--onb-d-fast) var(--onb-ease);
+}
+
+.src:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 0 0 1px var(--onb-hairline-strong),
+    0 8px 24px -10px rgba(0, 0, 0, 0.12);
+}
+
+.src.on {
+  background: var(--onb-paper);
+  box-shadow:
+    inset 0 0 0 1.5px var(--onb-confirm),
+    0 4px 16px -4px rgba(15, 122, 90, 0.25);
+}
+
+[data-theme='dark'] .src.on {
+  background: rgba(16, 185, 129, 0.12);
+  box-shadow:
+    inset 0 0 0 1.5px var(--onb-confirm),
+    0 0 16px rgba(16, 185, 129, 0.25);
+}
+
+.src__ic {
+  width: 19px;
+  height: 19px;
+  color: var(--onb-muted);
+  margin-bottom: 11px;
+}
+.src.on .src__ic {
+  color: var(--onb-confirm);
+}
+.src__t {
+  font-size: 14px;
+  font-weight: 550;
+}
+.src__s {
+  font-size: 12px;
+  color: var(--onb-muted);
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.src.on .src__s {
+  color: var(--onb-confirm);
+}
+.src__s svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ============================================================ processing
+
+    Full-bleed. The orb moves to the centre, the eight facets orbit in and
+    collapse into it one by one, and the status line names the facet
+    currently being absorbed. No percentage — there is no measurable
+    denominator here, and inventing one is a lie the user can feel.   */
+
+.proc {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: none;
+  background: var(--onb-ground);
+  overflow: hidden;
+}
+
+.proc.on {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade 420ms var(--onb-ease) both;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Ambient background glow */
+.proc__ambient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.proc__glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(650px, 90vw);
+  height: min(650px, 90vw);
+  background: radial-gradient(
+    circle,
+    rgba(255, 102, 0, 0.12) 0%,
+    rgba(255, 133, 51, 0.04) 45%,
+    transparent 70%
+  );
+  filter: blur(40px);
+  border-radius: 50%;
+}
+
+.proc__ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, 85vw);
+  height: min(560px, 85vw);
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 102, 0, 0.14);
+  animation: procSpinRing 45s linear infinite;
+}
+
+@keyframes procSpinRing {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.proc__wrap {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 860px;
+  height: 100%;
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(20px, 3.5vh, 40px) 24px;
+  box-sizing: border-box;
+  text-align: center;
+  pointer-events: none;
+}
+
+.proc__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 580px;
+  flex: none;
+}
+
+.proc__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 102, 0, 0.08);
+  border: 1px solid rgba(255, 102, 0, 0.2);
+  color: var(--onb-orange);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.proc__badge svg {
+  width: 13px;
+  height: 13px;
+}
+
+.proc__t {
+  font-size: clamp(1.7rem, 1.2rem + 1.8vw, 2.4rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  color: var(--onb-ink);
+  line-height: 1.15;
+}
+
+.proc__d {
+  font-size: clamp(13.5px, 0.95rem + 0.15vw, 15.5px);
+  color: var(--onb-muted);
+  line-height: 1.5;
+  max-width: 44ch;
+}
+
+.proc__orb-stage {
+  flex: 1;
+  width: 100%;
+  max-width: 480px;
+  max-height: 480px;
+  min-height: 240px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  margin: 6px 0;
+}
+
+.proc__canvas {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.proc__canvas #orb {
+  width: 100%;
+  height: 100%;
+  max-width: 480px;
+  max-height: 480px;
+}
+
+.proc__foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 4px;
+  flex: none;
+}
+
+.proc__status-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 18px;
+  border-radius: 999px;
+  background: var(--onb-paper);
+  border: 1px solid var(--onb-hairline);
+  box-shadow:
+    0 4px 20px -4px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(255, 102, 0, 0.08);
+}
+
+.proc__pulse-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.proc__pulse-dot i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--onb-orange);
+}
+
+.proc__pulse-dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: rgba(255, 102, 0, 0.4);
+  animation: procPing 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes procPing {
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.proc__status-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--onb-ink);
+}
+
+.proc__status-label.swap {
+  animation: ai-in 460ms var(--onb-ease) both;
+}
+
+/* =============================================================== result */
+
+.result {
+  display: none;
+}
+.result.on {
+  display: block;
+}
+
+.bb {
+  position: relative;
+  border-radius: 20px;
+  background: var(--onb-paper);
+  box-shadow:
+    inset 0 0 0 1px var(--onb-hairline),
+    0 30px 70px -50px rgba(17, 17, 17, 0.55);
+  overflow: hidden;
+}
+
+.bb__head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 17px 22px;
+  border-bottom: 1px solid var(--onb-hairline);
+  background: linear-gradient(180deg, var(--onb-peach), rgba(255, 240, 230, 0));
+}
+
+.bb__mark {
+  width: 26px;
+  height: 26px;
+  color: var(--onb-orange);
+  flex: none;
+}
+.bb__ttl {
+  font-size: var(--onb-fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.bb__ready {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--onb-confirm);
+}
+
+.bb__ready svg {
+  width: 13px;
+  height: 13px;
+}
+.bb__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.bb__cell {
+  padding: 17px 22px;
+  border-right: 1px solid var(--onb-hairline);
+  border-bottom: 1px solid var(--onb-hairline);
+  min-width: 0;
+}
+
+.bb__k {
+  font-size: var(--onb-fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--onb-muted);
+}
+.bb__v {
+  font-size: 15px;
+  font-weight: 550;
+  letter-spacing: -0.015em;
+  margin-top: 6px;
+  overflow-wrap: break-word;
+}
+.bb__sw {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  vertical-align: -2px;
+  margin-right: 7px;
+  box-shadow: inset 0 0 0 1px var(--onb-ink-08);
+}
+
+/* Confidence. Animated from 0 so the bar is a measurement being taken,
+   not a value that was always there. */
+.conf {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 9px;
+}
+.conf__track {
+  flex: 1;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--onb-hairline);
+  overflow: hidden;
+}
+.conf__fill {
+  height: 100%;
+  width: 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--onb-orange-2), var(--onb-orange));
+  transition: width 1100ms var(--onb-ease);
+}
+.conf__v {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.summary {
+  margin-top: 26px;
+  padding: 22px 24px;
+  border-radius: 16px;
+  background: var(--onb-orange-04);
+  box-shadow: inset 0 0 0 1px var(--onb-orange-14);
+}
+
+.summary__t {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 11px;
+}
+.summary__t svg {
+  width: 16px;
+  height: 16px;
+  color: var(--onb-orange);
+}
+.summary p {
+  font-size: 15.5px;
+  line-height: 1.62;
+  max-width: 58ch;
+}
+.summary p + p {
+  margin-top: 9px;
+}
+
+[data-theme='dark'] .summary {
+  background: rgba(255, 102, 0, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 102, 0, 0.22);
+}
+
+[data-theme='dark'] .bb {
+  box-shadow:
+    inset 0 0 0 1px var(--onb-hairline),
+    0 30px 70px -40px rgba(0, 0, 0, 0.85);
+}
+
+[data-theme='dark'] .proc__status-card {
+  background: var(--surface);
+  border-color: var(--line);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 102, 0, 0.15);
+}
+
+/* ============================================== cinematic transition ====
+
+    §"Transition Into Dashboard" — 800–1200ms, six beats. The wash is a
+    single full-bleed element that scales from the card's centre, so the
+    dashboard is revealed *through* the Brand Brain rather than after it.
+    Particles are drawn on the same canvas the orb already owns.       */
+
+.wash {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  display: none;
+  background: radial-gradient(
+    circle at 50% 50%,
+    var(--onb-orange) 0%,
+    var(--onb-orange-2) 42%,
+    rgba(255, 133, 51, 0) 72%
+  );
+  opacity: 0;
+}
+
+.wash.go {
+  display: block;
+  animation: wash 1100ms var(--onb-ease-io) forwards;
+}
+
+@keyframes wash {
+  0% {
+    opacity: 0;
+    transform: scale(0.16);
+  }
+  38% {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+  62% {
+    opacity: 1;
+    transform: scale(2.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3.4);
+  }
+}
+
+.bb.launch {
+  animation: bb-launch 620ms var(--onb-ease) forwards;
+}
+
+@keyframes bb-launch {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.045);
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0;
+    filter: blur(7px);
+  }
+}
+
+/* ================================================================ toast */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 70;
+  display: none;
+  align-items: center;
+  gap: 13px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 13px 15px 13px 17px;
+  border-radius: 14px;
+  background: var(--onb-ink);
+  color: var(--canvas);
+  box-shadow: 0 24px 60px -24px rgba(17, 17, 17, 0.7);
+}
+
+.toast.on {
+  display: flex;
+  animation: toast-in 520ms var(--onb-ease) both;
+}
+.toast.off {
+  animation: toast-out 320ms var(--onb-ease) forwards;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 18px) scale(0.97);
+  }
+}
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+}
+
+.toast__t {
+  font-size: 14px;
+  font-weight: 600;
+}
+.toast__d {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.66);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+.toast__b {
+  margin-left: auto;
+  flex: none;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--canvas);
+  font-size: 13px;
+  font-weight: 550;
+  transition: background var(--onb-d-fast) var(--onb-ease);
+}
+
+.toast__b:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* ============================================================== mobile & responsive
+
+    Rebuilt, not shrunk (§24). The orb moves behind the question as an
+    ambient field instead of a second column, the CTA is pinned to the
+    thumb, and the question gets the top third of the screen to itself. */
+
+@media (max-width: 960px) {
+  .frame {
+    grid-template-columns: minmax(0, 1fr);
+    padding-bottom: 110px;
+    align-items: start;
+    padding-top: 8px;
+  }
+
+  .orbwrap {
+    position: fixed;
+    inset: auto 0 -15vh 0;
+    height: 55vh;
+    min-height: 0;
+    z-index: -1;
+    opacity: 0.18;
+    pointer-events: none;
+  }
+
+  #orb {
+    max-width: 120vw;
+  }
+  .orbcap {
+    display: none;
+  }
+
+  .pane {
+    padding-bottom: 8px;
+  }
+
+  /* Pinned bottom CTA with blur backdrop in dark and light themes */
+  .cta-row,
+  #rail {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 25;
+    margin: 0;
+    padding: 12px var(--onb-gutter) calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, transparent, var(--onb-ground) 30%);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    gap: 10px;
+  }
+
+  .cta-row .btn {
+    flex: 1;
+    justify-content: center;
+    height: 38px;
+    border-radius: var(--r-sm, 6px);
+    font-size: 13px;
+  }
+  .cta-row .enterkey {
+    display: none;
+  }
+  .cta-row .btn--ghost {
+    flex: 0 0 auto;
+    height: 38px;
+  }
+
+  .more__grid {
+    grid-template-columns: 1fr;
+  }
+  .vgrid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+  .srcgrid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .bb__cell {
+    border-right: none;
+  }
+
+  .toast {
+    left: var(--onb-gutter);
+    right: var(--onb-gutter);
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    transform: none;
+    max-width: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 15px 16px;
+  }
+
+  .toast__b {
+    margin-left: 0;
+    text-align: center;
+    padding: 11px 14px;
+  }
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(18px) scale(0.97);
+    }
+  }
+  @keyframes toast-out {
+    to {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
+
+  /* 16px minimum stops iOS zooming the viewport on focus */
+  .inp,
+  .ta {
+    font-size: max(16px, var(--onb-fs-input));
+  }
+}
+
+@media (max-width: 768px) {
+  .nav {
+    padding: 16px var(--onb-gutter) 0;
+  }
+
+  .proc__wrap {
+    padding: clamp(14px, 2.5vh, 24px) 16px;
+  }
+
+  .proc__orb-stage {
+    max-height: 300px;
+    min-height: 180px;
+  }
+
+  .proc__t {
+    font-size: clamp(1.35rem, 1.1rem + 1.2vw, 1.85rem);
+  }
+
+  .proc__d {
+    font-size: 13px;
+  }
+
+  .proc__status-card {
+    padding: 6px 14px;
+    font-size: 12.5px;
+  }
+}
+
+@media (max-width: 580px) {
+  .prog__track {
+    width: min(140px, 32vw);
+  }
+  .lead {
+    max-width: none;
+  }
+  .vgrid {
+    grid-template-columns: 1fr;
+  }
+  .srcgrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .bb__grid {
+    grid-template-columns: 1fr;
+  }
+  .swatches {
+    gap: 8px;
+  }
+  .sw__dot {
+    width: 40px;
+    height: 40px;
+  }
+  .drop {
+    padding: 20px 14px;
+  }
+  .spec__pole {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 400px) {
+  .srcgrid {
+    grid-template-columns: 1fr;
+  }
+  .cta-row {
+    gap: 8px;
+  }
+  .cta-row .btn {
+    padding: 0 10px;
+    font-size: 12.5px;
+  }
+}
+
+/* ====================================================== reduced motion
+
+    Everything that moves becomes a fade (§26). State still changes
+    visibly — a user who asked for less motion still needs to see that
+    the step advanced — but nothing travels, spins or pulses.        */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .step.in-r,
+  .step.in-l,
+  .rise > * {
+    animation: rm-fade 240ms linear both !important;
+  }
+  .ai.show {
+    animation: rm-fade 240ms linear both !important;
+  }
+  .wash.go {
+    animation: rm-fade 300ms linear both !important;
+  }
+  .grain {
+    display: none;
+  }
+
+  @keyframes rm-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
