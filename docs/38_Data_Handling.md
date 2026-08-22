@@ -311,6 +311,30 @@ one function call per affected workspace switches it on and no data is altered.
 holds a reference to them — "for most rows a sign-in code rather than your name". That is the honest
 position while the question is open.
 
+### 5.1 · A related finding: the ledger's append-only guarantee has one hole, and it is the workspace row
+
+`credit_ledger` cannot be updated and cannot be deleted from — a database trigger refuses both, and
+that refusal is what "the ledger never lies" means in practice.
+
+**MEASURED 2026-08-23: the trigger exempts a delete that arrives through a parent's cascade.** So
+deleting the `workspaces` row removes every ledger entry for that workspace, silently, with no
+refusal and no record. The financial record has one guard, and the guard has one door.
+
+This is not hypothetical and it is not new. It is exercised in production today by the automated
+test suite's own cleanup, which does exactly this and says so in its comment: "Deleting the
+workspace cascades to members, posts, variants, media **and the credit ledger**, so this is the
+single root." That is correct for a workspace a test created ninety seconds earlier. It uses a
+service-role key, which is not restricted to test workspaces by anything other than the row filter
+it is given.
+
+**This is the reason the erasure keeps the `workspaces` row rather than deleting it** (§4.2). A
+deletion path that removed the row would have destroyed the financial record while appearing to do
+the lawful thing — and it would have looked exactly like a correct implementation.
+
+**What is needed:** a decision on whether anything at all should be able to delete a `workspaces`
+row in production. If the answer is no, that is a trigger, and it is one line. The counter-argument
+is that the test suite would then need a different teardown.
+
 ---
 
 ## 6 · Things this document does not answer
@@ -343,7 +367,10 @@ Stated as open questions rather than left to be assumed.
    matters — and for a customer's Brand Brain and their uploaded documents it may — the request can
    set a zero-retention preference, at the cost of the model choices that support it. **Nobody has
    decided this; nothing currently asks for it.**
-10. **Sentry receives the body of a failing request, in the United States.** See §7.5. Keeping it is
+10. **Nothing prevents a `workspaces` row being deleted, and that destroys the ledger.** See §5.1.
+    One trigger closes it; the counter-argument is that the automated test suite would then need a
+    different teardown.
+11. **Sentry receives the body of a failing request, in the United States.** See §7.5. Keeping it is
     a deliberate trade for being able to diagnose a crash, and it is the one place customer content
     knowingly crosses a border outside the AI path. Worth confirming as a decision rather than
     inheriting it as a default.
