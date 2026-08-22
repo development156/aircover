@@ -109,6 +109,29 @@ const ROUTES = [
   '/report',
   '/brain',
   '/brain/resolve',
+  //
+  // ── ADDED AT INTEGRATION, 2026-08-22 ────────────────────────────────────────
+  // Six sections landed in one merge wave and NONE of them was on this list.
+  // The suite went on reporting 25 green routes, which is true and says nothing
+  // about the six screens a customer could newly reach. A route list that only
+  // grows when somebody remembers is the same defect this file exists to catch,
+  // one level up: the guard was fine, its scope had quietly stopped matching the
+  // app.
+  //
+  //   /playbooks        recipes, a cost preview and a kill switch
+  //   /radar            a change feed over competitor snapshots
+  //   /remix            a priced batch that charges and refuses
+  //   /leads            two doors, a public form and promote-from-inbox
+  //   /brain/knowledge  a document library with counts of its own
+  //   /studio           still a roadmap screen, and therefore the MOST likely
+  //                     of the six to offer a remedy it cannot fulfil
+  //
+  '/playbooks',
+  '/radar',
+  '/remix',
+  '/leads',
+  '/brain/knowledge',
+  '/studio',
 ]
 
 test.describe('no impossible remedy on a healthy new account @smoke', () => {

@@ -53,8 +53,31 @@ function readEnvFile(path) {
   return out
 }
 
-/** Refuse anything that could write, before the server is even asked. */
-const FORBIDDEN = /\b(insert|update|delete|drop|truncate|alter|create|grant|revoke)\b/i
+/**
+ * Refuse anything that could write, before the server is even asked.
+ *
+ * ── CHECKED AGAINST THE STATEMENT, NOT THE TEXT ──────────────────────────────
+ * This was `/\b(insert|update|…|grant|revoke)\b/i` against the RAW sql, which
+ * matches inside STRING LITERALS. MEASURED 2026-08-22: the ledger invariant
+ * query — `entry_type in ('GRANT','TOPUP','ADJUST',…)` — was refused as a GRANT
+ * statement, and the entry types are not optional, they are the vocabulary the
+ * ledger actually stores.
+ *
+ * A guard that reads the spelling rather than the thing is the same class of
+ * defect this repo keeps finding in the app itself, so literals and comments are
+ * stripped first and the keyword must LEAD a statement. It is still refusing on
+ * suspicion rather than parsing SQL — `begin read only` below is what actually
+ * makes a write impossible, and this only exists to fail earlier and clearer.
+ */
+const FORBIDDEN = /(^|;)\s*(insert|update|delete|drop|truncate|alter|create|grant|revoke)\b/i
+
+/** The statement with string literals and comments blanked out. */
+function withoutLiterals(sql) {
+  return sql
+    .replace(/'(?:[^']|'')*'/g, "''")
+    .replace(/--[^\n]*/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+}
 
 const MIGRATIONS_SQL = `
   select version, name
@@ -78,7 +101,7 @@ async function main() {
     console.error('nothing to run: pass --sql, --file or --migrations')
     process.exit(2)
   }
-  if (FORBIDDEN.test(sql)) {
+  if (FORBIDDEN.test(withoutLiterals(sql))) {
     console.error('refused: this probe runs read-only statements only')
     process.exit(2)
   }

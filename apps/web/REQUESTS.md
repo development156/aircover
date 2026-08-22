@@ -782,3 +782,76 @@ The same tree, same commit, against `next start`: **88 passed, 1 failed, 0 refus
 
 Worth knowing before reading any smoke failure list: count the `ERR_CONNECTION_REFUSED`
 lines first. If it is non-zero, the run says nothing about the branch.
+
+## Written at integration, 2026-08-22 (wt-integrate2)
+
+### 8 · Playbooks: an approved-but-unexecuted run HOLDS its slot, and that is correct
+
+Logged because it will be reported as a bug, and "fixing" it would break one of two
+rules that are each right on their own.
+
+`playbook-run.ts:312-321` writes each approved item as a post. At autonomy **level 2**
+the row is created `status: 'approved'` with `scheduled_at: item.suggested_slot`;
+below level 2 it is a `draft` with `scheduled_at: null`.
+
+So the moment a person approves a level-2 run, the slot that run proposed is
+**occupied on the planner by a post that has not gone out yet**. Someone looking at
+the week sees the time taken and nothing published, which reads as "it says it ran and
+nothing happened".
+
+The two rules producing it:
+
+- **A slot a run has claimed must not be double-booked.** Reserving it at approval is
+  what stops the Loop, the planner and a second playbook run all writing into the same
+  time.
+- **Approval is not publication.** The post correctly stays `approved` until the
+  dispatcher sends it, and the dispatcher's gate is `status` plus `scheduled_at` — the
+  same pair the Loop's kill switch unsets.
+
+Remove either and something worse appears: drop the reservation and two runs can land
+on one slot; publish at approval and the halt that exists so nobody is surprised by a
+bill stops meaning anything.
+
+**What would actually help is a SENTENCE, not a code change.** The planner has no way
+of saying "held for a playbook run, not yet sent". Until it does, the honest options
+are a label on the reserved slot or a line on the run history. Whoever picks that up:
+the state is `posts.status = 'approved' and scheduled_at is not null and origin =
+'playbook'`, which is queryable exactly as written.
+
+### 9 · `ledger-invariants.mjs` still sets the SESSION characteristic its sibling warns about
+
+`packages/db/scripts/prod-probe.mjs` already documents this at the top of the file:
+`set session characteristics as transaction read only` sets state on the CONNECTION,
+and through a transaction-mode pooler that connection is handed to the next client
+with the state still on it, so a later writer is refused for a reason it cannot see.
+That file uses `begin read only` alone for exactly this reason.
+
+`ledger-invariants.mjs:279-280` runs BOTH. The second line is the one doing the work;
+the first is the one that escapes. Deleting line 279 changes nothing about what the
+script can do.
+
+**Not observed, and this note should not be read as a sighting.** The `.env` in this
+worktree names the DIRECT host (`db.<ref>.supabase.co:5432`), where the session dies
+with the process and nothing is inherited. It matters wherever the pooler is used,
+which is what Vercel had to switch to.
+
+### 10 · Three migrations share the version `20260821000000`, and only one can be recorded
+
+`asset_derivatives` (wt-media), `remix` (wt-remix) and `zernio_webhook_events`
+(wt-webhooks) each carry that timestamp. Git merged all three without a conflict —
+different filenames — and all three are genuinely applied: every table exists in
+production.
+
+`supabase_migrations.schema_migrations` is keyed by `version`, so the record can hold
+exactly one of them, and it holds `zernio_webhook_events`. The other two are applied
+and unrecordable. This is a **wt-db decision**, because the only repair is renaming an
+applied migration file, and no other lane may touch that directory.
+
+For whoever picks it up: the DDL must NOT be re-run — the tables are there. Renaming
+two files to unique versions and INSERTing those two rows is a record-only change.
+`packages/db/scripts/prod-record.mjs` does the INSERT half and refuses any version
+whose objects it cannot see first.
+
+Separately and correctly, `20260805000000_clerk_id_remap` is NOT recorded and must
+stay that way: `remap_clerk_user_ids` and `verify_clerk_remap` do not exist in
+production, so it has genuinely never been applied.
