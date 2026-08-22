@@ -52,24 +52,35 @@ test.describe('golden path @smoke', () => {
     await page.waitForURL(/\/posts\/new/, { timeout: 30_000 })
 
     // There is ONE screen for writing a post, and it does not create a row when
-    // it opens — opening a screen is not intent. The row appears on the first
-    // save that has something to write, which picking a channel is; the id then
-    // arrives in the address bar and the screen does not change.
+    // it opens — opening a screen is not intent. Nor does a bare channel tick:
+    // that used to write a row, and it left an empty "Untitled post" behind for
+    // everyone who ticked a channel and changed their mind. The row appears on
+    // the first save that has something to WRITE, so the words come first here
+    // and the id then arrives in the address bar without the screen changing.
     await page.locator('[data-channel-tile="instagram"]').click()
-    await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
-    const postId = new URL(page.url()).pathname.split('/').pop()
-    expect(postId).toMatch(/^[0-9a-f-]{36}$/)
 
     const body = page.getByLabel('Your post')
     await expect(body).toBeVisible()
     await body.fill('Fresh chai every morning at the corner shop.')
 
-    // THIS save, not the one that picking a channel already did. See
-    // `expectPostSaved`: waiting only for "Post saved" was MEASURED not to be
-    // satisfied by the earlier save, but it only held because a synchronous
-    // repaint beat Playwright's first poll — and if that ever stopped holding,
-    // the reload below would ask the database for words never sent to it and
-    // nothing would say why.
+    await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
+    const postId = new URL(page.url()).pathname.split('/').pop()
+    expect(postId).toMatch(/^[0-9a-f-]{36}$/)
+
+    // A SECOND edit, and the transition belongs to THAT one.
+    //
+    // `expectPostSaved` asserts the pair — "Post not saved yet" and then "Post
+    // saved" — because waiting only for "Post saved" was MEASURED not to be
+    // satisfied by an earlier save, and only held because a synchronous repaint
+    // beat Playwright's first poll. That pairing is what makes it honest, and it
+    // is also why it cannot be pointed at the save above: creation is what puts
+    // the id in the address bar, so by the time `waitForURL` returns that save
+    // has already landed and its "not saved yet" is long gone. Asserting it
+    // there would be waiting for a state the previous line guarantees is over.
+    //
+    // So the golden path writes twice, which is what writing is: the words, then
+    // the second thought. The reload below reads the second thought back.
+    await body.fill('Fresh chai every morning at the corner shop. Open from six.')
     await expectPostSaved(page)
 
     // ── 5. The post is really persisted — a reload is the honest check, not

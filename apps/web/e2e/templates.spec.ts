@@ -1,4 +1,4 @@
-import { bootstrapWorkspace, startPost } from './fixtures/compose'
+import { bootstrapWorkspace, SEED_BODY, startPost } from './fixtures/compose'
 import { adminClient, expect, test } from './fixtures/seeded-user'
 
 /**
@@ -66,7 +66,7 @@ test.describe('templates @smoke', () => {
     await expect(page.getByText(NAME)).toBeVisible()
 
     // ── 4. START A NEW POST FROM IT ─────────────────────────────────────────
-    // A fresh post, so words in the box can only have come from the template.
+    // A fresh post, so the template's words can only have come from the click.
     await startPost(page, 'linkedin')
     const secondPost = new URL(page.url()).pathname.split('/').pop() as string
 
@@ -75,7 +75,14 @@ test.describe('templates @smoke', () => {
     // fills the post's own body. Every channel still following the post moves
     // with it, which is how the LinkedIn version comes to hold these words
     // without anyone typing them there.
-    await expect(page.locator('[data-variant-editor="linkedin"]')).toHaveValue('')
+    //
+    // This asserted `''` until a bare channel tick stopped creating a row: the
+    // fixture now has to WRITE something to reach a saved post, so the box
+    // legitimately holds the fixture's own seed. Pinning the seed by name is
+    // stronger than the `not.toHaveValue(BODY)` it could have become — it says
+    // exactly what is in the box before the click, so "the template put these
+    // words here" is still the only reading of the line after it.
+    await expect(page.locator('[data-variant-editor="linkedin"]')).toHaveValue(SEED_BODY)
     await page.getByText(NAME).click()
     await expect(page.getByLabel('Your post')).toHaveValue(BODY)
     await expect(page.locator('[data-variant-editor="linkedin"]')).toHaveValue(BODY)

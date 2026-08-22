@@ -11,12 +11,18 @@ import { expect, type Page } from '@playwright/test'
  * about the product, and a spec about templates or about analytics should not
  * have an opinion on it.
  *
- * ── WHAT "PICKING A CHANNEL CREATES THE ROW" MEANS ───────────────────────────
+ * ── WHAT CREATES THE ROW, AND WHAT NO LONGER DOES ───────────────────────────
  * The composer never creates a post when the screen opens — opening a screen is
- * not intent. It creates one on the first save that has something to write, and
- * choosing a channel is such a change. So the id arriving in the address bar is
- * not a side effect this helper waits on; it IS the evidence that the first save
- * landed, and every caller below depends on that being true.
+ * not intent. It used to create one on a bare CHANNEL PICK, and that was the
+ * defect: a person who ticked Instagram and walked away left an empty draft
+ * called "Untitled post / No content written yet" on /posts, permanently. Five
+ * such rows turned up in fifteen minutes of ordinary use.
+ *
+ * A row is now written when there is something to write — a title or a body — or
+ * when an action genuinely needs one to exist. So this helper types, because
+ * that is what a person does and it is now the only honest way to reach a saved
+ * post. The id arriving in the address bar is still not a side effect this waits
+ * on; it IS the evidence that the first save landed.
  */
 export async function bootstrapWorkspace(page: Page): Promise<void> {
   await page.goto('/home')
@@ -33,10 +39,22 @@ export async function bootstrapWorkspace(page: Page): Promise<void> {
  * Open the composer on a brand new post, pick `channel`, and return the post id
  * once the row exists.
  */
+/**
+ * The words that make the draft worth a row.
+ *
+ * Deliberately bland and deliberately NOT a sentence any assertion would want to
+ * match on: every caller that cares about content overwrites either this box or
+ * its own channel's card. If a spec ever fails quoting this string, the spec is
+ * reading the fixture's scaffolding rather than its own subject.
+ */
+export const SEED_BODY = 'A draft, opened by the test fixture.'
+
 export async function startPost(page: Page, channel: string): Promise<string> {
   await page.goto('/posts/new')
   await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 60_000 })
   await page.locator(`[data-channel-tile="${channel}"]`).click()
+  // The tick alone writes nothing now. Typing is what makes it a draft.
+  await page.getByLabel('Your post').fill(SEED_BODY)
   await page.waitForURL(/\/posts\/[0-9a-f-]{36}$/, { timeout: 60_000 })
 
   const postId = new URL(page.url()).pathname.split('/').pop() as string
