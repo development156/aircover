@@ -90,6 +90,37 @@ function creditsText(balance: BalanceRead): string | null {
   return null
 }
 
+/**
+ * The label row under the credits figure — ONE definition, rendered by both the
+ * real foot and its skeleton.
+ *
+ * It started as a copy inside `RailFootSkeleton`, which the design lint caught:
+ * `scripts/design/design-lint.mjs` ratchets hand-written font sizes per file, and
+ * duplicating two `text-[12px]` labels took rail-foot.tsx from its baseline of 6 to
+ * 8. The lint was right about more than the count — a skeleton that copies the
+ * markup it stands in for is a second place for the geometry to drift, and the
+ * whole point of this placeholder is that it is exactly the size of the thing that
+ * replaces it.
+ *
+ * Neither label waits on anything, so both are rendered for real in both states:
+ * replacing a word the reader could already have read with a grey rectangle makes
+ * the page slower to understand while making it look busier. `Usage` therefore
+ * also works as a link before the balance has arrived.
+ */
+function CreditsFootRow() {
+  return (
+    <div className="mt-1.5 flex items-center justify-between">
+      <span className="text-[12px] text-muted">Credits left</span>
+      <Link
+        href="/wallet"
+        className="rounded-sm text-[12px] font-semibold text-accent transition-micro hover:underline"
+      >
+        Usage
+      </Link>
+    </div>
+  )
+}
+
 export async function RailFoot() {
   const [user, workspacesRead, activeSlug, balance] = await Promise.all([
     soft('clerk_user', currentUser, null),
@@ -154,15 +185,7 @@ export async function RailFoot() {
             </span>
           )}
         </div>
-        <div className="mt-1.5 flex items-center justify-between">
-          <span className="text-[12px] text-muted">Credits left</span>
-          <Link
-            href="/wallet"
-            className="rounded-sm text-[12px] font-semibold text-accent transition-micro hover:underline"
-          >
-            Usage
-          </Link>
-        </div>
+        <CreditsFootRow />
       </div>
 
       {/* Who you are signed in as. The one part that survives the collapse. */}
@@ -220,10 +243,7 @@ export function RailFootSkeleton() {
         <div className="flex min-h-[19px] items-baseline gap-1.5">
           <SkeletonBar className="h-[19px] w-16" />
         </div>
-        <div className="mt-1.5 flex items-center justify-between">
-          <span className="text-[12px] text-muted">Credits left</span>
-          <span className="text-[12px] font-semibold text-accent">Usage</span>
-        </div>
+        <CreditsFootRow />
       </div>
       <div className="flex items-center gap-2 px-3 py-2.5 max-wide:justify-center max-wide:px-0">
         <span aria-hidden className="size-[26px] flex-none rounded-full bg-s2" />
