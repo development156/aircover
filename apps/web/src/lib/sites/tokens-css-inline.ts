@@ -353,7 +353,29 @@ export const TOKENS_CSS = `/* ==================================================
      no scrim at all; the overlay has to separate from the page it covers, and
      in dark the fill cannot do that on its own (§2). */
   --scrim: rgb(0 0 0 / 0.62);
-  --surface-2: #17171a;
+  /* SOLVED against the LIGHT theme's own step, not picked — the same method
+     --ink-mute used one block down.
+
+     It shipped as #17171a, which is --surface EXACTLY. Not close: identical. So
+     every element that lifts itself off a card with a \`bg-s2\` fill painted the
+     card's own colour and separated nothing, and the ladder had a hole in the
+     middle of it:
+
+                          light            dark, as shipped
+       surface -> s2      1.044:1          1.000:1     <- nothing at all
+       s2 -> surface-3    1.054:1          1.089:1     <- a double step
+
+     MEASURED across all 40 routes in dark: 117 of 120 frames carried at least
+     one fill that separated nothing, and the worst of them is the workspace
+     chip in the topbar, which is on every page in the product. The pattern
+     apps/web/CLAUDE.md prescribes for dark accent-on-tint — \`dark:bg-s2\` — was
+     landing them all here.
+
+     #1b1b1f makes the two steps 1.042 and 1.045, which is the light theme's
+     spacing to two decimal places. §2's rule is unchanged and still applies: in
+     dark a fill this small cannot do the job alone, so a card still keeps its
+     hairline. What changed is that the fill is no longer ZERO. */
+  --surface-2: #1b1b1f;
   --surface-3: #1f1f23;
   --line: rgba(255, 255, 255, 0.14);
   --line-firm: rgba(255, 255, 255, 0.3);

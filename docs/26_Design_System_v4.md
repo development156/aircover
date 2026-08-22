@@ -139,6 +139,49 @@ is compressed near black; even the new pair is 1.10:1), so in dark, fill and hai
 together in a way they do not have to on light. Never remove a card's hairline "because the
 fill already separates it" — in dark, it does not.
 
+### 2.1 AMENDMENT — the ladder had a rung missing, and 117 of 120 dark frames paid for it
+
+Added 2026-08-22 by the `wt-ux` lane. §2 above says dark surfaces cannot separate by fill
+*alone*. What it did not say, and what nobody checked, is that one of the fills was not a
+fill at all.
+
+`--surface-2` shipped as `#17171a` in dark. That is `--surface` **exactly** — not close,
+identical. So the ladder read:
+
+| step | light | dark, as shipped | dark, now |
+|---|---|---|---|
+| `--surface` → `--surface-2` | 1.044:1 | **1.000:1** | 1.042:1 |
+| `--surface-2` → `--surface-3` | 1.054:1 | 1.089:1 | 1.045:1 |
+
+One rung was nothing and the next carried a double. `#1b1b1f` was **solved against the light
+theme's own step sizes**, the same method `scripts/design/dark-ladder.mjs` used for the ink
+ladder — not picked by eye.
+
+**What it cost.** MEASURED across all 40 routes at three widths in dark: **117 of 120 frames**
+carried at least one element whose fill was its parent's own colour and which had no edge of
+its own. The commonest was the topbar's workspace chip, which is on every page in the product.
+
+**And the vector was a documented fix.** `apps/web/CLAUDE.md` prescribes
+`bg-tint-50 text-accent dark:bg-s2` for dark accent-on-tint, which is correct about contrast —
+`--t50` stays warm-light in dark while `--acc` flips to Orange300 at ~1.7:1 — and it routed
+every one of those elements onto the collapsed rung. A fix for one problem became the
+delivery mechanism for another. The pattern is unchanged and now works, because the rung
+underneath it exists.
+
+**Two rules follow, and they are separate.**
+
+1. **A fill may never be the only thing separating an element from what is behind it.** This
+   is §2 restated and it still holds — the corrected step is 1.04:1, which is chrome, not
+   separation. Anything that has to read as a distinct object carries a hairline
+   (`surface-ring`) as well.
+2. **`bg-s1` is not a fill.** `--s1` is `var(--canvas)`, so on light it is the same `#ffffff`
+   as the page AND as `--surface`. A block drawn in `bg-s1` on a card or on the page is
+   invisible in light — `skeleton.tsx` learned this in run 18 and wrote it down; two composer
+   notes and a key cap had it anyway.
+
+`src/lib/design/dark-surface-ladder.test.ts` grades the shipped token file and fails if any
+rung collapses again. It asserts the GAP, not the value, so the theme can still be retuned.
+
 ---
 
 ## 3. The Certainty System

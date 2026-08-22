@@ -239,7 +239,19 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
               setFile(event.target.files?.[0] ?? null)
               setDirty(true)
             }}
-            className="rounded-card border border-line bg-bg p-2.5 text-[13px] text-ink file:mr-3 file:rounded-pill file:border-0 file:bg-s2 file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-ink"
+            /* The file button carries a HAIRLINE, and in dark that is the only
+               thing that makes it a button at all. MEASURED in tokens.css:
+               under [data-theme=dark] --surface and --surface-2 are BOTH
+               #17171a, so `file:bg-s2` on a `bg-bg` field paints the field's
+               own colour — a 1.00:1 fill, not a subtle one. The pill vanished
+               and "Choose File" read as a bold caption beside "No file chosen",
+               on the control that is one of only three doors into the whole
+               flow. docs/26 §2 states the rule this broke: in dark, fill and
+               hairline work together, and a card's edge is never dropped
+               because the fill "already separates it".
+               `file:cursor-pointer` because ::file-selector-button is not
+               reached by the base-layer pointer rule in globals.css. */
+            className="rounded-card border border-line bg-bg p-2.5 text-[13px] text-ink file:mr-3 file:cursor-pointer file:rounded-pill file:border file:border-line file:bg-s2 file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-ink"
           />
           {/* The native control says "No file chosen" again the moment React
               resets the form, so what WE hold is stated separately — otherwise
@@ -289,9 +301,20 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
           <Button type="button" variant="ghost" onClick={onBack} disabled={isPending}>
             Back
           </Button>
-          <Button type="submit" data-guide="onboarding.door-read" loading={isPending}>
-            {isPending ? 'Reading…' : 'Read this'}
-            {!isPending ? <span>· free</span> : null}
+          {/* SECONDARY once a read has landed. Before that this is the only
+              action on the screen and it leads; after it, "That is us —
+              continue" below is the way forward, and two primaries in one view
+              means neither is (docs/26 §1.5). In dark the spent one was the
+              brightest pixel on the page, out-shouting the live orange primary
+              directly beneath it. */}
+          <Button
+            type="submit"
+            data-guide="onboarding.door-read"
+            loading={isPending}
+            variant={read ? 'secondary' : 'primary'}
+          >
+            {isPending ? 'Reading…' : read ? 'Read it again' : 'Read this'}
+            {!isPending && !read ? <span>· free</span> : null}
           </Button>
         </div>
       </form>
@@ -450,6 +473,13 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
             </p>
           )}
 
+          {/* The panel above says "Check it is yours before we resolve anything
+              from it", and until now it offered exactly one answer. One button
+              meaning yes and no button meaning no is not a check, it is a
+              confirmation dialog wearing a question — and the next step spends
+              fifty credits resolving whatever this is. The second button clears
+              the read and puts the form back, which is the only honest way to
+              answer no. */}
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
@@ -465,6 +495,19 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
               }
             >
               That is us — continue
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              data-guide="onboarding.door-reject"
+              onClick={() => {
+                setState(null)
+                setStages([])
+                setBlocked(null)
+                setDirty(true)
+              }}
+            >
+              That is not us — try another source
             </Button>
           </div>
         </div>

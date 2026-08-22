@@ -65,7 +65,7 @@ function Tab({ href, label, icon: Icon }: { href: Route; label: string; icon: ty
   )
 }
 
-export function BottomNav() {
+export function BottomNav({ hasWorkspace = true }: { hasWorkspace?: boolean }) {
   return (
     <nav
       aria-label="Main"
@@ -81,15 +81,37 @@ export function BottomNav() {
 
       {/* The FAB sits in its own flex slot so the four tabs stay evenly spaced,
           and is lifted out of the bar so it reads as an action rather than a
-          fifth destination. */}
+          fifth destination.
+
+          ── AND IT IS ABSENT BEFORE THERE IS A WORKSPACE ────────────────────
+          MEASURED at 390 on a fresh account: this 50px orange circle is the
+          largest painted element on the screen, and the card behind it is a
+          second brand fill saying "Create workspace". Two fills means neither
+          leads (docs/26 §1.5), and the louder of the two pointed away from the
+          only thing that can happen next.
+
+          It is NOT a dead end and that half of the finding was checked and
+          rejected: `/posts/new` renders "Create a workspace to start writing"
+          with a working CreateWorkspaceButton. The defect is hierarchy, not a
+          broken link — the biggest target on the phone was the second step.
+
+          The slot itself stays, so the four tabs keep their spacing rather than
+          re-flowing the bar into a different shape for one state.
+
+          `unreadable` keeps the FAB. Hiding a control because a read FAILED
+          would be claiming "you have no workspace" from a question that never
+          got an answer — the exact three-way discipline lib/workspaces.ts
+          exists to enforce. */}
       <div className="relative flex w-[64px] shrink-0 justify-center">
-        <Link
-          href="/posts/new"
-          aria-label="Create a post"
-          className="absolute -top-[18px] grid size-[50px] place-items-center rounded-full bg-primary text-primary-foreground shadow-pop transition-micro active:translate-y-[0.5px]"
-        >
-          <Plus size={24} strokeWidth={2.2} aria-hidden />
-        </Link>
+        {hasWorkspace ? (
+          <Link
+            href="/posts/new"
+            aria-label="Create a post"
+            className="absolute -top-[18px] grid size-[50px] place-items-center rounded-full bg-primary text-primary-foreground shadow-pop transition-micro active:translate-y-[0.5px]"
+          >
+            <Plus size={24} strokeWidth={2.2} aria-hidden />
+          </Link>
+        ) : null}
       </div>
 
       {RIGHT.map((item) => (

@@ -22,7 +22,13 @@ export interface NotBuiltYetProps {
  */
 export function NotBuiltYet({ children }: NotBuiltYetProps) {
   return (
-    <p className="flex items-start gap-2 rounded-sm bg-s1 px-3 py-2 text-[12.5px] text-muted">
+    /* `bg-s2` with a ring, never `bg-s1`. `--s1` IS `--canvas`, so on light it
+       is the same #ffffff as the page and the card behind it, and this note has
+       been an unbounded paragraph rather than a block ever since. skeleton.tsx
+       carries the same lesson in its own comment ("learned the hard way in run
+       18") and this file did not get it. The ring is what docs/26 §2 asks for
+       in dark, where even the corrected fill step is only 1.04:1. */
+    <p className="surface-ring flex items-start gap-2 rounded-sm bg-s2 px-3 py-2 text-[12.5px] text-muted">
       <Clock3 size={13} className="mt-icon-nudge shrink-0" aria-hidden />
       <span>{children}</span>
     </p>
