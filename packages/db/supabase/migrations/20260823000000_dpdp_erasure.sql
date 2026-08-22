@@ -132,6 +132,21 @@ comment on column workspaces.deleted_at is
 -- still be refused by the policy, one layer earlier. `erasure.pglite.test.ts`
 -- asserts exactly that rather than leaving it as an argument.
 --
+-- ── IF A LATER MERGE OVERWRITES THIS FUNCTION ──────────────────────────────
+-- `create or replace` means the last migration to touch `app.block_mutations`
+-- wins. A peer lane re-applying `helpers.sql` after this file would silently
+-- restore the original and take the exemption away — and an erasure would then
+-- start raising ERASURE_INCOMPLETE, which is loud, but only when somebody runs
+-- one.
+--
+-- MEASURED, by adding exactly that migration: `erasure.pglite.test.ts` goes RED
+-- on four tests and the message names the tables that became unerasable. So the
+-- collision cannot land silently. (It named SEVEN there rather than the four
+-- above, because the generic seeder inserts rows with unrelated foreign keys, so
+-- no cascade reaches `knowledge_chunks`, `post_metric_snapshots` or
+-- `post_publish_logs` in that fixture. In a real workspace those three go with
+-- their parent and only the four named above need the exemption.)
+--
 -- ── WHY A GUC AND NOT `alter table … disable trigger` ───────────────────────
 -- Both work. `disable trigger` inside the function takes an ACCESS EXCLUSIVE
 -- lock on `ai_provider_logs` and `audit_logs` — tables every other workspace in
