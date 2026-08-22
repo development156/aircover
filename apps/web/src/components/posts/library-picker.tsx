@@ -7,6 +7,11 @@ import type { ChannelSet } from '@sahoda/shared'
 
 import { attachAssetToPost } from '@/app/actions/assets'
 import { listAssetsForPicker } from '@/app/actions/assets-picker'
+import { acceptCropForAsset } from '@/app/actions/posts-crop'
+import { CropOfferDialog } from '@/components/media/crop-offer-dialog'
+import type { AcceptCropState } from '@/lib/media/crop-state'
+import type { FocalPoint } from '@/lib/media/crop-geometry'
+import { NO_OFFER_COPY } from '@/lib/media/offer-state'
 import type { AttachAssetState } from '@/lib/assets/state'
 import type { AssetCard } from '@/lib/assets/view'
 import { displayName } from '@/lib/assets/view'
@@ -45,6 +50,11 @@ export function LibraryPicker({ postId, channels }: { postId: string; channels: 
   const [result, setResult] = useState<AttachAssetState | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  // The photo a refusal was about, so accepting a crop knows which file to cut.
+  const [offerFor, setOfferFor] = useState<string | null>(null)
+  const [cropOpen, setCropOpen] = useState(false)
+  const [cropError, setCropError] = useState<string | null>(null)
+  const [cropped, setCropped] = useState<AcceptCropState | null>(null)
 
   useEffect(() => {
     if (!open || cards !== null) return
@@ -66,6 +76,8 @@ export function LibraryPicker({ postId, channels }: { postId: string; channels: 
 
   function attach(card: AssetCard) {
     setResult(null)
+    setCropped(null)
+    setCropError(null)
     setBusyId(card.id)
     startTransition(async () => {
       const state = await attachAssetToPost(postId, card.id)
@@ -74,6 +86,15 @@ export function LibraryPicker({ postId, channels }: { postId: string; channels: 
       if (state.ok) {
         router.refresh()
         setOpen(false)
+        return
+      }
+      // The refusal renders below either way. The picker closes so the crop
+      // dialog is not a modal stacked on a modal — two <dialog>s in the top
+      // layer trap focus in the wrong one.
+      if (state.offer !== undefined) {
+        setOfferFor(card.id)
+        setOpen(false)
+        setCropOpen(true)
       }
     })
   }
@@ -99,7 +120,59 @@ export function LibraryPicker({ postId, channels }: { postId: string; channels: 
             {result.message}
           </p>
           <ChannelObjections objections={result.rejections ?? []} tone="danger" />
+          {result.noOffer !== undefined && (NO_OFFER_COPY[result.noOffer] ?? '') !== '' ? (
+            <p className="rounded-input bg-s1 px-3 py-2.5 type-body text-muted">
+              {NO_OFFER_COPY[result.noOffer]}
+            </p>
+          ) : null}
+          {result.offer !== undefined ? (
+            <Button type="button" variant="secondary" onClick={() => setCropOpen(true)}>
+              Show the crop Sahoda would make
+            </Button>
+          ) : null}
         </div>
+      ) : null}
+
+      {cropped !== null && cropped.ok ? (
+        <div className="mt-2 space-y-2">
+          <p className="rounded-input bg-ok-bg px-3 py-2.5 type-body text-ok">{cropped.message}</p>
+          {cropped.warnings.length > 0 ? (
+            <>
+              <p className="rounded-input border border-warn bg-warn-bg px-3 py-2.5 type-body text-warn">
+                These channels still will not use it:
+              </p>
+              <ChannelObjections objections={cropped.warnings} tone="warn" />
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      {result !== null && !result.ok && result.offer !== undefined ? (
+        <CropOfferDialog
+          offer={result.offer}
+          open={cropOpen}
+          onClose={() => setCropOpen(false)}
+          pending={pending}
+          // The library file's own signed URL is on the offer; the browser holds
+          // no copy of a photo it did not pick this session.
+          localSrc={null}
+          error={cropError}
+          onAccept={(focal: FocalPoint) => {
+            if (offerFor === null) return
+            setCropError(null)
+            startTransition(async () => {
+              const state = await acceptCropForAsset(postId, offerFor, focal.x, focal.y)
+              if (!state.ok) {
+                setCropError(state.message)
+                return
+              }
+              setCropOpen(false)
+              setResult(null)
+              setCropped(state)
+              router.refresh()
+            })
+          }}
+        />
       ) : null}
       {result !== null && result.ok && result.warnings.length > 0 ? (
         <div className="mt-2 space-y-2">

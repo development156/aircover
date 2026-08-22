@@ -25,7 +25,8 @@
  */
 
 /** Which input a `MediaPathError` is about, so callers branch without parsing prose. */
-export type MediaPathField = 'workspaceId' | 'postId' | 'objectId' | 'assetId' | 'mime'
+export type MediaPathField =
+  'workspaceId' | 'postId' | 'objectId' | 'assetId' | 'derivativeId' | 'mime'
 
 /**
  * Refusal to build a key. Thrown, not returned, because every caller has already
@@ -179,6 +180,71 @@ const ASSET_FOLDER = 'assets'
  * Throws `MediaPathError` on a malformed id or an unsupported mime, for the same
  * reasons `mediaObjectPath` does.
  */
+/**
+ * The folder a library file's CROPPED COPIES live under.
+ *
+ * `<workspaceId>/derivatives/<assetId>/<derivativeId>.<ext>` — the asset id is
+ * its own segment so every crop of one photo shares a prefix, which is what lets
+ * a delete sweep the lot by prefix without keeping a list. It cannot collide
+ * with a post's `<workspaceId>/<postId>/<objectId>.<ext>` for the same reason
+ * `assets` cannot: no accepted id can spell this word, because an accepted id is
+ * hex and dashes.
+ */
+const DERIVATIVE_FOLDER = 'derivatives'
+
+/**
+ * Build the `media` bucket key for one CROPPED COPY:
+ * `<workspaceId>/derivatives/<assetId>/<derivativeId>.<ext>`.
+ *
+ * The first segment is still the workspace uuid, which is the WHOLE tenant
+ * boundary `storage.objects`' policy reads — it takes `(storage.foldername(name))[1]`
+ * and nothing else — so this folder is covered by the existing rules with no
+ * policy change at all. `asset_derivatives` carries a CHECK asserting the same
+ * shape, so a future writer that bypasses this module is refused by the database.
+ *
+ * Throws `MediaPathError` on a malformed id or an unsupported mime, for the same
+ * reasons its two siblings do.
+ */
+export function derivativeObjectPath(input: {
+  workspaceId: string
+  assetId: string
+  /** The `asset_derivatives` row id. The CALLER mints it, so row and object agree. */
+  derivativeId: string
+  mime: string
+}): string {
+  const workspaceId = normaliseId(input.workspaceId, 'workspaceId')
+  const assetId = normaliseId(input.assetId, 'assetId')
+  const derivativeId = normaliseId(input.derivativeId, 'derivativeId')
+
+  const extension = extensionForMime(input.mime)
+  if (extension === null) {
+    throw new MediaPathError(
+      'mime',
+      'Cannot build a media path: mime is not an allowed image type.',
+    )
+  }
+
+  return `${derivativePrefix({ workspaceId, assetId })}/${derivativeId}.${extension}`
+}
+
+/**
+ * The folder holding every cropped copy of ONE library file.
+ *
+ * Exported because deleting an asset has to sweep its crops out of storage, and
+ * Postgres cannot: `asset_derivatives` cascades so the ROWS go, but no database
+ * deletes a file in a bucket. Sweeping by prefix rather than by a list read
+ * beforehand is what makes that sweep complete — a crop minted between the read
+ * and the commit would not be in such a list, and is in this folder.
+ *
+ * `derivativeObjectPath` builds its key from this, so the two cannot drift into
+ * a sweep that looks in a folder nothing was ever written to.
+ */
+export function derivativePrefix(input: { workspaceId: string; assetId: string }): string {
+  const workspaceId = normaliseId(input.workspaceId, 'workspaceId')
+  const assetId = normaliseId(input.assetId, 'assetId')
+  return `${workspaceId}/${DERIVATIVE_FOLDER}/${assetId}`
+}
+
 export function assetObjectPath(input: {
   workspaceId: string
   /** The `assets` row id. The CALLER mints it, so the row and the object agree. */

@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { PostMediaSchema } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
+import { offerFor } from '@/lib/media/offer'
 import { decideAttach } from '@/lib/posts/attach-decision'
 import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
 import { mediaObjectPath } from '@/lib/posts/media-path'
@@ -96,7 +97,46 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
       formats,
     )
     if (!decision.ok) {
-      return { ok: false, message: decision.message, rejections: decision.rejections }
+      // ── THE REFUSAL IS UNCHANGED. AN OFFER TRAVELS WITH IT ─────────────────
+      // Same `ok: false`, same sentence, and still nothing written to storage or
+      // to any table. `offerFor` reads the bytes already in memory and describes
+      // a crop that does not exist yet; accepting it is a SECOND, explicit call.
+      const offer = await offerFor({
+        bytes,
+        candidate: {
+          mime: sniffed.image.mime,
+          bytes: bytes.byteLength,
+          width: sniffed.image.width,
+          height: sniffed.image.height,
+        },
+        channels: post.channels,
+        // The formats ALREADY READ above, not a second query.
+        //
+        // wt-media wrote `await readVariantFormats(postId)` here, which does not
+        // exist under that name any more — a sibling lane split it into a strict
+        // reader and a `?? {}` wrapper, because `{}` is the documented value for
+        // "no version states an intent" and handing it back for a FAILED read
+        // makes the per-format rule vanish and a Story accept a landscape photo.
+        //
+        // Git merged the two sides without a conflict and the call simply did not
+        // compile. Had the lenient name survived, it would have compiled and the
+        // offer would have proposed a crop against constraints nobody read. The
+        // value is in scope, the function has already refused when it was null,
+        // and one read cannot disagree with itself.
+        formats,
+        rejections: decision.rejections,
+        // Not in the library yet, and it must not be put there on a refusal the
+        // person may simply accept. The browser already holds the File, so it
+        // needs no URL from us to draw the preview.
+        assetId: null,
+        previewUrl: null,
+      })
+      return {
+        ok: false,
+        message: decision.message,
+        rejections: decision.rejections,
+        ...(offer.offered ? { offer: offer.offer } : { noOffer: offer.reason }),
+      }
     }
 
     // Path is built from server-held ids only. `mediaObjectPath` throws on

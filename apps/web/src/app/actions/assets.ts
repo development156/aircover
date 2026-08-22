@@ -7,6 +7,7 @@ import { AssetSchema, AssetUpdateSchema, ChannelSchema, decideAssetDelete } from
 
 import { kindForProvenMime } from '@/lib/assets/kind'
 import { readAsset } from '@/lib/assets/read'
+import { offerForAsset } from '@/lib/media/offer-asset'
 import type {
   AttachAssetState,
   DeleteAssetState,
@@ -16,7 +17,7 @@ import type {
 import { reportServerError } from '@/lib/observability/report'
 import { decideAttach, type ChannelRejection } from '@/lib/posts/attach-decision'
 import { MEDIA_BUCKET, MEDIA_UPLOAD_CAP_BYTES } from '@/lib/posts/media-constants'
-import { assetObjectPath } from '@/lib/posts/media-path'
+import { assetObjectPath, derivativePrefix } from '@/lib/posts/media-path'
 import { mapPostError } from '@/lib/posts/post-error'
 import { getPost, readMedia, readVariantFormatsStrict } from '@/lib/posts/read'
 import { sniffImage } from '@/lib/posts/sniff-image'
@@ -294,6 +295,20 @@ export async function deleteAsset(assetId: string, confirmed = false): Promise<D
     const storagePath = typeof data === 'string' ? data : null
     if (storagePath !== null) await removeObject(supabase, storagePath)
 
+    // ── AND THE CROPPED COPIES, WHICH POSTGRES CANNOT REACH ─────────────────
+    // `asset_derivatives` cascades, so the ROWS went with the asset inside that
+    // transaction. The OBJECTS did not: no database can delete a file in a
+    // bucket. Without this every crop ever made of this photo stays in storage
+    // forever, invisible — nothing points at it, nothing lists it, and it is
+    // still being paid for every month.
+    //
+    // Swept by PREFIX rather than from a list read before the delete, and that
+    // is the difference between complete and nearly complete: a crop minted
+    // between the read and the commit is not in a list taken beforehand, and is
+    // in the folder. `derivativeObjectPath` puts every crop of one photo under
+    // `<workspace>/derivatives/<asset>/`, which is what makes one call enough.
+    await removeDerivativeObjects(supabase, workspace.id, assetId)
+
     revalidatePath('/assets')
     revalidatePath('/posts')
     return { ok: true }
@@ -439,6 +454,11 @@ export async function attachAssetToPost(
       return { ok: false, message: 'That file is already on this post.' }
     }
 
+    // NO SECOND READ. `formats` is read strictly above and the function has
+    // already refused when it was null; wt-media added a lenient re-read here
+    // that would have SHADOWED it in the same block and coerced a failed read to
+    // `{}` — the exact value the comment below says must not reach `decideAttach`.
+    // Git merged both sides without a conflict; only the rename made it visible.
     const decision = decideAttach(
       post.channels,
       { mime: asset.mime, bytes: asset.bytes, width: asset.width, height: asset.height },
@@ -450,7 +470,24 @@ export async function attachAssetToPost(
       formats,
     )
     if (!decision.ok) {
-      return { ok: false, message: decision.message, rejections: decision.rejections }
+      // The refusal stands exactly as it did. See `AttachMediaState` for why the
+      // offer is an addition to this shape rather than a replacement of it.
+      const offer = await offerForAsset({
+        asset,
+        channels: post.channels,
+        formats,
+        rejections: decision.rejections,
+      })
+      return {
+        ok: false,
+        message: decision.message,
+        rejections: decision.rejections,
+        ...(offer === null
+          ? {}
+          : offer.offered
+            ? { offer: offer.offer }
+            : { noOffer: offer.reason }),
+      }
     }
 
     const supabase = createServerSupabase()
@@ -477,6 +514,69 @@ export async function attachAssetToPost(
   } catch (error) {
     reportServerError(error, { action: 'attachAssetToPost', workspaceId })
     return { ok: false, message: 'Could not add that file to the post — try again.' }
+  }
+}
+
+/** One page of a storage listing, and the most passes the sweep will make. */
+const SWEEP_PAGE = 100
+const MAX_SWEEP_PASSES = 100
+
+/**
+ * Remove every cropped copy of one library file.
+ *
+ * Best effort, like `removeObject`: the asset row is already gone and the person
+ * has been told the file was deleted, so a storage failure here is waste to be
+ * reported rather than an error to be shown. It is reported, because nothing else
+ * in the system will ever mention these objects again.
+ */
+async function removeDerivativeObjects(
+  supabase: ReturnType<typeof createServerSupabase>,
+  workspaceId: string,
+  assetId: string,
+): Promise<void> {
+  try {
+    const prefix = derivativePrefix({ workspaceId, assetId })
+
+    // PAGED. `list()` returns at most 100 entries by default, and a loop that
+    // took the first page would leave every crop after the hundredth in the
+    // bucket forever while reporting nothing wrong — the same silent-partial
+    // shape this whole lane is about. One photo reaching 100 distinct crops is
+    // unlikely and it is not impossible: every move of the focal point that is
+    // accepted is a new recipe.
+    // Always reads from the START of the folder, never from an advancing
+    // offset: each pass DELETES what it listed, so the remainder shifts down and
+    // an offset would step straight over it. The bound is therefore a count of
+    // passes, not a cursor — and it is a real bound, because a loop that only
+    // stops on a short page would spin forever the day `remove` starts
+    // succeeding without removing.
+    for (let pass = 0; pass < MAX_SWEEP_PASSES; pass += 1) {
+      const listed = await supabase.storage
+        .from(MEDIA_BUCKET)
+        .list(prefix, { limit: SWEEP_PAGE, offset: 0 })
+      if (listed.error) {
+        console.error('[assets] could not list crops to remove', listed.error.message)
+        return
+      }
+      const entries = listed.data ?? []
+      const paths = entries
+        .map((entry) => entry.name)
+        .filter((name): name is string => typeof name === 'string' && name !== '')
+        .map((name) => `${prefix}/${name}`)
+      // Nothing left, or nothing removable: either way there is no next pass
+      // that would do anything a previous one did not.
+      if (paths.length === 0) return
+      const { error } = await supabase.storage.from(MEDIA_BUCKET).remove(paths)
+      if (error) {
+        console.error('[assets] orphan crops left behind', error.message)
+        return
+      }
+      // A short page was the last page.
+      if (entries.length < SWEEP_PAGE) return
+    }
+    console.error('[assets] crop sweep hit its pass ceiling; some crops may remain')
+  } catch (error) {
+    console.error('[assets] orphan crops left behind')
+    reportServerError(error, { action: 'removeDerivativeObjects', workspaceId })
   }
 }
 

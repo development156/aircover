@@ -35,6 +35,10 @@ const MIGRATIONS = [
   '20260819000400_assets.sql',
   '20260820000000_asset_attachments.sql',
   '20260820000100_delete_asset_rpc.sql',
+  // A6. The gate is not told about derivatives; it has to keep working BECAUSE
+  // of how they are shaped. That claim is what the block at the end of this file
+  // executes.
+  '20260821000000_asset_derivatives.sql',
 ] as const
 
 const WS = '11111111-1111-4111-8111-111111111111'
@@ -56,6 +60,7 @@ describe('A5b · asset delete gate + usage record (real Postgres, in-process)', 
     await db.exec(`
       delete from asset_usages;
       delete from post_media;
+      delete from asset_derivatives;
       delete from post_variants;
       delete from posts;
       delete from assets;
@@ -480,5 +485,271 @@ describe('A5b · asset delete gate + usage record (real Postgres, in-process)', 
         await db.query(`delete from post_media where id = $1`, [mediaId])
       })
     }
+  })
+
+  /** A cropped copy of `assetId`, exactly as `mintCroppedAttachment` writes one. */
+  async function newDerivative(assetId: string, workspace = WS): Promise<string> {
+    const id = crypto.randomUUID()
+    await db.query(
+      `insert into asset_derivatives
+         (id, workspace_id, asset_id, storage_path, recipe, channels, formats,
+          crop_x, crop_y, crop_w, crop_h, focal_x, focal_y, mime, bytes, width, height)
+       values ($1, $2, $3, $4, $5, $6, $7, 0, 240, 1080, 1440, 0.5, 0.5, 'image/jpeg', 900, 1080, 1440)`,
+      [
+        id,
+        workspace,
+        assetId,
+        `${workspace}/derivatives/${assetId}/${id}.jpg`,
+        '0-240-1080-1440-jpg-8388608',
+        ['instagram'],
+        JSON.stringify({ instagram: 'image' }),
+      ],
+    )
+    return id
+  }
+
+  /** Attach the CROP: asset_id names the original, derivative_id names the crop. */
+  async function attachCrop(
+    postId: string,
+    assetId: string,
+    derivativeId: string,
+    workspace = WS,
+  ): Promise<string> {
+    const r = await db.query<{ id: string }>(
+      `insert into post_media
+         (workspace_id, post_id, asset_id, derivative_id, storage_path, mime, bytes, width, height)
+       values ($1, $2, $3, $4, $5, 'image/jpeg', 900, 1080, 1440) returning id`,
+      [
+        workspace,
+        postId,
+        assetId,
+        derivativeId,
+        `${workspace}/derivatives/${assetId}/${derivativeId}.jpg`,
+      ],
+    )
+    return (r.rows[0] as { id: string }).id
+  }
+
+  // ── A6 · the gate, with a CROP on the post instead of the original ─────────
+
+  describe('the delete gate understands derivatives', () => {
+    /**
+     * THE DISCRIMINATING TEST, and the reason the table is shaped the way it is.
+     *
+     * Had a crop been its own `assets` row with `post_media.asset_id` pointing at
+     * the CROP, deleting the ORIGINAL would find no `asset_usages` row, the
+     * trigger would find nothing to refuse, and a post scheduled for Thursday
+     * would lose its photo with nobody told. The refusal below is what proves
+     * that door is shut — not the argument, which was also available to the
+     * version that had the bug.
+     */
+    it('refuses to delete an original whose CROP is on a scheduled post, and names it', async () => {
+      const asset = await newAsset()
+      const derivative = await newDerivative(asset)
+      const post = await newPost('scheduled', 'Diwali offer')
+      await attachCrop(post, asset, derivative)
+
+      // The usage record was written from the attachment even though the file on
+      // the post is the crop — because `asset_id` still names the original.
+      expect(await usageCount(asset)).toBe(1)
+
+      const message = await tryDelete(asset)
+      expect(message).not.toBeNull()
+      expect(message).toContain('Diwali offer')
+      expect(message).toContain('scheduled to go out')
+
+      // Nothing was touched: not the asset, not the crop, not the attachment.
+      const survived = await db.query<{ n: string }>(
+        `select count(*)::text as n from assets where id = $1`,
+        [asset],
+      )
+      expect(Number((survived.rows[0] as { n: string }).n)).toBe(1)
+      const crop = await db.query<{ n: string }>(
+        `select count(*)::text as n from asset_derivatives where id = $1`,
+        [derivative],
+      )
+      expect(Number((crop.rows[0] as { n: string }).n)).toBe(1)
+    })
+
+    it('refuses when a VARIANT is publishing, even with the post row still behind', async () => {
+      // The mid-flight window: the dispatcher moves a variant before it settles
+      // the parent. A gate reading only the post row would open for exactly the
+      // seconds during which the crop's bytes are being read.
+      const asset = await newAsset()
+      const derivative = await newDerivative(asset)
+      const post = await newPost('approved', 'Mid flight')
+      await attachCrop(post, asset, derivative)
+      await db.query(
+        `insert into post_variants (workspace_id, post_id, channel, body, publish_status)
+         values ($1, $2, 'instagram', 'x', 'publishing')`,
+        [WS, post],
+      )
+
+      const message = await tryDelete(asset)
+      expect(message).not.toBeNull()
+      expect(message).toContain('Mid flight')
+    })
+
+    it('lets the original go when only a DRAFT uses the crop, and the crop goes with it', async () => {
+      // The control. Without it a gate that refused everything would pass the two
+      // tests above while making the delete button permanently broken.
+      const asset = await newAsset()
+      const derivative = await newDerivative(asset)
+      const post = await newPost('draft', 'Still writing')
+      const mediaId = await attachCrop(post, asset, derivative)
+
+      // The attachment is detached first, exactly as `delete_asset(p_detach=>true)`
+      // does inside its transaction.
+      await db.query(`delete from post_media where id = $1`, [mediaId])
+      expect(await tryDelete(asset)).toBeNull()
+
+      // The crop CASCADED. A derivative cannot outlive its original.
+      const left = await db.query<{ n: string }>(
+        `select count(*)::text as n from asset_derivatives where id = $1`,
+        [derivative],
+      )
+      expect(Number((left.rows[0] as { n: string }).n)).toBe(0)
+    })
+
+    it('refuses a post_media row that names a crop without naming its original', async () => {
+      // THE CHECK THAT KEEPS THE GATE WHOLE. A row like this would be invisible
+      // to the trigger — it reads `asset_usages`, which is derived from
+      // `asset_id` — so the original could be deleted out from under a scheduled
+      // post. It cannot be written at all.
+      const asset = await newAsset()
+      const derivative = await newDerivative(asset)
+      const post = await newPost('scheduled', 'Sneaky')
+
+      let raised: string | null = null
+      try {
+        await db.query(
+          `insert into post_media (workspace_id, post_id, derivative_id, storage_path, mime)
+           values ($1, $2, $3, 'p/x.jpg', 'image/jpeg')`,
+          [WS, post, derivative],
+        )
+      } catch (error) {
+        raised = error instanceof Error ? error.message : String(error)
+      }
+      expect(raised).toContain('post_media_derivative_needs_asset')
+    })
+
+    it('refuses a crop attached under a DIFFERENT asset than the row names', async () => {
+      // The composite foreign key. A row claiming asset A while carrying a crop of
+      // asset B would let the gate guard the wrong file: A is locked, B is free,
+      // and deleting B strips the post.
+      const assetA = await newAsset()
+      const assetB = await newAsset()
+      const cropOfB = await newDerivative(assetB)
+      const post = await newPost('draft', 'Mismatched')
+
+      let raised: string | null = null
+      try {
+        await attachCrop(post, assetA, cropOfB)
+      } catch (error) {
+        raised = error instanceof Error ? error.message : String(error)
+      }
+      expect(raised).not.toBeNull()
+      expect(raised).toContain('post_media_derivative_of_asset_fk')
+    })
+
+    it('the SAME crop of the same photo cannot be stored twice', async () => {
+      // "Idempotent: re-running produces no duplicate objects" rests on this
+      // constraint and on the select-before-render in `mintCroppedAttachment`.
+      // The select is a fast path; THIS is the guarantee, because two requests
+      // can both miss the select and only one can win the insert.
+      const asset = await newAsset()
+      const first = await newDerivative(asset)
+      expect(first).toBeTruthy()
+
+      let raised: string | null = null
+      try {
+        // Same asset, same recipe — a second person cropping the same photo the
+        // same way, or the same person opening the crop screen twice.
+        await db.query(
+          `insert into asset_derivatives
+             (workspace_id, asset_id, storage_path, recipe, channels, formats,
+              crop_x, crop_y, crop_w, crop_h, mime, bytes, width, height)
+           values ($1, $2, $3, $4, $5, $6, 0, 240, 1080, 1440, 'image/jpeg', 900, 1080, 1440)`,
+          [
+            WS,
+            asset,
+            `${WS}/derivatives/${asset}/second.jpg`,
+            '0-240-1080-1440-jpg-8388608',
+            ['instagram'],
+            JSON.stringify({ instagram: 'image' }),
+          ],
+        )
+      } catch (error) {
+        raised = error instanceof Error ? error.message : String(error)
+      }
+      expect(raised).toContain('asset_derivatives_asset_id_recipe_key')
+
+      // A DIFFERENT crop of the same photo is a different file and is allowed —
+      // otherwise moving the focal point once would be the last crop anyone gets.
+      const other = await db.query(
+        `insert into asset_derivatives
+           (workspace_id, asset_id, storage_path, recipe, channels, formats,
+            crop_x, crop_y, crop_w, crop_h, mime, bytes, width, height)
+         values ($1, $2, $3, $4, $5, $6, 0, 0, 1080, 1440, 'image/jpeg', 900, 1080, 1440)
+         returning id`,
+        [
+          WS,
+          asset,
+          `${WS}/derivatives/${asset}/third.jpg`,
+          '0-0-1080-1440-jpg-8388608',
+          ['instagram'],
+          JSON.stringify({}),
+        ],
+      )
+      expect(other.rows).toHaveLength(1)
+    })
+
+    it('every crop of one photo shares the prefix the delete sweep looks in', async () => {
+      // `asset_derivatives` cascades, so the ROWS go with the asset. The OBJECTS
+      // do not — no database deletes a file in a bucket — so `deleteAsset`
+      // sweeps `<workspace>/derivatives/<asset>/` by prefix afterwards. That
+      // sweep is only complete if every path genuinely begins with it, which is
+      // what the `asset_derivatives_path_scoped` CHECK and this assertion are
+      // between them for.
+      const asset = await newAsset()
+      await newDerivative(asset)
+      const rows = await db.query<{ storage_path: string }>(
+        `select storage_path from asset_derivatives where asset_id = $1`,
+        [asset],
+      )
+      expect(rows.rows).not.toHaveLength(0)
+      for (const row of rows.rows) {
+        expect(row.storage_path.startsWith(`${WS}/derivatives/${asset}/`)).toBe(true)
+      }
+
+      // …and a path outside the workspace's own prefix cannot be stored at all.
+      let raised: string | null = null
+      try {
+        await db.query(
+          `insert into asset_derivatives
+             (workspace_id, asset_id, storage_path, recipe, channels, formats,
+              crop_x, crop_y, crop_w, crop_h, mime, bytes, width, height)
+           values ($1, $2, 'somewhere/else/x.jpg', 'r2', $3, '{}'::jsonb,
+                   0, 0, 10, 10, 'image/jpeg', 1, 10, 10)`,
+          [WS, asset, ['instagram']],
+        )
+      } catch (error) {
+        raised = error instanceof Error ? error.message : String(error)
+      }
+      expect(raised).toContain('asset_derivatives_path_scoped')
+    })
+
+    it('keeps a crop inside its own workspace, by key rather than by convention', async () => {
+      const mine = await newAsset(WS)
+      let raised: string | null = null
+      try {
+        // Another tenant's workspace id against my asset. The composite FK to
+        // `assets (id, workspace_id)` has no such pair.
+        await newDerivative(mine, OTHER_WS)
+      } catch (error) {
+        raised = error instanceof Error ? error.message : String(error)
+      }
+      expect(raised).not.toBeNull()
+    })
   })
 })

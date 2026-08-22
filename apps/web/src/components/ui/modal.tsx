@@ -77,6 +77,25 @@ export function Modal({
         // with no `text-center` anywhere in this file. An overlay's alignment must
         // come from the overlay, never from its mount point.
         'm-auto w-[min(560px,calc(100vw-32px))] rounded-card border border-line bg-surface p-0 text-left text-ink shadow-lg',
+        // ── A FOOTER THAT FALLS OFF THE SCREEN IS A DIALOG THAT CANNOT BE
+        //    ANSWERED ────────────────────────────────────────────────────────
+        // MEASURED in Chromium at 1440x1100 with the crop offer inside: the
+        // panel grew past the UA's own `max-height` for `<dialog>`, the overflow
+        // was CLIPPED rather than scrolled, and both footer buttons were
+        // off-screen. Escape still worked, so the only reachable answer was the
+        // one that does nothing — on a dialog whose whole purpose is a decision.
+        //
+        // The cap is stated here rather than left to the UA so the body below can
+        // be the thing that scrolls: `100dvh`, not `100vh`, because a phone's
+        // address bar is the difference between fitting and not.
+        //
+        // The underscores are not decoration. `calc()` requires whitespace around
+        // a `-`, so `calc(100dvh-2rem)` is INVALID CSS and the browser drops the
+        // whole declaration — silently, with the class still present in the
+        // markup and in the compiled stylesheet. Written without them, this cap
+        // did nothing at all and the footer went on falling off the screen at 390
+        // and 768 while looking, in the diff, exactly like a fix.
+        'max-h-[calc(100dvh_-_2rem)] overflow-hidden',
         // `bg-[var(--scrim)]`, not `bg-black/40`. globals.css opens @theme with
         // `--color-*: initial`, which wipes the stock palette, and only
         // `--color-white` is redefined — so `bg-black` was a class Tailwind
@@ -87,8 +106,13 @@ export function Modal({
         className,
       )}
     >
-      <div onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start gap-3 border-b border-line-soft p-4">
+      {/* The column that makes the cap above useful: header and footer hold
+          their size, and the BODY is what runs out of room and scrolls. */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[calc(100dvh_-_2rem)] flex-col"
+      >
+        <div className="flex flex-none items-start gap-3 border-b border-line-soft p-4">
           <div className="min-w-0 flex-1">
             <h2 id="modal-title" className="type-h3">
               {title}
@@ -104,9 +128,11 @@ export function Modal({
             <X size={16} aria-hidden />
           </button>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
         {footer ? (
-          <div className="flex justify-end gap-2 border-t border-line-soft p-4">{footer}</div>
+          <div className="flex flex-none justify-end gap-2 border-t border-line-soft p-4">
+            {footer}
+          </div>
         ) : null}
       </div>
     </dialog>

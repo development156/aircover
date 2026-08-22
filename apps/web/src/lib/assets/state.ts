@@ -1,5 +1,6 @@
 import type { Asset, AssetUsageSite } from '@sahoda/shared'
 
+import type { CropOfferView } from '@/lib/media/offer-state'
 import type { ChannelRejection } from '@/lib/posts/attach-decision'
 
 /**
@@ -36,6 +37,13 @@ export type DeleteAssetState =
 
 export type UpdateAssetState = { ok: true; asset: Asset } | { ok: false; message: string }
 
+/** See `AttachMediaState`: the offer is carried BESIDE the refusal, never instead of it. */
 export type AttachAssetState =
-  | { ok: true; warnings: ChannelRejection[] }
-  | { ok: false; message: string; rejections?: ChannelRejection[] }
+  | { ok: true; warnings: ChannelRejection[]; message?: string }
+  | {
+      ok: false
+      message: string
+      rejections?: ChannelRejection[]
+      offer?: CropOfferView
+      noOffer?: string
+    }
