@@ -667,3 +667,118 @@ Asked for rather than written here because only wt-db edits migrations. The pari
 catch a future divergence between the enum and the CHECKs is worth adding at the same time; the
 pattern is `apps/web/src/lib/connections/status-vocabulary.test.ts`, which parses the CHECK out of
 the migration and scans the source for literals compared against it.
+
+## Radar (wt-radar-ui, 2026-08-22)
+
+Three things this lane needed and could not do itself.
+
+### 1 · `posts.origin` cannot say `'radar'` — owed to whoever owns packages/db
+
+Migration `20260718000004_content.sql` declares
+`origin text not null default 'manual' check (origin in ('manual', 'plan_week'))`.
+A draft written from a Radar observation is therefore stored as `'manual'`, which is
+wrong in one specific way: a future query asking "which posts did a person write by
+hand" will count them. `app/actions/radar.ts` carries the same note at the constant.
+
+Widening the CHECK is a schema change and applied migrations are immutable, so this
+lane did not touch it. The value wanted is `'radar'`, and `PostOriginSchema` in
+`packages/shared/src/db/content.ts` moves with it.
+
+### 2 · The change records — owed to the wt-radar lane
+
+`lib/radar/port.ts` is the interface this screen reads through, and its header lists
+the shape wt-radar owes it. The Supabase binding (`lib/radar/store.ts`) reads
+`competitors` today and reports `collector: 'watch-list-only'`, which the screen
+renders as "the readings are not wired in yet" rather than as an empty feed — an empty
+feed would be the claim "nothing changed", which that binding has not earned.
+
+Flipping it to `'reading'` is one change query plus one line. The one requirement that
+is easy to miss: **scan attempts must be stored on FAILURE too.** A scan row written
+only on success makes "we could not check today" unrenderable, and that state is the
+point of the screen.
+
+### 3 · Is there a competitor slot cap, and what is it? — owner ruling
+
+`PlanLimits` (packages/shared) has `channels`, `sites`, `seats`, `loopLevel`,
+`twinSize` — no competitor dimension. The docs disagree with each other:
+
+- PRD §7.1 plan table: "Growth: **Radar (3 comps)**"
+- PRD M9 and FSD M9: "Track **1–5** competitors"
+
+The watch list ships uncapped and states the per-scan price instead. When this is
+ruled on it belongs in `PlanLimits` as a dimension, and
+`cheapestPlanWithAtLeast('competitors', n)` will then derive the upgrade sentence the
+way every other limit's is derived.
+
+### 4 · Does the fourth certainty rung mean NOT REAL, or NOT OBSERVED? — owner ruling
+
+`components/radar/marks.tsx` renders an inference with `.is-simulated` (hatch), per
+this lane's brief. docs/26 §3.1 words that rung "Not real. A fixture.", and three
+files — `brain/certainty-mark.tsx`, `audience/inferred.tsx`, `connections/catalogue.ts`
+— deliberately refuse it to protect that meaning, choosing `.is-proposed` for
+inference instead.
+
+Both readings are defensible and they cannot both be house style. Under "not real"
+Radar should move to `.is-proposed`; under "not observed" the rung's description in
+docs/26 §3.1 needs rewording. One decision, one class name in each place.
+
+### 5 · The Loop queries a connection status that cannot exist — owed to the Loop's lane
+
+`connections.status` is `check (status in ('active', 'expired', 'revoked', 'error'))`
+(migration `20260718000005_connections.sql:9`), and `upsert_connection` writes
+`'active'` on every successful OAuth return (`20260719160916:184`). No migration adds
+`'connected'`.
+
+Two places filter on it anyway:
+
+- `apps/web/src/lib/loop/read.ts:97` — the connected-channel list behind the Autonomy Dial
+- `apps/web/src/app/actions/loop-cycle.ts:82` — the cycle's connected-channel check
+
+Both match nothing, always. The Autonomy Dial therefore renders its "Connect a channel
+and its dial appears here" branch for every workspace including fully connected ones,
+and the cycle takes its zero-channels path unconditionally.
+
+MEASURED, not read: `e2e/radar-to-draft.spec.ts` staged a connection with
+`status: 'connected'` and Postgres rejected the row with
+`violates check constraint "connections_status_check"`.
+
+`lib/connections/read.ts:100` and `lib/audience/page-data.ts:148` already use `'active'`
+and are correct. Not changed from this lane: flipping the two lines turns a
+permanently-empty list into a populated one, which is a behaviour change in the Loop's
+feature and wants that lane's own tests run against it.
+
+### 6 · `motion.spec.ts`'s scrim check is wrong under a production build — owed to whoever owns the design system
+
+The test reads `--scrim` off `documentElement` and takes its alpha with
+`/[\d.]+\s*\)$/`, defaulting to `'1'` when that finds nothing.
+
+Next's CSS minifier rewrites the authored `rgb(0 0 0 / .4)` into `#0006` (light) and
+`#0000009e` (dark) — the same 0.4 alpha, hex-encoded, with no parenthesis for the
+regex to find. So `alphaOf(token)` silently returns 1 and the assertion compares the
+correctly-measured backdrop (0.4) against a fabricated 1.
+
+**The app is right in both modes.** The backdrop is 0.4 in dev and in production. It is
+the test that is wrong, and only against a minified stylesheet.
+
+`pnpm gate` runs `test:smoke` against `pnpm dev`, which does not minify, so this can
+never fail in the gate. It fails every time under
+`E2E_SERVER_CMD='pnpm --filter @sahoda/web start -p <port>'`, which
+`playwright.config.ts` documents as the faster and more production-like way to run.
+
+The fix is a parser that understands both forms — or better, comparing the composited
+`::backdrop` colour against the composited value of the token rather than parsing
+either as a string. The `?? '1'` fallback should also go: a parse failure must fail
+loudly, not resolve to a plausible number.
+
+### 7 · The dev server does not survive the smoke suite on this machine
+
+Two runs of `turbo run test:smoke` against `pnpm dev` both died at
+`concurrent-edit.spec.ts` ("against the real database"), producing 78
+`ERR_CONNECTION_REFUSED` and ~70 cascade failures that are one event and its echoes.
+One death had a kernel OOM kill of `next-server` (2.3 GB RSS, 02:28:46); the other had
+none in `journalctl -k` at all.
+
+The same tree, same commit, against `next start`: **88 passed, 1 failed, 0 refusals.**
+
+Worth knowing before reading any smoke failure list: count the `ERR_CONNECTION_REFUSED`
+lines first. If it is non-zero, the run says nothing about the branch.

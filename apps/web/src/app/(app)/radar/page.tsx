@@ -1,175 +1,156 @@
 import Link from 'next/link'
-import { Building2, FileText, Megaphone, Timer } from 'lucide-react'
+import { Radar as RadarIcon, Timer } from 'lucide-react'
 import { creditCost } from '@sahoda/shared'
 
+import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { creditWord } from '@/lib/credit-words'
-import { InertButton, InertField, RoadmapBanner } from '@/components/roadmap/inert'
-import { InertPanel, InertRow, NotRunningNote } from '@/components/roadmap/parts'
+import { ChangeFeed } from '@/components/radar/change-feed'
+import { WatchList } from '@/components/radar/watch-list'
+import { connectedChannels } from '@/app/actions/radar'
+import { radarStore } from '@/lib/radar/read'
+import { getActiveWorkspace } from '@/lib/workspaces'
 
 export const metadata = { title: 'Radar' }
 
 /**
- * RADAR — watching a handful of competitors, and saying what it will not do.
+ * RADAR — what the businesses beside you did, and what your brand says about it.
  *
- * ── THE FIVE SLOTS ARE THE SIGNATURE, AND THEY ARE EMPTY ─────────────────────
- * PRD M9 caps this at five competitors. That cap is the interesting part of the
- * design and it is the honest thing to draw: five named, numbered slots, all of
- * them empty. It shows the shape of the feature (a short watch-list, not a feed)
- * without a single invented name — and an empty slot is a truthful picture of a
- * workspace watching nobody, which is every workspace.
+ * ── THE DIFF, NOT THE STATE ──────────────────────────────────────────────────
+ * There is no list of a competitor's posts on this screen and there is not meant
+ * to be. Anybody can buy scraping; a feed of someone else's content is the
+ * commodity half of this category and it is the half nobody reads twice. What is
+ * here is what MOVED — a cadence that shifted, an offer that appeared, a price
+ * that is not what it was at the last read — because a change is the only thing
+ * a shop owner can act on this week.
  *
- * A competitor NAME would be the worst figure on this screen. Not a number, but
- * the same class of lie: a claim about the reader's market, invented.
+ * ── AND THE INTERPRETATION IS GROUNDED IN THE BRAND BRAIN ───────────────────
+ * "They are competing on price" is worth nothing on its own. "They are competing
+ * on price; your brain says you compete on same-day freshness, so answer with
+ * what a bundle cannot copy" is worth something, and no other product can say it
+ * because no other product holds this workspace's brain. That sentence is
+ * HATCHED wherever it appears — it is an inference, and it carries no number,
+ * because a number would give a judgement the authority of a measurement.
  *
- * ── WHY THE LIMITS PANEL IS AS PROMINENT AS THE FEATURE ──────────────────────
- * Competitive tools are where a marketing product is most tempted to imply it
- * knows things it cannot know — follower counts it did not measure, "engagement"
- * on someone else's post, a spend estimate. Radar reads public pages. It cannot
- * see a private account, it cannot see what an ad cost, and it will not guess.
- * Saying that here, at the same weight as the feature, is what separates this
- * from every competitor-tracking screen that quietly makes numbers up.
+ * ── THE THREE STATES OF THIS SCREEN ARE THREE DIFFERENT FACTS ───────────────
+ *   collector 'absent'   the weekly scan is not built yet. Nobody is collecting.
+ *   watching nobody      the collector is fine; you have not named anyone.
+ *   watching, no reads   we have looked and nothing has come back yet.
  *
- * ── COMPETITORS LIVE HERE, NOT IN THE BRAND BRAIN ────────────────────────────
- * `/brain/competitors` used to be a second, near-identical coming-soon screen.
- * Two homes for one idea is how a reader learns to distrust the navigation, so
- * that route now redirects here. The Brand Brain holds what your business IS;
- * this holds what the businesses around it are doing.
+ * Rendering any two of those the same way is the failure this whole screen is
+ * organised against, one level up from the per-day gaps in `ChangeFeed`. A
+ * product that distinguishes "their page did not load" from "their week was
+ * quiet" and then blurs its own three states has not understood its own point.
  */
+export default async function RadarPage() {
+  const workspace = await getActiveWorkspace()
+  const perScan = creditCost('radar_scan')
 
-/** Five, because five is the cap. Numbered because a cap is a count. */
-const SLOTS = [1, 2, 3, 4, 5] as const
-
-export default function RadarPage() {
-  return (
-    <div className="space-y-grid">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageTitle sub="Watch up to five businesses like yours, and get a short read on what they did each week.">
+  if (!workspace) {
+    return (
+      <div className="space-y-grid">
+        <PageTitle sub="What the businesses beside you are doing, and what your brand would say about it.">
           Radar
         </PageTitle>
-        <InertButton primary>Add a competitor</InertButton>
+        <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
+          Finish setting up your workspace and Radar appears here.
+        </p>
       </div>
+    )
+  }
 
-      <RoadmapBanner what="Radar will check a few public pages once a week and tell you what changed, with two drafts that answer it." />
+  const [snapshot, channels] = await Promise.all([
+    radarStore().read(workspace.id),
+    connectedChannels(),
+  ])
 
-      <section aria-labelledby="radar-watchlist" className="flex flex-col gap-3">
-        <div>
-          <h2 id="radar-watchlist" className="type-h2">
-            Your watch list
+  return (
+    <div className="space-y-grid">
+      <PageTitle sub="What the businesses beside you are doing, and what your brand would say about it.">
+        Radar
+      </PageTitle>
+
+      {snapshot.collector === 'absent' ? (
+        /* ── NOT COLLECTING ────────────────────────────────────────────────
+           The screen is built; the weekly scan that fills it is not. Saying so
+           plainly is the only honest option — an add form that cannot store
+           anything would be a control that fails on use, which reads as a broken
+           app rather than as an unshipped collector. */
+        <section
+          aria-labelledby="radar-not-collecting"
+          className="surface-ring flex flex-col gap-3 rounded-card bg-surface p-4"
+        >
+          <h2 id="radar-not-collecting" className="type-h2">
+            The weekly scan is not built yet
           </h2>
-          <p className="type-body mt-1 max-w-[68ch] text-muted">
-            Five places, entered by you &mdash; a website, a public Instagram, a Google Business
-            Profile. Five is the limit on purpose: a watch list you actually read beats a feed you
-            scroll past.
+          <p className="type-body max-w-[68ch] text-muted">
+            Radar reads a handful of public pages once a week and tells you what changed &mdash; a
+            posting rhythm that shifted, an offer that appeared, a price that is not what it was.
+            Then it says what your own positioning answers with, out of your Brand Brain. Nothing is
+            being collected yet, which is why there is no watch list here to add to.
           </p>
-        </div>
-
-        <ul className="grid gap-2 wide:grid-cols-2">
-          {SLOTS.map((slot) => (
-            <li
-              key={slot}
-              data-inert-control
-              className="is-proposed flex items-center gap-3 rounded-card px-3 py-3 select-none"
-            >
-              <span className="type-eyebrow num w-[18px] shrink-0 text-muted">{slot}</span>
-              <Building2 size={15} strokeWidth={1.8} aria-hidden className="shrink-0 text-muted" />
-              <span className="type-sm min-w-0 flex-1 text-muted">
-                An address you have not added yet
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        <div className="flex flex-wrap gap-2">
-          <InertField label="Website, Instagram handle or Google listing" />
-          <InertButton>Add</InertButton>
-        </div>
-      </section>
-
-      <section aria-labelledby="radar-digest" className="flex flex-col gap-3">
-        <div>
-          <h2 id="radar-digest" className="type-h2">
-            What a week&rsquo;s read looks like
-          </h2>
-          <p className="type-body mt-1 max-w-[68ch] text-muted">
-            One scan per business per week, then one page you can read in a minute.
+          <p className="type-body max-w-[68ch] text-muted">
+            What it will never do is put a number on a business it cannot see. No revenue, no ad
+            spend, no customer count, and no engagement rate it did not measure &mdash; those are
+            the figures every tool in this category prints and none of them can know.
           </p>
-        </div>
+          <p className="type-sm flex items-center gap-1.5 text-muted">
+            <Timer size={13} strokeWidth={1.8} aria-hidden />
+            One scan per business per week, at <span className="num">{perScan}</span>{' '}
+            {creditWord(perScan)} each. A page that will not load is skipped and not charged.
+          </p>
+          <p className="type-body max-w-[68ch] text-muted">
+            What your own business is goes in the{' '}
+            <Link href="/brain" className="font-[550] text-accent underline underline-offset-2">
+              Brand Brain
+            </Link>
+            , and that part works today.
+          </p>
+        </section>
+      ) : (
+        <>
+          <WatchList competitors={snapshot.competitors} />
 
-        <div className="grid gap-3 wide:grid-cols-3">
-          <InertPanel
-            title="How often they post"
-            what="Their rhythm over the last few weeks, next to yours."
-          >
-            <p className="type-sm text-muted">
-              A shape, not a score. There is no ranking here and no winner.
-            </p>
-          </InertPanel>
-          <InertPanel
-            title="What did best for them"
-            what="The posts of theirs that people responded to, and what they were about."
-          >
-            <p className="type-sm text-muted">
-              Only what a public page shows. Sahoda does not estimate what it cannot see.
-            </p>
-          </InertPanel>
-          <InertPanel
-            title="Offers and launches"
-            what="A price change, a new product, a sale that appeared this week."
-          >
-            <p className="type-sm text-muted">
-              The thing most worth knowing, and the thing you would otherwise find out late.
-            </p>
-          </InertPanel>
-        </div>
+          <section aria-labelledby="radar-changes" className="flex flex-col gap-3">
+            <h2 id="radar-changes" className="type-h2">
+              What changed
+            </h2>
 
-        <div className="grid gap-3 wide:grid-cols-2">
-          <InertRow
-            icon={FileText}
-            name="A draft that answers it"
-            note="Written from your Brand Brain — what you do differently, in your own words. Not a copy of theirs."
-          />
-          <InertRow
-            icon={Megaphone}
-            name="A second one, another angle"
-            note="Two drafts per digest, so you can choose rather than edit the only one you were given."
-          />
-        </div>
-      </section>
-
-      <section aria-labelledby="radar-limits" className="surface-ring rounded-card bg-surface p-4">
-        <h2 id="radar-limits" className="type-h3">
-          What Radar will never tell you
-        </h2>
-        <p className="type-body mt-1 max-w-[68ch] text-muted">
-          Every tool in this category shows numbers about other people&rsquo;s businesses. Most of
-          them are estimates presented as readings. Sahoda reads public pages, so there are three
-          things it cannot know and will not invent:
-        </p>
-        <ul className="type-body mt-2 grid gap-1.5 text-muted">
-          <li>&mdash; What a competitor spent on anything.</li>
-          <li>&mdash; Anything behind a login, a private account or a paywall.</li>
-          <li>&mdash; Their revenue, their customer count, or how they are doing.</li>
-        </ul>
-        <p className="type-sm mt-3 flex items-center gap-1.5 text-muted">
-          <Timer size={13} strokeWidth={1.8} aria-hidden />
-          One scan per business per week, at <span className="num">
-            {creditCost('radar_scan')}
-          </span>{' '}
-          {creditWord(creditCost('radar_scan'))} each. A page that will not load is skipped and not
-          charged.
-        </p>
-      </section>
-
-      <NotRunningNote>
-        Nothing is being watched. There is no watch list stored for your workspace and no scan has
-        run &mdash; which is why all five slots above are empty rather than showing a business
-        Sahoda picked for you. What your own business is goes in the{' '}
-        <Link href="/brain" className="font-[550] text-accent underline underline-offset-2">
-          Brand Brain
-        </Link>
-        , and that part works today.
-      </NotRunningNote>
+            {snapshot.competitors.length === 0 ? (
+              /* WATCHING NOBODY — and the empty state teaches rather than
+                 reports. "No competitors yet" tells a reader something they can
+                 already see; what they cannot see is what naming one would get
+                 them. */
+              <EmptyState
+                icon={RadarIcon}
+                title="You are not watching anyone yet"
+                body="Name a business above and Radar reads its public pages once a week, then tells you what moved — a new offer, a price that changed, a posting rhythm that shifted — and what your own brand would say back."
+                tip="Watch the shop your customers compare you against, not the biggest name in your category."
+              />
+            ) : snapshot.collector === 'watch-list-only' ? (
+              /* WATCHING, BUT THIS SCREEN CANNOT READ THE READINGS.
+                 An empty feed here would be a CLAIM — "nothing changed" — and
+                 this binding has not earned it. See lib/radar/store.ts. */
+              <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
+                Your watch list is stored, and the weekly readings are not wired into this screen
+                yet. This is not &ldquo;nothing changed&rdquo; &mdash; it is Radar not being able to
+                tell you either way, and those are different things.
+              </p>
+            ) : snapshot.days.length === 0 ? (
+              <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
+                Nothing has been read yet. The first scan runs within the week, and what it finds
+                appears here newest first.
+              </p>
+            ) : (
+              <ChangeFeed
+                days={snapshot.days}
+                competitors={snapshot.competitors}
+                channels={channels}
+              />
+            )}
+          </section>
+        </>
+      )}
     </div>
   )
 }
