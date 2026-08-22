@@ -196,9 +196,15 @@ most attractive thing in the system to point at somebody else's business. The co
 the export contains what that person is allowed to see, which is the right answer to "export MY
 data" in any case, and every gap it creates is named under rule 2.
 
-**Size.** The download carries up to 180 MB of files. Beyond that, the files are still LISTED in the
-document and their contents are not in the zip, and the file says so and says to ask. It does not
-silently send a short archive.
+**Size, and its practical ceiling.** The download carries up to 180 MB of files and at most 2,000 of
+them. Beyond either limit the files are still LISTED in the document with their names and sizes,
+their contents are not in the zip, and the file says so and says to ask. It does not silently send a
+short archive.
+
+The archive is assembled in memory in one request, so a customer with a very large library may find
+the download times out before it starts. At fifty businesses that has not happened; it is written
+down because a timeout there is a dead end with no message in it, and the remedy — sending the
+archive another way — is a person's job rather than a retry.
 
 ### 4.2 · Deleting everything (DPDP §12)
 
@@ -209,8 +215,8 @@ because the delete is an addressable endpoint whatever the screen does. Only the
 workspace can do it.
 
 **What is removed:** every row in all 48 tables except the four in the next paragraph, plus every
-file in storage, plus the encrypted keys for the linked social accounts, plus the customer's sign-in
-profile if this was their last workspace.
+file in storage, plus the encrypted keys for the linked social accounts, plus the sign-in profile of every member
+for whom this was their last workspace — not only the person who pressed the button.
 
 **What is kept, and why:**
 
@@ -572,6 +578,9 @@ would be doing the thing it warns about.
   policies.
 - One complete cycle: create a workspace, fill all 48 tables, delete it, and count what is left —
   including a second workspace that must be untouched.
+- That a FAILED deletion leaves everything exactly as it was. A trigger is installed that refuses to
+  let one table go; the deletion raises, naming the table, and all 48 tables still hold every row.
+  This is the only thing that demonstrates "all or nothing" rather than asserting it.
 - Whether the deletion writes to the financial ledger. It does not, and that is asserted against the
   function's own source.
 
