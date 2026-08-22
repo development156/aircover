@@ -5,10 +5,19 @@ import { expect, test, vi } from 'vitest'
 
 // `next/font/google` is compiled away by Next's SWC plugin at build time; imported
 // under plain vitest it resolves to a non-callable stub and the module throws
-// "Inter is not a function" before `metadata` is ever reached. The mock stands in
+// "<Face> is not a function" before `metadata` is ever reached. The mock stands in
 // for the font loader only — nothing under test reads it.
+//
+// It names the face the layout actually imports. v5 moved from Inter to
+// Plus Jakarta Sans and this mock kept only `Inter`, so the whole FILE failed to
+// collect and reported "0 test" — which is the shape of a suite that runs
+// nothing while looking like it ran. Keep this in step with layout.tsx.
 vi.mock('next/font/google', () => ({
-  Inter: () => ({ variable: 'test-font-variable', className: 'test-font', style: {} }),
+  Plus_Jakarta_Sans: () => ({
+    variable: 'test-font-variable',
+    className: 'test-font',
+    style: {},
+  }),
 }))
 
 import { metadata } from './layout'
