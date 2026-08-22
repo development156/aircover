@@ -139,7 +139,16 @@ export default function PlaybooksPage() {
                 <h2 className="type-h3 text-ink">{book.name}</h2>
                 <p className="type-eyebrow mt-1 text-muted">{book.group}</p>
               </div>
-              <InertToggle label="Off" />
+              {/* "Not built yet", not "Off". The switch SHAPE is a documented
+                  ruling and it stays: `is-proposed` is the Certainty System's
+                  proposed rung, it survives greyscale, and it is deliberately a
+                  span rather than a disabled input. What was wrong was the
+                  word. "Off" is a state claim, and a state claim implies an On
+                  that could be reached — so five cards each promised a switch
+                  while the only disclosure sat in the page's LAST sentence.
+                  Saying it on the object moves the truth to where the hand
+                  goes. */}
+              <InertToggle label="Not built yet" />
             </div>
 
             {/* The three things a recipe is, as a definition list — the labels
@@ -199,8 +208,16 @@ export default function PlaybooksPage() {
       </section>
 
       <NotRunningNote>
-        None of these is running. There is no playbook stored for your workspace, nothing is
-        watching a feed or a review, and the switch on each card is a picture of a switch.
+        None of these is running. There is no playbook stored for your workspace and nothing is
+        watching a feed or a review. Replying to a review by hand works today in your{' '}
+        <Link href="/inbox" className="font-[550] text-accent underline underline-offset-2">
+          Inbox
+        </Link>
+        , and you can schedule a post yourself in the{' '}
+        <Link href="/planner" className="font-[550] text-accent underline underline-offset-2">
+          Planner
+        </Link>
+        .
       </NotRunningNote>
     </div>
   )

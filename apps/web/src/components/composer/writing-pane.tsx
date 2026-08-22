@@ -87,12 +87,25 @@ export function WritingPane({ body, onBodyChange }: WritingPaneProps) {
           reads as never planned; a disabled button would be a control that
           exists and refuses. `CaptionRewriteInputSchema` in @sahoda/shared
           takes `rewrite | shorten | hookify` and nothing else, and no mesh
-          task writes a body from a brief — both are frozen contracts. */}
+          task writes a body from a brief — both are frozen contracts.
+
+          ── AND IT IS FIFTY WORDS SHORTER THAN IT WAS ───────────────────────
+          The honesty is not the problem; the SIZE was. MEASURED at 1440: the
+          largest block of prose in the composer's writing column was a 62-word
+          list of absent features, sitting directly under the box a person came
+          here to type in, and two more not-built notes followed it further
+          down. Three disclaimers made the left column read as more apology than
+          tool.
+
+          Two things went. The rule it repeated — "Sahoda can rewrite, shorten
+          or sharpen…" — was already the line above the box, word for word. And
+          "each needs a new kind of AI task, and the list of tasks it can run is
+          fixed for now" describes OUR task registry, not the reader's
+          situation, which is exactly the implementation jargon the copy style
+          rules out of user-facing bodies. What remains is the claim itself. */}
       <NotBuiltYet>
-        Sahoda can rewrite, shorten or sharpen the hook of any piece you select. Writing a first
-        draft from a brief, changing the tone, expanding a line, suggesting hashtags and describing
-        a picture are not built — each needs a new kind of AI task, and the list of tasks it can run
-        is fixed for now.
+        Writing a first draft from a brief, changing the tone, expanding a line, suggesting hashtags
+        and describing a picture are not built yet.
       </NotBuiltYet>
 
       <InlineRewrite

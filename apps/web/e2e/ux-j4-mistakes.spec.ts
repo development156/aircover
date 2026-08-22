@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import { deflateSync } from 'node:zlib'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -112,7 +113,6 @@ function pngOf(width: number, height: number): Buffer {
       Buffer.concat([Buffer.from([0]), Buffer.alloc(width * 3, 0x88)]),
     ),
   )
-  const { deflateSync } = require('node:zlib') as typeof import('node:zlib')
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', ihdr),

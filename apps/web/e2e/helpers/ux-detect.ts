@@ -348,9 +348,64 @@ export const MOTION = `${LIB}
   }
 })()`
 
+/**
+ * A FILL THAT SEPARATES NOTHING.
+ *
+ * MEASURED in tokens.css: in dark, --surface and --surface-2 are BOTH #17171a.
+ * So every element that leans on a bg-s2 fill to lift itself off a card is
+ * painting the card's own colour, and it disappears - not dimmed, not subtle,
+ * identical. docs/26 section 2 already says dark surfaces cannot separate by
+ * fill alone and that fill and hairline must work together there; what the doc
+ * does not say is that this particular pair is 1.00:1 rather than merely close.
+ *
+ * A fill is only reported when it has NO edge of its own: a border, an outline
+ * or an inset ring all count as an edge, and an element carrying one is doing
+ * exactly what the doc asks. Reported with the size, because a 0-height
+ * decorative div is not a defect and a 120x30 button is.
+ */
+export const INVISIBLE_FILL = `${LIB}
+;(() => {
+  const hasEdge = (s) => {
+    if (s.borderTopWidth !== '0px' || s.borderLeftWidth !== '0px' ||
+        s.borderRightWidth !== '0px' || s.borderBottomWidth !== '0px') return true
+    if (s.outlineStyle !== 'none' && s.outlineWidth !== '0px') return true
+    /* An inset ring is a box-shadow with the inset keyword - surface-ring. */
+    return s.boxShadow !== 'none' && s.boxShadow.includes('inset')
+  }
+  const same = (a, b) => a && b && Math.abs(a.r-b.r) < 2 && Math.abs(a.g-b.g) < 2 && Math.abs(a.b-b.b) < 2
+  const hits = []
+  let considered = 0
+  for (const el of document.querySelectorAll('*')) {
+    if (!_visible(el)) continue
+    const s = getComputedStyle(el)
+    const own = _parse(s.backgroundColor)
+    if (!own || own.a < 0.999) continue
+    if (s.backgroundImage && s.backgroundImage !== 'none') continue
+    const r = el.getBoundingClientRect()
+    if (r.width < 20 || r.height < 10) continue
+    const parent = el.parentElement
+    if (!parent) continue
+    const behind = _bgOf(parent)
+    if (!behind) continue
+    considered++
+    if (!same(own, behind)) continue
+    if (hasEdge(s)) continue
+    hits.push({
+      tag: el.tagName.toLowerCase(),
+      cls: (el.className && el.className.baseVal !== undefined ? el.className.baseVal : String(el.className || '')).slice(0, 80),
+      colour: s.backgroundColor,
+      w: Math.round(r.width),
+      h: Math.round(r.height),
+      text: (el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 40),
+    })
+  }
+  return { considered, count: hits.length, items: hits.slice(0, 20) }
+})()`
+
 export const DETECTORS = {
   brandFills: BRAND_FILLS,
   invisibleText: INVISIBLE_TEXT,
+  invisibleFill: INVISIBLE_FILL,
   arrowCursors: ARROW_CURSORS,
   unnamed: UNNAMED,
   deadEnds: DEAD_ENDS,

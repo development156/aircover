@@ -3,6 +3,7 @@ import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
 
 import { NavItem } from '@/components/shell/nav-item'
+import { RailRevealActive } from '@/components/shell/rail-reveal-active'
 import { RailFoot } from '@/components/shell/rail-foot'
 import { approvalCount } from '@/lib/approvals/read'
 import { NAV_FOOT, NAV_GROUPS } from '@/lib/nav/sections'
@@ -125,8 +126,19 @@ export async function Rail() {
           and the mask covers the ones that do not. */}
       <nav
         aria-label="Main"
-        className="scroll-visible scroll-fade flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-2 max-wide:px-2"
+        /* `pb-6` and not `py-2`. The fade mask covers the last 20px of this
+           box, and with 8px of bottom padding the clip landed THROUGH the
+           middle of whatever row was there — MEASURED at 1440x900, the word
+           AUTOMATE sliced horizontally in half on /home, /create, /loop and
+           /playbooks. A half-height word reads as broken layout, not as "more
+           below". With 24px the fade falls on space, so a partially scrolled
+           list ends in a soft edge instead of a bisected glyph. */
+        className="scroll-visible scroll-fade flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2 pb-6 max-wide:px-2"
       >
+        {/* Open on the row you are standing on. Without this the rail can
+            highlight the current route entirely below the fold, which is the
+            same as not highlighting it. */}
+        <RailRevealActive />
         {NAV_GROUPS.map((group, index) => (
           // A real <section> per group, labelled by its own heading, so the
           // twenty-one links arrive as six named regions rather than one long

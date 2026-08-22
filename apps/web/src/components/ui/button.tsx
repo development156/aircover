@@ -30,8 +30,24 @@ export const buttonVariants = cva(
         // six other components already follow (channel-picker, pick-chips,
         // conversation-list, step-rail, badge); these variants were
         // the ones that missed it.
+        // ⚠ THE DISABLED RECIPE FAILS IN OPPOSITE DIRECTIONS IF YOU USE
+        // `bg-line` + `text-white`, and it did.
+        //
+        // MEASURED: `--line` is `#dcdcdc` on light, so white on it is
+        // **1.37:1** — the label of every disabled primary in the product was
+        // effectively invisible, and `disabled:opacity-100` was there precisely
+        // to stop the base 45% from dimming it, so nothing rescued it. On dark
+        // `--line` is `rgba(255,255,255,.14)`, which composites to a dark grey,
+        // and white on THAT is high contrast — so the same one line made the
+        // refusal unreadable in light and made it look pressable in dark.
+        //
+        // `bg-s2` + `text-muted` measures 6.93:1 on light and 6.12:1 on dark:
+        // legible in both, and recessed in both, which is what a refusal should
+        // look like. The inset hairline keeps the button's shape without a
+        // border (a border would reflow the box). Pinned by
+        // `button.disabled-contrast.test.ts`, which grades the real tokens.
         primary:
-          'bg-primary text-primary-foreground hover:bg-ink hover:text-white dark:hover:bg-white dark:hover:text-[var(--canvas)] disabled:bg-line disabled:text-white disabled:opacity-100',
+          'bg-primary text-primary-foreground hover:bg-ink hover:text-white dark:hover:bg-white dark:hover:text-[var(--canvas)] disabled:bg-s2 disabled:text-muted disabled:opacity-100 disabled:shadow-[inset_0_0_0_1px_var(--line)]',
         // The workhorse — white with a hairline ring.
         secondary: 'surface-ring-firm bg-surface text-ink hover:bg-s2',
         ghost: 'text-muted hover:bg-surface-3 hover:text-ink',

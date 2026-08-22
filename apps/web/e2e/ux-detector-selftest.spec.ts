@@ -66,6 +66,17 @@ const FIXTURE = `
   <textarea class="short" placeholder="Named by placeholder"></textarea>
   <textarea class="short" id="nameless-area"></textarea>
 
+  <!-- FILLS: one that separates nothing, one with a ring, one genuinely different -->
+  <!-- The text is white ON PURPOSE. Left at the inherited black it would be
+       1.2:1 on this near-black card, which the contrast detector correctly
+       caught — a fixture that trips one detector while calibrating another
+       proves nothing about either. -->
+  <div class="card" style="background:#17171a;padding:8px;color:#ffffff">
+    <span id="f-same" style="display:block;background:#17171a;width:120px;height:30px">Same fill</span>
+    <span id="f-ringed" style="display:block;background:#17171a;width:120px;height:30px;box-shadow:inset 0 0 0 1px #444">Ringed</span>
+    <span id="f-diff" style="display:block;background:#1f1f23;width:120px;height:30px">Different</span>
+  </div>
+
   <!-- DEAD END -->
   <button disabled>Coming soon</button>
 
@@ -166,6 +177,24 @@ test.describe('ux detector self-test', () => {
     // exists to prevent, arriving from the other direction.
     expect(r.count).toBe(2)
     expect(r.items.map((i) => i.tag).sort()).toEqual(['button', 'textarea'])
+  })
+
+  test('invisible fill: same-on-same with no edge is caught, ringed and different are not', async ({
+    page,
+  }) => {
+    const r = (await page.evaluate(DETECTORS.invisibleFill)) as {
+      considered: number
+      count: number
+      items: { text: string }[]
+    }
+    const texts = r.items.map((i) => i.text)
+    // The exact shape of the dark-mode defect: --surface and --surface-2 are
+    // both #17171a, so a bg-s2 chip on a card paints the card's own colour.
+    expect(texts).toContain('Same fill')
+    // Both ends calibrated. An element carrying its own edge is doing what
+    // docs/26 section 2 asks for, and a genuinely different fill is fine.
+    expect(texts).not.toContain('Ringed')
+    expect(texts).not.toContain('Different')
   })
 
   test('dead ends: a disabled "Coming soon" is reported as one', async ({ page }) => {
