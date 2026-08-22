@@ -321,6 +321,32 @@ test.describe('signal resolution console @smoke', () => {
 
     await page.getByRole('checkbox').first().check()
 
+    /**
+     * WAIT FOR THE TICK TO SETTLE BEFORE MEASURING IT.
+     *
+     * The box carries `transition-micro`, and `getComputedStyle` DURING a
+     * transition returns the composited intermediate, not the destination.
+     * MEASURED 2026-08-22 at integration: at +0ms the pair reads
+     * `rgb(152, 152, 152)` on `rgba(255, 255, 255, 0.424)` — a ratio of 2.88,
+     * under this test's own 3:1 floor — and from +100ms onward it reads
+     * `rgb(11, 11, 12)` on `rgb(255, 255, 255)`, which is 19.67. The colours were
+     * never wrong. The test was sampling a fade.
+     *
+     * It has always been that race; it simply started losing it, so it failed
+     * looking exactly like a dark-mode contrast regression.
+     *
+     * Waiting for the animations to drain, rather than polling until the
+     * assertion passes: a poll would ALSO go green on a pair that is illegible
+     * for 900ms and correct at the very end, and "the selected checkbox stays
+     * legible" is a claim about what a person sees, not about where it lands.
+     * This asserts the settled value exactly once.
+     */
+    await page.waitForFunction(
+      () => document.getAnimations().every((a) => a.playState !== 'running'),
+      undefined,
+      { timeout: 4000 },
+    )
+
     const measured = await page.evaluate(
       ([contrastSrc]) => {
         const box = document.querySelector('[data-field] input[type=checkbox]')
