@@ -138,6 +138,19 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
     describes: 'the documents you added to the knowledge library',
   },
   { table: 'leads', readability: 'readable', describes: 'enquiries from your site' },
+  {
+    // Added 2026-08-23 with the erasure migration, and NOT by a person noticing:
+    // `export_manifest.pglite.test.ts` failed on the very next gate run, naming
+    // it. That is the guard working on its first real chance, and it is the
+    // answer to whether it can catch a table a later lane adds.
+    //
+    // `no-read-policy` is read from the migration, not assumed: the table has
+    // RLS on and no policies at all, so PostgREST answers `[]` — which reads
+    // identically to "you have none". It is named in `notIncluded` instead.
+    table: 'ledger_actor_redactions',
+    readability: 'no-read-policy',
+    describes: 'whether your name is shown on your credit record',
+  },
   { table: 'loop_briefs', readability: 'readable', describes: 'what the Loop planned each week' },
   {
     table: 'loop_channel_autonomy',
