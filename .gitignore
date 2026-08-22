@@ -127,3 +127,6 @@ supabase/.temp/
 # The 13 frames docs/33_QA_Report.md actually cites live in docs/33_QA_frames/.
 .qa/frames/
 .qa/*.log
+# ux lane capture output (frames + logs) — evidence, not source
+.ux/
+.uxlog/

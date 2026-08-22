@@ -46,8 +46,10 @@ export function RelinkControl({
   onUndo,
 }: RelinkControlProps) {
   if (state.relinkedFrom !== null) {
+    // Same fix as not-built-yet.tsx: --s1 is --canvas, so this block was the
+    // page's own colour on light and had no edge to say otherwise.
     return (
-      <div className="flex flex-wrap items-center gap-2 rounded-sm bg-s1 px-3 py-2 text-[12.5px] text-muted">
+      <div className="surface-ring flex flex-wrap items-center gap-2 rounded-sm bg-s2 px-3 py-2 text-[12.5px] text-muted">
         <span>
           {label} follows your post again. Its own copy is kept until you save — nothing was
           written.

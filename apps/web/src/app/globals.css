@@ -327,25 +327,56 @@
      already outranks anything in @layer base — a copy here would be dead code
      that drifts. One treatment, no per-component overrides. */
 
-  /* A button must look pressable.
+  /* ── THE POINTER, WHICH TAILWIND v4 TOOK AWAY ──────────────────────────────
+     v3's Preflight carried `button, [role="button"] { cursor: pointer }`.
+     v4's does not — `preflight.css` in tailwindcss@4.3.3 mentions `cursor`
+     exactly once, and only to correct Safari's number-input spinners. Nothing
+     warns; the app simply stops saying "this is pressable" with the one signal
+     a pointing device has.
 
-     Tailwind v3's Preflight added `cursor: pointer` to buttons; v4 REMOVED it,
-     so buttons fall back to the UA default of `cursor: default` — an arrow. This
-     app never restored it. MEASURED 2026-08-22 across 39 routes in a production
-     build: 209 enabled buttons resolved to `cursor: default` against 38 to
-     `pointer`, and those 38 were `<a>` elements getting the browser's own link
-     cursor. So on /home the NAV LINKS get a hand and the primary call to action
-     gets an arrow — the affordance is exactly inverted. The one shipped
-     stylesheet carried a single `cursor:pointer` declaration in 67KB.
+     MEASURED across the captured frames before this rule existed: `cursor:
+     default` on `Create workspace`, `Continue`, `Resolve my brand`, `Adapt for
+     1 channel · 3 credits`, `Read this`, `Preview publish`, `Save`, `Choose
+     from library`, `Search Sahoda`, the workspace switcher, the channel chips
+     and the bottom bar's `More` — up to 26 on a single screen. Every one of
+     them is a control a shop owner is meant to press.
 
-     `:disabled` keeps the arrow deliberately: a control you cannot press should
-     not claim you can. `[aria-disabled='true']` is included because a button
-     that stays focusable while inert is still not pressable. */
+     Declared here rather than on the Button primitive on purpose: this is not
+     a Button problem. It is every `<button>` in the product, including the ones
+     that will be written next week, and a variant-level fix would leave those
+     out exactly as it left out the twelve above.
+
+     `label` is deliberately NOT included wholesale. A label over a text field
+     is not a pressable thing and the arrow is correct there; a label that
+     CONTAINS a checkbox or radio is the control itself — which is the pattern
+     `pick-chips.tsx` uses, with the real input `sr-only` inside it. */
+  /* `:not([aria-disabled='true'])` from the sibling lane: a button that
+     stays focusable while inert is still not pressable, and
+     `:not(:disabled)` alone lets it claim otherwise. */
   button:not(:disabled):not([aria-disabled='true']),
-  [role='button']:not([aria-disabled='true']),
   summary,
-  select:not(:disabled) {
+  select:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='tab']:not([aria-disabled='true']),
+  [role='switch']:not([aria-disabled='true']),
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled),
+  input[type='submit']:not(:disabled),
+  input[type='reset']:not(:disabled),
+  input[type='color']:not(:disabled),
+  label:has(input[type='checkbox']),
+  label:has(input[type='radio']) {
     cursor: pointer;
+  }
+  /* A refusal should FEEL like one before it is clicked. Buttons carrying
+     `disabled` already get `pointer-events: none` from the Button primitive, so
+     this reaches the ones that do not. */
+  button:disabled,
+  button[aria-disabled='true'],
+  select:disabled,
+  input:disabled,
+  [role='button'][aria-disabled='true'] {
+    cursor: not-allowed;
   }
 }
 

@@ -1,6 +1,8 @@
-import { ChartColumn } from 'lucide-react'
+import Link from 'next/link'
+import { ChartColumn, Plug } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
+import { buttonVariants } from '@/components/ui/button'
 import { CreatePostButton } from '@/components/posts/create-post-button'
 import { PageTitle } from '@/components/page-title'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
@@ -42,6 +44,93 @@ export default async function AnalyticsPage() {
   // 20260819000100, that table does not exist. A read that cannot happen must cost
   // this one card and nothing else on the page.
   const series = await readMetricSeries('reach')
+
+  /**
+   * ── FIVE APOLOGIES, OR ONE ANSWER ────────────────────────────────────────
+   *
+   * Each container below argues correctly for its own existence, and MEASURED at
+   * 1024 on a workspace with nothing, the five of them together said this:
+   *
+   *   Performance          four absence rules + "Connect a channel to start
+   *                        measuring."
+   *   Instagram account    "Connect Instagram to see followers and reach."
+   *   Performance over time"Sahoda has started keeping a history. Nothing has
+   *                        been measured yet..."
+   *   Best performing      "Nothing has been measured yet, so there is nothing
+   *                        to rank."
+   *   Nothing published yet"Analytics start once a post goes out on a channel."
+   *
+   * 1250px of page to deliver one fact. Every sentence is true and the sum is a
+   * screen that reads as five separate failures rather than one honest state.
+   * This is the composition problem the individual comments could not see: each
+   * card was reviewed against its own gate, never against its four neighbours.
+   *
+   * docs/26 §4 already rules on it. "Not yet measured" is for a slot that is
+   * REAL and whose reading has not arrived. With no account linked and nothing
+   * published, none of these quantities can have a value from any source — so
+   * the third state applies, and the third state says OMIT THE SLOT.
+   *
+   * `PerformanceStrip` is ungated on `hasPublished` on purpose and that ruling
+   * stands: account insights do not need this workspace to have published. What
+   * they DO need is a linked account. So the gate here is not "has published",
+   * it is "could any of this ever have had a value".
+   *
+   * ── AND IT IS NARROWER THAN THAT, ON PURPOSE ─────────────────────────────
+   * `posts.length === 0` is the third condition, and it was added because the
+   * first version of this gate turned `analytics-history.spec.ts` red.
+   *
+   * That spec drafts one post, seeds three days of metric history, and asserts
+   * the performance-over-time card moves through its three states — starting
+   * with "Sahoda has started keeping a history", which is a different sentence
+   * from "Sahoda does not keep a history yet" and is the exact distinction the
+   * 2026-08-19 rewrite of that file exists to protect. With a two-part gate that
+   * workspace collapsed and the card never rendered.
+   *
+   * The tempting repair was to change the spec's setup so it reached the card.
+   * That is backwards: a guard should not be loosened to accommodate the change
+   * that broke it. The state actually MEASURED as broken was a workspace with
+   * NOTHING — no connection, nothing published, no posts — which is what every
+   * beta account is in for its first hour and where five stacked apologies were
+   * counted. A workspace that has drafted something is one step further along
+   * and keeps the full page.
+   *
+   * So the fix covers the state it was written for and not a pixel more.
+   */
+  const nothingCanBeMeasured =
+    account.kind === 'not-connected' && !hasPublished && posts.length === 0
+
+  if (nothingCanBeMeasured) {
+    return (
+      <div className="space-y-grid">
+        <PageTitle>Analytics</PageTitle>
+        {/* One state, and it names BOTH doors. The old copy offered only "write
+            a post", which is the second step: a post that goes out on no channel
+            is still never measured, so sending a new workspace to the composer
+            alone routes them the long way round to the same empty page. */}
+        <EmptyState
+          icon={ChartColumn}
+          title="Nothing to measure yet"
+          body="Analytics start when a post goes out on a connected channel. Until then there is nothing to measure — which is different from measuring nothing."
+          action={
+            /* ONE primary (docs/26 §1.5). Connecting leads because analytics
+               cannot exist without it; writing a post is the hairline second. */
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/connections"
+                className={buttonVariants({ variant: 'primary' })}
+                data-guide="analytics.connect"
+              >
+                <Plug size={16} strokeWidth={2} aria-hidden />
+                Connect a channel
+              </Link>
+              <CreatePostButton variant="secondary" />
+            </div>
+          }
+          tip="Sahoda: Reach and followers come from the channel itself, so one connection starts them even before you post."
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-grid">

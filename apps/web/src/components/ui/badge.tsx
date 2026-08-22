@@ -64,7 +64,19 @@ const RUNG_GLYPH: Record<Rung, React.ComponentType<{ className?: string }>> = {
  * near-black surface is not a fill, it is a hole.
  */
 const RUNG_FILL: Record<Rung, string> = {
-  urgent: 'bg-brand text-white',
+  // INK on the brand fill, never white. `--pfg` is `#000000` and measures
+  // 7.15:1; white on `#ff6600` is **2.94:1**, which docs/26 §1.1 names as the
+  // figure that misses every threshold there is, and §1.2 rules on directly.
+  // The token was fixed; this call site kept its literal, so the loudest badge
+  // in the product — the one that says "Weak signal — inputs conflict" on the
+  // reveal, the screen where an owner decides whether to approve a brain — was
+  // the least readable thing on it, while the Approve button 1500px below wore
+  // the correct pair. Two orange fills on one screen disagreeing with each
+  // other.
+  //
+  // `--pfg` is NOT redefined in dark (orange is the one fixed point, §1.1), so
+  // this pair holds in both themes without a `dark:` variant.
+  urgent: 'bg-brand text-primary-foreground',
   active: 'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]',
   // 1.5px ring, not 1px. In COLOUR the orange ring separates this from `calm`
   // instantly; in GREYSCALE it does not — orange-40 over white flattens to

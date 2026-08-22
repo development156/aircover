@@ -1,5 +1,7 @@
 import { Toaster } from 'sonner'
 
+import { activeWorkspaceRead } from '@/lib/workspaces'
+
 import { BottomNav } from '@/components/shell/bottom-nav'
 import { Rail } from '@/components/shell/rail'
 import { Topbar } from '@/components/shell/topbar'
@@ -20,7 +22,18 @@ import { Topbar } from '@/components/shell/topbar'
  * row of every page — the classic version of this bug hides exactly one
  * control, the one at the end of the list, on exactly one device.
  */
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  /**
+   * Only the phone's FAB needs this, and only to decide whether to paint the
+   * loudest control on a 390px screen.
+   *
+   * `activeWorkspaceRead` is the React-cached read, so a second consumer costs
+   * nothing, and it is the THREE-WAY one on purpose: 'none' is a fact about the
+   * account and 'unreadable' is a question that did not get an answer. Only the
+   * first may change what is rendered.
+   */
+  const workspace = await activeWorkspaceRead()
+
   return (
     <div className="grid min-h-dvh grid-cols-[auto_1fr] max-narrow:grid-cols-1">
       <div className="max-narrow:hidden">
@@ -35,7 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
-      <BottomNav />
+      <BottomNav hasWorkspace={workspace.status !== 'none'} />
       {/* Lifted clear of the bottom bar on a phone, or it covers the tabs. */}
       <Toaster position="bottom-left" offset={{ bottom: 16 }} mobileOffset={{ bottom: 72 }} />
     </div>

@@ -157,7 +157,13 @@ export function CommandPalette() {
       >
         <Search size={15} className="shrink-0" aria-hidden />
         <span className="truncate">Search Sahoda</span>
-        <kbd className="ml-auto shrink-0 rounded-sm bg-surface px-[5px] py-[1px] text-[11px] font-medium text-muted">
+        {/* A key cap needs an EDGE, and it had none. `bg-surface` inside this
+            `bg-s2` field is 1.04:1 on light and, before --surface-2 was given a
+            real dark value, was the field's exact colour in dark — so the ⌘K
+            hint rendered as two bare glyphs on 78 of the frames it appears in.
+            A ring rather than a heavier fill: a key cap reads as a key because
+            of its outline, not because of how bright it is. */}
+        <kbd className="surface-ring-firm ml-auto shrink-0 rounded-sm bg-surface px-[5px] py-[1px] text-[11px] font-medium text-muted">
           ⌘K
         </kbd>
       </button>

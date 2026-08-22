@@ -36,8 +36,21 @@ export function SahodaRail({ drafted, planCost }: SahodaRailProps) {
           <p className="text-[13px] text-muted">Sahoda hasn&rsquo;t drafted anything this week.</p>
           {/* Wears the Button's clothes via `buttonVariants` rather than
               re-typing them: a hand-rolled copy is how this one ended up a
-              40px pill after the control shapes moved to 34px / 6px. */}
-          <Link href="/planner" className={buttonVariants({ variant: 'primary' })}>
+              40px pill after the control shapes moved to 34px / 6px.
+
+              SECONDARY, and for two reasons that point the same way.
+
+              docs/26 §1.5: one primary per view. MEASURED on /home, this was a
+              second brand fill on a screen that already has the hero's "Create
+              post" — and when two things look equally like the main action,
+              neither is.
+
+              The sharper reason is that this one SPENDS. A twenty-credit action
+              dressed identically to a free one makes the paid tap look like the
+              recommended tap, on the screen a new account lands on with a
+              hundred credits to their name. Loud is for the free door; the paid
+              door states its price and waits to be chosen. */}
+          <Link href="/planner" className={buttonVariants({ variant: 'secondary' })}>
             <span>
               Plan my week · <span className="tabular-nums">{planCost}</span> {creditWord(planCost)}
             </span>

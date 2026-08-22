@@ -39,8 +39,24 @@ export function ActivityFeed({ entries }: { entries: LedgerEntry[] }) {
         // second label written here is a second chance to describe money
         // differently from the table that shows the same row.
         const display = describeEntry(entry)
-        const isCredit = entry.amount > 0
-        const Glyph = isCredit ? Check : Sparkles
+        // ⚠ THE SIGN IS NOT IN `amount`, AND READING IT THERE INVERTED EVERY
+        // SPEND ON THIS CARD.
+        //
+        // `credit_ledger` carries a CHECK constraint:
+        //   (entry_type = 'ADJUST' and amount <> 0)
+        //   or (entry_type <> 'ADJUST' and amount > 0)
+        // so a DEBIT's amount is POSITIVE by definition and the direction lives
+        // in `entry_type`. `entry.amount > 0` was therefore true for every row
+        // in the table, and Home rendered a 100-credit SPEND as "+100" with a
+        // tick — directly above a balance of 0. MEASURED on the zero-balance
+        // journey: "Ux probe +100" and "Welcome credits +100" read as +200
+        // arriving, while /wallet showed the same first row as -100.
+        //
+        // `describeEntry` already answers this, and this component was already
+        // calling it — for the label only, then re-deriving the sign itself.
+        // A second derivation is a second chance to describe money differently
+        // from the table showing the same row, which is exactly what happened.
+        const Glyph = display.direction === 'debit' ? Sparkles : Check
         return (
           <li
             key={entry.seq}
@@ -51,7 +67,7 @@ export function ActivityFeed({ entries }: { entries: LedgerEntry[] }) {
             </span>
             <span className="min-w-0 flex-1 truncate text-[12px] text-ink">{display.label}</span>
             <span className="shrink-0 text-[12px] font-[550] tabular-nums text-muted">
-              {isCredit ? `+${entry.amount}` : entry.amount}
+              {display.signedAmount}
             </span>
           </li>
         )

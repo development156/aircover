@@ -67,6 +67,32 @@ const DETECTOR = `(() => {
         && /hidden|clip/.test(cs.overflowX)) {
       hits.push({ kind: 'CLIPPED', tag: e.tagName, cls: cls.slice(0, 60), text: own.slice(0, 60) })
     }
+    // ── AND THE EXEMPTION'S OWN BLIND SPOT ─────────────────────────────────
+    // The rule above is right about customer data and wrong about a CATALOGUE
+    // label. MEASURED at 1440 on /connections: a truncate on a channel name
+    // rendered "Instagr...", "Google ..." and "Faceboo..." beside a shrink-0
+    // status chip, on the one screen whose entire subject is telling channels
+    // apart - and this guard walked past all three, because they had asked to
+    // be truncated and were therefore "a decision".
+    //
+    // What separates the two cases is not the class, it is the STRING. A
+    // customer's workspace name or sign-in address is long and unbounded; an
+    // app-authored label is short and fixed, and if a short fixed label needs
+    // an ellipsis then the row is carrying too much, which is run 13's lesson
+    // again. Three words or fewer AND 28 characters or fewer is the fixed-label
+    // shape; anything longer keeps the exemption it had.
+    //
+    // NO BACKTICKS ANYWHERE IN THIS COMMENT, and that is load-bearing: it lives
+    // inside the DETECTOR template literal, and one backtick ends the string.
+    // The word-split below is \\s and not \\\\s for the same reason - inside a
+    // template literal a lone backslash-s collapses to the letter s, which
+    // would have counted words by splitting on every "s" in the label.
+    if (/truncate|text-ellipsis/.test(cls)
+        && e.scrollWidth > e.clientWidth + 1
+        && own.split(/\\s+/).filter(Boolean).length <= 3
+        && own.length <= 28) {
+      hits.push({ kind: 'ELLIPSISED_SHORT_LABEL', tag: e.tagName, cls: cls.slice(0, 60), text: own.slice(0, 60) })
+    }
     // A one- or two-word label has no business being on two lines.
     const words = own.split(/\\s+/).filter(Boolean)
     if (words.length <= 2 && own.length <= 22 && cs.whiteSpace !== 'nowrap' && lineCount(e) >= 2) {
@@ -115,7 +141,14 @@ test.describe('no truncated labels at 390px @smoke', () => {
         '<div style="display:flex;width:120px">' +
         '<span id="t-clip" style="overflow:hidden;white-space:nowrap;width:40px">Reschedule</span></div>' +
         '<div style="display:flex;width:60px"><span id="t-wrap">Plan week</span></div>' +
-        '<div style="display:flex;width:300px"><span id="t-ok" style="white-space:nowrap">Approve</span></div>'
+        '<div style="display:flex;width:300px"><span id="t-ok" style="white-space:nowrap">Approve</span></div>' +
+        // A SHORT catalogue label wearing truncate and actually ellipsising.
+        '<div style="display:flex;width:40px"><span id="t-short" class="truncate" ' +
+        'style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:40px">Instagram</span></div>' +
+        // A LONG customer string wearing truncate, which keeps its exemption.
+        '<div style="display:flex;width:40px"><span id="t-long" class="truncate" ' +
+        'style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:40px">' +
+        'sahoda.e2e.mt3k771ir0nx61+clerk_test@example.com</span></div>'
       document.body.appendChild(host)
       const hits = ${DETECTOR}
       host.remove()
@@ -126,6 +159,13 @@ test.describe('no truncated labels at 390px @smoke', () => {
     expect(found.some((h) => h.kind === 'CLIPPED' && h.text === 'Reschedule')).toBe(true)
     expect(found.some((h) => h.kind === 'WRAPPED' && h.text === 'Plan week')).toBe(true)
     expect(found.some((h) => h.text === 'Approve')).toBe(false)
+    // The new half, calibrated at BOTH ends: a short catalogue label that
+    // ellipsises is a defect even though it asked to; a long customer string
+    // that ellipsises is still the decision it always was.
+    expect(found.some((h) => h.kind === 'ELLIPSISED_SHORT_LABEL' && h.text === 'Instagram')).toBe(
+      true,
+    )
+    expect(found.some((h) => h.text.startsWith('sahoda.e2e.'))).toBe(false)
   })
 
   for (const route of ROUTES) {

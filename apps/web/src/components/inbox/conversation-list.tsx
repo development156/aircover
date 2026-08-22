@@ -163,7 +163,7 @@ export function ConversationList({
                           {conversation.lastMessage ?? 'No message text'}
                         </span>
                         {count > 0 ? (
-                          <span className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full bg-brand px-[5px] text-[11px] font-bold text-white tabular-nums">
+                          <span className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums">
                             {count}
                           </span>
                         ) : null}

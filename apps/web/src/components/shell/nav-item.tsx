@@ -115,6 +115,29 @@ export function NavItem({
       data-guide={guide}
       data-soon={soon ? '' : undefined}
       aria-current={active ? 'page' : undefined}
+      /**
+       * THE OTHER HALF OF THE NINE-UNNAMED-LINKS BUG.
+       *
+       * The `sr-only` span below restored the ACCESSIBLE name, and its comment
+       * states the problem as "unlabelled to the eye across every width from
+       * 768 to 1179" — but sr-only fixes only the screen-reader half of that
+       * sentence. MEASURED at 1024 on /analytics: eighteen icons in a 64px
+       * strip, every label absolutely positioned into a 1px clip, no `title`,
+       * no tooltip, and nothing at all on hover. Between 700 and 1179 the whole
+       * navigation is anonymous glyphs to anyone using their eyes, which is a
+       * band a great many laptops sit in and neither 390 nor 1440 visits.
+       *
+       * A native `title` is the honest minimal repair: no dependency, no
+       * portal, and it cannot be clipped by the rail's `overflow-y: auto` the
+       * way a CSS `::after` tooltip would be. It is present at every width
+       * rather than only when collapsed, because the collapse is decided in CSS
+       * (`max-wide:`) and an attribute cannot read a media query. At the
+       * expanded width it merely repeats a visible label, which costs nothing.
+       *
+       * It does NOT become the accessible name — the span always supplies one,
+       * and text content outranks `title` in the accname algorithm.
+       */
+      title={soon ? `${label} — not built yet` : label}
       className={cn(
         // 34px tall, 9px inset, 13px/500 — the kit's control height. The density
         // is not incidental: 34px rows against 40px is most of what separates
