@@ -122,3 +122,8 @@ supabase/.temp/
 
 # The gate runner's per-stage logs and verdict. Machine output, not source.
 .gate/
+
+# The status page is BUILT by .github/workflows/status-page.yml from live probes.
+# Committing a copy would publish a measurement taken at commit time and let it
+# read as current — the exact staleness the page exists to make visible.
+public/status/

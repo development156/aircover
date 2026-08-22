@@ -1,0 +1,81 @@
+# The independent status page.
+#
+# ── WHY IT IS HERE AND NOT IN THE APP ────────────────────────────────────────
+# A status page served by the thing it reports on cannot answer during the one
+# event it exists for. This one is built by GitHub Actions and served by GitHub
+# Pages — a different company, a different network, a different failure domain
+# from Vercel, Supabase and Upstash. If all three are down, this page still loads
+# and still says so.
+#
+# ── IT IS NOT ARMED UNTIL IT IS ON THE DEFAULT BRANCH ────────────────────────
+# GitHub fires `schedule` only from a repository's DEFAULT branch, which on
+# `origin` (development156/sahodalabs) is `wt-web`. MEASURED 2026-08-22:
+# `.github/workflows` does not exist on `wt-web` at all, so no scheduled workflow
+# in this repository is armed today. Putting this file there is a founder
+# decision, not a task, and until then `workflow_dispatch` is the only trigger
+# that works.
+#
+# That is the same split this lane found in the crons: the schedule lives in one
+# place and the thing it starts lives in another, and watching only the half that
+# fired reports green forever.
+#
+# ── AND THE PAGES SETTING ────────────────────────────────────────────────────
+# `actions/deploy-pages` needs Pages enabled for the repository with the source
+# set to "GitHub Actions". Without it this job fails at the deploy step with a
+# permissions error, which is the correct direction: loud, not silently absent.
+name: status page
+
+on:
+  schedule:
+    # Every 30 minutes. `STALE_AFTER_MINUTES` in scripts/lib/status-page.mjs is 60,
+    # so a single missed run still reads as current and two in a row do not — a
+    # scheduled trigger is best-effort and is regularly 10-30 minutes late.
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Host to probe
+        required: false
+        default: https://app.sahodalabs.com
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never two builds at once: the second would publish whichever finished last,
+# which is not necessarily the newest measurement.
+concurrency:
+  group: status-page
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # No install step. The probes are plain Node with no imports outside
+      # scripts/, deliberately: a page that exists to be up must not depend on the
+      # dependency graph being installable.
+      - name: Build the page
+        env:
+          PROBE_HOST: ${{ github.event.inputs.url || 'https://app.sahodalabs.com' }}
+        # Always exits 0 — the page reports the failure rather than the job hiding
+        # it. A status page that only publishes when everything is fine is a page
+        # that goes blank exactly when it matters.
+        run: node scripts/build-status-page.mjs "$PROBE_HOST" public/status/index.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public/status
+      - id: deploy
+        uses: actions/deploy-pages@v4
