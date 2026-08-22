@@ -210,12 +210,73 @@ transaction. It was **not** run here; `db push` is the founder's call.
 | post-deploy smoke against the deployment | fixed and extended; **inert until it is on the default branch** |
 | independent status page | built on GitHub Pages; **inert until it is on the default branch** |
 
+## 10 · The two scanners that are not tests
+
+`scripts/lib/scanner-registry.test.mjs` enumerates every guard that reads source,
+but it only looks at `*.test.ts` / `*.test.mjs` / `*.test.tsx`. Two of this repo's
+most active scanners are neither, so they are audited here. Both caught real
+defects in this lane's own work, which is the argument for writing their limits
+down rather than trusting them silently.
+
+### `scripts/design/design-lint.mjs`
+
+Five rules, each with a count baseline that can shrink and never grow: `hex`
+(raw colour), `disabled` (coming-soon button), `spacing` (hardcoded), `breakpoint`
+(dead variant), `typesize` (hand-written font size).
+
+**What it can see:** class-name strings written literally in `.ts`/`.tsx` under
+`apps/web/src`, walked with `readdirSync`.
+
+**What it cannot see:**
+- a class assembled at runtime — concatenation, a template literal, a variable, a
+  `clsx` call whose parts live elsewhere. The literal is the unit;
+- CVA `size` variants, which are config objects and not classes at all — the file
+  says so itself and treats them as a known false-positive source;
+- anything outside `apps/web/src`: `packages/sites` renders markup and is not
+  scanned;
+- inline `style={{…}}`, which bypasses class names entirely;
+- CSS files. A raw hex in a `.css` is invisible to it.
+
+*It caught six hand-written font sizes in `/admin/jobs` on 2026-08-22 — copied
+from a grandfathered file, which is exactly how a baseline erodes.*
+
+### `scripts/lint.mjs`
+
+Five rules: `test-only` (a focused test left behind), `assertionless-test`,
+`console-log`, `uncollected-tests` (a test file no vitest `include` reaches), and
+`stale-exception` (a declared exception that no longer applies).
+
+**What it can see:** per-package source text, plus each package's vitest
+`include` globs for the collection rule.
+
+**What it cannot see:**
+- a test skipped by a runtime condition — `describe.skipIf(...)`. `uncollected-tests`
+  answers "is this file reachable", never "did anything in it execute". A suite
+  that skips everything reports as collected and passing;
+- an assertion made through a helper it does not recognise, which reads as
+  assertionless;
+- logging that is not literally `console.log` — a wrapper, `process.stdout.write`,
+  or a logger import;
+- **it is a ROOT script and sits outside `turbo`.** `pnpm gate` runs it via each
+  package's `lint` task, but `node scripts/lint.mjs .` at the repo root is not a
+  gate leg. That root invocation currently FAILS on a pre-existing finding —
+  `packages/sites/src/theme/readability.test.ts` is never collected — and has been
+  failing independently of this lane's changes (verified against a stashed tree).
+
 ## 9 · Founder actions
 
 1. **Put `.github/workflows/` on `wt-web`.** Three workflows exist and none is
    armed. Until then `workflow_dispatch` is the only trigger that works.
 2. **Deploy the integration branch.** Production is 8 days behind, runs one cron
    of three, and has no heartbeat at all.
+
+   Until that happens, **`post-deploy-smoke` will be RED on every production
+   deploy**, because `probe-crons.mjs` exits 1 at 1/3 reachable. That redness is
+   the accurate state of production and not a broken check — but an always-red
+   check is one people mute, which is the exact cry-wolf failure §4 just fixed in
+   the same workflow. Item 2 is what clears it. If it cannot be done soon, prefer
+   turning the cron step off deliberately over letting the team learn to ignore
+   a red tick.
 3. **Enable GitHub Pages** with source "GitHub Actions", or the status page job
    fails at its deploy step.
 4. **Decide on a phone rail** (Twilio/Gupshup account + number) if email is not

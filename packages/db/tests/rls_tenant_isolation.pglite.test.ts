@@ -77,7 +77,21 @@ let operatorOnly: string[]
  * is what fails.
  */
 const EXPECTED_SERVICE_ONLY = ['ai_provider_logs']
-const EXPECTED_OPERATOR_ONLY = ['ops_credit_requests']
+const EXPECTED_OPERATOR_ONLY = [
+  'ops_credit_requests',
+  // Added 2026-08-22 with migration 20260822160000. This guard failing is what
+  // made it a decision rather than a side effect, which is the whole point of
+  // naming the set instead of deriving it.
+  //
+  // `post_publish_logs` now carries BOTH policies: the member-scoped `t_select`
+  // it always had, and an `app.is_ops_admin()` one. Permissive policies are
+  // OR-ed, so a member's view is unchanged — VERIFIED live against production,
+  // where a member reads their own 6 rows before and after while an operator
+  // reads all 21 across 2 workspaces. Without the operator policy the failed
+  // publishes were visible to nobody but the tenant they happened to, and
+  // apps/web has no service-role client to fetch them with.
+  'post_publish_logs',
+]
 
 beforeAll(async () => {
   db = await bootFullSchema()
