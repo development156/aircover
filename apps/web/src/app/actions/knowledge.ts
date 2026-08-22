@@ -29,6 +29,10 @@ import { proposeFromLibrary } from '@/lib/knowledge/propose'
 import { readCurrentPassages } from '@/lib/knowledge/store'
 import { MAX_EVIDENCE_CHUNKS } from '@sahoda/research'
 import { workspaceForWrite } from '@/lib/workspaces'
+// Aliased: this file already binds `credits` to the withCredits Result, and
+// shadowing it inside the sentence below would read as the wallet figure
+// while being the call outcome.
+import { credits as creditsPhrase } from '@/lib/credit-words'
 
 /**
  * Adding a document to the library, and taking one out.
@@ -709,7 +713,7 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
         return {
           ok: false,
           insufficient: true,
-          message: `Reading your library costs ${state.required} credits and you have ${state.available}. You are ${short} short. Nothing was read and nothing was charged.`,
+          message: `Reading your library costs ${creditsPhrase(state.required)} and you have ${state.available}. You are ${short} short. Nothing was read and nothing was charged.`,
         }
       }
       return { ok: false, insufficient: false, message: state.message }

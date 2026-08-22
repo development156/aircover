@@ -8,6 +8,7 @@ import { Sparkles } from 'lucide-react'
 import { resolveFromLibrary } from '@/app/actions/knowledge'
 import type { LibraryResolveState } from '@/app/actions/knowledge'
 import { Button } from '@/components/ui/button'
+import { credits } from '@/lib/credit-words'
 
 /**
  * "Read my library" — the one control on this screen that spends.
@@ -66,7 +67,7 @@ export function ResolveFromLibrary({ cost }: { cost: number }) {
           >
             {/* The cost in the LABEL, never a tooltip — docs/26. It is a prop
                 because costs are server-owned and a hardcoded one goes stale. */}
-            {pending ? 'Reading…' : `Read my library · ${cost} credits`}
+            {pending ? 'Reading…' : `Read my library · ${credits(cost)}`}
           </Button>
         </div>
       </div>
