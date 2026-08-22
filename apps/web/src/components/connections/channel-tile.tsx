@@ -80,16 +80,30 @@ function statusOf(
  */
 function ChannelHeader({ entry }: { entry: CatalogueEntry }) {
   return (
-    <div className="flex items-start gap-2">
-      <ChannelLogo channel={entry.id} />
-      <div className="min-w-0 flex-1">
-        <p className="type-h3 truncate">{entry.label}</p>
-        <p className="type-eyebrow mt-label-gap text-muted">{entry.kind}</p>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-start gap-2">
+        <ChannelLogo channel={entry.id} />
+        {/* NO `truncate`. The name is this tile's whole subject and it comes from
+            an eight-row catalogue, not from customer data — there was never a
+            long value to defend against, only a slot too narrow to hold "Google
+            Business Profile" (147px) once a 22px mark and an 88px chip had taken
+            their share of a 181px tile at 1180px. */}
+        <div className="min-w-0 flex-1">
+          <p className="type-h3">{entry.label}</p>
+          <p className="type-eyebrow mt-label-gap text-muted">{entry.kind}</p>
+        </div>
       </div>
-      {/* The readiness rung. `.is-proposed` and `.is-committed` are outline
-          treatments, so this chip is quiet by construction on the two channels
-          that need a caveat, and a solid brand fill on the two that have earned
-          it. Ink on the fill, never white (§1.2). */}
+      {/* The readiness rung, on its OWN line. It is a fixed-width claim about
+          Sahoda; the name is a variable-width claim about the channel. Sharing
+          one row meant the fixed thing was paid for by the variable one, in
+          silence — and the `kind` beneath the name, which carries no `truncate`,
+          wrapped or painted outside its box instead of being clipped.
+          `self-start` keeps the chip hugging its own text.
+
+          `.is-proposed` and `.is-committed` are outline treatments, so this chip
+          is quiet by construction on the two channels that need a caveat, and a
+          solid brand fill on the two that have earned it. Ink on the fill, never
+          white (§1.2). */}
       <span
         /* A DISTINCT hook from the tile's own `data-readiness`. Both carried the
            same attribute, so a `[data-readiness="..."]` query matched the
@@ -97,7 +111,7 @@ function ChannelHeader({ entry }: { entry: CatalogueEntry }) {
            two different elements answering one selector. The dark-mode guard
            below caught it by reading a 0px border off the wrapper. */
         data-readiness-chip={entry.readiness}
-        className={`${READINESS_CLASS[entry.readiness]} type-chip shrink-0 rounded-sm px-[7px] py-[3px]`}
+        className={`${READINESS_CLASS[entry.readiness]} type-chip self-start rounded-sm px-[7px] py-[3px]`}
       >
         {READINESS_LABEL[entry.readiness]}
       </span>

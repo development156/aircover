@@ -58,9 +58,14 @@ export function AdminSubNav({ sections = SECTIONS }: { sections?: readonly Secti
             {section.label}
           </Link>
         ) : (
+          /* No `aria-disabled`. It says a control EXISTS and is currently
+             unavailable, which is untrue of a screen that was never built —
+             `inert.tsx` and `connections/channel-tile.tsx` both state the same
+             rule. A plain <span> is already not focusable and not announced as a
+             control, so the honest treatment is to say nothing about
+             availability at all; the title says what is actually true. */
           <span
             key={section.label}
-            aria-disabled="true"
             title={`Not built yet — ${section.pending} builds this screen.`}
             className={cn(ITEM, 'cursor-not-allowed text-faint')}
           >

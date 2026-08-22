@@ -31,14 +31,13 @@ export default async function InboxReviewsPage() {
     <InboxShell
       emptiness={decision.state}
       mobileShow={reviews.length > 0 ? 'list' : 'thread'}
+      hasSomethingToOpen={reviews.length > 0}
       list={
         <SurfaceList
           title="Reviews"
           isEmpty={reviews.length === 0}
           emptyLine={
-            decision.showList
-              ? 'Nothing to show for the accounts we asked.'
-              : 'Nothing read yet — see the panel beside this one.'
+            decision.showList ? 'Nothing to show for the accounts we asked.' : 'Nothing read yet.'
           }
         >
           {reviews.map((review) => (

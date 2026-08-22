@@ -5,6 +5,7 @@ import { DEMO_FALLBACK_PAYLOAD } from '@sahoda/shared'
 
 import { BRAIN_FIELDS } from '@/lib/brand/fields'
 import type { Provenance } from '@/lib/brand/provenance'
+import { ENTITLEMENT } from '@/lib/brand/resolution-queue'
 
 import { ResolutionConsole } from './resolution-console'
 
@@ -277,8 +278,39 @@ describe('ResolutionConsole', () => {
     renderConsole()
     const forbidden =
       /\b(from|on) your (site|website|page|pdf|document)|we (read|found) (this|it) (in|on|at)|source:/i
-    for (const row of document.querySelectorAll('[data-field]')) {
-      expect(row.textContent ?? '').not.toMatch(forbidden)
+    for (const node of document.querySelectorAll('[data-field], [id^="console-group-"]')) {
+      expect(node.textContent ?? '').not.toMatch(forbidden)
+    }
+  })
+
+  /**
+   * THE DUPLICATION GUARD.
+   *
+   * The entitlement sentence is a pure lookup on `field.metaKind` — two values
+   * for fifteen rows — so rendering it per row printed the same paragraph eleven
+   * times. It belongs once over each run. Asserted by COUNT, so the sentence can
+   * be rewritten freely and this still bites.
+   */
+  test('the entitlement sentence is stated once per group, not once per row', () => {
+    renderConsole()
+    expect(screen.getAllByText(ENTITLEMENT.asked.line)).toHaveLength(1)
+    expect(screen.getAllByText(ENTITLEMENT.negotiated.line)).toHaveLength(1)
+  })
+
+  /**
+   * THE SEMANTICS THE DE-DUPLICATION MUST NOT COST.
+   *
+   * A person tabbing checkbox to checkbox never enters the group header, so
+   * whose knowledge a field is has to ride in each checkbox's accessible name.
+   * This is what stops a future "tidy-up" from deleting the marker along with
+   * the sentence.
+   */
+  test('every row still says whose knowledge it is', () => {
+    renderConsole()
+    for (const field of BRAIN_FIELDS) {
+      const row = document.querySelector<HTMLElement>(`[data-field="${field.path}"]`)!
+      const want = field.metaKind === 'asked' ? /only you know this/i : /sahoda proposed this/i
+      expect(within(row).getByRole('checkbox', { name: want })).toBeInTheDocument()
     }
   })
 

@@ -185,6 +185,35 @@ describe('readPostCounts', () => {
     expect(counts.byChannel.find((c) => c.channel === 'gbp')?.count).toBe(2)
   })
 
+  /**
+   * The defect this file could not see.
+   *
+   * `posts.origin` is CHECK-constrained, and production widened it twice without
+   * this module hearing about it — 'playbook' and then 'radar'. The counter's
+   * `else` branch meant every draft of both kinds was counted as 'manual', which
+   * is the value the product uses to mean A PERSON WROTE THIS BY HAND.
+   *
+   * It is a separate test rather than another row in the one above, because
+   * adding a row there would take that test's `manual` count to 3 and its
+   * assertion of 2 would fail for a reason unrelated to what it checks.
+   */
+  test('an origin this code has never heard of is not counted as hand-written', async () => {
+    state.rows = [post({ origin: 'playbook' })]
+    const counts = await readPostCounts()
+
+    expect(counts.total).toBe(1)
+    expect(counts.byOrigin.manual ?? 0).toBe(0)
+    expect(counts.byOrigin.playbook).toBe(1)
+  })
+
+  test('an origin that is not a string is counted in the total and in no bucket', async () => {
+    state.rows = [post({ origin: { nope: true } })]
+    const counts = await readPostCounts()
+
+    expect(counts.total).toBe(1)
+    expect(Object.keys(counts.byOrigin)).toEqual([])
+  })
+
   test('a repeated channel on one post counts once', async () => {
     // `posts.channels` is a bare text[] with no unique constraint, so a repeated
     // value is storable and would otherwise inflate the count.

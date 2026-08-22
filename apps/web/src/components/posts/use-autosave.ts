@@ -61,8 +61,15 @@ export interface AutosaveApi {
   update: (patch: Partial<PostDraft>) => void
   /** The live draft, readable from inside an async callback without a stale closure. */
   read: () => PostDraft
-  /** Write any pending edit now. Resolves false when the write failed. */
-  flush: () => Promise<boolean>
+  /**
+   * Write any pending edit now. Resolves false when the write failed.
+   *
+   * `create: true` says the CALLER has an action that genuinely needs a row —
+   * publish, generate, save a version, set a time, retry a failed create — so the
+   * save may make one even with nothing written. Without it, a draft that has not
+   * earned a row (see `worthARow`) stays in the browser.
+   */
+  flush: (options?: { create?: boolean }) => Promise<boolean>
   /** Replace the draft with the version that came with the diverging read. */
   loadTheirs: () => void
   /** Dismiss the notice and write the local draft, making it the current row. */
@@ -94,6 +101,22 @@ function sameDraft(a: PostDraft, b: PostDraft): boolean {
     a.channels.length === b.channels.length &&
     a.channels.every((channel, index) => channel === b.channels[index])
   )
+}
+
+/**
+ * Whether this draft has earned a row of its own.
+ *
+ * A channel tick is a PREFERENCE, not a post: creating on it left
+ * "Untitled post / No content written yet. / Instagram" in Drafts behind every
+ * abandoned composer (QA J1-P). Words are the first thing that cannot be rebuilt
+ * from the browser's own buffer, so words are what earn the row.
+ *
+ * Schedule and media are deliberately absent: neither can be set without a row
+ * already. A time goes through `flush({ create: true })`, and the media pane
+ * renders "write a line first" for the whole time `postId` is null.
+ */
+function worthARow(draft: PostDraft): boolean {
+  return draft.title.trim() !== '' || draft.body.trim() !== ''
 }
 
 /**
@@ -166,6 +189,7 @@ export function useAutosave(
   if (postId !== null) writingTo.current = postId
   const adopted = useRef<string>(post?.updated_at ?? '')
   const forceNext = useRef<boolean>(false)
+  const createNext = useRef<boolean>(false)
   const inFlight = useRef<number>(0)
   const deferredRead = useRef<Post | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -183,6 +207,14 @@ export function useAutosave(
     const snapshot = latest.current
     const forced = forceNext.current
     forceNext.current = false
+    // Read and cleared on EVERY pass, including the early return below. A flag
+    // left set is consumed by the next DEBOUNCED save — a channel tick — and
+    // creates exactly the contentless row the gate under this exists to prevent.
+    // Losing it on the early return costs nothing: with no row yet, `lastSaved`
+    // is the empty draft, so that arm is reached only by a draft that is empty,
+    // which is the one case there is nothing to create for.
+    const mayCreate = createNext.current
+    createNext.current = false
 
     if (!forced && sameDraft(snapshot, lastSaved.current)) {
       // `lastSaved` only advances on a write the server confirmed, so a draft
@@ -193,6 +225,15 @@ export function useAutosave(
       return true
     }
 
+    // ── A TICK IS NOT A POST ────────────────────────────────────────────────
+    // Before any in-flight bookkeeping, so nothing needs unwinding. `error` is
+    // deliberately NOT cleared here: an earlier create really did fail and the
+    // writer has not retried it yet.
+    if (writingTo.current === null && !mayCreate && !worthARow(snapshot)) {
+      setStatus('unsaved')
+      return true
+    }
+
     setStatus('saving')
     setError(null)
     inFlight.current += 1
@@ -200,8 +241,9 @@ export function useAutosave(
     try {
       // ── THE ROW IS CREATED HERE, BY THE FIRST SAVE THAT HAS SOMETHING TO SAY ──
       // Not on mount, and not by the button that opened the screen. `sameDraft`
-      // above already returned for an untouched draft, so reaching this line
-      // means there are real words (or a real channel choice) to keep.
+      // above already returned for an untouched draft and the gate above that
+      // returned for a draft with no words, so reaching this line with a null id
+      // means either real words to keep or a caller that asked for a row.
       let id = writingTo.current
       if (id === null) {
         if (ensurePostId === undefined) {
@@ -299,13 +341,17 @@ export function useAutosave(
     [enqueue],
   )
 
-  const flush = useCallback((): Promise<boolean> => {
-    if (timer.current !== null) {
-      clearTimeout(timer.current)
-      timer.current = null
-    }
-    return enqueue()
-  }, [enqueue])
+  const flush = useCallback(
+    (options?: { create?: boolean }): Promise<boolean> => {
+      if (options?.create === true) createNext.current = true
+      if (timer.current !== null) {
+        clearTimeout(timer.current)
+        timer.current = null
+      }
+      return enqueue()
+    },
+    [enqueue],
+  )
 
   // A fresh server read newer than everything we have accounted for is the only
   // evidence of an outside edit available without a version column — and only

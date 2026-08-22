@@ -2,6 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
+import { toChannelSet } from '@sahoda/shared'
+
 /**
  * THE ROW IS CREATED BY THE FIRST SAVE, AND ONLY BY THE FIRST SAVE.
  *
@@ -63,8 +65,17 @@ function Inner({ idRef }: { idRef: { current: string | null } }) {
       <button type="button" onClick={() => autosave.update({ body: 'Chai and buns.' })}>
         write again
       </button>
+      <button
+        type="button"
+        onClick={() => autosave.update({ channels: toChannelSet(['instagram']) })}
+      >
+        pick
+      </button>
       <button type="button" onClick={() => void autosave.flush()}>
         flush
+      </button>
+      <button type="button" onClick={() => void autosave.flush({ create: true })}>
+        flush and create
       </button>
     </div>
   )
@@ -73,6 +84,15 @@ function Inner({ idRef }: { idRef: { current: string | null } }) {
 const press = (label: string) => screen.getByRole('button', { name: label })
 
 beforeEach(() => {
+  // ── THE TESTS IN THIS FILE ARE NOT INDEPENDENT WITHOUT THIS ────────────────
+  // `useAutosave` stashes every keystroke in `sessionStorage` under
+  // `sahoda.draft.new`, and its recovery effect reads that key back on the next
+  // mount. `sessionStorage` is one object for the whole file, so without this a
+  // test inherits the previous test's body and starts life already worth a row.
+  // MEASURED: deleting the `worthARow` gate left "a channel choice on its own
+  // creates nothing" GREEN in a whole-file run and RED when run alone. A guard
+  // that only fails in isolation is not guarding the run anyone actually does.
+  sessionStorage.clear()
   savePost.mockReset()
   createPost.mockReset()
   savePost.mockResolvedValue({ ok: true, postId: NEW_ID, updatedAt: '2026-08-19T10:00:00.000Z' })
@@ -136,5 +156,61 @@ describe('a post that does not exist yet', () => {
     expect(screen.getByTestId('status').textContent).toBe('error')
     // And emphatically NOT a save against a row that does not exist.
     expect(savePost).not.toHaveBeenCalled()
+  })
+
+  test('a channel choice on its own creates nothing, and the first words carry it', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+
+    await user.click(press('pick'))
+    await user.click(press('flush'))
+
+    // THE BARRIER. A bare `not.toHaveBeenCalled()` here would pass without the
+    // fix by outrunning the promise chain, so the absence is asserted only after
+    // a write that must be BEHIND it has landed — every write is serialised on
+    // one chain, so the words arriving means the tick's save has already run.
+    await user.click(press('write'))
+    await user.click(press('flush'))
+    await waitFor(() =>
+      expect(savePost).toHaveBeenCalledWith(NEW_ID, expect.objectContaining({ body: 'Chai.' })),
+    )
+
+    expect(savePost).toHaveBeenCalledTimes(1)
+    expect(createPost).toHaveBeenCalledTimes(1)
+    // The tick was not lost on the way.
+    expect(savePost.mock.calls[0]?.[1]).toMatchObject({ body: 'Chai.', channels: ['instagram'] })
+  })
+
+  test('an action that needs the row creates it with no words', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+
+    await user.click(press('pick'))
+    await user.click(press('flush and create'))
+
+    await waitFor(() => expect(createPost).toHaveBeenCalledTimes(1))
+    // `body: ''` is the half this test is named for: the row exists BECAUSE the
+    // caller asked for one, not because anything was written into it.
+    expect(savePost.mock.calls[0]?.[1]).toMatchObject({ body: '', channels: ['instagram'] })
+  })
+
+  test('a create-flush with nothing to do does not arm the next save', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+
+    // Nothing typed, nothing ticked: this returns at `sameDraft` without a row,
+    // exactly as it does today. The flag it set must not survive that return.
+    await user.click(press('flush and create'))
+    await user.click(press('pick'))
+    await user.click(press('flush'))
+
+    await user.click(press('write'))
+    await user.click(press('flush'))
+    await waitFor(() =>
+      expect(savePost).toHaveBeenCalledWith(NEW_ID, expect.objectContaining({ body: 'Chai.' })),
+    )
+
+    expect(createPost).toHaveBeenCalledTimes(1)
+    expect(savePost).toHaveBeenCalledTimes(1)
   })
 })

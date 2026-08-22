@@ -112,4 +112,28 @@ describe('the Autonomy Dial', () => {
     expect(screen.queryAllByRole('radio')).toHaveLength(0)
     expect(screen.getByText(/Connect a channel/i)).toBeTruthy()
   })
+
+  /**
+   * A workspace whose only connection has EXPIRED has no dial and has also not
+   * failed to connect anything. Production held four such rows on 2026-08-22.
+   * Telling that person to "connect a channel" is the screen asserting
+   * something about their account that is not true, and the remedy it points at
+   * is the wrong one — they need to reconnect, not connect.
+   */
+  it('tells someone whose connection lapsed to reconnect, not to connect', () => {
+    render(<AutonomyDial connected={[]} lapsed={['instagram']} chosen={{}} defaultLevel={1} />)
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
+    expect(screen.getByText(/lapsed/i)).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Reconnect/i }).getAttribute('href')).toBe(
+      '/connections',
+    )
+    // The claim it must NOT make.
+    expect(screen.queryByText(/Connect a channel and its dial appears/i)).toBeNull()
+  })
+
+  it('offers the dial when a channel is live, even alongside a lapsed one', () => {
+    render(<AutonomyDial connected={['instagram']} lapsed={['x']} chosen={{}} defaultLevel={1} />)
+    expect(screen.queryAllByRole('radio').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/lapsed/i)).toBeNull()
+  })
 })

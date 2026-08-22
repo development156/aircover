@@ -63,6 +63,10 @@ export default function StudioPage() {
         ))}
       </div>
 
+      <p className="surface-ring rounded-card bg-s2 px-3 py-3 type-sm text-muted">
+        Nothing is saved yet. There is no gallery behind these filters &mdash; see below.
+      </p>
+
       <section aria-labelledby="studio-shapes" className="flex flex-col gap-3">
         <div>
           <h2 id="studio-shapes" className="type-h2">

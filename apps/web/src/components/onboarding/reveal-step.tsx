@@ -1,11 +1,10 @@
 'use client'
 
-import type { BrandMemoryPayload } from '@sahoda/shared'
+import type { BrandFieldMetaMap, BrandMemoryPayload } from '@sahoda/shared'
 import { Info } from 'lucide-react'
 
 import type { SaveBrandState } from '@/app/actions/brand-resolve'
 import { Button } from '@/components/ui/button'
-import { signalClarityPercent } from '@/lib/brand/signal-clarity'
 
 import { AttemptErrorNotice, type AttemptError } from './attempt-error'
 import type { RegenerateCost } from './brand-card'
@@ -15,10 +14,17 @@ import { HookCard } from './cards/hook-card'
 import { SignalLockCard } from './cards/signal-lock-card'
 import { TabooCard } from './cards/taboo-card'
 import { VoiceCard } from './cards/voice-card'
-import { SignalClarityMeter } from './signal-clarity-meter'
+import { ConfirmedFieldsMeter } from './confirmed-fields-meter'
+import { ResolvingPanel } from './resolving-panel'
 
 export interface RevealStepProps {
   brain: BrandMemoryPayload
+  /**
+   * Per-field provenance for the brain on screen. `undefined` on a fresh resolve
+   * — nothing has been saved, so nothing has been confirmed, and the meter says
+   * so rather than counting how full the payload is.
+   */
+  fieldMeta?: BrandFieldMetaMap
   onChange: (updater: (brain: BrandMemoryPayload) => BrandMemoryPayload) => void
   /** Set only when this resolve was CHARGED. Null on the free path. */
   balanceAfter: number | null
@@ -57,6 +63,7 @@ export interface RevealStepProps {
  */
 export function RevealStep({
   brain,
+  fieldMeta,
   onChange,
   balanceAfter,
   wasFree,
@@ -72,7 +79,6 @@ export function RevealStep({
   saving,
   saveState,
 }: RevealStepProps) {
-  const clarity = signalClarityPercent(brain)
   const insufficient = regenerateError?.kind === 'insufficient'
 
   // `!canRegenerate` is the one that had teeth. Opening /onboarding on a saved
@@ -115,7 +121,13 @@ export function RevealStep({
         </div>
       ) : null}
 
-      <SignalClarityMeter percent={clarity} />
+      <ConfirmedFieldsMeter fieldMeta={fieldMeta} />
+
+      {/* One honest status instead of six dimmed buttons. `ResolvingPanel` is
+          already role="status" aria-live="polite" and carries the real elapsed
+          clock, so a re-resolve says what it is doing exactly as the first one
+          did on the question step. */}
+      {regeneratePending ? <ResolvingPanel isFree={regenerateCost === 'free'} /> : null}
 
       <div className="grid gap-4 narrow:grid-cols-2">
         <SignalLockCard

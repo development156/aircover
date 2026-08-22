@@ -31,8 +31,19 @@ import { PaneHeader, PaneScroll } from '@/components/inbox/inbox-panes'
  * The copy says "something from the list", not "a conversation": this same pane
  * serves messages, comments AND reviews, and naming one of the three made it
  * wrong on the other two.
+ *
+ * ── AND IT SAYS NOTHING WHEN THERE IS NOTHING TO OPEN ────────────────────────
+ * "Open something from the list" is an instruction that cannot be followed when
+ * the list is provably empty, and it was the THIRD pane announcing nothing on
+ * the one screen every new workspace sees (QA #21). The pane keeps its header —
+ * the structure is the thing being ported — and drops the line.
  */
-export function ContextPane() {
+export function ContextPane({
+  hasSomethingToOpen = true,
+}: {
+  /** False only when the list beside this pane is provably empty. */
+  hasSomethingToOpen?: boolean
+}) {
   return (
     <>
       <PaneHeader>
@@ -44,7 +55,9 @@ export function ContextPane() {
             different visual languages. Quiet, like the list pane: the loud one
             is the thread pane, because that is the one carrying the reason the
             inbox is empty and the button that fixes it (docs/26 §4.1). */}
-        <CardEmpty body="Open something from the list and what Sahoda knows about that person appears here." />
+        {hasSomethingToOpen ? (
+          <CardEmpty body="Open something from the list and what Sahoda knows about that person appears here." />
+        ) : null}
       </PaneScroll>
     </>
   )

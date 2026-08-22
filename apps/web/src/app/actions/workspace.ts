@@ -10,6 +10,7 @@ import { slugify } from '@/lib/slug'
 import { createServerSupabase } from '@/lib/supabase/server'
 import {
   bootstrapWithRetry,
+  deriveSlugSeed,
   deriveWorkspaceName,
   mapBootstrapError,
   type BootstrapResult,
@@ -59,11 +60,15 @@ export async function createWorkspace(
 
   const user = await currentUser()
   const provided = formData.get('name')
-  const name = deriveWorkspaceName(typeof provided === 'string' ? provided : null, {
+  const providedName = typeof provided === 'string' ? provided : null
+  const identity = {
     firstName: user?.firstName,
     username: user?.username,
     email: firstEmail(user),
-  })
+  }
+  // The display name and the slug seed diverge on purpose: the name must not
+  // carry the creator's identity, the slug must (see deriveSlugSeed).
+  const name = deriveWorkspaceName(providedName)
 
   const email = firstEmail(user)
   const displayName =
@@ -81,7 +86,7 @@ export async function createWorkspace(
       })
       return { data: (res.data as BootstrapResult | null) ?? null, error: res.error }
     },
-    slugify(name),
+    slugify(deriveSlugSeed(providedName, identity)),
   )
 
   if (error || !data) return mapBootstrapError(error)

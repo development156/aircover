@@ -26,15 +26,12 @@ export default async function InboxCommentsPage() {
     <InboxShell
       emptiness={decision.state}
       mobileShow={posts.length > 0 ? 'list' : 'thread'}
+      hasSomethingToOpen={posts.length > 0}
       list={
         <SurfaceList
           title="Comments"
           isEmpty={posts.length === 0}
-          emptyLine={
-            decision.showList
-              ? 'No posts have comments yet.'
-              : 'Nothing read yet — see the panel beside this one.'
-          }
+          emptyLine={decision.showList ? 'No posts have comments yet.' : 'Nothing read yet.'}
         >
           {posts.map((post) => (
             <SurfaceRow key={`${post.accountId}:${post.id}`}>

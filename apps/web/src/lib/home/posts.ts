@@ -26,7 +26,15 @@ export interface PostCounts {
   /** Keyed by post status. Absent keys are genuinely zero. */
   byStatus: Record<string, number>
   byChannel: { channel: string; count: number }[]
-  byOrigin: { manual: number; plan_week: number }
+  /**
+   * Keyed by the value the row actually carries. Absent keys are genuinely zero.
+   *
+   * Not a fixed shape, for the same reason `byStatus` above is not: this column
+   * has already learned a third value in production without this file hearing
+   * about it ('playbook', 2026-08-22) and a fourth ('radar') landed the same
+   * day. A closed shape means the next one is counted as something it is not.
+   */
+  byOrigin: Record<string, number>
   total: number
   capped: boolean
   coveredFrom: string | null
@@ -36,7 +44,7 @@ const EMPTY: PostCounts = {
   status: 'empty',
   byStatus: {},
   byChannel: [],
-  byOrigin: { manual: 0, plan_week: 0 },
+  byOrigin: {},
   total: 0,
   capped: false,
   coveredFrom: null,
@@ -76,7 +84,7 @@ export async function readPostCounts(): Promise<PostCounts> {
 
     const byStatus: Record<string, number> = {}
     const perChannel = new Map<string, number>()
-    const byOrigin = { manual: 0, plan_week: 0 }
+    const byOrigin: Record<string, number> = {}
     let total = 0
     let oldest: string | null = null
 
@@ -87,8 +95,20 @@ export async function readPostCounts(): Promise<PostCounts> {
       total += 1
       byStatus[row.status] = (byStatus[row.status] ?? 0) + 1
 
-      if (row.origin === 'plan_week') byOrigin.plan_week += 1
-      else byOrigin.manual += 1
+      // Keyed by what the row says, never by an else.
+      //
+      // The branch this replaces asserted that anything which is not
+      // 'plan_week' was written BY HAND — and 'manual' is the value the product
+      // uses to mean exactly that. Production widened this column to admit
+      // 'playbook' and now 'radar', so every machine-written draft of both kinds
+      // was being counted as a person's work on the home screen, silently and
+      // with no way to notice.
+      //
+      // A non-string origin is dropped rather than given an `[object Object]`
+      // bucket — the same call the status guard six lines above makes.
+      if (typeof row.origin === 'string') {
+        byOrigin[row.origin] = (byOrigin[row.origin] ?? 0) + 1
+      }
 
       if (Array.isArray(row.channels)) {
         // This is the ONE posts read that does not go through `PostSchema` — it

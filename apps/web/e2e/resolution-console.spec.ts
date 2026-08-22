@@ -178,6 +178,16 @@ test.describe('signal resolution console @smoke', () => {
       expect(text).not.toMatch(/\b(from|on) your (site|website|page|pdf|document)/i)
     }
 
+    // ── NOR DOES A GROUP HEADER. The entitlement sentence moved out of the
+    //    rows and into one header per group, so the scan above no longer reaches
+    //    it — scanned separately rather than by widening the locator, because
+    //    the row count of 15 above has to stay exact.
+    const groupText = await page.locator('[id^="console-group-"]').allInnerTexts()
+    expect(groupText.length).toBeGreaterThan(0)
+    for (const text of groupText) {
+      expect(text).not.toMatch(/\b(from|on) your (site|website|page|pdf|document)/i)
+    }
+
     // ── Tick two, and confirm exactly those two.
     await boxes.nth(0).check()
     await boxes.nth(1).check()

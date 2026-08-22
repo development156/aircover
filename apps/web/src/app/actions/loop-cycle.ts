@@ -22,6 +22,7 @@ import { reflect } from '@/lib/loop/reflect'
 import * as store from '@/lib/loop/store'
 import { normalizeSlot } from '@/lib/planner/slots'
 import { reportServerError } from '@/lib/observability/report'
+import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { workspaceForWrite } from '@/lib/workspaces'
 
@@ -72,18 +73,48 @@ export interface CycleState {
   insufficient?: boolean
 }
 
-/** Which channels this workspace has connected, as a de-duplicated set. */
-async function connectedChannels(workspaceId: string): Promise<Channel[]> {
+/**
+ * Which channels this workspace can actually publish to, and which ones it
+ * connected and then lost.
+ *
+ * `connections.status` is CHECK-constrained to ('active','expired','revoked',
+ * 'error') and `upsert_connection` writes 'active'. This filtered on
+ * 'connected', which the column cannot hold, so it matched nothing for every
+ * workspace and the cycle took its zero-channel path unconditionally. It failed
+ * as NO_CHANNELS and told people to connect a channel they had already
+ * connected. `lib/repo/check-constraints.test.ts` now refuses the whole class.
+ *
+ * `lapsed` is returned because the refusal message differs: a workspace that
+ * never connected needs to connect, and a workspace whose authorisation expired
+ * needs to reconnect, and sending the second one to do the first is the action
+ * telling them something untrue about their own account.
+ */
+/** "Instagram", "Instagram and X", "Instagram, X and LinkedIn". */
+function formatChannels(channels: readonly Channel[]): string {
+  const names = channels.map((c) => CHANNEL_LABELS[c])
+  if (names.length <= 1) return names[0] ?? ''
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+async function connectedChannels(
+  workspaceId: string,
+): Promise<{ live: Channel[]; lapsed: Channel[] }> {
   const supabase = createServerSupabase()
   const { data } = await supabase
     .from('connections')
-    .select('platform')
+    .select('platform, status')
     .eq('workspace_id', workspaceId)
-    .eq('status', 'connected')
-  const platforms = (data ?? [])
-    .map((row) => row.platform as Channel)
-    .filter((p): p is Channel => ['x', 'gbp', 'linkedin', 'instagram'].includes(p))
-  return [...toChannelSet(platforms)]
+    .in('status', ['active', 'expired', 'revoked', 'error'])
+  const rows = (data ?? []).filter((row) =>
+    (['x', 'gbp', 'linkedin', 'instagram'] as const).includes(row.platform as Channel),
+  )
+  const pick = (match: (status: string) => boolean): Channel[] => [
+    ...toChannelSet(
+      rows.filter((r) => match(r.status as string)).map((r) => r.platform as Channel),
+    ),
+  ]
+  const live = pick((status) => status === 'active')
+  return { live, lapsed: pick((status) => status !== 'active').filter((c) => !live.includes(c)) }
 }
 
 /**
@@ -181,7 +212,7 @@ export async function runCycleToPreview(
     })
 
     // ── STAGE 3: PLAN — the one paid step before the halt ─────────────────
-    const channels = await connectedChannels(workspaceId)
+    const { live: channels, lapsed } = await connectedChannels(workspaceId)
     if (channels.length === 0) {
       // FSD M2 edge case: zero connected channels. The cycle does not charge and
       // does not pretend — it fails honestly and says what to do.
@@ -192,7 +223,10 @@ export async function runCycleToPreview(
         ok: false,
         cycleId: cycle.id,
         insufficient: false,
-        message: 'Connect a channel first — Sahoda has nowhere to plan for.',
+        message:
+          lapsed.length > 0
+            ? `Your ${formatChannels(lapsed)} ${lapsed.length === 1 ? 'connection has' : 'connections have'} lapsed — reconnect ${lapsed.length === 1 ? 'it' : 'them'} and Sahoda has somewhere to plan for again.`
+            : 'Connect a channel first — Sahoda has nowhere to plan for.',
       }
     }
 

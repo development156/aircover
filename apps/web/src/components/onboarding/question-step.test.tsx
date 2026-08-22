@@ -115,3 +115,35 @@ describe('QuestionStep', () => {
     }
   })
 })
+
+/**
+ * An empty required box must not read as a finished answer.
+ *
+ * The specimen shipped as "We will not say homemade when we did not make the
+ * base." — sentence case, twelve words, terminal full stop — inside an empty
+ * required field directly above a DISABLED primary button. A customer walking
+ * the flow read the box as filled and the button as broken, and stopped.
+ *
+ * These assert the CLAIM, not the wording: the box announces itself as an
+ * example, and does not present a finished sentence.
+ */
+describe('the answer box does not look already answered', () => {
+  test('frames its specimen as an example', () => {
+    setup()
+    const box = screen.getByRole('textbox')
+
+    expect(box.getAttribute('placeholder')).toMatch(/^Example: /)
+  })
+
+  test('the specimen is not a finished sentence', () => {
+    setup()
+
+    expect(screen.getByRole('textbox').getAttribute('placeholder')).not.toMatch(/\.$/)
+  })
+
+  test('the box is still genuinely empty — a specimen is never pre-filled', () => {
+    setup()
+
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('')
+  })
+})

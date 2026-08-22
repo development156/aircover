@@ -42,10 +42,43 @@ export type CreateWorkspaceState = {
 }
 
 /**
- * Choose the workspace name: a non-blank provided name wins (capped); otherwise a
- * friendly possessive default from the user's identity, falling back to a generic.
+ * The DISPLAY name for a new workspace: whatever the creator provided, or a
+ * neutral default.
+ *
+ * Identity is deliberately absent. At bootstrap the product has not been told
+ * what the business is called — createWorkspace redirects into /onboarding
+ * immediately afterwards — so any name built here is a guess, and building it
+ * from the creator's email local part made that guess an identity leak. The
+ * label rides the switcher on every screen (workspace-switcher.tsx:140,168),
+ * shows at /settings, is sent to Zernio as the connected profile name
+ * (packages/publishing/src/zernio/connect.ts:27), and — when onboarding's door
+ * finds no site title — becomes the BRAND NAME handed to the resolver
+ * (actions/onboarding-resolve.ts:189). "My workspace" claims nothing.
  */
-export function deriveWorkspaceName(
+export function deriveWorkspaceName(provided: string | null | undefined): string {
+  const trimmed = (provided ?? '').trim()
+  return trimmed ? trimmed.slice(0, MAX_NAME_LENGTH) : DEFAULT_WORKSPACE_NAME
+}
+
+/**
+ * The seed `slugify` gets. This is the OLD deriveWorkspaceName verbatim, and it
+ * must stay that way.
+ *
+ * `workspaces.slug` is globally unique (identity.sql:8) and bootstrapWithRetry
+ * tries only DEFAULT_MAX_ATTEMPTS (5) suffixes, so the seed has to live in a
+ * sparse namespace. Seeding from the display name would put every nameless
+ * signup on "my-workspace" and hard-fail the 6th. Seeding from the bare
+ * identity token ("trinity") rather than the possessive ("trinity-s-workspace")
+ * would collapse first names into a dense namespace and hard-fail the 6th
+ * "Divya". Keeping the possessive keeps slugify() byte-identical to today for
+ * every input: no slug shape moves, no collision headroom is lost.
+ *
+ * The slug therefore still carries the creator's identity. That is unchanged
+ * from today and deliberately out of scope: the slug is a POINTER (the
+ * active-workspace cookie holds it; /settings calls it "never reused"), so
+ * changing its shape is an owner ruling, not a bug fix.
+ */
+export function deriveSlugSeed(
   provided: string | null | undefined,
   identity: CreatorIdentity,
 ): string {

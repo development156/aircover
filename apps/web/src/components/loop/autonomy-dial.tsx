@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { Check, Lock } from 'lucide-react'
 import { AUTONOMY_LEVELS, type AutonomyLevel, type Channel } from '@sahoda/shared'
@@ -41,15 +42,24 @@ const STORABLE = AUTONOMY_LEVELS.filter((l) => l.storable)
 const UNREACHABLE = AUTONOMY_LEVELS.filter((l) => !l.storable)
 
 export interface AutonomyDialProps {
-  /** Channels this workspace has connected. */
+  /** Channels this workspace has connected and Sahoda can publish to. */
   connected: readonly Channel[]
+  /**
+   * Channels connected once, whose authorisation has lapsed.
+   *
+   * A dial cannot be offered for these — Sahoda cannot post through them — but
+   * "connect a channel" is the wrong thing to say to somebody who did. The two
+   * states have different remedies and this screen is not entitled to collapse
+   * them.
+   */
+  lapsed?: readonly Channel[]
   /** Levels a person actually chose. A channel absent from this map is UNSET. */
   chosen: Record<string, AutonomyLevel>
   /** What an unset channel runs at. */
   defaultLevel: AutonomyLevel
 }
 
-export function AutonomyDial({ connected, chosen, defaultLevel }: AutonomyDialProps) {
+export function AutonomyDial({ connected, lapsed = [], chosen, defaultLevel }: AutonomyDialProps) {
   return (
     <section aria-labelledby="loop-dial" className="flex flex-col gap-3">
       <div>
@@ -64,8 +74,25 @@ export function AutonomyDial({ connected, chosen, defaultLevel }: AutonomyDialPr
 
       {connected.length === 0 ? (
         <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
-          Connect a channel and its dial appears here. Until then there is nothing for the Loop to
-          set a level for.
+          {lapsed.length > 0 ? (
+            <>
+              Your {lapsed.map((c) => CHANNEL_LABELS[c]).join(', ')}{' '}
+              {lapsed.length === 1 ? 'connection has' : 'connections have'} lapsed, so there is
+              nothing the Loop can post through right now.{' '}
+              <Link
+                href="/connections"
+                className="font-[550] text-accent underline underline-offset-2"
+              >
+                Reconnect
+              </Link>{' '}
+              and the {lapsed.length === 1 ? 'dial comes' : 'dials come'} back.
+            </>
+          ) : (
+            <>
+              Connect a channel and its dial appears here. Until then there is nothing for the Loop
+              to set a level for.
+            </>
+          )}
         </p>
       ) : (
         <ul className="grid gap-2">

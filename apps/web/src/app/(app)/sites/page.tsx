@@ -136,7 +136,12 @@ export default async function SitesPage() {
           icon={Globe}
           title="Your site shows up here"
           body="Generate a one-page draft above and preview it right here. Publishing to a real address is still being built."
-          tip="Resolve your Brand Brain first — the site is written in whatever voice it finds."
+          // Stated, not instructed. MEASURED 2026-08-22: this tip renders whenever no
+          // site exists, with no reference to brain state, so a workspace with a fully
+          // resolved Brand Brain was still told to go and resolve one. The causal fact
+          // it exists to convey — the site inherits the brain's voice — is true either
+          // way, and saying it that way cannot be wrong for anybody.
+          tip="The site is written in your Brand Brain's voice, so it will sound like whatever that holds today."
         />
       ) : preview === 'read-failed' ? (
         <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">

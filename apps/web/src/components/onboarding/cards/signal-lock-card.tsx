@@ -11,10 +11,23 @@ export interface SignalLockCardProps {
   regenerateDisabled: boolean
 }
 
+/**
+ * `weak` no longer asserts a CONFLICT.
+ *
+ * `signal_lock: 'weak'` covers two different situations — inputs that contradict
+ * each other, and inputs that were barely there — and the note underneath says
+ * which. On the brain the QA walk produced, the label read "inputs conflict"
+ * directly above a note reading "were all blank, so this Brand Brain relies on
+ * strong inference from category norms". Those inputs were SPARSE, not
+ * contradictory, and the badge was contradicting its own explanation.
+ *
+ * The label now states the strength, which is the only thing this field knows,
+ * and leaves the reason to `note`, which is the only thing that knows it.
+ */
 const LOCK_COPY: Record<BrandMemoryPayload['alignment']['signal_lock'], string> = {
   strong: 'Strong signal lock',
   moderate: 'Moderate signal lock',
-  weak: 'Weak signal — inputs conflict',
+  weak: 'Weak signal lock',
 }
 
 /**

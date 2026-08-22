@@ -15,6 +15,7 @@ import type { Provenance } from '@/lib/brand/provenance'
 import type { BrandMemoryPayload } from '@sahoda/shared'
 
 import { CertaintyMark } from './certainty-mark'
+import { EntitlementGroup } from './entitlement-group'
 import { ResolutionRow } from './resolution-row'
 
 export interface ResolutionConsoleProps {
@@ -166,17 +167,28 @@ export function ResolutionConsole({ payload, provenance }: ResolutionConsoleProp
           </p>
         </div>
 
-        <ul>
-          {open.map((entry) => (
-            <ResolutionRow
-              key={entry.field.path}
-              entry={entry}
-              selected={picked.has(entry.field.path)}
-              onSelectedChange={(next) => toggle(entry.field.path, next)}
-              onResolved={resolved}
-            />
+        {/*
+          GROUPED BY WHOSE KNOWLEDGE IT IS — the screen's whole argument, stated
+          once over each run rather than re-stated under every row. `divided` is
+          indexed over the FILTERED list, so if every `asked` row is confirmed
+          the surviving group is still index 0 and grows no stray top rule.
+        */}
+        {(['asked', 'negotiated'] as const)
+          .map((kind) => ({ kind, rows: open.filter((entry) => entry.field.metaKind === kind) }))
+          .filter((group) => group.rows.length > 0)
+          .map((group, index) => (
+            <EntitlementGroup key={group.kind} kind={group.kind} divided={index > 0}>
+              {group.rows.map((entry) => (
+                <ResolutionRow
+                  key={entry.field.path}
+                  entry={entry}
+                  selected={picked.has(entry.field.path)}
+                  onSelectedChange={(next) => toggle(entry.field.path, next)}
+                  onResolved={resolved}
+                />
+              ))}
+            </EntitlementGroup>
           ))}
-        </ul>
 
         {/*
           THE ONE PRIMARY ACTION ON THIS VIEW (docs/26 §1.5).

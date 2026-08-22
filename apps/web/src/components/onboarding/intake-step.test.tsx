@@ -18,6 +18,32 @@ describe('IntakeStep', () => {
     expect(screen.getByText("You're a local presence in food, in India.")).toBeInTheDocument()
   })
 
+  test('claims nothing about you before you have written anything', async () => {
+    // MEASURED 2026-08-22 on a fresh account: with the box untouched this screen
+    // asserted in bold "You're a service business in everyday consumer goods and
+    // services, in India." while saying, one line below, "We could not read any
+    // of this from your words". Two sentences, two lines apart, an empty box,
+    // and only one of them true.
+    //
+    // Asserted by the CLAIM, not by the wording: the read-back always opens
+    // "You're a ...", so this stays correct if the sentence is rewritten, and
+    // fails again the moment anything asserts a conclusion over an empty input.
+    setup()
+
+    expect(screen.queryByText(/^You're a /)).not.toBeInTheDocument()
+    expect(screen.queryByText(/could not read any of this/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/reads it back here/i)).toBeInTheDocument()
+  })
+
+  test('says it back as soon as there is something to say it about', async () => {
+    const { box } = setup()
+
+    await userEvent.type(box, 'I run a bakery in Pune')
+
+    expect(screen.getByText(/^You're a /)).toBeInTheDocument()
+    expect(screen.queryByText(/reads it back here/i)).not.toBeInTheDocument()
+  })
+
   test('marks a pick it guessed, and stops marking it once read', async () => {
     const { box } = setup()
 

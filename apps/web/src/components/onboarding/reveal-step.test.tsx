@@ -120,6 +120,14 @@ describe('RevealStep regenerate guard', () => {
     expect(onRegenerate).toHaveBeenCalledTimes(1)
   })
 
+  test('says a regenerate is running instead of only dimming six buttons', () => {
+    // Six dimmed buttons are not a status. One honest running-status is —
+    // and `ResolvingPanel` already carries the real elapsed clock.
+    setup({ regeneratePending: true, regenerateCost: 50 })
+
+    expect(screen.getByText('Working out your brand')).toBeInTheDocument()
+  })
+
   test('blocks the spend when the balance cannot cover it', () => {
     setup({
       canRegenerate: true,

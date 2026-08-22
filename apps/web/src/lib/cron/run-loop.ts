@@ -87,12 +87,19 @@ async function planOneWorkspace(
   const { databaseUrl } = loadBillingEnv()
   const ledger = createPgLedgerPort({ connectionString: databaseUrl })
 
-  // Only channels the workspace has actually connected. With none, FSD M2 says
+  // Only channels the workspace can actually publish to. With none, FSD M2 says
   // the cycle produces suggestions rather than a plan — and charging 20 credits
   // to plan for nowhere is the wrong half of that, so it does not open at all.
+  //
+  // 'active' is the value `upsert_connection` writes and one of the four the
+  // CHECK admits ('active','expired','revoked','error'). This asked for
+  // 'connected', which the column cannot hold, so the scheduled cycle skipped
+  // EVERY workspace on every run and looked exactly like a fleet with no
+  // channels. An expired connection is deliberately not planned for: the plan
+  // would be for somewhere Sahoda cannot post.
   const connections = await ledger.pool.query<{ platform: string }>(
     `select distinct platform from connections
-      where workspace_id = $1 and status = 'connected'`,
+      where workspace_id = $1 and status = 'active'`,
     [workspaceId],
   )
   const channels = toChannelSet(

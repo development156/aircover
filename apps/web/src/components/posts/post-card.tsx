@@ -12,6 +12,8 @@ import type { ChannelMetrics } from '@/lib/analytics/post-metrics'
 import { Card } from '@/components/ui/card'
 import type { DisplayPost } from '@/lib/posts/display-post'
 import { formatScheduledAt } from '@/lib/posts/schedule-format'
+import { bodyAfterFirstLine, displayTitleOf } from '@/lib/posts/display-title'
+import { relativeAge } from '@/lib/ops/session-pulse'
 import { cn } from '@/lib/utils'
 
 /**
@@ -91,9 +93,15 @@ export function PostCard({
   variantStates,
   metrics,
 }: PostCardProps) {
-  const title = post.title?.trim()
-  const displayTitle = title || 'Untitled post'
-  const excerpt = excerptOf(post.body)
+  const heading = displayTitleOf(post)
+  const displayTitle = heading.text
+  const hasBody = Boolean(post.body?.trim())
+  // When the heading IS the body's first line, the excerpt starts at the SECOND
+  // line — otherwise the card prints the same sentence twice.
+  const excerpt = excerptOf(
+    heading.source === 'derived' ? bodyAfterFirstLine(post.body) : post.body,
+  )
+  const savedAge = relativeAge(post.updated_at, now)
   const scheduledAt = formatScheduledAt(post.scheduled_at)
   // Distinct already: `post.channels` is a `ChannelSet`, deduplicated once when
   // the row was parsed. `posts.channels` is still a bare `text[]` with no unique
@@ -122,7 +130,7 @@ export function PostCard({
         <h2
           className={cn(
             'type-h3 flex items-center gap-2 transition-micro group-hover:text-accent',
-            !title && 'font-semibold text-muted',
+            heading.source === 'none' && 'font-semibold text-muted',
           )}
         >
           <AgencyBlade origin={post.origin} />
@@ -147,9 +155,13 @@ export function PostCard({
         </div>
       </div>
 
+      {/* A one-line body promoted to the heading leaves NOTHING here — and that
+          is right: the card is not empty, the heading carries the content.
+          "No content written yet." is a claim about the row, reserved for a post
+          that genuinely has no body, which is the only case the row supports. */}
       {excerpt ? (
         <p className="type-body mt-2 line-clamp-2 text-muted">{excerpt}</p>
-      ) : (
+      ) : hasBody ? null : (
         <p className="type-body mt-2 text-muted">No content written yet.</p>
       )}
 
@@ -173,6 +185,15 @@ export function PostCard({
           <span className="inline-flex items-center gap-1.5 text-muted">
             <CalendarClock size={14} strokeWidth={1.8} aria-hidden />
             <span className="tabular-nums">{scheduledAt}</span>
+          </span>
+        ) : null}
+
+        {/* "Saved", never "Edited": `updated_at` is `default now()` on INSERT as
+            well as trigger-written on update, so "Edited" would be false for a
+            draft nobody has touched since it was created. */}
+        {savedAge ? (
+          <span className="text-muted">
+            Saved <span className="tabular-nums">{savedAge}</span>
           </span>
         ) : null}
       </div>

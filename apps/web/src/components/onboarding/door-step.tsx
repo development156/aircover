@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 
 import type { DoorState } from '@/app/actions/onboarding-door'
+import { exampleHint } from '@/lib/onboarding/example-hint'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -40,6 +41,19 @@ const PREVIEW_CHARS = 1200
  * Reading is free and says so. The cost, when there is one, appears on the
  * resolve — never here.
  */
+/**
+ * The specimen shown in the "or just tell us" box.
+ *
+ * Framed as an example rather than written as one. Before this, it read
+ * "We bake sourdough and celebration cakes on Prabhat Road, and nothing is
+ * bought in." — a finished sentence in an empty required box, which a customer
+ * walking the flow mistook for a filled field above a broken button.
+ * `exampleHint` states the rule once for every specimen in onboarding.
+ */
+const SENTENCE_EXAMPLE = exampleHint(
+  'We bake sourdough and celebration cakes on Prabhat Road, and nothing is bought in.',
+)
+
 export function DoorStep({ onContinue, onBack }: DoorStepProps) {
   const [state, setState] = useState<DoorState | null>(null)
   const [isPending, setPending] = useState(false)
@@ -275,7 +289,7 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
               setSentence(event.target.value)
               setDirty(true)
             }}
-            placeholder="We bake sourdough and celebration cakes on Prabhat Road, and nothing is bought in."
+            placeholder={SENTENCE_EXAMPLE}
             className="w-full surface-ring rounded-card bg-surface p-3 text-[14px] text-ink transition-micro placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           />
           {sentence.length > 0 && sentence.trim().length < MIN_SENTENCE_CHARS ? (
@@ -386,10 +400,24 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
             it.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
+            {/*
+              A REAL CONTROL, because it is the only way forward.
+
+              This was `variant="ghost" size="sm"`: no border, no underline,
+              muted text, 28px tall. For a customer with no website and no PDF
+              it is the ONLY route out of this step, and it looked like a
+              caption sitting under the thing that had just refused them. A
+              remedy nobody recognises as a control is not a remedy.
+
+              `secondary` gives it the firm ring and ink text every other real
+              choice in the app wears, and the default size restores the 34px
+              desktop height with the 44px touch floor underneath. It stays
+              secondary rather than primary on purpose: reading the door IS the
+              better path, and this is the considered alternative to it.
+            */}
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
+              variant="secondary"
               onClick={() =>
                 onContinue({ text: '', foundName: '', colors: [], label: '', kind: 'sentence' })
               }
@@ -404,10 +432,14 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
         <div className="flex flex-col gap-3 rounded-card border border-line bg-s1 p-4">
           <div>
             <p className="text-[13px] font-semibold text-ink">
-              Here is what we read from {read.label}
+              {read.kind === 'sentence'
+                ? 'We will use your sentence as you wrote it'
+                : `Here is what we read from ${read.label}`}
             </p>
             <p className="mt-1 text-[12.5px] text-muted">
-              Check it is yours before we resolve anything from it.
+              {read.kind === 'sentence'
+                ? 'These are your own words, so there is nothing new to check \u2014 edit them above and press Read this again if they are not right.'
+                : 'Check it is yours before we resolve anything from it.'}
             </p>
             {read.note ? (
               <p
@@ -422,12 +454,18 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
             ) : null}
           </div>
 
-          <div className="max-h-56 overflow-y-auto surface-ring rounded-card bg-surface p-3">
-            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink">
-              {read.text.slice(0, PREVIEW_CHARS)}
-              {read.text.length > PREVIEW_CHARS ? '…' : ''}
-            </p>
-          </div>
+          {/* THE READ-BACK IS EVIDENCE, NOT AN ECHO. It proves what was actually
+              fetched from a link or a PDF. On the sentence arm the text came
+              from the field two inches above, so showing it back proves
+              nothing — the customer is being asked to check their own typing. */}
+          {read.kind === 'sentence' ? null : (
+            <div className="max-h-56 overflow-y-auto surface-ring rounded-card bg-surface p-3">
+              <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink">
+                {read.text.slice(0, PREVIEW_CHARS)}
+                {read.text.length > PREVIEW_CHARS ? '…' : ''}
+              </p>
+            </div>
+          )}
 
           {/* PAID WORK IS ALWAYS STATED. The escalation to OCR happens without
               asking — a shop owner should not be picking a parser — so the only
@@ -446,7 +484,9 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
             </p>
           ) : (
             <p className="text-[12.5px] text-muted">
-              We did not find a colour here, so the app keeps Sahoda&apos;s default.
+              {read.kind === 'sentence'
+                ? 'A sentence carries no colour, so the app keeps Sahoda\u2019s default.'
+                : 'We did not find a colour here, so the app keeps Sahoda\u2019s default.'}
             </p>
           )}
 

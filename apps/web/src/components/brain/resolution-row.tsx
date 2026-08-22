@@ -193,6 +193,16 @@ export function ResolutionRow({
               queue unreadable on the width most of these users are on.
             */}
             <span className="type-h3 min-w-0 text-ink">{field.label}</span>
+            {/*
+              THE ROW'S HALF OF THE GROUPING, for a person who never reads the
+              header. The entitlement SENTENCE now sits once over the run
+              (`entitlement-group.tsx`), but a screen-reader user tabbing
+              checkbox to checkbox never enters it, so the four-word marker rides
+              in the accessible name instead: "Red lines. Only you know this,
+              checkbox". `sr-only`, never `max-wide:hidden` — the latter strips
+              the name outright.
+            */}
+            <span className="sr-only">. {entitlement.label}</span>
           </label>
 
           <CertaintyMark state={state} />
@@ -227,28 +237,6 @@ export function ResolutionRow({
             </div>
           ) : null}
         </div>
-
-        {/*
-          THE ENTITLEMENT LINE — the console's "why", and the one genuinely new
-          thing it tells you.
-
-          It is read off `field.metaKind`, which mirrors `FieldKindSchema` in
-          packages/shared. Nothing here is inferred from the value or from the
-          document: it is what the contract says this KIND of field is, quoted
-          back. See `resolution-queue.ts` for why that distinction ranks the
-          queue.
-        */}
-        <p className="type-sm text-muted">
-          <span
-            className={cn(
-              'mr-1.5 font-[650]',
-              field.metaKind === 'asked' ? 'text-ink' : 'text-muted',
-            )}
-          >
-            {entitlement.label}.
-          </span>
-          {entitlement.line}
-        </p>
 
         {editing ? (
           <div className="flex flex-col gap-2">
