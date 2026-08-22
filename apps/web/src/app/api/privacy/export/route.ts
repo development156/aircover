@@ -1,8 +1,8 @@
 import { auth } from '@clerk/nextjs/server'
 
+import { buildArchiveEntries } from '@/lib/privacy/archive'
 import { buildWorkspaceExport } from '@/lib/privacy/export'
-import { renderReadableExport } from '@/lib/privacy/readable'
-import { buildZip, safeEntryName, type ZipEntry } from '@/lib/privacy/zip'
+import { buildZip } from '@/lib/privacy/zip'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace } from '@/lib/workspaces'
@@ -33,20 +33,18 @@ import { getActiveWorkspace } from '@/lib/workspaces'
  * MY data" anyway — and every gap is named inside the file rather than left as
  * an absence.
  *
- * ## The size cap, and why it refuses rather than truncates
+ * ## What this file does NOT decide
  *
- * Everything is assembled in memory, so there is a ceiling and it is stated. A
- * customer whose files exceed it gets the JSON and the summary page and a NAMED
- * omission telling them the pictures were too large to send this way and to ask.
- * A truncated archive that reported success would be the one thing this whole
- * module exists to prevent, arriving through the back door.
+ * The size ceiling, what happens when it is reached, and how a skipped file is
+ * named in the document all live in `lib/privacy/archive.ts`. They were here,
+ * and that made the one property this endpoint exists to keep — a file listed in
+ * the document and absent from `files/` must be NAMED, with a reason, in the
+ * document itself — reachable only by mounting a route with a Clerk session and
+ * a Supabase client. It is the whole export's claim in miniature and it was the
+ * only part with no assertion behind it. `archive.test.ts` drives it now.
+ *
+ * What is left here is authentication, one download function, and the response.
  */
-
-/** Total uncompressed file bytes the archive will carry. */
-const MAX_FILE_BYTES = 180 * 1024 * 1024
-
-/** The most objects fetched, whatever they weigh. Each is one round trip. */
-const MAX_FILES = 2000
 
 /** `sahoda-export-2026-08-23.zip` — dated, so two downloads do not overwrite. */
 function exportFilename(now: Date): string {
@@ -86,56 +84,11 @@ export async function GET(): Promise<Response> {
       now,
     })
 
-    const entries: ZipEntry[] = []
-    const skipped: string[] = []
-    let bytes = 0
-
-    for (const file of payload.files) {
-      if (entries.length >= MAX_FILES || bytes + (file.bytes ?? 0) > MAX_FILE_BYTES) {
-        skipped.push(file.path)
-        continue
-      }
-      const downloaded = await supabase.storage.from(file.bucket).download(file.path)
-      if (downloaded.error || !downloaded.data) {
-        skipped.push(file.path)
-        continue
-      }
-      const buffer = Buffer.from(await downloaded.data.arrayBuffer())
-      bytes += buffer.length
-      entries.push({
-        name: safeEntryName('files', `${file.bucket}/${file.path}`),
-        data: buffer,
-      })
-    }
-
-    // The skipped list goes INTO the document, not into a log. A file that is
-    // missing from `files/` and named nowhere is an omission the customer cannot
-    // see, which is the same defect as an empty table with no explanation.
-    const document = {
-      ...payload,
-      filesNotListed:
-        skipped.length > 0
-          ? [
-              ...payload.filesNotListed,
-              {
-                bucket: '(various)',
-                prefix: skipped.slice(0, 50).join(', '),
-                reason:
-                  `${skipped.length} file(s) are listed in this document but their contents are ` +
-                  `not in the archive — this download has a size limit. Ask Sahoda and we will ` +
-                  `send them another way.`,
-              },
-            ]
-          : payload.filesNotListed,
-    }
-
-    entries.unshift(
-      { name: 'your-data.html', data: Buffer.from(renderReadableExport(document), 'utf8') },
-      // Indented on purpose. This file exists to be READ — by the customer, by a
-      // lawyer, possibly by a regulator — and a single-line JSON blob is
-      // technically the same data and practically unreadable.
-      { name: 'data.json', data: Buffer.from(JSON.stringify(document, null, 2), 'utf8') },
-    )
+    const { entries } = await buildArchiveEntries(payload, async (bucket, path) => {
+      const downloaded = await supabase.storage.from(bucket).download(path)
+      if (downloaded.error || !downloaded.data) return null
+      return Buffer.from(await downloaded.data.arrayBuffer())
+    })
 
     const archive = buildZip(entries, now)
     return new Response(new Uint8Array(archive), {

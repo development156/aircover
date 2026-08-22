@@ -33,6 +33,14 @@ import type { WorkspaceExport } from './export'
  * the app, and this page cannot drift because it is generated fresh every time.
  */
 
+/**
+ * ⚠ "Nothing was left out" is about RECORDS, and it used to be printed while a
+ * warning about missing FILES sat directly above it. A customer reading the two
+ * together learns that something is missing and that nothing is missing, in the
+ * one document whose entire job is to let them tell an empty section from an
+ * absent one. The empty state of the omissions table now reads
+ * `payload.filesNotListed` before it says anything.
+ */
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -150,7 +158,12 @@ ${
 <table>
   <thead><tr><th>What it is</th><th>Why not</th><th>Table</th></tr></thead>
   <tbody>
-${omitted || '<tr><td colspan="3">Nothing was left out.</td></tr>'}
+${
+  omitted ||
+  (payload.filesNotListed.length > 0
+    ? '<tr><td colspan="3">No records were left out — but some of your FILES were, and they are named above.</td></tr>'
+    : '<tr><td colspan="3">Nothing was left out.</td></tr>')
+}
   </tbody>
 </table>
 
