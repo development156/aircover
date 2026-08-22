@@ -73,6 +73,23 @@ export interface ExportTable {
  * SELECT policy returns an empty array rather than an error, so this is the only
  * place the difference can be known.
  *
+ * ── 2026-08-22: EIGHT TABLES, FOUND BY THE GUARD RATHER THAN BY A PERSON ────
+ * `asset_derivatives`, `competitor_subscriptions`, `knowledge_chunks`,
+ * `knowledge_documents`, `playbook_run_items`, `playbook_runs`, `playbooks`,
+ * `zernio_webhook_events`.
+ *
+ * Every one arrived from a separate lane, and no lane could have seen the gap:
+ * on each branch, this file listed every table THAT branch knew about. The
+ * absence only exists in the union, which is what the merge is. That is the
+ * whole argument for running the gate after every merge instead of at the end.
+ *
+ * READABILITY WAS READ, NOT ASSUMED, for each of them — `apply_tenant_policies`
+ * for `asset_derivatives`, `apply_tenant_read_policy` for the knowledge,
+ * playbook and webhook tables, and hand-written `for select` policies for
+ * `competitor_subscriptions` and `playbooks`. All eight have a SELECT policy, so
+ * all eight are `readable` and none needs the "reported by name, never as an
+ * empty list" treatment `ai_provider_logs` gets.
+ *
  * ── 2026-08-21: `remix_batches` and `remix_derivatives` ────────────────────
  * Added the day they were written, not the day somebody noticed. Both take the
  * standard `app.apply_tenant_policies` set, so both are `readable` — read out of
@@ -83,6 +100,11 @@ export interface ExportTable {
 export const EXPORT_TABLES: readonly ExportTable[] = [
   { table: 'ai_provider_logs', readability: 'no-read-policy', describes: 'AI usage records' },
   { table: 'asset_usages', readability: 'readable', describes: 'where each picture is used' },
+  {
+    table: 'asset_derivatives',
+    readability: 'readable',
+    describes: 'the per-channel crops made from your pictures',
+  },
   { table: 'assets', readability: 'readable', describes: 'your picture library' },
   { table: 'audience_snapshots', readability: 'readable', describes: 'who follows you' },
   { table: 'audit_logs', readability: 'readable', describes: 'a record of admin actions' },
@@ -95,11 +117,26 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { table: 'campaign_posts', readability: 'readable', describes: 'posts inside campaigns' },
   { table: 'campaigns', readability: 'readable', describes: 'your campaigns' },
   { table: 'connections', readability: 'readable', describes: 'your linked accounts' },
+  {
+    table: 'competitor_subscriptions',
+    readability: 'readable',
+    describes: 'the businesses you asked Radar to watch',
+  },
   { table: 'credit_balances', readability: 'readable', describes: 'your credit balance' },
   { table: 'credit_ledger', readability: 'readable', describes: 'every credit movement' },
   { table: 'inbox_messages', readability: 'readable', describes: 'messages and comments' },
   { table: 'inbox_threads', readability: 'readable', describes: 'conversations' },
   { table: 'invoices', readability: 'readable', describes: 'your tax invoices and credit notes' },
+  {
+    table: 'knowledge_chunks',
+    readability: 'readable',
+    describes: 'the passages your documents were split into',
+  },
+  {
+    table: 'knowledge_documents',
+    readability: 'readable',
+    describes: 'the documents you added to the knowledge library',
+  },
   { table: 'leads', readability: 'readable', describes: 'enquiries from your site' },
   { table: 'loop_briefs', readability: 'readable', describes: 'what the Loop planned each week' },
   {
@@ -111,7 +148,18 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { table: 'loop_settings', readability: 'readable', describes: 'your Loop settings' },
   { table: 'memory_events', readability: 'readable', describes: 'changes to your Brand Brain' },
   { table: 'ops_credit_requests', readability: 'readable', describes: 'credit top-up requests' },
-  { table: 'planner_events', readability: 'readable', describes: 'your planner' },
+  {
+    table: 'planner_events',
+    readability: 'readable',
+    describes: 'your planner',
+  },
+  {
+    table: 'playbook_run_items',
+    readability: 'readable',
+    describes: 'what each playbook run produced',
+  },
+  { table: 'playbook_runs', readability: 'readable', describes: 'every playbook run' },
+  { table: 'playbooks', readability: 'readable', describes: 'your playbooks' },
   { table: 'post_media', readability: 'readable', describes: 'pictures attached to posts' },
   {
     table: 'post_metric_snapshots',
@@ -136,6 +184,11 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { table: 'workspace_members', readability: 'readable', describes: 'who is on this workspace' },
   { table: 'workspace_themes', readability: 'readable', describes: 'your colours' },
   { table: 'zernio_profiles', readability: 'readable', describes: 'the publishing profile id' },
+  {
+    table: 'zernio_webhook_events',
+    readability: 'readable',
+    describes: 'what the platforms told Sahoda about your accounts',
+  },
 ] as const
 
 export const EXPORTABLE_TABLES: readonly ExportTable[] = EXPORT_TABLES.filter(
