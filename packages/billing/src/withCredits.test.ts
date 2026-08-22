@@ -14,13 +14,21 @@ class FakePort implements LedgerPort {
   latest: LatestHold | null = null
   holdOutcome: 'ok' | 'insufficient' | 'throw' = 'ok'
   releaseOutcome: 'ok' | 'throw' = 'ok'
-  debitOutcome: 'ok' | 'throw' = 'ok'
+  /**
+   * `commit-then-throw` is the committed-but-lost-ack DEBIT — the case that
+   * decides whether a RELEASE on the settle path can double-refund. The row
+   * lands, the caller sees a throw, and the hold is then SETTLED, so any later
+   * RELEASE against it must be refused the way the real function refuses it.
+   */
+  debitOutcome: 'ok' | 'throw' | 'commit-then-throw' = 'ok'
   latestHoldOutcome: 'ok' | 'throw' = 'ok'
 
   private total: number
   private held = 0
   private seq = 0
   private readonly holdAmounts = new Map<string, number>()
+  /** Hold ids that already carry a settlement, DEBIT or RELEASE. */
+  private readonly settled = new Set<string>()
 
   constructor(total = 100) {
     this.total = total
@@ -43,6 +51,8 @@ class FakePort implements LedgerPort {
       if (this.debitOutcome === 'throw') throw new Error('ledger: HOLD_ALREADY_SETTLED')
       this.total -= input.amount
       this.held -= this.holdAmounts.get(input.settlesEntryId ?? '') ?? 0
+      this.settled.add(input.settlesEntryId ?? '')
+      if (this.debitOutcome === 'commit-then-throw') throw new Error('ledger: ack lost')
       return {
         entry: { id, balanceAfter: this.total, amount: input.amount },
         replayed: false,
@@ -50,6 +60,12 @@ class FakePort implements LedgerPort {
     }
     if (input.entryType === 'RELEASE') {
       if (this.releaseOutcome === 'throw') throw new Error('ledger: release write failed')
+      // `settles_entry_id` is UNIQUE and the real function pre-checks under
+      // `SELECT … FOR UPDATE`. A hold already settled cannot be settled again.
+      if (this.settled.has(input.settlesEntryId ?? '')) {
+        throw new Error('ledger: HOLD_ALREADY_SETTLED')
+      }
+      this.settled.add(input.settlesEntryId ?? '')
       this.held -= this.holdAmounts.get(input.settlesEntryId ?? '') ?? 0
       return {
         entry: { id, balanceAfter: this.total, amount: input.amount },
@@ -183,8 +199,36 @@ describe('withCredits — never rejects (WithCreditsFn Result contract)', () => 
     if (result.ok) throw new Error('expected err')
     expect(result.error.code).toBe('PROVIDER_ERROR')
     expect(result.error.traceId).toBe('trace-fixed')
-    // fn ran (HOLD then the DEBIT attempt); the user is NOT charged (hold TTL releases).
-    expect(port.entryTypes()).toEqual(['HOLD', 'DEBIT'])
+    /**
+     * THIS ASSERTION USED TO READ `['HOLD', 'DEBIT']`, with the comment "the
+     * user is NOT charged (hold TTL releases)".
+     *
+     * The TTL does not release it. `SAHODA_HOLD_SWEEP_MODE` is unset by
+     * default, which is `off`, so nothing reclaimed the hold and the credits sat
+     * in `held` where the customer could not spend them. The test named a
+     * backstop that was not running and pinned the defect as correct.
+     */
+    expect(port.entryTypes()).toEqual(['HOLD', 'DEBIT', 'RELEASE'])
+    // And the money is actually back, not merely a third write in a list.
+    expect(await port.balance()).toEqual({ total: 100, held: 0 })
+  })
+
+  it('does NOT refund twice when the DEBIT committed and only its ack was lost', async () => {
+    // The only real objection to the RELEASE above. `settles_entry_id` is UNIQUE
+    // and `apply_ledger_entry` pre-checks under `SELECT … FOR UPDATE`, so a hold
+    // already settled by that DEBIT makes the RELEASE lose with
+    // HOLD_ALREADY_SETTLED. Modelled here by committing the DEBIT and then
+    // throwing, with the port refusing to settle an already-settled hold.
+    const port = new FakePort(100)
+    port.debitOutcome = 'commit-then-throw'
+    const withCredits = createWithCredits(port, deps)
+
+    const result = await withCredits(OPTS, async () => 'generated')
+
+    expect(result.ok).toBe(false)
+    expect(port.entryTypes()).toEqual(['HOLD', 'DEBIT', 'RELEASE'])
+    // Charged exactly once, and not given back: 100 − 10 with nothing held.
+    expect(await port.balance()).toEqual({ total: 100 - creditCost('post_variants'), held: 0 })
   })
 
   it('returns an err Result (does not reject) when the latestHold read throws', async () => {

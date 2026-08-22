@@ -196,16 +196,64 @@ export function createWithCredits(port: LedgerPort, deps: WithCreditsDeps = {}):
       //    attempt and DEBITs (first real charge);
       //  - the DEBIT committed but the ack was lost → the hold is settled-by-DEBIT → the retry
       //    REUSES the attempt (see nextAttempt) so this same debitKey REPLAYS — charged once.
-      const debit = await port.apply({
-        workspaceId,
-        entryType: 'DEBIT',
-        amount: cost,
-        idempotencyKey: debitKey(hKey),
-        actionType: action,
-        objectRef,
-        settlesEntryId: holdId,
-        cogsUsdEst,
-      })
+      let debit
+      try {
+        debit = await port.apply({
+          workspaceId,
+          entryType: 'DEBIT',
+          amount: cost,
+          idempotencyKey: debitKey(hKey),
+          actionType: action,
+          objectRef,
+          settlesEntryId: holdId,
+          cogsUsdEst,
+        })
+      } catch (settleErr) {
+        /**
+         * A HOLD WHOSE DEBIT THROWS MUST STILL BE RELEASED.
+         *
+         * ── WHAT THIS COST BEFORE ────────────────────────────────────────────
+         * This threw straight to the outer backstop, which returns
+         * PROVIDER_ERROR and releases nothing. The RUN path has had a RELEASE
+         * since the beginning; the SETTLE path did not. So a customer whose
+         * action completed and whose settle failed had the credits taken out of
+         * their spendable balance and left in `held` — and with
+         * `SAHODA_HOLD_SWEEP_MODE` unset (default `off`) nothing reclaims them.
+         * The wallet then correctly tells them their money is stuck. That is the
+         * "users never pay for failures" non-negotiable, failing quietly.
+         *
+         * ── WHY THIS CANNOT DOUBLE-REFUND, WHICH IS THE ONLY REAL OBJECTION ───
+         * The dangerous case is a DEBIT that COMMITTED and only lost its ack: a
+         * RELEASE here would then refund a charge that stands.
+         *
+         * It cannot. `credit_ledger.settles_entry_id` is UNIQUE, and
+         * `app.apply_ledger_entry` checks for an existing settlement while
+         * holding `SELECT … FOR UPDATE` on the balance row. A hold already
+         * settled by that DEBIT makes this RELEASE lose the race and raise
+         * HOLD_ALREADY_SETTLED — which `apps/jobs/src/holds/sweep.ts` already
+         * treats as a correct no-op. The swallow below is that outcome.
+         *
+         * And the retry stays exactly-once either way. `nextAttempt` advances
+         * only when the last hold was settled by a RELEASE: if the DEBIT
+         * committed, `settledBy` stays `debit`, the attempt is REUSED, and the
+         * same `debitKey` replays instead of charging again.
+         */
+        try {
+          await port.apply({
+            workspaceId,
+            entryType: 'RELEASE',
+            amount: cost,
+            idempotencyKey: releaseKey(hKey),
+            settlesEntryId: holdId,
+          })
+        } catch {
+          // Swallowed for the same reason the RUN path swallows it: either the
+          // hold is already settled (nothing to do) or the expired-hold sweep is
+          // the backstop. Neither changes the honest error below.
+        }
+        notifyError(settleErr, traceId)
+        return err(appError('PROVIDER_ERROR', GENERIC_FAILURE, traceId))
+      }
 
       return ok({ data, balanceAfter: debit.entry.balanceAfter })
     } catch (unexpected) {
