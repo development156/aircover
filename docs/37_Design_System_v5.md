@@ -97,39 +97,57 @@ same Readability Guard every *customer* theme passes through.
 
 ### 2.3 THE ACCENT IS A BUDGET, AND THE BUDGET IS PER SCREEN
 
-This is the most useful measurement in this document, and it says something
-different from "use less orange".
-
-Saturated pixels as a fraction of the frame, same method, same sampling, 1440px light:
+Saturated pixels as a fraction of the frame — `HSV s>0.30, v>0.25`, every second
+pixel, 1440px light. Same method for both products.
 
 | screen | saturated |
 |---|---|
 | **Reference** /settings | **0.030%** |
 | **Reference** /invoices | **0.218%** |
 | **Reference** /report | **1.064%** |
-| Sahoda v4 /settings | 0.505% |
-| Sahoda v4 /home | 0.487% |
-| Sahoda v4 /posts | 0.550% |
-| Sahoda v4 /connections | 0.605% |
-| Sahoda v4 /wallet | 0.526% |
-| Sahoda v4 /brain | 0.516% |
+| Sahoda /create | 0.052% |
+| Sahoda /approvals | 0.116% |
+| Sahoda /home | 0.487% |
+| Sahoda /analytics | 0.498% |
+| Sahoda /settings | 0.505% |
+| Sahoda /brain | 0.516% |
+| Sahoda /wallet | 0.526% |
+| Sahoda /posts | 0.550% |
+| Sahoda /connections | 0.605% |
+| Sahoda /planner | 2.883% |
 
-The reference is **not** using less accent on average — on `/report` it uses
-roughly **twice** what Sahoda's busiest screen does. It ranges over a **35× spread**
-(0.030% → 1.064%). Sahoda ranges over **1.24×** (0.487% → 0.605%).
+> **A CORRECTION, KEPT ON THE RECORD.** An earlier draft of this section claimed
+> Sahoda spread over **1.24×** against the reference's 35×, and concluded the accent
+> was "distributed uniformly". **That was wrong, and it was wrong because of how the
+> sample was picked** — six screens that happen to resemble each other. Across ten
+> routes the real spread is **55×** (0.052% → 2.883%), which is *wider* than the
+> reference's 35×. The uniformity claim does not survive its own measurement and is
+> withdrawn. A conclusion drawn from a convenience sample is the failure this
+> document exists to prevent, so it is corrected here rather than quietly deleted.
 
-> **The accent was not rationed. It was distributed uniformly.** Every screen spent
-> about half a percent on orange regardless of what the screen was for, which is
-> exactly how an accent stops meaning anything: if it is everywhere, it points at
-> nothing.
+**What the measurement does support**, and it is narrower but real:
 
-**The rule.** The accent is spent on *the one thing the screen is for*. A settings
-screen spends approximately zero. A screen whose job is one measured quantity
-spends it on that quantity. If two screens with different jobs come out at the
-same number, the accent has become a texture and something is wrong.
+- **The reference spends ~0 on a configuration screen.** Its `/settings` is
+  **0.030%**; Sahoda's is **0.505%** — **17× more orange on a screen whose entire job
+  is configuration**, where nothing is being reported and nothing is being urged.
+- **The reference is not using less accent on average.** On `/report` it uses roughly
+  **twice** what Sahoda's typical screen does. Ration is not austerity; it is spending
+  the budget where the screen's job is.
+
+**The rule.** The accent is spent on *the one thing the screen is for*. A screen that
+configures something spends approximately zero. A screen whose job is one measured
+quantity spends it on that quantity. **A screen with nothing to report and nothing to
+urge should be near the floor, and Sahoda's configuration screens are not.**
 
 **One primary action per view.** Exactly one element per screen may carry the solid
 brand fill. Everything else is a secondary or a link.
+
+**v5 did not fix this, and P4 could not.** Measured after the shell landed, the same
+ten routes moved **+3% to +21%** — the accent went *up*, not down, because the dark
+rail's active item and its orange text are more saturated against a near-black ground
+than they were against white. The spend that matters is in the pages (a 1032px orange
+hero band, five cards each restating one absence), and pages are out of this lane's
+scope. **This section is the brief for the lanes that follow it.**
 
 ### 2.4 Never
 

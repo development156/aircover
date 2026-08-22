@@ -22,7 +22,7 @@ const TYPE: ReadonlyArray<[string, string, string]> = [
   [
     'type-h3',
     '650 · 16/22 · −0.008em',
-    'Card and row title. Added in v4 because a 7px cliff between h2 and body made every card title a hand-written text-[15px].',
+    'Card and row title. Added in v4 because a 7px cliff between h2 and body made every card title a hand-written fifteen-pixel literal.',
   ],
   [
     'type-body',
@@ -99,7 +99,11 @@ const ELEVATION: ReadonlyArray<[string, string, string]> = [
     'inset hairline',
     'When a surface must separate from a fill rather than from the page. An INSET ring, so a hover cannot reflow the layout. Never together with a border.',
   ],
-  ['--sh-card', '0 1px 2px / 3%', 'Almost nothing, deliberately. A card that sits on a busy ground.'],
+  [
+    '--sh-card',
+    '0 1px 2px / 3%',
+    'Almost nothing, deliberately. A card that sits on a busy ground.',
+  ],
   ['--sh-pop', '0 8px 28px / 10%', 'Popovers and menus — things that float and can be dismissed.'],
   ['--sh-lg', '0 24px 64px / 16%', 'Modals and drawers. The only rung that implies a scrim.'],
 ]
@@ -113,7 +117,11 @@ const MOTION: ReadonlyArray<[string, string, string]> = [
     '560ms',
     'Count-up only, and the exception is principled: a count-up is a REVEAL of one settled value, not a move between two states.',
   ],
-  ['--stagger', '40ms', 'The step between successive list items, capped at 8 so a 40-row table does not take 1.6s to arrive.'],
+  [
+    '--stagger',
+    '40ms',
+    'The step between successive list items, capped at 8 so a 40-row table does not take 1.6s to arrive.',
+  ],
   ['--ease', 'cubic-bezier(.2,0,.2,1)', 'Everything. One curve, so motion reads as one hand.'],
 ]
 
@@ -156,7 +164,7 @@ function Table({
     <div>
       <h3 className="type-h3 mb-2">{title}</h3>
       <div className="overflow-x-auto rounded-card border border-line-soft">
-        <table className="w-full border-collapse text-[13px]">
+        <table className="type-sm w-full border-collapse">
           <thead>
             <tr>
               {[head, 'Value', 'Why this step exists'].map((h) => (
