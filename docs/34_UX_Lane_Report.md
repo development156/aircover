@@ -164,6 +164,15 @@ a 4:1 image, no credits mid-action, a stale second session, leaving mid-edit, an
 URLs. The balance was zeroed through `app.apply_ledger_entry` — never a raw `UPDATE` on
 `credit_balances`, which has exactly one legal writer.
 
+**A gap in this journey, found by review rather than by capture, and now closed.** J4 originally
+ran at 1440 and 390 only, and J5 at 390 plus one landscape width — so **no mistake screen and no
+phone-specific screen was ever seen in the 700–1179 band**, the band docs/26 §9.1 makes the only
+interesting one and the band past audits found the most in. An error screen is precisely where a
+constrained layout gives way, because it is the layout carrying an extra sentence nobody
+budgeted for. 1024 is now in J4's matrix, and J5 gained the width where the bottom bar hands
+over to the collapsed rail. **The frames in this report predate that addition**; the routes it
+covers were swept at 1024 by J3, the mistake states were not.
+
 This journey produced the two worst findings in the lane, and both are honesty defects.
 
 **The ledger reported a spend as money arriving.** `credit_ledger` carries a CHECK requiring
@@ -443,6 +452,17 @@ outcome and not a reason to remove them.
 **Time to `load` is a different number.** 7552ms for `/home` and ~4800ms for the rest at 1440
 under throttle. First content is fast; full settle is not. Logged.
 
+> **These figures are scoped to `196c0fd` — the tree as I found it — and NOT to the tree this
+> lane leaves behind.** They were taken at 07:35 against the 04:14 build. One fix since then adds
+> server work to every `(app)` render: `AppLayout` is now `async` and awaits
+> `activeWorkspaceRead()` to decide whether the phone's FAB should exist. That read is
+> React-cached, but `Topbar` calls the UNCACHED `readWorkspaces`, so the cache has no other
+> consumer to share with and this is one extra workspace query per render rather than a free
+> hit. It is a small, indexed, RLS-scoped select and I would be surprised if it moved these
+> numbers — but I did not re-measure, so the honest statement is that I do not know. Re-running
+> `ux-motion.spec.ts`'s first test against the current build settles it in about a minute, and
+> that is the first thing to do before quoting any of these figures as current.
+
 ---
 
 ## 9. Which screens I OPENED, and which I only MEASURED
@@ -556,6 +576,14 @@ exactly what §4 designed it to do.
 | 21 | `/playbooks` refusal named no remedy | `playbooks/page.tsx` | medium |
 | 22 | "One click up there" pointed 400px the wrong way at 390 | `planner/page.tsx` | medium |
 | 23 | 62 words of implementation jargon in the composer's writing column | `writing-pane.tsx` | medium |
+
+**None of these 23 rests on a contaminated frame,** which is the obvious question after §7.5
+and deserves an answer rather than an implication. Fixes 1–6 and 18–19 are arithmetic or
+detector-derived (contrast ratios computed from the shipped token file, cursor and fill censuses
+read from the live DOM). Fixes 8, 13, 14 and 17 turn on geometry — a box that is too narrow, a
+wash that spans its container, a step scrolled past the edge. Fixes 7, 11, 12, 15, 16 and 20–23
+turn on text, on count, or on where a control leads. **Not one of them turns on the fill of a
+control near (836, 406) at 1440**, which is the only thing the stale pointer could change.
 
 **Guards added, so none of these can come back quietly:** `ux-detector-selftest` (11),
 `button.disabled-contrast` (5), `dark-surface-ladder` (5), `ink-on-brand` (2, scanning 927 files),

@@ -164,6 +164,35 @@ test.describe('ux j5 phone', () => {
     }
   })
 
+  /**
+   * The 700-1179 band, which this file otherwise never visits.
+   *
+   * J5 is deliberately 390-only — it covers what exists ONLY on a phone. But the
+   * bottom bar's boundary is 700, so 1024 is the first width where the bar is
+   * GONE and the rail is collapsed to icons, and that hand-off is the one thing
+   * about the phone shell that can only be seen from the other side of it.
+   */
+  test('the width where the bottom bar hands over to a collapsed rail', async ({
+    page,
+    signedIn,
+  }) => {
+    void signedIn
+    test.setTimeout(240_000)
+    await page.setViewportSize({ width: 1024, height: 900 })
+    await useTheme(page, 'light')
+    await bootstrap(page)
+    for (const route of ['/home', '/posts', '/posts/new', '/inbox', '/wallet', '/connections']) {
+      const ms = await timedGoto(page, route)
+      await shot(page, {
+        journey: JOURNEY,
+        stop: `P9-1024-${route.slice(1).replace(/\//g, '-')}`,
+        width: 1024,
+        theme: 'light',
+        ms,
+      })
+    }
+  })
+
   test('landscape, because a phone turns', async ({ page, signedIn }) => {
     void signedIn
     test.setTimeout(200_000)

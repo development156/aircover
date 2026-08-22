@@ -121,8 +121,23 @@ function pngOf(width: number, height: number): Buffer {
   ])
 }
 
+/**
+ * 1024 is in this list and it is not padding.
+ *
+ * The app has exactly two breakpoints, 700 and 1180 (docs/26 §9.1), so 390 and
+ * 1440 both land in terminal bands and NEITHER visits 700-1179. Past audits
+ * found their best defects there — a row pushing the page to 464px, a caption
+ * floating 178px from the box it names — and an ERROR screen is precisely where
+ * a constrained layout gives way, because it is the layout carrying an extra
+ * sentence nobody budgeted for.
+ *
+ * Light only at 1024: the dark-specific defects in this file (the AI-disclosure
+ * checkbox, the file pill) are theme defects rather than width defects, and they
+ * are already covered at both terminal widths.
+ */
 const COMBOS: { width: number; theme: Theme }[] = [
   { width: 1440, theme: 'light' },
+  { width: 1024, theme: 'light' },
   { width: 390, theme: 'light' },
   { width: 1440, theme: 'dark' },
   { width: 390, theme: 'dark' },
