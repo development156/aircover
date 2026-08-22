@@ -29,6 +29,37 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'sw
 export const metadata: Metadata = {
   title: { default: 'Sahoda', template: '%s · Sahoda' },
   description: 'AI Marketing OS',
+  /**
+   * The tab strip is browser chrome — it follows the OS colour scheme, not our
+   * in-app theme toggle, so this is `prefers-color-scheme` and never `data-theme`.
+   * (docs/ui-package/sahoda-labs/SPECIFICATION.md, asset rules.)
+   *
+   * BOTH PNG entries carry a media query on purpose. The package says "media
+   * variant first, plain one last as the Safari fallback", but an UNQUALIFIED
+   * entry declared last is picked by last-wins browsers regardless of scheme,
+   * which would silently kill the dark variant. The unqualified fallback is
+   * `app/favicon.ico` instead: Next `unshift`s a file-based favicon onto the
+   * front of this array (resolve-metadata.js), so it coexists with these two
+   * rather than overriding them, and it is guaranteed to be first.
+   *
+   * Naming reads backwards at a glance: favicon-dark.png is the DARK-INK mark,
+   * so it belongs on a light tab strip — which is exactly how bottom-nav.tsx
+   * uses it (`dark:hidden`).
+   *
+   * No `apple` entry, deliberately. Both marks are 594x508, and iOS composites a
+   * touch icon into a SQUARE — so pointing at either one hands Apple the exact
+   * distortion the .ico is padded to 594x594 to avoid. Padding one properly needs
+   * a background colour decision (transparent composites to black on iOS, which
+   * would swallow the dark-ink mark), and there is no token that says which.
+   * That is an owner call, not a defect fix; until then iOS falls back to its own
+   * page snapshot rather than to a squashed logo.
+   */
+  icons: {
+    icon: [
+      { url: '/brand/favicon-dark.png', type: 'image/png', media: '(prefers-color-scheme: light)' },
+      { url: '/brand/favicon-white.png', type: 'image/png', media: '(prefers-color-scheme: dark)' },
+    ],
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

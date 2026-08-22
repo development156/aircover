@@ -151,9 +151,10 @@ describe('queueTally', () => {
 })
 
 describe('entitlementOf', () => {
-  test('every registered field has an entitlement line', () => {
+  test('every registered field has an entitlement line and a group heading', () => {
     for (const field of BRAIN_FIELDS) {
       expect(entitlementOf(field).line.length).toBeGreaterThan(0)
+      expect(entitlementOf(field).heading.length).toBeGreaterThan(0)
     }
   })
 
@@ -171,6 +172,8 @@ describe('entitlementOf', () => {
       /\b(from|on) your (site|website|page|pdf|document)|we (read|found) (this|it) (in|on|at)|based on your (site|website|pdf)/i
     for (const entitlement of Object.values(ENTITLEMENT)) {
       expect(entitlement.line).not.toMatch(forbidden)
+      expect(entitlement.heading).not.toMatch(forbidden)
+      expect(entitlement.label).not.toMatch(forbidden)
     }
   })
 

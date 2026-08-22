@@ -30,12 +30,21 @@ export function InboxShell({
   list,
   thread,
   mobileShow,
+  hasSomethingToOpen = true,
 }: {
   /** Drives the banner only. The thread pane owns the empty-state copy. */
   emptiness: InboxEmptiness
   list: React.ReactNode
   thread: React.ReactNode
   mobileShow: 'list' | 'thread'
+  /**
+   * Is there anything in the list a reader could open? Default true, so the two
+   * detail routes are unchanged. The three list routes pass their own row count:
+   * with nothing to open, the context pane's instruction cannot be followed, so
+   * it stops being the third pane announcing nothing — the list keeps its quiet
+   * line and the thread keeps the reason, which is two statements, not three.
+   */
+  hasSomethingToOpen?: boolean
 }) {
   return (
     <div className="space-y-3" data-fullbleed>
@@ -48,7 +57,7 @@ export function InboxShell({
         <InboxPane kind="list">{list}</InboxPane>
         <InboxPane kind="thread">{thread}</InboxPane>
         <InboxPane kind="context">
-          <ContextPane />
+          <ContextPane hasSomethingToOpen={hasSomethingToOpen} />
         </InboxPane>
       </InboxPanes>
     </div>

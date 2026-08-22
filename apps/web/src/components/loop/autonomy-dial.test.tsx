@@ -132,9 +132,7 @@ describe('the Autonomy Dial', () => {
   })
 
   it('offers the dial when a channel is live, even alongside a lapsed one', () => {
-    render(
-      <AutonomyDial connected={['instagram']} lapsed={['x']} chosen={{}} defaultLevel={1} />,
-    )
+    render(<AutonomyDial connected={['instagram']} lapsed={['x']} chosen={{}} defaultLevel={1} />)
     expect(screen.queryAllByRole('radio').length).toBeGreaterThan(0)
     expect(screen.queryByText(/lapsed/i)).toBeNull()
   })

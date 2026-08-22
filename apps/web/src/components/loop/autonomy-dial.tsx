@@ -79,7 +79,10 @@ export function AutonomyDial({ connected, lapsed = [], chosen, defaultLevel }: A
               Your {lapsed.map((c) => CHANNEL_LABELS[c]).join(', ')}{' '}
               {lapsed.length === 1 ? 'connection has' : 'connections have'} lapsed, so there is
               nothing the Loop can post through right now.{' '}
-              <Link href="/connections" className="font-[550] text-accent underline underline-offset-2">
+              <Link
+                href="/connections"
+                className="font-[550] text-accent underline underline-offset-2"
+              >
                 Reconnect
               </Link>{' '}
               and the {lapsed.length === 1 ? 'dial comes' : 'dials come'} back.

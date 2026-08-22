@@ -80,7 +80,6 @@ const ROUTES = [
   '/brain/voice',
   '/brain/audience',
   '/brain/knowledge',
-  '/brain/competitors',
   '/brain/resolve',
   '/posts',
   '/posts/new',

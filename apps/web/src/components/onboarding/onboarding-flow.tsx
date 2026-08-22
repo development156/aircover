@@ -1,6 +1,13 @@
 'use client'
 
-import { useActionState, useEffect, useState, useTransition, type CSSProperties } from 'react'
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type CSSProperties,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { BrandFieldMetaMap, BrandMemoryPayload } from '@sahoda/shared'
@@ -75,6 +82,25 @@ export function OnboardingFlow({
     null,
   )
 
+  /**
+   * The money guard. `newResolveObjectRef` mints a FRESH ledger key per call, so
+   * two dispatches are two charges — and React's action queue does not drop the
+   * second, it runs it once the first settles (MEASURED: two same-tick dispatches
+   * on an ungated control invoke the action twice). A ref, not render state: it
+   * has to hold in the same tick as the second press, before React has
+   * re-rendered anything.
+   */
+  const inFlight = useRef(false)
+  /**
+   * Render mirror of the guard. The screens ask THIS, not `isPending`, whether a
+   * resolve is running: QA frames j1-09/j1-10 (2026-08-22) caught the resolve
+   * button enabled and labelled "Resolve my brand · free" mid-resolve. Why
+   * `isPending` read false there is not established, so this does not explain it —
+   * it removes the dependency on it. Never the guard itself; a ref is.
+   */
+  const [dispatched, setDispatched] = useState(false)
+  const resolving = isPending || dispatched
+
   const [screen, setScreen] = useState<Screen>(savedBrain ? 'reveal' : 'intake')
   const [intake, setIntake] = useState<Intake>(DEFAULT_INTAKE)
   const [intakeText, setIntakeText] = useState('')
@@ -114,6 +140,12 @@ export function OnboardingFlow({
   const [saveState, setSaveState] = useState<SaveBrandState | null>(null)
 
   useEffect(() => {
+    // Every return path of `resolveOnboarding` yields a fresh object, so this
+    // effect runs on every settle: success, fallback, insufficient and error.
+    // Keyed on `state`, NEVER on `isPending` — if `isPending` never flips, an
+    // `[isPending]` release never fires and the button latches dead forever.
+    inFlight.current = false
+    setDispatched(false)
     if (!state) return
 
     if (state.ok) {
@@ -158,9 +190,20 @@ export function OnboardingFlow({
   }
 
   function handleResolve(answer: string): void {
+    if (inFlight.current) return
+    inFlight.current = true
+    setDispatched(true)
     setRefusal(answer)
     setAttemptError(null)
     formAction(buildFormData(answer))
+  }
+
+  /** Same charge, same guard: six Regenerate buttons share one dispatch. */
+  function handleRegenerate(): void {
+    if (inFlight.current) return
+    inFlight.current = true
+    setDispatched(true)
+    formAction(buildFormData(refusal))
   }
 
   /**
@@ -283,7 +326,7 @@ export function OnboardingFlow({
           {screen === 'question' ? (
             <QuestionStep
               intake={intake}
-              isPending={isPending}
+              isPending={resolving}
               isFree={isFree}
               cost={cost}
               attemptError={attemptError}
@@ -318,9 +361,9 @@ export function OnboardingFlow({
               // so a card reading "Uses 50 credits" would be quoting a charge
               // the server is not going to make.
               regenerateCost={isFree ? 'free' : cost}
-              regeneratePending={isPending}
+              regeneratePending={resolving}
               regenerateError={attemptError}
-              onRegenerate={() => formAction(buildFormData(refusal))}
+              onRegenerate={handleRegenerate}
               onFinish={handleFinish}
               saving={isSaving}
               saveState={saveState}

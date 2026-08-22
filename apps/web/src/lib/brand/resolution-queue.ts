@@ -139,20 +139,24 @@ export function queueTally(queue: readonly QueueEntry[]): QueueTally {
  * there. See `brain-origin.ts`.
  */
 export interface Entitlement {
-  /** Short label for the row. */
+  /** Short marker for ONE row. Singular. Not rendered visibly; it is the row's sr-only marker. */
   label: string
-  /** One sentence: what the contract says about this kind of field. */
+  /** Header over the whole run of rows of this kind. Plural. */
+  heading: string
+  /** One sentence: what the contract says about this kind of field. Stated once per group. */
   line: string
 }
 
 export const ENTITLEMENT: Record<BrainFieldMetaKind, Entitlement> = {
   asked: {
     label: 'Only you know this',
-    line: 'Sahoda is not entitled to answer this one — it filled it in so the Brain would work at all, and its guess here is worth less than yours on any day.',
+    heading: 'Only you know these',
+    line: 'Sahoda is not entitled to answer these — it filled them in so the Brain would work at all, and its guesses here are worth less than yours on any day.',
   },
   negotiated: {
     label: 'Sahoda proposed this',
-    line: 'This is the kind of field Sahoda is meant to draft: you have the instinct, it has the craft. Keep it, or say it differently.',
+    heading: 'Sahoda proposed these',
+    line: 'These are the fields Sahoda is meant to draft: you have the instinct, it has the craft. Keep each one, or say it differently.',
   },
 }
 

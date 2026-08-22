@@ -96,6 +96,43 @@ test.describe('@smoke entrance', () => {
 })
 
 /**
+ * Alpha of a colour the ENGINE resolved — never of a raw token string.
+ *
+ * `getPropertyValue('--scrim')` hands back the token AFTER the minifier has
+ * had it: `next build` rewrites `rgb(0 0 0 / 0.4)` to `#0006` (dark's 0.62 to
+ * `#0000009e`). MEASURED both through lightningcss 1.32.0 and in Chromium.
+ * The first version of this helper was
+ * `Number(c.match(/[\d.]+\s*\)$/)?.[0].replace(')','') ?? '1')`, which needs a
+ * closing paren — so a hex fell to `?? '1'` and "could not read this colour"
+ * became "the alpha is 1", failing the test against a backdrop that was
+ * correct at 0.4. In the other direction it read `rgb(0, 0, 0)` as 0, having
+ * captured the blue channel: opaque reported as fully transparent.
+ *
+ * The fix is not a better regex. The token is resolved through a probe element
+ * (the idiom already in `connections-honesty.spec.ts`), so the browser — the
+ * only thing that has to agree with the browser — normalises the hex and rgb()
+ * forms the minifier can produce, and this stops depending on whether the CSS
+ * was minified. MEASURED, so the comment does not overclaim: Chromium keeps
+ * `oklch()` and `color-mix()` in computed style rather than converting them, so
+ * authoring `--scrim` in either would reach the end of this function and THROW.
+ * That is the designed behaviour, not an oversight — a measurement helper that
+ * returns a plausible number when it failed to measure is worse than one with
+ * no fallback at all.
+ */
+function alphaOf(color: string): number {
+  const args = /^rgba?\(([^)]+)\)$/i.exec(color.trim())?.[1]
+  if (args !== undefined) {
+    const [r, g, b, a] = args.split(/[\s,/]+/).filter(Boolean)
+    if (r !== undefined && g !== undefined && b !== undefined) {
+      if (a === undefined) return 1
+      const n = a.endsWith('%') ? Number.parseFloat(a) / 100 : Number.parseFloat(a)
+      if (Number.isFinite(n)) return n
+    }
+  }
+  throw new Error(`alphaOf: not a resolved rgb()/rgba() colour: ${JSON.stringify(color)}`)
+}
+
+/**
  * The scrim, on rendered pixels.
  *
  * Both overlay primitives asked for `backdrop:bg-black/40`. `globals.css` opens
@@ -127,23 +164,36 @@ test.describe('@smoke scrim', () => {
     await page.goto('/design-system')
     await page.getByRole('button', { name: 'Open modal' }).click()
 
-    const { backdrop, token } = await page.evaluate(() => {
+    const { backdrop, token, rawToken } = await page.evaluate(() => {
       const dialog = document.querySelector('dialog[open]')
-      if (!dialog) return { backdrop: '', token: '' }
+      if (!dialog) return { backdrop: '', token: '', rawToken: '' }
+      // The token AS AUTHORED is `#0006` in a production build and
+      // `rgb(0 0 0 / 0.4)` in dev — two strings for one colour, and neither is
+      // something a test should have to parse. Hand it to the engine and read
+      // back what the engine computes, which is always rgb()/rgba().
+      const raw = getComputedStyle(document.documentElement).getPropertyValue('--scrim').trim()
+      const probe = document.createElement('span')
+      probe.style.backgroundColor = raw
+      document.body.append(probe)
+      const token = getComputedStyle(probe).backgroundColor
+      probe.remove()
       return {
         // ::backdrop is not an element — it is read through the dialog.
         backdrop: getComputedStyle(dialog, '::backdrop').backgroundColor,
-        token: getComputedStyle(document.documentElement).getPropertyValue('--scrim').trim(),
+        token,
+        rawToken: raw,
       }
     })
 
     expect(backdrop).not.toBe('')
-    // Compare by ALPHA rather than by string: the token is authored
-    // `rgb(0 0 0 / .4)` and composites as `rgba(0, 0, 0, 0.4)`, so a literal
-    // match would fail on formatting rather than on the thing being tested.
-    const alphaOf = (c: string) => Number(c.match(/[\d.]+\s*\)$/)?.[0].replace(')', '') ?? '1')
+    expect(rawToken, '--scrim is not defined on :root').not.toBe('')
+    // Compare by ALPHA, not by string.
     expect(alphaOf(backdrop)).toBeCloseTo(alphaOf(token), 2)
-    // And explicitly not the browser default the bug produced.
+    // A token that reads as fully opaque or fully transparent is a parse
+    // failure wearing a number — the exact shape of the bug this replaced.
+    expect(alphaOf(token)).toBeGreaterThan(0.15)
+    expect(alphaOf(token)).toBeLessThan(1)
+    // And explicitly not the browser default the original bug produced (0.1).
     expect(alphaOf(backdrop)).toBeGreaterThan(0.15)
   })
 })

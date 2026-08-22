@@ -55,7 +55,10 @@ export function ConfirmedFieldsMeter({ fieldMeta }: ConfirmedFieldsMeterProps) {
   const none = ring.confirmed === 0
 
   return (
-    <div data-guide="onboarding.confirmed-fields" className="surface-ring rounded-card bg-surface p-4">
+    <div
+      data-guide="onboarding.confirmed-fields"
+      className="surface-ring rounded-card bg-surface p-4"
+    >
       <div className="type-eyebrow mb-2 flex items-center justify-between text-muted">
         <span>Confirmed by you</span>
         <span className="tabular-nums text-accent">

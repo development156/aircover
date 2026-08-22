@@ -37,14 +37,11 @@ export default async function InboxMessagesPage() {
     <InboxShell
       emptiness={decision.state}
       mobileShow={conversations.length > 0 ? 'list' : 'thread'}
+      hasSomethingToOpen={conversations.length > 0}
       list={
         <ConversationList
           conversations={conversations}
-          emptyLine={
-            decision.showList
-              ? 'No conversations yet.'
-              : 'Nothing read yet — see the panel beside this one.'
-          }
+          emptyLine={decision.showList ? 'No conversations yet.' : 'Nothing read yet.'}
         />
       }
       thread={

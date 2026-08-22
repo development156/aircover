@@ -71,7 +71,6 @@ const ROUTES: ReadonlyArray<{ path: string; slug: string; archetype: string }> =
   // reason they were missing is that nobody added the row.
   { path: '/create', slug: 'create', archetype: 'chooser' },
   { path: '/brain/voice', slug: 'brain-voice', archetype: 'long form' },
-  { path: '/brain/competitors', slug: 'brain-competitors', archetype: 'long form' },
   { path: '/settings/profile', slug: 'settings-profile', archetype: 'form' },
   { path: '/settings/integrations', slug: 'settings-integrations', archetype: 'form' },
   { path: '/design-system', slug: 'design-system', archetype: 'gallery' },
@@ -87,9 +86,15 @@ const ROUTES: ReadonlyArray<{ path: string; slug: string; archetype: string }> =
   //                         onboarding is the screen you see when you do NOT
   //                         have one. Same failure: it would photograph the
   //                         completed state and file it as the empty one.
+  //   /brain/competitors  — a redirect to /radar since the watch list moved
+  //                         there. There is no competitors screen to shoot, so
+  //                         the camera filed a Radar frame under a second path
+  //                         and the next pass read it back as two URLs for one
+  //                         screen. Sampled here until 2026-08-22, when it did.
   //
-  // Both need a fixture whose user is in the state the screen exists to serve.
-  // Auditing them from code is honest; auditing them from a redirect is not.
+  // The first two need a fixture whose user is in the state the screen exists to
+  // serve; the third has no screen behind it at all. Auditing them from code is
+  // honest; auditing them from a redirect is not.
 ]
 
 /**

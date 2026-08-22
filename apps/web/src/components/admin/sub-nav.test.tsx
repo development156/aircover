@@ -39,6 +39,18 @@ describe('the nav does not lie about where it can take you', () => {
     expect(screen.getByText(/Later/)).toBeInTheDocument()
   })
 
+  /**
+   * `aria-disabled` describes a control that EXISTS and is currently
+   * unavailable. A screen nobody has built is not an unavailable control — it is
+   * not a control. Announcing it as one is the same class of claim as a
+   * coming-soon `<button disabled>`, which this codebase already refuses.
+   */
+  it('does not announce an unbuilt section as a disabled control', () => {
+    render(<AdminSubNav sections={[{ label: 'Later', pending: 'SL-099' }]} />)
+
+    expect(screen.getByText(/Later/).getAttribute('aria-disabled')).toBeNull()
+  })
+
   it('names the card that builds an unbuilt section', () => {
     render(<AdminSubNav sections={[{ label: 'Later', pending: 'SL-099' }]} />)
 

@@ -15,6 +15,7 @@ import { SignalLockCard } from './cards/signal-lock-card'
 import { TabooCard } from './cards/taboo-card'
 import { VoiceCard } from './cards/voice-card'
 import { ConfirmedFieldsMeter } from './confirmed-fields-meter'
+import { ResolvingPanel } from './resolving-panel'
 
 export interface RevealStepProps {
   brain: BrandMemoryPayload
@@ -121,6 +122,12 @@ export function RevealStep({
       ) : null}
 
       <ConfirmedFieldsMeter fieldMeta={fieldMeta} />
+
+      {/* One honest status instead of six dimmed buttons. `ResolvingPanel` is
+          already role="status" aria-live="polite" and carries the real elapsed
+          clock, so a re-resolve says what it is doing exactly as the first one
+          did on the question step. */}
+      {regeneratePending ? <ResolvingPanel isFree={regenerateCost === 'free'} /> : null}
 
       <div className="grid gap-4 narrow:grid-cols-2">
         <SignalLockCard

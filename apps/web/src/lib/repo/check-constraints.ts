@@ -81,7 +81,9 @@ export function readConstraints(root = repoRoot()): ConstraintMap {
     const stripped = sql.replace(/--[^\n]*/g, '')
 
     // 1) Inline column definitions inside `create table <tbl> ( ... )`.
-    for (const table of stripped.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?([a-z_.]+)\s*\(/gi)) {
+    for (const table of stripped.matchAll(
+      /create\s+table\s+(?:if\s+not\s+exists\s+)?([a-z_.]+)\s*\(/gi,
+    )) {
       const body = stripped.slice((table.index ?? 0) + g(table, 0).length)
       const end = body.search(/\n\s*\)\s*;/)
       const cols = end === -1 ? body : body.slice(0, end)
@@ -171,7 +173,10 @@ export function resolveConstArrays(root = repoRoot()): Map<string, string[]> {
  * `.from()` chains inside one `Promise.all`, and without it the connections
  * filter and the `memory_events` filter would be attributed to each other.
  */
-export function findComparisons(root = repoRoot(), consts = resolveConstArrays(root)): Comparison[] {
+export function findComparisons(
+  root = repoRoot(),
+  consts = resolveConstArrays(root),
+): Comparison[] {
   const found: Comparison[] = []
 
   for (const file of sourceFiles(root)) {
@@ -199,7 +204,9 @@ export function findComparisons(root = repoRoot(), consts = resolveConstArrays(r
           form: `.${g(eq, 1)}('${g(eq, 2)}', '${g(eq, 3)}')`,
         })
       }
-      for (const inc of window.matchAll(/\.(in|not)\(\s*'([a-z_]+)'\s*,\s*(?:'in'\s*,\s*)?\[([^\]]*)\]/g)) {
+      for (const inc of window.matchAll(
+        /\.(in|not)\(\s*'([a-z_]+)'\s*,\s*(?:'in'\s*,\s*)?\[([^\]]*)\]/g,
+      )) {
         const literal = [...g(inc, 3).matchAll(QUOTED)].map((q) => g(q, 1))
         const spread = [...g(inc, 3).matchAll(/\.\.\.\s*([A-Z][A-Z0-9_]*)/g)].flatMap(
           (sp) => consts.get(g(sp, 1)) ?? [],
@@ -231,13 +238,29 @@ export function findComparisons(root = repoRoot(), consts = resolveConstArrays(r
        */
       const alias = new Map<string, string>()
       const tables = new Set<string>()
-      for (const t of body.matchAll(/\b(?:from|join)\s+([a-z_]+)(?:\s+(?:as\s+)?([a-z][a-z0-9_]*))?/gi)) {
+      for (const t of body.matchAll(
+        /\b(?:from|join)\s+([a-z_]+)(?:\s+(?:as\s+)?([a-z][a-z0-9_]*))?/gi,
+      )) {
         const table = g(t, 1).toLowerCase()
         if (table === 'lateral' || table === 'select') continue
         tables.add(table)
         alias.set(table, table)
         const a = t[2]?.toLowerCase()
-        if (a && !['on', 'where', 'order', 'group', 'limit', 'left', 'inner', 'join', 'and', 'as'].includes(a)) {
+        if (
+          a &&
+          ![
+            'on',
+            'where',
+            'order',
+            'group',
+            'limit',
+            'left',
+            'inner',
+            'join',
+            'and',
+            'as',
+          ].includes(a)
+        ) {
           alias.set(a, table)
         }
       }
@@ -264,7 +287,9 @@ export function findComparisons(root = repoRoot(), consts = resolveConstArrays(r
           form: `${cmp[1] ? `${cmp[1]}.` : ''}${g(cmp, 2)} = '${g(cmp, 3)}'`,
         })
       }
-      for (const cmp of body.matchAll(/(?:\b([a-z][a-z0-9_]*)\.)?\b([a-z_]+)\s+in\s*\(([^)]*'[^)]*)\)/gi)) {
+      for (const cmp of body.matchAll(
+        /(?:\b([a-z][a-z0-9_]*)\.)?\b([a-z_]+)\s+in\s*\(([^)]*'[^)]*)\)/gi,
+      )) {
         const table = tableFor(cmp[1])
         if (!table) continue
         const values = [...g(cmp, 3).matchAll(QUOTED)].map((q) => g(q, 1))

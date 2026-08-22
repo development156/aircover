@@ -1,28 +1,63 @@
 import { describe, expect, test, vi } from 'vitest'
 
-import { bootstrapWithRetry, deriveWorkspaceName, mapBootstrapError } from './workspace-bootstrap'
+import { slugify } from './slug'
+import {
+  bootstrapWithRetry,
+  deriveSlugSeed,
+  deriveWorkspaceName,
+  mapBootstrapError,
+} from './workspace-bootstrap'
 
 describe('deriveWorkspaceName', () => {
   test('uses a valid provided name, trimmed', () => {
-    expect(deriveWorkspaceName('  Acme Co  ', {})).toBe('Acme Co')
-  })
-
-  test('falls back to a possessive of the first name when none is given', () => {
-    expect(deriveWorkspaceName('', { firstName: 'Divya' })).toBe("Divya's workspace")
-  })
-
-  test('prefers first name, then username, then the email local part', () => {
-    expect(deriveWorkspaceName(null, { username: 'neo' })).toBe("neo's workspace")
-    expect(deriveWorkspaceName(null, { email: 'trinity@zion.io' })).toBe("trinity's workspace")
-  })
-
-  test('ultimate fallback is a generic name', () => {
-    expect(deriveWorkspaceName(undefined, {})).toBe('My workspace')
-    expect(deriveWorkspaceName('   ', { firstName: '  ' })).toBe('My workspace')
+    expect(deriveWorkspaceName('  Acme Co  ')).toBe('Acme Co')
   })
 
   test('caps an overlong provided name at 120 chars', () => {
-    expect(deriveWorkspaceName('a'.repeat(200), {})).toHaveLength(120)
+    expect(deriveWorkspaceName('a'.repeat(200))).toHaveLength(120)
+  })
+
+  // THE DEFECT. The display name was built from the creator's Clerk identity,
+  // so an account with no firstName and no username was labelled with its email
+  // local part everywhere the name goes — including out to Zernio.
+  test('never names a workspace after the person who made it', () => {
+    expect(deriveWorkspaceName(null)).toBe('My workspace')
+    expect(deriveWorkspaceName('')).toBe('My workspace')
+    expect(deriveWorkspaceName('   ')).toBe('My workspace')
+    expect(deriveWorkspaceName(undefined)).toBe('My workspace')
+  })
+})
+
+describe('deriveSlugSeed', () => {
+  test('a provided name still seeds the slug', () => {
+    expect(deriveSlugSeed('  Acme Co  ', {})).toBe('Acme Co')
+  })
+
+  test('falls back to a possessive: first name, then username, then email local part', () => {
+    expect(deriveSlugSeed('', { firstName: 'Divya' })).toBe("Divya's workspace")
+    expect(deriveSlugSeed(null, { username: 'neo' })).toBe("neo's workspace")
+    expect(deriveSlugSeed(null, { email: 'trinity@zion.io' })).toBe("trinity's workspace")
+  })
+
+  test('ultimate fallback is the generic name', () => {
+    expect(deriveSlugSeed(undefined, {})).toBe('My workspace')
+    expect(deriveSlugSeed('   ', { firstName: '  ' })).toBe('My workspace')
+  })
+
+  // THE REGRESSION GUARD. Splitting the name from the seed must not move a
+  // single slug. `trinity` is a far denser namespace than `trinity-s-workspace`
+  // and bootstrapWithRetry only tries 5 suffixes, so a "simplified" seed makes
+  // the 6th "Divya" hit "That name is taken" on a form with no name field.
+  test('produces byte-identical slugs to the pre-split derivation', () => {
+    expect(slugify(deriveSlugSeed(null, { email: 'trinity@zion.io' }))).toBe('trinity-s-workspace')
+    expect(slugify(deriveSlugSeed(null, { firstName: 'Divya' }))).toBe('divya-s-workspace')
+    expect(slugify(deriveSlugSeed('Acme Co', {}))).toBe('acme-co')
+  })
+
+  test('the seed keeps the identity the display name gave up', () => {
+    const identity = { email: 'sahoda.qa.mt3dx336uhcws1+clerk_test@example.com' }
+    expect(deriveWorkspaceName(null)).toBe('My workspace')
+    expect(deriveSlugSeed(null, identity)).toContain('clerk_test')
   })
 })
 
