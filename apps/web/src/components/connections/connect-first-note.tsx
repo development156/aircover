@@ -61,7 +61,7 @@ export function ConnectFirstNote({ connections }: { connections: ConnectedChanne
     <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
       <Plug size={13} strokeWidth={2} className="shrink-0 text-muted" aria-hidden />
       <span className="type-sm text-muted">
-        No channel is connected yet — you can write and plan, but nothing can go out.
+        No channel is connected yet. You can write and plan, but nothing can go out.
       </span>
       {/* `text-accent` is `--acc`, the darkened step that clears AA on every
           light ground (§2.2). Accent TEXT is legal where an accent FILL is not,

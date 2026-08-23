@@ -137,7 +137,7 @@ export default async function PlannerPage({
             <EmptyState
               icon={CalendarDays}
               title="Create a workspace to plan a week"
-              body="A plan belongs to a workspace and you don't have one yet. Nothing failed — there is simply no week to fill until one exists."
+              body="A plan belongs to a workspace and you don't have one yet. Nothing failed. There is simply no week to fill until one exists."
               action={<CreateWorkspaceButton variant="primary" />}
             />
           ) : posts.length === 0 ? (
@@ -150,7 +150,7 @@ export default async function PlannerPage({
                  breakpoints (docs/26 §9.1) any direction word is a claim about
                  one of them; naming the control instead survives every reflow. */
               body="Plan my week drafts five posts and places them across your coming week."
-              tip="Add goals first if you have a push this week — the plan bends toward them."
+              tip="Add goals first if you have a push this week: the plan bends toward them."
             />
           ) : view === 'month' ? (
             // 42 IST days from the Monday on or before the 1st — `bucketWeek`

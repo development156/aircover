@@ -173,7 +173,7 @@ export default async function AnalyticsPage() {
               {rows.length > ANALYTICS_METRIC_CALLS ? (
                 <p className="type-meta text-muted">
                   Metrics are read for the first {ANALYTICS_METRIC_CALLS} published channels on this
-                  page. The rest are listed as not loaded — open a post to read its own.
+                  page. The rest are listed as not loaded. Open a post to read its own.
                 </p>
               ) : null}
             </>

@@ -146,7 +146,7 @@ export function YourDataPanel() {
     } catch {
       setDownload({
         kind: 'error',
-        message: 'The download stopped before it finished. Nothing was saved — try again.',
+        message: 'The download stopped before it finished. Nothing was saved. Try again.',
       })
     }
   }, [])
@@ -226,7 +226,7 @@ export function YourDataPanel() {
           <p className="mt-1.5 type-meta text-muted">
             Your posts and their per-channel wording, your Brand Brain, your conversations and
             enquiries, every credit movement, your pictures and documents, and how your posts
-            performed. It lists anything it could not include and why — so you can tell an empty
+            performed. It lists anything it could not include and why, so you can tell an empty
             section from a missing one.
           </p>
         </details>
@@ -341,7 +341,7 @@ export function YourDataPanel() {
             </p>
             <p>
               Your credit and payment record is kept, and nothing in it can be reached from this app
-              any more. Your sign-in account is separate — close that with your sign-in provider if
+              any more. Your sign-in account is separate. Close that with your sign-in provider if
               you want it gone too.
             </p>
           </div>
@@ -369,7 +369,7 @@ export function YourDataPanel() {
               <p className="mt-1.5 type-body text-muted">
                 Your credit and payment record. It is the account of what you paid and what you were
                 charged, it can settle a disagreement in your favour as easily as ours, and Indian
-                tax law requires it to be kept for years. It holds a reference to you — for most
+                tax law requires it to be kept for years. It holds a reference to you: for most
                 rows a sign-in code rather than your name.
               </p>
             </div>

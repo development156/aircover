@@ -146,7 +146,7 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
               shape speaks for itself and this line is not rendered. */}
           {activeDays > 0 && activeDays < 3 ? (
             <p className="type-meta text-muted">
-              {activeDays === 1 ? 'One day' : `${activeDays} days`} with activity so far — not
+              {activeDays === 1 ? 'One day' : `${activeDays} days`} with activity so far, not
               enough to read as a trend.
             </p>
           ) : null}

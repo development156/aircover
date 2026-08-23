@@ -260,7 +260,7 @@ export function ScheduleField({
           className="inline-flex items-center gap-1 text-muted underline underline-offset-2 transition-micro hover:text-ink"
         >
           <XIcon size={12} strokeWidth={2} aria-hidden />
-          <span className="type-meta">Clear the schedule — keep this a draft</span>
+          <span className="type-meta">Clear the schedule, keep this a draft</span>
         </button>
       ) : null}
 

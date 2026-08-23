@@ -45,7 +45,7 @@ const REPORT_OUTLINE: ReadonlyArray<{ title: string; what: string }> = [
   },
   {
     title: 'The post that reached the most people',
-    what: 'The single best-performing post of the week, and the one that did least — named only when at least two were measured.',
+    what: 'The single best-performing post of the week, and the one that did least, named only when at least two were measured.',
   },
   {
     title: 'What Sahoda learned',

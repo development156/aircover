@@ -132,7 +132,7 @@ export function analyticsReadiness({
       // channel is still never measured, so sending someone to the composer
       // alone routes them the long way round to this same page.
       detail: hasPublished
-        ? 'Your posts went out, but reach and followers come from a connected account — so there is nothing to read them from.'
+        ? 'Your posts went out, but reach and followers come from a connected account, so there is nothing to read them from.'
         : 'Reach and followers come from the channel itself, so one connection starts them even before you post.',
       remedy: CONNECT,
       second: hasPublished ? null : WRITE,
@@ -153,7 +153,7 @@ export function analyticsReadiness({
 
   return {
     kind: 'waiting',
-    headline: 'Measuring — nothing has reported yet',
+    headline: 'Measuring: nothing has reported yet',
     detail:
       'Your posts are out and the channels have not returned figures for them yet. This fills in on the platform’s own schedule; there is nothing to do.',
   }

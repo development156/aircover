@@ -162,7 +162,7 @@ export function PerformanceStrip({
            things. The mark is right where four numbers would otherwise be; it
            is noise in front of a sentence that says more than it does. */
         <p className="type-body text-muted">
-          Reach, views, accounts engaged and interactions — not measured yet.
+          Reach, views, accounts engaged and interactions: not measured yet.
         </p>
       ) : (
         <dl className="grid grid-cols-4 gap-x-4 gap-y-3 max-wide:grid-cols-2 max-narrow:grid-cols-2">
