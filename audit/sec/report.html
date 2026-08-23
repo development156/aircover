@@ -1,0 +1,1672 @@
+<title>The Harness Lied Four Times</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+/>
+
+<style>
+  :root {
+    --ground: #f2f5f6;
+    --surface: #ffffff;
+    --surface-2: #eaeef0;
+    --ink: #11161b;
+    --muted: #57646f;
+    --faint: #7d8893;
+    --line: #d9e0e3;
+    --line-firm: #bcc7cc;
+    --accent: #14615c;
+    --accent-soft: #dcebe8;
+    --closed: #2c6a4a;
+    --closed-bg: #dcece2;
+    --open: #9b4510;
+    --open-bg: #f6e5d8;
+    --unproven: #5c6570;
+    --unproven-bg: #e4e8ea;
+    --shadow: 0 1px 2px rgba(17, 22, 27, 0.05), 0 8px 24px -16px rgba(17, 22, 27, 0.25);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --ground: #0d1114;
+      --surface: #151a1f;
+      --surface-2: #1d242a;
+      --ink: #e3e8ec;
+      --muted: #96a2ad;
+      --faint: #74808b;
+      --line: #262f36;
+      --line-firm: #37434c;
+      --accent: #63b8ae;
+      --accent-soft: #16302e;
+      --closed: #7dc39a;
+      --closed-bg: #162b22;
+      --open: #e0955c;
+      --open-bg: #33210f;
+      --unproven: #9aa4ae;
+      --unproven-bg: #212930;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -16px rgba(0, 0, 0, 0.8);
+    }
+  }
+  :root[data-theme='dark'] {
+    --ground: #0d1114;
+    --surface: #151a1f;
+    --surface-2: #1d242a;
+    --ink: #e3e8ec;
+    --muted: #96a2ad;
+    --faint: #74808b;
+    --line: #262f36;
+    --line-firm: #37434c;
+    --accent: #63b8ae;
+    --accent-soft: #16302e;
+    --closed: #7dc39a;
+    --closed-bg: #162b22;
+    --open: #e0955c;
+    --open-bg: #33210f;
+    --unproven: #9aa4ae;
+    --unproven-bg: #212930;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -16px rgba(0, 0, 0, 0.8);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family:
+      'IBM Plex Sans',
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+  .measure {
+    max-width: 68ch;
+  }
+
+  /* ── masthead ─────────────────────────────────────────────── */
+  header.masthead {
+    padding: 72px 0 40px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: Newsreader, Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(38px, 6vw, 58px);
+    line-height: 1.05;
+    letter-spacing: -0.018em;
+    margin: 0 0 20px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-family: Newsreader, Georgia, serif;
+    font-size: 20px;
+    line-height: 1.5;
+    color: var(--muted);
+    margin: 0;
+    max-width: 60ch;
+  }
+
+  .runmeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 32px;
+    padding: 18px 0 0;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--faint);
+  }
+  .runmeta b {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* ── scoreboard ───────────────────────────────────────────── */
+  .board {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin: 40px 0 0;
+  }
+  .board div {
+    background: var(--surface);
+    padding: 18px 20px;
+  }
+  .board .n {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 28px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    display: block;
+  }
+  .board .k {
+    font-size: 12px;
+    color: var(--muted);
+    display: block;
+    margin-top: 6px;
+    line-height: 1.35;
+  }
+
+  /* ── sections ─────────────────────────────────────────────── */
+  section {
+    margin-top: 76px;
+    scroll-margin-top: 24px;
+  }
+  h2 {
+    font-family: Newsreader, Georgia, serif;
+    font-weight: 600;
+    font-size: 30px;
+    letter-spacing: -0.012em;
+    line-height: 1.2;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  h2 .tag {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 400;
+  }
+  .lede {
+    color: var(--muted);
+    margin: 0 0 30px;
+    max-width: 66ch;
+  }
+  h3 {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    margin: 40px 0 8px;
+    letter-spacing: -0.005em;
+  }
+  p {
+    margin: 0 0 16px;
+    max-width: 68ch;
+  }
+  a {
+    color: var(--accent);
+    text-underline-offset: 2px;
+  }
+  a:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* ── finding ledger ───────────────────────────────────────── */
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--line-firm);
+    box-shadow: var(--shadow);
+    padding: 22px 24px;
+    margin: 0 0 14px;
+  }
+  .finding.closed {
+    border-left-color: var(--closed);
+  }
+  .finding.open {
+    border-left-color: var(--open);
+  }
+  .finding.note {
+    border-left-color: var(--unproven);
+  }
+
+  .fhead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .fhead h4 {
+    font-size: 16.5px;
+    font-weight: 600;
+    margin: 0;
+    flex: 1 1 320px;
+    letter-spacing: -0.005em;
+  }
+  .chip {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .chip.closed {
+    background: var(--closed-bg);
+    color: var(--closed);
+  }
+  .chip.open {
+    background: var(--open-bg);
+    color: var(--open);
+  }
+  .chip.note {
+    background: var(--unproven-bg);
+    color: var(--unproven);
+  }
+  .chip.sev {
+    background: transparent;
+    color: var(--faint);
+    border: 1px solid var(--line-firm);
+  }
+
+  .finding p {
+    margin: 0 0 12px;
+    max-width: none;
+  }
+  .finding p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* ── evidence ─────────────────────────────────────────────── */
+  .measured {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    background: var(--surface-2);
+    border-left: 2px solid var(--accent);
+    padding: 12px 16px;
+    margin: 0 0 14px;
+    overflow-x: auto;
+    white-space: pre;
+    font-variant-numeric: tabular-nums;
+  }
+  .measured .lbl {
+    display: block;
+    font-size: 10.5px;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 6px;
+    white-space: normal;
+  }
+  code {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.88em;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+  .finding code,
+  td code {
+    background: var(--surface-2);
+  }
+
+  /* ── tables ───────────────────────────────────────────────── */
+  .scroll {
+    overflow-x: auto;
+    margin: 0 0 20px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13.5px;
+    min-width: 560px;
+  }
+  th,
+  td {
+    text-align: left;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  thead th {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 400;
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+  td.num {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  td.mono {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 12.5px;
+  }
+  .ok {
+    color: var(--closed);
+    font-weight: 500;
+  }
+  .bad {
+    color: var(--open);
+    font-weight: 500;
+  }
+  .dim {
+    color: var(--faint);
+  }
+
+  ul.plain {
+    margin: 0 0 16px;
+    padding-left: 20px;
+    max-width: 68ch;
+  }
+  ul.plain li {
+    margin-bottom: 7px;
+  }
+
+  details {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    padding: 0 18px;
+    margin: 0 0 14px;
+  }
+  details[open] {
+    padding-bottom: 14px;
+  }
+  summary {
+    cursor: pointer;
+    padding: 13px 0;
+    font-weight: 500;
+    font-size: 14.5px;
+    list-style-position: outside;
+  }
+
+  footer {
+    margin-top: 80px;
+    padding-top: 26px;
+    border-top: 1px solid var(--line);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--faint);
+    line-height: 1.8;
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">Security audit · branch wt-sec · off wt-integrate2</p>
+    <h1>Twelve defects closed, and four more in the tools meant to find them</h1>
+    <p class="standfirst">
+      Every open finding from the last audit is closed and proven. Three ingestion paths reached a
+      model unfenced, and 95% of the admin audit log turned out to be one row that names nothing.
+      Then the mutation harness reported 11/11 killed on a run where nothing was tested at all.
+    </p>
+    <div class="runmeta">
+      <span>Date <b>2026-08-23</b></span>
+      <span>Commits <b>7</b></span>
+      <span>Files <b>79</b></span>
+      <span>Pushed <b>origin/wt-sec</b></span>
+      <span>Prod ref <b>rloztdhzfliyvpvxsgjl</b></span>
+    </div>
+    <div class="board">
+      <div>
+        <span class="n" style="color: var(--closed)">4 / 4</span
+        ><span class="k">P1 findings closed and proven</span>
+      </div>
+      <div>
+        <span class="n" style="color: var(--closed)">42</span
+        ><span class="k">mutants killed, 5 new specs</span>
+      </div>
+      <div>
+        <span class="n" style="color: var(--open)">4</span
+        ><span class="k">defects in this audit's own tooling</span>
+      </div>
+      <div>
+        <span class="n" style="color: var(--open)">2</span
+        ><span class="k">migrations written, NOT applied</span>
+      </div>
+      <div><span class="n">75</span><span class="k">tables counted before and after</span></div>
+    </div>
+  </header>
+
+  <section id="verdict">
+    <h2><span class="tag">Verdict</span>What the state of the product is</h2>
+    <p class="measure">
+      No cross-tenant leak was found, and the previous audit's headline results still hold. What
+      this pass found instead sits in three places the last one did not reach: a fetcher with no
+      guard at all, three prompts assembled by string concatenation, and the audit's own tooling.
+    </p>
+    <p class="measure">
+      The single most important sentence in this report is the last one in that list. Before any
+      finding below could be trusted, the mutation harness had to be repaired four times — and on
+      each occasion it had been reporting <em>kills it had not earned</em>. Two mutation specs
+      already in the repository were affected. Their verdicts are now re-earned.
+    </p>
+
+    <div class="finding open">
+      <div class="fhead">
+        <h4>Two things stay open, and both are owner decisions</h4>
+        <span class="chip open">Owner action</span>
+      </div>
+      <p>
+        <strong
+          >Migrations <code>20260823000000</code> and <code>20260823000100</code> are written and
+          NOT applied.</strong
+        >
+        Both are <code>create or replace function</code> only, both are strictly narrowing, and
+        every rollback body is written into the file and was verified against production with
+        <code>pg_get_functiondef</code> rather than against this branch. The first closes a live
+        console-lockout risk; the second stops an audit log filling with rows that name nothing.
+        This lane does not own <code>packages/db</code> and did not apply them.
+      </p>
+      <p>
+        <strong>Two dependencies should be bumped:</strong> <code>sharp 0.34.5 → ≥0.35.0</code>
+        (HIGH, libvips CVEs, and it decodes customer-uploaded bytes) and
+        <code>next 15.5.20 → ≥15.5.21</code> (three HIGH, four MODERATE). P4 asked for reachability,
+        not a bump, and a lockfile change here would collide with the other lanes.
+      </p>
+    </div>
+  </section>
+
+  <!-- ══════════════════ P1 ══════════════════ -->
+  <section id="p1">
+    <h2><span class="tag">P1</span>What the last audit left open</h2>
+    <p class="lede">Four items. All four closed, each with the measurement that closed it.</p>
+
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>a · Radar SSRF — and it was two separate defects, not one</h4>
+        <span class="chip closed">Closed</span>
+        <span class="chip sev">High</span>
+      </div>
+      <p>
+        <strong>Radar had no guard whatsoever.</strong> <code>scripts/radar-pass.ts</code> handed
+        <code>globalThis.fetch</code> to the nightly pass and <code>cheap-check.ts</code> asked it
+        for <code>redirect: 'follow'</code>, so every hop resolved inside undici where nothing of
+        ours could see it. <code>app.radar_normalize_locator</code> stores
+        <code>169.254.169.254</code> happily — its domain pattern is dotted
+        <code>[a-z0-9-]</code> labels, which a dotted quad satisfies. No encoding trick was needed.
+      </p>
+      <p>
+        <strong>Not live today, and the brief's framing needs one correction.</strong>
+        <code>supabaseRadarStore.add()</code> still throws <em>"not collecting"</em>, and
+        <code>app.radar_subscribe</code> is <code>service_role</code> only — so no signed-in account
+        can reach that door yet, and all seven radar tables are empty in production. The hole arms
+        itself the day wt-radar binds that store.
+      </p>
+      <p>
+        <strong>Research had a guard with a dead branch.</strong> Its only IPv4-mapped IPv6 case
+        matched <code>::ffff:169.254.169.254</code> — a string <code>new URL</code> never produces.
+      </p>
+      <div class="measured">
+        <span class="lbl">Measured · node, one line</span>new
+        URL('http://[::ffff:169.254.169.254]/').hostname → '[::ffff:a9fe:a9fe]' 14 of 16 hostile
+        IPv6 forms walked through the OLD guard. The 1 form it DID refuse is the one that never
+        reaches it.
+      </div>
+      <p>
+        Reachable with no URL literal at all: a hostname whose AAAA record answers
+        <code>::ffff:a9fe:a9fe</code> is handed to the guard by DNS in exactly that form.
+      </p>
+      <h3 style="margin-top: 26px">Every encoding, refused — including through a redirect</h3>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Form</th>
+              <th>Example</th>
+              <th>Old</th>
+              <th>Now</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>dotted quad</td>
+              <td class="mono">169.254.169.254</td>
+              <td class="ok">refused</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>decimal</td>
+              <td class="mono">http://2852039166/</td>
+              <td class="ok">refused</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>hex</td>
+              <td class="mono">http://0xA9FEA9FE/</td>
+              <td class="ok">refused</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>octal</td>
+              <td class="mono">http://0251.0376.0251.0376/</td>
+              <td class="ok">refused</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>trailing dot</td>
+              <td class="mono">169.254.169.254.</td>
+              <td class="ok">refused</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>IPv4-mapped, hextets</td>
+              <td class="mono">::ffff:a9fe:a9fe</td>
+              <td class="bad">ALLOWED</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>IPv4-mapped, uncompressed</td>
+              <td class="mono">0:0:0:0:0:ffff:a9fe:a9fe</td>
+              <td class="bad">ALLOWED</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>IPv4-compatible</td>
+              <td class="mono">::a9fe:a9fe</td>
+              <td class="bad">ALLOWED</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>IPv4-translated</td>
+              <td class="mono">::ffff:0:a9fe:a9fe</td>
+              <td class="bad">ALLOWED</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>6to4</td>
+              <td class="mono">2002:a9fe:a9fe::</td>
+              <td class="bad">ALLOWED</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>NAT64 well-known</td>
+              <td class="mono">64:ff9b::a9fe:a9fe</td>
+              <td class="bad">ALLOWED</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>NAT64 local-use</td>
+              <td class="mono">64:ff9b:1::a9fe:a9fe</td>
+              <td class="bad">ALLOWED</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>unparseable IPv6</td>
+              <td class="mono">zzzz::1</td>
+              <td class="bad">ALLOWED</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>DNS rebinding</td>
+              <td class="mono">public first, metadata second</td>
+              <td class="dim">pinned</td>
+              <td class="ok">refused</td>
+            </tr>
+            <tr>
+              <td>redirect, every hop</td>
+              <td class="mono">public → … → metadata</td>
+              <td class="bad">FOLLOWED</td>
+              <td class="ok">refused</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The classifier is now arithmetic, not regexes: parse to eight hextets, resolve every
+        IPv4-bearing form to the 32 bits it carries, hand those to one IPv4 range list. Unparseable
+        is refused — the predecessor returned <em>public</em> for gibberish, so a malformed address
+        was safer to send a request at than a well-formed one.
+        <code>apps/web/src/lib/onboarding/address-guard.ts</code> held a second, divergent copy with
+        no production importer left; it is deleted and its ranges and test cases folded in.
+      </p>
+      <p>
+        A store-time check is not the control and is not offered as one — a source is typed once and
+        fetched for months, and DNS is mutable in between. The control is
+        <code>createGuardedFetch</code>, which decides at the socket, on the night, at every hop.
+      </p>
+      <p>
+        <strong>And closing SSRF opened a slower door.</strong> <code>cheapCheck</code> does a bare
+        <code>await res.text()</code> on a customer-chosen address; the transport streamed with no
+        cap. A page that never stops sending was a memory kill on the nightly pass. Capped at 2 MB
+        in the transport, so every future caller inherits it.
+      </p>
+    </div>
+
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>b · ai_provider_logs — the framing was wrong, and there are eleven tables not one</h4>
+        <span class="chip closed">Decided &amp; pinned</span>
+        <span class="chip sev">Info</span>
+      </div>
+      <p>
+        "Unreadable rather than governed" describes a documented decision. The migration says so in
+        its own words:
+        <em>"no policies: service-only — raw COGS is margin data, not user-facing"</em>. It is
+        governed, by the strictest rule available. What was actually missing is that the decision
+        lived only in a comment, and that <strong>eleven</strong> tables are in this state, not one.
+      </p>
+      <div class="measured">
+        <span class="lbl">Measured live · as the member owning the most rows</span>control: that
+        token saw 40 of its own posts ← the probe is live table real rows member anon
+        ai_provider_logs 227 200/0 200/0 app_settings 0 200/0 200/0 billing_webhook_events 0 200/0
+        200/0 brands 0 200/0 200/0 connection_secrets 0 200/0 200/0 elements 0 200/0 200/0
+        invoice_serials 0 200/0 200/0 jobs 0 200/0 200/0 ledger 1 200/0 200/0 radar_fetch_log 0
+        200/0 200/0 radar_limits 1 200/0 200/0 tables that returned a row to a member or to anon: 0
+      </div>
+      <p>
+        The control is the point. A blind probe returns zero everywhere and looks perfect, so the
+        run <em>refuses to report anything</em> until the attacking token has been shown to see rows
+        it is entitled to. The set is now pinned by a test, and the direction that matters is a
+        table <em>leaving</em> it: a future <code>create policy … on connection_secrets</code> opens
+        the OAuth token vault, and nothing anywhere would have noticed.
+      </p>
+      <p>
+        <strong>Grants were left alone, deliberately.</strong> <code>anon</code> and
+        <code>authenticated</code> hold SELECT and INSERT on all 75 public tables — the Supabase
+        default — and RLS is what denies. Revoking on these eleven only matters if a policy is
+        added, which is the same edit the new test now catches, and it turns a clean empty answer
+        into a permission error for anyone debugging. Named as an owner decision rather than applied
+        to a production grant during an audit.
+      </p>
+    </div>
+
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>c · The two NULL seats are counted as owners by the guard that prevents lockout</h4>
+        <span class="chip closed">Fixed, unapplied</span>
+        <span class="chip sev">High</span>
+      </div>
+      <p>
+        They do not merely <em>read</em> as seats. <code>app.ops_active_owner_count()</code> is the
+        only thing standing between the team screen and a console nobody can open, and it counted
+        them.
+      </p>
+      <div class="measured">
+        <span class="lbl">Measured in production</span>app.ops_active_owner_count() → 5 active
+        owners that can actually sign in (user_id set) → 4 ommprakash@sahodalabs.com role owner
+        user_id NULL karunesh@altruixdigital.com role admin user_id NULL
+      </div>
+      <p>
+        <code>app.is_ops_admin()</code> authorises on <code>user_id = auth.jwt() ->> 'sub'</code>,
+        and NULL matches nothing. Today four spare owners hide it. At the boundary — one linked
+        owner, one unlinked — the function reports 2, <code>ops_admin_revoke</code> permits revoking
+        the real one, and /admin becomes unreachable by every human:
+        <em>the exact outcome the guard exists to prevent, produced by the guard.</em>
+      </p>
+      <p>
+        <strong>Not one row was touched.</strong> Those seats are how a colleague is invited before
+        their first sign-in; deleting them de-provisions two real people, which this repository has
+        already shipped once from the other direction. The rows are correct and the arithmetic over
+        them was not.
+      </p>
+      <p>
+        Narrowing the count then broke a sibling within a minute of the test running: revoking the
+        <em>unlinked</em> owner started raising <code>OPS_ADMIN_LAST_OWNER</code>, because the guard
+        measured a seat that cannot reduce the count by leaving. Both RPCs gain
+        <code>seat.user_id is not null</code>. The screen's own <code>activeOwners</code> now
+        mirrors the database predicate exactly, so the last real owner is no longer drawn a live
+        Revoke the database refuses.
+      </p>
+    </div>
+
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>d · matcher vs isPublicRoute — measured, not argued</h4>
+        <span class="chip closed">Closed</span>
+        <span class="chip sev">Low</span>
+      </div>
+      <p>
+        The <code>[LIVE 2026-08-09]</code> crash predates the try/catch now wrapping
+        <code>clerk()</code>, so reasoning about it would have been reasoning about a different
+        file. Routes were enumerated from the <em>filesystem</em> rather than by reading the two
+        lists against each other, which is the only way to catch the fourth mismatch class: a route
+        in neither list that expected to be public.
+      </p>
+      <div class="measured">
+        <span class="lbl">Measured against next start</span>72 routes on disk × GET and POST × {
+        bearer aaa.bbb.ccc, 2-part bearer, well-formed-invalid bearer, cookie __session=aaa.bbb.ccc
+        } 500s: 0 routes in neither list answering anything but a redirect: 0 matcher exclusions
+        absent from the public list: 0
+      </div>
+      <p>
+        <strong>One residual, and it was unpinned in both directions.</strong>
+        <code>/api/webhooks/zernio</code> was public but absent from both
+        <code>config.matcher</code> lookaheads <em>and</em> from both pinned lists in
+        <code>middleware.test.ts</code> — so it alone among the three self-authenticating webhooks
+        reached Clerk on every delivery, and no test said which side it belonged on. Excluded and
+        pinned. This closes a reachability gap, not a crash.
+      </p>
+      <details>
+        <summary>
+          A defect in the audit script, not the code — recorded rather than reported
+        </summary>
+        <p>
+          The first sweep parsed the public list without stripping comments, and invented a route
+          out of prose: <em>"Zernio's inbound events…"</em> pairs its apostrophe with the next quote
+          and yields a 200-character "path". <code>middleware.ts</code> carries a warning about
+          exactly this and <code>middleware.test.ts</code> already strips. Fixed in the script and
+          noted there, because a finding that turns out to be your own bug still has to be written
+          down somewhere.
+        </p>
+      </details>
+    </div>
+  </section>
+
+  <!-- ══════════════════ P2 ══════════════════ -->
+  <section id="p2">
+    <h2><span class="tag">P2</span>Injection, every ingestion path</h2>
+    <p class="lede">
+      Worked from the model call sites, not the doors. Eight paths forward means proving a negative
+      eight times; eight mesh tasks and fourteen call sites is a list you can finish.
+    </p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Ingestion path</th>
+            <th>Reaches a model?</th>
+            <th>Framing</th>
+            <th>Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>door crawl → <code>brand_extract</code></td>
+            <td>yes</td>
+            <td class="mono">quarantineCorpus</td>
+            <td class="ok">already fenced</td>
+          </tr>
+          <tr>
+            <td>door crawl → <code>brand_guidelines</code></td>
+            <td>yes</td>
+            <td class="mono">JSON.stringify, raw</td>
+            <td class="bad">FIXED — was unfenced</td>
+          </tr>
+          <tr>
+            <td>uploaded document body</td>
+            <td>yes</td>
+            <td class="mono">quarantineBlock</td>
+            <td class="ok">already fenced</td>
+          </tr>
+          <tr>
+            <td>uploaded document <em>filename</em></td>
+            <td>yes</td>
+            <td class="mono">interpolated raw</td>
+            <td class="bad">FIXED — was unfenced</td>
+          </tr>
+          <tr>
+            <td>post body → <code>gate_classify</code></td>
+            <td>yes</td>
+            <td class="mono">&lt;&lt;&lt;POST … POST</td>
+            <td class="bad">FIXED — forgeable fence</td>
+          </tr>
+          <tr>
+            <td>knowledge library passages</td>
+            <td>yes</td>
+            <td class="mono">quarantineBlock</td>
+            <td class="ok">already fenced</td>
+          </tr>
+          <tr>
+            <td>Radar's scraped pages</td>
+            <td class="ok">no</td>
+            <td>arithmetic only</td>
+            <td class="ok">now enforced by import graph</td>
+          </tr>
+          <tr>
+            <td>inbox messages</td>
+            <td class="ok">no</td>
+            <td>—</td>
+            <td class="ok">proven by import graph</td>
+          </tr>
+          <tr>
+            <td>site form leads</td>
+            <td class="ok">no</td>
+            <td>—</td>
+            <td class="ok">proven by import graph</td>
+          </tr>
+          <tr>
+            <td>asset alt text / media</td>
+            <td class="ok">no</td>
+            <td>—</td>
+            <td class="ok">proven by import graph</td>
+          </tr>
+          <tr>
+            <td>own posts, goals, briefs</td>
+            <td>yes</td>
+            <td>first-party</td>
+            <td class="dim">not an external path</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>1 · The call that produces the Brand Brain fenced nothing</h4>
+        <span class="chip closed">Closed</span>
+        <span class="chip sev">Medium</span>
+      </div>
+      <p>
+        The door's own call quarantines everything it reads. <code>brand_guidelines</code> — the
+        second call, the one that actually decides the Brain — sent
+        <code>JSON.stringify(input)</code> as its whole user turn, and two of that object's fields
+        are sentences lifted verbatim from a page or PDF at an address the customer typed. No fence,
+        no attribution, no preamble.
+      </p>
+      <p>
+        <strong>And the selection is attacker-controlled.</strong> Measured while writing the fix:
+      </p>
+      <div class="measured">
+        <span class="lbl">Measured</span>firstProofPoint() takes the first sentence carrying a
+        number. &lt;&lt;&lt;UNTRUSTED_PAGE index=0 url="forged" carries one. So the hostile page
+        CHOSE which of its own lines we would quote — and chose a forged delimiter.
+      </div>
+      <p>
+        Fixed with <code>quarantineInline</code>, a new one-line shape sharing the same tokens and
+        the same neutralizer as <code>quarantineBlock</code> — a second fence made of markers the
+        neutralizer does not know about is a door nobody is watching. Applied where provenance is
+        known, since the task cannot tell a founder's typed answer from a stranger's page. A
+        cross-package parity test fails if the prompt and the fence ever name different markers.
+      </p>
+    </div>
+
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>2 · The gate's fence was forgeable, and its adversary is the post's author</h4>
+        <span class="chip closed">Closed</span>
+        <span class="chip sev">Medium</span>
+      </div>
+      <p>
+        <code>gate_classify</code> fenced the post with <code>&lt;&lt;&lt;POST … POST</code> and its
+        comment claimed <em>"the same quarantine shape brand_extract uses"</em>. It was not: those
+        markers are unknown to <code>neutralize</code>, and the closer is the bare word
+        <code>POST</code> alone on a line — reachable on purpose, and reachable by accident in a
+        listicle. Every other quarantine here defends against a stranger's web page; this one
+        defends against the customer, because the gate exists to stop them publishing something they
+        may not.
+      </p>
+      <p>
+        <strong>The fix is a nonce, not a neutralizer</strong>, and the reason is three lines above
+        it in the same file: the prompt requires <code>quote</code> to be the post's words copied
+        character for character so the UI can find them in the stored post. Rewriting
+        <code>System:</code> inside the text — which is what neutralising does — would make every
+        quote of that span un-findable. <code>ctx.traceId</code> is already a fresh UUID per run, so
+        the marker is per-call, deterministic for one call, and traceable.
+      </p>
+    </div>
+
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>3 · A filename could add a line to the prompt</h4>
+        <span class="chip closed">Closed</span>
+        <span class="chip sev">Medium</span>
+      </div>
+      <p>
+        <code>brand_extract</code> interpolated <code>Filename: ${filename}</code> raw, one line
+        beneath the four sentences saying the attached document is evidence. The upload door
+        validates the data URL's type and size and <em>nothing</em> about the name, and a multipart
+        part carries whatever the client wrote — so a newline in a filename adds a fifth sentence
+        that the customer wrote. <code>Business name</code> had the same shape in both branches;
+        both are fixed, because leaving one of a pair is how the sibling walks through.
+      </p>
+      <p>
+        <code>JSON.stringify</code> is enough <em>here</em> and the code says why it is not enough
+        in general: it escapes newlines, which is the attack against a line-oriented framing, and it
+        does not escape <code>&lt;</code> or <code>&gt;</code>, which is exactly what defeated the
+        block header once before. A 200-character cap is the second half — a 50,000-character
+        filename pushes our own instructions out of a 2,048-token budget.
+      </p>
+    </div>
+
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>Radar's strongest claim was a sentence in a header. It is now an assertion.</h4>
+        <span class="chip closed">Enforced</span>
+      </div>
+      <p>
+        <em>"NO MODEL RUNS IN RADAR INGESTION AT ALL"</em> is what makes a hostile competitor page
+        harmless there — there is no prompt to inject into. Nothing enforced it. The import graph is
+        now read, with a second test proving the file walk reads a real set, because a glob that
+        matches nothing passes an "offenders is empty" assertion perfectly.
+      </p>
+    </div>
+
+    <p>
+      <strong>The two regressions the brief names are pinned.</strong> Dropping
+      <code>human</code> from the turn marker, and dropping <code>neutralize()</code> from the block
+      header — both shipped once with 0 of 94 tests failing.
+      <code>mutations/injection.mjs</code> restores each one; both are killed.
+    </p>
+  </section>
+
+  <!-- ══════════════════ P3 ══════════════════ -->
+  <section id="p3">
+    <h2><span class="tag">P3</span>The things nobody had looked at</h2>
+
+    <h3>Secrets</h3>
+    <p>
+      Searched by <em>literal value</em>, read from this worktree's env files — a pattern hunt finds
+      <code>sk-…</code>-shaped strings, but only the real value tells you whether
+      <em>this deployment's</em> key is the one exposed. Nothing was printed; matches are reported
+      by name.
+    </p>
+    <div class="measured">
+      <span class="lbl">Measured</span>client bundle (all of .next/static) 0 leaks git history (git
+      log -S, all refs) 0 real secrets tracked files (git grep -F) 0 real secrets 8 apparent hits,
+      classified: 7 = .env.example placeholders the local .env still carries verbatim 1 =
+      SUPABASE_PROJECT_REF, the public subdomain of NEXT_PUBLIC_SUPABASE_URL env files ever
+      committed on any ref: .env.example, and nothing else NEXT_PUBLIC_* values: 6, all legitimately
+      public
+    </div>
+
+    <h3>Rate limiting</h3>
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>The limit was keyed on a value the caller chooses</h4>
+        <span class="chip closed">Closed</span>
+        <span class="chip sev">Medium</span>
+      </div>
+      <p>
+        <code>clientIpFrom</code> took the <em>first</em> entry of <code>x-forwarded-for</code>,
+        which is whatever the original client wrote. A script sending a fresh value per request gets
+        a fresh bucket per request and the counter never reaches the limit. Now the rightmost hop —
+        the only entry not taken on a stranger's word — with
+        <code>x-vercel-forwarded-for</code> preferred. Correct under both platform behaviours: if
+        Vercel overwrites rather than appends, the list has one entry and the two are the same
+        value.
+      </p>
+      <p>
+        My own test then found a second hole: <code>x-real-ip</code> was consulted only when
+        <code>x-forwarded-for</code> was <em>absent</em>, so
+        <code>x-forwarded-for: " , "</code> suppressed the trustworthy header into the shared
+        <code>unknown</code> bucket. Both fixed.
+      </p>
+      <p class="dim">
+        Turnstile, not this, is what stops a script — and it fails closed (<code>unreachable</code>
+        is a refusal). The rate limit is a cost control in front of it.
+      </p>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Public endpoint</th>
+            <th>In front of it</th>
+            <th>Measured</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">/api/public/beta-apply</td>
+            <td>per-minute + per-day limit, honeypot, zod, Turnstile</td>
+            <td class="ok">Upstash reachable, 200</td>
+          </tr>
+          <tr>
+            <td class="mono">/api/public/site-lead</td>
+            <td>per-minute + per-day limit, honeypot, zod, Turnstile</td>
+            <td class="ok">Upstash reachable, 200</td>
+          </tr>
+          <tr>
+            <td class="mono">/api/admin/devops/ingest</td>
+            <td>global RPM limit + constant-time token</td>
+            <td class="ok">401 unauthenticated</td>
+          </tr>
+          <tr>
+            <td class="mono">/api/webhooks/{clerk,cashfree,zernio}</td>
+            <td>signature, verified first</td>
+            <td class="ok">401 unsigned; no rate limit</td>
+          </tr>
+          <tr>
+            <td class="mono">/api/cron/{sweeps,metrics,loop,playbooks}</td>
+            <td>constant-time CRON_SECRET, hashed to fixed width</td>
+            <td class="ok">4 routes × 5 credentials → 20/20 refused 401, with CRON_SECRET UNSET</td>
+          </tr>
+          <tr>
+            <td>sign-up</td>
+            <td>Clerk-hosted</td>
+            <td class="dim">not ours to limit</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="measured">
+      <span class="lbl">Measured · GET, because these are GET routes</span>A POST answers 405 on the
+      METHOD, which proves nothing about authorisation. This environment has NO CRON_SECRET, which
+      makes it the exact condition the fail-closed claim is about. no header Bearer wrong empty
+      malformed Basic /api/cron/sweeps 401 401 401 401 401 /api/cron/metrics 401 401 401 401 401
+      /api/cron/loop 401 401 401 401 401 /api/cron/playbooks 401 401 401 401 401
+    </div>
+
+    <h3>File upload</h3>
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>The PDF door trusted the label where the image path proves the bytes</h4>
+        <span class="chip closed">Closed</span>
+        <span class="chip sev">Medium</span>
+      </div>
+      <p>
+        <code>isPdfDataUrl</code> tested the data-URL prefix and nothing else, so any file wearing
+        <code>data:application/pdf;base64,</code> was forwarded to a model provider — and on
+        escalation to a <em>paid</em> OCR engine — as a PDF. The image path already refuses to work
+        this way, and its own comment names <code>image/svg+xml</code> as the reason. This was the
+        sibling left trusting the label. Now reads the <code>%PDF-</code> magic from the first eight
+        base64 characters.
+      </p>
+      <div class="measured">
+        <span class="lbl">And the first draft of that fix was itself a DoS</span>find:
+        /^data:application\/pdf;base64,([A-Za-z0-9+/=]{8,})/ This function runs BEFORE the size cap,
+        so the unbounded capture ran over the whole payload: 8 MB data URL → RangeError: Maximum
+        call stack size exceeded Caught by the oversize case in the new test — which exists for the
+        cap, and caught this instead.
+      </div>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Upload vector</th>
+              <th>What actually stops it</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>type confusion, images</td>
+              <td class="ok">
+                <code>sniffImage</code> reads the bytes; <code>kindForProvenMime</code> accepts only
+                what sniffing proved
+              </td>
+            </tr>
+            <tr>
+              <td>SVG with script</td>
+              <td class="ok">
+                not in the allowlist — it is derived from channel <code>mediaTypes</code>, and no
+                channel accepts SVG
+              </td>
+            </tr>
+            <tr>
+              <td>decompression bomb</td>
+              <td class="ok"><code>sharp({ limitInputPixels: 100_000_000 })</code></td>
+            </tr>
+            <tr>
+              <td>truncated / malformed image</td>
+              <td class="ok">
+                <code>failOn: 'error'</code>, and output facts are re-sniffed rather than taken from
+                sharp
+              </td>
+            </tr>
+            <tr>
+              <td>oversized body</td>
+              <td class="ok">
+                12 MB server-action cap; 8 MB upload-door cap, estimated before decode
+              </td>
+            </tr>
+            <tr>
+              <td>path traversal in the stored key</td>
+              <td class="ok">
+                the key is built by <code>media-path.ts</code>, never from the filename
+              </td>
+            </tr>
+            <tr>
+              <td>filename as prompt injection</td>
+              <td class="ok">fixed this pass — see P2·3</td>
+            </tr>
+            <tr>
+              <td>libvips CVEs behind sharp</td>
+              <td class="bad">open — bump to ≥0.35.0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3>Session and auth</h3>
+    <ul class="plain">
+      <li>
+        <strong>Token expiry mid-action.</strong> The Supabase client resolves
+        <code>accessToken</code> per call from <code>auth().getToken()</code>; an expired session
+        yields null, the client falls back to anon, and RLS denies. There is no cached token to
+        outlive its session.
+      </li>
+      <li>
+        <strong>Can a revoked member still act?</strong> No cache exists to go stale. Every policy
+        resolves through <code>app.member_workspace_ids()</code>, which reads
+        <code>workspace_members</code> against <code>auth.jwt() ->> 'sub'</code> on every query, so
+        removal takes effect on the next statement. The same holds for <code>ops_admins</code>: the
+        middleware asks PostgREST through the caller's own token, so a revoked seat is refused by
+        RLS rather than by a cached boolean.
+      </li>
+      <li>
+        <strong>Signing out.</strong> There is no server-side session state to kill —
+        <code>apps/web</code> has no service-role client and holds nothing per-user between
+        requests. Clearing the Clerk cookie is the whole of it, and the middleware's catch branch
+        deliberately clears a corrupted <code>__session</code> rather than looping a redirect that
+        would carry it straight back.
+      </li>
+    </ul>
+
+    <h3>The publish path</h3>
+    <p>
+      Already covered, and left alone — the work here was trying to break it. The pre-flight lives
+      in the database, takes no workspace argument at all, and is
+      <code>security invoker</code> rather than definer, so a signed-in member cannot borrow the
+      owner's rights through it. Eleven hostile-argument cases already existed and pass; the adapter
+      is counted and never reached. <strong>4/4 mutants killed.</strong>
+    </p>
+    <details>
+      <summary>One mutant survived, and it was equivalent — proven, not argued</summary>
+      <p>
+        Deleting <code>and v.workspace_id = v_ws_id</code> from the variant lookup passed every
+        test. That reads as a coverage gap and is not one: <code>post_variants</code> carries
+        <code>foreign key (post_id, workspace_id) references posts (id, workspace_id)</code>, so the
+        pairing it guards cannot be stored. The assumption is now <em>measured</em> — a new test
+        attempts the insert and asserts the database refuses it — and the day a migration drops that
+        FK, that test goes red and the redundant clause becomes load-bearing. The mutant is removed
+        from the spec with the reasoning attached, because a survivor that is really an equivalence
+        is noise in a report whose whole value is that a survivor means something.
+      </p>
+    </details>
+
+    <h3>Headers</h3>
+    <p>
+      Read off the wire on <code>next start</code> <em>and</em> on
+      <code>https://app.sahodalabs.com</code>, because the two disagree and reading the config would
+      have reported a hole that is not there.
+    </p>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Header</th>
+            <th>Local, before</th>
+            <th>Production, before</th>
+            <th>Now</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">content-security-policy</td>
+            <td class="mono">frame-ancestors only</td>
+            <td class="mono">frame-ancestors only</td>
+            <td class="ok">+ object-src, base-uri</td>
+          </tr>
+          <tr>
+            <td class="mono">strict-transport-security</td>
+            <td class="bad">absent</td>
+            <td class="ok">max-age=63072000</td>
+            <td class="dim">Vercel edge; no preload</td>
+          </tr>
+          <tr>
+            <td class="mono">x-content-type-options</td>
+            <td class="bad">absent</td>
+            <td class="bad">absent</td>
+            <td class="ok">nosniff</td>
+          </tr>
+          <tr>
+            <td class="mono">referrer-policy</td>
+            <td class="bad">absent</td>
+            <td class="bad">absent</td>
+            <td class="ok">strict-origin-when-cross-origin</td>
+          </tr>
+          <tr>
+            <td class="mono">permissions-policy</td>
+            <td class="bad">absent</td>
+            <td class="bad">absent</td>
+            <td class="ok">camera/mic/geo/payment off</td>
+          </tr>
+          <tr>
+            <td class="mono">frame-ancestors on /embed/*</td>
+            <td class="ok">*</td>
+            <td class="ok">*</td>
+            <td class="ok">unchanged, by design</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      <code>script-src</code> is deliberately <em>not</em> added: it needs per-request nonces
+      threaded through Next's inline bootstrap, which is a project with a live breakage risk, not a
+      line in an audit. Nor <code>form-action</code> — sign-in posts cross-origin to Clerk, and
+      <code>'self'</code> would break the login flow in the week nobody was watching. Both are named
+      as owed work, and asserted absent so a future tightening has to read the reason first.
+    </p>
+    <p>
+      The three static headers go in <code>next.config.ts</code> rather than the middleware because
+      measured: Clerk's <code>protect-rewrite</code> answers a signed-out <code>/home</code> with a
+      404 carrying no CSP at all — the rewrite replaces our response.
+    </p>
+
+    <h3>And one nobody was looking for</h3>
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>95% of the audit log is one row that names nothing</h4>
+        <span class="chip closed">Fixed, unapplied</span>
+        <span class="chip sev">Medium</span>
+      </div>
+      <p>Found while reconciling the row counts this audit was required to leave clean.</p>
+      <div class="measured">
+        <span class="lbl">Measured in production</span>ops_audit_log 12,839 rows
+        action='user.created', actor='clerk:webhook' 12,196 rows (95%) distinct target_id among them
+        1 — the empty string newest meta {"linked_application": false, "linked_admin_seat": false}
+        first 2026-07-28, last one four minutes before the fix
+      </div>
+      <p>
+        <code>ops_application_link_user</code> runs on every Clerk <code>user.created</code>. It
+        tries to mark a beta application joined, tries to link a seeded admin seat, then writes an
+        audit row <em>unconditionally</em>. <code>coalesce(app_id::text, '')</code> is the tell: the
+        row records that it has nothing to record. Almost every sign-up matches neither, and the E2E
+        suite mints Clerk users against this production instance on every gate run — 1,054 in one
+        hour on 2026-08-22.
+      </p>
+      <p>
+        <strong>The first reading of this was wrong, and that is worth recording.</strong> Twelve
+        thousand <code>user.created</code> rows read as twelve thousand production accounts. They
+        are <em>one</em> user id logged twelve thousand times. Counting distinct
+        <code>target_id</code> before raising it is the difference between an account-sprawl
+        incident and an idempotency defect.
+      </p>
+      <p>
+        It is a security defect and not housekeeping: an audit trail that is 95% content-free is one
+        nobody reads, and what is buried is <code>admin.role</code>, <code>admin.revoke</code>,
+        <code>admin.upsert</code> and <code>credit.*</code>. That is the ordinary shape of
+        anti-forensics — you do not delete the entry, you make the log unusable — and anyone who
+        could trigger sign-ups could bury their own <code>admin.role</code> row.
+      </p>
+      <p>
+        The other direction mattered as much: this row is the only record that a Clerk account was
+        bound to an admin seat. Every test comes in a pair, and the spec mutates both ways —
+        including <em>"nothing is ever written"</em>, which a careless fix would have passed.
+      </p>
+      <p>
+        <strong
+          >The 12,196 existing rows are not deleted, and that is not caution — the table refuses
+          it.</strong
+        >
+        <code>delete from ops_audit_log</code> raises
+        <em>"append-only: DELETE on ops_audit_log is not permitted"</em>, which the test discovered
+        by trying. The predicate an owner would need is written into the migration.
+      </p>
+    </div>
+  </section>
+
+  <!-- ══════════════════ P4 ══════════════════ -->
+  <section id="p4">
+    <h2><span class="tag">P4</span>Dependencies, by reachability</h2>
+    <p class="lede">
+      28 advisories — 14 high, 13 moderate, 1 low. Severity alone is not actionable, so each is
+      resolved to the chain that pulled it in and labelled runtime or dev.
+    </p>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Package</th>
+            <th>Sev</th>
+            <th>Reachable?</th>
+            <th>Why</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">sharp 0.34.5</td>
+            <td class="bad">HIGH</td>
+            <td class="bad">YES</td>
+            <td>
+              libvips CVE-2026-33327/33328/35590/35591. <code>derive.ts</code> decodes
+              <strong>customer-uploaded bytes</strong>. The most reachable HIGH here.
+              <strong>Bump to ≥0.35.0.</strong>
+            </td>
+          </tr>
+          <tr>
+            <td class="mono">next 15.5.20</td>
+            <td class="bad">HIGH ×3</td>
+            <td class="bad">PARTLY</td>
+            <td>
+              DoS in App Router Server Actions — reachable, this app is all server actions.
+              Unauthenticated disclosure of internal Server Function endpoints — reachable. SSRF in
+              rewrites — <em>not</em> reachable, <code>next.config</code> declares none. SSRF on
+              custom servers — not reachable, Vercel. Image-optimization SVG DoS — not reachable, no
+              <code>images</code> config. <strong>Bump to ≥15.5.21.</strong>
+            </td>
+          </tr>
+          <tr>
+            <td class="mono">postcss</td>
+            <td class="bad">HIGH ×2</td>
+            <td class="dim">build only</td>
+            <td>
+              sourceMappingURL path traversal. No runtime import in <code>apps/web</code> or
+              <code>packages/sites</code> — it runs at build time over CSS we wrote.
+            </td>
+          </tr>
+          <tr>
+            <td class="mono">ws, engine.io, cookie, nanoid</td>
+            <td class="bad">HIGH ×3, LOW</td>
+            <td class="dim">no</td>
+            <td>
+              All arrive via <code>@trigger.dev/sdk</code>. Nothing in this repository has ever
+              deployed to Trigger.dev, and the sweeps entry point excludes the SDK.
+            </td>
+          </tr>
+          <tr>
+            <td class="mono">brace-expansion, fast-uri</td>
+            <td class="bad">HIGH ×3</td>
+            <td class="dim">marginal</td>
+            <td>
+              Via <code>@sentry/nextjs</code>. Both need attacker-controlled glob or URI input;
+              Sentry's use is build-time path matching.
+            </td>
+          </tr>
+          <tr>
+            <td class="mono">undici</td>
+            <td class="bad">HIGH, MOD ×4</td>
+            <td class="ok">no</td>
+            <td>dev only — <code>vitest</code> and <code>jsdom</code>. Not shipped.</td>
+          </tr>
+          <tr>
+            <td class="mono">@opentelemetry/core</td>
+            <td>MOD</td>
+            <td class="dim">marginal</td>
+            <td>Unbounded allocation in W3C Baggage propagation; we propagate no baggage.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ══════════════════ P5 ══════════════════ -->
+  <section id="p5">
+    <h2><span class="tag">P5</span>The harness lied four times</h2>
+    <p class="lede">
+      The last audit found three defects in its own tooling. This one found four more, and every one
+      of them <em>manufactured a passing verdict</em>. They are listed first among the fixes because
+      nothing else in this report could be trusted until they were closed.
+    </p>
+
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>1 · A per-mutant <code>cwd</code> was silently ignored</h4>
+        <span class="chip closed">Fixed</span>
+      </div>
+      <p>
+        <code>spec.cwd</code> was read once and closed over, so a spec whose mutants each named a
+        directory ran <em>every</em> command from the repo root.
+        <code>pnpm vitest run src/ip.test.ts</code> finds no test files there and exits 1 — and exit
+        1 is what the runner calls KILLED.
+      </p>
+      <div class="measured">
+        <span class="lbl">The first run of the SSRF spec</span>mutation-check: 11/11 mutants killed
+        … every row read "no test summary found in the output" Assertions actually executed: ZERO.
+      </div>
+      <p>The tell was in the report the whole time. It is now a refusal, not a footnote.</p>
+    </div>
+
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>2 · A zero-assertion run counted as a kill</h4>
+        <span class="chip closed">Fixed</span>
+      </div>
+      <p>
+        <code>Tests 6 skipped (6)</code>. The mutated SQL made <code>beforeAll</code> throw, every
+        test was skipped, the process exited non-zero, and that was scored as a kill. It is also
+        exactly what a worker crash looks like when three sessions share a machine and PGlite is the
+        memory-hungry one — the skip count is the tell, and it is now read rather than displayed. A
+        run must show at least one test that passed or failed before its exit code means anything.
+        One mutant legitimately breaks a fixture and must run no tests; it now declares that
+        (<code>expectsNoTests</code>) where a reviewer can see it.
+      </p>
+    </div>
+
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>3 · Every PL/pgSQL mutant corrupted its own dollar quote</h4>
+        <span class="chip closed">Fixed</span>
+      </div>
+      <p>
+        <code>String.prototype.replace</code> treats <code>$</code> in a replacement
+        <em>string</em> as an escape. A PL/pgSQL body is delimited by <code>$$</code>, so any SQL
+        mutant carrying one wrote <code>$;</code> where it meant <code>$$;</code> — unbalancing the
+        quote and making every function below it a syntax error.
+      </p>
+      <div class="measured">
+        <span class="lbl">Measured</span>the same mutant, applied by hand: 4 failed | 3 passed ← a
+        real kill the same mutant, via the harness: Tests 7 skipped (7) ← scored as a kill
+        'a'.replace('a', '$$;') → '$;' 'a'.replace('a', '$1') → '$1' ← safe, checked, not assumed
+      </div>
+      <p>
+        <strong>Two shipped specs were affected</strong> — <code>rls-enforced.mjs</code> and
+        <code>jobs-integration-executes.mjs</code>, which between them are the repository's proof
+        that tenant isolation and the ledger function bite. Both re-run honestly:
+        <strong>9/9</strong> and <strong>3/3</strong>, now for the stated reason. A replacer
+        function is substituted verbatim, and the harness now also asserts the replacement text is
+        present after the write.
+      </p>
+    </div>
+
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>4 · SIGKILL leaves a mutant applied</h4>
+        <span class="chip note">Recorded</span>
+      </div>
+      <p>
+        A mutant that made a stream unbounded had to be killed mid-run, and the harness's restore
+        cannot survive SIGKILL — it left <code>guarded-fetch.ts</code> carrying its mutation.
+        Recovered from the harness's own verified backup after diffing every other backup against
+        its source to prove nothing else was stranded. Worth knowing rather than fixing: the backup
+        <em>was</em> there and <em>was</em> hash-verified, which is what made recovery a diff rather
+        than an investigation.
+      </p>
+    </div>
+
+    <h3>Two survivors, and one wrong claim of my own</h3>
+    <p>
+      A survivor is only worth something if it means something, so both were chased to the end. One
+      was a real gap — counting <code>could_not_check</code> did not distinguish "we refused to
+      look" from "we looked and it did not answer", and the assertion now reads
+      <code>transport: UnsafeUrlError</code>, which can only be produced before a socket exists. The
+      other was an equivalence, removed with the check that proved it.
+    </p>
+    <p>
+      And a comment I wrote myself claimed a signed bitmask makes <code>224.0.0.0/4</code> "silently
+      stop matching". Measured: <strong>0 divergences over 3,000,075 comparisons</strong>. Both
+      sides go through the same <code>ToInt32</code>, so the sign cancels. The claim is corrected in
+      the file rather than quietly dropped.
+    </p>
+  </section>
+
+  <!-- ══════════════════ gate ══════════════════ -->
+  <section id="gate">
+    <h2><span class="tag">Verification</span>The gate, five legs named</h2>
+    <p class="lede">
+      Run against <code>next start</code>, not <code>next dev</code>, with
+      <code>E2E_PORT=3253</code> and <code>SAHODA_E2E_ACK_TARGET</code> set — and on port 3253
+      rather than 3252, because 3252 was held by a <em>different session's worktree</em> and probing
+      it would have audited someone else's build.
+    </p>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Leg</th>
+            <th>Command</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>0 · build</td>
+            <td class="mono">turbo run build</td>
+            <td class="num LEG0CLS">LEG0</td>
+          </tr>
+          <tr>
+            <td>1 · typecheck</td>
+            <td class="mono">turbo run typecheck</td>
+            <td class="num LEG1CLS">LEG1</td>
+          </tr>
+          <tr>
+            <td>2 · lint</td>
+            <td class="mono">turbo run lint</td>
+            <td class="num LEG2CLS">LEG2</td>
+          </tr>
+          <tr>
+            <td>3 · test</td>
+            <td class="mono">turbo run test</td>
+            <td class="num LEG3CLS">LEG3</td>
+          </tr>
+          <tr>
+            <td>4 · smoke</td>
+            <td class="mono">turbo run test:smoke</td>
+            <td class="num LEG4CLS">LEG4</td>
+          </tr>
+          <tr>
+            <td>5 · format</td>
+            <td class="mono">prettier --check .</td>
+            <td class="num LEG5CLS">LEG5</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Mutation specs</h3>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Spec</th>
+            <th>Killed</th>
+            <th>What it pins</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">radar-ssrf</td>
+            <td class="num ok">12 / 12</td>
+            <td>
+              the guarded default, per-hop revalidation, every IPv6 form, the byte cap, the door
+            </td>
+          </tr>
+          <tr>
+            <td class="mono">injection</td>
+            <td class="num ok">16 / 16</td>
+            <td>
+              the neutralizer, both shipped regressions, the inline fence, the gate nonce, the
+              filename
+            </td>
+          </tr>
+          <tr>
+            <td class="mono">ops-last-owner</td>
+            <td class="num ok">6 / 6</td>
+            <td>the count, both RPCs, and the screen that must agree with them</td>
+          </tr>
+          <tr>
+            <td class="mono">publish-preflight</td>
+            <td class="num ok">4 / 4</td>
+            <td>
+              argument validation, the workspace filter, publishability, adapter-never-reached
+            </td>
+          </tr>
+          <tr>
+            <td class="mono">ops-audit-flood</td>
+            <td class="num ok">4 / 4</td>
+            <td>a row names something — and a bound seat is still recorded</td>
+          </tr>
+          <tr>
+            <td class="mono">rls-enforced <span class="dim">(re-run)</span></td>
+            <td class="num ok">9 / 9</td>
+            <td>previously corrupted by the <code>$$</code> defect; now earned</td>
+          </tr>
+          <tr>
+            <td class="mono">jobs-integration-executes <span class="dim">(re-run)</span></td>
+            <td class="num ok">3 / 3</td>
+            <td>previously corrupted by the <code>$$</code> defect; now earned</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Rows, before and after</h3>
+    <p>
+      75 tables counted <em>privileged and direct</em> before any probe, and again afterwards. A
+      diff is not an answer here — <code>wt-perf</code> ran a server against this same production
+      database for the whole session — so every non-zero delta was attributed by reading the new
+      rows, not explained away.
+    </p>
+    <div class="measured">
+      <span class="lbl">Attribution</span>Every audit probe was a SELECT. Attributable to this
+      audit: 0 rows. Moved by other sessions, by timestamp and workspace: credit_ledger +9
+      loop_briefs +5 loop_cycles +1 memory_events +1 posts +4 → all one workspace, 02:18 IST, while
+      this session was offline workspaces -1 workspace_members -1 users_profile -1 → an E2E
+      teardown; 0 stranded workspaces remain ops_audit_log +1379 → the clerk:webhook flood
+      documented in P3, not caused by this audit and now fixed
+    </div>
+  </section>
+
+  <!-- ══════════════════ open ══════════════════ -->
+  <section id="open">
+    <h2><span class="tag">Honesty</span>What I could not prove</h2>
+    <ul class="plain">
+      <li>
+        <strong>Whether Vercel appends to or overwrites <code>x-forwarded-for</code>.</strong> The
+        fix is correct under both, which is why it was made without waiting to find out — but the
+        <em>severity</em> of the original defect depends on the answer, and settling it means
+        probing a production endpoint that writes rows.
+      </li>
+      <li>
+        <strong>That an authenticated page response carries the CSP header.</strong> Every
+        unauthenticated path was measured. A signed-in response needs a live Clerk session, and the
+        middleware's <code>NextResponse.next()</code> path was read, not executed.
+      </li>
+      <li>
+        <strong
+          >That the two unapplied migrations behave in production as they do on PGlite.</strong
+        >
+        Both are proven against the real migration set on PGlite and their rollback bodies were
+        verified against production with <code>pg_get_functiondef</code>. Neither has been applied.
+      </li>
+      <li>
+        <strong>The Zernio webhook's signature path end to end.</strong>
+        <code>ZERNIO_WEBHOOK_SECRET</code> is absent from this environment, so the route answers
+        <code>503 not_configured</code> before the verifier. The middleware half was measured; the
+        HMAC half was not re-measured this pass.
+      </li>
+      <li>
+        <strong>That no secret exists outside this worktree's env.</strong> The scan searches for
+        the literal values <em>this</em> worktree holds. A credential used only by another lane, or
+        rotated out of these files, would not be found by it.
+      </li>
+      <li>
+        <strong>The other 74 worktrees.</strong> The brief mentions 89 env-shaped files across them.
+        They are gitignored and therefore cannot reach the repository, which is the property that
+        matters — but their contents were not enumerated.
+      </li>
+    </ul>
+  </section>
+
+  <footer>
+    branch wt-sec · 7 commits · 79 files · pushed to origin/wt-sec<br />
+    every measurement in this report is reproducible from <code>audit/sec/</code><br />
+    two migrations written and NOT applied · two dependency bumps recommended
+  </footer>
+</div>

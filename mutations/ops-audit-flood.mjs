@@ -9,7 +9,7 @@
  *   node scripts/mutation-check.mjs mutations/ops-audit-flood.mjs
  */
 const F =
-  'packages/db/supabase/migrations/20260823000100_clerk_webhook_stops_flooding_the_audit_log.sql'
+  'packages/db/supabase/migrations/20260823020100_clerk_webhook_stops_flooding_the_audit_log.sql'
 const RUN = { cwd: 'packages/db', command: 'pnpm vitest run tests/ops_audit_flood.pglite.test.ts' }
 
 export default {
