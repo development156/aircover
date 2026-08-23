@@ -424,7 +424,7 @@
     </p>
     <div class="runmeta">
       <span>Date <b>2026-08-23</b></span>
-      <span>Commits <b>10</b></span>
+      <span>Commits <b>11</b></span>
       <span>Files <b>88</b></span>
       <span>Pushed <b>origin/wt-sec</b></span>
       <span>Prod ref <b>rloztdhzfliyvpvxsgjl</b></span>
@@ -446,7 +446,9 @@
         <span class="n" style="color: var(--open)">2</span
         ><span class="k">migrations written, NOT applied</span>
       </div>
-      <div><span class="n">75</span><span class="k">tables counted before and after</span></div>
+      <div>
+        <span class="n">75</span><span class="k">tables counted; 1 moved, by 553 rows</span>
+      </div>
     </div>
   </header>
 
@@ -1541,6 +1543,7 @@
             <th>Run 1</th>
             <th>Run 2</th>
             <th>Run 3</th>
+            <th>Run 4</th>
           </tr>
         </thead>
         <tbody>
@@ -1549,41 +1552,44 @@
             <td class="ok">pass</td>
             <td class="ok">pass</td>
             <td class="dim">cached</td>
+            <td class="ok">pass</td>
           </tr>
           <tr>
             <td><code>turbo run typecheck lint test</code></td>
             <td class="bad">FAIL</td>
             <td class="ok">pass</td>
-            <td class="dim">not re-run</td>
+            <td class="dim">—</td>
+            <td class="ok">27/27 · 4377 tests</td>
           </tr>
           <tr>
             <td><code>turbo run test:smoke</code></td>
             <td class="ok">102 passed</td>
             <td class="bad">FAIL</td>
-            <td class="ok">101 passed, 1 flaky</td>
+            <td class="ok">101 + 1 flaky</td>
+            <td class="ok">102 passed</td>
           </tr>
           <tr>
             <td><code>prettier --check .</code></td>
             <td class="bad">FAIL</td>
             <td class="ok">pass</td>
-            <td class="dim">not re-run</td>
+            <td class="dim">—</td>
+            <td class="ok">pass</td>
           </tr>
           <tr>
             <td><strong>verdict</strong></td>
             <td class="bad">RED</td>
             <td class="bad">RED</td>
-            <td class="ok">smoke green</td>
+            <td class="dim">smoke only</td>
+            <td class="ok"><strong>GREEN</strong></td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <p>
-      <strong
-        >NO SINGLE RUN WAS GREEN END TO END, and this table says so rather than reporting the union
-        of three.</strong
-      >
-      Every leg has passed. Not at once.
+      <strong>Run 4 is green end to end</strong> — one run, all four legs, 0 flaky, 0 connection
+      refusals. The three before it are kept in the table rather than dropped, because two of them
+      failed and what they failed on is the useful part.
     </p>
     <ul class="plain">
       <li>
@@ -1601,13 +1607,13 @@
         because a real assertion failure costs the page load that precedes it. No kernel OOM (<code
           >journalctl -k</code
         >, checked before anything else), no crash output, and no hook in this repository kills a
-        process. Two other sessions held servers on 3252 and 3260 at the time.
+        process. Two other sessions held servers on 3252 and 3260 at the time. Run 4 reproduced the
+        same leg with 0 refusals.
       </li>
       <li>
-        <strong>Run 3 · the smoke leg alone, against a server held for the purpose.</strong>
-        <code>101 passed, 1 flaky, exit 0</code> — 102 tests. The flaky one is
-        <code>motion.spec.ts:73</code>, "prefers-reduced-motion leaves a still page, not a blank
-        one". It passed on retry and is nothing this lane touched.
+        <strong>Run 3 · the smoke leg alone</strong>, to separate "the server died" from "the code
+        broke": <code>101 passed, 1 flaky, exit 0</code>. The flaky one was
+        <code>motion.spec.ts:73</code>, which passed on retry and passed outright in run 4.
       </li>
     </ul>
 
@@ -1701,7 +1707,7 @@
       finding, and it is the honest one: the E2E suite mints a Clerk user per journey, each
       <code>user.created</code> reaches the webhook, and until the migration above is applied the
       webhook writes a row that names nothing. Applying it is what stops the next gate run adding
-      four hundred more.
+      five hundred more.
     </p>
   </section>
 
