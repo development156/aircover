@@ -38,6 +38,11 @@ ${ANCHOR}`,
       file: 'apps/jobs/tests/helpers/db-under-test.ts',
       find: "    await pglite.exec(readFileSync(resolve(MIGRATIONS, file), 'utf8'))",
       replace: '    void file // MUTANT: apply nothing',
+      // This one breaks the FIXTURE, not the code, so the correct outcome is a
+      // suite that cannot boot and therefore runs no assertions. Declared,
+      // because the harness otherwise refuses to call a zero-assertion run a kill
+      // — and it is right to, for every other mutant here.
+      expectsNoTests: true,
     },
     // ── TWO MUTANTS DELIBERATELY NOT LISTED ──────────────────────────────
     //

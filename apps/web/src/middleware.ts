@@ -282,7 +282,16 @@ export default async function middleware(
 // use for. Nothing went red: `middleware.test.ts` adjudicates the paths somebody typed
 // into its arrays, and zernio was in neither of them. `middleware.coverage.test.ts`
 // now walks src/app and requires every route on disk to be classified, which is the
-// only shape of guard that can see a route missing from every list. Excluding them here is the only bypass that works: the crash happens
+// only shape of guard that can see a route missing from every list.
+//
+// AND IT WAS NOT A LIVE CRASH, which is worth stating rather than leaving implied.
+// MEASURED 2026-08-23 against `next start`: 72 routes on disk, each sent
+// `Authorization: Bearer aaa.bbb.ccc`, a two-part bearer, a well-formed-but-invalid
+// bearer and `Cookie: __session=aaa.bbb.ccc`, by GET and by POST — ZERO 500s. The
+// catch above does hold. Zernio alone among the three webhooks paid Clerk's header
+// parse on every delivery and rested on that catch instead of on never being reached,
+// so this closes a reachability gap: the difference between a route that cannot reach
+// the failure and one that is rescued from it. Excluding them here is the only bypass that works: the crash happens
 // while Clerk computes the request state, BEFORE our handler runs, so an early return
 // inside the callback would never be reached.
 //

@@ -144,22 +144,78 @@ export function applyMutant(record, find, replace) {
 
   const count = current.split(find).length - 1
   if (count !== 1) {
+    /**
+     * ZERO MATCHES *AND* THE REPLACEMENT ALREADY PRESENT IS A STRANDED MUTANT.
+     *
+     * This harness restores every file it touches — but only if it is allowed to
+     * finish. SIGKILL, a shell timeout, or a killed process group leaves the last
+     * mutant applied, and the next run then reports "expected exactly 1
+     * occurrence, found 0", which reads as a broken SPEC and sends the reader to
+     * edit a spec that is perfectly correct.
+     *
+     * MEASURED twice in one session: once when a mutant that made a stream
+     * unbounded had to be killed, and once when a two-minute command timeout cut
+     * a run off mid-mutation. Both times the file was still carrying its mutation
+     * and the diagnosis took longer than the fix.
+     *
+     * The signal is exact — the target is gone and the thing it would have been
+     * replaced BY is there — so it is worth saying out loud rather than leaving
+     * as an inference.
+     */
+    const looksStranded = count === 0 && current.includes(replace)
     throw new MutationHarnessError(
       `expected exactly 1 occurrence of the mutation target in ${record.file}, found ${count}.\n` +
         `  target: ${JSON.stringify(find.slice(0, 120))}\n` +
-        (count === 0
-          ? '  Zero matches means the mutant was never applied — a "survived" verdict here ' +
-            'would be about unmodified code.'
-          : '  More than one match means this is not the mutation described.'),
+        (looksStranded
+          ? "  THE FILE IS ALREADY MUTATED. It contains this mutant's replacement text and not\n" +
+            '  its target, which is what an interrupted run leaves behind — a kill, a timeout, or\n' +
+            `  a reaped process group. Restore it before trusting anything:\n` +
+            `      git checkout -- ${record.file}\n` +
+            `  or from this run's own backup: ${record.backupPath}`
+          : count === 0
+            ? '  Zero matches means the mutant was never applied — a "survived" verdict here ' +
+              'would be about unmodified code.'
+            : '  More than one match means this is not the mutation described.'),
     )
   }
 
-  writeFileSync(record.file, current.replace(find, replace), 'utf8')
+  /**
+   * A REPLACER FUNCTION, NEVER A REPLACEMENT STRING.
+   *
+   * ⚠ FOUND 2026-08-23, AND IT HAD BEEN SILENTLY FAKING KILLS ⚠
+   * `String.prototype.replace` treats `$` in a replacement STRING as an escape:
+   * `$$` inserts one literal `$`, and `$1`, `$&`, `` $` `` and `$'` all mean
+   * something too. A PL/pgSQL body is delimited by `$$`, so a SQL mutant whose
+   * replacement carried one wrote `$;` where it meant `$$;` — which unbalances
+   * the dollar quote and makes every function BELOW it a syntax error.
+   *
+   * MEASURED: the same mutant killed cleanly when applied by hand (4 failed,
+   * 3 passed) and reported `Tests 7 skipped (7)` under this harness, because the
+   * migration no longer parsed and `beforeAll` threw. Exit code 1 either way — so
+   * it read as a kill, from a run where nothing was tested and the code under
+   * test was not the code the mutant described.
+   *
+   * A function replacer is substituted verbatim, which is what every caller here
+   * has always meant.
+   */
+  writeFileSync(
+    record.file,
+    current.replace(find, () => replace),
+    'utf8',
+  )
 
   const mutated = readFileSync(record.file, 'utf8')
   if (sha256(mutated) === record.sha) {
     throw new MutationHarnessError(
       `${record.file} is unchanged after applying the mutant — the write did not land.`,
+    )
+  }
+  // The mutation must be the one described: applying `find → replace` by hand and
+  // finding `replace` absent is the shape the `$$` defect took.
+  if (!mutated.includes(replace)) {
+    throw new MutationHarnessError(
+      `${record.file} does not contain the replacement text after mutation. The write landed ` +
+        'but produced something other than what the mutant describes.',
     )
   }
   return mutated

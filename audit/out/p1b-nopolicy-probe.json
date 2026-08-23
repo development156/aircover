@@ -1,0 +1,142 @@
+{
+  "member": {
+    "user_id": "user_3IHqtjAC6l7q2RJmJDVoHEBv9wG",
+    "workspace_id": "c7023764-7eaf-48ae-b6cd-ce6136ad0809",
+    "posts": 40
+  },
+  "control": 40,
+  "rows": [
+    {
+      "table": "ai_provider_logs",
+      "privileged": 227,
+      "member": {
+        "status": 200,
+        "count": 0
+      },
+      "anon": {
+        "status": 200,
+        "count": 0
+      }
+    },
+    {
+      "table": "app_settings",
+      "privileged": 0,
+      "member": {
+        "status": 200,
+        "count": 0
+      },
+      "anon": {
+        "status": 200,
+        "count": 0
+      }
+    },
+    {
+      "table": "billing_webhook_events",
+      "privileged": 0,
+      "member": {
+        "status": 200,
+        "count": 0
+      },
+      "anon": {
+        "status": 200,
+        "count": 0
+      }
+    },
+    {
+      "table": "brands",
+      "privileged": 0,
+      "member": {
+        "status": 200,
+        "count": 0
+      },
+      "anon": {
+        "status": 200,
+        "count": 0
+      }
+    },
+    {
+      "table": "connection_secrets",
+      "privileged": 0,
+      "member": {
+        "status": 200,
+        "count": 0
+      },
+      "anon": {
+        "status": 200,
+        "count": 0
+      }
+    },
+    {
+      "table": "elements",
+      "privileged": 0,
+      "member": {
+        "status": 200,
+        "count": 0
+      },
+      "anon": {
+        "status": 200,
+        "count": 0
+      }
+    },
+    {
+      "table": "invoice_serials",
+      "privileged": 0,
+      "member": {
+        "status": 200,
+        "count": 0
+      },
+      "anon": {
+        "status": 200,
+        "count": 0
+      }
+    },
+    {
+      "table": "jobs",
+      "privileged": 0,
+      "member": {
+        "status": 200,
+        "count": 0
+      },
+      "anon": {
+        "status": 200,
+        "count": 0
+      }
+    },
+    {
+      "table": "ledger",
+      "privileged": 1,
+      "member": {
+        "status": 200,
+        "count": 0
+      },
+      "anon": {
+        "status": 200,
+        "count": 0
+      }
+    },
+    {
+      "table": "radar_fetch_log",
+      "privileged": 0,
+      "member": {
+        "status": 200,
+        "count": 0
+      },
+      "anon": {
+        "status": 200,
+        "count": 0
+      }
+    },
+    {
+      "table": "radar_limits",
+      "privileged": 1,
+      "member": {
+        "status": 200,
+        "count": 0
+      },
+      "anon": {
+        "status": 200,
+        "count": 0
+      }
+    }
+  ]
+}

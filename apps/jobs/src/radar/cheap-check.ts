@@ -110,7 +110,16 @@ export async function cheapCheck(options: CheapCheckOptions): Promise<CheapCheck
   try {
     res = await options.fetch(url, {
       headers,
-      redirect: 'follow',
+      /**
+       * NO `redirect: 'follow'` HERE, AND THAT IS THE FIX.
+       *
+       * It used to say `follow`, which handed hop two to undici where no guard
+       * of ours can see it — a competitor's page redirecting to
+       * `http://169.254.169.254/` was fetched with the original URL still
+       * looking perfectly ordinary in the row. Redirects belong to the
+       * transport now (`createGuardedFetch`), which follows them manually and
+       * re-validates the address at every hop.
+       */
       signal: AbortSignal.timeout(timeoutMs),
     })
   } catch (error) {

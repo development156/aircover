@@ -212,7 +212,27 @@ describe('openUploadDoor', () => {
   })
 
   test('refuses an oversized document — a 40-page book bypasses the page cap', async () => {
-    const huge = `data:application/pdf;base64,${'A'.repeat(MAX_UPLOAD_BYTES * 2)}`
+    /**
+     * THE FIXTURE HAS TO BE A REAL PDF NOW, and finding out why cost a red gate.
+     *
+     * This payload used to be `'A'.repeat(...)` — a data URL that CLAIMED to be a
+     * PDF and was not. That was fine while `isPdfDataUrl` only read the label. It
+     * stopped being fine the moment the door started reading the `%PDF-` magic,
+     * because the type check runs first and this file now answers `not_pdf`
+     * before it ever reaches the cap.
+     *
+     * The order is deliberate and stays: `not_pdf` is the more accurate refusal
+     * for eight megabytes of something else, and the check is a slice of eight
+     * characters rather than a scan of the payload. What was wrong was the
+     * fixture: this test is about an oversized DOCUMENT, so it needs to be one.
+     *
+     * The new suite in `upload-door-type.test.ts` did not catch this, and that is
+     * the lesson worth keeping — its own oversize case was built with a valid
+     * `%PDF-` header, so the sibling with the unrealistic fixture walked straight
+     * through while the new tests all passed.
+     */
+    const pdfHead = Buffer.from('%PDF-1.7', 'latin1').toString('base64')
+    const huge = `data:application/pdf;base64,${pdfHead}${'A'.repeat(MAX_UPLOAD_BYTES * 2)}`
     const out = await openUploadDoor({ filename: 'big.pdf', dataUrl: huge }, 'Acme', {
       ctx,
       extract: runner(null),

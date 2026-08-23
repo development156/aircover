@@ -54,9 +54,51 @@ export async function verifyTurnstile(
   }
 }
 
-/** The first hop we can attribute a submission to, for rate limiting. */
+/**
+ * The hop we can attribute a submission to, for rate limiting.
+ *
+ * ── WHY NOT THE FIRST ENTRY, WHICH IS WHAT THIS USED TO TAKE ────────────────
+ * `x-forwarded-for` is a LIST, and it is built left to right by each proxy
+ * appending the peer it heard from. The LEFTMOST entry is therefore whatever the
+ * original client claimed — a header, not an observation. Keying a rate limit on
+ * it means a script sending a fresh random value per request gets a fresh bucket
+ * per request, and the limit counts to one forever.
+ *
+ * The RIGHTMOST entry is the one appended by the proxy closest to us, which is
+ * the only entry in the list we did not take a stranger's word for. It is also
+ * correct in the other case: if the platform OVERWRITES the header rather than
+ * appending — which Vercel may well do, and this audit could not measure from
+ * outside — the list has one entry and rightmost and leftmost are the same
+ * value. So this direction is right under both behaviours and wrong under
+ * neither, which is why it was changed without waiting to find out which.
+ *
+ * `x-vercel-forwarded-for` is preferred where present because our own platform
+ * sets it and a client cannot cause it to appear.
+ *
+ * ⚠ AND THIS IS NOT WHAT STOPS A SCRIPT ⚠ Turnstile is, and it fails CLOSED —
+ * `unreachable` is a refusal, above. The rate limit is a cost control in front
+ * of it. Reading this function as the bot defence would be reading a budget as a
+ * lock.
+ */
 export function clientIpFrom(headers: Headers): string | null {
-  const forwarded = headers.get('x-forwarded-for')
-  if (forwarded) return forwarded.split(',')[0]?.trim() || null
-  return headers.get('x-real-ip')
+  // Each candidate FALLS THROUGH when it yields nothing, rather than being
+  // consulted only when the header is absent. The old shape read `x-real-ip`
+  // only if `x-forwarded-for` was missing entirely, so a client sending
+  // `x-forwarded-for: " , "` suppressed the trustworthy header and got the
+  // shared `'unknown'` bucket. Found by the test beside this file, not by
+  // reading it.
+  return (
+    lastHop(headers.get('x-vercel-forwarded-for')) ??
+    lastHop(headers.get('x-forwarded-for')) ??
+    (headers.get('x-real-ip')?.trim() || null)
+  )
+}
+
+function lastHop(value: string | null): string | null {
+  if (value === null) return null
+  const hops = value
+    .split(',')
+    .map((hop) => hop.trim())
+    .filter((hop) => hop.length > 0)
+  return hops[hops.length - 1] ?? null
 }

@@ -1,5 +1,6 @@
 import { lookup } from 'node:dns/promises'
 
+import { ipLiteral, isPrivateAddress } from './ip'
 import { pinnedFetch } from './pinned-fetch'
 
 /**
@@ -31,142 +32,18 @@ export class UnsafeUrlError extends Error {
   }
 }
 
-/** IPv4 ranges that must never be reachable from a customer-supplied URL. */
-function isPrivateIpv4(ip: string): boolean {
-  const parts = ip.split('.').map(Number)
-  if (parts.length !== 4 || parts.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return true
-  const [a, b, c] = parts as [number, number, number, number]
-  if (a === 0 || a === 127) return true // this-host, loopback
-  if (a === 10) return true // private
-  if (a === 172 && b >= 16 && b <= 31) return true // private
-  if (a === 192 && b === 168) return true // private
-  if (a === 169 && b === 254) return true // link-local — cloud metadata lives here
-  if (a === 100 && b >= 64 && b <= 127) return true // CGNAT
-  if (a >= 224) return true // multicast + reserved
-  // Reserved ranges carried over from the onboarding lane's own address guard,
-  // which listed them and this did not. None is routable, so none can be a real
-  // customer's site — and a range nobody can legitimately be in is one a crawler
-  // should refuse rather than time out on.
-  if (a === 192 && b === 0 && c === 0) return true // IETF protocol assignments
-  if (a === 192 && b === 0 && c === 2) return true // TEST-NET-1
-  if (a === 198 && (b === 18 || b === 19)) return true // benchmarking
-  if (a === 198 && b === 51 && c === 100) return true // TEST-NET-2
-  if (a === 203 && b === 0 && c === 113) return true // TEST-NET-3
-  return false
-}
-
 /**
- * Expand an IPv6 literal to its eight 16-bit groups, or null if it is not one.
+ * ADDRESS CLASSIFICATION LIVES IN `ip.ts` AND NO LONGER HERE.
  *
- * PARSING IS THE POINT. The version this replaced matched SPELLINGS — a single
- * `^::ffff:(\d+\.\d+\.\d+\.\d+)$` regex — so it judged the IPv4-mapped form
- * only when the mapped address happened to be written in dotted quad. MEASURED
- * 2026-08-23: `::ffff:169.254.169.254` was blocked and `::ffff:a9fe:a9fe` was
- * ALLOWED. Those are the same 128 bits. `a9fe:a9fe` is `169.254.169.254`, the
- * cloud metadata endpoint, and `dns.lookup` may return either spelling.
- *
- * A guard that blocks one spelling of an address and admits another blocks
- * nothing at all, because the spelling is the attacker's to choose.
+ * What used to be here were two prefix-regex classifiers, and the IPv6 half had
+ * a hole wide enough to reach the cloud metadata endpoint: its only IPv4-mapped
+ * branch matched `::ffff:169.254.169.254`, a string `new URL` never produces —
+ * it serialises that literal as `::ffff:a9fe:a9fe`, which fell through every test
+ * and was returned as PUBLIC. Fourteen of sixteen hostile IPv6 forms walked
+ * through, MEASURED. `ip.ts` decides with arithmetic instead, and re-exporting
+ * from here keeps `isPrivateAddress` at the import path its callers already use.
  */
-function hextets(input: string): number[] | null {
-  let addr = input.toLowerCase().split('%')[0] ?? ''
-
-  // A dotted-quad tail IS the low 32 bits (`::ffff:1.2.3.4`, `64:ff9b::1.2.3.4`).
-  // Rewritten as two hextets so there is one representation to reason about.
-  const dotted = /^(.*:)(\d{1,3}(?:\.\d{1,3}){3})$/.exec(addr)
-  if (dotted) {
-    const v4 = parseIpv4Bits(dotted[2]!)
-    if (v4 === null) return null
-    addr = `${dotted[1]!}${((v4 >>> 16) & 0xffff).toString(16)}:${(v4 & 0xffff).toString(16)}`
-  }
-
-  const halves = addr.split('::')
-  if (halves.length > 2) return null
-  const part = (text: string): string[] => (text === '' ? [] : text.split(':'))
-  const head = part(halves[0] ?? '')
-  const tail = halves.length === 2 ? part(halves[1] ?? '') : []
-
-  const groups =
-    halves.length === 2
-      ? [...head, ...Array(8 - head.length - tail.length).fill('0'), ...tail]
-      : head
-  if (groups.length !== 8) return null
-
-  const out: number[] = []
-  for (const g of groups) {
-    if (!/^[0-9a-f]{1,4}$/.test(g)) return null
-    out.push(Number.parseInt(g, 16))
-  }
-  return out
-}
-
-/** The 32-bit value of a dotted quad, or null. */
-function parseIpv4Bits(ip: string): number | null {
-  const parts = ip.split('.')
-  if (parts.length !== 4) return null
-  let value = 0
-  for (const p of parts) {
-    if (!/^\d{1,3}$/.test(p)) return null
-    const octet = Number(p)
-    if (octet > 255) return null
-    value = value * 256 + octet
-  }
-  return value
-}
-
-/** Judge 32 bits as the IPv4 address they are, reusing the audited range list. */
-const embeddedV4IsPrivate = (v4: number): boolean =>
-  isPrivateIpv4([(v4 >>> 24) & 255, (v4 >>> 16) & 255, (v4 >>> 8) & 255, v4 & 255].join('.'))
-
-function isPrivateIpv6(ip: string): boolean {
-  const h = hextets(ip)
-  // Unparseable is REFUSED, not allowed. Everything reaching here came from a
-  // resolver, so a shape we cannot read is a shape we cannot judge.
-  if (h === null) return true
-
-  const [h0, h1, h2, h3, h4, h5, h6, h7] = h as [
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-  ]
-  const low32 = ((h6 << 16) >>> 0) + h7
-  const topSixZero = h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0
-
-  if (topSixZero && low32 === 0) return true // ::           unspecified
-  if (topSixZero && low32 === 1) return true // ::1          loopback
-  // ::a.b.c.d — the deprecated IPv4-compatible form, and it tunnels v4 exactly
-  // like the mapped form does.
-  if (topSixZero) return embeddedV4IsPrivate(low32)
-  // ::ffff:0:0/96 — IPv4-mapped, in EITHER spelling now.
-  if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0xffff) {
-    return embeddedV4IsPrivate(low32)
-  }
-  // 64:ff9b::/96 and 64:ff9b:1::/48 — NAT64. A prefix that exists specifically
-  // to carry the whole IPv4 space, so it inherits every v4 range. Listed by the
-  // onboarding lane's address guard and NOT by this one; deleting that file on
-  // 2026-08-23 is what made this line this file's responsibility.
-  if (h0 === 0x0064 && h1 === 0xff9b) {
-    if (h2 === 0x0001) return true // local-use NAT64: no legitimate crawl target
-    if (h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0) return embeddedV4IsPrivate(low32)
-  }
-  // 2002::/16 — 6to4, where the v4 address sits in the SECOND and THIRD hextets.
-  if (h0 === 0x2002) return embeddedV4IsPrivate((((h1 << 16) >>> 0) + h2) >>> 0)
-
-  if ((h0 & 0xfe00) === 0xfc00) return true // fc00::/7   unique-local
-  if ((h0 & 0xffc0) === 0xfe80) return true // fe80::/10  link-local
-  if ((h0 & 0xff00) === 0xff00) return true // ff00::/8   multicast
-  if (h0 === 0x2001 && h1 === 0x0db8) return true // 2001:db8::/32 documentation
-  return false
-}
-
-export function isPrivateAddress(ip: string, family: number): boolean {
-  return family === 6 ? isPrivateIpv6(ip) : isPrivateIpv4(ip)
-}
+export { isPrivateAddress, isPrivateIpv4, isPrivateIpv6, ipLiteral } from './ip'
 
 export interface SafeUrlOptions {
   /** Injected in tests so DNS is not a network dependency. */
@@ -191,6 +68,24 @@ export async function assertPublicUrl(raw: string, opts: SafeUrlOptions = {}): P
   }
   if (url.username || url.password) {
     throw new UnsafeUrlError('credentials in URL')
+  }
+
+  /**
+   * AN IP LITERAL IS JUDGED HERE, NOT BY DNS.
+   *
+   * `url.hostname` keeps the brackets on an IPv6 literal, and
+   * `dns.lookup('[::1]')` answers ENOTFOUND — so `http://[::1]/` was refused
+   * with "hostname does not resolve", which is an ACCIDENT rather than a
+   * decision. It reads as a working guard while resting on a DNS error message,
+   * and the moment any caller strips the brackets first the refusal disappears.
+   * Classify the literal directly and the refusal says what it means.
+   */
+  const literal = ipLiteral(url.hostname)
+  if (literal) {
+    if (isPrivateAddress(literal.address, literal.family)) {
+      throw new UnsafeUrlError('resolves to a private address')
+    }
+    return url
   }
 
   const resolver = opts.resolve ?? ((host: string) => lookup(host, { all: true, verbatim: true }))

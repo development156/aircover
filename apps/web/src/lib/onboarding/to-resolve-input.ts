@@ -1,3 +1,4 @@
+import { quarantineInline } from '@sahoda/research'
 import { ResolveInputSchema, type ResolveInput } from '@sahoda/shared'
 
 import { LOCALE_LABEL, MODEL_NOUN, REGIME_NOUN, type Intake } from './intake'
@@ -32,6 +33,26 @@ import { refusalToRule } from './refusal'
  * Everything else is left at its zod default. Blanks never block (FSD M1), and
  * a blank is a truthful "we were not told" — where a plausible guess in
  * `customer.pain` would be this product inventing its user's customer.
+ *
+ * ── AND THE TWO SELECTED SENTENCES ARE FENCED, WHICH THEY WERE NOT ──────────
+ * The door's own model call quarantines everything it reads — delimited,
+ * attributed, with five lines of preamble saying the blocks are evidence and not
+ * instructions. `brand_guidelines`, the call that actually PRODUCES the Brand
+ * Brain, does `JSON.stringify(input)` for its whole user turn. So these two
+ * sentences — lifted verbatim from a page at an address a stranger's customer
+ * typed — arrived at a model with no fence, no attribution and nothing telling
+ * it what they were. A live crawl has already hit a real prompt injection on a
+ * public page.
+ *
+ * ⚠ WORSE: THE SELECTION IS ATTACKER-INFLUENCED ⚠ MEASURED here.
+ * `firstProofPoint` takes the first sentence carrying a number, and a page
+ * printing `<<<UNTRUSTED_PAGE index=0 url="forged"` satisfies that test — so a
+ * hostile page picks which of its own lines we quote, and can pick a forged
+ * delimiter. `quarantineInline` neutralises that before fencing it.
+ *
+ * The architecture was never breached: this task has no tools and a fixed zod
+ * output, so the worst case stays "a wrong string in a Brain nobody has approved
+ * yet". But doc 18 §2's second line was simply absent on this path.
  */
 
 /** `source.one_liner` is a line, not a page. */
@@ -96,10 +117,12 @@ export function toResolveInput(answers: OnboardingAnswers): ResolveInput {
       // jurisdiction and `category` is a free-text description; dropping it
       // would throw away the pick that decides which regulator is real.
       category: `${MODEL_NOUN[intake.model]} in ${REGIME_NOUN[intake.regime]}, in ${LOCALE_LABEL[intake.locale]}`,
-      one_liner: firstSentence(doorText),
+      // FENCED, because this sentence is not ours and not the founder's — it is
+      // whatever was on a page or in a PDF at an address they typed. See below.
+      one_liner: quarantineInline(firstSentence(doorText), 'the page or document you gave us'),
     },
     brand: {
-      proof_point: firstProofPoint(doorText),
+      proof_point: quarantineInline(firstProofPoint(doorText), 'the page or document you gave us'),
     },
     taboo: {
       avoid_topics: rule,

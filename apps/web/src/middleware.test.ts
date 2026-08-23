@@ -104,13 +104,22 @@ const CLERK_BYPASS_PATHS = [
   '/api/cron/playbooks',
   '/api/webhooks/cashfree',
   '/api/webhooks/clerk',
-  // Added 2026-08-23, and the reason it was missing is the reason
-  // `middleware.coverage.test.ts` now exists beside this file. Zernio landed on
-  // `isPublicRoute` with the wt-webhooks merge on 2026-08-21 and reached NEITHER
-  // this array nor CLERK_MATCHED_PATHS, so this suite adjudicated it in no
-  // direction and stayed green while Clerk kept parsing the `Authorization`
-  // header of a route the whole internet can reach. Arrays of remembered paths
-  // cannot catch a path nobody remembered; the coverage guard walks src/app.
+  // Added 2026-08-23, by two lanes independently, and both reasons are kept
+  // because they are different facts.
+  //
+  // WHY IT WAS MISSING (wt-repair): Zernio landed on `isPublicRoute` with the
+  // wt-webhooks merge on 2026-08-21 and reached NEITHER this array nor
+  // CLERK_MATCHED_PATHS, so this suite adjudicated it in no direction and stayed
+  // green while Clerk kept parsing the `Authorization` header of a route the
+  // whole internet can reach. Arrays of remembered paths cannot catch a path
+  // nobody remembered, which is why `middleware.coverage.test.ts` now walks
+  // src/app instead of holding a list.
+  //
+  // WHAT IT COST (wt-sec): it was the ONE self-authenticating webhook still
+  // reaching Clerk. The live sweep that found it recorded ZERO 500s across 72
+  // routes, so this closes a reachability gap rather than a live crash — the
+  // difference between a route that cannot reach the failure and one that is
+  // rescued from it by a try/catch.
   '/api/webhooks/zernio',
 ]
 

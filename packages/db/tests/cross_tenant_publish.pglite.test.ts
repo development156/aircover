@@ -226,6 +226,41 @@ describe('assert_account_for_scheduled_post (real Postgres, in-process)', () => 
     }
   })
 
+  it('cannot even STORE a variant whose workspace differs from its post', async () => {
+    /**
+     * ── WHY THIS TEST EXISTS: A MUTANT SURVIVED ─────────────────────────────
+     * Deleting `and v.workspace_id = v_ws_id` from the variant lookup in
+     * `assert_account_for_scheduled_post` changes nothing that any fixture here
+     * can see, and a mutation run reported it SURVIVED. That reads as a coverage
+     * gap and is not one: the clause is redundant BY CONSTRUCTION, because
+     * `post_variants` carries
+     *
+     *     foreign key (post_id, workspace_id) references posts (id, workspace_id)
+     *
+     * and a mismatched pairing therefore cannot exist to be caught. The migration
+     * says as much — "the composite FK already makes the cross-tenant pairing
+     * unstorable; this re-reads it anyway, because a guard that assumes its own
+     * schema invariant is an assumption."
+     *
+     * So the assumption is measured rather than argued. And this is the test that
+     * gives the redundant clause its meaning: the day a migration drops that FK,
+     * THIS goes red, and the line in the function stops being redundant.
+     */
+    await expect(
+      db.query(
+        `insert into post_variants (workspace_id, post_id, channel, body)
+         values ($1, $2, 'x', 'a variant belonging to the wrong tenant')`,
+        [WS_B, POST_A],
+      ),
+    ).rejects.toThrow()
+
+    const rows = await db.query<{ n: number }>(
+      `select count(*)::int as n from post_variants where workspace_id = $1`,
+      [WS_B],
+    )
+    expect(rows.rows[0]!.n).toBe(0)
+  })
+
   it('takes the workspace from the POST, never from the caller', async () => {
     // There is no workspace argument at all, and that is the design: a signature
     // that accepted one would be a signature an attacker could fill in.

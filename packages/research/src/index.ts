@@ -21,6 +21,8 @@ export { createDirectSource } from './direct-source'
 export type { DirectSourceOptions } from './direct-source'
 export { safeFetch, assertPublicUrl, isPrivateAddress, UnsafeUrlError } from './safe-fetch'
 export { pinnedFetch } from './pinned-fetch'
+export { guardedFetch, createGuardedFetch } from './guarded-fetch'
+export { ipLiteral, isPrivateIpv4, isPrivateIpv6, parseIpv4, parseIpv6 } from './ip'
 export type { FetchedPage, SafeFetchOptions } from './safe-fetch'
 export { parsePage, htmlToMarkdown, extractLinks } from './html'
 export type { ParsedPage } from './html'
@@ -44,6 +46,7 @@ export {
   quarantineCorpus,
   quarantinePage,
   quarantineBlock,
+  quarantineInline,
   quarantinePreamble,
   type QuarantineInput,
   neutralize,

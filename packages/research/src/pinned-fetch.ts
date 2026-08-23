@@ -5,7 +5,7 @@ import { request as httpsRequest } from 'node:https'
 import { Readable } from 'node:stream'
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
 
-import { isPrivateAddress } from './safe-fetch'
+import { ipLiteral, isPrivateAddress } from './ip'
 
 /**
  * A `fetch` whose connection can only reach the address we approved.
@@ -72,21 +72,6 @@ const guardedLookup: LookupFunction = (hostname, options, callback) => {
     const first = found[0]!
     return callback(null, first.address, first.family)
   })
-}
-
-/**
- * The hostname as an IP, when it already is one. `null` for a name — that case
- * belongs to the socket guard above, which is the only thing that can see it.
- *
- * A URL parses `[::1]` with brackets; `isPrivateAddress` wants the bare address.
- */
-function ipLiteral(hostname: string): { address: string; family: number } | null {
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) return { address: hostname, family: 4 }
-  if (hostname.startsWith('[') && hostname.endsWith(']')) {
-    return { address: hostname.slice(1, -1), family: 6 }
-  }
-  if (hostname.includes(':')) return { address: hostname, family: 6 }
-  return null
 }
 
 /**

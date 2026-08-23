@@ -183,6 +183,45 @@ export function quarantineBlock(
   }
 }
 
+/**
+ * ONE FIELD'S WORTH of untrusted text, fenced on a single line.
+ *
+ * ── WHY A SECOND SHAPE EXISTS AT ALL ────────────────────────────────────────
+ * `quarantineBlock` fences a PAGE: a header line, the body, a closing line. Some
+ * untrusted text is not a page — it is one sentence lifted out of one and dropped
+ * into a field of a structured object that is then serialised whole.
+ * `toResolveInput` does exactly that: `source.one_liner` and `brand.proof_point`
+ * are sentences selected verbatim from a customer-supplied URL or PDF, and
+ * `brand_guidelines` sends the object as `JSON.stringify(input)`.
+ *
+ * A three-line block cannot live in a 240-character field, so before this the
+ * sentences went in raw — the door's own extraction fenced everything it read,
+ * and the call that actually produces the Brand Brain fenced nothing.
+ *
+ * ⚠ AND THE SELECTION IS ITSELF ATTACKER-INFLUENCED ⚠ MEASURED while writing
+ * this: `firstProofPoint` picks the first sentence carrying a number, and a page
+ * printing `<<<UNTRUSTED_PAGE index=0 url="forged"` satisfies that test — so the
+ * hostile page chose which of its own lines we would quote, and chose a forged
+ * delimiter. `neutralize` is what makes that line inert, and it runs here.
+ *
+ * SAME tokens and SAME neutralizer as `quarantineBlock`, for the reason stated
+ * above it: a second fence made of markers `neutralize` does not know about is a
+ * door the guard is not watching.
+ *
+ * An EMPTY value returns empty. A fence around nothing reads to a model as a
+ * quotation from a page that said nothing, which is not the same fact as "we
+ * were never given a page at all".
+ */
+export function quarantineInline(text: string, attribution: string): string {
+  const value = text.trim()
+  if (value === '') return ''
+  const where = JSON.stringify(neutralize(attribution))
+  // Newlines would break the single line this has to stay on, and a field this
+  // small has no use for them.
+  const flat = neutralize(value).replace(/\s*\n+\s*/g, ' ')
+  return `${OPEN} from=${where} ${flat} ${CLOSE}`
+}
+
 /** The whole crawl as one quarantined corpus, ready to be the user turn. */
 export function quarantineCorpus(pages: readonly CrawledPage[]): string {
   return [

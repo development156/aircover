@@ -136,6 +136,11 @@ async function main(): Promise<number> {
   try {
     const report = await runRadarPass({
       db: createRadarPgDb(pool),
+      // The PROVIDER transport only — Apify and Zyte, whose URLs this repository
+      // writes. The competitor's own page is fetched by `fetchPage`, which is
+      // deliberately NOT named here so it takes its guarded default. Handing the
+      // raw global to both is the defect this split closes: it made
+      // `http://169.254.169.254/` a fetchable competitor.
       fetch: globalThis.fetch as never,
       ...(process.env.APIFY_TOKEN ? { apifyToken: process.env.APIFY_TOKEN } : {}),
       ...(process.env.ZYTE_API_KEY ? { zyteApiKey: process.env.ZYTE_API_KEY } : {}),

@@ -71,10 +71,27 @@ if (commandless.length > 0) {
   )
 }
 
-const cwd = resolve(REPO_ROOT, spec.cwd ?? '.')
+/**
+ * A mutant may name its OWN cwd, and until 2026-08-23 it could not.
+ *
+ * ⚠ THE RUN THAT PROVED NOTHING AND SAID 11/11 ⚠
+ * `spec.cwd` was read once, here, and `runCommand` closed over it. A spec whose
+ * mutants each carried a `cwd` — the natural shape when one guard spans
+ * `packages/research` and `apps/jobs` — had every command executed from the
+ * REPO ROOT instead. `pnpm vitest run src/ip.test.ts` finds no test files there
+ * and exits 1, and exit 1 is what this file calls KILLED. Eleven mutants were
+ * reported killed having run zero assertions between them.
+ *
+ * The tell was in the report the whole time: every row read
+ * "no test summary found in the output". That string is now a REFUSAL rather
+ * than a footnote — see `summarise`.
+ */
+function cwdFor(mutant) {
+  return resolve(REPO_ROOT, mutant.cwd ?? spec.cwd ?? '.')
+}
 
 /** Exit code only. Whether a suite "failed" is the runner's judgement, not ours. */
-function runCommand(command) {
+function runCommand(command, cwd) {
   return new Promise((resolveRun) => {
     const child = spawn(command, { cwd, shell: true, stdio: ['ignore', 'pipe', 'pipe'] })
     let output = ''
@@ -84,10 +101,35 @@ function runCommand(command) {
   })
 }
 
-/** The runner's own summary line, so the report says what actually happened. */
+/**
+ * The runner's own summary line — and its ABSENCE is a failed run, not a note.
+ *
+ * The previous pattern required "N passed", so a suite where every test failed
+ * (`Tests  9 failed (9)`) also produced no summary. That made the string
+ * ambiguous between "all red" and "never started", and the second of those is
+ * the one that turns a green mutation report into fiction: a command that cannot
+ * find its tests exits non-zero, which this file reads as KILLED.
+ *
+ * Returns null when no vitest summary was printed at all, AND when the summary
+ * it did print records no test actually running.
+ *
+ * ⚠ THE SECOND SHAPE, FOUND 2026-08-23 ⚠
+ * `Tests  6 skipped (6)`. The mutated SQL made `beforeAll` throw, every test was
+ * skipped, the process exited non-zero, and this file called that a kill — a
+ * verdict earned by zero assertions. It is also what a worker crash looks like
+ * when three sessions share a machine and PGlite is the memory-hungry one; the
+ * SKIP COUNT IS THE TELL, and it is now read rather than displayed. A run has to
+ * show at least one test that passed or failed before its exit code means
+ * anything.
+ */
 function summarise(output) {
-  const match = /Tests\s+(?:\d+ failed \| )?\d+ passed[^\n]*/.exec(output)
-  return match ? match[0].replace(/\s+/g, ' ').trim() : 'no test summary found in the output'
+  const match = /^\s*Tests\s+\S[^\n]*/m.exec(output)
+  if (!match) return null
+  const line = match[0].replace(/\s+/g, ' ').trim()
+  const ran = /(\d+) (?:passed|failed)/g
+  let total = 0
+  for (const m of line.matchAll(ran)) total += Number(m[1])
+  return total > 0 ? line : null
 }
 
 try {
@@ -99,10 +141,39 @@ try {
     })),
     runTests: async (mutant) => {
       process.stderr.write(`mutation-check: ${mutant.name} … `)
-      const { code, output } = await runCommand(mutant.command ?? spec.command)
+      const { code, output } = await runCommand(mutant.command ?? spec.command, cwdFor(mutant))
+      const summary = summarise(output)
+      /**
+       * ONE MUTANT SHAPE LEGITIMATELY RUNS NO TESTS, AND IT HAS TO SAY SO.
+       *
+       * "the schema is never applied — the suites face an empty database" breaks
+       * the fixture rather than the code: the right outcome is a suite that
+       * cannot boot, and demanding an assertion from it is demanding the
+       * impossible. But that is also indistinguishable from a command that never
+       * started, which is the failure this check exists for — so the exception is
+       * DECLARED on the mutant, in the spec, where a reviewer sees it, rather than
+       * inferred from the output.
+       */
+      if (summary === null && mutant.expectsNoTests === true) {
+        const killed = code !== 0
+        process.stderr.write(`${killed ? 'killed (no tests ran, as declared)' : 'SURVIVED'}\n`)
+        return { killed, summary: 'no tests ran — declared by expectsNoTests' }
+      }
+      if (summary === null) {
+        // NOT a kill. The command exited without vitest reporting a single test,
+        // so nothing was executed against the mutated source and this run proves
+        // nothing about it. Louder than a survivor, because a survivor at least
+        // ran.
+        throw new MutationHarnessError(
+          `${mutant.name}: the command printed no test summary, so no assertion ran ` +
+            `against the mutated source. Exit code ${code} is not a kill. ` +
+            `Command: ${mutant.command ?? spec.command} (cwd ${cwdFor(mutant)})\n` +
+            output.split('\n').slice(-12).join('\n'),
+        )
+      }
       const killed = code !== 0
       process.stderr.write(`${killed ? 'killed' : 'SURVIVED'}\n`)
-      return { killed, summary: summarise(output) }
+      return { killed, summary }
     },
   })
 

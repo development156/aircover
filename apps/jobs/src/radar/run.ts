@@ -1,3 +1,4 @@
+import { guardedFetch } from '@sahoda/research'
 import {
   diffSnapshots,
   extractPrices,
@@ -46,8 +47,33 @@ import { isRefusal, withSpend } from './spend'
 
 export interface RadarPassOptions {
   db: RadarDb
-  /** Injected so the whole pass is executable without a network. */
+  /**
+   * The PROVIDER transport — Apify and Zyte, both fixed hosts we own the URL of.
+   * Injected so the whole pass is executable without a network.
+   *
+   * This is deliberately NOT the transport a competitor's page is read with. See
+   * `fetchPage`.
+   */
   fetch: FetchLike
+  /**
+   * The transport for a COMPETITOR-SUPPLIED URL, which is the only untrusted
+   * address in this pass — and it defaults to the guarded one.
+   *
+   * ⚠ THE DEFECT THIS FIELD EXISTS TO CLOSE ⚠
+   * `scripts/radar-pass.ts` passed `globalThis.fetch` as the single transport,
+   * and `cheapCheck` asked it for `redirect: 'follow'`. So any signed-in account
+   * could add `http://169.254.169.254/latest/meta-data/` as a competitor and have
+   * this server read its own cloud credentials into a snapshot row, nightly. The
+   * plain dotted quad was enough; no encoding trick was needed. Splitting the two
+   * transports is what makes the guard un-bypassable by omission: a caller that
+   * says nothing gets `guardedFetch`, and reaching a private address requires
+   * naming this field on purpose.
+   *
+   * It cannot be a check at the door instead. A source is typed once and fetched
+   * for months, and the DNS record behind a stored hostname is free to change in
+   * between — so the only honest place to decide is the socket, on the night.
+   */
+  fetchPage?: FetchLike
   apifyToken?: string
   zyteApiKey?: string
   /** How many sources to look at. A wall, not a target. */
@@ -191,7 +217,7 @@ async function checkWebsite(
           lastModified: source.lastModified,
           contentHash: source.contentHash,
         },
-        fetch: options.fetch,
+        fetch: options.fetchPage ?? (guardedFetch as FetchLike),
       })
       return {
         outcome: result.outcome,
