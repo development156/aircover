@@ -151,6 +151,22 @@ export interface ShotOptions {
 export async function shot(page: Page, opts: ShotOptions): Promise<FrameRow> {
   await parkPointer(page)
   const d = await measure(page)
+  /**
+   * DID THE STYLESHEET ARRIVE?
+   *
+   * Recorded on every row, beside the frame it describes, because a frame taken
+   * off a page whose CSS never loaded is a photograph of a state no person was
+   * in — and it is indistinguishable from a real frame by size, by theme label
+   * and by sha. docs/37 §10 requires `body` to paint an explicit token ground;
+   * with the stylesheet gone the computed value is `rgba(0, 0, 0, 0)`.
+   *
+   * MEASURED 2026-08-23: a run on a dying server wrote 34 such frames, median
+   * 5,851 bytes against 172,775 for the same routes in the pass before, and
+   * every existing assertion in the capture spec passed on all 34.
+   */
+  d.bodyGround = await page
+    .evaluate(() => getComputedStyle(document.body).backgroundColor)
+    .catch(() => null)
   const url = new URL(page.url())
   const domTheme = await page
     .evaluate(() => document.documentElement.getAttribute('data-theme'))

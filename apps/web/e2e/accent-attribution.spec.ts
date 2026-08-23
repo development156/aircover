@@ -1,4 +1,4 @@
-import { test } from './fixtures/seeded-user'
+import { expect, test } from './fixtures/seeded-user'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -103,7 +103,10 @@ test('accent attribution', async ({ page, signedIn }) => {
     await page.waitForLoadState('load').catch(() => {})
     await page.waitForTimeout(400)
     await page.mouse.move(-40, -40)
-    const result = await page.evaluate(PROBE)
+    const result = (await page.evaluate(PROBE)) as {
+      frame: number
+      els: unknown[]
+    }
     const slug = route.replace(/\//g, '_') || '_root'
     writeFileSync(join(OUT, `${slug}.json`), JSON.stringify(result, null, 1))
     /**
@@ -118,5 +121,25 @@ test('accent attribution', async ({ page, signedIn }) => {
      * long.
      */
     await page.screenshot({ path: join(OUT, `${slug}.png`), fullPage: false })
+
+    /**
+     * A PROBE THAT MEASURED NOTHING MUST NOT REPORT SUCCESS.
+     *
+     * This file is a data-collection tool rather than a property test, and it
+     * shipped with no `expect(` at all — which `scripts/lint.mjs` refuses, and
+     * is right to: a run whose navigations all failed would write a directory of
+     * `{"els": []}` and exit green, and the next session would read those files
+     * as "this screen spends no accent" rather than as "nothing was measured".
+     *
+     * So it asserts the two things that separate a real reading from an empty
+     * one: the viewport is the one §2.3's figures are quoted at, and the page
+     * had SOMETHING saturated on it. Every route here carries at least the
+     * topbar's credits pill, so zero means the page did not render.
+     */
+    expect(result.frame, `${route}: not measured at 1440x900`).toBe(1440 * 900)
+    expect(
+      result.els.length,
+      `${route}: not one saturated element — the page did not render`,
+    ).toBeGreaterThan(0)
   }
 })

@@ -138,5 +138,44 @@ for (const theme of THEMES) {
     const expected = theme === 'dark' ? 'dark' : 'light'
     const mislabelled = mine.filter((r) => r.domTheme !== expected).map((r) => r.stop)
     expect(mislabelled, `frames labelled ${theme} whose DOM was not`).toEqual([])
+
+    /**
+     * ── AND THE FRAMES MUST NOT BE BLANK ─────────────────────────────────────
+     * The three assertions above ALL PASSED on a run that wrote 34 unstyled
+     * PNGs. MEASURED 2026-08-23: this machine runs three lanes, at least two of
+     * which had run `pkill -f next-server` (which is not port-scoped), and mine
+     * died partway through the dark pass. Next kept answering HTML from a dying
+     * process while the stylesheet request failed, so the frames photographed a
+     * white page with blue underlined links and serif type — and the manifest
+     * called them dark, correctly, because `data-theme` is stamped by an inline
+     * <head> script that needs no CSS at all.
+     *
+     * Median size of those frames: **5,851 bytes**, against 172,775 for the
+     * light pass of the same routes. A count could not see it. Distinctness
+     * could not see it — unstyled pages still differ from each other. The theme
+     * label could not see it, and was the most misleading of the three, because
+     * it reported the one property that was still true.
+     *
+     * The byte floor is the crude half. The precise half is the body's own
+     * computed background: with the stylesheet gone it is `rgba(0, 0, 0, 0)`,
+     * and docs/37 §10 requires `body` to paint an explicit token ground in both
+     * themes. So a frame whose body is transparent is a frame of a page that did
+     * not finish loading, whatever its size.
+     *
+     * WHAT IT CANNOT SEE: a stylesheet that loaded but was WRONG, and a page
+     * that painted its ground and nothing else.
+     */
+    const groundless = mine
+      .filter((r) => (r.d as Record<string, unknown>)?.bodyGround === 'rgba(0, 0, 0, 0)')
+      .map((r) => r.stop)
+    expect(
+      groundless,
+      `frames whose <body> painted no ground — the stylesheet did not arrive`,
+    ).toEqual([])
+
+    // 20 KB. The smallest legitimate frame in the light pass of this suite was
+    // an order of magnitude above it; the blank ones sat at 5.8 KB.
+    const tiny = mine.filter((r) => r.bytes < 20_000).map((r) => `${r.stop}=${r.bytes}B`)
+    expect(tiny, `frames too small to hold a rendered screen`).toEqual([])
   })
 }
