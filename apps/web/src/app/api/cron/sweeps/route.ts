@@ -202,6 +202,11 @@ export async function GET(request: Request): Promise<Response> {
         states: heartbeats.checked.map((v) => `${v.job}:${v.state}`),
         alerted: heartbeats.sent,
         suppressed: heartbeats.suppressed,
+        // Reported separately from `suppressed` on purpose. Suppressed means the
+        // rail worked and held its tongue; undeliverable means an alarm was raised
+        // and NOBODY WAS TOLD. Merging them is how a claim URL that answered 400 on
+        // every call read as healthy restraint for as long as it existed.
+        undeliverable: heartbeats.undeliverable,
       },
     },
     { status: outcome.status },

@@ -3,7 +3,12 @@ import 'server-only'
 import { sendOpsEmail } from '@/lib/ops/email'
 
 import { readCronRun } from './heartbeat-store'
-import { allHeartbeatVerdicts, type CronJob, type HeartbeatVerdict } from './heartbeat'
+import {
+  CRON_SCHEDULES,
+  allHeartbeatVerdicts,
+  type CronJob,
+  type HeartbeatVerdict,
+} from './heartbeat'
 
 /**
  * Turn a stopped heartbeat into something a person actually receives.
@@ -47,22 +52,47 @@ function credentials(): { url: string; token: string } | null {
 }
 
 /**
+ * Three outcomes, not two.
+ *
+ * `declined` means another tick already alerted inside the window — the rail is
+ * working and is doing its job. `unavailable` means we could not ask. Collapsing
+ * them into one boolean is what hid the defect below for as long as it existed:
+ * a permanently broken claim looked exactly like healthy suppression.
+ */
+export type AlertSlot = 'claimed' | 'declined' | 'unavailable'
+
+/**
  * Claim the right to send for this job, or decline.
  *
  * FAILS CLOSED — no Upstash means no claim means no send. The opposite choice
  * would turn an Upstash outage into an unthrottled mail loop, and a rail that
  * floods is a rail that gets muted.
+ *
+ * ── THE URL WAS WRONG, AND IT MADE THIS WHOLE FILE INERT ─────────────────────
+ * This used to send `?NX=true&EX=n`. MEASURED against real Upstash 2026-08-22:
+ *
+ *   ?NX=true&EX=60  →  HTTP 400  {"error":"ERR syntax error"}
+ *   ?NX&EX=60       →  HTTP 200  {"result":"OK"}   then {"result":null}
+ *
+ * `NX` is a FLAG in the Redis SET command, not a parameter with a value, and
+ * Upstash passes the query string through to Redis verbatim. So `!response.ok`
+ * was true on every call, every job was reported `suppressed`, and no alert had
+ * ever been sent or ever could be. The unit tests could not see it: they mock
+ * fetch, so they asserted our own idea of the URL back to us.
+ *
+ * Every branch here is now exercised against real Upstash by
+ * `alert.live.test.ts`.
  */
-async function claimAlertSlot(job: CronJob, nowMs: number): Promise<boolean> {
+export async function claimAlertSlot(job: CronJob, nowMs: number): Promise<AlertSlot> {
   const creds = credentials()
-  if (creds === null) return false
+  if (creds === null) return 'unavailable'
 
   try {
     // NX = set only if absent, EX = expire. Together they are a lock with a
     // lease: the first caller in the window wins and the key evaporates in time
     // for the next one, with no reader-then-writer race between two ticks.
     const response = await fetch(
-      `${creds.url}/set/${encodeURIComponent(SUPPRESS_PREFIX + job)}/${nowMs}?NX=true&EX=${Math.floor(
+      `${creds.url}/set/${encodeURIComponent(SUPPRESS_PREFIX + job)}/${nowMs}?NX&EX=${Math.floor(
         RE_ALERT_AFTER_MS / 1000,
       )}`,
       {
@@ -71,12 +101,12 @@ async function claimAlertSlot(job: CronJob, nowMs: number): Promise<boolean> {
         cache: 'no-store',
       },
     )
-    if (!response.ok) return false
+    if (!response.ok) return 'unavailable'
     const body = (await response.json()) as { result?: unknown }
     // Upstash returns "OK" when NX succeeded and null when the key was there.
-    return body.result === 'OK'
+    return body.result === 'OK' ? 'claimed' : 'declined'
   } catch {
-    return false
+    return 'unavailable'
   }
 }
 
@@ -84,7 +114,15 @@ export interface AlertReport {
   readonly checked: readonly HeartbeatVerdict[]
   readonly alarming: readonly HeartbeatVerdict[]
   readonly sent: readonly CronJob[]
+  /** Another tick already alerted inside the window. The rail is working. */
   readonly suppressed: readonly CronJob[]
+  /**
+   * We could not ask whether to send, so we did not. Reported separately from
+   * `suppressed` because a broken rail and a working one must not read alike —
+   * a non-empty list here means NOBODY WAS TOLD and the reason was our own
+   * plumbing, not restraint.
+   */
+  readonly undeliverable: readonly CronJob[]
 }
 
 /**
@@ -97,7 +135,13 @@ export interface AlertReport {
  * down by their own watchdog.
  */
 export async function checkAndAlertHeartbeats(nowMs: number = Date.now()): Promise<AlertReport> {
-  const jobs: CronJob[] = ['sweeps', 'metrics']
+  // DERIVED from the schedule table, never listed here. This used to be a
+  // hard-coded `['sweeps', 'metrics']` while `allHeartbeatVerdicts` below
+  // iterated all THREE schedules — so `loop` was judged on a last-run this
+  // function never read, and would have reported "nothing has been recorded"
+  // for ever even on a night it ran perfectly. A guard whose input list is
+  // shorter than its output list is answering about rows it never looked at.
+  const jobs = Object.keys(CRON_SCHEDULES) as CronJob[]
   const lastRuns: Partial<Record<CronJob, number | null>> = {}
   for (const job of jobs) {
     lastRuns[job] = await readCronRun(job)
@@ -110,10 +154,16 @@ export async function checkAndAlertHeartbeats(nowMs: number = Date.now()): Promi
 
   const sent: CronJob[] = []
   const suppressed: CronJob[] = []
+  const undeliverable: CronJob[] = []
 
   for (const verdict of alarming) {
-    if (!(await claimAlertSlot(verdict.job, nowMs))) {
+    const slot = await claimAlertSlot(verdict.job, nowMs)
+    if (slot === 'declined') {
       suppressed.push(verdict.job)
+      continue
+    }
+    if (slot === 'unavailable') {
+      undeliverable.push(verdict.job)
       continue
     }
     const outcome = await sendOpsEmail({
@@ -132,7 +182,11 @@ export async function checkAndAlertHeartbeats(nowMs: number = Date.now()): Promi
       ].join('\n'),
     })
     if (outcome.ok) sent.push(verdict.job)
+    // The slot was claimed but the mail did not go. Not silence: the claim key
+    // now blocks a retry for six hours, so this is the one case where a reader
+    // must see that the alarm was raised and nobody received it.
+    else undeliverable.push(verdict.job)
   }
 
-  return { checked, alarming, sent, suppressed }
+  return { checked, alarming, sent, suppressed, undeliverable }
 }

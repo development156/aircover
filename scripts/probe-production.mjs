@@ -102,6 +102,21 @@ for (const route of EXPECTED_ROUTES) {
 const summary = summarise(verdicts)
 console.log(`\n  ${summary.passed}/${summary.total} routes behave · ${HOST}`)
 
+// EXIT 2 — could not measure. Distinct from exit 1 on purpose: a caller that
+// treats "Vercel's login wall answered" as "production is down" is a caller
+// whose alarms get muted. Six red runs of post-deploy-smoke.yml, from three
+// branches on three days, were all this and nothing else.
+if (!summary.measured) {
+  console.error('\nProduction probe COULD NOT MEASURE:')
+  for (const u of summary.unmeasured) console.error(`  ${u.path} — ${u.reason}`)
+  console.error(
+    '\n  This deployment is behind Vercel deployment protection. Probe the production\n' +
+      '  alias instead, or supply a protection-bypass token. Nothing here says the app\n' +
+      '  is broken, and nothing here says it works.',
+  )
+  process.exit(2)
+}
+
 if (!summary.ok) {
   console.error('\nProduction probe FAILED:')
   for (const f of summary.failed) console.error(`  ${f.path} (${f.kind}) — ${f.reason}`)

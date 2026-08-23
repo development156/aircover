@@ -3,14 +3,21 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, devices } from '@playwright/test'
 
+import { assertE2ETargetAllowed } from './src/lib/testing/e2e-target-report'
+
 /**
- * Next loads `.env.local` for the APP; the Playwright runner is a separate
- * process and gets nothing. Global setup needs the Clerk keys to fetch a testing
- * token, so load them here. Existing values always win, so CI secrets are never
- * shadowed by a developer's local file.
+ * Next loads `.env.local` and `.env` for the APP; the Playwright runner is a
+ * separate process and gets nothing. Global setup needs the Clerk keys to fetch a
+ * testing token, so load them here. Existing values always win, so CI secrets are
+ * never shadowed by a developer's local file.
+ *
+ * BOTH files, in Next's own precedence (process.env > .env.local > .env), because
+ * the destination guard below has to see exactly what the APP will see. Reading
+ * only `.env.local` made the runner blind to a `.env` that named a different
+ * project — the runner would report no target while the app happily wrote to one.
  */
-function loadEnvLocal(): void {
-  const file = join(dirname(fileURLToPath(import.meta.url)), '.env.local')
+function loadEnvFile(name: string): void {
+  const file = join(dirname(fileURLToPath(import.meta.url)), name)
   let raw: string
   try {
     raw = readFileSync(file, 'utf8')
@@ -31,7 +38,23 @@ function loadEnvLocal(): void {
   }
 }
 
-loadEnvLocal()
+// `.env.local` FIRST: each loader lets an already-set value win, so loading the
+// higher-precedence file first is what makes it higher precedence.
+loadEnvFile('.env.local')
+loadEnvFile('.env')
+
+/**
+ * WHICH DATABASE IS THIS RUN ABOUT TO WRITE TO?
+ *
+ * At module scope on purpose. Playwright evaluates this config before it starts
+ * the web server and before `globalSetup`, so a refusal lands before the first
+ * request instead of after a five-minute Turbopack compile.
+ *
+ * The banner prints on every run, refused or allowed. If you do not see it, this
+ * line did not execute — which is the only way to tell a guard that passed from a
+ * guard that was never wired in.
+ */
+assertE2ETargetAllowed()
 
 /**
  * E2E harness.
