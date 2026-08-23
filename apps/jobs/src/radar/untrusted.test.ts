@@ -356,7 +356,12 @@ describe('the strongest claim, enforced instead of asserted in prose', () => {
    */
   it('no provider endpoint is named anywhere radar can reach', () => {
     const graph = reachable()
-    const hosts = ['api.openai.com', 'openrouter.ai', 'api.anthropic.com', 'generativelanguage.googleapis.com']
+    const hosts = [
+      'api.openai.com',
+      'openrouter.ai',
+      'api.anthropic.com',
+      'generativelanguage.googleapis.com',
+    ]
     const offenders: string[] = []
     for (const file of graph.files) {
       const source = readFileSync(file, 'utf8')

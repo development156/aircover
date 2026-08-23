@@ -98,7 +98,10 @@ function extractWithAnyExtractor(
   const candidates: [string, string[]][] = [
     ['unzip', ['-q', archive]],
     ['bsdtar', ['-xf', archive]],
-    ['python3', ['-c', `import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall('.')`, archive]],
+    [
+      'python3',
+      ['-c', `import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall('.')`, archive],
+    ],
   ]
   for (const [tool, args] of candidates) {
     try {

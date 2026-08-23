@@ -58,7 +58,9 @@ const objects = await fingerprint(client)
 // migration is pending work and not drift, and reporting it as drift would make
 // the check unusable on any branch doing anything.
 const recorded = (
-  await client.query('select version, name from supabase_migrations.schema_migrations order by version')
+  await client.query(
+    'select version, name from supabase_migrations.schema_migrations order by version',
+  )
 ).rows as { version: string; name: string | null }[]
 
 await client.query('commit')

@@ -2,12 +2,7 @@ import 'server-only'
 
 import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
 import { createMesh, planWeekTask } from '@sahoda/mesh'
-import {
-  MESH_TASK_ACTION,
-  toChannelSet,
-  type AutonomyLevel,
-  type Channel,
-} from '@sahoda/shared'
+import { MESH_TASK_ACTION, toChannelSet, type AutonomyLevel, type Channel } from '@sahoda/shared'
 
 import { previewCost, priceBrief, cycleCost } from '@/lib/loop/cost'
 import { assess, explain, type LoopFacts, type LoopRefusalReason } from '@/lib/loop/eligibility'
@@ -143,7 +138,8 @@ export async function runScheduledLoopCycles(
     ).rows
 
     const considered = rows.slice(0, MAX_WORKSPACES_PER_TICK)
-    const deferred = rows.length > MAX_WORKSPACES_PER_TICK ? rows.length - MAX_WORKSPACES_PER_TICK : 0
+    const deferred =
+      rows.length > MAX_WORKSPACES_PER_TICK ? rows.length - MAX_WORKSPACES_PER_TICK : 0
 
     const outcomes: LoopWorkspaceOutcome[] = []
     let planned = 0
@@ -246,7 +242,6 @@ async function planOneWorkspace(
   budgetCredits: number,
   now: Date,
 ): Promise<boolean> {
-
   // The channels arrive already decided. `assess` chose them from the same
   // `status = 'active'` rule this used to apply here — 'active' being the value
   // `upsert_connection` writes, and one of the four the CHECK admits

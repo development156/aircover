@@ -107,9 +107,13 @@ function readTriggers(files) {
     'print(json.dumps(out))',
   ].join('\n')
   try {
-    const out = execFileSync('python3', ['-c', script, ...files.map((f) => join(WORKFLOW_DIR, f))], {
-      encoding: 'utf8',
-    })
+    const out = execFileSync(
+      'python3',
+      ['-c', script, ...files.map((f) => join(WORKFLOW_DIR, f))],
+      {
+        encoding: 'utf8',
+      },
+    )
     return JSON.parse(out)
   } catch (error) {
     throw new Error(
@@ -121,13 +125,19 @@ function readTriggers(files) {
 }
 
 function main() {
-  const meta = JSON.parse(gh(['api', `repos/${REPO}`, '--jq', '{d:.default_branch,p:.permissions}']))
+  const meta = JSON.parse(
+    gh(['api', `repos/${REPO}`, '--jq', '{d:.default_branch,p:.permissions}']),
+  )
   const branch = meta.d
   console.log(`Actions repository : ${REPO}`)
   console.log(`Default branch     : ${branch}   (the only ref GitHub schedules from)`)
 
-  const secrets = JSON.parse(gh(['api', `repos/${REPO}/actions/secrets`, '--jq', '[.secrets[].name]']))
-  console.log(`Secrets present    : ${secrets.length ? secrets.join(', ') : '(none — jobs here cannot reach the database)'}`)
+  const secrets = JSON.parse(
+    gh(['api', `repos/${REPO}/actions/secrets`, '--jq', '[.secrets[].name]']),
+  )
+  console.log(
+    `Secrets present    : ${secrets.length ? secrets.join(', ') : '(none — jobs here cannot reach the database)'}`,
+  )
 
   const everything = readdirSync(WORKFLOW_DIR)
     .filter((f) => f.endsWith('.yml') || f.endsWith('.yaml'))
@@ -152,7 +162,12 @@ function main() {
   // What the default branch holds today, by path -> {sha, blob}.
   const remote = new Map()
   const listing = gh(
-    ['api', `repos/${REPO}/contents/.github/workflows?ref=${branch}`, '--jq', '.[] | "\\(.name)\\t\\(.sha)"'],
+    [
+      'api',
+      `repos/${REPO}/contents/.github/workflows?ref=${branch}`,
+      '--jq',
+      '.[] | "\\(.name)\\t\\(.sha)"',
+    ],
     { allowFail: true },
   )
   if (listing) {
@@ -179,10 +194,13 @@ function main() {
   }
   // Never deleted, only named. Removing one here would disarm a job silently.
   for (const name of remote.keys()) {
-    if (!local.includes(name)) console.log(`  ! ${name}  — on ${branch} but not here; left alone, decide by hand`)
+    if (!local.includes(name))
+      console.log(`  ! ${name}  — on ${branch} but not here; left alone, decide by hand`)
   }
   for (const name of skipped) {
-    console.log(`  · ${name}  — no schedule (${triggers[name].join(', ')}); fires from its own branch, not armed here`)
+    console.log(
+      `  · ${name}  — no schedule (${triggers[name].join(', ')}); fires from its own branch, not armed here`,
+    )
   }
 
   const todo = plan.filter((p) => p.action !== 'same')
@@ -194,10 +212,16 @@ function main() {
   } else {
     for (const item of todo) {
       const args = [
-        'api', '--method', 'PUT', `repos/${REPO}/contents/.github/workflows/${item.name}`,
-        '-f', `message=ci: arm ${item.name} on ${branch} (scripts/ci/arm-workflows.mjs)`,
-        '-f', `branch=${branch}`,
-        '-f', `content=${item.bytes.toString('base64')}`,
+        'api',
+        '--method',
+        'PUT',
+        `repos/${REPO}/contents/.github/workflows/${item.name}`,
+        '-f',
+        `message=ci: arm ${item.name} on ${branch} (scripts/ci/arm-workflows.mjs)`,
+        '-f',
+        `branch=${branch}`,
+        '-f',
+        `content=${item.bytes.toString('base64')}`,
       ]
       if (item.sha) args.push('-f', `sha=${item.sha}`)
       gh(args)

@@ -132,8 +132,38 @@ function rawSqlStatusFilters(): StatusFilter[] {
   return found
 }
 
+/**
+ * The status as a NAMED CONSTANT, which neither scan above can see.
+ *
+ * The cron used to filter in raw SQL; `assess()` in `lib/loop/eligibility.ts` now
+ * decides it once, in TypeScript, against `PLANNABLE_STATUS`. That is a better
+ * shape — one rule instead of a literal repeated per query — and it made the
+ * literal INVISIBLE to a scanner that only reads SQL and PostgREST chains.
+ *
+ * A detector shaped like one half of the codebase certifies the other half. That
+ * sentence is already in this file about the SQL half; this is the third half.
+ */
+function namedConstantStatusFilters(): StatusFilter[] {
+  const found: StatusFilter[] = []
+  for (const root of SOURCE_ROOTS) {
+    for (const file of sourceFiles(root)) {
+      const text = readFileSync(file, 'utf8')
+      for (const decl of text.matchAll(
+        /\bexport const (?:PLANNABLE_STATUS|CONNECTION_STATUS|ACTIVE_STATUS)\s*=\s*'([^']*)'/g,
+      )) {
+        found.push({
+          file: file.slice(REPO.length + 1),
+          line: text.slice(0, decl.index ?? 0).split('\n').length,
+          value: decl[1]!,
+        })
+      }
+    }
+  }
+  return found
+}
+
 function connectionStatusFilters(): StatusFilter[] {
-  const found: StatusFilter[] = [...rawSqlStatusFilters()]
+  const found: StatusFilter[] = [...rawSqlStatusFilters(), ...namedConstantStatusFilters()]
   for (const root of SOURCE_ROOTS) {
     for (const file of sourceFiles(root)) {
       const text = readFileSync(file, 'utf8')
@@ -202,9 +232,16 @@ describe('connections.status — the migration and every query that filters on i
     // that moves them cannot quietly empty this test.
     expect(filters.length).toBeGreaterThanOrEqual(3)
     expect(filters.map((f) => f.file)).toContain('apps/web/src/lib/loop/read.ts')
-    // And the raw-SQL half, which the first version of this scanner could not
-    // see — the cron carried the same wrong literal and was reported clean.
-    expect(filters.map((f) => f.file)).toContain('apps/web/src/lib/cron/run-loop.ts')
+    // And the half the FIRST version of this scanner could not see. It was raw
+    // SQL in `cron/run-loop.ts` — the cron carried the same wrong literal and was
+    // reported clean. That query is gone: `assess()` in `lib/loop/eligibility.ts`
+    // now decides the status once, for the cron and for the screen, instead of
+    // the cron repeating the rule in SQL.
+    //
+    // So the assertion FOLLOWS THE RULE rather than naming a file that no longer
+    // has one. Deleting the run-loop assertion without adding this would have
+    // been how a guard quietly stops covering what it was written for.
+    expect(filters.map((f) => f.file)).toContain('apps/web/src/lib/loop/eligibility.ts')
   })
 
   test('every filtered status is a value the column can actually hold', () => {

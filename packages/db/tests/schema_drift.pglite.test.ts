@@ -24,6 +24,22 @@ import {
  * `scripts/capture-schema-snapshot.ts`), and this side is a real Postgres built
  * from the migration files production says it has applied.
  *
+ * ── WHAT IT CANNOT SEE ──────────────────────────────────────────────────────
+ * It reads migration FILENAMES off disk and compares two catalog fingerprints:
+ *  · a migration applied to production and never recorded there is invisible —
+ *    the snapshot is built from `schema_migrations`, so an unrecorded apply looks
+ *    like drift in the schema rather than like a missing record;
+ *  · function BODIES. `pg_get_functiondef` renders differently between server
+ *    versions, so a body change inside an unchanged signature passes;
+ *  · triggers, grants, constraints by name, sequences, and anything outside the
+ *    `public` and `app` schemas;
+ *  · a file whose CONTENT changed without changing any object this fingerprint
+ *    covers — a comment, a reordered statement, a different way of spelling the
+ *    same DDL;
+ *  · production as it is RIGHT NOW. The comparison is against a committed
+ *    snapshot, so drift introduced after the last capture is invisible until
+ *    somebody re-runs `capture-schema-snapshot.ts`.
+ *
  * ── IT BUILDS THE RECORDED SET, NOT THE DIRECTORY ────────────────────────────
  * A lane's unapplied migration is pending work, not drift. Building every file
  * would report every branch in flight as a failure, and a check that is red on
@@ -33,7 +49,6 @@ import {
  * The consequence is the important half: a file that is RECORDED but MISSING is
  * not silently skipped, it fails this test by name. That is the defect above.
  */
-
 
 /**
  * ⚠ FOUR TABLES IN PRODUCTION THAT THIS REPO DOES NOT BUILD. ⚠
@@ -89,7 +104,9 @@ const snapshot = JSON.parse(readFileSync(SNAPSHOT, 'utf8')) as Snapshot
 /** Migration files on disk, indexed by the version prefix of their name. */
 function filesByVersion(): Map<string, string[]> {
   const map = new Map<string, string[]>()
-  for (const name of readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()) {
+  for (const name of readdirSync(MIGRATIONS)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()) {
     const version = name.split('_')[0] ?? name
     map.set(version, [...(map.get(version) ?? []), name])
   }
@@ -105,9 +122,11 @@ describe('the migration directory builds the schema production has', () => {
       missing.length === 0
         ? ''
         : 'Production has applied and recorded these migrations, and this repo has no file ' +
-          'for them. Every PGlite suite is building a schema production does not have.\n' +
-          missing.map((v) => `  ${v}  ${snapshot.recordedNames[v] ?? '(no name recorded)'}`).join('\n') +
-          '\nRecover them: node packages/db/scripts/recover-lost-migration.mjs <version>',
+            'for them. Every PGlite suite is building a schema production does not have.\n' +
+            missing
+              .map((v) => `  ${v}  ${snapshot.recordedNames[v] ?? '(no name recorded)'}`)
+              .join('\n') +
+            '\nRecover them: node packages/db/scripts/recover-lost-migration.mjs <version>',
     ).toEqual([])
   })
 
@@ -121,14 +140,17 @@ describe('the migration directory builds the schema production has', () => {
       collisions.length === 0
         ? ''
         : 'Two files share one version. Only one of them can ever be recorded, so the ' +
-          'others are applied-but-unrecorded forever:\n' + collisions.join('\n'),
+            'others are applied-but-unrecorded forever:\n' +
+            collisions.join('\n'),
     ).toEqual([])
   })
 
   it('builds a schema that matches production, object for object', async () => {
     const onDisk = filesByVersion()
     const db = await new PGlite({ extensions: { pgcrypto } })
-    await db.exec(readFileSync(resolve(import.meta.dirname, 'helpers/supabase-prelude.sql'), 'utf8'))
+    await db.exec(
+      readFileSync(resolve(import.meta.dirname, 'helpers/supabase-prelude.sql'), 'utf8'),
+    )
     for (const version of snapshot.recordedVersions) {
       for (const file of onDisk.get(version) ?? []) {
         await db.exec(readFileSync(resolve(MIGRATIONS, file), 'utf8'))
@@ -145,9 +167,10 @@ describe('the migration directory builds the schema production has', () => {
       found.length === 0
         ? ''
         : `${found.length} difference(s) between production and what these migrations build.\n` +
-          'Either a migration was applied to production without its file reaching this repo, ' +
-          'or a file changed after it was applied. Refresh the snapshot only once you know ' +
-          'which:\n' + describeDrift(found),
+            'Either a migration was applied to production without its file reaching this repo, ' +
+            'or a file changed after it was applied. Refresh the snapshot only once you know ' +
+            'which:\n' +
+            describeDrift(found),
     ).toEqual([])
   }, 120_000)
 
@@ -155,7 +178,9 @@ describe('the migration directory builds the schema production has', () => {
     const declared = new Set<string>(UNMANAGED_IN_PRODUCTION)
     const onDisk = filesByVersion()
     const db = await new PGlite({ extensions: { pgcrypto } })
-    await db.exec(readFileSync(resolve(import.meta.dirname, 'helpers/supabase-prelude.sql'), 'utf8'))
+    await db.exec(
+      readFileSync(resolve(import.meta.dirname, 'helpers/supabase-prelude.sql'), 'utf8'),
+    )
     for (const version of snapshot.recordedVersions) {
       for (const file of onDisk.get(version) ?? []) {
         await db.exec(readFileSync(resolve(MIGRATIONS, file), 'utf8'))
@@ -174,7 +199,8 @@ describe('the migration directory builds the schema production has', () => {
       surprises.length === 0
         ? ''
         : 'Production has table(s) no migration here creates, and they are not among the ' +
-          'four already known about:\n  ' + surprises.join('\n  '),
+            'four already known about:\n  ' +
+            surprises.join('\n  '),
     ).toEqual([])
   }, 120_000)
 })

@@ -72,7 +72,9 @@ await client.end()
 if (rows.length === 0) throw new Error(`no record for ${version}`)
 const { name, statements } = rows[0]
 if (!statements || statements.length === 0) {
-  throw new Error(`${version} (${name ?? 'unnamed'}) has ZERO recorded statements — nothing to recover`)
+  throw new Error(
+    `${version} (${name ?? 'unnamed'}) has ZERO recorded statements — nothing to recover`,
+  )
 }
 
 const header = `-- ─────────────────────────────────────────────────────────────────────────────

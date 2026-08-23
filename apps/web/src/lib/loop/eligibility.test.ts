@@ -96,7 +96,7 @@ describe('the Loop says why it will not plan', () => {
   it('says how many credits are short, with both numbers', () => {
     const v = assess(eligibleFacts({ availableCredits: 4 }))
     expect(explain(v)).toBe(
-      'Planning a week costs 20 credits and you have 4 — top up and Sahoda will plan your next week.',
+      'Planning a week costs 20 credits and you have 4 credits — top up and Sahoda will plan your next week.',
     )
     expect(v.eligible === false && v.reason).toBe('insufficient_credits')
   })
@@ -163,7 +163,10 @@ describe('the Loop says why it will not plan', () => {
     )
 
     const pausedWithChannels = assess(
-      eligibleFacts({ settings: { paused: true, weeklyBudgetCredits: 150 }, workspaceId: 'ws-off' }),
+      eligibleFacts({
+        settings: { paused: true, weeklyBudgetCredits: 150 },
+        workspaceId: 'ws-off',
+      }),
     )
     expect(explain(pausedWithChannels)).toBe(
       'The Loop is paused — resume it and Sahoda will plan your next week.',

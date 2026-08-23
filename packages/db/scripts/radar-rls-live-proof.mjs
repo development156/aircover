@@ -328,8 +328,11 @@ try {
         where workspace_id = $1::uuid and competitor_id = $2::uuid`,
       [wsA, openedId],
     )
-    check('and the row is stamped with the JWT subject, not an argument',
-      who.rows[0]?.created_by ?? null, USER_A)
+    check(
+      'and the row is stamped with the JWT subject, not an argument',
+      who.rows[0]?.created_by ?? null,
+      USER_A,
+    )
   }
 
   // The attack the wrapper exists to refuse: B calling the door for A's workspace.
@@ -351,12 +354,17 @@ try {
     p_sources: [{ kind: 'website', locator: `${RUN}-anon.example` }],
     p_label: null,
   })
-  check('a signed-out caller cannot reach the door at all',
-    anonDoor.error !== null && anonDoor.error !== undefined, true)
+  check(
+    'a signed-out caller cannot reach the door at all',
+    anonDoor.error !== null && anonDoor.error !== undefined,
+    true,
+  )
   console.log(`        message: ${anonDoor.error?.message}`)
 
   // And the disclosure still holds for a row created THROUGH the door.
-  const afterDoor = await B.from('competitors').select('id').eq('id', openedId ?? ZERO_UUID)
+  const afterDoor = await B.from('competitors')
+    .select('id')
+    .eq('id', openedId ?? ZERO_UUID)
   check('B still cannot see the competitor A just added', afterDoor.data ?? [], [])
 
   const delOther = await A.from('competitor_subscriptions').delete().eq('workspace_id', wsB)
@@ -391,7 +399,10 @@ try {
     )
     // A namespace sweep, so a row created by a path nobody thought to track is
     // still reported rather than silently kept.
-    const orphans = await svc.from('competitors').select('id,display_name').like('display_name', `${RUN}%`)
+    const orphans = await svc
+      .from('competitors')
+      .select('id,display_name')
+      .like('display_name', `${RUN}%`)
     if ((orphans.data ?? []).length > 0) {
       console.log('  ⚠ STILL PRESENT under this run’s namespace:', orphans.data)
       FAIL += 1

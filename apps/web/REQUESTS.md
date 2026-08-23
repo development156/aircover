@@ -886,24 +886,24 @@ membership before anything, and **has no actor argument at all**.
 `store.read(workspaceId)` now returns `collector: 'watch-list-only'` with a real
 `competitors[]`, instead of `'absent'`. Draw the difference:
 
-| state | means |
-|---|---|
-| `absent` | the tables are not there — only if the migration is missing |
+| state             | means                                                                   |
+| ----------------- | ----------------------------------------------------------------------- |
+| `absent`          | the tables are not there — only if the migration is missing             |
 | `watch-list-only` | **the list is real; an empty `days[]` does NOT mean "nothing changed"** |
-| `reading` | fully bound; silence genuinely means nothing changed |
+| `reading`         | fully bound; silence genuinely means nothing changed                    |
 
 Nothing returns `'reading'` yet. The change feed is unbound, so a "nothing happened this
 week" empty state would be a lie.
 
 Per competitor, what is real and what is not:
 
-| field | value | why |
-|---|---|---|
-| `id` | the competitor's real id | |
-| `name` | the workspace's own `label`, falling back to `display_name` | the label is private to the workspace; one customer's name for a rival is never shown to another |
-| `url` | **always `''`** | there is no `url` on a competitor. Addresses are normalised locators on `competitor_sources`, one row per source. That read is not bound yet — do not render an empty string as an address |
-| `kind` | always `'website'` | see the vocabulary mismatch below |
-| `lastObservedAt` | **always `null`** | `competitor_snapshots` is empty for everyone. Never draw a "last checked" time |
+| field            | value                                                       | why                                                                                                                                                                                        |
+| ---------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`             | the competitor's real id                                    |                                                                                                                                                                                            |
+| `name`           | the workspace's own `label`, falling back to `display_name` | the label is private to the workspace; one customer's name for a rival is never shown to another                                                                                           |
+| `url`            | **always `''`**                                             | there is no `url` on a competitor. Addresses are normalised locators on `competitor_sources`, one row per source. That read is not bound yet — do not render an empty string as an address |
+| `kind`           | always `'website'`                                          | see the vocabulary mismatch below                                                                                                                                                          |
+| `lastObservedAt` | **always `null`**                                           | `competitor_snapshots` is empty for everyone. Never draw a "last checked" time                                                                                                             |
 
 ### THREE DECISIONS THAT ARE YOURS, NOT MINE
 
@@ -926,8 +926,8 @@ Per competitor, what is real and what is not:
 
 ### Where the proof is, if you need to check a claim
 
-* `packages/db/tests/radar_subscribe_door.pglite.test.ts` — real Postgres, RLS enforced.
-* `packages/db/scripts/radar-rls-live-proof.mjs` — production, anon key, minted member
+- `packages/db/tests/radar_subscribe_door.pglite.test.ts` — real Postgres, RLS enforced.
+- `packages/db/scripts/radar-rls-live-proof.mjs` — production, anon key, minted member
   JWTs. 29 PASS / 0 FAIL on 2026-08-23, 0 rows left behind.
 
 The two disclosure rules are proven separately and still hold after writing through the
@@ -960,4 +960,3 @@ needs no baseline permission: the ratchet only refuses growth.
 
 Worth checking first whether any pair can be a `Promise.all`. The analyser already treats
 `Promise.all` and `Promise.allSettled` as parallel and will drop the count when you do.
-

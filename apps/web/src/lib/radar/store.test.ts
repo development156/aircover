@@ -27,6 +27,17 @@ import { describe, expect, test } from 'vitest'
  *     `competitor_sources`, one row per source, deduped globally on
  *     (kind, locator).
  *
+ * ── WHAT IT CANNOT SEE ──────────────────────────────────────────────────────
+ * It reads `store.ts` as TEXT, so it is blind to:
+ *  · a query built somewhere else and imported — only this file is scanned;
+ *  · a column named through a variable or a template literal rather than written
+ *    into the `.select('…')` string, which is what the select assertions parse;
+ *  · a `.rpc()` reached dynamically, or the RPC's own behaviour — whether the SQL
+ *    is CORRECT is not a question source text can answer, and is deliberately not
+ *    asked here;
+ *  · anything about production's schema. The column names it forbids are the ones
+ *    that produced a 42703; it cannot tell that the ones it allows still exist.
+ *
  * ── WHAT IS ASSERTED HERE, AND WHAT IS ASSERTED AGAINST A REAL DATABASE ─────
  * These are the decisions that are the binding's own: which RPC it calls, which
  * kinds it can store, and that it never invents a reading. Whether the SQL is

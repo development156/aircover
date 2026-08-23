@@ -139,9 +139,11 @@ export function supabaseRadarStore(): RadarStore {
       }
 
       const competitors: Competitor[] = (data ?? []).map((row) => {
-        const c = row.competitors as unknown as
-          | { id: string; display_name: string; created_at: string }
-          | null
+        const c = row.competitors as unknown as {
+          id: string
+          display_name: string
+          created_at: string
+        } | null
         return {
           id: c?.id ?? String(row.competitor_id),
           // `display_name`, NOT `name`. The column the first binding guessed at
@@ -194,7 +196,10 @@ export function supabaseRadarStore(): RadarStore {
       if (error) {
         // The registry's own refusals are sentences a person can act on; anything
         // else is a failure and must not be dressed up as one of them.
-        if (error.message.includes('RADAR_BAD_LOCATOR') || error.message.includes('RADAR_NO_SOURCES')) {
+        if (
+          error.message.includes('RADAR_BAD_LOCATOR') ||
+          error.message.includes('RADAR_NO_SOURCES')
+        ) {
           throw new Error(`Sahoda could not read that address — check it and try again.`)
         }
         if (error.message.includes('FORBIDDEN_ROLE')) {

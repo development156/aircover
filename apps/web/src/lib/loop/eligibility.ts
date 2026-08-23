@@ -1,6 +1,12 @@
 import type { AutonomyLevel, Channel } from '@sahoda/shared'
 
 import { cycleCost } from '@/lib/loop/cost'
+// Always the `credits(n)` helper, never a hand-written interpolation: the
+// workspace this sentence is for is, by definition, the one with a small number,
+// and the singular has been got wrong twice in this codebase for that reason.
+// (Written without an example, because the scanner that enforces this reads
+// comments too — and would have matched the example.)
+import { credits } from '@/lib/credit-words'
 
 /**
  * WHY THE LOOP WILL NOT PLAN FOR A WORKSPACE — one named cause, never a boolean.
@@ -158,7 +164,9 @@ export function assess(facts: LoopFacts): LoopVerdict {
           .filter((p): p is Channel => (PLANNABLE as readonly string[]).includes(p)),
       ),
     ]
-    return lapsed.length > 0 ? no({ reason: 'channel_lapsed', lapsed }) : no({ reason: 'no_channel' })
+    return lapsed.length > 0
+      ? no({ reason: 'channel_lapsed', lapsed })
+      : no({ reason: 'no_channel' })
   }
 
   if (facts.openCycle) {
@@ -238,6 +246,6 @@ export function explain(verdict: LoopVerdict): string {
     case 'already_planned':
       return `Sahoda already planned week ${verdict.isoWeek} of ${verdict.isoYear} — open it to review this week's briefs.`
     case 'insufficient_credits':
-      return `Planning a week costs ${verdict.required} credits and you have ${verdict.available} — top up and Sahoda will plan your next week.`
+      return `Planning a week costs ${credits(verdict.required)} and you have ${credits(verdict.available)} — top up and Sahoda will plan your next week.`
   }
 }

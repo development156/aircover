@@ -38,7 +38,10 @@ vi.mock('@sahoda/billing', () => ({
   createWithCredits: () => async () => ({ ok: true, data: { count: 0 } }),
   loadBillingEnv: () => ({ databaseUrl: 'postgres://stub/stub' }),
 }))
-vi.mock('@sahoda/mesh', () => ({ createMesh: () => ({ runTask: vi.fn() }), planWeekTask: { def: {} } }))
+vi.mock('@sahoda/mesh', () => ({
+  createMesh: () => ({ runTask: vi.fn() }),
+  planWeekTask: { def: {} },
+}))
 vi.mock('@/lib/observability/report', () => ({ reportServerError: vi.fn() }))
 vi.mock('@/lib/loop/store', () => ({
   openCycle: vi.fn(async () => ({ cycle: { id: 'cyc-1' }, created: true })),

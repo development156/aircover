@@ -69,7 +69,10 @@ function normalizeDefault(value: string | null): string {
 }
 
 function normalizeIndexDef(value: string): string {
-  return value.replace(/\s+/g, ' ').replace(/ USING btree /i, ' USING btree ').trim()
+  return value
+    .replace(/\s+/g, ' ')
+    .replace(/ USING btree /i, ' USING btree ')
+    .trim()
 }
 
 export async function fingerprint(db: Queryable): Promise<SchemaFingerprint> {

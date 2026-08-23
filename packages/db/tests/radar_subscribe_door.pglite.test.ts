@@ -135,7 +135,14 @@ describe('public.radar_subscribe — who may add a competitor', () => {
     // The dedupe the whole registry exists for, now reached through the door
     // rather than through the service role.
     const a = await subscribeAs(db, OWNER_A, WS_A, 'Shared', 'instagram', '@sharedrival')
-    const b = await subscribeAs(db, OWNER_B, WS_B, 'Shared', 'instagram', 'instagram.com/SharedRival/')
+    const b = await subscribeAs(
+      db,
+      OWNER_B,
+      WS_B,
+      'Shared',
+      'instagram',
+      'instagram.com/SharedRival/',
+    )
     if (!a.ok || !b.ok) throw new Error(`both should have succeeded: ${JSON.stringify({ a, b })}`)
     // Written two different ways on purpose: the normaliser is what makes one
     // real-world rival cost one row however a hundred customers spell it.

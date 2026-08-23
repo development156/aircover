@@ -1,6 +1,10 @@
 import 'server-only'
 
-import sharp from 'sharp'
+// sharp 0.35 stopped shipping its types as a NAMESPACE on the default export.
+// `sharp.Sharp` was valid on 0.34 and is `TS2503: Cannot find namespace 'sharp'`
+// on 0.35 — the pipeline type is a named export now. The runtime default export
+// is unchanged; this is a types-only move.
+import sharp, { type Sharp } from 'sharp'
 
 import { sniffImage } from '../posts/sniff-image'
 import type { CropRect, FocalPoint } from './crop-geometry'
@@ -46,7 +50,7 @@ const MAX_PIXELS = 100_000_000
 /** Quality steps tried in order until the output is under the channel's byte cap. */
 const QUALITY_LADDER: readonly number[] = [82, 72, 62, 52]
 
-function open(input: Uint8Array): sharp.Sharp {
+function open(input: Uint8Array): Sharp {
   // `limitInputPixels` refuses an image whose declared dimensions would allocate
   // more than this, which is the defence against a small file that decodes to
   // gigabytes. `failOn: 'error'` refuses a truncated file rather than returning
@@ -99,7 +103,7 @@ export type RenderResult =
   | { ok: true; derivative: RenderedDerivative }
   | { ok: false; reason: 'decode_failed' | 'unreadable_output' | 'still_too_large' }
 
-function encode(pipeline: sharp.Sharp, mime: string, quality: number): sharp.Sharp {
+function encode(pipeline: Sharp, mime: string, quality: number): Sharp {
   switch (mime) {
     case 'image/webp':
       return pipeline.webp({ quality })

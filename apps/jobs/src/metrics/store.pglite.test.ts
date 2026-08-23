@@ -474,5 +474,4 @@ describe('the metric store (real Postgres, in-process)', () => {
       expect(night3.slice(0, 20).every((t) => !night2Ids.has(t.postId))).toBe(true)
     })
   })
-
 })
