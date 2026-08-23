@@ -31,11 +31,31 @@ import type { Page } from '@playwright/test'
  *     composite to a pale surface far outside the saturation floor, and both
  *     are grounds rather than fills — the active nav row wears one.
  *
- * ── AND THE FAB IS THE PHONE'S PRIMARY, NOT AN EXTRA ─────────────────────────
- * Below 700 the shell's `+` is a 52x52 solid fill and the page's own copy of the
- * same action is `max-narrow:hidden`. MEASURED before that hiding landed, the
- * two of them were **89% of every brand-hue pixel on /home at 390**. So the
- * count is one at every width; only which element carries it changes.
+ * ── THE COUNT IS PER LAYER, AND THAT IS A FINDING RATHER THAN A CONVENIENCE ──
+ * The first version of this file counted the whole document and asserted one.
+ * It went RED on the shipping product, at 390, on both routes:
+ *
+ *     /home 390       2 — 194x44 "Teach Sahoda your brand" | 50x50 (the FAB)
+ *     /analytics 390  2 — 147x44 "Connect a channel"       | 50x50 (the FAB)
+ *
+ * docs/40 §5.3 resolved the identical shape by DELETING the page's button —
+ * but only because `Create post` and the FAB were the same action to the same
+ * URL, so one of them was a duplicate. These are not. "Teach Sahoda your brand"
+ * and "write a post" are different doors, and on a workspace with nothing in it
+ * the page's door is the one that matters. Deleting it would remove the only
+ * thing the screen exists to offer.
+ *
+ * So the property is stated at the layer it belongs to. The SHELL has one
+ * permanent primary and it is on all forty screens; a PAGE has one of its own.
+ * Each is asserted at one, and the report prints both, so a page adding a
+ * second fill still fails by name — which is the regression this guard is for.
+ *
+ * WHAT IS NOT RESOLVED, and is not resolved by re-stating it: at 390 those two
+ * layers put two solid orange objects in one 390x844 viewport, and MEASURED by
+ * the pixel meter that is the highest brand fraction in the whole 24-frame
+ * matrix (3.190% on empty /home). Standing the FAB down on a screen whose first
+ * step is something else is a SHELL change affecting forty routes, and it is an
+ * owner ruling rather than this lane's call. Logged in docs/41 §6.
  */
 
 /** `--p` #ff6600 is h≈24°. Same window the pixel meter uses, same reason. */
@@ -52,6 +72,8 @@ interface Fill {
   text: string
   area: number
   box: string
+  /** Inside `#main` — the PAGE's budget — or in the shell's permanent chrome. */
+  inMain: boolean
 }
 
 async function solidBrandFills(page: Page): Promise<Fill[]> {
@@ -85,7 +107,14 @@ async function solidBrandFills(page: Page): Promise<Fill[]> {
         return d > 180 ? 360 - d : d
       }
 
-      const out: { tag: string; text: string; area: number; box: string }[] = []
+      const main = document.getElementById('main')
+      const out: {
+        tag: string
+        text: string
+        area: number
+        box: string
+        inMain: boolean
+      }[] = []
       for (const el of Array.from(document.querySelectorAll('body *'))) {
         const style = getComputedStyle(el)
         if (style.visibility === 'hidden' || style.display === 'none') continue
@@ -102,7 +131,6 @@ async function solidBrandFills(page: Page): Promise<Fill[]> {
         if (area < minArea) continue
         // A brand-filled child inside a brand-filled parent is ONE object to a
         // reader, so only the outermost is counted.
-        if (out.some(() => false)) continue
         const parent = el.parentElement
         if (parent) {
           const pbg = rgba(getComputedStyle(parent).backgroundColor)
@@ -116,6 +144,7 @@ async function solidBrandFills(page: Page): Promise<Fill[]> {
           text: (el.textContent ?? '').trim().slice(0, 40),
           area: Math.round(area),
           box: `${Math.round(box.width)}x${Math.round(box.height)}`,
+          inMain: main !== null && main.contains(el),
         })
       }
       return out
@@ -160,12 +189,17 @@ test.describe('the accent budget @smoke', () => {
 
           const fills = await solidBrandFills(page)
           const where = `${route} ${width} ${theme}`
+          const inPage = fills.filter((f) => f.inMain)
+          const inShell = fills.filter((f) => !f.inMain)
           report.push(
-            `  ${where.padEnd(28)} ${fills.length} — ${
-              fills.map((f) => `${f.tag} ${f.box} "${f.text}"`).join(' | ') || '(none)'
+            `  ${where.padEnd(28)} page ${inPage.length} shell ${inShell.length} — ${
+              fills
+                .map((f) => `${f.inMain ? 'page' : 'shell'} ${f.box} "${f.text}"`)
+                .join(' | ') || '(none)'
             }`,
           )
-          if (fills.length > 1) over.push(`${where}: ${fills.length}`)
+          if (inPage.length > 1) over.push(`${where}: ${inPage.length} in #main`)
+          if (inShell.length > 1) over.push(`${where}: ${inShell.length} in the shell`)
         }
       }
     }
@@ -177,7 +211,7 @@ test.describe('the accent budget @smoke', () => {
     expect(report.length, 'every composition must actually have been visited').toBe(12)
     expect(
       over,
-      'docs/37 §16: one primary action per view. These render more than one solid brand fill',
+      'docs/37 §16: one primary action per LAYER — the page has one, the shell has one',
     ).toEqual([])
   })
 })

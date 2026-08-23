@@ -36,11 +36,26 @@ import { cn } from '@/lib/utils'
  * The hatch is never rendered without the label the caller must pass with it —
  * `.is-simulated`'s own contract, restated in `assert` form below.
  *
- * ── ONE LABEL, NOT TWENTY ────────────────────────────────────────────────────
- * The peak gets a value pill (Nixtio puts the figure in a small pill at the end
- * of each bar; at thirty bars that is thirty numbers, so it goes on the one
- * that is worth reading). Everything else is legible from the axis and the
- * card's own total.
+ * ── ONE LABEL, NOT TWENTY. AND ONE ORANGE BAR, NOT THIRTY ───────────────────
+ * The peak gets the label (Nixtio puts the figure in a small pill at the end of
+ * each bar; at thirty bars that is thirty numbers, so it goes on the one worth
+ * reading) and it gets the accent. Everything else is `--ink-mute`.
+ *
+ * MEASURED, and this is why it is not a preference: the first version drew
+ * every bar in `--brand`, and /home populated at 1440 went from 0.550% to
+ * 0.613% brand — the accent budget going UP, on a lane whose brief is that the
+ * orange should be spent on the one thing the screen is for. Thirty orange bars
+ * is thirty things.
+ *
+ * It is also what the reference does and I had it backwards: its hours-by-day
+ * chart is drawn in NEUTRAL and the green is kept for the line and the primary
+ * button. Solis and Flux both go further and highlight exactly one bar, which
+ * is the shape here.
+ *
+ * THE COLOUR DOES NOT CARRY THE MEANING. The peak is named in words directly
+ * under the chart — "Highest: 30 credits on 23 Aug" — and in the accessible
+ * summary. Strip the hue and nothing is lost, which is the test docs/37 §9
+ * applies to every other signal in this product.
  *
  * ── ENTRANCE ─────────────────────────────────────────────────────────────────
  * `enter-step`, the product's ONE entrance (docs/37 §12), staggered along the
@@ -108,7 +123,12 @@ export function Bars({
                   data-bar={(point.value as number) === 0 ? 'zero' : 'value'}
                   className={cn(
                     'w-full max-w-[14px] rounded-full',
-                    point.hatched ? 'is-simulated' : 'bg-brand',
+                    point.hatched
+                      ? 'is-simulated'
+                      : // Neutral, except the peak. See the header.
+                        i === peakIndex
+                        ? 'bg-brand'
+                        : 'bg-ink-mute',
                     /* A measured zero is a STUB, and a DIFFERENT FILL. Height
                        alone cannot separate it from a value that rounds to the
                        same 3px floor, and `--line` against `--brand` is a fill
