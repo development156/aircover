@@ -136,7 +136,7 @@ export function PrimitiveRack() {
 
       <Rack
         name="Tile"
-        note="A tile is a selectable OPTION. A card is a container. Selection shows in three ways — aria-pressed, a ring, and weight — because a tint alone is nearly invisible against its surface."
+        note="A tile is a selectable OPTION. A card is a container. Selection shows in three ways (aria-pressed, a ring, and weight) because a tint alone is nearly invisible against its surface."
       >
         <Cell label="rest">
           <Tile title="Instagram" meta="Not connected" />
@@ -156,7 +156,7 @@ export function PrimitiveRack() {
 
       <Rack
         name="Chip"
-        note="A chip is data the USER put there — a channel, a filter, a tag. A badge is a status the SYSTEM computed. Do not dress one as the other."
+        note="A chip is data the USER put there: a channel, a filter, a tag. A badge is a status the SYSTEM computed. Do not dress one as the other."
       >
         <Cell label="static">
           <Chip>Instagram</Chip>

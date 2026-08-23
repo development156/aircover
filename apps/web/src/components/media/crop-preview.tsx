@@ -94,9 +94,7 @@ export function CropPreview({
     return (
       <div className="flex flex-col items-center justify-center gap-1.5 rounded-input border border-line bg-s2 px-3 py-8 text-center">
         <ImageOff size={18} strokeWidth={1.6} className="text-muted" aria-hidden />
-        <span className="type-sm text-muted">
-          Preview unavailable — the crop can still be made.
-        </span>
+        <span className="type-sm text-muted">Preview unavailable. The crop can still be made.</span>
       </div>
     )
   }

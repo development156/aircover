@@ -80,7 +80,7 @@ export function GbpOptions({ extras, onExtrasChange }: GbpOptionsProps) {
         </select>
         {ctaUnknown ? (
           <p className="text-[12.5px] text-warn">
-            The saved button is not one Google offers — pick one from the list.
+            The saved button is not one Google offers. Pick one from the list.
           </p>
         ) : null}
       </div>

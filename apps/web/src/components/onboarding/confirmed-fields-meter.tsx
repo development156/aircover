@@ -74,7 +74,7 @@ export function ConfirmedFieldsMeter({ fieldMeta }: ConfirmedFieldsMeterProps) {
       <p className="type-body mt-2 text-muted">
         {none ? (
           <>
-            Everything below is Sahoda&rsquo;s reading of what it found — none of it came from you
+            Everything below is Sahoda&rsquo;s reading of what it found. None of it came from you
             yet. Confirming a field costs nothing, and a guess Sahoda got wrong stays wrong in
             everything it writes until someone corrects it.
           </>

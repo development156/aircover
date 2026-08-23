@@ -70,7 +70,7 @@ export function AbsenceRow() {
 
       <Case
         title="Does not exist"
-        rule="There is no such quantity. Delete the slot — do not fill it."
+        rule="There is no such quantity. Delete the slot; do not fill it."
         example="A monthly allowance, for a wallet that is a balance."
       >
         <span className="type-sm text-muted">(nothing renders)</span>

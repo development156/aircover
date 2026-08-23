@@ -43,7 +43,7 @@ const OUTCOMES: Readonly<Record<ConnectOutcome, OutcomeCopy>> = {
     // Deliberately not "connected with a warning". Some accounts are missing, and
     // the customer has to act on that — so it leads with what did NOT happen.
     title: 'Some accounts didn’t finish connecting',
-    body: 'What’s listed below is everything we have. Connect the rest again — the ones that already worked will not be affected.',
+    body: 'What’s listed below is everything we have. Connect the rest again. The ones that already worked will not be affected.',
     icon: TriangleAlert,
     tone: 'border-warn bg-warn-bg text-warn',
   },
@@ -59,13 +59,13 @@ const OUTCOMES: Readonly<Record<ConnectOutcome, OutcomeCopy>> = {
     // connecting" would send them to reconnect an account that will be declined
     // again for the same reason.
     title: 'Your plan is full',
-    body: 'Everything we could add is listed below. The rest are still connected on the platform — connect again once your plan has room and they’ll be picked up.',
+    body: 'Everything we could add is listed below. The rest are still connected on the platform. Connect again once your plan has room and they’ll be picked up.',
     icon: Info,
     tone: 'border-line bg-s1 text-muted',
   },
   nothing: {
     title: 'Nothing new to connect',
-    body: 'No new account came back from the platform — you may have closed its screen before approving.',
+    body: 'No new account came back from the platform. You may have closed its screen before approving.',
     icon: Info,
     tone: 'border-line bg-s1 text-muted',
   },

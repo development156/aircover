@@ -82,12 +82,12 @@ export function LibrarySearch({
         unreadable ? (
           <p role="alert" className="type-body text-danger">
             Sahoda could not run that search just now. This is not a claim that your library has
-            nothing matching — the search did not come back. Try again.
+            nothing matching. The search did not come back. Try again.
           </p>
         ) : results.length === 0 ? (
           <p className="type-body text-muted">
             Nothing in your library mentions <span className="font-[550] text-ink">“{query}”</span>.
-            Sahoda searched the words in every document it has read — a document still being read is
+            Sahoda searched the words in every document it has read. A document still being read is
             not in there yet.
           </p>
         ) : (

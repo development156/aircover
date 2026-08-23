@@ -303,9 +303,7 @@ export function VersionCard({
           Save
         </Button>
         {state.body === '' ? (
-          <span className="text-[12px] text-muted">
-            Nothing to save — this channel has no copy.
-          </span>
+          <span className="text-[12px] text-muted">Nothing to save. This channel has no copy.</span>
         ) : null}
       </div>
     </section>

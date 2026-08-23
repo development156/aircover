@@ -90,7 +90,7 @@ export function BetaForm({ siteKey, source }: { siteKey: string | null; source: 
       }
 
       if (response.ok && body.ok) {
-        setStatus({ kind: 'sent', message: body.message ?? 'Thanks — we have your details.' })
+        setStatus({ kind: 'sent', message: body.message ?? 'Thanks. We have your details.' })
         form.reset()
         return
       }

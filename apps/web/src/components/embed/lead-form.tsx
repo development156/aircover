@@ -102,7 +102,7 @@ export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
       const body = (await response.json()) as { ok?: boolean; message?: string; fields?: string[] }
 
       if (response.ok && body.ok) {
-        setStatus({ kind: 'sent', message: body.message ?? 'Thanks — they have your details.' })
+        setStatus({ kind: 'sent', message: body.message ?? 'Thanks. They have your details.' })
         form.reset()
         return
       }

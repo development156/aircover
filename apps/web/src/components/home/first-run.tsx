@@ -53,7 +53,7 @@ export function FirstRun({ now }: FirstRunProps) {
       <EmptyState
         icon={Sparkles}
         title="Create a workspace to get started"
-        body="Everything in Sahoda lives in a workspace — your Brand Brain, your posts and your credits. Nothing has failed and nothing was charged; there is simply nothing to show until one exists."
+        body="Everything in Sahoda lives in a workspace: your Brand Brain, your posts and your credits. Nothing has failed and nothing was charged; there is simply nothing to show until one exists."
         action={<CreateWorkspaceButton variant="primary" guideAnchor="home.workspace-create" />}
         tip="Your free signup credits land the moment the workspace exists."
       />

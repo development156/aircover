@@ -18,7 +18,7 @@
 const LADDER = [
   ['--canvas', 'bg-canvas', 'The page ground. NOT white in v5.'],
   ['--surface', 'bg-surface', 'Cards, panels, sheets. A card is a card because it is brighter.'],
-  ['--surface-2', 'bg-s2', 'A well INSIDE a card — inputs, table heads, code.'],
+  ['--surface-2', 'bg-s2', 'A well INSIDE a card: inputs, table heads, code.'],
   ['--surface-3', 'bg-surface-3', 'Hover and pressed.'],
 ] as const
 
@@ -38,7 +38,7 @@ export function Surfaces() {
       <div>
         <h3 className="type-h3 mb-1">The tonal ladder</h3>
         <p className="type-meta mb-3 max-w-prose text-muted">
-          Four rungs, and every adjacent pair clears a floor derived from the reference — 1.03:1 on
+          Four rungs, and every adjacent pair clears a floor derived from the reference: 1.03:1 on
           light, 1.06:1 on dark. Two floors, not one: sRGB is compressed near black, so the same
           separation costs a different number of steps at each end. Proven by{' '}
           <code className="rounded-xs bg-s2 px-1">tonal-ladder.test.ts</code>.
@@ -60,7 +60,7 @@ export function Surfaces() {
         <h3 className="type-h3 mb-1">The radius ladder</h3>
         <p className="type-meta mb-3 max-w-prose text-muted">
           By surface SIZE, not by importance. A nested surface takes the parent&rsquo;s radius minus
-          one step — equal radii on nested boxes make the two curves fight, and a larger radius
+          one step. Equal radii on nested boxes make the two curves fight, and a larger radius
           inside a smaller one reads as a mistake.
         </p>
         <div className="flex flex-wrap items-end gap-3">
@@ -76,7 +76,7 @@ export function Surfaces() {
       </div>
 
       <div>
-        <h3 className="type-h3 mb-1">Glass — chrome only</h3>
+        <h3 className="type-h3 mb-1">Glass, chrome only</h3>
         <p className="type-meta mb-3 max-w-prose text-muted">
           Allowed on the topbar, the rail, the mobile bottom bar, the command palette, modal and
           drawer panels, and toasts. <strong>Never</strong> on a card, table, stat, chart or list
@@ -102,7 +102,7 @@ export function Surfaces() {
               <p className="type-h3">A glass panel</p>
               <p className="type-meta mt-1 text-muted">
                 Legal: this is chrome. The hatch behind it stays visible through the blur, which is
-                the whole effect — and the whole problem for anything below.
+                the whole effect, and the whole problem for anything below.
               </p>
               {/* The rule, demonstrated rather than only stated. */}
               <div className="glass-well surface-ring mt-3 rounded-md p-3">

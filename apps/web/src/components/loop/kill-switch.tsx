@@ -57,7 +57,7 @@ export function KillSwitch() {
       </h2>
       <p className="type-body mt-1 max-w-[68ch] text-muted">
         Takes every post the Loop scheduled off the calendar and pauses it. Your drafts stay in the
-        Planner — nothing is deleted.
+        Planner. Nothing is deleted.
       </p>
 
       {result ? (

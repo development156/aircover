@@ -57,7 +57,7 @@ export function DeleteCampaignButton({
               startTransition(async () => {
                 const result = await deleteCampaign(campaignId)
                 if (result.ok) {
-                  toast.success('Campaign deleted — the posts are still there')
+                  toast.success('Campaign deleted. The posts are still there')
                   router.push('/campaigns')
                 } else {
                   toast.error(result.message)

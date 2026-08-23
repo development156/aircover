@@ -112,7 +112,7 @@ export function DocumentRow({ document }: { document: KnowledgeDocument }) {
               className="mt-px shrink-0 text-accent"
             />
             <span>
-              This document contains text written as if to address an assistant —{' '}
+              This document contains text written as if to address an assistant, in{' '}
               <span className="num">{document.addressed_instructions}</span>{' '}
               {document.addressed_instructions === 1 ? 'place' : 'places'}. Sahoda reads those as
               words on a page, the same as any other sentence in it, and never as instructions.

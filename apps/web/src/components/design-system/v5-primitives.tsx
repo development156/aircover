@@ -87,10 +87,11 @@ function StatCards() {
     <div>
       <h3 className="type-h3 mb-1">Stat card</h3>
       <p className="type-meta mb-3 max-w-prose text-muted">
-        One large number, a small label above it, and a sparkline beneath — the reference&rsquo;s
-        most-repeated object. It ships in both of its real states, because the empty one is what
-        every account sees for its first hour. The figures on the right-hand card are DEMONSTRATION
-        DATA and the card says so; this product never renders a number it cannot prove.
+        One large number, a small label above it, and a sparkline beneath. It is the
+        reference&rsquo;s most-repeated object. It ships in both of its real states, because the
+        empty one is what every account sees for its first hour. The figures on the right-hand card
+        are DEMONSTRATION DATA and the card says so; this product never renders a number it cannot
+        prove.
       </p>
       <div className="grid grid-cols-2 gap-4 max-narrow:grid-cols-1">
         {/* 1 · NOT YET MEASURED. The slot is real; the reading has not arrived.
@@ -135,8 +136,8 @@ function Segmented() {
       <h3 className="type-h3 mb-1">Segmented control</h3>
       <p className="type-meta mb-3 max-w-prose text-muted">
         A floating pill, the way the reference draws it: a soft well holding one raised, opaque
-        selection. It is a RADIO GROUP, not a row of buttons — the options are mutually exclusive
-        and a screen reader has to be told that, or it announces three unrelated controls.
+        selection. It is a RADIO GROUP, not a row of buttons. The options are mutually exclusive and
+        a screen reader has to be told that, or it announces three unrelated controls.
       </p>
       <div
         role="radiogroup"
@@ -196,8 +197,8 @@ function Feedback() {
         <p className="type-meta mb-3 max-w-prose text-muted">
           An invitation to act, never a shrug. It says what will appear here and offers the one
           control that makes it appear. &ldquo;No data&rdquo; is not an empty state. And ONE absence
-          gets ONE statement — five cards each discovering the same emptiness is the defect this
-          rule exists for.
+          gets ONE statement. Five cards each discovering the same emptiness is the defect this rule
+          exists for.
         </p>
         <div className="surface-ring grid gap-3 rounded-lg bg-surface p-8 text-center">
           <p className="type-h3">No posts yet</p>

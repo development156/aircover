@@ -42,7 +42,7 @@ export function CoverageNote({ coveredFrom }: { coveredFrom: string | null }) {
 
   return (
     <p className="mt-2 text-[12px] text-muted">
-      Showing from {label} — older days are outside this view.
+      Showing from {label}. Older days are outside this view.
     </p>
   )
 }

@@ -120,7 +120,7 @@ export function CycleStrip({ status }: CycleStripProps = {}) {
         </h2>
         <p className="type-body mt-1 max-w-[68ch] text-muted">
           The Loop runs the same seven steps every week. You decide how far it gets on its own
-          before it needs you — that is the dial below.
+          before it needs you. That is the dial below.
         </p>
       </div>
 
@@ -168,8 +168,8 @@ export function CycleStrip({ status }: CycleStripProps = {}) {
       {/* The return edge, stated rather than drawn. This is the sentence a
           circular diagram would be trying to convey, and it says more. */}
       <p className="type-sm max-w-[68ch] text-muted">
-        Then it starts again — and it starts from a Brand Brain that now knows what happened last
-        week. That is the part that makes it a loop rather than a schedule.
+        Then it starts again, from a Brand Brain that now knows what happened last week. That is the
+        part that makes it a loop rather than a schedule.
       </p>
     </section>
   )
