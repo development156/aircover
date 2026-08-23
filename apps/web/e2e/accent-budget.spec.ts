@@ -291,12 +291,15 @@ async function sweep(page: Page, state: string, report: string[], over: string[]
         report.push(
           `  ${where.padEnd(36)} page ${inPage.length} shell ${inShell.length}` +
             ` — ${
-              actions.map((f) => `${f.inMain ? 'page' : 'shell'} ${f.box} "${f.text}"`).join(' | ') ||
-              '(no action)'
+              actions
+                .map((f) => `${f.inMain ? 'page' : 'shell'} ${f.box} "${f.text}"`)
+                .join(' | ') || '(no action)'
             }` +
             // Printed, never asserted on. A status pill is not competing to be
             // pressed, and a decorative slab still shows up here by name.
-            (marks.length ? `  [marks: ${marks.map((f) => `${f.box} "${f.text}"`).join(', ')}]` : ''),
+            (marks.length
+              ? `  [marks: ${marks.map((f) => `${f.box} "${f.text}"`).join(', ')}]`
+              : ''),
         )
         if (inPage.length > 1) over.push(`${where}: ${inPage.length} in #main`)
         if (inShell.length > 1) over.push(`${where}: ${inShell.length} in the shell`)
