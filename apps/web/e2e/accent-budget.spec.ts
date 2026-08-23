@@ -1,4 +1,6 @@
-import { expect, test } from './fixtures/seeded-user'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+import { adminClient, expect, test } from './fixtures/seeded-user'
 import { useTheme, type Theme } from './helpers/ux-shot'
 import type { Page } from '@playwright/test'
 
@@ -20,16 +22,29 @@ import type { Page } from '@playwright/test'
  * things on the screen are a solid, unmixed brand fill big enough to read as
  * "press me".
  *
- * ── WHAT COUNTS, AND THE TWO THINGS THAT DELIBERATELY DO NOT ─────────────────
- * A fill counts when its composited background is within the brand hue window
- * AND opaque AND at least MIN_FILL_AREA. The two exclusions:
+ * ── WHAT COUNTS: AN ACTION, NOT AN AREA ──────────────────────────────────────
+ * docs/37 §16's rule is **one primary ACTION per view**, and the first version
+ * of this file used SIZE as the proxy for "is it an action" — any opaque
+ * brand-hue fill over 1000px². The header even argued for it: "the approvals
+ * count is `bg-brand` at 18x18 = 324px², a signal not an action, and the
+ * threshold is what separates them".
  *
- *   · A BADGE. The approvals count is `bg-brand` at 18x18 = 324px². It is a
- *     signal, not an action, and docs/37 §16 is about actions. The threshold is
- *     what separates them and it is stated rather than sensed.
- *   · A WASH. `--brand-wash` is orange at 6% and `--brand-tint` at 16%. Both
- *     composite to a pale surface far outside the saturation floor, and both
- *     are grounds rather than fills — the active nav row wears one.
+ * The threshold does not separate them. MEASURED the moment this guard began
+ * visiting the POPULATED state: `Badge rung="urgent"` is
+ * `bg-brand text-primary-foreground`, and "In review" renders ~75x20 = 1500px²
+ * — over the floor, and not an action. Populated /home failed at 1024 and 1440
+ * in both themes for `Create post` plus a status pill.
+ *
+ * So the discriminator is INTERACTIVITY, which is what the rule was always
+ * about: an `<a>`, a `<button>`, or `[role="button"]`. Everything else that is
+ * a large brand fill is still counted and still PRINTED, under `marks`, so a
+ * decorative orange slab cannot hide behind this correction — it just does not
+ * fail the one-primary assertion, because it is not competing to be pressed.
+ *
+ * A WASH is excluded on a different axis and that has not changed:
+ * `--brand-wash` is orange at 6% and `--brand-tint` at 16%, both composite to a
+ * pale surface far outside the saturation floor, and both are grounds rather
+ * than fills — the active nav row wears one.
  *
  * ── THE COUNT IS PER LAYER, AND THAT IS A FINDING RATHER THAN A CONVENIENCE ──
  * The first version of this file counted the whole document and asserted one.
@@ -56,12 +71,28 @@ import type { Page } from '@playwright/test'
  * matrix (3.190% on empty /home). Standing the FAB down on a screen whose first
  * step is something else is a SHELL change affecting forty routes, and it is an
  * owner ruling rather than this lane's call. Logged in docs/41 §6.
+ *
+ * ── IT VISITS BOTH DATA STATES, AND THE FIRST VERSION DID NOT ────────────────
+ * It bootstrapped a workspace and stopped, so every pass measured an EMPTY one.
+ * A mutation adding a second brand fill to `greeting-banner.tsx` was applied,
+ * built and run, and this guard stayed GREEN — because an empty workspace
+ * renders `GetStarted` and `GreetingBanner` is not on the page at all. The
+ * mutation missed its target, and a guard aimed only at a state the founder is
+ * not looking at would have read in review as coverage of one he is.
+ *
+ * ONE POST IS ENOUGH. `workspaceHasStarted` gates the dashboard on it, so a
+ * single row switches /home from `GetStarted` to the real screen and puts the
+ * greeting, the stat strip and the queue in frame. Inserted through the service
+ * key; deleted by the fixture along with the workspace.
+ *
+ * With no service key the populated half cannot run, and the run SAYS SO and
+ * fails rather than reporting half a sweep as a clean one.
  */
 
 /** `--p` #ff6600 is h≈24°. Same window the pixel meter uses, same reason. */
 const BRAND_HUE = 24
 const HUE_TOLERANCE = 18
-/** Below this a brand fill is a badge or a dot, not an action. */
+/** Below this a brand fill is a dot or an icon chip, not something you press. */
 const MIN_FILL_AREA = 1000
 
 const ROUTES = ['/home', '/analytics'] as const
@@ -74,6 +105,8 @@ interface Fill {
   box: string
   /** Inside `#main` — the PAGE's budget — or in the shell's permanent chrome. */
   inMain: boolean
+  /** Something you can press. Only these compete to be the one primary. */
+  actionable: boolean
 }
 
 async function solidBrandFills(page: Page): Promise<Fill[]> {
@@ -114,6 +147,7 @@ async function solidBrandFills(page: Page): Promise<Fill[]> {
         area: number
         box: string
         inMain: boolean
+        actionable: boolean
       }[] = []
       for (const el of Array.from(document.querySelectorAll('body *'))) {
         const style = getComputedStyle(el)
@@ -145,12 +179,45 @@ async function solidBrandFills(page: Page): Promise<Fill[]> {
           area: Math.round(area),
           box: `${Math.round(box.width)}x${Math.round(box.height)}`,
           inMain: main !== null && main.contains(el),
+          actionable:
+            el.tagName === 'A' ||
+            el.tagName === 'BUTTON' ||
+            el.getAttribute('role') === 'button' ||
+            // A brand-filled wrapper AROUND a link is the same object to a
+            // reader as the link — `buttonVariants` on a <Link> renders an <a>,
+            // but a card whose whole surface is the target does not.
+            el.querySelector('a,button,[role="button"]') !== null,
         })
       }
       return out
     },
     { hue: BRAND_HUE, tolerance: HUE_TOLERANCE, minArea: MIN_FILL_AREA },
   )
+}
+
+/**
+ * One post, so /home stops being `GetStarted` and becomes the dashboard.
+ * `false` when there is no service key — see the header.
+ */
+async function seedOnePost(clerkUserId: string): Promise<boolean> {
+  const admin = adminClient() as SupabaseClient | null
+  if (!admin) return false
+  const { data } = await admin
+    .from('workspaces')
+    .select('id')
+    .eq('created_by', clerkUserId)
+    .limit(1)
+  const workspaceId = data?.[0]?.id
+  if (!workspaceId) return false
+  const { error } = await admin.from('posts').insert({
+    workspace_id: workspaceId,
+    title: 'Saturday cupping, five seats',
+    body: 'Saturday cupping is open again. Five seats, no charge, 9am.',
+    status: 'review',
+    channels: ['instagram'],
+    created_by: clerkUserId,
+  })
+  return !error
 }
 
 async function bootstrap(page: Page): Promise<void> {
@@ -166,7 +233,7 @@ async function bootstrap(page: Page): Promise<void> {
 }
 
 test.describe('the accent budget @smoke', () => {
-  test.setTimeout(6 * 60_000)
+  test.setTimeout(8 * 60_000)
 
   test('no view spends its accent on more than one solid fill', async ({ page, signedIn }) => {
     expect(signedIn).toBeTruthy()
@@ -174,43 +241,66 @@ test.describe('the accent budget @smoke', () => {
 
     const report: string[] = []
     const over: string[] = []
+    const visited: string[] = []
 
-    for (const theme of ['light', 'dark'] as Theme[]) {
-      await useTheme(page, theme)
-      for (const route of ROUTES) {
-        for (const width of WIDTHS) {
-          await page.setViewportSize({ width, height: 900 })
-          await page.goto(route, { waitUntil: 'domcontentloaded' })
-          // Park the pointer off-screen. A hovered primary paints
-          // `--brand-deep` (black) and would be MISSED, so a run that left the
-          // mouse on the button would report one fewer fill than ships.
-          await page.mouse.move(-50, -50)
-          await page.waitForTimeout(500)
-
-          const fills = await solidBrandFills(page)
-          const where = `${route} ${width} ${theme}`
-          const inPage = fills.filter((f) => f.inMain)
-          const inShell = fills.filter((f) => !f.inMain)
-          report.push(
-            `  ${where.padEnd(28)} page ${inPage.length} shell ${inShell.length} — ${
-              fills.map((f) => `${f.inMain ? 'page' : 'shell'} ${f.box} "${f.text}"`).join(' | ') ||
-              '(none)'
-            }`,
-          )
-          if (inPage.length > 1) over.push(`${where}: ${inPage.length} in #main`)
-          if (inShell.length > 1) over.push(`${where}: ${inShell.length} in the shell`)
-        }
+    for (const state of ['empty', 'populated'] as const) {
+      if (state === 'populated' && !(await seedOnePost(signedIn.clerkUserId))) {
+        console.log('\n  NOTE: no service key — the populated state was NOT measured.\n')
+        break
       }
+      visited.push(state)
+      await sweep(page, state, report, over)
     }
 
     console.log('\n──── SOLID BRAND FILLS PER VIEW ────')
     for (const line of report) console.log(line)
     console.log('')
 
-    expect(report.length, 'every composition must actually have been visited').toBe(12)
+    expect(
+      visited,
+      'both data states must be visited — an empty-only pass never renders the dashboard',
+    ).toEqual(['empty', 'populated'])
+    expect(report.length, 'every composition must actually have been visited').toBe(24)
     expect(
       over,
       'docs/37 §16: one primary action per LAYER — the page has one, the shell has one',
     ).toEqual([])
   })
 })
+
+/** Every route x width x theme, for one data state. */
+async function sweep(page: Page, state: string, report: string[], over: string[]): Promise<void> {
+  for (const theme of ['light', 'dark'] as Theme[]) {
+    await useTheme(page, theme)
+    for (const route of ROUTES) {
+      for (const width of WIDTHS) {
+        await page.setViewportSize({ width, height: 900 })
+        await page.goto(route, { waitUntil: 'domcontentloaded' })
+        // Park the pointer off-screen. A hovered primary paints `--brand-deep`
+        // (black) and would be MISSED, so a run that left the mouse on the
+        // button would report one fewer fill than ships.
+        await page.mouse.move(-50, -50)
+        await page.waitForTimeout(500)
+
+        const fills = await solidBrandFills(page)
+        const where = `${state} ${route} ${width} ${theme}`
+        const actions = fills.filter((f) => f.actionable)
+        const inPage = actions.filter((f) => f.inMain)
+        const inShell = actions.filter((f) => !f.inMain)
+        const marks = fills.filter((f) => !f.actionable)
+        report.push(
+          `  ${where.padEnd(36)} page ${inPage.length} shell ${inShell.length}` +
+            ` — ${
+              actions.map((f) => `${f.inMain ? 'page' : 'shell'} ${f.box} "${f.text}"`).join(' | ') ||
+              '(no action)'
+            }` +
+            // Printed, never asserted on. A status pill is not competing to be
+            // pressed, and a decorative slab still shows up here by name.
+            (marks.length ? `  [marks: ${marks.map((f) => `${f.box} "${f.text}"`).join(', ')}]` : ''),
+        )
+        if (inPage.length > 1) over.push(`${where}: ${inPage.length} in #main`)
+        if (inShell.length > 1) over.push(`${where}: ${inShell.length} in the shell`)
+      }
+    }
+  }
+}

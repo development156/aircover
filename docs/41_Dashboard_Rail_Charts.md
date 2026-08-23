@@ -357,7 +357,78 @@ Same instrument, same fixed viewports (390×844 · 1024×768 · 1440×900), same
 users per pass. `brand%` counts pixels within ±18° of `--p` #ff6600 over `HSV s>0.30,
 v>0.25`; `regions` counts disjoint 8-connected blobs of them.
 
-<!--METRICS-->
+### 5.1 Fragmentation is the number the verdict was about
+
+**Disjoint blobs of brand-hue accent across the 24 compositions: 145 → 124, −14.5%.**
+docs/40 §5.1 took this from 321 to 145 and identified it as the figure the founder's
+"no focal point" verdict actually tracks — a fraction cannot tell 0.3% in one button
+from 0.3% across nine links. It falls again, and **not one composition rose**.
+
+The biggest single drops are at 1440, where the rail's five eyebrows, six SOON labels
+and six extra links all left the frame:
+
+| | before | after |
+|---|---:|---:|
+| /home 1440 dark, populated | **10** | **7** |
+| /analytics 1440 dark, populated | 9 | 6 |
+| /analytics 1440 light, empty | 7 | 4 |
+| /home 1440 light, empty | 6 | 4 |
+
+### 5.2 Accent spend — flat or down everywhere, which is not what the first draft did
+
+**Brand-hue pixels across all 24 compositions: 42,584 → 41,246, −3.1%.**
+
+Every route/width/theme is flat or down. That took three attempts and the meter caught
+two of them (§3.2): thirty brand bars, then one brand bar, both of which put /home
+populated at 1440 UP at 0.613% against a 0.550% baseline. Neutral bars land it at
+**0.502%**.
+
+The 390 rows barely move, and that is expected rather than a disappointment: the rail
+does not render below 700, so none of §1's work is in those frames, and both routes'
+accent there is the page's primary plus the shell's FAB — §6 item 1.
+
+### 5.3 Page height moved in both directions, deliberately
+
+| | before | after | |
+|---|---:|---:|---|
+| /home 1440 populated | 1215 | **1256** | the 190px band left; four stat cards arrived |
+| /home 390 populated | 2066 | **2484** | the band was already gone below `narrow`, so the strip is added height on a phone |
+| /analytics 1440 populated | 1253 | **1507** | three stat cards, on a page that had no number at all |
+
+**The 390 figure is the cost, and it is stated rather than buried.** A mid-range
+Android gains ~420px of scroll on populated /home. What it gains for that is four
+figures at 44px above the fold, on a screen whose previous first number was the
+credit balance at y≈1190. The empty state — where a phone user actually starts — is
+unchanged at 844px, one viewport.
+
+### 5.4 The table
+
+| state | route | w | theme | brand% before | after | regions before | after | page height before | after |
+|---|---|---:|---|---:|---:|---:|---:|---:|---:|
+| empty | `/home` | 390 | light | 3.190 | **3.190** | 5 | **5** | 844 | **844** |
+| empty | `/analytics` | 390 | light | 2.571 | **2.571** | 4 | **4** | 844 | **844** |
+| empty | `/home` | 1024 | light | 0.950 | **0.950** | 5 | **5** | 768 | **768** |
+| empty | `/analytics` | 1024 | light | 0.734 | **0.734** | 5 | **5** | 768 | **768** |
+| empty | `/home` | 1440 | light | 0.606 | **0.577** | 6 | **4** | 900 | **900** |
+| empty | `/analytics` | 1440 | light | 0.485 | **0.441** | 7 | **4** | 900 | **900** |
+| empty | `/home` | 390 | dark | 3.235 | **3.235** | 5 | **5** | 844 | **844** |
+| empty | `/analytics` | 390 | dark | 2.581 | **2.581** | 4 | **4** | 844 | **844** |
+| empty | `/home` | 1024 | dark | 0.955 | **0.955** | 5 | **5** | 768 | **768** |
+| empty | `/analytics` | 1024 | dark | 0.740 | **0.740** | 5 | **5** | 768 | **768** |
+| empty | `/home` | 1440 | dark | 0.609 | **0.580** | 6 | **4** | 900 | **900** |
+| empty | `/analytics` | 1440 | dark | 0.488 | **0.444** | 7 | **4** | 900 | **900** |
+| populated | `/home` | 390 | light | 1.196 | **1.165** | 5 | **5** | 2066 | **2484** |
+| populated | `/analytics` | 390 | light | 2.560 | **2.559** | 4 | **4** | 1668 | **2154** |
+| populated | `/home` | 1024 | light | 0.832 | **0.814** | 7 | **7** | 1949 | **2193** |
+| populated | `/analytics` | 1024 | light | 0.739 | **0.739** | 6 | **6** | 1481 | **1697** |
+| populated | `/home` | 1440 | light | 0.550 | **0.502** | 8 | **6** | 1215 | **1256** |
+| populated | `/analytics` | 1440 | light | 0.503 | **0.444** | 8 | **5** | 1253 | **1507** |
+| populated | `/home` | 390 | dark | 1.244 | **1.214** | 5 | **5** | 2066 | **2484** |
+| populated | `/analytics` | 390 | dark | 2.576 | **2.575** | 4 | **4** | 1668 | **2154** |
+| populated | `/home` | 1024 | dark | 0.844 | **0.820** | 8 | **8** | 1949 | **2193** |
+| populated | `/analytics` | 1024 | dark | 0.744 | **0.744** | 7 | **7** | 1481 | **1697** |
+| populated | `/home` | 1440 | dark | 0.566 | **0.504** | 10 | **7** | 1215 | **1256** |
+| populated | `/analytics` | 1440 | dark | 0.506 | **0.447** | 9 | **6** | 1253 | **1507** |
 
 ---
 
@@ -370,3 +441,56 @@ v>0.25`; `regions` counts disjoint 8-connected blobs of them.
 | 3 | **`CardEmpty` is still centred at ~40 call sites outside this lane.** Centring a sentence in a wide box is what makes it look like a shrug, and it is why `align="start"` exists. | Those are on screens this lane has not shot, and converting what cannot be looked at is a change nobody can report on — docs/40 §6's own rule for `follower-chart.tsx`. |
 | 4 | **`follower-chart.tsx` still keeps 11 hand-written sizes**, including three banned 15px. Carried forward from docs/40 §6.4 unchanged. | None of its populated paths renders without a live Instagram connection, so none appears in a captured frame. |
 | 5 | **`page-title.tsx` renders `<h1>` at 20px** where docs/37 §3.3 puts a page title at 24. Carried forward from docs/40 §6.3. | It is the shared primitive for ~40 routes. /home's own heading is `type-h1` (24) via `GreetingBanner`, so the two now differ — stated here rather than silently promoted. |
+
+---
+
+## 7 · Every guard, shown red
+
+A guard that has never failed is a line that always passes. Each was broken, built,
+run, and put back — the script is `mut-unit.sh` / `mut4.sh` in the run directory, and
+**two of the eight survived their first attempt, which is the reason for doing this.**
+
+| # | what was broken | guard | verdict |
+|---|---|---|---|
+| 1 | `rail-min:sr-only` → `rail-min:hidden` on every nav label | `rail-collapse.spec.ts` | **1 failed** |
+| 2 | the inverse scope stops re-declaring `--muted` (the 2.49:1, put back) | `rail-collapse.spec.ts` contrast | **1 failed** |
+| 3 | a second solid brand ACTION in the populated /home header | `accent-budget.spec.ts` | **1 failed** |
+| 4 | the accent guard stops visiting the populated state | `accent-budget.spec.ts` | **1 failed** |
+| 5 | the flat-tangent-at-a-local-extremum clause deleted | `trend-area.test.tsx` | **1 failed** |
+| 6 | `Bars` stops refusing to hatch without a label | `trend-area.test.tsx` | **1 failed** |
+| 7 | a measured ZERO draws nothing, like an unasked day | `trend-area.test.tsx` | **1 failed** |
+| 8 | `SpendCard` stops naming the date a capped read starts at | `spend-card.test.tsx` | **1 failed** |
+| 9 | a `soon` section back in the rail's projection | `reachable.test.ts` | **1 failed** |
+
+### 7.1 The two that survived
+
+**#5 passed on its first attempt.** `never dips below the two readings it joins` was
+written against `[40, 0, 40]`, and the naive average of a symmetric V is
+`(-40 + 40) / 2 = 0` — the same answer the clause under test gives. The fixture's own
+symmetry supplied the property, so it could not tell a guarded implementation from an
+unguarded one. `[40, 0, 10]` separates them (naive −15, correct 0), and the local
+MAXIMUM case is asserted too.
+
+**#3 passed on its first attempt, for a different reason: the mutation never reached
+the page.** `accent-budget.spec.ts` bootstrapped a workspace and stopped, so every pass
+measured an EMPTY one — which renders `GetStarted`, not `GreetingBanner`. The guard was
+aimed at a state the founder is not looking at, and would have read in review as
+coverage of one he is. It seeds one post now (`workspaceHasStarted` gates the dashboard
+on exactly that), visits both states, and **asserts that it visited both** — which is
+mutation #4.
+
+### 7.2 And widening it found a defect in the guard itself
+
+The moment it reached the populated screen it went red on the shipping product:
+`populated /home 1024 and 1440, both themes: 2 in #main`. The second fill is
+`Badge rung="urgent"` — `bg-brand text-primary-foreground`, and "In review" renders
+~75×20 = **1500px², over the 1000px² floor** the first version used as its proxy for
+"is this an action". The header had even argued for that proxy, citing the 18×18
+approvals count.
+
+**The threshold does not separate a badge from a button; interactivity does**, and
+that is what docs/37 §16's rule was always about — *one primary ACTION per view*. The
+count is now over `<a>`, `<button>` and `[role="button"]`. Every other large brand fill
+is still measured and still PRINTED, under `marks`, so a decorative orange slab cannot
+hide behind the correction — it simply does not compete to be pressed.
+

@@ -150,9 +150,7 @@ export function StatStrip({
            wrap; three have ~300 and read fine. A shared `max-wide:grid-cols-2`
            put /analytics' third card alone on a second row at half width, for
            no reason but sharing a rule with a strip that has one more card. */
-        cols === 3
-          ? 'grid-cols-3 max-narrow:grid-cols-1'
-          : 'grid-cols-4 max-wide:grid-cols-2',
+        cols === 3 ? 'grid-cols-3 max-narrow:grid-cols-1' : 'grid-cols-4 max-wide:grid-cols-2',
       )}
     >
       {children}

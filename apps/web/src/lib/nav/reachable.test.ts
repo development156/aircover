@@ -288,9 +288,7 @@ describe('the audit cameras point at screens', () => {
  */
 describe('the rail projects the map, and hides nothing from the product', () => {
   test('every section in the rail is one you can use today', () => {
-    const soon = RAIL_GROUPS.flatMap((group) => group.items).filter(
-      (item) => item.state === 'soon',
-    )
+    const soon = RAIL_GROUPS.flatMap((group) => group.items).filter((item) => item.state === 'soon')
     expect(
       soon.map((item) => item.href),
       'a roadmap section reached the rail — see RAIL_GROUPS in sections.ts',

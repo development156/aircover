@@ -134,10 +134,19 @@ export function Bars({
                     point.hatched ? 'is-simulated' : 'bg-ink-mute',
                     /* A measured zero is a STUB, and a DIFFERENT FILL. Height
                        alone cannot separate it from a value that rounds to the
-                       same 3px floor, and `--line` against `--brand` is a fill
-                       difference rather than a hue one, so it survives
-                       greyscale like the rest of the Certainty ladder. */
-                    (point.value as number) === 0 && 'bg-line',
+                       same 3px floor, and a fill difference survives greyscale
+                       the way the rest of the Certainty ladder does.
+
+                       `--line-firm`, NOT `--line`, and that is a collision
+                       rather than a preference. `ChartSparse` draws its
+                       "nothing measured yet" baseline as `--line` dots, and at
+                       3px with gaps between columns a row of `--line` stubs is
+                       the SAME PICTURE — so a window of thirty measured zeroes
+                       and a window nobody looked at rendered identically, which
+                       is the one distinction this chart exists to make. Seen on
+                       `page-dash-after__populated__home__full__1440__light`,
+                       where the two sit 200px apart on the same screen. */
+                    (point.value as number) === 0 && 'bg-line-firm',
                   )}
                   /* `minHeight` rather than `height: max(3px, N%)`, and the
                      reason is worth recording: jsdom's CSS parser DROPS the
