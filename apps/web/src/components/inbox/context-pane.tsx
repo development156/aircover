@@ -81,12 +81,21 @@ export function ContextPane({
            * `type-meta text-muted`, top-aligned, not a `CardEmpty`: the weight
            * is what stopped it competing, and the weight is kept.
            *
-           * "something from the list", not "a message": this same pane serves
-           * messages, comments AND reviews, and naming one of the three makes it
-           * wrong on the other two.
+           * AND IT IS A DESCRIPTION, NOT AN INSTRUCTION. The first draft of this
+           * read "Open something from the list and what Sahoda knows about that
+           * person shows here", and `context-pane.test.tsx` refused it — rightly.
+           * An imperative is an instruction whatever tense follows it, and this
+           * branch runs precisely when the list is provably empty, so "open
+           * something from the list" is a remedy nobody can carry out. The test
+           * was NOT loosened to admit the sentence; the sentence changed.
+           *
+           * "a person", not "the sender": this same pane serves messages,
+           * comments AND reviews, and naming one of the three makes it wrong on
+           * the other two.
            */
           <p className="type-meta text-muted">
-            Open something from the list and what Sahoda knows about that person shows here.
+            What Sahoda knows about a person appears in this column, once there is something here to
+            open.
           </p>
         )}
       </PaneScroll>
