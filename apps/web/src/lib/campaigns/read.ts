@@ -157,7 +157,20 @@ export type CampaignRead =
  * One campaign. `missing` and `unreadable` are separate because only one of them
  * is a 404: a read that threw must not tell a customer their campaign is gone.
  */
-export async function readCampaign(campaignId: string): Promise<CampaignRead> {
+/**
+ * ── WRAPPED IN `cache()` BECAUSE THE PAGE ASKS FOR IT TWICE ─────────────────
+ * Next runs `generateMetadata` and the page component as two entry points into
+ * the same request, and `/campaigns/[id]` calls this from both — so every view
+ * of a campaign made the identical select twice. React's `cache` makes the
+ * second free without either caller having to know about the other, which is the
+ * point: the alternative is threading the first result into the second, and
+ * `generateMetadata` has nowhere to thread it to.
+ *
+ * MEASURED 2026-08-23: a PostgREST call from this server has a p50 of 105ms.
+ */
+export const readCampaign = cache(async function readCampaign(
+  campaignId: string,
+): Promise<CampaignRead> {
   try {
     const workspaceId = await activeWorkspaceId()
     if (workspaceId === null) return { status: 'unreadable' }
@@ -178,7 +191,7 @@ export async function readCampaign(campaignId: string): Promise<CampaignRead> {
   } catch {
     return { status: 'unreadable' }
   }
-}
+})
 
 export type CampaignPostsRead =
   { status: 'ok'; posts: Post[]; variants: VariantsRead } | { status: 'unreadable' }

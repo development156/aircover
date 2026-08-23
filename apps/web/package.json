@@ -5,14 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "next build && node scripts/perf/js-budget.mjs",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "node ../../scripts/design/design-lint.mjs && node ../../scripts/lint.mjs .",
     "verify:sentry": "node ./scripts/verify-sentry.mjs",
     "test:e2e": "playwright test",
-    "test:smoke": "playwright test --grep @smoke"
+    "test:smoke": "playwright test --grep @smoke",
+    "perf:budget:write": "PERF_BUDGET_WRITE=1 node scripts/perf/js-budget.mjs",
+    "perf:measure": "playwright test --config scripts/perf/perf.config.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.5.20",

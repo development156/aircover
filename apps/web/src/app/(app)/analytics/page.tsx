@@ -37,13 +37,23 @@ export const metadata = { title: 'Analytics' }
  * a broken Instagram connection costs the account card and nothing else.
  */
 export default async function AnalyticsPage() {
-  const { rows, posts, account, hasPublished } = await readAnalyticsPage()
-
-  // A FOURTH independent read, for the same reason the other three are independent:
-  // the history lives in its own table and, until the founder applies migration
-  // 20260819000100, that table does not exist. A read that cannot happen must cost
-  // this one card and nothing else on the page.
-  const series = await readMetricSeries('reach')
+  /**
+   * A FOURTH independent read, for the same reason the other three are independent:
+   * the history lives in its own table and, until the founder applies migration
+   * 20260819000100, that table does not exist. A read that cannot happen must cost
+   * this one card and nothing else on the page.
+   *
+   * ── AND BECAUSE IT IS INDEPENDENT, IT IS NOT AWAITED SECOND ────────────────
+   * The note above already said this read depends on nothing, and the code then
+   * waited for `readAnalyticsPage()` to come back before starting it — one extra
+   * round trip to ap-south-1 for a page that had already stated it did not need
+   * one. MEASURED 2026-08-23: a PostgREST call from this server has a p50 of
+   * 105ms, so that is roughly a tenth of a second on every visit to /analytics.
+   */
+  const [{ rows, posts, account, hasPublished }, series] = await Promise.all([
+    readAnalyticsPage(),
+    readMetricSeries('reach'),
+  ])
 
   /**
    * ── FIVE APOLOGIES, OR ONE ANSWER ────────────────────────────────────────

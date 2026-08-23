@@ -1,4 +1,6 @@
 import { currentUser } from '@clerk/nextjs/server'
+
+import { SkeletonBar } from '@/components/skeleton'
 import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
 
@@ -88,6 +90,37 @@ function creditsText(balance: BalanceRead): string | null {
   return null
 }
 
+/**
+ * The label row under the credits figure — ONE definition, rendered by both the
+ * real foot and its skeleton.
+ *
+ * It started as a copy inside `RailFootSkeleton`, which the design lint caught:
+ * `scripts/design/design-lint.mjs` ratchets hand-written font sizes per file, and
+ * duplicating two `text-[12px]` labels took rail-foot.tsx from its baseline of 6 to
+ * 8. The lint was right about more than the count — a skeleton that copies the
+ * markup it stands in for is a second place for the geometry to drift, and the
+ * whole point of this placeholder is that it is exactly the size of the thing that
+ * replaces it.
+ *
+ * Neither label waits on anything, so both are rendered for real in both states:
+ * replacing a word the reader could already have read with a grey rectangle makes
+ * the page slower to understand while making it look busier. `Usage` therefore
+ * also works as a link before the balance has arrived.
+ */
+function CreditsFootRow() {
+  return (
+    <div className="mt-1.5 flex items-center justify-between">
+      <span className="text-[12px] text-muted">Credits left</span>
+      <Link
+        href="/wallet"
+        className="rounded-sm text-[12px] font-semibold text-accent transition-micro hover:underline"
+      >
+        Usage
+      </Link>
+    </div>
+  )
+}
+
 export async function RailFoot() {
   const [user, workspacesRead, activeSlug, balance] = await Promise.all([
     soft('clerk_user', currentUser, null),
@@ -152,15 +185,7 @@ export async function RailFoot() {
             </span>
           )}
         </div>
-        <div className="mt-1.5 flex items-center justify-between">
-          <span className="text-[12px] text-muted">Credits left</span>
-          <Link
-            href="/wallet"
-            className="rounded-sm text-[12px] font-semibold text-accent transition-micro hover:underline"
-          >
-            Usage
-          </Link>
-        </div>
+        <CreditsFootRow />
       </div>
 
       {/* Who you are signed in as. The one part that survives the collapse. */}
@@ -187,6 +212,49 @@ export async function RailFoot() {
           </span>
         </span>
       </Link>
+    </div>
+  )
+}
+
+/**
+ * The shape `RailFoot` leaves behind while it streams in.
+ *
+ * ── SHAPED LIKE THE CONTENT, NOT A GREY BLOCK ────────────────────────────────
+ * Every box is the size of the thing that replaces it: the credits number is
+ * 19px tall because that is the type size it becomes, the avatar is the same
+ * 26px circle, and the two identity lines are 13px and 11px. So the rail does
+ * not resize when the real values land — a skeleton whose geometry differs from
+ * its content is a layout shift with extra steps.
+ *
+ * The two STATIC labels — "Credits left" and "Usage" — are rendered for real
+ * rather than skeletonised. They are not waiting on anything, and replacing a
+ * word you could already have read with a grey rectangle makes the page slower
+ * to understand while making it look busier.
+ *
+ * `aria-hidden` on the placeholder geometry with one polite live region: a
+ * screen reader should hear "loading your account" once, not five unlabelled
+ * boxes. `animate-pulse` is left to the shared token layer, which already
+ * respects prefers-reduced-motion.
+ */
+export function RailFootSkeleton() {
+  return (
+    <div className="flex-none border-t border-line-soft">
+      <div className="px-3 pt-3 pb-2 max-wide:hidden">
+        <div className="flex min-h-[19px] items-baseline gap-1.5">
+          <SkeletonBar className="h-[19px] w-16" />
+        </div>
+        <CreditsFootRow />
+      </div>
+      <div className="flex items-center gap-2 px-3 py-2.5 max-wide:justify-center max-wide:px-0">
+        <span aria-hidden className="size-[26px] flex-none rounded-full bg-s2" />
+        <span className="min-w-0 flex-1 max-wide:hidden">
+          <SkeletonBar className="h-[13px] w-24" />
+          <SkeletonBar className="mt-1 h-[11px] w-16" />
+        </span>
+      </div>
+      <span className="sr-only" role="status">
+        Loading your account
+      </span>
     </div>
   )
 }

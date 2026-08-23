@@ -134,3 +134,9 @@ supabase/.temp/
 # Committing a copy would publish a measurement taken at commit time and let it
 # read as current — the exact staleness the page exists to make visible.
 public/status/
+
+# Output of `pnpm --filter @sahoda/web perf:measure`. Measurements are evidence
+# for a report, not source: they are specific to the machine, the network and the
+# hour they were taken on, and committing them would invite a later reader to
+# treat one laptop's numbers as the product's.
+apps/web/perf-results/

@@ -41,7 +41,21 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function CampaignPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const campaignRead = await readCampaign(id)
+  /**
+   * ── THE CAMPAIGN AND ITS POSTS ARE BOTH KEYED BY `id` ─────────────────────
+   * Neither read needs the other's answer — both take the same campaign id —
+   * and they were awaited one after the other, so opening a campaign cost two
+   * round trips to ap-south-1 where one would do. MEASURED 2026-08-23: a
+   * PostgREST call from this server has a p50 of 105ms.
+   *
+   * On the 404 and unreadable paths the posts are now read for a campaign that
+   * will not render. That read is RLS-scoped, so it discloses nothing, and the
+   * 404 is still decided by the campaign's own read alone.
+   *
+   * `readAddablePosts` stays sequential below: it takes the ids the posts read
+   * returns, so it genuinely cannot start earlier.
+   */
+  const [campaignRead, postsRead] = await Promise.all([readCampaign(id), readCampaignPosts(id)])
 
   // Only a confirmed absence is a 404. A read that threw must never tell a
   // customer their campaign is gone.
@@ -63,7 +77,6 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   }
 
   const campaign = campaignRead.campaign
-  const postsRead = await readCampaignPosts(id)
   const posts = postsRead.status === 'ok' ? postsRead.posts : []
   const variants =
     postsRead.status === 'ok' ? postsRead.variants : ({ status: 'unreadable' } as const)
