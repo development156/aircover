@@ -5,7 +5,7 @@ import { ChannelSchema } from '../enums'
  * REMIX — one source, many drafts (FSD M3.3, PRD §5.2).
  *
  * Two tables: the run, and the pieces it produced. Both mirror
- * `20260821000000_remix.sql` exactly; the CHECK constraints there and the enums
+ * `20260821000002_remix.sql` exactly; the CHECK constraints there and the enums
  * here are the same vocabulary written twice on purpose (decision D9), and the
  * `remix_migrations.pglite.test.ts` suite reads the CHECKs out of the catalog
  * and compares them to these lists, so a drift fails rather than surprises.

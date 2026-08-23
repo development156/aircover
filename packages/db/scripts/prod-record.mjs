@@ -11,10 +11,15 @@
  * `supabase migration repair`.
  */
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 
-const ROOT = '/home/divas/Documents/GitHub/sahodalabs/.claude/worktrees/wt-integrate2'
+// Resolved from this file, not hardcoded. It named `wt-integrate2` — a
+// DIFFERENT worktree from whichever one is running it, so every other lane read
+// that lane's `.env` (or, once that worktree moves, none at all and a confusing
+// "not the expected production connection string").
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 
 function env(file) {
   const out = {}
@@ -44,6 +49,32 @@ function env(file) {
  * point is that the record follows the schema rather than leading it.
  */
 const PROOF = {
+  // ── THE VERSION COLLISION ────────────────────────────────────────────────
+  // Three files were authored as 20260821000000. `zernio_webhook_events` took
+  // the version and is recorded; these two were APPLIED IN SUBSTANCE and could
+  // not be recorded, because the version was taken. Renumbered to 000001 and
+  // 000002 (both free — 000100 is lead_doors), then recorded here.
+  //
+  // The proof for each names a table the migration alone creates. `assets` and
+  // `posts` would both pass on a database that never saw either file.
+  20260821000001: {
+    name: 'asset_derivatives',
+    sql: `select count(*)::int as n
+            from pg_class c join pg_namespace nsp on nsp.oid = c.relnamespace
+           where nsp.nspname = 'public'
+             and c.relname = 'asset_derivatives'
+             and c.relrowsecurity`,
+    expect: 1,
+  },
+  20260821000002: {
+    name: 'remix',
+    sql: `select count(*)::int as n
+            from pg_class c join pg_namespace nsp on nsp.oid = c.relnamespace
+           where nsp.nspname = 'public'
+             and c.relname in ('remix_batches', 'remix_derivatives')
+             and c.relrowsecurity`,
+    expect: 2,
+  },
   20260821000100: {
     name: 'lead_doors',
     sql: `select count(*)::int as n

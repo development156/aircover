@@ -38,7 +38,7 @@ const MIGRATIONS = [
   // A6. The gate is not told about derivatives; it has to keep working BECAUSE
   // of how they are shaped. That claim is what the block at the end of this file
   // executes.
-  '20260821000000_asset_derivatives.sql',
+  '20260821000001_asset_derivatives.sql',
 ] as const
 
 const WS = '11111111-1111-4111-8111-111111111111'
