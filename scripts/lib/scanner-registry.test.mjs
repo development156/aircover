@@ -38,6 +38,58 @@ const BASELINE = resolve(REPO, 'ops/lint-baselines/scanners.json')
 const scanners = findScanners(REPO)
 const baseline = JSON.parse(readFileSync(BASELINE, 'utf8'))
 
+/* ── THE REMEDY THIS FILE PRESCRIBES HAS TO BE RUNNABLE ──────────────────────
+   This block used to sit at the END of the file, below `describe(...)`, and was
+   therefore unreachable: under vitest 4.1.10 calling `describe` outside the
+   runner throws `Cannot read properties of undefined (reading 'config')` before
+   top-level execution ever gets here. So the failure message told the reader to
+   run `--update-baseline`, and that command crashed with a stack trace from
+   @vitest/runner about a config it could not read — a remedy that cannot be
+   executed, which is the same shape as no remedy at all.
+
+   It runs BEFORE the suite is registered, and exits, so the file is a test under
+   vitest and a CLI under node. */
+if (process.argv.includes('--update-baseline')) {
+  /* ── A COUNT CANNOT TELL A REGRESSION FROM A FILE THE REGISTER NEVER SAW ────
+     The refusal here was `undeclared.length > baseline.undeclared.length`, and a
+     total conflates two different events. MEASURED at integration on 2026-08-23:
+     this baseline was recorded on a branch 137 commits behind wt-integrate2, so
+     it had never seen 15 of the repository's scanners. All 15 are present on
+     wt-integrate2 and NONE is present on wt-ops — the merge introduced no new
+     undeclared scanner, it merely showed the register the rest of the repo. The
+     total went 50 → 65 and the only available answer was "refusing to RAISE",
+     which leaves the gate red for something no change caused and no command can
+     fix.
+
+     `scripts/design/design-lint.mjs` had already settled this, and its wording is
+     borrowed on purpose: a BASELINED entry that got worse is always refused, and
+     a file the register has never SEEN is refused too, unless `--absorb-new` is
+     passed. It is still debt, so it is recorded deliberately, named on stdout,
+     and visible as a JSON diff in git — never as a side effect of "the gate was
+     red so I re-baselined".
+
+     WHAT IT CANNOT SEE — this file is subject to its own rule: the baseline
+     records only UNDECLARED files, so a scanner that once declared its blind
+     spot and then LOST the declaration is indistinguishable here from one the
+     register is meeting for the first time. Both arrive as "not in the baseline".
+     That is why absorbing names every file rather than printing a count: the
+     reviewer, not this script, is the one who can tell those apart. */
+  const absorbNew = process.argv.includes('--absorb-new')
+  const undeclared = scanners.filter((s) => !s.declaresLimit).map((s) => s.file)
+  const known = new Set(baseline.undeclared)
+  const unseen = undeclared.filter((f) => !known.has(f))
+
+  if (unseen.length > 0 && !absorbNew) {
+    console.error(`  baseline NOT written — ${unseen.length} scanner(s) new to the register:`)
+    for (const f of unseen) console.error(`  REFUSED  ${f} (need --absorb-new)`)
+    process.exit(1)
+  }
+  for (const f of unseen) console.log(`  absorbing  ${f}`)
+  writeFileSync(BASELINE, `${JSON.stringify({ undeclared }, null, 2)}\n`)
+  console.log(`baseline: ${baseline.undeclared.length} → ${undeclared.length}`)
+  process.exit(0)
+}
+
 describe('every scanner declares what it is blind to', () => {
   it('finds the scanners by git grep, not by a list — a new one cannot hide', () => {
     // If this ever drops to a handful, the enumeration broke and every
@@ -99,13 +151,3 @@ describe('the pattern detector itself', () => {
     expect(Object.values(p).every((v) => v === false)).toBe(true)
   })
 })
-
-if (process.argv.includes('--update-baseline')) {
-  const undeclared = scanners.filter((s) => !s.declaresLimit).map((s) => s.file)
-  if (undeclared.length > baseline.undeclared.length) {
-    console.error('refusing to RAISE the baseline')
-    process.exit(1)
-  }
-  writeFileSync(BASELINE, `${JSON.stringify({ undeclared }, null, 2)}\n`)
-  console.log(`baseline: ${baseline.undeclared.length} → ${undeclared.length}`)
-}
