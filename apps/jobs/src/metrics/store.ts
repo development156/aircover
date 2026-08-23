@@ -77,10 +77,39 @@ export function createMetricStore(opts: MetricStoreOptions) {
    * `published_at` comes from the succeeded publish log, which is the only place
    * it is recorded, and the LATEST one wins: that is the attempt the platform is
    * reporting on.
+   *
+   * ── THE ORDER IS LEAST-RECENTLY-MEASURED, AND IT USED TO BE published_at ────
+   * The old ordering was `published_at asc` with a comment claiming a backlog
+   * "drains across nights rather than starving the same posts every time". That
+   * reasoning holds only if the sort key ADVANCES as work is done. `published_at`
+   * never changes. So the same oldest `limit` targets were selected every night
+   * for ever, and target 121 was not delayed — it was PERMANENTLY STARVED. At the
+   * current batch of 120 that arrives at roughly fifty workspaces.
+   *
+   * Ordering by the newest snapshot for that (workspace, post, channel) makes the
+   * key advance: measuring a target sends it to the back of the queue, and a
+   * target never measured sorts FIRST because `nulls first` is what "has no
+   * history at all" should mean. `published_at` survives as the tiebreak, so a
+   * night's worth of never-measured posts is still taken oldest-first.
+   *
+   * The subquery reads the leading columns of the snapshot table's unique
+   * constraint (workspace_id, post_id, channel, metric, measured_on), so it is an
+   * index lookup per candidate rather than a scan.
+   *
+   * ── AND IT FALLS BACK, BECAUSE THE HISTORY TABLE CAN BE ABSENT ─────────────
+   * `post_metric_snapshots` is created by a migration, and this store is written
+   * to work before it is applied — `store()` already answers `not-ready` on 42P01
+   * rather than throwing. Referencing the table in the ORDER BY would have made
+   * `listTargets` throw where it used to work, so the fairness ordering is TRIED
+   * and the old ordering is the fallback.
+   *
+   * The fallback loses nothing: with no history table nothing has ever been
+   * measured, so there is no starvation to fix and `published_at` order is
+   * exactly as fair as any other.
    */
-  async function listTargets(): Promise<MetricTarget[]> {
-    const r = await pool.query<TargetRow>(
-      `select v.workspace_id,
+  /** The candidate set. `$ORDER` is the only difference between the two forms. */
+  const TARGETS_SQL = (order: string): string =>
+    `select v.workspace_id,
               z.profile_id,
               v.post_id,
               v.channel,
@@ -96,10 +125,28 @@ export function createMetricStore(opts: MetricStoreOptions) {
         where v.publish_status = 'published'
           and v.platform_post_id is not null
           and (v.permalink is null or v.permalink not like 'fixture://%')
-        order by published_at asc nulls last
-        limit $1`,
-      [limit],
-    )
+        order by ${order}
+        limit $1`
+
+  /** Least-recently-measured first: the key ADVANCES as targets are measured. */
+  const FAIR_ORDER = `(select max(s.measured_at)
+                         from post_metric_snapshots s
+                        where s.workspace_id = v.workspace_id
+                          and s.post_id      = v.post_id
+                          and s.channel      = v.channel) asc nulls first,
+                      published_at asc nulls last`
+
+  /** Used only where there is no history table, and therefore no history to be fair about. */
+  const NO_HISTORY_ORDER = `published_at asc nulls last`
+
+  async function listTargets(): Promise<MetricTarget[]> {
+    let r
+    try {
+      r = await pool.query<TargetRow>(TARGETS_SQL(FAIR_ORDER), [limit])
+    } catch (error) {
+      if (!isMissingTable(error)) throw error
+      r = await pool.query<TargetRow>(TARGETS_SQL(NO_HISTORY_ORDER), [limit])
+    }
 
     return r.rows.map((row) => ({
       workspaceId: row.workspace_id,
