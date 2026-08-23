@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 
-import { ALL_SECTIONS, NAV_FOOT, NAV_GROUPS } from './sections'
+import { ALL_SECTIONS, NAV_FOOT, NAV_GROUPS, RAIL_GROUPS, ROADMAP_SECTIONS } from './sections'
 
 /**
  * EVERY SECTION OF THE APP IS REACHABLE FROM THE MENU.
@@ -268,5 +268,52 @@ describe('the audit cameras point at screens', () => {
         'URLs for one screen. Drop the row and note the reason beside the other ' +
         'exclusions the list already declares.',
     ).toEqual({})
+  })
+})
+
+/**
+ * THE RAIL SHOWS WHAT YOU CAN USE, AND THE ROADMAP IS STILL REACHABLE.
+ *
+ * ── WRITTEN BECAUSE A MUTATION SURVIVED ──────────────────────────────────────
+ * `RAIL_GROUPS` filters `NAV_GROUPS` to `live`, and that is the whole of how the
+ * two founder rulings are held apart — the roadmap stays visible, in one place,
+ * and that place is not the rail. Replacing the filter with `group.items` was
+ * applied and every test in this file stayed GREEN, because they all read
+ * `ALL_SECTIONS`, which is deliberately unchanged. The projection had no guard
+ * at all.
+ *
+ * Both halves are asserted, and the second is the one that matters: a rule that
+ * only said "no soon items in the rail" would be satisfied by deleting them
+ * from the product.
+ */
+describe('the rail projects the map, and hides nothing from the product', () => {
+  test('every section in the rail is one you can use today', () => {
+    const soon = RAIL_GROUPS.flatMap((group) => group.items).filter((item) => item.state === 'soon')
+    expect(
+      soon.map((item) => item.href),
+      'a roadmap section reached the rail — see RAIL_GROUPS in sections.ts',
+    ).toEqual([])
+  })
+
+  test('every roadmap section is still in the map the palette and phone sheet read', () => {
+    // ALL_SECTIONS feeds the command palette; NAV_GROUPS feeds the More sheet.
+    // A roadmap item missing from either has been deleted rather than moved,
+    // which is the opposite of the ruling this projection exists to keep.
+    const inMap = new Set(ALL_SECTIONS.map((s) => s.href))
+    const inSheet = new Set(NAV_GROUPS.flatMap((g) => g.items).map((s) => s.href))
+    const missing = ROADMAP_SECTIONS.filter((s) => !inMap.has(s.href) || !inSheet.has(s.href))
+    expect(
+      missing.map((s) => s.href),
+      'these left the rail AND the product — the roadmap must stay visible somewhere',
+    ).toEqual([])
+  })
+
+  test('there is a roadmap at all, so an empty projection cannot pass by accident', () => {
+    // If every section became live this would be zero and both tests above
+    // would be vacuously true. Fail loudly instead and let somebody delete them.
+    expect(
+      ROADMAP_SECTIONS.length,
+      'no `soon` sections left — delete these three tests deliberately, do not let them idle',
+    ).toBeGreaterThan(0)
   })
 })

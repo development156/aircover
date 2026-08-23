@@ -27,7 +27,23 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(function Card(
     <div
       ref={ref}
       className={cn(
-        'surface-ring rounded-card bg-surface p-4',
+        /* ── p-5, NOT p-4, AND THE PRIMITIVE WAS SIMPLY OFF THE SCALE ──────
+           docs/37 §4's table is explicit: **20-24 is card padding (default)**
+           and 16 is the COMPACT value. This shipped at 16 for every card in the
+           app, so the default case was rendering the compact one.
+
+           The founder's brief names the consequence rather than the cause —
+           "cards that breathe: the reference's internal padding is generous and
+           that is most of why it reads calm" — and MEASURED against the
+           reference's own dashboard capture, its stat cards carry ~20px. This
+           is bringing the primitive onto the documented scale, not a
+           preference, which is why it changes here rather than being overridden
+           per call site on the two screens this lane shot.
+
+           It costs 8px of content width at every card. `no-truncated-labels`
+           and `connections-widths` (seven widths) are the guards that would
+           catch that going wrong, and both are in the gate. */
+        'surface-ring rounded-card bg-surface p-5',
         // The kit draws this hover ring with --text-3, whose equivalent here is
         // --ink-faint. Using --line-firm instead: ink-faint is ratcheted to a
         // shrinking allowlist (ink-faint-exceptions.ts — adding an entry fails

@@ -1,5 +1,5 @@
-import { CardEmpty } from '@/components/empty-state'
-import { Card, CardLabel } from '@/components/ui/card'
+import { ChartSparse, Panel, PanelHead } from '@/components/charts/panel'
+import { TrendArea, type TrendPoint } from '@/components/charts/trend-area'
 import { METRIC_LABELS, type MetricKey } from '@/lib/analytics/compare'
 import { MIN_SERIES_DAYS, type MetricSeries, type SeriesPoint } from '@/lib/analytics/series'
 
@@ -23,6 +23,18 @@ import { MIN_SERIES_DAYS, type MetricSeries, type SeriesPoint } from '@/lib/anal
  *     move from day to day, so when it does the card says so under the chart
  *     rather than letting the reader assume one line means one population.
  *
+ * ── THE CURVE IS `TrendArea` NOW, AND `pathFor` WENT WITH IT ────────────────
+ * This file used to own a `pathFor` helper and four unit tests on it, and those
+ * tests encoded rules 1 and 2 above — no point on an unmeasured day, no segment
+ * across a gap. The rules did not change; the drawing moved into a shared
+ * component so /home's charts obey them too, and a helper nothing renders with
+ * four tests still passing on it is the worst thing in this codebase to leave
+ * behind. `charts/trend-area.test.ts` holds the same two properties against the
+ * code that actually ships, plus a third the old path could not have: the curve
+ * is monotone cubic, so it never dips below the two readings it joins. A
+ * Catmull-Rom through 40, 0, 40 passes through roughly -12, which would be a
+ * rendered negative reach.
+ *
  * ── AND WHY IT MAY RENDER NOTHING AT ALL ─────────────────────────────────────
  * The history lives in `post_metric_snapshots`, added by migration 20260819000100,
  * which applies to production and is the founder's to run. Until it does, this
@@ -31,56 +43,17 @@ import { MIN_SERIES_DAYS, type MetricSeries, type SeriesPoint } from '@/lib/anal
  * component stops saying it the moment it stops being true.
  */
 
-const WIDTH = 560
-const HEIGHT = 132
-const PAD_X = 6
-const PAD_Y = 10
-
 /** One day, in whole days since the epoch — the x axis's real unit. */
 function dayNumber(day: string): number {
   return Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000)
 }
 
-/**
- * The polyline commands, broken wherever a day is missing.
- *
- * The break is the honest part. Points are joined only when their days are
- * consecutive; anywhere else the path lifts, so a week with a two-day outage reads
- * as two runs of measurement rather than one continuous line.
- */
-export function pathFor(points: readonly SeriesPoint[]): string {
-  if (points.length === 0) return ''
-
-  const days = points.map((point) => dayNumber(point.day))
-  const firstDay = days[0]!
-  const lastDay = days[days.length - 1]!
-  const span = Math.max(1, lastDay - firstDay)
-
-  const totals = points.map((point) => point.total)
-  const top = Math.max(...totals)
-  const bottom = Math.min(...totals)
-  // A flat series has no range to scale against; it is drawn down the middle
-  // rather than divided by zero or stretched into invented variation.
-  const range = top - bottom
-
-  const x = (day: number): number => PAD_X + ((day - firstDay) / span) * (WIDTH - PAD_X * 2)
-  const y = (total: number): number =>
-    range === 0 ? HEIGHT / 2 : HEIGHT - PAD_Y - ((total - bottom) / range) * (HEIGHT - PAD_Y * 2)
-
-  let path = ''
-  points.forEach((point, i) => {
-    const command = i > 0 && days[i]! - days[i - 1]! === 1 ? 'L' : 'M'
-    path += `${path === '' ? 'M' : command}${x(days[i]!).toFixed(1)} ${y(point.total).toFixed(1)} `
-  })
-  return path.trim()
-}
-
 function Container({ children }: { children: React.ReactNode }) {
   return (
-    <Card className="space-y-3">
-      <CardLabel className="mb-0">Performance over time</CardLabel>
+    <Panel className="space-y-4">
+      <PanelHead title="Performance over time" />
       {children}
-    </Card>
+    </Panel>
   )
 }
 
@@ -88,19 +61,27 @@ function Container({ children }: { children: React.ReactNode }) {
  * What this card says when it has no series to draw.
  *
  * ── IT USED TO WEAR `.is-proposed`, AND THAT WAS A CATEGORY ERROR ────────────
- * The empty box was literally `className="is-proposed …"` — a dashed edge, which
- * in this product is not decoration. docs/26 §3 makes it one of four CERTAINTY
- * rungs, and `.is-proposed` means "Sahoda suggests it. Nobody agreed." Applied
- * to "nothing has been measured yet" it says the opposite of the truth: it
- * dresses an ABSENCE as a PROPOSAL, and it spends a load-bearing signature on a
- * state that is not on the ladder at all.
+ * The empty box was literally `className="is-proposed …"` — a dashed edge,
+ * which in this product is one of four CERTAINTY rungs meaning "Sahoda suggests
+ * it. Nobody agreed." Applied to "nothing has been measured yet" it dresses an
+ * ABSENCE as a PROPOSAL and spends a load-bearing signature on a state that is
+ * not on the ladder at all.
  *
- * docs/27 §1 counted this as one of five empty treatments in five visual
- * languages on this screen. It is now `CardEmpty` (docs/26 §4.1), the same one
- * every other card on the page uses.
+ * ── AND THEN IT WAS A CENTRED PARAGRAPH IN AN EMPTY BOX ──────────────────────
+ * `CardEmpty` fixed the category error and inherited the shape docs/40 §3.2
+ * already named on this page: a container three times wider than anything in
+ * it, prose centred in the middle of it. MEASURED on
+ * `page-dash-before__populated__analytics__full__1440__light`, this card is
+ * ~460x130 holding one sentence on three centred lines.
+ *
+ * `ChartSparse` draws the baseline the chart is waiting to fill and puts the
+ * sentence at the left margin above it, which is the difference between "not
+ * yet" and "broken". THE SENTENCES ARE UNCHANGED — every one of them is
+ * asserted by `performance-over-time.test.tsx` and each states a different
+ * claim (docs/37 §9); only the container moved.
  */
 function Note({ children }: { children: React.ReactNode }) {
-  return <CardEmpty className="min-h-[132px]" body={children} />
+  return <ChartSparse>{children}</ChartSparse>
 }
 
 export interface PerformanceOverTimeProps {
@@ -180,33 +161,26 @@ export function PerformanceOverTime({
   return (
     <Container>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[11px] text-muted">
+        <span className="type-meta text-muted">
           {METRIC_LABELS[metric]}, running total since each post went out
         </span>
-        <span className="text-[12.5px] font-[550] tabular-nums">
+        <span className="type-meta font-[550] tabular-nums">
           {last.total.toLocaleString('en-IN')}
         </span>
       </div>
 
-      <div className="overflow-x-auto">
-        <svg
-          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-          className="h-[132px] w-full min-w-[280px]"
-          role="img"
-          aria-label={`${METRIC_LABELS[metric]} across ${series.points.length} measured days, from ${first.total.toLocaleString('en-IN')} to ${last.total.toLocaleString('en-IN')}`}
-        >
-          <path
-            d={pathFor(series.points)}
-            fill="none"
-            stroke="var(--acc)"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
+      <TrendArea
+        points={series.points.map((point): TrendPoint => ({
+          x: dayNumber(point.day),
+          y: point.total,
+          label: point.day,
+        }))}
+        unit={METRIC_LABELS[metric].toLowerCase()}
+        pointNoun="days"
+        gradientId="pot-trend"
+      />
 
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[11px] text-muted">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 type-meta text-muted">
         <span className="tabular-nums">
           {first.day} to {last.day} · {series.points.length} measured days
         </span>
@@ -218,7 +192,7 @@ export function PerformanceOverTime({
       {series.minSeries !== series.maxSeries ? (
         // Coverage moved across the window. Said out loud, because a total drawn
         // from fewer posts on one day dips for a reason that is not performance.
-        <p className="text-[11px] text-muted">
+        <p className="type-meta text-muted">
           Measured across {series.minSeries} to {series.maxSeries} post channels a day, so part of
           the movement is how many reported rather than how they did.
         </p>

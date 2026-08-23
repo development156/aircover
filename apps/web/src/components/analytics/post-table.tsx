@@ -36,13 +36,13 @@ export function PostTable({ rows }: { rows: readonly ComparableRow[] }) {
       <CardLabel>By post · ordered on impressions</CardLabel>
 
       {ranked.length === 0 ? (
-        <p className="text-[14px] text-ink">
+        <p className="type-body text-ink">
           {/* NOT an empty table, and NOT a row of zeroes. Nothing has reported. */}
           None of your published posts has reported metrics yet.
         </p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px] border-collapse text-[13px]">
+          <table className="w-full min-w-[520px] border-collapse type-sm">
             <thead>
               <tr className="border-b border-line text-left">
                 <th scope="col" className="py-2 pr-4 font-semibold text-muted">
@@ -103,7 +103,7 @@ export function PostTable({ rows }: { rows: readonly ComparableRow[] }) {
 
       {waiting.length > 0 ? (
         <section className="space-y-2 border-t border-line pt-3">
-          <h3 className="text-[12px] font-semibold text-muted">
+          <h3 className="type-meta font-semibold text-muted">
             Not ranked — no measurement yet ({waiting.length})
           </h3>
           <ul className="space-y-1.5">
@@ -114,14 +114,14 @@ export function PostTable({ rows }: { rows: readonly ComparableRow[] }) {
                   key={`${row.postId}:${row.channel}`}
                   className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5"
                 >
-                  <span className="max-w-[24ch] truncate text-[13px] text-ink">{row.title}</span>
-                  <span className="text-[12px] text-muted">
+                  <span className="max-w-[24ch] truncate type-sm text-ink">{row.title}</span>
+                  <span className="type-meta text-muted">
                     {CHANNEL_LABELS[row.channel]} · {copy.headline}
                   </span>
                   {/* The reason, in full. This list's whole job is to be the place
                       a gap is explained rather than silently ordered last. */}
                   {copy.detail ? (
-                    <span className="w-full text-[12px] text-muted">{copy.detail}</span>
+                    <span className="w-full type-meta text-muted">{copy.detail}</span>
                   ) : null}
                 </li>
               )

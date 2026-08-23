@@ -404,6 +404,17 @@
      at 700px and `connections-widths.spec.ts` caught it.
      56 + 2x8 = 72px gives the 16px back and keeps the float visible. */
   --sidebar-w-collapsed: 56px;
+  /* THE READER'S OWN COLLAPSE, and it is a different number for a stated
+     reason rather than an inconsistency. Everything above is an argument about
+     the 700-1179 band, where the content column has no spare pixels and the
+     rail is collapsed whether anyone asked or not. At >=1180 nobody is short:
+     a 62px rail plus two 8px insets is 78px out of at least 1180, and the
+     founder's ruling names the reference's own 62 explicitly.
+     So the forced collapse keeps the measured 56 and the CHOSEN one takes the
+     reference's 62. Same idea as docs/37 sec 13's "take the reference's
+     proportion, not its pixels" — the pixels are only wrong where the
+     constraint is. */
+  --sidebar-w-user-collapsed: 62px;
   /* THE RAIL FLOATS. The reference measures a 10px inset; this is 8px for the
      same reason the collapsed width is 56 — the inset is paid TWICE out of the
      content column, and at 700px there are no spare pixels. Still a visible
@@ -594,6 +605,49 @@
   --info: #979797;
   --hatch: rgba(255, 255, 255, 0.2);
   --channel-x: #ffffff;
+
+  /* ── THE FIVE ALIASES, RE-DECLARED — AND THIS IS NOT TIDINESS ──────────────
+     MEASURED 2026-08-23 by `rail-collapse.spec.ts`, in a browser, on the
+     rendered colours: every label in the rail read **#57575a on #171717 —
+     2.49:1** in LIGHT. That is the app's primary navigation, at every width,
+     below the WCAG AA floor of 4.5, in the theme most people use. It is the
+     founder's "the text is too faded", and it was a real defect rather than a
+     preference.
+
+     WHY IT SURVIVED EVERY CHECK. The block above already declares
+     `--ink-mute: #979797` and the note beside it does the contrast arithmetic
+     correctly. But components do not write `--ink-mute`; they write
+     `text-muted`, which resolves `--muted`, which is declared in L3 as
+     `--muted: var(--ink-mute)` — ON `:root`. A custom property whose value
+     contains `var()` is substituted at computed-value time ON THE ELEMENT THAT
+     DECLARES IT, and then inherits as that fixed colour. So `--muted` was
+     already #57575a before the rail existed, and re-declaring `--ink-mute` on a
+     DESCENDANT could not reach it.
+
+     DARK NEVER SHOWED IT, which is why five audits of the dark frames came back
+     clean: `[data-theme='dark']` matches <html>, the SAME element the alias is
+     declared on, so there the substitution picks up the dark value and measures
+     6.14:1. Only a scope on a descendant — this one — is affected, and this is
+     the only such scope in the product.
+
+     This is docs/37 §19's own warning arriving a second time: "Guards that
+     grade TOKENS cannot see what COMPONENTS write. `--pfg` was correct for
+     weeks while three components wrote `text-white` on a brand fill."
+     `tonal-ladder.test.ts` grades this scope and passes, because every token it
+     reads IS correct. The rendered guard is in `rail-collapse.spec.ts`.
+
+     All five are listed, not just the one that was measured failing. `--s2` is
+     the rail foot's hover fill and would have painted the LIGHT #f4f4f5 inside
+     a dark panel; `--s1` is `--canvas`; `--bg` is `--surface`; `--faint` is
+     `--ink-faint`. Every alias in L3 whose source this scope re-declares is
+     re-declared here, because the next one to be reached for is the one nobody
+     measured. */
+  --bg: var(--surface);
+  --s1: var(--canvas);
+  --s2: var(--surface-2);
+  --muted: var(--ink-mute);
+  --faint: var(--ink-faint);
+
   color: var(--ink-body);
 }
 

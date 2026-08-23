@@ -1,23 +1,49 @@
 import { CreatePostButton } from '@/components/posts/create-post-button'
 
 /**
- * The greeting banner (reference `.greet`).
+ * The greeting. A PAGE HEADER, and as of 2026-08-23 not a band at all.
  *
- * A STRIP BEHIND ONE LINE OF TEXT, not a hero card. 190px is the reference's
- * number and it is load-bearing in both directions: tall enough to give the
- * wash somewhere to live, short enough that the first real content still sits
- * above the fold. A taller "hero" pushes question 1 off the screen, which is
- * the whole point of the four-question order.
+ * ── WHAT WAS THERE, AND WHAT IT COST ─────────────────────────────────────────
+ * A 1132x190 tinted strip carrying "Good evening", one line of state, a mascot
+ * render and a button. MEASURED at 390 it was 20% of the viewport's height and
+ * its art was `max-narrow:hidden`, so on the primary device — a mid-range
+ * Android — a fifth of the first screen was a greeting with nothing in it.
+ * That half was already fixed: below `narrow` the band, the wash and the
+ * minimum height were dropped and the greeting became a plain header.
  *
- * The wash is built from the palette — two orange radial gradients at 16% and
- * 6% — so it needs no artwork to look finished. The mascot art is layered on
- * top when present, masked so text stays legible over any image.
+ * The founder's question was about the other half: does the band earn its
+ * height at 1440? It does not, and the comparison settles it — the reference's
+ * equivalent is ONE LINE OF TYPE AND NO BAND. Its dashboard opens "Good
+ * morning, DIVAS" on the page ground with a period selector opposite, and goes
+ * straight into five stat cards. 190px of tinted surface holding two words was
+ * the largest non-informative object on this product's most-visited screen.
  *
- * ── THE PRIMARY ACTION LIVES HERE ────────────────────────────────────────────
- * The reference puts "+ Create" top-right of the banner, and this app had no
- * primary action on Home at all — a dashboard you can only read. One primary
- * per view (orange is rationed), so "Create post" is it; everything else on
- * this screen is secondary or a link.
+ * ── SO THE BAND IS GONE AT EVERY WIDTH, NOT RESTYLED ─────────────────────────
+ * No `min-h`, no `surface-ring`, no `bg-surface`, no radial wash and no mascot.
+ * What is left is exactly what the reference has: an h1, one line of real
+ * state, and the page's one primary action opposite. ~130px comes back at
+ * every width above `narrow`, and it goes to the four stat cards that now sit
+ * where the band was — a viewport that held a greeting now holds four numbers.
+ *
+ * ── THE WASH WAS NOT THE ACCENT PROBLEM, AND REMOVING IT IS NOT THE FIX ──────
+ * Recorded so nobody re-derives it: docs/40 §1.2 measured the two radial
+ * gradients at 16% and 6% and found they composite BELOW the s>0.30 saturation
+ * floor, contributing approximately zero measured accent pixels. The band was a
+ * VISUAL DOMINANCE defect, not a budget one, and this change is aimed at the
+ * first. The accent meter will barely move; the page height will.
+ *
+ * ── THE MASCOT IS NOT DELETED, IT IS UNPLACED ────────────────────────────────
+ * `public/mascot/0.png` is still shipped and still used by onboarding and the
+ * Guide. What went is the ONE placement where it sat behind a heading at 55%
+ * opacity under a two-gradient mask, whose own note records that the asset is
+ * cut off mid-plinth in the source PNG and that no container change can fix it.
+ * A character with nothing to do is worse for a brand than a character absent.
+ *
+ * ── AND THE PRIMARY ACTION STILL STANDS DOWN ON A PHONE ──────────────────────
+ * Unchanged, and the reason is unchanged: `Create post` here and the bottom
+ * bar's FAB are the SAME ACTION TO THE SAME URL, and MEASURED at 390 the two of
+ * them were 89% of every brand-hue pixel on the screen. The FAB wins — it is
+ * permanent and in the thumb zone.
  */
 export function GreetingBanner({
   greeting,
@@ -31,53 +57,23 @@ export function GreetingBanner({
   tools?: React.ReactNode
 }) {
   return (
-    <section
-      data-guide="home.greeting"
-      className="surface-ring relative flex min-h-[190px] items-center overflow-hidden rounded-lg bg-surface px-[22px] py-[18px] max-narrow:min-h-[150px] max-narrow:px-4"
-    >
-      {/* The wash. Palette-only, so a workspace with no art still gets a
-          finished banner rather than a grey box. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(130% 200% at 92% 45%, rgba(255,102,0,0.16), transparent 62%), radial-gradient(90% 160% at 70% 100%, rgba(255,102,0,0.06), transparent 70%)',
-        }}
-      />
-      {/* The art sits on the wash and is masked out across the left half, so
-          the text is legible over ANY image — no safe-zone rules for whoever
-          makes the artwork to remember.
-
-          CONTAIN, anchored right — NOT the reference's `cover`. The reference's
-          asset is a DESIGNED banner at 2.25:1 (soft ground left, subject right),
-          so covering a wide strip crops it sensibly. Ours is a product render of
-          the character on transparency, and `cover` scaled it until the robot
-          filled the middle of the banner and sat behind the greeting. Same
-          intent — subject right, text left, art subordinate — reached with the
-          setting the different source actually needs. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 right-0 w-[46%] bg-[url('/mascot/0.png')] bg-contain bg-[position:100%_58%] bg-no-repeat opacity-[0.55] max-narrow:hidden"
-        style={{
-          maskImage: 'linear-gradient(to right, transparent 0%, black 42%)',
-          WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 42%)',
-        }}
-      />
-
-      <div className="relative flex w-full flex-wrap items-center gap-3">
-        <div className="min-w-0">
-          {/* An <h1>, not a <p>. The banner replaced Home's PageTitle during the
-              structure port and took the page's only heading with it, leaving
-              the app's most-visited screen with no h1 at all — invisible to
-              anyone navigating by headings. */}
-          <h1 className="text-[20px] leading-7 font-[650] tracking-[-0.02em]">{greeting}</h1>
-          <p className="mt-[1px] text-[13px] font-[550] text-accent">{state}</p>
-        </div>
-        <div className="ml-auto flex flex-none items-center gap-2">
-          {tools}
+    <section data-guide="home.greeting" className="flex flex-wrap items-center gap-x-4 gap-y-3">
+      <div className="min-w-0">
+        {/* An <h1>, not a <p>. The banner took the page's only heading with it
+            during an earlier port and left the app's most-visited screen with
+            none — invisible to anyone navigating by headings. */}
+        <h1 className="type-h1">{greeting}</h1>
+        {/* NOT `text-accent`. A whole sentence in orange is decoration wearing a
+            state indicator's clothes, and docs/37 §2.3 spends the accent on the
+            one thing the screen is for — which on this page is the queue. */}
+        <p className="type-sm mt-1 text-muted">{state}</p>
+      </div>
+      <div className="ml-auto flex flex-none items-center gap-2">
+        {tools}
+        {/* See the header: the FAB is this same action, permanently, below 700. */}
+        <span className="max-narrow:hidden">
           <CreatePostButton />
-        </div>
+        </span>
       </div>
     </section>
   )

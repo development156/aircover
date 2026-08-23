@@ -58,7 +58,7 @@ export function TotalFigure({
       {/* Only stated when it is NOT everything. A "5 of 5" beside every figure is
           noise that trains the reader to skip the one that says "2 of 5". */}
       {complete ? null : (
-        <span className="text-[11px] tabular-nums text-muted">
+        <span className="type-meta tabular-nums text-muted">
           {total.coverage.counted}/{total.coverage.of}
         </span>
       )}
@@ -83,5 +83,5 @@ export function CoverageLine({
   className?: string
 }) {
   if (coverage.of === 0) return null
-  return <p className={`text-[12px] text-muted ${className}`}>{coverageNote(coverage, noun)}</p>
+  return <p className={`type-meta text-muted ${className}`}>{coverageNote(coverage, noun)}</p>
 }

@@ -12,9 +12,28 @@ import type { AccountAnalytics } from '@/lib/analytics/account-insights'
  * Home had no metric container at all. Not an empty one — none. Earlier runs
  * classified it as "content differs" and skipped it, which is exactly the
  * reading the run-9 brief revoked: a container is STRUCTURE and must exist even
- * with nothing in it. Four slots reading "—" is honest; no card is a defect,
- * because the reader cannot tell "we measured nothing" from "this product does
- * not measure".
+ * with nothing in it.
+ *
+ * ── AND THE SENTENCE THAT USED TO FOLLOW WAS WRONG BY ONE WORD ───────────────
+ * It read: "FOUR slots reading '—' is honest; no card is a defect." The first
+ * clause is the defect. MEASURED on
+ * `page-dash-before__populated__home__full__1440__light`: four labels above
+ * four absence marks, 1030px wide, a quarter of the main column, saying one
+ * thing — nothing has been measured — four times over. In dark it is worse: the
+ * marks are `--line` on `--surface` and the card reads as four labels floating
+ * over nothing at all.
+ *
+ * That is docs/40 §2.3's own finding, one level down. That section counted
+ * SEVEN containers on /home each announcing the same absence and collapsed them
+ * to one; this card is a single container announcing it four times INSIDE
+ * itself, and it survived the count because it is one card.
+ *
+ * The rule that produced it is still right and is unchanged: the container is
+ * structure and must exist. What changed is that an absence is now stated ONCE
+ * per container. Four slots when there are readings; one line when there are
+ * none. `Unmeasured` still carries the accessible name, so the absence stays
+ * legible to a screen reader rather than being skipped — the reason it was
+ * never a bare em dash.
  *
  * ── WHY THESE FOUR METRICS AND NOT THE REFERENCE'S FOUR ──────────────────────
  * The reference shows Followers, Reach, Conversions, Revenue. Sahoda has no
@@ -67,56 +86,116 @@ function reasonFor(analytics: AccountAnalytics): string | null {
   }
 }
 
-export function PerformanceStrip({ analytics }: { analytics: AccountAnalytics }) {
+export function PerformanceStrip({
+  analytics,
+  reasonStated = false,
+  detailsLink = true,
+}: {
+  analytics: AccountAnalytics
+  /**
+   * "Details" goes to /analytics, which is where this strip ALSO renders.
+   *
+   * MEASURED on the after-frames 2026-08-23: on /analytics the card's only link
+   * was an accent-coloured "Details" pointing at the page the reader is already
+   * on. A control that says what happens when it is used (docs/37 §17) cannot be
+   * one that does nothing, and a self-link is the quietest dead end there is —
+   * it does not error, it just fails to go anywhere. /home keeps it, because
+   * from there it is a real destination.
+   */
+  detailsLink?: boolean
+  /**
+   * The page has already said WHY there is nothing here, once, at the top.
+   *
+   * Default `false`, so /home — which has no page-level statement — keeps the
+   * sentence and this component's standalone contract is unchanged. Only
+   * /analytics opts in, where `ReadinessLine` carries the same claim with the
+   * remedy attached, and repeating it under four dashes is one of the six
+   * restatements docs/40 §3.1 counted.
+   */
+  reasonStated?: boolean
+}) {
   // A label -> value map, so a slot with no reported key falls to the em dash
   // rather than shifting the other three along.
   const values = new Map<string, number>(
     analytics.kind === 'ready' ? analytics.insights.map((i) => [i.label, i.value]) : [],
   )
-  const reason = reasonFor(analytics)
+  const reason = reasonStated ? null : reasonFor(analytics)
+  /**
+   * How many of the four slots have a reading. DERIVED from the same map the
+   * slots render from, never a second flag — a boolean passed in beside the
+   * data is a boolean that will one day disagree with it.
+   */
+  const measured = SLOTS.filter((label) => values.has(label)).length
 
   return (
     <Card className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[14px] font-semibold tracking-[-0.01em]">Performance</h2>
-        <Link
-          href="/analytics"
-          className="card-link rounded-sm text-[12.5px] font-semibold text-accent transition-micro hover:underline"
-        >
-          Details
-        </Link>
+        <h2 className="type-h3">Performance</h2>
+        {detailsLink ? (
+          /* MUTED, not accent. docs/37 §2.3 spends the orange on the one
+             thing the screen is for, and on /home that is `Create post`. This
+             was a second brand-coloured target 400px below it, and it is the
+             same "View all"/"See activity" job every other card head does in
+             `--ink-mute`. One fewer accent region, no information lost. */
+          <Link
+            href="/analytics"
+            className="card-link rounded-sm type-meta font-[550] text-muted transition-micro hover:text-accent"
+          >
+            Details
+          </Link>
+        ) : null}
       </div>
 
-      <dl className="grid grid-cols-4 gap-x-4 gap-y-3 max-wide:grid-cols-2 max-narrow:grid-cols-2">
-        {SLOTS.map((label) => {
-          const value = values.get(label)
-          return (
-            <div key={label} className="min-w-0">
-              <dt className="truncate text-[12px] text-muted">{label}</dt>
-              {/* `type-h2`, not `text-[19px] leading-7 font-[650] tracking-[-0.02em]`.
-                  19px is not a step on the scale and never was — docs/26 §5
-                  exists because sizes hand-written at a call site drift from
-                  every other call site that hand-wrote one. */}
-              <dd className="type-h2 tabular-nums text-ink">
-                {value === undefined ? (
-                  // The UNMEASURED mark, not a bare em dash. The slot is real
-                  // and the reading has not arrived (docs/26 §4) — and unlike a
-                  // dash it carries an accessible name, so the absence is
-                  // legible to a screen reader instead of being skipped.
-                  <Unmeasured what={label} />
-                ) : (
-                  // THE call site docs/26 §8.1 was written for. These are
-                  // SETTLED account readings for a closed period: finished, and
-                  // they will not move again while you look at them. Contrast
-                  // the credit balance, which may not count and is guarded
-                  // against it by count-up.guard.test.ts.
-                  <CountUp value={value} />
-                )}
-              </dd>
-            </div>
-          )
-        })}
-      </dl>
+      {measured === 0 ? (
+        /* ── ONE LINE, NOT FOUR MARKS ────────────────────────────────────
+           The slots are named rather than drawn, so the reader still learns
+           WHAT this product measures — which is the whole argument for keeping
+           the container — without four separate absences claiming it. */
+        /* NO `Unmeasured` MARK HERE, and that is a departure worth stating.
+           The mark exists for a SLOT — a real container whose reading has not
+           arrived — and it carries the accessible name a bare em dash cannot.
+           There is no slot in this branch: there is a sentence, and the
+           sentence is the claim, legible to a screen reader and to the eye
+           alike. MEASURED on the after-frame, the mark rendered as a 14x2 rule
+           immediately before a sentence that already contains an em dash, so
+           the line opened with two different dashes meaning two different
+           things. The mark is right where four numbers would otherwise be; it
+           is noise in front of a sentence that says more than it does. */
+        <p className="type-body text-muted">
+          Reach, views, accounts engaged and interactions — not measured yet.
+        </p>
+      ) : (
+        <dl className="grid grid-cols-4 gap-x-4 gap-y-3 max-wide:grid-cols-2 max-narrow:grid-cols-2">
+          {SLOTS.map((label) => {
+            const value = values.get(label)
+            return (
+              <div key={label} className="min-w-0">
+                <dt className="truncate type-meta text-muted">{label}</dt>
+                {/* `type-h2`, not `text-[19px] leading-7 font-[650] tracking-[-0.02em]`.
+                    19px is not a step on the scale and never was — docs/26 §5
+                    exists because sizes hand-written at a call site drift from
+                    every other call site that hand-wrote one. */}
+                <dd className="type-h2 tabular-nums text-ink">
+                  {value === undefined ? (
+                    /* Still the mark and not a bare em dash: SOME slots are
+                       filled here, so this one is a genuine per-slot absence
+                       inside a card that is otherwise reporting, which is
+                       exactly what docs/37 §9's mark is for. */
+                    <Unmeasured what={label} />
+                  ) : (
+                    // THE call site docs/26 §8.1 was written for. These are
+                    // SETTLED account readings for a closed period: finished, and
+                    // they will not move again while you look at them. Contrast
+                    // the credit balance, which may not count and is guarded
+                    // against it by count-up.guard.test.ts.
+                    <CountUp value={value} />
+                  )}
+                </dd>
+              </div>
+            )
+          })}
+        </dl>
+      )}
 
       {/* ── MARKETING SCORE IS GONE, AND THAT IS THE THIRD TIME ────────────
           The reference has a Marketing Score ring. This comment used to argue
@@ -133,7 +212,7 @@ export function PerformanceStrip({ analytics }: { analytics: AccountAnalytics })
 
           Not showing a ring at 0% was the right instinct. Deleting the row is
           the same instinct carried one step further. */}
-      {reason ? <p className="text-[12px] text-muted">{reason}</p> : null}
+      {reason ? <p className="type-meta text-muted">{reason}</p> : null}
     </Card>
   )
 }

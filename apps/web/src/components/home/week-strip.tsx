@@ -55,7 +55,7 @@ function Entry({ post, variants }: { post: DisplayPost; variants: readonly Varia
       href={`/posts/${post.id}`}
       data-certainty={certainty.level}
       className={cn(
-        'flex items-center gap-1.5 rounded-sm px-2 py-1 text-[12px] leading-4 font-semibold transition-micro hover:brightness-95',
+        'flex items-center gap-1.5 rounded-sm px-2 py-1 type-meta font-semibold transition-micro hover:brightness-95',
         CERTAINTY_CLASS[certainty.level],
       )}
     >
@@ -121,7 +121,7 @@ export function WeekStrip({ buckets, variantStates }: WeekStripProps) {
         ))}
       </ol>
       {total === 0 ? (
-        <p className="mt-3 text-[13px] text-muted">
+        <p className="mt-3 type-sm text-muted">
           Nothing scheduled this week yet. Anything you approve or schedule shows up here.
         </p>
       ) : null}

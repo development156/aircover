@@ -79,9 +79,26 @@ test.describe('@smoke entrance', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/home')
 
-    // READ THE RENDERED TEXT, not a box: the queue's own heading, which lives
-    // inside the first staggered region on the page.
-    await expect(page.getByRole('heading', { name: 'Needs your attention' })).toBeVisible()
+    /**
+     * READ THE RENDERED TEXT, not a box — that is the claim, and it is why this
+     * assertion exists at all: `fill: both` with a surviving delay leaves a
+     * staggered region present, sized and completely empty.
+     *
+     * It used to name the queue's own heading, "Needs your attention". That
+     * heading is the DASHBOARD's, and on 2026-08-23 /home gained a third state
+     * (`lib/home/started.ts`) where a workspace with nothing in it gets a setup
+     * screen instead — so a spec that bootstraps a workspace and stops no longer
+     * lands on the dashboard, and this test went red naming a heading that was
+     * correctly absent. The header above already records the SAME correction one
+     * state earlier, for `FirstRun`.
+     *
+     * The fix is not a different heading. It is the property the assertion was
+     * always making: the first staggered region has real, visible text in it,
+     * whichever state the page is in. That is strictly stronger than a string,
+     * and it does not have to be revisited the next time /home grows a state.
+     */
+    const firstRegionText = await page.locator('.enter-step').first().innerText()
+    expect(firstRegionText.trim().length).toBeGreaterThan(0)
 
     const step = page.locator('.enter-step').first()
     const { delay, duration, opacity } = await step.evaluate((n) => {

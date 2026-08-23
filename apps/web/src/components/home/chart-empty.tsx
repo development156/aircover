@@ -14,7 +14,7 @@ export function ChartEmpty({ status, empty }: { status: 'empty' | 'unreadable'; 
   return (
     <p
       data-testid="chart-empty"
-      className="flex min-h-[96px] items-center justify-center px-4 text-center text-[13px] text-muted"
+      className="flex min-h-[96px] items-center justify-center px-4 text-center type-sm text-muted"
     >
       {status === 'unreadable' ? "Couldn't read this right now. Try again in a moment." : empty}
     </p>
@@ -41,7 +41,7 @@ export function CoverageNote({ coveredFrom }: { coveredFrom: string | null }) {
   }).format(date)
 
   return (
-    <p className="mt-2 text-[12px] text-muted">
+    <p className="mt-2 type-meta text-muted">
       Showing from {label} — older days are outside this view.
     </p>
   )

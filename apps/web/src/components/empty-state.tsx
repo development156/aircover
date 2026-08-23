@@ -29,14 +29,14 @@ export function EmptyState({
       <span className="mb-2 grid size-11 place-items-center rounded-md bg-brand-wash text-accent shadow-[inset_0_0_0_1px_var(--brand-lift)]">
         <Icon size={21} strokeWidth={1.7} aria-hidden />
       </span>
-      <h2 className="text-[14px] font-semibold">{title}</h2>
-      <p className="max-w-[340px] text-[13px] text-muted">{body}</p>
+      <h2 className="type-h3">{title}</h2>
+      <p className="max-w-[340px] type-sm text-muted">{body}</p>
       {/* `.sl-state__a` — "is not optional" (RETHEME.md §4.5): an empty state
           answers what this is AND what to do next. It stays conditional here
           only because some screens genuinely have no destination to offer, and
           a button that goes nowhere is worse than none. */}
       {action ? <div className="mt-3">{action}</div> : null}
-      {tip ? <p className="mt-1 text-[12px] text-muted">Sahoda: {tip}</p> : null}
+      {tip ? <p className="mt-1 type-meta text-muted">Sahoda: {tip}</p> : null}
     </section>
   )
 }
@@ -73,8 +73,25 @@ export function CardEmpty({
   lead,
   body,
   action,
+  align = 'center',
   className,
 }: {
+  /**
+   * WHERE THE SENTENCE STARTS, AND WHY IT IS A CHOICE.
+   *
+   * Centred is right for a small card — `Best performing` is ~190px wide and a
+   * left-aligned line in it reads as a stray label. It is wrong for a wide one:
+   * MEASURED on `page-dash-before__populated__analytics__full__1440__light`,
+   * the Instagram account panel is a 1030px card holding a 340px text column
+   * centred in the middle of it, which docs/40 §3.2 named as most of why that
+   * page reads apologetic and `readiness-line.tsx` states outright — "centring
+   * a sentence in a wide box is what makes it look like a shrug".
+   *
+   * Defaulted to `center` so no call site outside this lane changes. The wide
+   * panels on /home and /analytics pass `start`; the ~40 other call sites in
+   * the app are unshot by this lane and are left exactly as they were.
+   */
+  align?: 'center' | 'start'
   /**
    * The one emphasised sentence, when the card has a REMEDY to lead with —
    * "Connect Instagram to see followers and reach." Optional because most
@@ -102,7 +119,8 @@ export function CardEmpty({
       // Vertically centred in the space the real content would have taken, so a
       // card does not visibly change height when its first row arrives.
       className={cn(
-        'flex min-h-[96px] flex-col items-center justify-center gap-2 px-4 py-6 text-center',
+        'flex min-h-[96px] flex-col justify-center gap-2 py-6',
+        align === 'center' ? 'items-center px-4 text-center' : 'items-start text-left',
         className,
       )}
     >

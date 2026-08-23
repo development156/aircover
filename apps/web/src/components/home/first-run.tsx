@@ -45,7 +45,7 @@ export function FirstRun({ now }: FirstRunProps) {
           more-seen screen on the old type scale. */}
       <header>
         <h1 className="text-[20px] leading-7 font-[650] tracking-[-0.02em]">{greetingFor(now)}</h1>
-        <p className="mt-[1px] text-[13px] font-[550] text-accent">
+        <p className="mt-[1px] type-sm font-[550] text-accent">
           Create a workspace and Sahoda starts filling this in.
         </p>
       </header>

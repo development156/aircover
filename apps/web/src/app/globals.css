@@ -29,6 +29,70 @@
    up inside a dark panel (RETHEME.md §6). */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *, .dark, .dark *));
 
+/* ── THE RAIL IS MINIMISED, FOR EITHER OF ITS TWO REASONS ────────────────────
+   The rail shows icons only in two different situations and they had ONE
+   spelling between them: `max-wide:`, the forced collapse below 1180px. The
+   founder's ruling added a second — the reader may collapse it, and it opens
+   COLLAPSED — which is a state no media query can see.
+
+   Writing `max-wide:x [data-rail='collapsed']:x` at every call site would be
+   two spellings of one idea, and the failure mode is the obvious one: somebody
+   updates one and the label reappears at 1440 while staying hidden at 1024.
+   So `rail-min:` means "the rail is showing icons only", whichever reason it is
+   for, and every rule that used to say `max-wide:` inside the rail says this.
+
+   `@slot` twice is not a typo. Tailwind v4 emits the utility once per slot, so
+   one class compiles to a media rule AND an attribute rule.
+
+   THE ATTRIBUTE IS AN OPT-OUT, NOT AN OPT-IN. Absence means collapsed, which is
+   what makes the default survive a reader who has never touched the control and
+   a document that renders before any script has run — there is no state in
+   which the rail flashes open and then shuts. */
+@custom-variant rail-min {
+  @media (width < 1180px) {
+    @slot;
+  }
+  &:where(html:not([data-rail='expanded']) *) {
+    @slot;
+  }
+}
+
+/* ── AND THE RAIL'S WIDTH IS A PARTITION, NOT A STACK OF OVERRIDES ───────────
+   `rail-min` above is deliberately permissive: it fires for EITHER reason, and
+   every rule that uses it does the same thing (hide a label, centre an icon),
+   so two rules landing on one element is harmless.
+
+   WIDTH IS NOT LIKE THAT. There are three widths and they disagree, so a rule
+   that fires for two reasons at once resolves by source order — and source
+   order between a media variant and a compound one is Tailwind's business, not
+   this file's. It would work, silently, until a version bump reordered the
+   utilities layer and the 700px band started rendering a 62px rail into a
+   content column with no spare pixels.
+
+   So the three states are spelled as three variants that cannot overlap:
+
+     max-wide   <1180              the forced collapse   56px
+     rail-icon  >=1180, collapsed  the reader's choice   62px
+     rail-wide  >=1180, expanded   the labelled rail    240px
+
+   Every width in the rail is written with one of these and none with a base
+   class. `rail-collapse.spec.ts` measures all three. */
+@custom-variant rail-icon {
+  @media (width >= 1180px) {
+    &:where(html:not([data-rail='expanded']) *) {
+      @slot;
+    }
+  }
+}
+
+@custom-variant rail-wide {
+  @media (width >= 1180px) {
+    &:where(html[data-rail='expanded'] *) {
+      @slot;
+    }
+  }
+}
+
 @theme {
   /* Tokens-only enforcement (docs/08 §1–2): wipe the stock palette so raw
      Tailwind colors (bg-red-500 …) do not compile at all.
@@ -48,7 +112,18 @@
 
   /* Not token-backed — layout constants the kit does not name. */
   --spacing-page-mobile: 14px;
-  --spacing-grid: 18px;
+  /* ── 20, NOT 18, AND 18 WAS NEVER ON THE SCALE ────────────────────────────
+     docs/37 §4's spacing ladder is 4·8·12·16·20·24·32·40·48·64·80. `grid` — the
+     gap between the major regions of /analytics and of four other screens —
+     sat at 18, which is between two rungs and belongs to neither. It is the
+     same class of defect as the 132 half-pixel font sizes §3.3 names: a value
+     hand-picked once, then inherited by everything that reached for the
+     nearest named thing.
+
+     20 is the rung, it is what `p-5` inside a card is now, and it is what
+     /home's own `space-y-5` runs at — so the two screens this lane rebuilt
+     share one rhythm rather than two that look alike. */
+  --spacing-grid: 20px;
   /* The gap between adjacent nav rows. --space-1 (4px) is the smallest step the
      scale has and it is visibly too loose for a 21-item rail, so this is named
      here rather than written as `gap-[2px]` at each of the two <section>s that
@@ -219,6 +294,7 @@
   /* ---- Shell dims → w-rail, h-topbar, p-page, max-w-content ---- */
   --spacing-rail: var(--sidebar-w);
   --spacing-rail-collapsed: var(--sidebar-w-collapsed);
+  --spacing-rail-min: var(--sidebar-w-user-collapsed);
   /* The rail FLOATS — measured 10px off every viewport edge on the reference.
      Named so the shell can write `p-rail-inset` instead of a literal, which
      design-lint rule 2 would refuse and which would then have to be spelled the

@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Plus_Jakarta_Sans } from 'next/font/google'
 
 import { ThemeAttributeGuard } from '@/components/shell/theme-attribute-guard'
+import { RailScript } from '@/components/shell/rail-script'
 import { ThemeScript } from '@/components/shell/theme-script'
 import { clerkAppearance } from '@/lib/clerk-appearance'
 // No env import here — validation is LAZY (first `env.X` access, i.e. the first
@@ -93,13 +94,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <ClerkProvider appearance={clerkAppearance} signInUrl="/sign-in" signUpUrl="/sign-up">
       {/* suppressHydrationWarning is required and narrow: ThemeScript writes
-          data-theme onto this exact element before React hydrates, so the
-          server's markup and the client's DOM differ by that one attribute by
-          design. It suppresses the warning for <html>'s own attributes only,
-          not for any subtree. */}
+          data-theme — and RailScript `data-rail` — onto this exact element
+          before React hydrates, so the server's markup and the client's DOM
+          differ by those attributes by design. It suppresses the warning for
+          <html>'s own attributes only, not for any subtree. */}
       <html lang="en" className={sans.variable} suppressHydrationWarning>
         <head>
           <ThemeScript />
+          {/* The rail's collapsed/expanded state, before first paint. Only the
+              non-default (`expanded`) is ever written, so a document rendered
+              with no JavaScript gets the founder's default rather than a rail
+              that opens wide and then shuts. */}
+          <RailScript />
         </head>
         <body>
           {/* Puts `data-theme` back when React re-renders <html> instead of
