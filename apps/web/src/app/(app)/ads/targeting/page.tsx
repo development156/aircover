@@ -101,7 +101,7 @@ export default function AdsTargetingPage() {
         <h3 className="type-h3">How many people this would reach</h3>
         <p className="type-body max-w-[68ch] text-muted">
           Sahoda will not show a figure here until a platform gives it one. Other tools put a live
-          estimate under this box and move it as you drag the radius — it is convincing, it is the
+          estimate under this box and move it as you drag the radius. It is convincing, it is the
           thing people budget against, and with no ad account connected it would be a number Sahoda
           made up about your market. When the connection exists, the estimate will come from Meta or
           Google and will say so.

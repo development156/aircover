@@ -34,7 +34,7 @@ const AREAS: ReadonlyArray<{ href: Route; icon: LucideIcon; title: string; body:
     href: '/ads/creative',
     icon: ImageIcon,
     title: 'Creative',
-    body: 'One ad, a different crop and a different line for every placement — the same rule your posts already follow across channels.',
+    body: 'One ad, a different crop and a different line for every placement. That is the same rule your posts already follow across channels.',
   },
   {
     href: '/ads/targeting',
@@ -86,7 +86,7 @@ export default function AdsPage() {
           { key: 'cpr', header: 'Cost per result', numeric: true },
         ]}
         rows={[]}
-        empty="No ad campaigns — Sahoda cannot run one yet. These are the columns it will report."
+        empty="No ad campaigns. Sahoda cannot run one yet. These are the columns it will report."
       />
 
       <GatesLadder />
@@ -117,7 +117,7 @@ export default function AdsPage() {
 
       <NotRunningNote>
         Everything you can press on this screen works and goes somewhere real. Everything that looks
-        like a control does not — there is no ad account, no bid and no spend behind any of it. Your
+        like a control does not. There is no ad account, no bid and no spend behind any of it. Your
         posts, your planner and your credits are unaffected by anything here.
       </NotRunningNote>
     </div>

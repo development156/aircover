@@ -69,7 +69,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           <Unreadable what="This campaign" />
           <h1 className="type-h3 mt-1">Sahoda could not read this campaign</h1>
           <p className="type-body max-w-[42ch] text-muted">
-            It did not come back this time. Reload — the campaign has not gone anywhere.
+            It did not come back this time. Reload. The campaign has not gone anywhere.
           </p>
         </section>
       </div>
@@ -129,7 +129,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           <Unreadable what="The posts in this campaign" />
           <h2 className="type-h3 mt-1">Sahoda could not read what is in this campaign</h2>
           <p className="type-body max-w-[42ch] text-muted">
-            Reload. Adding posts now would be working blind — some may already be in.
+            Reload. Adding posts now would be working blind. Some may already be in.
           </p>
         </section>
       ) : posts.length === 0 ? (
@@ -156,7 +156,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
             {/* Says what the grid is, once, so a reader does not have to infer
                 the rule from the shapes. */}
             <p className="type-sm text-muted">
-              Every channel publishes on its own — a column can be out while another is still
+              Every channel publishes on its own. A column can be out while another is still
               waiting.
             </p>
           </div>

@@ -120,7 +120,7 @@ export default async function AnalyticsPage() {
         <EmptyState
           icon={ChartColumn}
           title="Nothing to measure yet"
-          body="Analytics start when a post goes out on a connected channel. Until then there is nothing to measure — which is different from measuring nothing."
+          body="Analytics start when a post goes out on a connected channel. Until then there is nothing to measure. That is different from measuring nothing."
           action={
             /* ONE primary (docs/26 §1.5). Connecting leads because analytics
                cannot exist without it; writing a post is the hairline second. */
@@ -190,7 +190,7 @@ export default async function AnalyticsPage() {
           {rows.length > ANALYTICS_METRIC_CALLS ? (
             <p className="text-[12px] text-muted">
               Metrics are read for the first {ANALYTICS_METRIC_CALLS} published channels on this
-              page. The rest are listed as not loaded — open a post to read its own.
+              page. The rest are listed as not loaded. Open a post to read its own.
             </p>
           ) : null}
         </>
@@ -217,7 +217,7 @@ export default async function AnalyticsPage() {
         <EmptyState
           icon={ChartColumn}
           title="Nothing published yet"
-          body="Analytics start once a post goes out on a channel. Until then there is nothing to measure — which is different from measuring nothing."
+          body="Analytics start once a post goes out on a channel. Until then there is nothing to measure. That is different from measuring nothing."
           action={<CreatePostButton />}
         />
       )}

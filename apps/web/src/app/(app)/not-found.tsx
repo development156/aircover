@@ -44,7 +44,7 @@ export default function AppNotFound() {
             Go to Home
           </Link>
         }
-        tip="If you followed a link from inside Sahoda, tell us — that one is ours to fix."
+        tip="If you followed a link from inside Sahoda, tell us. That one is ours to fix."
       />
     </div>
   )

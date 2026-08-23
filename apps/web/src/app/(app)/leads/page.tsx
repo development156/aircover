@@ -55,7 +55,7 @@ export default async function LeadsPage() {
           body={
             read.status === 'no-workspace'
               ? 'Enquiries belong to a workspace, so there has to be one first.'
-              : 'Sahoda asked and got nothing back. This is not the same as having no enquiries — reloading is worth a try.'
+              : 'Sahoda asked and got nothing back. This is not the same as having no enquiries. Reloading is worth a try.'
           }
         />
         <Doors slug={null} />
@@ -75,7 +75,7 @@ export default async function LeadsPage() {
         <EmptyState
           icon={Users}
           title="Nobody has enquired yet"
-          body="When somebody fills in your contact form or messages you, they land here — with what they said and what to do next."
+          body="When somebody fills in your contact form or messages you, they land here, with what they said and what to do next."
         />
       ) : (
         <Board leads={read.leads} />
@@ -124,7 +124,7 @@ function Doors({ slug }: { slug: string | null }) {
             </pre>
           ) : (
             <p className="type-sm mt-2 text-muted">
-              The embed code appears once you have a site — it names which site the enquiry belongs
+              The embed code appears once you have a site. It names which site the enquiry belongs
               to.{' '}
               <Link href="/sites" className="font-[550] text-accent underline underline-offset-2">
                 Make one
@@ -135,7 +135,7 @@ function Doors({ slug }: { slug: string | null }) {
           <p className="type-sm mt-2 text-muted">
             A Sahoda site does not yet carry this form of its own. It needs two things: an address
             the public can reach, which Sites v0 does not deploy to yet, and a captcha widget inside
-            the generated page — a plain HTML form cannot carry a token, and an enquiry endpoint
+            the generated page. A plain HTML form cannot carry a token, and an enquiry endpoint
             without one would be open to anybody.
           </p>
         </article>

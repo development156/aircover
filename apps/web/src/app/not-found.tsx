@@ -27,7 +27,7 @@ export default function RootNotFound() {
   return (
     <main className="grid min-h-dvh place-items-center bg-canvas px-5 py-12">
       <div className="w-full max-w-[420px] text-center">
-        <Link href="/" aria-label="Sahoda — go to the start" className="inline-block rounded-sm">
+        <Link href="/" aria-label="Sahoda, go to the start" className="inline-block rounded-sm">
           {/* The supplied lockup, light and dark, exactly as the rail wears it. */}
           <Image
             src="/brand/logo-dark.png"

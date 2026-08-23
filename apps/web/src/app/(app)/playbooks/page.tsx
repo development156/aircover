@@ -213,8 +213,7 @@ export default async function PlaybooksPage() {
               <Link href="/loop" className="font-[550] text-accent underline underline-offset-2">
                 autonomy setting
               </Link>
-              . Yours is currently <span className="text-ink">{ladder?.name}</span> —{' '}
-              {ladder?.may.toLowerCase()}
+              . Yours is currently <span className="text-ink">{ladder?.name}</span>. {ladder?.may}
             </span>
           </li>
           <li className="type-body flex gap-2 text-muted">

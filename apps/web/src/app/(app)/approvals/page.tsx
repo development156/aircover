@@ -81,7 +81,7 @@ export default async function ApprovalsPage() {
         <EmptyState
           icon={CheckCheck}
           title="Nothing is waiting on you"
-          body="Anything sent for review, and anything that failed to go out, appears here. That is a real answer — not a screen that has yet to load."
+          body="Anything sent for review, and anything that failed to go out, appears here. That is a real answer. It is not a screen that has yet to load."
           tip="Posts you are still writing live under Posts. They are not waiting on a decision, so they are not here."
         />
       ) : (

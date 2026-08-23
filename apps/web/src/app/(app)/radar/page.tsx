@@ -124,7 +124,7 @@ export default async function RadarPage() {
               <EmptyState
                 icon={RadarIcon}
                 title="You are not watching anyone yet"
-                body="Name a business above and Radar reads its public pages once a week, then tells you what moved — a new offer, a price that changed, a posting rhythm that shifted — and what your own brand would say back."
+                body="Name a business above and Radar reads its public pages once a week, then tells you what moved (a new offer, a price that changed, a posting rhythm that shifted) and what your own brand would say back."
                 tip="Watch the shop your customers compare you against, not the biggest name in your category."
               />
             ) : snapshot.collector === 'watch-list-only' ? (

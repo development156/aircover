@@ -178,13 +178,13 @@ export default async function ResolveConsolePage() {
             {tally.unearned > 0 ? (
               <>
                 <span className="num font-[550] text-ink">{tally.unearned}</span> of them are things
-                only you can actually know — what your customers fear, what Sahoda must never say,
+                only you can actually know: what your customers fear, what Sahoda must never say,
                 what you promise. Those come first in the list below, because a guess there is worth
                 the least.
               </>
             ) : (
               <>
-                What is left are the fields Sahoda is meant to draft — how you sound, how formal to
+                What is left are the fields Sahoda is meant to draft: how you sound, how formal to
                 be, which phrases are yours. Keep them or say them differently.
               </>
             )}
@@ -212,7 +212,7 @@ export default async function ResolveConsolePage() {
         >
           Re-running the whole resolve
         </Link>{' '}
-        is a separate, paid action that rewrites all {tally.registered} fields — including every one
+        is a separate, paid action that rewrites all {tally.registered} fields, including every one
         you have already confirmed.
       </p>
     </div>

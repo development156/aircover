@@ -71,7 +71,7 @@ export default async function BrainPage() {
           title="Sahoda doesn't know your brand yet"
           body="The Brand Brain is what every caption, campaign and reply is written from. Give Sahoda a spark and it will resolve a first draft you can correct."
           action={<OnboardingLink>Set up your Brand Brain</OnboardingLink>}
-          tip="You approve and correct what it resolves — you never start from a blank form."
+          tip="You approve and correct what it resolves. You never start from a blank form."
         />
 
         <section className="surface-ring rounded-card bg-surface" aria-labelledby="brain-will-hold">

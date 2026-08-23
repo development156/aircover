@@ -115,7 +115,7 @@ export default async function ReportPage() {
             <p className="type-body max-w-[68ch] text-muted">
               {cycle.reflectSkippedNoHistory
                 ? 'Nothing of yours has been measured yet, so there is nothing to report on last week. This fills in once posts have gone out and the numbers have come back.'
-                : 'Fewer than two of your posts were measured last week, so there is no best and worst to name — with one post, the same post is both.'}
+                : 'Fewer than two of your posts were measured last week, so there is no best and worst to name. With one post, the same post is both.'}
             </p>
           )}
         </Block>
@@ -152,7 +152,7 @@ export default async function ReportPage() {
           {learnings.length === 0 ? (
             <p className="type-body max-w-[68ch] text-muted">
               {cycle.reflectSkippedNoHistory
-                ? 'Nothing — there was nothing to learn from. No post of yours has been measured, so Sahoda ran no insight pass at all rather than inventing one.'
+                ? 'Nothing. There was nothing to learn from. No post of yours has been measured, so Sahoda ran no insight pass at all rather than inventing one.'
                 : 'Nothing this week. Sahoda read your numbers and found no difference big enough to be worth acting on, which is a real answer and not a failure.'}
             </p>
           ) : (
@@ -162,7 +162,7 @@ export default async function ReportPage() {
                   <p className="type-body text-ink">{learning.summary}</p>
                   <p className="type-sm mt-1 text-muted">
                     {learning.status === 'accepted'
-                      ? `You added this to your Brand Brain${learning.appliedVersion !== null ? ` — version ${learning.appliedVersion}` : ''}.`
+                      ? `You added this to your Brand Brain${learning.appliedVersion !== null ? ` (version ${learning.appliedVersion})` : ''}.`
                       : learning.status === 'rejected'
                         ? 'You turned this down. Your Brand Brain is unchanged.'
                         : 'Waiting for you on the Loop screen. Nothing has been written into your brand.'}
@@ -187,8 +187,8 @@ export default async function ReportPage() {
                   <p className="type-sm mt-1 text-muted">
                     {brief.channels.join(' · ')}
                     {brief.stageOutcome === 'awaiting_approval'
-                      ? ' — scheduled, waiting for your approval'
-                      : ' — a draft in your Planner'}
+                      ? ' · scheduled, waiting for your approval'
+                      : ' · a draft in your Planner'}
                   </p>
                 </li>
               ))}
