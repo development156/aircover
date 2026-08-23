@@ -494,3 +494,58 @@ count is now over `<a>`, `<button>` and `[role="button"]`. Every other large bra
 is still measured and still PRINTED, under `marks`, so a decorative orange slab cannot
 hide behind the correction — it simply does not compete to be pressed.
 
+---
+
+## 8 · The gate, leg by leg
+
+`pnpm gate` runs five legs and stops at the first red one. The smoke leg needs two
+things this lane learned the hard way and neither is in the script:
+
+```bash
+SAHODA_E2E_ACK_TARGET=rloztdhzfliyvpvxsgjl \
+E2E_SERVER_CMD='pnpm --filter @sahoda/web start -p 3280' \
+pnpm gate
+```
+
+Without the first it fails in one second on the production-target guard; without the
+second it runs against `pnpm dev`, where Turbopack compiles each route on first
+request and the readiness probe times out.
+
+| leg | result |
+|---|---|
+| 1 · `turbo-typecheck-lint-test` | **ok** — 11 packages, `@sahoda/web` 4,495 tests over 359 files |
+| 2 · `vitest-root` | **ok** |
+| 3 · `turbo-smoke` | **106 passed, 1 failed** on the first pass; see below |
+| 4 · `prettier-check` | **ok** — all matched files |
+| 5 · `turbo-build` | **ok** — `js-budget ok: 80 routes within budget` |
+
+### 8.1 The one failure, and why it is not reported as green
+
+`composer-widths.spec.ts` failed on the full-suite pass with
+
+```
+strict mode violation: locator('[data-composer]') resolved to 2 elements
+  … unexpected value "hidden"
+```
+
+Exactly ONE component in the codebase renders `data-composer`, and this lane changed
+nothing in the composer. Both copies were `hidden`, which is a document caught with
+two renders of the same page in it — a mid-navigation capture, not a layout.
+
+It is called a flake because it was **tested twice, not because it looks like one**:
+the same spec on the same build passes standalone (41.5s), and it passes in a full
+re-run of the smoke leg (34.2s). The failing pass had already retried it once, under
+a machine running four worktrees.
+
+### 8.2 Three gate lessons this lane paid for
+
+1. **A scoped test run is a scoped verdict.** `vitest src/components` was green all
+   evening while `tokens-css-inline.test.ts` and six assertions in `home/page.test.tsx`
+   were red. The gate found both in ninety seconds.
+2. **`.next` is not the source.** A gate ran against a build made during a mutation
+   run, and 21 specs failed on a mutation that was no longer in any file — the accent
+   guard printed `page 140x38 "Second"`, which is the mutation's own label. Rebuild
+   before believing a rendered result.
+3. **Two gates at once fight over `.gate/`, port 3280 and `.next`.** Started by
+   chaining a second run behind a build while the first was still in its smoke leg.
+   One gate, or neither.
