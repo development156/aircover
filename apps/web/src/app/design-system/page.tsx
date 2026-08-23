@@ -6,6 +6,7 @@ import { AbsenceRow } from '@/components/design-system/absence-row'
 import { PrimitiveRack } from '@/components/design-system/primitive-rack'
 import { ScaleTables } from '@/components/design-system/scale-tables'
 import { Surfaces } from '@/components/design-system/surfaces'
+import { V5Primitives } from '@/components/design-system/v5-primitives'
 import { GreyscaleToggle } from '@/components/design-system/greyscale-toggle'
 
 export const metadata: Metadata = {
@@ -68,6 +69,13 @@ export default function DesignSystemPage() {
         blurb="Every state each primitive ships with. A control with no disabled state here does not have one in the app."
       >
         <PrimitiveRack />
+      </Section>
+
+      <Section
+        title="Stat card, segmented control, badge, empty, error, toast"
+        blurb="The primitives the reference is built out of, plus the four states a screen spends most of its life in. The stat card ships in BOTH of its real states, because the empty one is what every account sees for its first hour — and its figures are labelled as demonstration data, because this product never renders a number it cannot prove."
+      >
+        <V5Primitives />
       </Section>
 
       <Section
