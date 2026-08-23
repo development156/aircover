@@ -463,8 +463,32 @@ workspaces 0 · workspace_members 0 · posts 0 · post_variants 0
 brand_memory 0 · credit_ledger 0        (workspaces all-time: 26)
 ```
 
-**Nothing was left behind.** The ongoing cost is two Clerk users per `pnpm gate`,
-down from the four the guard would have cost as separate `test()` blocks.
+**Nothing this lane created was left behind.** The ongoing cost is two Clerk users
+per `pnpm gate`, down from the four the guard would have cost as separate `test()`
+blocks.
+
+### 8.1 One stranded row, and it is not this lane's
+
+The same count taken again at **19:50** reads `workspaces 1 · workspace_members 1 ·
+credit_ledger 1`, and all-time 26 → 27:
+
+```
+workspace  14d72df1-0865-4798-b66e-225bd72567f1  "My workspace"
+created_by user_3IJtqYDP1RvJZTrX01fcFWgDZ5K   created_at 19:48:18 IST
+clerk user STILL EXISTS: sahoda.e2e.mt5w6qbrgbqa4k+clerk_test@example.com
+```
+
+**It was created 2m06s after this lane's last browser process exited** (leg 3 ended
+`rc=0` at 19:46:12; nothing here ran a browser afterwards), while a peer session's
+`gate.mjs` was running — three worktrees were running gates against this database
+this evening. That peer's gate has since exited and the row is still there, so its
+teardown did not run: exactly the failure `fixtures/seeded-user.ts` documents in its
+own header, where five workspaces were stranded on 19–21 August.
+
+**It has NOT been deleted here.** It is not this lane's row, a peer may still be
+mid-run against it, and deleting a workspace cascades every FK into it — including
+`credit_ledger`, which is the financial record and append-only by design. That is
+irrecoverable and it is the owner's call, not a passing lane's.
 
 ---
 
