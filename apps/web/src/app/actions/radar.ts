@@ -36,21 +36,39 @@ import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 const RADAR_CHANGE_REVALIDATE = '/radar'
 
 /**
- * `posts.origin` CANNOT SAY 'radar', AND THIS IS THE HONEST NOTE ABOUT IT.
+ * A Radar draft says it came from Radar.
  *
- * The column is `check (origin in ('manual', 'plan_week'))` — migration
- * 20260718000004. Widening it is a schema change, applied migrations are
- * immutable, and this lane does not write migrations. So a Radar draft is stored
- * as `'manual'`, which is WRONG IN ONE SPECIFIC WAY worth stating rather than
- * burying: a future query asking "which posts did a person write by hand" will
- * count these.
+ * ── THE NOTE THIS REPLACES WAS TRUE WHEN WRITTEN AND IS NOT NOW ──────────────
+ * It read "`posts.origin` CANNOT SAY 'radar'", cited `check (origin in
+ * ('manual', 'plan_week'))` from migration 20260718000004, and stored a Radar
+ * draft as `'manual'` — stating plainly that a later query asking "which posts
+ * did a person write by hand" would count these.
  *
- * It is not papered over in the UI — the draft's own title names the competitor
- * and the move it answers, so the provenance is legible to the reader even though
- * the column cannot carry it. Recorded in apps/web/REQUESTS.md as a change owed
- * to whoever owns packages/db.
+ * The column has been widened TWICE since: `20260822030000_playbooks.sql` added
+ * `'playbook'`, and `20260822090000_posts_origin_radar.sql` added `'radar'`.
+ * MEASURED against production 2026-08-23, the live constraint is
+ * `check (origin = any (array['manual','plan_week','playbook','radar']))` — so
+ * both the branch and the deployed database admit it, and the comment justifying
+ * `'manual'` was pointing at a constraint that no longer exists.
+ *
+ * That is the more dangerous half of a stale comment: it did not merely go out of
+ * date, it argued convincingly for the wrong value, so a reader checking WHY the
+ * code writes 'manual' found a citation and stopped looking.
+ *
+ * Nothing needs backfilling. All five Radar tables are empty in production as of
+ * this date, so no post has ever been written by this path.
+ *
+ * ── AND check-constraints.ts DOES NOT COVER THIS, WHICH I ASSUMED IT DID ─────
+ * That guard reads `.eq()`, `.in()` and raw SQL. This is an object PROPERTY on
+ * an `.insert({ ... })`, resolved through a scalar const — three things it does
+ * not scan, and `resolveConstArrays` handles array consts only. MEASURED: with
+ * this set to 'competitor', a value `posts.origin` cannot hold, the whole guard
+ * stayed green.
+ *
+ * So the pin is `radar-origin.test.ts` beside it, which reads the admissible set
+ * out of the migrations and requires this literal to be a member.
  */
-const ORIGIN_UNTIL_RADAR_EXISTS = 'manual' as const
+const RADAR_POST_ORIGIN = 'radar' as const
 
 function isKind(value: unknown): value is CompetitorKind {
   return value === 'website' || value === 'instagram' || value === 'google_business'
@@ -254,7 +272,7 @@ export async function draftFromRadarChange(
         body: brief.body,
         status: 'draft',
         channels: [...requested],
-        origin: ORIGIN_UNTIL_RADAR_EXISTS,
+        origin: RADAR_POST_ORIGIN,
         created_by: userId,
       }),
     )

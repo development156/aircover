@@ -267,13 +267,22 @@ export default async function middleware(
 // dot-separated parts that are not valid base64url — passes Clerk's "is it JWT-shaped"
 // check and then throws inside the decode, where nothing catches it. Vercel answers
 // **HTTP 500 MIDDLEWARE_INVOCATION_FAILED** on EVERY matched path. Reproduced on
-// /sign-in, /embed/beta, /api/public/beta-apply and all three routes named below; a
+// /sign-in, /embed/beta, /api/public/beta-apply and the routes named below; a
 // 2-part token, a 4-part token and a well-formed 3-part token all answer 401 correctly.
 // One header, no credentials, any route. @clerk/nextjs 7.5.20 / @clerk/backend 3.11.7.
 //
-// The four routes below authenticate themselves — two constant-time CRON_SECRET
-// compares, a Cashfree HMAC, a Clerk/Svix signature — and take nothing from
-// clerkMiddleware but that failure mode. Excluding them here is the only bypass that works: the crash happens
+// The SEVEN routes below authenticate themselves — four constant-time CRON_SECRET
+// compares, a Cashfree HMAC, a Zernio HMAC and a Clerk/Svix signature — and take
+// nothing from clerkMiddleware but that failure mode.
+//
+// The count is spelled out because it has been wrong twice. It read "four" over six
+// entries for two days, and `/api/webhooks/zernio` was added to `isPublicRoute` on
+// 2026-08-21 and to THIS list only on 2026-08-23 — so for two days the whole internet
+// could reach a route on which Clerk still parsed an `Authorization` header it had no
+// use for. Nothing went red: `middleware.test.ts` adjudicates the paths somebody typed
+// into its arrays, and zernio was in neither of them. `middleware.coverage.test.ts`
+// now walks src/app and requires every route on disk to be classified, which is the
+// only shape of guard that can see a route missing from every list. Excluding them here is the only bypass that works: the crash happens
 // while Clerk computes the request state, BEFORE our handler runs, so an early return
 // inside the callback would never be reached.
 //
@@ -284,7 +293,12 @@ export default async function middleware(
 //   · EXACT paths, `$`-anchored — `/api/cron/sweeps-v2` must not inherit the bypass;
 //   · the route must authenticate itself in its FIRST statement, since nothing else will;
 //   · it must be in `isPublicRoute` too, so reverting this block cannot silently start
-//     redirecting it to /sign-in.
+//     redirecting it to /sign-in;
+//   · it must RETURN JSON. `middleware` is what sets `Content-Security-Policy`, so a
+//     route excluded here is served with no CSP header at all. That costs a webhook
+//     receiver nothing and would strip the header from /sign-in or /embed/lead — which
+//     is why this list is endpoints only and `middleware.coverage.test.ts` asserts that
+//     no page ever joins it.
 // Both patterns need the exclusion: the second one catches everything under /api on its
 // own, so excluding a path from the first alone does nothing. Next static-analyses these
 // at build time, so they must be literal strings — a shared const would be ignored.
@@ -292,12 +306,12 @@ export const config = {
   matcher: [
     // Clerk-recommended shape: skip Next internals + static assets unless
     // referenced in search params. (Next 16 renames middleware → proxy; n/a on 15.)
-    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Shaped as `/(…)` — ONE group holding the whole expression — because that is the
     // only place Next accepts a raw regex. `'/(?!…)(api|trpc)(.*)'` reads to
     // path-to-regexp as a group opening with invalid content and fails the BUILD with
     // `Error parsing … invalid-route-source`. Loud and before deploy, which is the right
     // direction for this file, but it is why the lookahead lives inside the parentheses.
-    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$)(?:api|trpc).*)',
+    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$)(?:api|trpc).*)',
   ],
 }

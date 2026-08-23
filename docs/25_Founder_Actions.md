@@ -418,3 +418,92 @@ when a document is added, searched or deleted. The one control that DOES spend i
 "Read my library", which runs `brand_extract`, and it carries `brand_research`'s
 price in its own label. If you want adding a document to cost credits, that is a
 pricing decision and nothing in the code assumes either answer.
+
+---
+
+## 14. Nothing in this product is on a schedule yet — 23 August 2026
+
+Five separate switches, all off. None of them is broken and none is waiting on code. Each one
+is off because turning it on is a decision somebody has to make, and this is that list.
+
+**The single most important sentence on this page:** GitHub only fires a scheduled workflow from
+the repository's **default branch**. The `.github/workflows` folder is not on it. So the three
+nightly jobs in this repository — numbers, Radar and audience — are not merely unarmed, they
+cannot fire at all, no matter what secrets are set. That is why the nightly numbers job has still
+never run.
+
+The Vercel crons are the opposite: all four ARE scheduled and all four ARE now reachable. Two of
+them then decline to do anything, on purpose, because of the switches below.
+
+### What was measured, on 23 August 2026, against the live site and the live database
+
+All four Vercel cron paths answer **401** when called without the secret, and **200** with it.
+That matters because until recently two of them answered **307** — a redirect to the sign-in
+page, which Vercel's cron does not follow — so the schedule fired, got a redirect, and reported
+success every single time while doing nothing. The check that proves the difference is that a
+path which has **never existed** also answers 307; so a 401 is the route saying "I am here and
+you did not identify yourself", and a 307 was the route not being reached at all.
+
+With both switches turned on and the correct secret, run against production:
+
+- the weekly Loop answered `eligible: 1, planned: 0`
+- the daily Playbook check answered `due: 0, proposed: 0`
+- the credit ledger was unchanged, before and after: 213 entries both times
+
+So arming them today would spend nothing. The reason is section (c) below, and it is the thing
+on this page most worth your attention.
+
+### The five switches
+
+| # | Switch | What arming it does | What it spends |
+|---|---|---|---|
+| a | `SAHODA_LOOP_CRON_MODE=on` | The Sunday 21:00 UTC Loop plans the coming week for every workspace that has opened the Loop screen and not paused it | 20 credits per workspace per week, before anyone sees anything. Drafting the briefs costs 3 credits each and only happens after a person approves |
+| b | `SAHODA_PLAYBOOKS_CRON_MODE=on` | The daily 06:00 UTC check looks seven days ahead for festivals and prepares a proposal | **Nothing.** It stops at the cost preview and waits for you |
+| c | `.github/workflows` on the default branch | The three nightly jobs become able to fire at all | Numbers and audience: bounded reads, no credits. **Radar spends real money the first night it runs** |
+| d | `ZERNIO_WEBHOOK_SECRET` + a subscription registered with Zernio | Comments, reviews and direct messages start arriving in your Inbox | Nothing. Without it the endpoint correctly answers "not configured" and Zernio has nobody to deliver to |
+| e | `SAHODA_PUBLISH_ENABLED` | See section 6 — publishing stays off | — |
+
+**All five are the safe direction.** Every one of them requires the exact string `on` (or a real
+value), so a typo leaves it off, which is what you want for anything that spends.
+
+### (c) is the one that would surprise you, and (a) is the one that would disappoint you
+
+**Radar's nightly pass spends money on its first run**, before anybody has looked at a single
+result. It fetches competitor pages through a paid provider. It has a daily cost cap and a
+per-workspace share, and both were checked: when the cap is reached, the provider is **not
+called** — verified by deleting the refusal and watching three tests fail because the provider
+had been called once instead of zero times. So the spending is bounded. It is still spending you
+have not agreed to yet.
+
+**The Loop would plan for nobody, and this is a data problem, not a code one.** Exactly two
+workspaces have ever opened the Loop screen:
+
+- **your own workspace** has the Loop switched on — and has **no connected channels and no
+  credits**, so there is nowhere to plan for and nothing to pay with;
+- **Chai & Chapters (Demo)** has two live channels and 1,260 credits — and has the Loop
+  **paused**.
+
+So the one workspace that is eligible cannot be planned for, and the one that could be planned
+for is switched off. Turning switch (a) on tonight would change nothing at all. If you want to
+see the Loop run on its schedule, the action is not the switch — it is to connect a channel to
+your own workspace, or to unpause the demo one.
+
+The Loop itself works. A full cycle was run end to end against production on 23 August 2026 and
+did exactly what it claims: it proposed five briefs at 15 credits, a person approved 12 of them,
+the fifth was excluded and was **never drafted and never charged**, four drafts were written and
+nothing was published. The ledger reconciled to the credit: 1,260 down to 1,228, and all nine
+ledger invariants held before and after.
+
+### Two smaller things, so they do not read as bugs later
+
+**A playbook that is waiting for you stops proposing.** A playbook may have one live run at a
+time, and a run that has proposed but not been approved is still live. So an unopened preview
+blocks that playbook's schedule until you approve it or stop it. That is correct — opening a
+second would charge you twice for the same festival — but it looks exactly like a broken
+schedule. The screen now says so on the run itself.
+
+**Radar's screen reads nothing yet.** The tables are in the live database and are empty, the
+ingestion side is built and tested, and the screen is deliberately connected to nothing rather
+than to guessed column names — an earlier attempt guessed `competitors.name`, the real column is
+`competitors.display_name`, and every visit to `/radar` returned an error. One file connects it,
+and the real column names are now recorded in the code so nobody has to guess again.

@@ -104,6 +104,14 @@ const CLERK_BYPASS_PATHS = [
   '/api/cron/playbooks',
   '/api/webhooks/cashfree',
   '/api/webhooks/clerk',
+  // Added 2026-08-23, and the reason it was missing is the reason
+  // `middleware.coverage.test.ts` now exists beside this file. Zernio landed on
+  // `isPublicRoute` with the wt-webhooks merge on 2026-08-21 and reached NEITHER
+  // this array nor CLERK_MATCHED_PATHS, so this suite adjudicated it in no
+  // direction and stayed green while Clerk kept parsing the `Authorization`
+  // header of a route the whole internet can reach. Arrays of remembered paths
+  // cannot catch a path nobody remembered; the coverage guard walks src/app.
+  '/api/webhooks/zernio',
 ]
 
 /** Paths that MUST keep reaching clerkMiddleware. A bypass that widens is a hole. */

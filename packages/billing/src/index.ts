@@ -45,9 +45,6 @@ export * from './dunning/dunning'
 // Reversing money — chargebacks and refunds, as COMPENSATING ENTRIES. Never an edit.
 export * from './reversals/applyReversal'
 
-// Free-tier abuse controls. Counts of real rows only — no score, ever.
-export * from './abuse/freeTier'
-
 // GST invoicing — the Indian financial year, the supplier registration (from env, with NO
 // defaults), and the document assembler. The serial is allocated by app.issue_invoice.
 export * from './invoices/financialYear'

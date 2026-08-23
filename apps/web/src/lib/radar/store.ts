@@ -33,6 +33,33 @@ import type { Competitor, RadarSnapshot } from './types'
  * alone is the same guess with a smaller surface. The honest position is that
  * this lane cannot read a schema it does not have.
  *
+ * ── THE REAL SCHEMA, READ OUT OF THE LIVE DATABASE ON 2026-08-23 ────────────
+ * Recorded here so the next attempt does not guess. Every name below came from
+ * `information_schema.columns` against the production project, not from a doc:
+ *
+ *   competitors               id, display_name, created_at
+ *   competitor_sources        id, competitor_id, kind, locator, cadence, etag,
+ *                             last_modified, content_hash, last_seen_at, created_at
+ *   competitor_snapshots      id, source_id, payload, content_hash, captured_at,
+ *                             captured_on, created_at
+ *   competitor_changes        id, source_id, from_snapshot_id, to_snapshot_id,
+ *                             change_kind, day_span, summary, detail, detected_at
+ *   competitor_subscriptions  id, workspace_id, competitor_id, label, created_by,
+ *                             created_at
+ *
+ * TWO THINGS THAT WOULD BREAK A BINDING WRITTEN FROM THE PROSE, and both are the
+ * reason the first attempt 500'd:
+ *
+ *   1. it is `display_name`, NOT `name`. That single wrong column is what
+ *      returned 42703 on every visit to /radar.
+ *   2. `competitors` has NO `workspace_id`. It is a SHARED catalogue; tenancy
+ *      lives in `competitor_subscriptions`, so every read must join through it
+ *      and a filter on `competitors.workspace_id` is a second 42703 waiting.
+ *
+ * All five tables exist in production and all five are EMPTY as of this date, so
+ * a correct binding returns an honest empty state rather than rows — which means
+ * "it renders" proves nothing here, and only a query that actually runs does.
+ *
  * ── WHAT WT-RADAR OWES, AND WHERE IT GOES ───────────────────────────────────
  * `port.ts` holds the full contract. Binding it is this one file:
  *
