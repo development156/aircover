@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 
 /**
  * EVERY SECTION IN THE MENU OPENS, AND SAYS ITS OWN NAME.
@@ -110,6 +111,7 @@ test.describe('every section loads @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     const broken: string[] = []
     for (const [href, heading] of SECTIONS) {
@@ -141,6 +143,7 @@ test.describe('every section loads @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     const broken: string[] = []
     for (const [href, pattern] of BRAIN_TABS) {

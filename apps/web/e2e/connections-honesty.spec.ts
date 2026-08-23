@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 
 /**
  * /CONNECTIONS, CHECKED IN A REAL BROWSER, BY TEXT.
@@ -39,6 +40,7 @@ test.describe('connections is honest about every channel @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 900 })
@@ -152,6 +154,7 @@ test.describe('connections is honest about every channel @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
     await page.goto('/connections')
     await expect(page.locator('#main')).toBeVisible({ timeout: 30_000 })
 
@@ -192,6 +195,7 @@ test.describe('connections is honest about every channel @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     // 390 specifically: labels go `sr-only` at narrow widths, and `display:none`
     // would remove the node from the accessibility tree and take the name with

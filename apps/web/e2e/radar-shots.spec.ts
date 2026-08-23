@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs'
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 
 /**
  * THE RADAR CAMERA — a tool, not an assertion.
@@ -46,6 +47,7 @@ test.describe('Radar, photographed', () => {
       if (await create.count()) {
         await create.click()
         await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
+        await leaveOnboarding(page)
       }
 
       mkdirSync(OUT, { recursive: true })

@@ -1,4 +1,5 @@
 import { adminClient, expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 import type { Page } from '@playwright/test'
 
 /**
@@ -74,6 +75,7 @@ async function bootstrapWorkspace(page: Page): Promise<void> {
   await expect(create).toBeVisible({ timeout: 30_000 })
   await create.click()
   await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+  await leaveOnboarding(page)
 }
 
 /**

@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Page } from '@playwright/test'
 
 import { adminClient, expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 import { framesTaken, shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
 
 /**
@@ -178,6 +179,7 @@ async function run(page: Page, width: number, theme: Theme, clerkUserId: string)
     await create.waitFor({ state: 'visible', timeout: 10_000 })
     await create.click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
   } catch {
     /* already bootstrapped */
   }

@@ -1,4 +1,4 @@
-import { expectPostSaved, startPost } from './fixtures/compose'
+import { expectPostSaved, startPost, leaveOnboarding } from './fixtures/compose'
 import { makePng } from './fixtures/png'
 import { adminClient, expect, test } from './fixtures/seeded-user'
 
@@ -45,6 +45,7 @@ async function bootstrapWorkspace(page: import('@playwright/test').Page): Promis
   await expect(create).toBeVisible({ timeout: 30_000 })
   await create.click()
   await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+  await leaveOnboarding(page)
 }
 
 test.describe('media library', () => {

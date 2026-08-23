@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 
 /**
  * APPROVALS — the queue, and the two claims it must never make.
@@ -44,6 +45,7 @@ test.describe('approvals @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 })
@@ -84,6 +86,7 @@ test.describe('approvals @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     await page.setViewportSize({ width: 390, height: 900 })
     await page.goto('/home')

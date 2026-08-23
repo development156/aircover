@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 
 /**
  * THE TWO ROADMAP SECTIONS SHOW NO FIGURE ABOUT THE READER'S BUSINESS.
@@ -234,6 +235,7 @@ test.describe('the roadmap sections invent nothing @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     const problems: string[] = []
 

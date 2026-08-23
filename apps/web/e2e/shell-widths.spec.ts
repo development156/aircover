@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 import { mkdirSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 
@@ -54,6 +55,7 @@ test.describe('shell across widths @smoke', () => {
     const create = page.locator('#main').getByRole('button', { name: /create workspace/i })
     await create.click()
     await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
+    await leaveOnboarding(page)
 
     const cookies = (await page.context().storageState()).cookies
     const findings: string[] = []

@@ -1,4 +1,5 @@
 import { adminClient, expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 
 /**
  * ONE OBSERVATION → A DRAFT A PERSON APPROVES, END TO END.
@@ -32,6 +33,7 @@ test.describe('a Radar change becomes a draft', () => {
     if (await create.count()) {
       await create.click()
       await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
+      await leaveOnboarding(page)
     }
 
     const { data: ws } = await admin

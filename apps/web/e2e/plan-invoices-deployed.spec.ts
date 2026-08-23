@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 
 /**
  * A one-off verification that `20260819213000_billing_lifecycle.sql` is live.
@@ -25,6 +26,7 @@ test.describe('the invoice store is deployed @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
+    await leaveOnboarding(page)
 
     await page.goto('/settings/plan', { waitUntil: 'domcontentloaded' })
     const main = page.locator('#main')
