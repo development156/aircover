@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 import type { Page } from '@playwright/test'
 
 /**
@@ -166,6 +167,7 @@ test.describe('the shell clears the 44px touch floor on a phone @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
+    await leaveOnboarding(page)
 
     // Landing on /onboarding proves the ACTION succeeded; it does not prove the shell
     // has re-read the workspace. Wait for the switcher itself before measuring, so a

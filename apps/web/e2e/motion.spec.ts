@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test'
 
 import { test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 
 /**
  * The entrance system, proved on a real page (docs/26 §8.1).
@@ -39,6 +40,7 @@ async function bootstrapWorkspace(page: import('@playwright/test').Page): Promis
     .getByRole('button', { name: /create workspace/i })
     .click()
   await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
+  await leaveOnboarding(page)
 }
 
 test.describe('@smoke entrance', () => {

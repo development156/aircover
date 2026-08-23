@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 import { framesTaken, readManifest, shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
 
 /**
@@ -48,6 +49,7 @@ for (const theme of THEMES) {
       await create.waitFor({ state: 'visible', timeout: 8_000 })
       await create.click()
       await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+      await leaveOnboarding(page)
     } catch {
       /* already has one — the /home frame records which it was */
     }

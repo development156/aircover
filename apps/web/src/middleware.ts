@@ -315,7 +315,26 @@ export const config = {
   matcher: [
     // Clerk-recommended shape: skip Next internals + static assets unless
     // referenced in search params. (Next 16 renames middleware → proxy; n/a on 15.)
-    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    //
+    // `mp4|webm` ADDED 2026-08-24, and it was a real hole rather than a tidy-up.
+    // MEASURED against `next start`: `/sahodaboot-poster.jpg` answered 200 and
+    // `/sahodaboot.mp4` answered **404** to the same unauthenticated request —
+    // the boot animation is 2.7 MB of static brand asset that was being routed
+    // through clerkMiddleware because no video extension was on this list, while
+    // its own poster frame was not. It only ever worked because the one person
+    // who fetches it has just signed in.
+    //
+    // Three costs, and the first is the one that matters: every play paid
+    // Clerk's request-state computation on a 2.7 MB file, INCLUDING the
+    // `Authorization`-header parse this whole block exists to keep off static
+    // paths. The others are that the poster and the film disagreed about who may
+    // see them, and that a film served through middleware inherits the 500 this
+    // file's own header documents.
+    //
+    // It is a marketing animation shown to every new customer, with nothing in
+    // it that is theirs — the same category as the poster beside it, which has
+    // been public all along.
+    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|mp4|webm|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Shaped as `/(…)` — ONE group holding the whole expression — because that is the
     // only place Next accepts a raw regex. `'/(?!…)(api|trpc)(.*)'` reads to
     // path-to-regexp as a group opening with invalid content and fails the BUILD with

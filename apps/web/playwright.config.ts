@@ -92,6 +92,27 @@ const BASE_URL = `http://127.0.0.1:${PORT}`
 
 export default defineConfig({
   testDir: './e2e',
+  /**
+   * ── `.spec.ts` ONLY, AND THIS IS NOT A NARROWING ────────────────────────────
+   * Playwright's default `testMatch` is `**\/*.@(spec|test).?(c|m)[jt]s?(x)`, so
+   * it collects `*.test.ts` as well. Every browser test in this repository is a
+   * `.spec.ts` — 57 of them, and `e2e/helpers/accent.test.ts` is the ONLY
+   * non-`.spec` test file in the tree, so the collected set is unchanged by this
+   * line. MEASURED with `--list` after it: **236 tests in 57 files, 102 under
+   * @smoke**. (The @smoke count is the number this repo's CLAUDE.md gates on and
+   * it has not moved; the total has, because lanes merged since that file last
+   * recorded 209.)
+   *
+   * What it stops is a VITEST file under `e2e/` being handed to the Playwright
+   * runner. `e2e/helpers/accent.test.ts` calibrates the accent meter and belongs
+   * to vitest (see `vitest.config.ts`, which includes `e2e/helpers/**`). Given
+   * to Playwright it threw `Cannot read properties of undefined (reading
+   * 'config')` at its `describe`, and — this is the part that matters — the
+   * failure was not one test. `playwright test --list` reported **0 tests in 0
+   * files**: a collection error takes the whole suite with it, so the gate's
+   * smoke leg had nothing to run and said so only through a stack trace.
+   */
+  testMatch: '**/*.spec.ts',
   // Fixtures self-seed and clean up, but they still share one Clerk instance
   // and one database; running files in parallel makes a failure's blast radius
   // hard to read. Serial by default, revisit when the suite is slow enough to

@@ -1,4 +1,4 @@
-import { expectPostSaved } from './fixtures/compose'
+import { expectPostSaved, leaveOnboarding } from './fixtures/compose'
 import { expect, test } from './fixtures/seeded-user'
 
 /**
@@ -36,6 +36,7 @@ test.describe('golden path @smoke', () => {
     //      profile and the 100-credit signup grant, then routes to onboarding.
     await createWorkspace.click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     // ── 3. Leave onboarding without resolving a Brain — no credits spent.
     await page.goto('/posts')
@@ -124,6 +125,7 @@ test.describe('golden path @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
     await page.goto('/home')
 
     // `—` is the honest "could not read" state. After a successful bootstrap the

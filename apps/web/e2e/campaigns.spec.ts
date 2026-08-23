@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 
 /**
  * CAMPAIGNS, end to end, against the real app and the real database:
@@ -129,8 +130,23 @@ test.describe('campaigns @smoke', () => {
     test.slow()
     // ── 1. Bootstrap a workspace. Campaigns belong to one, and the screen says
     //      so rather than showing an empty list.
+    //
+    //      The SENTENCE moved and the guarantee did not. This page used to
+    //      carry its own "Create a workspace first" copy; wt-boot replaced every
+    //      such per-page variant with ONE first-run screen rendered by
+    //      `(app)/layout.tsx`, because writing that sentence twenty-one times is
+    //      how /analytics came to tell a workspace-less account to connect a
+    //      channel instead. What this step has always asserted is that the page
+    //      names the missing workspace rather than showing an empty list, and
+    //      that is what is asserted here.
     await page.goto('/campaigns')
-    await expect(page.locator('#main').getByText(/create a workspace first/i)).toBeVisible()
+    await expect(
+      page.locator('#main').getByText(/create a workspace to get started/i),
+    ).toBeVisible()
+    // Not an empty campaigns list wearing a different hat.
+    await expect(
+      page.locator('#main').getByRole('button', { name: /create workspace/i }),
+    ).toBeVisible()
 
     await page.goto('/home')
     await page
@@ -138,6 +154,7 @@ test.describe('campaigns @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     // ── 2. With a workspace and no campaigns, the screen offers to make one.
     //      This is the EMPTY state, and it must not be the unreadable one: the
@@ -260,6 +277,7 @@ test.describe('campaigns @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     // A post on two channels, so the grid has more columns than a phone can hold.
     // A BODY is written here where the old flow needed none: creation is lazy, so
@@ -326,6 +344,7 @@ test.describe('ads is designed, not running @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     for (const route of ROUTES) {
       await page.goto(route)

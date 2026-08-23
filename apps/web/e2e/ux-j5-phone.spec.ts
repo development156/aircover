@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 import { DETECTORS } from './helpers/ux-detect'
 import {
   framesTaken,
@@ -57,6 +58,7 @@ async function bootstrap(page: Page): Promise<void> {
     await create.waitFor({ state: 'visible', timeout: 10_000 })
     await create.click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
   } catch {
     /* already bootstrapped */
   }

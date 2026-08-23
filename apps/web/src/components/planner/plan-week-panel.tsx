@@ -108,7 +108,19 @@ export function PlanWeekPanel() {
       {pending ? (
         <PendingLines lines={PENDING} />
       ) : (
-        <Button onClick={run} disabled={channels.length === 0} className="w-full">
+        // ── NOT A 1100px ORANGE BAR ────────────────────────────────────────
+        // `w-full` unconditionally made the loudest object in this lane: on the
+        // baseline capture /planner measured 3.5-4.3% saturated pixels, the
+        // worst of any route here and above the 2.883% docs/37 §2.3 recorded for
+        // it, and this single bar is most of that.
+        //
+        // Full width is RIGHT on a phone — a primary under the thumb — and wrong
+        // at 1440, where it is a band. `narrow:w-auto` is the pair
+        // `plan-picker.tsx` already uses. Deliberately NOT `sm:w-auto`: docs/37
+        // §13 records `top-up-panel.tsx` shipping exactly that, where the class
+        // is spelled correctly, type-checks, reads right in review and is never
+        // emitted — so the money screen's primary rendered as a ~1000px bar.
+        <Button onClick={run} disabled={channels.length === 0} className="w-full narrow:w-auto">
           <CalendarRange size={14} aria-hidden />
           <CostLabel action="Plan my week" cost={cost} />
         </Button>

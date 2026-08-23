@@ -1,0 +1,108 @@
+{"stop":"onb-00-intro","route":"/onboarding","width":390,"theme":"light","domTheme":"light","sha":"d67238ad4285288f","bytes":37682,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-01-basics","route":"/onboarding","width":390,"theme":"light","domTheme":"light","sha":"455c3ef29e9ce0ef","bytes":32117,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-02-what","route":"/onboarding","width":390,"theme":"light","domTheme":"light","sha":"5fb9635fc274366c","bytes":49886,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-03-audience","route":"/onboarding","width":390,"theme":"light","domTheme":"light","sha":"a15ac38616b6ddb2","bytes":42708,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-04-visual","route":"/onboarding","width":390,"theme":"light","domTheme":"light","sha":"cfdea144c71c800e","bytes":54223,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-05-references","route":"/onboarding","width":390,"theme":"light","domTheme":"light","sha":"9eea1efd0abedf45","bytes":48040,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-06-knowledge","route":"/onboarding","width":390,"theme":"light","domTheme":"light","sha":"000c365baf7c2ec5","bytes":84164,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-07-rivals","route":"/onboarding","width":390,"theme":"light","domTheme":"light","sha":"6de0242a4ff22181","bytes":42127,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"posts-empty","route":"/posts","width":390,"theme":"light","domTheme":"light","sha":"7170c672408e010d","bytes":76002,"ms":2078,"title":"Posts · Sahoda"}
+{"stop":"composer-new-empty","route":"/posts/new","width":390,"theme":"light","domTheme":"light","sha":"8773e86ca6dca50d","bytes":104503,"ms":1774,"title":"Write · Sahoda"}
+{"stop":"planner-list-empty","route":"/planner","width":390,"theme":"light","domTheme":"light","sha":"7617e2399a046b9d","bytes":90884,"ms":1435,"title":"Planner · Sahoda"}
+{"stop":"planner-week-empty","route":"/planner?view=week","width":390,"theme":"light","domTheme":"light","sha":"7617e2399a046b9d","bytes":90884,"ms":1421,"title":"Planner · Sahoda"}
+{"stop":"planner-month-empty","route":"/planner?view=month","width":390,"theme":"light","domTheme":"light","sha":"06c72203dce5c22c","bytes":90884,"ms":1434,"title":"Planner · Sahoda"}
+{"stop":"posts-full","route":"/posts","width":390,"theme":"light","domTheme":"light","sha":"1773db04618dd167","bytes":118592,"ms":1454,"title":"Posts · Sahoda"}
+{"stop":"planner-list-full","route":"/planner","width":390,"theme":"light","domTheme":"light","sha":"e6ffaf73cf52a1ed","bytes":111003,"ms":1442,"title":"Planner · Sahoda"}
+{"stop":"planner-week-full","route":"/planner?view=week","width":390,"theme":"light","domTheme":"light","sha":"12b0be8353494201","bytes":115541,"ms":1431,"title":"Planner · Sahoda"}
+{"stop":"planner-month-full","route":"/planner?view=month","width":390,"theme":"light","domTheme":"light","sha":"f8e3e50ba4a9505b","bytes":88893,"ms":1442,"title":"Planner · Sahoda"}
+{"stop":"composer-two-channels","route":"/posts/c1707df6-9633-4dae-b909-918deb4cd52c","width":390,"theme":"light","domTheme":"light","sha":"e04e3a0bfd21d3f1","bytes":208782,"ms":1437,"title":"Write · Sahoda"}
+{"stop":"onb-00-intro","route":"/onboarding","width":390,"theme":"dark","domTheme":"dark","sha":"e0503e65ccf3305a","bytes":34914,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-01-basics","route":"/onboarding","width":390,"theme":"dark","domTheme":"dark","sha":"0fad56379eb9a601","bytes":29775,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-02-what","route":"/onboarding","width":390,"theme":"dark","domTheme":"dark","sha":"22add2a0fa21da5c","bytes":50515,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-03-audience","route":"/onboarding","width":390,"theme":"dark","domTheme":"dark","sha":"40b9d885a7a34bb0","bytes":43717,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-04-visual","route":"/onboarding","width":390,"theme":"dark","domTheme":"dark","sha":"28c071a46c214a28","bytes":55006,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-05-references","route":"/onboarding","width":390,"theme":"dark","domTheme":"dark","sha":"fcd6a5341ddee07d","bytes":48363,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-06-knowledge","route":"/onboarding","width":390,"theme":"dark","domTheme":"dark","sha":"fb621d4e2594619d","bytes":84593,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-07-rivals","route":"/onboarding","width":390,"theme":"dark","domTheme":"dark","sha":"cc8a683dec193907","bytes":39288,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"posts-empty","route":"/posts","width":390,"theme":"dark","domTheme":"dark","sha":"8d3f554326f298dd","bytes":80213,"ms":1350,"title":"Posts · Sahoda"}
+{"stop":"composer-new-empty","route":"/posts/new","width":390,"theme":"dark","domTheme":"dark","sha":"ac107969364789da","bytes":112316,"ms":1207,"title":"Write · Sahoda"}
+{"stop":"planner-list-empty","route":"/planner","width":390,"theme":"dark","domTheme":"dark","sha":"06c0e99ee118fb11","bytes":93965,"ms":1142,"title":"Planner · Sahoda"}
+{"stop":"planner-week-empty","route":"/planner?view=week","width":390,"theme":"dark","domTheme":"dark","sha":"b08479c8d1e549e5","bytes":94367,"ms":1089,"title":"Planner · Sahoda"}
+{"stop":"planner-month-empty","route":"/planner?view=month","width":390,"theme":"dark","domTheme":"dark","sha":"b08479c8d1e549e5","bytes":94367,"ms":1107,"title":"Planner · Sahoda"}
+{"stop":"posts-full","route":"/posts","width":390,"theme":"dark","domTheme":"dark","sha":"9170c7d740fa97f2","bytes":124187,"ms":1143,"title":"Posts · Sahoda"}
+{"stop":"planner-list-full","route":"/planner","width":390,"theme":"dark","domTheme":"dark","sha":"84c9737a2f2908b2","bytes":114497,"ms":1121,"title":"Planner · Sahoda"}
+{"stop":"planner-week-full","route":"/planner?view=week","width":390,"theme":"dark","domTheme":"dark","sha":"c656f386d0899f12","bytes":120256,"ms":1115,"title":"Planner · Sahoda"}
+{"stop":"planner-month-full","route":"/planner?view=month","width":390,"theme":"dark","domTheme":"dark","sha":"d36e984300028889","bytes":92377,"ms":1106,"title":"Planner · Sahoda"}
+{"stop":"composer-two-channels","route":"/posts/27272482-1790-4067-a524-31521888ebef","width":390,"theme":"dark","domTheme":"dark","sha":"26ee0805091f3a1f","bytes":209559,"ms":1230,"title":"Write · Sahoda"}
+{"stop":"onb-00-intro","route":"/onboarding","width":1024,"theme":"light","domTheme":"light","sha":"b137c3de1adcb4e7","bytes":49349,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-01-basics","route":"/onboarding","width":1024,"theme":"light","domTheme":"light","sha":"13660d926ffb3fd7","bytes":39571,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-02-what","route":"/onboarding","width":1024,"theme":"light","domTheme":"light","sha":"969bf4b609ec6db4","bytes":51428,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-03-audience","route":"/onboarding","width":1024,"theme":"light","domTheme":"light","sha":"b21de51b05997e2b","bytes":41429,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-04-visual","route":"/onboarding","width":1024,"theme":"light","domTheme":"light","sha":"b549ec7002cea861","bytes":62420,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-05-references","route":"/onboarding","width":1024,"theme":"light","domTheme":"light","sha":"9f535939c86d2cd2","bytes":50020,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-06-knowledge","route":"/onboarding","width":1024,"theme":"light","domTheme":"light","sha":"c2b3ea5843125779","bytes":72154,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-07-rivals","route":"/onboarding","width":1024,"theme":"light","domTheme":"light","sha":"6eba0b88a6fba1c5","bytes":53921,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"posts-empty","route":"/posts","width":1024,"theme":"light","domTheme":"light","sha":"394e358df10aa79b","bytes":135153,"ms":2165,"title":"Posts · Sahoda"}
+{"stop":"composer-new-empty","route":"/posts/new","width":1024,"theme":"light","domTheme":"light","sha":"9fd8362aea5ba5e9","bytes":137197,"ms":1444,"title":"Write · Sahoda"}
+{"stop":"planner-list-empty","route":"/planner","width":1024,"theme":"light","domTheme":"light","sha":"62d05c25e72cd037","bytes":132272,"ms":1449,"title":"Planner · Sahoda"}
+{"stop":"planner-week-empty","route":"/planner?view=week","width":1024,"theme":"light","domTheme":"light","sha":"49df41e069aabf67","bytes":131654,"ms":1477,"title":"Planner · Sahoda"}
+{"stop":"planner-month-empty","route":"/planner?view=month","width":1024,"theme":"light","domTheme":"light","sha":"41ee82208eb79c7a","bytes":132276,"ms":1432,"title":"Planner · Sahoda"}
+{"stop":"posts-full","route":"/posts","width":1024,"theme":"light","domTheme":"light","sha":"8b81de62cb2d890f","bytes":147705,"ms":1471,"title":"Posts · Sahoda"}
+{"stop":"planner-list-full","route":"/planner","width":1024,"theme":"light","domTheme":"light","sha":"d61626ee1b0ac925","bytes":157788,"ms":1438,"title":"Planner · Sahoda"}
+{"stop":"planner-week-full","route":"/planner?view=week","width":1024,"theme":"light","domTheme":"light","sha":"c4a1b5c07a46634a","bytes":163117,"ms":1467,"title":"Planner · Sahoda"}
+{"stop":"planner-month-full","route":"/planner?view=month","width":1024,"theme":"light","domTheme":"light","sha":"072bc6391a1d9cfa","bytes":131487,"ms":1454,"title":"Planner · Sahoda"}
+{"stop":"composer-two-channels","route":"/posts/204e32f9-568c-4374-8d73-ba0080272bea","width":1024,"theme":"light","domTheme":"light","sha":"c273a5525ea5b524","bytes":252213,"ms":1441,"title":"Write · Sahoda"}
+{"stop":"onb-00-intro","route":"/onboarding","width":1024,"theme":"dark","domTheme":"dark","sha":"a56312f5aae49914","bytes":46685,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-01-basics","route":"/onboarding","width":1024,"theme":"dark","domTheme":"dark","sha":"89b70554f0335779","bytes":37194,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-02-what","route":"/onboarding","width":1024,"theme":"dark","domTheme":"dark","sha":"35d9548807d77fa9","bytes":48579,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-03-audience","route":"/onboarding","width":1024,"theme":"dark","domTheme":"dark","sha":"c6029eabd485f9ab","bytes":38912,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-04-visual","route":"/onboarding","width":1024,"theme":"dark","domTheme":"dark","sha":"55337479f7e251b1","bytes":59587,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-05-references","route":"/onboarding","width":1024,"theme":"dark","domTheme":"dark","sha":"11805917d7b194d8","bytes":47018,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-06-knowledge","route":"/onboarding","width":1024,"theme":"dark","domTheme":"dark","sha":"c532a181592ab7b2","bytes":67950,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-07-rivals","route":"/onboarding","width":1024,"theme":"dark","domTheme":"dark","sha":"31413262f4dea30e","bytes":51126,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"posts-empty","route":"/posts","width":1024,"theme":"dark","domTheme":"dark","sha":"62340ad758903d15","bytes":141116,"ms":1632,"title":"Posts · Sahoda"}
+{"stop":"composer-new-empty","route":"/posts/new","width":1024,"theme":"dark","domTheme":"dark","sha":"ae76673ef0faaeb3","bytes":144173,"ms":1427,"title":"Write · Sahoda"}
+{"stop":"planner-list-empty","route":"/planner","width":1024,"theme":"dark","domTheme":"dark","sha":"05520493d930ce9c","bytes":141522,"ms":1437,"title":"Planner · Sahoda"}
+{"stop":"planner-week-empty","route":"/planner?view=week","width":1024,"theme":"dark","domTheme":"dark","sha":"05520493d930ce9c","bytes":141522,"ms":1452,"title":"Planner · Sahoda"}
+{"stop":"planner-month-empty","route":"/planner?view=month","width":1024,"theme":"dark","domTheme":"dark","sha":"e513437ce7fd464f","bytes":141519,"ms":1462,"title":"Planner · Sahoda"}
+{"stop":"posts-full","route":"/posts","width":1024,"theme":"dark","domTheme":"dark","sha":"5ee2d431864c9edc","bytes":155279,"ms":1451,"title":"Posts · Sahoda"}
+{"stop":"planner-list-full","route":"/planner","width":1024,"theme":"dark","domTheme":"dark","sha":"7957612ae750c0a6","bytes":162261,"ms":1473,"title":"Planner · Sahoda"}
+{"stop":"planner-week-full","route":"/planner?view=week","width":1024,"theme":"dark","domTheme":"dark","sha":"facba3f371a5fc6e","bytes":168380,"ms":1440,"title":"Planner · Sahoda"}
+{"stop":"planner-month-full","route":"/planner?view=month","width":1024,"theme":"dark","domTheme":"dark","sha":"e6ed8fb3da12e631","bytes":137763,"ms":1454,"title":"Planner · Sahoda"}
+{"stop":"composer-two-channels","route":"/posts/5f21983f-8ae5-4a96-8602-2f1277b3721b","width":1024,"theme":"dark","domTheme":"dark","sha":"07e617051a9fb1b7","bytes":254022,"ms":1341,"title":"Write · Sahoda"}
+{"stop":"onb-00-intro","route":"/onboarding","width":1440,"theme":"light","domTheme":"light","sha":"7e6c90ab56fb78bb","bytes":138556,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-01-basics","route":"/onboarding","width":1440,"theme":"light","domTheme":"light","sha":"a7205f28e75e1173","bytes":125042,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-02-what","route":"/onboarding","width":1440,"theme":"light","domTheme":"light","sha":"d16a7ecf01715c79","bytes":141556,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-03-audience","route":"/onboarding","width":1440,"theme":"light","domTheme":"light","sha":"623f0c96eff1fc21","bytes":129746,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-04-visual","route":"/onboarding","width":1440,"theme":"light","domTheme":"light","sha":"20184eb21fda82d6","bytes":134345,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-05-references","route":"/onboarding","width":1440,"theme":"light","domTheme":"light","sha":"cd8ac073ed50e24b","bytes":145277,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-06-knowledge","route":"/onboarding","width":1440,"theme":"light","domTheme":"light","sha":"3de35bab3cb649c9","bytes":168962,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-07-rivals","route":"/onboarding","width":1440,"theme":"light","domTheme":"light","sha":"96e803bdd27571c2","bytes":148754,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"posts-empty","route":"/posts","width":1440,"theme":"light","domTheme":"light","sha":"9e1853fb74d56d52","bytes":159362,"ms":1345,"title":"Posts · Sahoda"}
+{"stop":"composer-new-empty","route":"/posts/new","width":1440,"theme":"light","domTheme":"light","sha":"b140ea3ca4f7bdab","bytes":187635,"ms":1206,"title":"Write · Sahoda"}
+{"stop":"planner-list-empty","route":"/planner","width":1440,"theme":"light","domTheme":"light","sha":"2c8e0e0a00b7a207","bytes":154924,"ms":1130,"title":"Planner · Sahoda"}
+{"stop":"planner-week-empty","route":"/planner?view=week","width":1440,"theme":"light","domTheme":"light","sha":"2c8e0e0a00b7a207","bytes":154924,"ms":1116,"title":"Planner · Sahoda"}
+{"stop":"planner-month-empty","route":"/planner?view=month","width":1440,"theme":"light","domTheme":"light","sha":"10da4231f0b12b27","bytes":155484,"ms":1140,"title":"Planner · Sahoda"}
+{"stop":"posts-full","route":"/posts","width":1440,"theme":"light","domTheme":"light","sha":"5bbacbe4f5686e12","bytes":170936,"ms":1099,"title":"Posts · Sahoda"}
+{"stop":"planner-list-full","route":"/planner","width":1440,"theme":"light","domTheme":"light","sha":"8a5197f34a972f5d","bytes":183183,"ms":1128,"title":"Planner · Sahoda"}
+{"stop":"planner-week-full","route":"/planner?view=week","width":1440,"theme":"light","domTheme":"light","sha":"45ff3526b9d256f7","bytes":186426,"ms":1111,"title":"Planner · Sahoda"}
+{"stop":"planner-month-full","route":"/planner?view=month","width":1440,"theme":"light","domTheme":"light","sha":"554b0b97d34e3948","bytes":155177,"ms":1666,"title":"Planner · Sahoda"}
+{"stop":"composer-two-channels","route":"/posts/c2db5994-3064-4ffb-96e5-1c507fd72b69","width":1440,"theme":"light","domTheme":"light","sha":"a157be1df5a45366","bytes":286773,"ms":1348,"title":"Write · Sahoda"}
+{"stop":"onb-00-intro","route":"/onboarding","width":1440,"theme":"dark","domTheme":"dark","sha":"bb668cf518a12501","bytes":131489,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-01-basics","route":"/onboarding","width":1440,"theme":"dark","domTheme":"dark","sha":"232e30845bd624b2","bytes":117787,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-02-what","route":"/onboarding","width":1440,"theme":"dark","domTheme":"dark","sha":"f3afc90bcd44ba48","bytes":133958,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-03-audience","route":"/onboarding","width":1440,"theme":"dark","domTheme":"dark","sha":"61693ce6036d79d6","bytes":122513,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-04-visual","route":"/onboarding","width":1440,"theme":"dark","domTheme":"dark","sha":"026c2a52309e9bd7","bytes":121665,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-05-references","route":"/onboarding","width":1440,"theme":"dark","domTheme":"dark","sha":"0e939f3b5d22d257","bytes":137993,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-06-knowledge","route":"/onboarding","width":1440,"theme":"dark","domTheme":"dark","sha":"ba33ae357dcb9ea7","bytes":160170,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"onb-07-rivals","route":"/onboarding","width":1440,"theme":"dark","domTheme":"dark","sha":"33ecaa1b0b1af219","bytes":141291,"ms":null,"title":"Set up your Brand Brain · Sahoda"}
+{"stop":"posts-empty","route":"/posts","width":1440,"theme":"dark","domTheme":"dark","sha":"7d6d01ac2673fb6e","bytes":167506,"ms":1520,"title":"Posts · Sahoda"}
+{"stop":"composer-new-empty","route":"/posts/new","width":1440,"theme":"dark","domTheme":"dark","sha":"d1ec3c1b23958853","bytes":196877,"ms":1255,"title":"Write · Sahoda"}
+{"stop":"planner-list-empty","route":"/planner","width":1440,"theme":"dark","domTheme":"dark","sha":"c6d666397f1257ec","bytes":164441,"ms":1266,"title":"Planner · Sahoda"}
+{"stop":"planner-week-empty","route":"/planner?view=week","width":1440,"theme":"dark","domTheme":"dark","sha":"0a695dd07040e307","bytes":164431,"ms":1282,"title":"Planner · Sahoda"}
+{"stop":"planner-month-empty","route":"/planner?view=month","width":1440,"theme":"dark","domTheme":"dark","sha":"c17b1fd485ea1ec2","bytes":163557,"ms":1227,"title":"Planner · Sahoda"}
+{"stop":"posts-full","route":"/posts","width":1440,"theme":"dark","domTheme":"dark","sha":"0e4fef11af6f33e3","bytes":178839,"ms":1279,"title":"Posts · Sahoda"}
+{"stop":"planner-list-full","route":"/planner","width":1440,"theme":"dark","domTheme":"dark","sha":"6f38ac9fa39b58ed","bytes":188180,"ms":1270,"title":"Planner · Sahoda"}
+{"stop":"planner-week-full","route":"/planner?view=week","width":1440,"theme":"dark","domTheme":"dark","sha":"4548d23156d8ce1e","bytes":190388,"ms":1242,"title":"Planner · Sahoda"}
+{"stop":"planner-month-full","route":"/planner?view=month","width":1440,"theme":"dark","domTheme":"dark","sha":"f6e66c259bbdd9cf","bytes":163017,"ms":1238,"title":"Planner · Sahoda"}
+{"stop":"composer-two-channels","route":"/posts/26fa2e0d-7e1f-42d7-b490-c9df5659ac8c","width":1440,"theme":"dark","domTheme":"dark","sha":"c1908487a2ca688c","bytes":293245,"ms":1243,"title":"Write · Sahoda"}

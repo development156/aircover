@@ -1,4 +1,5 @@
 import { test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 import { adminClient } from './fixtures/seeded-user'
 import { mkdirSync } from 'node:fs'
 import { expect, type Page } from '@playwright/test'
@@ -231,6 +232,7 @@ test.describe('design audit', () => {
     const create = page.locator('#main').getByRole('button', { name: /create workspace/i })
     await create.click()
     await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
+    await leaveOnboarding(page)
 
     // ── Seed content directly. Service-role is legitimate in test scaffolding.
     const admin = adminClient()

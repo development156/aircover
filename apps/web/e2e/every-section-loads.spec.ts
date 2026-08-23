@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
+import { bootstrapWorkspace, leaveOnboarding } from './fixtures/compose'
 
 /**
  * EVERY SECTION IN THE MENU OPENS, AND SAYS ITS OWN NAME.
@@ -110,6 +111,7 @@ test.describe('every section loads @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     const broken: string[] = []
     for (const [href, heading] of SECTIONS) {
@@ -141,6 +143,7 @@ test.describe('every section loads @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     const broken: string[] = []
     for (const [href, pattern] of BRAIN_TABS) {
@@ -160,6 +163,14 @@ test.describe('every section loads @smoke', () => {
     void signedIn
     // A moved feature must never become a 404. /brain/competitors rendered
     // <ComingSoon feature="Radar"> — it WAS Radar — and now redirects there.
+    //
+    // The workspace is bootstrapped FIRST, which this test did not used to need.
+    // Since wt-boot, an account with no workspace gets the first-run screen in
+    // place of any (app) page, so without one the redirect would land correctly
+    // on /radar and then be asserted against a screen that is deliberately not
+    // Radar. Giving it a workspace tests the stronger claim: the old URL reaches
+    // the real destination, not merely a non-404.
+    await bootstrapWorkspace(page)
     await page.goto('/brain/competitors')
     await page.waitForURL(/\/radar/, { timeout: 30_000 })
     await expect(page.getByRole('heading', { name: 'Radar', level: 1 })).toBeVisible()

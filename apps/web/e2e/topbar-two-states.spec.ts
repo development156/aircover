@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 import type { Page } from '@playwright/test'
 
 /**
@@ -90,6 +91,7 @@ test.describe('topbar at every width, both account states @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
+    await leaveOnboarding(page)
     const after = await sweep(page, 'STATE B · workspace present')
 
     for (const width of WIDTHS) {

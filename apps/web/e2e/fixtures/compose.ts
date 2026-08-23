@@ -33,6 +33,35 @@ export async function bootstrapWorkspace(page: Page): Promise<void> {
     .getByRole('button', { name: /create workspace/i })
     .click()
   await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
+  await leaveOnboarding(page)
+}
+
+/**
+ * PRESS THE BUTTON A REAL PERSON WOULD PRESS TO GET OUT OF THE FLOW.
+ *
+ * ── WHY EVERY SPEC THAT MAKES A WORKSPACE NOW NEEDS THIS ────────────────────
+ * `createWorkspace` redirects into /onboarding — it always has — and the
+ * landing rule added in wt-boot means an account with a workspace and no Brand
+ * Brain is sent back there when it next arrives at /home. So a spec that
+ * bootstrapped and then jumped to /home by URL now finds the onboarding intro,
+ * and every selector after that fails naming a control that is on a screen the
+ * test is not on.
+ *
+ * That is not the rule being wrong. It is the SPEC doing something a customer
+ * cannot: /onboarding has no navigation, so the only ways off it are finishing
+ * the flow or pressing this button. Jumping to /home by URL was always a
+ * transition with no user behind it; it simply used to work.
+ *
+ * So the fixture presses the button. `I'll do this later` calls `saveExit`,
+ * which sets the session cookie the rule stands down for — one click, no
+ * database write, and the same state a real person reaches by the same means.
+ *
+ * The apostrophe is CURLY in the markup (`I&rsquo;ll`), so the name is matched
+ * on the half that carries no punctuation at all.
+ */
+export async function leaveOnboarding(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /do this later/i }).click()
+  await page.waitForURL(/\/home/, { timeout: 60_000 })
 }
 
 /**

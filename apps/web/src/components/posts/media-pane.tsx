@@ -175,11 +175,19 @@ export function MediaPane({
             <ImageOff size={17} strokeWidth={1.7} aria-hidden />
           </span>
           <p className="text-[13px] font-semibold text-ink">No media on this post</p>
-          <p className="mt-1 text-[12.5px] text-muted">
+          {/* ONE sentence, and it is the one that is true right now.
+              "Sahoda checks every file against each channel before you publish"
+              stood here too — a promise about a file that does not exist, on the
+              card whose whole job is saying none does. `MediaAttach` directly
+              below already carries the terms of attaching ("Images only, up to
+              5 MB. Attaching spends no credits."), which is where a claim about
+              files belongs. docs/37 15: one absence gets one statement.
+
+              This line stays because it is NOT about a future file — it warns
+              that the channel rules bite on a text-only post too, which is the
+              thing a reader looking at an empty media card would assume wrong. */}
+          <p className="mt-1 type-meta text-muted">
             Channel limits still apply to text-only posts.
-          </p>
-          <p className="mt-2 text-[12px] text-muted">
-            Sahoda checks every file against each channel before you publish.
           </p>
         </div>
       ) : (
@@ -210,9 +218,24 @@ export function MediaPane({
           costs nothing; generating one is the paid alternative. */}
       <GenerateImage postId={postId} />
 
-      <InlineNote>
-        A photo added from your library stays in it. Removing it here takes it off this post only.
-      </InlineNote>
+      {/* ── BOTH OF THESE ARE ABOUT A PHOTO, SO THEY WAIT FOR ONE ─────────────
+          MEASURED on this lane's baseline frame at 1440: with no media attached
+          the writing column carried SIX blocks of explanation about media, on a
+          post that had none — the founder's "five cards explaining an absence
+          the page could state once", inside the one column where the writing
+          happens.
+
+          Neither claim is softened and neither is deleted. "Removing it here
+          takes it off this post only" is a statement about removing a photo,
+          and "there is nowhere to write alt text" is a statement about an image
+          that would carry some. On an empty post they describe nothing that is
+          on the screen; the moment a file lands they are exactly right, and
+          that is when they appear. */}
+      {media.length === 0 ? null : (
+        <InlineNote>
+          A photo added from your library stays in it. Removing it here takes it off this post only.
+        </InlineNote>
+      )}
 
       {/* ── ALT TEXT, NAMED WHERE IT WOULD BE ────────────────────────────────
           Zernio DOES carry it: `MediaItem.altText` reaches Instagram feed
@@ -220,10 +243,12 @@ export function MediaPane({
           adapter already forwards it. What is missing is a way to write one —
           `post_media.alt` exists and nothing fills it — and any AI that could
           suggest one would need a mesh task that is not in the frozen list. */}
-      <InlineNote>
-        Alt text is not built yet. Sahoda can send it to every channel that accepts one, but there
-        is nowhere to write it and no AI task that can describe a picture for you.
-      </InlineNote>
+      {media.length === 0 ? null : (
+        <InlineNote>
+          Alt text is not built yet. Sahoda can send it to every channel that accepts one, but there
+          is nowhere to write it and no AI task that can describe a picture for you.
+        </InlineNote>
+      )}
     </section>
   )
 }

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 import { ROUTES } from './helpers/ux-routes'
 import { framesTaken, shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
 
@@ -27,6 +28,7 @@ async function bootstrap(page: Page): Promise<void> {
     await create.waitFor({ state: 'visible', timeout: 10_000 })
     await create.click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
   } catch {
     // Already has one, or the offer is missing. Either way the sweep continues
     // and the /home frame records which it was.

@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs'
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 
 /**
  * SOLID AND HATCHED STAY APART WITH THE COLOUR REMOVED.
@@ -52,6 +53,7 @@ test.describe('Radar certainty survives greyscale', () => {
       if (await create.count()) {
         await create.click()
         await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
+        await leaveOnboarding(page)
       }
 
       await page.goto('/radar')

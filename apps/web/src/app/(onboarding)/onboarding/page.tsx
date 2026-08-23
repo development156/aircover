@@ -1,7 +1,9 @@
 import { creditCost } from '@sahoda/shared'
 
 import { OnboardingStage } from '@/components/onboarding/stage/onboarding-stage'
+import { SignOutLink } from '@/components/onboarding/sign-out-link'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
+import { readBootVideoSeen } from '@/lib/onboarding/boot-video-seen'
 import { activeBrandMemory } from '@/lib/onboarding/read-brain'
 import { getActiveWorkspace } from '@/lib/workspaces'
 
@@ -35,8 +37,13 @@ export default async function OnboardingPage() {
             Your Brand Brain belongs to a workspace, so there has to be one to put it in. This takes
             a second and costs nothing.
           </p>
-          <div className="mt-5">
+          {/* Two things, and only one of them is an action. See `SignOutLink`:
+              the landing rule makes this the ONLY screen a workspace-less
+              account can reach, and the app's sign-out lives in a topbar that
+              is not rendered here. */}
+          <div className="mt-5 flex items-center gap-5">
             <CreateWorkspaceButton variant="primary" />
+            <SignOutLink />
           </div>
         </div>
       </div>
@@ -46,7 +53,13 @@ export default async function OnboardingPage() {
   // Workspace-scoped, and read ONCE. `isFirstResolve` asking again would be a
   // second query that can disagree with this one — leaving the screen offering
   // a free build the server is about to charge for, or the reverse.
-  const saved = await activeBrandMemory(workspace.id)
+  //
+  // The boot flag is per PERSON and the brain is per WORKSPACE, so they are two
+  // reads and not one — but they are the same wait.
+  const [saved, bootSeen] = await Promise.all([
+    activeBrandMemory(workspace.id),
+    readBootVideoSeen(),
+  ])
 
   return (
     <OnboardingStage
@@ -55,6 +68,16 @@ export default async function OnboardingPage() {
       isFree={saved === null}
       cost={creditCost('brand_research')}
       hasSavedBrain={saved !== null}
+      /**
+       * `unknown` COUNTS AS SEEN, and that is a decision rather than a default.
+       *
+       * The film cannot be skipped. Playing it at somebody who has already sat
+       * through it, because one query failed, is a worse thing to do to them
+       * than never showing it — a customer who misses a brand animation has lost
+       * nothing they can name, and one who is made to watch it twice with no way
+       * out has been trapped by our error.
+       */
+      hasSeenBootVideo={bootSeen !== 'not-seen'}
     />
   )
 }

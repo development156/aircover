@@ -30,7 +30,14 @@ export default defineConfig({
         test: {
           name: 'lib',
           environment: 'node',
-          include: ['src/**/*.test.ts'],
+          // `e2e/helpers/**` is here so a MEASURING INSTRUMENT used by the
+          // browser suite is calibrated by the ordinary gate rather than by
+          // whoever remembers to run it. `accent.ts` returns the number a lane
+          // quotes as its before-and-after, and 0.000% is exactly what a
+          // successful fix looks like — so a meter that silently reads zero
+          // would certify every screen it could not decode. Playwright's own
+          // files are `*.spec.ts` and are not matched by this glob.
+          include: ['src/**/*.test.ts', 'e2e/helpers/**/*.test.ts'],
           // `*.live.test.ts` spends real money (Firecrawl credits, provider
           // tokens) and needs keys CI does not have. Without this exclusion the
           // glob above would sweep them into `turbo test`. Run them with

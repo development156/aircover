@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync } from 'node:fs'
 
 import { adminClient, expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 
 /**
  * The camera for `/brain/audience`, and for the three states it can be put into.
@@ -57,6 +58,7 @@ test.describe('audience camera', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
+    await leaveOnboarding(page)
 
     const admin = adminClient()
     if (!admin) throw new Error('the audience camera needs SUPABASE_SERVICE_ROLE_KEY')

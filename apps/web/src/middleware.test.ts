@@ -79,6 +79,35 @@ const PUBLIC_PATTERNS = [
 ]
 
 /**
+ * STATIC MEDIA THE MATCHER MUST ALSO SKIP — a different category from the list
+ * below, with a different invariant, which is why it is a different list.
+ *
+ * ── THE HOLE THIS CLOSES ─────────────────────────────────────────────────────
+ * MEASURED 2026-08-24 against `next start`: `/sahodaboot-poster.jpg` answered
+ * 200 to an unauthenticated request and `/sahodaboot.mp4` answered **404**. The
+ * boot animation is 2.7 MB of brand asset and no extension on the matcher
+ * covered video, so every play paid Clerk's request-state computation —
+ * including the `Authorization`-header parse that the bypass block exists to
+ * keep off static paths — while its own poster frame did not. It worked only
+ * because the one person who fetches it has just signed in.
+ *
+ * ── WHY NOT ON `CLERK_BYPASS_PATHS` ─────────────────────────────────────────
+ * That list carries three rules — exact `$`-anchored path, authenticates itself
+ * in its first statement, returns JSON — and asserts every member is ALSO on
+ * `isPublicRoute` so reverting the matcher cannot silently start redirecting it.
+ * A file in `public/` satisfies none of them and needs none of them: there is
+ * nothing to authenticate, nothing to return, and Next serves it from disk
+ * whatever `isPublicRoute` says. Putting it there would have meant loosening a
+ * rule that is doing its job.
+ */
+const STATIC_MEDIA_PATHS = [
+  '/sahodaboot.mp4',
+  // The sibling extension, so a WebM added later is covered on the day it lands
+  // rather than on the day somebody notices.
+  '/anything.webm',
+]
+
+/**
  * Paths `config.matcher` must NOT match, so clerkMiddleware never runs on them.
  *
  * Being on `isPublicRoute` is not the same thing: a "public" route still executes
@@ -258,6 +287,13 @@ describe('middleware routing contract', () => {
 
     it.each(CLERK_BYPASS_PATHS)(
       '%s is not matched, so clerkMiddleware never runs',
+      async (path) => {
+        expect(matchesAny(await matcherPatterns(), path)).toBe(false)
+      },
+    )
+
+    it.each(STATIC_MEDIA_PATHS)(
+      '%s is not matched, so a static file never pays for Clerk',
       async (path) => {
         expect(matchesAny(await matcherPatterns(), path)).toBe(false)
       },

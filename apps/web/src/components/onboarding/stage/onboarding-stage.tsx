@@ -4,19 +4,24 @@ import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { deferOnboarding } from '@/app/actions/onboarding-defer'
 import { ThemeToggle } from '@/components/shell/theme-toggle'
 import { creditWord } from '@/lib/credit-words'
 
+import { BootVideo } from './boot-video'
 import { doorColors, doorText, type DoorOutcome } from './door-outcome'
 import { OrbColumn } from './orb-column'
+import { useBootVideo } from './use-boot-video'
 import { ProcessingOverlay } from './processing-overlay'
 import { ProgressBar } from './progress-bar'
 import { readSite } from './read-site'
 import { useBuild } from './use-build'
 import { useOrb } from './use-orb'
+import { useStepHistory } from './use-step-history'
 import {
   canAdvance,
   clearState,
+  isStepId,
   DEFAULT_COLORS,
   DEFAULT_DATA,
   energyOf,
@@ -38,6 +43,14 @@ import { RivalsStep } from './steps/rivals-step'
 import { VisualStep } from './steps/visual-step'
 import { WhatStep } from './steps/what-step'
 
+/**
+ * Never given a history entry. The brain behind the result was built and paid
+ * for in this session, so an entry pointing at it would let Back return to a
+ * screen whose work has already been consumed — the same reason `loadState`
+ * refuses to resume there.
+ */
+const RESULT_ONLY: readonly StepId[] = ['result']
+
 export interface OnboardingStageProps {
   workspaceId: string
   workspaceName: string
@@ -46,6 +59,15 @@ export interface OnboardingStageProps {
   cost: number
   /** True when this workspace already has a Brand Brain — re-entry, not a first run. */
   hasSavedBrain: boolean
+  /**
+   * Server-decided: has this PERSON already been shown the boot animation?
+   *
+   * Read from `users_profile.prefs`, so it holds across a sign-out, a second
+   * device and a cleared browser — none of which localStorage survives. A read
+   * that FAILED arrives here as `true`, because showing a ten-second film twice
+   * to somebody who cannot skip it is the worse of the two mistakes.
+   */
+  hasSeenBootVideo: boolean
 }
 
 export function OnboardingStage({
@@ -54,6 +76,7 @@ export function OnboardingStage({
   isFree,
   cost,
   hasSavedBrain,
+  hasSeenBootVideo,
 }: OnboardingStageProps) {
   const router = useRouter()
 
@@ -111,6 +134,46 @@ export function OnboardingStage({
     const i = ORDER.indexOf(step)
     if (i > 0) go(ORDER[i - 1]!, -1)
   }, [go, step])
+
+  /**
+   * The browser's Back button means "the previous question".
+   *
+   * Nine screens live behind one URL and none of them used to push a history
+   * entry, so Back left the flow entirely — on the screens every customer meets
+   * first. The typed answers already survived that (the store writes on every
+   * move) but surviving a wrong exit is not the same as not being thrown out.
+   *
+   * `onPop` calls `setStep` directly rather than `go`: `go` also sets the
+   * transition DIRECTION, and it is set here from the ORDER positions so a pop
+   * animates backwards when it went backwards and forwards on a Forward press —
+   * which is the half a `dir: -1` constant would get wrong.
+   */
+  useStepHistory<StepId>({
+    step,
+    isStep: isStepId,
+    skip: RESULT_ONLY,
+    onPop: (id) => {
+      /**
+       * NOT DURING THE FILM. This is the fourth way out of a screen whose
+       * ruling is that there is no way out, and the only one that arrives from
+       * the browser rather than from the page.
+       *
+       * Popping while the boot animation runs takes `step` off `result`, which
+       * UNMOUNTS the video — so no `ended` ever fires, the start deadline was
+       * long since disarmed by `playing`, and the progress watchdog reads a
+       * null ref and returns. Nothing finishes, nothing navigates, and the
+       * customer is left on the rivals step with a saved Brand Brain and no
+       * route forward but pressing Build again.
+       *
+       * A skip control that also strands them. `exiting` is the same ref the
+       * keyboard handler reads and it is set in the click's own call stack, so
+       * there is no window where a pop can slip through.
+       */
+      if (exiting.current) return
+      setDir(ORDER.indexOf(id) < ORDER.indexOf(step) ? -1 : 1)
+      setStep(id)
+    },
+  })
 
   /**
    * The website read runs in the BACKGROUND from the moment they leave step 01.
@@ -172,32 +235,149 @@ export function OnboardingStage({
 
   /* ───────────────────────────────────────────────── save and exit / end ── */
 
+  /**
+   * `Save & exit` — and the server call in front of it is not decoration.
+   *
+   * `(app)/layout.tsx` now sends an account with no Brand Brain to /onboarding
+   * on arrival. Pushing /home from here without telling it would be bounced
+   * straight back, and wt-onboard2's button would be gone while every test of
+   * it still passed. `deferOnboarding` sets the session cookie that stands the
+   * gate down for this visit.
+   *
+   * The navigation does not wait on the result: the worst a failed cookie costs
+   * is one bounce back into a flow they can leave again, and blocking the
+   * button on a round trip would be the larger harm.
+   */
   const saveExit = useCallback(() => {
     saveState(workspaceId, { step, data })
-    router.push('/home')
+    void deferOnboarding().finally(() => router.push('/home'))
   }, [data, router, step, workspaceId])
 
   const [launching, setLaunching] = useState(false)
 
+  /* ────────────────────────────────────────────────── the boot animation ── */
+
+  /**
+   * Where the film is going. Held in a ref because BOTH halves of the exit are
+   * asynchronous and they finish in either order: the save may land before the
+   * ten seconds are up, or after. A destination in state would be read by
+   * whichever of them fires first, from a render that may not have happened.
+   */
+  const destination = useRef<'home' | 'brain'>('home')
+  const saveSettled = useRef(false)
+  const videoSettled = useRef(false)
+
+  /**
+   * THE KEYBOARD LOCK, and it is a ref for a reason a test found.
+   *
+   * `launching` and `boot.phase` are both React state, so they are true only
+   * after a render. A key pressed in the same tick as the click — a held Enter
+   * repeats faster than React commits — would be read against the PREVIOUS
+   * values and let Escape through, and Escape calls `saveExit`, which navigates.
+   * That is a skip control, arriving by accident, on a screen whose entire
+   * ruling is that there is not one.
+   *
+   * A ref is set in the click's own call stack, so there is no window at all.
+   * Same argument as `inFlight` in `use-build.ts`; `launching` remains the
+   * render mirror and is never the guard.
+   */
+  const exiting = useRef(false)
+
+  const leave = useCallback(() => {
+    clearState(workspaceId)
+    router.push(destination.current === 'brain' ? '/brain' : '/home')
+  }, [router, workspaceId])
+
+  /**
+   * Both halves have to be in before anyone moves.
+   *
+   * The film covers the save and the prefetch rather than being stacked on top
+   * of them — that is what makes the end of it a fade into a dashboard that is
+   * already built, instead of ten seconds followed by a second wait.
+   */
+  const leaveIfBothDone = useCallback(() => {
+    if (saveSettled.current && videoSettled.current) leave()
+  }, [leave])
+
+  const boot = useBootVideo({
+    onFinished: () => {
+      videoSettled.current = true
+      leaveIfBothDone()
+    },
+  })
+
+  /**
+   * Does the film run at all? Three ways it does not, and only one of them is
+   * about this browser's abilities.
+   *
+   *  · `hasSeenBootVideo` — they have watched it. Once means once.
+   *  · `prefers-reduced-motion` — an accessibility setting, and a ten-second
+   *    unstoppable animation is precisely what it is set to prevent. Not a
+   *    preference to weigh against a brand moment.
+   *  · the file is absent — handled by the watchdogs rather than here, because
+   *    a client cannot know that before it asks.
+   */
+  const playsBootVideo = !hasSeenBootVideo && !reduced.current
+
   const enterSahoda = useCallback(
     (then: 'home' | 'brain') => {
+      destination.current = then
+      saveSettled.current = false
+      videoSettled.current = false
+      // Before `play()`, so no keystroke can reach `saveExit` between the click
+      // and React's next render.
+      exiting.current = true
+
+      /**
+       * THE FILM STARTS FIRST, AND NOTHING IS AWAITED IN FRONT OF IT.
+       *
+       * This is the only line in the flow where the audio permission exists.
+       * `build.finish` below is a round trip; putting it first would spend the
+       * click's gesture and the ten seconds would play silently. See
+       * `use-boot-video.ts`.
+       */
+      if (playsBootVideo) boot.start()
+
       void build.finish(async (ok) => {
-        if (!ok) return
-        if (reduced.current) {
-          router.push(then === 'brain' ? '/brain' : '/home')
+        if (!ok) {
+          /**
+           * The save failed, so there is no dashboard to go to. Take the film
+           * back off the card rather than playing a celebration over an error
+           * the customer now has to read and act on. `abort` deliberately does
+           * not navigate.
+           */
+          if (playsBootVideo) boot.abort()
+          setLaunching(false)
+          // The screen is theirs again — the error has to be readable and the
+          // button pressable, which means the lock has to come off with it.
+          exiting.current = false
           return
         }
-        // Six beats. The wash scales out from the card's centre so the app is
-        // revealed THROUGH the Brand Brain rather than merely after it.
+
+        saveSettled.current = true
+
+        if (playsBootVideo) {
+          // The dashboard, built while the film runs. This is the half that
+          // makes the last frame a fade rather than a second load.
+          router.prefetch(then === 'brain' ? '/brain' : '/home')
+          leaveIfBothDone()
+          return
+        }
+
+        // ── NO FILM ─────────────────────────────────────────────────────────
+        // Reduced motion goes straight through, as it always did.
+        if (reduced.current) {
+          leave()
+          return
+        }
+        // And a returning brain-builder keeps the original six-beat wash: the
+        // orb dissolves and the app is revealed THROUGH the Brand Brain.
         setLaunching(true)
         orb.current?.setMode('dissolve')
-        window.setTimeout(() => {
-          clearState(workspaceId)
-          router.push(then === 'brain' ? '/brain' : '/home')
-        }, 620)
+        window.setTimeout(leave, 620)
       })
     },
-    [build, orb, router, workspaceId],
+    [boot, build, leave, leaveIfBothDone, orb, playsBootVideo, router],
   )
 
   /* ──────────────────────────────────────────────────────────── keyboard ── */
@@ -209,7 +389,13 @@ export function OnboardingStage({
       // `build.busy`, not just `build.processing`: the failure arms leave
       // `processing` true so the overlay can offer Retry, and `processing` only
       // becomes true after a render — a held Enter repeats faster than that.
-      if (build.processing || build.busy || launching) return
+      //
+      // `exiting.current` is FIRST and is the one that matters during the boot
+      // animation: it is set in the click's own call stack, so Escape, Enter and
+      // every other key are dead from the instant the film is asked to play
+      // rather than from the next render. There is no skip control on this
+      // screen and the keyboard is half of what that means.
+      if (exiting.current || build.processing || build.busy || launching) return
       if (e.key === 'Escape') {
         saveExit()
         return
@@ -388,9 +574,45 @@ export function OnboardingStage({
 
       <div className={`wash ${launching ? 'go' : ''}`} id="wash" aria-hidden="true" />
 
+      {/* MOUNTED AT THE RESULT STEP, NOT BEFORE AND NOT ON DEMAND.
+          `preload="auto"` here pulls 2.7 MB, which is the right trade one screen
+          from the end and the wrong one behind a customer still typing their
+          brand name. And it must exist BEFORE the click: `play()` has to run in
+          that click's own call stack to keep the audio permission, and an
+          element created in the same tick has nothing to play. */}
+      {/* `boot.phase === 'playing'` is the second half of the Back guard above,
+          and it is deliberately belt AND braces. `onPop` stops the pop this app
+          knows about; this stops the element being destroyed by ANY step change
+          while frames are moving — a future control, a hot reload, a pop that
+          arrived by a route nobody has thought of. Unmounting a running film is
+          the one failure mode with no watchdog behind it, because every watchdog
+          reads the element that just went away. */}
+      {(step === 'result' || boot.phase === 'playing') && playsBootVideo ? (
+        <BootVideo
+          videoRef={boot.videoRef}
+          active={boot.phase === 'playing'}
+          onPlaying={boot.onPlaying}
+          onEnded={boot.onEnded}
+          onError={boot.onError}
+        />
+      ) : null}
+
       {/* Read by the resolve. Kept out of the visible tree but in the DOM so the
           e2e walk can assert what the flow is actually holding. */}
-      <span hidden data-onb-signals={signalCount(data)} data-onb-door={door.kind} />
+      {/* `data-boot-*` is how a run reports WHICH branch the audio took. A
+          headless browser has no audio sink, so "sound was heard" is not a
+          measurable claim — "the unmuted path ran and the muted fallback did
+          not" is, and it is the honest one. `data-boot-end` names which of the
+          four endings fired: ended, start-timeout, stalled or error. */}
+      <span
+        hidden
+        data-onb-signals={signalCount(data)}
+        data-onb-door={door.kind}
+        data-boot-plays={playsBootVideo ? 'yes' : 'no'}
+        data-boot-phase={boot.phase}
+        data-boot-audio={boot.audioPath}
+        data-boot-end={boot.endReason ?? ''}
+      />
     </div>
   )
 }

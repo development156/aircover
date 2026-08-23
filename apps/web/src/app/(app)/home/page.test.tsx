@@ -10,6 +10,9 @@ import { readBalance, readLedger } from '@/lib/wallet/read'
 import { readBrain } from '@/lib/brand/read-brain'
 import { listConnections } from '@/lib/connections/read'
 
+import { hasDeferredOnboarding } from '@/lib/onboarding/defer'
+import { onboardingStateRead } from '@/lib/onboarding/read-onboarding-state'
+
 import HomePage from './page'
 
 /**
@@ -47,12 +50,39 @@ vi.mock('@/lib/connections/read', () => ({ listConnections: vi.fn() }))
 
 // Reached through CreateWorkspaceButton, which is a `'use server'` import away.
 vi.mock('@/app/actions/workspace', () => ({ createWorkspace: vi.fn() }))
+
+/**
+ * THE LANDING RULE'S TWO READS.
+ *
+ * `hasDeferredOnboarding` reaches `cookies()`, which throws outside a request
+ * scope, so without these every test in this file fails on that rather than on
+ * anything it asserts. They are also the seam the wiring tests below drive: the
+ * DECISION is pinned pure in `lib/onboarding/landing.test.ts`; what is pinned
+ * here is that this page acts on it.
+ */
+vi.mock('@/lib/onboarding/defer', () => ({
+  ONBOARDING_DEFER_COOKIE: 'sahoda_onb_defer',
+  hasDeferredOnboarding: vi.fn(),
+}))
+vi.mock('@/lib/onboarding/read-onboarding-state', () => ({ onboardingStateRead: vi.fn() }))
 // The greeting banner carries the page's primary action. CreatePostButton is
 // now a plain <Link> to the create flow — it no longer writes a draft before
 // asking anything, so it needs neither the router nor the action. Both mocks
 // are kept because OTHER components on this page still reach for them, and
 // removing them here would only move the failure.
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  /**
+   * THROWS, exactly as Next's own does.
+   *
+   * A `redirect` mocked as a silent spy would let the whole page go on and
+   * render underneath the assertion — so a test could report "it redirected"
+   * about a page that had also drawn the dashboard it was supposed to replace.
+   */
+  redirect: vi.fn((to: string) => {
+    throw new Error(`NEXT_REDIRECT:${to}`)
+  }),
+}))
 vi.mock('@/app/actions/posts', () => ({ createPost: vi.fn() }))
 
 const balanceRead = vi.mocked(readBalance)
@@ -91,6 +121,10 @@ const EMPTY_PUBLISH = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // The default is a finished account, which is what every assertion in this
+  // file below the landing block is about. The landing block sets its own.
+  vi.mocked(hasDeferredOnboarding).mockResolvedValue(false)
+  vi.mocked(onboardingStateRead).mockResolvedValue({ status: 'completed' })
   vi.mocked(listPosts).mockResolvedValue([])
   vi.mocked(listVariantStates).mockResolvedValue(new Map())
   // The rail's two reads. `no-brain` and `null` are the honest defaults for a
@@ -125,6 +159,9 @@ beforeEach(() => {
 describe('Home for a user with no workspace yet', () => {
   beforeEach(() => {
     balanceRead.mockResolvedValue({ status: 'no-workspace' })
+    // Not a redirect: there is no workspace-less URL to send them to, so the
+    // first-run screen is rendered where they stand. See `landing.ts`.
+    vi.mocked(onboardingStateRead).mockResolvedValue({ status: 'no-workspace' })
   })
 
   test('offers the one action that ends the first run', async () => {
@@ -273,5 +310,66 @@ describe('Home for a workspace that exists', () => {
     // they already have is the same lie pointing the other way.
     expect(screen.queryByRole('button', { name: /create workspace/i })).not.toBeInTheDocument()
     expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
+  })
+})
+
+/**
+ * THE LANDING RULE, WIRED.
+ *
+ * `lib/onboarding/landing.test.ts` proves the decision. These prove this page
+ * asks for it and obeys the answer — the half a pure test cannot reach, and the
+ * half that would silently stop working if someone deleted one line here.
+ */
+describe('the landing rule on the page that lands', () => {
+  beforeEach(() => {
+    balanceRead.mockResolvedValue({
+      status: 'ok',
+      balance: { total: 100, held: 0, available: 100, hasHold: false, heldNote: null },
+    })
+  })
+
+  test('an account that has never onboarded is sent into the flow', async () => {
+    vi.mocked(onboardingStateRead).mockResolvedValue({ status: 'not-started' })
+
+    await expect(HomePage()).rejects.toThrow('NEXT_REDIRECT:/onboarding')
+  })
+
+  test('and nothing of the dashboard is rendered on the way', async () => {
+    vi.mocked(onboardingStateRead).mockResolvedValue({ status: 'not-started' })
+
+    await expect(HomePage()).rejects.toThrow()
+    // `redirect` throws, so the JSX below it is never reached. If it were a
+    // silent spy this would be a dashboard drawn under a passing assertion.
+    expect(screen.queryByText(/available credits/i)).not.toBeInTheDocument()
+  })
+
+  test('a finished account gets the dashboard', async () => {
+    vi.mocked(onboardingStateRead).mockResolvedValue({ status: 'completed' })
+
+    render(await HomePage())
+
+    expect(screen.getByText(/available credits/i)).toBeInTheDocument()
+  })
+
+  /**
+   * THE ONE THAT MUST NOT MOVE ANYBODY. A failed read is not a fact about the
+   * account, and a customer who finished onboarding weeks ago must not be walked
+   * back to its first screen because one query timed out.
+   */
+  test('a read that FAILED leaves them on the dashboard', async () => {
+    vi.mocked(onboardingStateRead).mockResolvedValue({ status: 'unreadable' })
+
+    render(await HomePage())
+
+    expect(screen.getByText(/available credits/i)).toBeInTheDocument()
+  })
+
+  test('Save & exit is honoured — a deferred visit is not bounced', async () => {
+    vi.mocked(onboardingStateRead).mockResolvedValue({ status: 'not-started' })
+    vi.mocked(hasDeferredOnboarding).mockResolvedValue(true)
+
+    render(await HomePage())
+
+    expect(screen.getByText(/available credits/i)).toBeInTheDocument()
   })
 })

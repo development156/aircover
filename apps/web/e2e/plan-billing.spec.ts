@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 
 /**
  * The plan & billing screen, READ AS TEXT.
@@ -31,6 +32,7 @@ test.describe('plan & billing @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
+    await leaveOnboarding(page)
 
     await page.goto('/settings/plan')
     await page.waitForLoadState('networkidle')
@@ -131,6 +133,7 @@ test.describe('plan & billing @smoke', () => {
       .getByRole('button', { name: /create workspace/i })
       .click()
     await page.waitForURL(/\/onboarding/, { timeout: 60_000 })
+    await leaveOnboarding(page)
 
     await page.goto('/settings/plan')
     await page.waitForLoadState('networkidle')

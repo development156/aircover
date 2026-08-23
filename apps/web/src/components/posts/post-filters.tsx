@@ -81,21 +81,27 @@ export function PostFilters({
             className={cn(
               'inline-flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-[12.5px] font-[550] transition-micro max-narrow:min-h-[44px]',
               selected
-                ? // A brand FILL with INK on it — docs/26 §1.2. Never white on
-                  // orange (2.94:1) and never orange text on a light surface.
+                ? // ── AN INK FILL, NOT A BRAND FILL, AND THAT IS THE RATION ──
+                  // This was `bg-primary text-primary-foreground`: a correct,
+                  // accessible pair (black on orange, 7.15:1) that was
+                  // nonetheless the SECOND solid brand fill on a screen that
+                  // already has "Create post". docs/37 §2.3 allows exactly one
+                  // per view, and a filter is navigation rather than the action
+                  // the page exists for — so the one is the action.
                   //
-                  // `text-primary-foreground`, NOT `text-primary-fg`. The first
-                  // draft wrote the short name and it does not exist: the theme
-                  // maps --color-primary-foreground: var(--pfg). An unknown
-                  // utility is not an error — Tailwind emits nothing and the
-                  // label inherits its colour, which on a brand fill is white on
-                  // orange at 2.94:1, the one pair §1.2 forbids by name.
+                  // `ChannelPicker` reached the same conclusion independently
+                  // and wrote it down: "an orange selected state paints up to
+                  // four oranges on one screen". Matching its treatment exactly
+                  // means the two selectable-pill controls in this product read
+                  // as siblings, which is the other half of what a system is
+                  // for. A third invented treatment would not be.
                   //
-                  // Caught by grepping the COMPILED CSS: `text-primary-fg` -> 0
-                  // occurrences, `bg-primary` -> 4. Same silent-class failure as
-                  // the `sm:` breakpoint two commits ago, in code written by the
-                  // session that found it.
-                  'bg-primary text-primary-foreground'
+                  // The pair still carries its own contrast in both themes:
+                  // --ink is #000 in light and #fff in dark, so the foreground
+                  // is stated for each rather than inherited (§10 — pairing
+                  // --ink with a fill that does not follow the theme is the most
+                  // common way a dark-mode bug ships).
+                  'bg-ink text-white dark:bg-white dark:text-[var(--canvas)]'
                 : 'text-muted hover:bg-s2 hover:text-ink',
             )}
           >

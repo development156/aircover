@@ -1,10 +1,49 @@
 import { Toaster } from 'sonner'
 
+import { hasDeferredOnboarding } from '@/lib/onboarding/defer'
+import { landingDecision } from '@/lib/onboarding/landing'
+import { onboardingStateRead } from '@/lib/onboarding/read-onboarding-state'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
+import { FirstRun } from '@/components/home/first-run'
 import { BottomNav } from '@/components/shell/bottom-nav'
 import { Rail } from '@/components/shell/rail'
 import { Topbar } from '@/components/shell/topbar'
+
+/**
+ * NO WORKSPACE — THE FIRST-RUN SCREEN, EVERYWHERE, IN PLACE OF THE PAGE.
+ *
+ * ── THE DEAD END THIS CLOSES ─────────────────────────────────────────────────
+ * Every read on every route under `(app)` short-circuits on a null workspace, so
+ * what these pages render for such an account is a grid of empty cards offering
+ * remedies it cannot carry out. A peer found the sharp version: /analytics told
+ * a workspace-less account to connect a channel. /home and /wallet had each
+ * already fixed their own copy of this; fixing the rest one page at a time is
+ * how the next new route inherits it.
+ *
+ * ── WHY REPLACE AND NOT REDIRECT ─────────────────────────────────────────────
+ * There is no workspace-less URL to send them to — /home is inside this same
+ * layout, so a redirect to it loops unless the layout also knows the current
+ * path, which a server layout does not. Replacing the content is also strictly
+ * MORE certain: it covers every route in the group including ones not written
+ * yet, at whatever URL was typed. See `lib/onboarding/landing.ts`.
+ *
+ * The shell stays around it, and that is the other half of not being a dead
+ * end: the topbar's user menu is where signing out lives.
+ *
+ * ── WHAT IS NOT HERE ─────────────────────────────────────────────────────────
+ * The other half of the ruling — a new user LANDS in onboarding — is in
+ * `home/page.tsx`, because /home is where landing happens: Clerk returns to `/`
+ * after sign-in and `/` redirects there. Putting it in this layout would bounce
+ * every typed URL and every refresh, which is more than the ruling asks and is
+ * not what "lands" means.
+ */
+async function decideLanding(): Promise<'through' | 'first-run'> {
+  const [deferred, state] = await Promise.all([hasDeferredOnboarding(), onboardingStateRead()])
+  // The decision is `lib/onboarding/landing.ts` — pure, so every one of its
+  // eight combinations is executed by a test rather than only by a browser.
+  return landingDecision(state.status, deferred).kind === 'first-run' ? 'first-run' : 'through'
+}
 
 /**
  * The app shell, in two mutually exclusive forms (SPECIFICATION.md §10).
@@ -23,6 +62,8 @@ import { Topbar } from '@/components/shell/topbar'
  * control, the one at the end of the list, on exactly one device.
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const landing = await decideLanding()
+
   /**
    * Only the phone's FAB needs this, and only to decide whether to paint the
    * loudest control on a 390px screen.
@@ -54,7 +95,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           id="main"
           className="mx-auto w-full max-w-content p-page max-narrow:p-page-mobile max-narrow:pb-[76px]"
         >
-          {children}
+          {/* THE PAGE IS REPLACED, NOT DEGRADED. An account with no workspace
+              has nothing any of these routes can read — every one of them
+              short-circuits on a null workspace — so what they would render is
+              a grid of empty cards with remedies that cannot be carried out.
+              `id="main"` stays on the wrapper, so the bootstrap button keeps
+              the one selector this app's tests and its skip link both use. */}
+          {landing === 'first-run' ? <FirstRun now={new Date()} /> : children}
         </main>
       </div>
       <BottomNav hasWorkspace={workspace.status !== 'none'} />

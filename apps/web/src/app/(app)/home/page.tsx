@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { creditCost } from '@sahoda/shared'
 
 import { AtAGlance } from '@/components/home/at-a-glance'
@@ -20,6 +21,9 @@ import { readInstagramAnalytics } from '@/lib/analytics/account-insights'
 import { readBrain } from '@/lib/brand/read-brain'
 import { listConnections } from '@/lib/connections/read'
 import { greetingFor, greetingState } from '@/lib/home/greeting'
+import { hasDeferredOnboarding } from '@/lib/onboarding/defer'
+import { landingDecision, type LandingDecision } from '@/lib/onboarding/landing'
+import { onboardingStateRead } from '@/lib/onboarding/read-onboarding-state'
 import { readPostCounts } from '@/lib/home/posts'
 import { readPublishSummary } from '@/lib/home/publishing'
 import { readSpend } from '@/lib/home/spend'
@@ -30,6 +34,40 @@ import { listPosts, listVariantStates } from '@/lib/posts/read'
 import { readBalance, readLedger } from '@/lib/wallet/read'
 
 export const metadata = { title: 'Home' }
+
+/**
+ * THE LANDING RULE — a new user lands in onboarding, not on the dashboard.
+ *
+ * ── WHY IT IS ON THIS PAGE AND NOT IN THE LAYOUT ─────────────────────────────
+ * /home IS the landing. Clerk returns to `/` after sign-in and `app/page.tsx`
+ * redirects here, so this is the first authenticated screen of every session.
+ * The `(app)` layout was the other candidate and asks a different question: it
+ * runs for every route in the group, so the rule would fire on a typed
+ * /posts/new and on every refresh of every page. That is a wall, and the ruling
+ * says "lands".
+ *
+ * ── THE THREE ANSWERS IT ACTS ON ─────────────────────────────────────────────
+ *   never onboarded  → /onboarding.
+ *   mid-way          → /onboarding, and the stage restores the step they left
+ *                      from localStorage on mount. The server cannot tell these
+ *                      two apart and does not need to: same URL, different
+ *                      screen, decided by the browser that holds the answer.
+ *   completed        → this page. Nothing offers the flow again.
+ *
+ * `unreadable` is deliberately not one of them: a failed read is not a fact
+ * about the account, and moving somebody on it would walk a customer who
+ * finished onboarding weeks ago back to its first screen. `no-workspace` is not
+ * one either — that account is answered by the layout, which replaces this page
+ * with the first-run screen rather than sending it anywhere.
+ *
+ * `Save & exit` sets a session cookie that stands this down for the visit, so
+ * the button wt-onboard2 built still arrives somewhere. It re-arms at the next
+ * sign-in, which is the ruling's "resumes at the step they left".
+ */
+async function landingFor(): Promise<LandingDecision> {
+  const [deferred, state] = await Promise.all([hasDeferredOnboarding(), onboardingStateRead()])
+  return landingDecision(state.status, deferred)
+}
 
 /**
  * Home.
@@ -93,6 +131,7 @@ export default async function HomePage() {
   // (the topbar ring, /connections), so this adds calls, not queries, and both
   // degrade to a named state rather than throwing.
   const [
+    landing,
     posts,
     spend,
     counts,
@@ -104,6 +143,24 @@ export default async function HomePage() {
     connections,
     knowledgeDocuments,
   ] = await Promise.all([
+    /**
+     * IN THE BATCH, NOT IN FRONT OF IT.
+     *
+     * The landing rule has to be decided before this page may render, and the
+     * obvious shape — `await landingFor()` on its own line — puts a whole round
+     * trip in front of the nine reads for EVERY returning customer, which is a
+     * waterfall `lib/perf/read-waterfall.test.ts` exists to refuse. Here it is
+     * one wait, not two.
+     *
+     * What it costs instead: an account that is about to be redirected runs
+     * these nine reads and throws them away. That is a new workspace with almost
+     * nothing in it, once, on the way into onboarding — the right side of the
+     * trade against a slower dashboard for everyone who has already finished.
+     *
+     * Both of its own reads are `cache()`d and the layout has already asked for
+     * them this render, so this is a shared promise rather than a second query.
+     */
+    landingFor(),
     listPosts(),
     readSpend(now),
     readPostCounts(),
@@ -126,6 +183,11 @@ export default async function HomePage() {
      */
     countIndexedDocuments(),
   ])
+
+  // THE RULING, ACTED ON. Everything above was read in parallel with the
+  // decision; nothing below this line renders for an account that belongs in
+  // onboarding. `redirect` throws, so it never falls through.
+  if (landing.kind === 'redirect') redirect(landing.to)
 
   // No workspace ⇒ no wallet, no posts, no credits, and nothing on this page can
   // be pressed to fix that. Every read above already short-circuits on a null

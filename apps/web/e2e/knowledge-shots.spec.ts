@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { adminClient, expect, test } from './fixtures/seeded-user'
+import { leaveOnboarding } from './fixtures/compose'
 import type { Page } from '@playwright/test'
 
 /**
@@ -109,6 +110,7 @@ test.describe('knowledge library — photographs', () => {
     await expect(create).toBeVisible({ timeout: 30_000 })
     await create.click()
     await page.waitForURL(/\/onboarding/, { timeout: 30_000 })
+    await leaveOnboarding(page)
 
     // ── The EMPTY state, photographed before anything exists ────────────────
     await page.goto('/brain/knowledge')
