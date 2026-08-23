@@ -79,7 +79,7 @@ export default async function ThreadPage({
         <SurfaceList
           title="Inbox"
           isEmpty={!listDecision.showList || siblings.length === 0}
-          emptyLine="Nothing else to show."
+          waitingLine="Other conversations from this account appear here."
         >
           {(listDecision.showList ? siblings : []).map((conversation) => (
             <SurfaceRow key={`${conversation.accountId}:${conversation.id}`}>

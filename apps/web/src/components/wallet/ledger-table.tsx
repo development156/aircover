@@ -40,11 +40,26 @@ function formatWhen(iso: string): string | null {
 }
 
 /**
- * Credit rows read green; debits stay ink (a normal charge is not an alarm);
- * neutral rows — HOLD and RELEASE — are muted because they never moved the total.
+ * ── TONE RECEDES A ROW. IT NEVER SAYS WHICH WAY THE MONEY WENT ───────────────
+ * This comment used to read "credit rows read green; debits stay ink", and it
+ * had been false since `--ok` was re-solved: MEASURED off `tokens.css`, `--ok`
+ * is `#000000` in light and `#ffffff` in dark — the same value as `--ink` in
+ * both. So `credit` and `debit` render byte-identically and always have; the
+ * comment was describing a green that no longer exists in this palette.
+ *
+ * That is not a bug to repair by reintroducing the colour. docs/37 §1 refuses
+ * green-up/red-down on purpose: direction is carried by the SIGN GLYPH on the
+ * amount (`+100`, `-3`), which survives greyscale, re-theming and colour
+ * blindness, and which `describeEntry` derives from `entry_type` and never from
+ * the stored magnitude — `credit_ledger` stores a debit POSITIVE, and a screen
+ * that read the sign off the amount once reported every spend as `+100`.
+ *
+ * What tone still does is push the two rows that never moved the total — HOLD
+ * and RELEASE — behind the ones that did. That is the only job left, so the map
+ * now says so rather than promising a colour it does not paint.
  */
 const AMOUNT_TONE: Record<Direction, string> = {
-  credit: 'text-ok',
+  credit: 'text-ink',
   debit: 'text-ink',
   neutral: 'text-muted',
 }
@@ -148,7 +163,7 @@ function EntryRow({
           // `.num` is the token-file class: mono + tabular-nums. Amounts are the
           // one column that must align down the page for the ledger to be
           // readable as a ledger.
-          'num text-right text-[14px] font-semibold',
+          'num text-right type-body font-semibold',
           AMOUNT_TONE[display.direction],
         )}
       >

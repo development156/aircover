@@ -47,17 +47,57 @@ export function ContextPane({
   return (
     <>
       <PaneHeader>
-        <h2 className="text-[14px] font-semibold tracking-[-0.01em]">Customer</h2>
+        <h2 className="type-h3">Customer</h2>
       </PaneHeader>
 
-      <PaneScroll>
+      <PaneScroll className="p-3">
         {/* The third of three empty states this screen used to say in three
             different visual languages. Quiet, like the list pane: the loud one
             is the thread pane, because that is the one carrying the reason the
             inbox is empty and the button that fixes it (docs/26 §4.1). */}
         {hasSomethingToOpen ? (
           <CardEmpty body="Open something from the list and what Sahoda knows about that person appears here." />
-        ) : null}
+        ) : (
+          /**
+           * ── A TITLED VOID IS NOT RESTRAINT ────────────────────────────────
+           * This branch rendered `null`, for a reason that was right as far as
+           * it went: "Open something from the list" is a remedy nobody can carry
+           * out when the list is provably empty, and it made this the THIRD pane
+           * announcing nothing.
+           *
+           * MEASURED at 1440 on a workspace with no connection: the result was a
+           * 292x740 column carrying the word "Customer" and not one other mark.
+           * A pane that makes a promise in its header and then delivers a void
+           * reads as a render that failed, and it was the largest single area of
+           * dead space in the product.
+           *
+           * The third option neither branch took: say what the pane is FOR. This
+           * sentence is in the future tense and its subject is Sahoda, so it is
+           * not an instruction that cannot be followed, not a claim that the
+           * workspace has nothing, and — the line this pane exists to hold — not
+           * a statement about a customer. "Orders 0 · Lifetime ₹0" is refused
+           * here for the same reason it always was.
+           *
+           * `type-meta text-muted`, top-aligned, not a `CardEmpty`: the weight
+           * is what stopped it competing, and the weight is kept.
+           *
+           * AND IT IS A DESCRIPTION, NOT AN INSTRUCTION. The first draft of this
+           * read "Open something from the list and what Sahoda knows about that
+           * person shows here", and `context-pane.test.tsx` refused it — rightly.
+           * An imperative is an instruction whatever tense follows it, and this
+           * branch runs precisely when the list is provably empty, so "open
+           * something from the list" is a remedy nobody can carry out. The test
+           * was NOT loosened to admit the sentence; the sentence changed.
+           *
+           * "a person", not "the sender": this same pane serves messages,
+           * comments AND reviews, and naming one of the three makes it wrong on
+           * the other two.
+           */
+          <p className="type-meta text-muted">
+            What Sahoda knows about a person appears in this column, once there is something here to
+            open.
+          </p>
+        )}
       </PaneScroll>
     </>
   )

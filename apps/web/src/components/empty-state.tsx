@@ -19,9 +19,23 @@ export function EmptyState({
   tip?: string
 }) {
   return (
-    // The kit's `.sl-state`: an inset hairline ring and NO shadow — a resting
-    // surface does not float. Padding is 40/20 (--s8/--s5).
-    <section className="surface-ring flex flex-col items-center gap-2 rounded-card bg-surface px-5 py-10 text-center">
+    /**
+     * The kit's `.sl-state`: an inset hairline ring and NO shadow — a resting
+     * surface does not float. Padding is 40/20 (--s8/--s5).
+     *
+     * ── AND THE BOX IS CAPPED, NOT JUST THE PARAGRAPH ───────────────────────
+     * MEASURED at 1440 on /assets, /campaigns, /leads, /remix, /approvals and
+     * /brain: this section ran the full 1136px content column while its own body
+     * was capped at 340px, so ten screens each drew a 1136x230 band around about
+     * twenty-five words. docs/27 §3.4 names it exactly — "density is set by the
+     * container, not by the content" — and it is the reason a product with ten
+     * honest empty states reads as ten unfinished ones.
+     *
+     * `--measure-prose` (640px), centred. The cap binds only where there is room
+     * for it to bind, so the callers that already render this inside a narrow
+     * column — the inbox thread pane, /settings — are unchanged.
+     */
+    <section className="surface-ring mx-auto flex w-full max-w-[var(--measure-prose)] flex-col items-center gap-2 rounded-card bg-surface px-5 py-10 text-center">
       {/* `.sl-state__ic` is a 44px ROUNDED SQUARE, not a circle — a circle reads
           as an avatar, and this is a marker. Accent variant: orange glyph on a
           6% wash with a 24% ring. The wash is an alpha, so it composites on
@@ -30,7 +44,7 @@ export function EmptyState({
         <Icon size={21} strokeWidth={1.7} aria-hidden />
       </span>
       <h2 className="type-h3">{title}</h2>
-      <p className="max-w-[340px] type-sm text-muted">{body}</p>
+      <p className="max-w-[42ch] type-sm text-muted">{body}</p>
       {/* `.sl-state__a` — "is not optional" (RETHEME.md §4.5): an empty state
           answers what this is AND what to do next. It stays conditional here
           only because some screens genuinely have no destination to offer, and
@@ -73,25 +87,8 @@ export function CardEmpty({
   lead,
   body,
   action,
-  align = 'center',
   className,
 }: {
-  /**
-   * WHERE THE SENTENCE STARTS, AND WHY IT IS A CHOICE.
-   *
-   * Centred is right for a small card — `Best performing` is ~190px wide and a
-   * left-aligned line in it reads as a stray label. It is wrong for a wide one:
-   * MEASURED on `page-dash-before__populated__analytics__full__1440__light`,
-   * the Instagram account panel is a 1030px card holding a 340px text column
-   * centred in the middle of it, which docs/40 §3.2 named as most of why that
-   * page reads apologetic and `readiness-line.tsx` states outright — "centring
-   * a sentence in a wide box is what makes it look like a shrug".
-   *
-   * Defaulted to `center` so no call site outside this lane changes. The wide
-   * panels on /home and /analytics pass `start`; the ~40 other call sites in
-   * the app are unshot by this lane and are left exactly as they were.
-   */
-  align?: 'center' | 'start'
   /**
    * The one emphasised sentence, when the card has a REMEDY to lead with —
    * "Connect Instagram to see followers and reach." Optional because most
@@ -119,8 +116,7 @@ export function CardEmpty({
       // Vertically centred in the space the real content would have taken, so a
       // card does not visibly change height when its first row arrives.
       className={cn(
-        'flex min-h-[96px] flex-col justify-center gap-2 py-6',
-        align === 'center' ? 'items-center px-4 text-center' : 'items-start text-left',
+        'flex min-h-[96px] flex-col items-center justify-center gap-2 px-4 py-6 text-center',
         className,
       )}
     >

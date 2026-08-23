@@ -136,8 +136,26 @@ describe('the inbox with Zernio unreachable', () => {
     const { container } = render(await InboxMessagesPage())
     expect(container.querySelector('[class*="group/panes"]')).not.toBeNull()
 
-    // And the list pane says why it is empty instead of showing nothing at all.
-    expect(document.body.textContent ?? '').toMatch(/nothing read yet/i)
+    /**
+     * AND THE LIST PANE SAYS WHAT IT HOLDS — NOT WHY IT IS EMPTY.
+     *
+     * This assertion used to read `toMatch(/nothing read yet/i)`, and it was
+     * right about the thing it cared about (the column must not be blank) and
+     * wrong about how to check it. "Nothing read yet" is an emptiness CLAIM, and
+     * the thread pane beside it was making a second one — from `InboxEmptiness`,
+     * with its own reason and its own remedy. MEASURED at 1440 on 2026-08-23 with
+     * nothing connected: the list pane said a READ had not happened while the
+     * thread pane said a CONNECTION had not. Neither sentence was false; together
+     * they described two different situations, on the screen every beta user
+     * meets on day one.
+     *
+     * So the property is asserted in two halves now, and the second half is
+     * STRICTLY MORE than the old line asked for: the column is not blank, and it
+     * makes no claim about presence or absence at all.
+     */
+    const text = document.body.textContent ?? ''
+    expect(text).toMatch(/conversations appear here/i)
+    expect(text).not.toMatch(/nothing read yet|no conversations yet/i)
   })
 })
 

@@ -159,12 +159,31 @@ export function decideStoreSurface(input: StoreDecideInput): StoreDecision {
     }
   }
 
+  /**
+   * NOBODY WAS EVER ASKED, so nothing may be said about what the customer has.
+   *
+   * This branch used to answer `headline: "No ${noun} yet"` — word-for-word what
+   * `empty` answers thirty lines below, and `empty` is the ONE state this
+   * module's own header licenses to say it ("say what Sahoda DID, not what the
+   * customer HAS — except in `empty`, which is the one case where those
+   * coincide"). Here they do not coincide: a shop with two hundred Instagram
+   * DMs and no connected account gets told it has no conversations.
+   *
+   * MEASURED in the running app at 1440 on 2026-08-23 with a workspace that had
+   * connected nothing: /inbox said "No conversations yet" while /inbox/comments
+   * — one tab away, served by the LIVE classifier in `emptiness.ts`, which had
+   * this right — said "Connect an account to see comments here". Two tabs of one
+   * screen, two accounts of the same absence.
+   *
+   * The wording now matches that live classifier, because it is the same state
+   * and a reader moving between the tabs must not be told two things.
+   */
   if (input.connectedAccounts === 0) {
     return {
       state: 'never_connected',
       showList: false,
-      headline: `No ${noun} yet`,
-      body: `Sahoda will show ${noun} here once ${connectPrompt}.`,
+      headline: `Connect an account to see ${noun} here`,
+      body: `Nothing has been sent to Sahoda for this workspace and Sahoda has asked no account, so this is not a reading of your ${noun}. They appear here once ${connectPrompt}.`,
     }
   }
 

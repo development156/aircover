@@ -12,6 +12,7 @@ import { eraseWorkspaceData } from '@/app/actions/erase-workspace'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
+import { SettingCard, SettingRow } from '@/components/settings/setting-row'
 import { eraseConfirmationMatches } from '@/lib/privacy/confirm'
 
 /**
@@ -177,33 +178,61 @@ export function YourDataPanel() {
   const nameMatches = ready !== null && eraseConfirmationMatches(typed, ready.workspaceName)
 
   return (
-    <section
-      aria-labelledby="your-data"
-      className="rounded-card border border-line bg-bg p-5 shadow-card"
+    <SettingCard
+      title="Your data"
+      hint="Take a copy of everything in this workspace, or delete all of it."
     >
-      <h2 id="your-data" className="type-h3">
-        Your data
-      </h2>
+      {/*
+        ── WHY THIS IS TWO ROWS AND NOT TWO ESSAYS ────────────────────────────
+        MEASURED at 1440 on a seeded account: this panel ran 500 of the page's
+        913px and held 122 words, while the thing a person actually came to
+        /settings for — the workspace name — was a 200px card above it. An
+        export utility and a delete utility had taken the screen.
 
-      <p className="mt-1 type-body text-muted">
-        Take a copy of everything in this workspace, or delete all of it.
-      </p>
-
-      <div className="mt-4 space-y-1.5">
-        <h3 className="type-body font-semibold">Download a copy</h3>
-        <p className="type-body text-muted">
-          One zip file: your posts and their per-channel wording, your Brand Brain, your
-          conversations and enquiries, every credit movement, your pictures and documents, and how
-          your posts performed. It opens with a page you can read, and it lists anything it could
-          not include and why — so you can tell an empty section from a missing one.
-        </p>
-        <Button onClick={() => void run()} disabled={download.kind === 'working'} className="mt-2">
-          <Download size={15} strokeWidth={2} aria-hidden />
-          {download.kind === 'working' ? 'Downloading…' : 'Download my data'}
-        </Button>
+        docs/37 §16 rule 4: this screen is a LIST, so the list leads and every
+        entry is a row of the same shape. Nothing here is deleted — the download
+        manifest is the DPDP claim about completeness and it moves into a
+        disclosure a keyboard can reach, not out of the product.
+      */}
+      <SettingRow
+        label="Download a copy"
+        hint="One zip file with everything this workspace holds. It opens with a page you can read."
+        control={
+          /*
+            SECONDARY, and this is the whole point of the lane.
+            <Button> defaults to `primary`, which is the solid brand fill, so
+            this control carried it by omission rather than by decision.
+            MEASURED with scripts/design/accent-spend.mjs and the DOM
+            attribution probe at 1440 light: this one button was 6,308 of the
+            screen's 11,149 accent-bearing pixels — 57% of a CONFIGURATION
+            screen's entire accent budget, spent on a utility nobody opens
+            /settings to run. docs/37 §2.3: "a screen that configures something
+            spends approximately zero."
+          */
+          <Button
+            variant="secondary"
+            onClick={() => void run()}
+            disabled={download.kind === 'working'}
+          >
+            <Download size={15} strokeWidth={2} aria-hidden />
+            {download.kind === 'working' ? 'Downloading…' : 'Download my data'}
+          </Button>
+        }
+      >
+        <details className="group">
+          <summary className="w-fit cursor-pointer type-meta text-muted underline-offset-2 hover:text-ink hover:underline">
+            What is in the file
+          </summary>
+          <p className="mt-1.5 type-meta text-muted">
+            Your posts and their per-channel wording, your Brand Brain, your conversations and
+            enquiries, every credit movement, your pictures and documents, and how your posts
+            performed. It lists anything it could not include and why — so you can tell an empty
+            section from a missing one.
+          </p>
+        </details>
 
         {download.kind === 'working' ? (
-          <p role="status" className="type-sm text-muted">
+          <p role="status" className="mt-1.5 type-meta text-muted">
             {/* Real bytes, from the stream. Never a bar that moves on a timer. */}
             <span className="tabular-nums">{formatBytes(download.received)}</span>
             {download.total === null ? (
@@ -218,33 +247,53 @@ export function YourDataPanel() {
         ) : null}
 
         {download.kind === 'done' ? (
-          <p role="status" className="type-sm text-muted">
+          <p role="status" className="mt-1.5 type-meta text-muted">
             Saved <span className="font-medium">{download.filename}</span>. Open{' '}
             <span className="font-medium">your-data.html</span> inside it first.
           </p>
         ) : null}
 
         {download.kind === 'error' ? (
-          <p role="alert" className="type-sm text-danger">
+          <p role="alert" className="mt-1.5 type-meta text-danger">
             {download.message}
           </p>
         ) : null}
-      </div>
+      </SettingRow>
 
-      <div className="mt-5 space-y-1.5 border-t border-line pt-4">
-        <h3 className="type-body font-semibold">Delete everything</h3>
-        <p className="type-body text-muted">
-          Your posts, pictures, Brand Brain, conversations, enquiries, websites and linked accounts
-          are deleted for good. Your credit and payment record is kept — it is what proves what you
-          paid and what you were charged, so it is not ours to erase.
-        </p>
-        <p className="type-body text-muted">
-          Download a copy first if you want one. Deleting cannot be undone.
-        </p>
-        <Button variant="destructive" onClick={openErase} className="mt-2">
-          Delete everything
-        </Button>
-      </div>
+      <SettingRow
+        label="Delete everything"
+        hint={
+          /* What is KEPT, and why, is stated in the dialog — with real counts
+             read out of the database at that moment, which is a better place
+             for it than a settings row that four lines of it unbalanced. The
+             row says what the control does and that it cannot be undone; the
+             dialog says exactly what goes and exactly what stays. */
+          <>
+            Your posts, pictures, Brand Brain, conversations, enquiries, websites and linked
+            accounts go for good. This cannot be undone.
+          </>
+        }
+        control={
+          /*
+            Also secondary, and the reasoning is hierarchy rather than the
+            accent budget: `destructive` is solid INK (there is no red in this
+            palette), so it costs nothing in orange and everything in weight. A
+            solid black block is the loudest object a light screen can hold, and
+            on a list of four settings it made "delete my business" the thing
+            the eye lands on first.
+
+            Nothing is weakened by moving it. This control does not delete
+            anything — it opens a dialog that counts what you have from the
+            database and then requires the workspace name typed back. That
+            dialog's confirm button IS `destructive`, which is where the weight
+            belongs: on the irreversible click, not on the one that opens a
+            page you can read.
+          */
+          <Button variant="secondary" onClick={openErase}>
+            Delete everything
+          </Button>
+        }
+      />
 
       <Modal
         open={erase.kind !== 'closed'}
@@ -340,6 +389,6 @@ export function YourDataPanel() {
           </div>
         ) : null}
       </Modal>
-    </section>
+    </SettingCard>
   )
 }

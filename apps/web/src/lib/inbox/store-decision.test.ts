@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+import type { StoreDecision, StoreEmptinessState } from './store-decision'
 import { decideStoreSurface } from './store-decision'
 
 /**
@@ -78,6 +79,79 @@ describe('decideStoreSurface', () => {
     // A workspace with nothing connected is not "awaiting" anything.
     const d = decideStoreSurface({ ...base, connectedAccounts: 0, eventsEverReceived: false })
     expect(d.state).toBe('never_connected')
+  })
+
+  it('does NOT claim the customer has no conversations when NOBODY WAS EVER ASKED', () => {
+    /*
+     * ── THE GUARD THAT SHARED ITS SUBJECT'S BLIND SPOT ─────────────────────
+     * Two tests above already forbid `\bno conversations\b` — one for
+     * `awaiting_first_event`, one for `accounts_unreadable`. `never_connected`
+     * had a test, and it asserted `d.state` and nothing else. So the state that
+     * is LEAST entitled to make that claim was the only one whose copy nobody
+     * read, and it shipped `headline: "No conversations yet"` — byte-identical
+     * to `empty`, the one state the module's own header says is licensed to say
+     * it ("say what Sahoda DID, not what the customer HAS — except in `empty`").
+     *
+     * MEASURED in the running app at 1440 on 2026-08-23: /inbox rendered
+     * "No conversations yet" while /inbox/comments, one tab away and served by
+     * the LIVE classifier, rendered "Connect an account to see comments here".
+     * Two tabs of one screen giving two different accounts of the same absence.
+     */
+    const d = decideStoreSurface({ ...base, connectedAccounts: 0, eventsEverReceived: false })
+    expect(d.state).toBe('never_connected')
+    expect(`${d.headline} ${d.body}`).not.toMatch(/\bno conversations\b/i)
+    // And it must still name the remedy, which here genuinely can be carried out.
+    expect(`${d.headline} ${d.body}`).toMatch(/connect/i)
+  })
+
+  it('gives every state its OWN headline — no two may be word-for-word the same', () => {
+    /*
+     * The general form of the bug above, and the reason it is written as a sweep
+     * rather than as one more pairwise assertion. `never_connected` and `empty`
+     * were identical; a pairwise test only finds the pair somebody thought to
+     * compare, and nobody compares the pair they believe is fine.
+     *
+     * WHAT IT CANNOT SEE: two headlines that differ by a word while making the
+     * same claim. It compares strings, not meaning — the `\bno conversations\b`
+     * assertions above are what cover the claim itself.
+     */
+    const states: Array<[StoreEmptinessState, StoreDecision]> = [
+      [
+        'store_unreadable',
+        decideStoreSurface({ ...base, storeUnreadable: true, eventsEverReceived: true }),
+      ],
+      [
+        'accounts_unreadable',
+        decideStoreSurface({ ...base, connectedAccounts: null, eventsEverReceived: true }),
+      ],
+      [
+        'never_connected',
+        decideStoreSurface({ ...base, connectedAccounts: 0, eventsEverReceived: true }),
+      ],
+      ['awaiting_first_event', decideStoreSurface({ ...base, eventsEverReceived: false })],
+      ['empty', decideStoreSurface({ ...base, eventsEverReceived: true })],
+      ['ok', decideStoreSurface({ ...base, storedRows: 1, eventsEverReceived: true })],
+      [
+        'ok_history_unavailable',
+        decideStoreSurface({
+          ...base,
+          storedRows: 1,
+          historyAvailable: false,
+          eventsEverReceived: true,
+        }),
+      ],
+    ]
+
+    // Every state the table claims to cover must actually have been produced,
+    // or this sweep silently grades six states and reports seven.
+    for (const [want, decision] of states) expect(decision.state).toBe(want)
+
+    const byHeadline = new Map<string, string[]>()
+    for (const [, d] of states) {
+      byHeadline.set(d.headline, [...(byHeadline.get(d.headline) ?? []), d.state])
+    }
+    const shared = [...byHeadline.entries()].filter(([, s]) => s.length > 1)
+    expect(shared, `states sharing a headline: ${JSON.stringify(shared)}`).toEqual([])
   })
 
   // ── ZERNIO UNREACHABLE ───────────────────────────────────────────────────

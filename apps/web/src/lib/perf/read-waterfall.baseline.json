@@ -202,11 +202,11 @@
   },
   {
     "route": "/(auth)/sign-in/[[...sign-in]]",
-    "awaits": []
+    "awaits": ["auth"]
   },
   {
     "route": "/(auth)/sign-up/[[...sign-up]]",
-    "awaits": []
+    "awaits": ["auth"]
   },
   {
     "route": "/(onboarding)/onboarding",

@@ -57,7 +57,7 @@ export default async function SettingsPage() {
           <SettingRow
             label="Address"
             hint="Its stable identifier. Used in links and never reused."
-            control={<span className="text-[13px] font-[550] text-ink">{workspace.slug}</span>}
+            control={<span className="type-sm font-[550] text-ink">{workspace.slug}</span>}
           />
         </SettingCard>
 

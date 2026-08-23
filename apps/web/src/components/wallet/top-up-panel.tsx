@@ -51,9 +51,28 @@ export function TopUpPanel() {
           return (
             <label
               key={entry.id}
+              /**
+               * ── A SELECTED OPTION IS NOT AN URGENT ONE ────────────────────
+               * This was `border-primary` when checked: a solid brand border
+               * drawn all the way round a 1102x62 row. MEASURED at 1440 light
+               * with the DOM accent probe, it was 72,864 of this screen's
+               * 81,604 accent-bearing pixels — **89%** — which made a
+               * pre-selected radio the loudest coloured object on the money
+               * screen, louder than the balance the screen exists to report
+               * and louder than its own Start checkout.
+               *
+               * docs/37 §2.3: the accent is spent on the one thing the screen
+               * is for. Selection is carried by three signals that cost almost
+               * nothing — a real fill step, a firmer ring, and the radio's own
+               * dot, which keeps `accent-primary` because a 13px dot is where a
+               * brand mark is unambiguous and cheap.
+               *
+               * Ring, not border, in BOTH states: §6 refuses the two together,
+               * and an inset ring cannot reflow the row when the edge firms up.
+               */
               className={cn(
-                'flex cursor-pointer items-start gap-3 rounded-input border px-3 py-2.5 transition-micro',
-                checked ? 'border-primary bg-s2' : 'border-line hover:bg-s2',
+                'flex cursor-pointer items-start gap-3 rounded-input px-3 py-2.5 transition-micro',
+                checked ? 'surface-ring-firm bg-s2' : 'surface-ring hover:bg-s2',
                 pending && 'cursor-not-allowed opacity-45',
               )}
             >
@@ -66,9 +85,9 @@ export function TopUpPanel() {
                 className="mt-1 accent-primary"
               />
               <span className="min-w-0">
-                <span className="block text-[14px] font-semibold">{entry.name}</span>
+                <span className="block type-body font-semibold">{entry.name}</span>
                 {/* Cost before spend: price and what it grants, both from PLAN_CATALOG. */}
-                <span className="block text-[13px] text-muted">
+                <span className="block type-sm text-muted">
                   ₹<span className="tabular-nums">{inr(entry.priceInr)}</span> per month (about $
                   <span className="tabular-nums">{inr(entry.priceUsd)}</span>) ·{' '}
                   <span className="tabular-nums">{inr(entry.monthlyCredits)}</span>{' '}

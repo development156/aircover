@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { dunningPolicy } from '@sahoda/billing'
 
-import { PageTitle } from '@/components/page-title'
 import { BillingDetailsForm } from '@/components/billing/billing-details-form'
 import { CurrentPlan, PlanNoWorkspace, PlanUnreadable } from '@/components/billing/current-plan'
 import { DunningBanner } from '@/components/billing/dunning-banner'
@@ -12,10 +11,24 @@ import { buttonVariants } from '@/components/ui/button'
 import { readBillingProfile, readInvoices, readSubscription } from '@/lib/billing/read'
 import { readBalance, type BalanceRead } from '@/lib/wallet/read'
 
-export const metadata = { title: 'Plan & billing' }
+export const metadata = { title: 'Plan & credits' }
 
 /**
- * Plan & billing — ONE tab, where the reference has two.
+ * Plan & credits — ONE tab, where the reference has two.
+ *
+ * ── AND ONE NAME, WHERE THIS TAB HAD THREE ───────────────────────────────────
+ * The rail said "Plan & credits", this page's own <h1> said "Plan & billing",
+ * and the browser tab said "Plan & billing". docs/37 §17: an action keeps its
+ * name through the whole flow, and so does a place. "Plan & credits" wins
+ * because it is the one the reader clicked to get here.
+ *
+ * ── AND THE <h1> IS GONE, NOT RENAMED ────────────────────────────────────────
+ * `settings/layout.tsx` already renders `<PageTitle>Settings</PageTitle>`, so
+ * this page rendered a SECOND <h1> under it — two page titles in one view,
+ * against docs/37 §16's "exactly one type-h1 per view". Which section you are
+ * in is already said twice: by the rail's `aria-current="page"` item and by the
+ * browser tab. A third statement of it, set as the largest text on the screen,
+ * is the "says the same thing in more than one place" failure §16 names.
  *
  * The reference separates "Billing" from "Credits". This product's plan, its credits and its
  * invoices are one story: a payment buys a month's credits and produces a tax invoice, and
@@ -46,7 +59,6 @@ export default async function SettingsPlanPage() {
   if (subscription.status === 'no-workspace') {
     return (
       <div className="space-y-grid">
-        <PageTitle>Plan &amp; billing</PageTitle>
         <PlanNoWorkspace />
       </div>
     )
@@ -55,7 +67,6 @@ export default async function SettingsPlanPage() {
   if (subscription.status === 'unreadable') {
     return (
       <div className="space-y-grid">
-        <PageTitle>Plan &amp; billing</PageTitle>
         <PlanUnreadable />
       </div>
     )
@@ -67,8 +78,6 @@ export default async function SettingsPlanPage() {
 
   return (
     <div className="space-y-grid">
-      <PageTitle>Plan &amp; billing</PageTitle>
-
       <DunningBanner policy={policy} planId={subscription.data.planId} />
 
       <CurrentPlan subscription={subscription.data} policy={policy} />

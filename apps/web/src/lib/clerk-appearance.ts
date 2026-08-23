@@ -57,11 +57,37 @@ export const clerkAppearance = {
     },
 
     /* 34px is the kit's control height and what every other button in the app
-       uses; 44px is SPECIFICATION.md §10's phone floor. Clerk shipped 32. */
+       uses; 44px is SPECIFICATION.md §10's phone floor. Clerk shipped 32.
+
+       ── AND ITS LABEL IS INK, NOT WHITE ────────────────────────────────────
+       MEASURED off the shipped /sign-in at 1440 light on 2026-08-23, by
+       sampling the rendered button: white `#ffffff` on Clerk's computed fill
+       `rgb(255,107,8)` is **2.85:1** — under AA and under the 3:1 UI-boundary
+       floor, on the ONLY action of the first screen a customer ever meets.
+       docs/37 §2.4 names this exact pair as a never.
+
+       Clerk derives a foreground from `colorPrimary` on its own and chose
+       white. `--pfg` is `#000000`, which measures 7.15:1 on the brand and is
+       the value every other primary in this product already uses.
+
+       `background` is pinned too, and that is not belt-and-braces: Clerk paints
+       a slight gradient (the sampled fill ran `rgb(255,107,8)` to
+       `rgb(255,101,0)` across the button), so the contrast VARIES along the
+       label. A ratio that is only true at one x-coordinate is not a ratio.
+
+       ── AND WHY A SOURCE SCANNER COULD NOT HAVE CAUGHT THIS ────────────────
+       `ink-on-brand` greps 927 source files for `text-white` beside a brand
+       fill. This pair never appears in our source: Clerk composes it at
+       runtime from `colorPrimary`. `e2e/auth-contrast.spec.ts` measures the
+       rasterised button instead, which is the only place this pair exists. */
     formButtonPrimary: {
       minHeight: '34px',
       fontSize: '13px',
       textTransform: 'none',
+      background: 'var(--p)',
+      backgroundImage: 'none',
+      color: 'var(--pfg)',
+      '&:hover': { background: 'var(--ink)', color: 'var(--canvas)' },
       '@media (max-width: 699px)': { minHeight: '44px' },
     },
     formFieldInput: {

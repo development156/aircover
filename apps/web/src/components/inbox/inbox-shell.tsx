@@ -53,7 +53,10 @@ export function InboxShell({
           would claim there is nothing, and there is something. */}
       <SurfaceBanner state={emptiness} />
 
-      <InboxPanes mobileShow={mobileShow}>
+      {/* Nothing to open means nothing to scroll, so the panes stop holding a
+          viewport open around one card. See `InboxPanes`' `compact` for the
+          measurement — 72% of the 1440 frame was white. */}
+      <InboxPanes mobileShow={mobileShow} compact={!hasSomethingToOpen}>
         <InboxPane kind="list">{list}</InboxPane>
         <InboxPane kind="thread">{thread}</InboxPane>
         <InboxPane kind="context">
