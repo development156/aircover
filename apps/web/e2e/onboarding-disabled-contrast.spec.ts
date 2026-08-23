@@ -65,73 +65,81 @@ async function bootstrap(page: Page): Promise<void> {
   await page.waitForURL(/\/onboarding/, { timeout: 90_000 })
 }
 
+/**
+ * Three widths, because a downscaled contact sheet cannot settle a colour and
+ * the 390 thumbnails genuinely looked like they might still be orange. The
+ * question is answered by measuring, at the width the reader actually holds.
+ */
 for (const theme of ['light', 'dark'] as const) {
-  test(`the disabled Continue is legible in ${theme}`, async ({ page, signedIn }) => {
-    void signedIn
-    await page.emulateMedia({ colorScheme: theme })
-    await page.addInitScript((t) => {
-      try {
-        window.localStorage.setItem('sahoda-theme', t as string)
-      } catch {
-        /* storage disabled: the emulated scheme is then the only signal */
-      }
-    }, theme)
-
-    await bootstrap(page)
-    await page.goto('/onboarding')
-    await page.evaluate(() => {
-      for (const k of Object.keys(window.localStorage)) {
-        if (k.startsWith('sahoda.brandbrain')) window.localStorage.removeItem(k)
-      }
-    })
-    await page.reload()
-    await page.getByRole('button', { name: /build my brand brain/i }).click()
-
-    const button = page.getByRole('button', { name: /^Continue$/ })
-    // The state under examination. If this stops being disabled the gate for
-    // step 01 has gone, which is a different and larger defect — so it is
-    // asserted rather than skipped past.
-    await expect(button).toBeDisabled()
-
-    const read = await button.evaluate((el) => {
-      /**
-       * EFFECTIVE alpha, not the element's own. `opacity` multiplies down the
-       * tree, and the defect this guard exists for was an opacity ON THE
-       * BUTTON — a reader of `getComputedStyle(el).opacity` alone would miss
-       * the same defect applied to a wrapper.
-       */
-      let alpha = 1
-      let node: Element | null = el
-      while (node) {
-        alpha *= Number(getComputedStyle(node).opacity)
-        node = node.parentElement
-      }
-      let behind = 'rgb(255, 255, 255)'
-      let p: Element | null = el.parentElement
-      while (p) {
-        const c = getComputedStyle(p).backgroundColor
-        if (c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c)) {
-          behind = c
-          break
+  for (const width of [390, 1024, 1440] as const) {
+    test(`the disabled Continue is legible in ${theme} at ${width}`, async ({ page, signedIn }) => {
+      void signedIn
+      await page.setViewportSize({ width, height: 900 })
+      await page.emulateMedia({ colorScheme: theme })
+      await page.addInitScript((t) => {
+        try {
+          window.localStorage.setItem('sahoda-theme', t as string)
+        } catch {
+          /* storage disabled: the emulated scheme is then the only signal */
         }
-        p = p.parentElement
-      }
-      const cs = getComputedStyle(el)
-      return { fill: cs.backgroundColor, text: cs.color, alpha, behind }
+      }, theme)
+
+      await bootstrap(page)
+      await page.goto('/onboarding')
+      await page.evaluate(() => {
+        for (const k of Object.keys(window.localStorage)) {
+          if (k.startsWith('sahoda.brandbrain')) window.localStorage.removeItem(k)
+        }
+      })
+      await page.reload()
+      await page.getByRole('button', { name: /build my brand brain/i }).click()
+
+      const button = page.getByRole('button', { name: /^Continue$/ })
+      // The state under examination. If this stops being disabled the gate for
+      // step 01 has gone, which is a different and larger defect — so it is
+      // asserted rather than skipped past.
+      await expect(button).toBeDisabled()
+
+      const read = await button.evaluate((el) => {
+        /**
+         * EFFECTIVE alpha, not the element's own. `opacity` multiplies down the
+         * tree, and the defect this guard exists for was an opacity ON THE
+         * BUTTON — a reader of `getComputedStyle(el).opacity` alone would miss
+         * the same defect applied to a wrapper.
+         */
+        let alpha = 1
+        let node: Element | null = el
+        while (node) {
+          alpha *= Number(getComputedStyle(node).opacity)
+          node = node.parentElement
+        }
+        let behind = 'rgb(255, 255, 255)'
+        let p: Element | null = el.parentElement
+        while (p) {
+          const c = getComputedStyle(p).backgroundColor
+          if (c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c)) {
+            behind = c
+            break
+          }
+          p = p.parentElement
+        }
+        const cs = getComputedStyle(el)
+        return { fill: cs.backgroundColor, text: cs.color, alpha, behind }
+      })
+
+      const ground = parse(read.behind)
+      const fill = over(parse(read.fill), ground, read.alpha)
+      const label = over(parse(read.text), ground, read.alpha)
+      const ratio = contrast(label, fill)
+
+      expect(
+        ratio,
+        `the disabled Continue's label measures ${ratio.toFixed(2)}:1 against its own fill in ` +
+          `${theme} (label ${read.text}, fill ${read.fill}, effective alpha ${read.alpha}, ` +
+          `ground ${read.behind}). A refusal a person cannot read does not tell them why ` +
+          `they cannot continue. button.tsx settled this recipe already: a recessed ` +
+          `surface with muted text, not a dimmed brand fill.`,
+      ).toBeGreaterThanOrEqual(AA)
     })
-
-    const ground = parse(read.behind)
-    const fill = over(parse(read.fill), ground, read.alpha)
-    const label = over(parse(read.text), ground, read.alpha)
-    const ratio = contrast(label, fill)
-
-    expect(
-      ratio,
-      `the disabled Continue's label measures ${ratio.toFixed(2)}:1 against its own fill in ` +
-        `${theme} (label ${read.text}, fill ${read.fill}, effective alpha ${read.alpha}, ` +
-        `ground ${read.behind}). A refusal a person cannot read does not tell them why ` +
-        `they cannot continue. button.tsx settled this recipe already: a recessed ` +
-        `surface with muted text, not a dimmed brand fill.`,
-    ).toBeGreaterThanOrEqual(AA)
-  })
+  }
 }
