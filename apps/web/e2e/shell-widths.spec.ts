@@ -85,7 +85,7 @@ test.describe('shell across widths @smoke', () => {
 
         // ── 1. The brand lockup must never render a clipped word.
         const brandName = await p
-          .getByLabel(/Sahoda — go to Home/i)
+          .getByLabel(/Sahoda, go to Home/i)
           .first()
           .getAttribute('aria-label')
         if (brandName) findings.push(`${theme}/${width} brand aria-label="${brandName}"`)
