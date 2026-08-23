@@ -112,7 +112,12 @@ export function Bars({
    */
   return (
     <figure className={cn('flex flex-col', className)}>
-      <div className="flex h-[168px] items-end gap-[3px] max-narrow:h-[132px]">
+      {/* `gap-1`, not `gap-[3px]`. docs/37 §4's ladder starts at 4 and
+          design-lint rule 2 refused the 3 — correctly: a value picked because
+          it looked right at one width is exactly how the scale erodes. The
+          columns are `flex-1` with the bar capped at 14px and centred, so most
+          of the visual separation comes from the column, not the gap. */}
+      <div className="flex h-[168px] items-end gap-1 max-narrow:h-[132px]">
         {points.map((point, i) => {
           const measuredHere = point.value !== null
           // `peak || 1` only avoids a divide by zero on an all-zero window; it

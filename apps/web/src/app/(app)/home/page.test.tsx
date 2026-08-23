@@ -107,6 +107,21 @@ beforeEach(() => {
   vi.mocked(readInstagramAnalytics).mockResolvedValue({ kind: 'not-connected' })
 })
 
+/**
+ * ── THE DASHBOARD IS IDENTIFIED BY ITS QUEUE, NOT BY A CARD THAT MOVED ───────
+ * Six assertions in this file used `/available credits/i` as the marker for
+ * "the dashboard rendered rather than FirstRun or GetStarted". That card is
+ * gone — docs/41 §2.2: the balance was on this one screen THREE times (topbar
+ * chip, rail foot, and that card) and it is now one of four stat cards at the
+ * top instead — and every one of those six went red on a change that broke
+ * none of the properties they exist for.
+ *
+ * `Needs your attention` is the marker now. It is the page's structural LEAD
+ * (SPECIFICATION.md §1's "what needs me", which docs/40 §2.1 moved to the top
+ * and this lane did not move again), it renders in every dashboard branch
+ * including the empty queue, and it is not a figure that can be demoted or
+ * deduplicated. The PROPERTY each test holds is unchanged.
+ */
 describe('Home for a user with no workspace yet', () => {
   beforeEach(() => {
     balanceRead.mockResolvedValue({ status: 'no-workspace' })
@@ -123,7 +138,7 @@ describe('Home for a user with no workspace yet', () => {
 
     // The credits card, the week strip and the spend chart all describe a
     // workspace. None of them has one to describe.
-    expect(screen.queryByText(/available credits/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/needs your attention/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/credits to spend/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/nothing in flight yet/i)).not.toBeInTheDocument()
   })
@@ -187,7 +202,7 @@ describe('Home for a workspace with nothing in it', () => {
 
     expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
     // The dashboard's containers, each of which owned its own empty state.
-    expect(screen.queryByText(/available credits/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/needs your attention/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/needs your attention/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/credits spent/i)).not.toBeInTheDocument()
   })
@@ -209,7 +224,7 @@ describe('Home for a workspace with nothing in it', () => {
     render(await HomePage())
 
     expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
-    expect(screen.getByText(/available credits/i)).toBeInTheDocument()
+    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
   })
 
   test('an unreadable brain read does the same', async () => {
@@ -227,7 +242,7 @@ describe('Home for a workspace with nothing in it', () => {
     render(await HomePage())
 
     expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
-    expect(screen.getByText(/available credits/i)).toBeInTheDocument()
+    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
   })
 })
 
@@ -244,7 +259,7 @@ describe('Home for a workspace that exists', () => {
   test('renders the dashboard, not the first run', async () => {
     render(await HomePage())
 
-    expect(screen.getByText(/available credits/i)).toBeInTheDocument()
+    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /create workspace/i })).not.toBeInTheDocument()
   })
 
@@ -257,6 +272,6 @@ describe('Home for a workspace that exists', () => {
     // one first-run screen instead — a funded user told to create a workspace
     // they already have is the same lie pointing the other way.
     expect(screen.queryByRole('button', { name: /create workspace/i })).not.toBeInTheDocument()
-    expect(screen.getByText(/available credits/i)).toBeInTheDocument()
+    expect(screen.getByText(/needs your attention/i)).toBeInTheDocument()
   })
 })
