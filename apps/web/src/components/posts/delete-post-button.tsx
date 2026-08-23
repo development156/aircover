@@ -124,7 +124,7 @@ export function DeletePostButton({ postId, title, compact = false }: DeletePostB
 
         {error ? (
           <InlineError className="text-left">
-            {error} The post is still here — try again.
+            {error} The post is still here. Try again.
           </InlineError>
         ) : null}
       </div>

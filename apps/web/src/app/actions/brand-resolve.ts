@@ -158,11 +158,11 @@ export async function saveBrandMemory(
 
     const result = ResolveBrandMemoryResultSchema.safeParse(data)
     if (!result.success) {
-      return { ok: false, message: 'Saved, but the response was unreadable — reload to confirm.' }
+      return { ok: false, message: 'Saved, but the response was unreadable. Reload to confirm.' }
     }
     return { ok: true, version: result.data.version, replayed: result.data.replayed }
   } catch (error) {
     reportServerError(error, { action: 'saveBrandMemory', workspaceId })
-    return { ok: false, message: 'Could not save your Brand Brain — try again.' }
+    return { ok: false, message: 'Could not save your Brand Brain. Try again.' }
   }
 }

@@ -51,13 +51,13 @@ export async function draftReply(input: unknown): Promise<InboxActionState> {
       // Both omitted, deliberately and permanently for this path. They are what
       // would make this a sent message, and nothing here sent anything.
     })
-    if (error) return { ok: false, message: 'Could not save that reply — try again.' }
+    if (error) return { ok: false, message: 'Could not save that reply. Try again.' }
 
     revalidatePath('/inbox')
     return { ok: true }
   } catch (error) {
     reportServerError(error, { action: 'draftReply', workspaceId })
-    return { ok: false, message: 'Could not save that reply — try again.' }
+    return { ok: false, message: 'Could not save that reply. Try again.' }
   }
 }
 
@@ -98,13 +98,13 @@ export async function setThreadStatus(
       .select('id')
       .maybeSingle()
 
-    if (error) return { ok: false, message: 'Could not update that — try again.' }
+    if (error) return { ok: false, message: 'Could not update that. Try again.' }
     if (!data) return { ok: false, message: 'That conversation is no longer yours to change.' }
 
     revalidatePath('/inbox')
     return { ok: true }
   } catch (error) {
     reportServerError(error, { action: 'setThreadStatus', workspaceId })
-    return { ok: false, message: 'Could not update that — try again.' }
+    return { ok: false, message: 'Could not update that. Try again.' }
   }
 }

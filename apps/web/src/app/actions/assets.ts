@@ -136,7 +136,7 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
     })
     if (upload.error) {
       console.error('[assets] upload failed', upload.error.message)
-      return { ok: false, message: 'Could not store that file — try again.' }
+      return { ok: false, message: 'Could not store that file. Try again.' }
     }
     uploadedPath = objectPath
 
@@ -171,7 +171,7 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
 
     const parsed = AssetSchema.safeParse(data)
     if (!parsed.success) {
-      return { ok: false, message: 'Added, but the response was unreadable — reload to confirm.' }
+      return { ok: false, message: 'Added, but the response was unreadable. Reload to confirm.' }
     }
 
     revalidatePath('/assets')
@@ -180,7 +180,7 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
     console.error('[assets] upload threw', error instanceof Error ? error.message : 'unknown')
     reportServerError(error, { action: 'uploadAsset', workspaceId })
     if (uploadedPath !== null) await removeObject(supabase, uploadedPath)
-    return { ok: false, message: 'Could not add that file — try again.' }
+    return { ok: false, message: 'Could not add that file. Try again.' }
   }
 }
 
@@ -314,7 +314,7 @@ export async function deleteAsset(assetId: string, confirmed = false): Promise<D
     return { ok: true }
   } catch (error) {
     reportServerError(error, { action: 'deleteAsset', workspaceId })
-    return { ok: false, reason: 'failed', message: 'Could not delete that file — try again.' }
+    return { ok: false, reason: 'failed', message: 'Could not delete that file. Try again.' }
   }
 }
 
@@ -367,7 +367,7 @@ export async function updateAsset(
     return { ok: true, asset: row.data }
   } catch (error) {
     reportServerError(error, { action: 'updateAsset', workspaceId })
-    return { ok: false, message: 'Could not save that — try again.' }
+    return { ok: false, message: 'Could not save that. Try again.' }
   }
 }
 
@@ -406,7 +406,7 @@ export async function attachAssetToPost(
     if (read.status === 'missing')
       return { ok: false, message: 'That file is not in your library.' }
     if (read.status !== 'ok') {
-      return { ok: false, message: 'Sahoda could not read that file — reload and try again.' }
+      return { ok: false, message: 'Sahoda could not read that file. Reload and try again.' }
     }
     const asset = read.asset.asset
 
@@ -444,7 +444,7 @@ export async function attachAssetToPost(
     if (existing === null || formats === null) {
       return {
         ok: false,
-        message: 'Sahoda could not check that file against the channel limits — try again.',
+        message: 'Sahoda could not check that file against the channel limits. Try again.',
       }
     }
 
@@ -513,7 +513,7 @@ export async function attachAssetToPost(
     return { ok: true, warnings: decision.warnings }
   } catch (error) {
     reportServerError(error, { action: 'attachAssetToPost', workspaceId })
-    return { ok: false, message: 'Could not add that file to the post — try again.' }
+    return { ok: false, message: 'Could not add that file to the post. Try again.' }
   }
 }
 

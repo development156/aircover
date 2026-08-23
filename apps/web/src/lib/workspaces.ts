@@ -150,7 +150,7 @@ export const activeWorkspaceRead = cache(readActiveWorkspace)
  * the reader was to stop each caller deciding this for itself.
  */
 export const WRITE_NO_WORKSPACE = 'Create a workspace first.'
-export const WRITE_WORKSPACE_UNREADABLE = 'Couldn’t check your workspace just now — try again.'
+export const WRITE_WORKSPACE_UNREADABLE = 'Couldn’t check your workspace just now. Try again.'
 
 export type WriteWorkspace =
   { ok: true; workspace: WorkspaceOption } | { ok: false; message: string }

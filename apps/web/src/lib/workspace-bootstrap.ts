@@ -132,5 +132,5 @@ export function mapBootstrapError(
   if (message.includes('INVALID_SLUG')) {
     return { ok: false, code: 'INVALID_NAME', message: 'Use letters or numbers in the name.' }
   }
-  return { ok: false, code: 'ERROR', message: 'Could not create the workspace — try again.' }
+  return { ok: false, code: 'ERROR', message: 'Could not create the workspace. Try again.' }
 }

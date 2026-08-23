@@ -116,7 +116,7 @@ export function doorTransportFailure(status: number, code: string | null): DoorT
   }
   return {
     message:
-      'The request did not reach Sahoda, so your link or PDF was never opened. This is not a verdict on the document — try again.',
+      'The request did not reach Sahoda, so your link or PDF was never opened. This is not a verdict on the document. Try again.',
     retryable: true,
   }
 }

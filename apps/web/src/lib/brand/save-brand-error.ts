@@ -5,7 +5,7 @@
  * PostgREST message; anything else — and every raw SQL string — collapses to a
  * generic line so no database internals reach the UI.
  */
-const GENERIC = 'Could not save your Brand Brain — try again.'
+const GENERIC = 'Could not save your Brand Brain. Try again.'
 
 export function mapSaveBrandError(
   error: { message?: string | null; code?: string | null } | null | undefined,
@@ -24,7 +24,7 @@ export function mapSaveBrandError(
     return 'Your role cannot change the Brand Brain — ask an owner or editor.'
   }
   if (message.includes('VERSION_CONFLICT')) {
-    return 'The Brand Brain changed while you were editing — reload and try again.'
+    return 'The Brand Brain changed while you were editing. Reload and try again.'
   }
   return GENERIC
 }

@@ -11,7 +11,7 @@
  * which means the post is already in — not an error the customer caused, and
  * not one they should be shown as a failure.
  */
-const GENERIC = 'Could not save this campaign — try again.'
+const GENERIC = 'Could not save this campaign. Try again.'
 
 export function mapCampaignError(
   error: { message?: string | null; code?: string | null } | null | undefined,

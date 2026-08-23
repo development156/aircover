@@ -167,13 +167,13 @@ export async function renameWorkspace(
       .maybeSingle()
 
     if (error || !data) {
-      return { ok: false, message: 'Could not rename this workspace — try again.' }
+      return { ok: false, message: 'Could not rename this workspace. Try again.' }
     }
 
     revalidatePath('/settings')
     revalidatePath('/', 'layout')
     return { ok: true, name: (data as { name: string }).name }
   } catch {
-    return { ok: false, message: 'Could not rename this workspace — try again.' }
+    return { ok: false, message: 'Could not rename this workspace. Try again.' }
   }
 }

@@ -83,7 +83,7 @@ export function knowledgeFailure(
     case 'fetch_failed':
       return {
         message:
-          'The page did not answer. Sahoda cannot say whether it is usable, because it never arrived. Nothing was saved — try again.',
+          'The page did not answer. Sahoda cannot say whether it is usable, because it never arrived. Nothing was saved. Try again.',
         retryable: true,
       }
     case 'not_supported':

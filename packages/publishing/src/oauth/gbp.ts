@@ -260,7 +260,7 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
           locations,
         }),
         traceId,
-        'Could not prepare the location choice — try again.',
+        'Could not prepare the location choice. Try again.',
       )
       if (!resumeToken.ok) return resumeToken
       return ok({ kind: 'choose_location' as const, locations, resumeToken: resumeToken.data })
@@ -273,11 +273,11 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
       try {
         const parsed = ResumePayloadSchema.safeParse(JSON.parse(unseal(args.resumeToken)))
         if (!parsed.success) {
-          return validationErr(traceId, 'Invalid resume token — restart the connect flow.')
+          return validationErr(traceId, 'Invalid resume token. Restart the connect flow.')
         }
         payload = parsed.data
       } catch {
-        return validationErr(traceId, 'Invalid resume token — restart the connect flow.')
+        return validationErr(traceId, 'Invalid resume token. Restart the connect flow.')
       }
 
       if (payload.workspaceId !== args.workspaceId) {
@@ -286,11 +286,11 @@ export function createGbpOAuthHandlers(deps: OAuthHandlerDeps): GbpOAuthHandlers
         return validationErr(traceId, 'That connect flow belongs to a different workspace.')
       }
       if (now().getTime() - Date.parse(payload.issuedAt) > RESUME_TTL_MS) {
-        return validationErr(traceId, 'The location choice expired — restart the connect flow.')
+        return validationErr(traceId, 'The location choice expired. Restart the connect flow.')
       }
       const location = payload.locations.find((l) => l.name === args.locationName)
       if (!location) {
-        return validationErr(traceId, 'That location was not offered — restart the connect flow.')
+        return validationErr(traceId, 'That location was not offered. Restart the connect flow.')
       }
 
       return persist({

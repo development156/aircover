@@ -114,7 +114,7 @@ export default async function BrainPage() {
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
         >
-          Could not read your Brand Brain just now — reload to try again. Nothing has changed and
+          Could not read your Brand Brain just now. Reload to try again. Nothing has changed and
           nothing was charged.
         </div>
       </div>

@@ -283,7 +283,7 @@ export async function addPdfDocument(formData: FormData): Promise<KnowledgeActio
     )
   } catch (error) {
     reportServerError(error, { action: 'knowledge.addPdf' })
-    return { ok: false, message: 'Sahoda broke while adding that. Nothing was saved — try again.' }
+    return { ok: false, message: 'Sahoda broke while adding that. Nothing was saved. Try again.' }
   }
 }
 
@@ -309,7 +309,7 @@ export async function addUrlDocument(formData: FormData): Promise<KnowledgeActio
     )
   } catch (error) {
     reportServerError(error, { action: 'knowledge.addUrl' })
-    return { ok: false, message: 'Sahoda broke while reading that. Nothing was saved — try again.' }
+    return { ok: false, message: 'Sahoda broke while reading that. Nothing was saved. Try again.' }
   }
 }
 
@@ -333,7 +333,7 @@ export async function addTypedDocument(formData: FormData): Promise<KnowledgeAct
     )
   } catch (error) {
     reportServerError(error, { action: 'knowledge.addTyped' })
-    return { ok: false, message: 'Sahoda broke while saving that. Nothing was saved — try again.' }
+    return { ok: false, message: 'Sahoda broke while saving that. Nothing was saved. Try again.' }
   }
 }
 
@@ -695,7 +695,7 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
           ok: false,
           insufficient: false,
           message:
-            'Sahoda could not reach the model, so it has nothing to suggest. Nothing was written and you were not charged — try again.',
+            'Sahoda could not reach the model, so it has nothing to suggest. Nothing was written and you were not charged. Try again.',
         }
       }
       const state = chargeFailureState({ error: credits.error, action, delivered, reason: failure })
@@ -735,7 +735,7 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
     }
     return {
       ok: false,
-      message: 'Sahoda broke while reading your library. Nothing was written — try again.',
+      message: 'Sahoda broke while reading your library. Nothing was written. Try again.',
     }
   }
 }

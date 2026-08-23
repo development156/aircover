@@ -56,13 +56,13 @@ export function PublishPreview({ postId }: PublishPreviewProps) {
       // "simulated" banner that would then be describing something else.
       const fixtures = state.simulated.filter((item) => item.mode === 'fixture')
       if (fixtures.length !== state.simulated.length) {
-        setError('Preview is unavailable right now — try again.')
+        setError('Preview is unavailable right now. Try again.')
         return
       }
       // Nothing to say at all: report that plainly instead of rendering empty
       // banners, which read as a run that succeeded silently.
       if (fixtures.length === 0 && state.blocked.length === 0 && state.skipped.length === 0) {
-        setError('Preview is unavailable right now — try again.')
+        setError('Preview is unavailable right now. Try again.')
         return
       }
       setReport({ simulated: fixtures, blocked: state.blocked, skipped: state.skipped })

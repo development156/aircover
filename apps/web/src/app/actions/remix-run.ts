@@ -99,7 +99,7 @@ export async function runRemixBatch(batchId: string): Promise<RunState> {
       return {
         ok: false,
         insufficient: false,
-        message: 'Approve the cost first — nothing has been spent.',
+        message: 'Approve the cost first. Nothing has been spent.',
       }
     }
     if (batch.status === 'done') {
@@ -141,7 +141,7 @@ export async function runRemixBatch(batchId: string): Promise<RunState> {
         insufficient: false,
         message:
           'The price has changed since this was approved. Approve it again to see the new ' +
-          'total — nothing has been spent.',
+          'total. Nothing has been spent.',
       }
     }
 
@@ -196,7 +196,7 @@ export async function runRemixBatch(batchId: string): Promise<RunState> {
     return {
       ok: false,
       insufficient: false,
-      message: 'Could not make these drafts — try again.',
+      message: 'Could not make these drafts. Try again.',
     }
   }
 }

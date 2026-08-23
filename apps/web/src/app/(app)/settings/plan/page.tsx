@@ -88,7 +88,7 @@ export default async function SettingsPlanPage() {
           // invoiced, because a query failed, is a claim about their records that we have no
           // basis for.
           <p role="alert" className="type-body text-muted">
-            Sahoda could not read your invoices just now — reload to try again. Nothing has changed
+            Sahoda could not read your invoices just now. Reload to try again. Nothing has changed
             and no document has been lost.
           </p>
         )}

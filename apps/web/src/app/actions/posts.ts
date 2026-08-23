@@ -66,7 +66,7 @@ export async function createPost(title: string): Promise<SaveState> {
 
     const parsed = PostSchema.safeParse(data)
     if (!parsed.success) {
-      return { ok: false, message: 'Created, but the response was unreadable — reload to confirm.' }
+      return { ok: false, message: 'Created, but the response was unreadable. Reload to confirm.' }
     }
 
     revalidatePath('/posts')
@@ -74,7 +74,7 @@ export async function createPost(title: string): Promise<SaveState> {
     return { ok: true, postId: parsed.data.id, updatedAt: parsed.data.updated_at }
   } catch (error) {
     reportServerError(error, { action: 'createPost', workspaceId })
-    return { ok: false, message: 'Could not create this post — try again.' }
+    return { ok: false, message: 'Could not create this post. Try again.' }
   }
 }
 
@@ -113,7 +113,7 @@ export async function savePost(postId: string, patch: unknown): Promise<SaveStat
       .strict()
       .safeParse(patch)
     if (!parsedPatch.success) {
-      return { ok: false, message: 'Those changes are not valid — reload and try again.' }
+      return { ok: false, message: 'Those changes are not valid. Reload and try again.' }
     }
 
     const supabase = createServerSupabase()
@@ -169,7 +169,7 @@ export async function savePost(postId: string, patch: unknown): Promise<SaveStat
 
     const parsed = PostSchema.safeParse(data)
     if (!parsed.success) {
-      return { ok: false, message: 'Saved, but the response was unreadable — reload to confirm.' }
+      return { ok: false, message: 'Saved, but the response was unreadable. Reload to confirm.' }
     }
 
     revalidatePath('/posts')
@@ -177,7 +177,7 @@ export async function savePost(postId: string, patch: unknown): Promise<SaveStat
     return { ok: true, postId: parsed.data.id, updatedAt: parsed.data.updated_at }
   } catch (error) {
     reportServerError(error, { action: 'savePost', workspaceId })
-    return { ok: false, message: 'Could not save this post — try again.' }
+    return { ok: false, message: 'Could not save this post. Try again.' }
   }
 }
 
@@ -299,7 +299,7 @@ export async function saveVariant(
     }
   } catch (error) {
     reportServerError(error, { action: 'saveVariant', workspaceId })
-    return { ok: false, message: 'Could not save this variant — try again.' }
+    return { ok: false, message: 'Could not save this variant. Try again.' }
   }
 }
 
@@ -382,7 +382,7 @@ export async function setVariantFormat(
     return { ok: true, format: isPostFormat(stored) ? stored : null }
   } catch (error) {
     reportServerError(error, { action: 'setVariantFormat', workspaceId })
-    return { ok: false, message: 'Could not set the format — try again.' }
+    return { ok: false, message: 'Could not set the format. Try again.' }
   }
 }
 
@@ -422,6 +422,6 @@ export async function deletePost(postId: string): Promise<DeleteState> {
     return { ok: true }
   } catch (error) {
     reportServerError(error, { action: 'deletePost', workspaceId })
-    return { ok: false, message: 'Could not delete this post — try again.' }
+    return { ok: false, message: 'Could not delete this post. Try again.' }
   }
 }

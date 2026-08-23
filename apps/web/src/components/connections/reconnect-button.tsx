@@ -32,12 +32,12 @@ export function ReconnectButton({ platform, label }: { platform: string; label: 
         })
         const body = (await res.json()) as { ok?: boolean; authUrl?: string; message?: string }
         if (!res.ok || body.ok !== true || !body.authUrl) {
-          setError(body.message ?? 'Couldn’t start reconnecting — try again.')
+          setError(body.message ?? 'Couldn’t start reconnecting. Try again.')
           return
         }
         window.location.assign(body.authUrl)
       } catch {
-        setError('Couldn’t reach the server — check your connection and try again.')
+        setError('Couldn’t reach the server. Check your connection and try again.')
       }
     })
   }

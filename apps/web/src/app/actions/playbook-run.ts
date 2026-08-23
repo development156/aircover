@@ -166,7 +166,7 @@ export async function startRun(playbookId: string, now = new Date()): Promise<St
     return { ok: true, runId, estimatedCredits: preview.totalCredits }
   } catch (error) {
     reportServerError(error, { action: 'startRun', workspaceId })
-    return { ok: false, message: 'Could not start that playbook — try again.' }
+    return { ok: false, message: 'Could not start that playbook. Try again.' }
   }
 }
 
@@ -201,7 +201,7 @@ export async function executeRun(runId: string): Promise<ExecuteRunState> {
     // ── THE GATE ──────────────────────────────────────────────────────────
     const run = await store.readApprovedRunForExecute(runId, workspaceId)
     if (!run) {
-      return { ok: false, message: 'Approve the cost preview first — nothing has been spent.' }
+      return { ok: false, message: 'Approve the cost preview first. Nothing has been spent.' }
     }
 
     const recipe = playbookRecipe(run.recipe_key)
@@ -370,6 +370,6 @@ export async function executeRun(runId: string): Promise<ExecuteRunState> {
     return { ok: true, drafted, suggested, spent }
   } catch (error) {
     reportServerError(error, { action: 'executeRun', workspaceId })
-    return { ok: false, message: 'Could not finish that run — try again.' }
+    return { ok: false, message: 'Could not finish that run. Try again.' }
   }
 }

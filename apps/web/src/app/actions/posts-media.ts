@@ -79,7 +79,7 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     if (existing === null || formats === null) {
       return {
         ok: false,
-        message: 'Sahoda could not check that photo against the channel limits — try again.',
+        message: 'Sahoda could not check that photo against the channel limits. Try again.',
       }
     }
 
@@ -155,7 +155,7 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     })
     if (upload.error) {
       console.error('[media] upload failed', upload.error.message)
-      return { ok: false, message: 'Could not store that file — try again.' }
+      return { ok: false, message: 'Could not store that file. Try again.' }
     }
     uploadedPath = objectPath
 
@@ -185,7 +185,7 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     if (!parsed.success) {
       return {
         ok: false,
-        message: 'Attached, but the response was unreadable — reload to confirm.',
+        message: 'Attached, but the response was unreadable. Reload to confirm.',
       }
     }
 
@@ -196,7 +196,7 @@ export async function attachMedia(postId: string, formData: FormData): Promise<A
     reportServerError(error, { action: 'attachMedia', workspaceId })
     // A throw after the upload would otherwise strand the object.
     if (uploadedPath !== null) await removeObject(supabase, uploadedPath)
-    return { ok: false, message: 'Could not attach that file — try again.' }
+    return { ok: false, message: 'Could not attach that file. Try again.' }
   }
 }
 
@@ -263,7 +263,7 @@ export async function detachMedia(mediaId: string): Promise<DetachMediaState> {
     return { ok: true }
   } catch (error) {
     reportServerError(error, { action: 'detachMedia', workspaceId })
-    return { ok: false, message: 'Could not remove that file — try again.' }
+    return { ok: false, message: 'Could not remove that file. Try again.' }
   }
 }
 

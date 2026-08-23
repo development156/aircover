@@ -242,7 +242,7 @@ export async function startPlanUpgrade(planId: unknown): Promise<UpgradeCheckout
 
     const rail = provider()
     if (!rail) {
-      return { ok: false, message: 'Card payments are not connected yet — nothing was charged.' }
+      return { ok: false, message: 'Card payments are not connected yet. Nothing was charged.' }
     }
 
     // ABSOLUTE, not '/settings/plan'. This becomes Cashfree's `order_meta.return_url`, which
@@ -280,7 +280,7 @@ export async function startPlanUpgrade(planId: unknown): Promise<UpgradeCheckout
     return { ok: true, simulated: false, mode: 'live', sessionId: session.id, url: session.url }
   } catch (error) {
     reportServerError(error, { action: 'startPlanUpgrade', workspaceId })
-    return { ok: false, message: 'Sahoda could not start that upgrade — try again.' }
+    return { ok: false, message: 'Sahoda could not start that upgrade. Try again.' }
   }
 }
 

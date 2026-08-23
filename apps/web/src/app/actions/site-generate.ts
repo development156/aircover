@@ -290,6 +290,6 @@ export async function generateSite(name: unknown, goal: unknown): Promise<Genera
     if (isDeploymentConfigCause(error)) {
       return { ok: false, insufficient: false, message: DEPLOYMENT_CONFIG_MESSAGE }
     }
-    return { ok: false, insufficient: false, message: 'Could not generate the site — try again.' }
+    return { ok: false, insufficient: false, message: 'Could not generate the site. Try again.' }
   }
 }

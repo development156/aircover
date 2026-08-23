@@ -74,7 +74,7 @@ export async function approveCycleCost(
     if (error) {
       return {
         ok: false,
-        message: messageFor(error.message, 'Could not approve that — try again.'),
+        message: messageFor(error.message, 'Could not approve that. Try again.'),
       }
     }
 
@@ -92,7 +92,7 @@ export async function approveCycleCost(
     }
   } catch (error) {
     reportServerError(error, { action: 'approveCycleCost', workspaceId })
-    return { ok: false, message: 'Could not approve that — try again.' }
+    return { ok: false, message: 'Could not approve that. Try again.' }
   }
 }
 
@@ -145,7 +145,7 @@ export async function killLoop(alsoPause = true): Promise<KillState> {
     if (error) {
       return {
         ok: false,
-        message: messageFor(error.message, 'Could not stop the Loop — try again.'),
+        message: messageFor(error.message, 'Could not stop the Loop. Try again.'),
       }
     }
 
@@ -197,7 +197,7 @@ export async function killLoop(alsoPause = true): Promise<KillState> {
     }
   } catch (error) {
     reportServerError(error, { action: 'killLoop', workspaceId })
-    return { ok: false, message: 'Could not stop the Loop — try again.' }
+    return { ok: false, message: 'Could not stop the Loop. Try again.' }
   }
 }
 
@@ -236,7 +236,7 @@ export async function resolveLearning(
       p_decision: decision,
     })
     if (error) {
-      return { ok: false, message: messageFor(error.message, 'Could not save that — try again.') }
+      return { ok: false, message: messageFor(error.message, 'Could not save that. Try again.') }
     }
 
     const out = data as {
@@ -255,6 +255,6 @@ export async function resolveLearning(
     }
   } catch (error) {
     reportServerError(error, { action: 'resolveLearning', workspaceId })
-    return { ok: false, message: 'Could not save that — try again.' }
+    return { ok: false, message: 'Could not save that. Try again.' }
   }
 }

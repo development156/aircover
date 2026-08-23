@@ -208,7 +208,7 @@ export async function generateVariants(postId: string, channels: unknown): Promi
     if (isDeploymentConfigCause(error)) {
       return { ok: false, insufficient: false, message: DEPLOYMENT_CONFIG_MESSAGE }
     }
-    return { ok: false, insufficient: false, message: 'Could not generate variants — try again.' }
+    return { ok: false, insufficient: false, message: 'Could not generate variants. Try again.' }
   }
 }
 
@@ -311,7 +311,7 @@ export async function rewriteCaption(
     return {
       ok: false,
       insufficient: false,
-      message: 'Could not rewrite this caption — try again.',
+      message: 'Could not rewrite this caption. Try again.',
     }
   }
 }

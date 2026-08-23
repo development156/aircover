@@ -9,7 +9,7 @@ import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 
 export type DisconnectState = { ok: true } | { ok: false; message: string }
 
-const NO_ACCESS = "Couldn't disconnect this account — reload and try again."
+const NO_ACCESS = "Couldn't disconnect this account. Reload and try again."
 
 /**
  * Disconnect = DELETE the connection row; `connection_secrets` cascades, so
@@ -49,6 +49,6 @@ export async function disconnectConnection(connectionId: string): Promise<Discon
     return { ok: true }
   } catch (error) {
     reportServerError(error, { action: 'disconnectConnection', workspaceId })
-    return { ok: false, message: 'Could not disconnect — try again.' }
+    return { ok: false, message: 'Could not disconnect. Try again.' }
   }
 }

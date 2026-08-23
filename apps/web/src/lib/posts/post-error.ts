@@ -8,7 +8,7 @@
  * substrings is not defensible — a single-line Postgres error looks exactly like
  * prose.
  */
-const GENERIC = 'Could not save this post — try again.'
+const GENERIC = 'Could not save this post. Try again.'
 
 export function mapPostError(
   error: { message?: string | null; code?: string | null } | null | undefined,
@@ -17,11 +17,11 @@ export function mapPostError(
     // 23514 check_violation — the only user-fixable one we raise: posts.status
     // and post_variants.publish_status both carry CHECK constraints.
     case '23514':
-      return 'That status is not allowed for this post — reload and try again.'
+      return 'That status is not allowed for this post. Reload and try again.'
 
     // 23505 unique_violation — (post_id, channel) on post_variants.
     case '23505':
-      return 'That channel already has a variant on this post — reload and try again.'
+      return 'That channel already has a variant on this post. Reload and try again.'
 
     // 23503 foreign_key_violation — the post or workspace went away mid-edit.
     case '23503':

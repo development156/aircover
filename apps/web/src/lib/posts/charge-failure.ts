@@ -46,14 +46,14 @@ function isVettedReason(reason: string): reason is FailureReason {
 }
 
 /** Said only when the callback never delivered — the RELEASE ran, so this is verifiable. */
-const NOT_CHARGED = 'You were not charged — try again.'
+const NOT_CHARGED = 'You were not charged. Try again.'
 
 /** Said when the callback delivered but the wrapper still failed. Deliberately claims nothing. */
 const UNCONFIRMED =
   'The model ran, but we could not confirm whether it was charged. Check your wallet balance before you run this again.'
 
 /** Same claim as NOT_CHARGED, written as one sentence — it has no reason to follow. */
-const GENERIC = 'Could not complete this action — you were not charged. Try again.'
+const GENERIC = 'Could not complete this action. You were not charged. Try again.'
 
 export interface ChargeFailureInput {
   /**

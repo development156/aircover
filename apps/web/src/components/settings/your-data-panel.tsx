@@ -145,7 +145,7 @@ export function YourDataPanel() {
     } catch {
       setDownload({
         kind: 'error',
-        message: 'The download stopped before it finished. Nothing was saved — try again.',
+        message: 'The download stopped before it finished. Nothing was saved. Try again.',
       })
     }
   }, [])

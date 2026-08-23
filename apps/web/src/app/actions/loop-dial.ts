@@ -74,13 +74,13 @@ export async function setChannelAutonomy(channel: unknown, level: unknown): Prom
       },
       { onConflict: 'workspace_id,channel' },
     )
-    if (error) return { ok: false, message: 'Could not save that — try again.' }
+    if (error) return { ok: false, message: 'Could not save that. Try again.' }
 
     revalidatePath('/loop')
     return { ok: true }
   } catch (error) {
     reportServerError(error, { action: 'setChannelAutonomy', workspaceId })
-    return { ok: false, message: 'Could not save that — try again.' }
+    return { ok: false, message: 'Could not save that. Try again.' }
   }
 }
 
@@ -118,13 +118,13 @@ export async function setLoopSettings(input: {
     const { error } = await supabase
       .from('loop_settings')
       .upsert(patch, { onConflict: 'workspace_id' })
-    if (error) return { ok: false, message: 'Could not save that — try again.' }
+    if (error) return { ok: false, message: 'Could not save that. Try again.' }
 
     revalidatePath('/loop')
     return { ok: true }
   } catch (error) {
     reportServerError(error, { action: 'setLoopSettings', workspaceId })
-    return { ok: false, message: 'Could not save that — try again.' }
+    return { ok: false, message: 'Could not save that. Try again.' }
   }
 }
 

@@ -72,7 +72,7 @@ export async function approveRunCost(
     if (error) {
       return {
         ok: false,
-        message: messageFor(error.message, 'Could not approve that — try again.'),
+        message: messageFor(error.message, 'Could not approve that. Try again.'),
       }
     }
 
@@ -90,7 +90,7 @@ export async function approveRunCost(
     }
   } catch (error) {
     reportServerError(error, { action: 'approveRunCost', workspaceId })
-    return { ok: false, message: 'Could not approve that — try again.' }
+    return { ok: false, message: 'Could not approve that. Try again.' }
   }
 }
 
@@ -128,7 +128,7 @@ export async function killPlaybooks(alsoDisable = true): Promise<KillSwitchState
       p_also_disable: alsoDisable,
     })
     if (error) {
-      return { ok: false, message: messageFor(error.message, 'Could not stop them — try again.') }
+      return { ok: false, message: messageFor(error.message, 'Could not stop them. Try again.') }
     }
 
     const result = data as {
@@ -150,6 +150,6 @@ export async function killPlaybooks(alsoDisable = true): Promise<KillSwitchState
     }
   } catch (error) {
     reportServerError(error, { action: 'killPlaybooks', workspaceId })
-    return { ok: false, message: 'Could not stop them — try again.' }
+    return { ok: false, message: 'Could not stop them. Try again.' }
   }
 }

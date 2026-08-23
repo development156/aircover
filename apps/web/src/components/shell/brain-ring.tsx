@@ -124,7 +124,7 @@ export function BrainRing({ brain }: { brain: BrainRead }) {
           <Unreadable what="Your Brand Brain score" />
         </span>
         <HoverLine>
-          Could not read your Brand Brain just now — reload to try again. Nothing has changed.
+          Could not read your Brand Brain just now. Reload to try again. Nothing has changed.
         </HoverLine>
       </Link>
     )

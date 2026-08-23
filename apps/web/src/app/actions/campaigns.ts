@@ -107,7 +107,7 @@ export async function createCampaign(formData: FormData): Promise<CampaignSaveSt
 
     const row = CampaignSchema.safeParse(data)
     if (!row.success) {
-      return { ok: false, message: 'Created, but the response was unreadable — reload to confirm.' }
+      return { ok: false, message: 'Created, but the response was unreadable. Reload to confirm.' }
     }
 
     revalidatePath('/campaigns')
@@ -115,7 +115,7 @@ export async function createCampaign(formData: FormData): Promise<CampaignSaveSt
     return { ok: true, campaignId: row.data.id }
   } catch (error) {
     reportServerError(error, { action: 'createCampaign', workspaceId })
-    return { ok: false, message: 'Could not create this campaign — try again.' }
+    return { ok: false, message: 'Could not create this campaign. Try again.' }
   }
 }
 
@@ -172,7 +172,7 @@ export async function updateCampaign(
     return { ok: true, campaignId }
   } catch (error) {
     reportServerError(error, { action: 'updateCampaign', workspaceId })
-    return { ok: false, message: 'Could not save this campaign — try again.' }
+    return { ok: false, message: 'Could not save this campaign. Try again.' }
   }
 }
 
@@ -222,7 +222,7 @@ export async function setCampaignStatus(
     return { ok: true, campaignId }
   } catch (error) {
     reportServerError(error, { action: 'setCampaignStatus', workspaceId })
-    return { ok: false, message: 'Could not change this campaign — try again.' }
+    return { ok: false, message: 'Could not change this campaign. Try again.' }
   }
 }
 
@@ -276,7 +276,7 @@ export async function addPostsToCampaign(
     return { ok: true, changed: data?.length ?? 0 }
   } catch (error) {
     reportServerError(error, { action: 'addPostsToCampaign', workspaceId })
-    return { ok: false, message: 'Could not add those posts — try again.' }
+    return { ok: false, message: 'Could not add those posts. Try again.' }
   }
 }
 
@@ -324,7 +324,7 @@ export async function removePostFromCampaign(
     return { ok: true, changed: 1 }
   } catch (error) {
     reportServerError(error, { action: 'removePostFromCampaign', workspaceId })
-    return { ok: false, message: 'Could not remove that post — try again.' }
+    return { ok: false, message: 'Could not remove that post. Try again.' }
   }
 }
 
@@ -367,6 +367,6 @@ export async function deleteCampaign(campaignId: string): Promise<CampaignDelete
     return { ok: true }
   } catch (error) {
     reportServerError(error, { action: 'deleteCampaign', workspaceId })
-    return { ok: false, message: 'Could not delete this campaign — try again.' }
+    return { ok: false, message: 'Could not delete this campaign. Try again.' }
   }
 }

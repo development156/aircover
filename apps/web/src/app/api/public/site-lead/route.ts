@@ -39,7 +39,7 @@ function json(body: unknown, status: number): Response {
 
 /** One sentence, no jargon — this renders inside somebody else's landing page. */
 const COULD_NOT_SEND =
-  'We could not send that just now. Nothing was saved — please try again in a moment.'
+  'We could not send that just now. Nothing was saved. Please try again in a moment.'
 
 export async function POST(request: Request): Promise<Response> {
   const ip = clientIpFrom(request.headers)

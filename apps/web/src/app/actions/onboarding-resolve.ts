@@ -199,6 +199,6 @@ export async function resolveOnboarding(
     if (isDeploymentConfigCause(error)) {
       return { ok: false, kind: 'error', message: DEPLOYMENT_CONFIG_MESSAGE }
     }
-    return { ok: false, kind: 'error', message: 'Could not resolve your brand — try again.' }
+    return { ok: false, kind: 'error', message: 'Could not resolve your brand. Try again.' }
   }
 }

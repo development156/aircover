@@ -320,7 +320,7 @@ export async function runCycleToPreview(
         message:
           credits.error.code === 'CREDIT_INSUFFICIENT'
             ? 'Not enough credits to plan this week.'
-            : 'Could not plan this week — you were not charged.',
+            : 'Could not plan this week. You were not charged.',
       }
     }
 
@@ -361,6 +361,6 @@ export async function runCycleToPreview(
     return { ok: true, cycleId: cycle.id }
   } catch (error) {
     reportServerError(error, { action: 'runCycleToPreview', workspaceId })
-    return { ok: false, message: 'Could not run the cycle — try again.' }
+    return { ok: false, message: 'Could not run the cycle. Try again.' }
   }
 }

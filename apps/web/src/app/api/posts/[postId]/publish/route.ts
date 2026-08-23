@@ -92,7 +92,7 @@ export async function POST(
      */
     const workspaceRead = await readActiveWorkspace()
     if (workspaceRead.status === 'unreadable') {
-      return fail('Couldn’t check your workspace just now — try again.', 503)
+      return fail('Couldn’t check your workspace just now. Try again.', 503)
     }
     if (workspaceRead.status === 'none') return fail('Create a workspace first.', 400)
     const workspace = workspaceRead.workspace
@@ -145,11 +145,11 @@ export async function POST(
       if (msg.includes('POST_NOT_RELEASABLE')) {
         return fail('This post has already been published or closed.', 409)
       }
-      return fail('Couldn’t get this post ready to publish — try again.', 500)
+      return fail('Couldn’t get this post ready to publish. Try again.', 500)
     }
     const scheduledAt = (released as { scheduled_at?: unknown } | null)?.scheduled_at
     if (typeof scheduledAt !== 'string') {
-      return fail('Couldn’t get this post ready to publish — try again.', 500)
+      return fail('Couldn’t get this post ready to publish. Try again.', 500)
     }
 
     // Built OUTSIDE the publish call and classified on its own. `publishPostDeps` reads
@@ -232,7 +232,7 @@ export async function POST(
         code: infra ? 'INFRA_UNAVAILABLE' : 'PUBLISH_TRANSIENT',
         message: infra
           ? 'Publishing is unavailable right now — nothing was sent. We’ve been alerted.'
-          : 'Publishing didn’t go through — try again in a moment.',
+          : 'Publishing didn’t go through. Try again in a moment.',
       },
       { status: 503, headers: { 'cache-control': 'no-store' } },
     )

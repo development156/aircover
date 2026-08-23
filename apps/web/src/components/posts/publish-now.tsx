@@ -136,11 +136,11 @@ export function PublishNow({
         })
         body = (await res.json()) as typeof body
         if (!res.ok || body.ok !== true) {
-          setError(body.message ?? 'Publishing didn’t go through — try again.')
+          setError(body.message ?? 'Publishing didn’t go through. Try again.')
           return
         }
       } catch {
-        setError('Couldn’t reach the server — check your connection and try again.')
+        setError('Couldn’t reach the server. Check your connection and try again.')
         return
       }
 

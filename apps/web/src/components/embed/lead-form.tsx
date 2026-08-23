@@ -116,7 +116,7 @@ export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
       // A network failure is ours to own, and it genuinely did not save.
       setStatus({
         kind: 'error',
-        message: 'We could not send that just now. Nothing was saved — please try again.',
+        message: 'We could not send that just now. Nothing was saved. Please try again.',
       })
     }
   }

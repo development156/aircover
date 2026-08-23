@@ -106,7 +106,7 @@ export default async function ResolveConsolePage() {
         role="alert"
         className="type-body rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-danger"
       >
-        Could not read your Brand Brain just now — reload to try again. Nothing has changed and
+        Could not read your Brand Brain just now. Reload to try again. Nothing has changed and
         nothing was charged.
       </div>
     )

@@ -72,7 +72,7 @@ export async function savePlaybook(input: {
     return { ok: true, playbookId }
   } catch (error) {
     reportServerError(error, { action: 'savePlaybook', workspaceId })
-    return { ok: false, message: 'Could not save that playbook — try again.' }
+    return { ok: false, message: 'Could not save that playbook. Try again.' }
   }
 }
 
@@ -105,6 +105,6 @@ export async function togglePlaybook(
     return { ok: true, playbookId }
   } catch (error) {
     reportServerError(error, { action: 'togglePlaybook', workspaceId })
-    return { ok: false, message: 'Could not change that — try again.' }
+    return { ok: false, message: 'Could not change that. Try again.' }
   }
 }

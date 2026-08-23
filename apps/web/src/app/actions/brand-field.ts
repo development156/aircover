@@ -70,7 +70,7 @@ export async function confirmBrainField(
       return { ok: false, message: 'Set up your Brand Brain before editing it.' }
     }
     if (brain.status === 'unreadable') {
-      return { ok: false, message: 'Could not read your Brand Brain — reload and try again.' }
+      return { ok: false, message: 'Could not read your Brand Brain. Reload and try again.' }
     }
 
     // Unchanged text on an ALREADY-confirmed field is the only true no-op left:
@@ -102,6 +102,6 @@ export async function confirmBrainField(
     return { ok: true, version: saved.version, unchanged: saved.replayed }
   } catch (error) {
     reportServerError(error, { action: 'confirmBrainField' })
-    return { ok: false, message: 'Could not save that field — try again.' }
+    return { ok: false, message: 'Could not save that field. Try again.' }
   }
 }

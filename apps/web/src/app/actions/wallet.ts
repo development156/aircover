@@ -66,7 +66,7 @@ export async function startCheckout(planId: unknown): Promise<CheckoutState> {
 
     const rail = provider()
     if (!rail) {
-      return { ok: false, message: 'Card payments are not connected yet — nothing was charged.' }
+      return { ok: false, message: 'Card payments are not connected yet. Nothing was charged.' }
     }
 
     // ABSOLUTE, not '/wallet'. `successUrl` becomes Cashfree's `order_meta.return_url`, which
@@ -104,6 +104,6 @@ export async function startCheckout(planId: unknown): Promise<CheckoutState> {
     return { ok: true, simulated: false, mode: 'live', sessionId: session.id, url: session.url }
   } catch (error) {
     reportServerError(error, { action: 'startCheckout', workspaceId })
-    return { ok: false, message: 'Could not start a top-up — try again.' }
+    return { ok: false, message: 'Could not start a top-up. Try again.' }
   }
 }

@@ -201,7 +201,7 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
         }
       }
     } catch {
-      setState({ ok: false, message: 'The connection dropped while reading — try again.' })
+      setState({ ok: false, message: 'The connection dropped while reading. Try again.' })
     } finally {
       setPending(false)
     }

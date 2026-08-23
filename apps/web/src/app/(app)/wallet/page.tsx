@@ -71,7 +71,7 @@ export default async function WalletPage() {
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
         >
-          Could not read your credit balance just now — reload to try again. Nothing has been
+          Could not read your credit balance just now. Reload to try again. Nothing has been
           charged and your credits are unaffected.
         </div>
       )}

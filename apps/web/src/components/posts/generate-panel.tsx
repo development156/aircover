@@ -79,7 +79,7 @@ export function GeneratePanel({
         setOutcome({
           kind: 'failed',
           message:
-            'Your post body could not be saved, so nothing was generated and no credits were charged — try again.',
+            'Your post body could not be saved, so nothing was generated and no credits were charged. Try again.',
         })
         return
       }

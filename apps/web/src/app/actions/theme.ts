@@ -79,7 +79,7 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
       .limit(1)
       .maybeSingle()
     if (versionError) {
-      return { ok: false, message: 'Could not save your theme — try again.' }
+      return { ok: false, message: 'Could not save your theme. Try again.' }
     }
     const nextVersion = ((latest as { version?: number } | null)?.version ?? 0) + 1
 
@@ -93,7 +93,7 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
       .eq('workspace_id', workspace.id)
       .eq('status', 'active')
     if (supersedeError) {
-      return { ok: false, message: 'Could not save your theme — try again.' }
+      return { ok: false, message: 'Could not save your theme. Try again.' }
     }
 
     // A NULL ERROR ON AN UPDATE DOES NOT MEAN THE WRITE HAPPENED.
@@ -115,7 +115,7 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
       .eq('status', 'active')
       .limit(1)
     if (verifyError || (stillActive?.length ?? 0) > 0) {
-      return { ok: false, message: 'Could not save your theme — try again.' }
+      return { ok: false, message: 'Could not save your theme. Try again.' }
     }
 
     const { error } = await supabase.from('workspace_themes').insert({
@@ -128,13 +128,13 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
     })
     if (error) {
       // Never forward the postgres message — it can carry schema internals.
-      return { ok: false, message: 'Could not save your theme — try again.' }
+      return { ok: false, message: 'Could not save your theme. Try again.' }
     }
 
     // The theme paints the app shell and every site preview.
     revalidatePath('/', 'layout')
     return { ok: true }
   } catch {
-    return { ok: false, message: 'Could not save your theme — try again.' }
+    return { ok: false, message: 'Could not save your theme. Try again.' }
   }
 }
