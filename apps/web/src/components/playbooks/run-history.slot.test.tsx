@@ -8,6 +8,21 @@ import { RunHistory } from '@/components/playbooks/run-history'
 /**
  * A live run holds its playbook's only slot, and the screen has to say so.
  *
+ * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
+ * Two regexes over text, one on the migrations and one on the component:
+ *  · every migration file is CONCATENATED and the first
+ *    `one_live_per_playbook … where status in (…)` wins, so an index that a
+ *    later migration DROPPED, or narrowed, still matches its original CREATE;
+ *  · a predicate written another way — `status = any(array[…])`, a NOT IN, a
+ *    condition on a different column — reads as the index being absent;
+ *  · `HOLDS_THE_SLOT` is read as a literal `new Set([…])`. Built any other way
+ *    — spread from a const, filtered, imported — it is not found;
+ *  · that the component USES the set it declares. This compares two
+ *    declarations; a component that computed the sentence from something else
+ *    entirely would still pass;
+ *  · the live database, for the same reason the one above cannot: these are
+ *    files, not the catalog.
+ *
  * ── THE BEHAVIOUR THIS PINS IS CORRECT, WHICH IS THE PROBLEM ─────────────────
  * Two rules, each right. A playbook may have one live run at a time —
  * `playbook_runs_one_live_per_playbook`, a partial unique index — and a run that

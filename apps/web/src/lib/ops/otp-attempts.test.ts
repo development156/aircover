@@ -7,6 +7,19 @@ import { OTP_MAX_ATTEMPTS } from '@/lib/ops/otp'
 /**
  * `OTP_MAX_ATTEMPTS` is not read by anything, and it must not be deleted.
  *
+ * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
+ * It matches ONE spelling of the limit, `req.attempts >= N`, in migration FILES:
+ *  · a limit written any other way — `> 2`, `attempts + 1 >`, a named constant, a
+ *    value read from a settings row — yields no match and is invisible;
+ *  · a later migration that DROPS `ops_credit_request_verify` without redefining
+ *    it. That file MENTIONS the name, so it is scanned, but produces no match,
+ *    and `enforced` keeps the number from the previous definition. A limit that
+ *    no longer exists would still be reported as pinned;
+ *  · any enforcement OUTSIDE that function — a trigger, a rate limit in the
+ *    route, a check in the client;
+ *  · the live database. This reads the files in the repository, so a function
+ *    changed in production out of band is not something it can notice.
+ *
  * ── WHAT IT IS AND IS NOT ────────────────────────────────────────────────────
  * The attempt counter is enforced in the DATABASE. `ops_credit_request_verify`
  * counts attempts, refuses at three with `too_many_attempts`, and expires the
