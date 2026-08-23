@@ -477,7 +477,7 @@ export async function deleteKnowledgeDocument(
       brandFields,
       message:
         brandFields > 0
-          ? `Deleted. Sahoda has kept what it already learned from it. ${brandFields} ${brandFields === 1 ? 'field' : 'fields'} in your Brand Brain no longer name a document you can open.`
+          ? `Deleted. Sahoda has kept what it already learned from it: ${brandFields} ${brandFields === 1 ? 'field' : 'fields'} in your Brand Brain no longer name a document you can open.`
           : 'Deleted, along with everything Sahoda had indexed from it.',
     }
   } catch (error) {

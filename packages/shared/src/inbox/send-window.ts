@@ -199,7 +199,7 @@ export function evaluateSendWindow({
       state: 'open',
       platform,
       closesAt: addHours(inboundMs, spec.standardWindowHours),
-      reason: `Replies are open. ${platform} allows a free-form reply for ${spec.standardWindowHours} hours after the customer’s last message.`,
+      reason: `Replies are open: ${platform} allows a free-form reply for ${spec.standardWindowHours} hours after the customer’s last message.`,
       canSendFromSahoda: true,
     }
   }

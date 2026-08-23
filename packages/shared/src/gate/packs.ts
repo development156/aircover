@@ -54,7 +54,7 @@ const FLOOR_RULES: readonly Rule[] = [
     source: 'packs/regime/_floor.md',
     phrases: ['no.1', 'no 1', '#1', 'number one', "world's best", "india's best", 'the best in'],
     rewrite:
-      'Name what you are best at and how it was measured. "rated 4.8 by 300 customers" says more than "No.1" and is yours to stand behind.',
+      'Name what you are best at and how it was measured: "rated 4.8 by 300 customers" says more than "No.1" and is yours to stand behind.',
   },
   {
     id: 'floor.guaranteed-outcome',

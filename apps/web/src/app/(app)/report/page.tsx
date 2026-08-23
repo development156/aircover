@@ -187,8 +187,8 @@ export default async function ReportPage() {
                   <p className="type-sm mt-1 text-muted">
                     {brief.channels.join(' · ')}
                     {brief.stageOutcome === 'awaiting_approval'
-                      ? ' · scheduled, waiting for your approval'
-                      : ' · a draft in your Planner'}
+                      ? '. Scheduled, waiting for your approval'
+                      : '. A draft in your Planner'}
                   </p>
                 </li>
               ))}

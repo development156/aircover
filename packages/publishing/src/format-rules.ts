@@ -144,7 +144,7 @@ export const FORMAT_MEDIA: Readonly<Record<PostFormat, FormatMediaRule>> = {
     minItems: 1,
     maxItems: 1,
     maxAspect: 1,
-    need: 'One upright photo. 9:16 is the shape Instagram fills.',
+    need: 'One upright photo: 9:16 is the shape Instagram fills.',
   },
   // ── A THREAD'S PHOTOS STAY ON THE POST ─────────────────────────────────────
   // `threadItems[].mediaItems` exists and is NOT used. It is [SPEC]-only, and
