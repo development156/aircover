@@ -392,3 +392,53 @@ describe('MediaPane — remove', () => {
     expect(refresh).not.toHaveBeenCalled()
   })
 })
+
+/**
+ * SIX BLOCKS OF EXPLANATION ABOUT MEDIA, ON A POST THAT HAS NONE.
+ *
+ * MEASURED on the flow lane's baseline frame at 1440: with nothing attached the
+ * writing column carried the empty card (three sentences), the attach terms, the
+ * library picker, the generator and its note, and two trailing notes — one about
+ * removing a library photo and one about alt text. That is the founder's "five
+ * cards explaining an absence the page could state once", sitting in the one
+ * column where the writing happens.
+ *
+ * Nothing was softened. Both trailing claims are about a photo, so they wait for
+ * one — and the pair of tests below is what keeps that from becoming a deletion:
+ * an absence assertion alone passes against a component that renders nothing.
+ */
+describe('MediaPane — what it explains before there is anything to explain', () => {
+  test('an empty post is not told what happens when a photo is removed', () => {
+    render(<MediaPane media={[]} channels={toChannelSet(['x'])} postId={POST_ID} />)
+    expect(screen.queryByText(/takes it off this post only/i)).not.toBeInTheDocument()
+  })
+
+  test('an empty post is not told about alt text for an image it does not have', () => {
+    render(<MediaPane media={[]} channels={toChannelSet(['x'])} postId={POST_ID} />)
+    expect(screen.queryByText(/alt text is not built yet/i)).not.toBeInTheDocument()
+  })
+
+  test('...and BOTH come back the moment a file lands', () => {
+    // The counterweight. Without this the two assertions above would pass
+    // against a component that had simply lost the claims, which is the repair
+    // this product refuses: the fix for an honesty note is never to delete it.
+    render(<MediaPane media={[mediaRow()]} channels={toChannelSet(['x'])} postId={POST_ID} />)
+    expect(screen.getByText(/takes it off this post only/i)).toBeInTheDocument()
+    expect(screen.getByText(/alt text is not built yet/i)).toBeInTheDocument()
+  })
+
+  test('the empty card keeps the one warning that is true with no file', () => {
+    // Channel rules bite on a text-only post too, which is the thing a reader
+    // looking at an empty media card would otherwise assume wrong. It stays.
+    render(<MediaPane media={[]} channels={toChannelSet(['x'])} postId={POST_ID} />)
+    expect(screen.getByText(/channel limits still apply to text-only posts/i)).toBeInTheDocument()
+  })
+
+  test('the empty card drops the promise about a file that does not exist', () => {
+    render(<MediaPane media={[]} channels={toChannelSet(['x'])} postId={POST_ID} />)
+    expect(screen.queryByText(/checks every file against each channel/i)).not.toBeInTheDocument()
+    // The terms of attaching still exist — they moved nowhere, they were always
+    // on the attach control, which is where a claim about files belongs.
+    expect(screen.getByText(/images only/i)).toBeInTheDocument()
+  })
+})
