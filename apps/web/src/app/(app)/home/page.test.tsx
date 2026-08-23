@@ -340,7 +340,8 @@ describe('the landing rule on the page that lands', () => {
     await expect(HomePage()).rejects.toThrow()
     // `redirect` throws, so the JSX below it is never reached. If it were a
     // silent spy this would be a dashboard drawn under a passing assertion.
-    expect(screen.queryByText(/available credits/i)).not.toBeInTheDocument()
+    expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
+    expect(screen.queryByText(/needs your attention/i)).not.toBeInTheDocument()
   })
 
   test('a finished account gets the dashboard', async () => {
@@ -348,7 +349,7 @@ describe('the landing rule on the page that lands', () => {
 
     render(await HomePage())
 
-    expect(screen.getByText(/available credits/i)).toBeInTheDocument()
+    expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
   })
 
   /**
@@ -361,7 +362,7 @@ describe('the landing rule on the page that lands', () => {
 
     render(await HomePage())
 
-    expect(screen.getByText(/available credits/i)).toBeInTheDocument()
+    expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
   })
 
   test('Save & exit is honoured — a deferred visit is not bounced', async () => {
@@ -370,6 +371,6 @@ describe('the landing rule on the page that lands', () => {
 
     render(await HomePage())
 
-    expect(screen.getByText(/available credits/i)).toBeInTheDocument()
+    expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
   })
 })

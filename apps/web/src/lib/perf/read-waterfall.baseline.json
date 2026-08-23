@@ -5,35 +5,86 @@
   },
   {
     "route": "/(app)/ads",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/ads/budget",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/ads/creative",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/ads/performance",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/ads/targeting",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/analytics",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/approvals",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "readApprovalQueue"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readApprovalQueue"
+    ]
   },
   {
     "route": "/(app)/assets",
     "awaits": [
+      "decideLanding",
       "activeWorkspaceRead",
       "getOpsAdmin",
       "read",
@@ -46,6 +97,7 @@
   {
     "route": "/(app)/billing/checkout/[orderId]",
     "awaits": [
+      "decideLanding",
       "activeWorkspaceRead",
       "getOpsAdmin",
       "read",
@@ -57,23 +109,55 @@
   },
   {
     "route": "/(app)/brain",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "readBrain"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readBrain"
+    ]
   },
   {
     "route": "/(app)/brain/audience",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "readAudiencePage"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readAudiencePage"
+    ]
   },
   {
     "route": "/(app)/brain/competitors",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/brain/identity",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "readBrain"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readBrain"
+    ]
   },
   {
     "route": "/(app)/brain/knowledge",
     "awaits": [
+      "decideLanding",
       "activeWorkspaceRead",
       "getOpsAdmin",
       "read",
@@ -86,6 +170,7 @@
   {
     "route": "/(app)/brain/resolve",
     "awaits": [
+      "decideLanding",
       "activeWorkspaceRead",
       "getOpsAdmin",
       "read",
@@ -97,15 +182,32 @@
   },
   {
     "route": "/(app)/brain/voice",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "readBrain"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readBrain"
+    ]
   },
   {
     "route": "/(app)/campaigns",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "readCampaigns"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readCampaigns"
+    ]
   },
   {
     "route": "/(app)/campaigns/[id]",
     "awaits": [
+      "decideLanding",
       "activeWorkspaceRead",
       "getOpsAdmin",
       "read",
@@ -118,6 +220,7 @@
   {
     "route": "/(app)/connections",
     "awaits": [
+      "decideLanding",
       "activeWorkspaceRead",
       "getOpsAdmin",
       "read",
@@ -132,19 +235,42 @@
   },
   {
     "route": "/(app)/create",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/create/post",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/home",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "listVariantStates"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "listVariantStates"
+    ]
   },
   {
     "route": "/(app)/inbox",
     "awaits": [
+      "decideLanding",
       "activeWorkspaceRead",
       "getOpsAdmin",
       "read",
@@ -155,35 +281,89 @@
   },
   {
     "route": "/(app)/inbox/comments",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "readCommentedPosts"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readCommentedPosts"
+    ]
   },
   {
     "route": "/(app)/inbox/comments/[accountId]/[platformPostId]",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/inbox/reviews",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "readReviews"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readReviews"
+    ]
   },
   {
     "route": "/(app)/inbox/threads/[accountId]/[conversationId]",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/leads",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/loop",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "readLoop"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readLoop"
+    ]
   },
   {
     "route": "/(app)/planner",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "readPosts"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readPosts"
+    ]
   },
   {
     "route": "/(app)/playbooks",
     "awaits": [
+      "decideLanding",
       "activeWorkspaceRead",
       "getOpsAdmin",
       "read",
@@ -196,6 +376,7 @@
   {
     "route": "/(app)/posts",
     "awaits": [
+      "decideLanding",
       "activeWorkspaceRead",
       "getOpsAdmin",
       "read",
@@ -208,6 +389,7 @@
   {
     "route": "/(app)/posts/[id]",
     "awaits": [
+      "decideLanding",
       "activeWorkspaceRead",
       "getOpsAdmin",
       "read",
@@ -223,39 +405,103 @@
   },
   {
     "route": "/(app)/radar",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "getActiveWorkspace"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "getActiveWorkspace"
+    ]
   },
   {
     "route": "/(app)/radar/[id]",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "getActiveWorkspace"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "getActiveWorkspace"
+    ]
   },
   {
     "route": "/(app)/remix",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "activeWorkspaceRead"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "activeWorkspaceRead"
+    ]
   },
   {
     "route": "/(app)/report",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "readLoop"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readLoop"
+    ]
   },
   {
     "route": "/(app)/settings",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "getActiveWorkspace"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "getActiveWorkspace"
+    ]
   },
   {
     "route": "/(app)/settings/integrations",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "readConnections"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readConnections"
+    ]
   },
   {
     "route": "/(app)/settings/plan",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/settings/profile",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read", "currentUser"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "currentUser"
+    ]
   },
   {
     "route": "/(app)/sites",
     "awaits": [
+      "decideLanding",
       "activeWorkspaceRead",
       "getOpsAdmin",
       "read",
@@ -272,27 +518,52 @@
   },
   {
     "route": "/(app)/studio",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/wallet",
-    "awaits": ["activeWorkspaceRead", "getOpsAdmin", "read", "soft", "read"]
+    "awaits": [
+      "decideLanding",
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(auth)/sign-in/[[...sign-in]]",
-    "awaits": ["auth"]
+    "awaits": [
+      "auth"
+    ]
   },
   {
     "route": "/(auth)/sign-up/[[...sign-up]]",
-    "awaits": ["auth"]
+    "awaits": [
+      "auth"
+    ]
   },
   {
     "route": "/(onboarding)/onboarding",
-    "awaits": ["getActiveWorkspace", "activeBrandMemory"]
+    "awaits": [
+      "getActiveWorkspace"
+    ]
   },
   {
     "route": "/admin",
-    "awaits": ["requireOpsAdmin", "getOpsAdmin", "read", "soft"]
+    "awaits": [
+      "requireOpsAdmin",
+      "getOpsAdmin",
+      "read",
+      "soft"
+    ]
   },
   {
     "route": "/admin/applications",
@@ -307,7 +578,13 @@
   },
   {
     "route": "/admin/credits",
-    "awaits": ["requireOpsAdmin", "getOpsAdmin", "read", "soft", "requireOpsAdmin"]
+    "awaits": [
+      "requireOpsAdmin",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "requireOpsAdmin"
+    ]
   },
   {
     "route": "/admin/dev",
@@ -346,7 +623,14 @@
   },
   {
     "route": "/admin/team",
-    "awaits": ["requireOpsAdmin", "getOpsAdmin", "read", "soft", "requireOpsAdmin", "readOpsAdmins"]
+    "awaits": [
+      "requireOpsAdmin",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "requireOpsAdmin",
+      "readOpsAdmins"
+    ]
   },
   {
     "route": "/design-system",
