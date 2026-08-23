@@ -39,7 +39,13 @@ export function ReadinessLine({ readiness }: { readiness: AnalyticsReadiness }) 
       data-testid="analytics-readiness"
       data-readiness={readiness.kind}
       aria-labelledby="analytics-readiness-head"
-      className="surface-ring rounded-card bg-surface p-5"
+      /* The card is the width of what is in it. Its own note already argues
+         that "centring a sentence in a wide box is what makes it look like a
+         shrug" and fixes the ALIGNMENT; MEASURED on
+         `page-dash-after__empty__analytics__full__1440__dark`, the box is still
+         1100px around a ~400px column, which is the same defect one step out.
+         `--measure-form` because it holds two buttons on a row, not prose. */
+      className="surface-ring max-w-[var(--measure-form)] rounded-card bg-surface p-5"
     >
       <h2 id="analytics-readiness-head" className="type-h3 text-ink">
         {readiness.headline}

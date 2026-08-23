@@ -36,26 +36,24 @@ import { cn } from '@/lib/utils'
  * The hatch is never rendered without the label the caller must pass with it —
  * `.is-simulated`'s own contract, restated in `assert` form below.
  *
- * ── ONE LABEL, NOT TWENTY. AND ONE ORANGE BAR, NOT THIRTY ───────────────────
- * The peak gets the label (Nixtio puts the figure in a small pill at the end of
- * each bar; at thirty bars that is thirty numbers, so it goes on the one worth
- * reading) and it gets the accent. Everything else is `--ink-mute`.
+ * ── NO BAR IS ORANGE, AND IT TOOK TWO MEASUREMENTS TO GET THERE ─────────────
+ * Draft one painted every bar `--brand`. MEASURED: /home populated at 1440 went
+ * **0.550% → 0.613%** brand — the accent budget going UP, on a lane whose brief
+ * is that the orange should be spent on the one thing the screen is for. Thirty
+ * orange bars is thirty things.
  *
- * MEASURED, and this is why it is not a preference: the first version drew
- * every bar in `--brand`, and /home populated at 1440 went from 0.550% to
- * 0.613% brand — the accent budget going UP, on a lane whose brief is that the
- * orange should be spent on the one thing the screen is for. Thirty orange bars
- * is thirty things.
+ * Draft two kept the accent for the PEAK alone, following Solis and Flux, which
+ * each highlight exactly one bar. MEASURED: **still 0.613%.** A 14x168 solid
+ * rectangle is a large object, and one of them is most of what thirty were.
  *
- * It is also what the reference does and I had it backwards: its hours-by-day
- * chart is drawn in NEUTRAL and the green is kept for the line and the primary
- * button. Solis and Flux both go further and highlight exactly one bar, which
- * is the shape here.
- *
- * THE COLOUR DOES NOT CARRY THE MEANING. The peak is named in words directly
- * under the chart — "Highest: 30 credits on 23 Aug" — and in the accessible
- * summary. Strip the hue and nothing is lost, which is the test docs/37 §9
- * applies to every other signal in this product.
+ * The reference settles it, and the rule is cleaner than either draft: its
+ * balance chart's LINE is green — the accent — and its hours-by-day BARS are
+ * neutral. Lines take the accent; bars do not. So every bar here is
+ * `--ink-mute`, `TrendArea`'s stroke stays `--brand`, and nothing is lost:
+ * the peak is already named in words directly under the chart ("Highest: 30
+ * credits on 23 Aug") and in the accessible summary, and height is what encodes
+ * it. A highlight would have been a second way of saying the tallest bar is
+ * tallest.
  *
  * ── ENTRANCE ─────────────────────────────────────────────────────────────────
  * `enter-step`, the product's ONE entrance (docs/37 §12), staggered along the
@@ -98,12 +96,20 @@ export function Bars({
   }
 
   /**
-   * Every axis label at 30 points is a wall of 12px type. Show roughly eight,
-   * always including the first and last so the window's own extent is readable.
+   * ── THE AXIS IS TWO LABELS, AND THE FIRST ATTEMPT WAS UNREADABLE ──────────
+   * Draft one showed every Nth label — roughly eight — each inside its own
+   * 1/30th flex column with `truncate`. MEASURED on
+   * `page-dash-after__populated__home__full__1440__light`: a column is ~34px at
+   * 1440 and "25 Jul" needs ~40, so the axis rendered "25 … 29 … 2 A… 6 …",
+   * and at 390 it collapsed to "2. 2. 2. 6. 1. 1. 1. 2.2". Eight labels nobody
+   * can read is worse than two they can.
+   *
+   * The reference gets away with thirty date labels because it draws them at a
+   * 1844px viewport. Take its proportion, not its pixels: the two ENDS state
+   * the window's extent, which is what an axis is for, and the one date that
+   * matters — the peak's — is already named in words directly below the chart
+   * and in the accessible summary. Nothing has to truncate, at any width.
    */
-  const every = Math.max(1, Math.ceil(points.length / 8))
-  const shows = (i: number) => i === 0 || i === points.length - 1 || i % every === 0
-
   return (
     <figure className={cn('flex flex-col', className)}>
       <div className="flex h-[168px] items-end gap-[3px] max-narrow:h-[132px]">
@@ -123,12 +129,9 @@ export function Bars({
                   data-bar={(point.value as number) === 0 ? 'zero' : 'value'}
                   className={cn(
                     'w-full max-w-[14px] rounded-full',
-                    point.hatched
-                      ? 'is-simulated'
-                      : // Neutral, except the peak. See the header.
-                        i === peakIndex
-                        ? 'bg-brand'
-                        : 'bg-ink-mute',
+                    // Neutral. Lines take the accent, bars do not — see the
+                    // header for the two measurements that produced that rule.
+                    point.hatched ? 'is-simulated' : 'bg-ink-mute',
                     /* A measured zero is a STUB, and a DIFFERENT FILL. Height
                        alone cannot separate it from a value that rounds to the
                        same 3px floor, and `--line` against `--brand` is a fill
@@ -164,21 +167,12 @@ export function Bars({
         </p>
       ) : null}
 
-      <div aria-hidden className="mt-2 flex gap-[3px] border-t border-line-soft pt-2">
-        {points.map((point, i) => (
-          <span
-            key={`ax-${point.label}-${i}`}
-            className={cn(
-              'min-w-0 flex-1 truncate text-center type-meta',
-              // Faint where nothing was measured — the axis carries the second
-              // half of "there is no bar here because nobody looked".
-              point.value === null ? 'text-muted opacity-60' : 'text-muted',
-              !shows(i) && 'invisible',
-            )}
-          >
-            {point.label}
-          </span>
-        ))}
+      <div
+        aria-hidden
+        className="mt-2 flex justify-between gap-4 border-t border-line-soft pt-2 type-meta text-muted"
+      >
+        <span>{points[0]?.label}</span>
+        <span>{points[points.length - 1]?.label}</span>
       </div>
 
       {hatchLabel ? (

@@ -60,8 +60,22 @@ describe('the curve', () => {
    * to hold that inversion in their head to know which direction "below" is.
    */
   test('never dips below the two readings it joins', () => {
-    const m = monotoneTangents([0, 1, 2], [40, 0, 40])
+    /* ── THE FIXTURE IS ASYMMETRIC, AND THAT IS THE WHOLE TEST ──────────────
+       This was written as [40, 0, 40] and it PASSED UNDER MUTATION: removing
+       the flat-tangent clause entirely left it green. The naive average of a
+       symmetric V is (-40 + 40) / 2 = 0, which is exactly the answer the clause
+       gives, so the case could not tell a guarded implementation from an
+       unguarded one. Watching it fail is the only thing that surfaces that.
+
+       [40, 0, 10] separates them: the average is -15 and the correct answer is
+       0. Any tangent other than 0 at a local minimum sends the curve below the
+       minimum, which is a rendered reading nobody measured. */
+    const m = monotoneTangents([0, 1, 2], [40, 0, 10])
     expect(m[1], 'the tangent at a local minimum must be flat').toBe(0)
+
+    // …and at a local MAXIMUM, which is the same defect drawn upwards.
+    const peak = monotoneTangents([0, 1, 2], [10, 40, 0])
+    expect(peak[1], 'the tangent at a local maximum must be flat').toBe(0)
 
     const rising = monotoneTangents([0, 1, 2], [0, 10, 20])
     expect(

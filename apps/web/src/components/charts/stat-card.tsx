@@ -143,8 +143,16 @@ export function StatStrip({
   return (
     <div
       className={cn(
-        'grid gap-4 max-wide:grid-cols-2 max-narrow:gap-3',
-        cols === 3 ? 'grid-cols-3' : 'grid-cols-4',
+        'grid gap-4 max-narrow:gap-3',
+        /* THREE AND FOUR BREAK DIFFERENTLY, because three FIT in the middle
+           band and four do not. MEASURED at 1024, where the rail costs 72px and
+           the content column is ~936: four 44px figures need ~230px each and
+           wrap; three have ~300 and read fine. A shared `max-wide:grid-cols-2`
+           put /analytics' third card alone on a second row at half width, for
+           no reason but sharing a rule with a strip that has one more card. */
+        cols === 3
+          ? 'grid-cols-3 max-narrow:grid-cols-1'
+          : 'grid-cols-4 max-wide:grid-cols-2',
       )}
     >
       {children}

@@ -193,9 +193,8 @@ test.describe('the accent budget @smoke', () => {
           const inShell = fills.filter((f) => !f.inMain)
           report.push(
             `  ${where.padEnd(28)} page ${inPage.length} shell ${inShell.length} — ${
-              fills
-                .map((f) => `${f.inMain ? 'page' : 'shell'} ${f.box} "${f.text}"`)
-                .join(' | ') || '(none)'
+              fills.map((f) => `${f.inMain ? 'page' : 'shell'} ${f.box} "${f.text}"`).join(' | ') ||
+              '(none)'
             }`,
           )
           if (inPage.length > 1) over.push(`${where}: ${inPage.length} in #main`)

@@ -76,7 +76,20 @@ export function GetStarted({ now, steps }: { now: Date; steps: StartStep[] }) {
         <section
           data-testid="home-get-started"
           aria-labelledby="home-get-started-head"
-          className="surface-ring rounded-card bg-surface p-5"
+          /* ── THE CARD IS THE WIDTH OF WHAT IS IN IT ─────────────────────
+             MEASURED on `page-dash-after__empty__home__full__1440__light`: an
+             1100px card holding a ~640px text column, which is the founder's
+             "cards sized by their container rather than by their content" and
+             docs/40 §3.2's own finding on /analytics, arriving on the screen
+             that replaced it. The inner `max-w-[var(--measure-prose)]` was
+             already right; the CARD around it was not, so the ring drew a box
+             460px wider than anything it contained.
+
+             `--measure-form` (720px) rather than `--measure-prose` (640): the
+             card holds a heading, a button and three rows with their own
+             sub-lines, not a paragraph, and at 640 the primary and its price
+             line started to crowd. */
+          className="surface-ring max-w-[var(--measure-form)] rounded-card bg-surface p-5"
         >
           {/* Capped at the prose measure rather than left to the card. At 1440 the
             card is 1132px and every sentence in it is under 640 — letting the
