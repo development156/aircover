@@ -19,9 +19,23 @@ export function EmptyState({
   tip?: string
 }) {
   return (
-    // The kit's `.sl-state`: an inset hairline ring and NO shadow — a resting
-    // surface does not float. Padding is 40/20 (--s8/--s5).
-    <section className="surface-ring flex flex-col items-center gap-2 rounded-card bg-surface px-5 py-10 text-center">
+    /**
+     * The kit's `.sl-state`: an inset hairline ring and NO shadow — a resting
+     * surface does not float. Padding is 40/20 (--s8/--s5).
+     *
+     * ── AND THE BOX IS CAPPED, NOT JUST THE PARAGRAPH ───────────────────────
+     * MEASURED at 1440 on /assets, /campaigns, /leads, /remix, /approvals and
+     * /brain: this section ran the full 1136px content column while its own body
+     * was capped at 340px, so ten screens each drew a 1136x230 band around about
+     * twenty-five words. docs/27 §3.4 names it exactly — "density is set by the
+     * container, not by the content" — and it is the reason a product with ten
+     * honest empty states reads as ten unfinished ones.
+     *
+     * `--measure-prose` (640px), centred. The cap binds only where there is room
+     * for it to bind, so the callers that already render this inside a narrow
+     * column — the inbox thread pane, /settings — are unchanged.
+     */
+    <section className="surface-ring mx-auto flex w-full max-w-[var(--measure-prose)] flex-col items-center gap-2 rounded-card bg-surface px-5 py-10 text-center">
       {/* `.sl-state__ic` is a 44px ROUNDED SQUARE, not a circle — a circle reads
           as an avatar, and this is a marker. Accent variant: orange glyph on a
           6% wash with a 24% ring. The wash is an alpha, so it composites on
@@ -29,14 +43,14 @@ export function EmptyState({
       <span className="mb-2 grid size-11 place-items-center rounded-md bg-brand-wash text-accent shadow-[inset_0_0_0_1px_var(--brand-lift)]">
         <Icon size={21} strokeWidth={1.7} aria-hidden />
       </span>
-      <h2 className="text-[14px] font-semibold">{title}</h2>
-      <p className="max-w-[340px] text-[13px] text-muted">{body}</p>
+      <h2 className="type-h3">{title}</h2>
+      <p className="max-w-[42ch] type-sm text-muted">{body}</p>
       {/* `.sl-state__a` — "is not optional" (RETHEME.md §4.5): an empty state
           answers what this is AND what to do next. It stays conditional here
           only because some screens genuinely have no destination to offer, and
           a button that goes nowhere is worse than none. */}
       {action ? <div className="mt-3">{action}</div> : null}
-      {tip ? <p className="mt-1 text-[12px] text-muted">Sahoda: {tip}</p> : null}
+      {tip ? <p className="mt-1 type-meta text-muted">Sahoda: {tip}</p> : null}
     </section>
   )
 }

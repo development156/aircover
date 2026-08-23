@@ -5,6 +5,7 @@ import { reflectionWindow } from '@/lib/loop/iso-week'
 import { readLoop } from '@/lib/loop/read'
 import { readCycleLearnings, readRanking } from '@/lib/loop/report'
 import { creditWord } from '@/lib/credit-words'
+import { InertPanel } from '@/components/roadmap/parts'
 
 export const metadata = { title: 'CMO Report' }
 
@@ -31,6 +32,32 @@ export const metadata = { title: 'CMO Report' }
  * so, because one post is simultaneously the best and the worst and printing
  * that is worse than printing nothing.
  */
+/**
+ * The report's own table of contents, and it is the SAME list the filled report
+ * renders below — same order, same titles. Written once here so the shape a
+ * reader is shown before their first cycle cannot drift from the document they
+ * eventually get, which is the way a preview turns into a lie.
+ */
+const REPORT_OUTLINE: ReadonlyArray<{ title: string; what: string }> = [
+  {
+    title: 'How it went',
+    what: 'What went out last week, on which channels, and how much of it a person saw.',
+  },
+  {
+    title: 'The post that reached the most people',
+    what: 'The single best-performing post of the week, and the one that did least — named only when at least two were measured.',
+  },
+  {
+    title: 'What Sahoda learned',
+    what: 'The part that changes things: what the week suggests about what to write next.',
+  },
+  {
+    title: 'This week\u2019s plan',
+    what: 'What Sahoda intends to do about it, before you approve any of it.',
+  },
+  { title: 'Credits used', what: 'What the cycle cost, entry by entry.' },
+]
+
 export default async function ReportPage() {
   const read = await readLoop()
 
@@ -59,11 +86,33 @@ export default async function ReportPage() {
   const cycle = snapshot.cycle
 
   if (!cycle) {
+    /**
+     * ── NOTHING TO REPORT IS NOT NOTHING TO SHOW ─────────────────────────────
+     * MEASURED at 1440 on a workspace whose Loop has never run: this branch drew
+     * a page title, a subtitle and one 1136x100 card holding two sentences, and
+     * then 640px of empty page — 71% of the viewport. A reader who clicked "CMO
+     * Report" learned exactly one thing: that they do not have one.
+     *
+     * The blocks below are the SAME five the filled report renders, in the same
+     * order, each carrying the sentence that describes what goes in it. They are
+     * `is-proposed` — dashed, the rung that means "Sahoda suggests", never
+     * `is-simulated`, which docs/26 §3.1 defines as "not real, a fixture" and
+     * would be a claim that this report is fake rather than unwritten.
+     *
+     * NOT ONE OF THEM HOLDS A FIGURE. Not a zero, not a dash, not a placeholder
+     * bar. The container is a promise about Sahoda, which is allowed; a number
+     * in it would be a claim about the reader's week, which is not.
+     *
+     * The heading and the one action still lead — §16 rule 1, the reader is
+     * blocked and running a cycle is the remedy — and everything below is
+     * visibly subordinate to it.
+     */
     return (
       <div className="space-y-grid">
         <PageTitle sub="The Monday read: what last week did, what Sahoda learned from it, and what it plans to do next.">
           CMO Report
         </PageTitle>
+
         <section className="surface-ring rounded-card bg-surface p-4">
           <h2 className="type-h2">No week has been reported yet</h2>
           <p className="type-body mt-1 max-w-[68ch] text-muted">
@@ -78,6 +127,15 @@ export default async function ReportPage() {
             , which reports what actually went out.
           </p>
         </section>
+
+        <div>
+          <p className="type-eyebrow text-muted">What Monday&rsquo;s report says</p>
+          <div className="mt-3 space-y-3">
+            {REPORT_OUTLINE.map((block) => (
+              <InertPanel key={block.title} title={block.title} what={block.what} />
+            ))}
+          </div>
+        </div>
       </div>
     )
   }

@@ -104,9 +104,19 @@ test('accent attribution', async ({ page, signedIn }) => {
     await page.waitForTimeout(400)
     await page.mouse.move(-40, -40)
     const result = await page.evaluate(PROBE)
-    writeFileSync(
-      join(OUT, `${route.replace(/\//g, '_') || '_root'}.json`),
-      JSON.stringify(result, null, 1),
-    )
+    const slug = route.replace(/\//g, '_') || '_root'
+    writeFileSync(join(OUT, `${slug}.json`), JSON.stringify(result, null, 1))
+    /**
+     * The RASTER of the same instant, viewport-only.
+     *
+     * The two measurements answer different questions and both are needed: the
+     * JSON says WHERE the accent is, `scripts/design/accent-spend.mjs` run over
+     * this PNG says HOW MUCH of the frame it covers — which is the figure
+     * docs/37 §2.3 quotes. `fullPage: false` is not a detail: §2.3's own
+     * captures are 1440x900, and a fullPage frame changes the denominator with
+     * the page's content height, so a long screen would score low for being
+     * long.
+     */
+    await page.screenshot({ path: join(OUT, `${slug}.png`), fullPage: false })
   }
 })

@@ -63,6 +63,12 @@ const ROUTES = [
   '/report',
   '/studio',
   '/ads',
+  '/ads/creative',
+  '/ads/targeting',
+  '/ads/budget',
+  '/ads/performance',
+  '/sign-in',
+  '/sign-up',
 ] as const
 
 for (const theme of THEMES) {

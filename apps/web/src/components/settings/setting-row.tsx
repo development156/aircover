@@ -103,7 +103,7 @@ export function SettingCard({
       aria-labelledby={headingId}
       className={cn('surface-ring rounded-card bg-surface', className)}
     >
-      <header className="flex min-h-[46px] flex-col justify-center gap-[2px] border-b border-line-soft px-4 py-3">
+      <header className="flex min-h-[46px] flex-col justify-center gap-1 border-b border-line-soft px-4 py-3">
         <h2 id={headingId} className="type-h3">
           {title}
         </h2>

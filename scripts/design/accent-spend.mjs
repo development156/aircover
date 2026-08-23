@@ -113,15 +113,24 @@ function hueDeg(r, g, b) {
   return h < 0 ? h + 360 : h
 }
 
-export function accentSpend(file) {
+/**
+ * @param file  a PNG
+ * @param crop  optional [x, y] origin, to measure only what is INSIDE the shell.
+ *              The rail and the topbar are constant across every route, so a
+ *              whole-frame figure is mostly a measurement of the chrome; passing
+ *              the `#main` origin is what isolates the accent a PAGE spends.
+ */
+export function accentSpend(file, crop) {
   const { width, height, channels, data } = decodePng(fs.readFileSync(file))
+  const x0 = crop?.[0] ?? 0
+  const y0 = crop?.[1] ?? 0
   let sampled = 0
   let hot = 0
   // Hue histogram in 30° buckets. Brand orange (#ff6600) is 24°, so buckets 0
   // and 1 are "warm"; everything else is a platform mark or an image.
   const hues = new Array(12).fill(0)
-  for (let y = 0; y < height; y += 2) {
-    for (let x = 0; x < width; x += 2) {
+  for (let y = y0; y < height; y += 2) {
+    for (let x = x0; x < width; x += 2) {
       const i = y * width * channels + x * channels
       const r = data[i]
       const g = data[i + 1]

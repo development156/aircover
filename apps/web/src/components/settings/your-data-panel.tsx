@@ -262,7 +262,17 @@ export function YourDataPanel() {
 
       <SettingRow
         label="Delete everything"
-        hint="Your posts, pictures, Brand Brain, conversations, enquiries, websites and linked accounts go for good, and it cannot be undone. Your credit and payment record is kept — it is what proves what you paid and what you were charged, so it is not ours to erase."
+        hint={
+          /* What is KEPT, and why, is stated in the dialog — with real counts
+             read out of the database at that moment, which is a better place
+             for it than a settings row that four lines of it unbalanced. The
+             row says what the control does and that it cannot be undone; the
+             dialog says exactly what goes and exactly what stays. */
+          <>
+            Your posts, pictures, Brand Brain, conversations, enquiries, websites and linked
+            accounts go for good. This cannot be undone.
+          </>
+        }
         control={
           /*
             Also secondary, and the reasoning is hierarchy rather than the
