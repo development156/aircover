@@ -416,7 +416,7 @@
 <div class="wrap">
   <header class="masthead">
     <p class="eyebrow">Security audit · branch wt-sec · off wt-integrate2</p>
-    <h1>Twelve defects closed, and four more in the tools meant to find them</h1>
+    <h1>Twelve defects closed, and five more in the tools meant to find them</h1>
     <p class="standfirst">
       Every open finding from the last audit is closed and proven. Three ingestion paths reached a
       model unfenced, and 95% of the admin audit log turned out to be one row that names nothing.
@@ -424,8 +424,8 @@
     </p>
     <div class="runmeta">
       <span>Date <b>2026-08-23</b></span>
-      <span>Commits <b>7</b></span>
-      <span>Files <b>79</b></span>
+      <span>Commits <b>10</b></span>
+      <span>Files <b>88</b></span>
       <span>Pushed <b>origin/wt-sec</b></span>
       <span>Prod ref <b>rloztdhzfliyvpvxsgjl</b></span>
     </div>
@@ -440,7 +440,7 @@
       </div>
       <div>
         <span class="n" style="color: var(--open)">4</span
-        ><span class="k">defects in this audit's own tooling</span>
+        ><span class="k">defects found in this audit's own tooling</span>
       </div>
       <div>
         <span class="n" style="color: var(--open)">2</span
@@ -1481,13 +1481,40 @@
       </p>
     </div>
 
-    <h3>Two survivors, and one wrong claim of my own</h3>
+    <div class="finding closed">
+      <div class="fhead">
+        <h4>5 · A stranded mutant reads as a broken spec</h4>
+        <span class="chip closed">Fixed</span>
+      </div>
+      <p>
+        The consequence of 4, and it cost two diagnoses before it was worth fixing. An interrupted
+        run leaves its last mutant applied; the next run then reports
+        <em>"expected exactly 1 occurrence, found 0"</em>, which reads as a broken SPEC and sends
+        you to edit a spec that is perfectly correct. The signal is exact — the target is gone and
+        the text it would have been replaced BY is present — so the harness now says so, and prints
+        the <code>git checkout</code> that fixes it.
+      </p>
+      <p class="dim">
+        Both interruptions were self-inflicted: once killing a mutant that made a stream unbounded,
+        once a two-minute command timeout cutting a run off mid-mutation.
+      </p>
+    </div>
+
+    <h3>Three survivors, and one wrong claim of my own</h3>
     <p>
-      A survivor is only worth something if it means something, so both were chased to the end. One
-      was a real gap — counting <code>could_not_check</code> did not distinguish "we refused to
+      A survivor is only worth something if it means something, so all three were chased to the end.
+      One was a real gap — counting <code>could_not_check</code> did not distinguish "we refused to
       look" from "we looked and it did not answer", and the assertion now reads
       <code>transport: UnsafeUrlError</code>, which can only be produced before a socket exists. The
-      other was an equivalence, removed with the check that proved it.
+      other was an equivalence, removed with the check that proved it. The third was an equivalent
+      mutant of my OWN making — a "make the fence constant" edit that left
+      <code>${ctx.traceId}</code> in place, so the marker still varied and the mutant could not
+      fail. A wasted survivor is worse than none: it trains the reader to skim past the next one.
+    </p>
+    <p>
+      Two of this file's <code>find</code> strings also went stale when prettier reformatted the
+      sources under them, and the harness REFUSED both rather than scoring them — which is the guard
+      working, and also a real way a mutation spec can quietly stop covering the thing it names.
     </p>
     <p>
       And a comment I wrote myself claimed a signed bitmask makes <code>224.0.0.0/4</code> "silently
@@ -1511,44 +1538,78 @@
         <thead>
           <tr>
             <th>Leg</th>
-            <th>Command</th>
-            <th>Result</th>
+            <th>Run 1</th>
+            <th>Run 2</th>
+            <th>Run 3</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>0 · build</td>
-            <td class="mono">turbo run build</td>
-            <td class="num LEG0CLS">LEG0</td>
+            <td><code>turbo run build</code></td>
+            <td class="ok">pass</td>
+            <td class="ok">pass</td>
+            <td class="dim">cached</td>
           </tr>
           <tr>
-            <td>1 · typecheck</td>
-            <td class="mono">turbo run typecheck</td>
-            <td class="num LEG1CLS">LEG1</td>
+            <td><code>turbo run typecheck lint test</code></td>
+            <td class="bad">FAIL</td>
+            <td class="ok">pass</td>
+            <td class="dim">not re-run</td>
           </tr>
           <tr>
-            <td>2 · lint</td>
-            <td class="mono">turbo run lint</td>
-            <td class="num LEG2CLS">LEG2</td>
+            <td><code>turbo run test:smoke</code></td>
+            <td class="ok">102 passed</td>
+            <td class="bad">FAIL</td>
+            <td class="ok">101 passed, 1 flaky</td>
           </tr>
           <tr>
-            <td>3 · test</td>
-            <td class="mono">turbo run test</td>
-            <td class="num LEG3CLS">LEG3</td>
+            <td><code>prettier --check .</code></td>
+            <td class="bad">FAIL</td>
+            <td class="ok">pass</td>
+            <td class="dim">not re-run</td>
           </tr>
           <tr>
-            <td>4 · smoke</td>
-            <td class="mono">turbo run test:smoke</td>
-            <td class="num LEG4CLS">LEG4</td>
-          </tr>
-          <tr>
-            <td>5 · format</td>
-            <td class="mono">prettier --check .</td>
-            <td class="num LEG5CLS">LEG5</td>
+            <td><strong>verdict</strong></td>
+            <td class="bad">RED</td>
+            <td class="bad">RED</td>
+            <td class="ok">smoke green</td>
           </tr>
         </tbody>
       </table>
     </div>
+
+    <p>
+      <strong
+        >NO SINGLE RUN WAS GREEN END TO END, and this table says so rather than reporting the union
+        of three.</strong
+      >
+      Every leg has passed. Not at once.
+    </p>
+    <ul class="plain">
+      <li>
+        <strong>Run 1 · the test leg was RED, and it was a real defect of mine.</strong> Adding the
+        <code>%PDF-</code> magic check made a pre-existing oversize fixture answer
+        <code>not_pdf</code> — that payload was <code>'A'.repeat(…)</code> and had never been a PDF.
+        My own new suite has an oversize case and it PASSED, because I had built that fixture with a
+        valid header. One input shape closed, its sibling walked through, and only the full gate saw
+        it. The format leg failed on the report file, copied in mid-run.
+      </li>
+      <li>
+        <strong>Run 2 · the smoke leg was RED, and it was not a defect.</strong> The server died
+        partway: 52 <code>ERR_CONNECTION_REFUSED</code> against <code>127.0.0.1:3253</code>, every
+        one returning in about 140 ms. That is ONE event, not 76 failures — the timing is the tell,
+        because a real assertion failure costs the page load that precedes it. No kernel OOM (<code
+          >journalctl -k</code
+        >, checked before anything else), no crash output, and no hook in this repository kills a
+        process. Two other sessions held servers on 3252 and 3260 at the time.
+      </li>
+      <li>
+        <strong>Run 3 · the smoke leg alone, against a server held for the purpose.</strong>
+        <code>101 passed, 1 flaky, exit 0</code> — 102 tests. The flaky one is
+        <code>motion.spec.ts:73</code>, "prefers-reduced-motion leaves a still page, not a blank
+        one". It passed on retry and is nothing this lane touched.
+      </li>
+    </ul>
 
     <h3>Mutation specs</h3>
     <div class="scroll">
@@ -1609,19 +1670,39 @@
 
     <h3>Rows, before and after</h3>
     <p>
-      75 tables counted <em>privileged and direct</em> before any probe, and again afterwards. A
-      diff is not an answer here — <code>wt-perf</code> ran a server against this same production
-      database for the whole session — so every non-zero delta was attributed by reading the new
-      rows, not explained away.
+      75 tables counted <em>privileged and direct</em> at three points: before any probe, before the
+      gate, and after everything had settled. Three, not two, because there are two different deltas
+      and folding them together would report the footprint of the PROBES and call it the footprint
+      of the audit — the gate's smoke leg mints Clerk users against production, which is exactly
+      what <code>SAHODA_E2E_ACK_TARGET</code> exists to acknowledge.
     </p>
     <div class="measured">
-      <span class="lbl">Attribution</span>Every audit probe was a SELECT. Attributable to this
-      audit: 0 rows. Moved by other sessions, by timestamp and workspace: credit_ledger +9
-      loop_briefs +5 loop_cycles +1 memory_events +1 posts +4 → all one workspace, 02:18 IST, while
-      this session was offline workspaces -1 workspace_members -1 users_profile -1 → an E2E
-      teardown; 0 stranded workspaces remain ops_audit_log +1379 → the clerk:webhook flood
-      documented in P3, not caused by this audit and now fixed
+      <span class="lbl">Window 1 · the probes (and whatever else was running)</span>Every audit
+      probe was a SELECT. Attributable to the probes: 0 rows. Moved by ANOTHER session, all one
+      workspace at 02:18 IST while this one was doing offline work — attributed by timestamp and
+      workspace id, not assumed: credit_ledger +9 loop_briefs +5 loop_cycles +1 memory_events +1
+      posts +4 ai_provider_logs +1 And a teardown by that session, which is why three counts go
+      DOWN: workspaces -1 workspace_members -1 users_profile -1 credit_balances -1
     </div>
+    <div class="measured">
+      <span class="lbl">Window 2 · THIS AUDIT'S OWN GATE — three E2E runs</span>ops_audit_log +408
+      every row action='user.created' and nothing else that survived. A workspace, a member and a
+      profile appeared and were gone again within two minutes — the snapshot caught an E2E teardown
+      mid-flight, and the settled count is back where it was. workspaces with no member at all
+      (stranded): 0 E2E workspaces still present: 4, all created before this session net across the
+      whole session: 27 → 26 workspaces
+    </div>
+    <p>
+      <strong
+        >So this audit's durable footprint on production is 408 rows in <code>ops_audit_log</code> —
+        every one of them an instance of the flood documented above.</strong
+      >
+      Nothing else it created still exists. That is an uncomfortable number to publish beside the
+      finding, and it is the honest one: the E2E suite mints a Clerk user per journey, each
+      <code>user.created</code> reaches the webhook, and until the migration above is applied the
+      webhook writes a row that names nothing. Applying it is what stops the next gate run adding
+      four hundred more.
+    </p>
   </section>
 
   <!-- ══════════════════ open ══════════════════ -->

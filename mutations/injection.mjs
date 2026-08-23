@@ -82,13 +82,18 @@ export default {
       replace: '      one_liner: firstSentence(doorText),',
     },
     {
+      // The `find` strings in this file are the FORMATTED source, and they have
+      // to be: prettier rewrites a multi-line call onto one line, and a spec
+      // written against the pre-format shape then matches nothing. The harness
+      // refuses that rather than calling it a survivor, which is how it was
+      // caught — but a re-format is a real way for a mutation spec to quietly
+      // stop covering the thing it names.
       name: 'the proof point goes back to raw door text',
       cwd: 'apps/web',
       command: WEB,
       file: 'apps/web/src/lib/onboarding/to-resolve-input.ts',
-      find: '      proof_point: quarantineInline(\n        firstProofPoint(doorText),\n        ',
-      replace:
-        '      proof_point: ((t) => firstProofPoint(t))(doorText) + String.prototype.slice.call(\n        ',
+      find: "      proof_point: quarantineInline(firstProofPoint(doorText), 'the page or document you gave us'),",
+      replace: '      proof_point: firstProofPoint(doorText),',
     },
     {
       name: 'the system prompt stops saying the fenced text is not an instruction',
@@ -112,8 +117,13 @@ export default {
       cwd: 'packages/mesh',
       command: 'pnpm vitest run src/tasks/gate-classify.test.ts',
       file: 'packages/mesh/src/tasks/gate-classify.ts',
-      find: "  return `POST_${ctx.traceId.replace(/[^0-9a-zA-Z]/g, '').slice(0, 16).toUpperCase()}`",
-      replace: "  return 'POST_FIXEDMARKER'",
+      // The whole body, not a prefix. The first attempt replaced only the opening
+      // backtick-expression and left `${ctx.traceId…}` in place, so the marker
+      // still varied per call and the mutant SURVIVED — an equivalent mutant of
+      // my own making, which is a wasted survivor and the kind that trains a
+      // reader to ignore them.
+      find: "  return `POST_${ctx.traceId\n    .replace(/[^0-9a-zA-Z]/g, '')\n    .slice(0, 16)\n    .toUpperCase()}`",
+      replace: "  void ctx\n  return 'POST_FIXEDMARKER'",
     },
     {
       name: 'the gate mutates the post it was asked to quote character for character',
