@@ -35,7 +35,7 @@ export function greetingState(counts: PostCounts, publish: PublishSummary): stri
   if (publish.live > 0) clauses.push(`${plural(publish.live, 'post', 'posts')} out`)
 
   if (clauses.length === 0) {
-    return 'Nothing in flight yet — plan a week and it starts filling in.'
+    return 'Nothing in flight yet. Plan a week and it starts filling in.'
   }
 
   return `${clauses.join(', ')}.`

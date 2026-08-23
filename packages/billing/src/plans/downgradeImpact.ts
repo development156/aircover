@@ -74,7 +74,7 @@ export function overLimitSentence(impact: DowngradeImpact): string | null {
       ? (parts[0] as string)
       : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
   return (
-    `You have ${list}. Nothing is removed — you keep what you have built, ` +
+    `You have ${list}. Nothing is removed. You keep what you have built, ` +
     `and you can add more once you are back under the limit.`
   )
 }

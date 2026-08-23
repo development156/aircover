@@ -98,7 +98,7 @@ const COPY: Record<string, PublishErrorDisplay> = {
 
   // ── Worth another go ───────────────────────────────────────────────────────
   STILL_PROCESSING: {
-    message: 'The platform is still working on this one. It may still go live — check shortly.',
+    message: 'The platform is still working on this one. It may still go live. Check shortly.',
     worthRetrying: true,
     needsReconnect: false,
   },
@@ -211,7 +211,7 @@ const COPY: Record<string, PublishErrorDisplay> = {
     needsReconnect: false,
   },
   GBP_EVENT_NEEDS_TITLE: {
-    message: 'An event needs a name — it is the heading Google shows.',
+    message: 'An event needs a name. It is the heading Google shows.',
     worthRetrying: false,
     needsReconnect: false,
   },

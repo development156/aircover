@@ -43,7 +43,7 @@ export async function putSignedUpload(signedUrl: string, file: Blob): Promise<Up
     }
     return { ok: true }
   } catch {
-    return { ok: false, message: 'That screenshot did not upload — check your connection.' }
+    return { ok: false, message: 'That screenshot did not upload. Check your connection.' }
   }
 }
 

@@ -14,7 +14,7 @@
  */
 
 /** Must stay byte-identical to `TECHNICAL_MARKER` in scripts/lib/ops-cards.mjs. */
-export const TECHNICAL_MARKER = '\n\nTechnical detail — '
+export const TECHNICAL_MARKER = '\n\nTechnical detail: '
 
 export interface CardCopy {
   /** What the dashboard shows by default. Never empty when `detail` is not. */

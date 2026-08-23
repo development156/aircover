@@ -137,14 +137,14 @@ export interface FormatMediaRule {
  * the mistake it prevents.
  */
 export const FORMAT_MEDIA: Readonly<Record<PostFormat, FormatMediaRule>> = {
-  text: { minItems: 0, maxItems: 0, need: 'No photo — words only.' },
+  text: { minItems: 0, maxItems: 0, need: 'No photo, words only.' },
   image: { minItems: 1, maxItems: 1, need: 'One photo.' },
   carousel: { minItems: 2, maxItems: null, need: 'Two or more photos, in order.' },
   story: {
     minItems: 1,
     maxItems: 1,
     maxAspect: 1,
-    need: 'One upright photo — 9:16 is the shape Instagram fills.',
+    need: 'One upright photo. 9:16 is the shape Instagram fills.',
   },
   // ── A THREAD'S PHOTOS STAY ON THE POST ─────────────────────────────────────
   // `threadItems[].mediaItems` exists and is NOT used. It is [SPEC]-only, and

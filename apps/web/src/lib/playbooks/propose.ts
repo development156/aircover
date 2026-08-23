@@ -56,7 +56,7 @@ export function proposeFestivals(
     title: festival.name,
     body:
       `${festival.name} falls on ${festival.occursOn.toISOString().slice(0, 10)}. ` +
-      `Write one post for it, in the business's own voice — ${festival.angle}. ` +
+      `Write one post for it, in the business's own voice: ${festival.angle}. ` +
       `Say something only this business could say; a stock greeting is worse than silence.`,
     channels,
     // A DAY BEFORE THE FESTIVAL, at the same hour the run happened. Not the day

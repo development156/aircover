@@ -53,7 +53,7 @@ export function planLimitSentence(input: PlanLimitCopyInput): string {
   if (limit === 0) {
     const plural = NOUN[dimension].many
     if (!upgrade) return `${capitalize(plural)} aren't part of any plan yet.`
-    return `${capitalize(plural)} are on ${upgrade.name} and above — your ${planName} plan doesn't include one.`
+    return `${capitalize(plural)} are on ${upgrade.name} and above. Your ${planName} plan doesn't include one.`
   }
 
   const have = `Your ${planName} plan includes ${limit} ${noun(dimension, limit)} and you're using ${currentUsage}.`

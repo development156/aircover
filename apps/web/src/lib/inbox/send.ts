@@ -74,7 +74,7 @@ function fromReceipt(receipt: ReplyReceipt): SendOutcome {
   return {
     status: 'unconfirmed',
     message:
-      'Sahoda could not confirm this reply was delivered — the platform did not return an id for it. Check the conversation on the platform before sending again.',
+      'Sahoda could not confirm this reply was delivered. The platform did not return an id for it. Check the conversation on the platform before sending again.',
   }
 }
 

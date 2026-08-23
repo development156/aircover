@@ -124,7 +124,7 @@ export function mapBootstrapError(
 ): CreateWorkspaceState {
   const message = error?.message ?? ''
   if (message.includes('SLUG_TAKEN')) {
-    return { ok: false, code: 'SLUG_TAKEN', message: 'That name is taken — try a different one.' }
+    return { ok: false, code: 'SLUG_TAKEN', message: 'That name is taken. Try a different one.' }
   }
   if (message.includes('INVALID_NAME')) {
     return { ok: false, code: 'INVALID_NAME', message: 'Enter a workspace name.' }

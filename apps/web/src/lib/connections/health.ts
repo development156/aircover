@@ -96,14 +96,14 @@ export function healthMessage(platform: string, health: ConnectionHealth): strin
   switch (health.kind) {
     case 'needs-reconnect':
       return health.reason
-        ? `Reconnect ${platform} — ${health.reason}.`
+        ? `Reconnect ${platform}: ${health.reason}.`
         : `Reconnect ${platform} to keep posting.`
     case 'expired':
-      return `Reconnect ${platform} — its access has run out and scheduled posts will not go out.`
+      return `Reconnect ${platform}. Its access has run out and scheduled posts will not go out.`
     case 'expiring':
       return health.daysLeft === 1
-        ? `Reconnect ${platform} today — access ends tomorrow.`
-        : `Reconnect ${platform} within ${health.daysLeft} days — access ends then.`
+        ? `Reconnect ${platform} today. Access ends tomorrow.`
+        : `Reconnect ${platform} within ${health.daysLeft} days. Access ends then.`
     case 'ok':
       return null
   }

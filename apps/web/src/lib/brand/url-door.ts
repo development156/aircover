@@ -86,7 +86,7 @@ export async function openUrlDoor(
       ok: false,
       reason: 'extract_failed',
       message:
-        'Read your website, but could not turn it into a brand just now — tell us in your own words instead.',
+        'Read your website, but could not turn it into a brand just now. Tell us in your own words instead.',
       firecrawlCredits: outcome.creditsUsed,
     }
   }
@@ -255,7 +255,7 @@ export async function openUploadDoor(
     return {
       ok: false,
       reason: 'no_file',
-      message: 'No document to read — we will ask you instead.',
+      message: 'No document to read. We will ask you instead.',
     }
   }
   if (!isPdfDataUrl(file.dataUrl)) {
@@ -264,7 +264,7 @@ export async function openUploadDoor(
     return {
       ok: false,
       reason: 'not_pdf',
-      message: 'That file is not a PDF — upload a PDF, or tell us in your own words instead.',
+      message: 'That file is not a PDF. Upload a PDF, or tell us in your own words instead.',
     }
   }
   if (approximateBytes(file.dataUrl) > MAX_UPLOAD_BYTES) {
@@ -272,7 +272,7 @@ export async function openUploadDoor(
       ok: false,
       reason: 'too_large',
       message:
-        'That document is too large to read — send a shorter one, or tell us in your own words.',
+        'That document is too large to read. Send a shorter one, or tell us in your own words.',
     }
   }
 
@@ -286,7 +286,7 @@ export async function openUploadDoor(
       ok: false,
       reason: 'extract_failed',
       message:
-        'Read your document, but could not turn it into a brand just now — tell us in your own words instead.',
+        'Read your document, but could not turn it into a brand just now. Tell us in your own words instead.',
     }
   }
 
@@ -329,7 +329,7 @@ export async function openUploadDoor(
       // So the sentence names the cause we can stand behind and offers the
       // engine that reads pictures, with its price attached.
       message:
-        'The free reader found almost no text in that document — its words are probably inside the design rather than in a text layer. Reading it with OCR costs about ₹2 per page and takes longer, or you can point us at your website or tell us in your own words.',
+        'The free reader found almost no text in that document. Its words are probably inside the design rather than in a text layer. Reading it with OCR costs about ₹2 per page and takes longer, or you can point us at your website or tell us in your own words.',
     }
   }
 

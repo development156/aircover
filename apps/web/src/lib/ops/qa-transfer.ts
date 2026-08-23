@@ -96,7 +96,7 @@ export function parseQaImport(text: string): ParsedImport {
     const mb = (text.length / 1024 / 1024).toFixed(1)
     return {
       ok: false,
-      message: `That file is ${mb} MB. Import takes up to 0.9 MB at a time — split it and import each part.`,
+      message: `That file is ${mb} MB. Import takes up to 0.9 MB at a time. Split it and import each part.`,
     }
   }
 
@@ -149,7 +149,7 @@ export function summariseImport(payload: OpsQaExport, result: OpsQaImportResult)
   const skipped = result.conflicts.length
   const headline =
     result.imported === 0
-      ? `Nothing new — all ${payload.runs.length} runs were already recorded.`
+      ? `Nothing new. All ${payload.runs.length} runs were already recorded.`
       : `Imported ${result.imported} of ${payload.runs.length} runs${
           skipped > 0 ? `, ${skipped} already recorded` : ''
         }.`
@@ -158,7 +158,7 @@ export function summariseImport(payload: OpsQaExport, result: OpsQaImportResult)
     headline,
     artifactNote:
       payload.artifacts.length > 0
-        ? `${payload.artifacts.length} screenshots are described in this file but were not restored — the images live in a private bucket and do not travel in the JSON.`
+        ? `${payload.artifacts.length} screenshots are described in this file but were not restored. The images live in a private bucket and do not travel in the JSON.`
         : null,
     conflicts: result.conflicts,
   }

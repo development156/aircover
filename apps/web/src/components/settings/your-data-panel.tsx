@@ -195,7 +195,7 @@ export function YourDataPanel() {
           One zip file: your posts and their per-channel wording, your Brand Brain, your
           conversations and enquiries, every credit movement, your pictures and documents, and how
           your posts performed. It opens with a page you can read, and it lists anything it could
-          not include and why — so you can tell an empty section from a missing one.
+          not include and why, so you can tell an empty section from a missing one.
         </p>
         <Button onClick={() => void run()} disabled={download.kind === 'working'} className="mt-2">
           <Download size={15} strokeWidth={2} aria-hidden />
@@ -235,7 +235,7 @@ export function YourDataPanel() {
         <h3 className="type-body font-semibold">Delete everything</h3>
         <p className="type-body text-muted">
           Your posts, pictures, Brand Brain, conversations, enquiries, websites and linked accounts
-          are deleted for good. Your credit and payment record is kept — it is what proves what you
+          are deleted for good. Your credit and payment record is kept. It is what proves what you
           paid and what you were charged, so it is not ours to erase.
         </p>
         <p className="type-body text-muted">
@@ -292,7 +292,7 @@ export function YourDataPanel() {
             </p>
             <p>
               Your credit and payment record is kept, and nothing in it can be reached from this app
-              any more. Your sign-in account is separate — close that with your sign-in provider if
+              any more. Your sign-in account is separate. Close that with your sign-in provider if
               you want it gone too.
             </p>
           </div>
@@ -320,8 +320,8 @@ export function YourDataPanel() {
               <p className="mt-1.5 type-body text-muted">
                 Your credit and payment record. It is the account of what you paid and what you were
                 charged, it can settle a disagreement in your favour as easily as ours, and Indian
-                tax law requires it to be kept for years. It holds a reference to you — for most
-                rows a sign-in code rather than your name.
+                tax law requires it to be kept for years. It holds a reference to you, which for
+                most rows is a sign-in code rather than your name.
               </p>
             </div>
 

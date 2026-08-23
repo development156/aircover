@@ -51,7 +51,7 @@ export function freshnessOf(latestWrite: string | null, now: Date): Freshness {
     return {
       level: 'unknown',
       ageMs: null,
-      label: 'Last sync unknown — nothing on this page can be trusted to be current',
+      label: 'Last sync unknown, so nothing on this page can be trusted to be current',
     }
   }
 

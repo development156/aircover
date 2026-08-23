@@ -151,7 +151,7 @@ export const ENTITLEMENT: Record<BrainFieldMetaKind, Entitlement> = {
   asked: {
     label: 'Only you know this',
     heading: 'Only you know these',
-    line: 'Sahoda is not entitled to answer these — it filled them in so the Brain would work at all, and its guesses here are worth less than yours on any day.',
+    line: 'Sahoda is not entitled to answer these. It filled them in so the Brain would work at all, and its guesses here are worth less than yours on any day.',
   },
   negotiated: {
     label: 'Sahoda proposed this',

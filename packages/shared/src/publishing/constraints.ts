@@ -462,7 +462,7 @@ export function checkPerDayCap(args: { channel: Channel; used: number }): PerDay
 export function perDayCapRefusalMessage(verdict: PerDayCapVerdict): string {
   return (
     `This workspace has already published ${verdict.used} of the ${verdict.cap} posts ` +
-    `${verdict.channel} accepts in a day. It is the channel's own limit, not a Sahoda one — ` +
+    `${verdict.channel} accepts in a day. It is the channel's own limit, not a Sahoda one. ` +
     `the post is held until tomorrow, and nothing was sent. Other channels are unaffected.`
   )
 }

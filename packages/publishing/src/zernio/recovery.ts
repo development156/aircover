@@ -83,13 +83,13 @@ export function recoveryUnavailableReason(channel: Channel, action: RecoveryActi
   if (canRecover(channel, action)) return null
   const what = action === 'edit' ? 'edited' : 'taken down'
   if (channel === 'instagram') {
-    return `Instagram posts can’t be ${what} from here — open Instagram to change it.`
+    return `Instagram posts can’t be ${what} from here. Open Instagram to change it.`
   }
   if (channel === 'gbp') {
-    return `Google posts can’t be ${what} from here — open your Business Profile to change it.`
+    return `Google posts can’t be ${what} from here. Open your Business Profile to change it.`
   }
   if (channel === 'linkedin') {
-    return `LinkedIn posts can’t be ${what} from here — open LinkedIn to change it.`
+    return `LinkedIn posts can’t be ${what} from here. Open LinkedIn to change it.`
   }
   return `This can’t be ${what} from here.`
 }

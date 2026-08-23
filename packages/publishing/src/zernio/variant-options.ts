@@ -120,7 +120,7 @@ export function refusePoll(channel: string, poll: PollOption): FormatRefusal | n
   if (options.length < POLL_MIN_OPTIONS || options.length > POLL_MAX_OPTIONS) {
     return {
       code: 'POLL_OPTION_COUNT',
-      message: `A poll needs between ${POLL_MIN_OPTIONS} and ${POLL_MAX_OPTIONS} answers — this one has ${options.length}.`,
+      message: `A poll needs between ${POLL_MIN_OPTIONS} and ${POLL_MAX_OPTIONS} answers. This one has ${options.length}.`,
     }
   }
 
@@ -129,7 +129,7 @@ export function refusePoll(channel: string, poll: PollOption): FormatRefusal | n
     if (tooLong !== undefined) {
       return {
         code: 'POLL_OPTION_TOO_LONG',
-        message: `A poll answer on X holds ${X_POLL_OPTION_MAX} characters — “${tooLong.slice(0, 30)}…” is longer.`,
+        message: `A poll answer on X holds ${X_POLL_OPTION_MAX} characters. “${tooLong.slice(0, 30)}…” is longer.`,
       }
     }
     const minutes = poll.durationMinutes
@@ -158,7 +158,7 @@ export function refusePoll(channel: string, poll: PollOption): FormatRefusal | n
     if (Array.from(question).length > LINKEDIN_POLL_QUESTION_MAX) {
       return {
         code: 'POLL_QUESTION_TOO_LONG',
-        message: `A poll question on LinkedIn holds ${LINKEDIN_POLL_QUESTION_MAX} characters — this one has ${Array.from(question).length}.`,
+        message: `A poll question on LinkedIn holds ${LINKEDIN_POLL_QUESTION_MAX} characters. This one has ${Array.from(question).length}.`,
       }
     }
     if (!(LINKEDIN_POLL_DURATIONS as readonly string[]).includes(poll.durationCode ?? '')) {
@@ -192,7 +192,7 @@ export function refuseGbpTopic(options: VariantOptions): FormatRefusal | null {
     if (title === '') {
       return {
         code: 'GBP_EVENT_NEEDS_TITLE',
-        message: 'An event needs a name — it is the heading Google shows.',
+        message: 'An event needs a name. It is the heading Google shows.',
       }
     }
     if (event === undefined || parseIsoDate(event.startDate ?? '') === null) {

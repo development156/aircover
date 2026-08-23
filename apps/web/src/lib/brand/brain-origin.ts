@@ -175,4 +175,4 @@ export function brainOrigin(
  * that is showing exactly that would teach the reader to disbelieve the page.
  */
 export const NO_PER_FIELD_EVIDENCE =
-  'For anything Sahoda worked out from a link or a PDF at signup, it cannot show which sentence produced which field — it read everything in one pass and wrote the whole Brain at once, and it will not invent a source it does not have. A field drawn from your Knowledge library is different: it names the document and quotes the passage, underneath the field itself.'
+  'For anything Sahoda worked out from a link or a PDF at signup, it cannot show which sentence produced which field. It read everything in one pass and wrote the whole Brain at once, and it will not invent a source it does not have. A field drawn from your Knowledge library is different: it names the document and quotes the passage, underneath the field itself.'

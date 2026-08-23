@@ -21,13 +21,13 @@ export interface ChannelMediaVerdict {
 }
 
 const MISSING_MIME_MESSAGE =
-  'Re-upload this file to check it — its file type is missing, so it cannot be checked against the channel limits.'
+  'Re-upload this file to check it. Its file type is missing, so it cannot be checked against the channel limits.'
 
 const MISSING_BYTES_MESSAGE =
-  'Re-upload this file to check it — its file size is missing, so it cannot be checked against the channel limits.'
+  'Re-upload this file to check it. Its file size is missing, so it cannot be checked against the channel limits.'
 
 const INVALID_BYTES_MESSAGE =
-  'Re-upload this file to check it — its file size could not be read, so it cannot be checked against the channel limits.'
+  'Re-upload this file to check it. Its file size could not be read, so it cannot be checked against the channel limits.'
 
 /** Convert one `post_media` row into an attachment the Constraint Engine can validate. */
 export function toAttachment(row: PostMedia): AttachmentResult {

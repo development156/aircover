@@ -364,7 +364,7 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
         // the post may yet go live, so a retry must not assume it did not. The
         // platform post id rides on `raw` so the reconcile sweep can ask later.
         throw fail(
-          `${channel} is still processing this post — no live link yet.`,
+          `${channel} is still processing this post. No live link yet.`,
           'STILL_PROCESSING',
           'transient',
           { postId: post._id, status: leg?.status },

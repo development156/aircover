@@ -253,10 +253,10 @@ export function assumptionNote(classification: Classification): string | null {
     (field) => classification[field].basis === 'assumed',
   )
   if (assumed.length === 0) return null
-  if (assumed.length === 3) return 'We could not read any of this from your words — pick below.'
+  if (assumed.length === 3) return 'We could not read any of this from your words. Pick below.'
 
   const NAMES = { model: 'what you are', regime: 'your sector', locale: 'where you are' } as const
   const names = assumed.map((field) => NAMES[field])
   const list = names.length === 1 ? names[0] : `${names[0]} and ${names[1]}`
-  return `We guessed ${list} — change it below if that is wrong.`
+  return `We guessed ${list}. Change it below if that is wrong.`
 }

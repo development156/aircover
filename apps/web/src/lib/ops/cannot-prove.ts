@@ -43,7 +43,7 @@ export const RECORDED_UNPROVEN: readonly UnprovenClaim[] = [
   {
     key: 'unrun-packages',
     source: 'recorded',
-    what: 'Five parts of the codebase — including the one that handles payments — have no test runner wired up, so about 100 test files have never executed once.',
+    what: 'Five parts of the codebase, including the one that handles payments, have no test runner wired up, so about 100 test files have never executed once.',
     from: 'SL-050, found 2026-07-30',
   },
   {

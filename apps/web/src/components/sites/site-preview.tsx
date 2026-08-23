@@ -50,7 +50,7 @@ export function SitePreview({ siteName, pages }: SitePreviewProps) {
       ) : null}
 
       <iframe
-        title={`Preview of ${siteName} — ${active.path}`}
+        title={`Preview of ${siteName}: ${active.path}`}
         sandbox=""
         srcDoc={active.html}
         className="h-[560px] w-full rounded-card border border-line bg-white shadow-card"

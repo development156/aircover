@@ -49,7 +49,7 @@ export type ResolveActionState =
   | { ok: false; kind: 'error'; message: string }
 
 const FALLBACK_MESSAGE =
-  'Showing a sample Brand Brain — the model could not be reached, so you were not charged. Retry to resolve yours.'
+  'Showing a sample Brand Brain. The model could not be reached, so you were not charged. Retry to resolve yours.'
 const GENERIC_ERROR = 'Could not resolve your Brand Brain. Try again.'
 
 /**

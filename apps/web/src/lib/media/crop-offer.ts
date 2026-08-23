@@ -149,11 +149,11 @@ export function outputMimeFor(
 
 /** The sentence under each channel on the offer screen. Never invents a rule. */
 function noteFor(target: MediaTarget, fixed: boolean): string {
-  if (!fixed) return 'Will not take this file — cropping cannot fix it.'
+  if (!fixed) return 'Will not take this file. Cropping cannot fix it.'
   const parts: string[] = []
   if (target.aspect !== null) {
     const { min, max } = target.aspect
-    if (min !== null && max !== null) parts.push(`inside the ${min}–${max} shape range`)
+    if (min !== null && max !== null) parts.push(`inside the ${min} to ${max} shape range`)
     else if (max !== null) parts.push(`no wider than ${max}:1`)
     else if (min !== null) parts.push(`no narrower than ${min}:1`)
   }
@@ -162,7 +162,7 @@ function noteFor(target: MediaTarget, fixed: boolean): string {
   }
   // The honest answer for LinkedIn, which declares nothing at all. Saying
   // "1200×628" here would be this file inventing a rule the engine does not have.
-  if (parts.length === 0) return 'States no size or shape rule — takes it as it is.'
+  if (parts.length === 0) return 'States no size or shape rule. Takes it as it is.'
   return `Needs ${parts.join(', ')}.`
 }
 

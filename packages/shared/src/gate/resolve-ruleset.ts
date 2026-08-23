@@ -93,7 +93,7 @@ function ownerRules(input: ResolveRuleSetInput): readonly Rule[] {
       statement: `Words this brand does not use: ${phrases.join(', ')}.`,
       source: 'owner',
       phrases,
-      rewrite: 'Say it in your own words — this is a phrase you ruled out, not a rule about us.',
+      rewrite: 'Say it in your own words. This is a phrase you ruled out, not a rule about us.',
     })
   }
 

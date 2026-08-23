@@ -96,7 +96,7 @@ export interface WorkspaceExport {
 }
 
 const NO_READ_POLICY_REASON =
-  'This table has no read policy for members, so the app cannot read it on your behalf. It is not empty — it simply cannot be included from here. Ask Sahoda for it directly.'
+  'This table has no read policy for members, so the app cannot read it on your behalf. It is not empty. It simply cannot be included from here. Ask Sahoda for it directly.'
 
 async function readTable(
   supabase: SupabaseClient,

@@ -25,7 +25,7 @@ export function mapPostError(
 
     // 23503 foreign_key_violation — the post or workspace went away mid-edit.
     case '23503':
-      return 'That post no longer exists — reload to see the current list.'
+      return 'That post no longer exists. Reload to see the current list.'
 
     // PGRST116 (no rows) and 42501 (RLS refusal) must read IDENTICALLY: a
     // non-member must not be able to learn whether a post id exists.

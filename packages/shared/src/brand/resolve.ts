@@ -146,7 +146,7 @@ export const DEMO_FALLBACK_PAYLOAD: BrandMemoryPayload = {
     primary_emotion: 'Relief',
     sample_hooks: [
       'The quiet way to stay top-of-mind.',
-      'Your brand, handled — while you run the shop.',
+      'Your brand, handled, while you run the shop.',
       'Consistency beats loud. Every week.',
     ],
   },

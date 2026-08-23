@@ -275,7 +275,7 @@ export function LedgerTable({ entries, skipped, limit }: LedgerTableProps) {
         <table className="w-full min-w-[560px] border-collapse text-left">
           <caption className="sr-only">
             {isWindowed
-              ? `Credit activity, newest first — the ${limit} most recent entries`
+              ? `Credit activity, newest first: the ${limit} most recent entries`
               : 'Credit activity, newest first'}
           </caption>
           <thead>
@@ -347,8 +347,8 @@ export function SkippedNote({ skipped }: { skipped: number }) {
   return (
     <p className="text-[13px] text-warn">
       <span className="tabular-nums">{skipped}</span> {one ? 'entry' : 'entries'} could not be
-      displayed — {one ? 'it did' : 'they did'} not match the ledger contract. Your balance above
-      still counts {one ? 'it' : 'them'}.
+      displayed, because {one ? 'it did' : 'they did'} not match the ledger contract. Your balance
+      above still counts {one ? 'it' : 'them'}.
     </p>
   )
 }

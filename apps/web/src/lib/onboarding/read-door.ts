@@ -136,7 +136,7 @@ async function readPdf(
     return {
       ok: false,
       costUsd: 0,
-      message: `That PDF is over ${Math.round(MAX_PDF_BYTES / 1024 / 1024)}MB — upload a shorter one, or tell us in your own words.`,
+      message: `That PDF is over ${Math.round(MAX_PDF_BYTES / 1024 / 1024)}MB. Upload a shorter one, or tell us in your own words.`,
     }
   }
 
@@ -160,7 +160,7 @@ async function readPdf(
   const estimate = OCR_USD_PER_PAGE * OCR_ASSUMED_PAGES
   emit({
     stage: 'pdf.ocr-start',
-    detail: 'The free reader found no text — switching to OCR, which reads pictures',
+    detail: 'The free reader found no text, so it is switching to OCR, which reads pictures',
     costUsd: estimate,
   })
 
@@ -289,7 +289,7 @@ export async function readDoorStreaming(
   const message =
     (pdfResult && !pdfResult.ok ? pdfResult.message : null) ??
     (siteResult && !siteResult.ok ? siteResult.message : null) ??
-    'Give us one thing to read — a link, a PDF, or a sentence about what you do.'
+    'Give us one thing to read: a link, a PDF, or a sentence about what you do.'
   emit({ stage: 'failed', detail: message })
   return { ok: false, message, stages, costUsd }
 }

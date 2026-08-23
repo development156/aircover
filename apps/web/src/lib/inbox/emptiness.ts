@@ -167,7 +167,7 @@ export function neverConnected(surface: InboxSurface): InboxEmptiness {
     state: 'never_connected',
     showList: false,
     headline: `Connect an account to see ${surface.noun} here`,
-    body: `Sahoda has not asked any account for this workspace, so it has nothing to show yet — this is not a reading of your ${surface.noun}. Your ${surface.noun} appear here once ${surface.connectPrompt}.`,
+    body: `Sahoda has not asked any account for this workspace, so it has nothing to show yet. This is not a reading of your ${surface.noun}. Your ${surface.noun} appear here once ${surface.connectPrompt}.`,
     failed: [],
   }
 }
@@ -270,7 +270,7 @@ function classifyFanOut({
         state: 'unknown',
         showList: false,
         headline: `Sahoda could not confirm this ${surface.noun} view is complete`,
-        body: `Our publishing partner asked no account, and Sahoda could not check which accounts you have connected — so it cannot tell whether nothing is connected or something needs reconnecting. This is not a reading of your ${surface.noun}. Refresh to try again.`,
+        body: `Our publishing partner asked no account, and Sahoda could not check which accounts you have connected, so it cannot tell whether nothing is connected or something needs reconnecting. This is not a reading of your ${surface.noun}. Refresh to try again.`,
         failed,
       }
     }

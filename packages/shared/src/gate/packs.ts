@@ -54,7 +54,7 @@ const FLOOR_RULES: readonly Rule[] = [
     source: 'packs/regime/_floor.md',
     phrases: ['no.1', 'no 1', '#1', 'number one', "world's best", "india's best", 'the best in'],
     rewrite:
-      'Name what you are best at and how it was measured — "rated 4.8 by 300 customers" says more than "No.1" and is yours to stand behind.',
+      'Name what you are best at and how it was measured. "rated 4.8 by 300 customers" says more than "No.1" and is yours to stand behind.',
   },
   {
     id: 'floor.guaranteed-outcome',
@@ -63,7 +63,7 @@ const FLOOR_RULES: readonly Rule[] = [
     source: 'packs/regime/_floor.md',
     phrases: ['guaranteed results', '100% guaranteed', 'guaranteed success', 'results guaranteed'],
     rewrite:
-      'Say what you do and what customers have seen — "most clients see X within Y" — rather than promising the outcome.',
+      'Say what you do and what customers have seen ("most clients see X within Y") rather than promising the outcome.',
   },
   {
     id: 'floor.typical-result',
@@ -83,7 +83,7 @@ const HEALTHCARE_RULES: readonly Rule[] = [
     source: 'packs/regime/healthcare.md',
     phrases: ['cure', 'cures', 'cured', 'curing', 'miracle cure', 'permanent cure'],
     rewrite:
-      'Describe what the treatment does and who it suits — "manages", "relieves", "supports recovery from" — and leave the outcome to the clinician.',
+      'Describe what the treatment does and who it suits ("manages", "relieves", "supports recovery from") and leave the outcome to the clinician.',
   },
   {
     id: 'health.no-safety-guarantee',
@@ -151,7 +151,7 @@ const FOOD_RULES: readonly Rule[] = [
     source: 'packs/regime/food.md',
     phrases: ['cures', 'prevents disease', 'medicinal', 'treats diabetes', 'lowers cholesterol'],
     rewrite:
-      'Describe the ingredient and what it is — "made with millet, high in fibre" — without attaching it to a condition.',
+      'Describe the ingredient and what it is ("made with millet, high in fibre") without attaching it to a condition.',
   },
   {
     id: 'food.no-unverified-provenance',
@@ -199,7 +199,7 @@ const EDUCATION_RULES: readonly Rule[] = [
       'guaranteed rank',
     ],
     rewrite:
-      'Publish the real number and the cohort it came from — "62 of 80 placed in 2025" — which is more persuasive than a guarantee nobody believes.',
+      'Publish the real number and the cohort it came from ("62 of 80 placed in 2025"), which is more persuasive than a guarantee nobody believes.',
   },
   {
     id: 'education.no-unverified-rank',

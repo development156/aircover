@@ -73,7 +73,7 @@ export const QUESTIONS: Readonly<Record<string, QuestionCopy>> = Object.freeze({
   institutionxhealthcare: {
     counterparty: 'A family in the third-floor waiting room',
     moment:
-      'They want their father\'s recovery on your Instagram — "it will give other people hope." He is asleep down the corridor and nobody has asked him.',
+      'They want their father\'s recovery on your Instagram, because "it will give other people hope." He is asleep down the corridor and nobody has asked him.',
     ask: 'What do you refuse to post?',
     placeholder: "We do not post a patient's story on their family's consent.",
   },

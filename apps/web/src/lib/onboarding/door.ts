@@ -127,5 +127,5 @@ export function precedenceNote(choice: DoorChoice): string | null {
 
   const dropped = choice.ignored.map((kind) => KIND_NOUN[kind])
   const list = dropped.length === 1 ? dropped[0] : `${dropped[0]} and ${dropped[1]}`
-  return `We're reading ${KIND_NOUN[choice.kind]} and ignoring ${list} — ${KIND_REASON[choice.kind]}.`
+  return `We're reading ${KIND_NOUN[choice.kind]} and ignoring ${list}, because ${KIND_REASON[choice.kind]}.`
 }

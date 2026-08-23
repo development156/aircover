@@ -63,7 +63,7 @@ export async function sendApprovalCode(input: {
     `Your approval code is ${input.code}`,
     '',
     'It works for ten minutes and three attempts, and only for you.',
-    'If this was not expected, do not enter it — deny the request in /admin/credits instead.',
+    'If this was not expected, do not enter it. Deny the request in /admin/credits instead.',
   ].join('\n')
 
   return send(input.to, `Approve ${credits(input.amount)} for ${input.workspace}?`, text)

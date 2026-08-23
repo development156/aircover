@@ -45,7 +45,7 @@ export type ArtifactCheck =
  */
 export function checkArtifact(file: { size: number; type: string }): ArtifactCheck {
   if (!ARTIFACT_MIME_TYPES.includes(file.type as ArtifactMime)) {
-    return { ok: false, message: 'Screenshots only — PNG, JPEG or WebP.' }
+    return { ok: false, message: 'Screenshots only. PNG, JPEG or WebP.' }
   }
   if (file.size <= 0) {
     return { ok: false, message: 'That file is empty.' }
@@ -146,7 +146,7 @@ export function checkFinalize(draft: QaDraft, status: OpsQaStatus | null): Final
     return { ok: false, message: 'A run finishes as pass, fail or blocked.' }
   }
   if (draft.summary.trim() === '') {
-    return { ok: false, message: 'Say in one line what you checked — this record is read later.' }
+    return { ok: false, message: 'Say in one line what you checked. This record is read later.' }
   }
   if (draft.runId === null) {
     return { ok: false, message: 'Nothing has been saved yet, so there is nothing to finish.' }

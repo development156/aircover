@@ -40,5 +40,5 @@ export function describeImpact(impact: DeleteImpact): string {
   }
   if (parts.length === 0) return 'Nothing in your Brand Brain refers to this document.'
 
-  return `${parts.join(', and ')}. Deleting it does not undo what Sahoda already learned — those stay exactly as they are. What goes is the document behind them, so you will no longer be able to open the passage a field came from.`
+  return `${parts.join(', and ')}. Deleting it does not undo what Sahoda already learned. Those stay exactly as they are. What goes is the document behind them, so you will no longer be able to open the passage a field came from.`
 }

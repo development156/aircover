@@ -41,7 +41,7 @@ export const WAITING_ON: readonly WaitingOn[] = [
   },
   {
     code: 'SL-043',
-    who: 'DIVAS — a decision, not engineering',
+    who: 'DIVAS, a decision, not engineering',
     action:
       'Approve creating a second, separate database for testing. It was measured at no monthly cost; the work is a day once approved.',
     since: '2026-07-30',
@@ -55,7 +55,7 @@ export const WAITING_ON: readonly WaitingOn[] = [
   },
   {
     code: 'SL-057',
-    who: 'DIVAS — a decision',
+    who: 'DIVAS, a decision',
     action:
       'Decide whether the code repository stays public. No credentials are exposed, so this is a preference, not an incident.',
     since: '2026-07-31',

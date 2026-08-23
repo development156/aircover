@@ -133,7 +133,7 @@ export async function mintCroppedAttachment(input: MintInput): Promise<MintResul
   const oriented = await orientedSize(originalBytes)
   if (oriented === null) return { ok: false, message: CANNOT_READ }
   if (oriented.animated) {
-    return { ok: false, message: 'Sahoda does not crop moving images — it would freeze them.' }
+    return { ok: false, message: 'Sahoda does not crop moving images. It would freeze them.' }
   }
 
   // The plan is rebuilt SERVER-SIDE from the original's own dimensions. The
