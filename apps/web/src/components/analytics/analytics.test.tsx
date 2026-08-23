@@ -125,6 +125,26 @@ describe('the ranked table does not rank what it cannot measure', () => {
   })
 })
 
+/**
+ * ── TWO RENDERINGS, ONE OF WHICH jsdom CANNOT SEE HIDDEN ─────────────────────
+ * Below 700px the channel comparison is a block per channel rather than a table
+ * (docs/37 §13, and see the component header for the 390px measurement that
+ * forced it). Both are mounted and each is `display:none`'d for the other, which
+ * is right in a browser and invisible to jsdom — so every figure appears TWICE
+ * to a query over the whole render, and these two tests went red counting three
+ * "1/2"s as six.
+ *
+ * They scope to the table rather than de-duplicating, because the CLAIM is about
+ * the comparison table's per-metric denominator and the table is where it lives.
+ * `connections-widths.spec.ts` and the frames are what prove the narrow
+ * rendering; a jsdom query could not tell the two apart in any case.
+ */
+const table = () => {
+  const el = document.querySelector('table')
+  if (!el) throw new Error('the channel table did not render')
+  return within(el)
+}
+
 describe('the channel table keeps each channel on its own denominator', () => {
   test('shows a partial channel’s coverage beside its figure', () => {
     render(
@@ -141,7 +161,7 @@ describe('the channel table keeps each channel on its own denominator', () => {
     //
     // Once per metric column, not once per row: coverage is per metric, so a
     // channel can be complete for reach and partial for impressions.
-    expect(screen.getAllByText('1/2')).toHaveLength(3)
+    expect(table().getAllByText('1/2')).toHaveLength(3)
     expect(screen.getByText(/2 of 3 channels reported/)).toBeInTheDocument()
   })
 
@@ -149,7 +169,7 @@ describe('the channel table keeps each channel on its own denominator', () => {
     render(<ChannelTable rows={[row({ channel: 'x', state: lagPending })]} />)
     // Omitting it would read as "X has nothing to say" instead of "we have
     // nothing from X yet".
-    expect(screen.getByText('X')).toBeInTheDocument()
+    expect(table().getByText('X')).toBeInTheDocument()
   })
 })
 

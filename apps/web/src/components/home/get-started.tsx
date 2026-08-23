@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { StaggerItem } from '@/components/motion/stagger'
 import { buttonVariants } from '@/components/ui/button'
 import { greetingFor } from '@/lib/home/greeting'
 import type { StartStep } from '@/lib/home/started'
@@ -37,6 +38,15 @@ import type { StartStep } from '@/lib/home/started'
  * that renders this, all three are always incomplete. A checklist whose boxes
  * can never be checked is furniture, and the first version shipped three of them.
  *
+ * ── AND IT ARRIVES, BECAUSE EVERY OTHER STATE OF THIS PAGE DOES ──────────────
+ * `motion.spec.ts` caught this: it bootstraps a workspace, opens /home and reads
+ * `.enter-step`, and its own header explains why it bootstraps at all — with no
+ * workspace the page is `FirstRun` and "there is no dashboard to stagger". This
+ * screen added a THIRD state with the same property, so the most-seen screen in
+ * the product would have been the one that flashes in while the dashboard behind
+ * it deals itself. Two regions, not an orchestration: docs/37 §12 wants content
+ * to arrive, and the product register warns against making anyone watch it.
+ *
  * ── THE ORDER IS NOT A REQUIREMENT ───────────────────────────────────────────
  * Writing genuinely works with no brain and no connection; `ConnectionsCard` says
  * so and is right. The order is what unblocks the most, and every step is a live
@@ -53,61 +63,65 @@ export function GetStarted({ now, steps }: { now: Date; steps: StartStep[] }) {
           argues: the hour of the day is not a claim about their data, but
           "plan a week and it starts filling in" is advice for a workspace that
           has something to plan around. */}
-      <header>
-        <h1 className="type-h2">{greetingFor(now)}</h1>
-        <p className="type-sm mt-1 max-w-[var(--measure-prose)] text-muted">
-          Nothing has happened in this workspace yet, which is exactly what a new one looks like.
-        </p>
-      </header>
+      <StaggerItem i={0}>
+        <header>
+          <h1 className="type-h2">{greetingFor(now)}</h1>
+          <p className="type-sm mt-1 max-w-[var(--measure-prose)] text-muted">
+            Nothing has happened in this workspace yet, which is exactly what a new one looks like.
+          </p>
+        </header>
+      </StaggerItem>
 
-      <section
-        data-testid="home-get-started"
-        aria-labelledby="home-get-started-head"
-        className="surface-ring rounded-card bg-surface p-5"
-      >
-        {/* Capped at the prose measure rather than left to the card. At 1440 the
+      <StaggerItem i={1}>
+        <section
+          data-testid="home-get-started"
+          aria-labelledby="home-get-started-head"
+          className="surface-ring rounded-card bg-surface p-5"
+        >
+          {/* Capped at the prose measure rather than left to the card. At 1440 the
             card is 1132px and every sentence in it is under 640 — letting the
             rule and the text run the full width is the same container-over-content
             failure docs/27 §3.4 names, and this component criticises it in its
             own header. */}
-        <div className="max-w-[var(--measure-prose)]">
-          <h2 id="home-get-started-head" className="type-h3 text-ink">
-            Three things start it
-          </h2>
-          <p className="type-sm mt-1 text-muted">
-            Your week, your approvals queue and your numbers all fill in from these. You can do them
-            in any order.
-          </p>
+          <div className="max-w-[var(--measure-prose)]">
+            <h2 id="home-get-started-head" className="type-h3 text-ink">
+              Three things start it
+            </h2>
+            <p className="type-sm mt-1 text-muted">
+              Your week, your approvals queue and your numbers all fill in from these. You can do
+              them in any order.
+            </p>
 
-          <div className="mt-5">
-            {/* The one solid brand fill on this view (docs/37 §16). */}
-            <Link
-              href={lead.href}
-              data-guide="home.get-started"
-              className={buttonVariants({ variant: 'primary' })}
-            >
-              {lead.label}
-            </Link>
-            <p className="type-meta mt-2 text-muted">{lead.gets}</p>
+            <div className="mt-5">
+              {/* The one solid brand fill on this view (docs/37 §16). */}
+              <Link
+                href={lead.href}
+                data-guide="home.get-started"
+                className={buttonVariants({ variant: 'primary' })}
+              >
+                {lead.label}
+              </Link>
+              <p className="type-meta mt-2 text-muted">{lead.gets}</p>
+            </div>
+
+            {rest.length > 0 ? (
+              <ul className="mt-5 space-y-3 border-t border-line-soft pt-4">
+                {rest.map((step) => (
+                  <li key={step.id}>
+                    <Link
+                      href={step.href}
+                      className="type-body rounded-sm font-[550] text-ink transition-micro hover:text-accent"
+                    >
+                      {step.label}
+                    </Link>
+                    <p className="type-meta text-muted">{step.gets}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
-
-          {rest.length > 0 ? (
-            <ul className="mt-5 space-y-3 border-t border-line-soft pt-4">
-              {rest.map((step) => (
-                <li key={step.id}>
-                  <Link
-                    href={step.href}
-                    className="type-body rounded-sm font-[550] text-ink transition-micro hover:text-accent"
-                  >
-                    {step.label}
-                  </Link>
-                  <p className="type-meta text-muted">{step.gets}</p>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      </section>
+        </section>
+      </StaggerItem>
     </div>
   )
 }
