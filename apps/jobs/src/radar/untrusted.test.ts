@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
 import { describe, it, expect } from 'vitest'
 
@@ -210,29 +210,29 @@ describe('when the stored evidence is shown to a model, it arrives quarantined',
 
 describe('the strongest claim, enforced instead of asserted in prose', () => {
   /**
-   * ── WHAT IT CANNOT SEE ─────────────────────────────────────────────────────
-   * It greps `from '@sahoda/mesh` over the .ts files under THIS directory:
-   *  · a model reached without that import at all — a direct fetch to a provider
-   *    endpoint, or an HTTP client given a provider URL — is not an import and is
-   *    invisible here;
-   *  · the specifier written any other way: a dynamic `import()`, a `require`, a
-   *    re-export through a barrel, or DOUBLE QUOTES. The pattern is single-quoted
-   *    because that is what this repo's formatter emits, which makes it a
-   *    spelling match, and a spelling match is the exact defect the file above it
-   *    exists to refuse;
-   *  · anything OUTSIDE src/radar. The walk is directory-scoped, so a helper in
-   *    another directory that radar imports, and which itself imports mesh, is
-   *    reached at runtime and never read here;
-   *  · .test.ts files, excluded from the walk deliberately.
+   * "NO MODEL RUNS IN RADAR INGESTION AT ALL" is this file's headline claim, and
+   * the whole reason a hostile competitor page cannot do anything here: there is
+   * no prompt in the path, so there is nothing to inject INTO. A sentence is not a
+   * guard — the day someone adds "summarise what changed" to `run.ts`, every word
+   * in that header becomes false.
    *
-   * "NO MODEL RUNS IN RADAR INGESTION AT ALL" is the header's claim and the whole
-   * reason a hostile competitor page cannot do anything here — there is no prompt
-   * to inject into. Until now it was a sentence. A sentence is not a guard: the
-   * day someone adds "summarise what changed" to `run.ts`, every word in that
-   * header becomes false and nothing goes red.
+   * ── THIS USED TO GREP, AND THE GREP COULD NOT SEE MOST OF THE WAYS IN ──────
+   * The previous version tested `/from\s+'@sahoda\/mesh/` against the .ts files in
+   * THIS DIRECTORY. It missed, by construction:
    *
-   * So the import graph is read. `@sahoda/mesh` is where every model call in this
-   * codebase lives, so reaching it from this directory IS reaching a model.
+   *   · a DOUBLE-QUOTED specifier — the pattern was single-quoted because that is
+   *     what the formatter emits, which made it a spelling match. Its own comment
+   *     said so, and a spelling match is precisely the defect this file exists to
+   *     refuse;
+   *   · a dynamic `import()` or a `require()`;
+   *   · a re-export through a barrel;
+   *   · and the biggest one: ANYTHING OUTSIDE src/radar. The walk was
+   *     directory-scoped, so a helper one directory over that radar imports, and
+   *     which itself imports mesh, is reached at runtime and was never read.
+   *
+   * So the IMPORT GRAPH is walked instead, transitively, from radar's own files
+   * outward through every relative import, in every specifier form. Reaching
+   * `@sahoda/mesh` from anywhere in that graph is reaching a model.
    */
   const RADAR_DIR = new URL('.', import.meta.url).pathname
 
@@ -244,17 +244,124 @@ describe('the strongest claim, enforced instead of asserted in prose', () => {
     })
   }
 
-  it('nothing in src/radar can reach @sahoda/mesh', () => {
-    const offenders = sourceFiles(RADAR_DIR).filter((file) =>
-      /from\s+'@sahoda\/mesh/.test(readFileSync(file, 'utf8')),
-    )
-    expect(offenders).toEqual([])
+  /**
+   * Every module specifier in a file, however it is written.
+   *
+   * Four forms, not one: `from '…'` and `from "…"`, `import('…')`, `require('…')`.
+   * The quote character is a capture group matched against itself, so neither
+   * style can slip past and no third style is silently assumed away.
+   */
+  function specifiersIn(source: string): string[] {
+    const code = source.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
+    const out: string[] = []
+    for (const re of [
+      /(?:from|import)\s*\(?\s*(['"])([^'"]+)\1/g,
+      /require\s*\(\s*(['"])([^'"]+)\1/g,
+    ]) {
+      for (const m of code.matchAll(re)) if (m[2]) out.push(m[2])
+    }
+    return out
+  }
+
+  /** A relative specifier resolved to a file on disk, or null if it is a package. */
+  function resolveRelative(fromFile: string, specifier: string): string | null {
+    if (!specifier.startsWith('.')) return null
+    const base = join(dirname(fromFile), specifier)
+    for (const candidate of [base, `${base}.ts`, join(base, 'index.ts')]) {
+      if (existsSync(candidate) && statSync(candidate).isFile()) return candidate
+    }
+    return null
+  }
+
+  /**
+   * Everything radar can reach: the files it pulls in transitively, and the bare
+   * package names it stops at.
+   */
+  function reachable(): { files: Set<string>; packages: Set<string> } {
+    const files = new Set<string>()
+    const packages = new Set<string>()
+    const queue = sourceFiles(RADAR_DIR)
+    while (queue.length > 0) {
+      const file = queue.pop()!
+      if (files.has(file)) continue
+      files.add(file)
+      for (const specifier of specifiersIn(readFileSync(file, 'utf8'))) {
+        const resolved = resolveRelative(file, specifier)
+        if (resolved) {
+          if (!resolved.endsWith('.test.ts')) queue.push(resolved)
+        } else {
+          // A bare specifier. Keep the package root: '@scope/name' or 'name'.
+          const parts = specifier.split('/')
+          packages.add(specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]!)
+        }
+      }
+    }
+    return { files, packages }
+  }
+
+  it('nothing radar can reach, transitively, imports @sahoda/mesh', () => {
+    const graph = reachable()
+    expect([...graph.packages].filter((p) => p === '@sahoda/mesh')).toEqual([])
+  })
+
+  it('CAN walk outside src/radar, which is what the directory-scoped grep could not', () => {
+    // MEASURED: radar has no relative import that leaves its own directory today,
+    // so the walk currently finds nothing outside it — and the old grep was
+    // therefore sufficient BY ACCIDENT, not by design. The hole was real all the
+    // same: the day a radar file imports `../something` that itself imports mesh,
+    // the grep is blind and this is not.
+    //
+    // So what is asserted is the CAPABILITY, not a count that happens to be zero.
+    // Asserting `outside.length > 0` would be asserting a fact about today's
+    // imports, and it would go red on a refactor that changed nothing about
+    // safety.
+    const anyRadarFile = sourceFiles(RADAR_DIR)[0]!
+    const crossed = resolveRelative(anyRadarFile, '../runtime')
+    expect(crossed).not.toBeNull()
+    expect(crossed!.startsWith(RADAR_DIR)).toBe(false)
+    expect(crossed!.endsWith('runtime.ts')).toBe(true)
   })
 
   it('reads a real set of files, so an empty result means something', () => {
-    // A glob that matches nothing passes the assertion above perfectly.
-    const files = sourceFiles(RADAR_DIR)
-    expect(files.length).toBeGreaterThanOrEqual(6)
-    expect(files.some((f) => f.endsWith('run.ts'))).toBe(true)
+    // A walk that matches nothing passes every assertion above perfectly.
+    const graph = reachable()
+    expect(graph.files.size).toBeGreaterThanOrEqual(6)
+    expect([...graph.files].some((f) => f.endsWith('run.ts'))).toBe(true)
+    expect(graph.packages.size).toBeGreaterThan(0)
+  })
+
+  it('catches a DOUBLE-QUOTED mesh import, which the old pattern could not', () => {
+    // Executed rather than argued: the same detection, run over text that spells
+    // the import the way the old regex missed.
+    const doubleQuoted = `import { createMesh } from "@sahoda/mesh"`
+    expect(specifiersIn(doubleQuoted)).toContain('@sahoda/mesh')
+
+    const dynamic = `const m = await import("@sahoda/mesh")`
+    expect(specifiersIn(dynamic)).toContain('@sahoda/mesh')
+
+    const required = `const m = require('@sahoda/mesh')`
+    expect(specifiersIn(required)).toContain('@sahoda/mesh')
+
+    // And the single-quoted form the old pattern DID catch still works.
+    expect(specifiersIn(`import x from '@sahoda/mesh'`)).toContain('@sahoda/mesh')
+  })
+
+  /**
+   * ── WHAT THIS STILL CANNOT SEE, STATED RATHER THAN IMPLIED ─────────────────
+   * A model reached WITHOUT importing mesh — a bare `fetch` to a provider's HTTP
+   * endpoint — is not an import and no import graph can find it. The check below
+   * is a second, independent and deliberately cruder net: it looks for a provider
+   * hostname in the reachable source. It is a spelling match and is labelled as
+   * one; it exists because the failure it catches is one the graph cannot.
+   */
+  it('no provider endpoint is named anywhere radar can reach', () => {
+    const graph = reachable()
+    const hosts = ['api.openai.com', 'openrouter.ai', 'api.anthropic.com', 'generativelanguage.googleapis.com']
+    const offenders: string[] = []
+    for (const file of graph.files) {
+      const source = readFileSync(file, 'utf8')
+      for (const host of hosts) if (source.includes(host)) offenders.push(`${file} → ${host}`)
+    }
+    expect(offenders).toEqual([])
   })
 })

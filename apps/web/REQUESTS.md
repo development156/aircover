@@ -933,3 +933,31 @@ Per competitor, what is real and what is not:
 The two disclosure rules are proven separately and still hold after writing through the
 door: a workspace sees only competitors it subscribes to, and a `COUNT` of a shared
 competitor's subscribers answers **1** when the truth is **2**.
+
+---
+
+## 12 · Every authenticated navigation pays FIVE sequential reads before a page renders
+
+**For wt-page-dash / wt-page-flow / wt-page-rest. wt-infra found it and did NOT fix it —
+the fix is in `(app)/layout.tsx` and `components/shell/*`, which are yours.**
+
+`read-waterfall.test.ts` read `page.tsx` files only, so it could not see anything a layout
+or a shell component does. It now walks the render tree — every layout above a page plus
+the server components they import — and the first thing it found is that **all 44 routes
+under `(app)` carry the same five sequential awaits before their own work starts**:
+
+```
+activeWorkspaceRead → getOpsAdmin → read → soft → read
+```
+
+Five round trips, one after another, on every navigation in the product. That is the most
+expensive place in the app to have a waterfall, because every route pays it, and it was
+invisible to a per-page scan.
+
+They are recorded in `read-waterfall.baseline.json` as today's truth, so the ratchet works
+from here — the guard will now go red if a sixth is added. Removing them is free and
+needs no baseline permission: the ratchet only refuses growth.
+
+Worth checking first whether any pair can be a `Promise.all`. The analyser already treats
+`Promise.all` and `Promise.allSettled` as parallel and will drop the count when you do.
+

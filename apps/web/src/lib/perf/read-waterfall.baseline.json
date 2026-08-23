@@ -5,79 +5,208 @@
   },
   {
     "route": "/(app)/ads",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/ads/budget",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/ads/creative",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/ads/performance",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/ads/targeting",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/analytics",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/approvals",
-    "awaits": ["readApprovalQueue"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readApprovalQueue"
+    ]
   },
   {
     "route": "/(app)/assets",
-    "awaits": ["readAssets", "signMediaPreviews"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readAssets",
+      "signMediaPreviews"
+    ]
   },
   {
     "route": "/(app)/billing/checkout/[orderId]",
-    "awaits": ["activeWorkspaceRead", "provider.fetchOrder"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "activeWorkspaceRead",
+      "provider.fetchOrder"
+    ]
   },
   {
     "route": "/(app)/brain",
-    "awaits": ["readBrain"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readBrain"
+    ]
   },
   {
     "route": "/(app)/brain/audience",
-    "awaits": ["readAudiencePage"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readAudiencePage"
+    ]
   },
   {
     "route": "/(app)/brain/competitors",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/brain/identity",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readBrain"
+    ]
   },
   {
     "route": "/(app)/brain/knowledge",
-    "awaits": ["readLibrary", "searchLibrary"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readLibrary",
+      "searchLibrary"
+    ]
   },
   {
     "route": "/(app)/brain/resolve",
-    "awaits": ["readBrain", "readCitedPassages"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readBrain",
+      "readCitedPassages"
+    ]
   },
   {
     "route": "/(app)/brain/voice",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readBrain"
+    ]
   },
   {
     "route": "/(app)/campaigns",
-    "awaits": ["readCampaigns"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readCampaigns"
+    ]
   },
   {
     "route": "/(app)/campaigns/[id]",
-    "awaits": ["readCampaign", "readAddablePosts"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readCampaign",
+      "readAddablePosts"
+    ]
   },
   {
     "route": "/(app)/connections",
     "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
       "getActiveWorkspace",
       "readConnectionSlots",
       "checkCountableLimit",
@@ -87,59 +216,152 @@
   },
   {
     "route": "/(app)/create",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/create/post",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/home",
-    "awaits": ["listVariantStates"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "listVariantStates"
+    ]
   },
   {
     "route": "/(app)/inbox",
-    "awaits": ["readConversationsList"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readConversationsList"
+    ]
   },
   {
     "route": "/(app)/inbox/comments",
-    "awaits": ["readCommentedPosts"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readCommentedPosts"
+    ]
   },
   {
     "route": "/(app)/inbox/comments/[accountId]/[platformPostId]",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/inbox/reviews",
-    "awaits": ["readReviews"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readReviews"
+    ]
   },
   {
     "route": "/(app)/inbox/threads/[accountId]/[conversationId]",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/leads",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/loop",
-    "awaits": ["readLoop"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readLoop"
+    ]
   },
   {
     "route": "/(app)/planner",
-    "awaits": ["readPosts"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readPosts"
+    ]
   },
   {
     "route": "/(app)/playbooks",
-    "awaits": ["getActiveWorkspace", "readPlaybooksSnapshot"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "getActiveWorkspace",
+      "readPlaybooksSnapshot"
+    ]
   },
   {
     "route": "/(app)/posts",
-    "awaits": ["readPosts", "listPostMetrics"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readPosts",
+      "listPostMetrics"
+    ]
   },
   {
     "route": "/(app)/posts/[id]",
     "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
       "readActiveWorkspace",
       "getPost",
       "readVariantFormats",
@@ -150,39 +372,99 @@
   },
   {
     "route": "/(app)/radar",
-    "awaits": ["getActiveWorkspace"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "getActiveWorkspace"
+    ]
   },
   {
     "route": "/(app)/radar/[id]",
-    "awaits": ["getActiveWorkspace"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "getActiveWorkspace"
+    ]
   },
   {
     "route": "/(app)/remix",
-    "awaits": ["activeWorkspaceRead"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "activeWorkspaceRead"
+    ]
   },
   {
     "route": "/(app)/report",
-    "awaits": ["readLoop"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readLoop"
+    ]
   },
   {
     "route": "/(app)/settings",
-    "awaits": ["getActiveWorkspace"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "getActiveWorkspace"
+    ]
   },
   {
     "route": "/(app)/settings/integrations",
-    "awaits": ["readConnections"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "readConnections"
+    ]
   },
   {
     "route": "/(app)/settings/plan",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/settings/profile",
-    "awaits": ["currentUser"]
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
+      "currentUser"
+    ]
   },
   {
     "route": "/(app)/sites",
     "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read",
       "readRecentSites",
       "activeWorkspaceRead",
       "activeThemeTokens",
@@ -194,11 +476,23 @@
   },
   {
     "route": "/(app)/studio",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(app)/wallet",
-    "awaits": []
+    "awaits": [
+      "activeWorkspaceRead",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "read"
+    ]
   },
   {
     "route": "/(auth)/sign-in/[[...sign-in]]",
@@ -210,35 +504,86 @@
   },
   {
     "route": "/(onboarding)/onboarding",
-    "awaits": ["getActiveWorkspace", "activeBrandMemory"]
+    "awaits": [
+      "getActiveWorkspace",
+      "activeBrandMemory"
+    ]
   },
   {
     "route": "/admin",
-    "awaits": []
+    "awaits": [
+      "requireOpsAdmin",
+      "getOpsAdmin",
+      "read",
+      "soft"
+    ]
   },
   {
     "route": "/admin/applications",
-    "awaits": ["requireOpsAdmin", "readApplications"]
+    "awaits": [
+      "requireOpsAdmin",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "requireOpsAdmin",
+      "readApplications"
+    ]
   },
   {
     "route": "/admin/credits",
-    "awaits": ["requireOpsAdmin"]
+    "awaits": [
+      "requireOpsAdmin",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "requireOpsAdmin"
+    ]
   },
   {
     "route": "/admin/dev",
-    "awaits": []
+    "awaits": [
+      "requireOpsAdmin",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "readChangelog",
+      "readSessions",
+      "readGateRuns"
+    ]
   },
   {
     "route": "/admin/jobs",
-    "awaits": ["requireOpsAdmin", "readPublishDeadLetters"]
+    "awaits": [
+      "requireOpsAdmin",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "requireOpsAdmin",
+      "readPublishDeadLetters"
+    ]
   },
   {
     "route": "/admin/qa",
-    "awaits": ["requireOpsAdmin", "readQaArtifacts", "signQaArtifactViews"]
+    "awaits": [
+      "requireOpsAdmin",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "requireOpsAdmin",
+      "readQaArtifacts",
+      "signQaArtifactViews"
+    ]
   },
   {
     "route": "/admin/team",
-    "awaits": ["requireOpsAdmin", "readOpsAdmins"]
+    "awaits": [
+      "requireOpsAdmin",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "requireOpsAdmin",
+      "readOpsAdmins"
+    ]
   },
   {
     "route": "/design-system",
