@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { creditCost } from '@sahoda/shared'
 
 import { FirstRun } from '@/components/home/first-run'
+import { GetStarted } from '@/components/home/get-started'
 import { GreetingBanner } from '@/components/home/greeting-banner'
 import { NeedsAttention } from '@/components/home/needs-attention'
 import { BrainCard, ConnectionsCard } from '@/components/home/rail-cards'
@@ -22,6 +23,7 @@ import { greetingFor, greetingState } from '@/lib/home/greeting'
 import { readPostCounts } from '@/lib/home/posts'
 import { readPublishSummary } from '@/lib/home/publishing'
 import { readSpend } from '@/lib/home/spend'
+import { startSteps, workspaceHasStarted, type StartedSignals } from '@/lib/home/started'
 import { bucketWeek } from '@/lib/planner/week'
 import { forDisplay } from '@/lib/posts/display-post'
 import { listPosts, listVariantStates } from '@/lib/posts/read'
@@ -131,6 +133,36 @@ export default async function HomePage() {
   // dashboard is replaced rather than rendered empty. See FirstRun for why.
   if (balance.status === 'no-workspace') return <FirstRun now={now} />
 
+  /**
+   * ── AND A WORKSPACE THAT EXISTS AND HOLDS NOTHING GETS ITS OWN SCREEN TOO ──
+   *
+   * The branch above replaces the dashboard when there is no workspace. The state
+   * one step along — a workspace that exists and has nothing in it, which is
+   * every account for its first hour — had no branch at all, so it rendered all
+   * nine containers and each one announced the same absence independently.
+   * MEASURED 2026-08-23: SEVEN statements of "you have not done anything yet" in
+   * six visual languages, over 1085px at 1440, 1795px at 1024 and 2025px at 390.
+   * `lib/home/started.ts` carries the count and the argument.
+   *
+   * Every signal is read ABOVE this line already, so the branch costs nothing,
+   * and every unknown resolves to "started" — replacing a customer's dashboard on
+   * the strength of a query that failed is a far worse error than one extra
+   * scroll past some empty cards.
+   */
+  const signals: StartedSignals = {
+    posts: posts.length,
+    // `listConnections` returns null when the read failed, never on an empty table.
+    connections: connections === null ? null : connections.length,
+    hasBrain: brain.status === 'unreadable' ? null : brain.status === 'ok',
+    spendRows: spend.status === 'unreadable' ? null : spend.byAction.length,
+    // Account figures belong to the ACCOUNT, not to this workspace's work — a
+    // shop with an Instagram following has something to report on day one.
+    accountReported: instagram.kind === 'ready' && instagram.insights.length > 0,
+  }
+  if (!workspaceHasStarted(signals)) {
+    return <GetStarted now={now} steps={startSteps(signals)} />
+  }
+
   // The evidence behind `.is-real` on the strip. This page read publish-log
   // MODES here and never the variant rows, so a post that had genuinely gone out
   // could not render as real on Home at all — `posts.status` stays `approved`
@@ -209,10 +241,10 @@ export default async function HomePage() {
           <StaggerItem i={5}>
             <section className="surface-ring rounded-card bg-surface">
               <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
-                <h2 className="text-[14px] font-semibold tracking-[-0.01em]">Recent activity</h2>
+                <h2 className="type-h3">Recent activity</h2>
                 <Link
                   href="/wallet"
-                  className="card-link ml-auto text-[12px] font-[550] text-muted hover:text-accent"
+                  className="card-link ml-auto type-meta font-[550] text-muted hover:text-accent"
                 >
                   View all
                 </Link>
@@ -239,7 +271,7 @@ export default async function HomePage() {
                   <Unreadable what="Your credit balance" />
                 )}
               </p>
-              <p className="mt-1 text-[13px] text-muted">
+              <p className="mt-1 type-sm text-muted">
                 {balance.status === 'ok' && balance.balance.held > 0
                   ? `${balance.balance.held} held by actions in progress`
                   : 'credits to spend'}

@@ -28,14 +28,44 @@ function ConnectionsLink() {
   return (
     <Link
       href="/connections"
-      className="inline-flex items-center rounded-sm text-[13px] font-semibold text-accent underline-offset-2 hover:underline max-narrow:min-h-[44px]"
+      className="inline-flex items-center rounded-sm type-sm font-semibold text-accent underline-offset-2 hover:underline max-narrow:min-h-[44px]"
     >
       Open connections
     </Link>
   )
 }
 
-export function AccountPanel({ analytics }: { analytics: AccountAnalytics }) {
+export function AccountPanel({
+  analytics,
+  reasonStated = false,
+}: {
+  analytics: AccountAnalytics
+  /**
+   * The page stated the cause and the remedy once, at the top.
+   *
+   * Default `false` keeps every existing caller — and `analytics.test.tsx`'s
+   * four state assertions — on the standalone contract described above, where
+   * answering silence to "how is my account doing" would be worse than
+   * answering "you have not connected one". When the PAGE has already answered
+   * it, a second copy of the same sentence and a second copy of the same link
+   * is not honesty, it is repetition: two of the six statements docs/40 §3.1
+   * counted were this card and the strip above it saying "connect a channel".
+   */
+  reasonStated?: boolean
+}) {
+  /**
+   * The quiet form: the container stands, the claim is a slot-level statement,
+   * and the remedy is not offered twice. Used only when the page carried it.
+   */
+  if (reasonStated && (analytics.kind === 'not-connected' || analytics.kind === 'reconnect')) {
+    return (
+      <Card>
+        <CardLabel>Instagram account</CardLabel>
+        <CardEmpty body="Followers and reach appear here once an account is linked." />
+      </Card>
+    )
+  }
+
   if (analytics.kind === 'not-connected') {
     return (
       <Card>
@@ -102,7 +132,7 @@ export function AccountPanel({ analytics }: { analytics: AccountAnalytics }) {
       <section aria-label="Followers" className="space-y-2">
         {followers.length === 0 ? (
           <>
-            <p className="text-[14px] text-ink">
+            <p className="type-body text-ink">
               {/* NOT "0 followers". Instagram told us nothing, which is not a count.
                   Worded to hold whether this is too-early or never-coming — there is
                   no connection timestamp here to tell those apart. */}
@@ -117,7 +147,7 @@ export function AccountPanel({ analytics }: { analytics: AccountAnalytics }) {
             <FollowerFlow gained={gained} lost={lost} />
           </>
         )}
-        <p className="text-[12px] text-muted">{accountLagCopy(followerLagHours)}</p>
+        <p className="type-meta text-muted">{accountLagCopy(followerLagHours)}</p>
       </section>
 
       {insights.length > 0 ? (
@@ -125,7 +155,7 @@ export function AccountPanel({ analytics }: { analytics: AccountAnalytics }) {
           <dl className="flex flex-wrap gap-x-8 gap-y-3">
             {insights.map((tile) => (
               <div key={tile.label}>
-                <dt className="text-[12px] text-muted">{tile.label}</dt>
+                <dt className="type-meta text-muted">{tile.label}</dt>
                 <dd className="text-[20px] leading-7 font-bold tabular-nums text-ink">
                   {tile.value.toLocaleString('en-IN')}
                 </dd>
@@ -134,7 +164,7 @@ export function AccountPanel({ analytics }: { analytics: AccountAnalytics }) {
           </dl>
           {/* The insights delay — the LONGER one. Reusing the follower delay here
               would claim these figures are a day fresher than they are. */}
-          <p className="text-[12px] text-muted">{accountLagCopy(insightsLagHours)}</p>
+          <p className="type-meta text-muted">{accountLagCopy(insightsLagHours)}</p>
         </section>
       ) : null}
     </Card>

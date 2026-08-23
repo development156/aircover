@@ -1,9 +1,3 @@
-import Link from 'next/link'
-import { ChartColumn, Plug } from 'lucide-react'
-
-import { EmptyState } from '@/components/empty-state'
-import { buttonVariants } from '@/components/ui/button'
-import { CreatePostButton } from '@/components/posts/create-post-button'
 import { PageTitle } from '@/components/page-title'
 import { PerformanceStrip } from '@/components/analytics/performance-strip'
 import { BestPerforming } from '@/components/analytics/best-performing'
@@ -11,7 +5,10 @@ import { PerformanceOverTime } from '@/components/analytics/performance-over-tim
 import { AccountPanel } from '@/components/analytics/account-panel'
 import { ChannelTable } from '@/components/analytics/channel-table'
 import { PostTable } from '@/components/analytics/post-table'
+import { ReadinessLine } from '@/components/analytics/readiness-line'
+import { coverageFor } from '@/lib/analytics/compare'
 import { ANALYTICS_METRIC_CALLS, readAnalyticsPage } from '@/lib/analytics/page-data'
+import { analyticsReadiness } from '@/lib/analytics/readiness'
 import { readMetricSeries } from '@/lib/analytics/series'
 
 export const metadata = { title: 'Analytics' }
@@ -56,98 +53,67 @@ export default async function AnalyticsPage() {
   ])
 
   /**
-   * ── FIVE APOLOGIES, OR ONE ANSWER ────────────────────────────────────────
+   * ── SIX APOLOGIES, OR ONE ANSWER ─────────────────────────────────────────
    *
-   * Each container below argues correctly for its own existence, and MEASURED at
-   * 1024 on a workspace with nothing, the five of them together said this:
+   * The note this replaces described five containers each arguing correctly for
+   * its own existence and never against its four neighbours, and it fixed them
+   * with a gate: `not-connected && !hasPublished && posts.length === 0`.
    *
-   *   Performance          four absence rules + "Connect a channel to start
-   *                        measuring."
-   *   Instagram account    "Connect Instagram to see followers and reach."
-   *   Performance over time"Sahoda has started keeping a history. Nothing has
-   *                        been measured yet..."
-   *   Best performing      "Nothing has been measured yet, so there is nothing
-   *                        to rank."
-   *   Nothing published yet"Analytics start once a post goes out on a channel."
+   * THE GATE WAS AIMED ONE STATE TOO EARLY. `posts.length === 0` was added
+   * because a two-part gate turned `analytics-history.spec.ts` red, and the note
+   * argued that the state MEASURED as broken was "a workspace with NOTHING".
+   * MEASURED again on 2026-08-23 one step along — four posts, two channels
+   * published, nothing connected, which is where a beta account sits after its
+   * first hour — the screen says "nothing" SIX times in six treatments across
+   * 1237px at 1440 and 1652px at 390, and renders no number at all. The gate
+   * closed the state nobody stays in and left open the state everybody does.
    *
-   * 1250px of page to deliver one fact. Every sentence is true and the sum is a
-   * screen that reads as five separate failures rather than one honest state.
-   * This is the composition problem the individual comments could not see: each
-   * card was reviewed against its own gate, never against its four neighbours.
+   * ── AND THE GATE IS STILL NOT WIDENED ────────────────────────────────────
+   * Widening it is the obvious repair and it is the wrong one twice over.
+   * `analytics-history.spec.ts` asserts the performance-over-time card is
+   * present and says "has started keeping a history" on exactly that workspace;
+   * widening the gate would delete the card and turn the spec red, and a guard
+   * is never loosened to accommodate the change that broke it. It would also be
+   * wrong on its own terms — a reader who cannot see that this product measures
+   * reach AT ALL is worse off than one looking at an empty reach slot
+   * (docs/37 §15: a container is structure).
    *
-   * docs/26 §4 already rules on it. "Not yet measured" is for a slot that is
-   * REAL and whose reading has not arrived. With no account linked and nothing
-   * published, none of these quantities can have a value from any source — so
-   * the third state applies, and the third state says OMIT THE SLOT.
-   *
-   * `PerformanceStrip` is ungated on `hasPublished` on purpose and that ruling
-   * stands: account insights do not need this workspace to have published. What
-   * they DO need is a linked account. So the gate here is not "has published",
-   * it is "could any of this ever have had a value".
-   *
-   * ── AND IT IS NARROWER THAN THAT, ON PURPOSE ─────────────────────────────
-   * `posts.length === 0` is the third condition, and it was added because the
-   * first version of this gate turned `analytics-history.spec.ts` red.
-   *
-   * That spec drafts one post, seeds three days of metric history, and asserts
-   * the performance-over-time card moves through its three states — starting
-   * with "Sahoda has started keeping a history", which is a different sentence
-   * from "Sahoda does not keep a history yet" and is the exact distinction the
-   * 2026-08-19 rewrite of that file exists to protect. With a two-part gate that
-   * workspace collapsed and the card never rendered.
-   *
-   * The tempting repair was to change the spec's setup so it reached the card.
-   * That is backwards: a guard should not be loosened to accommodate the change
-   * that broke it. The state actually MEASURED as broken was a workspace with
-   * NOTHING — no connection, nothing published, no posts — which is what every
-   * beta account is in for its first hour and where five stacked apologies were
-   * counted. A workspace that has drafted something is one step further along
-   * and keeps the full page.
-   *
-   * So the fix covers the state it was written for and not a pixel more.
+   * So the containers stay and the DIAGNOSIS moves. `analyticsReadiness` decides
+   * the cause once, from the page's own data; `ReadinessLine` states it once, at
+   * the top, with the one remedy attached; and every section below falls back to
+   * its slot-level absence mark instead of re-deriving the same sentence.
+   * Six statements become one, the card the spec depends on keeps its words, and
+   * the gate is untouched.
    */
-  const nothingCanBeMeasured =
-    account.kind === 'not-connected' && !hasPublished && posts.length === 0
+  const readiness = analyticsReadiness({
+    account,
+    hasPublished,
+    // Impressions is the column the tables order on, so it is the one whose
+    // presence decides whether this page has anything to show.
+    measuredRows: coverageFor(rows, 'impressions').counted,
+  })
+  const reasonStated = readiness.kind !== 'measuring'
 
-  if (nothingCanBeMeasured) {
-    return (
-      <div className="space-y-grid">
-        <PageTitle>Analytics</PageTitle>
-        {/* One state, and it names BOTH doors. The old copy offered only "write
-            a post", which is the second step: a post that goes out on no channel
-            is still never measured, so sending a new workspace to the composer
-            alone routes them the long way round to the same empty page. */}
-        <EmptyState
-          icon={ChartColumn}
-          title="Nothing to measure yet"
-          body="Analytics start when a post goes out on a connected channel. Until then there is nothing to measure — which is different from measuring nothing."
-          action={
-            /* ONE primary (docs/26 §1.5). Connecting leads because analytics
-               cannot exist without it; writing a post is the hairline second. */
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Link
-                href="/connections"
-                className={buttonVariants({ variant: 'primary' })}
-                data-guide="analytics.connect"
-              >
-                <Plug size={16} strokeWidth={2} aria-hidden />
-                Connect a channel
-              </Link>
-              <CreatePostButton variant="secondary" />
-            </div>
-          }
-          tip="Sahoda: Reach and followers come from the channel itself, so one connection starts them even before you post."
-        />
-      </div>
-    )
-  }
+  /**
+   * Nothing to structure. No posts, no publish, no account — so every container
+   * below would be an empty frame around the one sentence the line already says,
+   * and the line says it alone.
+   *
+   * This is the SAME component and the same words as the populated case, which
+   * is the point: docs/27 §1's finding was six treatments of one fact, and
+   * keeping a separate page-level `EmptyState` here would have left two. It also
+   * retires the `Sahoda: Sahoda:` duplication that shipped in that block's `tip`
+   * — `EmptyState` prefixes the string, and the caller passed one already
+   * carrying the prefix.
+   */
+  const nothingToStructure = account.kind === 'not-connected' && !hasPublished && posts.length === 0
 
   return (
     <div className="space-y-grid">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageTitle>Analytics</PageTitle>
         {hasPublished ? (
-          <p className="text-[12.5px] text-muted">
+          <p className="type-meta text-muted">
             {posts.length} published {posts.length === 1 ? 'post' : 'posts'} · {rows.length}{' '}
             {rows.length === 1 ? 'channel' : 'channels'}
           </p>
@@ -163,63 +129,59 @@ export default async function AnalyticsPage() {
 
           The tables below stay gated, because those genuinely are per-post rows
           and there is nothing to tabulate until a post goes out. */}
-      <PerformanceStrip analytics={account} />
+      <ReadinessLine readiness={readiness} />
 
-      <AccountPanel analytics={account} />
+      {nothingToStructure ? null : (
+        <>
+          <PerformanceStrip analytics={account} reasonStated={reasonStated} />
 
-      {/* The reference's two remaining containers, side by side beneath the
+          <AccountPanel analytics={account} reasonStated={reasonStated} />
+
+          {/* The reference's two remaining containers, side by side beneath the
           account panel. Best performing is WIRED — rankBy already refuses to rank
           an unmeasured row. Performance over time is wired too now, and draws
           nothing until there is a history to draw: before the migration it renders
           the same container it always did. See the component for the five things
           it refuses to plot. */}
-      <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-grid max-wide:grid-cols-1">
-        <PerformanceOverTime series={series} />
-        <BestPerforming rows={rows} />
-      </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-grid max-wide:grid-cols-1">
+            <PerformanceOverTime series={series} />
+            <BestPerforming rows={rows} reasonStated={reasonStated} />
+          </div>
 
-      {hasPublished ? (
-        <>
-          <ChannelTable rows={rows} />
-          <PostTable rows={rows} />
-          {/* The cap is STATED, not silently applied. Rows past it come back
-              `not-loaded`, and they are already counted in every denominator on
-              this page — but a reader who sees "18 of 30 reported" deserves to
-              know that some of the twelve were never asked rather than assuming
-              all twelve are still pending. */}
-          {rows.length > ANALYTICS_METRIC_CALLS ? (
-            <p className="text-[12px] text-muted">
-              Metrics are read for the first {ANALYTICS_METRIC_CALLS} published channels on this
-              page. The rest are listed as not loaded — open a post to read its own.
-            </p>
+          {/* The tables are the one place a NUMBER can appear, so they are the
+              last thing gated and the first thing that would be wrong to hide.
+              Nothing to tabulate until a post goes out. */}
+          {hasPublished ? (
+            <>
+              <ChannelTable rows={rows} />
+              <PostTable rows={rows} />
+              {/* The cap is STATED, not silently applied. Rows past it come back
+                  `not-loaded`, and they are already counted in every denominator
+                  on this page — but a reader who sees "18 of 30 reported"
+                  deserves to know that some of the twelve were never asked
+                  rather than assuming all twelve are still pending. */}
+              {rows.length > ANALYTICS_METRIC_CALLS ? (
+                <p className="type-meta text-muted">
+                  Metrics are read for the first {ANALYTICS_METRIC_CALLS} published channels on this
+                  page. The rest are listed as not loaded — open a post to read its own.
+                </p>
+              ) : null}
+            </>
           ) : null}
+          {/* ── WHERE THE SEVENTH STATEMENT USED TO BE ─────────────────────
+              A page-level `EmptyState` — 44px orange marker tile, bold heading,
+              centred prose, `Create post` — rendered here whenever nothing had
+              published. docs/27 §1 called it the hierarchy inversion, and the
+              2026-08-20 pass fixed the half of that which was fixable in place
+              by giving it an action, so that loudest and most useful were the
+              same object.
+
+              It is gone rather than restyled, because on the frames docs/40 §3.1
+              measured it was not the only thing saying this: `ReadinessLine` now
+              opens the page with "Nothing published yet" and the same remedy,
+              and a second copy 1100px lower is the repetition this whole lane is
+              about. The claim did not move. The second rendering of it did. */}
         </>
-      ) : (
-        /* ── THE HIERARCHY INVERSION ────────────────────────────────────────
-           docs/27 §1: "the largest, highest-contrast, most colour-saturated
-           element on the page carries the LEAST information. The eye lands on
-           the emptiest thing first."
-
-           That was literally true. This block — a 44px orange marker tile, a
-           bold heading and centred prose — was the loudest object on /analytics
-           and it offered NO action at all: `EmptyState`'s `action` was simply
-           omitted, so the one element the eye went to first was the one element
-           you could not do anything with.
-
-           It keeps its size. What changes is that it now carries the most
-           information on the screen instead of the least: the remedy. Loudest
-           and most useful are the same object again, which is the only
-           arrangement in which loud is correct.
-
-           The action is `CreatePostButton` — the route that works ON THIS
-           BRANCH. `/posts/[id]` does not handle `id="new"` here, so linking a
-           reader there would be a dead end. */
-        <EmptyState
-          icon={ChartColumn}
-          title="Nothing published yet"
-          body="Analytics start once a post goes out on a channel. Until then there is nothing to measure — which is different from measuring nothing."
-          action={<CreatePostButton />}
-        />
       )}
     </div>
   )

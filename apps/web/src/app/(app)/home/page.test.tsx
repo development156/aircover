@@ -147,12 +147,98 @@ describe('Home for a user with no workspace yet', () => {
   })
 })
 
+/**
+ * ── A THIRD STATE, ADDED 2026-08-23 ─────────────────────────────────────────
+ *
+ * Home used to have two: no workspace, and everything else. "Everything else"
+ * quietly included a workspace with nothing in it, which is where every account
+ * spends its first hour — and MEASURED there, the nine containers stated the same
+ * absence seven times over 2025px at 390. `lib/home/started.ts` decides it now.
+ *
+ * The two tests below assert things about the BALANCE, not about emptiness, so
+ * they seed one post to reach the dashboard branch they were written for. Without
+ * it they would be asserting the dashboard renders on a workspace that has no
+ * dashboard to render, which is what they were doing by accident.
+ */
+const A_POST = {
+  id: 'p1',
+  workspace_id: 'w1',
+  title: 'Tuesday roast',
+  body: 'Roasted this week.',
+  status: 'draft',
+  channels: ['instagram'],
+  scheduled_at: null,
+  origin: 'manual',
+  created_at: '2026-08-20T09:00:00.000Z',
+  updated_at: '2026-08-20T09:00:00.000Z',
+  created_by: 'u1',
+} as unknown as Awaited<ReturnType<typeof listPosts>>[number]
+
+describe('Home for a workspace with nothing in it', () => {
+  beforeEach(() => {
+    balanceRead.mockResolvedValue({
+      status: 'ok',
+      balance: { total: 100, held: 0, available: 100, hasHold: false, heldNote: null },
+    })
+  })
+
+  test('states the absence ONCE, and offers the three doors', async () => {
+    render(await HomePage())
+
+    expect(screen.getByTestId('home-get-started')).toBeInTheDocument()
+    // The dashboard's containers, each of which owned its own empty state.
+    expect(screen.queryByText(/available credits/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/needs your attention/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/credits spent/i)).not.toBeInTheDocument()
+  })
+
+  test('is NOT the no-workspace screen — this workspace exists', async () => {
+    render(await HomePage())
+
+    expect(screen.queryByRole('button', { name: /create workspace/i })).not.toBeInTheDocument()
+  })
+
+  /**
+   * The fail-safe direction, and the one worth guarding. Swallowing a customer's
+   * dashboard because a query FAILED would tell them their work is gone; the cost
+   * of the opposite error is one scroll past some empty cards.
+   */
+  test('an unreadable connections read keeps the dashboard, never the setup screen', async () => {
+    vi.mocked(listConnections).mockResolvedValue(null)
+
+    render(await HomePage())
+
+    expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
+    expect(screen.getByText(/available credits/i)).toBeInTheDocument()
+  })
+
+  test('an unreadable brain read does the same', async () => {
+    vi.mocked(readBrain).mockResolvedValue({ status: 'unreadable' })
+
+    render(await HomePage())
+
+    expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
+  })
+
+  /** One real post is a real dashboard, however empty everything else is. */
+  test('one draft is enough to earn the dashboard', async () => {
+    vi.mocked(listPosts).mockResolvedValue([A_POST])
+
+    render(await HomePage())
+
+    expect(screen.queryByTestId('home-get-started')).not.toBeInTheDocument()
+    expect(screen.getByText(/available credits/i)).toBeInTheDocument()
+  })
+})
+
 describe('Home for a workspace that exists', () => {
   beforeEach(() => {
     balanceRead.mockResolvedValue({
       status: 'ok',
       balance: { total: 100, held: 0, available: 100, hasHold: false, heldNote: null },
     })
+    // See A_POST: these two are about the balance, and need a started workspace.
+    vi.mocked(listPosts).mockResolvedValue([A_POST])
   })
 
   test('renders the dashboard, not the first run', async () => {

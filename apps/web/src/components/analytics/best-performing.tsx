@@ -27,9 +27,12 @@ import { METRIC_LABELS, rankBy, type ComparableRow, type MetricKey } from '@/lib
 export function BestPerforming({
   rows,
   metric = 'reach',
+  reasonStated = false,
 }: {
   rows: readonly ComparableRow[]
   metric?: MetricKey
+  /** See `PerformanceStrip`. The page said it once; this card does not repeat it. */
+  reasonStated?: boolean
 }) {
   const ranked = rankBy(rows, metric, 5)
 
@@ -37,7 +40,7 @@ export function BestPerforming({
     <Card className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
         <CardLabel className="mb-0">Best performing</CardLabel>
-        <span className="text-[11px] text-muted">by {METRIC_LABELS[metric].toLowerCase()}</span>
+        <span className="type-meta text-muted">by {METRIC_LABELS[metric].toLowerCase()}</span>
       </div>
 
       {ranked.length === 0 ? (
@@ -45,20 +48,29 @@ export function BestPerforming({
         // is a statement about the measurement, which is what we actually know.
         // The CLAIM is unchanged; only the treatment moved, to the one language
         // every empty card on this page now speaks (docs/26 §4.1).
-        <CardEmpty body="Nothing has been measured yet, so there is nothing to rank." />
+        <CardEmpty
+          body={
+            reasonStated
+              ? // The page's line already carries the cause and the remedy. What is
+                // left that only this card knows is that a RANKING specifically has
+                // no input — a narrower claim, and the only part worth a sentence.
+                'No ranking yet.'
+              : 'Nothing has been measured yet, so there is nothing to rank.'
+          }
+        />
       ) : (
         <ol className="space-y-2">
           {ranked.map((row, i) => (
             <li key={`${row.postId}-${row.channel}`} className="flex items-baseline gap-2">
-              <span className="w-[14px] shrink-0 text-[11px] text-muted tabular-nums">{i + 1}</span>
+              <span className="w-[14px] shrink-0 type-meta text-muted tabular-nums">{i + 1}</span>
               <Link
                 href={`/posts/${row.postId}`}
-                className="min-w-0 flex-1 truncate text-[12.5px] font-[550] transition-micro hover:text-accent"
+                className="min-w-0 flex-1 truncate type-meta font-[550] transition-micro hover:text-accent"
               >
                 {row.title || 'Untitled post'}
               </Link>
-              <span className="shrink-0 text-[11px] text-muted">{CHANNEL_LABELS[row.channel]}</span>
-              <span className="shrink-0 text-[12.5px] font-[550] tabular-nums">
+              <span className="shrink-0 type-meta text-muted">{CHANNEL_LABELS[row.channel]}</span>
+              <span className="shrink-0 type-meta font-[550] tabular-nums">
                 {row.value.toLocaleString('en-IN')}
               </span>
             </li>

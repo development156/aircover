@@ -177,14 +177,50 @@ describe('SpendBars', () => {
     expect(screen.getByText(/couldn.t read/i)).toBeInTheDocument()
   })
 
-  test('a single action still renders a sane bar', () => {
+  /**
+   * REPLACES 'a single action still renders a sane bar', which asserted the
+   * defect. With one category `credits / peak` is `credits / credits`, so that
+   * "sane bar" was the full track every time and the assertion `width > 0`
+   * could not tell a proportion from a constant — it passed just as happily on
+   * 20 credits as on 20,000. See the component header.
+   */
+  test('one action draws NO track, because there is nothing to compare it against', () => {
     render(
       <SpendBars
         spend={spend({ byAction: [{ action: 'loop_cycle', label: 'Plan my week', credits: 20 }] })}
       />,
     )
-    const width = Number(screen.getByTestId('spend-bar-loop_cycle').getAttribute('width'))
 
-    expect(width).toBeGreaterThan(0)
+    expect(screen.queryByTestId('spend-bar-loop_cycle')).not.toBeInTheDocument()
+  })
+
+  /** And the FIGURE is never what gets dropped — only the ratio that isn't one. */
+  test('one action still states its label and its number', () => {
+    render(
+      <SpendBars
+        spend={spend({ byAction: [{ action: 'loop_cycle', label: 'Plan my week', credits: 20 }] })}
+      />,
+    )
+
+    expect(screen.getByText('Plan my week')).toBeInTheDocument()
+    expect(screen.getByTestId('spend-bar-value-loop_cycle')).toHaveTextContent('20')
+  })
+
+  /** Two categories is where a comparison starts existing, so the track returns. */
+  test('two actions draw tracks, and the smaller one is genuinely shorter', () => {
+    render(
+      <SpendBars
+        spend={spend({
+          byAction: [
+            { action: 'brand_research', label: 'Brand research', credits: 100 },
+            { action: 'loop_cycle', label: 'Plan my week', credits: 20 },
+          ],
+        })}
+      />,
+    )
+    const big = Number(screen.getByTestId('spend-bar-brand_research').getAttribute('width'))
+    const small = Number(screen.getByTestId('spend-bar-loop_cycle').getAttribute('width'))
+
+    expect(big).toBeGreaterThan(small)
   })
 })

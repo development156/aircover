@@ -52,7 +52,7 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
     <Card className="space-y-4">
       <div className="flex items-baseline justify-between gap-3">
         <CardLabel>Credits spent · last 30 days</CardLabel>
-        <span className="num text-[13px] font-semibold">
+        <span className="num type-sm font-semibold">
           {spend.status === 'unreadable' ? (
             <Unreadable what="Credits spent in the last 30 days" />
           ) : (
@@ -85,7 +85,7 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
             spend.status === 'unreadable' ? null : (
               <Link
                 href="/wallet"
-                className="rounded-sm text-[12px] font-[550] text-accent transition-micro hover:underline"
+                className="rounded-sm type-meta font-[550] text-accent transition-micro hover:underline"
               >
                 See your credit activity
               </Link>

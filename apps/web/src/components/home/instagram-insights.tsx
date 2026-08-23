@@ -32,13 +32,13 @@ export function InstagramInsights({ analytics }: { analytics: AccountAnalytics }
     return (
       <Card className="space-y-2">
         <CardLabel>Instagram</CardLabel>
-        <p className="text-[14px] text-ink">Reconnect Instagram to see followers and reach.</p>
-        <p className="text-[12.5px] text-muted">
+        <p className="type-body text-ink">Reconnect Instagram to see followers and reach.</p>
+        <p className="type-meta text-muted">
           The connection expired, so we can’t read metrics until it’s renewed.
         </p>
         <Link
           href="/connections"
-          className="inline-flex text-[13px] font-semibold text-accent underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="inline-flex type-sm font-semibold text-accent underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           Open connections
         </Link>
@@ -54,8 +54,8 @@ export function InstagramInsights({ analytics }: { analytics: AccountAnalytics }
     return (
       <Card className="space-y-2">
         <CardLabel>Instagram</CardLabel>
-        <p className="text-[14px] text-ink">Sahoda can’t read Instagram metrics here.</p>
-        <p className="text-[12.5px] text-muted">
+        <p className="type-body text-ink">Sahoda can’t read Instagram metrics here.</p>
+        <p className="type-meta text-muted">
           Your account is connected. This environment has no metrics connection, so no request went
           out. Nothing is wrong with your account.
         </p>
@@ -95,7 +95,7 @@ export function InstagramInsights({ analytics }: { analytics: AccountAnalytics }
           <FollowerLine points={followers} />
         )}
         {/* Beside the followers, stating the FOLLOWER delay (~24h). */}
-        <p className="text-[12px] text-muted">{accountLagCopy(followerLagHours)}</p>
+        <p className="type-meta text-muted">{accountLagCopy(followerLagHours)}</p>
       </section>
 
       {insights.length > 0 ? (
@@ -103,7 +103,7 @@ export function InstagramInsights({ analytics }: { analytics: AccountAnalytics }
           <dl className="flex flex-wrap gap-x-6 gap-y-2">
             {insights.map((tile) => (
               <div key={tile.label}>
-                <dt className="text-[12px] text-muted">{tile.label}</dt>
+                <dt className="type-meta text-muted">{tile.label}</dt>
                 <dd className="text-[17px] leading-6 font-bold tabular-nums text-ink">
                   {tile.value.toLocaleString('en-IN')}
                 </dd>
@@ -113,7 +113,7 @@ export function InstagramInsights({ analytics }: { analytics: AccountAnalytics }
           {/* And its OWN delay (~48h), which is the longer one. Printing the
               follower delay here would claim these figures are fresher than
               Instagram says they are. */}
-          <p className="text-[12px] text-muted">{accountLagCopy(insightsLagHours)}</p>
+          <p className="type-meta text-muted">{accountLagCopy(insightsLagHours)}</p>
         </section>
       ) : null}
     </Card>
@@ -152,7 +152,7 @@ function FollowerLine({ points }: { points: readonly SeriesPoint[] }) {
         <span className="text-[24px] leading-7 font-bold tabular-nums text-ink">
           {last.toLocaleString('en-IN')}
         </span>
-        <span className="text-[13px] tabular-nums text-muted">
+        <span className="type-sm tabular-nums text-muted">
           {change === 0 ? 'No change' : `${change > 0 ? '+' : ''}${change.toLocaleString('en-IN')}`}{' '}
           over {points.length} {points.length === 1 ? 'day' : 'days'}
         </span>
@@ -178,7 +178,7 @@ function FollowerLine({ points }: { points: readonly SeriesPoint[] }) {
 
       {/* The axis is zoomed, so its ends are stated. Without these two numbers the
           line's steepness is unreadable. */}
-      <div className="flex justify-between text-[11px] tabular-nums text-muted">
+      <div className="flex justify-between type-meta tabular-nums text-muted">
         <span>{min.toLocaleString('en-IN')}</span>
         <span>{max.toLocaleString('en-IN')}</span>
       </div>

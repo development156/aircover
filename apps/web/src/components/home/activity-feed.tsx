@@ -25,7 +25,7 @@ import { describeEntry } from '@/lib/wallet/entry-copy'
 export function ActivityFeed({ entries }: { entries: LedgerEntry[] }) {
   if (entries.length === 0) {
     return (
-      <p className="px-4 py-6 text-center text-[13px] text-muted">
+      <p className="px-4 py-6 text-center type-sm text-muted">
         Nothing has happened yet. Credits you spend or receive show up here.
       </p>
     )
@@ -65,8 +65,8 @@ export function ActivityFeed({ entries }: { entries: LedgerEntry[] }) {
             <span className="grid size-6 shrink-0 place-items-center rounded-sm bg-s2 text-muted">
               <Glyph size={13} strokeWidth={1.8} aria-hidden />
             </span>
-            <span className="min-w-0 flex-1 truncate text-[12px] text-ink">{display.label}</span>
-            <span className="shrink-0 text-[12px] font-[550] tabular-nums text-muted">
+            <span className="min-w-0 flex-1 truncate type-meta text-ink">{display.label}</span>
+            <span className="shrink-0 type-meta font-[550] tabular-nums text-muted">
               {display.signedAmount}
             </span>
           </li>

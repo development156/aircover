@@ -48,11 +48,11 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
       data-guide="home.attention"
     >
       <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
-        <h2 id="home-attention" className="text-[14px] font-semibold tracking-[-0.01em]">
+        <h2 id="home-attention" className="type-h3">
           Needs your attention
         </h2>
         {waiting.length > 0 ? (
-          <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-tint px-[5px] text-[11px] font-bold text-accent tabular-nums">
+          <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-tint px-[5px] type-meta font-bold text-accent tabular-nums">
             {waiting.length}
           </span>
         ) : null}
@@ -61,7 +61,7 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
             list would answer a different question with a different number. */}
         <Link
           href="/approvals"
-          className="card-link ml-auto text-[12px] font-[550] text-muted hover:text-accent"
+          className="card-link ml-auto type-meta font-[550] text-muted hover:text-accent"
         >
           View all
         </Link>
@@ -70,7 +70,7 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
       {waiting.length === 0 ? (
         // Honest, and specific about WHY it is empty. "Nothing needs you" is a
         // real and good answer; it must not read like a failure to load.
-        <p className="px-4 py-6 text-center text-[13px] text-muted">
+        <p className="px-4 py-6 text-center type-sm text-muted">
           Nothing is waiting on you. Anything sent for review, or that fails to go out, shows up
           here.
         </p>
@@ -83,20 +83,20 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
                 className="surface-ring block rounded-[8px] p-3 transition-micro hover:shadow-[inset_0_0_0_1px_var(--line-firm)]"
               >
                 <div className="flex items-start gap-2">
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-[550] text-ink">
+                  <span className="min-w-0 flex-1 truncate type-sm font-[550] text-ink">
                     {post.title?.trim() || 'Untitled post'}
                   </span>
                   <Badge rung="urgent">{STATUS_WORD[post.intent]}</Badge>
                 </div>
                 {post.body?.trim() ? (
-                  <p className="mt-1 line-clamp-2 text-[12px] text-muted">{post.body}</p>
+                  <p className="mt-1 line-clamp-2 type-meta text-muted">{post.body}</p>
                 ) : (
                   // R7: an empty body is an empty body. No lorem, no preview
                   // stitched from the title.
-                  <p className="mt-1 text-[12px] text-muted">No content written yet.</p>
+                  <p className="mt-1 type-meta text-muted">No content written yet.</p>
                 )}
                 {post.channels.length > 0 ? (
-                  <p className="mt-2 text-[11px] text-muted">
+                  <p className="mt-2 type-meta text-muted">
                     {post.channels.map((c) => CHANNEL_SHORT[c]).join(' · ')}
                   </p>
                 ) : null}

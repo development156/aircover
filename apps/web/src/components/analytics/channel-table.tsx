@@ -45,7 +45,7 @@ export function ChannelTable({ rows }: { rows: readonly ComparableRow[] }) {
       <CardLabel>By channel</CardLabel>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[420px] border-collapse text-[13px]">
+        <table className="w-full min-w-[420px] border-collapse type-sm">
           <thead>
             <tr className="border-b border-line text-left">
               <th scope="col" className="py-2 pr-4 font-semibold text-muted">

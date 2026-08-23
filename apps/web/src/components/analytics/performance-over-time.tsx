@@ -180,10 +180,10 @@ export function PerformanceOverTime({
   return (
     <Container>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[11px] text-muted">
+        <span className="type-meta text-muted">
           {METRIC_LABELS[metric]}, running total since each post went out
         </span>
-        <span className="text-[12.5px] font-[550] tabular-nums">
+        <span className="type-meta font-[550] tabular-nums">
           {last.total.toLocaleString('en-IN')}
         </span>
       </div>
@@ -206,7 +206,7 @@ export function PerformanceOverTime({
         </svg>
       </div>
 
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[11px] text-muted">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 type-meta text-muted">
         <span className="tabular-nums">
           {first.day} to {last.day} · {series.points.length} measured days
         </span>
@@ -218,7 +218,7 @@ export function PerformanceOverTime({
       {series.minSeries !== series.maxSeries ? (
         // Coverage moved across the window. Said out loud, because a total drawn
         // from fewer posts on one day dips for a reason that is not performance.
-        <p className="text-[11px] text-muted">
+        <p className="type-meta text-muted">
           Measured across {series.minSeries} to {series.maxSeries} post channels a day, so part of
           the movement is how many reported rather than how they did.
         </p>

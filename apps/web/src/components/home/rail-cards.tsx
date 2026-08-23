@@ -31,10 +31,10 @@ function RailCard({
   return (
     <section className="surface-ring rounded-card bg-surface">
       <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
-        <h2 className="text-[14px] font-semibold tracking-[-0.01em]">{title}</h2>
+        <h2 className="type-h3">{title}</h2>
         <Link
           href={href}
-          className="card-link ml-auto text-[12px] font-[550] text-muted hover:text-accent"
+          className="card-link ml-auto type-meta font-[550] text-muted hover:text-accent"
         >
           {linkLabel}
         </Link>
@@ -72,14 +72,12 @@ export function BrainCard({
       {brain.status === 'ok' ? (
         <div className="px-4 py-4">
           <p className="flex items-baseline gap-2">
-            <span className="text-[24px] leading-none font-[650] tabular-nums">
-              {brainRing(brain.provenance).confirmed}
-            </span>
-            <span className="text-[13px] text-muted">
+            <span className="type-h2 tabular-nums">{brainRing(brain.provenance).confirmed}</span>
+            <span className="type-sm text-muted">
               of {brainRing(brain.provenance).total} fields confirmed
             </span>
           </p>
-          <p className="mt-2 text-[12px] text-muted">
+          <p className="mt-2 type-meta text-muted">
             Confirmed means a person checked it. The rest are still Sahoda&rsquo;s reading of what
             it found.
           </p>
@@ -132,9 +130,9 @@ export function BrainCard({
               ] as ReadonlyArray<readonly [string, string | null]>
             ).map(([label, value]) => (
               <div key={label} className="min-w-0">
-                <dt className="truncate text-[11px] text-muted">{label}</dt>
+                <dt className="truncate type-meta text-muted">{label}</dt>
                 <dd
-                  className={`truncate text-[12.5px] ${value ? 'font-[550] text-ink' : 'text-muted'}`}
+                  className={`truncate type-meta ${value ? 'font-[550] text-ink' : 'text-muted'}`}
                   title={value ?? undefined}
                 >
                   {value ?? <Unmeasured what={label} />}
@@ -159,7 +157,7 @@ export function BrainCard({
           </dl>
         </div>
       ) : (
-        <p className="px-4 py-6 text-center text-[13px] text-muted">
+        <p className="px-4 py-6 text-center type-sm text-muted">
           {brain.status === 'unreadable'
             ? 'Couldn’t read the Brand Brain just now.'
             : 'Sahoda doesn’t know your brand yet.'}
@@ -181,7 +179,7 @@ export function ConnectionsCard({ connections }: { connections: Connection[] | n
   return (
     <RailCard title="Connections" href="/connections" linkLabel="Manage">
       {connections === null ? (
-        <p className="px-4 py-6 text-center text-[13px] text-muted">
+        <p className="px-4 py-6 text-center type-sm text-muted">
           Couldn&rsquo;t check your connections just now.
         </p>
       ) : connections.length === 0 ? (
@@ -204,16 +202,16 @@ export function ConnectionsCard({ connections }: { connections: Connection[] | n
                 >
                   <ChannelLogo channel={channel} size={18} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12px] font-[550] text-ink">
+                    <span className="block truncate type-meta font-[550] text-ink">
                       {CHANNEL_LABELS[channel]}
                     </span>
-                    <span className="block text-[11px] text-muted">Not connected</span>
+                    <span className="block type-meta text-muted">Not connected</span>
                   </span>
                 </Link>
               </li>
             ))}
           </ul>
-          <p className="px-4 pb-4 text-[12px] text-muted">
+          <p className="px-4 pb-4 type-meta text-muted">
             You can write and plan without one. Connecting is what lets a post actually go out.
           </p>
         </>
@@ -227,10 +225,10 @@ export function ConnectionsCard({ connections }: { connections: Connection[] | n
               >
                 <ChannelLogo channel={connection.platform} size={18} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] font-[550] text-ink">
+                  <span className="block truncate type-meta font-[550] text-ink">
                     {CHANNEL_LABELS[connection.platform]}
                   </span>
-                  <span className="block text-[11px] text-muted">
+                  <span className="block type-meta text-muted">
                     {connection.status === 'active' ? 'Connected' : 'Needs attention'}
                   </span>
                 </span>

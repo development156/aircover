@@ -51,7 +51,7 @@ export function SpendArea({ spend }: { spend: SpendRead }) {
   if (activeDays < 3) {
     return (
       <div data-testid="spend-sparse" className="grid min-h-[120px] place-items-center px-3">
-        <p className="max-w-[40ch] text-center text-[12.5px] text-muted">
+        <p className="max-w-[40ch] text-center type-meta text-muted">
           {activeDays === 0
             ? 'No credits spent in the last 30 days.'
             : `Spend shows as a trend once a few days have activity. So far ${activeDays === 1 ? 'one day has' : `${activeDays} days have`}.`}

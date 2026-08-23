@@ -67,21 +67,36 @@ function reasonFor(analytics: AccountAnalytics): string | null {
   }
 }
 
-export function PerformanceStrip({ analytics }: { analytics: AccountAnalytics }) {
+export function PerformanceStrip({
+  analytics,
+  reasonStated = false,
+}: {
+  analytics: AccountAnalytics
+  /**
+   * The page has already said WHY there is nothing here, once, at the top.
+   *
+   * Default `false`, so /home — which has no page-level statement — keeps the
+   * sentence and this component's standalone contract is unchanged. Only
+   * /analytics opts in, where `ReadinessLine` carries the same claim with the
+   * remedy attached, and repeating it under four dashes is one of the six
+   * restatements docs/40 §3.1 counted.
+   */
+  reasonStated?: boolean
+}) {
   // A label -> value map, so a slot with no reported key falls to the em dash
   // rather than shifting the other three along.
   const values = new Map<string, number>(
     analytics.kind === 'ready' ? analytics.insights.map((i) => [i.label, i.value]) : [],
   )
-  const reason = reasonFor(analytics)
+  const reason = reasonStated ? null : reasonFor(analytics)
 
   return (
     <Card className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[14px] font-semibold tracking-[-0.01em]">Performance</h2>
+        <h2 className="type-h3">Performance</h2>
         <Link
           href="/analytics"
-          className="card-link rounded-sm text-[12.5px] font-semibold text-accent transition-micro hover:underline"
+          className="card-link rounded-sm type-meta font-semibold text-accent transition-micro hover:underline"
         >
           Details
         </Link>
@@ -92,7 +107,7 @@ export function PerformanceStrip({ analytics }: { analytics: AccountAnalytics })
           const value = values.get(label)
           return (
             <div key={label} className="min-w-0">
-              <dt className="truncate text-[12px] text-muted">{label}</dt>
+              <dt className="truncate type-meta text-muted">{label}</dt>
               {/* `type-h2`, not `text-[19px] leading-7 font-[650] tracking-[-0.02em]`.
                   19px is not a step on the scale and never was — docs/26 §5
                   exists because sizes hand-written at a call site drift from
@@ -133,7 +148,7 @@ export function PerformanceStrip({ analytics }: { analytics: AccountAnalytics })
 
           Not showing a ring at 0% was the right instinct. Deleting the row is
           the same instinct carried one step further. */}
-      {reason ? <p className="text-[12px] text-muted">{reason}</p> : null}
+      {reason ? <p className="type-meta text-muted">{reason}</p> : null}
     </Card>
   )
 }

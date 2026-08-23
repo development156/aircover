@@ -29,14 +29,14 @@ export function EmptyState({
       <span className="mb-2 grid size-11 place-items-center rounded-md bg-brand-wash text-accent shadow-[inset_0_0_0_1px_var(--brand-lift)]">
         <Icon size={21} strokeWidth={1.7} aria-hidden />
       </span>
-      <h2 className="text-[14px] font-semibold">{title}</h2>
-      <p className="max-w-[340px] text-[13px] text-muted">{body}</p>
+      <h2 className="type-h3">{title}</h2>
+      <p className="max-w-[340px] type-sm text-muted">{body}</p>
       {/* `.sl-state__a` — "is not optional" (RETHEME.md §4.5): an empty state
           answers what this is AND what to do next. It stays conditional here
           only because some screens genuinely have no destination to offer, and
           a button that goes nowhere is worse than none. */}
       {action ? <div className="mt-3">{action}</div> : null}
-      {tip ? <p className="mt-1 text-[12px] text-muted">Sahoda: {tip}</p> : null}
+      {tip ? <p className="mt-1 type-meta text-muted">Sahoda: {tip}</p> : null}
     </section>
   )
 }

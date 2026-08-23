@@ -33,7 +33,7 @@ export function SahodaRail({ drafted, planCost }: SahodaRailProps) {
 
       {drafted.length === 0 ? (
         <div className="space-y-3">
-          <p className="text-[13px] text-muted">Sahoda hasn&rsquo;t drafted anything this week.</p>
+          <p className="type-sm text-muted">Sahoda hasn&rsquo;t drafted anything this week.</p>
           {/* Wears the Button's clothes via `buttonVariants` rather than
               re-typing them: a hand-rolled copy is how this one ended up a
               40px pill after the control shapes moved to 34px / 6px.
@@ -62,7 +62,7 @@ export function SahodaRail({ drafted, planCost }: SahodaRailProps) {
             <li key={post.id}>
               <Link
                 href={`/posts/${post.id}`}
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-micro hover:bg-surface-2"
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 type-sm transition-micro hover:bg-surface-2"
               >
                 <AgencyBlade origin={post.origin} />
                 <span className="truncate">{post.title?.trim() || 'Untitled post'}</span>
