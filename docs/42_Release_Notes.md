@@ -150,6 +150,22 @@ creates is ABSENT (`ledger_actor_redactions`, `redact_ledger_actor`,
 So the `create or replace` collision is a **deploy-time** hazard, not a merge-time
 one, and `erasure.pglite.test.ts` is present and unmodified in this cut.
 
+**But this cut ships the erasure UI against a schema that does not have it.**
+`your-data-panel.tsx` offers "Take a copy of everything in this workspace, or delete
+all of it", and `app/actions/erasure-preview.ts` and `app/actions/erase-workspace.ts`
+call `workspace_erasure_preview` and `erase_workspace` — RPCs that are **absent from
+production**. The gate cannot see this: its database has the migration.
+
+**Checked, and it does not 500.** Both actions test for PostgREST's `PGRST202`
+(function not found) and answer honestly: *"Deleting a workspace is not switched on
+for this database yet. Nothing was deleted. Write to support@sahodalabs.com and we
+will do it by hand."* `ledger_actor_redactions` is likewise declared
+`no-read-policy` in `lib/privacy/export-manifest.ts`, so the DPDP export names it
+under `notIncluded` rather than trying to read it.
+
+So: **Delete-my-workspace is visible and refuses politely until §5's step 3 runs.**
+That is a product decision to be aware of, not a defect.
+
 ### (e) PageTitle renders h1 at 20px where docs/37 says 24 — LEFT, DELIBERATELY
 
 Not fixed. Three lanes saw it and left it because it is shared across ~38 routes,
@@ -186,6 +202,14 @@ never a glyph swap. The absence-mark exception is untouched: every dash that is 
 *whole* string value stands. Files: `analytics/page`, `planner/page`, `report/page`,
 `performance-strip`, `connect-first-note`, `spend-card`, `schedule-field`,
 `your-data-panel` (×4), `readiness` (×2).
+
+`packages/*/src` was scanned separately, because wt-voice's sweep covered it too.
+**No user-facing regression there.** The three files its report names as fixed —
+`shared/src/inbox/send-window.ts`, `shared/src/gate/packs.ts`,
+`publishing/src/format-rules.ts` — are all still clean. The 30 remaining dash lines
+under `packages/` are LLM prompts (`mesh/src/tasks/*`), telemetry `source:` strings
+and internal `throw` messages, none of which is reader-facing prose — the same call
+wt-voice made when it left `apps/jobs`' 57 dash lines alone.
 
 **This will recur on the next lane.** The rule needs a lint, not another sweep.
 
@@ -242,8 +266,20 @@ into `Promise.all`, so the one-line "fix" would have **blinded the guard on ever
 route** rather than speeding anything up.
 
 Reverted. Baseline re-recorded with `PERF_WATERFALL_WRITE=1`: 45 routes changed, 0
-added, 0 removed. The cost is now *recorded* rather than hidden. **Owner decision
-owed** — see §8.
+added, 0 removed. The cost is now *recorded* rather than hidden.
+
+**A blanket re-record can baseline in someone else's change**, so every delta was
+then diffed against the pre-record baseline (`a08bd18e`) and asserted individually:
+
+- **44 of 45** differ by exactly one inserted `decideLanding`. Nothing rode along.
+- **1 does not.** `/(onboarding)/onboarding` went `['getActiveWorkspace',
+  'activeBrandMemory']` → `['getActiveWorkspace']`. It **LOST** a read rather than
+  gaining one — the onboarding rebuild no longer reads brand memory on that route.
+  The ratchet direction is tighter, so it is not a perf regression, but it is a
+  behavioural change that arrived unannounced and is recorded here rather than
+  absorbed.
+
+**Owner decision owed** — see §8.
 
 ### 4.4 A test that was vacuous before anyone touched it
 
@@ -329,15 +365,33 @@ without a file.
 |---|---|---|
 | `20260805000000_clerk_id_remap` | **NOT APPLIED** | `clerk_id_map`, `remap_clerk_user_ids`, `verify_clerk_remap` all ABSENT |
 | `20260823000000_dpdp_erasure` | **NOT APPLIED** | all six objects ABSENT |
-| `20260823020000_ops_owner_count…` | **NOT APPLIED** | see below |
-| `20260823020100_clerk_webhook…` | **NOT APPLIED** | see below |
+| `20260823020000_ops_owner_count…` | **NOT APPLIED** | body comparison, see below |
+| `20260823020100_clerk_webhook…` | **NOT APPLIED** | body comparison, see below |
 
-> **The two `wt-sec` migrations nearly read as applied, and that was a trap.**
+> **The two `wt-sec` migrations nearly read as applied, and that was a trap — twice.**
+>
 > `ops_active_owner_count`, `ops_admin_set_role`, `ops_admin_revoke` and
-> `ops_application_link_user` all EXIST in production — but they come from earlier
-> migrations. Comparing the **live function bodies** against the migration files,
-> every one **LACKS** the distinctive content the new migration introduces. A
-> function name existing is not evidence its migration ran.
+> `ops_application_link_user` all EXIST in production. A function name existing is
+> not evidence its migration ran, so the first probe searched the live bodies for a
+> distinctive phrase — and **that probe was worthless**, because the phrases were
+> guessed from the filenames and were not in the migration files either. An absent
+> needle that is absent from both sides proves nothing.
+>
+> Redone properly: the `create or replace function` bodies were parsed out of each
+> migration file, whitespace- and comment-normalised, and compared against live
+> `pg_proc.prosrc`. Every one **DIFFERS**, and the shape of the difference is
+> consistent — the file body is longer than the live one and the live one is very
+> nearly a prefix of it:
+>
+> | function | live | in file | common prefix |
+> |---|---|---|---|
+> | `ops_active_owner_count` | 80 | 104 | 79 |
+> | `ops_admin_set_role` | 819 | 848 | 438 |
+> | `ops_admin_revoke` | 661 | 690 | 285 |
+> | `ops_application_link_user` | 775 | 844 | 427 |
+>
+> That is the signature of a migration that ADDS to what is live. **NOT APPLIED**,
+> now on evidence rather than on a guessed needle.
 
 ### Nothing was recorded, and nothing was applied
 
