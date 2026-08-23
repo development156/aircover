@@ -193,8 +193,50 @@ export interface UploadDoorOptions {
 }
 
 /** `data:application/pdf;base64,…` — the shape OpenRouter's file_data expects. */
+/**
+ * Is this actually a PDF?
+ *
+ * ── THE DECLARED TYPE IS THE CLIENT'S CLAIM, NOT A FACT ─────────────────────
+ * This used to test only the data-URL prefix, `data:application/pdf;base64,`,
+ * which is a string the browser — or a script that is not a browser — writes.
+ * Any file at all could carry that label and be forwarded to a model provider,
+ * and on the escalation path to a PAID OCR engine, as "a PDF". The comment below
+ * this call says "a DOCX or a scan-as-JPEG is a different door", which is what
+ * this function was believed to be enforcing and was not.
+ *
+ * The image upload path already refuses to work this way — `sniffImage` reads
+ * the real bytes and `kindForProvenMime` takes only what sniffing PROVED, with
+ * its own comment about `image/svg+xml`. This is the sibling that was left
+ * trusting the label, and a fix that closes one input shape while its sibling
+ * walks through is the defect this repository has shipped before.
+ *
+ * Only the first six bytes are decoded. A PDF begins `%PDF-`; eight base64
+ * characters carry six bytes, so the cheque is paid before the payload is ever
+ * held in memory as anything larger than a word.
+ *
+ * THE READ IS EXACTLY EIGHT CHARACTERS, AND THAT IS NOT TIDINESS.
+ * The first draft matched `([A-Za-z0-9+/=]{8,})`. This function runs BEFORE the
+ * size cap, so that unbounded capture ran over the whole payload — and an 8 MB
+ * data URL took the regex engine past its stack limit and threw
+ * `RangeError: Maximum call stack size exceeded`. A denial of service introduced
+ * BY the fix for a type-confusion bug, on the same customer-supplied input.
+ * Found by the oversize case in `upload-door-type.test.ts`, which exists for the
+ * cap and caught this instead.
+ */
+const PDF_MAGIC = '%PDF-'
+/** Eight base64 characters carry six bytes — one more than `%PDF-` needs. */
+const MAGIC_B64_CHARS = 8
+
 function isPdfDataUrl(dataUrl: string): boolean {
-  return /^data:application\/pdf;base64,/i.test(dataUrl)
+  const prefix = /^data:application\/pdf;base64,/i.exec(dataUrl)
+  if (!prefix) return false
+  const head = dataUrl.slice(prefix[0].length, prefix[0].length + MAGIC_B64_CHARS)
+  if (head.length < MAGIC_B64_CHARS || !/^[A-Za-z0-9+/=]+$/.test(head)) return false
+  try {
+    return Buffer.from(head, 'base64').toString('latin1').startsWith(PDF_MAGIC)
+  } catch {
+    return false
+  }
 }
 
 /** Base64 expands ~4/3; estimate the decoded size without decoding it. */

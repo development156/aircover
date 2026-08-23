@@ -17,8 +17,32 @@
 /** The embeddable surface. A prefix, so `/embed/beta?src=…` and future embeds match. */
 const FRAMEABLE_PREFIX = '/embed/'
 
+/**
+ * The directives that apply on every path.
+ *
+ * ── WHY THESE TWO AND NOT A REAL SCRIPT POLICY ──────────────────────────────
+ * MEASURED 2026-08-23, on `next start` and on https://app.sahodalabs.com: the
+ * whole header was `frame-ancestors` and nothing else, so the CSP was a
+ * clickjacking control and not a content policy.
+ *
+ * `script-src` is the one that would matter most and it is not here: it needs
+ * per-request nonces threaded through Next's inline bootstrap, which is a piece
+ * of work with a live breakage risk rather than a line in an audit. These two
+ * carry real value and cannot break a page that was not already being attacked:
+ *
+ *   object-src 'none'  — no plugins, no <embed>, no legacy Flash-shaped vector.
+ *   base-uri 'self'    — an injected <base href="//evil"> silently repoints
+ *                        EVERY relative URL on the page, including form posts
+ *                        and script srcs. Nothing legitimate here sets one.
+ *
+ * `form-action` is deliberately absent: sign-in posts cross-origin to Clerk, and
+ * `'self'` would break the login flow in the week nobody was watching.
+ */
+const BASE_DIRECTIVES = "object-src 'none'; base-uri 'self'"
+
 export function cspFor(pathname: string): string {
-  return isFrameable(pathname) ? 'frame-ancestors *' : "frame-ancestors 'none'"
+  const frame = isFrameable(pathname) ? 'frame-ancestors *' : "frame-ancestors 'none'"
+  return `${frame}; ${BASE_DIRECTIVES}`
 }
 
 export function isFrameable(pathname: string): boolean {

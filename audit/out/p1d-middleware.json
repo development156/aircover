@@ -1,679 +1,679 @@
 {
- "base": "http://127.0.0.1:3253",
- "declaredPublic": [
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/embed/beta",
-  "/embed/lead",
-  "/design-system",
-  "/api/public/beta-apply",
-  "/api/public/site-lead",
-  "/api/admin/devops/ingest",
-  "/api/webhooks/clerk",
-  "/api/webhooks/cashfree",
-  "s inbound events (posts, messages, comments, reviews). Obeys all three\n  // rules above: `verifyZernioWebhook` is the first thing the handler does after the\n  // size check and nothing below it can run on unverified bytes — `ingestZernioWebhook`\n  // accepts only a `VerifiedZernioBody`, which only the verifier can mint, so parsing\n  // unsigned bytes is a compile error rather than a review comment. A MISSING\n  // signature header is a 401, not a skip: the header is optional on Zernio",
-  "/api/webhooks/zernio",
-  "/api/cron/sweeps",
-  "/api/cron/metrics",
-  "/api/cron/loop",
-  "/api/cron/playbooks"
- ],
- "matcherExcluded": [
-  "/api/cron/sweeps",
-  "/api/cron/metrics",
-  "/api/cron/loop",
-  "/api/cron/playbooks",
-  "/api/webhooks/cashfree",
-  "/api/webhooks/clerk"
- ],
- "rows": [
-  {
-   "url": "/",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/admin",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 404,
-   "cookie": 404
-  },
-  {
-   "url": "/admin/applications",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 404,
-   "cookie": 404
-  },
-  {
-   "url": "/admin/credits",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 404,
-   "cookie": 404
-  },
-  {
-   "url": "/admin/dev",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 404,
-   "cookie": 404
-  },
-  {
-   "url": "/admin/qa",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 404,
-   "cookie": 404
-  },
-  {
-   "url": "/admin/team",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 404,
-   "cookie": 404
-  },
-  {
-   "url": "/ads",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/ads/budget",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/ads/creative",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/ads/performance",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/ads/targeting",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/analytics",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/api/admin/devops/ingest",
-   "kind": "api",
-   "public": true,
-   "clerkSkipped": false,
-   "plain": 405,
-   "bearer": 405,
-   "cookie": 405
-  },
-  {
-   "url": "/api/cron/loop",
-   "kind": "api",
-   "public": true,
-   "clerkSkipped": true,
-   "plain": 401,
-   "bearer": 401,
-   "cookie": 401
-  },
-  {
-   "url": "/api/cron/metrics",
-   "kind": "api",
-   "public": true,
-   "clerkSkipped": true,
-   "plain": 401,
-   "bearer": 401,
-   "cookie": 401
-  },
-  {
-   "url": "/api/cron/playbooks",
-   "kind": "api",
-   "public": true,
-   "clerkSkipped": true,
-   "plain": 401,
-   "bearer": 401,
-   "cookie": 401
-  },
-  {
-   "url": "/api/cron/sweeps",
-   "kind": "api",
-   "public": true,
-   "clerkSkipped": true,
-   "plain": 401,
-   "bearer": 401,
-   "cookie": 401
-  },
-  {
-   "url": "/api/debug/sentry",
-   "kind": "api",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/api/oauth/zernio/return",
-   "kind": "api",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/api/oauth/zernio/start",
-   "kind": "api",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/api/onboarding/door",
-   "kind": "api",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/api/posts/[postId]/publish",
-   "kind": "api",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/api/public/beta-apply",
-   "kind": "api",
-   "public": true,
-   "clerkSkipped": false,
-   "plain": 405,
-   "bearer": 405,
-   "cookie": 405
-  },
-  {
-   "url": "/api/public/site-lead",
-   "kind": "api",
-   "public": true,
-   "clerkSkipped": false,
-   "plain": 405,
-   "bearer": 405,
-   "cookie": 405
-  },
-  {
-   "url": "/api/webhooks/cashfree",
-   "kind": "api",
-   "public": true,
-   "clerkSkipped": true,
-   "plain": 405,
-   "bearer": 405,
-   "cookie": 405
-  },
-  {
-   "url": "/api/webhooks/clerk",
-   "kind": "api",
-   "public": true,
-   "clerkSkipped": true,
-   "plain": 405,
-   "bearer": 405,
-   "cookie": 405
-  },
-  {
-   "url": "/api/webhooks/zernio",
-   "kind": "api",
-   "public": true,
-   "clerkSkipped": false,
-   "plain": 405,
-   "bearer": 405,
-   "cookie": 405
-  },
-  {
-   "url": "/approvals",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/assets",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/billing/checkout/[orderId]",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/brain",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/brain/audience",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/brain/competitors",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/brain/identity",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/brain/knowledge",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/brain/resolve",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/brain/voice",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/campaigns",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/campaigns/[id]",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/connections",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/create",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/create/post",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/design-system",
-   "kind": "page",
-   "public": true,
-   "clerkSkipped": false,
-   "plain": 200,
-   "bearer": 200,
-   "cookie": 200
-  },
-  {
-   "url": "/embed/beta",
-   "kind": "page",
-   "public": true,
-   "clerkSkipped": false,
-   "plain": 200,
-   "bearer": 200,
-   "cookie": 200
-  },
-  {
-   "url": "/embed/lead",
-   "kind": "page",
-   "public": true,
-   "clerkSkipped": false,
-   "plain": 200,
-   "bearer": 200,
-   "cookie": 200
-  },
-  {
-   "url": "/home",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/inbox",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/inbox/comments",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/inbox/comments/[accountId]/[platformPostId]",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/inbox/reviews",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/inbox/threads/[accountId]/[conversationId]",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/leads",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/loop",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/onboarding",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/planner",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/playbooks",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/posts",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/posts/[id]",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/radar",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/radar/[id]",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/remix",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/report",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/settings",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/settings/integrations",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/settings/plan",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/settings/profile",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/sign-in/[[...sign-in]]",
-   "kind": "page",
-   "public": true,
-   "clerkSkipped": false,
-   "plain": 200,
-   "bearer": 200,
-   "cookie": 200
-  },
-  {
-   "url": "/sign-up/[[...sign-up]]",
-   "kind": "page",
-   "public": true,
-   "clerkSkipped": false,
-   "plain": 200,
-   "bearer": 200,
-   "cookie": 200
-  },
-  {
-   "url": "/sites",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/studio",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  },
-  {
-   "url": "/wallet",
-   "kind": "page",
-   "public": false,
-   "clerkSkipped": false,
-   "plain": 404,
-   "bearer": 503,
-   "cookie": 307
-  }
- ]
+  "base": "http://127.0.0.1:3253",
+  "declaredPublic": [
+    "/sign-in(.*)",
+    "/sign-up(.*)",
+    "/embed/beta",
+    "/embed/lead",
+    "/design-system",
+    "/api/public/beta-apply",
+    "/api/public/site-lead",
+    "/api/admin/devops/ingest",
+    "/api/webhooks/clerk",
+    "/api/webhooks/cashfree",
+    "s inbound events (posts, messages, comments, reviews). Obeys all three\n  // rules above: `verifyZernioWebhook` is the first thing the handler does after the\n  // size check and nothing below it can run on unverified bytes — `ingestZernioWebhook`\n  // accepts only a `VerifiedZernioBody`, which only the verifier can mint, so parsing\n  // unsigned bytes is a compile error rather than a review comment. A MISSING\n  // signature header is a 401, not a skip: the header is optional on Zernio",
+    "/api/webhooks/zernio",
+    "/api/cron/sweeps",
+    "/api/cron/metrics",
+    "/api/cron/loop",
+    "/api/cron/playbooks"
+  ],
+  "matcherExcluded": [
+    "/api/cron/sweeps",
+    "/api/cron/metrics",
+    "/api/cron/loop",
+    "/api/cron/playbooks",
+    "/api/webhooks/cashfree",
+    "/api/webhooks/clerk"
+  ],
+  "rows": [
+    {
+      "url": "/",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/admin",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 404,
+      "cookie": 404
+    },
+    {
+      "url": "/admin/applications",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 404,
+      "cookie": 404
+    },
+    {
+      "url": "/admin/credits",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 404,
+      "cookie": 404
+    },
+    {
+      "url": "/admin/dev",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 404,
+      "cookie": 404
+    },
+    {
+      "url": "/admin/qa",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 404,
+      "cookie": 404
+    },
+    {
+      "url": "/admin/team",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 404,
+      "cookie": 404
+    },
+    {
+      "url": "/ads",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/ads/budget",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/ads/creative",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/ads/performance",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/ads/targeting",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/analytics",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/api/admin/devops/ingest",
+      "kind": "api",
+      "public": true,
+      "clerkSkipped": false,
+      "plain": 405,
+      "bearer": 405,
+      "cookie": 405
+    },
+    {
+      "url": "/api/cron/loop",
+      "kind": "api",
+      "public": true,
+      "clerkSkipped": true,
+      "plain": 401,
+      "bearer": 401,
+      "cookie": 401
+    },
+    {
+      "url": "/api/cron/metrics",
+      "kind": "api",
+      "public": true,
+      "clerkSkipped": true,
+      "plain": 401,
+      "bearer": 401,
+      "cookie": 401
+    },
+    {
+      "url": "/api/cron/playbooks",
+      "kind": "api",
+      "public": true,
+      "clerkSkipped": true,
+      "plain": 401,
+      "bearer": 401,
+      "cookie": 401
+    },
+    {
+      "url": "/api/cron/sweeps",
+      "kind": "api",
+      "public": true,
+      "clerkSkipped": true,
+      "plain": 401,
+      "bearer": 401,
+      "cookie": 401
+    },
+    {
+      "url": "/api/debug/sentry",
+      "kind": "api",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/api/oauth/zernio/return",
+      "kind": "api",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/api/oauth/zernio/start",
+      "kind": "api",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/api/onboarding/door",
+      "kind": "api",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/api/posts/[postId]/publish",
+      "kind": "api",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/api/public/beta-apply",
+      "kind": "api",
+      "public": true,
+      "clerkSkipped": false,
+      "plain": 405,
+      "bearer": 405,
+      "cookie": 405
+    },
+    {
+      "url": "/api/public/site-lead",
+      "kind": "api",
+      "public": true,
+      "clerkSkipped": false,
+      "plain": 405,
+      "bearer": 405,
+      "cookie": 405
+    },
+    {
+      "url": "/api/webhooks/cashfree",
+      "kind": "api",
+      "public": true,
+      "clerkSkipped": true,
+      "plain": 405,
+      "bearer": 405,
+      "cookie": 405
+    },
+    {
+      "url": "/api/webhooks/clerk",
+      "kind": "api",
+      "public": true,
+      "clerkSkipped": true,
+      "plain": 405,
+      "bearer": 405,
+      "cookie": 405
+    },
+    {
+      "url": "/api/webhooks/zernio",
+      "kind": "api",
+      "public": true,
+      "clerkSkipped": false,
+      "plain": 405,
+      "bearer": 405,
+      "cookie": 405
+    },
+    {
+      "url": "/approvals",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/assets",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/billing/checkout/[orderId]",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/brain",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/brain/audience",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/brain/competitors",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/brain/identity",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/brain/knowledge",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/brain/resolve",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/brain/voice",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/campaigns",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/campaigns/[id]",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/connections",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/create",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/create/post",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/design-system",
+      "kind": "page",
+      "public": true,
+      "clerkSkipped": false,
+      "plain": 200,
+      "bearer": 200,
+      "cookie": 200
+    },
+    {
+      "url": "/embed/beta",
+      "kind": "page",
+      "public": true,
+      "clerkSkipped": false,
+      "plain": 200,
+      "bearer": 200,
+      "cookie": 200
+    },
+    {
+      "url": "/embed/lead",
+      "kind": "page",
+      "public": true,
+      "clerkSkipped": false,
+      "plain": 200,
+      "bearer": 200,
+      "cookie": 200
+    },
+    {
+      "url": "/home",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/inbox",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/inbox/comments",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/inbox/comments/[accountId]/[platformPostId]",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/inbox/reviews",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/inbox/threads/[accountId]/[conversationId]",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/leads",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/loop",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/onboarding",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/planner",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/playbooks",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/posts",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/posts/[id]",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/radar",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/radar/[id]",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/remix",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/report",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/settings",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/settings/integrations",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/settings/plan",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/settings/profile",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/sign-in/[[...sign-in]]",
+      "kind": "page",
+      "public": true,
+      "clerkSkipped": false,
+      "plain": 200,
+      "bearer": 200,
+      "cookie": 200
+    },
+    {
+      "url": "/sign-up/[[...sign-up]]",
+      "kind": "page",
+      "public": true,
+      "clerkSkipped": false,
+      "plain": 200,
+      "bearer": 200,
+      "cookie": 200
+    },
+    {
+      "url": "/sites",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/studio",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    },
+    {
+      "url": "/wallet",
+      "kind": "page",
+      "public": false,
+      "clerkSkipped": false,
+      "plain": 404,
+      "bearer": 503,
+      "cookie": 307
+    }
+  ]
 }

@@ -30,6 +30,54 @@ const nextConfig: NextConfig = {
     // storage signed upload URL is the right answer if media ever gets large.
     serverActions: { bodySizeLimit: '12mb' },
   },
+  /**
+   * THE HEADERS THAT WERE MEASURED ABSENT, 2026-08-23.
+   *
+   * Read off the wire on `next start` AND on https://app.sahodalabs.com — not
+   * off this file, because the two disagree: Vercel adds
+   * `Strict-Transport-Security: max-age=63072000` at the edge, so HSTS is
+   * present in production and absent locally, and reading the config would have
+   * reported a hole that is not there.
+   *
+   * What IS absent in both: `x-content-type-options`, `referrer-policy`, and any
+   * CSP directive beyond `frame-ancestors`.
+   *
+   * ── WHY HERE AND NOT IN THE MIDDLEWARE ──────────────────────────────────────
+   * The middleware sets `Content-Security-Policy` per path (`cspFor`) because
+   * `/embed/*` needs a different `frame-ancestors` from everything else. These
+   * three do not vary by path, and — MEASURED — a middleware header does not
+   * survive every response: Clerk's `protect-rewrite` answers a signed-out
+   * request to /home with a 404 carrying no CSP at all, because the rewrite
+   * replaces our response. `headers()` applies to those too.
+   *
+   * ── AND WHAT IS DELIBERATELY NOT HERE ───────────────────────────────────────
+   * `script-src`. A real script policy needs per-request nonces threaded through
+   * Next's inline bootstrap, which is a project with a live breakage risk, not a
+   * line in an audit. `object-src 'none'` and `base-uri 'self'` are the two
+   * directives that carry real value with no such risk — `base-uri` is what stops
+   * an injected `<base>` tag repointing every relative URL on the page — so they
+   * go in and the rest is named as owed work.
+   *
+   * `form-action` is also absent on purpose: sign-in posts cross-origin to Clerk,
+   * and `'self'` would break the login flow the same week nobody was watching.
+   */
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          // The full URL of an admin or wallet page is itself information; the
+          // origin alone is all any third party needs.
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), payment=()',
+          },
+        ],
+      },
+    ]
+  },
 }
 
 /**
