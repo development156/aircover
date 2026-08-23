@@ -1,7 +1,9 @@
 import 'server-only'
 
 import { UNWIRED, type RadarStore } from './port'
-import type { Competitor, RadarSnapshot } from './types'
+import { createServerSupabase } from '@/lib/supabase/server'
+
+import type { Competitor, CompetitorKind, RadarSnapshot } from './types'
 
 /**
  * RADAR OVER SUPABASE — DELIBERATELY NOT BOUND, AND THIS IS THE SECOND VERSION.
@@ -76,29 +78,165 @@ import type { Competitor, RadarSnapshot } from './types'
  * `roadmap-honesty` holds `/radar` to.
  */
 
-/** Nothing is read, so nothing can be mis-read. */
-function notCollecting(): never {
-  throw new Error(
-    'Radar is not collecting yet, so there is nowhere to store a watch list. ' +
-      'The collector is the wt-radar lane; see lib/radar/port.ts for the contract.',
-  )
+/**
+ * ── THE KIND VOCABULARIES DO NOT MATCH, AND ONE SIDE CANNOT BE STORED ───────
+ *
+ * This screen's `CompetitorKind` is `website | instagram | google_business`.
+ * The registry's CHECK admits `website | instagram | x | linkedin | facebook`.
+ *
+ * So `google_business` RAISES `RADAR_BAD_KIND` and can never be stored, and three
+ * kinds the collector supports cannot be asked for. That is not a bug in either
+ * side — they were written by different lanes against different briefs — but it
+ * is a decision somebody has to make, and it is NOT this lane's: widening the
+ * screen's union changes what `/radar`'s components render, and those belong to
+ * wt-page-rest.
+ *
+ * Until then the mapping is explicit and the refusal is NAMED. Silently dropping
+ * a Google Business entry, or coercing it to `website`, would tell a customer
+ * they are watching something they are not.
+ */
+const KIND_TO_REGISTRY: Record<CompetitorKind, string | null> = {
+  website: 'website',
+  instagram: 'instagram',
+  // No registry kind means this. `x`, `linkedin` and `facebook` exist there and
+  // have no name here — see the block above.
+  google_business: null,
+}
+
+/** What the registry calls a kind, mapped back for the screen. */
+function kindFromRegistry(kind: string): CompetitorKind {
+  return kind === 'instagram' ? 'instagram' : 'website'
 }
 
 export function supabaseRadarStore(): RadarStore {
   return {
-    async read(_workspaceId: string): Promise<RadarSnapshot> {
-      return UNWIRED
+    /**
+     * The watch list, for real. The change feed is not wired, so this reports
+     * `watch-list-only` — never `reading`, which would let an empty feed be drawn
+     * as the claim "nothing changed this week".
+     *
+     * ── THE JOIN IS THROUGH THE SUBSCRIPTION, AND IT HAS TO BE ────────────────
+     * `competitors` has NO `workspace_id`; it is a shared catalogue, and tenancy
+     * lives entirely in `competitor_subscriptions`. A filter on
+     * `competitors.workspace_id` is another 42703 waiting. RLS enforces the same
+     * rule underneath, so this join is the honest expression of it rather than
+     * the thing that makes it safe.
+     */
+    async read(workspaceId: string): Promise<RadarSnapshot> {
+      const supabase = await createServerSupabase()
+      const { data, error } = await supabase
+        .from('competitor_subscriptions')
+        .select('competitor_id, label, created_at, competitors(id, display_name, created_at)')
+        .eq('workspace_id', workspaceId)
+        .order('created_at', { ascending: true })
+
+      // The table genuinely not being there is the ONLY case that reads as
+      // `absent`. Anything else is a real failure and must not be disguised as
+      // "the feature is not built yet".
+      if (error) {
+        if (error.code === '42P01') return UNWIRED
+        throw new Error(`Could not read the watch list: ${error.message}`)
+      }
+
+      const competitors: Competitor[] = (data ?? []).map((row) => {
+        const c = row.competitors as unknown as {
+          id: string
+          display_name: string
+          created_at: string
+        } | null
+        return {
+          id: c?.id ?? String(row.competitor_id),
+          // `display_name`, NOT `name`. The column the first binding guessed at
+          // does not exist, and the guess cost every /radar request a 500.
+          name: row.label ?? c?.display_name ?? 'Competitor',
+          // The registry stores a normalised LOCATOR per source, not one url on
+          // the competitor. Sources are a separate read this binding does not do
+          // yet, so the honest answer is an empty string rather than a fabricated
+          // address.
+          url: '',
+          kind: kindFromRegistry('website'),
+          addedOn: String(row.created_at ?? c?.created_at ?? ''),
+          // NEVER inferred. No successful read has been recorded for anyone —
+          // competitor_snapshots is empty — and inventing a timestamp here is
+          // exactly the fabrication the screen's provenance guard exists to stop.
+          lastObservedAt: null,
+        }
+      })
+
+      return { collector: 'watch-list-only', competitors, days: [] }
     },
 
-    async add(): Promise<Competitor> {
-      // `addCompetitor` maps this message onto its `not-collecting` arm, which
-      // is a different sentence from a generic failure: retrying cannot help.
-      return notCollecting()
+    /**
+     * Subscribe to a competitor, through the door.
+     *
+     * `public.radar_subscribe` — NOT `app.radar_subscribe`, which is service-role
+     * only and trusts its `p_workspace_id` and `p_created_by` arguments without
+     * checking membership. The public wrapper takes identity from the JWT, checks
+     * membership first, and has no actor argument at all.
+     */
+    async add(
+      workspaceId: string,
+      input: { name: string; url: string; kind: CompetitorKind },
+    ): Promise<Competitor> {
+      const registryKind = KIND_TO_REGISTRY[input.kind]
+      if (registryKind === null) {
+        throw new Error(
+          'Radar cannot watch a Google Business listing yet — it tracks websites and Instagram.',
+        )
+      }
+
+      const supabase = await createServerSupabase()
+      const { data, error } = await supabase.rpc('radar_subscribe', {
+        p_workspace_id: workspaceId,
+        p_display_name: input.name,
+        p_sources: [{ kind: registryKind, locator: input.url }],
+        p_label: input.name,
+      })
+
+      if (error) {
+        // The registry's own refusals are sentences a person can act on; anything
+        // else is a failure and must not be dressed up as one of them.
+        if (
+          error.message.includes('RADAR_BAD_LOCATOR') ||
+          error.message.includes('RADAR_NO_SOURCES')
+        ) {
+          throw new Error(`Sahoda could not read that address — check it and try again.`)
+        }
+        if (error.message.includes('FORBIDDEN_ROLE')) {
+          throw new Error('Only an owner or an editor can add a competitor to watch.')
+        }
+        throw new Error(`Could not add that competitor: ${error.message}`)
+      }
+
+      const result = data as { competitor_id: string } | null
+      return {
+        id: result?.competitor_id ?? '',
+        name: input.name,
+        url: input.url,
+        kind: input.kind,
+        addedOn: new Date().toISOString(),
+        lastObservedAt: null,
+      }
     },
 
-    async remove(): Promise<void> {
-      // Removing from a list that is not stored is a no-op, not an error. There
-      // is nothing to fail at, and a refusal here would be theatre.
+    /**
+     * Stop watching. A plain DELETE, because `competitor_subscriptions` HAS a
+     * delete policy — a member may remove a row they can already see, and doing
+     * so reveals nothing about the registry.
+     *
+     * The competitor itself is deliberately not touched: it belongs to every
+     * other subscriber too.
+     */
+    async remove(workspaceId: string, competitorId: string): Promise<void> {
+      const supabase = await createServerSupabase()
+      const { error } = await supabase
+        .from('competitor_subscriptions')
+        .delete()
+        .eq('workspace_id', workspaceId)
+        .eq('competitor_id', competitorId)
+      if (error && error.code !== '42P01') {
+        throw new Error(`Could not stop watching that competitor: ${error.message}`)
+      }
     },
   }
 }

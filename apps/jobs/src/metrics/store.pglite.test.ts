@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { PGlite } from '@electric-sql/pglite'
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
 
@@ -25,6 +28,8 @@ import { createMetricStore, type PgQueryable } from './store'
  */
 
 const MIGRATIONS = new URL('../../../../packages/db/supabase/migrations/', import.meta.url).pathname
+
+const SNAPSHOT_MIGRATION = '20260819000100_post_metric_snapshots.sql'
 
 const WS = '11111111-1111-4111-8111-111111111111'
 const OTHER_WS = '99999999-9999-4999-8999-999999999999'
@@ -361,6 +366,112 @@ describe('the metric store (real Postgres, in-process)', () => {
       await db.exec(`alter table post_metric_snapshots drop constraint "${found.rows[0]!.conname}"`)
 
       await expect(store.writeSnapshots([row()])).rejects.toThrow()
+    })
+  })
+
+  /**
+   * ── PERMANENT STARVATION PAST THE BATCH SIZE ────────────────────────────────
+   *
+   * The route asks for 120 targets a night. The ordering was `published_at asc`,
+   * and `published_at` NEVER CHANGES — so the same 120 rows were selected every
+   * night for ever and target 121 was never measured once. Not "delayed until the
+   * backlog drains", which is what the comment above the query claimed: starved,
+   * permanently. At the current batch that arrives at roughly fifty workspaces.
+   *
+   * These run ABOVE the threshold — 150 targets against a batch of 120 — because
+   * at or below it every target fits in one pass and the bug cannot appear. A
+   * fixture where the defect is impossible proves nothing about the defect.
+   */
+  describe('fairness above the batch size', () => {
+    const BATCH = 120
+    const TARGETS = 150
+
+    /** One post per target, each its own channel row, all published. */
+    async function seedTargets(n: number): Promise<string[]> {
+      const ids: string[] = []
+      for (let i = 0; i < n; i += 1) {
+        const postId = `33333333-3333-4333-8333-${String(i).padStart(12, '0')}`
+        ids.push(postId)
+        await db.query(`insert into posts (id, workspace_id) values ($1, $2)`, [postId, WS])
+        await db.query(
+          `insert into post_variants
+             (workspace_id, post_id, channel, publish_status, platform_post_id, permalink)
+           values ($1, $2, 'instagram', 'published', $3, $4)`,
+          [WS, postId, `pid-${i}`, `https://instagram.com/p/${i}`],
+        )
+        // Published oldest-first, so the OLD ordering is deterministic and its
+        // starvation is reproducible rather than incidental.
+        await db.query(
+          `insert into post_publish_logs (workspace_id, post_id, channel, status, published_at)
+           values ($1, $2, 'instagram', 'succeeded', $3)`,
+          [WS, postId, new Date(Date.UTC(2026, 0, 1) + i * 3_600_000)],
+        )
+      }
+      return ids
+    }
+
+    /** Record a measurement for each target, as a real pass would. */
+    async function measure(targets: { postId: string }[], at: Date): Promise<void> {
+      for (const target of targets) {
+        await db.query(
+          `insert into post_metric_snapshots
+             (workspace_id, post_id, channel, metric, value, measured_at)
+           values ($1, $2, 'instagram', 'impressions', 1, $3)
+           on conflict do nothing`,
+          [WS, target.postId, at],
+        )
+      }
+    }
+
+    beforeEach(async () => {
+      await db.exec(readFileSync(resolve(MIGRATIONS, SNAPSHOT_MIGRATION), 'utf8'))
+      store = createMetricStore({ pool: poolOver(db), limit: BATCH })
+    })
+
+    it('reaches EVERY target within two nights, at 150 targets and a batch of 120', async () => {
+      await seedTargets(TARGETS)
+
+      const seen = new Set<string>()
+      for (let night = 0; night < 2; night += 1) {
+        const targets = await store.listTargets()
+        expect(targets).toHaveLength(BATCH)
+        for (const t of targets) seen.add(t.postId)
+        await measure(targets, new Date(Date.UTC(2026, 5, 1 + night)))
+      }
+
+      // 150 targets, 120 a night: two nights is enough to reach all of them, and
+      // only because the second night selects the ones the first did not.
+      expect(seen.size).toBe(TARGETS)
+    })
+
+    it('puts a measured target BEHIND one never measured', async () => {
+      await seedTargets(TARGETS)
+
+      const firstNight = await store.listTargets()
+      await measure(firstNight, new Date(Date.UTC(2026, 5, 1)))
+
+      const secondNight = await store.listTargets()
+      const measured = new Set(firstNight.map((t) => t.postId))
+
+      // The 30 never-measured targets sort first, ahead of everything measured.
+      const leading = secondNight.slice(0, TARGETS - BATCH).map((t) => t.postId)
+      expect(leading.every((id) => !measured.has(id))).toBe(true)
+      expect(new Set(leading).size).toBe(TARGETS - BATCH)
+    })
+
+    it('rotates: after everything is measured once, the oldest measurement goes first', async () => {
+      await seedTargets(TARGETS)
+
+      const night1 = await store.listTargets()
+      await measure(night1, new Date(Date.UTC(2026, 5, 1)))
+      const night2 = await store.listTargets()
+      await measure(night2, new Date(Date.UTC(2026, 5, 2)))
+
+      // Everything has now been measured. The third night must lead with the
+      // targets measured on the FIRST night, not with the same 120 again.
+      const night3 = await store.listTargets()
+      const night2Ids = new Set(night2.map((t) => t.postId))
+      expect(night3.slice(0, 20).every((t) => !night2Ids.has(t.postId))).toBe(true)
     })
   })
 })

@@ -9,14 +9,29 @@ import { scanRoutes, waterfallOf } from './read-waterfall'
  * `scanRoutes` walks `src/app` and reads `page.tsx` FILES ONLY, and `waterfallOf`
  * judges each one as text.
  *
- *  · NOT layouts — and that is the sharp one, because it means this guard could
- *    not have found the defect its own lane fixed. The sequential pair that cost
- *    every authenticated navigation a round trip was `showsAdminItem()` then
- *    `approvalCount()` in `components/shell/rail.tsx`, reached from
- *    `(app)/layout.tsx`. Nothing here would ever have read it.
- *  · NOT route handlers (`route.ts`), and NOT any component a page renders — the
- *    analysis is per-file, so two sequential reads inside `lib/campaigns/read.ts`
- *    are one `await` here and two round trips in production.
+ *  · [FIXED 2026-08-23.] It read `page.tsx` FILES ONLY — no layouts, no
+ *    components — which meant it could not have found the defect its own lane
+ *    fixed: `showsAdminItem()` then `approvalCount()` in
+ *    `components/shell/rail.tsx`, reached from `(app)/layout.tsx`.
+ *
+ *    `scanRoutes` now walks the RENDER TREE: every layout above a page, plus the
+ *    server components any of them import, transitively. The first thing it found
+ *    is that EVERY authenticated route pays five sequential reads before a page
+ *    renders at all — `activeWorkspaceRead, getOpsAdmin, read, soft, read` — which
+ *    were invisible to a per-page scan and are the most expensive place in the app
+ *    to have them, because every navigation pays them.
+ *
+ *    Scoped to components ON PURPOSE, not to the whole import graph. MEASURED
+ *    while building it: following `lib` and `app/actions` too produced 59-122
+ *    "sequential reads" per route — an await CENSUS of a subgraph, counting
+ *    `deleteAsset` and `Sentry.flush` and every branch of every server action.
+ *    A ratchet on that number is red on every change and teaches everyone to
+ *    regenerate without reading.
+ *  · NOT route handlers (`route.ts`), and still NOT the inside of a reader: two
+ *    sequential awaits within `lib/campaigns/read.ts` are one `await` here and
+ *    two round trips in production.
+ *  · NOT a client component — a file whose first statement is `'use client'` is
+ *    skipped, because it does not await on the server.
  *  · `Promise.race` — `Promise.all` and `Promise.allSettled` are recognised as
  *    parallel and `race` is not, so a legitimate `race` reads as sequential.
  *  · TIME. It counts round-trip OPPORTUNITIES, not milliseconds: a `cache()`-wrapped
@@ -102,5 +117,31 @@ describe('no page gains a sequential read', () => {
     }
 
     expect(grew, `sequential server reads grew:\n  ${grew.join('\n  ')}`).toEqual([])
+  })
+
+  /**
+   * THE CAPABILITY, PINNED — otherwise it can silently narrow back to pages.
+   *
+   * The guard's whole failure was reading one kind of file. If a refactor ever
+   * returns it to that, these go red rather than the coverage quietly halving.
+   */
+  it('reads layouts, not only pages', () => {
+    const source = readFileSync(resolve(import.meta.dirname, 'read-waterfall.ts'), 'utf8')
+    expect(source).toContain("'layout.tsx'")
+  })
+
+  it('every authenticated route carries the shell’s reads, not just its own', () => {
+    // The five the per-page scan could not see. Asserted as a PROPERTY — every
+    // route under (app) carries them — rather than as a count, which would go red
+    // on any legitimate change to a single page.
+    const routes = scanRoutes(APP).filter((r) => r.route.startsWith('/(app)/'))
+    expect(routes.length).toBeGreaterThan(20)
+    for (const route of routes) {
+      expect(
+        route.awaits,
+        `${route.route} carries none of the shell's reads — the walk has stopped ` +
+          'following layouts, and this guard is back to reading pages only.',
+      ).toContain('activeWorkspaceRead')
+    }
   })
 })

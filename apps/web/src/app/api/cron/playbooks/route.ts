@@ -38,6 +38,27 @@ export const runtime = 'nodejs'
  */
 export const dynamic = 'force-dynamic'
 
+/**
+ * The platform ceiling, and the same number the three sibling crons use.
+ *
+ * ── IT HAD NONE, AND THE DEFAULT IS 10 SECONDS ───────────────────────────────
+ * `MAX_PLAYBOOKS_PER_TICK` is 60 and each one is a handful of round trips —
+ * `openRun`, `readDial`, `markRan`, then the finish. That is well under a second
+ * each at one workspace and close to the ten-second default at sixty, which is
+ * exactly the shape that is invisible until the fleet grows.
+ *
+ * Being killed partway is worse here than merely losing work: `markRan` is
+ * written BEFORE the outcome is known, deliberately, so a torn-down tick leaves
+ * playbooks marked as having run today. The next tick will not pick them up, and
+ * the customer's daily playbook silently did nothing.
+ *
+ * 300s against 60 items is five seconds each — headroom, not a budget. Unlike
+ * /api/cron/loop this needs no deadline: the per-item work here is database round
+ * trips, not a fourteen-second model call, so the cap cannot be reached by the
+ * batch size alone.
+ */
+export const maxDuration = 300
+
 export async function GET(request: Request): Promise<Response> {
   if (
     !isAuthorizedCronRequest({

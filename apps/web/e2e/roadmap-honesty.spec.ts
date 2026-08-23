@@ -5,7 +5,7 @@ import { expect, test } from './fixtures/seeded-user'
 import { leaveOnboarding } from './fixtures/compose'
 
 /**
- * THE TWO ROADMAP SECTIONS SHOW NO FIGURE ABOUT THE READER'S BUSINESS.
+ * THE ONE ROADMAP SECTION SHOWS NO FIGURE ABOUT THE READER'S BUSINESS.
  *
  * ── THE NUMBER IN THAT SENTENCE IS PART OF THE TEST, AND IT HAD DRIFTED ─────
  * It read SEVEN while `ALLOWED` held six: `/brain/audience` left in the same
@@ -156,33 +156,29 @@ const ALLOWED: ReadonlyArray<readonly [string, readonly number[]]> = [
   // rather than a loosening — see the header. `playbook_run` stays in
   // pricing.config.json and the screen still quotes it; the screen that quoted
   // it as a promise is now a screen that charges it.
-  // `/radar` IS STILL HERE, AND ITS ALLOWANCE JUST GOT NARROWER, NOT WIDER.
+  // `/radar` IS NOT IN THIS LIST ANY MORE, and the removal is the point rather
+  // than a loosening — the same move `/playbooks`, `/brain/audience`, `/remix`,
+  // `/leads` and `/brain/knowledge` each made when they stopped being drawings.
   //
-  // AT INTEGRATION the premise below is half spent: wt-radar IS merged now,
-  // so `competitors` and the scan exist. The allowance stays narrow anyway —
-  // if the fed screen legitimately renders a figure, this guard is meant to
-  // say so and the number is meant to be admitted with a reason, which is the
-  // opposite of pre-widening it on a guess.
+  // The entry's own reasoning said why it belonged: "with the `competitors`
+  // table absent … `/radar` renders one honest panel saying the scan is not
+  // built yet. It still says so, so it stays on this list." Both halves of that
+  // are now false. The table is present — wt-radar applied its migrations to the
+  // shared database — and as of 20260823030000 a signed-in member can actually
+  // SUBSCRIBE: `public.radar_subscribe` is granted to `authenticated`, and
+  // `lib/radar/store.ts` is bound to it. `read()` returns `watch-list-only`, not
+  // `absent`, so the screen no longer draws "The weekly scan is not built yet".
   //
-  // The screen was built (wt-radar-ui): it has a watch list, a day-grouped
-  // change feed, a competitor detail view and a path from an observation to a
-  // draft. What was NOT built in that lane is the weekly scan that fills it —
-  // that is wt-radar's — so with the `competitors` table absent, which is the
-  // state every environment this suite runs in is in, `/radar` renders one
-  // honest panel saying the scan is not built yet. It still says so, so it stays
-  // on this list and this property still holds it.
+  // What it draws instead is narrower and still honest: "Your watch list is
+  // stored, and the weekly readings are not wired into this screen yet. This is
+  // not 'nothing changed' — it is Radar not being able to tell you either way."
+  // A screen that reads a real table and states precisely which half of itself
+  // is unbound is not a roadmap section, and holding it to a "coming soon" it no
+  // longer says would be asserting a sentence back into existence.
   //
-  // The five numbered slots are GONE, and with them the 1–5 allowance. They drew
-  // a cap that the entitlement surface does not define: `PlanLimits` in
-  // packages/shared has channels, sites, seats, loopLevel and twinSize, and no
-  // competitor dimension at all. The two docs that mention one disagree — PRD
-  // §7.1 says "Growth: Radar (3 comps)", PRD/FSD M9 both say "1–5" — so drawing
-  // either was picking an entitlement rather than reading one. An owner ruling
-  // is owed; until it lands the watch list is uncapped and states the per-scan
-  // price instead, which is a fact about Sahoda rather than a claim about anyone.
-  //
-  // What remains is the price, which is what the panel quotes.
-  ['/radar', [price('radar_scan')]],
+  // THE PER-SCAN PRICE IT QUOTES IS NOW UNCHECKED BY THIS FILE. That is the cost
+  // of the removal and it is stated rather than absorbed: `/radar` invents no
+  // figure today, and nothing here will notice if it starts.
   ['/studio', [price('carousel')]],
   // `/brain/audience` IS NOT IN THIS LIST ANY MORE, and the removal is the point
   // rather than a loosening. This guard exists to stop screens that are DRAWINGS
@@ -215,7 +211,7 @@ const HEADER_COUNTS: Record<string, number> = {
 
 test('@smoke the number in the header is the length of the list below it', () => {
   const source = readFileSync(fileURLToPath(import.meta.url), 'utf8')
-  const word = /THE ([A-Z]+) ROADMAP SECTIONS SHOW NO FIGURE/.exec(source)?.[1]
+  const word = /THE ([A-Z]+) ROADMAP SECTIONS? SHOWS? NO FIGURE/.exec(source)?.[1]
   expect(word, 'the header sentence this test reads has been reworded').toBeDefined()
   expect(HEADER_COUNTS[word!], `"${word}" is not a number word this test knows`).toBe(
     ALLOWED.length,

@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 
 /**
  * How many reads a page component waits for ONE AFTER ANOTHER.
@@ -96,7 +96,119 @@ export function waterfallOf(source: string): string[] {
   return out
 }
 
+/**
+ * Module specifiers a file imports, in any form the codebase uses.
+ *
+ * Relative (`./x`, `../x`) and alias (`@/lib/x`) both, because a component is
+ * reached by whichever the author happened to write.
+ */
+function importsIn(source: string): string[] {
+  const code = source.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
+  const out: string[] = []
+  for (const m of code.matchAll(/(?:from|import)\s*\(?\s*(['"])([^'"]+)\1/g)) {
+    const spec = m[2]
+    if (spec && (spec.startsWith('.') || spec.startsWith('@/'))) out.push(spec)
+  }
+  return out
+}
+
+/** A specifier resolved to a real file under `src`, or null. */
+function resolveModule(fromFile: string, spec: string, srcDir: string): string | null {
+  const base = spec.startsWith('@/')
+    ? resolve(srcDir, spec.slice(2))
+    : resolve(dirname(fromFile), spec)
+  for (const ext of ['', '.ts', '.tsx', '/index.ts', '/index.tsx']) {
+    const candidate = `${base}${ext}`
+    if (existsSync(candidate) && statSync(candidate).isFile()) return candidate
+  }
+  return null
+}
+
+/**
+ * EVERY AWAIT A NAVIGATION PAYS FOR, NOT EVERY AWAIT IN ONE FILE.
+ *
+ * ── WHY THIS NOW FOLLOWS LAYOUTS AND COMPONENTS ─────────────────────────────
+ * It used to read `page.tsx` FILES ONLY. That is why it could not have found the
+ * defect its own lane fixed: the sequential pair costing every authenticated
+ * navigation a round trip was `showsAdminItem()` then `approvalCount()` in
+ * `components/shell/rail.tsx`, reached from `(app)/layout.tsx`. Neither file was
+ * ever opened.
+ *
+ * A page is not what a navigation renders. The layouts above it render too, and
+ * so does every server component they pull in — and an await in the shell is
+ * paid on EVERY route, which makes it the most expensive place to have one and
+ * the one place this could not look.
+ *
+ * ── A RULE, NOT A LIST ──────────────────────────────────────────────────────
+ * The set is derived by following imports, so a component moved or renamed is
+ * still followed. A hardcoded list of files would have to be maintained by the
+ * people least likely to be reading this file, and three lanes are rewriting
+ * these directories right now.
+ *
+ * ── WHAT IT STILL CANNOT SEE ────────────────────────────────────────────────
+ * A client component's data fetching (this counts server awaits in source), an
+ * await reached conditionally or in a loop, and TIME — it counts round-trip
+ * OPPORTUNITIES, so a `cache()`-wrapped second call counts the same as a cold
+ * one. Those limits are unchanged and are listed in the test beside it.
+ */
 export function scanRoutes(appDir: string): RouteWaterfall[] {
+  const srcDir = resolve(appDir, '..')
+
+  /** Layouts that wrap a route, outermost first — every one of them renders. */
+  const layoutsFor = (pageFile: string): string[] => {
+    const found: string[] = []
+    let dir = dirname(pageFile)
+    while (dir.length >= appDir.length) {
+      const layout = resolve(dir, 'layout.tsx')
+      if (existsSync(layout)) found.unshift(layout)
+      dir = dirname(dir)
+    }
+    return found
+  }
+
+  const COMPONENTS = resolve(srcDir, 'components')
+
+  /**
+   * ── THE RENDER TREE, AND DELIBERATELY NOT THE WHOLE IMPORT GRAPH ───────────
+   * Only server components are followed: files under `src/components` and the
+   * layouts above a page. NOT `src/lib`, NOT `app/actions`.
+   *
+   * MEASURED 2026-08-23, following everything: 59 to 122 "sequential reads" per
+   * route. That number is an await CENSUS of a whole subgraph, not a waterfall —
+   * it counted `deleteAsset`, `Sentry.flush` and every branch of every server
+   * action reachable from a page, none of which runs during a render. A ratchet
+   * on a number like that is red on every change and teaches everyone to
+   * regenerate the baseline without reading it.
+   *
+   * What IS followed is what actually renders, which is where the defect this
+   * guard missed lived: `showsAdminItem()` then `approvalCount()` in
+   * `components/shell/rail.tsx`, reached from `(app)/layout.tsx`.
+   *
+   * A `'use client'` file is skipped: it does not await on the server.
+   *
+   * STILL NOT SEEN, and unchanged from before: two sequential awaits INSIDE a
+   * a reader under `lib` are one await here and two round trips in production.
+   */
+  const awaitsReachedFrom = (entry: string, seen: Set<string>): string[] => {
+    if (seen.has(entry)) return []
+    seen.add(entry)
+    const source = readFileSync(entry, 'utf8')
+    if (/^\s*['"]use client['"]/m.test(source)) return []
+    const out = [...waterfallOf(source)]
+    for (const spec of importsIn(source)) {
+      const target = resolveModule(entry, spec, srcDir)
+      if (
+        target &&
+        target.startsWith(COMPONENTS) &&
+        !target.includes('.test.') &&
+        /\.tsx$/.test(target)
+      ) {
+        out.push(...awaitsReachedFrom(target, seen))
+      }
+    }
+    return out
+  }
+
   const out: RouteWaterfall[] = []
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir)) {
@@ -104,7 +216,14 @@ export function scanRoutes(appDir: string): RouteWaterfall[] {
       if (statSync(full).isDirectory()) walk(full)
       else if (entry === 'page.tsx') {
         const route = full.slice(appDir.length).replace(/\/page\.tsx$/, '') || '/'
-        out.push({ route, awaits: waterfallOf(readFileSync(full, 'utf8')) })
+        // One `seen` for the whole route: a component rendered by both the
+        // layout and the page is ONE render and one round trip, not two.
+        const seen = new Set<string>()
+        const awaits = [
+          ...layoutsFor(full).flatMap((l) => awaitsReachedFrom(l, seen)),
+          ...awaitsReachedFrom(full, seen),
+        ]
+        out.push({ route, awaits })
       }
     }
   }

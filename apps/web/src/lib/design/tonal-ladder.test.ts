@@ -8,11 +8,22 @@ import { describe, expect, it } from 'vitest'
  * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
  * It reads ONE file — `@sahoda/shared/tokens.css` — pulls three named scope
  * blocks out of it by regex, and compares four rungs inside each:
- *  · THE SECOND COPY. `apps/web/src/lib/sites/tokens-css-inline.ts` carries the
- *    same ladder inline (19 mentions of these variables) because a generated
- *    site cannot import a stylesheet, and nothing here reads that file. The
- *    ladder this guard proves and the ladder a published site ships are two
- *    different strings;
+ *  · [CORRECTED 2026-08-23 — this entry was WRONG.] It read: "THE SECOND COPY.
+ *    `apps/web/src/lib/sites/tokens-css-inline.ts` carries the same ladder
+ *    inline… the ladder this guard proves and the ladder a published site ships
+ *    are two different strings."
+ *
+ *    They cannot be two different strings. `tokens-css-inline.test.ts` asserts
+ *    the inline copy is BYTE-FOR-BYTE identical to `tokens.css`, and that check
+ *    runs on every gate. MEASURED: making `--surface-2` identical to `--surface`
+ *    in the inline copy alone fails it in two places.
+ *
+ *    The composition was real and undocumented, which is its own hazard — this
+ *    guard's coverage of the shipped ladder depended on a sibling test no reader
+ *    of this file was told about, and deleting that sibling would have silently
+ *    halved this one. So the loop is closed HERE as well, in the last test in
+ *    this file, rather than left as an arrangement between two files that do not
+ *    mention each other;
  *  · a rung that is not a six-digit hex literal. The extraction takes the last
  *    six hex characters of the declaration, so a `var()` reference, an
  *    eight-digit hex with alpha, or an `rgb()`/`oklch()` value is either
@@ -169,5 +180,28 @@ describe('the tonal ladder separates every adjacent pair', () => {
   /** And that it does not simply fail everything. */
   it('accepts a pair that genuinely separates', () => {
     expect(contrast([13, 13, 13], [23, 23, 23])).toBeGreaterThanOrEqual(FLOOR.dark)
+  })
+
+  /**
+   * THE SHIPPED LADDER IS THE LADDER PROVED ABOVE.
+   *
+   * Everything above reads `@sahoda/shared/tokens.css`. A generated site cannot
+   * import a stylesheet, so `lib/sites/tokens-css-inline.ts` carries the same
+   * ladder as a string — and if the two could drift, every measurement above
+   * would be true of a stylesheet no customer's site ever loads.
+   *
+   * They cannot drift: `tokens-css-inline.test.ts` pins them byte-for-byte. This
+   * asserts the SAME thing from this side, deliberately duplicating one line,
+   * because a guard whose scope depends on a sibling test staying alive has a
+   * second way to go quietly green.
+   */
+  it('the inline copy a published site ships is the same ladder, byte for byte', async () => {
+    const { TOKENS_CSS } = await import('@/lib/sites/tokens-css-inline')
+    expect(
+      TOKENS_CSS,
+      'lib/sites/tokens-css-inline.ts has drifted from tokens.css, so every ladder ' +
+        'measurement in this file is true of a stylesheet no published site loads. ' +
+        'Regenerate it: node scripts/gen-tokens-inline.mjs',
+    ).toBe(TOKENS)
   })
 })

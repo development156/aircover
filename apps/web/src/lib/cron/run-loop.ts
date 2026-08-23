@@ -2,9 +2,10 @@ import 'server-only'
 
 import { createPgLedgerPort, createWithCredits, loadBillingEnv } from '@sahoda/billing'
 import { createMesh, planWeekTask } from '@sahoda/mesh'
-import { MESH_TASK_ACTION, toChannelSet, type Channel } from '@sahoda/shared'
+import { MESH_TASK_ACTION, toChannelSet, type AutonomyLevel, type Channel } from '@sahoda/shared'
 
 import { previewCost, priceBrief, cycleCost } from '@/lib/loop/cost'
+import { assess, explain, type LoopFacts, type LoopRefusalReason } from '@/lib/loop/eligibility'
 import { planningWeekFor, reflectionWindow } from '@/lib/loop/iso-week'
 import { isLoopRef, newLoopCycleRef } from '@/lib/loop/object-ref'
 import { reflect } from '@/lib/loop/reflect'
@@ -35,81 +36,224 @@ import { reportServerError } from '@/lib/observability/report'
 /** Enough for every workspace this product has, several times over. */
 const MAX_WORKSPACES_PER_TICK = 40
 
+/** One workspace's outcome, in the words a person would use. */
+export interface LoopWorkspaceOutcome {
+  workspaceId: string
+  /** `planned` when a cycle opened and was paid for; otherwise why not. */
+  outcome: 'planned' | 'failed' | LoopRefusalReason
+  /** The sentence /loop should render. Never a code, never a boolean. */
+  message: string
+}
+
 export interface LoopCronResult {
   eligible: number
   planned: number
   failed: number
   /** Workspaces that did not fit in this tick. Reported, never hidden. */
   deferred: number
+  /**
+   * EVERY WORKSPACE LOOKED AT, AND WHAT HAPPENED TO IT.
+   *
+   * The tick used to answer `eligible: 1, planned: 0` and nothing else, which is
+   * true and useless: it cannot tell a fleet that is working from a fleet where
+   * every workspace is paused. This is the same run, itemised.
+   */
+  outcomes: LoopWorkspaceOutcome[]
 }
 
-export async function runScheduledLoopCycles(now = new Date()): Promise<LoopCronResult> {
+export interface LoopTickOptions {
+  /**
+   * Epoch ms after which no NEW workspace is started. Work already begun is
+   * allowed to finish; what was never begun is counted as `deferred`.
+   *
+   * Passed in by the route rather than read here, because the route is what the
+   * platform kills and therefore the only place that knows the real budget.
+   * Absent, the tick is unbounded — which is right for a script run by hand.
+   */
+  deadline?: number
+  /** Injectable clock, so the deadline is testable without waiting. */
+  monotonicNow?: () => number
+}
+
+export async function runScheduledLoopCycles(
+  now = new Date(),
+  options: LoopTickOptions = {},
+): Promise<LoopCronResult> {
   const { databaseUrl } = loadBillingEnv()
+
+  // ── ONE POOL FOR THE WHOLE TICK. ─────────────────────────────────────────
+  // `planOneWorkspace` used to call `createPgLedgerPort` itself, once per
+  // workspace, and every one of those calls is `new Pool({ max: 10 })` that is
+  // never closed. At one workspace that is invisible; at fifty it is fifty-one
+  // pools and up to 510 connections opened by a single scheduled request, held
+  // until the function is torn down. A long run holding pools is how a cron
+  // takes a database down.
+  //
+  // The port already accepts an existing pool and only ends one it OWNS, so the
+  // fix is to make exactly one and hand it down.
   const ledger = createPgLedgerPort({ connectionString: databaseUrl })
 
-  const eligible = await ledger.pool.query<{ workspace_id: string; weekly_budget_credits: number }>(
-    `select workspace_id, weekly_budget_credits
-       from loop_settings
-      where paused = false
-      order by workspace_id
-      limit $1`,
-    [MAX_WORKSPACES_PER_TICK + 1],
-  )
-  const rows = eligible.rows.slice(0, MAX_WORKSPACES_PER_TICK)
-  const deferred =
-    eligible.rows.length > MAX_WORKSPACES_PER_TICK
-      ? eligible.rows.length - MAX_WORKSPACES_PER_TICK
-      : 0
+  try {
+    const week = planningWeekFor(now)
 
-  let planned = 0
-  let failed = 0
-  for (const row of rows) {
-    try {
-      const ok = await planOneWorkspace(row.workspace_id, row.weekly_budget_credits, now)
-      if (ok) planned += 1
-    } catch (error) {
-      failed += 1
-      // One workspace's failure must not stop the others. Reported per
-      // workspace so a single broken tenant is visible rather than absorbed
-      // into a route-level 500 that says nothing about which.
-      reportServerError(error, { action: 'cron.loop.workspace', workspaceId: row.workspace_id })
+    // ── EVERY WORKSPACE, NOT EVERY loop_settings ROW. ──────────────────────
+    // The old query read `loop_settings where paused = false`, so a workspace
+    // that has never opened the Loop screen HAS NO ROW and never appeared at
+    // all. MEASURED 2026-08-23: that is almost the entire fleet — two
+    // workspaces have ever opened it. A function that reads from
+    // `loop_settings` cannot answer "why not" for the workspaces that most need
+    // asking, which is why this is a LEFT JOIN and why `never_enabled` is a
+    // reason of its own rather than being folded into `paused`.
+    const rows = (
+      await ledger.pool.query<{
+        workspace_id: string
+        paused: boolean | null
+        weekly_budget_credits: number | null
+        available_credits: string | null
+        open_cycle_id: string | null
+        open_cycle_status: string | null
+        connections: { platform: string; status: string }[] | null
+        dial: { channel: Channel; level: AutonomyLevel }[] | null
+      }>(
+        `select w.id as workspace_id,
+                s.paused,
+                s.weekly_budget_credits,
+                b.balance_total - b.balance_held as available_credits,
+                c.id     as open_cycle_id,
+                c.status as open_cycle_status,
+                (select coalesce(json_agg(json_build_object('platform', k.platform, 'status', k.status)), '[]')
+                   from connections k where k.workspace_id = w.id) as connections,
+                (select coalesce(json_agg(json_build_object('channel', d.channel, 'level', d.level)), '[]')
+                   from loop_autonomy d where d.workspace_id = w.id) as dial
+           from workspaces w
+           left join loop_settings  s on s.workspace_id = w.id
+           left join credit_balances b on b.workspace_id = w.id
+           left join loop_cycles    c on c.workspace_id = w.id
+                                     and c.iso_year = $1 and c.iso_week = $2
+                                     and c.status not in ('cancelled', 'failed')
+          order by w.id
+          limit $3`,
+        [week.isoYear, week.isoWeek, MAX_WORKSPACES_PER_TICK + 1],
+      )
+    ).rows
+
+    const considered = rows.slice(0, MAX_WORKSPACES_PER_TICK)
+    const deferred =
+      rows.length > MAX_WORKSPACES_PER_TICK ? rows.length - MAX_WORKSPACES_PER_TICK : 0
+
+    const outcomes: LoopWorkspaceOutcome[] = []
+    let planned = 0
+    let failed = 0
+    let eligible = 0
+
+    const clock = options.monotonicNow ?? (() => Date.now())
+    let ranOutOfTime = 0
+
+    for (const row of considered) {
+      // ── STOP STARTING WHAT CANNOT FINISH. ─────────────────────────────────
+      // Checked BEFORE the verdict, so a workspace that is merely being
+      // explained still costs nothing, and before any write, so a truncated tick
+      // never leaves a half-opened cycle behind. The remainder is COUNTED — a
+      // silent truncation reads as "everyone was planned" when they were not.
+      if (options.deadline !== undefined && clock() >= options.deadline) {
+        ranOutOfTime += 1
+        continue
+      }
+
+      const facts: LoopFacts = {
+        workspaceId: row.workspace_id,
+        settings:
+          row.paused === null
+            ? null
+            : { paused: row.paused, weeklyBudgetCredits: row.weekly_budget_credits ?? 0 },
+        connections: row.connections ?? [],
+        // A workspace with no balance row has no credits, not unlimited ones.
+        availableCredits: Number(row.available_credits ?? 0),
+        planningWeek: { isoYear: week.isoYear, isoWeek: week.isoWeek },
+        openCycle: row.open_cycle_id
+          ? { id: row.open_cycle_id, status: row.open_cycle_status ?? 'unknown' }
+          : null,
+        dial: row.dial ?? [],
+      }
+
+      const verdict = assess(facts)
+      if (!verdict.eligible) {
+        outcomes.push({
+          workspaceId: row.workspace_id,
+          outcome: verdict.reason,
+          message: explain(verdict),
+        })
+        continue
+      }
+
+      eligible += 1
+      try {
+        const ok = await planOneWorkspace(
+          ledger,
+          verdict.workspaceId,
+          verdict.channels,
+          verdict.weeklyBudgetCredits,
+          now,
+        )
+        if (ok) {
+          planned += 1
+          outcomes.push({
+            workspaceId: row.workspace_id,
+            outcome: 'planned',
+            message: explain(verdict),
+          })
+        } else {
+          // Eligible a moment ago and not planned now means something raced or
+          // the charge was refused. Named as `failed` rather than reported as
+          // one of the refusal reasons, because none of them is true.
+          failed += 1
+          outcomes.push({
+            workspaceId: row.workspace_id,
+            outcome: 'failed',
+            message: 'Sahoda could not finish planning this week — nothing was charged.',
+          })
+        }
+      } catch (error) {
+        failed += 1
+        // One workspace's failure must not stop the others. Reported per
+        // workspace so a single broken tenant is visible rather than absorbed
+        // into a route-level 500 that says nothing about which.
+        reportServerError(error, { action: 'cron.loop.workspace', workspaceId: row.workspace_id })
+        outcomes.push({
+          workspaceId: row.workspace_id,
+          outcome: 'failed',
+          message: 'Sahoda could not finish planning this week — nothing was charged.',
+        })
+      }
     }
+
+    return { eligible, planned, failed, deferred: deferred + ranOutOfTime, outcomes }
+  } finally {
+    // The pool this function made is the pool this function closes.
+    await ledger.close()
   }
-  return { eligible: rows.length, planned, failed, deferred }
 }
 
 /** Collect → reflect → plan → halt, for one workspace. Returns false when skipped. */
 async function planOneWorkspace(
+  ledger: ReturnType<typeof createPgLedgerPort>,
   workspaceId: string,
+  channels: readonly Channel[],
   budgetCredits: number,
   now: Date,
 ): Promise<boolean> {
-  const { databaseUrl } = loadBillingEnv()
-  const ledger = createPgLedgerPort({ connectionString: databaseUrl })
-
-  // Only channels the workspace can actually publish to. With none, FSD M2 says
-  // the cycle produces suggestions rather than a plan — and charging 20 credits
-  // to plan for nowhere is the wrong half of that, so it does not open at all.
-  //
-  // 'active' is the value `upsert_connection` writes and one of the four the
-  // CHECK admits ('active','expired','revoked','error'). This asked for
+  // The channels arrive already decided. `assess` chose them from the same
+  // `status = 'active'` rule this used to apply here — 'active' being the value
+  // `upsert_connection` writes, and one of the four the CHECK admits
+  // ('active','expired','revoked','error'). An earlier version asked for
   // 'connected', which the column cannot hold, so the scheduled cycle skipped
   // EVERY workspace on every run and looked exactly like a fleet with no
-  // channels. An expired connection is deliberately not planned for: the plan
-  // would be for somewhere Sahoda cannot post.
-  // Pinned by lib/connections/status-vocabulary.test.ts, which parses the CHECK
-  // out of the migration rather than restating it.
-  const connections = await ledger.pool.query<{ platform: string }>(
-    `select distinct platform from connections
-      where workspace_id = $1 and status = 'active'`,
-    [workspaceId],
-  )
-  const channels = toChannelSet(
-    connections.rows
-      .map((c) => c.platform as Channel)
-      .filter((p): p is Channel => ['x', 'gbp', 'linkedin', 'instagram'].includes(p)),
-  )
-  if (channels.length === 0) return false
+  // channels. Pinned by lib/connections/status-vocabulary.test.ts, which parses
+  // the CHECK out of the migration rather than restating it.
+  //
+  // Reading them here as well would be a second query per workspace AND a second
+  // copy of the rule — the two could disagree, and the one that decided the
+  // customer's answer would not be the one that decided the charge.
 
   const week = planningWeekFor(now)
   const opened = await store.openCycle({
@@ -182,7 +326,7 @@ async function planOneWorkspace(
       const priced = priceBrief()
       const rows = result.data.briefs.map((brief, index) => {
         const kept = toChannelSet((brief.channels as Channel[]).filter((c) => channels.includes(c)))
-        const use = kept.length > 0 ? kept : channels
+        const use = kept.length > 0 ? kept : toChannelSet([...channels])
         const slot = normalizeSlot(brief.suggestedSlot, [...use], now, index)
         return {
           priority: index + 1,

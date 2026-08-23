@@ -835,7 +835,7 @@ worktree names the DIRECT host (`db.<ref>.supabase.co:5432`), where the session 
 with the process and nothing is inherited. It matters wherever the pooler is used,
 which is what Vercel had to switch to.
 
-### 10 · Three migrations share the version `20260821000000`, and only one can be recorded
+### 10 · ~~Three migrations share the version `20260821000000`~~ — DONE 2026-08-23 (wt-infra)
 
 `asset_derivatives` (wt-media), `remix` (wt-remix) and `zernio_webhook_events`
 (wt-webhooks) each carry that timestamp. Git merged all three without a conflict —
@@ -855,3 +855,133 @@ whose objects it cannot see first.
 Separately and correctly, `20260805000000_clerk_id_remap` is NOT recorded and must
 stay that way: `remap_clerk_user_ids` and `verify_clerk_remap` do not exist in
 production, so it has genuinely never been applied.
+
+**Resolved 2026-08-23 by wt-infra**, exactly as described above: `asset_derivatives`
+renamed to `20260821000001`, `remix` to `20260821000002` (both versions were free —
+`000100` is `lead_doors`), then recorded with `prod-record.mjs`. No DDL re-run.
+`schema_migrations` 66 → 68. `20260805000000_clerk_id_remap` remains unrecorded, and
+that was re-verified rather than taken on trust: neither function exists in `pg_proc`.
+
+---
+
+## 11 · Radar can be subscribed to now — /radar's shape, for wt-page-rest
+
+**wt-infra opened the write path. It did NOT touch `/radar` or any component.**
+
+### What changed underneath
+
+`app.radar_subscribe` was granted to `service_role` only, and `app` is not an exposed
+schema, so `supabaseRadarStore.add()` threw "Radar is not collecting yet" and all five
+tables were empty. Migration `20260823030000_radar_subscribe_reachable` adds
+`public.radar_subscribe(p_workspace_id, p_display_name, p_sources, p_label)` — applied
+to production 2026-08-23 — and `lib/radar/store.ts` is now bound to it.
+
+The inner function was NOT granted to `authenticated`, deliberately: it takes
+`p_workspace_id` and `p_created_by` and checks no membership, so exposing it would have
+been a cross-tenant write. The wrapper takes identity from `auth.jwt()`, checks
+membership before anything, and **has no actor argument at all**.
+
+### The shape the screen gets
+
+`store.read(workspaceId)` now returns `collector: 'watch-list-only'` with a real
+`competitors[]`, instead of `'absent'`. Draw the difference:
+
+| state             | means                                                                   |
+| ----------------- | ----------------------------------------------------------------------- |
+| `absent`          | the tables are not there — only if the migration is missing             |
+| `watch-list-only` | **the list is real; an empty `days[]` does NOT mean "nothing changed"** |
+| `reading`         | fully bound; silence genuinely means nothing changed                    |
+
+Nothing returns `'reading'` yet. The change feed is unbound, so a "nothing happened this
+week" empty state would be a lie.
+
+Per competitor, what is real and what is not:
+
+| field            | value                                                       | why                                                                                                                                                                                        |
+| ---------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`             | the competitor's real id                                    |                                                                                                                                                                                            |
+| `name`           | the workspace's own `label`, falling back to `display_name` | the label is private to the workspace; one customer's name for a rival is never shown to another                                                                                           |
+| `url`            | **always `''`**                                             | there is no `url` on a competitor. Addresses are normalised locators on `competitor_sources`, one row per source. That read is not bound yet — do not render an empty string as an address |
+| `kind`           | always `'website'`                                          | see the vocabulary mismatch below                                                                                                                                                          |
+| `lastObservedAt` | **always `null`**                                           | `competitor_snapshots` is empty for everyone. Never draw a "last checked" time                                                                                                             |
+
+### THREE DECISIONS THAT ARE YOURS, NOT MINE
+
+1. **The kind vocabularies do not match.** The screen's `CompetitorKind` is
+   `website | instagram | google_business`. The registry's CHECK admits
+   `website | instagram | x | linkedin | facebook`. So **`google_business` can never be
+   stored** — `add()` refuses it by name rather than coercing it to `website` — and
+   `x`, `linkedin` and `facebook` cannot be asked for. Widening the union changes what
+   your components render, so it is your call.
+
+2. **Only owners and editors may subscribe.** A `viewer` gets `FORBIDDEN_ROLE`.
+   Subscribing is a spending decision — every source is fetched nightly, on our card —
+   so it uses the same allowlist as `upsert_connection`. The screen should not offer the
+   control to a viewer rather than letting them press it and be refused.
+
+3. **The nightly collector is armed and OFF.** `radar-nightly.yml` runs only when
+   `vars.RADAR_NIGHTLY` is exactly `on`. So a customer can subscribe today and nothing
+   will be collected until the founder arms it. Whatever the screen says after a
+   successful add must not promise a reading that is not coming.
+
+### Where the proof is, if you need to check a claim
+
+- `packages/db/tests/radar_subscribe_door.pglite.test.ts` — real Postgres, RLS enforced.
+- `packages/db/scripts/radar-rls-live-proof.mjs` — production, anon key, minted member
+  JWTs. 29 PASS / 0 FAIL on 2026-08-23, 0 rows left behind.
+
+The two disclosure rules are proven separately and still hold after writing through the
+door: a workspace sees only competitors it subscribes to, and a `COUNT` of a shared
+competitor's subscribers answers **1** when the truth is **2**.
+
+---
+
+## 12 · Every authenticated navigation pays FIVE sequential reads before a page renders
+
+**For wt-page-dash / wt-page-flow / wt-page-rest. wt-infra found it and did NOT fix it —
+the fix is in `(app)/layout.tsx` and `components/shell/*`, which are yours.**
+
+`read-waterfall.test.ts` read `page.tsx` files only, so it could not see anything a layout
+or a shell component does. It now walks the render tree — every layout above a page plus
+the server components they import — and the first thing it found is that **all 44 routes
+under `(app)` carry the same five sequential awaits before their own work starts**:
+
+```
+activeWorkspaceRead → getOpsAdmin → read → soft → read
+```
+
+Five round trips, one after another, on every navigation in the product. That is the most
+expensive place in the app to have a waterfall, because every route pays it, and it was
+invisible to a per-page scan.
+
+They are recorded in `read-waterfall.baseline.json` as today's truth, so the ratchet works
+from here — the guard will now go red if a sixth is added. Removing them is free and
+needs no baseline permission: the ratchet only refuses growth.
+
+Worth checking first whether any pair can be a `Promise.all`. The analyser already treats
+`Promise.all` and `Promise.allSettled` as parallel and will drop the count when you do.
+
+### 11a · `/radar` has left `roadmap-honesty`'s ALLOWED list — read this before you touch the screen
+
+Opening the subscribe path changed what `/radar` renders, and that broke a guard. The
+repair is done and the suite is green again, but wt-page-rest should know why.
+
+`lib/radar/store.ts` `read()` used to return `collector: 'absent'`, which the screen draws
+as **"The weekly scan is not built yet"**. `roadmap-honesty.spec.ts` requires exactly that
+sentence on every route in its `ALLOWED` list, and `/radar` was on it _because_ of that
+sentence — the entry said so in its own comment.
+
+It now returns `collector: 'watch-list-only'`, so the screen takes your other branch:
+
+> Your watch list is stored, and the weekly readings are not wired into this screen yet.
+> This is not "nothing changed" — it is Radar not being able to tell you either way.
+
+That is the honest state and your existing copy for it is right. So `/radar` was removed
+from `ALLOWED`, the same move `/playbooks`, `/brain/audience`, `/remix`, `/leads` and
+`/brain/knowledge` each made when they stopped being drawings.
+
+**The cost, stated rather than absorbed:** the per-scan price `/radar` quotes is no longer
+checked by that guard. It invents no figure today and nothing there will notice if it
+starts. If you would rather it stayed covered, the entry to restore is
+`['/radar', [price('radar_scan')]]` — but it will fail until the screen says "coming soon"
+again, which would now be untrue.

@@ -7,13 +7,12 @@
 # from Vercel, Supabase and Upstash. If all three are down, this page still loads
 # and still says so.
 #
-# ── IT IS NOT ARMED UNTIL IT IS ON THE DEFAULT BRANCH ────────────────────────
+# ── ARMED 2026-08-23, AND OFF UNTIL PAGES IS ENABLED ─────────────────────────
 # GitHub fires `schedule` only from a repository's DEFAULT branch, which on
-# `origin` (development156/sahodalabs) is `wt-web`. MEASURED 2026-08-22:
-# `.github/workflows` does not exist on `wt-web` at all, so no scheduled workflow
-# in this repository is armed today. Putting this file there is a founder
-# decision, not a task, and until then `workflow_dispatch` is the only trigger
-# that works.
+# `origin` (development156/sahodalabs) is `wt-web`, where `.github/workflows` does
+# not exist at all. MEASURED 2026-08-23: that repo also has ZERO Actions secrets,
+# so the scheduled jobs are armed on IDIVASM/sahodalabs instead, whose default
+# branch is `main` and which holds the credentials. `arm-workflows.mjs` does it.
 #
 # That is the same split this lane found in the crons: the schedule lives in one
 # place and the thing it starts lives in another, and watching only the half that
@@ -33,6 +32,10 @@ on:
     - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
+      ref:
+        description: 'Branch or SHA carrying the prober (blank = the SAHODA_JOBS_REF variable)'
+        required: false
+        type: string
       url:
         description: Host to probe
         required: false
@@ -51,13 +54,59 @@ concurrency:
 
 jobs:
   build:
+    # ⚠ ARMED BUT OFF, UNTIL PAGES IS ENABLED. ⚠
+    #
+    # MEASURED 2026-08-23: `GET /repos/IDIVASM/sahodalabs/pages` answers 404 — Pages
+    # is not enabled for this repository. `actions/deploy-pages` cannot succeed
+    # without it, and this job runs every 30 minutes, so arming it as-is would post
+    # 48 identical failures a day. A notification everyone learns to ignore is worse
+    # than a page nobody has switched on yet.
+    #
+    # Enabling Pages is not a change a script should make on someone's behalf: this
+    # repository is PRIVATE, and turning Pages on decides who can read a page about
+    # the health of a production system. That is the founder's call.
+    #
+    # TO TURN IT ON: enable Pages with the source set to "GitHub Actions", then set
+    # the repository variable STATUS_PAGE to the literal `on`. A manual dispatch is
+    # ungated, so the job can be tested before the schedule is trusted.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' || vars.STATUS_PAGE == 'on' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      # ⚠ THE REF IS NOT OPTIONAL HERE. ⚠
+      # A bare checkout takes the branch the workflow FIRED from, and a scheduled
+      # run always fires from the default branch. The default branch is a carrier
+      # for the schedule and does not hold the application — MEASURED 2026-08-23:
+      # `scripts/build-status-page.mjs` does not exist on it. A bare checkout
+      # therefore fails at the build step with "cannot find module", on a page
+      # whose entire purpose is to answer when other things cannot.
+      - name: Check out the prober
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || vars.SAHODA_JOBS_REF || 'wt-integrate3' }}
+          fetch-depth: 1
+
+      # Same sentence as the three nightly collectors: a finished run must say
+      # which commit produced it, in the summary rather than buried in a log.
+      - name: Say which code this run executes
+        run: |
+          {
+            echo '### Code under this run'
+            echo
+            echo '| | |'
+            echo '|---|---|'
+            printf '| asked for | `%s` |\n'   "$REQUESTED"
+            printf '| resolved to | `%s` |\n' "$(git rev-parse HEAD)"
+            printf '| subject | %s |\n'       "$(git log -1 --pretty=format:%s)"
+            printf '| committed | %s |\n'     "$(git log -1 --pretty=format:%cI)"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          REQUESTED: ${{ inputs.ref || vars.SAHODA_JOBS_REF || 'wt-integrate3' }}
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24

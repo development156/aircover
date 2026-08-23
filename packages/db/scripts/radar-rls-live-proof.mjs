@@ -77,6 +77,8 @@ const asUser = (sub) =>
     global: { headers: { Authorization: `Bearer ${mintJwt(sub)}` } },
   })
 
+const ZERO_UUID = '00000000-0000-4000-8000-000000000000'
+
 // Run-scoped so nothing here can ever collide with a real customer's row.
 const RUN = `radarproof${Date.now().toString(36)}`
 const USER_A = `user_${RUN}_a`
@@ -184,6 +186,7 @@ try {
   )
 
   const A = asUser(USER_A)
+  const B = asUser(USER_B)
   const C = asUser(USER_C)
 
   // ── DISCLOSURE (a): reading a competitor you do not subscribe to ───────────
@@ -285,6 +288,85 @@ try {
     '42501',
   )
 
+  // ── THE DOOR THAT IS SUPPOSED TO OPEN ─────────────────────────────────────
+  //
+  // Everything above proves what a member may NOT do. Until 20260823030000 there
+  // was nothing a member COULD do: `app.radar_subscribe` is service-role only and
+  // `app` is not an exposed schema, so `supabaseRadarStore.add()` threw "Radar is
+  // not collecting yet" and all five tables stayed empty. A feature that is
+  // perfectly secured and completely unreachable is still broken.
+  //
+  // `public.radar_subscribe` is the door. It is called here EXACTLY as the app
+  // calls it: the anon key, a member's bearer token, through PostgREST.
+  console.log('\n── the door that is supposed to open ────────────────────────')
+
+  const opened = await A.rpc('radar_subscribe', {
+    p_workspace_id: wsA,
+    p_display_name: `${RUN} door rival`,
+    p_sources: [{ kind: 'website', locator: `${RUN}-door.example` }],
+    p_label: null,
+  })
+  check(
+    'a signed-in MEMBER can subscribe a competitor through the door',
+    opened.error?.message ?? 'no error',
+    'no error',
+  )
+  const openedId = opened.data?.competitor_id ?? null
+  console.log(`        competitor_id: ${openedId}`)
+  // TRACKED IMMEDIATELY, before anything that could throw. The first version of
+  // this section did not track it, a later line crashed, and the cleanup — which
+  // deletes exactly the ids it knows about — reported "0 left behind" while a
+  // competitor and its source sat in production. Removed by hand afterwards; the
+  // fix is that the id joins the list the instant it exists.
+  if (openedId) created.competitors.push(openedId)
+
+  // The actor is the JWT's subject and there is no argument that could have
+  // supplied it — the wrapper has no p_created_by at all.
+  if (openedId) {
+    const who = await pool.query(
+      `select created_by from competitor_subscriptions
+        where workspace_id = $1::uuid and competitor_id = $2::uuid`,
+      [wsA, openedId],
+    )
+    check(
+      'and the row is stamped with the JWT subject, not an argument',
+      who.rows[0]?.created_by ?? null,
+      USER_A,
+    )
+  }
+
+  // The attack the wrapper exists to refuse: B calling the door for A's workspace.
+  const crossTenant = await B.rpc('radar_subscribe', {
+    p_workspace_id: wsA,
+    p_display_name: `${RUN} injected`,
+    p_sources: [{ kind: 'website', locator: `${RUN}-injected.example` }],
+    p_label: null,
+  })
+  check(
+    'B CANNOT subscribe on A’s behalf — the inner function would have allowed it',
+    (crossTenant.error?.message ?? 'NO ERROR').includes('NOT_A_MEMBER'),
+    true,
+  )
+
+  const anonDoor = await anon.rpc('radar_subscribe', {
+    p_workspace_id: wsA,
+    p_display_name: `${RUN} anon`,
+    p_sources: [{ kind: 'website', locator: `${RUN}-anon.example` }],
+    p_label: null,
+  })
+  check(
+    'a signed-out caller cannot reach the door at all',
+    anonDoor.error !== null && anonDoor.error !== undefined,
+    true,
+  )
+  console.log(`        message: ${anonDoor.error?.message}`)
+
+  // And the disclosure still holds for a row created THROUGH the door.
+  const afterDoor = await B.from('competitors')
+    .select('id')
+    .eq('id', openedId ?? ZERO_UUID)
+  check('B still cannot see the competitor A just added', afterDoor.data ?? [], [])
+
   const delOther = await A.from('competitor_subscriptions').delete().eq('workspace_id', wsB)
   const stillThere = await pool.query(
     `select count(*)::int as n from competitor_subscriptions where workspace_id = $1::uuid`,
@@ -307,10 +389,24 @@ try {
     for (const id of created.workspaces) {
       await svc.from('workspaces').delete().eq('id', id)
     }
-    const left = await svc.from('workspaces').select('id').in('id', created.workspaces)
+    // Counted for BOTH, because the check that only looked at workspaces reported
+    // "0 left behind" on a run that left a competitor and its source behind.
+    const leftWs = await svc.from('workspaces').select('id').in('id', created.workspaces)
+    const leftComp = await svc.from('competitors').select('id').in('id', created.competitors)
+    const stray = (leftWs.data ?? []).length + (leftComp.data ?? []).length
     console.log(
-      `\ncleanup: ${created.competitors.length} competitors and ${created.workspaces.length} workspaces removed; ${(left.data ?? []).length} left behind`,
+      `\ncleanup: ${created.competitors.length} competitors and ${created.workspaces.length} workspaces removed; ${stray} left behind`,
     )
+    // A namespace sweep, so a row created by a path nobody thought to track is
+    // still reported rather than silently kept.
+    const orphans = await svc
+      .from('competitors')
+      .select('id,display_name')
+      .like('display_name', `${RUN}%`)
+    if ((orphans.data ?? []).length > 0) {
+      console.log('  ⚠ STILL PRESENT under this run’s namespace:', orphans.data)
+      FAIL += 1
+    }
   }
   console.log(`\nPASS ${PASS}   FAIL ${FAIL}`)
   process.exitCode = FAIL === 0 ? 0 : 1

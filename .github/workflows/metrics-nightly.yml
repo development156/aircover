@@ -22,8 +22,10 @@
 # GitHub fires `schedule` only from a repository's DEFAULT branch. So this file must be on
 # the default branch to be armed at all, and the code it runs is fetched by the checkout
 # step below rather than being whatever the default branch happens to hold. Point the
-# repository variable METRICS_REF at the branch that carries the collector; it defaults to
-# `wt-collect`, and should be moved to `wt-web` the day the route merges there.
+# repository variable SAHODA_JOBS_REF at the branch that carries the collector — ONE
+# variable for all four scheduled jobs, replacing the three that had drifted onto three
+# different dead lanes. MEASURED 2026-08-23: `wt-integrate3` is the only branch carrying
+# all four collectors, and `wt-web` carries none of them.
 name: metrics-nightly
 
 on:
@@ -40,7 +42,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Branch or SHA carrying the collector (blank = the METRICS_REF variable)'
+        description: 'Branch or SHA carrying the collector (blank = the SAHODA_JOBS_REF variable)'
         required: false
         type: string
       batch:
@@ -69,9 +71,30 @@ jobs:
       - name: Check out the collector
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || vars.METRICS_REF || 'wt-collect' }}
+          ref: ${{ inputs.ref || vars.SAHODA_JOBS_REF || 'wt-integrate3' }}
           # Only this run's tree is needed; the history is not.
           fetch-depth: 1
+
+      # ── WHICH CODE DID THIS RUN EXECUTE? ─────────────────────────────────────
+      # The schedule fires from the DEFAULT branch; the code comes from wherever
+      # `SAHODA_JOBS_REF` points. Those are two different commits, and a reader of
+      # a finished run has no way to tell what the second one was — the checkout
+      # step logs the ref it was ASKED for, not what it got, and a branch moves.
+      # So every run states it, in the run summary rather than buried in a log.
+      - name: Say which code this run executes
+        run: |
+          {
+            echo '### Code under this run'
+            echo
+            echo '| | |'
+            echo '|---|---|'
+            printf '| asked for | `%s` |\n'   "$REQUESTED"
+            printf '| resolved to | `%s` |\n' "$(git rev-parse HEAD)"
+            printf '| subject | %s |\n'       "$(git log -1 --pretty=format:%s)"
+            printf '| committed | %s |\n'     "$(git log -1 --pretty=format:%cI)"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          REQUESTED: ${{ inputs.ref || vars.SAHODA_JOBS_REF || 'wt-integrate3' }}
 
       - name: Set up Node
         uses: actions/setup-node@v4

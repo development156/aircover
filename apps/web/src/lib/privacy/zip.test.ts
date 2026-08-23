@@ -4,10 +4,12 @@
  * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
  * It checks the bytes with `node:zlib`'s inflateRaw and, when the binary is
  * there, the system `unzip`:
- *  · the `unzip` assertion SKIPS when no such binary exists, and a skipped
- *    assertion reports as a pass. On a machine without it — which includes most
- *    CI images — the only reader exercising this archive is the same runtime
- *    that wrote it;
+ *  · [FIXED 2026-08-23.] The `unzip` assertion used to SKIP when no such binary
+ *    existed, and a skipped assertion reports as a pass — so on an image without
+ *    it, the only reader exercising this archive was the runtime that wrote it.
+ *    Worse, the catch could not tell a MISSING TOOL from one that REFUSED THE
+ *    ARCHIVE, so a corrupt zip went green. Three extractors are now tried, ENOENT
+ *    is distinguished from a refusal, and none available is a FAILURE;
  *  · every other extractor. Windows Explorer, macOS Archive Utility and 7-Zip
  *    each have their own tolerance for a malformed central directory, and a
  *    customer opens the file in one of those, not in Node;
@@ -77,6 +79,47 @@ function readCentralDirectory(zip: Buffer): Array<{ name: string; data: Buffer; 
   return out
 }
 
+/**
+ * Unpack with whichever foreign extractor this machine has.
+ *
+ * Returns the tool that ran and whether it refused, KEPT APART. Collapsing the
+ * two — "it did not work" — is what let a corrupt archive read as a missing
+ * binary and pass.
+ *
+ * `unzip` first because it is the reference behaviour, then `bsdtar` (macOS and
+ * most BSD-derived images ship it as `tar`), then python3's `zipfile`, which is
+ * a completely independent implementation and is present on essentially every CI
+ * image that can run this suite at all.
+ */
+function extractWithAnyExtractor(
+  dir: string,
+  archive: string,
+): { tool: string | null; error: string | null } {
+  const candidates: [string, string[]][] = [
+    ['unzip', ['-q', archive]],
+    ['bsdtar', ['-xf', archive]],
+    [
+      'python3',
+      ['-c', `import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall('.')`, archive],
+    ],
+  ]
+  for (const [tool, args] of candidates) {
+    try {
+      execFileSync(tool, args, { cwd: dir, stdio: 'pipe' })
+      return { tool, error: null }
+    } catch (error) {
+      // execFileSync throws an Error carrying BOTH a code and the tool's stderr;
+      // the built-in type knows about the first only.
+      const err = error as NodeJS.ErrnoException & { stderr?: Buffer | string }
+      // ENOENT means the TOOL is absent — try the next one. Anything else means
+      // the tool ran and REFUSED, which is a real answer and must be reported.
+      if (err.code === 'ENOENT') continue
+      return { tool, error: String(err.stderr ?? err.message).slice(0, 300) }
+    }
+  }
+  return { tool: null, error: null }
+}
+
 describe('the archive is a real ZIP', () => {
   it('round-trips every entry, byte for byte', () => {
     const entries = [
@@ -110,22 +153,61 @@ describe('the archive is a real ZIP', () => {
     expect(read[0]!.data.length).toBe(0)
   })
 
-  it('opens with the system unzip, not only with this file’s own reader', () => {
+  it('opens with a FOREIGN extractor, not only with this file’s own reader', () => {
     // The assertion that keeps the two above honest. `readCentralDirectory` and
-    // `buildZip` were written by the same hand in the same hour, so agreeing
-    // with each other proves only that they share an opinion.
+    // `buildZip` were written by the same hand in the same hour, so agreeing with
+    // each other proves only that they share an opinion.
     const dir = mkdtempSync(join(tmpdir(), 'sahoda-zip-'))
-    const path = join(dir, 'export.zip')
-    writeFileSync(path, buildZip([{ name: 'data.json', data: Buffer.from('{"ok":true}') }], WHEN))
-    try {
-      execFileSync('unzip', ['-q', 'export.zip'], { cwd: dir, stdio: 'pipe' })
-    } catch {
-      // No `unzip` on this machine. Skipping is honest; asserting on a tool that
-      // is not there would be a green test about nothing.
-      return
-    }
+    writeFileSync(
+      join(dir, 'export.zip'),
+      buildZip([{ name: 'data.json', data: Buffer.from('{"ok":true}') }], WHEN),
+    )
+
+    const result = extractWithAnyExtractor(dir, 'export.zip')
+
+    // ── A MISSING EXTRACTOR IS A FAILURE, NOT A SKIP ────────────────────────
+    // The previous version ran `unzip` inside a `try` and `return`ed from the
+    // catch. Two things were wrong with that, and the second is the worse one:
+    //   · a skipped assertion reports as a PASS, so on any image without `unzip`
+    //     the only reader exercising this archive was the runtime that wrote it;
+    //   · the catch could not tell "no such binary" from "the extractor REFUSED
+    //     THIS ARCHIVE". A genuinely corrupt zip threw exactly like a missing
+    //     tool and the test went green — which is the entire failure this test
+    //     exists to catch.
+    // Three extractors are tried so a missing one is nearly impossible, and if
+    // every one of them is absent this FAILS and says so.
+    expect(
+      result.tool,
+      'no ZIP extractor is available (tried unzip, bsdtar, python3) — this ' +
+        'assertion cannot run, and a test that cannot run must not report as a pass.',
+    ).not.toBeNull()
+    expect(
+      result.error,
+      `${result.tool} REFUSED the archive: ${result.error}. That is this test's ` +
+        'whole purpose — a foreign extractor disagreeing with our own reader.',
+    ).toBeNull()
+
     expect(readdirSync(dir).sort()).toEqual(['data.json', 'export.zip'])
     expect(readFileSync(join(dir, 'data.json'), 'utf8')).toBe('{"ok":true}')
+  })
+
+  it('the extractor it found REJECTS a corrupt archive', () => {
+    // Proves the check above can fail. Without this, "the extractor opened it"
+    // is a claim about an extractor nobody has watched refuse anything — and the
+    // old version would have reported a corrupt archive as a pass.
+    const dir = mkdtempSync(join(tmpdir(), 'sahoda-zip-bad-'))
+    const good = buildZip([{ name: 'data.json', data: Buffer.from('{"ok":true}') }], WHEN)
+    const corrupt = Buffer.from(good)
+    // Break the END OF CENTRAL DIRECTORY signature. Every extractor finds the
+    // archive by scanning backwards for it, so none of them can open this.
+    const eocd = corrupt.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]))
+    expect(eocd).toBeGreaterThan(-1)
+    corrupt[eocd + 3] = 0x07
+    writeFileSync(join(dir, 'export.zip'), corrupt)
+
+    const result = extractWithAnyExtractor(dir, 'export.zip')
+    expect(result.tool).not.toBeNull()
+    expect(result.error).not.toBeNull()
   })
 })
 
