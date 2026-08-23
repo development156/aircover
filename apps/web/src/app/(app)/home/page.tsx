@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { creditCost } from '@sahoda/shared'
 
+import { AtAGlance } from '@/components/home/at-a-glance'
 import { FirstRun } from '@/components/home/first-run'
 import { GetStarted } from '@/components/home/get-started'
 import { GreetingBanner } from '@/components/home/greeting-banner'
@@ -12,9 +13,8 @@ import { PerformanceStrip } from '@/components/analytics/performance-strip'
 import { SahodaRail } from '@/components/home/sahoda-rail'
 import { SpendCard } from '@/components/home/spend-card'
 import { WeekStrip } from '@/components/home/week-strip'
-import { Card, CardLabel } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { StaggerItem } from '@/components/motion/stagger'
-import { Unreadable } from '@/components/design-system/absence-row'
 import { ActivityFeed } from '@/components/home/activity-feed'
 import { readInstagramAnalytics } from '@/lib/analytics/account-insights'
 import { readBrain } from '@/lib/brand/read-brain'
@@ -184,7 +184,16 @@ export default async function HomePage() {
   )
 
   return (
-    <div className="space-y-4">
+    /* ── ONE RHYTHM, AND IT IS 20px ──────────────────────────────────────
+       This page ran at 16 between regions and 16 between the columns, while
+       `Card` ran at 16 inside them — so the gap AROUND a group was the same as
+       the gap BETWEEN things inside it, which docs/37 §4 names as "the most
+       common spacing bug in this product": the reader cannot tell which value
+       belongs to which label. 20 outside, and `Card` is now 20 inside, so the
+       two are at least on the same step; the separation comes from the card's
+       ring rather than from a bigger hole. /analytics runs the same 20 via
+       `space-y-grid`. */
+    <div className="space-y-5">
       {/* ── THE FOUR QUESTIONS, IN ORDER (SPECIFICATION.md §1) ──────────────
           what happened · what is happening · what needs me · what next.
 
@@ -192,20 +201,32 @@ export default async function HomePage() {
           used to, answers "what is scheduled" — a question nobody opened the
           app to ask — and pushes the queue below the fold. */}
 
-      {/* The banner. Carries the page's ONE primary action, which this screen
+      {/* The header. Carries the page's ONE primary action, which this screen
           previously did not have at all: it was a dashboard you could only
-          read. */}
+          read. No band behind it any more — see the component. */}
       <GreetingBanner greeting={greetingFor(now)} state={greetingState(counts, publish)} />
+
+      {/* ── AND THEN FOUR NUMBERS, WHERE THE 190px BAND USED TO BE ────────
+          The reference opens on five stat cards; this page opened on a
+          greeting and then a queue, with its first figure at y≈1190 on a 768px
+          laptop. All four of these are counts of rows this product owns or a
+          ledger balance, so the strip is full on day one with nothing
+          connected — which is the whole reason /home could not have a KPI row
+          before. See the component for why these four and not the platform
+          metrics. */}
+      <StaggerItem i={0}>
+        <AtAGlance posts={displayPosts} buckets={buckets} publish={publish} balance={balance} />
+      </StaggerItem>
 
       {/* `split--wide` — 1fr / 380px, not the 280px this page used. The rail
           holds three cards; at 280px the connection tiles wrapped to one per
           row and the stack read as a leftovers column. */}
-      <div className="grid grid-cols-[minmax(0,1fr)_380px] items-start gap-4 max-wide:grid-cols-1">
-        <div className="flex min-w-0 flex-col gap-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_380px] items-start gap-5 max-wide:grid-cols-1">
+        <div className="flex min-w-0 flex-col gap-5">
           {/* WHAT NEEDS ME — the lead. See the header note: this is the question
               someone actually opened the app to ask, and it used to sit fourth,
               below two charts and a spend card. */}
-          <StaggerItem i={0}>
+          <StaggerItem i={1}>
             <NeedsAttention posts={displayPosts} />
           </StaggerItem>
 
@@ -214,31 +235,31 @@ export default async function HomePage() {
               is connected, which is the honest answer; showing nothing left the
               reader unable to tell "we measured nothing" from "this product
               does not measure". */}
-          <StaggerItem i={1}>
+          <StaggerItem i={2}>
             <PerformanceStrip analytics={instagram} />
           </StaggerItem>
 
           {/* Instagram's own series sits below the strip: the strip carries the
               headline numbers, this carries the one real chart. */}
-          <StaggerItem i={2}>
+          <StaggerItem i={3}>
             <InstagramInsights analytics={instagram} />
           </StaggerItem>
 
-          <StaggerItem i={3}>
+          <StaggerItem i={4}>
             <SpendCard spend={spend} />
           </StaggerItem>
 
-          <StaggerItem i={4}>
+          <StaggerItem i={5}>
             <WeekStrip buckets={buckets} variantStates={variantStates} />
           </StaggerItem>
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-5">
           {/* 1 — WHAT HAPPENED. The reference puts the activity feed at the
                   top of the rail; this app had it as a full-width table at the
                   very bottom, which is the least-read position on the page. */}
           {/* WHAT HAPPENED. */}
-          <StaggerItem i={5}>
+          <StaggerItem i={6}>
             <section className="surface-ring rounded-card bg-surface">
               <header className="flex min-h-[46px] items-center gap-3 border-b border-line-soft px-4 py-3">
                 <h2 className="type-h3">Recent activity</h2>
@@ -253,31 +274,14 @@ export default async function HomePage() {
             </section>
           </StaggerItem>
 
-          {/* The balance, DEMOTED. It was `type-display` with a brand shadow —
-              the second hero docs/27 §1 found — while the identical figure was
-              already rendering in the topbar chip and the rail foot. Third copy,
-              biggest type. It is now a `type-h2` stat: still readable at a
-              glance, no longer competing with the greeting for the fold.
-
-              It does NOT count up. Authoritative live balance, docs/26 §8.1,
-              enforced by count-up.guard.test.ts. */}
-          <StaggerItem i={6}>
-            <Card>
-              <CardLabel>Available credits</CardLabel>
-              <p className="type-h2 num mt-1 text-ink">
-                {balance.status === 'ok' ? (
-                  balance.balance.available.toLocaleString('en-IN')
-                ) : (
-                  <Unreadable what="Your credit balance" />
-                )}
-              </p>
-              <p className="mt-1 type-sm text-muted">
-                {balance.status === 'ok' && balance.balance.held > 0
-                  ? `${balance.balance.held} held by actions in progress`
-                  : 'credits to spend'}
-              </p>
-            </Card>
-          </StaggerItem>
+          {/* ── WHERE `Available credits` USED TO BE ────────────────────────
+              docs/40 §2.3 counted the balance THREE times on this one screen —
+              the topbar chip, the rail foot and a card here — and demoted this
+              copy from `type-display` to `type-h2` rather than removing it. It
+              is removed now: the figure leads the page in `AtAGlance`, where it
+              is one of four things you can act on, and the rail foot's copy is
+              hidden whenever the rail is minimised, which is the default. Two
+              copies, down from three, and the biggest one is at the top. */}
 
           {/* WHAT NEXT: what Sahoda knows, and what it can post to. */}
           <StaggerItem i={7}>

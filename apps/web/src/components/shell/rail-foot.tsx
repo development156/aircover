@@ -171,7 +171,7 @@ export async function RailFoot() {
       {/* Credits. Dropped when the rail collapses, matching the reference.
           There is no "of —" here any more: the quantity has no denominator, so
           per docs/26 §4 the slot does not exist rather than being filled. */}
-      <div className="px-3 pt-3 pb-2 max-wide:hidden">
+      <div className="px-3 pt-3 pb-2 rail-min:hidden">
         <div className="flex min-h-[19px] items-baseline gap-1.5">
           {credits === null ? (
             noWorkspaceYet ? (
@@ -192,7 +192,7 @@ export async function RailFoot() {
       <Link
         href="/settings/profile"
         data-guide="nav.identity"
-        className="flex items-center gap-2 px-3 py-2.5 transition-micro hover:bg-s2 max-wide:justify-center max-wide:px-0"
+        className="flex items-center gap-2 px-3 py-2.5 transition-micro hover:bg-s2 rail-min:justify-center rail-min:px-0"
       >
         <span
           aria-hidden
@@ -200,7 +200,7 @@ export async function RailFoot() {
         >
           {initials(name)}
         </span>
-        <span className="min-w-0 flex-1 max-wide:hidden">
+        <span className="min-w-0 flex-1 rail-min:hidden">
           <span className="block truncate text-[13px] font-semibold">{name}</span>
           <span className="block truncate text-[11px] text-muted">
             {roleLabel ??
@@ -239,15 +239,15 @@ export async function RailFoot() {
 export function RailFootSkeleton() {
   return (
     <div className="flex-none border-t border-line-soft">
-      <div className="px-3 pt-3 pb-2 max-wide:hidden">
+      <div className="px-3 pt-3 pb-2 rail-min:hidden">
         <div className="flex min-h-[19px] items-baseline gap-1.5">
           <SkeletonBar className="h-[19px] w-16" />
         </div>
         <CreditsFootRow />
       </div>
-      <div className="flex items-center gap-2 px-3 py-2.5 max-wide:justify-center max-wide:px-0">
+      <div className="flex items-center gap-2 px-3 py-2.5 rail-min:justify-center rail-min:px-0">
         <span aria-hidden className="size-[26px] flex-none rounded-full bg-s2" />
-        <span className="min-w-0 flex-1 max-wide:hidden">
+        <span className="min-w-0 flex-1 rail-min:hidden">
           <SkeletonBar className="h-[13px] w-24" />
           <SkeletonBar className="mt-1 h-[11px] w-16" />
         </span>

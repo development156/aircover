@@ -12,9 +12,28 @@ import type { AccountAnalytics } from '@/lib/analytics/account-insights'
  * Home had no metric container at all. Not an empty one — none. Earlier runs
  * classified it as "content differs" and skipped it, which is exactly the
  * reading the run-9 brief revoked: a container is STRUCTURE and must exist even
- * with nothing in it. Four slots reading "—" is honest; no card is a defect,
- * because the reader cannot tell "we measured nothing" from "this product does
- * not measure".
+ * with nothing in it.
+ *
+ * ── AND THE SENTENCE THAT USED TO FOLLOW WAS WRONG BY ONE WORD ───────────────
+ * It read: "FOUR slots reading '—' is honest; no card is a defect." The first
+ * clause is the defect. MEASURED on
+ * `page-dash-before__populated__home__full__1440__light`: four labels above
+ * four absence marks, 1030px wide, a quarter of the main column, saying one
+ * thing — nothing has been measured — four times over. In dark it is worse: the
+ * marks are `--line` on `--surface` and the card reads as four labels floating
+ * over nothing at all.
+ *
+ * That is docs/40 §2.3's own finding, one level down. That section counted
+ * SEVEN containers on /home each announcing the same absence and collapsed them
+ * to one; this card is a single container announcing it four times INSIDE
+ * itself, and it survived the count because it is one card.
+ *
+ * The rule that produced it is still right and is unchanged: the container is
+ * structure and must exist. What changed is that an absence is now stated ONCE
+ * per container. Four slots when there are readings; one line when there are
+ * none. `Unmeasured` still carries the accessible name, so the absence stays
+ * legible to a screen reader rather than being skipped — the reason it was
+ * never a bare em dash.
  *
  * ── WHY THESE FOUR METRICS AND NOT THE REFERENCE'S FOUR ──────────────────────
  * The reference shows Followers, Reach, Conversions, Revenue. Sahoda has no
@@ -101,6 +120,12 @@ export function PerformanceStrip({
     analytics.kind === 'ready' ? analytics.insights.map((i) => [i.label, i.value]) : [],
   )
   const reason = reasonStated ? null : reasonFor(analytics)
+  /**
+   * How many of the four slots have a reading. DERIVED from the same map the
+   * slots render from, never a second flag — a boolean passed in beside the
+   * data is a boolean that will one day disagree with it.
+   */
+  const measured = SLOTS.filter((label) => values.has(label)).length
 
   return (
     <Card className="space-y-3">
@@ -116,36 +141,47 @@ export function PerformanceStrip({
         ) : null}
       </div>
 
-      <dl className="grid grid-cols-4 gap-x-4 gap-y-3 max-wide:grid-cols-2 max-narrow:grid-cols-2">
-        {SLOTS.map((label) => {
-          const value = values.get(label)
-          return (
-            <div key={label} className="min-w-0">
-              <dt className="truncate type-meta text-muted">{label}</dt>
-              {/* `type-h2`, not `text-[19px] leading-7 font-[650] tracking-[-0.02em]`.
-                  19px is not a step on the scale and never was — docs/26 §5
-                  exists because sizes hand-written at a call site drift from
-                  every other call site that hand-wrote one. */}
-              <dd className="type-h2 tabular-nums text-ink">
-                {value === undefined ? (
-                  // The UNMEASURED mark, not a bare em dash. The slot is real
-                  // and the reading has not arrived (docs/26 §4) — and unlike a
-                  // dash it carries an accessible name, so the absence is
-                  // legible to a screen reader instead of being skipped.
-                  <Unmeasured what={label} />
-                ) : (
-                  // THE call site docs/26 §8.1 was written for. These are
-                  // SETTLED account readings for a closed period: finished, and
-                  // they will not move again while you look at them. Contrast
-                  // the credit balance, which may not count and is guarded
-                  // against it by count-up.guard.test.ts.
-                  <CountUp value={value} />
-                )}
-              </dd>
-            </div>
-          )
-        })}
-      </dl>
+      {measured === 0 ? (
+        /* ── ONE LINE, NOT FOUR MARKS ────────────────────────────────────
+           The slots are named rather than drawn, so the reader still learns
+           WHAT this product measures — which is the whole argument for keeping
+           the container — without four separate absences claiming it. */
+        <p className="flex flex-wrap items-baseline gap-x-2 type-body text-muted">
+          <Unmeasured what="Reach, views, accounts engaged and interactions" />
+          <span>Reach, views, accounts engaged and interactions — not measured yet.</span>
+        </p>
+      ) : (
+        <dl className="grid grid-cols-4 gap-x-4 gap-y-3 max-wide:grid-cols-2 max-narrow:grid-cols-2">
+          {SLOTS.map((label) => {
+            const value = values.get(label)
+            return (
+              <div key={label} className="min-w-0">
+                <dt className="truncate type-meta text-muted">{label}</dt>
+                {/* `type-h2`, not `text-[19px] leading-7 font-[650] tracking-[-0.02em]`.
+                    19px is not a step on the scale and never was — docs/26 §5
+                    exists because sizes hand-written at a call site drift from
+                    every other call site that hand-wrote one. */}
+                <dd className="type-h2 tabular-nums text-ink">
+                  {value === undefined ? (
+                    /* Still the mark and not a bare em dash: SOME slots are
+                       filled here, so this one is a genuine per-slot absence
+                       inside a card that is otherwise reporting, which is
+                       exactly what docs/37 §9's mark is for. */
+                    <Unmeasured what={label} />
+                  ) : (
+                    // THE call site docs/26 §8.1 was written for. These are
+                    // SETTLED account readings for a closed period: finished, and
+                    // they will not move again while you look at them. Contrast
+                    // the credit balance, which may not count and is guarded
+                    // against it by count-up.guard.test.ts.
+                    <CountUp value={value} />
+                  )}
+                </dd>
+              </div>
+            )
+          })}
+        </dl>
+      )}
 
       {/* ── MARKETING SCORE IS GONE, AND THAT IS THE THIRD TIME ────────────
           The reference has a Marketing Score ring. This comment used to argue

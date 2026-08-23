@@ -1,7 +1,7 @@
 import { CardEmpty } from '@/components/empty-state'
 import Link from 'next/link'
 
-import { Card, CardLabel } from '@/components/ui/card'
+import { Panel, PanelHead } from '@/components/charts/panel'
 import { FollowerChart, FollowerFlow } from '@/components/analytics/follower-chart'
 import { accountLagCopy } from '@/lib/analytics/copy'
 import type { AccountAnalytics } from '@/lib/analytics/account-insights'
@@ -59,36 +59,38 @@ export function AccountPanel({
    */
   if (reasonStated && (analytics.kind === 'not-connected' || analytics.kind === 'reconnect')) {
     return (
-      <Card>
-        <CardLabel>Instagram account</CardLabel>
-        <CardEmpty body="Followers and reach appear here once an account is linked." />
-      </Card>
+      <Panel className="space-y-3">
+        <PanelHead title="Instagram account" />
+        <CardEmpty align="start" body="Followers and reach appear here once an account is linked." />
+      </Panel>
     )
   }
 
   if (analytics.kind === 'not-connected') {
     return (
-      <Card>
-        <CardLabel>Instagram account</CardLabel>
+      <Panel className="space-y-3">
+        <PanelHead title="Instagram account" />
         <CardEmpty
+          align="start"
           lead="Connect Instagram to see followers and reach."
           body="Account insights come from the connected account, not from your posts, so there’s nothing to show until one is linked."
           action={<ConnectionsLink />}
         />
-      </Card>
+      </Panel>
     )
   }
 
   if (analytics.kind === 'reconnect') {
     return (
-      <Card>
-        <CardLabel>Instagram account</CardLabel>
+      <Panel className="space-y-3">
+        <PanelHead title="Instagram account" />
         <CardEmpty
+          align="start"
           lead="Reconnect Instagram to see followers and reach."
           body="The connection expired, so we can’t read metrics until it’s renewed. Your posts and their own metrics are unaffected."
           action={<ConnectionsLink />}
         />
-      </Card>
+      </Panel>
     )
   }
 
@@ -97,28 +99,30 @@ export function AccountPanel({
   // for the first and useless for the second, so this branch does not offer it.
   if (analytics.kind === 'not-configured') {
     return (
-      <Card>
-        <CardLabel>Instagram account</CardLabel>
+      <Panel className="space-y-3">
+        <PanelHead title="Instagram account" />
         <CardEmpty
+          align="start"
           lead="Sahoda can’t read account insights here."
           body="Your account is connected. This environment has no metrics connection, so no request went out. Your posts and their own metrics are unaffected."
         />
-      </Card>
+      </Panel>
     )
   }
 
   if (analytics.kind === 'unreadable') {
     return (
-      <Card>
-        <CardLabel>Instagram account</CardLabel>
+      <Panel className="space-y-3">
+        <PanelHead title="Instagram account" />
         {/* Says we could not look. Pointedly does NOT say the account is empty —
             an unreadable call and an account with no followers are the same
             blank space and completely different facts. */}
         <CardEmpty
+          align="start"
           lead="Couldn’t read your account insights just now."
           body="Refresh to try again."
         />
-      </Card>
+      </Panel>
     )
   }
 
@@ -126,8 +130,8 @@ export function AccountPanel({
     analytics
 
   return (
-    <Card className="space-y-5">
-      <CardLabel>Instagram account · last 30 days</CardLabel>
+    <Panel className="space-y-5">
+      <PanelHead title="Instagram account" sub="last 30 days" />
 
       <section aria-label="Followers" className="space-y-2">
         {followers.length === 0 ? (
@@ -167,6 +171,6 @@ export function AccountPanel({
           <p className="type-meta text-muted">{accountLagCopy(insightsLagHours)}</p>
         </section>
       ) : null}
-    </Card>
+    </Panel>
   )
 }

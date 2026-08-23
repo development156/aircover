@@ -1,7 +1,7 @@
 import { CardEmpty } from '@/components/empty-state'
 import Link from 'next/link'
 
-import { Card, CardLabel } from '@/components/ui/card'
+import { Panel } from '@/components/charts/panel'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 import { METRIC_LABELS, rankBy, type ComparableRow, type MetricKey } from '@/lib/analytics/compare'
 
@@ -37,9 +37,9 @@ export function BestPerforming({
   const ranked = rankBy(rows, metric, 5)
 
   return (
-    <Card className="space-y-3">
+    <Panel className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
-        <CardLabel className="mb-0">Best performing</CardLabel>
+        <h2 className="type-h3 text-ink">Best performing</h2>
         <span className="type-meta text-muted">by {METRIC_LABELS[metric].toLowerCase()}</span>
       </div>
 
@@ -77,6 +77,6 @@ export function BestPerforming({
           ))}
         </ol>
       )}
-    </Card>
+    </Panel>
   )
 }

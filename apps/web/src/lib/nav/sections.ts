@@ -48,6 +48,34 @@ import type { NavIconName } from '@/components/shell/nav-item'
  * that learns — is invisible if the Loop is not in the menu. The condition is
  * that "visible" must never read as "available", which is what `state: 'soon'`
  * carries into every surface that renders this list.
+ *
+ * ── VISIBLE SOMEWHERE IS NOT VISIBLE IN THE RAIL (2026-08-23) ────────────────
+ * A second founder ruling arrived and it reads against the first at first
+ * glance: "five SOON items are roadmap, not navigation — a person cannot use
+ * them today." Both are the same founder and neither is withdrawn, so they are
+ * read together: the roadmap stays VISIBLE, in ONE place rather than five, and
+ * that place is not the working list you navigate with every day.
+ *
+ * `RAIL_GROUPS` is the projection that carries it — `live` only. The roadmap
+ * still renders, with its "Soon" state intact, in the two surfaces whose job is
+ * to show the whole product: the command palette (`ALL_SECTIONS`) and the
+ * phone's More sheet (`NAV_GROUPS`). Nothing is unreachable and nothing is
+ * silently deleted; one list got shorter.
+ *
+ * ── AND FOUR OF THE SIX `soon` FLAGS WERE STALE, WHICH IS MOST OF THE NOISE ──
+ * MEASURED 2026-08-23 against `e2e/roadmap-honesty.spec.ts`, whose ALLOWED list
+ * is down to `/radar` and `/studio` and whose header records `/loop`,
+ * `/playbooks` and `/report` LEAVING it because they were built. Confirmed at
+ * the source: `/loop`, `/report` and `/playbooks` each open a live read
+ * (`readLoop`, `readRanking`, `readPlaybooksSnapshot`) and render rows out of
+ * the database; `/studio` and `/ads` open no read at all and are drawings.
+ * `/radar` reads live but its own page says the weekly scan is not built, so it
+ * stays `soon` — a person still cannot use it today.
+ *
+ * So three of the six SOON labels the rail was showing were on working screens.
+ * Correcting them is not a loosening: it removes the word from three sections
+ * that had stopped deserving it, and `roadmap-honesty.spec.ts` is what would
+ * catch it if any of them started lying again.
  */
 
 /** Built and connected, or drawn and honest about it. There is no third state. */
@@ -216,7 +244,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: 'file-text',
         guide: 'nav.report',
         hint: 'The Monday read on your week',
-        state: 'soon',
+        state: 'live',
       },
       {
         href: '/radar',
@@ -237,7 +265,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: 'refresh-cw',
         guide: 'nav.loop',
         hint: 'The weekly cycle, and how much it may do alone',
-        state: 'soon',
+        state: 'live',
       },
       {
         href: '/playbooks',
@@ -245,7 +273,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: 'book-open',
         guide: 'nav.playbooks',
         hint: 'When this happens, write that',
-        state: 'soon',
+        state: 'live',
       },
     ],
   },
@@ -291,3 +319,28 @@ export const ALL_SECTIONS: readonly NavSection[] = [
   ...NAV_GROUPS.flatMap((group) => group.items),
   ...NAV_FOOT,
 ]
+
+/**
+ * WHAT THE RAIL SHOWS: the sections you can use today.
+ *
+ * A projection of `NAV_GROUPS`, not a second list — a section added above
+ * appears here the moment its `state` becomes `live`, and there is no third
+ * place for the two to drift apart. Groups that empty out drop away rather than
+ * rendering a heading over nothing.
+ *
+ * The GROUPS SURVIVE HERE even though the rail no longer draws their titles.
+ * They are what puts a gap between Posts and Planner, and they are what the
+ * rail's `<section aria-label>` regions are built from — six named regions to a
+ * screen reader, five silent gaps to the eye. Flattening the data instead would
+ * have taken the accessibility structure with the visual one, and would have
+ * made `reachable.test.ts`'s ordering rule vacuous rather than failing.
+ */
+export const RAIL_GROUPS: readonly NavGroup[] = NAV_GROUPS.map((group) => ({
+  title: group.title,
+  items: group.items.filter((item) => item.state === 'live'),
+})).filter((group) => group.items.length > 0)
+
+/** The roadmap, for any surface that wants to state what is NOT in the rail. */
+export const ROADMAP_SECTIONS: readonly NavSection[] = NAV_GROUPS.flatMap((group) =>
+  group.items.filter((item) => item.state === 'soon'),
+)

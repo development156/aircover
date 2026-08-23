@@ -7,7 +7,8 @@ import { NavItem } from '@/components/shell/nav-item'
 import { RailRevealActive } from '@/components/shell/rail-reveal-active'
 import { RailFoot, RailFootSkeleton } from '@/components/shell/rail-foot'
 import { approvalCount } from '@/lib/approvals/read'
-import { NAV_FOOT, NAV_GROUPS } from '@/lib/nav/sections'
+import { RailToggle } from '@/components/shell/rail-toggle'
+import { NAV_FOOT, RAIL_GROUPS } from '@/lib/nav/sections'
 import { getOpsAdmin } from '@/lib/ops/guard'
 
 /**
@@ -42,6 +43,46 @@ import { getOpsAdmin } from '@/lib/ops/guard'
  * They do not collapse. A collapsible group hides destinations behind a state
  * the user has to remember setting, and the whole point of this pass is that
  * nothing in the product is unreachable.
+ *
+ * ── AND AS OF 2026-08-23 NO HEADING IS DRAWN AT ALL ──────────────────────────
+ * The founder's verdict was "dull, and the text is too faded". MEASURED, the
+ * text is not faded: `--ink-mute` on the inverse surface is #979797 on #171717,
+ * **6.14:1**, comfortably past AA at every size in this rail. Raising it would
+ * have made a crowded list LOUDER and still crowded.
+ *
+ * What was actually wrong is how many things were on screen. MEASURED on
+ * `page-dash-before__populated__home__full__1440__light`: twenty-one links,
+ * FIVE uppercase group eyebrows and six "SOON" labels — thirty-two pieces of
+ * text — against the reference's twelve flat items and no headings at all. At
+ * 900px the list did not fit: `Connections`, `Wallet` and `Settings` were below
+ * the rail's own fold, so the three destinations you reach for when something
+ * is wrong needed a scroll to find.
+ *
+ * Three changes, and none of them is a colour:
+ *
+ *   · the roadmap left the rail (`RAIL_GROUPS`, and see sections.ts for how
+ *     that squares with the earlier ruling that it must stay visible) — and
+ *     three of those six SOON labels were on screens that had been BUILT;
+ *   · the group headings became `sr-only` at every width instead of only when
+ *     collapsed. Six named regions survive for a screen reader; the eye gets
+ *     the gap between them, which is what the reference uses and is enough;
+ *   · the rail collapses, and OPENS COLLAPSED.
+ *
+ * Fifteen links, no eyebrows, no SOON. It fits at 900px with room to spare.
+ *
+ * ── THE COLLAPSE IS CSS, SO THE RAIL STAYS A SERVER COMPONENT ────────────────
+ * `data-rail` on <html>, written before first paint by `RailScript`, read by
+ * the `rail-min` variant. The only client component is the 26px button. Putting
+ * the state in React would have shipped the nav map, the approval count and the
+ * ops-admin check to the browser to move a width.
+ *
+ * EVERY LABEL GOES `sr-only`, NEVER `display:none`. That is not a preference:
+ * it is the defect this shell already shipped once. `display:none` removes the
+ * node from the accessibility tree and takes the link's NAME with it, and nine
+ * nav items announced as unnamed links across every width from 768 to 1179.
+ * `shell-widths.spec.ts` reads `link.textContent()` at six widths and is what
+ * holds it; `rail-collapse.spec.ts` now holds the same property against the
+ * TOGGLED state, which no media query can reach.
  */
 
 /**
@@ -101,15 +142,22 @@ export async function Rail() {
        does NOT follow the theme, so its text tokens cannot either: without the
        scope, `text-ink` is #000000 here and the whole rail is black on
        near-black in light mode. See THE INVERSE SURFACE in tokens.css. */
-    <div className="sticky top-0 h-dvh flex-none p-rail-inset">
+    <div className="sticky top-0 h-dvh flex-none p-rail-inset relative">
       <aside
         data-guide="nav.rail"
         data-surface="inverse"
-        className="flex h-full w-rail flex-col overflow-hidden rounded-xl bg-surface max-wide:w-rail-collapsed"
+        /* Three widths, two reasons. `w-rail` (240) is the labelled rail;
+           `rail-min` collapses it, and the collapsed width differs by WHICH
+           reason collapsed it — 56px when the 700-1179 band forces it, where
+           the content column has no spare pixels, and the reference's own 62px
+           when the reader chose it at >=1180, where nobody is short. The two
+           are separate tokens with that argument written on them in
+           tokens.css. */
+        className="flex h-full flex-col overflow-hidden rounded-xl bg-surface max-wide:w-rail-collapsed rail-icon:w-rail-min rail-wide:w-rail"
       >
         {/* Brand block is exactly topbar-height so the rail's baseline and the
           header's baseline are the same line across the fold. */}
-        <div className="flex h-topbar flex-none items-center px-4 max-wide:justify-center max-wide:px-0">
+        <div className="flex h-topbar flex-none items-center px-4 rail-min:justify-center rail-min:px-0">
           <Link href="/home" aria-label="Sahoda — go to Home" className="rounded-sm">
             {/* The supplied lockup is mark + wordmark in ONE file. Collapsing the
               rail CROPS the container to the mark rather than scaling the whole
@@ -121,7 +169,7 @@ export async function Rail() {
               pair here would swap to the BLACK wordmark on a black panel the
               moment someone flipped the theme. The inverse surface removed a
               whole class of bug rather than restyling one. */}
-            <span className="block h-[34px] w-[120px] overflow-hidden max-wide:w-[34px]">
+            <span className="block h-[34px] w-[120px] overflow-hidden rail-min:w-[34px]">
               <Image
                 src="/brand/logo-white.png"
                 alt="Sahoda"
@@ -161,38 +209,35 @@ export async function Rail() {
            /playbooks. A half-height word reads as broken layout, not as "more
            below". With 24px the fade falls on space, so a partially scrolled
            list ends in a soft edge instead of a bisected glyph. */
-          className="scroll-visible scroll-fade flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2 pb-6 max-wide:px-2"
+          id="rail-nav"
+          className="scroll-visible scroll-fade flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2 pb-6 rail-min:px-2"
         >
           {/* Open on the row you are standing on. Without this the rail can
             highlight the current route entirely below the fold, which is the
             same as not highlighting it. */}
           <RailRevealActive />
-          {NAV_GROUPS.map((group, index) => (
-            // A real <section> per group, labelled by its own heading, so the
-            // twenty-one links arrive as six named regions rather than one long
-            // list — the same structure a sighted reader gets from the eyebrows.
+          {RAIL_GROUPS.map((group, index) => (
+            // A real <section> per group, named, so fifteen links arrive as six
+            // named regions rather than one long list. The NAME survives; only
+            // its rendering changed.
             <section
               key={group.title ?? 'top'}
               aria-labelledby={group.title ? `nav-group-${index}` : undefined}
               aria-label={group.title ? undefined : 'Main sections'}
-              className="flex flex-col gap-nav"
+              /* The gap that replaces the eyebrow. `mt-3` on every group after
+                 the first, so the eye reads five clusters where it used to read
+                 five headings — which is what the reference does and is the
+                 whole of what the heading was buying at a glance. */
+              className={`flex flex-col gap-nav${index > 0 ? ' mt-3' : ''}`}
             >
               {group.title ? (
-                // A group label, so it must not compete with the active item —
-                // hence muted rather than accent. The kit puts this at --text-3
-                // (black-45); this app uses --ink-mute instead, because
-                // ink-faint.test.ts bans --ink-faint as content text and an 11px
-                // uppercase eyebrow at 3.5:1 is the exact string that ban exists
-                // for. Accessibility floor wins over an exact colour match.
-                //
-                // `sr-only` rather than hidden when the rail collapses: the
-                // heading is what makes the six regions navigable, and
-                // display:none would take it out of the accessibility tree — the
-                // same mistake that once left nine nav links unnamed.
-                <h2
-                  id={`nav-group-${index}`}
-                  className="type-eyebrow px-[9px] pt-3 pb-[3px] text-muted max-wide:sr-only"
-                >
+                /* `sr-only` AT EVERY WIDTH now, not only when collapsed.
+                   Five uppercase eyebrows were a third of the text in this rail
+                   and the reference has none. The heading is still what makes
+                   the six regions navigable by a screen reader, so it is hidden
+                   the way a name must be hidden — clipped, never `display:none`,
+                   which is the mistake that once left nine nav links unnamed. */
+                <h2 id={`nav-group-${index}`} className="sr-only">
                   {group.title}
                 </h2>
               ) : null}
@@ -203,7 +248,6 @@ export async function Rail() {
                   label={item.label}
                   icon={item.icon}
                   guide={item.guide}
-                  soon={item.state === 'soon'}
                   count={item.href === '/approvals' ? waiting : undefined}
                 />
               ))}
@@ -214,7 +258,7 @@ export async function Rail() {
             different KIND of destination, not a sixth job. */}
           <section
             aria-label="Account and setup"
-            className="mt-3 flex flex-col gap-nav border-t border-line-soft pt-3"
+            className="mt-4 flex flex-col gap-nav border-t border-line-soft pt-4"
           >
             {NAV_FOOT.map((item) => (
               <NavItem
@@ -263,6 +307,10 @@ export async function Rail() {
           <RailFoot />
         </Suspense>
       </aside>
+      {/* On the WRAPPER, not in the panel: the panel is `overflow-hidden` so it
+          can clip the lockup and the scroll fade, and a control straddling its
+          edge would be sliced in half. See rail-toggle.tsx. */}
+      <RailToggle />
     </div>
   )
 }

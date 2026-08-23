@@ -6,6 +6,7 @@ import { AccountPanel } from '@/components/analytics/account-panel'
 import { ChannelTable } from '@/components/analytics/channel-table'
 import { PostTable } from '@/components/analytics/post-table'
 import { ReadinessLine } from '@/components/analytics/readiness-line'
+import { WhatPublished } from '@/components/analytics/what-published'
 import { coverageFor } from '@/lib/analytics/compare'
 import { ANALYTICS_METRIC_CALLS, readAnalyticsPage } from '@/lib/analytics/page-data'
 import { analyticsReadiness } from '@/lib/analytics/readiness'
@@ -112,12 +113,12 @@ export default async function AnalyticsPage() {
     <div className="space-y-grid">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageTitle>Analytics</PageTitle>
-        {hasPublished ? (
-          <p className="type-meta text-muted">
-            {posts.length} published {posts.length === 1 ? 'post' : 'posts'} · {rows.length}{' '}
-            {rows.length === 1 ? 'channel' : 'channels'}
-          </p>
-        ) : null}
+        {/* ── THE CORNER STRING IS GONE ────────────────────────────────────
+            It read "2 published posts · 2 channels" in 12px muted type. Both
+            figures now lead the page as stat cards at `type-hero-num`, and
+            docs/37 §16 is explicit: a page that says the same thing in more
+            than one place says it once, at the top. Keeping it would have been
+            the same figure in the two most different sizes on the screen. */}
       </div>
 
       {/* The reference opens this page with a KPI strip (1150x103) and the app
@@ -133,6 +134,15 @@ export default async function AnalyticsPage() {
 
       {nothingToStructure ? null : (
         <>
+          {/* ── THREE NUMBERS THIS PAGE CAN ALWAYS PROVE ─────────────────
+              MEASURED before this landed: a workspace with two posts on two
+              channels saw six containers and NOT ONE NUMBER, while the two real
+              figures it held rendered as a 12px muted string in the page's
+              top-right corner. Every container below waits on a platform; these
+              three are counts of rows this product owns, so they are full the
+              moment anything publishes. See the component. */}
+          {hasPublished ? <WhatPublished posts={posts} rows={rows} /> : null}
+
           <PerformanceStrip analytics={account} reasonStated={reasonStated} detailsLink={false} />
 
           <AccountPanel analytics={account} reasonStated={reasonStated} />

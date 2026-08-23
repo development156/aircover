@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 
-import { PerformanceOverTime, pathFor } from './performance-over-time'
+import { PerformanceOverTime } from './performance-over-time'
 import type { MetricSeries, SeriesPoint } from '@/lib/analytics/series'
 
 /**
@@ -23,32 +23,19 @@ const ready = (points: SeriesPoint[], min = 1, max = 1): MetricSeries => ({
   maxSeries: max,
 })
 
-describe('the path', () => {
-  test('joins consecutive days', () => {
-    const d = pathFor([point('2026-08-17', 10), point('2026-08-18', 20), point('2026-08-19', 30)])
-    // One move to the start, then two joined segments.
-    expect(d.match(/M/g)).toHaveLength(1)
-    expect(d.match(/L/g)).toHaveLength(2)
-  })
-
-  test('BREAKS across a missing day rather than spanning it', () => {
-    // The 18th was never measured. A segment drawn over it would assert a reading
-    // that does not exist, and would look exactly like an honest one.
-    const d = pathFor([point('2026-08-17', 10), point('2026-08-19', 30), point('2026-08-20', 40)])
-    expect(d.match(/M/g)).toHaveLength(2)
-    expect(d.match(/L/g)).toHaveLength(1)
-  })
-
-  test('draws a flat series down the middle rather than inventing variation', () => {
-    const d = pathFor([point('2026-08-17', 50), point('2026-08-18', 50), point('2026-08-19', 50)])
-    const ys = [...d.matchAll(/[ML]([\d.]+) ([\d.]+)/g)].map((m) => m[2])
-    expect(new Set(ys).size).toBe(1)
-  })
-
-  test('has nothing to draw for no points', () => {
-    expect(pathFor([])).toBe('')
-  })
-})
+/**
+ * THE `pathFor` BLOCK MOVED, IT DID NOT DISAPPEAR.
+ *
+ * Four tests lived here — joins consecutive days · BREAKS across a missing day ·
+ * flat series down the middle · nothing to draw for no points — and they held
+ * rules 1 and 2 in the component's own header. The drawing is now
+ * `charts/trend-area.tsx`, shared with /home, and `charts/trend-area.test.tsx`
+ * holds all four properties against it plus one more: the curve is monotone
+ * cubic and cannot dip below the two readings it joins.
+ *
+ * Left here as a pointer rather than deleted silently, because four tests
+ * vanishing from a file is exactly what a loosened guard looks like in a diff.
+ */
 
 describe('what the card says', () => {
   test('before the migration, it says Sahoda keeps no history yet', () => {
