@@ -498,8 +498,12 @@ hide behind the correction — it simply does not compete to be pressed.
 
 ## 8 · The gate, leg by leg
 
-`pnpm gate` runs five legs and stops at the first red one. The smoke leg needs two
-things this lane learned the hard way and neither is in the script:
+**NO SINGLE `pnpm gate` INVOCATION COMPLETED ALL FIVE LEGS.** Every run stopped at
+leg 3, so legs 4 and 5 were run by hand afterwards. The table below is five results,
+not one invocation, and it says how each was produced. A five-row table implying one
+green command would be the same class of claim this whole lane is about.
+
+The smoke leg needs two things the script does not supply, and neither is optional:
 
 ```bash
 SAHODA_E2E_ACK_TARGET=rloztdhzfliyvpvxsgjl \
@@ -507,45 +511,69 @@ E2E_SERVER_CMD='pnpm --filter @sahoda/web start -p 3280' \
 pnpm gate
 ```
 
-Without the first it fails in one second on the production-target guard; without the
+Without the first it fails in one second on the production-target guard. Without the
 second it runs against `pnpm dev`, where Turbopack compiles each route on first
 request and the readiness probe times out.
 
-| leg | result |
-|---|---|
-| 1 · `turbo-typecheck-lint-test` | **ok** — 11 packages, `@sahoda/web` 4,495 tests over 359 files |
-| 2 · `vitest-root` | **ok** |
-| 3 · `turbo-smoke` | **106 passed, 1 failed** on the first pass; see below |
-| 4 · `prettier-check` | **ok** — all matched files |
-| 5 · `turbo-build` | **ok** — `js-budget ok: 80 routes within budget` |
+| leg | how it was run | result |
+|---|---|---|
+| 1 · `turbo-typecheck-lint-test` | `pnpm gate` | **ok (49.2s)** — 11 packages; `@sahoda/web` alone is 4,495 tests over 359 files |
+| 2 · `vitest-root` | `pnpm gate` | **ok (2.5s)** |
+| 3 · `turbo-smoke` | `pnpm gate`, then again standalone | **run A: 106 passed, 1 failed. run B: 104 passed, 4 failed.** Zero overlap — see §8.1 |
+| 4 · `prettier-check` | `pnpm exec prettier --check .` | **ok** — "All matched files use Prettier code style!" |
+| 5 · `turbo-build` | `pnpm turbo run build --concurrency=1`, forced and cached | **1 successful, 1 total** · `js-budget ok: 80 routes within budget` |
 
-### 8.1 The one failure, and why it is not reported as green
+**Leg 5 is one task and that is not a truncated run.** `apps/web` is the only package
+in the workspace with a `build` script, so `1 successful, 1 total` IS the whole leg.
+It was run twice: once with `--force` (a real execution, which is what proves it
+compiles) and once without (`FULL TURBO`, cached — which is what the gate itself
+does). Recorded because "Tasks: 1 total" beside an ERROR is exactly what the two
+FAILED attempts in §8.2 printed, and the count alone does not distinguish them.
 
-`composer-widths.spec.ts` failed on the full-suite pass with
+### 8.1 Two smoke runs, four failures, no overlap
 
-```
-strict mode violation: locator('[data-composer]') resolved to 2 elements
-  … unexpected value "hidden"
-```
+| run | failed | passed |
+|---|---|---|
+| A (inside `pnpm gate`) | `composer-widths` | 106 |
+| B (standalone re-run, same build) | `motion` · `templates` · `topbar-two-states` · `unauthenticated` | 104 |
 
-Exactly ONE component in the codebase renders `data-composer`, and this lane changed
-nothing in the composer. Both copies were `hidden`, which is a document caught with
-two renders of the same page in it — a mid-navigation capture, not a layout.
+**Not one spec failed in both runs**, and every failure is a timing or navigation
+artefact rather than an assertion about anything this lane changed:
 
-It is called a flake because it was **tested twice, not because it looks like one**:
-the same spec on the same build passes standalone (41.5s), and it passes in a full
-re-run of the smoke leg (34.2s). The failing pass had already retried it once, under
-a machine running four worktrees.
+- `composer-widths` — `locator('[data-composer]') resolved to 2 elements … "hidden"`.
+  Exactly ONE component in the codebase renders that attribute and this lane changed
+  nothing in the composer; two copies, both hidden, is a document caught mid-navigation.
+  **It passes standalone on the same build (41.5s) and it passed in run B (34.2s).**
+- `motion` — `opacity expected > 0.99, received 0.958972`. The spec reads the entrance
+  animation's opacity without waiting for it to finish. It passed in run A.
+- `topbar-two-states` — `page.waitForURL: Timeout 30000ms exceeded`. The test never
+  reached its measurements. It passed in run A.
+- `unauthenticated` — four failures on a spec that does nothing but check a redirect,
+  **after two of its own cases had already passed earlier in the same run.** That is
+  the environment degrading, and it is the clearest single piece of evidence here.
 
-### 8.2 Three gate lessons this lane paid for
+MEASURED context: a 15 GB machine running four worktrees, ~20 Chromium processes, and
+a production Next server. LEARNINGS already records this shape ("turbo concurrency
+fakes failures", "shared machine server traps"). Reported as two runs rather than as
+one green one, because a reader who later sees a red `templates.spec.ts` needs to
+know it flaked here too.
+
+### 8.2 Four gate lessons this lane paid for
 
 1. **A scoped test run is a scoped verdict.** `vitest src/components` was green all
    evening while `tokens-css-inline.test.ts` and six assertions in `home/page.test.tsx`
    were red. The gate found both in ninety seconds.
 2. **`.next` is not the source.** A gate ran against a build made during a mutation
-   run, and 21 specs failed on a mutation that was no longer in any file — the accent
-   guard printed `page 140x38 "Second"`, which is the mutation's own label. Rebuild
-   before believing a rendered result.
-3. **Two gates at once fight over `.gate/`, port 3280 and `.next`.** Started by
+   run and 21 specs failed on a mutation no longer in any file — the accent guard
+   printed `page 140x38 "Second"`, the mutation's own label. Rebuild before believing
+   a rendered result.
+3. **Two gates at once fight over `.gate/`, port 3280 and `.next`** — started by
    chaining a second run behind a build while the first was still in its smoke leg.
-   One gate, or neither.
+   Worse than the contention: **that rebuild landed under a live `next start`**, which
+   is the hazard this lane's brief opens with, and the next `turbo run build` died on
+   a missing `.next/types/app/(app)/ads/budget/page.ts` — typedRoutes' gitignored
+   artifact, from a `.next` written by two processes. One gate, or neither.
+4. **`/ads/budget` and `/connections` print `Dynamic server usage … used headers`
+   during the build and the build still succeeds.** They are prerender notices, not
+   failures, and they appear on a clean green run — worth knowing before somebody
+   greps for "Error" and reports a red build that is not red.
