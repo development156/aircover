@@ -40,7 +40,7 @@ export const DOOR_WAIT_TICKS = 225
 export const DOOR_TIMED_OUT = {
   kind: 'blocked',
   message:
-    'Sahoda was still reading your website when this was built, so it was built without it. That is not a verdict on your site — open Brand Brain to add what it says.',
+    'Sahoda was still reading your website when this was built, so it was built without it. That is not a verdict on your site. Open Brand Brain to add what it says.',
   retryable: false,
   fatal: false,
 } as const satisfies DoorOutcome

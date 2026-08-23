@@ -38,7 +38,7 @@ export async function readSite(url: string, signal?: AbortSignal): Promise<DoorO
     return {
       kind: 'blocked',
       message:
-        'The request did not reach Sahoda, so your website was never opened. This is not a verdict on the site — it will be tried again when you build.',
+        'The request did not reach Sahoda, so your website was never opened. This is not a verdict on the site. It will be tried again when you build.',
       retryable: true,
       fatal: false,
     }

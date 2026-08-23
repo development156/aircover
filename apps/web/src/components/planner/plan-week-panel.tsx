@@ -20,7 +20,7 @@ const PENDING = [
   'Reading your Brand Brain…',
   'Planning five posts across your week…',
   'Placing each one at a sensible time…',
-  'Still working — if this fails you will not be charged.',
+  'Still working. If this fails you will not be charged.',
 ] as const
 
 /** The two Alpha real-publish channels — a sensible seed the user can change. */

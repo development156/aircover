@@ -193,7 +193,7 @@ export function BatchPreview({ batch }: BatchPreviewProps) {
       </dl>
 
       <p className="type-sm mt-2 text-muted">
-        Unticking a channel takes away a draft and not a credit — one writing pass covers every
+        Unticking a channel takes away a draft and not a credit. One writing pass covers every
         channel it is for. Unticking a whole row is what changes the total.
       </p>
 
@@ -265,7 +265,7 @@ function BatchDone({ batch, outcome }: { batch: BatchView; outcome: Outcome }) {
             <Link href="/posts" className="font-[550] text-accent underline underline-offset-2">
               your posts
             </Link>
-            . Every one is a draft — read it, change it, and approve it yourself before it goes
+            . Every one is a draft. Read it, change it, and approve it yourself before it goes
             anywhere.
           </>
         )}

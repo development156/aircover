@@ -153,7 +153,7 @@ export function ScheduleField({
       ) : (
         <p className="text-[12px] text-muted">
           {draft === ''
-            ? 'No schedule set — this post stays a draft.'
+            ? 'No schedule set. This post stays a draft.'
             : earliest !== null
               ? `Earliest for these channels: ${earliest.toLocaleString('en-IN', {
                   dateStyle: 'medium',

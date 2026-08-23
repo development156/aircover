@@ -115,7 +115,7 @@ export function RunHistory({ runs }: { runs: readonly RunWithItems[] }) {
                   {run.items.map((item) => (
                     <li key={item.id} className="type-sm flex flex-wrap gap-x-2 text-muted">
                       <span className="text-ink">{item.title}</span>
-                      <span>— {OUTCOME[item.outcome] ?? item.outcome}</span>
+                      <span>{OUTCOME[item.outcome] ?? item.outcome}</span>
                       {item.post_id ? (
                         <Link
                           href={`/posts/${item.post_id}`}

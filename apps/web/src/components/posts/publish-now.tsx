@@ -20,7 +20,7 @@ import { PendingLines } from './pending-lines'
 const PENDING_LINES = [
   'Saving your latest edits…',
   'Sending the post to Instagram…',
-  'Waiting for Instagram to finish processing — this takes about fifteen seconds.',
+  'Waiting for Instagram to finish processing. This takes about fifteen seconds.',
 ] as const
 
 export interface PublishNowProps {
@@ -151,7 +151,7 @@ export function PublishNow({
         return
       }
       if (!body.permalink) {
-        setError('Instagram accepted the post but hasn’t given us a link yet — check back shortly.')
+        setError('Instagram accepted the post but hasn’t given us a link yet. Check back shortly.')
         return
       }
 

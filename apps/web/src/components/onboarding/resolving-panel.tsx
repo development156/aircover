@@ -106,13 +106,13 @@ export function ResolvingPanel({ isFree }: { isFree: boolean }) {
       <p className="text-[12.5px] text-muted">
         {isFree
           ? 'This one is free. Nothing is charged until you approve it.'
-          : 'You are only charged for a real result — a sample or a failure costs nothing.'}
+          : 'You are only charged for a real result. A sample or a failure costs nothing.'}
       </p>
 
       {overdue ? (
         <p className="text-[12.5px] text-warn">
-          This is taking longer than usual. It is still going, and it will say so either way —
-          leaving this page is what would lose it.
+          This is taking longer than usual. It is still going, and it will say so either way.
+          Leaving this page is what would lose it.
         </p>
       ) : null}
     </div>

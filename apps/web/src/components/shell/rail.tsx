@@ -110,7 +110,7 @@ export async function Rail() {
         {/* Brand block is exactly topbar-height so the rail's baseline and the
           header's baseline are the same line across the fold. */}
         <div className="flex h-topbar flex-none items-center px-4 max-wide:justify-center max-wide:px-0">
-          <Link href="/home" aria-label="Sahoda — go to Home" className="rounded-sm">
+          <Link href="/home" aria-label="Sahoda, go to Home" className="rounded-sm">
             {/* The supplied lockup is mark + wordmark in ONE file. Collapsing the
               rail CROPS the container to the mark rather than scaling the whole
               lockup down into illegibility — which is why this is an

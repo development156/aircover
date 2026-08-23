@@ -23,7 +23,7 @@ const INSTRUCTIONS = [
 const PENDING_LINES = [
   'Sending the selected text to the model…',
   'Waiting on the rewrite…',
-  'Still waiting — you are not charged if this fails.',
+  'Still waiting. You are not charged if this fails.',
 ] as const
 
 type Failure =
@@ -143,7 +143,7 @@ export function InlineRewrite({ body, selection, onReplace }: InlineRewriteProps
         >
           <p>
             Your post changed while I was rewriting, so I didn&rsquo;t replace anything. The rewrite
-            was still charged — here it is to place yourself.
+            was still charged. Here it is to place yourself.
           </p>
           <p className="rounded-input bg-s1 px-2.5 py-2 text-ink">{stranded}</p>
           {/* Stays until it is dismissed on purpose. It disappeared on its own

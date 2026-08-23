@@ -99,7 +99,7 @@ export function PublishPreview({ postId }: PublishPreviewProps) {
               <ul className="space-y-1.5">
                 {report.blocked.map((item) => (
                   <li key={item.channel} className="text-[13px] text-danger">
-                    <span className="font-semibold">{CHANNEL_LABELS[item.channel]}</span> — would be
+                    <span className="font-semibold">{CHANNEL_LABELS[item.channel]}</span> would be
                     rejected. Fix this before publishing:
                     <ul className="mt-1 list-disc space-y-0.5 pl-4">
                       {item.violations.map((violation, index) => {
@@ -121,19 +121,19 @@ export function PublishPreview({ postId }: PublishPreviewProps) {
             <div className="space-y-2 rounded-input border border-warn bg-warn-bg p-3">
               <p className="type-eyebrow flex items-center gap-1.5 text-warn">
                 <FlaskConical size={13} aria-hidden />
-                Simulated — nothing was posted
+                Simulated, nothing was posted
               </p>
               <ul className="space-y-1.5">
                 {report.simulated.map((result) => (
                   <li key={result.channel} className="text-[13px] text-warn">
-                    <span className="font-semibold">{CHANNEL_LABELS[result.channel]}</span> — passes
+                    <span className="font-semibold">{CHANNEL_LABELS[result.channel]}</span> passes
                     the channel rules we check. This is a fixture result, not a real post, and no
                     publish was recorded.
                   </li>
                 ))}
               </ul>
               <p className="text-[12px] text-warn opacity-80">
-                Connect a channel, then use Publish below — or set a time and let it go out on its
+                Connect a channel, then use Publish below, or set a time and let it go out on its
                 own.
               </p>
             </div>
@@ -148,8 +148,8 @@ export function PublishPreview({ postId }: PublishPreviewProps) {
               <ul className="space-y-1">
                 {report.skipped.map((item) => (
                   <li key={item.channel} className="text-[13px] text-muted">
-                    <span className="font-semibold">{CHANNEL_LABELS[item.channel]}</span> — preview
-                    isn&rsquo;t something this release can post to, so there is nothing to simulate.
+                    <span className="font-semibold">{CHANNEL_LABELS[item.channel]}</span> is not
+                    something this release can post to, so there is nothing to simulate.
                   </li>
                 ))}
               </ul>

@@ -141,7 +141,7 @@ export function MobileHeaderMark() {
        keeps the 26px glyph centred in the widened box. */
     <Link
       href="/home"
-      aria-label="Sahoda — go to Home"
+      aria-label="Sahoda, go to Home"
       className="hidden shrink-0 items-center justify-center rounded-sm max-narrow:flex max-narrow:min-h-[44px] max-narrow:min-w-[44px]"
     >
       <Image

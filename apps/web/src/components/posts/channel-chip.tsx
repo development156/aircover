@@ -92,12 +92,12 @@ export function ChannelChip({ channel, state }: { channel: Channel; state?: Vari
           truth. A "published" with no link is deliberately not called live. */}
       <span className="sr-only">
         {state.status === 'failed'
-          ? ' — did not go out'
+          ? ', did not go out'
           : state.status === 'published'
-            ? ' — published, no link yet'
+            ? ', published, no link yet'
             : state.status === 'publishing'
-              ? ' — going out now'
-              : ' — not sent yet'}
+              ? ', going out now'
+              : ', not sent yet'}
       </span>
     </span>
   )

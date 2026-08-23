@@ -69,7 +69,7 @@ export function PlaybookKillSwitch() {
       </h2>
       <p className="type-body mt-1 max-w-[68ch] text-muted">
         Takes every post a playbook scheduled off the calendar and switches them all off. Your
-        drafts stay in the Planner — nothing is deleted, and anything you scheduled yourself is left
+        drafts stay in the Planner. Nothing is deleted, and anything you scheduled yourself is left
         exactly where it is.
       </p>
 

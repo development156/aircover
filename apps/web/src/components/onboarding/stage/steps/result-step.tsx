@@ -116,7 +116,7 @@ export function ResultStep({
       is exactly the false confidence the rest of this flow is built to avoid. */
   bits.push(
     <>
-      I have not settled on a tone of voice yet — set that in Brand Brain and everything I write
+      I have not settled on a tone of voice yet. Set that in Brand Brain and everything I write
       follows it.
     </>,
   )
@@ -181,7 +181,7 @@ export function ResultStep({
       {saveError ? <p className="hint">{saveError}</p> : null}
       {themeError ? (
         <p className="hint">
-          {themeError} Your Brand Brain is unaffected — only the workspace colours were not saved.
+          {themeError} Your Brand Brain is unaffected. Only the workspace colours were not saved.
         </p>
       ) : null}
 

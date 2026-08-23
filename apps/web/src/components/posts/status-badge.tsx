@@ -145,7 +145,7 @@ export function StatusBadge({ intent, outcome, className }: StatusBadgeProps) {
           glyph's extra meaning is spoken by the hint below it. */}
       <MarkIcon aria-hidden size={12} strokeWidth={2.25} className="shrink-0" />
       {style.label}
-      <span className="sr-only"> — {mark.hint}</span>
+      <span className="sr-only">. {mark.hint}</span>
       {/* UI_RULES_v3: `.is-simulated` ALWAYS carries a visible text label. The
           label comes from the mapping rather than from this call site, so it
           cannot be forgotten — and it is rendered text, not a title attribute,

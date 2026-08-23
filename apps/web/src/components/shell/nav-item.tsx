@@ -137,7 +137,7 @@ export function NavItem({
        * It does NOT become the accessible name — the span always supplies one,
        * and text content outranks `title` in the accname algorithm.
        */
-      title={soon ? `${label} — not built yet` : label}
+      title={soon ? `${label}, not built yet` : label}
       className={cn(
         // 34px tall, 9px inset, 13px/500 — the kit's control height. The density
         // is not incidental: 34px rows against 40px is most of what separates

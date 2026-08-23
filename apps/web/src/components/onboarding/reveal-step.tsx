@@ -177,7 +177,7 @@ export function RevealStep({
 
       {!canRegenerate ? (
         <p className="text-[12.5px] text-muted">
-          Regenerate is off because there is nothing to resolve from — this brain was loaded, not
+          Regenerate is off because there is nothing to resolve from. This brain was loaded, not
           answered for. Start over to give Sahoda the three answers again.
         </p>
       ) : null}

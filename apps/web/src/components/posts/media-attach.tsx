@@ -205,7 +205,7 @@ export function MediaAttach({ postId, channels }: MediaAttachProps) {
                     "attached" would hide that half the channels will drop it;
                     colouring it as an error would claim the upload failed. */}
                 <p className="rounded-input border border-warn bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
-                  Attached this file. It is on the post — these channels will not use it:
+                  Attached this file. It is on the post. These channels will not use it:
                 </p>
                 <ChannelObjections objections={result.warnings} tone="warn" />
               </>
