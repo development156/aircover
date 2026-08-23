@@ -2,9 +2,25 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+import { assess, type LoopFacts } from '@/lib/loop/eligibility'
+
 import { loopCronEnabled } from './loop-enabled'
 
 const KEY = 'SAHODA_LOOP_CRON_MODE'
+
+/** A workspace that would otherwise be planned for; each call breaks one thing. */
+function facts(over: Partial<LoopFacts> = {}): LoopFacts {
+  return {
+    workspaceId: 'ws-1',
+    settings: { paused: false, weeklyBudgetCredits: 150 },
+    connections: [{ platform: 'instagram', status: 'active' }],
+    availableCredits: 1260,
+    planningWeek: { isoYear: 2026, isoWeek: 35 },
+    openCycle: null,
+    dial: [{ channel: 'instagram', level: 1 }],
+    ...over,
+  }
+}
 
 afterEach(() => {
   delete process.env[KEY]
@@ -73,10 +89,37 @@ describe('the Sunday route stops where the feature says it stops', () => {
   })
 
   it('only ever opens cycles for workspaces with an unpaused settings row', () => {
-    // Opt-in, not opt-out. A workspace that never opened the Loop screen has no
-    // loop_settings row and is invisible to this query — which is the whole
-    // reason the deploy cannot start charging the database.
-    expect(code(runner)).toContain('from loop_settings')
-    expect(code(runner)).toContain('where paused = false')
+    // Opt-in, not opt-out: a workspace that never opened the Loop screen must not
+    // be charged by the deploy that adds the schedule.
+    //
+    // ── THIS USED TO GREP THE RUNNER'S SQL, AND THAT WAS THE WEAKER TEST ─────
+    // It asserted the source contained `from loop_settings` and
+    // `where paused = false`. That pinned one SPELLING of the rule, and it could
+    // not tell whether the query was used, ignored, or overridden three lines
+    // later. When the query correctly became a LEFT JOIN from `workspaces` — so
+    // the cron could SAY why a workspace is skipped instead of silently not
+    // seeing it — this test went red on a change that strengthened the very
+    // guarantee it exists to protect.
+    //
+    // The guarantee is behavioural, so it is asserted behaviourally, against the
+    // function that now makes the decision.
+    expect(assess(facts({ settings: null })).eligible).toBe(false)
+    expect(assess(facts({ settings: { paused: true, weeklyBudgetCredits: 150 } })).eligible).toBe(
+      false,
+    )
+    // And the two are DIFFERENT answers, which is the point of the rewrite.
+    const never = assess(facts({ settings: null }))
+    const paused = assess(facts({ settings: { paused: true, weeklyBudgetCredits: 150 } }))
+    expect(never.eligible === false && never.reason).toBe('never_enabled')
+    expect(paused.eligible === false && paused.reason).toBe('paused')
+  })
+
+  it('reaches no paid work without a verdict', () => {
+    // The structural half the behavioural test cannot cover: nothing may call
+    // `planOneWorkspace` before `assess` has answered for that workspace.
+    const assessAt = code(runner).indexOf('assess(facts)')
+    const planAt = code(runner).indexOf('await planOneWorkspace(')
+    expect(assessAt).toBeGreaterThan(-1)
+    expect(planAt).toBeGreaterThan(assessAt)
   })
 })

@@ -40,6 +40,35 @@ export const runtime = 'nodejs'
  */
 export const dynamic = 'force-dynamic'
 
+/**
+ * The platform ceiling (300s on Hobby and on Pro with Fluid compute), and the
+ * same number the metrics and sweeps crons use.
+ *
+ * ── IT HAD NONE, AND THE DEFAULT IS 10 SECONDS ───────────────────────────────
+ * One workspace's cycle is a paid model call measured at 14 seconds. So without
+ * this line the FIRST workspace could not finish: the function was torn down
+ * mid-plan, after `openCycle` had written a row and possibly after the ledger had
+ * taken a hold, leaving a cycle stuck in `planning` that no later tick will
+ * reopen — the one-live-cycle-per-week index sees it and declines.
+ *
+ * ── 300 IS NOT ENOUGH FOR 40 WORKSPACES, AND THAT IS HANDLED, NOT IGNORED ────
+ * 40 × 14s is 560s. A cap alone would mean workspaces 21 to 40 are silently
+ * dropped by a timeout — reported as neither planned nor deferred, which reads
+ * as "everyone was planned". `runScheduledLoopCycles` therefore watches the
+ * clock and stops STARTING work it cannot finish, counting the rest as
+ * `deferred`. The number below is what it is given.
+ */
+export const maxDuration = 300
+
+/**
+ * How much of `maxDuration` is left unused, so the response is still written.
+ *
+ * Being killed while serialising the result loses the whole report — including
+ * which workspaces were deferred, which is the part a person needs in order to
+ * know the tick was truncated at all.
+ */
+const SAFETY_MARGIN_SECONDS = 20
+
 export async function GET(request: Request): Promise<Response> {
   if (
     !isAuthorizedCronRequest({
@@ -61,7 +90,10 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const result = await runScheduledLoopCycles()
+    // The route owns the clock, because the route is what Vercel kills.
+    const result = await runScheduledLoopCycles(new Date(), {
+      deadline: Date.now() + (maxDuration - SAFETY_MARGIN_SECONDS) * 1000,
+    })
     return Response.json({ ok: true, ...result })
   } catch (error) {
     reportServerError(error, { action: 'cron.loop' })
