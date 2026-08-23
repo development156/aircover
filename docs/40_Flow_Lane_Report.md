@@ -593,23 +593,23 @@ Run against `next start` on 3272, `--concurrency=1`, never piped —
 `scripts/gate.mjs` writes each stage to `.gate/<n>-<stage>.log` and puts the
 verdict on stderr as well as stdout, precisely so a `| tail` cannot swallow it.
 
-**GATE PASSED**, all five stages, on the pushed HEAD `f576171a`, against a
-`.next` cleared and rebuilt immediately beforehand.
+**GATE PASSED**, all five stages, on the final HEAD, against a `.next` cleared
+and rebuilt immediately beforehand.
 
 | stage | command | result |
 |---|---|---|
-| 1 | `turbo run typecheck lint test --concurrency=1` | **ok** — see the note below |
-| 2 | `vitest run` (root) | **ok** (1.4s) |
-| 3 | `turbo run test:smoke --concurrency=1` | **ok** (928.6s) — **102 passed · 0 flaky · 0 failed** |
-| 4 | `prettier --check .` | **ok** (14.6s) |
-| 5 | `turbo run build --concurrency=1` | **ok** (46.9s) — js-budget ok, 80 routes |
+| 1 | `turbo run typecheck lint test --concurrency=1` | **ok** (53.1s) — 27 tasks |
+| 2 | `vitest run` (root) | **ok** (1.3s) |
+| 3 | `turbo run test:smoke --concurrency=1` | **ok** (963.3s) — **102 passed · 0 flaky · 0 failed** |
+| 4 | `prettier --check .` | **ok** (18.5s) |
+| 5 | `turbo run build --concurrency=1` | **ok** (51.6s) — js-budget ok, 80 routes |
 
-**Stage 1 on this run reported 0.6s, and that is a CACHE REPLAY verifying
-nothing** — said plainly rather than quoted as a result. Its real execution on
-this identical tree was the preceding run: **85.6s, 27 tasks, ok**, with no
-commit between the two. The full unit suite was also run directly on this tree:
-**4521 passed, 13 skipped, 0 failed**, and `design-lint` reports 828 / 139 / 0 /
-0 with none new.
+**Every stage here is a real run, not a replay.** An earlier attempt reported
+stage 1 at 0.6s, which is a cache replay verifying nothing; it is recorded as
+such below rather than quoted as a result. This run's 53.1s is genuine — the
+tree changed, so the input hash did. The full unit suite also runs directly on
+this tree at **4521 passed, 13 skipped, 0 failed**, and `design-lint` reports
+828 / 139 / 0 / 0 with none new.
 
 **Stage 3 is quoted at 102 passed with nothing flaky**, which is the whole
 `@smoke` tag.
