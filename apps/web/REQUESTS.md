@@ -960,3 +960,28 @@ needs no baseline permission: the ratchet only refuses growth.
 
 Worth checking first whether any pair can be a `Promise.all`. The analyser already treats
 `Promise.all` and `Promise.allSettled` as parallel and will drop the count when you do.
+
+### 11a · `/radar` has left `roadmap-honesty`'s ALLOWED list — read this before you touch the screen
+
+Opening the subscribe path changed what `/radar` renders, and that broke a guard. The
+repair is done and the suite is green again, but wt-page-rest should know why.
+
+`lib/radar/store.ts` `read()` used to return `collector: 'absent'`, which the screen draws
+as **"The weekly scan is not built yet"**. `roadmap-honesty.spec.ts` requires exactly that
+sentence on every route in its `ALLOWED` list, and `/radar` was on it _because_ of that
+sentence — the entry said so in its own comment.
+
+It now returns `collector: 'watch-list-only'`, so the screen takes your other branch:
+
+> Your watch list is stored, and the weekly readings are not wired into this screen yet.
+> This is not "nothing changed" — it is Radar not being able to tell you either way.
+
+That is the honest state and your existing copy for it is right. So `/radar` was removed
+from `ALLOWED`, the same move `/playbooks`, `/brain/audience`, `/remix`, `/leads` and
+`/brain/knowledge` each made when they stopped being drawings.
+
+**The cost, stated rather than absorbed:** the per-scan price `/radar` quotes is no longer
+checked by that guard. It invents no figure today and nothing there will notice if it
+starts. If you would rather it stayed covered, the entry to restore is
+`['/radar', [price('radar_scan')]]` — but it will fail until the screen says "coming soon"
+again, which would now be untrue.
