@@ -35,13 +35,13 @@ function messageFor(raw: string | undefined): string {
   const msg = raw ?? ''
   if (msg.includes('FORBIDDEN_ROLE')) return 'Only an owner or editor can schedule a post.'
   if (msg.includes('POST_ALREADY_GOING_OUT')) {
-    return 'This post is already going out — you can’t change its time now.'
+    return 'This post is already going out. You can’t change its time now.'
   }
   if (msg.includes('POST_NOT_RESCHEDULABLE') || msg.includes('POST_NOT_RELEASABLE')) {
     return 'This post has already been published or closed.'
   }
   if (msg.includes('INVALID_POST')) return "You don't have access to this post."
-  return 'Could not change the schedule — try again.'
+  return 'Could not change the schedule. Try again.'
 }
 
 /**
@@ -90,7 +90,7 @@ export async function schedulePost(
     return { ok: true, scheduledAt: typeof scheduledAt === 'string' ? scheduledAt : null }
   } catch (error) {
     reportServerError(error, { action: 'schedulePost', workspaceId })
-    return { ok: false, message: 'Could not change the schedule — try again.' }
+    return { ok: false, message: 'Could not change the schedule. Try again.' }
   }
 }
 
@@ -116,6 +116,6 @@ export async function cancelSchedule(postId: string): Promise<ScheduleState> {
     return { ok: true, scheduledAt: null }
   } catch (error) {
     reportServerError(error, { action: 'cancelSchedule', workspaceId })
-    return { ok: false, message: 'Could not change the schedule — try again.' }
+    return { ok: false, message: 'Could not change the schedule. Try again.' }
   }
 }

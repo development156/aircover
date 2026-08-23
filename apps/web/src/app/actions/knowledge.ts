@@ -181,7 +181,7 @@ async function indexFromSource(
   return {
     ok: true,
     documentId,
-    message: `Read and indexed — ${chunked.chunks.length} ${chunked.chunks.length === 1 ? 'passage' : 'passages'} Sahoda can now quote from.`,
+    message: `Read and indexed. That is ${chunked.chunks.length} ${chunked.chunks.length === 1 ? 'passage' : 'passages'} Sahoda can now quote from.`,
   }
 }
 
@@ -283,7 +283,7 @@ export async function addPdfDocument(formData: FormData): Promise<KnowledgeActio
     )
   } catch (error) {
     reportServerError(error, { action: 'knowledge.addPdf' })
-    return { ok: false, message: 'Sahoda broke while adding that. Nothing was saved — try again.' }
+    return { ok: false, message: 'Sahoda broke while adding that. Nothing was saved. Try again.' }
   }
 }
 
@@ -309,7 +309,7 @@ export async function addUrlDocument(formData: FormData): Promise<KnowledgeActio
     )
   } catch (error) {
     reportServerError(error, { action: 'knowledge.addUrl' })
-    return { ok: false, message: 'Sahoda broke while reading that. Nothing was saved — try again.' }
+    return { ok: false, message: 'Sahoda broke while reading that. Nothing was saved. Try again.' }
   }
 }
 
@@ -333,7 +333,7 @@ export async function addTypedDocument(formData: FormData): Promise<KnowledgeAct
     )
   } catch (error) {
     reportServerError(error, { action: 'knowledge.addTyped' })
-    return { ok: false, message: 'Sahoda broke while saving that. Nothing was saved — try again.' }
+    return { ok: false, message: 'Sahoda broke while saving that. Nothing was saved. Try again.' }
   }
 }
 
@@ -477,7 +477,7 @@ export async function deleteKnowledgeDocument(
       brandFields,
       message:
         brandFields > 0
-          ? `Deleted. Sahoda has kept what it already learned from it — ${brandFields} ${brandFields === 1 ? 'field' : 'fields'} in your Brand Brain no longer name a document you can open.`
+          ? `Deleted. Sahoda has kept what it already learned from it: ${brandFields} ${brandFields === 1 ? 'field' : 'fields'} in your Brand Brain no longer name a document you can open.`
           : 'Deleted, along with everything Sahoda had indexed from it.',
     }
   } catch (error) {
@@ -598,7 +598,7 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
       return {
         ok: false,
         message:
-          'Sahoda could not read your library just now. This is not a claim that it is empty — the read did not come back. Try again.',
+          'Sahoda could not read your library just now. This is not a claim that it is empty. The read did not come back. Try again.',
       }
     }
     if (passages.passages.length === 0) {
@@ -687,7 +687,7 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
           insufficient: false,
           documents,
           message:
-            'Sahoda read your library and found nothing it could turn into a Brand Brain field. That is an honest outcome — a menu of prices says a lot about what you sell and little about how you sound. You were not charged.',
+            'Sahoda read your library and found nothing it could turn into a Brand Brain field. That is an honest outcome. A menu of prices says a lot about what you sell and little about how you sound. You were not charged.',
         }
       }
       if (!delivered && failure === FAILURE_REASON.MESH_ERROR) {
@@ -695,7 +695,7 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
           ok: false,
           insufficient: false,
           message:
-            'Sahoda could not reach the model, so it has nothing to suggest. Nothing was written and you were not charged — try again.',
+            'Sahoda could not reach the model, so it has nothing to suggest. Nothing was written and you were not charged. Try again.',
         }
       }
       const state = chargeFailureState({ error: credits.error, action, delivered, reason: failure })
@@ -723,7 +723,7 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
       ok: true,
       proposed: written,
       documents,
-      message: `Sahoda read ${documents.length} ${documents.length === 1 ? 'document' : 'documents'} and has ${written} ${written === 1 ? 'suggestion' : 'suggestions'} for you. Nothing has changed in your Brand Brain — each one is waiting for you to agree with it.`,
+      message: `Sahoda read ${documents.length} ${documents.length === 1 ? 'document' : 'documents'} and has ${written} ${written === 1 ? 'suggestion' : 'suggestions'} for you. Nothing has changed in your Brand Brain. Each one is waiting for you to agree with it.`,
     }
   } catch (error) {
     reportServerError(error, { action: 'knowledge.resolveFromLibrary', workspaceId })
@@ -735,7 +735,7 @@ export async function resolveFromLibrary(): Promise<LibraryResolveState> {
     }
     return {
       ok: false,
-      message: 'Sahoda broke while reading your library. Nothing was written — try again.',
+      message: 'Sahoda broke while reading your library. Nothing was written. Try again.',
     }
   }
 }

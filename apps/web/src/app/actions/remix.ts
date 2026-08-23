@@ -96,13 +96,13 @@ export async function planRemix(
       sourceCredit: sourceCreditFor(post.title, post.created_by),
       derivatives,
     })
-    if (!created) return { ok: false, message: 'Could not start this batch — try again.' }
+    if (!created) return { ok: false, message: 'Could not start this batch. Try again.' }
 
     revalidatePath('/remix')
     return { ok: true, batchId: created.batch.id }
   } catch (error) {
     reportServerError(error, { action: 'planRemix', workspaceId })
-    return { ok: false, message: 'Could not start this batch — try again.' }
+    return { ok: false, message: 'Could not start this batch. Try again.' }
   }
 }
 
@@ -130,12 +130,12 @@ export async function setDerivativeIncluded(
     }
 
     const done = await store.setIncluded(derivativeId, workspaceId, included)
-    if (!done) return { ok: false, message: 'Could not change that — try again.' }
+    if (!done) return { ok: false, message: 'Could not change that. Try again.' }
     revalidatePath('/remix')
     return { ok: true }
   } catch (error) {
     reportServerError(error, { action: 'setDerivativeIncluded', workspaceId })
-    return { ok: false, message: 'Could not change that — try again.' }
+    return { ok: false, message: 'Could not change that. Try again.' }
   }
 }
 
@@ -191,8 +191,8 @@ export async function approveRemixBatch(
       return {
         ok: false,
         message:
-          'This batch is not what it was a moment ago. Check the total and approve it again — ' +
-          'nothing has been spent.',
+          'This batch is not what it was a moment ago. Check the total and approve it again. ' +
+          'Nothing has been spent.',
       }
     }
 
@@ -210,7 +210,7 @@ export async function approveRemixBatch(
     return { ok: true, approvedCredits: cost.totalCredits }
   } catch (error) {
     reportServerError(error, { action: 'approveRemixBatch', workspaceId })
-    return { ok: false, message: 'Could not approve this — try again.' }
+    return { ok: false, message: 'Could not approve this. Try again.' }
   }
 }
 

@@ -241,7 +241,7 @@ export function QaComposer({ openDraft, restoredThumbs, taskCodes }: QaComposerP
       </div>
 
       <p className="mt-2 text-[12px] text-muted">
-        A recorded run cannot be edited afterwards — it is the evidence someone reads later.
+        A recorded run cannot be edited afterwards. It is the evidence someone reads later.
       </p>
     </section>
   )

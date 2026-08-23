@@ -51,8 +51,8 @@ export type AttachDecision =
   | { ok: false; rejections: ChannelRejection[]; message: string }
 
 const ACCEPTED = 'Attached this file.'
-const ACCEPTED_WITH_WARNINGS = 'Attached this file — some channels will not use it.'
-const REJECTED = 'Check this file — no channel on this post can use it.'
+const ACCEPTED_WITH_WARNINGS = 'Attached this file. Some channels will not use it.'
+const REJECTED = 'Check this file. No channel on this post can use it.'
 
 /**
  * A candidate whose size or dimensions are not real numbers cannot be judged: a
@@ -60,7 +60,7 @@ const REJECTED = 'Check this file — no channel on this post can use it.'
  * linkedin and instagram, which declare no `imageDims`. Both would read as valid.
  * Unverifiable must surface as "cannot check", never as accepted.
  */
-const UNVERIFIABLE = 'Re-upload this file — it could not be checked against the channel limits.'
+const UNVERIFIABLE = 'Re-upload this file. It could not be checked against the channel limits.'
 
 /** One sentence per channel; beyond this the rest are counted, so no summary can become a wall. */
 const MAX_CLAUSES = 3

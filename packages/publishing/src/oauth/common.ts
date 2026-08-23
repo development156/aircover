@@ -49,7 +49,7 @@ export const defaultUnseal = (sealed: string): string =>
   createTokenVault(keyringFromEnv()).decrypt(JSON.parse(sealed))
 
 /** The single user-facing message for any failure on the persist path. */
-export const CONNECT_SAVE_FAILED = 'Could not save the connection — try again.'
+export const CONNECT_SAVE_FAILED = 'Could not save the connection. Try again.'
 
 export const newTraceId = (): string => randomUUID()
 
@@ -102,7 +102,7 @@ export function guardCallback(
   providerLabel: string,
 ): Result<never> | undefined {
   if (!params.state || !stateMatches(expectedState, params.state)) {
-    return validationErr(traceId, 'OAuth state mismatch — restart the connect flow.')
+    return validationErr(traceId, 'OAuth state mismatch. Restart the connect flow.')
   }
   if (params.error) {
     return providerErr(
@@ -111,7 +111,7 @@ export function guardCallback(
     )
   }
   if (!params.code) {
-    return validationErr(traceId, 'Missing authorization code — restart the connect flow.')
+    return validationErr(traceId, 'Missing authorization code. Restart the connect flow.')
   }
   return undefined
 }

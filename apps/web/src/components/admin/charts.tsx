@@ -35,7 +35,7 @@ export async function AdminCharts() {
           <FlowChart history={buildFlowHistory(tasks.data, now)} />
         ) : (
           <p className="text-[13px] text-muted">
-            We couldn&apos;t read the board, so this is blank rather than empty — there may well be
+            We couldn&apos;t read the board, so this is blank rather than empty. There may well be
             work here. Reload to try again.
           </p>
         )}

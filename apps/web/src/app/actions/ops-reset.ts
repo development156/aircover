@@ -46,7 +46,7 @@ function refusal(error: { code?: string | null; message?: string | null }): stri
   // PostgREST cannot find the function: the migration has not landed yet. Say
   // that, rather than "something went wrong" — the remedy is somebody else's.
   if (error.code === 'PGRST202' || message.includes('ops_workspace_reset')) {
-    return 'Reset is not available yet — the ops_workspace_reset function has not been applied to this database.'
+    return 'Reset is not available yet. The ops_workspace_reset function has not been applied to this database.'
   }
   if (error.code === '42501' || message.includes('not permitted')) {
     return 'Only an ops owner can reset a workspace.'

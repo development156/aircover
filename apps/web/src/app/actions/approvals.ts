@@ -88,6 +88,6 @@ export async function approvePosts(postIds: readonly string[]): Promise<BulkAppr
     return { ok: true, approved, moved: ids.length - approved, failed: 0 }
   } catch (error) {
     reportServerError(error, { action: 'approvePosts', workspaceId })
-    return { ok: false, message: 'Could not approve these posts — try again.' }
+    return { ok: false, message: 'Could not approve these posts. Try again.' }
   }
 }

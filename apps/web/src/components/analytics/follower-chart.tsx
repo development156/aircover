@@ -37,7 +37,7 @@ export function FollowerChart({ points }: { points: readonly SeriesPoint[] }) {
           {last.toLocaleString('en-IN')}
         </p>
         <p className="text-[12px] text-muted">
-          One day of history so far — not enough to show a trend.
+          One day of history so far. Not enough to show a trend.
         </p>
       </div>
     )

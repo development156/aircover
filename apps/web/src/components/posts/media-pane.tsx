@@ -56,7 +56,7 @@ function fileNameOf(row: PostMedia, libraryNames: ReadonlyMap<string, string>): 
 function altTextFor(row: PostMedia, fileName: string): string {
   const alt = row.alt
   if (alt !== null && alt.trim() !== '') return alt
-  return `Attached image with no alt text — ${fileName}`
+  return `Attached image with no alt text: ${fileName}`
 }
 
 interface MediaRowProps {
@@ -90,7 +90,7 @@ function MediaRow({ row, unverifiable, previewUrl, libraryNames }: MediaRowProps
            writer's only handle for removing it. */
         <p className="mb-2 flex items-center gap-2 rounded-input border border-dashed border-line bg-bg px-3 py-4 text-[12.5px] text-muted">
           <ImageOff size={15} strokeWidth={1.7} className="shrink-0 text-faint" aria-hidden />
-          <span>Preview unavailable — the file is still attached to this post.</span>
+          <span>Preview unavailable. The file is still attached to this post.</span>
         </p>
       )}
 
@@ -115,8 +115,8 @@ function MediaRow({ row, unverifiable, previewUrl, libraryNames }: MediaRowProps
         <p className="mt-2 flex items-start gap-1.5 rounded-input bg-warn-bg px-2 py-1.5 text-[12.5px] text-warn">
           <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden />
           <span>
-            {"Can't verify this file — "}
-            {!result.ok ? result.message : 'it could not be checked against the channel limits.'}
+            {"Can't verify this file. "}
+            {!result.ok ? result.message : 'It could not be checked against the channel limits.'}
           </span>
         </p>
       ) : null}

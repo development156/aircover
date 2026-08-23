@@ -91,7 +91,7 @@ export function CollapsibleRegion({
 export function CollapseNote() {
   return (
     <p className="text-[11px] text-muted">
-      Which sections you leave open is remembered in this browser only — a different browser, a
+      Which sections you leave open is remembered in this browser only. A different browser, a
       different machine or a private window starts collapsed again. Nothing red is ever hidden by a
       collapsed section.
     </p>

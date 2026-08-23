@@ -23,7 +23,7 @@ describe('ErrorFallback', () => {
     expect(screen.getByRole('heading')).toHaveTextContent("This screen didn't load")
     expect(
       screen.getByText(
-        'Something broke on our side, not yours. Try again in a moment — if it keeps happening, contact support.',
+        'Something broke on our side, not yours. Try again in a moment. If it keeps happening, contact support.',
       ),
     ).toBeInTheDocument()
   })

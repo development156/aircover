@@ -66,8 +66,8 @@ export function BillingDetailsForm({ profile }: { profile: BillingProfile | null
     >
       <h2 className="type-h2">Billing details</h2>
       <p className="type-body mt-1 text-muted">
-        These go on every invoice Sahoda issues from now on. Invoices already issued do not change —
-        a tax invoice cannot be edited, and a correction is a separate credit note.
+        These go on every invoice Sahoda issues from now on. Invoices already issued do not change.
+        A tax invoice cannot be edited, and a correction is a separate credit note.
       </p>
 
       <fieldset disabled={pending} className="mt-4 space-y-4">

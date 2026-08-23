@@ -171,7 +171,7 @@ export function checkXRation(args: { used: number }): XRationVerdict {
 export function xRationRefusalMessage(verdict: XRationVerdict): string {
   return (
     `This workspace has used all ${verdict.ration} of its X posts for this month. ` +
-    `X charges Sahoda for every post, so the rest are held until the month turns — ` +
+    `X charges Sahoda for every post, so the rest are held until the month turns. ` +
     `nothing was sent and nothing was charged. Other channels are unaffected.`
   )
 }

@@ -54,7 +54,7 @@ export function ChannelCell({ cell }: { cell: CampaignCell }) {
 
   if (cell.kind === 'absent') {
     // Deliberately renders no mark. See the header.
-    return <span className="sr-only">Not on {channel} — this post does not target it</span>
+    return <span className="sr-only">Not on {channel}, because this post does not target it</span>
   }
 
   if (cell.kind === 'unreadable') {

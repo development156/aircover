@@ -102,7 +102,7 @@ export function BrainRing({ brain }: { brain: BrainRead }) {
       >
         <Dial percent={0} />
         <span className="text-[13px] text-muted max-narrow:hidden">No brain yet</span>
-        <HoverLine>Sahoda has nothing to write from yet — set up your Brand Brain.</HoverLine>
+        <HoverLine>Sahoda has nothing to write from yet. Set up your Brand Brain.</HoverLine>
       </Link>
     )
   }
@@ -124,7 +124,7 @@ export function BrainRing({ brain }: { brain: BrainRead }) {
           <Unreadable what="Your Brand Brain score" />
         </span>
         <HoverLine>
-          Could not read your Brand Brain just now — reload to try again. Nothing has changed.
+          Could not read your Brand Brain just now. Reload to try again. Nothing has changed.
         </HoverLine>
       </Link>
     )

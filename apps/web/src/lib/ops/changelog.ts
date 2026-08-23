@@ -63,7 +63,7 @@ export function groupByDay(entries: readonly OpsChangelogEntry[]): ChangelogDay[
  */
 export function toPlainText(entry: OpsChangelogEntry): string {
   const when = formatIst(entry.happened_at)
-  return [entry.title, '', entry.summary_plain, '', `— ${entry.author}${when ? ` · ${when}` : ''}`]
+  return [entry.title, '', entry.summary_plain, '', `by ${entry.author}${when ? ` · ${when}` : ''}`]
     .join('\n')
     .trim()
 }
@@ -79,7 +79,7 @@ export function toMarkdown(entry: OpsChangelogEntry): string {
     ...(entry.details_tech ? ['', '<details><summary>Technical details</summary>', ''] : []),
     ...(entry.details_tech ? [entry.details_tech, '', '</details>'] : []),
     '',
-    `*${entry.kind}${codes} — ${entry.author}${when ? ` · ${when}` : ''}*`,
+    `*${entry.kind}${codes} · ${entry.author}${when ? ` · ${when}` : ''}*`,
   ]
     .join('\n')
     .trim()

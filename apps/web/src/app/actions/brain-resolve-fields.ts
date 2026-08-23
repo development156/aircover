@@ -70,7 +70,7 @@ export async function confirmBrainFields(paths: readonly string[]): Promise<Reso
       return { ok: false, message: 'Set up your Brand Brain before confirming anything in it.' }
     }
     if (brain.status === 'unreadable') {
-      return { ok: false, message: 'Could not read your Brand Brain — reload and try again.' }
+      return { ok: false, message: 'Could not read your Brand Brain. Reload and try again.' }
     }
 
     /**
@@ -89,6 +89,6 @@ export async function confirmBrainFields(paths: readonly string[]): Promise<Reso
     return { ok: true, version: saved.version, confirmed: requested.length }
   } catch (error) {
     reportServerError(error, { action: 'confirmBrainFields' })
-    return { ok: false, message: 'Could not confirm those fields — try again.' }
+    return { ok: false, message: 'Could not confirm those fields. Try again.' }
   }
 }

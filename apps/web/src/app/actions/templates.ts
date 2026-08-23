@@ -79,7 +79,7 @@ export async function saveTemplate(
     return { ok: true, templateId: (data as { id: string }).id }
   } catch (error) {
     reportServerError(error, { action: 'saveTemplate', workspaceId })
-    return { ok: false, message: 'Could not save this template — try again.' }
+    return { ok: false, message: 'Could not save this template. Try again.' }
   }
 }
 
@@ -123,6 +123,6 @@ export async function deleteTemplate(templateId: string): Promise<TemplateState>
     return { ok: true, templateId }
   } catch (error) {
     reportServerError(error, { action: 'deleteTemplate', workspaceId })
-    return { ok: false, message: 'Could not delete this template — try again.' }
+    return { ok: false, message: 'Could not delete this template. Try again.' }
   }
 }

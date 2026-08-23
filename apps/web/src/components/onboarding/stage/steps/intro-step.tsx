@@ -54,8 +54,8 @@ export function IntroStep({
           is ready.
         </h1>
         <p className="lead step__lead">
-          Sahoda already has one for {workspaceName}. Open it to read or change what it knows —
-          nothing to rebuild and nothing to spend.
+          Sahoda already has one for {workspaceName}. Open it to read or change what it knows.
+          Nothing to rebuild and nothing to spend.
         </p>
         <div className="cta-row">
           <button type="button" className="btn btn--primary" id="review-saved" onClick={onReview}>

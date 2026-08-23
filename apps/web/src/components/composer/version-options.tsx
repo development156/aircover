@@ -25,7 +25,7 @@ const FORMAT_LABEL: Readonly<Record<PostFormat, string>> = {
   // format renders as a grid and on LinkedIn as a multi-image post, and one
   // label sits on all three cards.
   carousel: 'A set of photos',
-  story: 'A story — gone in 24 hours',
+  story: 'A story, gone in 24 hours',
   thread: 'A thread',
   video: 'Video',
 }

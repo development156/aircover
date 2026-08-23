@@ -46,7 +46,7 @@ export function DivergenceNotice({
           className="flex flex-wrap items-center gap-3 rounded-card border border-warn bg-warn-bg px-3 py-2.5 text-[13px] text-warn"
         >
           <span className="grow">
-            {divergence.message} Both versions are still here — choose which one to keep.
+            {divergence.message} Both versions are still here. Choose which one to keep.
           </span>
           <Button variant="secondary" size="sm" onClick={onLoadTheirs}>
             Load that version
@@ -60,7 +60,7 @@ export function DivergenceNotice({
       {error !== null ? (
         <InlineError className="flex flex-wrap items-center gap-3">
           <span className="grow">
-            {error} Your text is still here — retry now, or keep editing and Sahoda retries on the
+            {error} Your text is still here. Retry now, or keep editing and Sahoda retries on the
             next change.
           </span>
           <Button variant="secondary" size="sm" onClick={onRetry}>

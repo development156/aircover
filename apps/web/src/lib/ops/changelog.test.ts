@@ -67,7 +67,7 @@ describe('toPlainText', () => {
 
     expect(text).toContain('The sync commands are in place')
     expect(text).toContain('You can now move a card with one command.')
-    expect(text).toContain('— GIRIJA · 26 Jul 2026 · 00:45')
+    expect(text).toContain('by GIRIJA · 26 Jul 2026 · 00:45')
   })
 
   it('OMITS details_tech — the plain copy is the one pasted to a non-technical reader', () => {
@@ -97,7 +97,7 @@ describe('toMarkdown', () => {
     expect(toMarkdown(entry({ seq: 58, task_codes: ['SL-011', 'SL-017'] }))).toContain(
       '(SL-011, SL-017)',
     )
-    expect(toMarkdown(entry({ seq: 58 }))).toContain('*added — GIRIJA')
+    expect(toMarkdown(entry({ seq: 58 }))).toContain('*added · GIRIJA')
   })
 })
 

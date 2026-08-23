@@ -71,7 +71,7 @@ export function ConfidenceCard({ provenance }: { provenance: Provenance }) {
 
         <p className="mt-3 text-[12px] text-muted">
           Every caption, campaign and reply is written from these fields. A guess Sahoda got wrong
-          is wrong in everything it writes until someone corrects it — and correcting one costs
+          is wrong in everything it writes until someone corrects it, and correcting one costs
           nothing.
         </p>
       </div>

@@ -49,8 +49,8 @@ export type ResolveActionState =
   | { ok: false; kind: 'error'; message: string }
 
 const FALLBACK_MESSAGE =
-  'Showing a sample Brand Brain — the model could not be reached, so you were not charged. Retry to resolve yours.'
-const GENERIC_ERROR = 'Could not resolve your Brand Brain — try again.'
+  'Showing a sample Brand Brain. The model could not be reached, so you were not charged. Retry to resolve yours.'
+const GENERIC_ERROR = 'Could not resolve your Brand Brain. Try again.'
 
 /**
  * A DEBIT (`credits.ok`) only ever happens when the wrapped fn returned, which the

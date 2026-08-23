@@ -20,7 +20,7 @@ const PENDING = [
   'Reading your Brand Brain…',
   'Writing your homepage, section by section…',
   'Building the page with your brand tokens…',
-  'Still working — if this fails you will not be charged.',
+  'Still working. If this fails you will not be charged.',
 ] as const
 
 type Outcome =
@@ -107,7 +107,7 @@ export function GenerateSitePanel({ limitNotice }: GenerateSitePanelProps) {
         <div>
           <h2 className="text-[15px] leading-5 font-bold">Generate your site</h2>
           <p className="text-[13px] text-muted">
-            A one-page site draft, written in your brand voice. Preview only for now — publishing to
+            A one-page site draft, written in your brand voice. Preview only for now. Publishing to
             a real address is coming.
           </p>
         </div>

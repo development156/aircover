@@ -93,7 +93,7 @@ export function FestivalForm(props: FestivalFormProps) {
       setMessage(
         out.nothingToDo
           ? 'Nothing falls inside your window right now, so nothing was made and nothing was charged.'
-          : 'Ready — the cost preview is below.',
+          : 'Ready. The cost preview is below.',
       )
     })
   }

@@ -45,16 +45,16 @@ export const RESET_CLEARS: readonly ResetTable[] = [
 export const RESET_KEEPS: readonly ResetTable[] = [
   {
     table: 'credit_ledger',
-    label: 'Credits and the whole ledger — append-only, and the money record',
+    label: 'Credits and the whole ledger, append-only, and the money record',
   },
   { table: 'credit_balances', label: 'The wallet balance' },
   { table: 'subscriptions', label: 'The plan and billing state' },
-  { table: 'connections', label: 'Connected social accounts — no re-authorising' },
+  { table: 'connections', label: 'Connected social accounts, no re-authorising' },
   { table: 'workspace_themes', label: 'The Brand Skin' },
   { table: 'workspace_members', label: 'Members and their roles' },
   {
     table: 'post_publish_logs',
-    label: 'Publish history — append-only evidence a post really went out',
+    label: 'Publish history, append-only evidence a post really went out',
   },
   { table: 'audit_logs', label: 'The audit trail' },
 ] as const

@@ -48,12 +48,23 @@ Rules for teammates fixing bugs in cloud sessions at claude.ai/code. Type `/fix 
 
 ## Copy style
 
-User-facing copy follows `.agents/skills/humanizer` (33 patterns, from Wikipedia's "Signs of AI writing"). Three standing rulings, so nobody re-litigates them:
+User-facing copy follows `.agents/skills/humanizer` (33 patterns, from Wikipedia's "Signs of AI writing"). Standing rulings, so nobody re-litigates them:
 
-- **Em dashes stay.** §14 bans them outright, but the reference design uses 542 and this app 355, and the skill's own Voice Calibration says a writing sample outranks §14. Matching the house voice beats scrubbing the tell. Never run a bulk em-dash strip.
+- **The em dash and the en dash leave user-facing PROSE.** Founder's ruling, 2026-08-23, reversing the earlier "em dashes stay" that cited the reference design's 542 uses. 650 dashes were rewritten across 290 files. Rewrite the sentence: a full stop where the dash joined two independent clauses, a comma where it fenced a genuine aside, a colon where it introduced a list or a value, parentheses where two dashes bracketed one. Swapping the glyph for a comma and leaving the sentence otherwise untouched is not the ruling. **Never run a bulk strip** — that is how the three exceptions below get destroyed.
+  - **The HYPHEN stays.** `per-channel`, `read-only`, `sign-in`, `coming-soon`. Removing hyphens breaks English and makes copy ambiguous.
+  - **The em dash as an ABSENCE MARK stays.** The product renders a bare `—` to mean "we have no measurement here" (docs/26 §4). It is a UI token, not prose, and guards assert it. The mechanical test: a dash that is the WHOLE string value is the absence mark and stays; a dash INSIDE a sentence is prose and goes.
+  - **A dash that is a stored parse sentinel stays.** `lib/ops/card-copy.ts`'s `TECHNICAL_MARKER` is baked into the `detail` column of every `ops_tasks` row in production and `splitCardDetail` finds the technical half by searching for it. Changing it needs a prod rewrite, not a copy edit.
 - **Sahoda speaks in the third person.** "Sahoda could not reach your accounts", never "I could not". 44 third-person mentions set the voice; the two first-person strays were fixed 2026-08-16.
 - **Curly quotes around user content are correct typography**, not a tell — §19's own false-positive clause. `Delete "{title}" for good?` keeps them.
 
 The mechanical patterns (AI vocabulary, filler, signposting, servility, emoji, rule-of-three) audit clean and have stayed clean. What actually gets caught here is implementation jargon leaking into user-facing bodies — "the response carried no per-account status" describes our payload, not the reader's situation — plus subjectless fragments and garden-path sentences.
 
 Empty states and errors state the CLAIM precisely: "we never asked" and "we asked and got nothing" are different sentences, and `lib/inbox/emptiness.ts` exists to keep eight of them apart. Its tests assert the claim (`not a reading of your reviews`, `nothing was charged`) and the forbidden claim (`not.toMatch(/\bno reviews\b/)`), never the wording — so rewrite the sentence freely and keep the guarantee.
+
+**Five rules that outrank the skill.** They exist because this product's sentences were built to be exact.
+
+1. **A sentence must never become vaguer than the truth it replaces.** If a rewrite is less specific, or true in fewer cases, it is a defect and not a style improvement. "Publishing key isn't set in this environment", `InboxEmptiness`'s six remedies and /analytics separating "no account connected" from "read failed" are precise on purpose. Print the before and the after and say what the claim is, per string.
+2. **Never offer a remedy that cannot work.** The product distinguishes seven kinds of nothing and `no-impossible-remedy.spec.ts` enforces it. A reload cannot create a workspace.
+3. **The emoji rule (§18) applies to Sahoda's own interface only.** It must never reach anything that generates or templates a social caption. Emoji are native to that medium and stripping them is a product regression. docs/22 §4 is the record.
+4. **Check the sentence the READER gets, not the literal you wrote.** A split whose second half begins with `${…}` is only as good as what that interpolation holds: `platform` is a lowercase key, a count is a numeral, and a list separator is not a category boundary. Five of the first 649 rewrites were wrong this way and the self-check could not see any of them (docs/40).
+5. **Tests pin copy. Retarget them, never delete them.** An assertion that checks a CLAIM through a lowercase substring is checking the claim, not the capital letter: make it case-insensitive rather than deleting it. An assertion anchored to an exact engine sentence (`lib/posts/violation-copy.ts`) is a shape gate whose failure mode is a silent downgrade to vaguer copy — move the guard in the same commit as the sentence, and prove it by mutation.

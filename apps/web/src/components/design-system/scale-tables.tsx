@@ -27,17 +27,17 @@ const TYPE: ReadonlyArray<[string, string, string]> = [
   [
     'type-body',
     '400 · 14/22',
-    'THE BASE. 14px, up from v4\u2019s 13px: the reference is generous rather than dense, and the reader is meeting this on a cheap 720p phone. 16px was rejected — this product has tables.',
+    'THE BASE. 14px, up from v4\u2019s 13px: the reference is generous rather than dense, and the reader is meeting this on a cheap 720p phone. 16px was rejected because this product has tables.',
   ],
   [
     'type-sm',
     '400 · 13/18',
-    'Secondary and supporting. Absorbs the 12.5px block — 110 hand-written uses, the third most common size in the codebase, with no step at all.',
+    'Secondary and supporting. Absorbs the 12.5px block: 110 hand-written uses, the third most common size in the codebase, with no step at all.',
   ],
   [
     'type-meta',
     '400 · 12/16',
-    'NEW in v5. Table cells, captions, timestamps, helper text — the 211 hand-written 12px uses that had nowhere to go.',
+    'NEW in v5. Table cells, captions, timestamps, helper text: the 211 hand-written 12px uses that had nowhere to go.',
   ],
   [
     'type-chip',

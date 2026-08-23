@@ -65,7 +65,7 @@ describe('resetWorkspace', () => {
     expect(result).toEqual({
       ok: false,
       message:
-        'Reset is not available yet — the ops_workspace_reset function has not been applied to this database.',
+        'Reset is not available yet. The ops_workspace_reset function has not been applied to this database.',
     })
   })
 

@@ -58,7 +58,7 @@ export async function POST(request: Request): Promise<Response> {
     const client = zernioClient()
     if (!client) {
       // Honest, not a 500: the rail simply is not provisioned in this environment.
-      return fail('Connecting isn’t available right now — the publishing key isn’t set.', 503)
+      return fail('Connecting isn’t available right now. The publishing key isn’t set.', 503)
     }
 
     /**
@@ -76,7 +76,7 @@ export async function POST(request: Request): Promise<Response> {
      */
     const workspaceRead = await readActiveWorkspace()
     if (workspaceRead.status === 'unreadable') {
-      return fail('Couldn’t check your workspace just now — try again.', 503)
+      return fail('Couldn’t check your workspace just now. Try again.', 503)
     }
     if (workspaceRead.status === 'none') return fail('Create a workspace first.', 400)
     const workspace = workspaceRead.workspace
@@ -101,11 +101,11 @@ export async function POST(request: Request): Promise<Response> {
     // never consulted.
     const slots = await readConnectionSlots(workspace.id)
     // Fail closed: without the count we cannot say there is room.
-    if (slots === null) return fail('Couldn’t check your plan — try again.', 500)
+    if (slots === null) return fail('Couldn’t check your plan. Try again.', 500)
 
     const limit = await checkCountableLimit(workspace.id, 'channels', slots.count)
     if (limit.kind === 'blocked') return fail(limit.sentence, 403)
-    if (limit.kind === 'unknown') return fail('Couldn’t check your plan — try again.', 503)
+    if (limit.kind === 'unknown') return fail('Couldn’t check your plan. Try again.', 503)
 
     const profileId = await ensureZernioProfile(client, {
       workspaceId: workspace.id,
@@ -130,7 +130,7 @@ export async function POST(request: Request): Promise<Response> {
         // a workspace at another profile, which moves a tenant boundary silently.
         return fail('This workspace is already linked to a different publishing profile.', 409)
       }
-      return fail('Couldn’t start the connection — try again.', 500)
+      return fail('Couldn’t start the connection. Try again.', 500)
     }
 
     const authUrl = await client.connectUrl(platform, profileId, zernioReturnUrl())
@@ -140,6 +140,6 @@ export async function POST(request: Request): Promise<Response> {
     )
   } catch (error) {
     await reportServerError(error, { action: 'zernioStart', workspaceId })
-    return fail('Couldn’t start the connection — try again.', 500)
+    return fail('Couldn’t start the connection. Try again.', 500)
   }
 }

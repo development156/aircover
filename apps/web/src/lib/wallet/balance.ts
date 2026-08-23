@@ -163,14 +163,14 @@ export function staleHoldNote(
 
   if (reaper === 'running') {
     return (
-      `${credits} ${expiry} — those credits are held by ${action}. Sahoda releases ` +
+      `${credits} ${expiry}. Those credits are held by ${action}. Sahoda releases ` +
       `expired holds every few minutes, so they should come back on their own. If they ` +
       `are still held in an hour, tell us.`
     )
   }
 
   return (
-    `${credits} ${expiry} — those credits are held by ${action} and are not released ` +
+    `${credits} ${expiry}. Those credits are held by ${action} and are not released ` +
     `automatically. They stay held until ${one ? 'that action is' : 'those actions are'} settled.`
   )
 }

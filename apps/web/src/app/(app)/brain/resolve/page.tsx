@@ -76,7 +76,7 @@ export default async function ResolveConsolePage() {
       <EmptyState
         icon={BrainCircuit}
         title="Create a workspace to resolve a Brand Brain"
-        body="A Brand Brain belongs to a workspace and you don't have one yet. Nothing failed — there is simply nothing to resolve."
+        body="A Brand Brain belongs to a workspace and you don't have one yet. Nothing failed. There is simply nothing to resolve."
         action={<CreateWorkspaceButton variant="primary" />}
       />
     )
@@ -106,7 +106,7 @@ export default async function ResolveConsolePage() {
         role="alert"
         className="type-body rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-danger"
       >
-        Could not read your Brand Brain just now — reload to try again. Nothing has changed and
+        Could not read your Brand Brain just now. Reload to try again. Nothing has changed and
         nothing was charged.
       </div>
     )
@@ -178,13 +178,13 @@ export default async function ResolveConsolePage() {
             {tally.unearned > 0 ? (
               <>
                 <span className="num font-[550] text-ink">{tally.unearned}</span> of them are things
-                only you can actually know — what your customers fear, what Sahoda must never say,
+                only you can actually know: what your customers fear, what Sahoda must never say,
                 what you promise. Those come first in the list below, because a guess there is worth
                 the least.
               </>
             ) : (
               <>
-                What is left are the fields Sahoda is meant to draft — how you sound, how formal to
+                What is left are the fields Sahoda is meant to draft: how you sound, how formal to
                 be, which phrases are yours. Keep them or say them differently.
               </>
             )}
@@ -212,7 +212,7 @@ export default async function ResolveConsolePage() {
         >
           Re-running the whole resolve
         </Link>{' '}
-        is a separate, paid action that rewrites all {tally.registered} fields — including every one
+        is a separate, paid action that rewrites all {tally.registered} fields, including every one
         you have already confirmed.
       </p>
     </div>

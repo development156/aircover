@@ -48,7 +48,7 @@ export default function StudioPage() {
   return (
     <div className="space-y-grid">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageTitle sub="Make the picture, not just the caption — templates that already know your colours, your type and your logo.">
+        <PageTitle sub="Make the picture, not just the caption. Templates that already know your colours, your type and your logo.">
           Studio
         </PageTitle>
         <InertButton primary>New design</InertButton>
@@ -103,7 +103,7 @@ export default function StudioPage() {
               <InertRow
                 icon={Quote}
                 name="The picture"
-                note="From your library, from your phone, or generated — dropped into a slot that already knows its crop."
+                note="From your library, from your phone, or generated, then dropped into a slot that already knows its crop."
               />
               <InertRow
                 icon={Layers}

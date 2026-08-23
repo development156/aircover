@@ -78,7 +78,7 @@ export function CertaintyLadder() {
           structural, which is why <strong className="font-semibold text-ink">Approved</strong>,{' '}
           <strong className="font-semibold text-ink">Scheduled</strong> and{' '}
           <strong className="font-semibold text-ink">Published</strong> stay apart even though all
-          three sit on the same rung — evidence, not intent, is what earns{' '}
+          three sit on the same rung. Evidence, not intent, is what earns{' '}
           <code className="rounded-sm bg-s2 px-1">.is-real</code>.
         </p>
       </div>

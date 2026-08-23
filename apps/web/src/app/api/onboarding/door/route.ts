@@ -108,7 +108,7 @@ export async function POST(request: Request): Promise<Response> {
             result: {
               ok: false,
               message:
-                'Sahoda broke part-way through reading, so it cannot say whether your link or PDF is usable. Nothing was charged — try again.',
+                'Sahoda broke part-way through reading, so it cannot say whether your link or PDF is usable. Nothing was charged. Try again.',
               stages: [],
               costUsd: 0,
             },

@@ -27,7 +27,7 @@ function messageFor(raw: string, fallback: string): string {
     INVALID_WORKSPACE: 'That workspace no longer exists.',
     WRONG_STATUS: 'That run is not waiting for approval.',
     NOTHING_INCLUDED: 'Keep at least one draft, or stop the run instead.',
-    ESTIMATE_CHANGED: 'The list changed while you were looking — check the new total.',
+    ESTIMATE_CHANGED: 'The list changed while you were looking. Check the new total.',
   }
   for (const [code, copy] of Object.entries(known)) if (raw.includes(code)) return copy
   return fallback
@@ -72,7 +72,7 @@ export async function approveRunCost(
     if (error) {
       return {
         ok: false,
-        message: messageFor(error.message, 'Could not approve that — try again.'),
+        message: messageFor(error.message, 'Could not approve that. Try again.'),
       }
     }
 
@@ -90,7 +90,7 @@ export async function approveRunCost(
     }
   } catch (error) {
     reportServerError(error, { action: 'approveRunCost', workspaceId })
-    return { ok: false, message: 'Could not approve that — try again.' }
+    return { ok: false, message: 'Could not approve that. Try again.' }
   }
 }
 
@@ -128,7 +128,7 @@ export async function killPlaybooks(alsoDisable = true): Promise<KillSwitchState
       p_also_disable: alsoDisable,
     })
     if (error) {
-      return { ok: false, message: messageFor(error.message, 'Could not stop them — try again.') }
+      return { ok: false, message: messageFor(error.message, 'Could not stop them. Try again.') }
     }
 
     const result = data as {
@@ -150,6 +150,6 @@ export async function killPlaybooks(alsoDisable = true): Promise<KillSwitchState
     }
   } catch (error) {
     reportServerError(error, { action: 'killPlaybooks', workspaceId })
-    return { ok: false, message: 'Could not stop them — try again.' }
+    return { ok: false, message: 'Could not stop them. Try again.' }
   }
 }

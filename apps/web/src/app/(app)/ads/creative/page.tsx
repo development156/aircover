@@ -38,7 +38,7 @@ const PLACEMENTS = [
   {
     label: 'Search',
     aspect: '4 / 1',
-    note: 'No picture at all — a headline and one line under it.',
+    note: 'No picture at all. A headline with one line under it.',
   },
 ] as const
 
@@ -75,7 +75,7 @@ export default function AdsCreativePage() {
 
       <InertPanel
         title="The words"
-        what="A headline and a body per placement — not one caption stretched over four shapes."
+        what="A headline and a body for each placement. Not one caption stretched over four shapes."
       >
         <div className="grid gap-3 narrow:grid-cols-2">
           <div className="flex flex-col gap-2">
@@ -88,7 +88,7 @@ export default function AdsCreativePage() {
           </div>
           <div className="flex flex-col gap-2">
             <span className="type-eyebrow text-muted">Call to action</span>
-            <InertField label="What you want them to do — the platform picks from a fixed list" />
+            <InertField label="What you want them to do. The platform picks from a fixed list" />
           </div>
           <div className="flex flex-col gap-2">
             <span className="type-eyebrow text-muted">Where it sends them</span>
@@ -99,7 +99,7 @@ export default function AdsCreativePage() {
 
       <NotRunningNote>
         Nothing here uploads, saves or generates. When it does, the writing will go through the same
-        Brand Brain and the same refusal gate your posts already pass — an ad that Sahoda would not
+        Brand Brain and the same refusal gate your posts already pass. An ad that Sahoda would not
         let you publish for free is not one it should let you pay to show.
       </NotRunningNote>
     </div>

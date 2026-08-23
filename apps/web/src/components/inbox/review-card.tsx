@@ -85,7 +85,7 @@ export function ReviewCard({ review }: { review: ZernioReview }) {
       {review.text ? (
         <p className="mt-2 max-w-[70ch] text-[14px] leading-[22px]">{review.text}</p>
       ) : (
-        <p className="mt-2 text-[14px] text-muted italic">Rating only — no written review.</p>
+        <p className="mt-2 text-[14px] text-muted italic">Rating only. No written review.</p>
       )}
 
       {review.reply?.text ? (

@@ -160,7 +160,7 @@ export const PLAYBOOK_RECIPES: readonly PlaybookRecipe[] = [
     key: 'rss_to_post',
     name: 'New article, new post',
     group: 'Content',
-    when: 'Something new appears on a feed you follow — your own blog, an industry site.',
+    when: 'Something new appears on a feed you follow: your own blog, an industry site.',
     makes: 'A short post in your voice, with your take rather than a summary.',
     lands: 'Your Planner as a draft.',
     triggers: ['manual', 'schedule'],
@@ -202,7 +202,7 @@ export const PLAYBOOK_RECIPES: readonly PlaybookRecipe[] = [
     lands: 'A campaign, with the three posts grouped under it.',
     triggers: ['event', 'manual'],
     blocker:
-      'somewhere for Sahoda to learn that a product exists — a catalogue connection or a form on your site',
+      'somewhere for Sahoda to learn that a product exists: a catalogue connection or a form on your site',
     outputAction: 'post_variants',
     fields: [
       {

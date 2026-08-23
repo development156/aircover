@@ -50,7 +50,7 @@ export function WhatStep({ data, patch }: StepProps) {
         </div>
         {/* A statement of intent about what happens next, not a finding. */}
         <AiLine show={Boolean(data.category)}>
-          Got it — <em>{data.category}</em>. I&rsquo;ll weight channels and formats that actually
+          Got it, <em>{data.category}</em>. I&rsquo;ll weight channels and formats that actually
           work for that.
         </AiLine>
       </div>

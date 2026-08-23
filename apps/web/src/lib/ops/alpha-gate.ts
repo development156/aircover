@@ -110,7 +110,7 @@ export interface AlphaGateRecord {
 
 /** Wording reused by every item the 13 Aug pass did not re-open. */
 const AS_AUDITED =
-  'Recorded by the 25 Jul sweep and not re-checked since — this is that date’s reading, not today’s.'
+  'Recorded by the 25 Jul sweep and not re-checked since. This is that date’s reading, not today’s.'
 
 export const ALPHA_GATE: AlphaGateRecord = {
   recordedOn: '2026-07-25',
@@ -144,7 +144,7 @@ export const ALPHA_GATE: AlphaGateRecord = {
       status: 'partial',
       revisedOn: '2026-08-13',
       evidence:
-        'Colour extraction, the Readability Guard and persistence all work — themeTokensFrom() derives the tokens and saveWorkspaceTheme() writes them, and 5 workspaces wear an active extracted theme. Two halves are missing: the 4 default themes docs/05 asks for do not exist anywhere in the app, and a palette is only ever found when the door is a URL whose page declares a colour. A sentence door yields none, which the door step states on screen ("a sentence carries no colour").',
+        'Colour extraction, the Readability Guard and persistence all work: themeTokensFrom() derives the tokens and saveWorkspaceTheme() writes them, and 5 workspaces wear an active extracted theme. Two halves are missing: the 4 default themes docs/05 asks for do not exist anywhere in the app, and a palette is only ever found when the door is a URL whose page declares a colour. A sentence door yields none, which the door step states on screen ("a sentence carries no colour").',
     },
     {
       code: 'A6',
@@ -161,14 +161,14 @@ export const ALPHA_GATE: AlphaGateRecord = {
       status: 'fail',
       revisedOn: '2026-08-13',
       evidence:
-        'Neither platform A8 names has ever published live. In post_publish_logs, x is 3 fixture successes and gbp is 2 fixture successes plus 1 fixture failure, all dated 22 Jul; there is not one live row for either. Every live row belongs to a platform A8 does not name — instagram 6 succeeded and linkedin 1 succeeded, both 10 Aug, through Zernio. Live publishing works; live publishing TO X AND GBP has never happened.',
+        'Neither platform A8 names has ever published live. In post_publish_logs, x is 3 fixture successes and gbp is 2 fixture successes plus 1 fixture failure, all dated 22 Jul; there is not one live row for either. Every live row belongs to a platform A8 does not name: instagram 6 succeeded and linkedin 1 succeeded, both 10 Aug, through Zernio. Live publishing works; live publishing TO X AND GBP has never happened.',
     },
     {
       code: 'A9',
       status: 'partial',
       revisedOn: '2026-08-13',
       evidence:
-        'Scheduled publish runs, and is genuinely idempotent: runClaimedPublish claims a variant with a single atomic UPDATE, so two overlapping ticks cannot double-post. Two things A9 names are not true. It is not Trigger.dev — apps/jobs was never deployed there, and the sweep runs as a Vercel cron. And the schedule in apps/web/vercel.json is "*/5 * * * *", so a due post waits up to five minutes for a tick.',
+        'Scheduled publish runs, and is genuinely idempotent: runClaimedPublish claims a variant with a single atomic UPDATE, so two overlapping ticks cannot double-post. Two things A9 names are not true. It is not Trigger.dev, because apps/jobs was never deployed there and the sweep runs as a Vercel cron. And the schedule in apps/web/vercel.json is "*/5 * * * *", so a due post waits up to five minutes for a tick.',
     },
     {
       code: 'A10',
@@ -187,7 +187,7 @@ export const ALPHA_GATE: AlphaGateRecord = {
       status: 'partial',
       revisedOn: '2026-08-13',
       evidence:
-        'Prompt → sections → in-app preview works. The rest of the chain A12 names — real deploy, contact form, leads — is unbuilt, so the module is hidden from the nav rather than shown half-finished. Deferred on purpose; see the out-of-scope record below.',
+        'Prompt → sections → in-app preview works. The rest of the chain A12 names (real deploy, contact form, leads) is unbuilt, so the module is hidden from the nav rather than shown half-finished. Deferred on purpose; see the out-of-scope record below.',
     },
     {
       code: 'A13',
@@ -197,7 +197,7 @@ export const ALPHA_GATE: AlphaGateRecord = {
     {
       code: 'A14',
       status: 'fail',
-      evidence: `Sahoda Guide v0 — mascot, six tours and the sandbox seed brand. ${AS_AUDITED}`,
+      evidence: `Sahoda Guide v0: mascot, six tours and the sandbox seed brand. ${AS_AUDITED}`,
     },
   ],
   outOfScope: [

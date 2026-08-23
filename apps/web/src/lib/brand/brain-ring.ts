@@ -49,7 +49,7 @@ export function brainRing(provenance: Provenance): BrainRing {
  * nothing left to ask, say so rather than inventing urgency.
  */
 export function ringHoverLine(ring: BrainRing): string {
-  if (!ring.next) return 'Every field is confirmed — Sahoda writes from your answers.'
+  if (!ring.next) return 'Every field is confirmed. Sahoda writes from your answers.'
   return ring.next.question
 }
 

@@ -135,7 +135,7 @@ export const FIXTURE_SNAPSHOT: RadarSnapshot = {
           reading: {
             text:
               'This looks like a push on weekend footfall. Your brain says you compete on ' +
-              'same-day freshness, so the answer is what a weekend combo cannot copy — ' +
+              'same-day freshness, so the answer is what a weekend combo cannot copy. ' +
               'not a cheaper combo.',
             brandBasis: { field: 'Positioning', value: 'Same-day freshness, never day-old' },
           },

@@ -39,7 +39,7 @@ function json(body: unknown, status: number): Response {
 
 /** One sentence, no jargon — this renders inside somebody else's landing page. */
 const COULD_NOT_SEND =
-  'We could not send that just now. Nothing was saved — please try again in a moment.'
+  'We could not send that just now. Nothing was saved. Please try again in a moment.'
 
 export async function POST(request: Request): Promise<Response> {
   const ip = clientIpFrom(request.headers)
@@ -138,5 +138,5 @@ export async function POST(request: Request): Promise<Response> {
 
   // The id is deliberately NOT returned. It identifies a row in somebody else's
   // workspace to an anonymous caller, and the visitor has no use for it.
-  return json({ ok: true, message: 'Thanks — they have your details and will be in touch.' }, 200)
+  return json({ ok: true, message: 'Thanks. They have your details and will be in touch.' }, 200)
 }

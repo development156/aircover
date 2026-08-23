@@ -28,7 +28,7 @@ const GATES: ReadonlyArray<{ icon: LucideIcon; title: string; body: string }> = 
   {
     icon: KeyRound,
     title: 'A different permission from you',
-    body: 'Posting to your Instagram and running an ad from your ad account are two separate grants. Sahoda has the first one. The second needs a business account set up on the platform’s side, and it is yours to give — nothing here can arrange it for you.',
+    body: 'Posting to your Instagram and running an ad from your ad account are two separate grants. Sahoda has the first one. The second needs a business account set up on the platform’s side, and it is yours to give. Nothing here can arrange it for you.',
   },
   {
     icon: ShieldCheck,
@@ -38,7 +38,7 @@ const GATES: ReadonlyArray<{ icon: LucideIcon; title: string; body: string }> = 
   {
     icon: Scale,
     title: 'Money handled the way credits are',
-    body: 'A budget is not a number on a row — it is a spend record that cannot be edited afterwards, a running total that stays right when two things spend at once, and a rule for a charge a platform reports three days late. Sahoda already has one system built to that standard. Ad spend gets the same, or it does not ship.',
+    body: 'A budget is not a number on a row. It is a spend record that cannot be edited afterwards, a running total that stays right when two things spend at once, and a rule for a charge a platform reports three days late. Sahoda already has one system built to that standard. Ad spend gets the same, or it does not ship.',
   },
 ]
 

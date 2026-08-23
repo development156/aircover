@@ -39,10 +39,10 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
     // a degenerate or non-string list would derive a broken token set and
     // repaint the whole workspace.
     if (!Array.isArray(colors) || colors.length === 0) {
-      return { ok: false, message: 'Upload a logo first — there is no palette to save yet.' }
+      return { ok: false, message: 'Upload a logo first. There is no palette to save yet.' }
     }
     if (!colors.every((color) => typeof color === 'string' && color.trim().length > 0)) {
-      return { ok: false, message: 'That palette could not be read — re-upload your logo.' }
+      return { ok: false, message: 'That palette could not be read. Re-upload your logo.' }
     }
 
     // Derive, then zod-parse before writing: `tokens` is a jsonb column with no
@@ -51,7 +51,7 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
     if (!tokens.success) {
       return {
         ok: false,
-        message: 'That palette could not be turned into a theme — try another logo.',
+        message: 'That palette could not be turned into a theme. Try another logo.',
       }
     }
 
@@ -79,7 +79,7 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
       .limit(1)
       .maybeSingle()
     if (versionError) {
-      return { ok: false, message: 'Could not save your theme — try again.' }
+      return { ok: false, message: 'Could not save your theme. Try again.' }
     }
     const nextVersion = ((latest as { version?: number } | null)?.version ?? 0) + 1
 
@@ -93,7 +93,7 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
       .eq('workspace_id', workspace.id)
       .eq('status', 'active')
     if (supersedeError) {
-      return { ok: false, message: 'Could not save your theme — try again.' }
+      return { ok: false, message: 'Could not save your theme. Try again.' }
     }
 
     // A NULL ERROR ON AN UPDATE DOES NOT MEAN THE WRITE HAPPENED.
@@ -115,7 +115,7 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
       .eq('status', 'active')
       .limit(1)
     if (verifyError || (stillActive?.length ?? 0) > 0) {
-      return { ok: false, message: 'Could not save your theme — try again.' }
+      return { ok: false, message: 'Could not save your theme. Try again.' }
     }
 
     const { error } = await supabase.from('workspace_themes').insert({
@@ -128,13 +128,13 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
     })
     if (error) {
       // Never forward the postgres message — it can carry schema internals.
-      return { ok: false, message: 'Could not save your theme — try again.' }
+      return { ok: false, message: 'Could not save your theme. Try again.' }
     }
 
     // The theme paints the app shell and every site preview.
     revalidatePath('/', 'layout')
     return { ok: true }
   } catch {
-    return { ok: false, message: 'Could not save your theme — try again.' }
+    return { ok: false, message: 'Could not save your theme. Try again.' }
   }
 }

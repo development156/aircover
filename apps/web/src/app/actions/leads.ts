@@ -55,12 +55,12 @@ export async function setLeadStatus(leadId: string, status: unknown): Promise<Le
       .eq('id', leadId)
       .eq('workspace_id', workspaceId)
 
-    if (error) return { ok: false, message: 'Could not move that lead — try again.' }
+    if (error) return { ok: false, message: 'Could not move that lead. Try again.' }
     revalidatePath('/leads')
     return { ok: true }
   } catch (error) {
     reportServerError(error, { action: 'setLeadStatus', workspaceId })
-    return { ok: false, message: 'Could not move that lead — try again.' }
+    return { ok: false, message: 'Could not move that lead. Try again.' }
   }
 }
 
@@ -123,7 +123,7 @@ export async function promoteThreadToLead(input: PromoteInput): Promise<PromoteS
       p_message: input.message,
       p_permalink: null,
     })
-    if (error) return { ok: false, message: 'Could not save that as a lead — try again.' }
+    if (error) return { ok: false, message: 'Could not save that as a lead. Try again.' }
 
     const row = (data ?? {}) as { ok?: boolean; id?: string; existing?: boolean; reason?: string }
     if (row.ok !== true || !row.id) {
@@ -138,6 +138,6 @@ export async function promoteThreadToLead(input: PromoteInput): Promise<PromoteS
     return { ok: true, leadId: row.id, existing: Boolean(row.existing) }
   } catch (error) {
     reportServerError(error, { action: 'promoteThreadToLead', workspaceId })
-    return { ok: false, message: 'Could not save that as a lead — try again.' }
+    return { ok: false, message: 'Could not save that as a lead. Try again.' }
   }
 }

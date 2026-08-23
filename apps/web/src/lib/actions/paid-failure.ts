@@ -35,7 +35,7 @@ const CONFIG_MESSAGE_PATTERNS: readonly RegExp[] = [
  * warning.
  */
 export const DEPLOYMENT_CONFIG_MESSAGE =
-  'This deployment is not fully configured for AI actions yet — nothing ran and you were not charged.'
+  'This deployment is not fully configured for AI actions yet. Nothing ran and you were not charged.'
 
 function messageOf(cause: unknown): string {
   if (cause instanceof Error) return cause.message

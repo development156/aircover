@@ -30,7 +30,7 @@ export function TabooCard({
 }: TabooCardProps) {
   return (
     <BrandCard
-      title="Red lines — what Sahoda steers away from"
+      title="Red lines, what Sahoda steers away from"
       guide="onboarding.card.taboo"
       full
       onRegenerate={onRegenerate}
@@ -39,7 +39,7 @@ export function TabooCard({
     >
       <p className="text-[13px] text-muted">
         These shape every caption Sahoda writes for you. They are guidance to the model, not a
-        filter on the way out — keep reviewing posts before they go live.
+        filter on the way out. Keep reviewing posts before they go live.
       </p>
       <EditableList
         label="Red lines"

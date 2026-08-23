@@ -82,7 +82,7 @@ export default function AdsPerformancePage() {
             { key: 'results', header: 'Results', numeric: true },
           ]}
           rows={[]}
-          empty="No results — no ad has run. These are the columns Sahoda will report, and each one will name the platform it came from."
+          empty="No results. No ad has run. These are the columns Sahoda will report, and each one will name the platform it came from."
         />
       </section>
 
@@ -90,7 +90,7 @@ export default function AdsPerformancePage() {
         <h3 className="type-h3">The half of this that already works</h3>
         <p className="type-body max-w-[68ch] text-muted">
           Sahoda reports on your unpaid posts today, per channel, from what the platforms actually
-          returned. That is the column this screen will sit beside — and it is the reason paid
+          returned. That is the column this screen will sit beside. It is also the reason paid
           results here will be worth more than the same numbers in Meta&rsquo;s own dashboard.
         </p>
         <p className="mt-2">

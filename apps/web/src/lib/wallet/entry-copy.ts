@@ -143,7 +143,7 @@ const ENTRY_TYPE_WHY: Record<LedgerEntryType, string | null> = {
   GRANT: null, // from grantOrigin — see GRANT_COPY
   TOPUP: 'Added from a credit purchase.',
   PERF_REWARD: 'Earned from post performance.',
-  HOLD: 'Reserved while this action runs — returned in full if it does not complete.',
+  HOLD: 'Reserved while this action runs. Returned in full if it does not complete.',
   // Money first. A refund that opens on the failure reads like being told off
   // for a mistake the user did not make — and the reaper writes this same row
   // for a hold that simply outlived its action.

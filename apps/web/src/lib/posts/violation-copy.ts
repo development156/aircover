@@ -43,9 +43,9 @@ const KNOWN_CODES = [
   'MEDIA_DIMS',
   // ── THESE TWO WERE MISSING, AND THEY ARE THE INSTAGRAM ONES ────────────────
   // MEASURED 2026-08-20 against real `validateVariant` / `validateMedia` output:
-  //   engine: "instagram needs at least one photo — there is no text-only post."
+  //   engine: "instagram needs at least one photo. There is no text-only post."
   //   screen: "This does not meet the channel rules. Review it before publishing."
-  //   engine: "instagram feed photos must be between 0.75:1 and 1.91:1 — this one is 0.56:1."
+  //   engine: "instagram feed photos must be between 0.75:1 and 1.91:1. This one is 0.56:1."
   //   screen: "This does not meet the channel rules. Review it before publishing."
   // Both are the defects doc 13 section 10 said would go live the moment
   // Instagram became publishable. The engine was fixed and says exactly the
@@ -117,7 +117,7 @@ const FALLBACK_MESSAGES: Readonly<Record<KnownCode, string>> = {
   MEDIA_TYPE: 'This channel does not accept this file type.',
   MEDIA_SIZE: 'This file is larger than the channel allows.',
   MEDIA_DIMS: 'This image is smaller than the channel allows.',
-  MEDIA_REQUIRED: 'This channel has no text-only post — attach at least one photo.',
+  MEDIA_REQUIRED: 'This channel has no text-only post. Attach at least one photo.',
   MEDIA_ASPECT: 'This image is the wrong shape for this channel.',
   FORMAT_UNSUPPORTED: 'This channel cannot publish this kind of post.',
   FORMAT_NEEDS_MEDIA: 'This kind of post needs a photo that is not attached yet.',
@@ -170,10 +170,10 @@ const MESSAGE_SHAPES: Readonly<Record<KnownCode, RegExp>> = {
   MEDIA_SIZE: new RegExp(`^(?:${CHANNEL}) media must be ≤ ${DECIMAL} MB\\.$`),
   MEDIA_DIMS: new RegExp(`^(?:${CHANNEL}) images must be ≥ ${NUM}×${NUM}\\.$`),
   MEDIA_REQUIRED: new RegExp(
-    `^(?:${CHANNEL}) needs at least one photo — there is no text-only post\\.$`,
+    `^(?:${CHANNEL}) needs at least one photo\\. There is no text-only post\\.$`,
   ),
   MEDIA_ASPECT: new RegExp(
-    `^(?:${CHANNEL}) feed photos must be between ${DECIMAL}:1 and ${DECIMAL}:1 — this one is ${DECIMAL}:1\\.$`,
+    `^(?:${CHANNEL}) feed photos must be between ${DECIMAL}:1 and ${DECIMAL}:1\\. This one is ${DECIMAL}:1\\.$`,
   ),
   // ── THE FORMAT SENTENCES, AS ALTERNATIONS OF CLOSED LITERALS ───
   // `refuseFormat` emits a fixed set of sentences with the channel and a count
@@ -187,17 +187,17 @@ const MESSAGE_SHAPES: Readonly<Record<KnownCode, RegExp>> = {
       `|(?:${CHANNEL}) takes one photo per post, so there is no set to swipe through\\.)$`,
   ),
   FORMAT_NEEDS_MEDIA: new RegExp(
-    `^(?:(?:${CHANNEL}) has no text-only post — this one needs at least one photo\\.` +
-      `|A story is a picture — this one has none attached\\.` +
+    `^(?:(?:${CHANNEL}) has no text-only post\\. This one needs at least one photo\\.` +
+      `|A story is a picture\\. This one has none attached\\.` +
       `|This was written as a photo post but has no image attached\\.` +
       `|A set needs at least two images\\.)$`,
   ),
   FORMAT_CONTRADICTED: new RegExp(
     `^(?:This was written as a text-only post but has (?:an image|images) attached\\.` +
-      `|This was written as a single photo but has ${NUM} attached — choose a set instead\\.)$`,
+      `|This was written as a single photo but has ${NUM} attached\\. Choose a set instead\\.)$`,
   ),
   FORMAT_MEDIA_ASPECT: new RegExp(
-    `^A story is taller than it is wide — this photo is ${DECIMAL}:1\\. ` +
+    `^A story is taller than it is wide\\. This photo is ${DECIMAL}:1\\. ` +
       `Crop it upright, or post it to the feed instead\\.$`,
   ),
   // ── THE THREAD SENTENCES, AS CLOSED LITERALS WITH BOUNDED NUMBERS ─────────
@@ -205,7 +205,7 @@ const MESSAGE_SHAPES: Readonly<Record<KnownCode, RegExp>> = {
   THREAD_EMPTY: /^A thread needs something written in it\.$/,
   THREAD_UNBREAKABLE: new RegExp(
     `^This has ${NUM} characters in a row with no space to break at, and one post ` +
-      `holds ${NUM}\\. Splitting it would cut it in half — shorten it, or put it on ` +
+      `holds ${NUM}\\. Splitting it would cut it in half\\. Shorten it, or put it on ` +
       `its own line\\.$`,
   ),
   THREAD_NO_ROOM: /^A link leaves no room for words on this channel\.$/,

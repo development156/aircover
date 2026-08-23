@@ -86,8 +86,8 @@ export function scheduleGapNote(
   if (!someChannelStillConnected) {
     // Nothing this post is aimed at can receive it. The schedule is a promise with
     // no way to keep it, and saying "it goes out" first would bury that.
-    return `Nothing goes out at that time — ${names} ${verb} connected.`
+    return `Nothing goes out at that time. ${names} ${verb} connected.`
   }
 
-  return `This goes out on its own at around that time — but ${names} ${verb} connected, so it won’t go out there.`
+  return `This goes out on its own at around that time, but ${names} ${verb} connected, so it won’t go out there.`
 }

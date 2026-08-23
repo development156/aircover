@@ -144,7 +144,7 @@ export default async function SitesPage() {
         <EmptyState
           icon={Globe}
           title="Create a workspace to build a site"
-          body="Sites belong to a workspace and you don't have one yet. Nothing failed — and nothing has been charged."
+          body="Sites belong to a workspace and you don't have one yet. Nothing failed and nothing has been charged."
           action={<CreateWorkspaceButton variant="primary" />}
         />
       ) : preview === null ? (
@@ -161,13 +161,13 @@ export default async function SitesPage() {
         />
       ) : preview === 'read-failed' ? (
         <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
-          Couldn&rsquo;t check your sites just now — reload before generating. You may already have
-          a site, and generating again costs credits.
+          Couldn&rsquo;t check your sites just now. Reload before generating. You may already have a
+          site, and generating again costs credits.
         </p>
       ) : preview === 'unreadable' ? (
         <p className="rounded-input bg-danger-bg px-3 py-2.5 text-[13px] text-danger">
           Your recent site drafts could not be read back. Reload first; if this persists, generate
-          again — you were only ever charged for drafts that saved.
+          again. You were only ever charged for drafts that saved.
         </p>
       ) : (
         <SitePreview siteName={preview.siteName} pages={preview.pages} />

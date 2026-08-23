@@ -46,7 +46,7 @@ export function DangerZone({ isOwner }: { isOwner: boolean }) {
       const result = await resetWorkspace(workspaceId.trim(), workspaceName.trim(), typed)
       if (result.ok) {
         toast.success(
-          `Reset ${workspaceName.trim()} — content cleared, credits and access untouched.`,
+          `Reset ${workspaceName.trim()}. Content is cleared; credits and access are untouched.`,
         )
         setWorkspaceId('')
         setWorkspaceName('')

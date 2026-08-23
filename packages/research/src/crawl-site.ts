@@ -152,7 +152,7 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
     return {
       ok: false,
       reason: 'no_url',
-      message: 'No website to read — we will ask you instead.',
+      message: 'No website to read. We will ask you instead.',
       attempted: [],
       pagesFetched: 0,
       wordsFound: 0,
@@ -166,7 +166,7 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
       ok: false,
       reason: 'invalid_url',
       message:
-        'Check that website address — we could not read it as a link. Or tell us in your own words instead.',
+        'Check that website address. We could not read it as a link. Or tell us in your own words instead.',
       attempted: [],
       pagesFetched: 0,
       wordsFound: 0,
@@ -192,7 +192,7 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
       return {
         ok: false,
         reason: 'crawler_error',
-        message: 'Could not read your website just now — we will ask you instead.',
+        message: 'Could not read your website just now. We will ask you instead.',
         attempted: [],
         pagesFetched: 0,
         wordsFound: 0,
@@ -243,7 +243,7 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
     return {
       ok: false,
       reason: 'crawler_error',
-      message: 'Could not read your website just now — we will ask you instead.',
+      message: 'Could not read your website just now. We will ask you instead.',
       attempted: selected,
       pagesFetched: 0,
       wordsFound: 0,
@@ -258,8 +258,8 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
       reason: jsOnly ? 'js_only' : 'unreachable',
       attempted: selected,
       message: jsOnly
-        ? 'Your site loads its text with JavaScript, so we could not read it — tell us in your own words instead.'
-        : 'Could not reach that website — check the address, or tell us in your own words instead.',
+        ? 'Your site loads its text with JavaScript, so we could not read it. Tell us in your own words instead.'
+        : 'Could not reach that website. Check the address, or tell us in your own words instead.',
       pagesFetched: 0,
       wordsFound: 0,
       creditsUsed,
@@ -271,7 +271,7 @@ export async function crawlSite(rawUrl: string, opts: CrawlSiteOptions): Promise
       ok: false,
       reason: 'thin',
       attempted: selected,
-      message: `Read ${pages.length} page${pages.length === 1 ? '' : 's'}, but there was not enough writing to learn your voice — tell us in your own words instead.`,
+      message: `Read ${pages.length} page${pages.length === 1 ? '' : 's'}, but there was not enough writing to learn your voice. Tell us in your own words instead.`,
       pagesFetched: pages.length,
       wordsFound,
       creditsUsed,

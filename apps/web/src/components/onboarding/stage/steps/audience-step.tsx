@@ -78,7 +78,7 @@ export function AudienceStep({ data, patch }: StepProps) {
         </div>
 
         <AiLine show={audience.length >= 3}>
-          Noted. Everything I write will be aimed at <em>{audience}</em> — not at everyone.
+          Noted. Everything I write will be aimed at <em>{audience}</em>, not at everyone.
         </AiLine>
       </div>
     </>

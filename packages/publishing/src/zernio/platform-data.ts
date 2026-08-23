@@ -170,7 +170,7 @@ export function buildPlatformData(input: PlatformDataInput): PlatformDataResult 
         ok: false,
         refusal: {
           code: 'GBP_CTA_NEEDS_URL',
-          message: 'A Google button needs somewhere to go — add the web address it opens.',
+          message: 'A Google button needs somewhere to go. Add the web address it opens.',
         },
       }
     }

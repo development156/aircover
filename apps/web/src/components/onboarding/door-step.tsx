@@ -201,7 +201,7 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
         }
       }
     } catch {
-      setState({ ok: false, message: 'The connection dropped while reading — try again.' })
+      setState({ ok: false, message: 'The connection dropped while reading. Try again.' })
     } finally {
       setPending(false)
     }
@@ -212,7 +212,7 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
       <div>
         <p className="text-[16px] font-bold text-ink">Show us how you already talk</p>
         <p className="mt-1 text-[13px] text-muted">
-          A link, a PDF, or one sentence. If you give us more than one, we read the PDF — it is the
+          A link, a PDF, or one sentence. If you give us more than one, we read the PDF. It is the
           one you wrote every word of. Reading is free.
         </p>
       </div>
@@ -306,7 +306,7 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
           />
           {sentence.length > 0 && sentence.trim().length < MIN_SENTENCE_CHARS ? (
             <p className="text-[12px] text-muted">
-              A few more words — that is too short to read anything from.
+              A few more words. That is too short to read anything from.
             </p>
           ) : null}
         </div>
@@ -354,7 +354,7 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
           <p className="mt-1.5 text-[12.5px] text-muted">
             {file
               ? 'A document usually takes about 26 seconds, sometimes 40.'
-              : 'A website usually takes about 12 seconds — we read up to five pages.'}
+              : 'A website usually takes about 12 seconds. We read up to five pages.'}
           </p>
           {elapsed > typicalSeconds * 2 ? (
             <p className="mt-1 text-[12.5px] text-warn">
@@ -399,13 +399,12 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
         <div role="alert" className="rounded-card border border-danger bg-danger-bg p-4">
           <p className="type-body font-semibold text-danger">{stopped.message}</p>
           <p className="mt-1 type-sm text-muted">
-            Nothing was charged — reading is always free. Your link and PDF are still attached
-            above.
+            Nothing was charged. Reading is always free. Your link and PDF are still attached above.
           </p>
           <p className="mt-2 type-sm text-muted">
             {stopped.retryable
               ? 'Press Read this again when you are ready. Nothing about your document needs to change.'
-              : 'Fix the sign-in or the workspace first — pressing Read this again now would fail the same way.'}
+              : 'Fix the sign-in or the workspace first. Pressing Read this again now would fail the same way.'}
           </p>
         </div>
       ) : null}
@@ -414,13 +413,12 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
         <div className="rounded-card border border-danger bg-danger-bg p-4">
           <p className="text-[13px] font-semibold text-danger">{failure.message}</p>
           <p className="mt-1 text-[12.5px] text-muted">
-            Nothing was charged — reading is always free.
+            Nothing was charged. Reading is always free.
           </p>
           <p className="mt-2 text-[12.5px] text-muted">
             You can try another link or PDF, type a sentence above, or go on without it. Going on
             without it means we resolve from what you have already told us, and nothing from that
-            document — the Brain will be thinner, and every field stays a guess until you confirm
-            it.
+            document. The Brain will be thinner, and every field stays a guess until you confirm it.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {/*
@@ -496,8 +494,8 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
           {(read as { costUsd?: number }).costUsd ? (
             <p className="rounded-input border border-line bg-bg px-2.5 py-1.5 text-[12.5px] text-ink">
               The free reader found no text, so we used OCR to read the pictures. That cost about ₹
-              {Math.max(1, Math.round((read as { costUsd: number }).costUsd * 88))} — an estimate
-              for a short document, charged to us, not to your credits.
+              {Math.max(1, Math.round((read as { costUsd: number }).costUsd * 88))}, an estimate for
+              a short document, charged to us, not to your credits.
             </p>
           ) : null}
 
@@ -534,7 +532,7 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
                 })
               }
             >
-              That is us — continue
+              That is us, continue
             </Button>
             <Button
               type="button"
@@ -547,7 +545,7 @@ export function DoorStep({ onContinue, onBack }: DoorStepProps) {
                 setDirty(true)
               }}
             >
-              That is not us — try another source
+              That is not us, try another source
             </Button>
           </div>
         </div>

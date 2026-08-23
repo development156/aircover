@@ -35,10 +35,10 @@ export type SniffResult =
   | { ok: false; reason: 'unknown_format' | 'truncated'; message: string }
 
 const UNKNOWN_FORMAT_MESSAGE =
-  'Upload a JPEG, PNG, WebP or GIF — this file is not an image type the channels accept.'
+  'Upload a JPEG, PNG, WebP or GIF. This file is not an image type the channels accept.'
 
 const TRUNCATED_MESSAGE =
-  'Re-upload this file to check it — it looks incomplete, so it cannot be checked against the channel limits.'
+  'Re-upload this file to check it. It looks incomplete, so it cannot be checked against the channel limits.'
 
 const unknownFormat = (): SniffResult => ({
   ok: false,

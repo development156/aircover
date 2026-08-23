@@ -276,7 +276,7 @@ export function ScheduleField({
         <p className="type-meta text-muted">
           {now === null
             ? 'Checking the schedule against the channel lead times…'
-            : 'No schedule set — this post stays a draft.'}
+            : 'No schedule set. This post stays a draft.'}
         </p>
       ) : null}
 

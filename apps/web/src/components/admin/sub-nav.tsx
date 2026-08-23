@@ -71,7 +71,7 @@ export function AdminSubNav({ sections = SECTIONS }: { sections?: readonly Secti
              availability at all; the title says what is actually true. */
           <span
             key={section.label}
-            title={`Not built yet — ${section.pending} builds this screen.`}
+            title={`Not built yet. ${section.pending} builds this screen.`}
             className={cn(ITEM, 'cursor-not-allowed text-faint')}
           >
             {section.label}

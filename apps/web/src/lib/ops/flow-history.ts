@@ -138,7 +138,7 @@ export function buildFlowHistory(tasks: readonly OpsTask[], now: Date, maxDays =
     days,
     windowLabel:
       days.length === 1
-        ? 'Today only — one day of history'
+        ? 'Today only, one day of history'
         : `${days.length} days · ${from} to ${today}`,
     enoughForTrend: days.length >= MIN_POINTS_FOR_TREND,
   }

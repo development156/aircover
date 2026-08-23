@@ -88,7 +88,7 @@ export function EditableList({
           </Button>
           {atCap ? (
             <span className="text-[12.5px] text-muted">
-              That's the maximum of <span className="tabular-nums">{maxItems}</span> — remove one to
+              That's the maximum of <span className="tabular-nums">{maxItems}</span>. Remove one to
               add another.
             </span>
           ) : null}

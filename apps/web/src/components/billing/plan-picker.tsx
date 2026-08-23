@@ -79,7 +79,7 @@ export function PlanPicker({ subscription }: { subscription: SubscriptionView })
                 message:
                   `A real ${checkout.mode} order was opened for ` +
                   `${rupees(checkout.amountDuePaise)}. Nothing was charged and no credits ` +
-                  `were added — the payment page is not reachable from the app yet.`,
+                  `were added. The payment page is not reachable from the app yet.`,
               }
             : { ok: true, message: 'Checkout is ready. Credits land once the payment clears.' }
           : { ok: false, message: checkout.message },
@@ -189,7 +189,7 @@ function Preview({
         <p className="type-body mt-3 border-t border-line-soft pt-3">
           <span className="font-[650]">What you keep. </span>
           {impact.over.map((o) => `${o.have} of ${o.allowed} ${o.dimension}`).join(', ')}. Nothing
-          is removed — every channel, site and post stays exactly where it is. You just cannot add
+          is removed. Every channel, site and post stays exactly where it is. You just cannot add
           more until you are back under the limit.
         </p>
       ) : null}

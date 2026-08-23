@@ -125,7 +125,7 @@ export function buildGateHistory(
 export function coverageNote(history: GateHistory): string {
   const percent = Math.round(history.coverage * 100)
   if (percent === 0)
-    return 'No gate runs landed in this window — the chart below is empty, not green.'
+    return 'No gate runs landed in this window. The chart below is empty, not green.'
   if (percent < 40) {
     return `Only ${percent}% of this window was measured. Gaps are days a suite did not run, not days it passed.`
   }

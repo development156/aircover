@@ -124,7 +124,7 @@ function TagPicker({
       <legend className="text-[13px] font-semibold">Message tag</legend>
       <p className="mt-1 max-w-[70ch] text-[13px] text-muted">
         The free-form window has closed, so this reply has to declare why it is allowed. Choose the
-        one that is actually true — the platform audits these.
+        one that is actually true. The platform audits these.
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {tags.map((option) => (

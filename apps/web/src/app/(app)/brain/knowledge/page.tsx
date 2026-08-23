@@ -56,7 +56,7 @@ export default async function BrainKnowledgePage({
         <EmptyState
           icon={Library}
           title="Create a workspace to build a library"
-          body="A library belongs to a workspace and you don't have one yet. Nothing failed — there is simply nowhere to put a document."
+          body="A library belongs to a workspace and you don't have one yet. Nothing failed. There is simply nowhere to put a document."
           action={<CreateWorkspaceButton variant="primary" />}
         />
       </Shell>
@@ -69,7 +69,7 @@ export default async function BrainKnowledgePage({
         <EmptyState
           icon={Library}
           title="Sahoda could not read your library"
-          body="This is not a claim that it is empty — the list did not come back. Reload the page."
+          body="This is not a claim that it is empty. The list did not come back. Reload the page."
         />
       </Shell>
     )

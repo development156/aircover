@@ -111,7 +111,7 @@ export async function buildArchiveEntries(
               prefix: skipped.slice(0, NAMED_SKIPS).join(', '),
               reason:
                 `${skipped.length} file(s) are listed in this document but their contents are ` +
-                `not in the archive — this download has a size limit. Ask Sahoda and we will ` +
+                `not in the archive, because this download has a size limit. Ask Sahoda and we will ` +
                 `send them another way.`,
             },
           ],

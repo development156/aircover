@@ -23,7 +23,7 @@ const ROLES: readonly OpsRole[] = ['owner', 'admin', 'viewer']
 const ROLE_NOTE: Record<OpsRole, string> = {
   owner: 'Everything, including managing this list',
   admin: 'Everything except managing this list',
-  viewer: 'Read only — never approves or grants',
+  viewer: 'Read only, never approves or grants',
 }
 
 const WHEN = new Intl.DateTimeFormat('en-IN', {

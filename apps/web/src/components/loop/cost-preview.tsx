@@ -102,7 +102,7 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
             // person who pressed stop that it went ahead anyway.
             `${wrote}, then you stopped the week. They are in your Planner and nothing more will be written.`
           : made.created === 0
-            ? 'Nothing was written — every brief is on a channel set to suggest only.'
+            ? 'Nothing was written. Every brief is on a channel set to suggest only.'
             : `${wrote}.`,
       )
     })
@@ -198,7 +198,7 @@ export function CostPreview({ cycleId, briefs, budgetCredits }: CostPreviewProps
           <AlertTriangle size={15} strokeWidth={1.8} aria-hidden className="mt-[2px] shrink-0" />
           <span>
             This is <span className="num">{preview.overBy}</span> {creditWord(preview.overBy)} over
-            your weekly budget. Uncheck a post to fit, or approve it anyway — the budget is yours to
+            your weekly budget. Uncheck a post to fit, or approve it anyway. The budget is yours to
             set.
           </span>
         </p>

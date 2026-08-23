@@ -159,7 +159,7 @@ export function PlanBatch({ posts }: PlanBatchProps) {
         {cost.includedCount === 1 ? 'draft' : 'drafts'} for{' '}
         <span className="num text-ink">{cost.totalCredits}</span>{' '}
         {cost.totalCredits === 1 ? 'credit' : 'credits'}. Adding a channel adds a draft, not a
-        credit — one writing pass covers every channel it is for.
+        credit. One writing pass covers every channel it is for.
       </p>
 
       {error ? (

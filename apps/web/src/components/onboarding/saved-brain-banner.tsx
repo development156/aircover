@@ -47,7 +47,7 @@ export function SavedBrainBanner({
         <Info size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden />
         <div>
           <p className="text-[13px] font-semibold text-ink">
-            Loaded your saved Brand Brain — version <span className="tabular-nums">{version}</span>,{' '}
+            Loaded your saved Brand Brain, version <span className="tabular-nums">{version}</span>,{' '}
             {formatDay(updatedAt)}.
           </p>
           <p className="mt-0.5 text-[12.5px] text-muted">

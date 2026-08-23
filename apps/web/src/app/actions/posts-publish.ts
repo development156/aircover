@@ -131,7 +131,7 @@ export async function simulatePublish(postId: string): Promise<PublishState> {
       // fixture adapter always mints one deterministically, so a null here means this
       // is not the fixture adapter and the preview must not claim it ran.
       if (result.mode !== 'fixture' || result.platformPostId === null) {
-        return { ok: false, message: 'Preview is unavailable right now — try again.' }
+        return { ok: false, message: 'Preview is unavailable right now. Try again.' }
       }
 
       simulated.push({
@@ -155,6 +155,6 @@ export async function simulatePublish(postId: string): Promise<PublishState> {
     return { ok: true, simulated, blocked, skipped }
   } catch (error) {
     reportServerError(error, { action: 'simulatePublish', workspaceId })
-    return { ok: false, message: 'Could not run the publish preview — try again.' }
+    return { ok: false, message: 'Could not run the publish preview. Try again.' }
   }
 }

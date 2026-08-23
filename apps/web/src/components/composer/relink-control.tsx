@@ -51,8 +51,7 @@ export function RelinkControl({
     return (
       <div className="surface-ring flex flex-wrap items-center gap-2 rounded-sm bg-s2 px-3 py-2 text-[12.5px] text-muted">
         <span>
-          {label} follows your post again. Its own copy is kept until you save — nothing was
-          written.
+          {label} follows your post again. Its own copy is kept until you save. Nothing was written.
         </span>
         <button
           type="button"

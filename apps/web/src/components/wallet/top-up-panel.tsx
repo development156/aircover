@@ -100,7 +100,7 @@ export function TopUpPanel() {
       </fieldset>
 
       <p className="text-[13px] text-muted">
-        Starts a checkout session for {plan.name} — ₹
+        Starts a checkout session for {plan.name}, at ₹
         <span className="tabular-nums">{inr(plan.priceInr)}</span> per month. Nothing is charged and
         no credits are added until a payment completes.
       </p>
@@ -157,12 +157,12 @@ function CheckoutResult({ result, onRetry }: { result: CheckoutState; onRetry: (
         <p className="flex items-center gap-2 font-semibold">
           <Info size={14} strokeWidth={2} aria-hidden />
           {result.mode === 'sandbox'
-            ? 'Sandbox order created — no real money moves'
-            : 'Simulated checkout — no payment rail is connected'}
+            ? 'Sandbox order created. No real money moves'
+            : 'Simulated checkout. No payment rail is connected'}
         </p>
         <p>
           {result.mode === 'sandbox'
-            ? 'A real Cashfree order was opened in test mode. Nothing was charged and no credits were added — credits arrive only after a completed payment is confirmed. The payment page is not reachable from the app yet.'
+            ? 'A real Cashfree order was opened in test mode. Nothing was charged and no credits were added. Credits arrive only after a completed payment is confirmed. The payment page is not reachable from the app yet.'
             : `No payment was taken and no credits were added. This is what a ${result.mode} session returns while billing is being wired.`}
         </p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-[12px]">

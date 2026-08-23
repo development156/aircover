@@ -66,7 +66,7 @@ export default async function AdminQaPage() {
       ) : (
         <section className="rounded-card border border-line bg-bg p-5 shadow-card">
           <p className="text-[13px] text-muted">
-            We couldn&apos;t read the QA runs just now. The records are safe — this is our read
+            We couldn&apos;t read the QA runs just now. The records are safe. This is our read
             failing. Reload to try again.
           </p>
           {runs.eventId ? (

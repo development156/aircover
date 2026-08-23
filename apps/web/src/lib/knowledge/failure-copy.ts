@@ -57,14 +57,14 @@ export function knowledgeFailure(
     case 'no_text':
       return {
         message:
-          'Sahoda opened this and found almost no text — the words are probably part of the design rather than typed into it. A menu exported as a picture reads this way. Try a version you can select text in, or paste the text yourself.',
+          'Sahoda opened this and found almost no text. The words are probably part of the design rather than typed into it. A menu exported as a picture reads this way. Try a version you can select text in, or paste the text yourself.',
         retryable: false,
       }
     case 'too_large':
       return {
         message:
           extra.passages && extra.limit
-            ? `This is far longer than Sahoda stores in one go — about ${extra.passages.toLocaleString('en-IN')} passages against a limit of ${extra.limit.toLocaleString('en-IN')}. Nothing was saved, because storing half a document and calling it read would be worse. Split it into sections and add them separately.`
+            ? `This is far longer than Sahoda stores in one go: about ${extra.passages.toLocaleString('en-IN')} passages against a limit of ${extra.limit.toLocaleString('en-IN')}. Nothing was saved, because storing half a document and calling it read would be worse. Split it into sections and add them separately.`
             : 'This is far longer than Sahoda stores in one go. Nothing was saved, because storing half a document and calling it read would be worse. Split it into sections and add them separately.',
         retryable: false,
       }
@@ -77,13 +77,13 @@ export function knowledgeFailure(
     case 'fetch_refused':
       return {
         message:
-          'Sahoda will not fetch that address. It points somewhere private rather than to a page on the open web — a home network, or a machine only this server can see. Check the link and try a public page.',
+          'Sahoda will not fetch that address. It points somewhere private rather than to a page on the open web. It looks like a home network, or a machine only this server can see. Check the link and try a public page.',
         retryable: false,
       }
     case 'fetch_failed':
       return {
         message:
-          'The page did not answer. Sahoda cannot say whether it is usable, because it never arrived. Nothing was saved — try again.',
+          'The page did not answer. Sahoda cannot say whether it is usable, because it never arrived. Nothing was saved. Try again.',
         retryable: true,
       }
     case 'not_supported':
@@ -102,7 +102,7 @@ export function knowledgeFailure(
     case 'interrupted':
       return {
         message:
-          'Sahoda stopped part-way through reading this and cannot say whether it is usable. That is a fault at our end, not with your file. Nothing was saved and nothing was charged — read it again.',
+          'Sahoda stopped part-way through reading this and cannot say whether it is usable. That is a fault at our end, not with your file. Nothing was saved and nothing was charged. Read it again.',
         retryable: true,
       }
   }

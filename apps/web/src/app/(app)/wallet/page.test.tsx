@@ -9,7 +9,7 @@ import WalletPage from './page'
  * /wallet has to answer three different questions honestly, and for a long time
  * it answered two of them with the same red alert:
  *
- *   "Could not read your credit balance just now — reload to try again."
+ *   "Could not read your credit balance just now. Reload to try again."
  *
  * For a signed-in user who has not created a workspace yet, every clause of
  * that sentence is wrong. Nothing failed, there is nothing to re-read, and no

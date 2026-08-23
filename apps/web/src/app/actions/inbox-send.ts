@@ -148,7 +148,7 @@ export async function sendThreadReply(
     return toState(outcome, threadHref({ accountId, conversationId }))
   } catch (error) {
     reportServerError(error, { action: 'sendThreadReply' })
-    return { ok: false, status: 'failed', message: 'Could not send that reply — try again.' }
+    return { ok: false, status: 'failed', message: 'Could not send that reply. Try again.' }
   }
 }
 
@@ -171,7 +171,7 @@ export async function sendCommentReply(
     return toState(outcome, commentsHref({ accountId, platformPostId }))
   } catch (error) {
     reportServerError(error, { action: 'sendCommentReply' })
-    return { ok: false, status: 'failed', message: 'Could not send that reply — try again.' }
+    return { ok: false, status: 'failed', message: 'Could not send that reply. Try again.' }
   }
 }
 
@@ -195,6 +195,6 @@ export async function sendReviewReply(
     return toState(outcome, '/inbox/reviews')
   } catch (error) {
     reportServerError(error, { action: 'sendReviewReply' })
-    return { ok: false, status: 'failed', message: 'Could not send that reply — try again.' }
+    return { ok: false, status: 'failed', message: 'Could not send that reply. Try again.' }
   }
 }

@@ -129,13 +129,13 @@ export function PollOptions({ channel, extras, onExtrasChange, mediaCount }: Pol
             // Not an empty box on X: X polls have no question field, and adding
             // one would collect something no platform will show.
             <p className="text-[12.5px] text-muted">
-              On X the post itself is the question — the answers go below.
+              On X the post itself is the question. The answers go below.
             </p>
           )}
 
           <fieldset className="space-y-1.5">
             <legend className="text-[12px] text-muted">
-              Answers — two to four
+              Answers, two to four
               {channel === 'x' ? (
                 <>
                   , up to <span className="tabular-nums">{X_POLL_OPTION_MAX}</span> characters each

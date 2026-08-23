@@ -43,7 +43,7 @@ export function SpendBars({ spend }: { spend: SpendRead }) {
     return (
       <ChartEmpty
         status={spend.status === 'unreadable' ? 'unreadable' : 'empty'}
-        empty="Nothing spent yet — no actions to break down."
+        empty="Nothing spent yet. No actions to break down."
       />
     )
   }

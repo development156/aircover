@@ -104,7 +104,7 @@ describe('InlineRewrite', () => {
     rewriteCaption.mockResolvedValue({
       ok: false,
       insufficient: false,
-      message: 'The model returned an empty rewrite. You were not charged — try again.',
+      message: 'The model returned an empty rewrite. You were not charged. Try again.',
     })
     const { rerender } = render(
       <InlineRewrite body={BODY} selection={SELECTION} onReplace={() => true} />,

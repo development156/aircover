@@ -157,7 +157,7 @@ export function planThread(spec: PlatformSpec, publishedText: string): ThreadPla
       ok: false,
       refusal: {
         code: 'THREAD_UNBREAKABLE',
-        message: `This has ${countCodePoints(token)} characters in a row with no space to break at, and one post holds ${limit}. Splitting it would cut it in half — shorten it, or put it on its own line.`,
+        message: `This has ${countCodePoints(token)} characters in a row with no space to break at, and one post holds ${limit}. Splitting it would cut it in half. Shorten it, or put it on its own line.`,
       },
     }
   }

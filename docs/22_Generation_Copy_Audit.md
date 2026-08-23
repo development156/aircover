@@ -12,20 +12,21 @@ words in front of a customer's audience.
 
 ## 0. The distinction this whole document rests on
 
-Doc CLAUDE.md now records a ruling that em dashes stay in **Sahoda's own UI copy**,
-because the reference design uses 542 of them and the humanizer's Voice Calibration says
-a writing sample outranks its §14.
+**Updated 2026-08-23.** This section originally argued from a CLAUDE.md ruling that em
+dashes STAYED in Sahoda's own UI copy, because the reference design uses 542 of them.
+The founder reversed that ruling on 2026-08-23 and the `wt-voice` lane removed 650 dashes
+from UI prose. The premise below has therefore changed. The conclusion has not, and the
+findings F1 to F5 are untouched by it.
 
-**That ruling does not extend to generated captions, and must not be read as if it does.**
+Both surfaces now lose the em dash, but **for different reasons, and the distinction still
+has to be kept**. Sahoda's UI copy loses it because the founder rules how Sahoda sounds. A
+caption published to a customer's Instagram is the *customer's* voice, read by the
+customer's audience, who have no idea Sahoda exists; there an em dash is a reliable tell
+that a machine wrote the post, and the authority over it is the Brand Brain, not
+CLAUDE.md. Nothing in the UI ruling reaches a generation prompt on its own. §3 is still
+the decision that has to be made before F4 or F5 is applied.
 
-Sahoda's UI copy is Sahoda's voice, and the reference is its sample. A caption published
-to a customer's Instagram is the *customer's* voice, read by the customer's audience, who
-have no idea Sahoda exists. There, an em dash is what it is everywhere else on the
-internet in 2026: a reliable tell that a machine wrote the post. The two surfaces have
-different authors, different readers, and therefore different rules.
-
-This is the single most important thing to get right before any of the changes below are
-applied.
+The thing that must not be read across is the EMOJI rule, and §4 below records why.
 
 ---
 
@@ -99,6 +100,51 @@ whether "exactly three" was ever a product decision or just a convenient schema.
 should relax it from inside a copy audit.
 
 Owner: shared + db. Risk: high, contract and stored data.
+
+#### F2 addendum — what relaxing it would actually take (MEASURED 2026-08-23, `wt-voice`)
+
+Nothing below was changed. This is the enumeration F2 asked for, so the decision can be
+made on a list rather than an estimate. Every call site of `signature_phrases`,
+`core_values` and `sample_hooks` outside tests:
+
+**The three places that ENFORCE exactly three.**
+
+| # | where | what it does | can it change? |
+| --- | --- | --- | --- |
+| 1 | `packages/shared/src/brand/resolve.ts:15,21,32` | `z.array(z.string()).length(3)` on the v1 payload | yes, it is a source edit |
+| 2 | `packages/db/.../20260719094548_resolve_brand_memory.sql:137-142` | the `resolve_brand_memory` RPC raises `INVALID_PAYLOAD` unless `jsonb_array_length` is `<> 3` for all three | **no**, that migration is applied; it needs a NEW migration replacing the function |
+| 3 | `packages/mesh/src/tasks/brand-guidelines.ts:23-33` | the output contract prints `[string, string, string]` AND says "Rules: signature_phrases, core_values, and sample_hooks have EXACTLY 3 items each." | yes, prompt text |
+
+**The finding F2 could not have known: v2 already relaxed it.**
+`packages/shared/src/brand/audiences.ts:133,140,145` declares the same three fields on
+`BrandMemoryPayloadV2Schema` as plain `z.array(z.string())` with **no `.length(3)`**. So
+the "exactly three" contract is a v1 constraint that the v2 schema has already dropped at
+the type level, while the DB function and the prompt still enforce it for everyone. That
+is a divergence, not a design: whichever way the founder rules, these three should agree.
+
+**What else moves if the length changes.**
+
+| where | why it is coupled |
+| --- | --- |
+| `apps/web/src/components/onboarding/editable-list.tsx:13` | has a fixed-length mode whose entries cannot be added or removed; three cards use it (`voice-card`, `brand-persona-card`, `hook-card`) |
+| `apps/web/src/lib/brand/prune-blank-entries.ts:13` | must NOT prune blanks from these three precisely because they are fixed-length; relaxing the length changes what pruning means |
+| `packages/db/.../20260820000400_loop_rpcs.sql:41-42` | the Loop's memory merge treats them as ordered fixed-length lists and concludes "merge has no meaning for them" |
+| `packages/shared/src/brand/migrate-v2.ts:52` | carries `sample_hooks` across the v1 to v2 migration |
+| `apps/web/src/lib/brand/fields.ts:182,191,200` | all three are registered fields on the resolution console |
+| `apps/web/src/lib/knowledge/field-map.ts:38-51` | knowledge extraction writes into all three |
+| `packages/mesh/src/brand-context.ts:35,37` | joins them into the grounded prompt prefix every caption is written from |
+
+**Stored data.** Every existing v1 brain holds exactly three in each. Widening the schema
+does not invalidate them (three satisfies `string[]`), so no backfill is required, but
+narrowing later would.
+
+**The order to do it in, if it is done.** New migration replacing the RPC's length check
+first, then `resolve.ts`, then the prompt, then `editable-list`'s fixed mode. Doing the
+zod first would let the app write a payload the database then refuses.
+
+**The prior question stands and is not ours.** Nothing above says whether three is right.
+It says that three is currently asserted in three places, contradicted in a fourth, and
+that changing it is one migration plus four source edits rather than a copy fix.
 
 ### F3 — `site_generate` can fabricate testimonials (HIGH)
 
@@ -201,8 +247,10 @@ proposal in this document adds an emoji restriction to any generation prompt, an
 should be added later by someone applying §18 mechanically.
 
 **The em-dash ruling for UI copy** (CLAUDE.md, "Copy style") is about Sahoda's own
-surfaces and is not reopened here. §0 explains why generated captions are the opposite
-case.
+surfaces and is not reopened here. As of 2026-08-23 that ruling REMOVES the dash from UI
+prose rather than keeping it, and §0 records the correction. Either way the authority over
+a caption is the Brand Brain, so applying the UI ruling to a generation prompt without
+settling §3 remains wrong.
 
 **`packages/shared` schemas** are frozen contracts. F2 names one and deliberately stops.
 

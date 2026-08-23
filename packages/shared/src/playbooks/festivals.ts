@@ -91,7 +91,7 @@ export const FESTIVALS: readonly Festival[] = [
     calendar: 'global',
     month: 4,
     day: 22,
-    angle: 'only if you have something real to say about it — otherwise skip',
+    angle: 'only if you have something real to say about it, otherwise skip',
   },
   {
     key: 'workers-day',

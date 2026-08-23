@@ -31,7 +31,7 @@ export function ReferencesStep({ data, patch }: StepProps) {
         <p className="micro step__eyebrow">References</p>
         <h2 className="display">Show us what &ldquo;good&rdquo; looks like.</h2>
         <p className="lead step__lead">
-          Websites, Instagram accounts, Pinterest boards, competitors — anything you admire.
+          Websites, Instagram accounts, Pinterest boards, competitors: anything you admire.
         </p>
       </div>
       <div className="rise">

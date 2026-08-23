@@ -194,7 +194,7 @@ export function AddDocument() {
                 />
                 <p id={capId} className="type-sm text-muted">
                   Up to <span className="num">{Math.floor(MAX_UPLOAD_BYTES / 1_000_000)}</span> MB.
-                  Sahoda reads the text layer — a menu saved as a picture has none, and it will say
+                  Sahoda reads the text layer. A menu saved as a picture has none, and it will say
                   so rather than store an empty document.
                 </p>
               </div>

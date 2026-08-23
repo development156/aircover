@@ -151,7 +151,7 @@ export function parseGstin(raw: string): GstinParts | null {
 }
 
 export const GstinSchema = z.string().refine((v) => parseGstin(v) !== null, {
-  message: 'Not a valid GSTIN — check the 15 characters',
+  message: 'Not a valid GSTIN. Check the 15 characters',
 })
 
 // ─────────────────────────────────────────────────────────────────────────────

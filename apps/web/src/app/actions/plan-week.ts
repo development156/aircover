@@ -232,6 +232,6 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
     if (isDeploymentConfigCause(error)) {
       return { ok: false, insufficient: false, message: DEPLOYMENT_CONFIG_MESSAGE }
     }
-    return { ok: false, insufficient: false, message: 'Could not plan your week — try again.' }
+    return { ok: false, insufficient: false, message: 'Could not plan your week. Try again.' }
   }
 }

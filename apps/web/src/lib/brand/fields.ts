@@ -211,7 +211,7 @@ export const BRAIN_FIELDS: readonly BrainField[] = [
     metaKind: 'negotiated',
     label: 'Register',
     kind: 'text',
-    question: 'How formal should you be — a shopkeeper, or a consultant?',
+    question: 'How formal should you be: a shopkeeper, or a consultant?',
   },
 ] as const
 

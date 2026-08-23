@@ -53,7 +53,7 @@ export interface MintInput {
 
 export type MintResult = { ok: true; warnings: ChannelRejection[] } | { ok: false; message: string }
 
-const CANNOT_READ = 'Sahoda could not read that photo well enough to crop it — try again.'
+const CANNOT_READ = 'Sahoda could not read that photo well enough to crop it. Try again.'
 const CROP_FAILED = 'That crop did not produce a file the channels accept, so nothing was saved.'
 
 /**
@@ -133,7 +133,7 @@ export async function mintCroppedAttachment(input: MintInput): Promise<MintResul
   const oriented = await orientedSize(originalBytes)
   if (oriented === null) return { ok: false, message: CANNOT_READ }
   if (oriented.animated) {
-    return { ok: false, message: 'Sahoda does not crop moving images — it would freeze them.' }
+    return { ok: false, message: 'Sahoda does not crop moving images. It would freeze them.' }
   }
 
   // The plan is rebuilt SERVER-SIDE from the original's own dimensions. The
@@ -228,7 +228,7 @@ export async function mintCroppedAttachment(input: MintInput): Promise<MintResul
       contentType: derivative.mime,
       upsert: false,
     })
-    if (upload.error) return { ok: false, message: 'Could not store the cropped copy — try again.' }
+    if (upload.error) return { ok: false, message: 'Could not store the cropped copy. Try again.' }
 
     const inserted = await supabase
       .from('asset_derivatives')
@@ -300,7 +300,7 @@ export async function mintCroppedAttachment(input: MintInput): Promise<MintResul
     // the row by recipe and reuses it rather than rendering and uploading again.
     // Removing them here would also break any OTHER post already using this same
     // crop. `uploadedPath` is not cleaned up for exactly that reason.
-    return { ok: false, message: 'Could not put the cropped copy on this post — try again.' }
+    return { ok: false, message: 'Could not put the cropped copy on this post. Try again.' }
   }
 
   const final = decideAttach(

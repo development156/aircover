@@ -10,7 +10,7 @@ export async function Changelog() {
       // The region around this supplies the card and the heading.
       <section aria-label="Changelog entries">
         <p className="text-[13px] text-muted">
-          We couldn&apos;t read the changelog just now. The entries are safe — this is our read
+          We couldn&apos;t read the changelog just now. The entries are safe. This is our read
           failing. Reload to try again.
         </p>
         {entries.eventId ? (

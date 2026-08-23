@@ -36,7 +36,7 @@ export default async function WalletPage() {
         <EmptyState
           icon={Wallet}
           title="Create a workspace to open your wallet"
-          body="Credits belong to a workspace and you don't have one yet. Nothing failed and nothing was charged — there is simply no wallet to show."
+          body="Credits belong to a workspace and you don't have one yet. Nothing failed and nothing was charged. There is simply no wallet to show."
           action={<CreateWorkspaceButton variant="primary" />}
           tip="Your free signup credits land the moment the workspace exists."
         />
@@ -71,8 +71,8 @@ export default async function WalletPage() {
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
         >
-          Could not read your credit balance just now — reload to try again. Nothing has been
-          charged and your credits are unaffected.
+          Could not read your credit balance just now. Reload to try again. Nothing has been charged
+          and your credits are unaffected.
         </div>
       )}
 
@@ -84,7 +84,7 @@ export default async function WalletPage() {
               icon={Receipt}
               title="No credit activity yet"
               body="Every grant, hold, charge and refund lands here with the action that caused it and what it cost to run."
-              tip="A hold is credits reserved while an action runs — if the action fails, they come back and you are not charged."
+              tip="A hold is credits reserved while an action runs. If the action fails, they come back and you are not charged."
             />
             {/* An all-malformed page is not an empty one, and must not read as one. */}
             <SkippedNote skipped={ledger.skipped} />

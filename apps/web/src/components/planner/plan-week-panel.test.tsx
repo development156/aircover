@@ -83,14 +83,14 @@ describe('PlanWeekPanel', () => {
     state.result = {
       ok: false,
       insufficient: false,
-      message: 'The plan could not be saved. You were not charged — try again.',
+      message: 'The plan could not be saved. You were not charged. Try again.',
     }
 
     render(<PlanWeekPanel />)
     await userEvent.click(screen.getByRole('button', { name: /plan my week/i }))
 
     expect(
-      await screen.findByText('The plan could not be saved. You were not charged — try again.'),
+      await screen.findByText('The plan could not be saved. You were not charged. Try again.'),
     ).toBeInTheDocument()
   })
 })

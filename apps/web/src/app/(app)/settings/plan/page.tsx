@@ -97,7 +97,7 @@ export default async function SettingsPlanPage() {
           // invoiced, because a query failed, is a claim about their records that we have no
           // basis for.
           <p role="alert" className="type-body text-muted">
-            Sahoda could not read your invoices just now — reload to try again. Nothing has changed
+            Sahoda could not read your invoices just now. Reload to try again. Nothing has changed
             and no document has been lost.
           </p>
         )}
@@ -154,5 +154,5 @@ export default async function SettingsPlanPage() {
 const AVAILABLE_HINT: Record<BalanceRead['status'], string> = {
   ok: 'What you can spend right now.',
   'no-workspace': 'Credits belong to a workspace and you don’t have one yet.',
-  unreadable: 'We could not read your balance just now — this is not a zero.',
+  unreadable: 'We could not read your balance just now. This is not a zero.',
 }

@@ -150,7 +150,7 @@ export function AssetUpload({ label = 'Add photos' }: { label?: string }) {
               key={entry.name}
               className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
             >
-              <span className="font-semibold">{entry.name}</span> — {entry.message}
+              <span className="font-semibold">{entry.name}</span>: {entry.message}
             </li>
           ))}
         </ul>

@@ -29,7 +29,7 @@ export function AttemptErrorNotice({ error }: AttemptErrorNoticeProps) {
     >
       {error.kind === 'insufficient' ? (
         <p>
-          Not enough credits to resolve your Brand Brain — this needs{' '}
+          Not enough credits to resolve your Brand Brain. This needs{' '}
           <span className="tabular-nums">{error.required}</span>, you have{' '}
           <span className="tabular-nums">{error.available}</span>. Nothing was charged.
         </p>

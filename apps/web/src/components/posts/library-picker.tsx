@@ -177,7 +177,7 @@ export function LibraryPicker({ postId, channels }: { postId: string; channels: 
       {result !== null && result.ok && result.warnings.length > 0 ? (
         <div className="mt-2 space-y-2">
           <p className="rounded-input border border-warn bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
-            Added this photo. It is on the post — these channels will not use it:
+            Added this photo. It is on the post. These channels will not use it:
           </p>
           <ChannelObjections objections={result.warnings} tone="warn" />
         </div>
@@ -214,7 +214,7 @@ export function LibraryPicker({ postId, channels }: { postId: string; channels: 
 
           {loadFailed ? (
             <p role="alert" className="rounded-input bg-s1 px-3 py-4 text-[13px] text-muted">
-              Sahoda could not read your library. This is not a claim that it is empty — close this
+              Sahoda could not read your library. This is not a claim that it is empty. Close this
               and open it again.
             </p>
           ) : cards === null ? (

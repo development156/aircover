@@ -102,7 +102,7 @@ export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
       const body = (await response.json()) as { ok?: boolean; message?: string; fields?: string[] }
 
       if (response.ok && body.ok) {
-        setStatus({ kind: 'sent', message: body.message ?? 'Thanks — they have your details.' })
+        setStatus({ kind: 'sent', message: body.message ?? 'Thanks. They have your details.' })
         form.reset()
         return
       }
@@ -116,7 +116,7 @@ export function LeadForm({ siteSlug, siteKey, source }: LeadFormProps) {
       // A network failure is ours to own, and it genuinely did not save.
       setStatus({
         kind: 'error',
-        message: 'We could not send that just now. Nothing was saved — please try again.',
+        message: 'We could not send that just now. Nothing was saved. Please try again.',
       })
     }
   }

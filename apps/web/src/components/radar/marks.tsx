@@ -156,7 +156,7 @@ export function NotChecked({ what, note }: { what: string; note?: string | null 
       </span>
       <span aria-hidden>
         Could not check {what}
-        {note ? ` — ${note}` : ''}
+        {note ? `. ${note}` : ''}
       </span>
     </span>
   )

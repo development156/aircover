@@ -97,7 +97,7 @@ export async function startRun(playbookId: string, now = new Date()): Promise<St
     if (!recipe || !isRunnable(recipe)) {
       return {
         ok: false,
-        message: recipe ? `Not yet — this one still needs ${recipe.blocker}.` : 'Not offered.',
+        message: recipe ? `Not yet. This one still needs ${recipe.blocker}.` : 'Not offered.',
       }
     }
 
@@ -114,7 +114,7 @@ export async function startRun(playbookId: string, now = new Date()): Promise<St
     if (!runId) {
       return {
         ok: false,
-        message: 'This playbook is already running — look below for its preview.',
+        message: 'This playbook is already running. Look below for its preview.',
       }
     }
 
@@ -166,7 +166,7 @@ export async function startRun(playbookId: string, now = new Date()): Promise<St
     return { ok: true, runId, estimatedCredits: preview.totalCredits }
   } catch (error) {
     reportServerError(error, { action: 'startRun', workspaceId })
-    return { ok: false, message: 'Could not start that playbook — try again.' }
+    return { ok: false, message: 'Could not start that playbook. Try again.' }
   }
 }
 
@@ -201,7 +201,7 @@ export async function executeRun(runId: string): Promise<ExecuteRunState> {
     // ── THE GATE ──────────────────────────────────────────────────────────
     const run = await store.readApprovedRunForExecute(runId, workspaceId)
     if (!run) {
-      return { ok: false, message: 'Approve the cost preview first — nothing has been spent.' }
+      return { ok: false, message: 'Approve the cost preview first. Nothing has been spent.' }
     }
 
     const recipe = playbookRecipe(run.recipe_key)
@@ -370,6 +370,6 @@ export async function executeRun(runId: string): Promise<ExecuteRunState> {
     return { ok: true, drafted, suggested, spent }
   } catch (error) {
     reportServerError(error, { action: 'executeRun', workspaceId })
-    return { ok: false, message: 'Could not finish that run — try again.' }
+    return { ok: false, message: 'Could not finish that run. Try again.' }
   }
 }

@@ -20,7 +20,7 @@ const PENDING_LINES = [
   'Saving your post body first…',
   'Asking the model for one version per channel…',
   'Checking each version against the channel rules…',
-  'Still working — if this fails you will not be charged.',
+  'Still working. If this fails you will not be charged.',
 ] as const
 
 type Outcome =
@@ -79,7 +79,7 @@ export function GeneratePanel({
         setOutcome({
           kind: 'failed',
           message:
-            'Your post body could not be saved, so nothing was generated and no credits were charged — try again.',
+            'Your post body could not be saved, so nothing was generated and no credits were charged. Try again.',
         })
         return
       }

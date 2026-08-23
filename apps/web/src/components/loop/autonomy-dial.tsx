@@ -68,7 +68,7 @@ export function AutonomyDial({ connected, lapsed = [], chosen, defaultLevel }: A
         </h2>
         <p className="type-body mt-1 max-w-[68ch] text-muted">
           One setting per channel. You can have Sahoda draft for Instagram and publish for Google
-          Business Profile — they do not have to move together.
+          Business Profile. They do not have to move together.
         </p>
       </div>
 
@@ -137,7 +137,7 @@ export function AutonomyDial({ connected, lapsed = [], chosen, defaultLevel }: A
               </span>
               <span className="min-w-0">
                 <span className="type-h3 block text-muted">
-                  {level.name} <span className="type-sm font-normal">— not available</span>
+                  {level.name} <span className="type-sm font-normal">, not available</span>
                 </span>
                 <span className="type-body mt-0.5 block text-muted">{level.may}</span>
                 <span className="type-sm mt-1 block text-muted">{level.needs}</span>
@@ -190,7 +190,7 @@ function ChannelDial({
         <h3 className="type-h3 text-ink">{CHANNEL_LABELS[channel]}</h3>
         {level === undefined ? (
           <span className="type-sm text-muted">
-            Not set — running at {AUTONOMY_LEVELS[defaultLevel]?.name.toLowerCase()}
+            Not set, running at {AUTONOMY_LEVELS[defaultLevel]?.name.toLowerCase()}
           </span>
         ) : null}
       </div>

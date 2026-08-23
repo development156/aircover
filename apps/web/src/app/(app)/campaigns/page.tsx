@@ -98,15 +98,15 @@ export default async function CampaignsPage({
           <Unreadable what="Your campaigns" />
           <h2 className="type-h3 mt-1">Sahoda could not read your campaigns</h2>
           <p className="type-body max-w-[42ch] text-muted">
-            The list did not come back this time. Reload — this is not a sign that you have none,
-            and making a new one would not help.
+            The list did not come back this time. Reload. This is not a sign that you have none, and
+            making a new one would not help.
           </p>
         </section>
       ) : read.rollups.length === 0 ? (
         <EmptyState
           icon={Megaphone}
           title="No campaigns yet"
-          body="A campaign is a named push — Diwali week, a new menu — that a handful of posts belong to, so you can plan and read them together."
+          body="A campaign is a named push (Diwali week, a new menu) that a handful of posts belong to, so you can plan and read them together."
           action={<CampaignForm />}
           tip="Name it after the thing you would say out loud. You can add posts straight after."
         />
@@ -121,7 +121,7 @@ export default async function CampaignsPage({
           {/* The one honest note about what this screen does NOT do. Without it
               a stage column reads as something that keeps itself current. */}
           <p className="type-sm text-muted">
-            Nothing moves a campaign between stages on its own — you set the stage when you are
+            Nothing moves a campaign between stages on its own. You set the stage when you are
             ready.
           </p>
         </>

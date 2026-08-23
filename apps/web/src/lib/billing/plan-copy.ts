@@ -131,7 +131,7 @@ export function dunningNotice(policy: DunningPolicy, planId: PlanId): DunningNot
         mark: '!!',
         title: `Your ${planName} plan is suspended`,
         body:
-          'Your workspace is on the free plan’s limits for now. Nothing has been deleted — ' +
+          'Your workspace is on the free plan’s limits for now. Nothing has been deleted. ' +
           'every channel, site and post is still here, and the credits you already have are ' +
           'still yours to spend. Paying restores the plan straight away.',
         action: 'Pay now',
@@ -180,7 +180,7 @@ export function prorationSummary(p: Proration): string[] {
     return [
       `You keep ${PLAN_CATALOG[p.fromPlanId].name} until ${onDate(p.effectiveAt)}, ` +
         `with everything it includes.`,
-      `${to} starts on ${onDate(p.effectiveAt)}. Nothing is charged today and nothing is refunded — ` +
+      `${to} starts on ${onDate(p.effectiveAt)}. Nothing is charged today and nothing is refunded. ` +
         `you have already paid for this month and you keep all of it.`,
     ]
   }

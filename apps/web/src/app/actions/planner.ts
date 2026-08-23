@@ -10,7 +10,7 @@ import type { ApproveState } from '@/lib/planner/state'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getActiveWorkspace, workspaceForWrite } from '@/lib/workspaces'
 
-const CANNOT_APPROVE = "Can't approve this post from its current state — reload to see where it is."
+const CANNOT_APPROVE = "Can't approve this post from its current state. Reload to see where it is."
 
 /**
  * The ONE sanctioned status write in apps/web: `idea|draft|review → approved`.
@@ -49,7 +49,7 @@ export async function approvePost(postId: string): Promise<ApproveState> {
     if (!parsed.success) {
       return {
         ok: false,
-        message: 'Approved, but the response was unreadable — reload to confirm.',
+        message: 'Approved, but the response was unreadable. Reload to confirm.',
       }
     }
 
@@ -58,6 +58,6 @@ export async function approvePost(postId: string): Promise<ApproveState> {
     return { ok: true, status: parsed.data.status }
   } catch (error) {
     reportServerError(error, { action: 'approvePost', workspaceId })
-    return { ok: false, message: 'Could not approve this post — try again.' }
+    return { ok: false, message: 'Could not approve this post. Try again.' }
   }
 }

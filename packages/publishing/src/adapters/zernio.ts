@@ -244,7 +244,7 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
         // Belt and braces with the Constraint Engine's MEDIA_REQUIRED. Reaching the
         // network to be told so wastes an attempt against a per-day cap.
         throw fail(
-          `${channel} needs at least one photo — there is no text-only post.`,
+          `${channel} needs at least one photo. There is no text-only post.`,
           'MEDIA_REQUIRED',
           'permanent',
         )
@@ -364,7 +364,7 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
         // the post may yet go live, so a retry must not assume it did not. The
         // platform post id rides on `raw` so the reconcile sweep can ask later.
         throw fail(
-          `${channel} is still processing this post — no live link yet.`,
+          `${channel} is still processing this post. No live link yet.`,
           'STILL_PROCESSING',
           'transient',
           { postId: post._id, status: leg?.status },

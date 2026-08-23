@@ -221,7 +221,7 @@ describe('sending, and what the customer is told afterwards', () => {
     state.result = {
       ok: false,
       status: 'failed',
-      message: 'Could not send that reply — try again.',
+      message: 'Could not send that reply. Try again.',
     }
     const user = userEvent.setup()
     const { container } = renderCard('instagram', 1)

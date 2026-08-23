@@ -81,7 +81,7 @@ function refusal(error: { code?: string | null; message?: string | null }): stri
     // The RPC rolled back, so this is genuinely "nothing happened" and not a
     // half-deletion. Saying so is the difference between a customer who waits
     // and a customer who assumes the worst.
-    return 'Something refused to be deleted, so the whole deletion was undone and your workspace is exactly as it was. Write to support@sahodalabs.com — this one needs a person.'
+    return 'Something refused to be deleted, so the whole deletion was undone and your workspace is exactly as it was. Write to support@sahodalabs.com. This one needs a person.'
   }
   return 'That deletion was not applied, and nothing was deleted.'
 }
@@ -116,7 +116,7 @@ export async function eraseWorkspaceData(typed: string): Promise<EraseState> {
       const count = sweep.failed.length + sweep.leftUnread.length
       return {
         ok: false,
-        message: `${count === 1 ? 'One of your files' : `${count} of your files`} could not be deleted, so nothing else was deleted either. Try again in a moment — if it keeps happening, write to support@sahodalabs.com.`,
+        message: `${count === 1 ? 'One of your files' : `${count} of your files`} could not be deleted, so nothing else was deleted either. Try again in a moment. If it keeps happening, write to support@sahodalabs.com.`,
       }
     }
 

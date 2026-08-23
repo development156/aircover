@@ -295,7 +295,7 @@ export function validateVariant(
   if (spec.requiresMedia === true && (draft.mediaCount ?? 0) < 1) {
     violations.push({
       code: 'MEDIA_REQUIRED',
-      message: `${spec.channel} needs at least one photo — there is no text-only post.`,
+      message: `${spec.channel} needs at least one photo. There is no text-only post.`,
       field: 'media',
     })
   }
@@ -340,7 +340,7 @@ export function validateMedia(
         if (aspect < range[0] || aspect > range[1]) {
           violations.push({
             code: 'MEDIA_ASPECT',
-            message: `${spec.channel} feed photos must be between ${range[0]}:1 and ${range[1]}:1 — this one is ${aspect.toFixed(2)}:1.`,
+            message: `${spec.channel} feed photos must be between ${range[0]}:1 and ${range[1]}:1. This one is ${aspect.toFixed(2)}:1.`,
             field: 'dimensions',
           })
         }
@@ -462,7 +462,7 @@ export function checkPerDayCap(args: { channel: Channel; used: number }): PerDay
 export function perDayCapRefusalMessage(verdict: PerDayCapVerdict): string {
   return (
     `This workspace has already published ${verdict.used} of the ${verdict.cap} posts ` +
-    `${verdict.channel} accepts in a day. It is the channel's own limit, not a Sahoda one — ` +
+    `${verdict.channel} accepts in a day. It is the channel's own limit, not a Sahoda one. ` +
     `the post is held until tomorrow, and nothing was sent. Other channels are unaffected.`
   )
 }

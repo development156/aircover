@@ -44,12 +44,12 @@ export function RemovePostButton({
       disabled={pending}
       // Named for what it does to the CAMPAIGN, not to the post. A screen reader
       // announcing "Remove Diwali teaser" would describe a delete.
-      aria-label={`Remove ${postTitle} from this campaign — the post is kept`}
+      aria-label={`Remove ${postTitle} from this campaign, keeping the post`}
       onClick={() => {
         startTransition(async () => {
           const result = await removePostFromCampaign(campaignId, postId)
           if (result.ok) {
-            toast.success('Removed from the campaign — the post is still in Posts')
+            toast.success('Removed from the campaign. The post is still in Posts')
             router.refresh()
           } else {
             toast.error(result.message)

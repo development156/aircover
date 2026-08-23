@@ -97,7 +97,7 @@ export function CampaignForm({
           <Field
             id="campaign-name"
             label="Name"
-            hint="What you would call this push out loud — “Diwali week”, “New menu”."
+            hint="What you would call this push out loud: “Diwali week”, “New menu”."
             error={error?.field === 'name' ? error.message : undefined}
           >
             <Input
@@ -114,7 +114,7 @@ export function CampaignForm({
           <Field
             id="campaign-objective"
             label="What it is for"
-            hint="Optional. In your words — nothing reads this but you."
+            hint="Optional. In your words. Nothing reads this but you."
             error={error?.field === 'objective' ? error.message : undefined}
           >
             <Input
@@ -155,7 +155,7 @@ export function CampaignForm({
             {/* Both dates are optional and the screen never invents one. Saying
                 so here stops people typing a date they have not decided. */}
             <p className="type-sm text-muted">
-              Optional. Nothing starts or ends a campaign on its own — you move it when you are
+              Optional. Nothing starts or ends a campaign on its own. You move it when you are
               ready.
             </p>
             {error?.field === 'dates' ? (

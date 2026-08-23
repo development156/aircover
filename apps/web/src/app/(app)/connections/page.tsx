@@ -160,7 +160,7 @@ export default async function ConnectionsPage({
         <EmptyState
           icon={Link2}
           title="Create a workspace to connect a channel"
-          body="Channels belong to a workspace and you don't have one yet. Nothing failed — there is simply nothing to connect to until one exists."
+          body="Channels belong to a workspace and you don't have one yet. Nothing failed. There is simply nothing to connect to until one exists."
           action={<CreateWorkspaceButton variant="primary" />}
         />
       ) : (

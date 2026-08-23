@@ -73,13 +73,13 @@ export function doorTransportFailure(status: number, code: string | null): DoorT
         // Says what to do, and says the document is untouched — otherwise the
         // obvious reading of "sign in again" is that the upload was rejected.
         message:
-          'Your sign-in expired before Sahoda could start reading. Sign in again and press Read this — nothing about your link or PDF was the problem.',
+          'Your sign-in expired before Sahoda could start reading. Sign in again and press Read this. Nothing about your link or PDF was the problem.',
         retryable: false,
       }
     case 'no_workspace':
       return {
         message:
-          'This account has no workspace yet, so there is nowhere to save what Sahoda reads. Create one and try again — your link or PDF has not been read either way.',
+          'This account has no workspace yet, so there is nowhere to save what Sahoda reads. Create one and try again. Your link or PDF has not been read either way.',
         retryable: false,
       }
     case 'workspace_unreadable':
@@ -116,7 +116,7 @@ export function doorTransportFailure(status: number, code: string | null): DoorT
   }
   return {
     message:
-      'The request did not reach Sahoda, so your link or PDF was never opened. This is not a verdict on the document — try again.',
+      'The request did not reach Sahoda, so your link or PDF was never opened. This is not a verdict on the document. Try again.',
     retryable: true,
   }
 }

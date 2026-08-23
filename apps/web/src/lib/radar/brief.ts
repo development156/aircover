@@ -79,7 +79,7 @@ export function briefFromChange(
 
   if (brandBasis) {
     lines.push(
-      `Answer from our own position — ${brandBasis.field}: "${brandBasis.value}". ` +
+      `Answer from our own position, ${brandBasis.field}: "${brandBasis.value}". ` +
         `Say what we do, not what they do.`,
     )
   } else {

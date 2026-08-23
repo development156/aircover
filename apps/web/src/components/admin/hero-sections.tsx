@@ -181,7 +181,7 @@ export function FreshnessLine({ freshness }: { freshness: Freshness }) {
   return (
     <span
       className={cn('text-[12px] tabular-nums', FRESHNESS_STYLE[freshness.level])}
-      title="Read from the newest change in the console's own tables — never reported by the sync itself."
+      title="Read from the newest change in the console's own tables, never reported by the sync itself."
     >
       {freshness.label}
     </span>

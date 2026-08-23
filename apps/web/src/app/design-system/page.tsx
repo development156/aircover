@@ -45,7 +45,7 @@ export default function DesignSystemPage() {
 
       <Section
         title="The Certainty System"
-        blurb="How real a thing is. Four rungs, each with a structural signature — fill, edge, texture — so the meaning survives greyscale, recolouring and colour blindness."
+        blurb="How real a thing is. Four rungs, each with a structural signature (fill, edge, texture) so the meaning survives greyscale, recolouring and colour blindness."
       >
         <CertaintyLadder />
       </Section>
@@ -59,7 +59,7 @@ export default function DesignSystemPage() {
 
       <Section
         title="Measured, and worked out"
-        blurb="The two layers of /brain/audience. Above the line, every figure came from a platform and is drawn with a SOLID fill. Below it, every figure is Sahoda's arithmetic on those figures, drawn .is-proposed — dashed, unfilled — and each panel states the evidence it stands on and refuses when there is not enough. The numbers on this section are demonstration data, taken from Zernio's own published example."
+        blurb="The two layers of /brain/audience. Above the line, every figure came from a platform and is drawn with a SOLID fill. Below it, every figure is Sahoda's arithmetic on those figures, drawn .is-proposed, dashed and unfilled, and each panel states the evidence it stands on and refuses when there is not enough. The numbers on this section are demonstration data, taken from Zernio's own published example."
       >
         <AudienceLayers />
       </Section>
@@ -73,7 +73,7 @@ export default function DesignSystemPage() {
 
       <Section
         title="Stat card, segmented control, badge, empty, error, toast"
-        blurb="The primitives the reference is built out of, plus the four states a screen spends most of its life in. The stat card ships in BOTH of its real states, because the empty one is what every account sees for its first hour — and its figures are labelled as demonstration data, because this product never renders a number it cannot prove."
+        blurb="The primitives the reference is built out of, plus the four states a screen spends most of its life in. The stat card ships in BOTH of its real states, because the empty one is what every account sees for its first hour. Its figures are labelled as demonstration data, because this product never renders a number it cannot prove."
       >
         <V5Primitives />
       </Section>

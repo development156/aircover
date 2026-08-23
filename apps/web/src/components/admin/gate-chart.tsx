@@ -45,8 +45,8 @@ export function GateChart({ history }: { history: GateHistory }) {
                   key={day.day}
                   title={
                     day.status === null
-                      ? `${day.day} — did not run`
-                      : `${day.day} — ${VERDICT_LABEL[day.status]}`
+                      ? `${day.day}: did not run`
+                      : `${day.day}: ${VERDICT_LABEL[day.status]}`
                   }
                   className={cn(
                     'h-4 flex-1 rounded-[2px]',
@@ -78,7 +78,7 @@ export function GateChart({ history }: { history: GateHistory }) {
 
       {measured.length > 0 && measured.every((series) => !series.enoughForTrend) ? (
         <p className="text-[12px] text-warn">
-          No suite has five measured days yet — read these as individual runs, not a trend.
+          No suite has five measured days yet. Read these as individual runs, not a trend.
         </p>
       ) : null}
     </div>

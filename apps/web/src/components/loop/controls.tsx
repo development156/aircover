@@ -104,7 +104,7 @@ export function LoopControls({
           </Button>
           <span className="type-sm max-w-[42ch] text-muted">
             {!hasChannels
-              ? 'Connect a channel first — Sahoda has nowhere to plan for.'
+              ? 'Connect a channel first. Sahoda has nowhere to plan for.'
               : paused
                 ? 'The Loop is paused. Turn it back on to plan a week.'
                 : cycleRunning

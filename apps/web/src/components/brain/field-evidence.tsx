@@ -66,8 +66,8 @@ export function FieldEvidence({ cited }: { cited: CitedPassage }) {
         </blockquote>
       ) : cited.missing ? (
         <p className="type-sm mt-1 text-muted">
-          That document is no longer in your library. Sahoda kept what it learned from it — this
-          value is unchanged — but the passage behind it can no longer be opened.
+          That document is no longer in your library. Sahoda kept what it learned from it, so this
+          value is unchanged, but the passage behind it can no longer be opened.
         </p>
       ) : null}
     </div>

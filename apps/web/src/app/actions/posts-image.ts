@@ -206,6 +206,6 @@ export async function generateImage(postId: string, input: unknown): Promise<Gen
     return { ok: true, storagePath, balanceAfter: credits.data.balanceAfter }
   } catch (error) {
     reportServerError(error, { action: 'generateImage', workspaceId })
-    return { ok: false, insufficient: false, message: 'Could not generate an image — try again.' }
+    return { ok: false, insufficient: false, message: 'Could not generate an image. Try again.' }
   }
 }

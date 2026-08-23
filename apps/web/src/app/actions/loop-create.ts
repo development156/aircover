@@ -92,7 +92,7 @@ export async function runCreateStage(cycleId: string): Promise<CreateStageState>
     if (!cycle) {
       return {
         ok: false,
-        message: 'Approve the cost preview first — nothing has been spent.',
+        message: 'Approve the cost preview first. Nothing has been spent.',
       }
     }
 
@@ -182,6 +182,6 @@ export async function runCreateStage(cycleId: string): Promise<CreateStageState>
     return { ok: true, created, skipped, spent }
   } catch (error) {
     reportServerError(error, { action: 'runCreateStage', workspaceId })
-    return { ok: false, message: 'Could not create this week — try again.' }
+    return { ok: false, message: 'Could not create this week. Try again.' }
   }
 }

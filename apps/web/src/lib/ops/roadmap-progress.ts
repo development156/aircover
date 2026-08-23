@@ -152,14 +152,14 @@ export function toReachDone({
     ...redSuites.map((suite) => ({
       key: `gate:${suite}`,
       kind: 'gate' as const,
-      label: `The ${suite} gate is red — fix it or supersede the run.`,
+      label: `The ${suite} gate is red. Fix it or supersede the run.`,
       href: null,
     })),
     ...blockedTasks.map((task) => ({
       key: `blocked:${task.code}`,
       kind: 'blocked' as const,
       label: task.blocked_reason
-        ? `${task.code} is blocked — ${task.blocked_reason}`
+        ? `${task.code} is blocked: ${task.blocked_reason}`
         : `${task.code} is blocked, with no reason recorded.`,
       href: `#task-${task.code}`,
     })),

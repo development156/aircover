@@ -58,7 +58,7 @@ function formatBytes(bytes: number): string {
 /** The one paragraph a customer is most likely to be looking for. */
 const KEPT_NOTE = `Your credit and payment record is NOT deleted when you delete your workspace.
 That is the account of what you paid and what you were charged. It is the only thing that can
-settle a disagreement about a charge — in your favour as easily as ours — and Indian tax and
+settle a disagreement about a charge, in your favour as easily as ours, and Indian tax and
 company law requires financial records to be kept for years regardless of anything else.
 It contains a reference to you: for most rows a long code from our sign-in provider rather than
 your name. We would rather say that than let you believe the record is anonymous when it is not.`
@@ -73,7 +73,7 @@ export function renderReadableExport(payload: WorkspaceExport): string {
     .map(
       (t) =>
         `<tr><td>${escapeHtml(t.describes)}</td><td class="n">${t.rows.length}</td>` +
-        `<td class="t">${escapeHtml(t.table)}${t.truncated ? ' <b>(shortened — see below)</b>' : ''}</td></tr>`,
+        `<td class="t">${escapeHtml(t.table)}${t.truncated ? ' <b>(shortened, see below)</b>' : ''}</td></tr>`,
     )
     .join('\n')
 
@@ -94,7 +94,7 @@ export function renderReadableExport(payload: WorkspaceExport): string {
     payload.filesNotListed.length > 0
       ? `<p class="warn">Some of your files could not be listed: ` +
         payload.filesNotListed
-          .map((f) => `${escapeHtml(f.bucket)}/${escapeHtml(f.prefix)} — ${escapeHtml(f.reason)}`)
+          .map((f) => `${escapeHtml(f.bucket)}/${escapeHtml(f.prefix)}: ${escapeHtml(f.reason)}`)
           .join('; ') +
         `. They are not in this archive.</p>`
       : ''
@@ -129,10 +129,10 @@ ${escapeHtml(payload.generatedAt.slice(0, 10))}.</p>
 
 <h2>What is in this archive</h2>
 <ul>
-  <li><code>your-data.html</code> — this page.</li>
-  <li><code>data.json</code> — every row, exactly as it is stored. This is the file to
+  <li><code>your-data.html</code>: this page.</li>
+  <li><code>data.json</code>: every row, exactly as it is stored. This is the file to
       hand to a lawyer or a regulator. ${totalRows} rows in total.</li>
-  <li><code>files/</code> — ${payload.files.length} of your pictures and documents
+  <li><code>files/</code>: ${payload.files.length} of your pictures and documents
       ${payload.files.length > 0 ? `(${formatBytes(totalBytes)})` : ''}.</li>
 </ul>
 ${truncatedNote}
@@ -142,7 +142,7 @@ ${fileNote}
 <table>
   <thead><tr><th>What it is</th><th>How many</th><th>Where in data.json</th></tr></thead>
   <tbody>
-${rowsTable || '<tr><td colspan="3">Nothing yet — this workspace has no saved work.</td></tr>'}
+${rowsTable || '<tr><td colspan="3">Nothing yet. This workspace has no saved work.</td></tr>'}
   </tbody>
 </table>
 ${
@@ -161,7 +161,7 @@ ${
 ${
   omitted ||
   (payload.filesNotListed.length > 0
-    ? '<tr><td colspan="3">No records were left out — but some of your FILES were, and they are named above.</td></tr>'
+    ? '<tr><td colspan="3">No records were left out, but some of your FILES were, and they are named above.</td></tr>'
     : '<tr><td colspan="3">Nothing was left out.</td></tr>')
 }
   </tbody>
@@ -172,7 +172,7 @@ ${
 
 <h2>Questions</h2>
 <p>Write to <b>support@sahodalabs.com</b>. If something here is wrong, or a section looks empty
-that should not be, say so — an export that reads as complete and is not would be the worst
+that should not be, say so. An export that reads as complete and is not would be the worst
 thing this file could do.</p>
 </body>
 </html>

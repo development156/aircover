@@ -42,7 +42,7 @@ export function ResolveFromLibrary({ cost }: { cost: number }) {
           </h2>
           <p className="type-sm mt-1 max-w-[62ch] text-muted">
             Sahoda reads what you have added and suggests what it says about your business. It
-            changes nothing on its own — every suggestion waits for you on the{' '}
+            changes nothing on its own. Every suggestion waits for you on the{' '}
             <Link
               href="/brain/resolve"
               className="font-[550] text-accent underline underline-offset-2"

@@ -112,7 +112,7 @@ export function QuestionStep({
 
         {!usable ? (
           <p className="text-[12.5px] text-muted">
-            Answer in a few words first — this is the one thing we cannot infer.
+            Answer in a few words first. This is the one thing we cannot infer.
           </p>
         ) : null}
 

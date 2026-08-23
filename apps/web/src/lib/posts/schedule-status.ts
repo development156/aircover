@@ -47,19 +47,19 @@ interface AutoPublishCopy {
  */
 export const AUTO_PUBLISH_COPY = {
   awaiting: {
-    note: "Won't post itself — scheduled auto-publish isn't live yet. Copy it across at that time to post it.",
+    note: "Won't post itself. Scheduled auto-publish isn't live yet. Copy it across at that time to post it.",
     short: 'Not auto-posted',
   },
   overdue: {
-    note: "This time has passed and nothing was published — scheduled auto-publish isn't live yet. Copy it across to post it.",
+    note: "This time has passed and nothing was published. Scheduled auto-publish isn't live yet. Copy it across to post it.",
     short: 'Missed · not posted',
   },
   partial: {
-    note: "Out on some channels and not on others — scheduled auto-publish isn't live yet, so the rest will stay put. Send those from the post rather than publishing it again.",
+    note: "Out on some channels and not on others. Scheduled auto-publish isn't live yet, so the rest will stay put. Send those from the post rather than publishing it again.",
     short: 'Partly out',
   },
   simulated: {
-    note: "Nothing reached a platform — this ran as a simulation, and scheduled auto-publish isn't live yet. Copy it across to post it for real.",
+    note: "Nothing reached a platform. This ran as a simulation, and scheduled auto-publish isn't live yet. Copy it across to post it for real.",
     short: 'Simulated only',
   },
 } as const satisfies Record<Exclude<AutoPublishTruth, 'none'>, AutoPublishCopy>
@@ -70,7 +70,7 @@ export const AUTO_PUBLISH_COPY = {
  * writer decides they are done with the post.
  */
 export const SCHEDULE_FIELD_NOTE =
-  "Setting a time doesn't publish it — scheduled auto-publish isn't live yet. Copy it across at that time to post it."
+  "Setting a time doesn't publish it. Scheduled auto-publish isn't live yet. Copy it across at that time to post it."
 
 /**
  * What the picker says once the dispatcher is actually running.
@@ -91,15 +91,15 @@ export function scheduleFieldNote(enabled: boolean): string {
 export const AUTO_PUBLISH_COPY_LIVE = {
   awaiting: { note: 'Goes out on its own at this time.', short: 'Auto-posts' },
   overdue: {
-    note: 'This time has passed and it has not gone out yet — check the channel status on the post.',
+    note: 'This time has passed and it has not gone out yet. Check the channel status on the post.',
     short: 'Late · check',
   },
   partial: {
-    note: 'Out on some channels and not on others — check the channel status on the post.',
+    note: 'Out on some channels and not on others. Check the channel status on the post.',
     short: 'Partly out',
   },
   simulated: {
-    note: 'Nothing reached a platform — this ran as a simulation. Send it again to post it for real.',
+    note: 'Nothing reached a platform. This ran as a simulation. Send it again to post it for real.',
     short: 'Simulated only',
   },
 } as const satisfies Record<Exclude<AutoPublishTruth, 'none'>, AutoPublishCopy>

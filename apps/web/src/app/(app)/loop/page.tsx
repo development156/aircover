@@ -48,13 +48,13 @@ export default async function LoopPage() {
   if (read.status !== 'ok') {
     return (
       <div className="space-y-grid">
-        <PageTitle sub="A weekly cycle that plans, writes, tests and reports — as far as you let it go on its own.">
+        <PageTitle sub="A weekly cycle that plans, writes, tests and reports, as far as you let it go on its own.">
           The Loop
         </PageTitle>
         <p className="surface-ring rounded-card bg-surface p-4 type-body text-muted">
           {read.status === 'no-workspace'
             ? 'Finish setting up your workspace and the Loop appears here.'
-            : 'Sahoda couldn’t read your Loop just now, so nothing below would be true. Try again in a moment — your cycle and its settings are unchanged.'}
+            : 'Sahoda couldn’t read your Loop just now, so nothing below would be true. Try again in a moment. Your cycle and its settings are unchanged.'}
         </p>
       </div>
     )
@@ -69,7 +69,7 @@ export default async function LoopPage() {
 
   return (
     <div className="space-y-grid">
-      <PageTitle sub="A weekly cycle that plans, writes, tests and reports — as far as you let it go on its own.">
+      <PageTitle sub="A weekly cycle that plans, writes, tests and reports, as far as you let it go on its own.">
         The Loop
       </PageTitle>
 
@@ -182,7 +182,7 @@ function CycleSummary({
       {!failed && !cancelled ? (
         <p className="type-sm mt-2 text-muted">
           {cycle.reflectSkippedNoHistory
-            ? 'It had nothing to reflect on — no post of yours has been measured yet, so there was nothing to learn from.'
+            ? 'It had nothing to reflect on. No post of yours has been measured yet, so there was nothing to learn from.'
             : 'It read last week’s numbers before planning.'}
         </p>
       ) : null}

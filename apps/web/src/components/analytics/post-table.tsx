@@ -104,7 +104,7 @@ export function PostTable({ rows }: { rows: readonly ComparableRow[] }) {
       {waiting.length > 0 ? (
         <section className="space-y-2 border-t border-line pt-3">
           <h3 className="type-meta font-semibold text-muted">
-            Not ranked — no measurement yet ({waiting.length})
+            Not ranked, no measurement yet ({waiting.length})
           </h3>
           <ul className="space-y-1.5">
             {waiting.map((row) => {

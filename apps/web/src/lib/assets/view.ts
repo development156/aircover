@@ -60,7 +60,7 @@ export function usageLine(card: AssetCard): string {
   const locked = lockedSites(card)
   if (locked.length > 0) {
     const first = locked[0] as AssetUsageSite
-    if (locked.length === 1) return `In ${nameOfPost(first)} — ${reasonForLock(first)}`
+    if (locked.length === 1) return `In ${nameOfPost(first)}: ${reasonForLock(first)}`
     return `In ${locked.length} posts that have gone out or are going out`
   }
   if (card.usage.length === 0) return 'Not used yet'
@@ -77,5 +77,5 @@ export function usageLine(card: AssetCard): string {
 export function previewAlt(card: AssetCard): string {
   const alt = typeof card.alt === 'string' ? card.alt.trim() : ''
   if (alt !== '') return alt
-  return `${displayName(card)} — no description added`
+  return `${displayName(card)}, no description added`
 }

@@ -124,7 +124,7 @@ describe('/brain', () => {
 
     test('says outright that it is not counted', async () => {
       render(await BrainPage())
-      expect(screen.getByText('Derived — not counted')).toBeInTheDocument()
+      expect(screen.getByText('Derived, not counted')).toBeInTheDocument()
     })
 
     test('is not editable — a conclusion is not a question anyone can answer', async () => {
@@ -165,7 +165,7 @@ describe('/brain', () => {
       mockedReadBrain.mockResolvedValue({ status: 'unreadable' })
       render(await BrainPage())
 
-      expect(screen.getByRole('alert')).toHaveTextContent('reload to try again')
+      expect(screen.getByRole('alert')).toHaveTextContent(/reload to try again/i)
       expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()
     })
   })

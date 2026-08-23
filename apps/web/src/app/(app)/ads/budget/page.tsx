@@ -76,7 +76,7 @@ export default function AdsBudgetPage() {
         </h3>
         <p className="type-body max-w-[68ch] text-muted">
           Not a progress bar. A charge you can point at, with the day it happened and the ad it
-          belongs to — the same way your credit history already works, and for the same reason.
+          belongs to, the same way your credit history already works and for the same reason.
         </p>
         <DataTable
           caption="Ad spend, one row per charge"
@@ -88,7 +88,7 @@ export default function AdsBudgetPage() {
             { key: 'running', header: 'Running total', numeric: true },
           ]}
           rows={[]}
-          empty="No spend — Sahoda cannot spend on your behalf yet. These are the columns it will record."
+          empty="No spend. Sahoda cannot spend on your behalf yet. These are the columns it will record."
         />
       </section>
 

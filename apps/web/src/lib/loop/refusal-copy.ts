@@ -35,12 +35,12 @@ export function formatChannels(channels: readonly Channel[]): string {
 
 /** The refusal for a workspace with no channel the Loop can plan for. */
 export function noChannelsMessage(lapsed: readonly Channel[]): string {
-  if (lapsed.length === 0) return 'Connect a channel first — Sahoda has nowhere to plan for.'
+  if (lapsed.length === 0) return 'Connect a channel first. Sahoda has nowhere to plan for.'
   const has = lapsed.length === 1 ? 'connection has' : 'connections have'
   const them = lapsed.length === 1 ? 'it' : 'them'
-  return `Your ${formatChannels(lapsed)} ${has} lapsed — reconnect ${them} and Sahoda has somewhere to plan for again.`
+  return `Your ${formatChannels(lapsed)} ${has} lapsed. Reconnect ${them} and Sahoda has somewhere to plan for again.`
 }
 
 /** The refusal for a read that did not complete. Never a claim about the account. */
 export const CHANNELS_UNREADABLE_MESSAGE =
-  'Sahoda couldn’t check your channels just now — nothing was charged. Try again.'
+  'Sahoda couldn’t check your channels just now. Nothing was charged. Try again.'

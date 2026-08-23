@@ -92,7 +92,7 @@ export async function acceptCropForUpload(
     }
   } catch (error) {
     reportServerError(error, { action: 'acceptCropForUpload', workspaceId })
-    return { ok: false, message: 'Could not crop that photo — try again.' }
+    return { ok: false, message: 'Could not crop that photo. Try again.' }
   }
 }
 
@@ -120,7 +120,7 @@ export async function acceptCropForAsset(
       return { ok: false, message: 'That file is not in your library.' }
     }
     if (read.status !== 'ok') {
-      return { ok: false, message: 'Sahoda could not read that file — reload and try again.' }
+      return { ok: false, message: 'Sahoda could not read that file. Reload and try again.' }
     }
 
     const existing = await listMedia(postId)
@@ -146,6 +146,6 @@ export async function acceptCropForAsset(
     }
   } catch (error) {
     reportServerError(error, { action: 'acceptCropForAsset', workspaceId })
-    return { ok: false, message: 'Could not crop that photo — try again.' }
+    return { ok: false, message: 'Could not crop that photo. Try again.' }
   }
 }

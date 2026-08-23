@@ -66,7 +66,7 @@ export function useVariantFormat(
   const write = useCallback(async (id: string, channel: Channel, format: PostFormat | null) => {
     const stored = await setVariantFormat(id, channel, format).catch(() => null)
     if (stored === null) {
-      setError('Could not save that format — try again.')
+      setError('Could not save that format. Try again.')
       return
     }
     if (!stored.ok) {

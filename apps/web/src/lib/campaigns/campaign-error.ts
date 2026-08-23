@@ -11,23 +11,23 @@
  * which means the post is already in — not an error the customer caused, and
  * not one they should be shown as a failure.
  */
-const GENERIC = 'Could not save this campaign — try again.'
+const GENERIC = 'Could not save this campaign. Try again.'
 
 export function mapCampaignError(
   error: { message?: string | null; code?: string | null } | null | undefined,
 ): string {
   switch (error?.code) {
     case '23505':
-      return 'A campaign with that name already exists — pick another name.'
+      return 'A campaign with that name already exists. Pick another name.'
 
     // 23514 check_violation — the status vocabulary, or a name that is only
     // whitespace, or an end date before the start date.
     case '23514':
-      return 'Check the name, the status and the dates — one of them is not allowed.'
+      return 'Check the name, the status and the dates. One of them is not allowed.'
 
     // 23503 foreign_key_violation — the campaign or the post went away mid-edit.
     case '23503':
-      return 'That campaign or post no longer exists — reload to see the current list.'
+      return 'That campaign or post no longer exists. Reload to see the current list.'
 
     // No rows and an RLS refusal must read IDENTICALLY, so a non-member cannot
     // learn whether a campaign id exists.

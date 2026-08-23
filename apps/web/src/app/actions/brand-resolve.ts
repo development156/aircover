@@ -112,7 +112,7 @@ export async function saveBrandMemory(
 
     const parsed = BrandMemoryPayloadSchema.safeParse(brain)
     if (!parsed.success) {
-      return { ok: false, message: 'That Brand Brain is incomplete — check the cards and retry.' }
+      return { ok: false, message: 'That Brand Brain is incomplete. Check the cards and retry.' }
     }
 
     // Prune AFTER validation: the schema pins the three fixed arrays at exactly 3,
@@ -158,11 +158,11 @@ export async function saveBrandMemory(
 
     const result = ResolveBrandMemoryResultSchema.safeParse(data)
     if (!result.success) {
-      return { ok: false, message: 'Saved, but the response was unreadable — reload to confirm.' }
+      return { ok: false, message: 'Saved, but the response was unreadable. Reload to confirm.' }
     }
     return { ok: true, version: result.data.version, replayed: result.data.replayed }
   } catch (error) {
     reportServerError(error, { action: 'saveBrandMemory', workspaceId })
-    return { ok: false, message: 'Could not save your Brand Brain — try again.' }
+    return { ok: false, message: 'Could not save your Brand Brain. Try again.' }
   }
 }

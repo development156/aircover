@@ -77,9 +77,7 @@ export function CampaignTable({ rollups }: { rollups: readonly CampaignRollup[] 
                 ))}
               </span>
             ) : (
-              <span className="sr-only">
-                No channels — nothing in this campaign targets one yet
-              </span>
+              <span className="sr-only">No channels. Nothing in this campaign targets one yet</span>
             ),
         }
       })}
@@ -95,7 +93,7 @@ export function CampaignTable({ rollups }: { rollups: readonly CampaignRollup[] 
 function periodWords(period: NonNullable<ReturnType<typeof campaignPeriod>>): string {
   switch (period.kind) {
     case 'both':
-      return `${day(period.startsAt)} – ${day(period.endsAt)}`
+      return `${day(period.startsAt)} to ${day(period.endsAt)}`
     case 'from':
       return `From ${day(period.startsAt)}`
     case 'until':

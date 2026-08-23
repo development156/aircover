@@ -223,14 +223,14 @@ describe('the hero panels never render an absence as a pass', () => {
         entries={[
           {
             code: 'SL-043',
-            who: 'DIVAS — a decision',
+            who: 'DIVAS, a decision',
             action: 'Approve the second database.',
             since: '2026-07-30',
           },
         ]}
       />,
     )
-    expect(screen.getByText('DIVAS — a decision')).toBeInTheDocument()
+    expect(screen.getByText('DIVAS, a decision')).toBeInTheDocument()
     expect(screen.getByText('Approve the second database.')).toBeInTheDocument()
     expect(screen.getByText(/SL-043 · since 2026-07-30/)).toBeInTheDocument()
   })

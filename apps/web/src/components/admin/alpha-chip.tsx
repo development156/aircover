@@ -152,7 +152,7 @@ export function AlphaChip({
         </p>
         {failing.length === 0 ? (
           <p className="mt-1.5 text-[12px] text-ink">
-            Nothing is recorded as fully broken. That is not a pass — see the partial items below.
+            Nothing is recorded as fully broken. That is not a pass. See the partial items below.
           </p>
         ) : (
           <AssessmentList entries={failing} titleOf={titleOf} />
@@ -164,7 +164,7 @@ export function AlphaChip({
         {partial.length > 0 ? (
           <div className="mt-2.5 border-t border-danger/20 pt-2.5">
             <p className="text-[12px] font-semibold text-warn">
-              Partly working — real, and not what was asked for:
+              Partly working. Real, and not what was asked for:
             </p>
             <AssessmentList entries={partial} titleOf={titleOf} />
           </div>
@@ -172,8 +172,8 @@ export function AlphaChip({
 
         {unmatched > 0 ? (
           <p className="mt-1.5 text-[11px] text-warn tabular-nums">
-            {unmatched} assessed item{unmatched === 1 ? '' : 's'} no longer match a roadmap item —
-            the record and the roadmap disagree.
+            {unmatched} assessed item{unmatched === 1 ? '' : 's'} no longer match a roadmap item.
+            The record and the roadmap disagree.
           </p>
         ) : null}
 
@@ -183,7 +183,7 @@ export function AlphaChip({
         {record.outOfScope.length > 0 ? (
           <div className="mt-2.5 border-t border-danger/20 pt-2.5">
             <p className="text-[12px] font-semibold text-ink">
-              Taken out of scope on purpose — not assessed as broken:
+              Taken out of scope on purpose, not assessed as broken:
             </p>
             <ul className="mt-1.5 space-y-1.5">
               {record.outOfScope.map((entry) => (
@@ -200,8 +200,8 @@ export function AlphaChip({
               <p className="mt-1.5 text-[11px] text-warn tabular-nums">
                 {unmatchedDescopes.length === 1
                   ? '1 out-of-scope code matches no roadmap item'
-                  : `${unmatchedDescopes.length} out-of-scope codes match no roadmap item`}{' '}
-                — check it before trusting the count above.
+                  : `${unmatchedDescopes.length} out-of-scope codes match no roadmap item`}
+                . Check it before trusting the count above.
               </p>
             ) : null}
           </div>
@@ -213,8 +213,8 @@ export function AlphaChip({
           <p className="mt-2.5 border-t border-danger/20 pt-2.5 text-[12px] text-ink">
             The other <span className="font-semibold tabular-nums">{passing.length}</span> items
             were recorded passing by the {formatShort(record.recordedOn)} sweep and{' '}
-            <span className="font-semibold">have not been re-checked since</span> — that is a
-            reading from {ageLabel(age)}, not a statement about today.
+            <span className="font-semibold">have not been re-checked since</span>. That is a reading
+            from {ageLabel(age)}, not a statement about today.
           </p>
         ) : null}
 
@@ -226,7 +226,7 @@ export function AlphaChip({
           Separately, the <span className="font-semibold tabular-nums">11 behavioural checks</span>{' '}
           of the Alpha Gate are a different list.{' '}
           <span className="font-semibold tabular-nums">10</span> are{' '}
-          <span className="font-semibold">unverified, not failed</span> — nobody has run them. The
+          <span className="font-semibold">unverified, not failed</span>. Nobody has run them. The
           eleventh, “a scheduled post fires within ±60s”, cannot be met as built: the cron that
           publishes ticks every five minutes (A9).
         </p>

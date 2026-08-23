@@ -123,7 +123,7 @@ export function decideStoreSurface(input: StoreDecideInput): StoreDecision {
       state: 'store_unreadable',
       showList: false,
       headline: `Sahoda could not read your ${noun}`,
-      body: `This is not a reading of your ${noun} — the attempt itself failed. Try again in a moment.`,
+      body: `This is not a reading of your ${noun}. The attempt itself failed. Try again in a moment.`,
     }
   }
 
@@ -197,7 +197,7 @@ export function decideStoreSurface(input: StoreDecideInput): StoreDecision {
       state: 'awaiting_first_event',
       showList: false,
       headline: `Nothing has come through yet`,
-      body: `Sahoda is listening, and new ${noun} will appear here as they arrive. This is not a reading of your ${noun} — it is what has reached Sahoda so far, which is nothing.`,
+      body: `Sahoda is listening, and new ${noun} will appear here as they arrive. This is not a reading of your ${noun}. It is what has reached Sahoda so far, which is nothing.`,
     }
   }
 
@@ -207,7 +207,7 @@ export function decideStoreSurface(input: StoreDecideInput): StoreDecision {
     state: 'empty',
     showList: false,
     headline: `No ${noun} yet`,
-    body: `Sahoda is listening and has been receiving updates — none of them ${noun}.`,
+    body: `Sahoda is listening and has been receiving updates, none of them ${noun}.`,
   }
 }
 

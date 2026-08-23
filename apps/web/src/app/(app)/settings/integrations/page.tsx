@@ -31,7 +31,7 @@ export default async function SettingsIntegrationsPage() {
            forever is the whole of what that row offered. */
         <SettingRow
           label="No workspace yet"
-          hint="Channels belong to a workspace. Nothing failed — there is nothing to connect to until one exists."
+          hint="Channels belong to a workspace. Nothing failed. There is nothing to connect to until one exists."
         />
       ) : read.connections.length === 0 ? (
         <SettingRow

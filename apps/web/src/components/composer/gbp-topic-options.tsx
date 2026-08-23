@@ -132,7 +132,7 @@ export function GbpTopicOptions({ extras, onExtrasChange }: GbpTopicOptionsProps
       {topic === 'OFFER' ? (
         <div className="space-y-2 rounded-sm bg-s1 p-3">
           <p className="text-[12.5px] text-muted">
-            Fill in at least one of these — an offer with none of them publishes as an ordinary
+            Fill in at least one of these. An offer with none of them publishes as an ordinary
             update.
           </p>
           <div className="space-y-1.5">

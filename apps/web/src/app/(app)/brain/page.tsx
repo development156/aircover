@@ -46,7 +46,7 @@ export default async function BrainPage() {
         <EmptyState
           icon={BrainCircuit}
           title="Create a workspace to build a Brand Brain"
-          body="A Brand Brain belongs to a workspace and you don't have one yet. Nothing failed — there is simply no brain to show."
+          body="A Brand Brain belongs to a workspace and you don't have one yet. Nothing failed. There is simply no brain to show."
           action={<CreateWorkspaceButton variant="primary" />}
         />
       </div>
@@ -71,7 +71,7 @@ export default async function BrainPage() {
           title="Sahoda doesn't know your brand yet"
           body="The Brand Brain is what every caption, campaign and reply is written from. Give Sahoda a spark and it will resolve a first draft you can correct."
           action={<OnboardingLink>Set up your Brand Brain</OnboardingLink>}
-          tip="You approve and correct what it resolves — you never start from a blank form."
+          tip="You approve and correct what it resolves. You never start from a blank form."
         />
 
         <section className="surface-ring rounded-card bg-surface" aria-labelledby="brain-will-hold">
@@ -114,7 +114,7 @@ export default async function BrainPage() {
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
         >
-          Could not read your Brand Brain just now — reload to try again. Nothing has changed and
+          Could not read your Brand Brain just now. Reload to try again. Nothing has changed and
           nothing was charged.
         </div>
       </div>

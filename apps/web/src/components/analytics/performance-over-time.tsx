@@ -133,7 +133,7 @@ export function PerformanceOverTime({
     return (
       <Container>
         <Note>
-          Sahoda has started keeping a history. Nothing has been measured yet — the first readings
+          Sahoda has started keeping a history. Nothing has been measured yet. The first readings
           arrive once your published posts report.
         </Note>
       </Container>

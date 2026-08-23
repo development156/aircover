@@ -31,21 +31,6 @@ import {
 
 import { cn } from '@/lib/utils'
 
-/**
- * ── THERE IS NO `soon` HERE ANY MORE, AND THAT IS NOT A DELETION ─────────────
- * This component used to draw a roadmap item three ways — the word "Soon", a
- * hollow ring when collapsed, and ", not built yet" in the accessible name. The
- * rail no longer renders roadmap items at all (`RAIL_GROUPS` in
- * lib/nav/sections.ts, and the reasoning is there), so every one of those
- * branches became unreachable the moment that projection landed.
- *
- * Unreachable code with a confident comment on it is worse than no code: the
- * next reader takes the comment as a description of what ships. The treatment
- * still exists, unchanged, in the two surfaces that DO list the roadmap —
- * `more-sheet.tsx` for the phone and `command-palette.tsx` for ⌘K — and those
- * are the files to edit if the roadmap's rendering should change.
- */
-
 // Icons resolved client-side by name — component references cannot cross the
 // server→client boundary.
 const ICONS = {
@@ -81,6 +66,7 @@ export function NavItem({
   icon,
   guide,
   count,
+  soon = false,
 }: {
   // typedRoutes' Route union — no hand-maintained href list to drift
   href: Route
@@ -97,6 +83,27 @@ export function NavItem({
    * "0" badge is noise, not information.
    */
   count?: number
+  /**
+   * The section is designed but not built.
+   *
+   * ── THIS IS STILL A REAL LINK, AND THAT IS THE DESIGN ────────────────────────
+   * It is not disabled, not `aria-disabled` and not a `<span>`. The screen at the
+   * other end EXISTS, loads, and says plainly that the feature does not run yet —
+   * so the link keeps every promise it makes. The `<div>`-not-`<button>` rule
+   * governs CONTROLS that would do nothing; a nav item that navigates somewhere
+   * useful is not one of those, and greying it out would make the roadmap
+   * unreachable rather than legible.
+   *
+   * ── HOW IT READS AS NOT-YET, THREE WAYS, NONE OF THEM A COLOUR ──────────────
+   * · the word "Soon" beside the label, which is the whole claim in one word;
+   * · a HOLLOW ring at the collapsed width, where the label goes `sr-only` and
+   *   the word has nowhere to sit. Hollow against the count badge's FILLED dot:
+   *   filled means something is waiting for you, hollow means nothing is there
+   *   yet. Fill versus no-fill survives greyscale, which hue would not;
+   * · the accessible name, which carries "not built yet" at every width, so a
+   *   screen reader user learns it before following the link rather than after.
+   */
+  soon?: boolean
 }) {
   const pathname = usePathname()
   const active = pathname === href || pathname.startsWith(`${href}/`)
@@ -106,6 +113,7 @@ export function NavItem({
     <Link
       href={href}
       data-guide={guide}
+      data-soon={soon ? '' : undefined}
       aria-current={active ? 'page' : undefined}
       /**
        * THE OTHER HALF OF THE NINE-UNNAMED-LINKS BUG.
@@ -129,14 +137,14 @@ export function NavItem({
        * It does NOT become the accessible name — the span always supplies one,
        * and text content outranks `title` in the accname algorithm.
        */
-      title={label}
+      title={soon ? `${label}, not built yet` : label}
       className={cn(
         // 34px tall, 9px inset, 13px/500 — the kit's control height. The density
         // is not incidental: 34px rows against 40px is most of what separates
         // this shell from a stock dashboard.
         'relative flex h-[34px] items-center gap-[10px] rounded-sm px-[9px] text-[13px] font-medium text-muted transition-micro',
         'hover:bg-surface-3 hover:text-ink',
-        'rail-min:justify-center rail-min:px-0',
+        'max-wide:justify-center max-wide:px-0',
         // The active surface is an ALPHA wash (--t50 = orange at 6%), so it
         // composites correctly on white AND on the dark shell — which is why
         // this no longer needs the `dark:bg-s2` override the solid v3 tint did.
@@ -146,30 +154,40 @@ export function NavItem({
         // that survives greyscale, so the state does not rest on hue alone.
         active &&
           'before:absolute before:top-2 before:bottom-2 before:-left-[9px] before:w-[2px] before:rounded-full before:bg-brand before:content-[""]',
-        active && 'rail-min:before:hidden',
+        active && 'max-wide:before:hidden',
       )}
     >
       <Icon size={17} strokeWidth={1.7} className="shrink-0" />
-      {/* sr-only, NOT hidden, whenever the rail is minimised. `display:none`
-          removes the node from the accessibility tree, which took the link's
-          NAME with it — below 1180px all nine nav items announced as unnamed
-          links, so the app's main navigation was unusable by screen reader and
-          unlabelled to the eye across every width from 768 to 1179.
+      {/* sr-only, NOT hidden, when the rail collapses. `display:none` removes the
+          node from the accessibility tree, which took the link's NAME with it —
+          below 1180px all nine nav items announced as unnamed links, so the app's
+          main navigation was unusable by screen reader and unlabelled to the eye
+          across every width from 768 to 1179. The collapse to a 64px icon rail is
+          the reference's design; losing the name was not. sr-only is absolutely
+          positioned, so it leaves the flex row and the centred icon is unmoved. */}
+      <span className="max-wide:sr-only">{label}</span>
 
-          `rail-min:` and not `max-wide:` since 2026-08-23, and the widening is
-          the point: the rail now also minimises because the READER collapsed
-          it, and it opens that way. A rule keyed to the media query alone would
-          have restored every label at 1440 the moment the default flipped to
-          collapsed, which is the same nine-unnamed-links bug arriving from the
-          other direction — names present, layout broken. One spelling covers
-          both reasons. sr-only is absolutely positioned, so it leaves the flex
-          row and the centred icon is unmoved. */}
-      <span className="rail-min:sr-only">{label}</span>
+      {soon ? (
+        <>
+          {/* Expanded: the word, in the trailing slot. Muted, not accented — a
+              roadmap item must not compete with the active one. */}
+          <span aria-hidden className="type-eyebrow ml-auto flex-none text-muted max-wide:hidden">
+            Soon
+          </span>
+          {/* Collapsed: a HOLLOW ring where the count badge puts a filled dot. */}
+          <span
+            aria-hidden
+            className="absolute top-[7px] right-[13px] hidden size-[7px] rounded-full bg-surface ring-[1.5px] ring-line-firm max-wide:block"
+          />
+          {/* The claim, at every width, before the link is followed. */}
+          <span className="sr-only">, not built yet</span>
+        </>
+      ) : null}
 
       {count !== undefined && count > 0 ? (
         <>
           {/* Expanded: the number, pushed to the trailing edge. */}
-          <span className="ml-auto grid h-[18px] min-w-[18px] flex-none place-items-center rounded-full bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums rail-min:hidden">
+          <span className="ml-auto grid h-[18px] min-w-[18px] flex-none place-items-center rounded-full bg-brand px-[5px] text-[11px] font-bold text-primary-foreground tabular-nums max-wide:hidden">
             {count}
           </span>
           {/* Collapsed: a dot. The count has nowhere to go in a 64px rail, but
@@ -177,7 +195,7 @@ export function NavItem({
               for. The accessible name below carries the number either way. */}
           <span
             aria-hidden
-            className="absolute top-[7px] right-[13px] hidden size-[7px] rounded-full bg-brand ring-2 ring-surface rail-min:block"
+            className="absolute top-[7px] right-[13px] hidden size-[7px] rounded-full bg-brand ring-2 ring-surface max-wide:block"
           />
           <span className="sr-only">{count} waiting</span>
         </>

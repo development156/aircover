@@ -92,8 +92,8 @@ export function IntakeStep({ initialText, initialOverrides, onContinue }: Intake
       <div data-guide="onboarding.start">
         <p className="text-[16px] font-bold text-ink">Tell us what you do</p>
         <p className="mt-1 text-[13px] text-muted">
-          One sentence, in your own words. We read three things out of it and show you what we got —
-          change any of them.
+          One sentence, in your own words. We read three things out of it and show you what we got.
+          Change any of them.
         </p>
       </div>
 

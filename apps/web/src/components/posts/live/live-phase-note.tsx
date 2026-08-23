@@ -28,8 +28,8 @@ export function LivePhaseNote({ className }: { className?: string }) {
   return (
     <p className={className} role="status">
       <span className="text-[13px] text-muted">
-        Stopped watching for updates — a publish has been running for a while. Reload to see where
-        it got to.
+        Stopped watching for updates. A publish has been running for a while. Reload to see where it
+        got to.
       </span>
     </p>
   )

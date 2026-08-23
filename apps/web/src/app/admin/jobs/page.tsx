@@ -48,8 +48,8 @@ export default async function DeadLettersPage() {
       <div>
         <h1 className="type-h2 font-extrabold">Dead letters</h1>
         <p className="mt-1 type-body text-muted">
-          Publishes that failed, newest first, across every workspace. Tenants are shown by id —
-          naming them would mean widening what an operator can read.
+          Publishes that failed, newest first, across every workspace. Tenants are shown by id.
+          Naming them would mean widening what an operator can read.
         </p>
       </div>
 
@@ -89,7 +89,7 @@ export default async function DeadLettersPage() {
                         costs the most. */}
                     {letter.error ?? (
                       <span className="text-muted">
-                        recorded as failed with no message — the failure is real, the reason was not
+                        recorded as failed with no message. The failure is real, the reason was not
                         captured
                       </span>
                     )}
