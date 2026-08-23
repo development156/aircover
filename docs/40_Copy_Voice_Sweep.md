@@ -12,14 +12,49 @@ reconstruction. `n` is how many times that exact string occurred.
 
 | | |
 | --- | --- |
-| replacements applied | 649 |
+| replacements applied | 649, then 5 corrected |
 | distinct sentences rewritten | 461 |
 | source files touched | 287 |
 | test assertions retargeted | 22 across 20 files |
 | dashes deliberately kept | 12 |
+| `apps/jobs` dash lines, all operator CLI or test names | 57, none changed |
 
 How each dash was resolved: 517 became a full stop, 74 a comma, 32 a colon, 10 a pair of
 parentheses, and 16 needed the sentence restructured.
+
+## Five splits that were wrong, and the check that could not see them
+
+The first pass verified its own work with `re.escape(replacement) + r'\s+[a-z]'`, which
+looks for a lowercase letter AFTER the replacement string. It cannot see a sentence that
+begins badly INSIDE the replacement, and it cannot see one whose first word arrives from
+an interpolation at runtime. Re-run as `\.\s+(?:["'`]?[a-z]|\d|\$\{)` over every
+touched file, it found five real defects:
+
+| where | what it rendered | fix |
+| --- | --- | --- |
+| `app/(app)/report/page.tsx` | `Instagram · LinkedIn · scheduled, waiting for your approval` — the middot is the LIST separator on that line, so the status read as a third channel | full stop; the dash was marking a category boundary, not a list |
+| `packages/shared/src/inbox/send-window.ts` | `Replies are open. instagram allows a free-form reply…` — `platform` is a lowercase key | colon |
+| `app/actions/knowledge.ts` | `…already learned from it. 3 fields in your Brand Brain…` — a sentence opening on a numeral | colon |
+| `packages/shared/src/gate/packs.ts` | `…and how it was measured. "rated 4.8 by 300 customers" says more…` — a lowercase quoted phrase opening a sentence, where its four siblings in the same file all take a colon or parentheses | colon |
+| `packages/publishing/src/format-rules.ts` | `One upright photo. 9:16 is the shape Instagram fills.` | colon |
+
+The interpolations that were checked and are CORRECT, so the split stands: `radar/marks.tsx`'s
+`note` (`'The page did not respond.'`), `ops-team.ts`'s `invited.message` (all four Clerk
+strings start capitalised), `connection-gap.ts`'s `names` (`CHANNEL_LABELS`, so `Instagram`),
+and `sub-nav.tsx`'s `section.pending` (a task code such as `SL-081`).
+
+**The general lesson.** A check written against the literal you wrote cannot see the string
+the reader gets. Where a sentence begins with `${…}`, the check has to be against the values
+that interpolation can hold.
+
+## `apps/jobs` was scanned separately and holds no product prose
+
+The sweep's roots were `apps/web/src` and `packages`, so `apps/jobs` was audited on its own
+afterwards rather than assumed empty. **57 dash-bearing non-comment lines, none of them
+user-facing**: `throw new Error` and `console.log` in the operator CLI scripts under
+`apps/jobs/scripts/` (`audience-capture`, `metric-capture`, `radar-pass`), plus test
+`describe`/`it` names and one fixture page title. `apps/jobs` runs background work and
+renders no interface copy. Nothing was changed there.
 
 ## Every changed string
 
