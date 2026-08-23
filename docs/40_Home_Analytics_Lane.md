@@ -260,6 +260,10 @@ it. No unit test asserts the tip's text, and `no-truncated-labels` does not read
 `overflow-x-auto` against ~344px of usable card width, so "Engagement" renders as
 "Engager" and the `Posts` column — which holds the only real numbers on the page —
 is entirely off-screen with no visual affordance that the region scrolls.
+`no-truncated-labels.spec.ts` does not see it: /analytics is not in its route list.
+**FIXED** — docs/37 §13 ("mobile is recomposed, not shrunk"): below `narrow` each
+channel becomes a block with its metrics as a grid, through the same `TotalFigure`,
+so the coverage suffix and the refusal to print a total nobody reported survive.
 
 ### 3.4 The decisions
 
@@ -397,6 +401,8 @@ silently absorbed.
 | 5 | **The topbar restates the page's absence.** At 1024 and 1440 the brain ring reads "No brain yet" beside a page already saying nothing has happened here. | The shell's chip. Bounded at one by the guard and named there, rather than reached into from a page lane. |
 | 6 | **The mascot asset is cut off in the PNG**, not by its container (§2, and `greeting-banner.tsx`). | Needs the render, not CSS. The container now fades the bottom so the cut does not read as a fault. |
 | 7 | **/analytics populated repeats its coverage line** — "0 of 2 channels reported" and "0 of 2 published channels reported", 130px apart with different nouns. | Genuinely different denominators when some channels are unpublished; identical on this fixture. Deciding whether to merge them is a product call about what the two numbers mean. |
+| 8 | **`no-truncated-labels.spec.ts` does not cover /analytics.** It found nothing at 390 because it never looked. | Adding routes to another lane's guard changes what that lane is responsible for. Named here so the next reader knows the green was silence, not evidence. |
+| 9 | **The `SpendArea` sparse state runs ~200px tall for one sentence.** Visible on populated /home at every width. | Pre-existing, in a component this lane did not otherwise touch, and it is a container-height decision rather than a claim about data. |
 
 ---
 
@@ -458,3 +464,28 @@ brand_memory 0 · credit_ledger 0        (workspaces all-time: 26)
 
 **Nothing was left behind.** The ongoing cost is two Clerk users per `pnpm gate`,
 down from the four the guard would have cost as separate `test()` blocks.
+
+---
+
+## 9 · Two things the gate and the frames found after the fact
+
+**`motion.spec.ts` went red, and it was right.** It bootstraps a workspace, opens
+/home and reads `.enter-step`; its own header records why it bootstraps at all —
+with no workspace the page is `FirstRun` and "there is no dashboard to stagger".
+`GetStarted` added a THIRD state with that property, so the most-seen screen in the
+product would have shipped as the one that flashes in while the dashboard behind it
+deals itself. The screen gained an entrance; the guard was not touched.
+
+Its second test named the heading "Needs your attention", which is the dashboard's
+and correctly absent. That assertion is **re-aimed, not re-worded**: its claim is "a
+still page, not a blank one", and asserting the first staggered region carries real
+visible text makes the same claim in any state — strictly stronger than a string,
+and it does not need revisiting the next time /home grows a state.
+
+**And two unit assertions went red on the responsive table for a reason worth
+recording.** Both renderings are mounted and `display:none`'d for each other, which
+is correct in a browser and **invisible to jsdom** — so every figure appeared twice
+to a query over the whole render and three `1/2`s counted as six. The tests scope to
+the table rather than de-duplicating, because the claim they make is about the
+comparison table's per-metric denominator. Anything that mounts two renderings for
+two bands has this property, and a jsdom query cannot tell them apart.

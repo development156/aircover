@@ -264,9 +264,7 @@ async function capture(page: Page, state: string, route: string, width: number, 
     ms,
     viewportOnly: true,
   })
-  const spend = measureAccentSpend(
-    await page.screenshot({ clip: { x: 0, y: 0, width, height } }),
-  )
+  const spend = measureAccentSpend(await page.screenshot({ clip: { x: 0, y: 0, width, height } }))
 
   // The frame a person reads. Full page, so a screen that runs long shows it.
   const pageRow = await shot(page, {
