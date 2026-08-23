@@ -160,7 +160,7 @@ export default async function HomePage() {
     accountReported: instagram.kind === 'ready' && instagram.insights.length > 0,
   }
   if (!workspaceHasStarted(signals)) {
-    return <GetStarted now={now} steps={startSteps(signals)} />
+    return <GetStarted now={now} steps={startSteps()} />
   }
 
   // The evidence behind `.is-real` on the strip. This page read publish-log

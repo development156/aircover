@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { Check } from 'lucide-react'
 
 import { buttonVariants } from '@/components/ui/button'
 import { greetingFor } from '@/lib/home/greeting'
@@ -13,30 +12,40 @@ import type { StartStep } from '@/lib/home/started'
  * and `/wallet` already made one state earlier for the same reason. MEASURED on
  * 2026-08-23, the dashboard on an empty workspace ran 1085px at 1440, 1795px at
  * 1024 and 2025px at 390 to say "you have not done anything yet" seven times in
- * six visual languages — the founder's verdict, in the product's most-visited
- * screen. See `lib/home/started.ts` for the count.
+ * six visual languages. This screen is 900 / 768 / 844 — one viewport at every
+ * width. See `lib/home/started.ts` for the count and the predicate.
  *
  * ── IT IS THE SAME TREATMENT /analytics USES, DELIBERATELY ───────────────────
- * Left-aligned, content-width prose, one solid brand fill, and no 44px marker
- * tile. `ReadinessLine` is the same shape on the other route. Two screens
- * inventing two answers to "how do we say there is nothing here" is the system
- * gap docs/27 §4 names, and the fix has to be one language rather than two good
- * ones.
+ * Left-aligned, content-width prose, one solid brand fill, no marker tile.
+ * `ReadinessLine` is the same shape on the other route. Two screens inventing
+ * two answers to "how do we say there is nothing here" is the system gap
+ * docs/27 §4 names, and the fix has to be one language rather than two good ones.
  *
- * ── THE LIST IS STATUS, NOT A NAG ────────────────────────────────────────────
- * All three steps render whether or not they are done. A reader on day one does
- * not know what this product needs in order to work, and a list that hides the
- * finished items cannot tell them. `done` is drawn with a glyph and a label
- * rather than a colour, so it survives greyscale (docs/37 §9).
+ * ── THE LEAD IS A STEP, NOT A COPY OF ONE ────────────────────────────────────
+ * The first version put the three doors in a list and then a primary button
+ * underneath, and the button read "Teach Sahoda your brand" — the same words as
+ * the first row, 230px below it at 390. That is §16's "says the same thing in
+ * more than one place" reproduced inside the component built to end it, and the
+ * after-frames showed it before any test did.
  *
- * ── AND THE STEPS ARE NOT LOCKED ─────────────────────────────────────────────
- * Every row is a live link regardless of the rows above it. Writing genuinely
- * works with no brain and no connection, so gating the third step behind the
- * first two would be a false claim about the product dressed up as guidance.
- * The PRIMARY is simply the first one not done.
+ * So the leading step IS the button. The other two are links under a rule. One
+ * fill, three doors, every label written once.
+ *
+ * ── AND THERE ARE NO TICKS, BECAUSE THERE IS NOTHING TO TICK ─────────────────
+ * `workspaceHasStarted` returns false only when EVERY signal is empty, and
+ * `startSteps` derives `done` from those same signals — so on the only screen
+ * that renders this, all three are always incomplete. A checklist whose boxes
+ * can never be checked is furniture, and the first version shipped three of them.
+ *
+ * ── THE ORDER IS NOT A REQUIREMENT ───────────────────────────────────────────
+ * Writing genuinely works with no brain and no connection; `ConnectionsCard` says
+ * so and is right. The order is what unblocks the most, and every step is a live
+ * link regardless of the ones above it — presenting it as a sequence with locks
+ * would be a false claim about the product dressed up as guidance.
  */
 export function GetStarted({ now, steps }: { now: Date; steps: StartStep[] }) {
-  const next = steps.find((step) => !step.done)
+  const [lead, ...rest] = steps
+  if (!lead) return null
 
   return (
     <div className="space-y-8">
@@ -46,7 +55,7 @@ export function GetStarted({ now, steps }: { now: Date; steps: StartStep[] }) {
           has something to plan around. */}
       <header>
         <h1 className="type-h2">{greetingFor(now)}</h1>
-        <p className="type-sm mt-1 text-muted">
+        <p className="type-sm mt-1 max-w-[var(--measure-prose)] text-muted">
           Nothing has happened in this workspace yet, which is exactly what a new one looks like.
         </p>
       </header>
@@ -56,55 +65,48 @@ export function GetStarted({ now, steps }: { now: Date; steps: StartStep[] }) {
         aria-labelledby="home-get-started-head"
         className="surface-ring rounded-card bg-surface p-5"
       >
-        <h2 id="home-get-started-head" className="type-h3 text-ink">
-          Three things start it
-        </h2>
-        <p className="type-sm mt-1 max-w-[var(--measure-prose)] text-muted">
-          Your week, your approvals queue and your numbers all fill in from these. You can do them
-          in any order.
-        </p>
+        {/* Capped at the prose measure rather than left to the card. At 1440 the
+            card is 1132px and every sentence in it is under 640 — letting the
+            rule and the text run the full width is the same container-over-content
+            failure docs/27 §3.4 names, and this component criticises it in its
+            own header. */}
+        <div className="max-w-[var(--measure-prose)]">
+          <h2 id="home-get-started-head" className="type-h3 text-ink">
+            Three things start it
+          </h2>
+          <p className="type-sm mt-1 text-muted">
+            Your week, your approvals queue and your numbers all fill in from these. You can do them
+            in any order.
+          </p>
 
-        <ol className="mt-4 divide-y divide-line-soft border-t border-line-soft">
-          {steps.map((step) => (
-            <li key={step.id} className="flex items-start gap-3 py-3">
-              {/* Structural, not chromatic: a filled tick against an empty ring,
-                  each with its own accessible name. */}
-              <span
-                aria-hidden
-                className={
-                  step.done
-                    ? 'mt-1 grid size-[18px] shrink-0 place-items-center rounded-full bg-ink text-canvas'
-                    : 'mt-1 size-[18px] shrink-0 rounded-full shadow-[inset_0_0_0_1.5px_var(--line-firm)]'
-                }
-              >
-                {step.done ? <Check size={11} strokeWidth={3} /> : null}
-              </span>
-              <span className="min-w-0 flex-1">
-                <Link
-                  href={step.href}
-                  className="type-body rounded-sm font-[550] text-ink transition-micro hover:text-accent"
-                >
-                  {step.label}
-                </Link>
-                <span className="sr-only">{step.done ? ' — done' : ' — not done yet'}</span>
-                <span className="type-meta block text-muted">{step.gets}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-
-        {next ? (
-          <div className="mt-4">
-            {/* The page's one solid brand fill (docs/37 §16). */}
+          <div className="mt-5">
+            {/* The one solid brand fill on this view (docs/37 §16). */}
             <Link
-              href={next.href}
+              href={lead.href}
               data-guide="home.get-started"
               className={buttonVariants({ variant: 'primary' })}
             >
-              {next.label}
+              {lead.label}
             </Link>
+            <p className="type-meta mt-2 text-muted">{lead.gets}</p>
           </div>
-        ) : null}
+
+          {rest.length > 0 ? (
+            <ul className="mt-5 space-y-3 border-t border-line-soft pt-4">
+              {rest.map((step) => (
+                <li key={step.id}>
+                  <Link
+                    href={step.href}
+                    className="type-body rounded-sm font-[550] text-ink transition-micro hover:text-accent"
+                  >
+                    {step.label}
+                  </Link>
+                  <p className="type-meta text-muted">{step.gets}</p>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       </section>
     </div>
   )

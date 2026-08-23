@@ -52,32 +52,30 @@ describe('an unknown is never read as an absence', () => {
 })
 
 describe('the three doors', () => {
-  test('all three render whatever their state, so the list can teach', () => {
-    expect(startSteps(NOTHING).map((s) => s.id)).toEqual(['brain', 'connect', 'write'])
-    expect(startSteps({ ...NOTHING, hasBrain: true, connections: 2, posts: 5 }).length).toBe(3)
-  })
-
-  test('done tracks the real signal, not the position in the list', () => {
-    const steps = startSteps({ ...NOTHING, posts: 3 })
-    expect(steps.find((s) => s.id === 'write')?.done).toBe(true)
-    expect(steps.find((s) => s.id === 'brain')?.done).toBe(false)
+  test('all three, in the order that unblocks the most', () => {
+    expect(startSteps().map((s) => s.id)).toEqual(['brain', 'connect', 'write'])
   })
 
   /**
-   * An unreadable connections read must not be drawn as a tick. `?? 0` is what
-   * does it, and this is the test that keeps it there.
+   * No step may be gated on another: writing genuinely works with no brain and
+   * no connection, so a locked third row would be a false claim dressed as help.
    */
-  test('an unreadable connections read is not a completed step', () => {
-    expect(
-      startSteps({ ...NOTHING, connections: null }).find((s) => s.id === 'connect')?.done,
-    ).toBe(false)
+  test('every step points somewhere that works with no setup at all', () => {
+    for (const step of startSteps()) {
+      expect(step.href).toMatch(/^\/(brain|connections|posts\/new)$/)
+    }
   })
 
-  test('every step points somewhere that works with no setup at all', () => {
-    // No step may be gated on another: writing genuinely works with no brain and
-    // no connection, so a locked third row would be a false claim dressed as help.
-    for (const step of startSteps(NOTHING)) {
-      expect(step.href).toMatch(/^\/(brain|connections|posts\/new)$/)
+  /**
+   * The list is only ever rendered by a screen that `workspaceHasStarted` has
+   * already said no to, and that answer requires every signal to be empty. This
+   * pins the pair together: if the predicate ever starts returning false while
+   * something IS set, a `done` flag becomes meaningful again and this fails.
+   */
+  test('the only state that reaches this list has nothing done in it', () => {
+    expect(workspaceHasStarted(NOTHING)).toBe(false)
+    for (const patch of [{ posts: 1 }, { connections: 1 }, { hasBrain: true }] as const) {
+      expect(workspaceHasStarted({ ...NOTHING, ...patch })).toBe(true)
     }
   })
 })

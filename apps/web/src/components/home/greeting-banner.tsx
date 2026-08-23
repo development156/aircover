@@ -36,6 +36,14 @@ import { CreatePostButton } from '@/components/posts/create-post-button'
  * permanent, it is in the thumb zone, and it is the shell's, so removing it
  * would be this lane reaching into another. The page's copy is what goes.
  *
+ * ── AND `overflow-hidden` CAME OFF BELOW `narrow`, BECAUSE IT CLIPPED THE H1 ──
+ * Found by looking at a frame, not by a test. With `max-narrow:px-0` the heading
+ * starts at the section's own x=0, and `overflow-hidden` then shaved the left
+ * side bearing off the "G" of "Good evening" — visible as a straight vertical
+ * nick in a 3x crop of `after__populated__home__full__390__dark`. It exists to
+ * clip the wash and the art, and both are `max-narrow:hidden`, so below 700 it
+ * was clipping nothing but the text.
+ *
  * ── THE MASCOT IS NOT CLIPPED BY THIS CONTAINER ──────────────────────────────
  * docs/27 §1 records "the mascot is clipped by its container … cut off mid-body
  * at the bottom edge". MEASURED: `public/mascot/0.png` is 2048x983, the art box
@@ -66,7 +74,7 @@ export function GreetingBanner({
   return (
     <section
       data-guide="home.greeting"
-      className="relative flex items-center overflow-hidden rounded-lg px-[22px] py-[18px] narrow:surface-ring narrow:min-h-[190px] narrow:bg-surface max-narrow:px-0 max-narrow:py-0"
+      className="relative flex items-center rounded-lg px-[22px] py-[18px] narrow:overflow-hidden narrow:surface-ring narrow:min-h-[190px] narrow:bg-surface max-narrow:px-0 max-narrow:py-0"
     >
       {/* The wash. Palette-only, so a workspace with no art still gets a
           finished banner rather than a grey box — and absent below `narrow`,

@@ -77,17 +77,16 @@ export interface StartStep {
   /** What this step turns on, stated as the thing the reader gets. */
   gets: string
   href: '/brain' | '/connections' | '/posts/new'
-  done: boolean
 }
 
 /**
- * The three doors, always all three, with their real state.
+ * The three doors, in the order that unblocks the most.
  *
- * ── THIS IS A STATUS LIST, NOT A CHECKLIST THAT NAGS ─────────────────────────
- * All three render whether or not they are done, because the list's job is to
- * say what this product needs to work — which a reader on day one does not know
- * — and a list that hides what is finished cannot say it. The leading action is
- * the first one NOT done.
+ * ── AND WITHOUT A `done` FLAG, WHICH THE FIRST VERSION CARRIED ───────────────
+ * It rendered three empty tick-rings. `workspaceHasStarted` returns false only
+ * when EVERY signal is empty, and `done` was derived from those same signals, so
+ * on the only screen that calls this every step is always incomplete and no ring
+ * could ever be filled. A checklist whose boxes cannot be checked is furniture.
  *
  * ── AND THE ORDER IS NOT A REQUIREMENT ───────────────────────────────────────
  * Writing genuinely works with no connection and no brain; `ConnectionsCard`
@@ -95,28 +94,25 @@ export interface StartStep {
  * step is disabled by the state of another — presenting it as a sequence with
  * locks would be a false claim about the product.
  */
-export function startSteps(signals: StartedSignals): StartStep[] {
+export function startSteps(): StartStep[] {
   return [
     {
       id: 'brain',
       label: 'Teach Sahoda your brand',
       gets: 'Everything it writes comes from this.',
       href: '/brain',
-      done: signals.hasBrain === true,
     },
     {
       id: 'connect',
       label: 'Connect a channel',
       gets: 'Lets a post actually go out, and starts reach and followers.',
       href: '/connections',
-      done: (signals.connections ?? 0) > 0,
     },
     {
       id: 'write',
       label: 'Write your first post',
       gets: 'Appears in your week and in the approvals queue.',
       href: '/posts/new',
-      done: signals.posts > 0,
     },
   ]
 }

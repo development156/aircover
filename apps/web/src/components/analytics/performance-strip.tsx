@@ -70,8 +70,20 @@ function reasonFor(analytics: AccountAnalytics): string | null {
 export function PerformanceStrip({
   analytics,
   reasonStated = false,
+  detailsLink = true,
 }: {
   analytics: AccountAnalytics
+  /**
+   * "Details" goes to /analytics, which is where this strip ALSO renders.
+   *
+   * MEASURED on the after-frames 2026-08-23: on /analytics the card's only link
+   * was an accent-coloured "Details" pointing at the page the reader is already
+   * on. A control that says what happens when it is used (docs/37 §17) cannot be
+   * one that does nothing, and a self-link is the quietest dead end there is —
+   * it does not error, it just fails to go anywhere. /home keeps it, because
+   * from there it is a real destination.
+   */
+  detailsLink?: boolean
   /**
    * The page has already said WHY there is nothing here, once, at the top.
    *
@@ -94,12 +106,14 @@ export function PerformanceStrip({
     <Card className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <h2 className="type-h3">Performance</h2>
-        <Link
-          href="/analytics"
-          className="card-link rounded-sm type-meta font-semibold text-accent transition-micro hover:underline"
-        >
-          Details
-        </Link>
+        {detailsLink ? (
+          <Link
+            href="/analytics"
+            className="card-link rounded-sm type-meta font-semibold text-accent transition-micro hover:underline"
+          >
+            Details
+          </Link>
+        ) : null}
       </div>
 
       <dl className="grid grid-cols-4 gap-x-4 gap-y-3 max-wide:grid-cols-2 max-narrow:grid-cols-2">

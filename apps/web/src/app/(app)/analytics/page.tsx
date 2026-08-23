@@ -133,7 +133,7 @@ export default async function AnalyticsPage() {
 
       {nothingToStructure ? null : (
         <>
-          <PerformanceStrip analytics={account} reasonStated={reasonStated} />
+          <PerformanceStrip analytics={account} reasonStated={reasonStated} detailsLink={false} />
 
           <AccountPanel analytics={account} reasonStated={reasonStated} />
 

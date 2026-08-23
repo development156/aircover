@@ -45,6 +45,18 @@ import { SpendBars } from './spend-bars'
  * The rule is the one CreditChip already states: a real zero renders as 0 —
  * that is knowledge.
  */
+/**
+ * The single category's own label, lower-cased to sit inside a sentence.
+ *
+ * `SpendRead` is an interface with a `status` string rather than a discriminated
+ * union, so `Extract<…, { status: 'ok' }>` narrows to `never` — it takes the
+ * whole read and reads `byAction`, which is present on every status.
+ */
+function oneLabel(spend: SpendRead): string {
+  const label = spend.byAction[0]?.label ?? 'one action'
+  return label.charAt(0).toLowerCase() + label.slice(1)
+}
+
 export function SpendCard({ spend }: { spend: SpendRead }) {
   const hasSeries = spend.status === 'ok' && spend.days.length > 0
 
@@ -69,7 +81,20 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
       {hasSeries ? (
         <>
           <SpendArea spend={spend} />
-          <SpendBars spend={spend} />
+          {/* ── A TOTAL AND ITS ONLY CATEGORY ARE THE SAME NUMBER ───────────
+              With one category the breakdown restates the figure already
+              printed in the header — "CREDITS SPENT · LAST 30 DAYS  30" above
+              "DRAFT POST  30", the same 30 twice, 170px apart. It only became
+              visible once the always-100% bar was removed; the bar had been
+              carrying the eye past the repetition. So the single category is
+              NAMED rather than tabulated, which says the extra thing the header
+              could not (what the spend was for) without saying the number
+              again. Two or more, and there is a real breakdown to draw. */}
+          {spend.status === 'ok' && spend.byAction.length === 1 ? (
+            <p className="type-meta text-muted">All of it on {oneLabel(spend)}.</p>
+          ) : (
+            <SpendBars spend={spend} />
+          )}
         </>
       ) : (
         // ONE sentence. The two claims stay distinct — "we could not look" is
