@@ -174,7 +174,22 @@ isn't live yet" sentence is the honest one. Both branches are guarded.
 
 ---
 
-## 3 · Per screen: what leads now, and why
+## 3 · Per screen
+
+### 3.0 · The five questions, answered from the BEFORE frames
+
+Written before any code was touched, off the 108-frame baseline.
+
+| | `/posts` | `/posts/[id]` | `/planner` | `/onboarding` |
+|---|---|---|---|---|
+| **What did they come for?** | the post they were working on | to write, and to see each channel's version | what is going out, and when | to answer one question |
+| **What was loudest?** | a tinted full-width banner with its own button — *plus* two solid brand fills (Create post, the `All` filter) | a full-width sticky bar reading "No changes yet", carrying no control | a ~1100px solid orange bar for a **paid** action, above the plan | the orb, and the one question |
+| **Did it deserve to be?** | **No.** §16 rung 1 is "is the user blocked"; the banner's own copy says you can write and plan without a channel. And §2.3 allows one solid fill per view, not two. | **No.** The widest object on the product's most important screen said nothing. | **No.** On `?view=month` — a view reached by clicking *Calendar* — the calendar began at y≈580 of a 900px viewport. | **Yes.** The hierarchy is settled, which is §0's precondition for delight. Left alone. |
+| **Any absence stated twice?** | No — the two notices are different absences (no channel, no post). | **Yes: six.** With no media attached, the writing column carried six blocks explaining media. | No. | No. |
+| **Anything sized by its CONTAINER?** | the banner, spanning the content column to hold two lines | the commit bar, spanning it to hold three words | **the Plan my week button** — `w-full` at every width | No. |
+| **Would they know what to do next?** | Yes, but the eye lands on the gate before the action. | **No back link**; the only route out was the rail, which is behind *More* on a phone. | Yes, but the plan is below the offer to spend. | Yes. |
+
+### 3.1 · What leads now, and why
 
 The decision procedure is `docs/37` §16's ladder, asked in order — is the user
 blocked, is there one number, is there one action, otherwise the list leads.
@@ -534,7 +549,45 @@ Run against `next start` on 3272, `--concurrency=1`, never piped —
 `scripts/gate.mjs` writes each stage to `.gate/<n>-<stage>.log` and puts the
 verdict on stderr as well as stdout, precisely so a `| tail` cannot swallow it.
 
-GATE_TABLE_PLACEHOLDER
+**GATE PASSED**, all five stages, 2026-08-23.
+
+| stage | command | result |
+|---|---|---|
+| 1 | `turbo run typecheck lint test --concurrency=1` | **ok** (69.5s) — 27 tasks |
+| 2 | `vitest run` (root) | **ok** (2.1s) |
+| 3 | `turbo run test:smoke --concurrency=1` | **ok** (1027.6s) — **100 passed · 2 flaky · 0 failed** |
+| 4 | `prettier --check .` | **ok** (16.3s) |
+| 5 | `turbo run build --concurrency=1` | **ok** (60.7s) — js-budget ok, 80 routes |
+
+**The two flaky are named, and neither is this lane's:**
+`connections-widths.spec.ts:155` and `post-format.spec.ts:29`. Both failed once
+and passed on the repo's configured single retry; neither touches a route in
+this lane, and `post-format` is already recorded elsewhere as a known flake.
+
+### Two earlier runs failed, and both are worth recording
+
+**Run 1 failed stage 1** on `src/lib/media/crop-geometry.test.ts` — "Test timed
+out in 5000ms", at 5131ms. Not this lane's file (it is not in the diff), and it
+**passed standalone in 2.14s, 28/28**. `journalctl -k` showed **no OOM**; the
+load average was **16.08**, from peer sessions running browser automation on the
+same machine. A 2.6% overrun of a 5s limit under that load is contention, and
+the second run passed the same stage in 69.5s.
+
+**Run 3 failed stage 3, and that one WAS mine.** Playwright's default
+`testMatch` is `**/*.@(spec|test).?(c|m)[jt]s?(x)`, so it collected
+`e2e/helpers/accent.test.ts` — a **vitest** file — and threw
+`Cannot read properties of undefined (reading 'config')` at its `describe`.
+
+The important part is not the error, it is the blast radius: a collection error
+takes the **whole suite** with it. `playwright test --list` reported **0 tests in
+0 files**. The gate's smoke leg had nothing to run and reported that only through
+a stack trace, not as "0 tests" — so a less careful reading of a green-looking
+run would have banked a smoke stage that executed nothing.
+
+Fixed by pinning `testMatch: '**/*.spec.ts'`, and **proved not to be a
+narrowing**: `accent.test.ts` is the only non-`.spec` test file in the tree, and
+`--list` after the change reports **236 tests in 57 files, 102 under @smoke** —
+the @smoke figure this repo gates on, unmoved.
 
 **Stage 3 is quoted against `next start`, not the gate's own `pnpm dev`.** That
 is a deviation and it is stated rather than glossed: `docs/34` §11a records the
