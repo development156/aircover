@@ -229,6 +229,10 @@
     "awaits": []
   },
   {
+    "route": "/admin/jobs",
+    "awaits": ["requireOpsAdmin", "readPublishDeadLetters"]
+  },
+  {
     "route": "/admin/qa",
     "awaits": ["requireOpsAdmin", "readQaArtifacts", "signQaArtifactViews"]
   },
