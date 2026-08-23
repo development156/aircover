@@ -309,19 +309,59 @@ own test, and the **polarity inverted** to `isPrivateAddress`. Verified reachabl
 from both entry points: `apps/web/src/lib/radar/locator.ts` and
 `apps/jobs/src/radar/run.ts` (`guardedFetch`). The SSRF guard survived the move.
 
+### 4.8 Two halves of one rename, on opposite sides of a merge
+
+Gate run 2, leg 3. Two causes behind one red spec.
+
+**Mine.** `wt-voice` branched before `wt-dash2` renamed the rail's Tailwind variant
+from `max-wide:` (the forced collapse below 1180px) to `rail-min:` (icons-only for
+*either* reason — `globals.css` defines it and says "every rule that used to say
+`max-wide:` inside the rail says this"). Taking wt-voice's whole `nav-item.tsx`
+reverted all seven renames, while `rail.tsx` — resolved the other way — kept
+`rail-min:`. **One rename, split across two files by two opposite side-takes.** At
+1440px in the *user*-collapsed state the label kept `max-wide:sr-only`, so it never
+hid and rendered inside a 62px rail: `not.toBeInViewport() failed … viewport ratio
+0.45`.
+
+Siblings were enumerated rather than assumed: `rail-toggle.tsx` and
+`workspace-switcher.tsx` match wt-dash2 byte-for-byte, so only `nav-item.tsx` was
+affected. It is now identical to wt-dash2's.
+
+wt-voice's roadmap `title` variant was deliberately **not** grafted back. wt-dash2
+removed the `soon` concept from that component and says why in its header — the rail
+no longer renders roadmap items, and the treatment still lives in `more-sheet.tsx`
+and `command-palette.tsx`. Re-adding it was a type error, which is the honest outcome
+for re-introducing a deleted concept.
+
+**A real collision.** `rail-collapse`'s `bootstrap()` ends by *waiting for*
+`/onboarding`, so it leaves a workspace with no Brand Brain — `not-started`.
+wt-boot's `decideLanding` then redirects `/home` away, the shell never renders, and
+`railWidth` waited the full 300s for an `<aside>` that was never going to arrive.
+Fixed by setting the defer cookie, which is the product's own "Save & exit" path,
+rather than faking a brain the spec has no use for.
+
+> **A note on `next start`.** After `nav-item.tsx` was fixed the spec still failed —
+> because `next start` serves the existing `.next`, and the fix was not in it. The
+> rebuild is what proved the fix. **A stale bundle looks exactly like a bad fix.**
+
+Both tests now pass in 37.4s, and the contrast guard prints its worst **resolved**
+pair at **5.69:1** — comfortably above 4.5:1, and the direct answer to the 2.49:1
+the brief warns about.
+
 ### 4.6 The combination checks — what ran and what did not
 
 | check | result |
 |---|---|
 | Ledger invariants | **10/10 PROVEN** — see §4.7 |
 | Zero unsettled holds | **PROVEN**, 0 of 88 HOLDs unsettled |
-| Rail-contrast guard survived the merge | **PROVEN** — both guards preserved, §4.1 |
+| Rail-contrast guard survived the merge | **PROVEN, and MEASURED** — both guards preserved (§4.1), and the resolved-pair guard reports its worst pair at **5.69:1** (§4.8) |
 | Deleted/moved files → import graph | **PROVEN**, 0 dangling |
 | Radar SSRF guard reachable | **PROVEN** reachable + unit-tested; per-encoding-and-redirect refusals **NOT EXERCISED** live |
 | Crons 401-not-307 | **STRUCTURALLY PROVEN, NOT LIVE.** All four routes exempt in *both* the public set and the matcher regex, exact-path `$` anchored, asserted by `middleware.test.ts` and `middleware.coverage.test.ts`. Cannot be confirmed live without a deploy. |
-| E2E guard refuses an unacknowledged run | Guard present (`lib/testing/e2e-target.ts`, `ACK_VARIABLE`) and the gate ran *with* the ack. Refusal path **NOT EXERCISED**. |
-| `no-impossible-remedy`, `roadmap-honesty` | Present as specs; covered by gate leg 3 (see §6) |
-| Two channels / two bodies / two limits / two formats round-trip | **NOT RUN** |
+| E2E guard refuses an unacknowledged run | **HALF PROVEN.** It ran and printed `parsed ref rloztdhzfliyvpvxsgjl / guarded refs rloztdhzfliyvpvxsgjl / decision allowed-acknowledged`, so the allow path is live and genuinely target-checked. The **refusal** path was not exercised. |
+| `no-impossible-remedy` | **PROVEN** — green in leg 3 across /home, /posts, /planner and /create, and its own "the detector itself still detects" self-check passed |
+| `roadmap-honesty` | **PROVEN** — `roadmap-figures-scan.spec.ts` green in leg 3 |
+| Two channels / two bodies / two limits / two formats round-trip | **NOT RUN.** `variant-save.spec.ts` proves the round-trip for **one** channel (instagram: write → save → reload → still there) and passed in leg 3. The *two*-channel divergence is not covered. |
 | Onboarding money guard — resolve twice → exactly one POST, via `route.abort()` | **NOT RUN** |
 | The Loop — one cycle, cost-preview refusal, kill switch with a surviving control | **NOT RUN** |
 
@@ -443,11 +483,37 @@ against a definition the deployed code does not expect.
 Run with `--concurrency=1` (built into `scripts/gate.mjs`), against `next start`,
 never piped, with `SAHODA_E2E_ACK_TARGET=rloztdhzfliyvpvxsgjl` and `E2E_PORT=3290`.
 
-*(final verdict appended below — see §6.1)*
+### 6.1 · FINAL VERDICT — **GATE PASSED**
+
+`.gate/verdict.json`: `ok: true`, `allPassed: true`, `failedStage: null`,
+`skipped: []`, `notSelected: []`. Nothing was skipped and nothing sat out.
+
+| leg | result | time |
+|---|---|---|
+| 1 · turbo-typecheck-lint-test | **ok**, 27/27 tasks | 44s |
+| 2 · vitest-root | **ok** | 1s |
+| 3 · turbo-smoke | **ok — 115 passed, 0 failed, 0 skipped** | 937s |
+| 4 · prettier-check | **ok** | 14s |
+| 5 · turbo-build | **ok**, `js-budget ok: 80 routes within budget` | 46s |
+
+**The @smoke count, measured rather than quoted.** `playwright test --list` reports
+**274 tests in 70 files**; `--grep @smoke` reports **115 tests in 35 files**, and the
+gate ran all 115.
+
+The brief says CLAUDE.md documents 102. In this cut CLAUDE.md already said 110/32
+(measured on `wt-page-rest`), and it is **now stale by 5**, because four lanes plus
+this session's own `accent-area-budget.spec.ts` each added specs. CLAUDE.md's own
+rule is that a stale number there is the same defect as a stale number on a screen,
+so it was re-measured **in this cut** rather than left for the next reader.
+
+It took **three** gate runs. The first two were red, and both failures were real.
 
 The **first** run failed at leg 1 with 25 of 27 turbo tasks green and exactly one
 task red, `@sahoda/web#test`, in two groups — both merge-shaped, both written up in
-§4.3 and §4.4. Failures are grouped by error message, never counted.
+§4.3 and §4.4.
+
+The **second** run reached leg 3 and failed there: **113 passed, 2 failed**, both in
+`rail-collapse.spec.ts` — §4.8. Failures are grouped by error message, never counted.
 
 ---
 
