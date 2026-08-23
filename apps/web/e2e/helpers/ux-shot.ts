@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -65,6 +65,26 @@ export interface FrameRow {
 let taken = 0
 export function framesTaken(): number {
   return taken
+}
+
+/**
+ * Read back every row this run (and any earlier one) has written.
+ *
+ * Exists so a capture spec can assert its OWN frames are distinct. A count
+ * proves something was written; only the sha proves the frames differ, and a
+ * viewport or theme change that silently failed produces the right COUNT of
+ * identical PNGs. Reading the manifest keeps that check inside the spec rather
+ * than in someone's Python afterwards.
+ */
+export function readManifest(): FrameRow[] {
+  try {
+    return readFileSync(MANIFEST, 'utf8')
+      .split('\n')
+      .filter((l) => l.trim() !== '')
+      .map((l) => JSON.parse(l) as FrameRow)
+  } catch {
+    return []
+  }
 }
 
 export function resetManifest(): void {

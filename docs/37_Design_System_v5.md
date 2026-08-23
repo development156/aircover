@@ -134,6 +134,12 @@ pixel, 1440px light. Same method for both products.
   **twice** what Sahoda's typical screen does. Ration is not austerity; it is spending
   the budget where the screen's job is.
 
+> **The two spreads are not like-for-like, and the next lane should not quote them as if they
+> were.** Sahoda's 55× is ten routes captured from the running app; the reference's 35× is
+> three screenshots, and three captures cannot bound a product's real range. The **per-screen**
+> comparisons above (settings against settings, 0.030% against 0.505%) are sound, because they
+> compare the same kind of screen. The spread figures are indicative only.
+
 **The rule.** The accent is spent on *the one thing the screen is for*. A screen that
 configures something spends approximately zero. A screen whose job is one measured
 quantity spends it on that quantity. **A screen with nothing to report and nothing to
@@ -386,8 +392,21 @@ can never be mistaken for a surface edge. Dark's smallest step is 1.08:1.
 
 **Light and dark are different gradients, not one inverted.** In light the brand hue
 is the warm stop with a cool counterpoint to stop it reading as a stain. In dark the
-orange drops to a third of its light value, because on a `#0d0d0d` ground even 2%
-orange glows.
+stops differ again, because on a `#0d0d0d` ground even a little orange glows.
+
+**The alphas are SOLVED against that ceiling, and the first two attempts failed it.**
+`glass-and-gradient.spec.ts` measures the strongest stop composited over `--canvas`:
+
+| attempt | light | dark | |
+|---|---|---|---|
+| chosen by eye (0.05 / 0.045 / 0.035) | **1.056:1** | 1.047:1 | over the ceiling _and_ over one whole ladder step |
+| solved to 3 decimals | 1.030:1 | **1.031:1** | one thousandth over |
+| solved in n/255 | **1.030:1** | **1.029:1** | passes |
+
+The middle row is the instructive one. **CSS serialises a colour's alpha to 8 bits**, so a
+declared `0.034` leaves the build as `#…09` — 9/255 = 0.0353, a _larger_ value than the one
+solved for. Solving in the units the browser actually stores is the difference between a
+value that passes on paper and one that passes in the document.
 
 **It does not animate.** The brief permits animation if it stops under
 `prefers-reduced-motion`, but a permanently animating full-viewport gradient is a
@@ -585,7 +604,14 @@ viewport, which is a squeezed desktop layout rather than the mobile design.
 Layout tokens: `--content-max: 1320px` (widened from 1080 — the reference does not cap its
 content at all; 1320 does not bind at 1440 and only starts working at 1920, where an
 uncapped table runs to a length nobody can track a row across), `--topbar-h: 60px`,
-`--rail-inset: 10px`, `--control-h: 38px`, `--input-h: 42px`.
+`--control-h: 38px`, `--input-h: 42px`.
+
+**The floating rail costs its width PLUS two insets, and that is the number to plan with.**
+`--sidebar-w-collapsed: 56px` and `--rail-inset: 8px`, so the middle band's rail column is
+**72px**. It shipped at 68 + 2×10 = 88px, copied from the reference's own 62px/10px — but the
+reference measures those at a **1844px viewport**, and 88px at 700px removed 24px from the
+content column at the one width with none to spare. The topbar overflowed by exactly 16px and
+`connections-widths.spec.ts` caught it. **Take the reference's proportion, not its pixels.**
 
 **The touch floor is 44px** (`--control-h-touch`). At narrow widths every *interactive*
 control grows to it. It is a token rather than a literal because it has to be the same
@@ -731,6 +757,10 @@ the slot (§9).
 | `design-system.spec.ts` | rendered | two certainty rungs perceptually identical in greyscale |
 | `shell-widths.spec.ts` | rendered | a shell control losing its label or its accessible name at any of six widths |
 | `no-truncated-labels.spec.ts` | rendered | clipped text anywhere |
+| `glass-and-gradient.spec.ts` | rendered | **new** — a blur inside `#main`, a certainty mark resting on one, and a gradient stop over the §8 ceiling |
+| `glass-cost.spec.ts` | rendered | **new** — the shipped blur exceeding its frame-time budget |
+| `connections-widths.spec.ts` | rendered | a page scrolling sideways at any of seven widths |
+| `motion.spec.ts` | rendered | reduced-motion leaving a delay behind, so the still screen is also a slower one |
 | `design-lint.mjs` | source | raw hex · hardcoded spacing · `<button disabled>` · dead breakpoints · hand-written font sizes |
 
 **Guards that grade TOKENS cannot see what COMPONENTS write.** `--pfg` was correct for
@@ -741,7 +771,19 @@ composited luminance, an accessible name — do not exist until something is ras
 **Every guard here has been shown red on the defect it exists for.** A guard that cannot
 fail is worse than no guard, because a green result is read as evidence.
 
-**A guard is never loosened to accommodate the change that broke it.** When
-`tonal-ladder.test.ts` refused this system's own inverse scope, the scope was fixed. When
-`type-space.spec.ts` refused this system's own root-level word-spacing, the correction was
-moved to where it resolves correctly. Both times the guard was right.
+**A guard is never loosened to accommodate the change that broke it.** Four times in this
+lane a guard refused this system's own work, and four times the work changed:
+
+- `tonal-ladder.test.ts` refused the inverse scope for having three rungs where the system
+  promises four. The scope was fixed.
+- `type-space.spec.ts` refused a root-level word-spacing that inherited as one computed pixel
+  value. The correction moved onto each type step.
+- `connections-widths.spec.ts` refused a 16px overflow at 700px. The rail column gave it back.
+- `glass-and-gradient.spec.ts` refused a gradient at 1.056:1 against `--canvas`. The alphas
+  were re-solved — twice, because the first re-solve did not survive CSS's 8-bit alpha.
+
+**And a guard that cannot fail is worse than none.** Two guards in this lane were themselves
+wrong on their first run, and were fixed rather than trusted: `type-space` measured a synthetic
+span built from a token — a token check in a browser costume — and the gradient check reported
+a passing "1:1" while parsing zero stops. Both now refuse to report a result they did not
+actually measure.

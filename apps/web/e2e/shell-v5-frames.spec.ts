@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures/seeded-user'
-import { framesTaken, shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
+import { framesTaken, readManifest, shot, timedGoto, useTheme, type Theme } from './helpers/ux-shot'
 
 /**
  * P4's proof obligation, as frames.
@@ -33,6 +33,11 @@ for (const theme of THEMES) {
     void signedIn
     test.setTimeout(300_000)
     const before = framesTaken()
+    // The manifest ACCUMULATES across runs, so rows must be scoped to this one.
+    // Filtering by journey+theme alone matches every previous run's rows too,
+    // and the duplicate check then reports `home__360 == home__360` — the same
+    // stop from two runs, which is not a defect. The row offset is the scope.
+    const rowsBefore = readManifest().length
 
     await useTheme(page, theme)
     // A workspace has to exist or the shell renders its no-workspace form and
@@ -63,5 +68,30 @@ for (const theme of THEMES) {
 
     // A run whose navigations all missed writes zero PNGs and reports green.
     expect(framesTaken() - before).toBe(WIDTHS.length * ROUTES.length)
+
+    /**
+     * AND THE FRAMES MUST BE DISTINCT, which a count cannot tell you.
+     *
+     * A size check is not an identity check and neither is a count: a harness
+     * whose viewport resize silently failed would write twelve byte-identical
+     * PNGs and satisfy the assertion above. The manifest already carries a
+     * sha256 per frame for exactly this, so the check is free — it just has to
+     * be made, and it has to be made HERE rather than by someone running Python
+     * over the manifest afterwards, because this is the spec that re-runs on
+     * every shell change.
+     *
+     * Only THIS run's rows are considered, by OFFSET rather than by filter: the
+     * manifest accumulates across runs, so `journey === JOURNEY` also matches
+     * every previous run and the check then reports `home__360 == home__360` —
+     * the same stop from two runs, which is not a defect at all.
+     */
+    const mine = readManifest().slice(rowsBefore)
+    const bySha = new Map<string, string[]>()
+    for (const r of mine) bySha.set(r.sha, [...(bySha.get(r.sha) ?? []), r.stop])
+    const dupes = [...bySha.entries()].filter(([, stops]) => stops.length > 1)
+    expect(
+      dupes.map(([sha, stops]) => `${sha}: ${stops.join(' == ')}`),
+      'two shell frames are byte-identical — a viewport or theme change did not take',
+    ).toEqual([])
   })
 }

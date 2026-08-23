@@ -394,9 +394,23 @@ export const TOKENS_CSS = `/* ==================================================
      different gradients, not one inverted: in light the brand hue is the warm
      one and a cool counterpoint keeps it from reading as a stain; in dark the
      orange is nearly absent because on a #0d0d0d ground even 2% of it glows. */
-  --grad-1: rgba(255, 102, 0, 0.05); /* warm — brand hue, top left */
-  --grad-2: rgba(120, 140, 255, 0.045); /* cool counterpoint, right */
-  --grad-3: rgba(255, 160, 60, 0.035); /* a second warm, low */
+  /* THE ALPHAS ARE SOLVED, NOT CHOSEN, and the first set FAILED the ceiling
+     this file states. They shipped at 0.05 / 0.045 / 0.035, which composites to
+     1.056:1 against --canvas — over the 1.03 ceiling AND over one whole ladder
+     step (canvas->surface is 1.04), so the wash could read as a surface edge.
+     \`glass-and-gradient.spec.ts\` measured it and refused.
+
+     THE ALPHAS ARE QUANTISED TO n/255, BECAUSE THAT IS WHAT SHIPS. The second
+     attempt solved to three decimals and dark came back at 1.031:1 — one
+     thousandth over. CSS serialises a colour's alpha to 8 bits, so \`0.034\`
+     leaves the build as \`#...09\`, i.e. 9/255 = 0.0353, a LARGER value than the
+     one solved for. Solving in the units the browser stores is the difference
+     between a value that passes on paper and one that passes in the document.
+     These are the largest n/255 alphas whose composite stays at or under
+     1.03:1. */
+  --grad-1: rgba(255, 102, 0, 0.0275); /* warm — brand hue, top left. 7/255 */
+  --grad-2: rgba(120, 140, 255, 0.0314); /* cool counterpoint, right. 8/255 */
+  --grad-3: rgba(255, 160, 60, 0.0431); /* a second warm, low. 11/255 */
   --grad-base: var(--canvas);
 
   /* ---------- L2 · LAYOUT ---------- */
@@ -549,9 +563,9 @@ export const TOKENS_CSS = `/* ==================================================
   /* A DIFFERENT gradient, not the light one inverted. On a #0d0d0d ground even
      2% orange glows, so the warm stop drops to a third of its light value and
      the cool one carries most of the movement. */
-  --grad-1: rgba(255, 102, 0, 0.05);
-  --grad-2: rgba(90, 110, 220, 0.06);
-  --grad-3: rgba(255, 140, 40, 0.025);
+  --grad-1: rgba(255, 102, 0, 0.0314); /* 8/255 */
+  --grad-2: rgba(90, 110, 220, 0.0392); /* 10/255 */
+  --grad-3: rgba(255, 140, 40, 0.0275); /* 7/255 */
 }
 
 /* ============================================================
