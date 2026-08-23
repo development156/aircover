@@ -99,37 +99,35 @@ export default async function PlannerPage({
 
   return (
     <PublishStateProvider initial={liveSeed}>
-      {/* ── ON A PHONE THE PLAN COMES FIRST ──────────────────────────────────────
-          At 390px the grid used to start at y=773, behind the page header, the
-          connect note and the Plan my week panel. A planner whose plan is below
-          three panels is not a planner on a phone, so below 700px the grid moves
-          directly under the title and the two panels follow it. Founder ruling;
-          desktop order is deliberately unchanged.
+      {/* ── THE PLAN COMES FIRST. AT EVERY WIDTH. ────────────────────────────────
+          The founder ruled this for the phone: at 390 the grid used to start at
+          y=773, behind the page header, the connect note and the Plan my week
+          panel, and a planner whose plan is below three panels is not a planner.
+          The ruling was applied `max-narrow` only, and desktop was left alone.
 
-          `flex flex-col gap-grid` rather than `space-y-grid` because space-y is
-          margin-based and applies to DOM order, so it would have spaced the
-          children in their written order while the eye saw a different one. gap
-          is order-agnostic. EVERY child carries an explicit max-narrow order:
-          anything left at the default order-0 would sort ahead of the grid. */}
-      <div className="flex flex-col gap-grid">
-        <div className="flex flex-wrap items-center justify-between gap-3 max-narrow:order-1">
+          MEASURED on this lane's baseline capture, 1440 light: it is worse on
+          desktop, not better. On `?view=month` — a view the reader reached by
+          deliberately clicking "Calendar" — the calendar begins at y=580 of a
+          900px viewport, so more than half the screen is spent before the thing
+          they asked for. The panel above it is 260px of a PAID action nobody
+          requested. The phone ruling was not a mobile accommodation; it was the
+          right answer, discovered at the width where the cost was unmissable.
+
+          So the DOM order is now the reading order and there is no per-band
+          reordering left. `space-y-grid` is back for the same reason it was
+          dropped: it is margin-based and follows DOM order, which is now the
+          order the eye sees at every width. The `max-narrow:order-*` ladder
+          existed only to fight the old order and would now be six classes
+          keeping two identical sequences in step. */}
+      <div className="space-y-grid">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <PageTitle sub="Plan, schedule and stay ahead.">Planner</PageTitle>
           {posts.length > 0 ? <ViewToggle active={view} /> : null}
         </div>
 
-        <div className="max-narrow:order-3">
-          <ConnectFirstNote connections={connected} />
-        </div>
+        <ConnectFirstNote connections={connected} />
 
-        {/* The spend panel goes only where there is something to spend from. A
-            read hiccup keeps it — the plan may well be there. */}
-        {read.status === 'no-workspace' ? null : (
-          <div className="max-narrow:order-4">
-            <PlanWeekPanel />
-          </div>
-        )}
-
-        <div className="max-narrow:order-2">
+        <div>
           {read.status === 'unreadable' ? (
             <p className="rounded-input bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
               Couldn&rsquo;t load your plan just now &mdash; reload to see it. Nothing has been
@@ -193,12 +191,20 @@ export default async function PlannerPage({
           )}
         </div>
 
-        <div className="max-narrow:order-5">
-          <LivePhaseNote />
-        </div>
+        {/* AFTER the plan, at every width. It is an offer to SPEND 20 credits,
+            which is not what the reader opened this route to see — and as a
+            260px panel carrying the loudest object in the lane it was taking the
+            slot the plan needed. The one-line connect note above costs the plan
+            nothing and is a standing condition worth meeting early; this is not.
+
+            The spend panel goes only where there is something to spend from. A
+            read hiccup keeps it — the plan may well be there. */}
+        {read.status === 'no-workspace' ? null : <PlanWeekPanel />}
+
+        <LivePhaseNote />
 
         {posts.length === LIST_LIMIT ? (
-          <p className="text-[13px] tabular-nums text-muted max-narrow:order-6">
+          <p className="type-meta tabular-nums text-muted">
             Showing the {LIST_LIMIT} most recently updated posts — older ones may not be on this
             page.
           </p>

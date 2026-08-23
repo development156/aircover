@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { Channel } from '@sahoda/shared'
 
 import {
   DELIVERY_WINDOW_MINUTES,
@@ -47,7 +48,8 @@ describe('the named schedule choices', () => {
     // The one assertion that makes this a guard rather than a list. Every
     // channel's lead is read from the Constraint Engine by `earliestScheduleAt`;
     // a choice below that floor is a button whose click gets rejected.
-    for (const channels of [['instagram'], ['x'], ['linkedin'], ['instagram', 'linkedin', 'x']]) {
+    const sets: Channel[][] = [['instagram'], ['x'], ['linkedin'], ['instagram', 'linkedin', 'x']]
+    for (const channels of sets) {
       const floor = earliestScheduleAt(channels, NOW).getTime()
       for (const choice of scheduleChoices(channels, NOW)) {
         expect(choice.when.getTime()).toBeGreaterThanOrEqual(floor)

@@ -61,6 +61,35 @@ export function CommitBar({
   // and a count of one does not need the word "all" at all.
   const saveAllLabel = unsavedVersions === 1 ? 'Save this version' : 'Save all versions'
 
+  /**
+   * ── AN EMPTY BAR IS FURNITURE, AND IT WAS THE WIDEST THING ON THE SCREEN ────
+   * `docs/34` §10 named this screen the worst in the product and listed, among
+   * the reasons, "the widest element on it says 'No changes yet' and carries no
+   * control". MEASURED again on this lane's baseline frame at 1440: on
+   * `/posts/new` the bar spans the full content column, holds one grey phrase,
+   * and offers nothing — while the thing the reader came to do is a textarea
+   * two thirds its width.
+   *
+   * `idle` is deliberately NOT the same as "empty" (see POST_STATUS_COPY): a
+   * reloaded post with a body is legitimately idle, and there the bar carries
+   * "Send it" and earns its space. So the test is all three together — nothing
+   * has happened, nothing is unsaved, and there is nowhere to go.
+   *
+   * The LIVE REGION SURVIVES. An `aria-live` container added to the DOM at the
+   * same moment its text changes is not reliably announced, so removing the
+   * element outright would cost a screen-reader user the first "Post not saved
+   * yet" — trading a visual defect for an accessibility one. The region stays
+   * mounted and only the chrome goes.
+   */
+  const carriesNothing = status === 'idle' && unsavedVersions === 0 && !canFinish
+  if (carriesNothing) {
+    return (
+      <p aria-live="polite" className="sr-only">
+        {POST_STATUS_COPY[status]}
+      </p>
+    )
+  }
+
   return (
     <div className="sticky bottom-0 z-5 -mx-page pt-2 max-narrow:bottom-[56px] max-narrow:-mx-page-mobile">
       <div className="surface-ring flex flex-wrap items-center justify-between gap-3 rounded-card bg-surface px-3 py-2.5 shadow-pop">

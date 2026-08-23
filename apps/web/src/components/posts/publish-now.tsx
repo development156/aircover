@@ -215,9 +215,30 @@ export function PublishNow({
           ))}
         </div>
       )}
-      <p className="text-[12px] text-muted">
-        This posts for real, straight away. Instagram takes about fifteen seconds to finish.
-      </p>
+      {/* ── ONLY WHEN THERE IS SOMETHING TO PUBLISH, AND ONLY ABOUT CHANNELS
+             THAT ARE ACTUALLY ON THE POST ────────────────────────────────────
+          This rendered unconditionally, and both halves of it were wrong at
+          once. MEASURED on this lane's baseline frame
+          (`flow__composer-two-channels__1440__light.png`): a post carrying X and
+          LinkedIn, neither connected, showed "This posts for real, straight
+          away. Instagram takes about fifteen seconds to finish."
+
+          So it named a channel that was not on the post — the reader's only
+          reasonable conclusion being that Sahoda thinks this is an Instagram
+          post — and it promised a real publish directly beneath a warn block
+          that had just said "X and LinkedIn aren't connected yet, so this can't
+          go out there." Two sentences, forty pixels apart, in contradiction.
+
+          Neither half was a wording problem. `live` is already computed above
+          and is exactly the set of channels a press of this button would reach;
+          with nothing in it there is no button, and a sentence about what the
+          button does is a claim about an action nobody can take. */}
+      {live.length === 0 ? null : (
+        <p className="type-meta text-muted">
+          This posts for real, straight away.
+          {live.includes('instagram') ? ' Instagram takes about fifteen seconds to finish.' : ''}
+        </p>
+      )}
 
       {error !== null ? <InlineError>{error}</InlineError> : null}
 

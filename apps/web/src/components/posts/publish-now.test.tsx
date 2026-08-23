@@ -116,3 +116,62 @@ describe('PublishNow — the unconnected-channel warning', () => {
     expect(screen.getAllByRole('button', { name: /Publish to X/ })).toHaveLength(1)
   })
 })
+
+/**
+ * THE FOOTNOTE THAT NAMED A CHANNEL THAT WAS NOT ON THE POST.
+ *
+ * MEASURED on this lane's baseline frame: a post carrying X and LinkedIn, with
+ * neither connected, rendered "This posts for real, straight away. Instagram
+ * takes about fifteen seconds to finish."
+ *
+ * Two claims, both false at once — a channel the post does not use, and a real
+ * publish promised forty pixels below a block saying nothing could go out. All
+ * eight assertions above passed with it in place, because none of them read
+ * this line. That is the argument for these four.
+ */
+describe('PublishNow — what the footnote may claim', () => {
+  const FOOTNOTE = /posts for real, straight away/i
+  const INSTAGRAM_WAIT = /fifteen seconds/i
+
+  test('says nothing about publishing when nothing can be published', () => {
+    // No connection at all, so there is no button. A sentence describing what
+    // the button does is a claim about an action nobody on this screen can take.
+    renderPublish(['x', 'linkedin'], set())
+    expect(screen.queryByText(FOOTNOTE)).not.toBeInTheDocument()
+  })
+
+  test('never names Instagram on a post that does not use Instagram', () => {
+    // THE ONE THAT WOULD HAVE CAUGHT IT. The reader's only reasonable
+    // conclusion from the old copy was that Sahoda thought this was an
+    // Instagram post.
+    renderPublish(['x', 'linkedin'], set('x', 'linkedin'))
+    expect(screen.queryByText(INSTAGRAM_WAIT)).not.toBeInTheDocument()
+  })
+
+  test('does describe the publish when a channel can actually receive it', () => {
+    // The counterweight: silencing the line everywhere would be the other
+    // failure, and a test that only asserts absence passes against a deleted
+    // component.
+    renderPublish(['x'], set('x'))
+    expect(screen.getByText(FOOTNOTE)).toBeInTheDocument()
+  })
+
+  test('keeps the Instagram wait where Instagram is the thing being published', () => {
+    renderPublish(['instagram'], set('instagram'))
+    expect(screen.getByText(INSTAGRAM_WAIT)).toBeInTheDocument()
+  })
+
+  test('a mixed post keeps the wait, because Instagram is one of the buttons', () => {
+    renderPublish(['instagram', 'x'], set('instagram', 'x'))
+    expect(screen.getByText(INSTAGRAM_WAIT)).toBeInTheDocument()
+  })
+
+  test('a mixed post where only the OTHER channel is connected drops the wait', () => {
+    // `live` is the set a press would reach, not the set that was picked. With
+    // Instagram unconnected the Instagram button does not exist, so neither
+    // does the sentence about how long Instagram takes.
+    renderPublish(['instagram', 'x'], set('x'))
+    expect(screen.getByText(FOOTNOTE)).toBeInTheDocument()
+    expect(screen.queryByText(INSTAGRAM_WAIT)).not.toBeInTheDocument()
+  })
+})

@@ -18,6 +18,31 @@ import { toChannelSet } from '@sahoda/shared'
 
 const input = () => screen.getByLabelText(/schedule/i) as HTMLInputElement
 
+/**
+ * Reach the exact `datetime-local`, which is now behind a disclosure.
+ *
+ * ── THIS IS A CHANGE OF ROUTE, NOT A LOOSENED GUARD ──────────────────────────
+ * Four assertions in this file used to reach the native input directly, because
+ * it was the only control the field had — and that was the defect: `docs/34` §1
+ * found the journey's stated goal, a scheduled post, unreachable by looking,
+ * because a `dd/mm/yyyy` mask is not a control the reader can be assumed to
+ * operate. The input is now one click behind "Pick an exact time".
+ *
+ * EVERY GUARANTEE THOSE FOUR ASSERTED IS UNCHANGED and still asserted below —
+ * the wall-clock rendering, the re-sync on a replaced value, the clear, and the
+ * keystroke that must not be eaten. What moved is how the test gets there,
+ * which is a property of the screen rather than of the promise. Nothing was
+ * weakened to let the new field pass; the named-time path added its own guards
+ * rather than replacing these.
+ *
+ * With a stored value the disclosure is already open (a time nobody's shortcut
+ * produced has to be visible), so this is only needed from an empty field.
+ */
+async function openExact(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  const opener = screen.queryByText(/pick an exact time/i)
+  if (opener) await user.click(opener)
+}
+
 // Far enough ahead to clear every channel's 5-minute minimum lead.
 const future = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString()
 
@@ -59,7 +84,9 @@ describe('ScheduleField', () => {
     )
     rerender(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
 
-    expect(input().value).toBe('')
+    // The value is gone from the field AND the field has folded back to the
+    // named choices, which is the state a person with no schedule should meet.
+    expect(screen.queryByLabelText(/schedule/i)).toBeNull()
     expect(screen.getByText(/stays a draft/i)).toBeInTheDocument()
   })
 
@@ -70,6 +97,7 @@ describe('ScheduleField', () => {
     // which is exactly when a mismatch-keyed re-sync would wipe the input.
     render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={onChange} />)
 
+    await openExact(user)
     await user.type(input(), '2030-01-01T10:30')
 
     expect(input().value).toBe('2030-01-01T10:30')
@@ -85,6 +113,7 @@ describe('ScheduleField', () => {
       <ScheduleField channels={toChannelSet(['x'])} value={stored} onChange={onChange} />,
     )
 
+    await openExact(user)
     await user.type(input(), '2030-01-01T10:30')
     const typed = input().value
     // Feed the committed value back the way the parent does.
@@ -107,6 +136,7 @@ describe('what setting a time actually does', () => {
     const user = userEvent.setup()
     render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
 
+    await openExact(user)
     await user.type(input(), '2030-01-01T10:30')
 
     expect(screen.getByText(NOT_LIVE)).toBeInTheDocument()
@@ -243,5 +273,191 @@ describe('ScheduleField warns about a channel that cannot receive the post', () 
     )
 
     expect(screen.queryByText(/isn’t connected/)).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * THE NINTH CLICK.
+ *
+ * `docs/34` §1: eight clicks from nothing to a saved draft, and then no ninth —
+ * the journey's stated goal was a first SCHEDULED post and the only control was
+ * a bare `dd/mm/yyyy, --:--`. These assert that a person who does not know what
+ * a date input is can now reach a scheduled post, and that the words on the
+ * buttons are true.
+ */
+describe('scheduling without knowing what a date input is', () => {
+  test('offers named times before it offers a date mask', () => {
+    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+
+    // The named choices are present...
+    const named = screen.getAllByRole('button', { pressed: false })
+    expect(named.length).toBeGreaterThan(1)
+    // ...and the date mask is NOT, until it is asked for. That ordering IS the
+    // fix: the mask being the first and only control was the defect.
+    expect(screen.queryByLabelText(/schedule/i)).toBeNull()
+  })
+
+  test('a named choice commits the exact instant its own label prints', async () => {
+    // THE ASSERTION THAT MAKES THE LABEL HONEST. A button reading "Tomorrow
+    // morning · Mon 24 Aug, 9:00 am" that committed some other time would be a
+    // lie told in the most trustworthy-looking place on the screen.
+    const user = userEvent.setup()
+    let stored: string | null = null
+    render(
+      <ScheduleField
+        channels={toChannelSet(['x'])}
+        value={null}
+        onChange={(iso) => {
+          stored = iso
+        }}
+      />,
+    )
+
+    const button = document.querySelector('[data-schedule-choice="tomorrow-morning"]')
+    expect(button).not.toBeNull()
+    const printed = button!.textContent ?? ''
+    await user.click(button as HTMLElement)
+
+    expect(stored).not.toBeNull()
+    const committed = new Date(stored as unknown as string)
+    // The label prints a day and a time; the committed instant has to BE them.
+    expect(printed).toContain(String(committed.getDate()))
+    expect(committed.getHours()).toBe(9)
+    expect(committed.getMinutes()).toBe(0)
+  })
+
+  test('the chosen time reads as chosen, and to a screen reader too', async () => {
+    const user = userEvent.setup()
+    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+
+    const button = document.querySelector(
+      '[data-schedule-choice="tomorrow-evening"]',
+    ) as HTMLElement
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+    await user.click(button)
+    // Re-queried: the click re-renders. `aria-pressed` rather than a colour,
+    // because a selected state carried only by a fill is a state a screen
+    // reader cannot report.
+    expect(
+      document
+        .querySelector('[data-schedule-choice="tomorrow-evening"]')!
+        .getAttribute('aria-pressed'),
+    ).toBe('true')
+  })
+
+  test('a named choice raises the same correction the date mask does', async () => {
+    // The "nothing will actually publish this" sentence was attached to the
+    // input. A new path to the same state that skipped it would reintroduce the
+    // promise this product refuses to make.
+    const user = userEvent.setup()
+    render(<ScheduleField channels={toChannelSet(['x'])} value={null} onChange={vi.fn()} />)
+
+    await user.click(document.querySelector('[data-schedule-choice="hour"]') as HTMLElement)
+
+    expect(screen.getByText(/auto-publish isn't live yet/i)).toBeInTheDocument()
+  })
+
+  test('there is a way back to no schedule that is not emptying a date mask', async () => {
+    const user = userEvent.setup()
+    let stored: string | null = null
+    const { rerender } = render(
+      <ScheduleField
+        channels={toChannelSet(['x'])}
+        value={null}
+        onChange={(iso) => {
+          stored = iso
+        }}
+      />,
+    )
+    await user.click(document.querySelector('[data-schedule-choice="hour"]') as HTMLElement)
+    expect(stored).not.toBeNull()
+
+    rerender(
+      <ScheduleField
+        channels={toChannelSet(['x'])}
+        value={stored}
+        onChange={(iso) => {
+          stored = iso
+        }}
+      />,
+    )
+    await user.click(document.querySelector('[data-schedule-clear]') as HTMLElement)
+
+    expect(stored).toBeNull()
+  })
+})
+
+/**
+ * THE LATENCY, STATED.
+ *
+ * Publishing is a five-minute cron and every measured delivery landed 73-199 s
+ * after its tick. A picker that takes a to-the-minute time and says only "at
+ * around that time" has declined to say a number it has.
+ */
+describe('what the picker promises about when it goes out', () => {
+  const connected = new Set<'x'>(['x'])
+
+  test('names a window rather than an instant, once the dispatcher is live', async () => {
+    const user = userEvent.setup()
+    render(
+      <ScheduleField
+        channels={toChannelSet(['x'])}
+        value={null}
+        onChange={vi.fn()}
+        autoPublish
+        connected={connected}
+      />,
+    )
+    await user.click(
+      document.querySelector('[data-schedule-choice="tomorrow-morning"]') as HTMLElement,
+    )
+
+    // Two clock readings in the promise, and they differ: that is what a window
+    // is. Asserted as a shape, never as prose — rewrite the sentence freely.
+    const note = screen.getByText(/goes out between/i).textContent ?? ''
+    const times = note.match(/\d{1,2}:\d{2}/g) ?? []
+    expect(new Set(times).size).toBeGreaterThanOrEqual(2)
+  })
+
+  test('promises no window at all while the dispatcher is off', async () => {
+    // With it off nothing goes out, and a delivery range there would be a
+    // promise about a rail that is not running.
+    const user = userEvent.setup()
+    render(
+      <ScheduleField
+        channels={toChannelSet(['x'])}
+        value={null}
+        onChange={vi.fn()}
+        connected={connected}
+      />,
+    )
+    await user.click(
+      document.querySelector('[data-schedule-choice="tomorrow-morning"]') as HTMLElement,
+    )
+
+    expect(screen.queryByText(/goes out between/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/auto-publish isn't live yet/i)).toBeInTheDocument()
+  })
+
+  test('an unconnected channel still outranks the delivery window', async () => {
+    // Order of claims: a channel that cannot receive the post is a promise this
+    // schedule cannot keep at all, so it replaces the timing note rather than
+    // sitting under it.
+    const user = userEvent.setup()
+    render(
+      <ScheduleField
+        channels={toChannelSet(['x', 'linkedin'])}
+        value={null}
+        onChange={vi.fn()}
+        autoPublish
+        connected={connected}
+      />,
+    )
+    await user.click(
+      document.querySelector('[data-schedule-choice="tomorrow-morning"]') as HTMLElement,
+    )
+
+    expect(screen.getByText(/LinkedIn isn’t connected/)).toBeInTheDocument()
+    expect(screen.queryByText(/goes out between/i)).not.toBeInTheDocument()
   })
 })
