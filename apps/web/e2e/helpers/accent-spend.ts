@@ -90,6 +90,19 @@ export interface AccentSpend {
    */
   top: Region[]
   /**
+   * Median luminance of the sampled pixels, 0-255.
+   *
+   * Not part of the accent budget. It is here because a peer lane recorded, on
+   * 2026-08-23, a capture spec reporting green over 34 UNSTYLED PNGs: the frame
+   * count, the sha and the `data-theme` label were all correct and the pages had
+   * no CSS at all. Everything a camera normally asserts survives a stylesheet
+   * that never loaded, and the pixels are the only place the difference exists.
+   *
+   * See the light-against-dark assertion in `page-dash-frames.spec.ts`, which is
+   * the form of the check that catches it in BOTH themes rather than only in one.
+   */
+  medianLuminance: number
+  /**
    * Disjoint blobs of BRAND-hue accent, 8-connected on the sampled grid.
    *
    * Blobs under `MIN_REGION` sampled pixels are dropped: antialiasing on a single
@@ -147,6 +160,9 @@ export function measureAccentSpend(png: Buffer): AccentSpend {
   // A flat grid rather than a 2-D array: at 1440x900 this is 324k entries and
   // the region pass walks it twice.
   const brand = new Uint8Array(cols * rows)
+  // Rec.601 luma is enough here: this is a "did the stylesheet load" check, not
+  // a contrast measurement, and it never leaves this function's own histogram.
+  const luma = new Uint32Array(256)
   let pixels = 0
   let brandPixels = 0
 
@@ -155,7 +171,11 @@ export function measureAccentSpend(png: Buffer): AccentSpend {
     for (let gx = 0; gx < cols; gx += 1) {
       const x = gx * SAMPLE_STEP
       const i = (img.width * y + x) * img.channels
-      const { h, s, v } = hsv(img.data[i] ?? 0, img.data[i + 1] ?? 0, img.data[i + 2] ?? 0)
+      const r = img.data[i] ?? 0
+      const g = img.data[i + 1] ?? 0
+      const b = img.data[i + 2] ?? 0
+      luma[Math.min(255, Math.round(0.299 * r + 0.587 * g + 0.114 * b))]! += 1
+      const { h, s, v } = hsv(r, g, b)
       if (s <= SAT_MIN || v <= VAL_MIN) continue
       pixels += 1
       if (h !== null && hueDistance(h, BRAND_HUE) <= BRAND_HUE_TOLERANCE) {
@@ -167,7 +187,17 @@ export function measureAccentSpend(png: Buffer): AccentSpend {
 
   const sampled = cols * rows
   const found = findRegions(brand, cols, rows)
+  let seen = 0
+  let median = 0
+  for (let level = 0; level < 256; level += 1) {
+    seen += luma[level] ?? 0
+    if (seen * 2 >= sampled) {
+      median = level
+      break
+    }
+  }
   return {
+    medianLuminance: median,
     sampled,
     pixels,
     brandPixels,

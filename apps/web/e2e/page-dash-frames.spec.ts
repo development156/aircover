@@ -296,15 +296,63 @@ async function capture(page: Page, state: string, route: string, width: number, 
       documentHeight: await page.evaluate(() => document.documentElement.scrollHeight),
     }) + '\n',
   )
+
+  return spend
 }
+
+/**
+ * Median luminance per `${route}@${width}@${theme}`, kept for the assertion below.
+ */
+const litness = new Map<string, number>()
 
 async function walk(page: Page, state: string): Promise<void> {
   for (const theme of THEMES) {
     await useTheme(page, theme)
     for (const width of WIDTHS) {
       for (const route of ROUTES) {
-        await capture(page, state, route, width, theme)
+        const spend = await capture(page, state, route, width, theme)
+        litness.set(`${route}@${width}@${theme}`, spend.medianLuminance)
       }
+    }
+  }
+}
+
+/**
+ * DID THE STYLESHEET ACTUALLY LOAD?
+ *
+ * ── THE FAILURE THIS EXISTS FOR, WHICH IS NOT HYPOTHETICAL ──────────────────
+ * A peer lane recorded on 2026-08-23 that its capture spec reported green over
+ * **34 unstyled PNGs**. Every assertion a camera normally makes survived it: the
+ * frame COUNT was right, the shas were DISTINCT (unstyled pages still differ
+ * from each other), and `domTheme` read back correctly, because `data-theme` is
+ * an attribute and an attribute does not need CSS. This spec asserted exactly
+ * those three things and would have reported the same green.
+ *
+ * ── AND WHY IT IS LIGHT-AGAINST-DARK RATHER THAN A THRESHOLD ────────────────
+ * An unstyled page renders white in BOTH themes. A per-frame threshold catches
+ * that in dark and cannot catch it in light, where `--canvas` is `#fafafa` and
+ * sits four points from the browser's own default. Comparing the two themes of
+ * the SAME route and width needs no absolute number at all: if the stylesheet
+ * did not load, the pair collapses onto one value, and no threshold has to be
+ * guessed. MEASURED on this branch, the smallest real gap across the twelve
+ * pairs is far wider than this floor.
+ */
+const LIGHT_DARK_FLOOR = 40
+
+function assertThemesActuallyDiffer(): void {
+  for (const route of ROUTES) {
+    for (const width of WIDTHS) {
+      const light = litness.get(`${route}@${width}@light`)
+      const dark = litness.get(`${route}@${width}@dark`)
+      expect(light, `no light frame for ${route}@${width}`).toBeDefined()
+      expect(dark, `no dark frame for ${route}@${width}`).toBeDefined()
+      expect(
+        (light as number) - (dark as number),
+        `${route} @ ${width}: light median luminance ${light} against dark ${dark}. ` +
+          'A gap this small means both frames rendered the same ground — which is what a ' +
+          'page with no stylesheet looks like, in both themes, with the right sha and the ' +
+          'right data-theme on it.',
+      ).toBeGreaterThan(LIGHT_DARK_FLOOR)
     }
   }
 }
@@ -323,6 +371,7 @@ test.describe('page-dash camera', () => {
     // and otherwise reports green — the failure this repo names "a harness that
     // cannot tell nothing-broke from nothing-ran".
     expect(framesTaken() - before).toBe(EXPECTED)
+    assertThemesActuallyDiffer()
     void signedIn
   })
 
@@ -340,5 +389,6 @@ test.describe('page-dash camera', () => {
 
     await walk(page, 'populated')
     expect(framesTaken() - before).toBe(EXPECTED)
+    assertThemesActuallyDiffer()
   })
 })
