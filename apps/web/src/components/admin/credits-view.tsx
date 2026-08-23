@@ -100,7 +100,7 @@ function RequestForm({ admins, me }: { admins: readonly OpsAdmin[]; me: string }
         <h2 className="text-[15px] font-bold">Request credits</h2>
         <p className="mt-1.5 text-[13px] text-muted">
           There is no second admin to approve a grant, so none can be made. Add another active admin
-          on the Team screen first — one account cannot do both halves.
+          on the Team screen first. One account cannot do both halves.
         </p>
       </section>
     )
@@ -229,7 +229,7 @@ function ApprovalRow({ request, me }: { request: OpsCreditRequest; me: string })
       if (result.ok) {
         toast.success(
           result.replayed
-            ? 'Already approved — nothing was granted twice.'
+            ? 'Already approved. Nothing was granted twice.'
             : `${
                 result.amount === null
                   ? 'Granted the credits, but Sahoda could not read back how many'

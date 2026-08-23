@@ -229,7 +229,7 @@ export function ResolutionRow({
                 offered; the only move is to write one.
               */}
               {blank ? (
-                <span className="type-sm text-muted">Nothing to confirm — it is empty</span>
+                <span className="type-sm text-muted">Nothing to confirm, it is empty</span>
               ) : (
                 <Button
                   type="button"
@@ -335,7 +335,7 @@ export function ResolutionRow({
             ) : null}
             {!clearable && !field.fixedLength ? (
               <p className="type-sm text-muted">
-                There is no way to record &ldquo;nothing&rdquo; here — a blank answer would be an
+                There is no way to record &ldquo;nothing&rdquo; here. A blank answer would be an
                 absence rather than a position, and Sahoda will not count one as yours. Say it in
                 your own words instead.
               </p>

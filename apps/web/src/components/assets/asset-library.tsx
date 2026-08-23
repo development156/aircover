@@ -133,7 +133,7 @@ export function AssetLibrary({ cards, capped }: { cards: AssetCard[]; capped: bo
             <span className="num">{cards.length}</span>
           </>
         ) : null}
-        {capped ? ' — showing the most recent 200. Older files are not in this list.' : ''}
+        {capped ? '. Showing the most recent 200. Older files are not in this list.' : ''}
       </p>
 
       {visible.length === 0 ? (

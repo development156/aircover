@@ -65,7 +65,7 @@ export function QaTransfer() {
       </h2>
       <p className="mt-1 text-[13px] text-muted">
         Exports the 500 most recent runs as JSON. Screenshots are described in the file but stay in
-        the bucket — an import restores the runs, not the images.
+        the bucket. An import restores the runs, not the images.
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -111,7 +111,7 @@ export function QaTransfer() {
                   file they may never open. */}
               {panel.truncated ? (
                 <p className="mt-1 text-warn">
-                  There are more runs than one export holds — this file has the 500 most recent.
+                  There are more runs than one export holds. This file has the 500 most recent.
                 </p>
               ) : null}
             </>

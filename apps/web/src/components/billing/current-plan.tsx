@@ -147,7 +147,7 @@ export function PlanNoWorkspace() {
         failed and nothing was charged.
       </p>
       <p className="type-sm mt-2 text-muted">
-        Your free signup credits land the moment the workspace exists — that is{' '}
+        Your free signup credits land the moment the workspace exists. That is{' '}
         <span className="num">{count(PLAN_CATALOG.free.monthlyCredits)}</span>{' '}
         {creditWord(PLAN_CATALOG.free.monthlyCredits)}, at no cost.
       </p>

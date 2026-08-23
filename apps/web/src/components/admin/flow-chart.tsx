@@ -134,7 +134,7 @@ export function FlowChart({ history }: FlowChartProps) {
         {/* The rule, said out loud when it bites. */}
         {!history.enoughForTrend ? (
           <p className="text-[12px] text-warn">
-            Fewer than five days of history — drawn as daily totals, not a trend.
+            Fewer than five days of history. Drawn as daily totals, not a trend.
           </p>
         ) : null}
 

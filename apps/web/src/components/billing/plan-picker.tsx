@@ -189,7 +189,7 @@ function Preview({
         <p className="type-body mt-3 border-t border-line-soft pt-3">
           <span className="font-[650]">What you keep. </span>
           {impact.over.map((o) => `${o.have} of ${o.allowed} ${o.dimension}`).join(', ')}. Nothing
-          is removed — every channel, site and post stays exactly where it is. You just cannot add
+          is removed. Every channel, site and post stays exactly where it is. You just cannot add
           more until you are back under the limit.
         </p>
       ) : null}

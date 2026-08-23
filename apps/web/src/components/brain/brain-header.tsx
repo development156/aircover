@@ -66,7 +66,7 @@ export function BrainHeader({ provenance, version }: { provenance: Provenance; v
       ) : (
         <div className="rounded-input border border-line bg-s2 px-3 py-2.5">
           <p className="text-[13.5px] text-ink">
-            Every field is confirmed — Sahoda writes from your answers, not its guesses.
+            Every field is confirmed. Sahoda writes from your answers, not its guesses.
           </p>
         </div>
       )}
@@ -74,7 +74,7 @@ export function BrainHeader({ provenance, version }: { provenance: Provenance; v
       {explainsZero ? (
         <p role="status" className="text-[12.5px] text-muted">
           Nothing is confirmed yet. Sahoda only started recording who wrote each field in this
-          version of the app, so any corrections you made during setup are not counted here — edit a
+          version of the app, so any corrections you made during setup are not counted here. Edit a
           field below and it becomes yours.
         </p>
       ) : null}
@@ -87,7 +87,7 @@ export function BrainHeader({ provenance, version }: { provenance: Provenance; v
         >
           Re-running the whole resolve
         </Link>{' '}
-        is a separate, paid action that rewrites every field — including the ones you have already
+        is a separate, paid action that rewrites every field, including the ones you have already
         confirmed.
       </p>
     </section>

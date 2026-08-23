@@ -9,7 +9,7 @@ import { Badge, type Rung } from '@/components/ui/badge'
 const LOCK_COPY: Record<BrandMemoryPayload['alignment']['signal_lock'], string> = {
   strong: 'Strong signal lock',
   moderate: 'Moderate signal lock',
-  weak: 'Weak signal — inputs conflict',
+  weak: 'Weak signal, inputs conflict',
 }
 
 /**
@@ -62,7 +62,7 @@ export function DerivedCard({
     <Card data-guide="brain.section.alignment" className="flex flex-col gap-4">
       <div className="flex items-baseline justify-between gap-3">
         <CardLabel className="mb-0">{derived.label}</CardLabel>
-        <span className="type-eyebrow shrink-0 text-muted">Derived — not counted</span>
+        <span className="type-eyebrow shrink-0 text-muted">Derived, not counted</span>
       </div>
 
       <div className="flex flex-col gap-2">

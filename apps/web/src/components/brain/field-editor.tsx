@@ -76,7 +76,7 @@ export function FieldEditor({ field, draft, onDraftChange, disabled }: FieldEdit
             {atCap ? (
               <span className="text-[12.5px] text-muted">
                 That&apos;s the maximum of{' '}
-                <span className="tabular-nums">{MAX_OPEN_LIST_ENTRIES}</span> — remove one to add
+                <span className="tabular-nums">{MAX_OPEN_LIST_ENTRIES}</span>. Remove one to add
                 another.
               </span>
             ) : null}

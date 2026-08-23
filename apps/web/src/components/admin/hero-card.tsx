@@ -120,7 +120,7 @@ function StageDots({ stages }: { stages: readonly StageSummary[] }) {
       {stages.map((stage) => (
         <li
           key={stage.stage}
-          title={`${stage.label} — ${stage.percent}%`}
+          title={`${stage.label}: ${stage.percent}%`}
           className={cn(
             'size-2 rounded-pill',
             stage.state === 'done' && 'bg-ok',
@@ -155,7 +155,7 @@ export async function HeroCard() {
           Progress
         </h2>
         <p className="mt-1.5 text-[13px] text-muted">
-          We couldn&apos;t read the roadmap just now. Nothing is wrong with the plan — this is our
+          We couldn&apos;t read the roadmap just now. Nothing is wrong with the plan. This is our
           read failing. Reload to try again.
         </p>
         {items.eventId ? (
@@ -277,7 +277,7 @@ export async function HeroCard() {
           <ToReachDoneList entries={entries} />
           {partial ? (
             <p className="mt-2 text-[11px] text-warn">
-              This list is incomplete — we couldn&apos;t read{' '}
+              This list is incomplete. We couldn&apos;t read{' '}
               {tasks.status !== 'ok' ? 'the board' : 'the test record'} just now.
             </p>
           ) : null}

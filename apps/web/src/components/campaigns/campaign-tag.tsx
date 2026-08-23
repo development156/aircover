@@ -40,7 +40,7 @@ export function CampaignTag({
         >
           <Megaphone aria-hidden size={12} strokeWidth={2} className="shrink-0" />
           <span className="truncate">{campaign.name}</span>
-          <span className="sr-only"> — open this campaign</span>
+          <span className="sr-only">, open this campaign</span>
         </Link>
       ))}
     </span>

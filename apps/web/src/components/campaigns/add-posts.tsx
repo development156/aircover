@@ -79,7 +79,7 @@ export function AddPosts({
       const skipped = ids.length - result.changed
       toast.success(
         skipped > 0
-          ? `Added ${result.changed} — ${skipped} ${skipped === 1 ? 'was' : 'were'} already in`
+          ? `Added ${result.changed}, and ${skipped} ${skipped === 1 ? 'was' : 'were'} already in`
           : `Added ${result.changed} ${result.changed === 1 ? 'post' : 'posts'}`,
       )
       router.refresh()
@@ -101,7 +101,7 @@ export function AddPosts({
       >
         {unreadable ? (
           <p className="type-body text-muted">
-            Sahoda could not read your posts just now. Reload — this is not a sign that you have
+            Sahoda could not read your posts just now. Reload. This is not a sign that you have
             none.
           </p>
         ) : posts.length === 0 ? (
@@ -109,7 +109,7 @@ export function AddPosts({
             {capped
               ? // The list was truncated, so "you have nothing left" is not a
                 // claim this read can make. Say what is actually known.
-                'Nothing to add from the most recent posts Sahoda looked at. Older posts are not shown here yet — open one from Posts to add it.'
+                'Nothing to add from the most recent posts Sahoda looked at. Older posts are not shown here yet. Open one from Posts to add it.'
               : 'Every post you have is already in this campaign. Write another one from Posts and it will show up here.'}
           </p>
         ) : (
