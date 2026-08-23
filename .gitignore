@@ -140,3 +140,7 @@ public/status/
 # hour they were taken on, and committing them would invite a later reader to
 # treat one laptop's numbers as the product's.
 apps/web/perf-results/
+
+# wt-page-dash lane: capture output and the shell wrapper that drives it.
+.ux-page-dash/
+.lane/
