@@ -406,13 +406,57 @@ through a surface that did not write them**.
 - `flow-journeys.spec.ts` reloads a real two-channel post and asserts both cards
   and **both limits** survive a fresh document.
 
+### RELINK, and the crop offer — both brief items, both verified by executing their guards
+
+- **RELINK is built, discoverable, and writes nothing.** `relink-control.tsx` is
+  FSD §3.1's second half — "variants editable independently; relink re-syncs from
+  canonical" — and it is an UNDO rather than a confirm, deliberately: a writer
+  can judge the two bodies far better after the swap than from a sentence
+  describing it. It **cannot silently discard written words**, and the reason is
+  structural rather than careful: relinking writes nothing, so the mirrored body
+  lands in the box marked unsaved and `post_variants` still holds the channel's
+  own copy until the writer saves. It is discoverable because it is ON the
+  version card — visible in this lane's own composer frames as *"Follow the post
+  again"* under both the X and LinkedIn cards — and hidden only when it would do
+  nothing (a channel already following, or one whose copy already equals the
+  post). `relink.test.tsx`: **13 passed**.
+- **The crop offer's two halves are both there.** `crop-preview.tsx` shows the
+  crop it would make and `crop-focal.tsx` carries the adjustable focal point;
+  `crop-outcomes.tsx` is careful that a photo under Google Business's 250px floor
+  reads as a refusal rather than a fix, because cropping only removes pixels.
+  And the second half — the refusal standing when the offer is declined — has its
+  own guard: `crop-decline.test.tsx`, **5 passed**, whose stated subject is "the
+  thing that did NOT change".
+
+**Neither was changed by this lane.** They were verified by running their guards
+and reading what those guards claim, which is weaker than driving them in a
+browser and is stated as such.
+
 **The three named regressions, re-checked:**
 
 | defect | state |
 |---|---|
-| a channel never written to saying "Saved" | not reproduced; the fixture writes both variants, and `variant-state.ts` derives the label from the row rather than from `{body:'', dirty:false}` |
+| a channel never written to saying "Saved" | **fixed, and now guarded** — see below |
 | a button label that was six flex items | not reintroduced; the new choice buttons put the label and the time in **explicit spans**, precisely because a bare text fragment beside another in a flex container becomes its own item |
 | `MEDIA_REQUIRED` missing from the copy allowlist | present — `gate-refusal-note` carries it; not re-verified against a live Instagram refusal, and that is stated rather than claimed |
+
+**The "Saved" defect needed a guard, not a shrug.** The first draft of this
+report said "not reproduced" — which was true of the frames and worthless as
+evidence, because `flow-seed.ts` writes a non-empty body to every variant it
+inserts, so the defect state never existed in anything captured. Read properly,
+the fix is structural and lives in `seed()`: `own = row !== undefined &&
+row.body !== ''`, so the only branch that can set `following: false` is one that
+has copy in it, and `{ following: false, dirty: false, body: '' }` — the exact
+pair `versionStateLabel` turns into "Saved" — is unreachable.
+
+**Nothing imported `seed()` in a test.** `follow-the-post.test.tsx` covers the
+live editing session through a rendered harness, which is right for typing and
+detaching; it never calls `seed`, so the RELOAD path — the one a person actually
+meets coming back to a post — had no coverage. `variant-state.test.tsx` is now
+that coverage: 5 tests, and deleting the `row.body !== ''` clause turns **2 of
+them red**, including the one that asserts the unreachable STATE rather than the
+label, so a future change that keeps the words and reintroduces the state still
+fails.
 
 ---
 
@@ -629,6 +673,9 @@ Stated so a reader does not mistake silence for coverage.
   live connection row, which this lane did not create.
 - **`MEDIA_REQUIRED` was verified present in the copy allowlist, not against a
   live Instagram refusal.** Stated as read, not as exercised.
+- **RELINK and the crop offer were verified by running their guards, not by
+  driving them in a browser.** 13 and 5 tests respectively, both green, both
+  read. Neither was changed.
 - **The composer's writing column is better, not solved.** Two "not built yet"
   notices remain in it (inline rewrite, and the generator's terms). Both are
   true and both are about controls that ARE on the screen, which is the test the
@@ -640,6 +687,18 @@ Stated so a reader does not mistake silence for coverage.
   (empty is empty) and worth an owner's eye, because a new account cannot see
   that a calendar exists at all until it has a post. **Logged, not fixed** — it
   is a question about what a new workspace should be shown, not a bug.
+- **Shared surfaces this lane touched**, listed for whoever integrates it:
+  `apps/web/playwright.config.ts` · `apps/web/vitest.config.ts` ·
+  `scripts/design/design-lint-baseline.json` · `.gitignore` ·
+  `components/connections/connect-first-note.tsx` (also rendered by /posts) ·
+  `components/composer/commit-bar.tsx` · `components/composer/composer-header.tsx`
+  · `components/posts/publish-now.tsx` · `components/posts/media-pane.tsx` ·
+  `components/posts/post-filters.tsx` · `components/posts/schedule-field.tsx`
+  (also rendered by /planner's row control) · `styles/onboarding.css` ·
+  `components/onboarding/stage/store.ts` (one export added).
+  **The baseline file is the one to watch**: it is a `globalDependencies` entry
+  every lane touches, and a merge that takes the wrong side silently loosens the
+  838 → 828 ratchet back up without failing anything.
 - **The five stranded `sahoda.e2e` workspaces in production are not this
   lane's.** All five are dated 19–21 August, before the fixture's
   `assertCleanupCapable` fix. Every workspace this lane created on 2026-08-23 is
