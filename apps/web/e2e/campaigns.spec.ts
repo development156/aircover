@@ -130,8 +130,23 @@ test.describe('campaigns @smoke', () => {
     test.slow()
     // ── 1. Bootstrap a workspace. Campaigns belong to one, and the screen says
     //      so rather than showing an empty list.
+    //
+    //      The SENTENCE moved and the guarantee did not. This page used to
+    //      carry its own "Create a workspace first" copy; wt-boot replaced every
+    //      such per-page variant with ONE first-run screen rendered by
+    //      `(app)/layout.tsx`, because writing that sentence twenty-one times is
+    //      how /analytics came to tell a workspace-less account to connect a
+    //      channel instead. What this step has always asserted is that the page
+    //      names the missing workspace rather than showing an empty list, and
+    //      that is what is asserted here.
     await page.goto('/campaigns')
-    await expect(page.locator('#main').getByText(/create a workspace first/i)).toBeVisible()
+    await expect(
+      page.locator('#main').getByText(/create a workspace to get started/i),
+    ).toBeVisible()
+    // Not an empty campaigns list wearing a different hat.
+    await expect(
+      page.locator('#main').getByRole('button', { name: /create workspace/i }),
+    ).toBeVisible()
 
     await page.goto('/home')
     await page
