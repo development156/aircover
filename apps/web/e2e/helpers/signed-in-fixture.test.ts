@@ -40,6 +40,27 @@ import { seededTestName, testCases, testsMissingTheFixture } from './fixture-aud
  * `apps/web` has no eslint configuration, so a lint rule has nowhere to live.
  * This runs in the ordinary `turbo test` leg, checked by every gate rather than
  * by whoever remembers.
+ *
+ * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
+ * It reads source as TEXT, so every one of these walks straight past it:
+ *
+ *  · A navigation whose path is not a literal — `page.goto(url)`,
+ *    `page.goto(`/posts/${id}`)`, a route held in a const. Only
+ *    `.goto('/…')` with the path written out is matched.
+ *  · A helper defined in ANOTHER FILE. `helperBodies` resolves `async function`
+ *    declarations in the same source only, so a test whose whole body is
+ *    `await bootstrapWorkspace(page)` — imported from `./fixtures/compose` — is
+ *    read as a test that never navigates. CHECKED 2026-08-24: all fifteen specs
+ *    that import that helper already request `signedIn`, so this is a latent
+ *    gap and not an open one. Cross-file resolution is the fix if it ever
+ *    catches something.
+ *  · Whether a test that DOES request the fixture makes any use of it. Asking
+ *    for `signedIn` and then asserting nothing passes trivially.
+ *  · A spec that reaches the app some other way — a raw `fetch`, an API route,
+ *    a `context.request` call.
+ *
+ * It is a rule about one specific shape that has now cost three files, not a
+ * proof that a spec is correctly authenticated.
  */
 
 const E2E = join(import.meta.dirname, '..')

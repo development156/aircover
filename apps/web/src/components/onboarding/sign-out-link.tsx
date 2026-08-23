@@ -28,7 +28,11 @@ export function SignOutLink() {
     <form action={signOutAction}>
       <button
         type="submit"
-        className="text-[13px] font-[550] text-muted underline-offset-4 hover:text-ink hover:underline"
+        // `type-sm`, not `text-[13px]`. The scale's secondary rung is 13px
+        // exactly (`--t-sm: 400 13px/18px`), so this is the same size named
+        // rather than written out — which is what docs/37 §3.3 asks for and what
+        // `design-lint.mjs` refuses at build time.
+        className="type-sm font-[550] text-muted underline-offset-4 hover:text-ink hover:underline"
       >
         Sign out
       </button>
