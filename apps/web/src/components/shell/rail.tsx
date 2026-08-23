@@ -73,40 +73,56 @@ export async function Rail() {
   const waiting = await approvalCount()
 
   return (
-    <aside
-      data-guide="nav.rail"
-      className="sticky top-0 flex h-dvh w-rail flex-col border-r border-line-soft bg-surface max-wide:w-rail-collapsed"
-    >
-      {/* Brand block is exactly topbar-height so the rail's baseline and the
+    /* ── THE RAIL FLOATS, AND IT IS DARK IN BOTH THEMES (v5) ──────────────────
+       Two changes, one idea. MEASURED off the reference: a rounded panel inset
+       10px from every viewport edge, radius 28px, fill #171717, against a
+       #fafafa page. That inset is what makes the rail read as an OBJECT on the
+       page rather than a wall beside it, and it is most of the reference's feel.
+
+       The outer div owns the inset and the stickiness; the panel is `h-full`
+       inside it. Written that way rather than as `h-[calc(100dvh - 20px)]`
+       deliberately — a calc with a mis-spaced operator is invalid CSS that the
+       browser drops SILENTLY while the class sits in the markup and in the
+       compiled stylesheet, so it looks applied and is not.
+
+       `data-surface="inverse"` is the load-bearing attribute. The panel's fill
+       does NOT follow the theme, so its text tokens cannot either: without the
+       scope, `text-ink` is #000000 here and the whole rail is black on
+       near-black in light mode. See THE INVERSE SURFACE in tokens.css. */
+    <div className="sticky top-0 h-dvh flex-none p-rail-inset">
+      <aside
+        data-guide="nav.rail"
+        data-surface="inverse"
+        className="flex h-full w-rail flex-col overflow-hidden rounded-xl bg-surface max-wide:w-rail-collapsed"
+      >
+        {/* Brand block is exactly topbar-height so the rail's baseline and the
           header's baseline are the same line across the fold. */}
-      <div className="flex h-topbar flex-none items-center px-4 max-wide:justify-center max-wide:px-0">
-        <Link href="/home" aria-label="Sahoda — go to Home" className="rounded-sm">
-          {/* The supplied lockup is mark + wordmark in ONE file. Collapsing the
+        <div className="flex h-topbar flex-none items-center px-4 max-wide:justify-center max-wide:px-0">
+          <Link href="/home" aria-label="Sahoda — go to Home" className="rounded-sm">
+            {/* The supplied lockup is mark + wordmark in ONE file. Collapsing the
               rail CROPS the container to the mark rather than scaling the whole
               lockup down into illegibility — which is why this is an
-              overflow-hidden box with a fixed height, not a resized image. */}
-          <span className="block h-[34px] w-[120px] overflow-hidden max-wide:w-[34px]">
-            <Image
-              src="/brand/logo-dark.png"
-              alt="Sahoda"
-              width={120}
-              height={34}
-              priority
-              className="block h-[34px] w-[120px] max-w-none dark:hidden"
-            />
-            <Image
-              src="/brand/logo-white.png"
-              alt=""
-              aria-hidden
-              width={120}
-              height={34}
-              className="hidden h-[34px] w-[120px] max-w-none dark:block"
-            />
-          </span>
-        </Link>
-      </div>
+              overflow-hidden box with a fixed height, not a resized image.
 
-      {/* ── THE RAIL SCROLLS, AND IT HAS TO SAY SO ────────────────────────────
+              ONE image now, not two. The rail is dark in both themes, so the
+              light-mode lockup has nowhere left to render — and a `dark:hidden`
+              pair here would swap to the BLACK wordmark on a black panel the
+              moment someone flipped the theme. The inverse surface removed a
+              whole class of bug rather than restyling one. */}
+            <span className="block h-[34px] w-[120px] overflow-hidden max-wide:w-[34px]">
+              <Image
+                src="/brand/logo-white.png"
+                alt="Sahoda"
+                width={120}
+                height={34}
+                priority
+                className="block h-[34px] w-[120px] max-w-none"
+              />
+            </span>
+          </Link>
+        </div>
+
+        {/* ── THE RAIL SCROLLS, AND IT HAS TO SAY SO ────────────────────────────
           MEASURED at 1440x900 on 2026-08-20: twenty-one items at 34px, five
           group headings, the brand block and the foot come to roughly 1050px
           against a 900px viewport, so `Automate` and all three foot links sat
@@ -124,89 +140,90 @@ export async function Rail() {
           `::-webkit-scrollbar` width were each measured at ZERO layout width in
           headless Chromium. It styles the bar for the engines that honour it,
           and the mask covers the ones that do not. */}
-      <nav
-        aria-label="Main"
-        /* `pb-6` and not `py-2`. The fade mask covers the last 20px of this
+        <nav
+          aria-label="Main"
+          /* `pb-6` and not `py-2`. The fade mask covers the last 20px of this
            box, and with 8px of bottom padding the clip landed THROUGH the
            middle of whatever row was there — MEASURED at 1440x900, the word
            AUTOMATE sliced horizontally in half on /home, /create, /loop and
            /playbooks. A half-height word reads as broken layout, not as "more
            below". With 24px the fade falls on space, so a partially scrolled
            list ends in a soft edge instead of a bisected glyph. */
-        className="scroll-visible scroll-fade flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2 pb-6 max-wide:px-2"
-      >
-        {/* Open on the row you are standing on. Without this the rail can
+          className="scroll-visible scroll-fade flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2 pb-6 max-wide:px-2"
+        >
+          {/* Open on the row you are standing on. Without this the rail can
             highlight the current route entirely below the fold, which is the
             same as not highlighting it. */}
-        <RailRevealActive />
-        {NAV_GROUPS.map((group, index) => (
-          // A real <section> per group, labelled by its own heading, so the
-          // twenty-one links arrive as six named regions rather than one long
-          // list — the same structure a sighted reader gets from the eyebrows.
+          <RailRevealActive />
+          {NAV_GROUPS.map((group, index) => (
+            // A real <section> per group, labelled by its own heading, so the
+            // twenty-one links arrive as six named regions rather than one long
+            // list — the same structure a sighted reader gets from the eyebrows.
+            <section
+              key={group.title ?? 'top'}
+              aria-labelledby={group.title ? `nav-group-${index}` : undefined}
+              aria-label={group.title ? undefined : 'Main sections'}
+              className="flex flex-col gap-nav"
+            >
+              {group.title ? (
+                // A group label, so it must not compete with the active item —
+                // hence muted rather than accent. The kit puts this at --text-3
+                // (black-45); this app uses --ink-mute instead, because
+                // ink-faint.test.ts bans --ink-faint as content text and an 11px
+                // uppercase eyebrow at 3.5:1 is the exact string that ban exists
+                // for. Accessibility floor wins over an exact colour match.
+                //
+                // `sr-only` rather than hidden when the rail collapses: the
+                // heading is what makes the six regions navigable, and
+                // display:none would take it out of the accessibility tree — the
+                // same mistake that once left nine nav links unnamed.
+                <h2
+                  id={`nav-group-${index}`}
+                  className="type-eyebrow px-[9px] pt-3 pb-[3px] text-muted max-wide:sr-only"
+                >
+                  {group.title}
+                </h2>
+              ) : null}
+              {group.items.map((item) => (
+                <NavItem
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  guide={item.guide}
+                  soon={item.state === 'soon'}
+                  count={item.href === '/approvals' ? waiting : undefined}
+                />
+              ))}
+            </section>
+          ))}
+
+          {/* The plumbing. Separated by a rule rather than by an eyebrow: it is a
+            different KIND of destination, not a sixth job. */}
           <section
-            key={group.title ?? 'top'}
-            aria-labelledby={group.title ? `nav-group-${index}` : undefined}
-            aria-label={group.title ? undefined : 'Main sections'}
-            className="flex flex-col gap-nav"
+            aria-label="Account and setup"
+            className="mt-3 flex flex-col gap-nav border-t border-line-soft pt-3"
           >
-            {group.title ? (
-              // A group label, so it must not compete with the active item —
-              // hence muted rather than accent. The kit puts this at --text-3
-              // (black-45); this app uses --ink-mute instead, because
-              // ink-faint.test.ts bans --ink-faint as content text and an 11px
-              // uppercase eyebrow at 3.5:1 is the exact string that ban exists
-              // for. Accessibility floor wins over an exact colour match.
-              //
-              // `sr-only` rather than hidden when the rail collapses: the
-              // heading is what makes the six regions navigable, and
-              // display:none would take it out of the accessibility tree — the
-              // same mistake that once left nine nav links unnamed.
-              <h2
-                id={`nav-group-${index}`}
-                className="type-eyebrow px-[9px] pt-3 pb-[3px] text-muted max-wide:sr-only"
-              >
-                {group.title}
-              </h2>
-            ) : null}
-            {group.items.map((item) => (
+            {NAV_FOOT.map((item) => (
               <NavItem
                 key={item.href}
                 href={item.href}
                 label={item.label}
                 icon={item.icon}
                 guide={item.guide}
-                soon={item.state === 'soon'}
-                count={item.href === '/approvals' ? waiting : undefined}
               />
             ))}
-          </section>
-        ))}
-
-        {/* The plumbing. Separated by a rule rather than by an eyebrow: it is a
-            different KIND of destination, not a sixth job. */}
-        <section
-          aria-label="Account and setup"
-          className="mt-3 flex flex-col gap-nav border-t border-line-soft pt-3"
-        >
-          {NAV_FOOT.map((item) => (
-            <NavItem
-              key={item.href}
-              href={item.href}
-              label={item.label}
-              icon={item.icon}
-              guide={item.guide}
-            />
-          ))}
-          {/* doc 13 §14: visible only to ops admins. Absence is the point — a
+            {/* doc 13 §14: visible only to ops admins. Absence is the point — a
               greyed-out Admin item would tell every tenant the console exists. */}
-          {isOpsAdmin ? (
-            <NavItem href="/admin/dev" label="Admin" icon="shield" guide="nav.admin" />
-          ) : null}
-        </section>
-      </nav>
+            {isOpsAdmin ? (
+              <NavItem href="/admin/dev" label="Admin" icon="shield" guide="nav.admin" />
+            ) : null}
+          </section>
+        </nav>
 
-      {/* The reference's third sidebar block. The rail shipped with two. */}
-      <RailFoot />
-    </aside>
+        {/* The reference's third sidebar block. The rail shipped with two. */}
+        <RailFoot />
+      </aside>
+    </div>
   )
 }

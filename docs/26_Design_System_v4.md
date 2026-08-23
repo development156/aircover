@@ -1,6 +1,21 @@
 # 26 · Design System v4
 
-**Status:** canon. Supersedes `docs/08_Design_System_SAHODA_LABS.md` **and**
+> ## SUPERSEDED by `docs/37_Design_System_v5.md`
+>
+> **Do not build from this file.** v5 replaces it entirely: a new system built to a named
+> target (runey.app), with different surfaces, radii, type scale and family.
+>
+> It is kept, not deleted, because its **reasoning** is still the record of why several
+> things are the way they are. These survive v5 unchanged and are documented here at
+> length: the Certainty System, the absence vocabulary, the two-tone focus ring, the
+> `--pfg` decision, and the `prefers-reduced-motion` delay fix. v5 cites this file for all
+> five rather than restating them.
+>
+> Where this file and v5 disagree about a **value**, v5 wins without exception. The largest
+> reversals: `--canvas` is no longer `#ffffff` (v5 §1), the base size is 14px not 13px
+> (v5 §3.3), and the family is Plus Jakarta Sans not Inter (v5 §3.1).
+
+**Status:** ~~canon~~ superseded. Supersedes `docs/08_Design_System_SAHODA_LABS.md` **and**
 `docs/ui-package/sahoda-labs/` (the ported kit and its `RETHEME.md`). Where any of those
 disagree with this file, this file wins.
 

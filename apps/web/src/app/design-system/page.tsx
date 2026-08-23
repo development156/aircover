@@ -5,6 +5,8 @@ import { CertaintyLadder } from '@/components/design-system/certainty-ladder'
 import { AbsenceRow } from '@/components/design-system/absence-row'
 import { PrimitiveRack } from '@/components/design-system/primitive-rack'
 import { ScaleTables } from '@/components/design-system/scale-tables'
+import { Surfaces } from '@/components/design-system/surfaces'
+import { V5Primitives } from '@/components/design-system/v5-primitives'
 import { GreyscaleToggle } from '@/components/design-system/greyscale-toggle'
 
 export const metadata: Metadata = {
@@ -13,7 +15,7 @@ export const metadata: Metadata = {
 }
 
 /**
- * The living reference for docs/26.
+ * The living reference for docs/37.
  *
  * ── WHY A ROUTE AND NOT A STATIC PAGE ────────────────────────────────────────
  * A hand-written swatch page drifts from the app the day after it is written.
@@ -35,7 +37,7 @@ export default function DesignSystemPage() {
         <h1 className="type-display mt-1">Design system</h1>
         <p className="type-body mt-2 max-w-[62ch] text-muted">
           Every token and primitive, in every state. The written rules are in{' '}
-          <code className="rounded-sm bg-s2 px-1">docs/26_Design_System_v4.md</code>; this page is
+          <code className="rounded-sm bg-s2 px-1">docs/37_Design_System_v5.md</code>; this page is
           what they render as. Toggle greyscale to check that nothing depends on hue.
         </p>
         <GreyscaleToggle />
@@ -67,6 +69,20 @@ export default function DesignSystemPage() {
         blurb="Every state each primitive ships with. A control with no disabled state here does not have one in the app."
       >
         <PrimitiveRack />
+      </Section>
+
+      <Section
+        title="Stat card, segmented control, badge, empty, error, toast"
+        blurb="The primitives the reference is built out of, plus the four states a screen spends most of its life in. The stat card ships in BOTH of its real states, because the empty one is what every account sees for its first hour — and its figures are labelled as demonstration data, because this product never renders a number it cannot prove."
+      >
+        <V5Primitives />
+      </Section>
+
+      <Section
+        title="Surfaces, radius and glass"
+        blurb="The three things v5 changed most. Surfaces separate by FILL rather than by line; the radius ladder is by surface size; glass is chrome-only, and the rule is shown rather than only stated."
+      >
+        <Surfaces />
       </Section>
 
       <Section

@@ -1,95 +1,96 @@
 /* ============================================================
-   SAHODA LABS — Design Tokens v4.0
+   SAHODA LABS — Design Tokens v5.0
 
    Lives at: packages/shared/tokens.css — the SOURCE OF TRUTH for values.
 
    ── THE CANON, IN ONE PLACE ──────────────────────────────────────────
-   SPEC:       docs/26_Design_System_v4.md  ← read this first
-   AUDIT:      docs/27_Design_Audit.md      ← why the values changed
-   LIVE REF:   /design-system               ← the real primitives, with a
-                                              greyscale toggle
-   docs/26 SUPERSEDES both docs/08_Design_System_SAHODA_LABS.md and
-   docs/ui-package/sahoda-labs/ (the ported kit and its RETHEME.md).
-   Those two are historical. If either disagrees with docs/26, docs/26
-   wins — this note exists because one session read the ported kit and
-   another read docs/08 and they built different screens.
+   SPEC:       docs/37_Design_System_v5.md  ← read this first
+   SOLVER:     scripts/design/solve-v5.mjs  ← every ratio below is printed by it
+   REFERENCE:  docs/design-inspiration/runey/ ← the named target
+   LIVE REF:   /design-system                ← every primitive, every state
 
-   Supersedes v3.0 "The Ledger" (warm neutrals + Outfit).
+   v5 SUPERSEDES docs/26_Design_System_v4.md, which supersedes docs/08 and
+   docs/ui-package/. docs/26 is kept, marked superseded in its header, because
+   its REASONING is still the record of why several values are what they are —
+   the Certainty System, the absence vocabulary, the two-tone focus ring and the
+   reduced-motion delay fix all survive v5 unchanged and are documented there.
 
-   WHAT CHANGED FROM v3 — values only, no names.
-   Every token NAME in v3 survives, so every `bg-s1` / `text-muted` /
-   `type-h1` call site in apps/web keeps compiling and simply renders
-   in the new palette. What moved is what the names RESOLVE TO:
-     · warm neutrals (#fbfaf9 / #171514) -> achromatic (white / black)
-     · Sahoda Orange #ff4b00 -> #ff6600
-     · Outfit -> Inter (variable axis; 550 + 650 are load-bearing)
-     · base body type 14px -> 13px (the density is most of the look)
-     · solid brand tints -> orange at alpha (composites on any surface)
+   ── WHAT v5 IS ──────────────────────────────────────────────────────
+   A new system built to a named target: runey.app. Not a port of v4 and not a
+   comparison. The values below marked MEASURED were sampled off the reference
+   screenshots with Pillow; the values marked SOLVED are printed by
+   scripts/design/solve-v5.mjs. Nothing here is a remembered number.
 
-   THE PALETTE IS FIVE COLOURS. Everything else is one of them at
-   reduced alpha. Platform marks (Instagram, LinkedIn, ...) keep their
-   own brand colours because they are identity, not UI chrome — that is
-   the only exception, and it never leaks into buttons, text or surfaces.
+   THE FOUR MECHANISMS TAKEN FROM THE REFERENCE, each measured:
 
-   THERE IS NO RED. Severity is carried by fill weight + glyph + label,
-   never by hue (RETHEME.md §5). --danger and --warn are both orange on
-   purpose; the four-rung ladder separates them by FILL, and the label
-   does the rest. This survives greyscale and colour-blind viewers.
+     1. SURFACES SEPARATE BY FILL, NOT BY LINE.  Page #fafafa, card #ffffff,
+        and a border so faint it measured #fdfdfd — 1px of anti-aliasing. v4
+        did the exact opposite (canvas == surface, separated by a hairline) and
+        wrote a rationale for it; that rationale served a different target and
+        is why the app reads flat and dense rather than calm. This single pair
+        is the largest visual change in v5.
 
-   THREE LAYERS — read before editing:
-   L1  Brand Skin sources (--p ...). Brand Skin is CUT, but the seven
-       names stay: apps/web/src/lib/brand/* still imports them and the
-       whole L2 brand block aliases into them.
-   L2  Semantic names. Brand-linked ones ALIAS INTO L1 so one flip
-       retunes every surface. Neutrals and semantics are sources.
-   L3  Legacy names (--bg, --s1, --muted ...) alias into L2 so existing
-       components keep rendering. Delete an alias only when nothing
-       references it.
+     2. VERY LARGE RADII, AS A LADDER.  Card 24px and rail 28px, both measured.
+        Buttons are pills, always.
 
-   SPACING IS --space-N, NOT --s-N.
-   The portable kit calls its spacing scale --sl-s1 ... --sl-s9. This
-   file must NOT copy those names: --s1 / --s2 are SURFACE COLOURS here
-   (158 references across apps/web), and redefining them as spacing
-   turns `background: var(--s1)` into `background: 4px` and blanks every
-   card in the app. The two scales are identical in value anyway
-   (4/8/12/16/20/24/32/40/48) — use --space-N.
+     3. A SOLID NEAR-BLACK RAIL AGAINST A VERY LIGHT CONTENT AREA. #171717,
+        measured — and it is the same hex as dark mode's card, which is why the
+        rail needs no second value when the theme flips. See INVERSE SURFACE.
+
+     4. A RATIONED ACCENT.  See the COLOUR BUDGET note below; the measurement
+        there is the most load-bearing number in this file.
+
+   ── WHAT v5 DELIBERATELY DOES NOT TAKE FROM THE REFERENCE ───────────
+   Runey codes deltas green-up / red-down. v5 does not, and this is not a
+   preference. Severity and certainty here are carried by FILL WEIGHT, GLYPH and
+   LABEL so they survive greyscale, re-theming and colour blindness (see THE
+   CERTAINTY SYSTEM below). Orange replaces the reference's green; no red is
+   introduced. What ports is the reference's RATION, not its hue-coding.
+
+   ── NAMES ARE STABLE; VALUES MOVED ──────────────────────────────────
+   Every token NAME in v4 survives, so every `bg-s1` / `text-muted` / `type-h1`
+   call site in apps/web keeps compiling. This is the same contract v4 made with
+   v3 and it is what makes a system change shippable in one lane. New names are
+   ADDED (--r-xs, --r-xl, --t-xs, the glass block, the gradient block, the
+   inverse-surface scope); none is removed.
+
+   SPACING IS --space-N, NOT --s-N. --s1 / --s2 are SURFACE COLOURS here.
    ============================================================ */
 
 :root {
   /* ---------- L1 · BRAND SOURCES (7 names — never rename) ---------- */
-  --p: #ff6600; /* Sahoda Orange — the one brand colour */
-  --pfg: #000000; /* text/icon ON primary. MEASURED 7.15:1 (was #ffffff at
-     2.94:1 — below AA, and below even the 3:1 floor for UI boundaries).
+  --p: #ff6600; /* Sahoda Orange — the one brand colour. Unchanged from v4. */
+  /* Text/icon ON the brand fill. MEASURED 7.15:1 against #ffffff's 2.94:1.
      This is not a taste call: `brandSkinVars()` — the Readability Guard every
-     CUSTOMER theme already passes through — returns `var(--ink)` when handed
-     Sahoda's own orange. The default theme was the one theme exempt from it.
-     `own-medicine.test.ts` now grades this file against that guard. */
-  --pstrong: #000000; /* primary hovers to BLACK, not a darker orange:
-                             orange is the resting state, black is the
-                             commitment (RETHEME.md §3) */
-  /* Accent TEXT — links, and any orange word on a light surface.
-     NOT --p. #ff6600 measures 2.94:1 on white; this is the darkest step along
-     the SAME hue that clears AA body text, solved by
-     scripts/design/contrast.mjs → 4.51:1. The brand orange is not weakened,
-     it is RATIONED: --p still paints every fill, chip and focus halo, and in
-     dark mode --acc returns to #ff6600 (6.32:1 there) because the constraint
-     only ever existed on light. */
-  --acc: #c95100; /* accent TEXT on light. 4.51:1 on --surface. */
-  /* Tints are orange AT ALPHA, not solid steps: they composite correctly on
-     white, on --surface-2 and on dark without a second set of values.
+     CUSTOMER theme passes through — returns ink when handed Sahoda's own
+     orange. own-medicine.test.ts grades this file against that guard. */
+  --pfg: #000000;
+  --pstrong: #000000; /* primary hovers to BLACK: orange is the resting state,
+                         black is the commitment. */
 
-     The alphas are chosen so that OVER WHITE they land on the v3 solids they
-     replace, because ~31 call sites across apps/web already depend on that
-     ramp and cannot be re-checked one by one:
-       --t50   0.06 -> #fff3ed   (was #fff2ed)  light wash FILL
-       --t100  0.16 -> #ffe0cc   (was #ffe4d9)  stronger FILL — badge grounds
-       --t300  0.40 -> #ffc299   (was #ffa580)  BORDER / ring
-     Keep them in lightness order. An earlier pass assigned them "by use" and
-     inverted 100 and 300, which would have rendered `bg-tint-100 text-accent`
-     (status-badge "approved", comment-card) as orange text on 40% orange. */
-  --t50: rgba(255, 102, 0, 0.06);
-  --t100: rgba(255, 102, 0, 0.16);
-  --t300: rgba(255, 102, 0, 0.4);
+  /* Accent TEXT — links, and any orange word on a light surface.
+     SOLVED, not picked, and RE-SOLVED for v5 because the ground moved.
+
+     v4 solved this against --surface alone, when --surface and --canvas were
+     both #ffffff. v5 moves the page ground to #fafafa and adds a #f2f2f3 well,
+     so accent text now has THREE grounds and the darkest one decides.
+
+       #ff6600  on #ffffff 2.94:1 · #fafafa 2.81:1 · #f2f2f3 2.62:1
+       #c95100  (v4's value) on the NEW canvas: 4.32:1 — BELOW AA
+       #bd4b00  5.04:1 / 4.82:1 / 4.50:1 — clears AA on all three
+
+     Carrying v4's #c95100 forward would have shipped a silent AA regression
+     the moment the canvas moved. The brand orange is not weakened, it is
+     RATIONED: --p still paints every fill, chip and focus halo. */
+  --acc: #bd4b00;
+
+  /* Tints are orange AT ALPHA, not solid steps, so they composite correctly on
+     #ffffff, on #fafafa, on a well and on dark without a second set of values.
+     Keep them in lightness order — an earlier pass inverted 100 and 300 and
+     would have rendered orange text on 40% orange. */
+  --t50: rgba(255, 102, 0, 0.06); /* light wash FILL */
+  --t100: rgba(255, 102, 0, 0.16); /* stronger FILL — badge grounds */
+  --t300: rgba(255, 102, 0, 0.4); /* BORDER / ring */
 
   /* ---------- L2 · BRAND (aliases into L1) ---------- */
   --brand: var(--p);
@@ -100,47 +101,64 @@
   --brand-tint: var(--t100);
   --brand-lift: var(--t300);
 
-  /* ---------- L2 · ACHROMATIC NEUTRALS ----------
-     Ground and card are the SAME white, separated by a hairline. That
-     is deliberate: a card tinted off the page ground reads as a box
-     inside a box, and it is why this UI reads flat and dense rather
-     than puffy. Depth comes from the ring, not from a fill step. */
-  --canvas: #ffffff; /* app background */
-  --surface: #ffffff; /* cards, sidebar, topbar */
-  --surface-2: #fafafa; /* wells, subtle fills, chrome */
-  --surface-3: #f4f4f4; /* hover wash, pressed states */
-  --line: #dcdcdc; /* hairlines — these do the structural work */
-  --line-firm: rgba(0, 0, 0, 0.3); /* dashed borders, stronger dividers */
-  --line-soft: rgba(0, 0, 0, 0.08); /* card inset rings */
-  --ink: #000000; /* headings */
+  /* ---------- L2 · ACHROMATIC NEUTRALS — THE LIGHT LADDER ----------
+     MEASURED off docs/design-inspiration/runey/ (light captures):
+       page ground #fafafa · card #ffffff · rail #171717 · divider #ebebeb
+
+     THE RULE THIS LADDER ENCODES: a card is a card because it is BRIGHTER than
+     the page, not because it has a line around it. The hairline is a backstop
+     for the case where two surfaces meet at an angle the fill cannot describe.
+
+     ADJACENT-PAIR FLOOR — light 1.03:1, measured by solve-v5.mjs:
+       canvas    → surface    1.04:1
+       surface   → surface-2  1.12:1
+       surface-3 → surface-3  1.08:1
+     The floor is DERIVED from the reference's own worst pair (1.04:1), not
+     asserted. tonal-ladder.test.ts fails the build if any pair drops under it.
+     v4's dark theme shipped --surface-2 BYTE-IDENTICAL to --surface (1.000:1);
+     that is the defect this floor exists to catch. */
+  --canvas: #fafafa; /* the page ground — NO LONGER white */
+  --surface: #ffffff; /* cards, panels, sheets */
+  --surface-2: #f2f2f3; /* a well INSIDE a card — inputs, code, table heads */
+  --surface-3: #e9e9eb; /* hover / pressed */
+  /* Hairlines. Softer than v4's #dcdcdc because they are no longer doing the
+     structural work — the fill is. A line at v4's weight over the new fill
+     ladder reads as a drawn box, which is the look v5 is moving away from. */
+  --line: #e9e9ec;
+  --line-firm: rgba(0, 0, 0, 0.28); /* dashed borders, deliberate dividers */
+  --line-soft: rgba(0, 0, 0, 0.05); /* card inset rings */
+
+  --ink: #000000; /* headings. 21:1 on --surface. */
   --ink-body: #000000; /* body text */
-  --ink-mute: #575756; /* secondary text — 7.0:1 on white */
-  /* DISABLED + DECORATIVE ONLY — 3.54:1, never content text.
-     Flattened to hex rather than left as rgba(0,0,0,.45): the Readability
-     Guard mirrors this token as decimal RGB and can only parse 6-digit hex
-     (guard-neutrals.test.ts). #8c8c8c IS black-45 composited on white. */
+  /* SOLVED against all three light grounds: 7.20 / 6.90 / 6.44:1.
+     Nudged from v4's #575756 to a neutral #57575a — the warm cast was a v3
+     residue and this palette is achromatic. */
+  --ink-mute: #57575a;
+  /* DISABLED + DECORATIVE ONLY — 3.36:1 on --surface, never content text.
+     Flattened to hex rather than left as rgba(): the Readability Guard mirrors
+     this token as decimal RGB and can only parse 6-digit hex. */
   --ink-faint: #8c8c8c;
-  --white: #ffffff; /* was the one sanctioned hex in globals.css */
+  --white: #ffffff;
 
   /* ---------- L2 · SEMANTIC ----------
      Strokes, icons and text only. NEVER large fills.
-     There is no red, green or amber in this palette (RETHEME.md §5).
-     --danger and --warn are BOTH orange; they are told apart by fill
-     weight and by the label, which is what survives a photocopier.
-     --ok and --info are achromatic, because "it worked" and "here is
-     some context" are the two states that never need to shout. */
+     THERE IS NO RED, GREEN OR AMBER IN THIS PALETTE. --danger and --warn are
+     BOTH orange; they are told apart by fill weight and by the label, which is
+     what survives a photocopier and a colour-blind reader. --ok and --info are
+     achromatic, because "it worked" and "here is some context" are the two
+     states that never need to shout. */
   --ok: #000000;
   --ok-bg: rgba(0, 0, 0, 0.04);
   --warn: #ff6600;
   --warn-bg: rgba(255, 102, 0, 0.06);
   --danger: #ff6600;
   --danger-bg: rgba(255, 102, 0, 0.06);
-  --info: #575756;
+  --info: #57575a;
   --info-bg: rgba(0, 0, 0, 0.04);
 
-  /* ---------- L2 · CHANNEL ACCENTS (platform-owned; chips only) ----------
-     The one place a non-palette colour is allowed: a platform mark is
-     identity, not UI chrome. It never leaks into buttons or text. */
+  /* ---------- L2 · CHANNEL ACCENTS (platform-owned; marks only) ----------
+     The one place a non-palette colour is allowed: a platform mark is identity,
+     not UI chrome. It never leaks into buttons, text or surfaces. */
   --channel-instagram: #e1306c;
   --channel-google: #1a73e8;
   --channel-whatsapp: #25d366;
@@ -151,60 +169,117 @@
   --hatch: rgba(0, 0, 0, 0.16); /* simulated-state diagonal */
 
   /* ---------- L2 · TYPE ----------
-     Inter, variable axis. 550 and 650 are load-bearing, not decoration:
-     the UI separates a label from its value with a half-step instead of
-     jumping to bold. Load it as a VARIABLE font or they round to
-     500/600 and the whole hierarchy flattens (RETHEME.md §2).
+     THE SCALE IS SIZED TO MEASURED DEMAND, which is the one thing v4's was not.
 
-     The kit ships NO mono family, so --mono aliases --sans. The three
-     places v3 used mono — the topbar credit pill, the Credits balance
-     and eyebrow labels — are sans here; anything countable still gets
-     tabular-nums, which Inter provides. */
+     MEASURED across apps/web/src on 2026-08-23: 859 hand-written `text-[Npx]`
+     classes in 19 distinct values against a scale of 8 steps. Reading the
+     distribution rather than the total changes the diagnosis completely:
+
+        13px 290   12px 211   12.5px 110   11px 90   14px 52   15px 35
+        10px 17    11.5px 13   20px 9      13.5px 8  … 9 more under 7 each
+
+     636 of 859 — 74% — hand-write a size that ALREADY HAS A STEP. That is not
+     a missing rung, it is a rung nobody reached for, and adding steps cannot
+     fix it. The other 26% IS real gap: 12.5px is the third most-used size in
+     the entire codebase and had no step at all.
+
+     So v5 does two different things for two different defects:
+       · the 74%  — design-lint rule 5 stays ratcheted, and the utilities are
+                    named for the JOB (type-body, type-meta) not the size
+       · the 26%  — the base moves 13px → 14px, which pulls 12.5/13 together
+                    onto one step and gives 14px (52 uses) a home
+
+     HALF-PIXEL SIZES ARE BANNED, and the reason is mechanical rather than
+     tidy: 12.5px does not rasterise as half a pixel. The engine rounds per
+     glyph run, so two adjacent 12.5px labels can land a whole pixel apart and
+     a baseline can shift under a hover. 132 uses across four half-pixel values
+     is the largest single source of the app's uneven vertical rhythm.
+
+     WHY 14px AND NOT 13px. v4 chose 13px and wrote "the density is most of the
+     look" — true, for the reference v4 was built to. v5's reference is not
+     dense; it is generous, and the user is a shop owner meeting a marketing
+     tool for the first time on a mid-range Android, not an operator scanning a
+     terminal. 14px is the smallest step that stays comfortable on a cheap
+     720p panel in daylight. 16px was rejected: this product has tables. */
   --sans:
-    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans Devanagari', sans-serif;
+    'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans Devanagari',
+    sans-serif;
   --mono: var(--sans);
 
-  /* Base is 13px, not 16px. This is the second biggest reason the
-     reference reads denser than a stock dashboard (RETHEME.md §2). */
-  --t-display: 700 30px/36px var(--sans);
-  --t-h1: 600 24px/30px var(--sans);
-  --t-h2: 600 20px/26px var(--sans);
-  /* THE MISSING RUNG. Between h2 (20px) and body (13px) there was a 7px cliff,
-     so every card title in the app hand-wrote `text-[15px] font-semibold`
-     instead of using the scale — which is how headings came to drift between
-     routes. A card title is not a page title; it now has a name. */
-  --t-h3: 650 15px/20px var(--sans);
-  --t-body: 400 13px/20px var(--sans);
-  --t-sm: 400 12px/18px var(--sans);
-  /* A chip's own label: the eyebrow's size and weight, without the uppercase.
-     See globals.css `type-chip` for why the step exists. */
-  --t-chip: 600 11px/14px var(--sans);
-  /* THE EMBED FIELD STEP, and 16px is a constraint rather than a taste.
-     iOS Safari zooms the viewport on focus for any input below 16px, and the
-     embeddable forms (/embed/beta, /embed/lead) render inside somebody else's
-     mobile page where that zoom cannot be undone. `--t-body` is 13px and is
-     right everywhere the app owns the page; this is the one rung that exists
-     because a browser insists on it. Density is carried by the label, not by
-     the field. */
-  --t-input-embed: 400 16px/22px var(--sans);
-  --t-eyebrow: 600 11px/14px var(--sans);
+  /* THE SCALE. Eleven steps, each named for its JOB.
+     Weight is part of the step: the UI separates a label from its value with a
+     half-step (550/650) instead of jumping to bold, and those weights exist
+     only on a VARIABLE axis. Pin the weights in next/font and they round to
+     500/600 and the whole hierarchy flattens. */
+  --t-hero-num: 650 44px/44px var(--sans); /* the ONE big number per view */
+  --t-display: 700 30px/36px var(--sans); /* a screen that is one statement */
+  --t-h1: 650 24px/30px var(--sans); /* page title */
+  --t-h2: 650 20px/26px var(--sans); /* section title */
+  --t-h3: 650 16px/22px var(--sans); /* card title — was 15px */
+  --t-body: 400 14px/22px var(--sans); /* THE BASE */
+  --t-sm: 400 13px/18px var(--sans); /* secondary — absorbs 12.5px */
+  --t-xs: 400 12px/16px var(--sans); /* meta, captions, table cells */
+  --t-chip: 600 12px/16px var(--sans); /* a chip's own label */
+  --t-eyebrow: 600 11px/14px var(--sans); /* uppercase section label */
   --t-eyebrow-ls: 0.06em;
-  /* The ONE big number per view — a balance, a total. Not a heading: it is set
-     in tabular figures so digits do not shuffle when the value changes, and it
-     is the only step above --t-display. Pair with `.num`. */
-  --t-hero-num: 650 44px/44px var(--sans);
+  /* THE EMBED FIELD STEP. 16px is a constraint, not a taste: iOS Safari zooms
+     the viewport on focus for any input below 16px, and the embeddable forms
+     render inside somebody else's mobile page where that zoom cannot be
+     undone. This is the one rung that exists because a browser insists on it. */
+  --t-input-embed: 400 16px/22px var(--sans);
 
   /* ---------- L2 · TRACKING ----------
      Optical, not decorative: type set large needs NEGATIVE tracking to stop
-     looking loose, and type set at 11px uppercase needs positive tracking to
-     stop looking cramped. One value per size band, never per component. */
+     looking loose, type set at 11px uppercase needs positive tracking to stop
+     looking cramped. One value per size band, never per component. */
   --ls-display: -0.022em; /* >=24px */
-  --ls-heading: -0.011em; /* 15-20px */
-  --ls-body: 0em; /* 12-13px — Inter is already correct here */
+  --ls-heading: -0.008em; /* 16-20px */
+  --ls-body: 0em; /* 12-14px */
   --ls-hero-num: -0.03em; /* figures are wide; the hero number needs the most */
 
-  /* ---------- L2 · SPACE (4pt scale) ----------
-     --space-N. Do NOT introduce --s1/--s2 — see header. */
+  /* ---------- L2 · WORD SPACING — A CORRECTION, NOT A STYLE ----------
+     THE FACE'S ONE DEFECT, MEASURED AND FIXED.
+
+     Plus Jakarta Sans was chosen for its letterforms. Its WORD SPACE is too
+     narrow to ship as-is, and the measurement is unambiguous — space advance as
+     a fraction of the font size, read off the live document:
+
+        Arial              14px/400              3.89px   27.8%   (a normal face)
+        Plus Jakarta Sans  14px/400              2.00px   14.3%
+        Plus Jakarta Sans  16px/650  -0.014em    2.77px   17.3%
+        Plus Jakarta Sans  16px/650   0          3.00px   18.8%
+
+     At 14.3% of an em the words run together: "Needs your attention" renders as
+     one word at a glance, which was visible in a 3x crop of the shipped frame
+     before this token existed. It matters most for the reader this product is
+     for — someone meeting a marketing tool for the first time, on a phone.
+
+     NEGATIVE TRACKING IS NOT THE CAUSE, and that is why the fix is not "stop
+     tracking". Removing it entirely moves 17.3% -> 18.8%, still far under a
+     normal face. The narrow space is the typeface's own metric.
+
+     So the correction uses the one property that targets word gaps and leaves
+     every letterform alone.
+
+     IT MUST BE RE-DECLARED ON EVERY TYPE STEP, AND THAT IS NOT BELT-AND-BRACES.
+     An `em` length in `word-spacing` computes to ABSOLUTE PIXELS against the
+     element it is declared on, and what inherits is that computed pixel value —
+     not the em. Declared once on `html` (16px) it becomes a flat 1.6px for the
+     whole document, which is a different fraction at every step. MEASURED, and
+     the tell is that three steps came back byte-identical:
+
+        body 14px  3.61px  25.8%     h1  24px  5.08px  21.2%   <- under the floor
+        sm   13px  3.61px  27.8%     meta 12px 3.61px  30.1%   <- and over it
+
+     Three sizes, one advance. So each `@utility type-*` in globals.css carries
+     its own `word-spacing: var(--ws-word)`, where the em resolves against that
+     step's own size, and the root declaration stays only as the baseline for
+     text that uses no type step. `type-space.spec.ts` measures the advance in a
+     real browser — the only place a font's metrics exist — and fails below 22%
+     of the size. It caught this. */
+  --ws-word: 0.1em;
+
+  /* ---------- L2 · SPACE (4pt scale) ---------- */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -214,65 +289,152 @@
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
+  /* NEW in v5. The reference's page rhythm is 64px between major regions and
+     v4's ladder stopped at 48, so every screen that wanted more wrote it by
+     hand. Two steps, not five — the gap between 48 and 64 is where a layout
+     stops being spacing and starts being composition. */
+  --space-16: 64px;
+  --space-20: 80px;
 
-  /* ---------- L2 · RADIUS ---------- */
-  --r-sm: 6px; /* buttons, inputs, badges, chips */
-  --r: 8px; /* tiles, small surfaces */
-  --r-md: 10px; /* segmented controls, larger controls */
-  --r-lg: 12px; /* cards, nav items, wells */
-  --r-full: 999px;
+  /* ---------- L2 · RADIUS ----------
+     LOAD-BEARING FOR THE LOOK. MEASURED off the reference: card 24px (corner
+     profile x112→x90 over 22 rows), rail 28px, buttons fully round.
+
+     THE LADDER IS BY SURFACE SIZE, NOT BY IMPORTANCE. A chip inside a card
+     takes a smaller radius than the card, always, or the two curves fight. The
+     rule of thumb the ladder encodes: a nested surface's radius is the parent's
+     minus one step. */
+  --r-xs: 8px; /* a mark, a swatch, a 20px square */
+  --r-sm: 12px; /* chips, badges, inputs, small buttons */
+  --r: 16px; /* tiles, list rows, nav items */
+  --r-md: 20px; /* segmented controls, wells, media */
+  --r-lg: 24px; /* CARDS — measured */
+  --r-xl: 28px; /* modals, drawers, the rail — measured */
+  --r-full: 999px; /* every button, every pill */
 
   /* ---------- L2 · ELEVATION ----------
-     Hairline first. A shadow means "this floats above the page", so
-     only overlays get one. Resting cards use an inset ring. */
-  --sh-card: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --sh-pop: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --sh-lg: 0 16px 48px rgba(0, 0, 0, 0.14);
-  /* Credits balance hero ONLY. color-mix keeps it tied to --p. */
+     The reference separates by FILL and the faintest border, not by shadow, and
+     the measurement is unambiguous: at a card's edge the pixel reads #fdfdfd
+     against a #fafafa page — one step, which is anti-aliasing, not a shadow.
+
+     So a resting card gets NO shadow. A shadow means "this floats above the
+     page", and only overlays float. */
+  --sh-card: 0 1px 2px rgba(0, 0, 0, 0.03); /* barely there, and that is right */
+  --sh-pop: 0 8px 28px rgba(0, 0, 0, 0.1); /* popovers, dropdowns */
+  --sh-lg: 0 24px 64px rgba(0, 0, 0, 0.16); /* modals, drawers */
   --sh-brand: 0 8px 24px color-mix(in srgb, var(--p) 24%, transparent);
 
+  /* ---------- L2 · GLASS ----------
+     THE ONE PLACE THE BRIEF'S TWO WISHES COLLIDE, RESOLVED BY SURFACE ROLE.
+
+     "Glassy and transparent" and "exactly like the reference" are not the same
+     instruction: the reference's APP is not glass. Its rail is solid, its cards
+     are opaque, its buttons are solid. The only glass in the whole product is
+     its auth card floating over a gradient.
+
+     THE RULE — GLASS ON CHROME, OPAQUE ON DATA:
+       ALLOWED   topbar · rail · mobile bottom bar · command palette · modal
+                 and drawer panels · toasts · the gradient layer itself
+       FORBIDDEN every card, table, stat, chart, list row, form well — anything
+                 that carries a value, a status or a certainty mark
+
+     Two reasons, neither aesthetic:
+
+     1. COST. backdrop-filter forces the compositor to re-read and re-blur the
+        content behind the element on every frame it changes. On the mid-range
+        Android these users are on, that is among the most expensive things a
+        page can ask for. Chrome on chrome is a handful of fixed elements; glass
+        on data is one per row.
+
+     2. THE CERTAINTY SYSTEM SEPARATES MEASURED FROM INFERRED BY FILL WEIGHT.
+        Translucency muddies fill weight by definition — a hatched inference
+        over a busy background stops reading as hatched. A glass surface that
+        must host a status-bearing element gives it an OPAQUE WELL
+        (`.glass-well`) rather than letting the mark sit on the blur.
+
+     --glass-blur is 20px because that is where the reference's own auth card
+     lands; --glass-sat lifts saturation back because a blur desaturates what it
+     samples and the result otherwise reads grey. */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-blur: 20px;
+  --glass-sat: 1.6;
+  --glass-line: rgba(0, 0, 0, 0.06);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+
+  /* ---------- L2 · THE GRADIENT GROUND ----------
+     A soft mesh behind everything, fixed, built in CSS rather than shipped as
+     an image — an image cannot follow the theme, cannot scale to a 1920 canvas
+     without banding, and costs a request on a phone.
+
+     IT MUST NEVER COMPETE WITH CONTENT, and that is a measurable claim rather
+     than a feeling: the gradient's strongest point must sit CLOSER to --canvas
+     than one deliberate ladder step. solve-v5.mjs prints the ceiling —
+     canvas→surface is 1.04:1 in light, so a wash measuring 1.03:1 against
+     --canvas can never be mistaken for a surface edge. Light and dark are
+     different gradients, not one inverted: in light the brand hue is the warm
+     one and a cool counterpoint keeps it from reading as a stain; in dark the
+     orange is nearly absent because on a #0d0d0d ground even 2% of it glows. */
+  /* THE ALPHAS ARE SOLVED, NOT CHOSEN, and the first set FAILED the ceiling
+     this file states. They shipped at 0.05 / 0.045 / 0.035, which composites to
+     1.056:1 against --canvas — over the 1.03 ceiling AND over one whole ladder
+     step (canvas->surface is 1.04), so the wash could read as a surface edge.
+     `glass-and-gradient.spec.ts` measured it and refused.
+
+     THE ALPHAS ARE QUANTISED TO n/255, BECAUSE THAT IS WHAT SHIPS. The second
+     attempt solved to three decimals and dark came back at 1.031:1 — one
+     thousandth over. CSS serialises a colour's alpha to 8 bits, so `0.034`
+     leaves the build as `#...09`, i.e. 9/255 = 0.0353, a LARGER value than the
+     one solved for. Solving in the units the browser stores is the difference
+     between a value that passes on paper and one that passes in the document.
+     These are the largest n/255 alphas whose composite stays at or under
+     1.03:1. */
+  --grad-1: rgba(255, 102, 0, 0.0275); /* warm — brand hue, top left. 7/255 */
+  --grad-2: rgba(120, 140, 255, 0.0314); /* cool counterpoint, right. 8/255 */
+  --grad-3: rgba(255, 160, 60, 0.0431); /* a second warm, low. 11/255 */
+  --grad-base: var(--canvas);
+
   /* ---------- L2 · LAYOUT ---------- */
-  --sidebar-w: 232px; /* collapses to 64px at 1180px and below */
-  --sidebar-w-collapsed: 64px;
-  --topbar-h: 56px;
-  --content-max: 1080px; /* left-aligned; caps, leaves right whitespace */
+  --sidebar-w: 240px; /* labelled rail, >=1180 */
+  /* Icon rail, the 700-1179 band. The reference measures 62px at a 1844px
+     viewport; this is narrower because the constraint is different and it was
+     MEASURED, not chosen: the rail is no longer flush, so its grid column costs
+     its width PLUS two insets. At 68px + 2x10 that column took 88px where v4's
+     flush 64px rail took 64 — 24px removed from the content column, at the one
+     width where there is none to spare. The topbar overflowed by exactly 16px
+     at 700px and `connections-widths.spec.ts` caught it.
+     56 + 2x8 = 72px gives the 16px back and keeps the float visible. */
+  --sidebar-w-collapsed: 56px;
+  /* THE RAIL FLOATS. The reference measures a 10px inset; this is 8px for the
+     same reason the collapsed width is 56 — the inset is paid TWICE out of the
+     content column, and at 700px there are no spare pixels. Still a visible
+     float, and it is what makes the rail read as an object on the page rather
+     than a wall beside it. Radius 28px, measured. */
+  --rail-inset: 8px;
+  --rail-r: var(--r-xl);
+  --topbar-h: 60px;
+  /* Widened from v4's 1080. The reference does not cap its content at all — at
+     1844px it uses ~1710 of it. 1320 does not bind at 1440 (the width most of
+     this product is looked at) and only starts working at 1920, where an
+     uncapped table would otherwise run to a length nobody can track a row
+     across. Prose is capped separately by --measure-prose. */
+  --content-max: 1320px;
   --content-pad: 24px;
   --rail-w: 280px; /* Home only */
-  --control-h: 34px; /* buttons, segmented controls */
-  --input-h: 38px; /* text inputs, selects */
-  /* The touch floor. 34px and 38px are correct for a mouse and too small for a
+  --control-h: 38px; /* buttons, segmented controls — up from 34 */
+  --input-h: 42px; /* text inputs, selects — up from 38 */
+  /* The touch floor. The two above are correct for a mouse and too small for a
      thumb, so at narrow widths every INTERACTIVE control grows to this. It is a
-     token rather than a literal because it has to be the same number in the
-     button, the input, the tab and the icon button — `max-narrow:min-h-[44px]`
-     scattered by hand is how three of them end up at 40. */
+     token rather than a literal because it must be the same number in the
+     button, the input, the tab and the icon button. */
   --control-h-touch: 44px;
 
-  /* ---------- L2 · SCRIM ----------
-     The wash behind a modal or a drawer.
-
-     It did not exist, and neither did the scrim. `modal.tsx` and `drawer.tsx`
-     both asked for `backdrop:bg-black/40`, and `globals.css` opens @theme with
-     `--color-*: initial` — which wipes the stock palette. Only `--color-white`
-     was redefined, so `bg-black` was never generated and EVERY overlay in the
-     product opened over an untouched page. PROVEN: the compiled CSS contains
-     two `::backdrop` rules and both are Tailwind preflight.
-
-     Dark is a PEER, not an inversion (§2): black at 40% over a near-black
-     canvas barely reads, so dark takes a heavier value rather than the same
-     one. */
+  /* ---------- L2 · SCRIM ---------- */
   --scrim: rgb(0 0 0 / 0.4);
 
   /* ---------- L2 · MEASURE ----------
-     How wide a thing is allowed to get before it stops being readable.
-     Space (--space-N) is the gap BETWEEN things; measure is the cap on ONE
-     thing, and the app had no vocabulary for it — which is why a two-row
-     settings form stretched to 1150px with its label and its control ~900px
-     apart, reading as an unfinished page rather than a short one. */
-
-  /* A label/control pair. Past this the two halves stop reading as one row. */
-  --measure-form: 720px;
-  /* Running prose. Roughly 68ch at the 13px base. */
-  --measure-prose: 620px;
+     Space is the gap BETWEEN things; measure is the cap on ONE thing. */
+  --measure-form: 720px; /* a label/control pair */
+  --measure-prose: 640px; /* running prose — roughly 66ch at the 14px base */
 
   /* ---------- L2 · MOTION ---------- */
   --ease: cubic-bezier(0.2, 0, 0.2, 1);
@@ -280,33 +442,15 @@
   --dur-fast: 140ms;
   --dur-base: 180ms;
   --dur-slow: 280ms;
-
-  /* The stagger step. Content arriving all at once reads as a flash; content
-     arriving one item at a time reads as a list being dealt. 40ms is the step
-     between successive items, and --stagger-cap is how many items are allowed
-     to carry a delay — beyond that they share the last one, so a 40-row table
-     does not take 1.6s to finish arriving. Both are tokens because a stagger
-     hand-written per screen is exactly how eleven screens end up with eleven
-     rhythms (docs/26 §8.1). */
   --stagger: 40ms;
   --stagger-cap: 8;
-
-  /* How far an entering element travels. Small on purpose: an entrance that
-     moves far enough to notice is an entrance you wait for. */
   --enter-lift: 6px;
-
-  /* The ONE duration longer than --dur-slow, and it is not a transition.
-     §8 rules that nothing longer than 280ms ships, and that rule is about
-     moving between two states — at 280ms a four-digit count is a flicker,
-     not a count, so it would buy the cost of animating a number without the
-     legibility that justifies it. A count-up is a REVEAL of one settled
-     value (docs/26 §8.1), so it is allowed its own step. Read from JS by
-     CountUp rather than duplicated there. */
+  /* The ONE duration longer than --dur-slow, and it is not a transition. A
+     count-up is a REVEAL of one settled value, not a move between two states. */
   --dur-count: 560ms;
 
   /* ---------- L3 · LEGACY ALIASES ----------
-     Existing components only. Remove one at a time as surfaces migrate.
-     NOTE --s1/--s2 stay SURFACE COLOURS here. That is deliberate. */
+     Existing components only. NOTE --s1/--s2 stay SURFACE COLOURS. */
   --bg: var(--surface);
   --s1: var(--canvas);
   --s2: var(--surface-2);
@@ -318,70 +462,55 @@
   --r-pill: var(--r-full);
   --dur-1: var(--dur-fast);
   --dur-2: var(--dur-base);
-  /* --ink, --line, --ok, --warn, --danger, --info, --mono, --sh-card
-     and --sh-pop already carry their legacy names above — no alias needed. */
 }
 
-/* ---------- DARK ----------
-   Responds to [data-theme='dark'] AND .dark, because next-themes and
-   Tailwind reach for the class while the app's own toggle sets the
-   attribute. Running only one of the two is how a light dropdown ends
-   up inside a dark panel (RETHEME.md §6). */
+/* ---------- DARK — A PEER, NOT AN INVERSION ----------
+   Responds to [data-theme='dark'] AND .dark, because next-themes and Tailwind
+   reach for the class while the app's own toggle sets the attribute. Running
+   only one of the two is how a light dropdown ends up inside a dark panel.
+
+   THE LADDER IS MEASURED OFF THE REFERENCE'S OWN DARK CAPTURE, not derived from
+   the light one:  page #0d0d0d · card #171717 · raised #212121 · hover #292929
+
+   ADJACENT-PAIR FLOOR — dark 1.06:1, and it is a DIFFERENT number from light's
+   1.03 for a physical reason. In ΔL/1000 the light steps measure 44-111 and the
+   dark steps 4.5-7.0: a 10-20x difference for pairs doing the same job, because
+   sRGB is compressed near black. In CONTRAST they measure 1.04 and 1.08 — the
+   same order. A floor written in ΔL would condemn a dark ladder that is fine,
+   which is why the spec and the guard both use contrast.
+
+     canvas → surface    1.08:1
+     surface → surface-2 1.11:1
+     surface-2 → -3      1.11:1
+
+   v4 shipped --surface-2 BYTE-IDENTICAL to --surface here (1.000:1). 117 of 120
+   frames carried a fill that separated nothing, and nothing could go red
+   because a missing 4% fill reads as a design choice. tonal-ladder.test.ts is
+   the guard that would have caught it. */
 :root[data-theme='dark'],
 [data-theme='dark'],
 .dark {
-  --canvas: #0b0b0c;
-  /* Raised from #131315. Against the canvas that step was ΔL 3.2/1000; this is
-     5.3/1000 — 66% more separation, so a card reads as a card before its
-     hairline is noticed. Dark surfaces cannot separate by fill ALONE (sRGB is
-     compressed near black: even this pair is only 1.10:1), so fill and hairline
-     work together here in a way they do not have to on light. */
-  --surface: #17171a;
-  /* Heavier than light's 0.4. Black at 40% over a #0b0b0c canvas is close to
-     no scrim at all; the overlay has to separate from the page it covers, and
-     in dark the fill cannot do that on its own (§2). */
-  --scrim: rgb(0 0 0 / 0.62);
-  /* SOLVED against the LIGHT theme's own step, not picked — the same method
-     --ink-mute used one block down.
-
-     It shipped as #17171a, which is --surface EXACTLY. Not close: identical. So
-     every element that lifts itself off a card with a `bg-s2` fill painted the
-     card's own colour and separated nothing, and the ladder had a hole in the
-     middle of it:
-
-                          light            dark, as shipped
-       surface -> s2      1.044:1          1.000:1     <- nothing at all
-       s2 -> surface-3    1.054:1          1.089:1     <- a double step
-
-     MEASURED across all 40 routes in dark: 117 of 120 frames carried at least
-     one fill that separated nothing, and the worst of them is the workspace
-     chip in the topbar, which is on every page in the product. The pattern
-     apps/web/CLAUDE.md prescribes for dark accent-on-tint — `dark:bg-s2` — was
-     landing them all here.
-
-     #1b1b1f makes the two steps 1.042 and 1.045, which is the light theme's
-     spacing to two decimal places. §2's rule is unchanged and still applies: in
-     dark a fill this small cannot do the job alone, so a card still keeps its
-     hairline. What changed is that the fill is no longer ZERO. */
-  --surface-2: #1b1b1f;
-  --surface-3: #1f1f23;
-  --line: rgba(255, 255, 255, 0.14);
+  --canvas: #0d0d0d;
+  --surface: #171717;
+  --surface-2: #212121;
+  --surface-3: #292929;
+  --line: #333333;
   --line-firm: rgba(255, 255, 255, 0.3);
-  --line-soft: rgba(255, 255, 255, 0.1);
+  --line-soft: rgba(255, 255, 255, 0.08);
   --ink: #ffffff;
   --ink-body: #ffffff;
-  /* SOLVED, not picked — scripts/design/dark-ladder.mjs.
-     Light earns its hierarchy from the GAP between ink and mute: 21.0:1 vs
-     7.23:1, a 2.90x ratio-of-ratios. Dark shipped #dcdcdc, which measures
-     13.53:1 against 18.56:1 — a 1.37x gap, so secondary text was almost as
-     loud as primary and every card read flat. #979797 restores the light
-     theme's SEPARATION (2.92x) while still clearing AA body at 6.35:1.
-     The old comment was right that grey dies on black; it over-corrected. */
+  /* SOLVED, not picked. Light earns its hierarchy from the GAP between ink and
+     mute — 21.0:1 vs 7.2:1, a 2.90x ratio-of-ratios. This reproduces that
+     separation on #171717: 17.93:1 vs 6.14:1 is 2.92x, and 6.14:1 still clears
+     AA body. A grey chosen by eye here makes secondary text nearly as loud as
+     primary and every card reads flat. */
   --ink-mute: #979797;
-  --ink-faint: rgba(255, 255, 255, 0.45);
+  --ink-faint: #6f6f6f; /* 3.57:1 — decorative only, same ban as light */
 
-  /* Orange does not shift between themes — the one fixed point. It is
-     NOT re-pointed at a tint here: a 24%-alpha focus ring is invisible. */
+  /* Orange does not shift between themes — the one fixed point in the palette.
+     On #171717 it measures 6.11:1, so accent TEXT needs no darkened step here;
+     --acc returns to the brand value. It is NOT re-pointed at a tint: a
+     24%-alpha focus ring is invisible. */
   --acc: #ff6600;
   --channel-x: #ffffff; /* the X glyph is invisible on dark otherwise */
 
@@ -391,27 +520,98 @@
   --warn-bg: rgba(255, 102, 0, 0.12);
   --danger: #ff6600;
   --danger-bg: rgba(255, 102, 0, 0.12);
-  --info: #dcdcdc;
+  --info: #979797;
   --info-bg: rgba(255, 255, 255, 0.06);
 
   --hatch: rgba(255, 255, 255, 0.2);
+
+  /* Heavier than light's 0.4. Black at 40% over a #0d0d0d canvas is close to no
+     scrim at all; the overlay has to separate from the page it covers, and in
+     dark the fill cannot do that on its own. */
+  --scrim: rgb(0 0 0 / 0.62);
+
   --sh-card: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --sh-pop: 0 4px 16px rgba(0, 0, 0, 0.6);
-  --sh-lg: 0 16px 48px rgba(0, 0, 0, 0.7);
+  --sh-pop: 0 8px 28px rgba(0, 0, 0, 0.6);
+  --sh-lg: 0 24px 64px rgba(0, 0, 0, 0.7);
+
+  /* Glass over a near-black ground needs a LIGHTENING veil, not a white one at
+     lower alpha: white at 72% over #0d0d0d is a white panel. */
+  --glass-bg: rgba(32, 32, 34, 0.72);
+  --glass-line: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  /* A DIFFERENT gradient, not the light one inverted. On a #0d0d0d ground even
+     2% orange glows, so the warm stop drops to a third of its light value and
+     the cool one carries most of the movement. */
+  --grad-1: rgba(255, 102, 0, 0.0314); /* 8/255 */
+  --grad-2: rgba(90, 110, 220, 0.0392); /* 10/255 */
+  --grad-3: rgba(255, 140, 40, 0.0275); /* 7/255 */
+}
+
+/* ============================================================
+   THE INVERSE SURFACE — a dark panel inside a light document.
+
+   THE TRAP THIS EXISTS TO CLOSE. The rail is #171717 in BOTH themes. In dark
+   that is simply --surface. In LIGHT it is an inverted context, and every token
+   inside it is wrong: --ink is #000000, so `text-ink` on the rail is black on
+   near-black, and --line is #e9e9ec, so a divider is a bright white scratch.
+   The mirror-image failure — pairing --ink with a dark fill and getting
+   white-on-white when the theme flips — is the same bug from the other side.
+
+   Anything painted with a fill that does not follow the theme MUST re-declare
+   its text tokens. This scope is that declaration, written once.
+
+     <aside data-surface="inverse">   →  ink #ffffff (17.93:1)
+                                         mute #979797 (6.14:1, AA body)
+                                         acc  #ff6600 (6.11:1)
+
+   The mute value is SOLVED the same way dark's is: it reproduces the light
+   theme's 2.90x separation between primary and secondary text, landing at
+   2.92x. Copying light's #57575a here would measure 1.6:1 and be unreadable;
+   using #ffffff for both would remove the hierarchy entirely.
+   ============================================================ */
+[data-surface='inverse'] {
+  /* The inverse scope IS the dark ladder, scoped to a subtree — not a
+     one-colour patch. It shipped for ten minutes with --canvas equal to
+     --surface, on the reasoning that a rail has no page behind it, and
+     tonal-ladder.test.ts refused it. The guard was right: the moment anything
+     nests inside the rail (an active pill, a well, a count badge) it needs a
+     ground to sit on, and a scope with three rungs where the system promises
+     four is the same hole in a smaller room. */
+  --canvas: #0d0d0d;
+  --surface: #171717;
+  --surface-2: #212121;
+  --surface-3: #292929;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-firm: rgba(255, 255, 255, 0.3);
+  --line-soft: rgba(255, 255, 255, 0.07);
+  --ink: #ffffff;
+  --ink-body: #ffffff;
+  --ink-mute: #979797;
+  --ink-faint: #6f6f6f;
+  --acc: #ff6600;
+  --ok: #ffffff;
+  --info: #979797;
+  --hatch: rgba(255, 255, 255, 0.2);
+  --channel-x: #ffffff;
+  color: var(--ink-body);
 }
 
 /* ---------- GLOBAL FOCUS — one treatment, no per-component overrides ----------
    TWO-TONE, and that is a requirement rather than a flourish. WCAG 1.4.11 asks
    3:1 of a focus indicator against what surrounds it, and the brand orange
    measures 2.94:1 on white — it misses by 0.06. A near-identical darker orange
-   (#fb6500, 3.02:1) would pass the letter of the rule while being invisibly
-   different, which is gaming the check, not clearing it.
+   (3.02:1) would pass the letter of the rule while being invisibly different,
+   which is gaming the check rather than clearing it.
 
-   So the ring is an INK core with an orange halo. The core carries the
-   contrast (21:1 on white, and the halo carries it on dark), the halo carries
-   the brand. It also reads on top of an orange fill, where a pure orange ring
-   would disappear entirely — the one case a single-colour ring can never
-   solve. */
+   So the ring is an INK core with an orange halo. The core carries the contrast
+   (21:1 on light, and on the inverse surface --ink is white and carries it
+   there), the halo carries the brand. It also reads on top of an orange fill,
+   where a pure orange ring would disappear entirely — the one case a
+   single-colour ring can never solve.
+
+   --r-sm, not --r-full: the ring follows the CONTROL's radius via the element's
+   own border-radius wherever one is set, and this is only the fallback. */
 :focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
@@ -424,23 +624,36 @@
   color: var(--ink);
 }
 
+/* The word-space correction, applied once at the root so every step inherits it.
+   See --ws-word for the measurement.
+
+   It CANNOT live in the `--t-*` steps: those are `font` shorthands, and the
+   shorthand has no word-spacing slot at all — `font:` sets family, size,
+   line-height, weight, style, stretch and variant, and word-spacing is a CSS
+   Text property that simply is not part of it. Writing it there would not
+   compile. One inherited declaration at the root reaches every step instead,
+   and `type-space.spec.ts` proves it arrives. */
+html {
+  word-spacing: var(--ws-word);
+}
+
 /* ============================================================
-   THE CERTAINTY SYSTEM — the signature.
-   Four levels of how real a thing is, each with a STRUCTURAL
-   signature that survives recolour, greyscale and colourblindness.
-   Apply to any status-bearing element: post chips, planner pills,
-   publish logs, wallet entries.
+   THE CERTAINTY SYSTEM — the signature. UNCHANGED FROM v4.
 
-   CERTAINTY IS NOT URGENCY. These four say how REAL a thing is. The
-   kit's four-rung badge ladder (RETHEME.md §5) says how much it NEEDS
-   YOU. The axes are orthogonal and must not be collapsed: a published
-   post is maximally real and minimally urgent — it is `.is-real` AND
-   rung 4 "calm". Mapping .is-real onto rung 1 "urgent" would stamp a
-   `!` glyph on every successful publish.
+   Four levels of how real a thing is, each with a STRUCTURAL signature that
+   survives recolour, greyscale and colour blindness. Apply to any status-
+   bearing element: post chips, planner pills, publish logs, wallet entries.
 
-   So: reuse the kit's FILL WEIGHTS (solid / wash+ring / dashed), which
-   is what the borrowing below is, and pick the rung separately from
-   urgency when the badge ladder gets built.
+   CERTAINTY IS NOT URGENCY. These four say how REAL a thing is, not how much it
+   NEEDS YOU. A published post is maximally real and minimally urgent.
+
+   IT IS SEPARATION BY FILL WEIGHT, AND THAT IS WHY IT MAY NOT SIT ON GLASS.
+   solid → wash+ring → dashed → hatched is a ladder of INK COVERAGE. A
+   translucent surface changes the coverage of everything on it, so the ladder
+   stops being a ladder. A glass surface hosting one of these must put it in an
+   opaque well. greyscale-certainty.test.ts proves the four rungs stay distinct
+   by COMPOSITED LUMINANCE — comparing the colour strings would let two rungs
+   pass on hue alone, which is the whole thing this system refuses to rely on.
    ============================================================ */
 
 /* REAL — it happened. Solid fill, no border. Settled. */
@@ -453,7 +666,7 @@
 /* COMMITTED — it will happen. Hairline + tint. Locked in.
    The ring is --brand-lift (orange 40%), not --brand-tint (16%): at 16% the
    border is invisible against the 6% wash it sits on, and the state would then
-   rest on text colour alone. Matches the kit's `.sl-badge--pending`. */
+   rest on text colour alone. */
 .is-committed {
   background: var(--brand-wash);
   color: var(--brand-text);
@@ -478,33 +691,24 @@
 }
 
 /* ============================================================
-   THE ABSENCE VOCABULARY — three states, three treatments.
+   THE ABSENCE VOCABULARY — three states, three treatments. UNCHANGED FROM v4.
 
-   The most-rendered glyph in this product was an em dash meaning
-   "nothing", and it was doing three different jobs at once. They are
-   not the same claim and a user has to be able to tell them apart:
+   The most-rendered glyph in this product was an em dash meaning "nothing", and
+   it was doing three different jobs at once:
 
-     1. NOT YET MEASURED  the slot is real, the reading has not arrived.
-                          Reach on a workspace with no published post.
-     2. UNREADABLE        we asked and the answer did not come back.
-                          `readBalance` returning `unreadable`.
-     3. DOES NOT EXIST    there is no such quantity. Omit the slot.
+     1. NOT YET MEASURED  the slot is real, the reading has not arrived
+     2. UNREADABLE        we asked and the answer did not come back
+     3. DOES NOT EXIST    there is no such quantity — OMIT THE SLOT
 
-   Rendering 1 and 2 identically is the defect: "you have nothing yet"
-   and "something is broken" led to the same dash, so a failed read
-   looked like a quiet Tuesday. Rendering 3 at all is the other defect —
-   `100 of —` invents a fraction that has no denominator. If the
-   quantity does not exist, DELETE THE SLOT. There is no class for it,
-   on purpose.
+   Rendering 1 and 2 identically is the defect: "you have nothing yet" and
+   "something is broken" led to the same dash. Rendering 3 at all is the other
+   defect — `100 of —` invents a fraction with no denominator. There is no class
+   for 3, on purpose.
 
-   Both marks are RULES, not characters: a solid rule reads as "not
-   yet", a broken rule reads as "the line to this number is cut". The
-   difference is structural, so it survives greyscale and does not
-   depend on the one brand colour this palette has.
-
-   Both REQUIRE an accessible name. A rule with no name is a decoration
-   that a screen reader skips, which would make the absence invisible
-   rather than legible.
+   Both marks are RULES, not characters, so the difference is structural and
+   survives greyscale. Both REQUIRE an accessible name: a rule with no name is a
+   decoration a screen reader skips, which makes the absence invisible rather
+   than legible.
    ============================================================ */
 
 /* 1 · NOT YET MEASURED — a quiet solid rule. */
@@ -517,9 +721,7 @@
   background: var(--line);
 }
 
-/* 2 · UNREADABLE — the same rule, BROKEN. Something is wrong, said
-   quietly: this is not an error state, it is an honest gap. Pair it
-   with words wherever there is room for them. */
+/* 2 · UNREADABLE — the same rule, BROKEN. Not an error state; an honest gap. */
 .is-unreadable {
   display: inline-block;
   width: 14px;
@@ -535,8 +737,7 @@
   );
 }
 
-/* The blade marks AGENCY — Sahoda acted, rather than the user.
-   One meaning only. */
+/* The blade marks AGENCY — Sahoda acted, rather than the user. One meaning. */
 .blade {
   display: inline-block;
   width: 9px;
@@ -546,24 +747,19 @@
   flex: none;
 }
 
-/* Anything countable that the user is accountable for. Inter carries
-   tabular figures, so this no longer needs a second family. */
+/* Anything countable that the user is accountable for.
+   Plus Jakarta Sans carries tabular figures, so this needs no second family. */
 .num {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
 }
 
 /* ============================================================
-   ENTRANCE — how content arrives (docs/26 §8.1)
-   ------------------------------------------------------------
-   ONE keyframe for the whole product. A screen that fades, a
-   screen that slides and a screen that scales read as three
-   products; the audit's core finding was every screen answering
-   the same question by itself, and "how does content arrive" is
-   one of those questions.
-
-   Travel is --enter-lift (6px) and it is deliberately small. An
-   entrance you can watch is an entrance you are waiting for.
+   ENTRANCE — how content arrives.
+   ONE keyframe for the whole product. A screen that fades, a screen that slides
+   and a screen that scales read as three products. Travel is --enter-lift (6px)
+   and it is deliberately small: an entrance you can watch is one you wait for.
    ============================================================ */
 @keyframes sl-enter {
   from {
@@ -576,24 +772,28 @@
   }
 }
 
-/* An element that arrives. `both` fill so it is hidden BEFORE its
-   delay elapses rather than flashing at full opacity first. */
 .enter {
   animation: sl-enter var(--dur-base) var(--ease) both;
 }
 
-/* The stagger ladder. Applied by the Stagger component via
-   --i (the item's index, already capped at --stagger-cap), so a
-   call site never hand-writes a delay. */
 .enter-step {
   animation: sl-enter var(--dur-base) var(--ease) both;
-  /* The cap lives HERE, in CSS, not mirrored in TypeScript. A call site
-     passes its raw index and min() clamps it, so --stagger-cap stays the
-     one place the ceiling is written. */
+  /* The cap lives HERE, in CSS, not mirrored in TypeScript. A call site passes
+     its raw index and min() clamps it, so --stagger-cap stays the one place the
+     ceiling is written. */
   animation-delay: calc(min(var(--i, 0), var(--stagger-cap)) * var(--stagger));
 }
 
-/* ---------- REDUCED MOTION — suppresses blade-sweep, mascot, confetti ---------- */
+/* ---------- REDUCED MOTION ----------
+   A STILL interface, and a FAST one. Zeroing the DURATION alone leaves the
+   DELAY intact, so a staggered row with `animation-delay: 320ms` and
+   `fill: both` stays invisible for 320ms and then snaps in — the person who
+   asked for less motion gets a SLOWER, jumpier screen than everyone else. A
+   stagger is a motion and its delay has to die with it.
+
+   The gradient never animates in the first place (see .grad-ground), so there
+   is nothing here to switch off for it — but if a later lane animates it, this
+   block already stops it. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -602,12 +802,6 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-
-    /* MUST be here. Zeroing the DURATION alone leaves the DELAY intact,
-       so a staggered row with `animation-delay: 320ms` and `fill: both`
-       stays invisible for 320ms and then snaps in — the person who asked
-       for less motion gets a slower, jumpier screen than everyone else.
-       A stagger is a motion, and its delay has to die with it. */
     animation-delay: 0ms !important;
     transition-delay: 0ms !important;
   }

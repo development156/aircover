@@ -73,7 +73,7 @@ export function BottomNav({ hasWorkspace = true }: { hasWorkspace?: boolean }) {
       // `wide:hidden` — this bar and the rail are mutually exclusive, never both.
       // pb accounts for the iOS home indicator; without it the last 34px of the
       // bar sits under the system gesture area and the tabs cannot be tapped.
-      className="fixed inset-x-0 bottom-0 z-30 hidden h-[56px] border-t border-line-soft bg-surface pb-[env(safe-area-inset-bottom)] max-narrow:flex"
+      className="glass fixed inset-x-0 bottom-0 z-30 hidden h-[56px] border-t pb-[env(safe-area-inset-bottom)] max-narrow:flex"
     >
       {LEFT.map((item) => (
         <Tab key={item.href} {...item} />

@@ -1,6 +1,6 @@
 import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Plus_Jakarta_Sans } from 'next/font/google'
 
 import { ThemeAttributeGuard } from '@/components/shell/theme-attribute-guard'
 import { ThemeScript } from '@/components/shell/theme-script'
@@ -12,20 +12,46 @@ import { clerkAppearance } from '@/lib/clerk-appearance'
 import './globals.css'
 
 /**
- * Inter, VARIABLE axis. `weight` is deliberately omitted.
+ * Plus Jakarta Sans, VARIABLE axis. `weight` is deliberately omitted.
  *
- * The kit leans on 550 and 650 to separate a label from its value with a
- * half-step instead of jumping to bold, and neither exists as a static
- * instance. Passing `weight: ['400','500','600','700']` would ship four fixed
- * cuts, silently round 550 -> 500 and 650 -> 600, and flatten the type
- * hierarchy across every screen (RETHEME.md §2). Omitting `weight` is what
- * makes next/font emit the variable font with the full axis.
+ * ── WHY THE FAMILY CHANGED FROM INTER (v5) ───────────────────────────────────
+ * The brief asked for the brand's own fonts. There is no `brand/fonts/` — the
+ * supplied assets are a logo lockup, a mascot, platform icons and a brandbook
+ * PDF whose text layer is empty (49 pages, `pdftotext` yields 49 bytes), so
+ * there is no font file and no named face to honour. The choice therefore had
+ * to be made and justified rather than inherited.
  *
- * There is no second family: the kit ships no mono, so tokens.css aliases
- * --mono to --sans. Inter carries tabular figures, which is all the three
- * former mono sites (credit pill, Credits balance, eyebrows) actually needed.
+ * The wordmark is a PNG lockup, not a type specimen, so it does not oblige the
+ * UI family — but it does describe the brand's letterforms, and they are
+ * geometric with a double-story `a` and circular bowls. That rules Poppins out
+ * (single-story `a`) and it rules Inter out too: Inter is a neo-grotesque with
+ * a tall x-height and closed apertures, and it reads as the default UI face of
+ * the last five years rather than as this brand.
+ *
+ * Plus Jakarta Sans is the closest available match to the wordmark's geometry
+ * and to the reference's roundness, and it clears the three constraints that
+ * actually bind:
+ *
+ *   1. VARIABLE AXIS 200-800. The scale leans on 550 and 650 to separate a
+ *      label from its value with a half-step instead of jumping to bold, and
+ *      neither exists as a static instance. Passing `weight: [...]` would ship
+ *      fixed cuts, silently round 550 -> 500 and 650 -> 600, and flatten the
+ *      hierarchy on every screen. Omitting `weight` emits the full axis.
+ *   2. TABULAR FIGURES. `.num` sets `tnum`; a marketing OS may not let digits
+ *      shuffle when a value updates. Outfit was rejected here — it is the
+ *      closer geometric match and has no reliable tabular set.
+ *   3. INDIC FALLBACK. It carries no Devanagari, exactly as Inter carried none,
+ *      so `'Noto Sans Devanagari'` stays in the stack in tokens.css.
+ *
+ * The CSS variable keeps its `--font-inter` name on purpose: globals.css binds
+ * `--sans` to it and renaming would be a rename with no reader, in a file whose
+ * whole contract is that names stay stable while values move.
  */
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
+const sans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: { default: 'Sahoda', template: '%s · Sahoda' },
@@ -71,7 +97,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           server's markup and the client's DOM differ by that one attribute by
           design. It suppresses the warning for <html>'s own attributes only,
           not for any subtree. */}
-      <html lang="en" className={inter.variable} suppressHydrationWarning>
+      <html lang="en" className={sans.variable} suppressHydrationWarning>
         <head>
           <ThemeScript />
         </head>

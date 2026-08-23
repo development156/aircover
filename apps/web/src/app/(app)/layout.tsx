@@ -36,6 +36,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="grid min-h-dvh grid-cols-[auto_1fr] max-narrow:grid-cols-1">
+      {/* THE GRADIENT GROUND — fixed, behind everything, out of every hit-test.
+          It is `aria-hidden` and empty because it carries no information: a
+          decorative layer that a screen reader announces is noise, and one that
+          intercepts a click is a bug that only shows up on a phone.
+
+          It lives HERE rather than in the root layout on purpose. /sign-in and
+          /onboarding compose their own grounds, and a second fixed layer under
+          them would fight the one they already paint. */}
+      <div aria-hidden className="grad-ground" />
       <div className="max-narrow:hidden">
         <Rail />
       </div>

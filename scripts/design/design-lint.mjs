@@ -210,7 +210,7 @@ for (const file of files) {
         violations.typesize.push({
           rel,
           line: i + 1,
-          text: `${m[0]} — use a type-* step (docs/26 §5)`,
+          text: `${m[0]} — use a type-* step (docs/37 §3.3)`,
         })
       }
     }
@@ -282,8 +282,8 @@ let failed = 0
    Measured at zero when written, so any violation is one this lane or a later
    one introduced. */
 for (const [key, name, why] of [
-  ['hex', 'raw hex colour', 'docs/26 §11 — tokens only'],
-  ['disabled', 'disabled coming-soon button', 'docs/26 §10.2 — use a <span>'],
+  ['hex', 'raw hex colour', 'docs/37 §18 — tokens only'],
+  ['disabled', 'disabled coming-soon button', 'docs/37 §15 — use a <span>'],
 ]) {
   const found = violations[key]
   if (found.length === 0) {
@@ -305,7 +305,7 @@ for (const [key, name, why] of [
    on a screen this lane has neither seen nor shot. That is a visual change to
    another lane's work, so it is written down instead. */
 const RATCHETED = [
-  ['spacing', 'hardcoded spacing', 'docs/26 §6 — use --space-N / the 4pt scale'],
+  ['spacing', 'hardcoded spacing', 'docs/37 §4 — use --space-N / the 4pt scale'],
   ['breakpoint', 'dead breakpoint variant', 'globals.css defines narrow/wide only'],
   /* Rule 5 is ratcheted for the reason rule 2 is, only more so: its 847 hits
      span 192 files across every lane running right now. Rewriting another
@@ -314,7 +314,7 @@ const RATCHETED = [
      CHANGES ITS RENDERED SIZE when the old value was off-scale, which is a
      visual change to a screen this lane has neither seen nor shot. Written
      down, and it only goes down. */
-  ['typesize', 'hand-written font size', 'docs/26 §5/§11 — use a type-* step'],
+  ['typesize', 'hand-written font size', 'docs/37 §3.3/§18 — use a type-* step'],
 ]
 
 if (process.argv.includes('--update-baseline')) {

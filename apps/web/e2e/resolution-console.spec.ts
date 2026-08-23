@@ -138,6 +138,43 @@ async function seedResolvedBrain(admin: SupabaseClient, workspaceId: string): Pr
   if (error) throw new Error(`seeding the brain failed: ${error.message}`)
 }
 
+/**
+ * Prove the page really is in dark, WITHOUT pinning a palette value.
+ *
+ * Both call sites used to assert `--canvas === '#0b0b0c'`. The INTENT was right
+ * and is kept — in light, `--ink` is black and both pairs are legible, so a
+ * theme that failed to apply would make these tests pass on the one state the
+ * bug never existed in. The IMPLEMENTATION was brittle: it pinned v4's exact
+ * dark canvas, so v5 moving it to the reference's measured #0d0d0d failed two
+ * tests that were not testing the palette at all.
+ *
+ * What the tests actually need is "the ground is dark", so that is what this
+ * measures — relative luminance, not a string. It survives any future retune of
+ * the ladder and still catches a theme that never applied (light's canvas
+ * measures ~0.96).
+ */
+async function expectDarkGround(page: import('@playwright/test').Page): Promise<void> {
+  const lum = await page.evaluate(() => {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim()
+    const hex = raw.replace('#', '')
+    const full =
+      hex.length === 3
+        ? hex
+            .split('')
+            .map((c) => c + c)
+            .join('')
+        : hex
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) / 255)
+    const lin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * lin(r!) + 0.7152 * lin(g!) + 0.0722 * lin(b!)
+  })
+  expect(
+    lum,
+    `--canvas has a relative luminance of ${lum.toFixed(4)} — the page is not in dark, so anything ` +
+      `measured on it would be measuring the state this test does not cover`,
+  ).toBeLessThan(0.05)
+}
+
 test.describe('signal resolution console @smoke', () => {
   test('a resolved brain arrives as a queue of guesses, and a batch can be confirmed', async ({
     page,
@@ -314,10 +351,7 @@ test.describe('signal resolution console @smoke', () => {
     // Confirm the page really is in dark before measuring anything on it —
     // otherwise a theme that failed to apply would make this pass on the light
     // palette, which is the state the bug never existed in.
-    const canvas = await page.evaluate(() =>
-      getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim(),
-    )
-    expect(canvas).toBe('#0b0b0c')
+    await expectDarkGround(page)
 
     await page.getByRole('checkbox').first().check()
 
@@ -409,10 +443,7 @@ test.describe('dark ink on a white fill @smoke', () => {
     // Prove the page really is in dark before measuring. In light, `--ink` is
     // black and BOTH pairs are legible — so a theme that failed to apply would
     // make this pass on the one state the bug never existed in.
-    const canvas = await page.evaluate(() =>
-      getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim(),
-    )
-    expect(canvas).toBe('#0b0b0c')
+    await expectDarkGround(page)
 
     const measured = await page.evaluate(
       ([contrastSrc]) => {
