@@ -82,7 +82,7 @@ export async function createCreditRequest(input: {
     if (parsed.data.approver_email.toLowerCase() === me.email.toLowerCase()) {
       return {
         ok: false,
-        message: 'Pick a different admin to approve this — you cannot approve your own request.',
+        message: 'Pick a different admin to approve this. You cannot approve your own request.',
       }
     }
 
@@ -134,7 +134,7 @@ export async function createCreditRequest(input: {
         ok: false,
         message:
           sent.reason === 'not_configured'
-            ? 'Email is not set up, so the approval code could not be sent. The request was created but nobody can approve it — deny it and try again once email works.'
+            ? 'Email is not set up, so the approval code could not be sent. The request was created but nobody can approve it. Deny it and try again once email works.'
             : 'The approval code could not be sent. The request was created but nobody can approve it yet.',
       }
     }
@@ -205,7 +205,7 @@ export async function verifyCreditOtp(input: {
           ? 'That code is wrong, and this request is now closed. Ask for a new one.'
           : `That code is wrong. ${result.attempts_left ?? 0} attempt${result.attempts_left === 1 ? '' : 's'} left.`,
       expired: 'This code has expired. Ask for a new request.',
-      too_many_attempts: 'Too many wrong codes. This request is closed — ask for a new one.',
+      too_many_attempts: 'Too many wrong codes. This request is closed. Ask for a new one.',
       not_the_approver: 'This code was sent to a different admin. They need to approve it.',
       self_approval_blocked: 'You raised this request, so you cannot approve it.',
       approved: 'This request has already been approved.',

@@ -420,7 +420,7 @@ export async function attachAssetToPost(
     ) {
       return {
         ok: false,
-        message: 'Sahoda could not check that file against the channel limits — add it again.',
+        message: 'Sahoda could not check that file against the channel limits. Add it again.',
       }
     }
 

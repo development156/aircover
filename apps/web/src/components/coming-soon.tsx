@@ -95,7 +95,7 @@ export function ComingSoon({
           read as a feature that is merely empty today. */}
       <p className="mt-6 max-w-[46ch] text-[12px] text-muted">
         Nothing on this screen is connected yet. It is here so the route works and so you can see
-        what is planned — not because the feature is running.
+        what is planned. It is not here because the feature is running.
       </p>
     </section>
   )

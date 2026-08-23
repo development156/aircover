@@ -56,7 +56,7 @@ export type OnboardingResolveState =
   ResolveActionState | { ok: true; kind: 'free'; brain: BrandMemoryPayload }
 
 const FALLBACK_MESSAGE =
-  'Showing a sample Brand Brain — the model could not be reached, so nothing was charged. Retry to resolve yours.'
+  'Showing a sample Brand Brain. The model could not be reached, so nothing was charged. Retry to resolve yours.'
 
 // NOTHING ELSE IS EXPORTED FROM HERE. Every export of a `'use server'` module
 // is a callable endpoint, so `isFirstResolve` (which takes a workspace id) and

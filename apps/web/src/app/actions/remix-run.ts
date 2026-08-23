@@ -106,7 +106,7 @@ export async function runRemixBatch(batchId: string): Promise<RunState> {
       return {
         ok: false,
         insufficient: false,
-        message: 'This batch has already been made — nothing was charged again.',
+        message: 'This batch has already been made. Nothing was charged again.',
       }
     }
     if (batch.status === 'running') {
@@ -122,7 +122,7 @@ export async function runRemixBatch(batchId: string): Promise<RunState> {
         insufficient: false,
         message:
           'This batch stopped part-way through. Whatever was written is in your posts, and ' +
-          'nothing more will be charged for it — start a new batch when you are ready.',
+          'nothing more will be charged for it. Start a new batch when you are ready.',
       }
     }
 

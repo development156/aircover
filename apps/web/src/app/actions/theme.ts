@@ -39,10 +39,10 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
     // a degenerate or non-string list would derive a broken token set and
     // repaint the whole workspace.
     if (!Array.isArray(colors) || colors.length === 0) {
-      return { ok: false, message: 'Upload a logo first — there is no palette to save yet.' }
+      return { ok: false, message: 'Upload a logo first. There is no palette to save yet.' }
     }
     if (!colors.every((color) => typeof color === 'string' && color.trim().length > 0)) {
-      return { ok: false, message: 'That palette could not be read — re-upload your logo.' }
+      return { ok: false, message: 'That palette could not be read. Re-upload your logo.' }
     }
 
     // Derive, then zod-parse before writing: `tokens` is a jsonb column with no
@@ -51,7 +51,7 @@ export async function saveWorkspaceTheme(colors: string[]): Promise<SaveThemeSta
     if (!tokens.success) {
       return {
         ok: false,
-        message: 'That palette could not be turned into a theme — try another logo.',
+        message: 'That palette could not be turned into a theme. Try another logo.',
       }
     }
 

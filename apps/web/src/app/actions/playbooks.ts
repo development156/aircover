@@ -49,12 +49,12 @@ export async function savePlaybook(input: {
     // A blocked recipe names the one thing it waits on, and that sentence is what
     // the customer sees rather than a generic refusal.
     if (input.enabled && !isRunnable(recipe)) {
-      return { ok: false, message: `Not yet — this one still needs ${recipe.blocker}.` }
+      return { ok: false, message: `Not yet. This one still needs ${recipe.blocker}.` }
     }
 
     const parsed = recipe.paramsSchema.safeParse(input.params)
     if (!parsed.success) {
-      return { ok: false, message: 'Check the fields — something there is not filled in yet.' }
+      return { ok: false, message: 'Check the fields. Something there is not filled in yet.' }
     }
 
     const triggerKind = input.cadence ? 'schedule' : 'manual'
@@ -96,7 +96,7 @@ export async function togglePlaybook(
     if (enabled && (!recipe || !isRunnable(recipe))) {
       return {
         ok: false,
-        message: recipe ? `Not yet — this one still needs ${recipe.blocker}.` : 'Not offered.',
+        message: recipe ? `Not yet. This one still needs ${recipe.blocker}.` : 'Not offered.',
       }
     }
 

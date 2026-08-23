@@ -55,7 +55,7 @@ export async function inviteAdmin(email: string, role: string): Promise<OpsWrite
     if (!invited.ok && invited.reason !== 'already_invited') {
       return {
         ok: false,
-        message: `The seat was created but the invitation did not send — ${invited.message}`,
+        message: `The seat was created but the invitation did not send. ${invited.message}`,
       }
     }
     return { ok: true }

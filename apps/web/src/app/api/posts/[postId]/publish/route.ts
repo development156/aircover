@@ -231,7 +231,7 @@ export async function POST(
         ok: false,
         code: infra ? 'INFRA_UNAVAILABLE' : 'PUBLISH_TRANSIENT',
         message: infra
-          ? 'Publishing is unavailable right now — nothing was sent. We’ve been alerted.'
+          ? 'Publishing is unavailable right now. Nothing was sent. We’ve been alerted.'
           : 'Publishing didn’t go through. Try again in a moment.',
       },
       { status: 503, headers: { 'cache-control': 'no-store' } },

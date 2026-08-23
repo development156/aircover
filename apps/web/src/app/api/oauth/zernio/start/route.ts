@@ -58,7 +58,7 @@ export async function POST(request: Request): Promise<Response> {
     const client = zernioClient()
     if (!client) {
       // Honest, not a 500: the rail simply is not provisioned in this environment.
-      return fail('Connecting isn’t available right now — the publishing key isn’t set.', 503)
+      return fail('Connecting isn’t available right now. The publishing key isn’t set.', 503)
     }
 
     /**

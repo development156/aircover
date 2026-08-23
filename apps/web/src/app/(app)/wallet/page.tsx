@@ -84,7 +84,7 @@ export default async function WalletPage() {
               icon={Receipt}
               title="No credit activity yet"
               body="Every grant, hold, charge and refund lands here with the action that caused it and what it cost to run."
-              tip="A hold is credits reserved while an action runs — if the action fails, they come back and you are not charged."
+              tip="A hold is credits reserved while an action runs. If the action fails, they come back and you are not charged."
             />
             {/* An all-malformed page is not an empty one, and must not read as one. */}
             <SkippedNote skipped={ledger.skipped} />

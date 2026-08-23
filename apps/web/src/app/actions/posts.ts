@@ -153,7 +153,7 @@ export async function savePost(postId: string, patch: unknown): Promise<SaveStat
         // out that it is one rule.
         return {
           ok: false,
-          message: 'This post has already been published or closed — its time can’t be changed.',
+          message: 'This post has already been published or closed. Its time can’t be changed.',
         }
       }
     }

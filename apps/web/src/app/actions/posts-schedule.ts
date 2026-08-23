@@ -35,7 +35,7 @@ function messageFor(raw: string | undefined): string {
   const msg = raw ?? ''
   if (msg.includes('FORBIDDEN_ROLE')) return 'Only an owner or editor can schedule a post.'
   if (msg.includes('POST_ALREADY_GOING_OUT')) {
-    return 'This post is already going out — you can’t change its time now.'
+    return 'This post is already going out. You can’t change its time now.'
   }
   if (msg.includes('POST_NOT_RESCHEDULABLE') || msg.includes('POST_NOT_RELEASABLE')) {
     return 'This post has already been published or closed.'

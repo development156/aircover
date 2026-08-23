@@ -191,8 +191,8 @@ export async function approveRemixBatch(
       return {
         ok: false,
         message:
-          'This batch is not what it was a moment ago. Check the total and approve it again — ' +
-          'nothing has been spent.',
+          'This batch is not what it was a moment ago. Check the total and approve it again. ' +
+          'Nothing has been spent.',
       }
     }
 

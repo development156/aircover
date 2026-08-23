@@ -97,7 +97,7 @@ export async function startRun(playbookId: string, now = new Date()): Promise<St
     if (!recipe || !isRunnable(recipe)) {
       return {
         ok: false,
-        message: recipe ? `Not yet — this one still needs ${recipe.blocker}.` : 'Not offered.',
+        message: recipe ? `Not yet. This one still needs ${recipe.blocker}.` : 'Not offered.',
       }
     }
 
@@ -114,7 +114,7 @@ export async function startRun(playbookId: string, now = new Date()): Promise<St
     if (!runId) {
       return {
         ok: false,
-        message: 'This playbook is already running — look below for its preview.',
+        message: 'This playbook is already running. Look below for its preview.',
       }
     }
 

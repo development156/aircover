@@ -148,7 +148,7 @@ export async function signQaUpload(input: unknown): Promise<QaUploadState> {
 
     const parsed = UploadSchema.safeParse(input)
     if (!parsed.success) {
-      return { ok: false, message: 'Screenshots only — PNG, JPEG or WebP, up to 10 MB.' }
+      return { ok: false, message: 'Screenshots only. PNG, JPEG or WebP, up to 10 MB.' }
     }
 
     const supabase = createServerSupabase()

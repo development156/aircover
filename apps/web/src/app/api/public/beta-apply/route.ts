@@ -112,5 +112,5 @@ export async function POST(request: Request): Promise<Response> {
 
   // The id is deliberately NOT returned. It identifies a row in an internal
   // table to an anonymous caller, and the visitor has no use for it.
-  return json({ ok: true, message: "Thanks — we have your details and we'll be in touch." }, 200)
+  return json({ ok: true, message: "Thanks. We have your details and we'll be in touch." }, 200)
 }

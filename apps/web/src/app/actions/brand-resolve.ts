@@ -112,7 +112,7 @@ export async function saveBrandMemory(
 
     const parsed = BrandMemoryPayloadSchema.safeParse(brain)
     if (!parsed.success) {
-      return { ok: false, message: 'That Brand Brain is incomplete — check the cards and retry.' }
+      return { ok: false, message: 'That Brand Brain is incomplete. Check the cards and retry.' }
     }
 
     // Prune AFTER validation: the schema pins the three fixed arrays at exactly 3,

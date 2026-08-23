@@ -102,7 +102,7 @@ export async function editTask(code: string, patch: TaskEditPatch): Promise<OpsW
     // Blocking without a reason is the one edit that would make the board lie:
     // a crimson ribbon with nothing behind it (doc 13 §10).
     if (parsed.data.blocked === true && !parsed.data.blockedReason?.trim()) {
-      return { ok: false, message: 'Say what is blocking it — a blocked card needs a reason.' }
+      return { ok: false, message: 'Say what is blocking it. A blocked card needs a reason.' }
     }
 
     const supabase = createServerSupabase()
