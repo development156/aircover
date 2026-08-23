@@ -1,36 +1,37 @@
-'use client'
-
-import { SignOutButton } from '@clerk/nextjs'
+import { signOutAction } from '@/app/actions/sign-out'
 
 /**
  * THE WAY OUT OF THE PRODUCT, on the one screen that would otherwise have none.
  *
  * ── THE DEAD END THIS CLOSES ─────────────────────────────────────────────────
  * Signing out lives in exactly one place in this app: Clerk's `<UserButton/>` in
- * the topbar, and the topbar is rendered by `(app)/layout.tsx`. The landing rule
- * in that same layout sends an account with NO WORKSPACE to /onboarding, and
- * /onboarding answers that state with a card that returns before
- * `OnboardingStage` — so it carries no header, no `Save & exit`, and no user
- * menu either.
+ * the topbar, rendered by `(app)/layout.tsx`. An account with no workspace that
+ * opens /onboarding directly gets a card which returns BEFORE `OnboardingStage`
+ * — so it carries no header, no `Save & exit`, and no user menu either. That is
+ * a screen a person can reach and cannot leave. Creating a workspace is the
+ * intended remedy and it works, but "the only way out of this product is to use
+ * it" is a dead end wearing a primary button.
  *
- * Put together, that is an account which can reach exactly one screen and cannot
- * leave it. Creating a workspace is the intended remedy and it works, but "the
- * only way out of this product is to use it" is a dead end wearing a primary
- * button. Signing out has to be reachable from anywhere a person can be stranded.
+ * ── A SERVER COMPONENT, AND THAT IS THE POINT ────────────────────────────────
+ * The obvious version imports Clerk's `<SignOutButton>`, and MEASURED it takes
+ * /onboarding from 779.8 kB to 925.1 kB of first-load JavaScript — the build's
+ * own budget failed over it. A form posting to a server action costs nothing,
+ * works without JavaScript, and revokes the session at Clerk rather than merely
+ * forgetting it here. See `actions/sign-out.ts`.
  *
  * Rendered as quiet text rather than a second button: it is the way out, not the
- * thing to do, and two buttons of similar weight would make the choice look
+ * thing to do, and two controls of similar weight would make the choice look
  * balanced when it is not.
  */
 export function SignOutLink() {
   return (
-    <SignOutButton redirectUrl="/sign-in">
+    <form action={signOutAction}>
       <button
-        type="button"
+        type="submit"
         className="text-[13px] font-[550] text-muted underline-offset-4 hover:text-ink hover:underline"
       >
         Sign out
       </button>
-    </SignOutButton>
+    </form>
   )
 }
