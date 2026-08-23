@@ -15,9 +15,31 @@ import { adminClient, expect, test, type SeededUser } from './fixtures/seeded-us
  * `data-boot-audio="unmuted"` with the muted fallback NOT entered. That is the
  * honest form of the claim and it is the form asserted below.
  *
- * Nothing here passes `--autoplay-policy=no-user-gesture-required`. A flag that
- * makes the test go green by removing the policy would prove something no
- * customer's browser does.
+ * ── AND THE AUTOPLAY POLICY IS NOT ONE OF THE THINGS IT CAN PROVE ───────────
+ * MEASURED 2026-08-24 with a throwaway probe, three trials against this exact
+ * Chromium (Playwright 1.61.1):
+ *
+ *   default browser, no click ever                 -> unmuted play SUCCEEDS
+ *   --autoplay-policy=user-gesture-required, none  -> unmuted play SUCCEEDS
+ *   the same flag, one click, then a 3s delay      -> unmuted play SUCCEEDS
+ *
+ * The policy is not enforced here, and the flag that is supposed to enforce it
+ * does not change that. So the assertions below CANNOT distinguish "the gesture
+ * earned the sound" from "the browser was never going to refuse" — confirmed by
+ * mutation: putting `await Promise.resolve()` in front of `video.play()`, which
+ * is exactly the mistake `use-boot-video.ts` is shaped to avoid, leaves this
+ * suite GREEN.
+ *
+ * What is therefore MEASURED here: the code asks for sound, does not mute
+ * itself, and never enters the muted fallback. That the synchronous call inside
+ * the click is what a REAL browser requires is INFERRED — from the documented
+ * policy and from Safari's stricter reading of it — and is not evidenced by this
+ * run. Stated because a green suite that looks like proof of the mechanism, and
+ * is not, is worse than one that says so.
+ *
+ * Nothing here passes `--autoplay-policy=no-user-gesture-required` either. It
+ * would be redundant, and a flag that removes a policy to make a test pass
+ * proves something no customer's browser does.
  *
  * ── COST ─────────────────────────────────────────────────────────────────────
  * NOT @smoke. Each test walks the flow to the end, which calls the model once.
@@ -186,6 +208,17 @@ test('onboarding → the film with sound → the dashboard, once', async ({ page
   await page.keyboard.press('Escape')
   await page.keyboard.press('Space')
   await page.keyboard.press('Enter')
+  /**
+   * AND THE BROWSER'S OWN BACK BUTTON, which is the way out that does not come
+   * from the page at all.
+   *
+   * Onboarding pushes a history entry per step, so Back is a real control here
+   * rather than a page exit. During the film it used to pop the step off
+   * `result`, UNMOUNT the video, and strand the customer on the rivals screen
+   * with a saved Brand Brain and nothing to press — no `ended`, no `error`, and
+   * a start deadline already disarmed by `playing`.
+   */
+  await page.goBack()
   await page.waitForTimeout(700)
 
   const after = await videoState(page)
@@ -195,6 +228,8 @@ test('onboarding → the film with sound → the dashboard, once', async ({ page
   expect(after!.currentTime).toBeGreaterThan(before)
   // And nothing navigated. Escape used to call `Save & exit`.
   expect(new URL(page.url()).pathname).toBe('/onboarding')
+  // The film is still the thing on screen — Back did not put the rivals step back.
+  await pwExpect(page.locator('[data-boot-video][data-active="true"]')).toBeVisible()
   // The element offers no controls and cannot be focused.
   expect(after!.hasControls).toBe(false)
   expect(after!.tabIndex).toBe(-1)
@@ -344,7 +379,26 @@ test('a blocked video file lands on the dashboard, not a black screen', async ({
   await pwExpect(page.getByText(/available credits/i)).toBeVisible({ timeout: 30_000 })
   // No error, no blank screen — the dashboard, with the Brand Brain saved.
   await pwExpect(page.getByText(/something went wrong|could not/i)).toBeHidden()
-  await shoot(page, 'boot-04-blocked-file-dashboard-1440-light')
+
+  /**
+   * THE FAILURE STATES AT BOTH WIDTHS AND BOTH THEMES.
+   *
+   * The walk is already paid for by this test, so the sweep costs no extra
+   * provider call. A dashboard reached because the film failed has to look like
+   * an ordinary dashboard — that is the claim, and it is a claim about pixels.
+   */
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+    for (const theme of ['light', 'dark'] as const) {
+      await page.evaluate((t) => {
+        document.documentElement.classList.toggle('dark', t === 'dark')
+        document.documentElement.dataset.theme = t
+        document.documentElement.style.colorScheme = t
+      }, theme)
+      await page.waitForTimeout(200)
+      await shoot(page, `boot-04-blocked-dashboard-${width}-${theme}`)
+    }
+  }
 })
 
 test('a video that stalls lands on the dashboard after the timeout', async ({ page, signedIn }) => {
@@ -383,7 +437,26 @@ test('a video that stalls lands on the dashboard after the timeout', async ({ pa
   expect(took).toBeGreaterThan(2_000)
   expect(took).toBeLessThan(9_000)
   await pwExpect(page.getByText(/available credits/i)).toBeVisible({ timeout: 30_000 })
-  await shoot(page, 'boot-05-stalled-dashboard-1440-light')
+
+  /**
+   * THE FAILURE STATES AT BOTH WIDTHS AND BOTH THEMES.
+   *
+   * The walk is already paid for by this test, so the sweep costs no extra
+   * provider call. A dashboard reached because the film failed has to look like
+   * an ordinary dashboard — that is the claim, and it is a claim about pixels.
+   */
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+    for (const theme of ['light', 'dark'] as const) {
+      await page.evaluate((t) => {
+        document.documentElement.classList.toggle('dark', t === 'dark')
+        document.documentElement.dataset.theme = t
+        document.documentElement.style.colorScheme = t
+      }, theme)
+      await page.waitForTimeout(200)
+      await shoot(page, `boot-05-stalled-dashboard-${width}-${theme}`)
+    }
+  }
 })
 
 test('prefers-reduced-motion never mounts it at all', async ({ page, signedIn }) => {
@@ -414,4 +487,24 @@ test('prefers-reduced-motion never mounts it at all', async ({ page, signedIn })
   // eslint-disable-next-line no-console
   console.log(`REDUCED MOTION → dashboard in ${Date.now() - clickedAt}ms`)
   await pwExpect(page.getByText(/available credits/i)).toBeVisible({ timeout: 30_000 })
+
+  /**
+   * THE FAILURE STATES AT BOTH WIDTHS AND BOTH THEMES.
+   *
+   * The walk is already paid for by this test, so the sweep costs no extra
+   * provider call. A dashboard reached because the film failed has to look like
+   * an ordinary dashboard — that is the claim, and it is a claim about pixels.
+   */
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+    for (const theme of ['light', 'dark'] as const) {
+      await page.evaluate((t) => {
+        document.documentElement.classList.toggle('dark', t === 'dark')
+        document.documentElement.dataset.theme = t
+        document.documentElement.style.colorScheme = t
+      }, theme)
+      await page.waitForTimeout(200)
+      await shoot(page, `boot-06-reduced-motion-dashboard-${width}-${theme}`)
+    }
+  }
 })

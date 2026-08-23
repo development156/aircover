@@ -153,6 +153,23 @@ export function OnboardingStage({
     isStep: isStepId,
     skip: RESULT_ONLY,
     onPop: (id) => {
+      /**
+       * NOT DURING THE FILM. This is the fourth way out of a screen whose
+       * ruling is that there is no way out, and the only one that arrives from
+       * the browser rather than from the page.
+       *
+       * Popping while the boot animation runs takes `step` off `result`, which
+       * UNMOUNTS the video — so no `ended` ever fires, the start deadline was
+       * long since disarmed by `playing`, and the progress watchdog reads a
+       * null ref and returns. Nothing finishes, nothing navigates, and the
+       * customer is left on the rivals step with a saved Brand Brain and no
+       * route forward but pressing Build again.
+       *
+       * A skip control that also strands them. `exiting` is the same ref the
+       * keyboard handler reads and it is set in the click's own call stack, so
+       * there is no window where a pop can slip through.
+       */
+      if (exiting.current) return
       setDir(ORDER.indexOf(id) < ORDER.indexOf(step) ? -1 : 1)
       setStep(id)
     },
@@ -563,7 +580,14 @@ export function OnboardingStage({
           brand name. And it must exist BEFORE the click: `play()` has to run in
           that click's own call stack to keep the audio permission, and an
           element created in the same tick has nothing to play. */}
-      {step === 'result' && playsBootVideo ? (
+      {/* `boot.phase === 'playing'` is the second half of the Back guard above,
+          and it is deliberately belt AND braces. `onPop` stops the pop this app
+          knows about; this stops the element being destroyed by ANY step change
+          while frames are moving — a future control, a hot reload, a pop that
+          arrived by a route nobody has thought of. Unmounting a running film is
+          the one failure mode with no watchdog behind it, because every watchdog
+          reads the element that just went away. */}
+      {(step === 'result' || boot.phase === 'playing') && playsBootVideo ? (
         <BootVideo
           videoRef={boot.videoRef}
           active={boot.phase === 'playing'}

@@ -136,8 +136,26 @@ export function useBootVideo({ onFinished }: UseBootVideoArgs) {
     lastAdvanceAt.current = Date.now()
     lastTime.current = videoRef.current?.currentTime ?? 0
     pollTimer.current = window.setInterval(() => {
+      if (finishedRef.current) return
       const video = videoRef.current
-      if (!video || finishedRef.current) return
+      /**
+       * THE ELEMENT WENT AWAY WHILE IT WAS PLAYING.
+       *
+       * This used to `return`, which is the one shape of failure no watchdog
+       * covered: an unmounted `<video>` fires no `ended` and no `error`, and the
+       * start deadline has already been disarmed by `playing`. The poll then
+       * spins forever against a null ref and `onFinished` never runs — the
+       * customer is left wherever the unmount put them, with a saved Brand Brain
+       * and nothing to press.
+       *
+       * The stage no longer unmounts it mid-play, so this should be unreachable.
+       * It is here because "should be unreachable" is what the previous version
+       * of this line assumed.
+       */
+      if (!video) {
+        finish('error')
+        return
+      }
       if (video.ended) return
       if (video.currentTime > lastTime.current) {
         lastTime.current = video.currentTime

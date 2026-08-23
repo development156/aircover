@@ -1,4 +1,5 @@
 import { act, cleanup, render } from '@testing-library/react'
+import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const marked = vi.hoisted(() => ({ calls: 0 }))
@@ -37,18 +38,29 @@ interface Harness {
 
 let harness: Harness
 
-/** The controls live beside the element; the hook's ref holds the real one. */
+/**
+ * The controls live beside the element; the hook's ref holds the real one.
+ *
+ * The `mounted` flag exists so a test can make REACT unmount the video the way
+ * the stage does when `step` stops being `result` — which is what nulls
+ * `videoRef.current`. Removing the node by hand does not: React keeps the ref
+ * pointing at a detached element, so the case would never be reproduced.
+ */
 function Rig({ onFinished }: { onFinished: (r: BootEndReason) => void }) {
   const boot = useBootVideo({ onFinished })
+  const [mounted, setMounted] = useState(true)
   return (
     <div>
-      <video
-        ref={boot.videoRef}
-        data-testid="v"
-        onPlaying={boot.onPlaying}
-        onEnded={boot.onEnded}
-        onError={boot.onError}
-      />
+      <button type="button" data-testid="unmount" onClick={() => setMounted(false)} />
+      {mounted ? (
+        <video
+          ref={boot.videoRef}
+          data-testid="v"
+          onPlaying={boot.onPlaying}
+          onEnded={boot.onEnded}
+          onError={boot.onError}
+        />
+      ) : null}
       <span data-testid="audio">{boot.audioPath}</span>
       <span data-testid="phase">{boot.phase}</span>
       <button type="button" data-testid="start" onClick={boot.start} />
@@ -403,6 +415,35 @@ describe('abort is not an ending', () => {
 
     expect(harness.finishes).toEqual([])
     expect(document.querySelector('[data-testid="phase"]')!.textContent).toBe('idle')
+  })
+})
+
+describe('the element vanishes mid-play', () => {
+  /**
+   * THE ONE FAILURE WITH NO WATCHDOG BEHIND IT, because every watchdog reads the
+   * element that just went away.
+   *
+   * An unmounted `<video>` fires no `ended` and no `error`, and the start
+   * deadline was disarmed by `playing`. Before this, the poll returned on a null
+   * ref and spun forever: `onFinished` never ran, so the customer was left
+   * wherever the unmount put them — with a saved Brand Brain and nothing to
+   * press. Browser Back on the onboarding stage did exactly that.
+   */
+  test('is treated as an ending rather than spun on forever', async () => {
+    act(() => harness.start())
+    await settle()
+    fire(harness.video, 'playing')
+    harness.video.currentTime = 1
+    advance(250)
+
+    // The stage pops a history entry, the step changes, and REACT unmounts the
+    // video — which is what nulls the ref the watchdog reads.
+    act(() => {
+      ;(document.querySelector('[data-testid="unmount"]') as HTMLButtonElement).click()
+    })
+    advance(1000)
+
+    expect(harness.finishes).toEqual(['error'])
   })
 })
 
