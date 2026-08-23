@@ -7,7 +7,8 @@ line says INFERRED or NOT RUN.
 >
 > **Nothing has been pushed. `wt-web` is untouched, production is untouched.**
 >
-> The work sits on the local branch `wt-release`, 521 commits ahead of `wt-web`.
+> The work sits on the local branch `wt-release`, 526 commits ahead of `wt-web`,
+> with a **green five-leg gate** (§6.1) and a clean working tree.
 > The session was asked to go fast on a limited budget, and the one thing that
 > cannot be done fast is the proof that belongs in front of a push to trunk. So
 > the merging, the conflict resolution and the gate were done here, and the single
@@ -23,7 +24,7 @@ Captured **2026-08-23 21:04:30 UTC**, read-only (`begin read only` — never
 | thing | value |
 |---|---|
 | `wt-web` SHA before | `c8faa3477790ac27f8471c3576b6bf16943bdf23` |
-| `wt-release` SHA now | `77237c473f2970c63114efb61c25058f521608e3` |
+| `wt-release` gate-green at | `73fb141e` — everything after it is docs-only, and `prettier --check` is clean on the tip |
 | `schema_migrations` rows | **69** |
 | newest recorded migration | `20260823030000` |
 | `workspaces` | 26 |
