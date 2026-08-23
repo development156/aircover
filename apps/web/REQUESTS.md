@@ -835,7 +835,7 @@ worktree names the DIRECT host (`db.<ref>.supabase.co:5432`), where the session 
 with the process and nothing is inherited. It matters wherever the pooler is used,
 which is what Vercel had to switch to.
 
-### 10 · Three migrations share the version `20260821000000`, and only one can be recorded
+### 10 · ~~Three migrations share the version `20260821000000`~~ — DONE 2026-08-23 (wt-infra)
 
 `asset_derivatives` (wt-media), `remix` (wt-remix) and `zernio_webhook_events`
 (wt-webhooks) each carry that timestamp. Git merged all three without a conflict —
@@ -855,3 +855,81 @@ whose objects it cannot see first.
 Separately and correctly, `20260805000000_clerk_id_remap` is NOT recorded and must
 stay that way: `remap_clerk_user_ids` and `verify_clerk_remap` do not exist in
 production, so it has genuinely never been applied.
+
+**Resolved 2026-08-23 by wt-infra**, exactly as described above: `asset_derivatives`
+renamed to `20260821000001`, `remix` to `20260821000002` (both versions were free —
+`000100` is `lead_doors`), then recorded with `prod-record.mjs`. No DDL re-run.
+`schema_migrations` 66 → 68. `20260805000000_clerk_id_remap` remains unrecorded, and
+that was re-verified rather than taken on trust: neither function exists in `pg_proc`.
+
+---
+
+## 11 · Radar can be subscribed to now — /radar's shape, for wt-page-rest
+
+**wt-infra opened the write path. It did NOT touch `/radar` or any component.**
+
+### What changed underneath
+
+`app.radar_subscribe` was granted to `service_role` only, and `app` is not an exposed
+schema, so `supabaseRadarStore.add()` threw "Radar is not collecting yet" and all five
+tables were empty. Migration `20260823030000_radar_subscribe_reachable` adds
+`public.radar_subscribe(p_workspace_id, p_display_name, p_sources, p_label)` — applied
+to production 2026-08-23 — and `lib/radar/store.ts` is now bound to it.
+
+The inner function was NOT granted to `authenticated`, deliberately: it takes
+`p_workspace_id` and `p_created_by` and checks no membership, so exposing it would have
+been a cross-tenant write. The wrapper takes identity from `auth.jwt()`, checks
+membership before anything, and **has no actor argument at all**.
+
+### The shape the screen gets
+
+`store.read(workspaceId)` now returns `collector: 'watch-list-only'` with a real
+`competitors[]`, instead of `'absent'`. Draw the difference:
+
+| state | means |
+|---|---|
+| `absent` | the tables are not there — only if the migration is missing |
+| `watch-list-only` | **the list is real; an empty `days[]` does NOT mean "nothing changed"** |
+| `reading` | fully bound; silence genuinely means nothing changed |
+
+Nothing returns `'reading'` yet. The change feed is unbound, so a "nothing happened this
+week" empty state would be a lie.
+
+Per competitor, what is real and what is not:
+
+| field | value | why |
+|---|---|---|
+| `id` | the competitor's real id | |
+| `name` | the workspace's own `label`, falling back to `display_name` | the label is private to the workspace; one customer's name for a rival is never shown to another |
+| `url` | **always `''`** | there is no `url` on a competitor. Addresses are normalised locators on `competitor_sources`, one row per source. That read is not bound yet — do not render an empty string as an address |
+| `kind` | always `'website'` | see the vocabulary mismatch below |
+| `lastObservedAt` | **always `null`** | `competitor_snapshots` is empty for everyone. Never draw a "last checked" time |
+
+### THREE DECISIONS THAT ARE YOURS, NOT MINE
+
+1. **The kind vocabularies do not match.** The screen's `CompetitorKind` is
+   `website | instagram | google_business`. The registry's CHECK admits
+   `website | instagram | x | linkedin | facebook`. So **`google_business` can never be
+   stored** — `add()` refuses it by name rather than coercing it to `website` — and
+   `x`, `linkedin` and `facebook` cannot be asked for. Widening the union changes what
+   your components render, so it is your call.
+
+2. **Only owners and editors may subscribe.** A `viewer` gets `FORBIDDEN_ROLE`.
+   Subscribing is a spending decision — every source is fetched nightly, on our card —
+   so it uses the same allowlist as `upsert_connection`. The screen should not offer the
+   control to a viewer rather than letting them press it and be refused.
+
+3. **The nightly collector is armed and OFF.** `radar-nightly.yml` runs only when
+   `vars.RADAR_NIGHTLY` is exactly `on`. So a customer can subscribe today and nothing
+   will be collected until the founder arms it. Whatever the screen says after a
+   successful add must not promise a reading that is not coming.
+
+### Where the proof is, if you need to check a claim
+
+* `packages/db/tests/radar_subscribe_door.pglite.test.ts` — real Postgres, RLS enforced.
+* `packages/db/scripts/radar-rls-live-proof.mjs` — production, anon key, minted member
+  JWTs. 29 PASS / 0 FAIL on 2026-08-23, 0 rows left behind.
+
+The two disclosure rules are proven separately and still hold after writing through the
+door: a workspace sees only competitors it subscribes to, and a `COUNT` of a shared
+competitor's subscribers answers **1** when the truth is **2**.

@@ -3,69 +3,119 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 
-import { supabaseRadarStore } from './store'
-
 /**
- * THE SUPABASE BINDING READS NOTHING, AND THAT IS THE ASSERTION.
+ * THE BINDING, AGAINST COLUMNS SOMEBODY HAS ACTUALLY READ.
  *
- * ── THE DEFECT THIS PINS ────────────────────────────────────────────────────
- * The first version of `store.ts` selected `id, name, url, kind, added_on,
- * last_observed_at` from `competitors`, with the column names guessed from TSD
- * prose that names tables and not columns. The `competitors` table is REAL — a
- * parallel lane applied its migrations to the shared database — so the
- * missing-table branch never fired, and Postgres answered 42703 (undefined
- * column) rather than 42P01 (undefined table). The throw reached the server
- * component and `/radar` returned a 500.
+ * ── WHAT THIS FILE USED TO ASSERT, AND WHY IT NO LONGER DOES ────────────────
+ * It asserted that `store.ts` CONTAINED NO QUERY. That was the right guard for
+ * its moment: the first binding selected `id, name, url, kind, added_on,
+ * last_observed_at` from `competitors`, with column names guessed from TSD prose
+ * that names tables and not their columns. `competitors` is REAL, so the
+ * missing-table branch never fired — Postgres answers 42703 for a missing COLUMN,
+ * not 42P01 — and every `/radar` request returned a 500.
  *
- * It cost two suites: `roadmap-honesty` found no "not built yet" text because
- * the screen rendered nothing at all, and `every-section-loads` found no `h1`.
+ * That guard carried its own expiry: "Bind it against a migration you have read,
+ * and delete this test in the same commit." This is that commit.
  *
- * ── WHY THE TEST READS THE SOURCE ───────────────────────────────────────────
- * Asserting that `read()` returns UNWIRED is necessary and not sufficient: a
- * future binding could query, catch, and return UNWIRED anyway, which passes
- * that assertion while restoring the 500 on any error the catch does not name.
- * What must hold is that this file CONTAINS NO QUERY, so the scan below looks
- * for the Supabase call surface directly.
+ * ── THE COLUMN NAMES, TAKEN FROM 20260822060000_radar_registry.sql ───────────
+ * Not from prose. The three that the last attempt got wrong:
  *
- * Deliberately a source scan and not a mocked client. A mock proves the calls
- * this test thought to stub; the file is the thing that either has a query in it
- * or does not.
+ *   · `competitors.display_name`   — NOT `name`. This is the 42703.
+ *   · `competitors` has NO `workspace_id`. It is a SHARED catalogue and tenancy
+ *     lives in `competitor_subscriptions`, so every read joins through it.
+ *   · there is no `url` on a competitor. Addresses are normalised LOCATORS on
+ *     `competitor_sources`, one row per source, deduped globally on
+ *     (kind, locator).
  *
- * DELETE THIS TEST when the binding lands for real — with the reconcile, and on
- * purpose, alongside columns someone has actually read a migration for.
+ * ── WHAT IS ASSERTED HERE, AND WHAT IS ASSERTED AGAINST A REAL DATABASE ─────
+ * These are the decisions that are the binding's own: which RPC it calls, which
+ * kinds it can store, and that it never invents a reading. Whether the SQL is
+ * right is not a question a mock can answer, and it is not asked here — it is
+ * proved in `packages/db/tests/radar_subscribe_door.pglite.test.ts` against a
+ * real Postgres with RLS enforced, and against production itself by
+ * `packages/db/scripts/radar-rls-live-proof.mjs`.
  */
 
-const SOURCE = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), 'store.ts'),
-  'utf8',
-).replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '') // comments describe the defect; they are not code
+const SOURCE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'store.ts'), 'utf8')
 
-describe('the Supabase binding does not guess a schema it cannot see', () => {
-  test('read() answers UNWIRED without touching the database', async () => {
-    const snapshot = await supabaseRadarStore().read('ws-1')
-    expect(snapshot).toEqual({ collector: 'absent', competitors: [], days: [] })
+/** The file with its prose removed — comments describe the defect, they are not code. */
+const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
+
+describe('the Supabase binding uses the registry the migration describes', () => {
+  test('goes through public.radar_subscribe, never app.radar_subscribe', () => {
+    // `app.radar_subscribe` takes `p_created_by` and checks no membership: it
+    // trusts both of its identity arguments because its only sanctioned caller is
+    // the service role. Reaching it from a customer's session would be a
+    // cross-tenant write.
+    expect(CODE).toContain("rpc('radar_subscribe'")
+    expect(CODE).not.toContain('app.radar_subscribe')
   })
 
-  test('the file contains no query at all', () => {
-    for (const call of ['.from(', 'createServerSupabase', '.select(', '.insert(', '.delete(']) {
-      expect(
-        SOURCE.includes(call),
-        `store.ts calls ${call} — a query here is a guess at another lane's columns, ` +
-          'and the last one returned a 500 on every /radar request. Bind it against a ' +
-          'migration you have read, and delete this test in the same commit.',
-      ).toBe(false)
+  test('sends no actor argument — identity is the JWT’s and nothing else', () => {
+    // The wrapper has no p_created_by. A parameter naming the actor is a
+    // parameter that can lie about the actor.
+    expect(CODE).not.toContain('p_created_by')
+  })
+
+  test('never selects the columns that produced the 42703', () => {
+    // `competitors.name` and `competitors.workspace_id` do not exist. Asserted on
+    // the select strings rather than on the words, so a comment explaining the
+    // defect cannot fail its own test.
+    const selects = [...CODE.matchAll(/\.select\(\s*'([^']*)'/g)].map((m) => m[1] ?? '')
+    expect(selects.length).toBeGreaterThan(0)
+    for (const select of selects) {
+      expect(select).not.toMatch(/\bworkspace_id\s*,|\bworkspace_id\)/)
+      // `display_name` contains "name"; the bare column is what must be absent.
+      expect(select.split(/[\s,()]+/)).not.toContain('name')
     }
   })
 
-  test('removing is a no-op rather than a refusal, since nothing is stored', async () => {
-    await expect(supabaseRadarStore().remove('ws-1', 'comp-1')).resolves.toBeUndefined()
+  test('reads the watch list through the subscription, because that is where tenancy is', () => {
+    expect(CODE).toContain("from('competitor_subscriptions')")
+    expect(CODE).toContain('display_name')
   })
 
-  test('adding refuses in the words the action maps to its not-collecting arm', async () => {
-    // `actions/radar.ts` matches on "not collecting" to tell a reader that
-    // retrying cannot help. If this wording moves, that arm goes silently dead.
+  test('reports watch-list-only, never reading, while the change feed is unbound', () => {
+    // `reading` means an empty feed genuinely says "nothing changed". Claiming it
+    // before the changes are queried would render silence as good news.
+    expect(CODE).toContain("collector: 'watch-list-only'")
+    expect(CODE).not.toContain("collector: 'reading'")
+  })
+
+  test('never invents a last-observed timestamp', () => {
+    // competitor_snapshots is empty for everyone. A `new Date()` here would be a
+    // fabricated reading of a competitor that has never been read.
+    expect(CODE).toContain('lastObservedAt: null')
+    expect(CODE).not.toMatch(/lastObservedAt:\s*(new Date|Date\.now)/)
+  })
+
+  test('refuses google_business by name, rather than storing something else', async () => {
+    // The screen's kinds are website | instagram | google_business; the registry's
+    // CHECK admits website | instagram | x | linkedin | facebook. `google_business`
+    // cannot be stored at all. Coercing it to `website` would tell a customer they
+    // are watching something they are not.
+    const { supabaseRadarStore } = await import('./store')
     await expect(
-      supabaseRadarStore().add('ws-1', { name: 'A', url: 'https://e.com', kind: 'website' }),
-    ).rejects.toThrow(/not collecting/)
+      supabaseRadarStore().add('ws-1', {
+        name: 'A Shop',
+        url: 'https://example.com',
+        kind: 'google_business',
+      }),
+    ).rejects.toThrow(/Google Business/)
+  })
+
+  test('the refusal happens BEFORE any client is opened', async () => {
+    // Proved by the test above passing at all: this environment has no Supabase
+    // env vars, so `createServerSupabase()` throws "missing or invalid env". A
+    // refusal that reached the client would surface that message instead, which
+    // is a different sentence and a worse one.
+    const { supabaseRadarStore } = await import('./store')
+    await expect(
+      supabaseRadarStore().add('ws-1', {
+        name: 'A Shop',
+        url: 'https://example.com',
+        kind: 'google_business',
+      }),
+    ).rejects.not.toThrow(/env/)
   })
 })
