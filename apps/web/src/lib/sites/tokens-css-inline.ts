@@ -401,11 +401,21 @@ export const TOKENS_CSS = `/* ==================================================
 
   /* ---------- L2 · LAYOUT ---------- */
   --sidebar-w: 240px; /* labelled rail, >=1180 */
-  --sidebar-w-collapsed: 68px; /* icon rail, 700-1179. Reference measured 62px. */
-  /* THE RAIL FLOATS. Measured on the reference: inset 10px from the viewport
-     on every side, radius 28px, so the page ground runs behind it. This is what
-     makes the rail read as an object on the page rather than a wall beside it. */
-  --rail-inset: 10px;
+  /* Icon rail, the 700-1179 band. The reference measures 62px at a 1844px
+     viewport; this is narrower because the constraint is different and it was
+     MEASURED, not chosen: the rail is no longer flush, so its grid column costs
+     its width PLUS two insets. At 68px + 2x10 that column took 88px where v4's
+     flush 64px rail took 64 — 24px removed from the content column, at the one
+     width where there is none to spare. The topbar overflowed by exactly 16px
+     at 700px and \`connections-widths.spec.ts\` caught it.
+     56 + 2x8 = 72px gives the 16px back and keeps the float visible. */
+  --sidebar-w-collapsed: 56px;
+  /* THE RAIL FLOATS. The reference measures a 10px inset; this is 8px for the
+     same reason the collapsed width is 56 — the inset is paid TWICE out of the
+     content column, and at 700px there are no spare pixels. Still a visible
+     float, and it is what makes the rail read as an object on the page rather
+     than a wall beside it. Radius 28px, measured. */
+  --rail-inset: 8px;
   --rail-r: var(--r-xl);
   --topbar-h: 60px;
   /* Widened from v4's 1080. The reference does not cap its content at all — at
