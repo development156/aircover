@@ -406,6 +406,38 @@ describe('abort is not an ending', () => {
   })
 })
 
+describe('a file that died before the click', () => {
+  /**
+   * The element preloads from the result step, so a file that cannot be fetched
+   * has usually already failed by the time Enter is pressed. Showing the overlay
+   * and holding it for the full start deadline would be 2.5s of a brand-coloured
+   * rectangle for somebody whose connection is already struggling.
+   */
+  test('is never shown, and lands on the dashboard at once', async () => {
+    Object.defineProperty(harness.video, 'error', {
+      configurable: true,
+      value: { code: 4, message: 'MEDIA_ELEMENT_ERROR' },
+    })
+
+    act(() => harness.start())
+
+    expect(harness.finishes).toEqual(['error'])
+    // Never displayed: the phase went straight from idle to finished.
+    expect(document.querySelector('[data-testid="phase"]')!.textContent).toBe('finished')
+    // And no deadline was left armed to fire a second ending later.
+    advance(30_000)
+    expect(harness.finishes).toEqual(['error'])
+  })
+
+  test('a healthy element is NOT short-circuited by the same check', async () => {
+    act(() => harness.start())
+    await settle()
+
+    expect(harness.finishes).toEqual([])
+    expect(document.querySelector('[data-testid="phase"]')!.textContent).toBe('playing')
+  })
+})
+
 describe('nothing to play', () => {
   test('start with no element mounted lands on the dashboard rather than hanging', async () => {
     const finishes: BootEndReason[] = []

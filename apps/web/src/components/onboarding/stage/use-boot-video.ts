@@ -164,6 +164,27 @@ export function useBootVideo({ onFinished }: UseBootVideoArgs) {
       return
     }
 
+    /**
+     * ALREADY DEAD, SO DO NOT SHOW IT AT ALL.
+     *
+     * The element preloads from the moment the result step is reached, which
+     * means a file that cannot be fetched has usually failed BEFORE this button
+     * is pressed — `video.error` is set and there is nothing to wait for.
+     *
+     * Without this the overlay still appears, covers the screen, and holds for
+     * the full 2.5s start deadline before giving up. The watchdog would rescue
+     * them, so it is not a dead end; it is two and a half seconds of a
+     * brand-coloured rectangle for somebody whose connection is already having a
+     * bad day. Finishing here costs them nothing and shows them nothing.
+     *
+     * MEASURED: 11,061ms → under 8s once the blocked-file test stopped letting
+     * the file cache before it blocked it.
+     */
+    if (video.error) {
+      finish('error')
+      return
+    }
+
     setPhase('playing')
     finishedRef.current = false
 

@@ -87,6 +87,22 @@ async function walkToResult(page: Page): Promise<void> {
   })
 }
 
+/**
+ * Read one of the stage's reported flags.
+ *
+ * ONLY VALID WHILE /onboarding IS STILL MOUNTED. `[data-boot-*]` lives on that
+ * page, so a read after the film has navigated to /home waits for a node that
+ * left with the document — MEASURED: the first draft called this for
+ * `data-boot-end` immediately after `waitForURL`, and the test sat on a
+ * successful dashboard until the 600s ceiling, with a page snapshot showing
+ * Home rendered correctly behind it. A hang that looks like a product defect
+ * and is a harness one.
+ *
+ * WHICH of the four endings fired is pinned per-ending in
+ * `use-boot-video.test.tsx`. What the browser is here to measure is the OUTCOME
+ * and the TIME, and the timings below are what separate the failure paths from
+ * each other and from a film that ran.
+ */
 const flag = (page: Page, name: string) =>
   page.locator(`[data-boot-${name}]`).getAttribute(`data-boot-${name}`)
 
@@ -187,7 +203,7 @@ test('onboarding → the film with sound → the dashboard, once', async ({ page
   await page.waitForURL(/\/home/, { timeout: 60_000 })
   const total = Date.now() - clickedAt
   // eslint-disable-next-line no-console
-  console.log(`ENTER→DASHBOARD (unthrottled): ${total}ms  end=${await flag(page, 'end')}`)
+  console.log(`ENTER→DASHBOARD (unthrottled): ${total}ms`)
   // The film is ten seconds. Landing much sooner would mean something cut it
   // short; much later would mean the dashboard was not ready behind it.
   expect(total).toBeGreaterThan(9_000)
@@ -199,9 +215,19 @@ test('onboarding → the film with sound → the dashboard, once', async ({ page
 
   /* ── AND NEVER AGAIN ── */
   await page.goto('/onboarding')
-  await pwExpect(page.getByRole('heading', { name: /teach Sahoda/i })).toBeVisible({
+  /**
+   * The RE-ENTRY branch, which is what a finished workspace gets — a different
+   * screen, not the nine-step flow with a button added. (`IntroStep` branches on
+   * `hasSavedBrain`.) Worth asserting here rather than only in the routing
+   * suite: that one seeds `brand_memory` directly, and this one arrives having
+   * genuinely walked and paid for the thing.
+   */
+  await pwExpect(page.getByRole('heading', { name: /your brand brain\s+is ready/i })).toBeVisible({
     timeout: 60_000,
   })
+
+  // The film is not offered a second time, and it is not merely hidden — the
+  // element is never mounted, so its 2.7 MB is never fetched again either.
   expect(await flag(page, 'plays')).toBe('no')
   await pwExpect(page.locator('[data-boot-video]')).toHaveCount(0)
 })
@@ -241,7 +267,16 @@ test('a second device with empty storage still never sees it again', async ({
   })
   const { token } = (await res.json()) as { token: string }
   await second.goto(`/sign-in?__clerk_ticket=${token}`)
-  await second.waitForURL((url) => !url.pathname.startsWith('/sign-in'), { timeout: 60_000 })
+  /**
+   * WAIT FOR /home, NOT MERELY FOR "NOT /sign-in".
+   *
+   * Clerk returns to `/`, and `/` is its own redirect to /home — so a wait that
+   * only asks to have left /sign-in resolves on the intermediate hop and reads
+   * the URL as "/". MEASURED: it did, and the failure said `Expected "/home",
+   * Received "/"`, which looks like the landing rule misfiring and is the test
+   * sampling one hop early.
+   */
+  await second.waitForURL(/\/home/, { timeout: 60_000 })
 
   // Signed in fresh, on a device that has never held a byte of this app's
   // storage: straight to the dashboard, and no film.
@@ -250,9 +285,9 @@ test('a second device with empty storage still never sees it again', async ({
   await pwExpect(second.locator('[data-boot-video]')).toHaveCount(0)
 
   await second.goto('/onboarding')
-  await pwExpect(second.getByRole('heading', { name: /teach Sahoda/i })).toBeVisible({
-    timeout: 60_000,
-  })
+  await pwExpect(second.getByRole('heading', { name: /your brand brain\s+is ready/i })).toBeVisible(
+    { timeout: 60_000 },
+  )
   expect(await flag(second, 'plays')).toBe('no')
 
   await context.close()
@@ -260,47 +295,88 @@ test('a second device with empty storage still never sees it again', async ({
 
 /* ══════════════════════════════════════════ every way it can fail ═════ */
 
-test('a blocked video file lands on the dashboard, not a black screen', async ({ page }) => {
+test('a blocked video file lands on the dashboard, not a black screen', async ({
+  page,
+  signedIn,
+}) => {
+  // `signedIn` is requested even where its value is unused: Playwright only runs
+  // a fixture a test ASKS for, so omitting it does not sign in — it leaves the
+  // run on /sign-in, where the failure names a missing button and looks like a
+  // product defect. This file lost three tests to it after the routing suite had
+  // already been fixed for the same reason.
+  void signedIn
+
+  /**
+   * THE ROUTE IS INSTALLED FIRST, AND THAT IS THE WHOLE TEST.
+   *
+   * MEASURED: with this line AFTER `walkToResult`, blocking the file took
+   * 11,061ms to reach the dashboard — the film's own ten seconds. The element is
+   * mounted at the result step with `preload="auto"`, so by the time the handler
+   * existed the 2.7 MB was already fetched and cached, and the "blocked" run
+   * played the video normally. The assertion was `< 15s`, so it PASSED while
+   * exercising nothing at all.
+   *
+   * Installed here, the abort lands on the preload — which is also what actually
+   * happens to a customer whose connection cannot fetch it.
+   */
+  await page.route('**/sahodaboot.mp4', (route) => route.abort('failed'))
+
   await createWorkspace(page)
   await walkToResult(page)
-
-  // The file is unreachable. Nobody chose to skip; the film failed.
-  await page.route('**/sahodaboot.mp4', (route) => route.abort('failed'))
 
   const clickedAt = Date.now()
   await page.getByRole('button', { name: /enter sahoda/i }).click()
   await page.waitForURL(/\/home/, { timeout: 30_000 })
   const took = Date.now() - clickedAt
   // eslint-disable-next-line no-console
-  console.log(`BLOCKED FILE → dashboard in ${took}ms, end=${await flag(page, 'end')}`)
+  console.log(`BLOCKED FILE → dashboard in ${took}ms`)
 
-  // Bounded, and well inside the 2.5s deadline because `error` is immediate.
-  expect(took).toBeLessThan(15_000)
+  /**
+   * FAST, and the number matters. `error` has already fired on the preload by
+   * the time Enter is pressed, so `start()` sees a dead element and finishes
+   * without ever showing the overlay — nobody watches a black rectangle waiting
+   * for a deadline to expire. What is left is the save and the navigation.
+   *
+   * Well under the film's ten seconds, which is what the old assertion could not
+   * tell apart.
+   */
+  expect(took).toBeLessThan(8_000)
   await pwExpect(page.getByText(/available credits/i)).toBeVisible({ timeout: 30_000 })
   // No error, no blank screen — the dashboard, with the Brand Brain saved.
   await pwExpect(page.getByText(/something went wrong|could not/i)).toBeHidden()
   await shoot(page, 'boot-04-blocked-file-dashboard-1440-light')
 })
 
-test('a video that stalls lands on the dashboard after the timeout', async ({ page }) => {
-  await createWorkspace(page)
-  await walkToResult(page)
+test('a video that stalls lands on the dashboard after the timeout', async ({ page, signedIn }) => {
+  // `signedIn` is requested even where its value is unused: Playwright only runs
+  // a fixture a test ASKS for, so omitting it does not sign in — it leaves the
+  // run on /sign-in, where the failure names a missing button and looks like a
+  // product defect. This file lost three tests to it after the routing suite had
+  // already been fixed for the same reason.
+  void signedIn
 
   /**
    * THE REQUEST NEVER ANSWERS. Not an abort — an abort produces `error`, which
    * is a different watchdog. This is the connection that accepts the request and
    * then says nothing, which only the START DEADLINE can see.
+   *
+   * Installed BEFORE the walk for the same measured reason as the test above:
+   * the element preloads at the result step, so a handler added afterwards finds
+   * the file already in cache and the film plays as normal.
    */
   await page.route('**/sahodaboot.mp4', () => {
     /* deliberately never fulfilled */
   })
+
+  await createWorkspace(page)
+  await walkToResult(page)
 
   const clickedAt = Date.now()
   await page.getByRole('button', { name: /enter sahoda/i }).click()
   await page.waitForURL(/\/home/, { timeout: 30_000 })
   const took = Date.now() - clickedAt
   // eslint-disable-next-line no-console
-  console.log(`STALLED → dashboard in ${took}ms, end=${await flag(page, 'end')}`)
+  console.log(`STALLED → dashboard in ${took}ms`)
 
   // The deadline is 2.5s from the click. Allow for the save and the navigation,
   // but it must be nothing like the film's ten seconds.
@@ -310,7 +386,14 @@ test('a video that stalls lands on the dashboard after the timeout', async ({ pa
   await shoot(page, 'boot-05-stalled-dashboard-1440-light')
 })
 
-test('prefers-reduced-motion never mounts it at all', async ({ page }) => {
+test('prefers-reduced-motion never mounts it at all', async ({ page, signedIn }) => {
+  // `signedIn` is requested even where its value is unused: Playwright only runs
+  // a fixture a test ASKS for, so omitting it does not sign in — it leaves the
+  // run on /sign-in, where the failure names a missing button and looks like a
+  // product defect. This file lost three tests to it after the routing suite had
+  // already been fixed for the same reason.
+  void signedIn
+
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await createWorkspace(page)
   await walkToResult(page)
