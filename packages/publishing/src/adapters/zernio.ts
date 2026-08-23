@@ -244,7 +244,7 @@ export function createZernioAdapter(channel: Channel, deps: ZernioAdapterDeps): 
         // Belt and braces with the Constraint Engine's MEDIA_REQUIRED. Reaching the
         // network to be told so wastes an attempt against a per-day cap.
         throw fail(
-          `${channel} needs at least one photo — there is no text-only post.`,
+          `${channel} needs at least one photo. There is no text-only post.`,
           'MEDIA_REQUIRED',
           'permanent',
         )

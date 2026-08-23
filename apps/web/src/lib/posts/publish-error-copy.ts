@@ -51,7 +51,7 @@ const COPY: Record<string, PublishErrorDisplay> = {
 
   // ── The content ────────────────────────────────────────────────────────────
   MEDIA_REQUIRED: {
-    message: 'Instagram needs at least one photo — there is no text-only post.',
+    message: 'Instagram needs at least one photo. There is no text-only post.',
     worthRetrying: false,
     needsReconnect: false,
   },

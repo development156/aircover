@@ -73,7 +73,7 @@ export function withFormat(meter: ChannelMeter, refusal: FormatRefusal | null): 
 
   // ── ONE PROBLEM, ONE SENTENCE ───────────────────────────────────────────────
   // MEASURED in a 1440 screenshot of an Instagram carousel with nothing
-  // attached: the card showed BOTH "Instagram needs at least one photo — there
+  // attached: the card showed BOTH "Instagram needs at least one photo. There
   // is no text-only post." and "A set needs at least two images." Two rules, two
   // sources, and to the person reading them one problem — there are no photos.
   //

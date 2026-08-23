@@ -103,7 +103,7 @@ export function refuseFormat(
     // a sentence about their choice rather than about a missing file.
     return {
       code: 'FORMAT_NEEDS_MEDIA',
-      message: `${channel} has no text-only post — this one needs at least one photo.`,
+      message: `${channel} has no text-only post. This one needs at least one photo.`,
     }
   }
 
@@ -118,7 +118,7 @@ export function refuseFormat(
         code: 'FORMAT_NEEDS_MEDIA',
         message:
           format === 'story'
-            ? 'A story is a picture — this one has none attached.'
+            ? 'A story is a picture. This one has none attached.'
             : 'This was written as a photo post but has no image attached.',
       }
     }
@@ -137,7 +137,7 @@ export function refuseFormat(
     if (format === 'image' || format === 'story') {
       return {
         code: 'FORMAT_CONTRADICTED',
-        message: `This was written as a single photo but has ${mediaCount} attached — choose a set instead.`,
+        message: `This was written as a single photo but has ${mediaCount} attached. Choose a set instead.`,
       }
     }
     // The engine's own sentence for this code, deliberately word for word, so
@@ -187,6 +187,6 @@ export function refuseFormatMedia(
   // wrong twice over — the article and the case — and it rendered exactly like that.
   return {
     code: 'FORMAT_MEDIA_ASPECT',
-    message: `A story is taller than it is wide — this photo is ${aspect.toFixed(2)}:1. Crop it upright, or post it to the feed instead.`,
+    message: `A story is taller than it is wide. This photo is ${aspect.toFixed(2)}:1. Crop it upright, or post it to the feed instead.`,
   }
 }
