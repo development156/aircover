@@ -416,6 +416,7 @@ silently absorbed.
 | · shell bound | rendered DOM | the excluded half of the `#main` scoping growing | (bound only; found the topbar's chip on its first run) |
 | · doubled prefix | rendered text | `Sahoda: Sahoda:` | reintroducing the prefix in `ReadinessLine` |
 | · pixel ceiling | composited pixels | accent spend past a per-route, per-width ceiling | lowering `/analytics@1440` to 0.40 |
+| `page-dash-frames.spec.ts` · stylesheet | composited pixels | a frame whose CSS never loaded | raising the light-vs-dark floor to 240 against a real gap of 225 |
 | `accent-spend.ts` | instrument | — | (measures; asserts nothing on its own) |
 | `readiness.test.ts` | pure | a remedy offered where none can work; a failure claimed where none happened | — |
 | `started.test.ts` | pure | an unreadable read being mistaken for an absence | — |
@@ -489,3 +490,27 @@ to a query over the whole render and three `1/2`s counted as six. The tests scop
 the table rather than de-duplicating, because the claim they make is about the
 comparison table's per-metric denominator. Anything that mounts two renderings for
 two bands has this property, and a jsdom query cannot tell them apart.
+
+---
+
+## 10 · The check a peer lane's failure added
+
+While this lane's gate was running, another recorded that **its capture spec
+reported green over 34 unstyled PNGs**. Every assertion a camera normally makes
+survived a stylesheet that never loaded: the frame COUNT was right, the shas were
+DISTINCT — unstyled pages still differ from each other — and the theme label read
+back correctly, because `data-theme` is an attribute and an attribute needs no CSS.
+
+`page-dash-frames.spec.ts` asserted exactly those three things and would have
+reported the same green. This pass is vouched for by 48 frames having been opened
+and looked at; the next person to run the camera would have had no such evidence.
+
+**The check is light AGAINST dark rather than a threshold**, and the difference is
+the point: an unstyled page renders white in *both* themes, so a per-frame
+threshold catches it in dark and cannot catch it in light, where `--canvas` is
+`#fafafa` and sits four points from the browser's own default. Comparing the two
+themes of the same route and width needs no absolute number at all — if the
+stylesheet did not load, the pair collapses onto one value.
+
+MEASURED across the twelve pairs: the smallest real gap is **225** (light 248 · dark
+23) against a floor of **40**. Shown red by raising the floor to 240.
