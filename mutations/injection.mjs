@@ -20,7 +20,13 @@ export default {
     {
       name: 'the turn marker loses `human` again — half the pair walks through',
       cwd: 'packages/research',
-      command: `${RESEARCH} && cd ../../apps/web && ${WEB}`,
+      // Research's own suite alone, not chained into apps/web's. A `&&` chain
+      // short-circuits on the first failure, so the summary this harness prints
+      // would be the FIRST suite's line — a passing one, beside a KILLED verdict
+      // driven by the second. The verdict was right and the evidence beside it
+      // would have read as a contradiction, which is the last thing a mutation
+      // report can afford.
+      command: RESEARCH,
       file: 'packages/research/src/quarantine.ts',
       find: '/^\\s*(system|assistant|user|human)\\s*:/gim',
       replace: '/^\\s*(system|assistant|user)\\s*:/gim',

@@ -512,7 +512,8 @@
         <strong>Not live today, and the brief's framing needs one correction.</strong>
         <code>supabaseRadarStore.add()</code> still throws <em>"not collecting"</em>, and
         <code>app.radar_subscribe</code> is <code>service_role</code> only — so no signed-in account
-        can reach that door yet, and all seven radar tables are empty in production. The hole arms
+        can reach that door yet. Six of the seven radar tables hold nothing at all in production and
+        the seventh, <code>radar_limits</code>, holds only its single config row. The hole arms
         itself the day wt-radar binds that store.
       </p>
       <p>
