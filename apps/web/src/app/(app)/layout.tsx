@@ -1,74 +1,48 @@
-import { redirect } from 'next/navigation'
 import { Toaster } from 'sonner'
 
 import { hasDeferredOnboarding } from '@/lib/onboarding/defer'
-import { landingRedirect } from '@/lib/onboarding/landing'
+import { landingDecision } from '@/lib/onboarding/landing'
 import { onboardingStateRead } from '@/lib/onboarding/read-onboarding-state'
 import { activeWorkspaceRead } from '@/lib/workspaces'
 
+import { FirstRun } from '@/components/home/first-run'
 import { BottomNav } from '@/components/shell/bottom-nav'
 import { Rail } from '@/components/shell/rail'
 import { Topbar } from '@/components/shell/topbar'
 
 /**
- * THE LANDING RULE — a new user lands in onboarding, not on the dashboard.
+ * NO WORKSPACE — THE FIRST-RUN SCREEN, EVERYWHERE, IN PLACE OF THE PAGE.
  *
- * ── WHERE IT LIVES, AND WHY HERE ─────────────────────────────────────────────
- * Every authenticated page of the product is inside `(app)`, and this layout is
- * the one thing all of them pass through. `middleware.ts` was the other
- * candidate and is the wrong one twice over: it decides whether a caller is
- * SIGNED IN, which is a different question, and it runs on the edge, where
- * answering "does this workspace have a Brand Brain" means a database round trip
- * on every request for a static asset that slipped the matcher.
+ * ── THE DEAD END THIS CLOSES ─────────────────────────────────────────────────
+ * Every read on every route under `(app)` short-circuits on a null workspace, so
+ * what these pages render for such an account is a grid of empty cards offering
+ * remedies it cannot carry out. A peer found the sharp version: /analytics told
+ * a workspace-less account to connect a channel. /home and /wallet had each
+ * already fixed their own copy of this; fixing the rest one page at a time is
+ * how the next new route inherits it.
  *
- * ── WHAT IT IS NOT ───────────────────────────────────────────────────────────
- * This is a LANDING rule, not access control, and the distinction is worth
- * stating because the code cannot: React re-uses a layout across a client-side
- * navigation between two routes that share it, so this runs on the load that
- * MOUNTS the shell — a sign-in, a typed URL, a refresh, a full-page redirect —
- * and not on every `<Link>` press afterwards. That is exactly the behaviour the
- * ruling asks for. It is not a wall, and nothing here should ever be relied on
- * as one: `auth.protect()` in middleware and RLS in the database are what decide
- * who may see what, and both are untouched.
+ * ── WHY REPLACE AND NOT REDIRECT ─────────────────────────────────────────────
+ * There is no workspace-less URL to send them to — /home is inside this same
+ * layout, so a redirect to it loops unless the layout also knows the current
+ * path, which a server layout does not. Replacing the content is also strictly
+ * MORE certain: it covers every route in the group including ones not written
+ * yet, at whatever URL was typed. See `lib/onboarding/landing.ts`.
  *
- * ── THE FOUR CASES ───────────────────────────────────────────────────────────
- *   never onboarded  → /onboarding. First screen of the product.
- *   mid-way          → /onboarding, and the stage restores the step they left
- *                      from localStorage on mount. The server cannot tell these
- *                      two apart and does not need to: same URL, different
- *                      screen, decided by the browser that holds the answer.
- *   completed        → straight through. Nothing sends them back into the flow.
- *   no workspace     → /onboarding, which is where the create-workspace remedy
- *                      lives. This is the case a peer found broken: a
- *                      workspace-less account reading /analytics was told to
- *                      connect a channel, an instruction it cannot carry out.
- *                      Every such page is now unreachable in that state rather
- *                      than individually re-worded.
+ * The shell stays around it, and that is the other half of not being a dead
+ * end: the topbar's user menu is where signing out lives.
  *
- * And a fifth that is deliberately NOT a case: `unreadable`. A failed read is
- * not a fact about the account, and moving somebody on it would be the "one
- * null, two meanings" defect wearing a redirect. They stay where they are and
- * the page's own honest-absence states do their job.
- *
- * ── THE ESCAPE HATCH IS THE PRODUCT'S OWN BUTTON ─────────────────────────────
- * `Save & exit` calls `deferOnboarding()`, which sets a SESSION cookie, and this
- * gate stands down while it is set. Without that the button would push /home,
- * this would bounce it back to /onboarding, and wt-onboard2's feature would be
- * gone. The cookie dies with the browser session, so the next sign-in lands them
- * in the flow again — which is the ruling, not a loophole in it.
+ * ── WHAT IS NOT HERE ─────────────────────────────────────────────────────────
+ * The other half of the ruling — a new user LANDS in onboarding — is in
+ * `home/page.tsx`, because /home is where landing happens: Clerk returns to `/`
+ * after sign-in and `/` redirects there. Putting it in this layout would bounce
+ * every typed URL and every refresh, which is more than the ruling asks and is
+ * not what "lands" means.
  */
-async function routeNewAccountsToOnboarding(): Promise<void> {
-  // Cheap and local; asked first so a visit that has already deferred costs no
-  // query at all.
-  const deferred = await hasDeferredOnboarding()
-  if (deferred) return
-
-  const state = await onboardingStateRead()
-  // The decision itself is `lib/onboarding/landing.ts` — a pure function, so
-  // every one of its five cases is executed by a test rather than only by a
-  // browser. This file is the wiring.
-  const target = landingRedirect(state.status, deferred)
-  if (target) redirect(target)
+async function decideLanding(): Promise<'through' | 'first-run'> {
+  const [deferred, state] = await Promise.all([hasDeferredOnboarding(), onboardingStateRead()])
+  // The decision is `lib/onboarding/landing.ts` — pure, so every one of its
+  // eight combinations is executed by a test rather than only by a browser.
+  return landingDecision(state.status, deferred).kind === 'first-run' ? 'first-run' : 'through'
 }
 
 /**
@@ -88,7 +62,7 @@ async function routeNewAccountsToOnboarding(): Promise<void> {
  * control, the one at the end of the list, on exactly one device.
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  await routeNewAccountsToOnboarding()
+  const landing = await decideLanding()
 
   /**
    * Only the phone's FAB needs this, and only to decide whether to paint the
@@ -121,7 +95,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           id="main"
           className="mx-auto w-full max-w-content p-page max-narrow:p-page-mobile max-narrow:pb-[76px]"
         >
-          {children}
+          {/* THE PAGE IS REPLACED, NOT DEGRADED. An account with no workspace
+              has nothing any of these routes can read — every one of them
+              short-circuits on a null workspace — so what they would render is
+              a grid of empty cards with remedies that cannot be carried out.
+              `id="main"` stays on the wrapper, so the bootstrap button keeps
+              the one selector this app's tests and its skip link both use. */}
+          {landing === 'first-run' ? <FirstRun now={new Date()} /> : children}
         </main>
       </div>
       <BottomNav hasWorkspace={workspace.status !== 'none'} />
