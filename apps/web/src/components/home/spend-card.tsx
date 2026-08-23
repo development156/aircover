@@ -6,6 +6,7 @@ import { CountUp } from '@/components/motion/count-up'
 import { Unreadable } from '@/components/design-system/absence-row'
 import type { SpendRead } from '@/lib/home/spend'
 
+import { CoverageNote } from './chart-empty'
 import { SpendBars } from './spend-bars'
 
 /**
@@ -29,13 +30,30 @@ import { SpendBars } from './spend-bars'
  * thing that is coming and the window's real ends, which is the difference
  * between "not yet" and "broken". See the component.
  *
- * ── THE SPARSE FLOOR IS UNCHANGED, AND IT MOVED HOUSE ────────────────────────
- * Three active days, because two points are a straight line between them and
- * say nothing the number does not say better. That floor used to live inside
- * `SpendArea`, which meant the CARD could not know whether its chart had drawn
- * anything and rendered a header for a chart that had refused. It is decided
- * here now, once, by the thing that is empty — the same restructure this file's
- * previous note describes for the two-empty-states defect.
+ * ── THE THREE-DAY FLOOR IS GONE, AND THAT IS NOT A LOOSENING ────────────────
+ * `SpendArea` refused to draw below three active days, and its reason was
+ * exact: "two points are a straight line between them, which implies a rate of
+ * change nothing supports", MEASURED as "29 points at an identical y and one
+ * spike at the right edge — it reads as a rendering fault rather than as a
+ * chart".
+ *
+ * Every word of that is an argument about a LINE. A line interpolates: it draws
+ * ink where no reading exists, between the points, and with one active day in
+ * thirty almost all of its ink is interpolation. Bars do not interpolate. Thirty
+ * bars where one is tall and twenty-nine are baseline stubs is a completely
+ * readable statement — "you spent on one day" — and it is exactly what the
+ * reference's own hours-by-day chart looks like on a quiet fortnight.
+ *
+ * So the floor was never about how much data there is. It was about the shape
+ * doing the drawing, and the shape changed. The CAPTION still says how many
+ * days had activity, because "one day" is what stops a reader inferring a trend
+ * from a single spike — the floor's real job, kept, now stated in words instead
+ * of by withholding the chart.
+ *
+ * MEASURED before this: `page-dash-after__populated__home__full__1440__light`
+ * showed the panel as a number, one sentence, ~90px of nothing, and a dotted
+ * baseline — which is a designed apology and still an apology. It now shows the
+ * one day that was spent on.
  *
  * ── BARS, NOT AN AREA ────────────────────────────────────────────────────────
  * Every one of the thirty days is MEASURED: the ledger was read for the whole
@@ -51,9 +69,6 @@ import { SpendBars } from './spend-bars'
  * `unreadable` is an absence. `empty` is `rows.length === 0` after a SUCCESSFUL
  * read, which means the true answer is zero and we know it.
  */
-
-/** Below this there is no shape to read, only a number. */
-const MIN_ACTIVE_DAYS = 3
 
 /** The single category's own label, lower-cased to sit inside a sentence. */
 function oneLabel(spend: SpendRead): string {
@@ -75,7 +90,9 @@ function dayLabel(iso: string): string {
 export function SpendCard({ spend }: { spend: SpendRead }) {
   const readable = spend.status !== 'unreadable'
   const activeDays = spend.days.filter((day) => day.credits > 0).length
-  const hasShape = spend.status === 'ok' && activeDays >= MIN_ACTIVE_DAYS
+  // Every day in the window was READ, so every day is a measured value. The
+  // chart draws whenever there is a window; only a failed read has nothing.
+  const hasChart = spend.status === 'ok' && spend.days.length > 0
   const from = spend.days[0] ? dayLabel(spend.days[0].date) : undefined
   const to = spend.days[spend.days.length - 1]
     ? dayLabel(spend.days[spend.days.length - 1]!.date)
@@ -120,14 +137,32 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
         )}
       </p>
 
-      {hasShape ? (
+      {hasChart ? (
         <>
           <Bars points={points} unit="credits" />
+          {/* THE FLOOR'S REAL JOB, IN WORDS. One tall bar in thirty is honest
+              and it is not a trend, so the caption says how many days had
+              activity rather than the chart withholding itself. Above three the
+              shape speaks for itself and this line is not rendered. */}
+          {activeDays > 0 && activeDays < 3 ? (
+            <p className="type-meta text-muted">
+              {activeDays === 1 ? 'One day' : `${activeDays} days`} with activity so far — not
+              enough to read as a trend.
+            </p>
+          ) : null}
           {/* ── A TOTAL AND ITS ONLY CATEGORY ARE THE SAME NUMBER ───────────
               With one category the breakdown restates the figure already
               printed above it. So the single category is NAMED rather than
               tabulated, which says the extra thing the figure could not (what
               the spend was for) without saying the number again. */}
+          {/* ── THE CAP, RESTORED ────────────────────────────────────────────
+              The rewrite dropped this and nothing caught it: the note lived
+              inside `SpendArea`, so replacing the chart took the sentence with
+              it. `readSpend` truncates OLDEST-FIRST past its row limit, so a
+              capped window silently begins later than the reader assumes and
+              the total under-reports. It names the DATE, never a row count —
+              "from 12 Jul" is something a person can reason about. */}
+          <CoverageNote coveredFrom={spend.capped ? spend.coveredFrom : null} />
           {spend.byAction.length === 1 ? (
             <p className="type-meta text-muted">All of it on {oneLabel(spend)}.</p>
           ) : (
@@ -136,13 +171,9 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
         </>
       ) : (
         <ChartSparse from={from} to={to}>
-          {!readable
-            ? 'Sahoda could not read your spending just now. Nothing has been charged, and reloading will try again.'
-            : activeDays === 0
-              ? 'Nothing spent yet. Your first AI action shows up here, broken down by what it was for.'
-              : `A shape needs a few days with activity. So far ${
-                  activeDays === 1 ? 'one day has' : `${activeDays} days have`
-                }${spend.byAction.length === 1 ? `, all of it on ${oneLabel(spend)}` : ''}.`}
+          {readable
+            ? 'Nothing spent yet. Your first AI action shows up here, broken down by what it was for.'
+            : 'Sahoda could not read your spending just now. Nothing has been charged, and reloading will try again.'}
         </ChartSparse>
       )}
     </Panel>

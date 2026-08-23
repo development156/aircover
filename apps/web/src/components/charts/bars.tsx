@@ -59,9 +59,6 @@ export interface BarPoint {
   hatched?: boolean
 }
 
-/** Below this there is no shape to read, only numbers. Same floor as SpendArea. */
-export const MIN_BARS_MEASURED = 3
-
 export function Bars({
   points,
   /** What one bar is a quantity OF. Goes into the accessible summary. */

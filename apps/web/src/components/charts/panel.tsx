@@ -106,40 +106,22 @@ export function ChartSparse({
 }
 
 /**
- * The legend: coloured dots with counts, and the total at the far right.
+ * ── WHERE `Legend` AND `Direction` WERE, AND WHY THEY ARE NOT ────────────────
+ * Two more primitives were written for this kit and then deleted rather than
+ * shipped: a legend of coloured dots with counts and a right-aligned total
+ * (Nixtio's shape), and a `Direction` component rendering a triangle glyph plus
+ * a word so that up and down never rest on hue.
  *
- * Nixtio's shape, and its `Total: 284` in the trailing corner is the part worth
- * taking — a legend that also answers "how many altogether" saves the reader
- * adding four numbers a chart already knows.
+ * NOTHING ON EITHER SCREEN NEEDED THEM. There is no chart here with two series
+ * to distinguish — the hatch that separates simulated from measured carries its
+ * own label by construction (`Bars`' `hatchLabel`), which is the one case a
+ * legend would have served. And there is no prior-period reading anywhere on
+ * /home or /analytics to difference against, so a direction component could
+ * only ever have been handed one number and asked to imply a second.
  *
- * `swatch` is a className, not a colour, so every caller spends a token and
- * `design-lint` rule 1 keeps holding. A `hatched` entry takes `is-simulated`
- * and therefore carries its own label by construction.
+ * A primitive with a confident comment and no call site is the worst thing to
+ * leave in this codebase: the next reader takes the comment as a description of
+ * what ships. The RULE they existed to keep is unaffected and is kept the
+ * simpler way — no hue-coded up/down was introduced, so there is nothing for a
+ * glyph to rescue. Rebuild them from this note when a chart earns one.
  */
-export function Legend({
-  items,
-  total,
-}: {
-  items: readonly { label: string; count: number | null; swatch: string }[]
-  total?: { label: string; value: number } | null
-}) {
-  return (
-    <ul className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      {items.map((item) => (
-        <li key={item.label} className="flex items-center gap-2 type-meta text-muted">
-          <span aria-hidden className={cn('size-2 flex-none rounded-full', item.swatch)} />
-          {item.label}
-          {item.count !== null ? (
-            <span className="num font-semibold text-ink">{item.count.toLocaleString('en-IN')}</span>
-          ) : null}
-        </li>
-      ))}
-      {total ? (
-        <li className="ml-auto type-meta text-muted">
-          {total.label}{' '}
-          <span className="num font-semibold text-ink">{total.value.toLocaleString('en-IN')}</span>
-        </li>
-      ) : null}
-    </ul>
-  )
-}

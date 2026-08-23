@@ -132,9 +132,14 @@ export function PerformanceStrip({
       <div className="flex items-center justify-between gap-3">
         <h2 className="type-h3">Performance</h2>
         {detailsLink ? (
+          /* MUTED, not accent. docs/37 §2.3 spends the orange on the one
+             thing the screen is for, and on /home that is `Create post`. This
+             was a second brand-coloured target 400px below it, and it is the
+             same "View all"/"See activity" job every other card head does in
+             `--ink-mute`. One fewer accent region, no information lost. */
           <Link
             href="/analytics"
-            className="card-link rounded-sm type-meta font-semibold text-accent transition-micro hover:underline"
+            className="card-link rounded-sm type-meta font-[550] text-muted transition-micro hover:text-accent"
           >
             Details
           </Link>
@@ -146,9 +151,18 @@ export function PerformanceStrip({
            The slots are named rather than drawn, so the reader still learns
            WHAT this product measures — which is the whole argument for keeping
            the container — without four separate absences claiming it. */
-        <p className="flex flex-wrap items-baseline gap-x-2 type-body text-muted">
-          <Unmeasured what="Reach, views, accounts engaged and interactions" />
-          <span>Reach, views, accounts engaged and interactions — not measured yet.</span>
+        /* NO `Unmeasured` MARK HERE, and that is a departure worth stating.
+           The mark exists for a SLOT — a real container whose reading has not
+           arrived — and it carries the accessible name a bare em dash cannot.
+           There is no slot in this branch: there is a sentence, and the
+           sentence is the claim, legible to a screen reader and to the eye
+           alike. MEASURED on the after-frame, the mark rendered as a 14x2 rule
+           immediately before a sentence that already contains an em dash, so
+           the line opened with two different dashes meaning two different
+           things. The mark is right where four numbers would otherwise be; it
+           is noise in front of a sentence that says more than it does. */
+        <p className="type-body text-muted">
+          Reach, views, accounts engaged and interactions — not measured yet.
         </p>
       ) : (
         <dl className="grid grid-cols-4 gap-x-4 gap-y-3 max-wide:grid-cols-2 max-narrow:grid-cols-2">

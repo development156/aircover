@@ -75,7 +75,13 @@ export function NeedsAttention({ posts }: { posts: DisplayPost[] }) {
           here.
         </p>
       ) : (
-        <ul className="grid gap-3 p-4 wide:grid-cols-2">
+        /* `wide:grid-cols-2` UNCONDITIONALLY put a single waiting post in
+           column one of two and left the other half of an 870px card empty —
+           visible on `page-dash-after__populated__home__full__1440__light` as a
+           430px row in an 870px box, which reads as a card that failed to
+           finish rather than as a queue with one thing in it. Two columns need
+           two items. */
+        <ul className={`grid gap-3 p-4${waiting.length > 1 ? ' wide:grid-cols-2' : ''}`}>
           {waiting.slice(0, 4).map((post) => (
             <li key={post.id}>
               <Link

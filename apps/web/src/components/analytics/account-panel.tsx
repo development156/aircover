@@ -61,7 +61,10 @@ export function AccountPanel({
     return (
       <Panel className="space-y-3">
         <PanelHead title="Instagram account" />
-        <CardEmpty align="start" body="Followers and reach appear here once an account is linked." />
+        <CardEmpty
+          align="start"
+          body="Followers and reach appear here once an account is linked."
+        />
       </Panel>
     )
   }

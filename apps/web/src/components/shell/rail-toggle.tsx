@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 /**
  * Collapse and expand the rail. Founder's ruling: it OPENS COLLAPSED.
@@ -69,7 +69,12 @@ export function RailToggle() {
     }
   }, [])
 
-  const Icon = expanded ? PanelLeftClose : PanelLeftOpen
+  /* A CHEVRON, not a panel glyph. MEASURED on the after-frame at 1440: the
+     26px `PanelLeftOpen` rectangle read as a stray square sitting on the rail's
+     edge — a picture of a sidebar, at a size where it is four grey lines. A
+     chevron pointing the way the rail will move is the one shape that needs no
+     legend, and it is what the reference uses. */
+  const Icon = expanded ? ChevronLeft : ChevronRight
 
   return (
     <button
@@ -80,15 +85,38 @@ export function RailToggle() {
       aria-expanded={expanded}
       aria-controls="rail-nav"
       aria-label={expanded ? 'Collapse the menu' : 'Expand the menu'}
+      /* ── ITS TOKENS ARE THE RAIL'S, NOT THE PAGE'S ────────────────────────
+         The button is mounted on the rail's OUTER wrapper so the panel's
+         `overflow-hidden` cannot slice it — which also puts it OUTSIDE the
+         `data-surface="inverse"` scope. Without this attribute `bg-surface` is
+         the page's white and `text-ink` is black, so in light the control is a
+         white dot on a white page, and in dark it inverts to the opposite
+         mistake. This is the exact trap tokens.css's inverse-surface note
+         describes, arriving from a third direction.
+
+         Declaring the scope on the button itself is the fix rather than
+         hand-picking two colours: the control belongs to the rail, so it takes
+         the rail's ladder. */
+      data-surface="inverse"
       className={[
-        // Straddles the rail's right edge, vertically centred. `z-1` so it sits
-        // over the page's content edge rather than under it.
-        'absolute top-1/2 right-0 z-1 grid size-[26px] -translate-y-1/2 translate-x-1/2 place-items-center',
-        // A pill, like every other control (docs/37 §5). Solid, not glass: it
-        // overlaps two different grounds at once and a translucent control
-        // would take a different colour on each half.
-        'rounded-full bg-surface-3 text-ink-mute shadow-[0_0_0_1px_var(--canvas)]',
-        'transition-micro hover:bg-surface-2 hover:text-ink',
+        /* Centred ON the rail's edge, not in the gutter beside it.
+           `right-rail-inset` backs out the wrapper's own 8px padding so
+           `translate-x-1/2` lands the button's centre on the panel's border —
+           the reference's placement, where the control reads as belonging to
+           the rail rather than floating next to it. `z-1` so it sits over the
+           page's content edge. */
+        'absolute top-1/2 right-rail-inset z-1 grid size-[24px] -translate-y-1/2 translate-x-1/2 place-items-center',
+        /* A pill, like every other control (docs/37 §5). Solid, not glass: it
+           overlaps two different grounds at once and a translucent control
+           would take a different colour on each half.
+
+           `--surface-3` (#292929 in this scope) rather than the rail's own
+           `--surface`: the dot has to separate from the RAIL on its left as
+           well as from the page on its right, and a fill equal to the panel
+           would leave it edgeless on that side. The white chevron carries the
+           contrast either way — 12:1 on #292929. */
+        'rounded-full bg-surface-3 text-ink ring-1 ring-line-firm',
+        'transition-micro hover:bg-surface-2',
         'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
         /* ── HIDDEN BELOW 1180, AND THAT IS THE POINT ──────────────────────
            Between 700 and 1179 the rail is collapsed BY THE MEDIA QUERY, and
@@ -105,7 +133,7 @@ export function RailToggle() {
         'max-wide:hidden',
       ].join(' ')}
     >
-      <Icon size={14} strokeWidth={1.9} aria-hidden />
+      <Icon size={13} strokeWidth={2.4} aria-hidden />
     </button>
   )
 }

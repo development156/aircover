@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 
-import { SpendArea } from './spend-area'
 import { SpendBars } from './spend-bars'
 import type { SpendRead } from '@/lib/home/spend'
 
@@ -34,97 +33,32 @@ const spend = (over: Partial<SpendRead> = {}): SpendRead => ({
   ...over,
 })
 
-describe('SpendArea', () => {
-  test('draws an area and a line when there is data', () => {
-    render(<SpendArea spend={spend()} />)
-
-    expect(screen.getByTestId('spend-area-fill')).toBeInTheDocument()
-    expect(screen.getByTestId('spend-area-line')).toBeInTheDocument()
-  })
-
-  test('paints with var(--brand) so it re-themes', () => {
-    render(<SpendArea spend={spend()} />)
-
-    expect(screen.getByTestId('spend-area-fill').getAttribute('fill')).toBe('var(--brand)')
-    expect(screen.getByTestId('spend-area-line').getAttribute('stroke')).toBe('var(--brand)')
-  })
-
-  test('the fill is low-opacity and the line is not', () => {
-    render(<SpendArea spend={spend()} />)
-
-    const fillOpacity = Number(screen.getByTestId('spend-area-fill').getAttribute('fill-opacity'))
-    expect(fillOpacity).toBeGreaterThan(0)
-    expect(fillOpacity).toBeLessThan(0.5)
-    expect(screen.getByTestId('spend-area-line').getAttribute('fill')).toBe('none')
-  })
-
-  test('an EMPTY read draws nothing and says why', () => {
-    render(<SpendArea spend={spend({ status: 'empty', days: [], total: 0 })} />)
-
-    expect(screen.queryByTestId('spend-area-line')).not.toBeInTheDocument()
-    expect(screen.getByText(/no credits spent yet/i)).toBeInTheDocument()
-  })
-
-  test('an UNREADABLE read never renders as an empty chart', () => {
-    // The dangerous case: a failed read drawn as a flat line tells the user they
-    // spent nothing, which is a different — and false — claim.
-    render(<SpendArea spend={spend({ status: 'unreadable', days: [], total: 0 })} />)
-
-    expect(screen.queryByTestId('spend-area-line')).not.toBeInTheDocument()
-    expect(screen.getByText(/couldn.t read/i)).toBeInTheDocument()
-    expect(screen.queryByText(/no credits spent yet/i)).not.toBeInTheDocument()
-  })
-
-  test('a capped read names the date coverage starts at, not a row count', () => {
-    render(<SpendArea spend={spend({ capped: true, coveredFrom: '2026-07-12' })} />)
-
-    expect(screen.getByText(/12 Jul/)).toBeInTheDocument()
-  })
-
-  test('an uncapped read shows no coverage note', () => {
-    render(<SpendArea spend={spend()} />)
-
-    expect(screen.queryByText(/^from /i)).not.toBeInTheDocument()
-  })
-
-  test('the path stays inside the viewBox for a single spike', () => {
-    // A lone large value must not send the path above the top edge, which would
-    // clip the peak and understate it.
-    //
-    // The fixture gained two more active days. It was [0, 0, 999, 0] — ONE day
-    // with spend — which now renders the sparse state instead of a path, so the
-    // geometry it means to guard was no longer being exercised. The guarantee is
-    // unchanged and still the point: a lone enormous value among ordinary ones
-    // must stay inside the box.
-    render(<SpendArea spend={spend({ days: days([0, 1, 999, 1, 1]) })} />)
-    const d = screen.getByTestId('spend-area-line').getAttribute('d') ?? ''
-    const ys = [...d.matchAll(/[ ,](-?\d+(?:\.\d+)?)(?=[ L]|$)/g)].map((m) => Number(m[1]))
-
-    expect(Math.min(...ys)).toBeGreaterThanOrEqual(0)
-  })
-
-  test('a measured-zero window says so, and is never the no-data state', () => {
-    // The guarantee this has always made: days that were READ and genuinely had
-    // no spend must not be reported as "we have nothing". That still holds — it
-    // is now made in words rather than as a flat line at the axis, because a
-    // zero line and a broken chart are the same picture.
-    render(<SpendArea spend={spend({ days: days([0, 0, 0]), total: 0 })} />)
-
-    expect(screen.getByTestId('spend-sparse')).toBeInTheDocument()
-    expect(screen.getByText(/No credits spent in the last 30 days/i)).toBeInTheDocument()
-    // The no-data copy, which would be the false claim, must NOT appear.
-    expect(screen.queryByText(/Your first AI action will show up here/i)).not.toBeInTheDocument()
-  })
-
-  test('one active day is not charted as a trend', () => {
-    // The shape that started this: 29 zeros and one spike drew a flat line with
-    // a vertical edge and read as a rendering fault.
-    render(<SpendArea spend={spend({ days: days([0, 0, 0, 0, 6]), total: 6 })} />)
-
-    expect(screen.getByTestId('spend-sparse')).toBeInTheDocument()
-    expect(screen.queryByTestId('spend-area-line')).not.toBeInTheDocument()
-  })
-})
+/**
+ * ── `SpendArea` AND ITS TEN TESTS ARE GONE, AND WHERE EACH PROPERTY WENT ─────
+ * The card draws BARS now (see spend-card.tsx for why the three-day floor was
+ * an argument about a line, not about how much data there is), so `SpendArea`
+ * became a component nothing rendered — with ten green tests still standing on
+ * it. That is the shape this repo has already recorded as "a test suite that
+ * proves the wrong thing": ten assertions reporting a chart works, on a chart
+ * no customer can reach.
+ *
+ * Deleted rather than left, and every property re-homed rather than dropped:
+ *
+ *   paints with `var(--brand)`, never a hex   → `design-lint` rule 1, at zero
+ *   nothing drawn for empty / unreadable      → `spend-card.test.tsx`
+ *   a lone spike stays inside the box         → structural in `Bars`: heights
+ *                                               are `value / peak`, so the peak
+ *                                               IS 100% and cannot overflow
+ *   a measured-zero window is not "no data"   → `trend-area.test.tsx`, "draws a
+ *                                               STUB for a measured zero"
+ *   a capped read names its start DATE        → `spend-card.test.tsx`
+ *   one active day is not charted as a trend  → DELIBERATELY CHANGED. It is
+ *                                               charted, and captioned "one day
+ *                                               with activity so far — not
+ *                                               enough to read as a trend".
+ *                                               The claim is kept; the chart is
+ *                                               no longer withheld to make it.
+ */
 
 describe('SpendBars', () => {
   test('one bar per action, biggest first', () => {
