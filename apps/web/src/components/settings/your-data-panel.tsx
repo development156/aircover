@@ -369,8 +369,8 @@ export function YourDataPanel() {
               <p className="mt-1.5 type-body text-muted">
                 Your credit and payment record. It is the account of what you paid and what you were
                 charged, it can settle a disagreement in your favour as easily as ours, and Indian
-                tax law requires it to be kept for years. It holds a reference to you: for most
-                rows a sign-in code rather than your name.
+                tax law requires it to be kept for years. It holds a reference to you, which for
+                most rows is a sign-in code rather than your name.
               </p>
             </div>
 
