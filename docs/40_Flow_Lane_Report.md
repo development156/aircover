@@ -593,22 +593,28 @@ Run against `next start` on 3272, `--concurrency=1`, never piped —
 `scripts/gate.mjs` writes each stage to `.gate/<n>-<stage>.log` and puts the
 verdict on stderr as well as stdout, precisely so a `| tail` cannot swallow it.
 
-**GATE PASSED**, all five stages, 2026-08-23.
+**GATE PASSED**, all five stages, on the pushed HEAD `f576171a`, against a
+`.next` cleared and rebuilt immediately beforehand.
 
 | stage | command | result |
 |---|---|---|
-| 1 | `turbo run typecheck lint test --concurrency=1` | **ok** (69.5s) — 27 tasks |
-| 2 | `vitest run` (root) | **ok** (2.1s) |
-| 3 | `turbo run test:smoke --concurrency=1` | **ok** (1027.6s) — **100 passed · 2 flaky · 0 failed** |
-| 4 | `prettier --check .` | **ok** (16.3s) |
-| 5 | `turbo run build --concurrency=1` | **ok** (60.7s) — js-budget ok, 80 routes |
+| 1 | `turbo run typecheck lint test --concurrency=1` | **ok** — see the note below |
+| 2 | `vitest run` (root) | **ok** (1.4s) |
+| 3 | `turbo run test:smoke --concurrency=1` | **ok** (928.6s) — **102 passed · 0 flaky · 0 failed** |
+| 4 | `prettier --check .` | **ok** (14.6s) |
+| 5 | `turbo run build --concurrency=1` | **ok** (46.9s) — js-budget ok, 80 routes |
 
-**The two flaky are named, and neither is this lane's:**
-`connections-widths.spec.ts:155` and `post-format.spec.ts:29`. Both failed once
-and passed on the repo's configured single retry; neither touches a route in
-this lane, and `post-format` is already recorded elsewhere as a known flake.
+**Stage 1 on this run reported 0.6s, and that is a CACHE REPLAY verifying
+nothing** — said plainly rather than quoted as a result. Its real execution on
+this identical tree was the preceding run: **85.6s, 27 tasks, ok**, with no
+commit between the two. The full unit suite was also run directly on this tree:
+**4521 passed, 13 skipped, 0 failed**, and `design-lint` reports 828 / 139 / 0 /
+0 with none new.
 
-### Two earlier runs failed, and both are worth recording
+**Stage 3 is quoted at 102 passed with nothing flaky**, which is the whole
+`@smoke` tag.
+
+### Four earlier runs failed, and each says something different
 
 **Run 1 failed stage 1** on `src/lib/media/crop-geometry.test.ts` — "Test timed
 out in 5000ms", at 5131ms. Not this lane's file (it is not in the diff), and it
@@ -632,6 +638,24 @@ Fixed by pinning `testMatch: '**/*.spec.ts'`, and **proved not to be a
 narrowing**: `accent.test.ts` is the only non-`.spec` test file in the tree, and
 `--list` after the change reports **236 tests in 57 files, 102 under @smoke** —
 the @smoke figure this repo gates on, unmoved.
+
+**Run 5 failed stage 3 on SIX unrelated specs at once** — `analytics-history`,
+`approvals` (×2), `assets`, `audience-layers` (×2) — every one of which had
+passed forty minutes earlier on code that differed only by a unit test and two
+documents. Six unrelated failures together is an environment, not a diff. The
+run before it had ended with `turbo run build`, which **rewrites `.next`
+underneath the long-running `next start` that stage 3 then reuses**; this lane's
+brief warns about exactly that ordering. Killed, `.next` cleared, rebuilt,
+server restarted, and the re-run was clean.
+
+**Run 6 failed `composer-widths` twice, and that one IS in this lane** — the
+composer is `/posts/[id]` and this lane added wrapping pills to it, so a
+sideways-scroll failure was a live possibility and was chased rather than
+dismissed. It passed standalone in 34.4s, and passed again in the clean run
+above. The gate had been killed before Playwright printed its failure detail, so
+**there is no artefact and no error text for run 6, and no claim is made about
+why it failed** — only that the behaviour it guards passes on a clean server,
+twice, at every width and both themes.
 
 **Stage 3 is quoted against `next start`, not the gate's own `pnpm dev`.** That
 is a deviation and it is stated rather than glossed: `docs/34` §11a records the
