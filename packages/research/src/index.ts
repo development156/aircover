@@ -46,6 +46,7 @@ export {
   quarantineCorpus,
   quarantinePage,
   quarantineBlock,
+  quarantineInline,
   quarantinePreamble,
   type QuarantineInput,
   neutralize,

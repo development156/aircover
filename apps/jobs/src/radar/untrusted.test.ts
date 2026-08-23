@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { describe, it, expect } from 'vitest'
 
 import { quarantineCorpus } from '@sahoda/research'
@@ -202,5 +205,41 @@ describe('when the stored evidence is shown to a model, it arrives quarantined',
 
   it('carries the source URL, so any claim can be traced back to the page', () => {
     expect(wrapped).toContain('url="https://rival.example/pricing"')
+  })
+})
+
+describe('the strongest claim, enforced instead of asserted in prose', () => {
+  /**
+   * "NO MODEL RUNS IN RADAR INGESTION AT ALL" is the header's claim and the whole
+   * reason a hostile competitor page cannot do anything here — there is no prompt
+   * to inject into. Until now it was a sentence. A sentence is not a guard: the
+   * day someone adds "summarise what changed" to `run.ts`, every word in that
+   * header becomes false and nothing goes red.
+   *
+   * So the import graph is read. `@sahoda/mesh` is where every model call in this
+   * codebase lives, so reaching it from this directory IS reaching a model.
+   */
+  const RADAR_DIR = new URL('.', import.meta.url).pathname
+
+  function sourceFiles(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) return sourceFiles(full)
+      return entry.isFile() && full.endsWith('.ts') && !full.endsWith('.test.ts') ? [full] : []
+    })
+  }
+
+  it('nothing in src/radar can reach @sahoda/mesh', () => {
+    const offenders = sourceFiles(RADAR_DIR).filter((file) =>
+      /from\s+'@sahoda\/mesh/.test(readFileSync(file, 'utf8')),
+    )
+    expect(offenders).toEqual([])
+  })
+
+  it('reads a real set of files, so an empty result means something', () => {
+    // A glob that matches nothing passes the assertion above perfectly.
+    const files = sourceFiles(RADAR_DIR)
+    expect(files.length).toBeGreaterThanOrEqual(6)
+    expect(files.some((f) => f.endsWith('run.ts'))).toBe(true)
   })
 })
