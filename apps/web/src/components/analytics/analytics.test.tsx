@@ -98,7 +98,7 @@ describe('the ranked table does not rank what it cannot measure', () => {
 
   test('lists it separately with its own reason', () => {
     render(<PostTable rows={rows} />)
-    expect(screen.getByText(/Not ranked — no measurement yet \(1\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Not ranked, no measurement yet \(1\)/)).toBeInTheDocument()
     expect(screen.getByText('Waiting post')).toBeInTheDocument()
     // The `unknown-window` copy: no date promised, no zero implied.
     expect(screen.getByText(/doesn’t publish how far behind its metrics run/)).toBeInTheDocument()
@@ -157,7 +157,7 @@ describe('the follower chart will not describe a trend it does not have', () => 
   test('draws no line and no change figure for a single point', () => {
     const { container } = render(<FollowerChart points={[{ date: '2026-08-11', value: 4 }]} />)
     expect(screen.getByText('4')).toBeInTheDocument()
-    expect(screen.getByText(/not enough to show a trend/)).toBeInTheDocument()
+    expect(screen.getByText(/not enough to show a trend/i)).toBeInTheDocument()
     // The documented past bug: "No change over 1 day" claims two readings, that
     // they were equal, and that a day separated them. One point supports none.
     expect(screen.queryByText(/No change/)).not.toBeInTheDocument()

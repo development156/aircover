@@ -100,7 +100,7 @@ describe('GenerateSitePanel', () => {
     state.result = {
       ok: false,
       insufficient: false,
-      message: 'The site could not be saved. You were not charged — try again.',
+      message: 'The site could not be saved. You were not charged. Try again.',
     }
 
     render(<GenerateSitePanel limitNotice={null} />)
@@ -108,7 +108,7 @@ describe('GenerateSitePanel', () => {
     await userEvent.click(screen.getByRole('button', { name: /generate site/i }))
 
     expect(
-      await screen.findByText('The site could not be saved. You were not charged — try again.'),
+      await screen.findByText('The site could not be saved. You were not charged. Try again.'),
     ).toBeInTheDocument()
   })
 

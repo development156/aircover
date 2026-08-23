@@ -17,7 +17,7 @@ import {
 describe('the Loop refusal copy', () => {
   it('tells a workspace that never connected to CONNECT', () => {
     const message = noChannelsMessage([])
-    expect(message).toBe('Connect a channel first — Sahoda has nowhere to plan for.')
+    expect(message).toBe('Connect a channel first. Sahoda has nowhere to plan for.')
     // The other claim must be absent, not merely un-asserted.
     expect(message).not.toMatch(/reconnect/i)
     expect(message).not.toMatch(/lapsed/i)
@@ -25,7 +25,7 @@ describe('the Loop refusal copy', () => {
 
   it('tells a workspace whose channel LAPSED to RECONNECT, and names it', () => {
     const message = noChannelsMessage(['instagram'])
-    expect(message).toContain('reconnect it')
+    expect(message).toMatch(/reconnect it/i)
     expect(message).toContain('Instagram')
     expect(message).toContain('lapsed')
     // The wrong remedy must not appear. Production held 4 expired connections
@@ -36,7 +36,7 @@ describe('the Loop refusal copy', () => {
   it('agrees in number when more than one channel lapsed', () => {
     const message = noChannelsMessage(['instagram', 'linkedin'])
     expect(message).toContain('connections have lapsed')
-    expect(message).toContain('reconnect them')
+    expect(message).toMatch(/reconnect them/i)
     expect(message).toContain('Instagram and LinkedIn')
     expect(message).not.toContain('connection has')
   })
@@ -45,7 +45,7 @@ describe('the Loop refusal copy', () => {
     // A read that errored is not a workspace with no channels. This sentence
     // claims nothing about what the customer has connected, and it says the
     // money question out loud because that is the first thing a person asks.
-    expect(CHANNELS_UNREADABLE_MESSAGE).toContain('nothing was charged')
+    expect(CHANNELS_UNREADABLE_MESSAGE).toMatch(/nothing was charged/i)
     expect(CHANNELS_UNREADABLE_MESSAGE).not.toMatch(/connect/i)
     expect(CHANNELS_UNREADABLE_MESSAGE).not.toMatch(/lapsed/i)
   })

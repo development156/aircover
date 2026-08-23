@@ -17,7 +17,7 @@ describe('planLimitSentence', () => {
       currentUsage: 0,
     })
 
-    expect(sentence).toBe("Sites are on Starter and above — your Free plan doesn't include one.")
+    expect(sentence).toBe("Sites are on Starter and above. Your Free plan doesn't include one.")
   })
 
   test('a used-up allowance states the numbers and the next plan up', () => {

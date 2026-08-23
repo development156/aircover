@@ -143,7 +143,7 @@ describe('sending a comment reply', () => {
     state.result = {
       ok: false,
       status: 'failed',
-      message: 'Could not send that reply — try again.',
+      message: 'Could not send that reply. Try again.',
     }
     const user = await openAndType('Thanks')
     await user.click(screen.getByRole('button', { name: /send reply/i }))

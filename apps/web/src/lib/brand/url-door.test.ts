@@ -82,7 +82,7 @@ describe('openUrlDoor', () => {
         ok: false,
         reason: 'js_only',
         message:
-          'Your site loads its text with JavaScript, so we could not read it — tell us in your own words instead.',
+          'Your site loads its text with JavaScript, so we could not read it. Tell us in your own words instead.',
         attempted: ['https://x.in/'],
         pagesFetched: 0,
         wordsFound: 0,

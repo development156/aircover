@@ -40,7 +40,7 @@ import { MediaAttach } from '@/components/posts/media-attach'
  * sentences exist and which function was called.
  */
 
-const REFUSAL = 'Check this file — no channel on this post can use it.'
+const REFUSAL = 'Check this file. No channel on this post can use it.'
 
 const OFFER = {
   previewUrl: null,

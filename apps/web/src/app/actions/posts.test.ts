@@ -93,7 +93,7 @@ describe('deletePost', () => {
 
     await expect(deletePost('post_1')).resolves.toEqual({
       ok: false,
-      message: 'That post no longer exists — reload to see the current list.',
+      message: 'That post no longer exists. Reload to see the current list.',
     })
   })
 })

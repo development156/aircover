@@ -29,7 +29,7 @@ describe('TabooCard copy', () => {
   test('claims influence, not enforcement', () => {
     renderCard()
 
-    expect(screen.getByText('Red lines — what Sahoda steers away from')).toBeInTheDocument()
+    expect(screen.getByText('Red lines, what Sahoda steers away from')).toBeInTheDocument()
     expect(screen.getByText(/shape every caption Sahoda writes/)).toBeInTheDocument()
   })
 
@@ -44,7 +44,7 @@ describe('TabooCard copy', () => {
 
   test('says plainly that a human still reviews the output', () => {
     renderCard()
-    expect(screen.getByText(/keep reviewing posts before they go live/)).toBeInTheDocument()
+    expect(screen.getByText(/keep reviewing posts before they go live/i)).toBeInTheDocument()
   })
 
   test('still shows the resolve cost on Regenerate, in the label', () => {

@@ -138,6 +138,6 @@ describe('GateChart', () => {
       cell.getAttribute('title'),
     )
 
-    expect(titles).toEqual(['2026-07-27 — did not run', '2026-07-28 — passing'])
+    expect(titles).toEqual(['2026-07-27: did not run', '2026-07-28: passing'])
   })
 })

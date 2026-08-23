@@ -107,7 +107,7 @@ describe('MediaPane — attach', () => {
     const user = userEvent.setup()
     attachMedia.mockResolvedValue({
       ok: false,
-      message: 'Check this file — no channel on this post can use it.',
+      message: 'Check this file. No channel on this post can use it.',
       rejections: [{ channel: 'gbp', violations: [GBP_SIZE_VIOLATION] }],
     })
 
@@ -300,7 +300,7 @@ describe('MediaPane — previews', () => {
     )
 
     expect(screen.getByRole('img').getAttribute('alt')).toBe(
-      'Attached image with no alt text — chai-cup.png',
+      'Attached image with no alt text: chai-cup.png',
     )
   })
 
