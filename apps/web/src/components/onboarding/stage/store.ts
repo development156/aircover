@@ -232,7 +232,13 @@ interface Persisted {
   data?: unknown
 }
 
-function isStepId(value: unknown): value is StepId {
+/**
+ * Exported for `use-step-history`, which reads a step id back out of
+ * `history.state` — an object this app does not solely own (Next keeps its
+ * router keys there) and that a previous version of the site may have written.
+ * Anything unrecognised must be ignored rather than rendered.
+ */
+export function isStepId(value: unknown): value is StepId {
   return typeof value === 'string' && (ORDER as readonly string[]).includes(value)
 }
 

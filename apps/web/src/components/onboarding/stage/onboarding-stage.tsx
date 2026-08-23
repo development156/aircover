@@ -14,9 +14,11 @@ import { ProgressBar } from './progress-bar'
 import { readSite } from './read-site'
 import { useBuild } from './use-build'
 import { useOrb } from './use-orb'
+import { useStepHistory } from './use-step-history'
 import {
   canAdvance,
   clearState,
+  isStepId,
   DEFAULT_COLORS,
   DEFAULT_DATA,
   energyOf,
@@ -37,6 +39,14 @@ import { ResultStep } from './steps/result-step'
 import { RivalsStep } from './steps/rivals-step'
 import { VisualStep } from './steps/visual-step'
 import { WhatStep } from './steps/what-step'
+
+/**
+ * Never given a history entry. The brain behind the result was built and paid
+ * for in this session, so an entry pointing at it would let Back return to a
+ * screen whose work has already been consumed — the same reason `loadState`
+ * refuses to resume there.
+ */
+const RESULT_ONLY: readonly StepId[] = ['result']
 
 export interface OnboardingStageProps {
   workspaceId: string
@@ -111,6 +121,29 @@ export function OnboardingStage({
     const i = ORDER.indexOf(step)
     if (i > 0) go(ORDER[i - 1]!, -1)
   }, [go, step])
+
+  /**
+   * The browser's Back button means "the previous question".
+   *
+   * Nine screens live behind one URL and none of them used to push a history
+   * entry, so Back left the flow entirely — on the screens every customer meets
+   * first. The typed answers already survived that (the store writes on every
+   * move) but surviving a wrong exit is not the same as not being thrown out.
+   *
+   * `onPop` calls `setStep` directly rather than `go`: `go` also sets the
+   * transition DIRECTION, and it is set here from the ORDER positions so a pop
+   * animates backwards when it went backwards and forwards on a Forward press —
+   * which is the half a `dir: -1` constant would get wrong.
+   */
+  useStepHistory<StepId>({
+    step,
+    isStep: isStepId,
+    skip: RESULT_ONLY,
+    onPop: (id) => {
+      setDir(ORDER.indexOf(id) < ORDER.indexOf(step) ? -1 : 1)
+      setStep(id)
+    },
+  })
 
   /**
    * The website read runs in the BACKGROUND from the moment they leave step 01.
