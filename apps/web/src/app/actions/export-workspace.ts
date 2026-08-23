@@ -45,7 +45,11 @@ export async function exportWorkspaceData(): Promise<ExportState> {
     workspaceId = workspace.id
 
     const now = new Date()
-    const payload = await buildWorkspaceExport(createServerSupabase(), workspace.id, now)
+    const payload = await buildWorkspaceExport(createServerSupabase(), {
+      workspaceId: workspace.id,
+      userId,
+      now,
+    })
 
     return {
       ok: true,

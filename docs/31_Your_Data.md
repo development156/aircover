@@ -1,10 +1,27 @@
 # 31 · Your data — export and deletion
 
-**Date:** 2026-08-19 · India's DPDP Act gives a person the right to a copy of their data and the
-right to have it erased. This page is two things at once: the plain-language answer a shop owner
-should get, and the engineering record of what is built, what is not, and exactly why.
+**Date:** 2026-08-19 · **Superseded 2026-08-23.**
 
-Everything here is **MEASURED** against the live database unless marked otherwise.
+> **Read [38_Data_Handling.md](38_Data_Handling.md) instead.** That document is the current one and
+> it is written for a lawyer. This page is kept because it is the record of a decision — it argued,
+> correctly at the time, that a deletion button would be a lie, and it specified the function that
+> would make one honest. That function now exists
+> (`packages/db/supabase/migrations/20260823000000_dpdp_erasure.sql`) and the button is real.
+>
+> **Three things below are now WRONG and are left in place rather than quietly corrected**, because
+> the reason they went wrong is the point:
+>
+> | said | actually | why it matters |
+> | --- | --- | --- |
+> | "30 tables" | **47** on 2026-08-23 | a number in prose is a claim nobody checks |
+> | "15 of 30 have no member DELETE policy" | **26 of 47** | same |
+> | "your name, email and sign-in belong to Clerk … and are deleted with your account" | a copy lives in `users_profile` in **our** database | the sweep it was derived from cannot see a table keyed by `user_id` |
+>
+> Every figure in doc 38 is re-measured by a test on every gate run instead of being written down.
+
+India's DPDP Act gives a person the right to a copy of their data and the right to have it erased.
+This page was two things at once: the plain-language answer a shop owner should get, and the
+engineering record of what was built, what was not, and exactly why.
 
 ---
 
@@ -21,11 +38,16 @@ a section were simply missing, you would have no way to tell "I have none of the
 left out" — so the file never shows an empty list where the truth is "we could not read it". One
 thing is in that list today, and it is named in Part 2.
 
-### Asking for deletion: **by request, not self-serve**
+### Asking for deletion: ~~by request, not self-serve~~ **BUILT 2026-08-23**
 
-Email **support@sahodalabs.com** from the address you signed up with. It is done by hand today. The
-button is not there because a button would delete about half of it and tell you it had finished —
-and you would have no way to know. Part 2 says exactly what stands in the way.
+> Settings → Your data → **Delete everything**. Two steps, the second typed. See doc 38 §4.
+
+The original text follows, and the reasoning in it is still correct about why a client-driven button
+would have been a lie:
+
+> Email **support@sahodalabs.com** from the address you signed up with. It is done by hand today.
+> The button is not there because a button would delete about half of it and tell you it had
+> finished — and you would have no way to know. Part 2 says exactly what stands in the way.
 
 ### What is removed, and what is kept
 
@@ -169,8 +191,9 @@ a decision to take deliberately and write down, not one an implementation should
 
 ### Not done on this run
 
-- **The deletion RPC.** `packages/db/supabase/migrations` belongs to `wt-db`, four sessions were
-  running in parallel, and an unapplied migration plus an inert button is precisely the state
-  `ops_workspace_reset` has been in for weeks. Specified here instead.
-- **A retention period.** Nothing in this product expires anything on a schedule. That is a separate
-  question from a deletion request and is not answered here.
+- ~~**The deletion RPC.**~~ **BUILT 2026-08-23** as `public.erase_workspace`, to this specification,
+  with two additions this page did not anticipate: `ledger_actor_redactions` is retained alongside
+  the ledger (erasing the marker would silently re-disclose the identity it suppresses), and
+  `users_profile` is removed for anybody left with no workspace at all.
+- **A retention period.** Still not answered. Nothing in this product expires anything on a
+  schedule. Doc 38 §6 states that as an open question rather than leaving it implied.

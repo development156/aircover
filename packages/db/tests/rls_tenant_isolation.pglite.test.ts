@@ -92,7 +92,18 @@ let operatorOnly: string[]
  * by the very check meant to catch it. Naming them means the reclassification
  * is what fails.
  */
-const EXPECTED_SERVICE_ONLY = ['ai_provider_logs']
+const EXPECTED_SERVICE_ONLY = [
+  'ai_provider_logs',
+  /* Added deliberately 2026-08-23, which is what this list's own failure message
+     asks for. `ledger_actor_redactions` records a decision about whether a
+     workspace's identity may be shown on its financial record. It is Sahoda's
+     decision record rather than the customer's content, nothing in `apps/web`
+     reads or writes it, and a member who could read it would learn nothing
+     about themselves they are not already told in the product.
+     It is NOT invisible to the customer: the DPDP export names it, with the
+     reason it cannot be included, exactly as `ai_provider_logs` is named. */
+  'ledger_actor_redactions',
+]
 const EXPECTED_OPERATOR_ONLY = [
   'ops_credit_requests',
   // Added 2026-08-22 with migration 20260822160000. This guard failing is what

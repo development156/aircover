@@ -2,7 +2,8 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { EXPORT_TABLES, type ExportTable } from './export-manifest'
+import { EXPORT_TABLES, OMITTED_BY_DESIGN, type ExportTable } from './export-manifest'
+import { walkWorkspaceStorage, type StoredObject } from './storage'
 
 /**
  * Build the DPDP export: everything this workspace owns, plus an honest account
@@ -25,6 +26,15 @@ import { EXPORT_TABLES, type ExportTable } from './export-manifest'
  *  - **A table nobody remembered.** The manifest is derived from
  *    `information_schema`, and `export-manifest.test.ts` fails when the schema
  *    grows a workspace-owned table this file does not know about.
+ *  - **A table the sweep is structurally blind to.** `workspaces` and
+ *    `users_profile` hold the business name and the customer's own email and are
+ *    keyed by something other than `workspace_id`, so no version of that query
+ *    would ever return them. They are read by name, below. `connection_secrets`
+ *    is the third and is named in `notIncluded` instead, permanently — see
+ *    `OMITTED_BY_DESIGN`.
+ *  - **A file.** A photograph is personal data as much as the row pointing at
+ *    it. Every object under the workspace's storage prefix is inventoried, and
+ *    the caller carries the bytes.
  *
  * ## Why it runs as the member and not as a service role
  *
@@ -64,12 +74,25 @@ export interface OmittedTable {
 }
 
 export interface WorkspaceExport {
-  readonly format: 'sahoda.workspace-export.v1'
+  /**
+   * v2 — v1 carried no files, no `workspaces` row and no `users_profile` row.
+   * The version is in the file so a customer holding an old export can tell
+   * which one they have, and so can anybody they hand it to.
+   */
+  readonly format: 'sahoda.workspace-export.v2'
   readonly workspaceId: string
   readonly generatedAt: string
   readonly included: ExportedTable[]
   /** Named, always. An omission that is not listed is an omission nobody can see. */
   readonly notIncluded: OmittedTable[]
+  /**
+   * Every file under this workspace's storage prefix. The bytes travel beside
+   * this document, under `files/`; this is the record of what should be there,
+   * so a short download is detectable rather than invisible.
+   */
+  readonly files: StoredObject[]
+  /** Storage folders that could not be listed. Same rule as `notIncluded`. */
+  readonly filesNotListed: { bucket: string; prefix: string; reason: string }[]
 }
 
 const NO_READ_POLICY_REASON =
@@ -124,6 +147,47 @@ async function readTable(
 }
 
 /**
+ * A row identified by something other than `workspace_id`.
+ *
+ * Separate from `readTable` on purpose: that function's `.eq('workspace_id', …)`
+ * IS the tenant filter, and making the column a parameter of the main path would
+ * turn the one line that scopes every read into something a caller can get
+ * wrong.
+ */
+async function readByKey(
+  supabase: SupabaseClient,
+  table: string,
+  describes: string,
+  column: string,
+  value: string,
+): Promise<{ ok: true; value: ExportedTable } | { ok: false; value: OmittedTable }> {
+  try {
+    const { data, error } = await supabase.from(table).select('*').eq(column, value)
+    if (error) {
+      return {
+        ok: false,
+        value: {
+          table,
+          describes,
+          reason: `Could not be read: ${error.message ?? 'the read failed'}`,
+        },
+      }
+    }
+    const rows = Array.isArray(data) ? data : []
+    return { ok: true, value: { table, describes, rows, truncated: false } }
+  } catch (thrown) {
+    return {
+      ok: false,
+      value: {
+        table,
+        describes,
+        reason: `Could not be read: ${thrown instanceof Error ? thrown.message : 'the read threw'}`,
+      },
+    }
+  }
+}
+
+/**
  * Read every workspace-owned table this member may read.
  *
  * Sequential rather than concurrent: thirty parallel PostgREST calls from one
@@ -133,10 +197,32 @@ async function readTable(
  * `now` is a parameter so the timestamp in the file is the caller's instant and
  * the function stays testable without a clock.
  */
+export interface ExportRequest {
+  readonly workspaceId: string
+  /**
+   * The signed-in person, for the ONE row that is theirs rather than the
+   * workspace's. `null` is allowed and is REPORTED — `users_profile` lands in
+   * `notIncluded` saying the profile could not be identified, never silently
+   * skipped.
+   */
+  readonly userId: string | null
+  /** The caller's instant, so the file's timestamp is the caller's and this stays testable. */
+  readonly now: Date
+}
+
+/**
+ * An OBJECT and not three positional arguments.
+ *
+ * `(supabase, workspaceId, userId, now)` reads identically to
+ * `(supabase, workspaceId, now, userId)` at every call site, and this repo has
+ * shipped two defects in two days from exactly that shape — an optional
+ * positional whose default was silently taken. Here the wrong order would put a
+ * Date where an identity goes and quietly drop the customer's own email out of
+ * their subject-access export.
+ */
 export async function buildWorkspaceExport(
   supabase: SupabaseClient,
-  workspaceId: string,
-  now: Date = new Date(),
+  { workspaceId, userId, now }: ExportRequest,
 ): Promise<WorkspaceExport> {
   const included: ExportedTable[] = []
   const notIncluded: OmittedTable[] = []
@@ -156,11 +242,62 @@ export async function buildWorkspaceExport(
     else notIncluded.push(result.value)
   }
 
+  // The two tables no sweep over `workspace_id` can reach. Read by name, with
+  // their own `where`, because their keys are not the one the sweep uses.
+  const workspaceRow = await readByKey(
+    supabase,
+    'workspaces',
+    'the name and settings of this workspace',
+    'id',
+    workspaceId,
+  )
+  if (workspaceRow.ok) included.push(workspaceRow.value)
+  else notIncluded.push(workspaceRow.value)
+
+  if (userId !== null) {
+    const profile = await readByKey(
+      supabase,
+      'users_profile',
+      'your name, email and sign-in preferences',
+      'user_id',
+      userId,
+    )
+    if (profile.ok) included.push(profile.value)
+    else notIncluded.push(profile.value)
+  } else {
+    notIncluded.push({
+      table: 'users_profile',
+      describes: 'your name, email and sign-in preferences',
+      reason:
+        'This export was built without a signed-in person, so the profile row could not be identified.',
+    })
+  }
+
+  // Permanent omissions, in the file, in the customer's words. An omission the
+  // customer cannot see is a lie by silence — the whole reason this shape exists.
+  for (const entry of OMITTED_BY_DESIGN) {
+    notIncluded.push({ table: entry.table, describes: entry.describes, reason: entry.reason })
+  }
+
+  const storage = await walkWorkspaceStorage(supabase, workspaceId)
+
   return {
-    format: 'sahoda.workspace-export.v1',
+    format: 'sahoda.workspace-export.v2',
     workspaceId,
     generatedAt: now.toISOString(),
     included,
     notIncluded,
+    files: storage.objects,
+    filesNotListed: storage.truncated
+      ? [
+          ...storage.unreadable,
+          {
+            bucket: '(all)',
+            prefix: workspaceId,
+            reason:
+              'The file listing hit its own size limit, so this list may be short. Ask Sahoda for the rest.',
+          },
+        ]
+      : storage.unreadable,
   }
 }
