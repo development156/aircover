@@ -811,10 +811,34 @@
     0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
+/* ── A REFUSAL HAS TO BE READABLE ──────────────────────────────────────────
+   This was `opacity: 0.34` over the `!important` orange fill above, and
+   MEASURED on real pixels 2026-08-23 the disabled Continue on step 01 came out
+   at **1.65:1 in light and 1.75:1 in dark** — label against its own fill,
+   composited exactly as the eye sees it (fill rgb(255,102,0), text rgb(0,0,0),
+   effective alpha 0.34, over rgb(242,242,243) and rgb(13,13,13)).
+
+   That is the same class of defect `docs/34` fix #2 called CRITICAL and fixed
+   in `button.tsx` at 1.37:1 — and it survived here because these screens do not
+   use the Button primitive. They ship their own `.btn` classes, so a fix in the
+   component could never reach them. This is the onboarding flow: the screens
+   every customer meets first, and the control is the one telling them why they
+   cannot continue.
+
+   The recipe is `button.tsx`'s, not a new one: a recessed surface with muted
+   text and an inset hairline, which measures 6.93:1 light / 6.12:1 dark and is
+   legible AND recessed in both — what a refusal should look like. `!important`
+   because the fill above is `!important`; overriding an `!important` needs one.
+
+   Opacity is NOT reduced. Dimming is what produced the unreadable pair; the
+   recession is carried by the surface, which is a colour decision the tonal
+   ladder already governs rather than a veil over one. */
 .stage .btn[disabled],
 .proc .btn[disabled],
 .cta-row .btn[disabled] {
-  opacity: 0.34;
+  background: var(--s2) !important;
+  color: var(--ink-mute) !important;
+  box-shadow: inset 0 0 0 1px var(--line) !important;
   pointer-events: none;
 }
 

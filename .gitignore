@@ -134,7 +134,9 @@ supabase/.temp/
 # token moves; the MEASUREMENTS taken off them are committed under docs/ so a
 # before-and-after survives the frames being deleted.
 .flow-before/
+.flow-mid/
 .flow-after/
+.flow-detail/
 # The status page is BUILT by .github/workflows/status-page.yml from live probes.
 # Committing a copy would publish a measurement taken at commit time and let it
 # read as current — the exact staleness the page exists to make visible.

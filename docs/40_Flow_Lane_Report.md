@@ -305,6 +305,43 @@ change is behavioural, not visual: the browser's Back button.
 | re-entry with an existing brain is not a dead end | **holds** | `intro-step.tsx` branches on `hasSavedBrain` to "Your Brand Brain is ready", with a **free** primary *Review Brand Brain* and a ghost *Build a new one* that states its cost before it is pressed. |
 | the first resolve is free and the copy says so | **holds** | Read off the rendered frame: *"Takes about three minutes. You can stop and come back. Building it is free the first time."* |
 
+### The refusal nobody could read, found by looking at a 390 frame
+
+Not in the brief's list, and the worst thing this lane found on its own.
+
+`onboarding.css` disabled its primary with `opacity: 0.34` over an `!important`
+orange fill. MEASURED on real pixels — fill `rgb(255,102,0)`, label
+`rgb(0,0,0)`, **effective** alpha 0.34 (multiplied down the tree, not read off
+the element), over `rgb(242,242,243)` light and `rgb(13,13,13)` dark:
+
+| | before | after |
+|---|---|---|
+| label on its own fill, light | **1.65:1** | **6.44:1** |
+| label on its own fill, dark | **1.75:1** | **5.51:1** |
+
+That is the same class of defect `docs/34` fix #2 called CRITICAL and fixed in
+`button.tsx` at 1.37:1 — and **it survived because these screens do not use the
+Button primitive.** They ship their own `.btn` classes, so a fix in the
+component could never have reached them, and no amount of care in `button.tsx`
+would have found it. It sits on step 01 of the flow every customer meets first,
+on the one control that is supposed to tell them why they cannot continue.
+
+The recipe is `button.tsx`'s, not a new one: a recessed surface with muted text
+and an inset hairline. Opacity is not reduced at all — dimming is what produced
+the unreadable pair, and the recession is now carried by a surface the tonal
+ladder governs rather than by a veil over a brand fill.
+
+`onboarding-disabled-contrast.spec.ts` guards it in a real browser, and was
+**shown red against the original CSS**, reporting exactly 1.65:1 and 1.75:1. It
+is a RENDERED guard on purpose: every token involved was correct the whole time,
+and `docs/37` §19 is explicit that guards grading tokens cannot see what
+components write. An `opacity` on an element does not exist until something is
+rasterised.
+
+It was found by building a contact sheet of all eighteen states at 390 and
+looking at them together — the pale-on-pale button is unmissable beside three
+siblings that are not disabled, and invisible when you read one frame at a time.
+
 ### The money guard, proven red
 
 Not asserted — executed. `if (inFlight.current) return` was **deleted** from
@@ -366,46 +403,63 @@ through a surface that did not write them**.
 
 ## 6 · Accent spend, before and after
 
-MEASURED with `e2e/helpers/accent.ts` (§1), 1440 light, full-page frames.
-`satpx` is the absolute count of saturated samples — the column that cannot be
-moved by a page changing height.
+MEASURED with `e2e/helpers/accent.ts` (§1), full-page frames, **all 108 of
+them** — three widths, both themes, before and after. `satpx` is the absolute
+count of saturated samples, the column a page changing height cannot move.
+
+**Across the whole lane: 2.218% → 1.625%.** 64 frames down, 25 up, 0 missing.
+
+Mean over the six (width, theme) frames of each state:
 
 | route · state | before | after | Δ | satpx |
 |---|---|---|---|---|
-| `/planner` list, populated | **3.657%** | **0.908%** | −2.749 | 11850 → 2942 |
-| `/planner` week, populated | 3.450% | 0.911% | −2.539 | 11972 → 2952 |
-| `/planner` month, populated | 2.346% | 0.553% | −1.793 | 11504 → 2560 |
-| `/planner` list, empty | 3.511% | 0.760% | −2.751 | 11376 → 2463 |
-| `/planner` week, empty | 3.511% | 0.760% | −2.751 | 11376 → 2463 |
-| `/planner` month, empty | 3.543% | 0.760% | −2.783 | 11480 → 2463 |
-| `/posts`, populated | 0.848% | 0.650% | −0.198 | 2834 → 2107 |
-| `/posts`, empty | 0.617% | 0.506% | −0.111 | 1998 → 1640 |
-| `/posts/[id]`, two channels | 0.319% | 0.182% | −0.137 | 2540 → 1451 |
-| `/posts/new`, empty | 0.075% | **0.096%** | +0.020 | 328 → 430 |
-| `/onboarding` (8 steps) | 1.32–1.80% | 1.32–1.80% | ±0.006 | unchanged |
+| `/planner` list, empty | **3.938%** | **2.103%** | −1.835 | 8392 → 3075 |
+| `/planner` month, empty | 3.938% | 2.117% | −1.821 | 8391 → 3076 |
+| `/planner` week, empty | 3.930% | 2.122% | −1.808 | 8374 → 3095 |
+| `/planner` list, populated | **3.709%** | **1.843%** | −1.866 | 8915 → 3650 |
+| `/planner` week, populated | 3.507% | 1.832% | −1.675 | 8866 → 3547 |
+| `/planner` month, populated | 2.622% | 1.413% | −1.209 | 8488 → 3169 |
+| `/posts`, populated | 1.471% | 1.264% | −0.207 | 2875 → 2239 |
+| `/posts`, empty | 1.415% | 1.236% | −0.180 | 2079 → 1740 |
+| `/posts/[id]`, two channels | 0.371% | 0.333% | −0.039 | 2332 → 1792 |
+| `/posts/new`, empty | 0.241% | 0.247% | **+0.007** | 447 → 481 |
+| `/onboarding` · visual | 2.182% | 2.190% | +0.008 | 3689 → 3720 |
+| `/onboarding` · references | 1.997% | 2.007% | +0.010 | 3190 → 3223 |
+| `/onboarding` · audience | 1.947% | 1.939% | −0.008 | 3085 → 3060 |
+| `/onboarding` · basics | 1.934% | 1.930% | −0.004 | 2925 → 2911 |
+| `/onboarding` · what | 1.921% | 1.908% | −0.013 | 3015 → 2976 |
+| `/onboarding` · rivals | 1.787% | 1.772% | −0.014 | 3381 → 3335 |
+| `/onboarding` · knowledge | 1.570% | 1.567% | −0.004 | 3290 → 3279 |
+| `/onboarding` · intro | 1.435% | 1.437% | +0.001 | 2810 → 2815 |
 
-**`/planner` fell by a factor of four**, and the absolute count fell with it —
-11,850 saturated samples to 2,942. Both halves moved, which is the test that
-distinguishes a real reduction from a taller page.
+At **1440 light alone**, where the `narrow:w-auto` change bites hardest, the
+planner figures are sharper still — `/planner` list populated goes
+**3.657% → 0.908%**, satpx 11850 → 2942, and `/planner` month populated
+**2.346% → 0.553%**. The six-frame means above are lower because **at 390 the
+Plan my week button is still full width, deliberately** — a primary under the
+thumb is right on a phone, and the mobile frames keep that orange on purpose.
 
-**The one that went up is explained, not excused.** `/posts/new` gained the back
-link, which made the page **35 pixels taller** — an *odd* number. The sampler
-steps two pixels in each axis, so every element below the link changed sampling
-parity and elements previously invisible to the grid became visible. Confirmed by
-opening the frame: **no orange element was added**; the saturated pixels are the
-rail's active item, the credits pill, "Usage" and the platform marks, exactly as
-before. This is a limit of a fixed-phase sampler on a full-page capture, and it
-is why the absolute count is printed rather than the percentage alone.
+**`/onboarding` did not move, and should not have.** This lane changed its
+history behaviour and nothing about its paint. The ±0.014 across eight steps is
+the noise floor of a full-page sampler, and quoting it as a result either way
+would be reading noise.
 
-**`/onboarding` did not move because this lane did not change its paint.** Its
-one change is the history behaviour.
+**The one route that went up is explained, not excused.** `/posts/new` gained
+the back link, which made the page **35 pixels taller** — an *odd* number. The
+sampler steps two pixels in each axis, so every element below the link changed
+sampling parity and some previously unsampled orange became sampled. Confirmed
+by opening the frame: **no orange element was added.** The saturated pixels are
+the rail's active item, the credits pill, "Usage" and the platform marks,
+exactly as before. This is a limit of a fixed-phase sampler on a full-page
+capture, and it is why the absolute count is printed rather than the percentage
+alone.
 
-> **What none of this settles.** §2.3's headline comparison is Sahoda's
-> `/settings` at 0.505% against the reference's 0.030%. `/settings` is not in this
-> lane and was not measured here, and — per §1 — these figures cannot be laid
-> beside §2.3's own in any case. What is supported is that four routes in this
-> lane spend materially less orange than they did, measured the same way, before
-> and after, by an instrument that was calibrated first.
+> **What none of this settles.** §2.3's headline is Sahoda's `/settings` at
+> 0.505% against the reference's 0.030%. `/settings` is not in this lane, was
+> not measured here, and — per §1 — could not be laid beside §2.3's figures
+> anyway. What is supported: four routes in this lane spend materially less
+> orange than they did, measured the same way, before and after, by an
+> instrument calibrated first and shown red.
 
 ---
 
@@ -435,12 +489,107 @@ both layers, and the mutation that produces exactly that defect turns it red.
 
 ---
 
-## 8 · Every guard written, and what each cannot see
+## 8 · Every guard written, shown red, and what each cannot see
 
-*(completed below)*
+**Every one of these was executed against the defect it exists for**, not
+reasoned about. A guard that cannot fail is worse than none, because a green
+result is read as evidence.
+
+| guard | what it catches | shown red by | what it CANNOT see |
+|---|---|---|---|
+| `e2e/helpers/accent.test.ts` (9) | the accent meter mis-reading, or reporting a clean frame it could not decode | flipping `s > SAT_MIN` to `>=` — the boundary case went 0% → 100% | it grades the METER, not any screen. It cannot tell you a route regressed; only that the number describing it is arithmetically right. And it says nothing about the sampler's fixed phase, which §6 had to explain by hand. |
+| `schedule-choices.test.ts` (14) | a named time whose label disagrees with the instant it commits; a delivery promise tighter than the cron can keep | — (its subject is new code; the shape is guarded at the component layer below) | it is pure. It cannot see whether the CHOICES REACH A SCREEN, which is exactly the gap `docs/34` found — the old picker's logic was fine and unreachable. |
+| `schedule-field.test.tsx` (22, 8 new) | the label lying; the delivery window shown when the dispatcher is off; selection carried by colour alone | 3 mutations: morning committing the evening hour (1 red), ungating the range (5 red), `aria-pressed={false}` (1 red) | jsdom has no layout, so it cannot see the pills WRAP correctly at 390 — that is settled by the frames in §6, not here. |
+| `publish-now.test.tsx` (14, 6 new) | a footnote naming a channel the post does not carry, or promising a publish under a block refusing one | restoring the original unconditional line — **3 red** | it reads the rendered text. It cannot tell you the sentence is *good*, only that it is not making a claim about the wrong channel. |
+| `commit-bar.test.tsx` (6, all new) | a full-width bar carrying one grey phrase and no control; and the wrong repair, which is hiding on `idle` alone | the component had NO test at all before this, which is why the defect survived two audits | `.sticky` is matched by class, so a refactor that renames the wrapper would make the "no bar" assertions pass vacuously. The counterweight tests (bar present) are what stop that being silent. |
+| `use-step-history.test.tsx` (8, all new) | Back leaving the flow; **Forward killed by a Back that pushes**; Next's router keys destroyed; a foreign popstate blanking the screen | 4 mutations, each caught by its own: pop-that-pushes (**2 red, incl. forward-after-Back**), push-instead-of-replace (1), replace-instead-of-spread (1), no `isStep` (1) | jsdom's history is real but its ROUTER is not — it cannot see Next degrading a soft navigation into a full reload. That is why §7's browser leg exists. |
+| `media-pane.test.tsx` (+5) | six blocks explaining media on a post with none — and the wrong repair, deleting the claims | the absence assertions are paired with "…and BOTH come back the moment a file lands", without which they would pass against a component that lost them | it asserts presence, not position. It cannot see that the notes are in the WRITING column, which is what made them a defect rather than clutter. |
+| `flow-journeys.spec.ts` (10, all new) | reload / Back / Forward / deep link / two tabs, in a real browser | the onboarding legs go red against the pre-hook build by construction — Back left the route | it is a READ-side check for the two-tab case. The concurrent WRITE collision is `docs/23`'s subject and `concurrent-edit.spec.ts` owns it; this deliberately does not duplicate it. |
+| `flow-frames.spec.ts` (6) | a capture that silently shot fewer frames than it claims | it asserts an exact frame count per combo, so a selector that stopped matching fails rather than reporting green | **it cannot judge a frame.** It proves 108 distinct images exist; only opening them settles what is in them, which is why §3 quotes what was seen and not what was counted. |
+| `design-lint` ratchet | a hand-written font size creeping back | reintroducing one `text-[12.5px]` — **FAIL, NEW in 1 file** | it reads SOURCE. A size arriving through a variable, a `cn()` branch or a token indirection is invisible to it. |
+
+**Tightened, not loosened:** the font-size baseline went **838 → 828** (five
+files improved) and the new number was shown to bite. Spacing stays at 139 and
+breakpoints at 0 — untouched, neither loosened nor claimed as progress.
+
+### The one test that was changed, and why it is not a loosened guard
+
+Four assertions in `schedule-field.test.tsx` reached the native `datetime-local`
+directly, because it was the only control the field had — **and that was the
+defect being fixed.** The input now sits one click behind *Pick an exact time*.
+
+Every guarantee those four asserted is unchanged and still asserted: the
+wall-clock rendering, the re-sync when the stored value is replaced, the clear,
+and the keystroke that must not be eaten. What changed is how the test navigates
+to the control, which is a property of the screen rather than of the promise. The
+named-time path **added** eight guards rather than replacing any. One assertion
+did get stronger: "clears the field" now also requires the field to have folded
+back to the named choices, which is the state a person with no schedule meets.
 
 ---
 
 ## 9 · The gate
 
-*(completed below)*
+Run against `next start` on 3272, `--concurrency=1`, never piped —
+`scripts/gate.mjs` writes each stage to `.gate/<n>-<stage>.log` and puts the
+verdict on stderr as well as stdout, precisely so a `| tail` cannot swallow it.
+
+GATE_TABLE_PLACEHOLDER
+
+**Stage 3 is quoted against `next start`, not the gate's own `pnpm dev`.** That
+is a deviation and it is stated rather than glossed: `docs/34` §11a records the
+same one, where a dev run produced 32 × `ERR_CONNECTION_REFUSED` and 24 ×
+"Could not find the module" — one dead Turbopack server, not fifty-six failures —
+and the identical commit passed against `next start`. This lane's brief requires
+`next start` for the same reason.
+
+**`.next` was cleared before the build this gate ran against.** Stage 5 leaves a
+production build behind that a later stage 3 would silently run against, and a
+turbo leg finishing in under a second is a cache replay verifying nothing.
+
+---
+
+## 10 · What this lane did NOT do
+
+Stated so a reader does not mistake silence for coverage.
+
+- **`posts.body` still has no CAS.** `post_variants` has a `version` column and a
+  compare-and-set; the canonical body does not, so two tabs editing it still
+  silently overwrite and the two editors behave differently on the same
+  collision. **Not fixed, and deliberately.** It needs a `version` column on
+  `posts`, a CAS predicate in whichever RPC owns the write, and a decision about
+  what each editor does on a losing write — a `packages/db` migration plus a
+  contract change touching every writer of the shared body. That is another
+  lane's ownership and doing it here would be a scope expansion disguised as a
+  paint job. **What it needs, precisely:** `posts.version integer not null
+  default 1`; a `save_post_body(p_id, p_expected_version, …)` RPC that updates
+  `where id = p_id and version = p_expected_version` and returns the current row
+  when it matches nothing; `useAutosave` carrying the version it read and
+  surfacing a losing write through the divergence notice the variant path
+  already has.
+- **The delivery-range sentence is proven by unit test, not by a frame.**
+  `SAHODA_PUBLISH_DISPATCH_MODE` is absent from this environment, so
+  `autoPublishEnabled()` is false and every frame shows the not-live branch. The
+  live branch WAS photographed by restarting the server with the flag on — and
+  it correctly showed the CONNECTION GAP claim outranking the timing note, since
+  the fixture's channels are unconnected. A frame of the range itself needs a
+  live connection row, which this lane did not create.
+- **`MEDIA_REQUIRED` was verified present in the copy allowlist, not against a
+  live Instagram refusal.** Stated as read, not as exercised.
+- **The composer's writing column is better, not solved.** Two "not built yet"
+  notices remain in it (inline rewrite, and the generator's terms). Both are
+  true and both are about controls that ARE on the screen, which is the test the
+  two removed ones failed — but the column is still denser than the writing in
+  it deserves.
+- **`/planner` empty renders identically for all three views.** Found by frame
+  hashing: `list`, `week` and `month` collide byte-for-byte with nothing
+  scheduled, because `ViewToggle` only renders once a post exists. Defensible
+  (empty is empty) and worth an owner's eye, because a new account cannot see
+  that a calendar exists at all until it has a post. **Logged, not fixed** — it
+  is a question about what a new workspace should be shown, not a bug.
+- **The five stranded `sahoda.e2e` workspaces in production are not this
+  lane's.** All five are dated 19–21 August, before the fixture's
+  `assertCleanupCapable` fix. Every workspace this lane created on 2026-08-23 is
+  gone: the only two rows dated today belong to LIVE Clerk users minted after
+  this lane's last capture finished — a peer session running concurrently
+  against the same database.
