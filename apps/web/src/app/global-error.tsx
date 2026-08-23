@@ -73,7 +73,7 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
                 printed. The line speaks for itself when it exists. */}
             <ErrorFallback
               title="This page didn't load"
-              body="Something broke on our side, not yours. Reload the page — if it keeps happening, contact support."
+              body="Something broke on our side, not yours. Reload the page. If it keeps happening, contact support."
               eventId={eventId}
             />
           </div>

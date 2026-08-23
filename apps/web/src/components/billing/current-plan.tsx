@@ -129,7 +129,7 @@ export function PlanUnreadable() {
         Sahoda could not read your plan just now
       </h2>
       <p className="type-body mt-1.5 text-muted">
-        Reload to try again. Nothing has changed and nothing has been charged — this is a failed
+        Reload to try again. Nothing has changed and nothing has been charged. This is a failed
         read, not a plan that ended.
       </p>
     </section>

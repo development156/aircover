@@ -144,7 +144,7 @@ export default async function SitesPage() {
         <EmptyState
           icon={Globe}
           title="Create a workspace to build a site"
-          body="Sites belong to a workspace and you don't have one yet. Nothing failed — and nothing has been charged."
+          body="Sites belong to a workspace and you don't have one yet. Nothing failed and nothing has been charged."
           action={<CreateWorkspaceButton variant="primary" />}
         />
       ) : preview === null ? (

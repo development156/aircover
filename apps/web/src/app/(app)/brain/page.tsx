@@ -46,7 +46,7 @@ export default async function BrainPage() {
         <EmptyState
           icon={BrainCircuit}
           title="Create a workspace to build a Brand Brain"
-          body="A Brand Brain belongs to a workspace and you don't have one yet. Nothing failed — there is simply no brain to show."
+          body="A Brand Brain belongs to a workspace and you don't have one yet. Nothing failed. There is simply no brain to show."
           action={<CreateWorkspaceButton variant="primary" />}
         />
       </div>

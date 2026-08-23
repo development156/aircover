@@ -145,5 +145,5 @@ export default async function SettingsPlanPage() {
 const AVAILABLE_HINT: Record<BalanceRead['status'], string> = {
   ok: 'What you can spend right now.',
   'no-workspace': 'Credits belong to a workspace and you don’t have one yet.',
-  unreadable: 'We could not read your balance just now — this is not a zero.',
+  unreadable: 'We could not read your balance just now. This is not a zero.',
 }

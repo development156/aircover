@@ -58,7 +58,7 @@ export default function OnboardingError({
             space. It speaks for itself when it exists. */}
         <ErrorFallback
           title="Setup didn't load"
-          body="Something broke on our side, not yours. Try again to restart setup — if it keeps happening, contact support."
+          body="Something broke on our side, not yours. Try again to restart setup. If it keeps happening, contact support."
           eventId={eventId}
           onRetry={reset}
         />

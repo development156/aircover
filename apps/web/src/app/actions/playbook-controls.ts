@@ -27,7 +27,7 @@ function messageFor(raw: string, fallback: string): string {
     INVALID_WORKSPACE: 'That workspace no longer exists.',
     WRONG_STATUS: 'That run is not waiting for approval.',
     NOTHING_INCLUDED: 'Keep at least one draft, or stop the run instead.',
-    ESTIMATE_CHANGED: 'The list changed while you were looking — check the new total.',
+    ESTIMATE_CHANGED: 'The list changed while you were looking. Check the new total.',
   }
   for (const [code, copy] of Object.entries(known)) if (raw.includes(code)) return copy
   return fallback

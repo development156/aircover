@@ -97,7 +97,7 @@ export default async function PostsPage({
         <EmptyState
           icon={SquarePen}
           title="Create a workspace to start writing"
-          body="Posts belong to a workspace and you don't have one yet. Nothing failed — there is simply nowhere to keep a draft until one exists."
+          body="Posts belong to a workspace and you don't have one yet. Nothing failed. There is simply nowhere to keep a draft until one exists."
           action={<CreateWorkspaceButton variant="primary" />}
         />
       ) : posts.length === 0 ? (

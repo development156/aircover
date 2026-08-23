@@ -46,7 +46,7 @@ export default async function AssetsPage() {
         <EmptyState
           icon={FolderOpen}
           title="Sahoda could not read your library"
-          body="This is not a claim that it is empty — the list did not come back. Reload the page."
+          body="This is not a claim that it is empty. The list did not come back. Reload the page."
         />
       </Shell>
     )

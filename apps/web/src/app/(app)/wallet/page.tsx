@@ -36,7 +36,7 @@ export default async function WalletPage() {
         <EmptyState
           icon={Wallet}
           title="Create a workspace to open your wallet"
-          body="Credits belong to a workspace and you don't have one yet. Nothing failed and nothing was charged — there is simply no wallet to show."
+          body="Credits belong to a workspace and you don't have one yet. Nothing failed and nothing was charged. There is simply no wallet to show."
           action={<CreateWorkspaceButton variant="primary" />}
           tip="Your free signup credits land the moment the workspace exists."
         />

@@ -27,7 +27,7 @@ function messageFor(raw: string, fallback: string): string {
     INVALID_CYCLE: 'That cycle no longer exists.',
     WRONG_STATUS: 'That cycle is not waiting for approval.',
     NOTHING_INCLUDED: 'Keep at least one post, or cancel the week instead.',
-    ESTIMATE_CHANGED: 'The plan changed while you were looking — check the new total.',
+    ESTIMATE_CHANGED: 'The plan changed while you were looking. Check the new total.',
     ALREADY_RESOLVED: 'Someone already answered that one.',
     INVALID_DIFF: 'That suggestion is malformed and cannot be applied.',
     NO_ACTIVE_BRAIN: 'Finish your Brand Brain before accepting a learning.',

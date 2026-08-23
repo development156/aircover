@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button'
 // can quote to support, which resolves to the detail on OUR side.
 export function ErrorFallback({
   title = "This screen didn't load",
-  body = 'Something broke on our side, not yours. Try again in a moment — if it keeps happening, contact support.',
+  body = 'Something broke on our side, not yours. Try again in a moment. If it keeps happening, contact support.',
   eventId,
   onRetry,
 }: {

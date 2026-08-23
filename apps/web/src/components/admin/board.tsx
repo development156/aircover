@@ -22,7 +22,7 @@ export async function Board() {
           Board
         </h2>
         <p className="mt-1.5 text-[13px] text-muted">
-          We couldn&apos;t read the board just now. The cards are safe — this is our read failing.
+          We couldn&apos;t read the board just now. The cards are safe. This is our read failing.
           Reload to try again.
         </p>
         {tasks.eventId ? (

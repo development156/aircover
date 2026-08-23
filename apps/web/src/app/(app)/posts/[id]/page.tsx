@@ -69,7 +69,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
         <EmptyState
           icon={SquarePen}
           title="Create a workspace to start writing"
-          body="A post belongs to a workspace and you don't have one yet. Nothing failed — there is simply nowhere to keep what you write until one exists."
+          body="A post belongs to a workspace and you don't have one yet. Nothing failed. There is simply nowhere to keep what you write until one exists."
           action={<CreateWorkspaceButton variant="primary" />}
         />
       )

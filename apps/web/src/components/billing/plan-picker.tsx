@@ -79,7 +79,7 @@ export function PlanPicker({ subscription }: { subscription: SubscriptionView })
                 message:
                   `A real ${checkout.mode} order was opened for ` +
                   `${rupees(checkout.amountDuePaise)}. Nothing was charged and no credits ` +
-                  `were added — the payment page is not reachable from the app yet.`,
+                  `were added. The payment page is not reachable from the app yet.`,
               }
             : { ok: true, message: 'Checkout is ready. Credits land once the payment clears.' }
           : { ok: false, message: checkout.message },

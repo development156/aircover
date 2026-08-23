@@ -19,7 +19,7 @@ export default async function ApplicationsPage() {
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
         >
-          We couldn&apos;t read the inbox just now — this is our read failing, not an empty inbox.
+          We couldn&apos;t read the inbox just now. This is our read failing, not an empty inbox.
           Nobody&apos;s application has been lost. Reload to try again.
         </div>
         {applications.eventId ? (

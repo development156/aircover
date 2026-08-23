@@ -19,7 +19,7 @@ export default async function TeamPage() {
           role="alert"
           className="rounded-input border border-danger-bg bg-danger-bg px-3 py-2.5 text-[13px] text-danger"
         >
-          We couldn&apos;t read the team just now — this is our read failing, and nobody&apos;s
+          We couldn&apos;t read the team just now. This is our read failing, and nobody&apos;s
           access has changed. Reload to try again.
         </div>
         {admins.eventId ? (

@@ -116,7 +116,7 @@ export async function eraseWorkspaceData(typed: string): Promise<EraseState> {
       const count = sweep.failed.length + sweep.leftUnread.length
       return {
         ok: false,
-        message: `${count === 1 ? 'One of your files' : `${count} of your files`} could not be deleted, so nothing else was deleted either. Try again in a moment — if it keeps happening, write to support@sahodalabs.com.`,
+        message: `${count === 1 ? 'One of your files' : `${count} of your files`} could not be deleted, so nothing else was deleted either. Try again in a moment. If it keeps happening, write to support@sahodalabs.com.`,
       }
     }
 

@@ -76,7 +76,7 @@ export default async function ResolveConsolePage() {
       <EmptyState
         icon={BrainCircuit}
         title="Create a workspace to resolve a Brand Brain"
-        body="A Brand Brain belongs to a workspace and you don't have one yet. Nothing failed — there is simply nothing to resolve."
+        body="A Brand Brain belongs to a workspace and you don't have one yet. Nothing failed. There is simply nothing to resolve."
         action={<CreateWorkspaceButton variant="primary" />}
       />
     )

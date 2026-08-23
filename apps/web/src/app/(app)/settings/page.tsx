@@ -35,7 +35,7 @@ export default async function SettingsPage() {
       <EmptyState
         icon={SlidersHorizontal}
         title="Nothing to configure yet"
-        body="Settings belong to a workspace and you don't have one yet. Nothing failed — there is simply nothing to show until one exists."
+        body="Settings belong to a workspace and you don't have one yet. Nothing failed. There is simply nothing to show until one exists."
         // MEASURED across all 19 routes on a seeded account: this was the ONE
         // no-workspace screen that named the remedy and then did not offer it.
         // /home, /posts, /planner, /wallet, /connections and /sites all put the

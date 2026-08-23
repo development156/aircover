@@ -49,7 +49,7 @@ const RPC_MESSAGES: Record<string, string> = {
   UNKNOWN_PLAN: 'That plan is not available.',
   NOT_A_DOWNGRADE: 'Moving up a plan takes effect straight away and goes through payment.',
   NO_PERIOD_END: 'Sahoda could not find the end of your current billing month.',
-  INVALID_GSTIN: 'That GSTIN is not valid — check the 15 characters.',
+  INVALID_GSTIN: 'That GSTIN is not valid. Check the 15 characters.',
   INVALID_STATE: 'Choose the state your business is registered in.',
   INVALID_COUNTRY: 'Choose the country your business is in.',
   INVALID_NAME: 'Enter the legal name the invoice should be made out to.',

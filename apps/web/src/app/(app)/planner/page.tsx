@@ -139,7 +139,7 @@ export default async function PlannerPage({
             <EmptyState
               icon={CalendarDays}
               title="Create a workspace to plan a week"
-              body="A plan belongs to a workspace and you don't have one yet. Nothing failed — there is simply no week to fill until one exists."
+              body="A plan belongs to a workspace and you don't have one yet. Nothing failed. There is simply no week to fill until one exists."
               action={<CreateWorkspaceButton variant="primary" />}
             />
           ) : posts.length === 0 ? (
