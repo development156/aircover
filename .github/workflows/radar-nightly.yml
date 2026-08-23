@@ -12,9 +12,10 @@
 # GitHub fires `schedule` only from a repository's DEFAULT branch. So this file must be on
 # the default branch to be armed at all, and the code it runs is fetched by the checkout
 # step below rather than being whatever the default branch happens to hold. Point the
-# repository variable RADAR_REF at the branch carrying the collector.
+# repository variable SAHODA_JOBS_REF at the branch carrying the collector — ONE variable
+# for all four jobs. See .github/workflows/README.md.
 #
-# ⚠ THIS WORKFLOW IS NOT ARMED UNTIL RADAR_REF AND THE SECRETS ARE SET. ⚠ Until then it
+# ⚠ ARMED 2026-08-23 BUT DELIBERATELY OFF — see the `if:` on the job below. ⚠ Until it
 # can only be started by hand from the Actions tab, which is deliberate: the first night
 # it runs it will start spending money, and that should be a decision somebody makes.
 name: radar-nightly
@@ -31,7 +32,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Branch or SHA carrying the collector (blank = the RADAR_REF variable)'
+        description: 'Branch or SHA carrying the collector (blank = the SAHODA_JOBS_REF variable)'
         required: false
         type: string
       batch:
@@ -59,6 +60,31 @@ permissions:
 
 jobs:
   sweep:
+    # ⚠ ARMED BUT OFF, AND THAT IS DELIBERATE. ⚠
+    #
+    # Every other job here reads. This one SPENDS — Apify and Zyte bill a card, per
+    # source, every night, forever. Putting the file on the default branch is what
+    # makes the schedule exist; this line is what stops the schedule from spending
+    # before a person has said so. Set the repository variable RADAR_NIGHTLY to the
+    # literal `on` and the next night runs.
+    #
+    # EXACT-MATCH, AND ONLY FOR THE ON DIRECTION, the same rule as
+    # `SAHODA_LOOP_CRON_MODE` in the app: a typo leaves it OFF, which is the safe
+    # direction for anything that spends money.
+    #
+    # A MANUAL DISPATCH IS NOT GATED. A person typing the run into the Actions UI
+    # has already consented, and needing to set a variable first would mean the only
+    # way to test the job is to arm it permanently.
+    #
+    # WHAT ONE RUN COSTS. `app.radar_begin_fetch` refuses before the provider is
+    # called, against `radar_limits.daily_cap_micros` — default 2000000 micros, and
+    # 50000 per workspace. So a night is bounded at $2.00 whatever happens, with an
+    # Apify profile fetch estimated at 2600 micros ($0.0026). MEASURED 2026-08-23:
+    # competitors, competitor_sources and competitor_subscriptions are ALL EMPTY in
+    # production, so the first run after arming costs exactly nothing until somebody
+    # subscribes to something.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' || vars.RADAR_NIGHTLY == 'on' }}
     runs-on: ubuntu-latest
     # A wall, not a budget. The measured pass is one HTTP request per website and one
     # Apify run (~12s) per social account; twenty minutes covers a hundred sources with
@@ -68,8 +94,29 @@ jobs:
       - name: Check out the collector
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || vars.RADAR_REF || 'wt-radar' }}
+          ref: ${{ inputs.ref || vars.SAHODA_JOBS_REF || 'wt-integrate3' }}
           fetch-depth: 1
+
+      # ── WHICH CODE DID THIS RUN EXECUTE? ─────────────────────────────────────
+      # The schedule fires from the DEFAULT branch; the code comes from wherever
+      # `SAHODA_JOBS_REF` points. Those are two different commits, and a reader of
+      # a finished run has no way to tell what the second one was — the checkout
+      # step logs the ref it was ASKED for, not what it got, and a branch moves.
+      # So every run states it, in the run summary rather than buried in a log.
+      - name: Say which code this run executes
+        run: |
+          {
+            echo '### Code under this run'
+            echo
+            echo '| | |'
+            echo '|---|---|'
+            printf '| asked for | `%s` |\n'   "$REQUESTED"
+            printf '| resolved to | `%s` |\n' "$(git rev-parse HEAD)"
+            printf '| subject | %s |\n'       "$(git log -1 --pretty=format:%s)"
+            printf '| committed | %s |\n'     "$(git log -1 --pretty=format:%cI)"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          REQUESTED: ${{ inputs.ref || vars.SAHODA_JOBS_REF || 'wt-integrate3' }}
 
       - name: Set up Node
         uses: actions/setup-node@v4

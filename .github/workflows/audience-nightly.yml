@@ -1,29 +1,25 @@
 # The nightly AUDIENCE collection.
 #
 # ── READ THIS BEFORE ASSUMING IT RUNS ────────────────────────────────────────
-# IT IS NOT ARMED, AND A LANE CANNOT ARM IT.
+# ARMED 2026-08-23, and a lane CAN arm it now.
 #
-# GitHub fires `schedule` only from a repository's DEFAULT branch. This file is on
-# `wt-audience`, so the `schedule` block below is inert here — it becomes live only
-# when this file is on the default branch. Pushing it there is an owner decision,
-# not a task, and `main` is what the deployed product is cut from.
+# GitHub fires `schedule` only from a repository's default branch, so for as long as
+# this file lived only on the lane that wrote it, it was a file and not a workflow.
+# That is no longer a hand ritual per job:
 #
-# There are two ways to arm it, and the second is better:
+#     node scripts/ci/arm-workflows.mjs --apply
 #
-#   1. Copy this file to the default branch, and point `vars.AUDIENCE_REF` at a
-#      branch that carries `apps/jobs/scripts/audience-capture.ts`.
+# copies every schedule-carrying workflow onto the Actions repository's default
+# branch and then asks GitHub whether it registered. See .github/workflows/README.md
+# for why the Actions repository is IDIVASM/sahodalabs and not the deploy repo.
 #
-#   2. BETTER — add the one step at the bottom of this file to the EXISTING
-#      `metrics-nightly.yml`, which is already on the default branch and already
-#      armed, and repoint `vars.METRICS_REF` at a branch carrying both scripts.
-#      One schedule, one checkout, one install, two passes. The install step there
-#      (`--filter @sahoda/jobs...`) already covers everything this needs, and the
-#      four secrets are already wired.
+# FIRST SCHEDULED RUN: the night of 2026-08-23, 20:20 UTC.
 #
-# Option 2 is preferred for the reason `metrics-nightly.yml` gives about itself: a
-# stopgap that puts a second thing to remember in a second place is worse than one
-# that puts it in the same place. This file exists so the work is not blocked on
-# that decision, and so the decision is a two-line diff rather than an authoring job.
+# The alternative once considered — folding this into `metrics-nightly.yml` so there
+# is one schedule rather than two — is no longer the cheaper option. Arming a job is
+# now one command, and the two passes are deliberately twenty minutes apart so they
+# never contend for the same Zernio rate-limit window. Separate files keep that
+# spacing visible and let one job fail without taking the other's night with it.
 #
 # ── WHY NOT JUST FOLD IT INTO runMetricCapture ───────────────────────────────
 # They are siblings, not halves. The metric pass's unit is a published CHANNEL and
@@ -51,7 +47,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Branch or SHA carrying the collector (blank = the AUDIENCE_REF variable)'
+        description: 'Branch or SHA carrying the collector (blank = the SAHODA_JOBS_REF variable)'
         required: false
         type: string
       batch:
@@ -84,8 +80,29 @@ jobs:
       - name: Check out the collector
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || vars.AUDIENCE_REF || 'wt-audience' }}
+          ref: ${{ inputs.ref || vars.SAHODA_JOBS_REF || 'wt-integrate3' }}
           fetch-depth: 1
+
+      # ── WHICH CODE DID THIS RUN EXECUTE? ─────────────────────────────────────
+      # The schedule fires from the DEFAULT branch; the code comes from wherever
+      # `SAHODA_JOBS_REF` points. Those are two different commits, and a reader of
+      # a finished run has no way to tell what the second one was — the checkout
+      # step logs the ref it was ASKED for, not what it got, and a branch moves.
+      # So every run states it, in the run summary rather than buried in a log.
+      - name: Say which code this run executes
+        run: |
+          {
+            echo '### Code under this run'
+            echo
+            echo '| | |'
+            echo '|---|---|'
+            printf '| asked for | `%s` |\n'   "$REQUESTED"
+            printf '| resolved to | `%s` |\n' "$(git rev-parse HEAD)"
+            printf '| subject | %s |\n'       "$(git log -1 --pretty=format:%s)"
+            printf '| committed | %s |\n'     "$(git log -1 --pretty=format:%cI)"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          REQUESTED: ${{ inputs.ref || vars.SAHODA_JOBS_REF || 'wt-integrate3' }}
 
       - name: Set up Node
         uses: actions/setup-node@v4
