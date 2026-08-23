@@ -198,6 +198,30 @@ async function bootstrap(page: Page): Promise<void> {
   } catch {
     /* already bootstrapped */
   }
+
+  /**
+   * ── THIS BOOTSTRAP ENDS ON /onboarding, AND SINCE wt-boot THAT MATTERS ───────
+   * The lines above deliberately wait for `/onboarding`, so the user they leave
+   * behind is a workspace with NO Brand Brain — `onboardingStateRead` calls that
+   * `not-started`. `(app)/layout.tsx` now asks `decideLanding()` first, and a
+   * `not-started` account is redirected off /home, so the shell this whole file
+   * measures never renders and `railWidth` waits 300s for an <aside> that was
+   * never going to arrive.
+   *
+   * Neither branch could see it: the landing rule and this spec were written in
+   * different lanes, and each was green alone.
+   *
+   * The defer cookie is the product's OWN "Save & exit" path — `landing.ts` sends
+   * a deferred visitor `through` — so this asks for the dashboard the way a real
+   * customer does, rather than faking a Brand Brain this spec has no use for.
+   */
+  await page.context().addCookies([
+    {
+      name: 'sahoda_onb_defer',
+      value: '1',
+      url: new URL(page.url()).origin,
+    },
+  ])
 }
 
 async function railWidth(page: Page): Promise<number> {
