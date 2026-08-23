@@ -8,6 +8,20 @@ import { quarantineInline } from '@sahoda/research'
 /**
  * THE PROMPT AND THE FENCE MUST NAME THE SAME TWO TOKENS.
  *
+ * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
+ * It reads ONE file's text — `tasks/brand-guidelines.ts`, at whatever
+ * `require.resolve('@sahoda/mesh')` points at:
+ *  · every OTHER mesh task. A second task that fences untrusted text with its
+ *    own markers is not checked by anything, here or elsewhere;
+ *  · a prompt assembled at runtime, or tokens built by concatenation or from a
+ *    constant — this greps for the literal strings in source;
+ *  · whether the fence is APPLIED anywhere. It proves the prompt and the writer
+ *    agree on markers, not that any call site actually fenced its input;
+ *  · whether the model HONOURS the sentences. Three regexes prove the claim is
+ *    present in the prompt, which is not the same fact as it being obeyed — and
+ *    the note at the top of quarantine.ts records that published injection
+ *    defences were bypassed with over 90% success.
+ *
  * `packages/mesh` cannot import `@sahoda/research` — the layering runs the other
  * way — so `brand_guidelines`'s system prompt repeats the delimiters as literal
  * text. That is a second copy, and `quarantine.ts` is explicit about what a

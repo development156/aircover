@@ -210,6 +210,21 @@ describe('when the stored evidence is shown to a model, it arrives quarantined',
 
 describe('the strongest claim, enforced instead of asserted in prose', () => {
   /**
+   * ── WHAT IT CANNOT SEE ─────────────────────────────────────────────────────
+   * It greps `from '@sahoda/mesh` over the .ts files under THIS directory:
+   *  · a model reached without that import at all — a direct fetch to a provider
+   *    endpoint, or an HTTP client given a provider URL — is not an import and is
+   *    invisible here;
+   *  · the specifier written any other way: a dynamic `import()`, a `require`, a
+   *    re-export through a barrel, or DOUBLE QUOTES. The pattern is single-quoted
+   *    because that is what this repo's formatter emits, which makes it a
+   *    spelling match, and a spelling match is the exact defect the file above it
+   *    exists to refuse;
+   *  · anything OUTSIDE src/radar. The walk is directory-scoped, so a helper in
+   *    another directory that radar imports, and which itself imports mesh, is
+   *    reached at runtime and never read here;
+   *  · .test.ts files, excluded from the walk deliberately.
+   *
    * "NO MODEL RUNS IN RADAR INGESTION AT ALL" is the header's claim and the whole
    * reason a hostile competitor page cannot do anything here — there is no prompt
    * to inject into. Until now it was a sentence. A sentence is not a guard: the
