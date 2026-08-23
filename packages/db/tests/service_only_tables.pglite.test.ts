@@ -6,7 +6,8 @@ import { bootFullSchema } from './helpers/pglite-tenant'
 /**
  * THE TABLES THAT DENY EVERYONE, PINNED AS A DECISION RATHER THAN AN ACCIDENT.
  *
- * Eleven tables carry `enable row level security` and NO policies at all. That
+ * NINE tables on this branch carry `enable row level security` and NO policies
+ * at all — eleven in production, and the split is explained below. That
  * denies every read and write by `anon` and `authenticated`, and it is
  * deliberate — `ai_provider_logs` says so in its own migration: "no policies:
  * service-only — raw COGS is margin data, not user-facing". The last audit read
@@ -42,26 +43,31 @@ const SERVICE_ONLY: ReadonlyArray<readonly [table: string, why: string]> = [
   ['clerk_id_map', 'the dev-to-production subject remap; empty, and read by no application code'],
   ['connection_secrets', 'THE OAUTH TOKEN VAULT. A policy here is a token disclosure'],
   ['invoice_serials', 'the invoice counter; a member reading it learns other customers volumes'],
+  [
+    'ledger_actor_redactions',
+    'whether a workspace name may be shown on its own credit record — Sahoda’s decision record, not the customer’s content. Arrived from wt-dpdp at integration on 2026-08-23: wt-sec wrote this list and wt-dpdp created the table, and neither branch could see the other',
+  ],
   ['radar_fetch_log', 'per-fetch provider cost; those prices are ours, not the customers'],
   ['radar_limits', 'the global spend cap — one row nobody may read or move'],
 ]
 
 /**
  * ── THIS ASSERTS THE MIGRATIONS, AND PRODUCTION HAS FOUR MORE ───────────────
- * MEASURED 2026-08-23. Production's policy-free set is ELEVEN, not eight, and
+ * MEASURED 2026-08-23. Production's policy-free set is ELEVEN, not nine, and
  * the difference is not drift in the policies — it is drift in the TABLES:
  *
  *   in prod, created by no migration on this branch:
  *       brands, elements, jobs, ledger   (all RLS on, 0 policies, 0-1 rows)
  *   on this branch, absent from prod:
- *       clerk_id_map     (20260805000000 has never been applied there)
+ *       clerk_id_map              (20260805000000 has never been applied there)
+ *       ledger_actor_redactions   (20260823000000 is deliberately unapplied)
  *
  * The four are legacy, they predate the migration set, and they deny everyone —
  * so they are untracked schema rather than an opening. This test cannot assert
  * them: it boots the migrations, and a table no migration creates cannot appear.
  * The prod-side check is `audit/sec/schema-drift.mjs`, which needs credentials
  * and therefore cannot be a gate leg. Naming the split here is what stops the
- * next reader treating eight as a contradiction of eleven.
+ * next reader treating nine as a contradiction of eleven.
  */
 
 let db: PGlite
