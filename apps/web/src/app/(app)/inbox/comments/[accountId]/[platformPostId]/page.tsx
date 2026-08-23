@@ -57,7 +57,7 @@ export default async function PostCommentsPage({
         <SurfaceList
           title="Comments"
           isEmpty={!listDecision.showList || siblings.length === 0}
-          emptyLine="Nothing else to show."
+          waitingLine="Other posts with comments appear here."
         >
           {(listDecision.showList ? siblings : []).map((post) => (
             <SurfaceRow key={`${post.accountId}:${post.id}`}>

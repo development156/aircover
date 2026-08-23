@@ -36,9 +36,7 @@ export default async function InboxReviewsPage() {
         <SurfaceList
           title="Reviews"
           isEmpty={reviews.length === 0}
-          emptyLine={
-            decision.showList ? 'Nothing to show for the accounts we asked.' : 'Nothing read yet.'
-          }
+          waitingLine="Reviews people leave on your Google Business Profile appear here."
         >
           {reviews.map((review) => (
             <SurfaceRow key={`${review.accountId}:${review.id}`}>

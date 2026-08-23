@@ -47,7 +47,11 @@ export default async function InboxMessagesPage() {
       list={
         <ConversationList
           conversations={conversations}
-          emptyLine={decision.showList ? 'No conversations yet.' : 'Nothing read yet.'}
+          title="Conversations"
+          /* Future tense, subject Sahoda: what this column holds, never whether
+             it holds anything. The absence, its reason and its remedy are stated
+             once, in the thread pane, from `InboxEmptiness`. */
+          waitingLine="Conversations appear here as they arrive, newest first."
         />
       }
       thread={

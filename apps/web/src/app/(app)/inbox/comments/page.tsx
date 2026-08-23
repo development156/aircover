@@ -31,7 +31,7 @@ export default async function InboxCommentsPage() {
         <SurfaceList
           title="Comments"
           isEmpty={posts.length === 0}
-          emptyLine={decision.showList ? 'No posts have comments yet.' : 'Nothing read yet.'}
+          waitingLine="Posts people have commented on appear here, most recent first."
         >
           {posts.map((post) => (
             <SurfaceRow key={`${post.accountId}:${post.id}`}>

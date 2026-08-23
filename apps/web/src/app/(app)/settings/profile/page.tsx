@@ -24,7 +24,7 @@ export default async function SettingsProfilePage() {
         label="Email"
         hint="You sign in with this."
         control={
-          <span className="text-[13px] font-[550] text-ink">
+          <span className="type-sm font-[550] text-ink">
             {user?.primaryEmailAddress?.emailAddress ?? 'Not recorded'}
           </span>
         }
@@ -33,7 +33,7 @@ export default async function SettingsProfilePage() {
         label="Name"
         hint="Shown on anything you approve."
         control={
-          <span className="text-[13px] font-[550] text-ink">
+          <span className="type-sm font-[550] text-ink">
             {[user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Not set'}
           </span>
         }

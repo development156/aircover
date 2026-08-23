@@ -38,11 +38,31 @@ function nameOf(c: ZernioConversation): string {
 
 export function ConversationList({
   conversations,
-  emptyLine,
+  waitingLine,
+  title = 'Conversations',
 }: {
   conversations: ZernioConversation[]
-  /** One short line for when there is nothing. The REASON lives in the thread pane. */
-  emptyLine: string
+  /**
+   * ── NOT AN EMPTY STATE. A STATEMENT OF WHAT THIS COLUMN HOLDS ─────────────
+   * This prop used to be `emptyLine`, and the pages passed an absence claim into
+   * it — "No conversations yet." / "Nothing read yet." — while the thread pane
+   * two columns over stated the SAME absence with its reason and its remedy.
+   * That is two announcements of one nothing, and the shell's own header
+   * forbids it: "EMPTINESS IS STATED ONCE PER SCREEN, NEVER ONCE PER PANE."
+   *
+   * Worse, the two could disagree. MEASURED at 1440 on a workspace that had
+   * connected nothing: this pane said "Nothing read yet" (a claim about a READ)
+   * while the thread pane said the account was never connected (a claim about a
+   * CONNECTION). Neither was false; together they described two different
+   * situations, on the screen every beta user meets on day one.
+   *
+   * So the line is now future tense with Sahoda as its subject — what will
+   * appear in this column — which asserts nothing about presence or absence and
+   * therefore cannot contradict the pane that does.
+   */
+  waitingLine: string
+  /** The surface's own noun. NEVER "Inbox" — the page <h1> already says that. */
+  title?: string
 }) {
   const [query, setQuery] = useState('')
   const [channel, setChannel] = useState<string>('all')
@@ -70,7 +90,11 @@ export function ConversationList({
     <>
       <PaneHeader>
         <div className="mb-3 flex items-center gap-2">
-          <h2 className="text-[14px] font-semibold tracking-[-0.01em]">Inbox</h2>
+          {/* The page <h1> above these panes already says "Inbox", 109px away.
+              docs/37 §16: a page that says the same thing in more than one place
+              says it once, at the top. This header names the COLUMN instead,
+              which on a three-surface tab bar also says which one you are on. */}
+          <h2 className="type-h3">{title}</h2>
           {unread > 0 ? (
             <span className="ml-auto grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-tint px-[5px] text-[11px] font-bold text-accent tabular-nums">
               {unread}
@@ -119,12 +143,10 @@ export function ConversationList({
 
       <PaneScroll>
         {conversations.length === 0 ? (
-          // `CardEmpty`, not bare prose. MEASURED on /inbox: this pane, the
-          // thread pane and the context pane each said "nothing" in a DIFFERENT
-          // visual language on the same screen — the same failure docs/27 §1
-          // found on /analytics. The thread pane stays loud because it carries
-          // the REASON and the REMEDY; these two are quiet because they do not.
-          <CardEmpty body={emptyLine} />
+          // Quiet, and top-aligned rather than floated to the middle of a 730px
+          // column. The thread pane stays loud because it carries the REASON and
+          // the REMEDY; this one only says what the column is for.
+          <p className="p-3 type-meta text-muted">{waitingLine}</p>
         ) : shown.length === 0 ? (
           // Filtered to nothing is a DIFFERENT state from having nothing, and
           // it has a different remedy: change the filter, not connect a channel.
