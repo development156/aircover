@@ -1155,3 +1155,95 @@ that keeps a real `src/.something` covered.
 
 Workaround meanwhile: take scratch configuration from `process.argv`, not the
 environment.
+
+## 17 · The UX detectors run on every screen and nothing can fail
+
+**Research lane, 2026-08-24. Scope declaration and a measured defect list.** I am
+about to work in `apps/web/src/components/` and page-level UI. Girija: read this
+before starting a design session, per `08_ROLES.md`.
+
+### What I ran
+
+`e2e/ux-j3-sweep.spec.ts`, all six combos, against a production `next start`:
+**240 frames, 40 routes, 390/1024/1440, light and dark**, one fresh Clerk account
+per combo. 229 distinct by SHA. The 11 identical-frame groups are two redirects,
+confirmed from the manifest's final URLs: `/create/post` to `/posts/new` and
+`/brain/competitors` to `/radar`. So **38 real screens from 40 routes**, nothing
+silently skipped: the spec asserts one frame per route, which is the only thing
+between "forty screens audited" and "forty screens listed".
+
+### The finding that outranks the defects
+
+**`deadEnds`, `invisibleText`, `invisibleFill`, `touch`, `headings` and `motion`
+are computed for all 240 frames, written to `.ux/manifest.jsonl`, and no
+assertion anywhere reads them.**
+
+- `deadEnds` appears exactly once outside its own definition:
+  `ux-detector-selftest.spec.ts`, which tests the DETECTOR against a synthetic
+  fixture. Good practice, and not a check on the product.
+- `scripts/ux-report.mjs` does rank them, under the heading "DISABLED CONTROLS (a
+  dead end wearing an action's clothes)". It contains no `throw` and no
+  `process.exit`, and it is referenced by no `package.json` script, no
+  `turbo.json` task and no workflow. **Nothing runs it and it cannot fail.**
+
+This is `shell-probe.spec.ts` again, one layer further out: there, the 44px floor
+was measured and asserted nothing. Here a whole apparatus measures nine things
+well, self-tests its own instruments, writes a ranked report, and stops one step
+short of anything that goes red.
+
+Its default view is `summary`; the defects are behind `--view=defects`, which is
+a flag, not a positional. `node scripts/ux-report.mjs defects` silently prints
+the summary, which is how you can run this tool and see none of its findings.
+
+### The ranked list, all measured, phone first
+
+Discount `/design-system` throughout: it is a reference page that renders swatches
+and demo controls on purpose, and it dominates several rankings as a result. Every
+count below is at **390px**, which `01_CONTEXT.md` says is the product's primary
+viewport.
+
+1. **Brand-orange fills, 52 frames over the one-primary rule (docs §1.5).**
+   `/brain/knowledge` and `/connections` paint **3** at 390; `/home` and `/posts`
+   paint 2. `01_CONTEXT.md` names "four orange buttons shouting at each other" as
+   a defect a human found in a browser in the first minute. **Caveat before
+   anyone acts on this: `accent-budget.spec.ts` and `accent-area-budget.spec.ts`
+   already exist.** I have not read them, so I do not know whether they measure
+   count or area, or what threshold they allow. Read them first; this may be a
+   threshold disagreement rather than an unguarded defect.
+2. **Elements painted past the viewport, 22 frames, every one at 390.**
+   `/wallet` 11, `/ads/performance` 8, `/ads` and `/ads/budget` 7, and all six
+   `/brain/*` pages 2 each. **Stated precisely, because the two are different
+   numbers:** these are elements whose box extends past 390, which is not the
+   same as the page scrolling sideways. By `docWidth > viewport`, only
+   `/design-system` actually scrolls. The rest are painted out of view or
+   clipped, and each needs a frame opened to say which.
+3. **Three disabled controls on customer screens** — `/loop` "Plan my week · 20
+   credits", `/sites` "Generate site · 100 credits", `/settings` "Save". All six
+   combos. `docs/26 §10.3` bans `<button disabled>` for this: unfocusable,
+   unhoverable, unexplained.
+
+### What is clean, so nobody re-checks it
+
+Zero across all 240 frames: interactive elements with no accessible name, text
+under 1.25:1 against its own ground, clickable things wearing an arrow cursor,
+theme mismatches, frames under 6KB.
+
+### On the three disabled controls, corrected by looking
+
+The detector reads only `aria-describedby` and `title`, and by those it reports
+all three as unexplained. **Opening the frames says otherwise**, and the detector
+cannot see it: `/loop` prints "Connect a channel first. Sahoda has nowhere to plan
+for." directly beneath the button. That is precise copy naming a remedy that
+works, which is the product's doctrine done right.
+
+So the defect is narrower than the detector implies, and it is real:
+`generate-site-panel.tsx:162` is `disabled={blocked || name.trim() === ''}`, a
+true `disabled`, so the control leaves the tab order entirely. A keyboard or
+screen-reader user never reaches it and never hears the sentence that would tell
+them what to do, because the sentence is a sibling paragraph with nothing tying
+it to the button. The repair is `aria-disabled` plus `aria-describedby` pointing
+at the copy that already exists, and a click handler that no-ops.
+
+**What I cannot see:** I read `e2e/**` and grepped the repo for consumers of
+`manifest.jsonl`. A check living somewhere I did not look, or one reaching these
+measurements by another route, is not covered by that.
