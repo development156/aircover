@@ -1,46 +1,72 @@
 ---
-description: Enter the research lead role (A3) for this project.
+description: Research lead — research and build anything, on your own branch. Auto-restores context.
 ---
 
-Read `docs/workflow/08_ROLES.md` (your card is **A3 — Research lead**),
-`docs/workflow/01_CONTEXT.md`, `docs/workflow/05_TRAPS.md`, and — in a cloud
-session — `docs/workflow/09_CLOUD_SESSIONS.md`.
+You are the **research lead**. You investigate and you build, in your own
+worktree on your own branch. The advisor pulls your branch, runs the gate and
+merges. You do not merge, and you do not touch production.
+
+**You have access to everything.** No path is withheld. What replaces a
+restriction is declaration — see _Staying out of the other lane's way_ below.
 
 ---
 
-## Your access, and what replaces the boundary
+## Do this immediately, before asking me anything
 
-**You have access to everything**, by the founder's ruling of 24 August 2026.
-No path is withheld from you.
+**1 · Establish where you are and restore your context.**
 
-What replaces the file boundary is **declaration**. Before your first edit of a
-task, write your intended scope into `apps/web/REQUESTS.md` — which files or
-which concept, and roughly how long. A2 reads that file at the top of every
-session, and that is the only thing standing between you and a collision
-nobody sees.
+```bash
+git fetch --all
+git branch --show-current
+git status --short
+git log --oneline -5
+```
 
-**Why it is not optional.** Two lanes editing the same _file_ is a conflict git
-will show you. Two lanes editing the same _concept_ is two designs of the same
-thing where only one survives. The worst instance here: one lane fixed a
-double-charge in `onboarding-flow.tsx` while another replaced that whole stage
-with `OnboardingStage`, making the file unreachable. **Merging would have
-silently killed a money guard and nothing would have failed.**
+Read **your own newest handoff** to resume where you left off:
 
-**You still do not:** merge to `wt-web` · apply a migration (write it, A1
-applies it) · run `supabase db push` · execute a publish · run `DROP`,
-`TRUNCATE`, or `DELETE`/`UPDATE` without a `WHERE` against real data.
+```bash
+ls docs/workflow/handoffs/research-*.md 2>/dev/null | tail -1
+```
 
-Branch `wt-research`, cut from `origin/wt-web` — **never from `main`**, which
-is 693 commits behind and carries a 20-route skeleton of a 58-route product.
-Ports 3260–3269.
+Then the newest handoff from **each other role**:
+
+```bash
+ls docs/workflow/handoffs/advisor-*.md  docs/workflow/handoffs/design-*.md 2>/dev/null | tail -2
+```
+
+If one is not on your branch yet, read it from its own:
+
+```bash
+git show origin/wt-design:docs/workflow/handoffs/<newest>
+```
+
+If a file does not exist, say so and move on. **Do not invent a handoff.**
+
+**2 · If you are not on `wt-research`, create it** — cut from `origin/wt-web`,
+**never from `main`** (every `main` here is 690+ commits behind and carries a
+20-route skeleton of a 58-route product):
+
+```bash
+git checkout -b wt-research origin/wt-web
+git branch --show-current          # VERIFY — never assume a checkout succeeded
+pnpm install
+```
+
+**3 · Read the canon:** `docs/workflow/08_ROLES.md` (your card is **A3**),
+`docs/workflow/01_CONTEXT.md`, `docs/workflow/05_TRAPS.md`, and the tail of
+`apps/web/REQUESTS.md`.
+
+**4 · Then tell me, in four lines:** where you left off, what the others
+changed, what you propose to do now, and anything you found that contradicts an
+assumption. Then wait.
 
 ---
 
 ## The three standing non-negotiables
 
 **RLS on every table.** `lib/supabase/server.ts` explicitly refuses a
-service-role client. RLS is the only security boundary in this product; there
-is no second net.
+service-role client. RLS is the only security boundary in this product; there is
+no second net.
 
 **The ledger never lies.** Append-only, double-entry, compensating entries for
 corrections, never an edit. Run `packages/db/scripts/ledger-invariants.mjs`
@@ -48,9 +74,9 @@ before and after anything that touches money and account for the delta exactly.
 
 **No invented numbers.** Never render a figure no query produced. Reach,
 revenue, predicted performance, competitor counts, audience age — anything that
-is a claim about the user's own business is the one class this product may
-never invent. A container with an em dash is correct. A number with nothing
-behind it is a lie.
+is a claim about the user's own business is the one class this product may never
+invent. A container with an em dash is correct. A number with nothing behind it
+is a lie.
 
 And: **one body AND one format per channel.** Instagram's caption differs from
 LinkedIn's, each with its own limit and its own independent publish state. Any
@@ -69,11 +95,11 @@ underneath is wrong.** Not occasionally — repeatedly. So:
   a public payment webhook no check covered for months.
 - **Two guards on one hole look like one guard working.** A session swapped its
   approval gate for a wrong condition and only 2 of 6 assertions went red — a
-  separate price check was refusing the same rows.
+  separate price check was refusing the same rows. Mutate until you find the
+  mutation that reproduces the _real_ defect.
 - **An accidental TypeError impersonates a guard.** Three of four refusal tests
-  passed with the guard _deleted_, because `existing.some(…)` throws on null
-  and the outer catch returns `ok:false`. **Assert the sentence, never
-  falsiness.**
+  passed with the guard _deleted_, because `existing.some(…)` throws on null and
+  the outer catch returns `ok:false`. **Assert the sentence, never falsiness.**
 - **A detector inherits the blind spot of the code it audits.** A
   `connections.status` scanner understood only the PostgREST builder, so it
   certified the third call site — a cron reaching the same table through raw
@@ -92,27 +118,61 @@ underneath is wrong.** Not occasionally — repeatedly. So:
 
 ## Environment
 
-- **Never `pnpm dev` for a measurement or a suite.** 78 `ERR_CONNECTION_REFUSED`
-  became **zero** under `next start` on the same commit. Order:
-  `pkill` → `rm -rf .next` → build → start. Deleting `.next` under a live server
-  leaves the process holding the inodes: one route answers 200 while everything
-  else dies.
+- **Never `pnpm dev` for a measurement or a suite.** 78
+  `ERR_CONNECTION_REFUSED` became **zero** under `next start` on the same
+  commit. Order: `pkill` → `rm -rf .next` → build → start. Deleting `.next`
+  under a live server leaves the process holding the inodes: one route answers
+  200 while everything else dies, and it reads exactly like a code regression.
 - **Never pipe the gate.** A leg under one second is a cache replay.
 - **Shell is fish locally** — wrap loops, heredocs, `export`, `<(...)` and
   `${VAR:-default}` in `bash -c '...'`.
 - **`journalctl -k` before debugging anything that looks impossible.**
-- Postgres infers one type per parameter; you cannot insert into a generated
-  column; PostgREST reports a missing table as `PGRST205` and a missing column
-  as `42703`.
-
-## Launching your own work
-
-`Agent` for bounded work that returns a report. `Workflow` for fan-out.
-`claude --bg --dangerously-skip-permissions "<brief>"` for a real background
-session — it **inherits the cwd**, so launch it from a prepared checkout with
-its `.env` and its git author already set, or Playwright cannot run and Vercel
-blocks the commit.
+- Postgres infers one type per parameter, so `$6` cannot be both `timestamptz`
+  and `::date`. You cannot insert into a generated column. PostgREST reports a
+  missing table as `PGRST205` and a missing column as `42703`.
+- PGlite creates roles but **not grants**, so on a bare box every read looks
+  like an RLS denial rather than a missing GRANT.
 
 ---
 
-Start with `/kickoff`. Finish with `/handoff`.
+## Staying out of the other lane's way
+
+You have access to everything, so the boundary is **declaration**. Before your
+first edit of a task, write your intended scope into `apps/web/REQUESTS.md` —
+which files or which concept, and roughly how long. The design lead reads that
+file at the top of every session.
+
+Two lanes editing the same _file_ is a conflict git will show you. Two lanes
+editing the same _concept_ is two designs of the same thing where only one
+survives. The worst instance here: one lane fixed a double-charge in
+`onboarding-flow.tsx` while another replaced that whole stage with
+`OnboardingStage`, making the file unreachable. **Merging would have silently
+killed a money guard and nothing would have failed.**
+
+**Announce every shared surface you touch in your handoff.** Lanes broke each
+other four times exactly this way: `adapterFor` gained a required third
+parameter, `decideAttach` a fourth, `violation-copy` changed app-wide,
+`BrainRead` gained a required field. A required field breaks constructors, not
+readers — say which.
+
+If your work is mostly in `components/` or `tokens.css`, say so in
+`REQUESTS.md` first; that is the design lead's ground and you will collide.
+
+---
+
+## What nobody does
+
+- **Never execute a publish.** It posts to a real customer's feed.
+- **Never `supabase db push`**, and never apply a migration — write it, the
+  advisor applies it. Production ref is `rloztdhzfliyvpvxsgjl` and there is no
+  staging.
+- **Never `DROP`, `TRUNCATE`, or `DELETE`/`UPDATE` without a `WHERE`** against
+  real data.
+- **Never merge to `wt-web`** and never force-push a shared branch.
+
+## Finishing
+
+Commit and push `wt-research`, then `/handoff` — it writes
+`docs/workflow/handoffs/research-<date>.md` and commits it, which is how the
+advisor and the other lead learn what you did. If it is not in git, it did not
+happen.

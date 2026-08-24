@@ -50,51 +50,65 @@ not this product.
 
 ---
 
-## A1 — Advisor (the founder)
+## A1 — Advisor (the founder) — the single executor
 
-**Rules on work. Does not write code.** That constraint is the job, not a
-limitation of it: an advisor that has been editing files has a stake in the
-outcome and stops catching its own silent failures.
+**Rules on work, and is the only session that executes it.** Founder's ruling,
+24 August 2026.
+
+This amends `02_ADVISOR.md`, which says the advisor "does not write code" and
+sits "never in a worktree." Under this model the advisor still does not *author*
+changes — the two leads do — but it is the only session that pulls their
+branches, runs the gate, merges, and touches production. It therefore needs a
+worktree, and the property that survives is the one that mattered: **the advisor
+has no stake in any change's design, because it wrote none of them.**
 
 | | |
 |---|---|
-| Runs from | the repository root, `squashed-root`, **never a worktree** |
-| Branch | none of its own |
-| Owns | the merge, the release, every migration, everything money touches |
-| May merge to `wt-web` | **yes — only A1** |
-| May apply a migration | **yes — only A1** |
+| Sees | both lead branches, and everything else |
+| Pulls | `wt-design` and `wt-research` |
+| **Runs the gate** | **yes — only A1** |
+| **Merges to `wt-web`** | **yes — only A1** |
+| **Applies a migration** | **yes — only A1** |
+| **Touches production** | **yes — only A1** |
+| Launches parallel sessions | yes — new branch, new worktree, new session |
 | Port block | 3240–3249 (Lightpanda +100) |
-| Lane cap | see *The shared ceiling* below |
 
-Reads `02_ADVISOR.md` for the communication contract. Writes the briefs. Rules
-on the reports. Volunteers the uncomfortable thing once, then executes what the
-founder decides.
+**Launching a parallel session.** The advisor makes the lane — worktree, branch
+off `origin/wt-web`, `git config --worktree` author, all three `.env` copies,
+a free port — then writes a complete paste-ready brief using
+`03_SESSION_PROTOCOL.md`. The founder runs it and pastes the output back. Or,
+when told to, the advisor launches it itself with
+`claude --bg --dangerously-skip-permissions "<brief>"` from inside the prepared
+worktree, since that command **inherits the cwd**.
+
+**Merging is the most dangerous operation here** and `04_PARALLEL_SESSIONS.md`
+carries its rules. The three that get skipped: cut `wt-release` off `wt-web`
+rather than merging into trunk; run the full gate after **every single** merge,
+not at the end; and check `git rev-list --count HEAD..<branch>` first, because a
+lane can hold its whole output uncommitted and `git merge` will succeed having
+merged nothing.
 
 ---
 
-## A2 — Design lead
+## A2 — Design lead · `/lead-design`
 
-**Edits directly. This one is deliberate.**
-
-Design is a tight loop, and a lead who must describe a change, spawn an agent,
-wait and then review a report will produce worse work than one who edits. So A2
-is a *lead*, not an advisor, and the discipline comes from the file boundary
-below rather than from not-touching.
+**Builds UI and UX against the current design system.** Own worktree, own
+branch. Writes code; does not integrate it.
 
 | | |
 |---|---|
-| Branch | `wt-design`, cut from `origin/wt-web` |
-| **Owns** | `apps/web/src/components/**` · `apps/web/src/app/**/*.tsx` **presentation only** · `packages/shared/tokens.css` · `docs/37_Design_System_v5.md` |
-| **Never touches** | server actions · any query · `packages/db/**` · migrations · `packages/shared/**` except `tokens.css` · `pricing.config.json` · `.github/**` · `.claude/settings.json` |
-| May merge to `wt-web` | no — pushes `wt-design`, A1 merges |
-| May apply a migration | no |
+| Branch | `wt-design`, cut from `origin/wt-web` — **never `main`** |
+| Access | **everything.** No path is withheld |
+| Focus | `apps/web/src/components/**` · `apps/web/src/app/**/*.tsx` · `packages/shared/tokens.css` · `docs/37_Design_System_v5.md` |
+| Declares | anything outside that focus, in `apps/web/REQUESTS.md`, before the first edit |
+| Merges | no — pushes `wt-design`, A1 pulls and merges |
+| Applies a migration | no — writes it, A1 applies it |
 | Port block | 3250–3259 (Lightpanda +100) |
-| Visual channel | the branch's own Vercel preview URL |
 
 **The canon is `docs/37_Design_System_v5.md` and nothing else.** Four documents
-in this repository each claim some authority over design; three of them are
-superseded and one of those still says in its own header that it *"wins for any
-token or component value."* It does not. The chain, from each file's own header:
+here claim authority over design; three are superseded and one of those still
+says in its own header that it *"wins for any token or component value."* It
+does not. From each file's own header:
 
 ```
 docs/37_Design_System_v5.md    CANON — build from this
@@ -104,81 +118,43 @@ docs/37_Design_System_v5.md    CANON — build from this
 docs/design2.0/UI_RULES_v3.md  superseded — points back at 08 "for governance"
 ```
 
-The two demo HTMLs illustrate the v1.0 system and are **not** a reference for
-new work.
-
 **Read `docs/45_Product_Structure.md` before designing any screen.** 60,507
-words, written out of the running product's code and its production database
-rather than a specification. It carries what a design cannot be guessed from:
-every route and what a person does there, where every value on every screen
-comes from, and — the section that matters most — **what this product may not
-show.**
+words read out of the running product's code and its production database. Its
+most important section is **what this product may not show.**
 
-**Three things about this product that will otherwise produce unshippable
-screens:**
-
-- **It never renders a figure no query produced.** Reference designs are full of
-  "Reach 68K–81K" and "12 competitors tracked". Every one of those becomes a
-  container with an em dash. This is the differentiator, not a limitation.
-- **Empty states are half the product.** Nothing connected, day one, is the
-  version most people see first. It must look designed, not failed. There are
-  **seven distinct kinds of nothing** — not connected · read failed · not
-  configured · no data yet · no workspace yet · suppressed by the platform · we
-  could not check today — and each gets its own sentence and its own remedy.
-- **State is carried by fill weight, glyph and label — never by hue alone.**
-  The product distinguishes CONFIRMED from INFERRED, and that distinction has to
-  survive greyscale and re-theming.
-
-**And the mechanics that bite:**
-
-- `md:` `sm:` `lg:` **compile to nothing here.** `--breakpoint-*: initial` wiped
-  them; Tailwind emits no CSS and no warning. The real breakpoints are **700 and
-  1180**. 390 and 1440 both land in terminal bands and neither exercises
-  700–1179 — **capture 1024 as well.**
-- `apps/web`'s lint is `design-lint.mjs` and it is **ratcheted**. Adding a
-  `text-[Npx]` turns it red. The escape is `--update-baseline` *after* removing
-  violations; it refuses to loosen.
-- Editing `packages/shared/tokens.css` requires
-  `node scripts/gen-tokens-inline.mjs` — there is a generated inline copy and it
-  will drift silently.
-- **Measure the resolved pair, never the declared token.** `--surface-2` once
-  equalled `--surface` exactly in dark mode: 117 of 120 frames had a fill that
-  separated nothing, and nothing could go red because a missing 4% fill reads as
-  a design choice. The primary navigation measured 2.49:1 while every token
-  check passed.
+The three product facts that otherwise produce unshippable screens — no figure
+without a query behind it, seven distinct kinds of nothing, state carried by
+fill weight and glyph rather than hue — and the mechanics that bite, are in
+`.claude/commands/lead-design.md`. Read it; it is the working card.
 
 ---
 
-## A3 — Research lead
+## A3 — Research lead · `/lead-research`
 
-**Access to everything, by the founder's ruling of 24 August 2026.** No path is
-withheld.
-
-What replaces the file boundary is **declaration**. A3 announces the scope of a
-task in `apps/web/REQUESTS.md` *before starting it*, and A2 reads that file at
-the top of every session.
+**Researches and builds anything.** Own worktree, own branch. Writes code; does
+not integrate it.
 
 | | |
 |---|---|
-| Branch | `wt-research`, cut from `origin/wt-web` |
-| Owns | everything, by ruling |
+| Branch | `wt-research`, cut from `origin/wt-web` — **never `main`** |
+| Access | **everything.** No path is withheld |
 | Declares | intended scope in `apps/web/REQUESTS.md` before the first edit |
-| May merge to `wt-web` | no — pushes `wt-research`, A1 merges |
-| May apply a migration | **no** — writes the migration, A1 applies it |
+| Merges | no — pushes `wt-research`, A1 pulls and merges |
+| Applies a migration | no — writes it, A1 applies it |
 | Port block | 3260–3269 (Lightpanda +100) |
 
-**Why declaration is not optional.** Two lanes editing the same *file* is a
-conflict git will show you. Two lanes editing the same *concept* is two designs
-of the same thing where only one survives, and git shows you nothing. The worst
-instance in this project: one lane fixed a double-charge in
-`onboarding-flow.tsx` while another replaced that whole stage with
+**Both leads have access to everything, so the boundary is declaration.** Two
+lanes editing the same *file* is a conflict git will show you. Two lanes editing
+the same *concept* is two designs of the same thing where only one survives, and
+git shows you nothing. The worst instance here: one lane fixed a double-charge
+in `onboarding-flow.tsx` while another replaced that whole stage with
 `OnboardingStage`, making the file unreachable. **Merging would have silently
 killed a money guard and nothing would have failed.**
 
-**A3 must announce, in the handoff, every shared surface touched.** Lanes broke
-each other four times exactly this way: `adapterFor` gained a required third
-parameter, `decideAttach` a fourth, `violation-copy` changed app-wide,
-`BrainRead` gained a required field.
+**Every shared surface touched goes in the handoff.** Lanes broke each other
+four times exactly this way: `adapterFor` gained a required third parameter,
+`decideAttach` a fourth, `violation-copy` changed app-wide, `BrainRead` gained a
+required field. A required field breaks constructors, not readers — say which.
 
 ---
 
@@ -198,25 +174,42 @@ These are engineering facts, not permissions.
 - **Nobody merges their own branch to `wt-web`.** A1 merges, into a
   `wt-release` cut off `wt-web`, running the full gate after **every single
   merge** — not at the end, or you cannot tell which merge went red.
+- **Nobody but A1 runs the gate, applies a migration, or touches production.**
+  The leads verify their own work in their own sandbox; the **authoritative**
+  gate is A1's, and it is the one that decides whether something merges.
 
 ---
 
-## The shared ceiling
+## One executor
 
-**Four concurrent lanes across all three people, not four each.**
+**Execution is single-threaded, by ruling.** The advisor is the only session
+that runs the gate, merges, or touches production. The leads write code in
+their own worktrees and push; they do not integrate.
 
-Measured on the founder's machine, 24 August 2026: 15 GB total, 7 GB available.
-Each lane is a Next server plus a browser, 3–4 GB. `journalctl -k` shows
-`next-server` OOM-killed at 2.3 GB anon-rss on 22 August, and a prior session
-recorded 22 kernel OOM kills in three hours with four sessions running.
+This is what makes the whole arrangement fit. Three people writing in parallel
+costs nothing extra; three people *executing* in parallel costs ports, memory
+and a merge order nobody is holding. Measured on the founder's machine,
+24 August 2026: 15 GB total, 7 GB available, and each running lane is a Next
+server plus a browser at 3–4 GB. `journalctl -k` shows `next-server` OOM-killed
+at 2.3 GB anon-rss on 22 August, and a prior session recorded 22 kernel OOM
+kills in three hours with four sessions running.
 
-**This ceiling only binds work running on that machine.** A2 and A3 in cloud
-sandboxes do not consume it — see `09_CLOUD_SESSIONS.md`.
+**The advisor may still run several lanes at once** — it launches them, and
+before starting another it checks:
 
-**The real ceiling is review, and it is lower.** Sessions run in parallel;
-ruling on their reports is serial. Three autonomous lane-launchers can generate
-reports faster than one person can read them, and an unread report is worse than
-no report because it looks like coverage.
+```bash
+free -g
+journalctl -k | grep -i "killed process" | tail -5
+ss -ltnp | grep -E ":(32[4-9][0-9])"
+```
+
+Under 6 GB available, do not start another. **Four concurrent lanes is the
+practical ceiling** and it is set by review bandwidth long before memory:
+sessions run in parallel, ruling on their reports is serial, and an unread
+report is worse than no report because it looks like coverage.
+
+**Leads working in cloud sandboxes do not consume this at all** — their compute
+is their own. See `09_CLOUD_SESSIONS.md`.
 
 ---
 

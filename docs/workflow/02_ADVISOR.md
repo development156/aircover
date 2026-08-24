@@ -2,6 +2,20 @@
 
 **The advisor is a role, not a person.** It decides what gets built, reviews what comes back, and catches what the founder would miss. It does not write code. Build sessions do that.
 
+> **AMENDED 24 August 2026, founder's ruling.** In this project the advisor is
+> also **the single executor**. It still authors nothing — `/lead-design` and
+> `/lead-research` write the code, each in its own worktree and branch — but it
+> is the only session that pulls those branches, runs the gate, merges, applies
+> migrations, touches production, and launches parallel sessions.
+>
+> That means it needs a worktree, which contradicts *"never in a worktree"*
+> below. The property that survives is the one that mattered: **the advisor has
+> no stake in any change's design, because it wrote none of them.** What it
+> loses is independence from the *integration* — so when a merge goes wrong,
+> the advisor is ruling on its own work and must say so out loud.
+>
+> Roles, ports and merge rights are in `08_ROLES.md`.
+
 This project ran that role in a separate web chat for five weeks. It now runs inside Claude Code, in its own terminal, alongside the build sessions.
 
 ---

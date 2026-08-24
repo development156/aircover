@@ -174,7 +174,13 @@ commit not authored `SAHODALABS <development@sahodalabs.com>`.
 
 ---
 
-## Before you open a pull request
+## Before you hand your branch over
+
+**You do not run the authoritative gate and you do not merge.** The advisor
+pulls your branch, gates it, and merges. What you owe is a branch that is honest
+about its own state.
+
+Verify what you cheaply can in your own sandbox, then:
 
 - `pnpm turbo run typecheck lint test --filter=...[origin/wt-web] && pnpm format:check`
 - **Never pipe the gate.** `pnpm gate | tail -60` returns *tail's* exit code.
@@ -185,9 +191,17 @@ commit not authored `SAHODALABS <development@sahodalabs.com>`.
   environment. One test failing is a diff.**
 - Run the `reviewer` agent on `git diff origin/wt-web`.
 - Then `/handoff`, which writes your session record to
-  `docs/workflow/handoffs/` and commits it — that is how the other two learn what
-  you did.
-- Open the PR against **`wt-web`**. **Never merge it yourself.**
+  `docs/workflow/handoffs/<role>-<date>.md` and commits it. **That file is how
+  the advisor and the other lead learn what you did**, and it is what your own
+  next session reads to restore context. If it is not in git, it did not
+  happen.
+- Push your branch. Open a PR against **`wt-web`** if you want the discussion
+  in one place — but **never merge it yourself**; the advisor integrates.
+
+**Say plainly in the handoff what you could NOT verify.** A lead who writes
+"the smoke suite is UNRUN here, it needs Clerk keys this sandbox does not
+have" is giving the advisor something usable. A lead who omits it is handing
+over a branch that looks more finished than it is.
 
 ---
 

@@ -2,6 +2,13 @@
 
 The practical version. What a day looks like, what to set up once, and what to do when something goes wrong.
 
+> **AMENDED 24 August 2026.** This file describes the single-operator day. The
+> project now runs three roles — `/advisor`, `/lead-design`, `/lead-research` —
+> and **only the advisor executes**: it alone runs the gate, merges, applies
+> migrations, touches production and launches parallel sessions. The leads write
+> code in their own worktrees and push. **Read `08_ROLES.md` for who owns what**;
+> where it disagrees with this file, it wins.
+
 ---
 
 ## Set up once

@@ -17,7 +17,23 @@ without them. Their absence is the failure, not a detail. `docs/workflow/` was
 missing from every branch until 24 August 2026 while `/kickoff` instructed
 every session to read it — so this check is not hypothetical.
 
-## 2 · Read what the other roles did
+## 2 · Restore your own context
+
+Your role comes from your branch: `wt-design` is `design`, `wt-research` is
+`research`, anything else is `advisor`.
+
+```bash
+git fetch --all
+ls docs/workflow/handoffs/<role>-*.md 2>/dev/null | tail -1
+```
+
+Read your own newest handoff **first**. It is where you left off: what you
+shipped, what you deliberately did not, and what you said was owed. Resume from
+it rather than starting cold.
+
+If there is none, say so — a first session is a first session, not a lost one.
+
+## 3 · Read what the other roles did
 
 ```bash
 git fetch --all
@@ -39,7 +55,7 @@ for anything addressed to your role, and any scope another role has declared.
 others shipped, what they said they did not do, and every shared surface they
 touched that your task will meet.
 
-## 3 · Establish where you are
+## 4 · Establish where you are
 
 ```bash
 git branch --show-current      # verify — never assume a checkout succeeded
@@ -54,7 +70,7 @@ a 20-route skeleton of a 58-route product.
 If the working tree has uncommitted changes that are not yours, say so and
 leave them alone.
 
-## 4 · Plan
+## 5 · Plan
 
 State, before touching anything:
 
@@ -67,7 +83,7 @@ State, before touching anything:
 
 Then wait for my confirmation before modifying code.
 
-## 5 · If your scope overlaps another role
+## 6 · If your scope overlaps another role
 
 Declare it in `apps/web/REQUESTS.md` before your first edit, and say so here.
 Two lanes editing the same _file_ is a conflict git will show you. Two lanes
