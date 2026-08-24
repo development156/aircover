@@ -35,6 +35,34 @@ import type { SpendRead } from '@/lib/home/spend'
 const TRACK = 100
 const BAR_H = 6
 
+/**
+ * ── WHY THE TRACK IS A FIXED COLUMN AND NOT THE ROW'S WIDTH ──────────────────
+ * It used to span the row, so the peak category drew a ~1100px solid
+ * `var(--brand)` rectangle across the card — MEASURED on a 1024 frame, and the
+ * largest orange area on /home. `Bars`, the thirty-day chart directly ABOVE this
+ * one, already refuses that: it fills with `bg-ink-mute` and says why in its own
+ * comment ("a rectangle is a large object"). The breakdown was contradicting its
+ * own sibling three rows down the same card.
+ *
+ * A fixed column also does the thing the row layout could not: it puts every
+ * amount in one right-aligned column, so the figures line up the way the
+ * ledger's do, which is what `.num` was already asking for and not getting.
+ *
+ * ── AND THE BAR IS REINFORCEMENT, NEVER THE ONLY CARRIER ─────────────────────
+ * `var(--brand)` on a near-white track measures 2.624:1 in light against 5.484
+ * in dark, and it CANNOT be fixed by darkening the track: orange is darker than
+ * white, so a darker track moves the two closer together. White is the ceiling
+ * and docs/37 §2.2 already prints it — `#ff6600` on `#ffffff` is 2.94:1, which
+ * fails the 3:1 UI-boundary floor.
+ *
+ * That floor applies to a graphical object carrying meaning ALONE. This one
+ * never does: the amount is printed beside it and is unconditional, by this
+ * file's own rule. The bar is a second encoding of a number already on screen,
+ * so the honest fix is to stop it being large rather than to restate it in a
+ * hue that cannot hold an edge on white.
+ */
+const TRACK_W = 'w-20'
+
 /** Below this there is no ratio to draw, only a number. */
 const MIN_FOR_COMPARISON = 2
 
@@ -54,24 +82,16 @@ export function SpendBars({ spend }: { spend: SpendRead }) {
   const peak = Math.max(...spend.byAction.map((a) => a.credits)) || 1
 
   return (
-    <ul className={comparable ? 'space-y-3' : 'space-y-2'} data-testid="spend-breakdown">
+    <ul className="space-y-2.5" data-testid="spend-breakdown">
       {spend.byAction.map((action) => (
-        <li key={action.action}>
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="type-eyebrow truncate text-ink-mute">{action.label}</span>
-            <span
-              data-testid={`spend-bar-value-${action.action}`}
-              className="num type-sm shrink-0 font-semibold"
-            >
-              {action.credits}
-            </span>
-          </div>
+        <li key={action.action} className="flex items-center gap-3">
+          <span className="type-eyebrow min-w-0 flex-1 truncate text-ink-mute">{action.label}</span>
           {comparable ? (
             <svg
               viewBox={`0 0 ${TRACK} ${BAR_H}`}
               preserveAspectRatio="none"
               aria-hidden
-              className="mt-1.5 h-[6px] w-full"
+              className={`h-[6px] shrink-0 ${TRACK_W}`}
             >
               <rect x={0} y={0} width={TRACK} height={BAR_H} rx={3} fill="var(--surface-2)" />
               <rect
@@ -85,6 +105,14 @@ export function SpendBars({ spend }: { spend: SpendRead }) {
               />
             </svg>
           ) : null}
+          <span
+            data-testid={`spend-bar-value-${action.action}`}
+            /* A fixed, right-aligned column. `.num` is tabular, so equal-width
+               digits only line up if the box they sit in is equal too. */
+            className="num type-sm w-9 shrink-0 text-right font-semibold"
+          >
+            {action.credits}
+          </span>
         </li>
       ))}
     </ul>
