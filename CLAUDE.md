@@ -1,8 +1,22 @@
 # SAHODA LABS — AI Marketing OS
 
-Docs are law: /docs 00_README → canon order. Sprint = docs/05 (2-day Alpha). Behavior = 02_FSD. Architecture = 03_TSD. Tokens/components = 08_Design_System (no raw hex anywhere). Demos sahoda_dashboard_demo.html + sahoda_brand_brain_demo.html = canonical UI reference.
+Docs are law: /docs 00_README → canon order. Sprint = docs/05 (2-day Alpha). Behavior = 02_FSD. Architecture = 03_TSD. **Tokens/components = docs/37_Design_System_v5.md** (no raw hex anywhere).
 
-UI work: read docs/design2.0/UI_RULES_v3.md first.
+**Design canon, in order — read the top one, not the others.** The chain is
+`08 → 26 → 37` and each states its own supersession in its header:
+
+| File                                   | Status                      | Its own header says                                                                                                                              |
+| -------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `docs/37_Design_System_v5.md`          | **CANON — build from this** | "Status: canon. Supersedes 26, which supersedes 08 and `docs/ui-package/sahoda-labs/`. If any of those disagree with this file, this file wins." |
+| `docs/26_Design_System_v4.md`          | superseded                  | "SUPERSEDED by `docs/37`. **Do not build from this file.**"                                                                                      |
+| `docs/08_Design_System_SAHODA_LABS.md` | superseded (v1.0)           | still claims "this file wins for any token or component value" — it does not                                                                     |
+| `docs/design2.0/UI_RULES_v3.md`        | superseded                  | points back at 08 "for governance" — it does not govern                                                                                          |
+
+The two demo HTMLs (`sahoda_dashboard_demo.html`, `sahoda_brand_brain_demo.html`)
+illustrate the v1.0 system and are **not** a reference for new work.
+
+Tokens live in `packages/shared/tokens.css`. Editing that file requires
+regenerating the inline copy: `node scripts/gen-tokens-inline.mjs`.
 
 ## Stack
 
@@ -43,7 +57,7 @@ Rules for teammates fixing bugs in cloud sessions at claude.ai/code. Type `/fix 
 - **Never push to main.** Always work on a branch and open a pull request. Never merge your own pull request.
 - **Reproduce the bug with a failing test first.** Then fix it, then confirm that same test passes.
 - **Agents:** use `reviewer` (on the diff, before opening the PR), `test-writer`, and `debug-agent`. Do NOT use `db-migration-agent`, `sites-agent`, or any agent that writes migrations.
-- **The cloud sandbox has no `.env`.** Live-database tests skip automatically and the app cannot be run locally — that is normal, not something to fix. Visual checks happen on the Vercel preview URL that builds automatically for the PR.
+- **The cloud sandbox now GETS a `.env`**, written by `scripts/cloud-setup.sh` from environment variables set on the cloud environment. Changed 2026-08-24; this line previously said the sandbox has none by design. If the script reports a REQUIRED variable absent, that is a settings problem to report, **not** a reason to invent a value or to un-skip a test that skipped for want of it — a suite that ran nothing reports as passing, which is how twenty-six billing tests never executed for months. Visual checks still happen on the Vercel preview URL that builds automatically for the branch.
 - **If the fix would need a schema change, a shared-contract change, or another package's internals: STOP.** Say exactly that in the PR description instead of doing it.
 
 ## Copy style
@@ -68,3 +82,23 @@ Empty states and errors state the CLAIM precisely: "we never asked" and "we aske
 3. **The emoji rule (§18) applies to Sahoda's own interface only.** It must never reach anything that generates or templates a social caption. Emoji are native to that medium and stripping them is a product regression. docs/22 §4 is the record.
 4. **Check the sentence the READER gets, not the literal you wrote.** A split whose second half begins with `${…}` is only as good as what that interpolation holds: `platform` is a lowercase key, a count is a numeral, and a list separator is not a category boundary. Five of the first 649 rewrites were wrong this way and the self-check could not see any of them (docs/44).
 5. **Tests pin copy. Retarget them, never delete them.** An assertion that checks a CLAIM through a lowercase substring is checking the claim, not the capital letter: make it case-insensitive rather than deleting it. An assertion anchored to an exact engine sentence (`lib/posts/violation-copy.ts`) is a shape gate whose failure mode is a silent downgrade to vaguer copy — move the guard in the same commit as the sentence, and prove it by mutation.
+
+## Workflow
+
+Before doing anything substantial, read `docs/workflow/00_START_HERE.md`.
+It carries this project's operating rules, the environment traps that will
+otherwise cost you hours, and the verification doctrine this codebase runs
+on. It is not optional reading.
+
+If you have been given a role — advisor, design lead, research lead — read
+`docs/workflow/08_ROLES.md` for your owned paths, your never-touch list,
+your port block, and who is allowed to merge. Working in a cloud session
+instead of a local worktree: read `docs/workflow/09_CLOUD_SESSIONS.md`,
+which names the branch you must cut from. It is not `main`.
+
+## The one rule
+
+A guard never shown to fail is not a guard. Break the thing it tests.
+Watch it go red. Six guards in this repository were found passing by not
+looking — including a public payment webhook that no check covered for
+months.
