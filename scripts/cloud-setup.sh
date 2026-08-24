@@ -143,9 +143,38 @@ else
   ok "$ROUTES routes, this is the current product"
 fi
 case "$BRANCH" in
-  wt-girija|wt-jiban|wt-divas) ok "on your own lane" ;;
-  wt-core|wt-web) bad "$BRANCH is a shared branch. Work on wt-girija, wt-jiban or wt-divas." ;;
+  wt-girija|wt-jiban|wt-divas) ok "on a working lane" ;;
+  wt-core|wt-web)
+    bad "$BRANCH is a shared branch and is NOT a working lane."
+    echo "         Everyone shares one GitHub account, so nothing stops you"
+    echo "         committing here. Switch to wt-girija, wt-jiban or wt-divas."
+    ;;
+  *) gap "$BRANCH is not one of the three named lanes" ;;
 esac
+
+# ── Is somebody else already working this lane? ──────────────────────────────
+# One Claude account and one GitHub account means two sessions CAN land on the
+# same branch, and git will not warn you until the second push is rejected.
+# Compare against the remote before any work starts.
+if git rev-parse --verify -q "origin/$BRANCH" >/dev/null 2>&1; then
+  AHEAD=$(git rev-list --count "origin/$BRANCH..HEAD" 2>/dev/null || echo 0)
+  BEHIND=$(git rev-list --count "HEAD..origin/$BRANCH" 2>/dev/null || echo 0)
+  if [ "$BEHIND" -gt 0 ] && [ "$AHEAD" -gt 0 ]; then
+    bad "DIVERGED from origin/$BRANCH: $AHEAD local, $BEHIND remote."
+    echo "         Another session has pushed this lane. Do NOT force-push."
+    echo "         Find out who, and rebase or hand over deliberately."
+  elif [ "$BEHIND" -gt 0 ]; then
+    gap "origin/$BRANCH is $BEHIND ahead of you. Someone pushed. Pull before you work."
+  elif [ "$AHEAD" -gt 0 ]; then
+    gap "you hold $AHEAD unpushed commit(s) from a previous session on this lane"
+  else
+    ok "level with origin/$BRANCH"
+  fi
+  LASTBY=$(git log -1 --format='%cr' "origin/$BRANCH" 2>/dev/null)
+  [ -n "$LASTBY" ] && printf '  last push  %s\n' "$LASTBY"
+else
+  gap "origin/$BRANCH does not exist yet"
+fi
 
 say "6 · MCP"
 if [ -f .mcp.json ]; then

@@ -52,6 +52,46 @@ done
 
 ---
 
+## One Claude account, one GitHub account, three people
+
+Everyone signs in as the same Claude account and pushes as the same GitHub
+account, `development156`. That removes an access problem and creates four
+others. All four are real; none of them announce themselves.
+
+**1 · Git authorship cannot tell you who did what.** Every commit is
+`SAHODALABS <development@sahodalabs.com>`, and it has to stay that way: Vercel
+blocks a deployment whose HEAD is authored as anything else, and a lane's
+preview is gated on **that lane's own HEAD**. Author the commits as individuals
+and Girija loses her preview URL, which is her entire visual channel.
+
+So **the branch is the identity.** `wt-girija` is Girija's work, `wt-jiban` is
+Jiban's, `wt-divas` is Divas's, and the handoff names the person. When the
+advisor reviews `wt-core`, `git log --first-parent` shows which lane each merge
+came from — that, and the handoffs, are the only attribution there is. Nothing
+in `git blame` will ever help you.
+
+**2 · Two sessions can land on the same branch and git will not warn you.**
+With separate accounts you would notice; with one you will not, until the second
+push is rejected as non-fast-forward. `scripts/cloud-setup.sh` now checks the
+lane against its remote at startup and says DIVERGED, behind, or ahead before
+any work begins. **When it says diverged, do not force-push.** Find out who else
+is in there.
+
+**One person per lane at a time.** If two of you need to work at once, that is
+two lanes, not two sessions on one lane.
+
+**3 · The usage quota is shared.** A large `Workflow` fan-out from one session
+eats into what the other two have. It is not a per-person allowance. Before
+spawning a wide fan-out, consider whether someone else is mid-task.
+
+**4 · Everyone can see everyone's sessions and artifacts.** `ListAgents` lists
+the account's sessions, the artifact gallery is shared, and session history is
+visible. Mostly this is useful — the setup guide is there for all three. Treat
+it as a shared workspace rather than a private one, and do not paste anything
+into a session you would not put in the repo.
+
+---
+
 ## The rule that comes before everything
 
 **Pull at the start of every session. Every time. No exceptions.**

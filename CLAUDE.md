@@ -90,11 +90,25 @@ It carries this project's operating rules, the environment traps that will
 otherwise cost you hours, and the verification doctrine this codebase runs
 on. It is not optional reading.
 
-If you have been given a role — advisor, design lead, research lead — read
-`docs/workflow/08_ROLES.md` for your owned paths, your never-touch list,
-your port block, and who is allowed to merge. Working in a cloud session
-instead of a local worktree: read `docs/workflow/09_CLOUD_SESSIONS.md`,
-which names the branch you must cut from. It is not `main`.
+**Pull before anything else, every session.** `git fetch --all --prune` then
+`git pull --ff-only origin "$(git branch --show-current)"`. Three lanes and an
+integration branch move independently; a stale checkout writes against code that
+no longer exists. If `--ff-only` refuses, the lane has diverged — say so and
+stop, do not merge past it.
+
+**Branches.** `wt-girija`, `wt-jiban` and `wt-divas` are the working lanes, each
+cut from `origin/wt-web` and never from `main` (every `main` here is 690+
+commits behind and carries a 20-route skeleton of a 58-route product). Lanes
+merge into `wt-core`; the advisor reviews `wt-core` and alone promotes it to
+`wt-web`. Read `docs/workflow/08_ROLES.md` for who does what and
+`docs/workflow/09_CLOUD_SESSIONS.md` for the cloud setup.
+
+**All three people share one Claude account and one GitHub account.** So every
+commit is authored `SAHODALABS` and `git blame` can never tell you who did what:
+**the branch is the identity** and the handoff names the person. It also means
+two sessions can land on the same branch with no warning until a push is
+rejected — `scripts/cloud-setup.sh` checks the lane against its remote at
+startup, and when it says DIVERGED, do not force-push.
 
 ## The one rule
 
