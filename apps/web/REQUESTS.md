@@ -985,3 +985,105 @@ checked by that guard. It invents no figure today and nothing there will notice 
 starts. If you would rather it stayed covered, the entry to restore is
 `['/radar', [price('radar_scan')]]` — but it will fail until the screen says "coming soon"
 again, which would now be untrue.
+
+---
+
+## 13 · The format gate is red on an untouched tree, and the fix is an ignore, not a reformat
+
+**Lane:** research (Jiban), 2026-08-24. **Scope declared:** `.prettierignore`, one
+block. Nothing under `apps/web/src`, nothing in `components/`, no token. Under an
+hour.
+
+`pnpm format:check` fails on `bc9b97b` with **nothing edited**:
+
+```
+[warn] .agents/skills/humanizer/README.md
+[warn] .agents/skills/humanizer/SKILL.md
+[warn] Code style issues found in 2 files.
+```
+
+That leg sits OUTSIDE turbo, so no turbo count can see it, and CLAUDE.md already
+records that this exact leg "was silently red for months". It is red again, from
+the moment `8077df3` tracked the skill.
+
+**Why the fix is `.prettierignore` and not `prettier --write`.**
+`.agents/skills/humanizer/` is vendored upstream content, not ours. It ships its
+own `LICENSE`, its own `.github/workflows/validate.yml`, and its own
+`scripts/validate-package.py`. Reformatting it diverges it from upstream and puts
+our copy under a validator we did not write and do not run.
+
+`.prettierignore` already protects exactly this class, and says so in its own
+comment: `docs/` is excluded to keep "the numbered spec pack from prettier
+drift". A vendored skill is the same argument.
+
+**One thing I checked rather than assumed.** Prettier's SKILL.md edit looked at
+first like a content change: it rewrites `**After:**` to `> **After:**`. It is
+not. `**After:**` follows a `>` line with no blank between, so CommonMark **lazy
+continuation** already pulls it into the blockquote. Prettier is making the
+existing render explicit. The label reads as part of the quote today, which the
+author plainly did not intend, but that is upstream's bug to fix and not ours to
+bake in.
+
+## 14 · `export-drift.test.ts` is protected by turbo's env allowlist, not by what its header claims
+
+**Owed to:** whoever owns `apps/web/src/lib/privacy/`, and the advisor. **I have
+not changed this file.** Reporting only, because the repair is a judgement call
+about who is allowed to dial production and that is not mine to make alone.
+
+That file's header says it skips safely because **"the sandbox has no `.env`"**.
+CLAUDE.md withdrew that premise **today**: "The cloud sandbox now GETS a `.env`
+... Changed 2026-08-24; this line previously said the sandbox has none by
+design."
+
+Its only condition is `DB_URL === ''`. In this cloud session `SUPABASE_DB_URL`
+**is set**, and points at `db.rloztdhzfliyvpvxsgjl.supabase.co` — production, the
+one project, 26 real workspaces.
+
+**MEASURED, both halves:**
+
+```
+apps/web $ pnpm run test          # turbo bypassed
+  × knows about every workspace-owned table, and invents none
+  Error: getaddrinfo ENOTFOUND db.rloztdhzfliyvpvxsgjl.supabase.co
+
+$ pnpm turbo run test --filter=@sahoda/web --force
+  ↓ src/lib/privacy/export-drift.test.ts (2 tests | 2 skipped)
+```
+
+So the gate is fine. What makes it fine is **`turbo.json`'s `test` task declaring
+`env: ["SAHODA_ALLOW_LIVE_TESTS"]` under turbo 2.x strict mode**, which strips
+`SUPABASE_DB_URL` before vitest starts. Proven directly with a throwaway task:
+inside a turbo task the variable reads `NO(stripped)`; under `pnpm exec` in the
+same shell it reads `YES`.
+
+**Why this is worth writing down.** Two artifacts hold half a fact each and
+nothing tests the seam. The test believes credentials are absent. They are
+present, and an allowlist nobody wrote for this purpose is the only thing
+standing between a plain `pnpm test` and a live connection to production. Add
+`SUPABASE_DB_URL` to that `env` list for any reason — and something already wants
+it, `@sahoda/billing: missing required env — SUPABASE_DB_URL` appears in the web
+test output today — and this file starts dialling production on every gate run,
+green, with nobody told.
+
+It is read-only (`begin read only`, one `information_schema` query, rollback), so
+this is not a data-loss report. It is a trust-boundary report. Note that
+`packages/db` refuses this destination by identity —
+`FORBIDDEN_PROJECT_REFS = ['rloztdhzfliyvpvxsgjl']`, "even with the flag set,
+even with valid credentials, even if someone typed it deliberately" — and this
+file calls neither that check nor the `SAHODA_ALLOW_LIVE_TESTS` flag.
+
+**Why I did not simply add the flag.** The header is explicit that this file
+exists to be pointed AT production and "run by hand when somebody has the
+credential" — it is the only thing that can say what production holds. Banning
+the ref would make it useless. Its real defect is that it carries a _script's_
+trust model (deliberate by invocation) while living in vitest (runs whenever the
+suite runs). The sanctioned prod readers next door — `prod-probe.mjs`,
+`ledger-invariants.mjs` — are scripts for exactly that reason. **THE DECISION IS
+YOURS:** give it its own explicit opt-in (`SAHODA_EXPORT_DRIFT_LIVE=1`, declared
+in `turbo.json` or it can never be switched on), or move it out of vitest into
+`packages/db/scripts/` where its trust model already holds.
+
+**And one caveat on my own detector.** I checked the `describe.skip`/`skipIf`
+suites and the DB-URL-gated files by grep. A suite that reaches a database
+through a helper I did not name, or through raw `fetch` to PostgREST rather than
+`pg`, is not covered by what I looked at.
