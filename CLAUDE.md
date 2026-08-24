@@ -57,7 +57,7 @@ Rules for teammates fixing bugs in cloud sessions at claude.ai/code. Type `/fix 
 - **Never push to main.** Always work on a branch and open a pull request. Never merge your own pull request.
 - **Reproduce the bug with a failing test first.** Then fix it, then confirm that same test passes.
 - **Agents:** use `reviewer` (on the diff, before opening the PR), `test-writer`, and `debug-agent`. Do NOT use `db-migration-agent`, `sites-agent`, or any agent that writes migrations.
-- **The cloud sandbox has no `.env`.** Live-database tests skip automatically and the app cannot be run locally — that is normal, not something to fix. Visual checks happen on the Vercel preview URL that builds automatically for the PR.
+- **The cloud sandbox now GETS a `.env`**, written by `scripts/cloud-setup.sh` from environment variables set on the cloud environment. Changed 2026-08-24; this line previously said the sandbox has none by design. If the script reports a REQUIRED variable absent, that is a settings problem to report, **not** a reason to invent a value or to un-skip a test that skipped for want of it — a suite that ran nothing reports as passing, which is how twenty-six billing tests never executed for months. Visual checks still happen on the Vercel preview URL that builds automatically for the branch.
 - **If the fix would need a schema change, a shared-contract change, or another package's internals: STOP.** Say exactly that in the PR description instead of doing it.
 
 ## Copy style
