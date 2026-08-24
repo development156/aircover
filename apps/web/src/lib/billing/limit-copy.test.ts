@@ -40,8 +40,11 @@ describe('planLimitSentence', () => {
   })
 
   test('the largest plan gets no invented upsell', () => {
-    // Agency is the top of the catalog: there is no plan with 11 sites, so the
+    // Studio is the top of the catalog: there is no plan with 11 sites, so the
     // sentence must stop at the facts rather than point at something unbuyable.
+    // The id stays `agency` while the customer-facing label is "Studio", so this
+    // asserts the sentence carries the LABEL — a sentence naming a plan the
+    // customer cannot find in the picker is its own defect.
     const sentence = planLimitSentence({
       dimension: 'sites',
       planId: 'agency',
@@ -49,7 +52,7 @@ describe('planLimitSentence', () => {
       currentUsage: 10,
     })
 
-    expect(sentence).toBe("Your Agency plan includes 10 sites and you're using 10.")
+    expect(sentence).toBe("Your Studio plan includes 10 sites and you're using 10.")
     expect(cheapestPlanWithAtLeast('sites', 11)).toBeNull()
   })
 })
