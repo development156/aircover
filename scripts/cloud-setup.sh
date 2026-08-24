@@ -18,7 +18,20 @@
 #
 # Anything missing is REPORTED, never invented.
 #
-set -uo pipefail
+# NO `set -e` and NO `set -u`, both deliberately.
+#
+#   set -e  : the cloud harness treats ANY non-zero exit from the setup script
+#             as "Setup script failed" and then REFUSES to start Claude Code.
+#             A setup script must never block the session. It reports; the
+#             session decides. Measured 2026-08-24: an earlier version of this
+#             file exited 1 on a missing required variable and killed the
+#             session before Claude Code ever started.
+#   set -u  : `${!v:-}` indirect expansion still trips "unbound variable" on
+#             bash older than 4.4, which would abort before printing anything.
+#
+# This script ALWAYS exits 0. Problems are printed, and written to
+# .sahoda-setup-status so /kickoff can read them.
+set -o pipefail 2>/dev/null || true
 
 say()  { printf '\n\033[1m%s\033[0m\n' "$*"; }
 ok()   { printf '  ok       %s\n' "$*"; }
@@ -73,14 +86,17 @@ ENV_OPTIONAL=(
   CONTEXT7_API_KEY
 )
 
+# Safe indirect read: works on every bash, never trips set -u.
+val() { eval "printf '%s' \"\${$1}\"" 2>/dev/null; }
+
 say "1 · Environment variables"
 MISSING=(); SET_COUNT=0
 for v in "${ENV_REQUIRED[@]}"; do
-  if [ -n "${!v:-}" ]; then ok "$v"; SET_COUNT=$((SET_COUNT+1))
+  if [ -n "$(val "$v")" ]; then ok "$v"; SET_COUNT=$((SET_COUNT+1))
   else gap "$v   <- REQUIRED"; MISSING+=("$v"); fi
 done
 for v in "${ENV_OPTIONAL[@]}"; do
-  if [ -n "${!v:-}" ]; then ok "$v"; SET_COUNT=$((SET_COUNT+1)); else gap "$v"; fi
+  if [ -n "$(val "$v")" ]; then ok "$v"; SET_COUNT=$((SET_COUNT+1)); else gap "$v"; fi
 done
 
 # ── Fixed values that are not secrets ────────────────────────────────────────
@@ -101,7 +117,7 @@ write_env() {
   local target="$1"; mkdir -p "$(dirname "$target")"; : > "$target"; chmod 600 "$target"
   local v
   for v in "${ENV_REQUIRED[@]}" "${ENV_OPTIONAL[@]}"; do
-    [ -n "${!v:-}" ] && printf '%s=%s\n' "$v" "${!v}" >> "$target"
+    _x=$(val "$v"); [ -n "$_x" ] && printf '%s=%s\n' "$v" "$_x" >> "$target"
   done
   printf 'SUPABASE_PROJECT_REF=%s\n'  "$SUPABASE_PROJECT_REF"  >> "$target"
   printf 'SAHODA_E2E_ACK_TARGET=%s\n' "$SAHODA_E2E_ACK_TARGET" >> "$target"
@@ -185,16 +201,29 @@ else
 fi
 
 say "Result"
+STATUS=".sahoda-setup-status"
 if [ ${#MISSING[@]} -gt 0 ]; then
   bad "${#MISSING[@]} REQUIRED variable(s) absent: ${MISSING[*]}"
   echo
-  echo "  Set them in this environment's settings and re-run. Do NOT invent"
-  echo "  values, and do NOT un-skip a test that skipped for want of them. A"
-  echo "  suite that ran nothing reports as passing, which is how twenty-six"
-  echo "  billing tests never executed for months."
-  exit 1
+  echo "  The session will still start. It just cannot reach the database or"
+  echo "  Clerk until these are set in this environment's settings."
+  echo
+  echo "  Do NOT invent values, and do NOT un-skip a test that skipped for want"
+  echo "  of them. A suite that ran nothing reports as passing, which is how"
+  echo "  twenty-six billing tests never executed for months."
+  {
+    echo "INCOMPLETE"
+    echo "missing_required=${MISSING[*]}"
+    echo "set_count=$SET_COUNT"
+  } > "$STATUS" 2>/dev/null
+else
+  ok "All ${#ENV_REQUIRED[@]} required present; $SET_COUNT set in total."
+  { echo "OK"; echo "set_count=$SET_COUNT"; } > "$STATUS" 2>/dev/null
 fi
-ok "All ${#ENV_REQUIRED[@]} required present; $SET_COUNT set in total."
 echo
 echo "  Next: run /kickoff. It pulls, restores your own context from the last"
 echo "  handoff, and reads what the other two lanes did before you plan."
+
+# ALWAYS succeed. A non-zero exit here stops Claude Code from starting at all,
+# and a session that cannot start cannot tell you what is wrong.
+exit 0

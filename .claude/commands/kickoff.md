@@ -4,7 +4,27 @@ description: Start a session — read the other roles' handoffs, then plan.
 
 Do not plan anything until steps 1 and 2 are done.
 
-## 0 · Pull. Always. Before anything else.
+## 0 · Did the sandbox come up complete?
+
+```bash
+cat .sahoda-setup-status 2>/dev/null || echo "no status file - setup script did not run"
+```
+
+`scripts/cloud-setup.sh` writes this on every boot and **always exits 0**, so the
+session starts even when the environment is incomplete. That is deliberate: a
+non-zero exit stops Claude Code from starting at all, and a session that cannot
+start cannot tell you what is wrong.
+
+- **`OK`** - carry on.
+- **`INCOMPLETE`** - it lists the missing required variables. **Say so plainly
+  and stop.** The database and Clerk are unreachable. Do not invent values, and
+  do not un-skip a test that skipped for want of them: a suite that ran nothing
+  reports as passing, which is how twenty-six billing tests never executed for
+  months.
+- **no file** - the setup script never ran. Say so; do not carry on assuming an
+  environment you have not checked.
+
+## 1 · Pull. Always. Before anything else.
 
 ```bash
 git fetch --all --prune
@@ -26,7 +46,7 @@ git branch --show-current
 find apps/web/src/app -name page.tsx | wc -l   # 58 = the product. ~20 or ~11 = a stale main.
 ```
 
-## 1 · Read the canon
+## 2 · Read the canon
 
 - `CLAUDE.md`
 - `docs/workflow/00_START_HERE.md`
@@ -39,7 +59,7 @@ without them. Their absence is the failure, not a detail. `docs/workflow/` was
 missing from every branch until 24 August 2026 while `/kickoff` instructed
 every session to read it — so this check is not hypothetical.
 
-## 2 · Restore your own context
+## 3 · Restore your own context
 
 Your role comes from your branch: `wt-design` is `design`, `wt-research` is
 `research`, anything else is `advisor`.
@@ -55,7 +75,7 @@ it rather than starting cold.
 
 If there is none, say so — a first session is a first session, not a lost one.
 
-## 3 · Read what the other roles did
+## 4 · Read what the other roles did
 
 ```bash
 git fetch --all
@@ -77,7 +97,7 @@ for anything addressed to your role, and any scope another role has declared.
 others shipped, what they said they did not do, and every shared surface they
 touched that your task will meet.
 
-## 4 · Establish where you are
+## 5 · Establish where you are
 
 ```bash
 git branch --show-current      # verify — never assume a checkout succeeded
@@ -92,7 +112,7 @@ a 20-route skeleton of a 58-route product.
 If the working tree has uncommitted changes that are not yours, say so and
 leave them alone.
 
-## 5 · Plan
+## 6 · Plan
 
 State, before touching anything:
 
@@ -105,7 +125,7 @@ State, before touching anything:
 
 Then wait for my confirmation before modifying code.
 
-## 6 · If your scope overlaps another role
+## 7 · If your scope overlaps another role
 
 Declare it in `apps/web/REQUESTS.md` before your first edit, and say so here.
 Two lanes editing the same _file_ is a conflict git will show you. Two lanes
