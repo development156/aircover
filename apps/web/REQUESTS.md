@@ -1128,3 +1128,30 @@ is either unit-only or needs secrets. And per `docs/workflow/01_CONTEXT.md`
 GitHub schedules only from the DEFAULT branch, which is `main` — 692 commits
 behind — so anything added on a lane will not fire on a timer until that is
 resolved.
+
+## 16 · `turbo-env-wiring` scans gitignored scratch, so a local file can fail the gate
+
+Small, self-inflicted, and worth one paragraph because the next person will lose
+the same twenty minutes. Found 2026-08-24 (research lane).
+
+`src/lib/turbo-env-wiring.test.ts` walks `apps/web` for `process.env.X` reads and
+requires each to be declared in `turbo.json`. Its walker skips exactly three
+names: `node_modules`, `.next`, `.turbo` (line 110). It does **not** consult
+`.gitignore`.
+
+I put a throwaway Playwright capture script in `apps/web/.ui-port-shots/` — a
+gitignored directory — and it read `process.env.FULLPAGE`. The gate went red
+with `FULLPAGE (read in .ui-port-shots/shoot.mjs)`. **That red cannot be fixed by
+any commit**, because the offending file is not in the repository; you fix it by
+editing or deleting an untracked local file, which is a confusing place to end up
+when the failure names `turbo.json`.
+
+The guard itself is good and should not be loosened casually — it is the thing
+standing between a stripped variable and a silently broken production build, and
+it even self-tests (`the scanner sees both process.env forms and ignores
+lookalikes`). Two honest options if it is ever worth touching: skip dot-directories
+in the walker, or read `.gitignore`. Neither is urgent, and the second is the one
+that keeps a real `src/.something` covered.
+
+Workaround meanwhile: take scratch configuration from `process.argv`, not the
+environment.
