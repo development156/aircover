@@ -97,6 +97,12 @@ supabase/.temp/
 !/.claude/agents/**/*.md
 !/.claude/commands/**/*.md
 !/.claude/skills/**/*.md
+# `.agents/skills/humanizer` is named by CLAUDE.md's Copy style section as the
+# source of the 33 patterns user-facing copy follows. Without this negation its
+# SKILL.md, AGENTS.md and README.md are all swallowed by `*.md` above, and every
+# session is told to follow a skill that is not in the tree. Verified 2026-08-24
+# with `git check-ignore -v` before adding: all three were IGNORED.
+!/.agents/**/*.md
 !/.github/ISSUE_TEMPLATE/bug.md
 
 # apps/web/REQUESTS.md — the cross-lane request log. TRACKED SINCE BEFORE THIS LINE
