@@ -1,0 +1,746 @@
+{
+  "_meta": {
+    "phases": "1-8 (Phase 0 approved 2026-08-17)",
+    "repo_basis": "wt-web @ c8faa34 — also the live production deployment",
+    "generated": "2026-08-17",
+    "read_by": "finance/recompute.mjs",
+    "doctrine": "Every value carries a tag. MEASURED = read in a cited file or fetched from a cited URL on a cited date. INFERRED = reasoned, carries low/base/high and a stated basis. DISPUTED = equally authoritative sources disagree; both positions kept.",
+    "two_models": "AS_IS = what the code does today. AS_DESIGNED = the spec pack's intent with all six Margin Engine levers working. Both are computed at every step and never blended.",
+    "void": "Every price in docs 01-12 and every margin percentage in PRD 7.2 is a pre-build placeholder computed against placeholder prices. Nothing here derives from them."
+  },
+  "fx": {
+    "inr_per_usd": {
+      "value": 95.5,
+      "tag": "MEASURED",
+      "source": "x-rates monthly avg Aug 2026 95.30 + Wise spot 95.60 (2026-08-16) + RBI ref 95.410 (2026-08-13); midpoint used",
+      "note": "three independent sources agree in a 95.30-95.60 band"
+    },
+    "inr_per_usd_year_ago": {
+      "value": 87.5163,
+      "tag": "MEASURED",
+      "source": "x-rates monthly average Aug 2025"
+    },
+    "annual_depreciation_pct": {
+      "value": 8.9,
+      "tag": "MEASURED",
+      "source": "95.30/87.5163-1, exactly 12 months, matched methodology",
+      "note": "spot cross-check +9.24%, RBI cross-check +9.02%; call it ~9%/yr"
+    },
+    "code_hardcodes": {
+      "value": 88,
+      "tag": "MEASURED",
+      "source": "apps/web/src/components/onboarding/door-step.tsx:376",
+      "note": "the only FX assumption in the codebase, stale by 8.5%"
+    }
+  },
+  "model_prices_usd_per_1m": {
+    "_source": "https://openrouter.ai/api/v1/models fetched 2026-08-16, independently refetched and matched; corroborated first-party at https://platform.claude.com/docs/en/about-claude/pricing 2026-08-17",
+    "_openrouter_markup_pct": {
+      "value": 0,
+      "tag": "MEASURED",
+      "source": "https://openrouter.ai/docs/faq — 'We pass through the pricing of the underlying providers without any markup'",
+      "note": "margin is taken on money-in instead: 5.5% on credit purchases"
+    },
+    "_sonnet5_price_is_permanent": {
+      "value": true,
+      "tag": "MEASURED",
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing 2026-08-17 — 'The $2/$10 ... is now the standard price. The previously scheduled increase to $3/$15 ... on September 1, 2026 will not occur.'",
+      "note": "resolves a direct conflict between two extraction agents; no COGS shock is pending"
+    },
+    "haiku-4.5": {
+      "in": 1.0,
+      "cached_in": 0.1,
+      "out": 5.0,
+      "batch_in": 0.5,
+      "batch_out": 2.5,
+      "min_cacheable_prefix": 4096,
+      "tag": "MEASURED"
+    },
+    "sonnet-5": {
+      "in": 2.0,
+      "cached_in": 0.2,
+      "out": 10.0,
+      "batch_in": 1.0,
+      "batch_out": 5.0,
+      "min_cacheable_prefix": 1024,
+      "tag": "MEASURED"
+    },
+    "opus-4.8": {
+      "in": 5.0,
+      "cached_in": 0.5,
+      "out": 25.0,
+      "batch_in": 2.5,
+      "batch_out": 12.5,
+      "min_cacheable_prefix": 1024,
+      "tag": "MEASURED"
+    },
+    "gemini-2.5-flash-image": {
+      "usd_per_1024_image": 0.0387,
+      "tag": "MEASURED",
+      "note": "per-image meter, not per-token; no lever touches it"
+    }
+  },
+  "margin_engine": {
+    "_six_levers_from_PRD_TSD": [
+      "tier routing",
+      "per-call complexity classifier",
+      "prompt caching",
+      "batch API",
+      "cost telemetry -> margin dashboard",
+      "auto-repricing from app_settings"
+    ],
+    "routing": {
+      "value": "SHIPPED but static",
+      "tag": "MEASURED",
+      "source": "packages/mesh/src/routing.ts:19-25",
+      "note": "compile-time map, no ai_model_routes table, deploy-only"
+    },
+    "complexity_classifier": {
+      "value": "ABSENT",
+      "tag": "MEASURED",
+      "source": "packages/mesh/src/routing.ts:31",
+      "note": "TASK_TIER is dead code; each task file's own def.tier wins"
+    },
+    "prompt_caching": {
+      "value": "SHIPPED, DELIVERS ZERO",
+      "tag": "MEASURED",
+      "source": "packages/mesh/src/providers/openrouter.ts:14-16",
+      "note": "cached prefix renders to 701 chars = ~175 tokens against minimums of 4096 (haiku) and 1024 (sonnet/opus); fails on all four cached tasks under either reading of the minimum"
+    },
+    "batch": {
+      "value": "ABSENT",
+      "tag": "MEASURED",
+      "source": "repo-wide grep for messages/batches|/v1/batches|batch_id|createBatch returns zero",
+      "note": "vendors publish exactly -50% on both legs"
+    },
+    "cost_telemetry": {
+      "value": "WRITES, NOTHING READS",
+      "tag": "MEASURED",
+      "source": "packages/mesh/src/engine.ts:183",
+      "note": "cost_usd SELECTed by nothing; credit_ledger.cogs_usd_est null on every row"
+    },
+    "auto_repricing": {
+      "value": "ABSENT",
+      "tag": "MEASURED",
+      "source": "packages/shared/src/ledger/pricing.ts:2",
+      "note": "pricing.config.json is a build-time import; app_settings exists with no rows and no price reader"
+    },
+    "estimator_error": {
+      "value": "wrong and HIGH on 4 of 6 reachable models",
+      "tag": "MEASURED",
+      "source": "packages/mesh/src/mesh.ts:33-42",
+      "note": "haiku [1,5] correct, opus [5,25] correct, everything else [3,15]; sonnet actual [2,10], gpt-4o-mini actual [0.15,0.60], image model priced on the chat schedule entirely. Recorded COGS is a ceiling, never a floor."
+    }
+  },
+  "actions": {
+    "_note": "6 of 18 priced actions have a charging code path. 11 are unreachable. inbox_reply and the free first brand resolve are reachable, cost real money and charge nothing. Verified twice.",
+    "_token_source": "outputs are MEASURED observedMax from packages/mesh/src/token-budget.ts; inputs are INFERRED from rendering the real prompt strings at ~4 chars/token, since no prompt_tokens measurement exists for 6 of 8 tasks",
+    "caption_rewrite": {
+      "credits": 1,
+      "task": "caption_rewrite",
+      "model": "haiku-4.5",
+      "in_low": 240,
+      "in_base": 300,
+      "in_high": 800,
+      "out": 210,
+      "cacheable_in": 231,
+      "wired": true,
+      "batchable": false
+    },
+    "post_variants": {
+      "credits": 3,
+      "task": "content_variants",
+      "model": "haiku-4.5",
+      "in_low": 350,
+      "in_base": 600,
+      "in_high": 1400,
+      "out": 925,
+      "cacheable_in": 299,
+      "wired": true,
+      "batchable": false
+    },
+    "loop_cycle": {
+      "credits": 20,
+      "task": "plan_week",
+      "model": "sonnet-5",
+      "in_low": 320,
+      "in_base": 400,
+      "in_high": 700,
+      "out": 1855,
+      "cacheable_in": 300,
+      "wired": true,
+      "batchable": true,
+      "note": "produces EXACTLY 5 briefs — PlanWeekOutputSchema.length(5) at packages/shared/src/mesh/tasks.ts:241. This is the backbone of the derived usage profile."
+    },
+    "site_generate": {
+      "credits": 100,
+      "task": "site_generate",
+      "model": "opus-4.8",
+      "in_low": 340,
+      "in_base": 400,
+      "in_high": 600,
+      "out": 4096,
+      "out_high": 8192,
+      "cacheable_in": 359,
+      "wired": true,
+      "batchable": false,
+      "note": "output is a FLOOR not a measurement (token-budget.ts:81-82). Gated by entitlements to sites:0 on free, and nothing writes subscriptions, so it has NEVER executed in production."
+    },
+    "image_standard": {
+      "credits": 6,
+      "task": "image_generate",
+      "model": "gemini-2.5-flash-image",
+      "flat_usd": 0.0387,
+      "wired": true,
+      "batchable": false,
+      "note": "no lever touches this line — it is a per-image meter"
+    },
+    "brand_research": {
+      "credits": 50,
+      "task": "brand_guidelines",
+      "model": "sonnet-5",
+      "in_low": 378,
+      "in_base": 474,
+      "in_high": 1500,
+      "out": 2750,
+      "cacheable_in": 0,
+      "wired": true,
+      "batchable": false,
+      "as_designed_model": "haiku-4.5",
+      "note": "the ONE tier divergence: routing.ts:61 says economy, brand-guidelines.ts:39 says standard, and def.tier wins. The bake-off recorded haiku at equal specificity. First resolve per workspace is FREE and unbounded."
+    },
+    "_unreachable": [
+      "twin_preflight",
+      "image_premium",
+      "carousel",
+      "video_script",
+      "site_edit",
+      "playbook_run",
+      "radar_scan",
+      "seo_article",
+      "remix_pack",
+      "campaign_plan",
+      "voice_minute"
+    ],
+    "_uncharged_but_costing": [
+      "inbox_reply (Zernio write, no model call)",
+      "brand_research first resolve (full sonnet call, creditsCharged 0, no ledger)",
+      "the publish platform write itself (no action key exists)",
+      "the onboarding PDF door (up to 4 billed calls + OCR page fee)"
+    ]
+  },
+  "repair": {
+    "_mechanism": {
+      "value": "one retry on the SAME model, resending every original message plus the failed output plus ~40 tokens",
+      "tag": "MEASURED",
+      "source": "packages/mesh/src/engine.ts:131-144, :312-327",
+      "note": "so the repair's INPUT is larger than the original's. No retry loop, no backoff, no timeout anywhere in packages/mesh/src."
+    },
+    "rate": {
+      "low": 0.0,
+      "base": 0.05,
+      "high": 0.2,
+      "tag": "INFERRED",
+      "basis": "the only measurement is brand_extract going 5-in-6 before the 4096-token ceiling fix to 0-of-7 after (commit c8faa34 body). n=7 post-fix, one task only. No per-task production rate exists."
+    }
+  },
+  "usage_profile": {
+    "_derivation": "DERIVED FROM PRODUCT DEFAULTS, not invented. The Loop is weekly and plan_week returns exactly 5 briefs by schema. Everything else is a conversion rate off those 5 briefs.",
+    "loops_per_month": {
+      "low": 2.0,
+      "base": 4.33,
+      "high": 4.33,
+      "tag": "INFERRED",
+      "basis": "4.33 = one Loop per week, the product's designed cadence. Low = fortnightly, the realistic behaviour of a user who has to press the button manually because no scheduler runs."
+    },
+    "briefs_per_loop": {
+      "value": 5,
+      "tag": "MEASURED",
+      "source": "packages/shared/src/mesh/tasks.ts:241 .length(5) and the system prompt at plan-week.ts:52 'EXACTLY 5 briefs'"
+    },
+    "brief_to_variants_rate": {
+      "low": 0.4,
+      "base": 0.7,
+      "high": 1.0,
+      "tag": "INFERRED",
+      "basis": "share of briefs a user actually turns into channel variants. No telemetry exists; 0.7 assumes most planned ideas get drafted."
+    },
+    "variants_to_image_rate": {
+      "low": 0.15,
+      "base": 0.3,
+      "high": 0.6,
+      "tag": "INFERRED",
+      "basis": "share of drafted posts that get a generated image. Images are the single largest COGS line so this rate matters more than any other behavioural assumption."
+    },
+    "caption_rewrites_per_month": {
+      "low": 2,
+      "base": 4.3,
+      "high": 20,
+      "tag": "INFERRED",
+      "basis": "an editing action; base assumes ~20% of drafted posts get one rewrite"
+    },
+    "site_generates_per_month": {
+      "low": 0,
+      "base": 0.05,
+      "high": 0.25,
+      "tag": "INFERRED",
+      "basis": "a one-off action. Base assumes 1 in 20 workspaces generates a site in a given month. HAS NEVER EXECUTED IN PRODUCTION — the entitlement gate blocks it for every workspace because nothing writes subscriptions."
+    },
+    "brand_research_per_signup": {
+      "value": 1,
+      "tag": "MEASURED",
+      "source": "apps/web/src/app/actions/onboarding-resolve.ts:193",
+      "note": "one per signup, and the FIRST one is free and uncharged"
+    }
+  },
+  "zernio": {
+    "_billing_axis": {
+      "value": "per connected account, not per call",
+      "tag": "MEASURED",
+      "source": "docs/17_One_Week_Beta_Plan_SAHODA_LABS.md:63; corroborated docs/14_Launch_Plan_SAHODA_LABS.md:225 'Per-account cost makes 2 free channels a real cost line.'"
+    },
+    "usd_per_account_month": {
+      "value": 4.8,
+      "tag": "DISPUTED",
+      "source": "docs/17_One_Week_Beta_Plan_SAHODA_LABS.md:63",
+      "note": "the same sentence says 'roughly ... at volume' and instructs asking Zernio what the cap counts and what the next tier costs. Treat as an order of magnitude. No rate card exists in the repo — grep for zernio x price|cost|usd|billing|plan returns only a rate-limit header."
+    },
+    "scenarios": {
+      "S1_per_connected_account": {
+        "multiplier_basis": "connected channels",
+        "active_rate": 1.0,
+        "note": "the literal reading. Every channel a workspace connects bills every month whether or not it publishes."
+      },
+      "S2_per_active_account": {
+        "multiplier_basis": "connected channels",
+        "active_rate": 0.5,
+        "note": "only accounts that actually transacted in the month count. Halves the free-tier carry."
+      },
+      "S3_per_profile": {
+        "multiplier_basis": "one per workspace",
+        "active_rate": 1.0,
+        "note": "the cap counts profiles/organisations, so a workspace is one billable unit regardless of how many channels hang off it. Makes channels free to grant and destroys channels as a cost fence."
+      }
+    },
+    "channels_that_exist": {
+      "value": 4,
+      "tag": "MEASURED",
+      "source": "packages/shared/src/enums.ts:8 — z.enum(['x','gbp','linkedin','instagram'])",
+      "note": "the plan table sells 8 to Growth and Agency; only 4 exist"
+    },
+    "publish_flags_default_off": {
+      "value": true,
+      "tag": "MEASURED",
+      "source": "apps/jobs/src/env.ts:90,:113,:115,:171",
+      "note": "SAHODA_PUBLISH_MODE=fixture, DISPATCH_MODE=off, RECONCILE_MODE=off, PUBLISH_ENABLED unset. All publish-driven COGS is zero until every one is set. Runtime values unknown."
+    }
+  },
+  "platform_fixed_usd_month": {
+    "vercel_pro": {
+      "value": 20,
+      "tag": "MEASURED",
+      "source": "https://vercel.com/docs/plans/pro-plan 2026-08-17",
+      "note": "1 deploying seat, $20 usage credit that does not roll over; includes 1TB transfer + 10M edge requests and nothing else"
+    },
+    "supabase_pro": {
+      "value": 25,
+      "tag": "MEASURED",
+      "source": "https://supabase.com/pricing 2026-08-17",
+      "note": "includes $10 compute credits; Team at $599 buys ZERO additional quota"
+    },
+    "supabase_compute_micro": {
+      "value": 10,
+      "tag": "MEASURED",
+      "source": "https://supabase.com/docs/guides/platform/manage-your-usage/compute 2026-08-17",
+      "note": "covered by the $10 credit at this rung"
+    },
+    "clerk": {
+      "value": 0,
+      "tag": "MEASURED",
+      "source": "production runs a Clerk DEVELOPMENT instance — pk_test_, leading-hyena-7.clerk.accounts.dev, verified on the live sign-in page",
+      "note": "$25/mo Pro after a pk_live cutover; 50,000 MRU included so it stays flat to that cliff"
+    },
+    "sentry": {
+      "value": 0,
+      "tag": "MEASURED",
+      "source": "apps/web/src/lib/observability/sentry-options.ts:67 tracesSampleRate=0, no Replay",
+      "note": "Developer free tier suffices at this volume; Team is $26/mo annual-billed"
+    },
+    "resend": {
+      "value": 0,
+      "tag": "MEASURED",
+      "source": "apps/web/src/lib/ops/email.ts:49",
+      "note": "exactly one email exists in the codebase and it is an admin OTP. Zero customer-facing email."
+    },
+    "upstash": {
+      "value": 0,
+      "tag": "MEASURED",
+      "source": "apps/web/src/lib/ops/rate-limit.ts",
+      "note": "2 commands per call, 3 call sites; free tier is 500k commands/month"
+    },
+    "trigger_dev": {
+      "value": 0,
+      "tag": "MEASURED",
+      "source": "apps/jobs/CLAUDE.md:10-13 'No deploy has ever been made from this repo'",
+      "note": "not a live cost line"
+    },
+    "cloudflare": {
+      "value": 0,
+      "tag": "MEASURED",
+      "source": "packages/sites/src/index.ts:78 — only createFixtureDeployer exists",
+      "note": "no real deploy, no hosting cost"
+    }
+  },
+  "payments": {
+    "_source": "https://www.cashfree.com/payment-gateway-charges/ and /recurring-payment/, both 2026-08-17",
+    "upi_mdr_pct": {
+      "value": 1.95,
+      "tag": "MEASURED",
+      "source": "headline, EXCLUSIVE of GST — the vendor states this explicitly"
+    },
+    "gst_on_mdr_pct": {
+      "value": 18,
+      "tag": "MEASURED",
+      "source": "vendor states rates are ex-GST"
+    },
+    "intl_card_mdr_pct": {
+      "value": 2.99,
+      "tag": "MEASURED",
+      "source": "international Visa/Mastercard"
+    },
+    "upi_autopay_debit_inr_under_1000": {
+      "value": 5,
+      "tag": "MEASURED",
+      "source": "https://www.cashfree.com/recurring-payment/"
+    },
+    "upi_autopay_debit_inr_1000_plus": {
+      "value": 15,
+      "tag": "MEASURED",
+      "source": "same — the threshold TRIPLES the per-debit fee and is a real pricing-design constant"
+    },
+    "mandate_creation_inr": {
+      "value": 7.5,
+      "tag": "MEASURED",
+      "source": "same, one-time"
+    },
+    "refund_fee": {
+      "value": null,
+      "tag": "BLOCKED",
+      "note": "not published on any fetchable Cashfree page; /pricing/ returns 403, /docs/help/payments/refunds 404s. Razorpay publishes Rs0 refund processing as a benchmark."
+    },
+    "chargeback_fee": {
+      "value": null,
+      "tag": "BLOCKED",
+      "note": "not published"
+    },
+    "promo_0pct": {
+      "tag": "DISPUTED",
+      "a": "0% to 31 Mar 2027 up to Rs20L GMV per MONTH (cashfree.com/payment-gateway-charges/)",
+      "b": "0% up to Rs20,00,000 CUMULATIVE GMV (cashfree.com/docs/help/account/pricing)",
+      "note": "per-month vs lifetime is a durable floor vs a one-time runway. EXCLUDES subscriptions and international entirely, so it does not touch either recurring revenue or the USD tier. Model on 1.95%."
+    },
+    "what_is_wired": {
+      "value": "Cashfree only, INR-hardcoded, ONE-TIME orders, and the checkout bridge route does not exist",
+      "tag": "MEASURED",
+      "source": "apps/web/src/app/actions/wallet.ts:88-92",
+      "note": "no customer has ever been able to pay. Every revenue figure in this model is a forecast."
+    }
+  },
+  "tax": {
+    "gst_pct": {
+      "value": 18,
+      "tag": "MEASURED",
+      "source": "https://busy.in/gst-rates/it-services/ (upd 2026-08-05), https://cleartax.in/s/gst-on-software",
+      "note": "IT services were NOT moved in the Sep 2025 GST 2.0 rationalisation"
+    },
+    "inclusive_divisor": {
+      "value": 1.18,
+      "tag": "MEASURED",
+      "source": "net = gross / 1.18. Subtracting 18% instead understates net revenue by 3.2% and compounds through every downstream line."
+    },
+    "b2c_display_rule": {
+      "value": "transparency, not inclusivity",
+      "tag": "MEASURED",
+      "source": "Consumer Protection (E-Commerce) Rules 2020 Rule 4",
+      "note": "must show the total in a single figure with the tax broken out. Legal Metrology MRP rules govern packaged GOODS, not services. CCPA has penalised showing a tax-inclusive price then adding GST at checkout."
+    },
+    "export_zero_rated": {
+      "value": true,
+      "tag": "MEASURED",
+      "source": "Section 16 IGST Act, conditional on all five limbs of Section 2(6)",
+      "note": "requires an annual LUT (Form GST RFD-11) and FIRC/e-BRC remittance evidence. A lapsed LUT retrospectively converts a zero-rated year into an 18% liability."
+    },
+    "rcm_pct": {
+      "value": 18,
+      "tag": "MEASURED",
+      "source": "Section 5(3) IGST Act, self-invoice under s.31(3)(f) within 30 days",
+      "note": "MUST be paid from the electronic CASH ledger — s.49(4) forbids using ITC for RCM. Creditable afterwards."
+    },
+    "rcm_lockup_months": {
+      "low": 2,
+      "base": 4,
+      "high": 7,
+      "tag": "INFERRED",
+      "basis": "60-day statutory refund window under s.54(3) plus the practical filing cycle. Export-heavy revenue produces nil output GST, so the credit has nothing to offset and accumulates as a permanently outstanding receivable proportional to foreign vendor spend."
+    },
+    "equalisation_levy": {
+      "value": 0,
+      "tag": "MEASURED",
+      "source": "2% withdrawn 1 Aug 2024, 6% withdrawn 1 Apr 2025",
+      "note": "nothing is in force in FY2026-27"
+    },
+    "tds_on_saas": {
+      "value": 0,
+      "tag": "MEASURED",
+      "source": "Engineering Analysis Centre of Excellence v CIT (SC, 2021) — off-the-shelf software is not royalty",
+      "note": "budget CA fees for Form 146 on any vendor crossing Rs5 lakh/year (~USD 5,200)"
+    },
+    "dpdp_oneoff_inr": {
+      "low": 155000,
+      "base": 390000,
+      "high": 950000,
+      "tag": "INFERRED",
+      "basis": "itemised: legal review + consent notice + DPA templates, engineering for consent/erasure/retention/export, breach runbook. Obligations bite 14 May 2027 (PIB backgrounder, primary)."
+    },
+    "soc2": {
+      "value": "DO NOT BUDGET",
+      "tag": "MEASURED",
+      "source": "qualitative",
+      "note": "a US enterprise procurement artifact with no standing in Indian law and no DPDP relevance. An Indian SMB buyer asks for a GSTIN and a tax invoice."
+    }
+  },
+  "rbi_emandate": {
+    "framework": {
+      "value": "Digital Payments - E-mandate Framework, 2026, RBI/DPSS/2026-27/396, issued 21 April 2026",
+      "tag": "MEASURED",
+      "source": "https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=13374"
+    },
+    "afa_free_ceiling_inr": {
+      "value": 15000,
+      "tag": "MEASURED",
+      "source": "s.8 verbatim: 'All recurring transactions may be authorised without AFA up to Rs15,000/- per transaction.'",
+      "note": "applies identically to cards, PPIs AND UPI. The common belief that UPI AutoPay carries a higher limit is WRONG under the 2026 framework."
+    },
+    "enhanced_ceiling_categories": {
+      "value": ["insurance premiums", "mutual fund subscriptions", "credit card bill payments"],
+      "tag": "MEASURED",
+      "source": "s.8",
+      "note": "a closed, enumerated list. Software subscriptions do NOT qualify."
+    },
+    "pre_debit_notice_hours": {
+      "value": 24,
+      "tag": "MEASURED",
+      "source": "s.6(a)",
+      "note": "every renewal generates a proactive opt-out-bearing message 24 hours before payment — an involuntary-churn prompt that exists at Rs499 just as much as at Rs14,999"
+    },
+    "variable_mandate_cap": {
+      "value": null,
+      "tag": "BLOCKED",
+      "note": "s.4(c) references an 'overall cap fixed by the RBI' for variable-amount mandates; the cap itself is not stated in the retrieved text. A second, separate constraint."
+    }
+  },
+  "market": {
+    "_all_fetched": "2026-08-17, URLs in docs/22",
+    "global_competitors_publishing_inr": {
+      "value": 0,
+      "tag": "MEASURED",
+      "source": "nine tools checked: Ocoya, Predis, Blaze, Simplified, ContentStudio, SocialBee, FeedHive, Buffer, Later",
+      "note": "FeedHive prices in EUR; the other eight in USD. Predis is a Bengaluru company and still prices in dollars."
+    },
+    "zoho_social_inr": {
+      "value": {
+        "standard": 900,
+        "professional": 2400,
+        "premium": 3800
+      },
+      "tag": "MEASURED",
+      "source": "https://www.techjockey.com/detail/zoho-social 2026-08-17",
+      "note": "ex-GST. Standard buys TWELVE channels for Rs900 — the hardest comparison in the market."
+    },
+    "zocialone_inr": {
+      "value": {
+        "essential": 1999,
+        "professional": 4999,
+        "business": 14999
+      },
+      "tag": "MEASURED",
+      "source": "https://www.zocialone.ai/pricing 2026-08-17",
+      "note": "+18% GST at checkout; 3/10/25 social accounts; the closest INR-native AI-native comparable"
+    },
+    "postdesi_inr": {
+      "value": {
+        "pro_creator": 399,
+        "agency": 999
+      },
+      "tag": "MEASURED",
+      "source": "https://postdesi.in/ 2026-08-17",
+      "note": "UPI via Cashfree; 100/500 post credits"
+    },
+    "buffer_free": {
+      "value": "3 channels, 10 scheduled posts per channel, 1 user",
+      "tag": "MEASURED",
+      "source": "https://buffer.com/pricing 2026-08-17",
+      "note": "the genuine entry point to the category and the thing any new product is actually priced against"
+    },
+    "usd29_landed_inr_b2b": {
+      "value": 2888.71,
+      "tag": "MEASURED",
+      "source": "arithmetic on measured inputs: $29 x Rs95.66 + 3.5% card markup + 18% GST on the markup",
+      "note": "a GST-registered Indian business pays +4.13% over spot"
+    },
+    "usd29_landed_inr_b2c": {
+      "value": 3408.68,
+      "tag": "MEASURED",
+      "source": "same plus 18% OIDAR IGST charged by the foreign vendor, non-recoverable",
+      "note": "an unregistered Indian consumer pays +22.87% over spot"
+    },
+    "later_raised_prices": {
+      "value": "Starter +12.5%, Growth +25% with a one-third cut to sets AND seats, free plan eliminated",
+      "tag": "MEASURED",
+      "source": "https://www.socialchamp.com/blog/later-pricing/ pub 2026-06-30",
+      "note": "the only dated before-and-after evidence obtained in the category"
+    }
+  },
+  "anchors_inr_month": {
+    "_source": "all fetched 2026-08-17; full citations in docs/22",
+    "diy_lean": {
+      "value": 1210,
+      "tag": "MEASURED",
+      "source": "Canva Pro annual Rs333 + ChatGPT Go Rs399 + Buffer 1 channel $5"
+    },
+    "diy_standard": {
+      "value": 3932,
+      "tag": "MEASURED",
+      "source": "Canva Pro Rs500 + ChatGPT Plus Rs1999 + Buffer x3 channels $15"
+    },
+    "agency_floor": {
+      "value": 7000,
+      "tag": "MEASURED",
+      "source": "https://digitalflo.in/social-media-marketing-packages/ — DigitalFLO Silver: 2 platforms, 12 static posts + 2 reels, branded designs, calendar, ad setup, report",
+      "note": "the published small-agency floor delivers MORE output than the Rs15,000 freelance tier"
+    },
+    "agency_mid": {
+      "value": 12000,
+      "tag": "MEASURED",
+      "source": "DigitalFLO Gold: 3 platforms, 12 posts + 4 reels, 2 Meta campaigns"
+    },
+    "freelancer_floor": {
+      "value": 15000,
+      "tag": "MEASURED",
+      "source": "https://upgrowth.in/social-media-management-pricing/ — 8-12 posts, 1-2 platforms, no video, no ads"
+    },
+    "junior_hire_tier2": {
+      "value": 26400,
+      "tag": "MEASURED",
+      "source": "AmbitionBox Social Media Executive Indore n=62 upd 2026-07-21, CTC Rs3.0L/12 + device amortisation",
+      "note": "CTC INCLUDES employer PF — adding 12% on top would double-count"
+    },
+    "junior_hire_tier1": {
+      "value": 31400,
+      "tag": "MEASURED",
+      "source": "AmbitionBox Social Media Executive India n=9200 upd 2026-08-14, CTC Rs3.4-3.8L/12 + device"
+    },
+    "msme_digital_marketing_ceiling": {
+      "value": "62.5% of Indian MSME owner-managers spend under Rs10,000/month on digital marketing in total; only 13% actively use digital marketing at all",
+      "tag": "MEASURED",
+      "source": "SIDBI 2025 survey via India SME Forum (secondary, primary PDF not fetched)",
+      "note": "the demand-side ceiling for a mass-market Indian SMB product"
+    }
+  },
+  "opex_inr_month": {
+    "_source": "AmbitionBox CTC bands + published CA retainers, all 2026-08-17",
+    "founders_unpaid": {
+      "engineer": 86250,
+      "designer": 0,
+      "founder": 0,
+      "marketer": 0,
+      "ca_retainer": 10000,
+      "incorporation_amortised": 560,
+      "tag": "INFERRED",
+      "basis": "survival threshold: one paid engineer, founders drawing nothing, compliance retainer only"
+    },
+    "founders_paid": {
+      "engineer": 86250,
+      "designer": 65000,
+      "founder": 100000,
+      "marketer": 30000,
+      "ca_retainer": 10000,
+      "incorporation_amortised": 560,
+      "tag": "INFERRED",
+      "basis": "lean-startup rates, MEASURED AmbitionBox bands adjusted down from funded-employer medians"
+    },
+    "full_market": {
+      "engineer": 86250,
+      "designer": 124583,
+      "founder": 170833,
+      "marketer": 30000,
+      "ca_retainer": 10000,
+      "incorporation_amortised": 560,
+      "tag": "MEASURED bands",
+      "basis": "AmbitionBox 3-6yr medians at face value"
+    },
+    "_excluded": "office/coworking rent, team laptops, software licences, insurance. NOT RESEARCHED and NOT GUESSED. Treat every opex figure as a floor."
+  },
+  "support": {
+    "cost_per_minute_inr": {
+      "low": 2.0,
+      "base": 2.5,
+      "high": 3.6,
+      "tag": "INFERRED",
+      "basis": "junior salary Rs26,400-31,400/month over ~176 working hours"
+    },
+    "minutes_per_customer_month": {
+      "low": 3,
+      "base": 10,
+      "high": 30,
+      "tag": "INFERRED",
+      "basis": "no ticket data exists. Base assumes one short interaction a month. High is the SMB reality at a low price point where the buyer is not technical."
+    },
+    "_note": "there is no support tooling in the repo and no customer-facing email exists at all, so every ticket today would arrive by an unmanaged channel"
+  },
+  "churn_cac": {
+    "_evidence_quality": "India-specific SMB SaaS churn, CAC and free-to-paid conversion were NOT OBTAINED after six targeted searches across Chargebee, SaaSBoomi, Bessemer, Chiratae-Zinnov and Inc42. Every figure below is a GLOBAL benchmark and is labelled as such. Converting a US CAC into rupees would be a fabrication — the source set itself states comparable regions run 40-60% lower.",
+    "monthly_logo_churn_smb_global": {
+      "value": {
+        "low": 0.03,
+        "high": 0.05
+      },
+      "tag": "MEASURED",
+      "source": "Optifai Pipeline Study, N=939 B2B SaaS, Q2 2025-Q1 2026, geography unspecified",
+      "note": "early-stage self-serve at low ARPA runs 5-7% monthly per a weaker source"
+    },
+    "churn_scenarios_modelled": [0.05, 0.08, 0.12],
+    "free_to_paid_by_acv_under_500usd": {
+      "value": 0.22,
+      "tag": "MEASURED",
+      "source": "1Capture, 10,000+ SaaS companies / 2.5M trial users, pub 2025-08-12",
+      "note": "explicitly states no India-specific benchmarks appear in the analysis"
+    },
+    "free_to_paid_no_card_trial": {
+      "value": 0.18,
+      "tag": "MEASURED",
+      "source": "same"
+    },
+    "free_to_paid_card_required": {
+      "value": 0.25,
+      "tag": "MEASURED",
+      "source": "same"
+    },
+    "pure_freemium": {
+      "value": 0.035,
+      "tag": "MEASURED",
+      "source": "typically 2-5%, self-serve 3-5%",
+      "note": "weaker provenance; this is the band a no-card free tier actually lands in"
+    },
+    "india_involuntary_churn_driver": {
+      "value": "RBI recurring-mandate rules caused significant involuntary churn for subscription businesses in India; involuntary churn is >20% of total SaaS churn",
+      "tag": "MEASURED",
+      "source": "Chargebee via search summary",
+      "note": "directional and India-specific, but no percentage exists. The 24-hour pre-debit opt-out notice is a structural churn surface at every price point."
+    }
+  },
+  "targets": {
+    "gross_margin_ladder": [0.7, 0.75, 0.8, 0.85],
+    "ltv_cac_threshold": 3.0
+  }
+}
