@@ -62,18 +62,26 @@ work around it.
 
 ```
 Repository:  development156/sahodalabs
-Base branch: wt-web          ← never main
-Your branch: wt-design  (A2)   or   wt-research  (A3)
+Base branch: wt-web            ← never main
+Your branch: wt-girija (Girija) · wt-jiban (Jiban) · wt-divas (Divas)
+Your work goes to: wt-core     ← then the advisor reviews and promotes to wt-web
 ```
 
 **First four commands, every session, in order:**
 
 ```bash
-git fetch --all
-git checkout -b wt-design origin/wt-web      # or wt-research
+git fetch --all --prune
+git checkout wt-girija || git checkout -b wt-girija origin/wt-web   # your own lane
+git pull --ff-only origin wt-girija
 git branch --show-current                    # VERIFY — never assume a checkout succeeded
+find apps/web/src/app -name page.tsx | wc -l # 58 = the product, ~20 = a stale main
 pnpm install
 ```
+
+**Pull every single session.** Three lanes and an integration branch move
+independently; a session that starts stale writes against code that no longer
+exists. `--ff-only` is deliberate: if it refuses, your lane has diverged and you
+should find out why rather than let a merge happen by accident.
 
 The third line is not ceremony. A session in this project once ran an unguarded
 `git checkout -B`, the switch failed silently, and a six-way trial merge ran on

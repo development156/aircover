@@ -2,18 +2,21 @@
 #
 # Sahoda Labs — Claude Code cloud sandbox setup.
 #
-#   Setup script field:  bash scripts/cloud-setup.sh
+#   Setup script field:   bash scripts/cloud-setup.sh
 #
-# It reads ENVIRONMENT VARIABLES from the cloud environment's own settings and
-# materialises the three .env files this repository needs. It contains no secret
-# itself, which is why it is safe in git.
+# It holds NO secret. It reads environment variables set on the cloud
+# environment and writes the three .env files this repository needs. That is why
+# it is safe in git.
 #
-# The variable names below were read out of the source with
-#   grep -rhoE 'process\.env\.[A-Z_][A-Z0-9_]*' apps packages
-# on 2026-08-24, not guessed. Re-derive them the same way when this drifts.
+# The 47 names below were read out of the working apps/web/.env on 2026-08-22
+# (names only, never values) — they are what actually runs, not a guess. An
+# earlier version of this script was written from a grep of `process.env` and
+# was wrong in eight places: there is no OPENROUTER_API_KEY (there are three:
+# _TEXT, _RESEARCH, _IMAGE), no ENCRYPTION_KEY (it is TOKEN_VAULT_KEY), and
+# DATABASE_URL, SUPABASE_DB_CA_CERT, CRON_SECRET, ZERNIO_WEBHOOK_SECRET and
+# NEXT_PUBLIC_SENTRY_DSN are read by source but are NOT in the working env.
 #
-# Anything missing is REPORTED, never invented. A sandbox that half-works while
-# claiming to be ready is the failure this whole repository is built against.
+# Anything missing is REPORTED, never invented.
 #
 set -uo pipefail
 
@@ -22,44 +25,51 @@ ok()   { printf '  ok       %s\n' "$*"; }
 gap()  { printf '  absent   %s\n' "$*"; }
 bad()  { printf '  FAIL     %s\n' "$*"; }
 
-# ── REQUIRED — without these the app cannot boot and the gate cannot run ──────
+# ── REQUIRED — the app cannot boot and the gate cannot run without these ──────
 ENV_REQUIRED=(
-  NEXT_PUBLIC_SUPABASE_URL          # must be the BARE ORIGIN, no trailing path
+  NEXT_PUBLIC_SUPABASE_URL           # BARE ORIGIN, no trailing path
   NEXT_PUBLIC_SUPABASE_ANON_KEY
-  SUPABASE_DB_URL                   # use the ap-south-1 POOLER host, not the
-                                    # direct host: the direct one is IPv6-only
-                                    # and every paid action dies against it
+  SUPABASE_DB_URL                    # the ap-south-1 POOLER host. The direct
+                                     # host is IPv6-only and every paid action
+                                     # dies against it.
+  SUPABASE_SERVICE_ROLE_KEY
+  SUPABASE_JWT_SECRET
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
   CLERK_SECRET_KEY
 )
 
-# ── OPTIONAL — each absence is a visible, honest "not configured" state ───────
-# This product is built to say what it cannot do rather than fake a result, so
-# a missing key degrades a feature; it does not crash the app.
+# ── The rest of the working environment ──────────────────────────────────────
+# A missing key here degrades one feature honestly. This product is built to
+# say what it cannot do rather than fake a result, so absence is a visible
+# state, not a crash.
 ENV_OPTIONAL=(
-  # database
-  SUPABASE_SERVICE_ROLE_KEY  SUPABASE_JWT_SECRET  SUPABASE_DB_CA_CERT  DATABASE_URL
-  # secrets and jobs
-  TOKEN_VAULT_KEY  CRON_SECRET
-  # AI — note these are TWO keys, not one OPENROUTER_API_KEY
-  OPENROUTER_API_KEY_TEXT  OPENROUTER_API_KEY_RESEARCH
-  # publishing
-  ZERNIO_API_KEY  ZERNIO_WEBHOOK_SECRET
+  # auth and admin
+  CLERK_WEBHOOK_SECRET  ADMIN_BOOTSTRAP_EMAILS  OPS_ALLOW_SELF_APPROVE
+  TURNSTILE_SECRET_KEY  NEXT_PUBLIC_TURNSTILE_SITE_KEY
+  # AI — THREE OpenRouter keys, not one
+  OPENROUTER_API_KEY_TEXT  OPENROUTER_API_KEY_RESEARCH  OPENROUTER_API_KEY_IMAGE
+  OPENAI_API_KEY  GOOGLE_GEMINI_API_KEY
+  # publishing and connections
+  ZERNIO_API_KEY  X_CLIENT_ID  LINKEDIN_CLIENT_ID  META_APP_ID
+  GOOGLE_OAUTH_CLIENT_ID  GOOGLE_OAUTH_CLIENT_SECRET
+  TOKEN_VAULT_KEY                    # the AES vault. Tokens decrypt in memory
+                                     # and are never logged or returned.
   # payments
-  CASHFREE_APP_ID  CASHFREE_SECRET_KEY
+  CASHFREE_APP_ID  CASHFREE_SECRET_KEY  CASHFREE_ENV
+  RAZORPAY_KEY_ID  STRIPE_SECRET_KEY  STRIPE_STARTER_PRICE_ID
+  # jobs and ops
+  TRIGGER_PROJECT_ID  TRIGGER_SECRET_KEY  JOB_SIGNING_SECRET  DEVOPS_INGEST_TOKEN
   # infrastructure
-  UPSTASH_REDIS_REST_URL  UPSTASH_REDIS_REST_TOKEN
-  SENTRY_DSN  NEXT_PUBLIC_SENTRY_DSN  NEXT_PUBLIC_SENTRY_ENVIRONMENT
-  SENTRY_ORG  SENTRY_PROJECT  SENTRY_AUTH_TOKEN
+  UPSTASH_REDIS_REST_URL  UPSTASH_REDIS_REST_TOKEN  SENTRY_DSN  RESEND_API_KEY
+  CLOUDFLARE_ACCOUNT_ID  CLOUDFLARE_API_TOKEN  CLOUDFLARE_ZONE_ID
   # radar
   APIFY_TOKEN  ZYTE_API_KEY
   # web
-  NEXT_PUBLIC_APP_URL  NEXT_PUBLIC_TURNSTILE_SITE_KEY
-  # MCP — .mcp.json interpolates CONTEXT7_API_KEY and SUPABASE_PROJECT_REF.
-  # Without them the context7 and supabase MCP servers start but cannot
-  # authenticate. SUPABASE_PROJECT_REF is NOT listed here: it is written once,
-  # explicitly, below. Listing it in both places emitted the key TWICE into
-  # every .env file — caught by this script's own self-test, not by reading it.
+  NEXT_PUBLIC_APP_URL  NEXT_PUBLIC_SITE_DOMAIN
+  # MCP — .mcp.json interpolates CONTEXT7_API_KEY. SUPABASE_PROJECT_REF is also
+  # interpolated but is written once, explicitly, below: listing it in both
+  # places emitted the key TWICE into every .env, caught by this script's own
+  # self-test rather than by reading it.
   CONTEXT7_API_KEY
 )
 
@@ -67,7 +77,7 @@ say "1 · Environment variables"
 MISSING=(); SET_COUNT=0
 for v in "${ENV_REQUIRED[@]}"; do
   if [ -n "${!v:-}" ]; then ok "$v"; SET_COUNT=$((SET_COUNT+1))
-  else gap "$v   ← REQUIRED"; MISSING+=("$v"); fi
+  else gap "$v   <- REQUIRED"; MISSING+=("$v"); fi
 done
 for v in "${ENV_OPTIONAL[@]}"; do
   if [ -n "${!v:-}" ]; then ok "$v"; SET_COUNT=$((SET_COUNT+1)); else gap "$v"; fi
@@ -77,8 +87,8 @@ done
 # SAHODA_E2E_ACK_TARGET is a GUARD, not a knob: Playwright refuses at module
 # scope without it. It exists because this suite wrote to the production
 # database on every gate run for months and minted 12,196 Clerk users.
-# E2E_PORT must be explicit — turbo's strict env stripping drops it otherwise,
-# and every sandbox then lands on the same default port.
+# E2E_PORT must be explicit, or turbo's strict env stripping drops it and every
+# sandbox lands on the same default port.
 : "${SUPABASE_PROJECT_REF:=rloztdhzfliyvpvxsgjl}"
 : "${SAHODA_E2E_ACK_TARGET:=rloztdhzfliyvpvxsgjl}"
 : "${E2E_PORT:=3100}"
@@ -88,7 +98,7 @@ say "2 · Writing the three .env files"
 # and apps/web/.env.local is the one Playwright reads — two sessions could not
 # run their smoke suite at all for want of exactly that file.
 write_env() {
-  local target="$1"; mkdir -p "$(dirname "$target")"; : > "$target"
+  local target="$1"; mkdir -p "$(dirname "$target")"; : > "$target"; chmod 600 "$target"
   local v
   for v in "${ENV_REQUIRED[@]}" "${ENV_OPTIONAL[@]}"; do
     [ -n "${!v:-}" ] && printf '%s=%s\n' "$v" "${!v}" >> "$target"
@@ -96,7 +106,6 @@ write_env() {
   printf 'SUPABASE_PROJECT_REF=%s\n'  "$SUPABASE_PROJECT_REF"  >> "$target"
   printf 'SAHODA_E2E_ACK_TARGET=%s\n' "$SAHODA_E2E_ACK_TARGET" >> "$target"
   printf 'E2E_PORT=%s\n'              "$E2E_PORT"              >> "$target"
-  chmod 600 "$target"
   ok "$target  ($(wc -l < "$target") vars)"
 }
 write_env .env
@@ -114,31 +123,36 @@ say "4 · Dependencies"
 if command -v pnpm >/dev/null 2>&1; then
   pnpm install --frozen-lockfile >/tmp/pnpm-install.log 2>&1 \
     && ok "pnpm install" \
-    || { bad "pnpm install failed — last 15 lines:"; tail -15 /tmp/pnpm-install.log; }
+    || { bad "pnpm install failed, last 15 lines:"; tail -15 /tmp/pnpm-install.log; }
 else
   bad "pnpm not found"
 fi
 
 say "5 · Where you are"
-git fetch --all --quiet 2>/dev/null || true
+git fetch --all --prune --quiet 2>/dev/null || true
 ROUTES=$(find apps/web/src/app -name 'page.tsx' 2>/dev/null | wc -l)
-printf '  branch     %s\n' "$(git branch --show-current 2>/dev/null || echo '?')"
+BRANCH=$(git branch --show-current 2>/dev/null || echo '?')
+printf '  branch     %s\n' "$BRANCH"
 printf '  head       %s\n' "$(git log -1 --format='%h %s' 2>/dev/null | cut -c1-64)"
 printf '  routes     %s\n' "$ROUTES"
 if [ "${ROUTES:-0}" -lt 40 ] 2>/dev/null; then
   bad "Only $ROUTES routes. The product has 58."
-  echo "         You are on a stale base — every 'main' in this repository is"
+  echo "         You are on a stale base. Every 'main' in this repository is"
   echo "         690+ commits behind. Cut your branch from origin/wt-web."
 else
-  ok "$ROUTES routes — this is the current product"
+  ok "$ROUTES routes, this is the current product"
 fi
+case "$BRANCH" in
+  wt-girija|wt-jiban|wt-divas) ok "on your own lane" ;;
+  wt-core|wt-web) bad "$BRANCH is a shared branch. Work on wt-girija, wt-jiban or wt-divas." ;;
+esac
 
 say "6 · MCP"
 if [ -f .mcp.json ]; then
-  ok "$(grep -cE '^\s{4}"[a-z0-9-]+":' .mcp.json 2>/dev/null || echo '?') servers declared in .mcp.json"
-  [ -z "${CONTEXT7_API_KEY:-}" ] && gap "CONTEXT7_API_KEY — context7 will start but not authenticate"
+  ok "$(grep -cE '^\s{4}"[a-z0-9-]+":' .mcp.json 2>/dev/null || echo '?') servers declared"
+  [ -z "${CONTEXT7_API_KEY:-}" ] && gap "CONTEXT7_API_KEY, context7 starts but cannot authenticate"
 else
-  bad ".mcp.json absent — no MCP servers will load"
+  bad ".mcp.json absent, no MCP servers will load"
 fi
 
 say "Result"
@@ -146,12 +160,12 @@ if [ ${#MISSING[@]} -gt 0 ]; then
   bad "${#MISSING[@]} REQUIRED variable(s) absent: ${MISSING[*]}"
   echo
   echo "  Set them in this environment's settings and re-run. Do NOT invent"
-  echo "  values, and do NOT un-skip a test that skipped for want of them — a"
+  echo "  values, and do NOT un-skip a test that skipped for want of them. A"
   echo "  suite that ran nothing reports as passing, which is how twenty-six"
   echo "  billing tests never executed for months."
   exit 1
 fi
-ok "All ${#ENV_REQUIRED[@]} required variables present; $SET_COUNT set in total."
+ok "All ${#ENV_REQUIRED[@]} required present; $SET_COUNT set in total."
 echo
-echo "  Next: run /lead-design or /lead-research. Either one auto-restores its"
-echo "  own context from docs/workflow/handoffs/ before asking you anything."
+echo "  Next: run /kickoff. It pulls, restores your own context from the last"
+echo "  handoff, and reads what the other two lanes did before you plan."

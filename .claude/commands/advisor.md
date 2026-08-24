@@ -21,9 +21,20 @@ when you were wrong.
 
 ```bash
 cd /home/divas/Documents/GitHub/sahodalabs
-git fetch --all
+git fetch --all --prune          # ALWAYS, before anything else
 git worktree list
 ```
+
+**The flow you are integrating:**
+
+```
+wt-girija ─┐
+wt-jiban  ─┼──► wt-core ──(you review)──► wt-web ──► production
+wt-divas  ─┘
+```
+
+Lanes merge into `wt-core`. You review `wt-core`. Only then does it reach
+`wt-web`. Nobody but you pushes `wt-web`.
 
 **1 · Read your own last handoff** to restore context:
 
@@ -34,21 +45,29 @@ ls docs/workflow/handoffs/advisor-*.md 2>/dev/null | tail -1
 **2 · Read each lead's newest handoff**, from their branch:
 
 ```bash
-git log --oneline -3 origin/wt-design origin/wt-research
-git show origin/wt-design:docs/workflow/handoffs/$(git ls-tree --name-only origin/wt-design docs/workflow/handoffs/ | grep design | tail -1 | xargs basename)
+for b in wt-girija wt-jiban wt-divas; do
+  echo "--- $b"
+  git ls-tree --name-only origin/$b docs/workflow/handoffs/ 2>/dev/null | tail -2
+done
+git show origin/wt-girija:docs/workflow/handoffs/<newest>
 ```
 
-Do the same for `wt-research`. If a branch does not exist yet, say so and move
-on — do not invent a handoff.
+If a branch does not exist yet, say so and move on — do not invent a handoff.
 
 **3 · Measure what is actually outstanding:**
 
 ```bash
-for b in wt-design wt-research; do
-  echo "$b: $(git rev-list --count origin/wt-web..origin/$b 2>/dev/null) ahead"
+for b in wt-girija wt-jiban wt-divas wt-core; do
+  printf "%-12s %s ahead of wt-web, %s ahead of wt-core\n" "$b" \
+    "$(git rev-list --count origin/wt-web..origin/$b 2>/dev/null)" \
+    "$(git rev-list --count origin/wt-core..origin/$b 2>/dev/null)"
 done
 git log --oneline -1 origin/wt-web
 ```
+
+**A lane showing 0 ahead is not necessarily idle** — it may be holding its whole
+output uncommitted. Check its `git status` too, because `git merge` on an empty
+lane succeeds having merged nothing.
 
 **4 · Then report to me, in this shape, and wait:**
 

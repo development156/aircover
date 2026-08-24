@@ -4,6 +4,28 @@ description: Start a session — read the other roles' handoffs, then plan.
 
 Do not plan anything until steps 1 and 2 are done.
 
+## 0 · Pull. Always. Before anything else.
+
+```bash
+git fetch --all --prune
+git pull --ff-only origin "$(git branch --show-current)"
+```
+
+**This is the rule that comes before every other rule.** Three lanes and an
+integration branch move independently; a session that starts from a stale
+checkout writes changes against code that no longer exists.
+
+`--ff-only` on purpose: if it refuses, your lane and the remote have diverged
+and you must look at why rather than let a merge happen by accident. Say so and
+stop.
+
+Then confirm you are where you think you are:
+
+```bash
+git branch --show-current
+find apps/web/src/app -name page.tsx | wc -l   # 58 = the product. ~20 or ~11 = a stale main.
+```
+
 ## 1 · Read the canon
 
 - `CLAUDE.md`

@@ -1,19 +1,80 @@
-# 08 · Roles
+# 08 · Roles and branches
 
-**Three people work on this repository. This file says who owns what, who may
-merge, and which branch each one cuts from.** Read your own card before your
-first task. Read the other two before you touch anything shared.
+**Three people work on this repository, each in a Claude Code cloud session, each
+on their own branch.** This file says which branch is yours, where your work
+goes, and who is allowed to merge it.
 
-Written 24 August 2026. Every number in the Facts section was measured, not
-assumed; the command that produced it is given so you can re-measure when this
-file goes stale.
+Written 24 August 2026. Every number below was measured, and the command that
+produced it is given so you can re-measure when this file goes stale.
 
 ---
 
-## The facts these roles are built on
+## The flow
 
-Re-measure with `git fetch --all` first. All counts are `page.tsx` files under
-`apps/web/src/app/`.
+```
+                    origin/wt-web          ← production. Vercel deploys this.
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │      each lane is cut from wt-web
+   wt-girija         wt-jiban         wt-divas   and NEVER from main
+        │                │                │
+        └────────────────┼────────────────┘
+                         ▼
+                     wt-core               ← everything lands here first
+                         │
+                    (review)               ← the advisor, and only the advisor
+                         ▼
+                    origin/wt-web
+```
+
+**You push to your own lane. Your lane merges into `wt-core`. `wt-core` is
+reviewed, and only then does it reach `wt-web`.** Nobody merges their own work
+into `wt-core`, and nobody but the advisor touches `wt-web`.
+
+| Branch | Who | What it is |
+|---|---|---|
+| `wt-girija` | Girija | a working lane, cut from `wt-web` |
+| `wt-jiban` | Jiban | a working lane, cut from `wt-web` |
+| `wt-divas` | Divas | a working lane, cut from `wt-web` |
+| `wt-core` | the advisor | the integration branch. Reviewed before it moves. |
+| `wt-web` | the advisor | **production.** Only the advisor pushes here. |
+
+All five were created at `70ce7b26` on 24 August 2026 and all five carry 58
+routes. Re-check with:
+
+```bash
+git fetch --all --prune
+for b in wt-web wt-core wt-girija wt-jiban wt-divas; do
+  printf "%-12s %s routes=%s\n" "$b" "$(git rev-parse --short origin/$b)" \
+    "$(git ls-tree -r --name-only origin/$b apps/web/src/app | grep -c page.tsx)"
+done
+```
+
+---
+
+## The rule that comes before everything
+
+**Pull at the start of every session. Every time. No exceptions.**
+
+```bash
+git fetch --all --prune
+git pull --ff-only origin <your-branch>
+```
+
+This is not hygiene, it is the difference between building on the product and
+building on a memory of it. Three lanes and an integration branch move
+independently, and a session that starts from a stale checkout writes changes
+against code that no longer exists. `/kickoff` does this for you as its first
+action; run it before you plan anything.
+
+**`--ff-only` on purpose.** If it refuses, your lane and the remote have
+diverged and you need to look at why rather than let a merge happen by accident.
+
+---
+
+## The one thing that will silently ruin a week
+
+**Never cut a branch from `main`. Any `main`.**
 
 | Ref | Date | Routes | Behind `wt-web` |
 |---|---|---|---|
@@ -22,93 +83,40 @@ Re-measure with `git fetch --all` first. All counts are `page.tsx` files under
 | `idivasm/main` | 2026-08-23 | 11 | 693 |
 | `idivasm/wt-web` | 2026-08-05 | 20 | 693 |
 
-**Two conclusions, and everything below depends on them.**
+`main` is the root commit the trunk was rebuilt on after the August history
+reset. It was never advanced. **A branch cut from it is a 20-route skeleton of a
+58-route product**, with no current design system in `docs/`.
 
-**1 · `main` is not the trunk. It is the root commit the trunk was rebuilt on.**
-It was never advanced after 7 August. A branch cut from any `main` is a
-20-route skeleton of a 58-route product. `.claude/commands/fix.md` still says
-*"Create a branch from `origin/main`"* — that instruction is now wrong and is
-corrected in `09_CLOUD_SESSIONS.md`.
+`.claude/commands/fix.md` still says *"Create a branch from `origin/main`"*.
+That instruction predates the reset and is wrong.
 
-**2 · The two GitHub remotes are not mirrors of each other.**
+**And the repository is `development156/sahodalabs`.** There are two GitHub
+remotes and they are not mirrors:
 
-| | `development156/sahodalabs` (`origin`) | `IDIVASM/sahodalabs` (`idivasm`) |
+| | `development156/sahodalabs` | `IDIVASM/sahodalabs` |
 |---|---|---|
-| Carries the current product | **yes** | no — 693 commits stale |
+| Carries the current product | **yes** | no, 693 commits behind |
 | Vercel project attached | **yes** — `prj_L4IDks4bMlBwObyKcHzej6lVqm9D` | **none** |
 | Preview URL per branch | **yes, every branch** | **no** |
 
 Measured from the Vercel API: the one project's only git link is
-`{type: github, org: development156, repo: sahodalabs}`, and its last twenty
-deployments cover `wt-web`, `wt-sec`, `wt-handoff`, `wt-loop` and
-`squashed-root` — every pushed branch gets a `branchAlias` preview at
-`sahodalabs-git-<branch>-development-4417s-projects.vercel.app`.
-
-**So all work happens on `development156/sahodalabs`, cut from `wt-web`.**
-A branch pushed anywhere else has no preview, and a branch cut from `main` is
-not this product.
+`{org: development156, repo: sahodalabs}`. Every branch pushed there gets a
+preview at `sahodalabs-git-<branch>-development-4417s-projects.vercel.app`.
+A branch pushed anywhere else has no preview at all.
 
 ---
 
-## A1 — Advisor (the founder) — the single executor
+## What each person does
 
-**Rules on work, and is the only session that executes it.** Founder's ruling,
-24 August 2026.
+**Everyone has access to everything.** No path is withheld from anyone. The
+roles below describe focus, not permission.
 
-This amends `02_ADVISOR.md`, which says the advisor "does not write code" and
-sits "never in a worktree." Under this model the advisor still does not *author*
-changes — the two leads do — but it is the only session that pulls their
-branches, runs the gate, merges, and touches production. It therefore needs a
-worktree, and the property that survives is the one that mattered: **the advisor
-has no stake in any change's design, because it wrote none of them.**
+### Girija — design · `/lead-design`
 
-| | |
-|---|---|
-| Sees | both lead branches, and everything else |
-| Pulls | `wt-design` and `wt-research` |
-| **Runs the gate** | **yes — only A1** |
-| **Merges to `wt-web`** | **yes — only A1** |
-| **Applies a migration** | **yes — only A1** |
-| **Touches production** | **yes — only A1** |
-| Launches parallel sessions | yes — new branch, new worktree, new session |
-| Port block | 3240–3249 (Lightpanda +100) |
-
-**Launching a parallel session.** The advisor makes the lane — worktree, branch
-off `origin/wt-web`, `git config --worktree` author, all three `.env` copies,
-a free port — then writes a complete paste-ready brief using
-`03_SESSION_PROTOCOL.md`. The founder runs it and pastes the output back. Or,
-when told to, the advisor launches it itself with
-`claude --bg --dangerously-skip-permissions "<brief>"` from inside the prepared
-worktree, since that command **inherits the cwd**.
-
-**Merging is the most dangerous operation here** and `04_PARALLEL_SESSIONS.md`
-carries its rules. The three that get skipped: cut `wt-release` off `wt-web`
-rather than merging into trunk; run the full gate after **every single** merge,
-not at the end; and check `git rev-list --count HEAD..<branch>` first, because a
-lane can hold its whole output uncommitted and `git merge` will succeed having
-merged nothing.
-
----
-
-## A2 — Design lead · `/lead-design`
-
-**Builds UI and UX against the current design system.** Own worktree, own
-branch. Writes code; does not integrate it.
-
-| | |
-|---|---|
-| Branch | `wt-design`, cut from `origin/wt-web` — **never `main`** |
-| Access | **everything.** No path is withheld |
-| Focus | `apps/web/src/components/**` · `apps/web/src/app/**/*.tsx` · `packages/shared/tokens.css` · `docs/37_Design_System_v5.md` |
-| Declares | anything outside that focus, in `apps/web/REQUESTS.md`, before the first edit |
-| Merges | no — pushes `wt-design`, A1 pulls and merges |
-| Applies a migration | no — writes it, A1 applies it |
-| Port block | 3250–3259 (Lightpanda +100) |
-
-**The canon is `docs/37_Design_System_v5.md` and nothing else.** Four documents
-here claim authority over design; three are superseded and one of those still
-says in its own header that it *"wins for any token or component value."* It
-does not. From each file's own header:
+Builds UI and UX against **`docs/37_Design_System_v5.md`**, which is canon.
+Three other documents in this repository claim authority over design and one of
+them still says in its own header that it *"wins for any token or component
+value."* It does not. From each file's own header:
 
 ```
 docs/37_Design_System_v5.md    CANON — build from this
@@ -118,40 +126,48 @@ docs/37_Design_System_v5.md    CANON — build from this
 docs/design2.0/UI_RULES_v3.md  superseded — points back at 08 "for governance"
 ```
 
-**Read `docs/45_Product_Structure.md` before designing any screen.** 60,507
-words read out of the running product's code and its production database. Its
-most important section is **what this product may not show.**
+Read `docs/45_Product_Structure.md` before designing any screen. 60,507 words
+read out of the running product's code and its production database; its most
+important section is **what this product may not show.**
 
-The three product facts that otherwise produce unshippable screens — no figure
-without a query behind it, seven distinct kinds of nothing, state carried by
-fill weight and glyph rather than hue — and the mechanics that bite, are in
-`.claude/commands/lead-design.md`. Read it; it is the working card.
+### Jiban — research · `/lead-research`
+
+Researches and builds anything. The standing non-negotiables are in
+`.claude/commands/lead-research.md` and they are not negotiable: RLS on every
+table, the ledger never lies, no invented numbers, one body **and one format**
+per channel.
+
+### Divas — advisor · `/advisor`
+
+Rules on the work and is **the only session that executes it**: pulls the lanes,
+runs the gate, merges into `wt-core`, reviews, promotes to `wt-web`, applies
+migrations, touches production, and launches parallel sessions.
+
+This amends `02_ADVISOR.md`, which says the advisor "does not write code" and
+sits "never in a worktree". The advisor still authors nothing — the lanes do —
+but it needs a worktree to integrate. **What survives is the property that
+mattered: the advisor has no stake in any change's design, because it wrote none
+of them.** What it loses is independence from the integration, so when a merge
+goes wrong it is ruling on its own work and must say so out loud.
 
 ---
 
-## A3 — Research lead · `/lead-research`
+## Staying out of each other's way
 
-**Researches and builds anything.** Own worktree, own branch. Writes code; does
-not integrate it.
+Everyone has full access, so the boundary is **declaration**.
 
-| | |
-|---|---|
-| Branch | `wt-research`, cut from `origin/wt-web` — **never `main`** |
-| Access | **everything.** No path is withheld |
-| Declares | intended scope in `apps/web/REQUESTS.md` before the first edit |
-| Merges | no — pushes `wt-research`, A1 pulls and merges |
-| Applies a migration | no — writes it, A1 applies it |
-| Port block | 3260–3269 (Lightpanda +100) |
+Before starting a task that reaches outside your usual ground, write what you
+are about to touch into `apps/web/REQUESTS.md`, and read the tail of that file
+for what the others have declared.
 
-**Both leads have access to everything, so the boundary is declaration.** Two
-lanes editing the same *file* is a conflict git will show you. Two lanes editing
-the same *concept* is two designs of the same thing where only one survives, and
-git shows you nothing. The worst instance here: one lane fixed a double-charge
-in `onboarding-flow.tsx` while another replaced that whole stage with
-`OnboardingStage`, making the file unreachable. **Merging would have silently
-killed a money guard and nothing would have failed.**
+**Two lanes editing the same *file* is a conflict git will show you. Two lanes
+editing the same *concept* is two designs of the same thing where only one
+survives, and git shows you nothing.** The worst instance here: one lane fixed a
+double-charge in `onboarding-flow.tsx` while another replaced that whole stage
+with `OnboardingStage`, making the file unreachable. **Merging would have
+silently killed a money guard and nothing would have failed.**
 
-**Every shared surface touched goes in the handoff.** Lanes broke each other
+**Every shared surface you touch goes in your handoff.** Lanes broke each other
 four times exactly this way: `adapterFor` gained a required third parameter,
 `decideAttach` a fourth, `violation-copy` changed app-wide, `BrainRead` gained a
 required field. A required field breaks constructors, not readers — say which.
@@ -171,64 +187,23 @@ These are engineering facts, not permissions.
   `UPDATE` without a `WHERE`, against any table holding real data.
 - **Nobody force-pushes a shared branch.** A rebase over someone else's work
   loses it silently.
-- **Nobody merges their own branch to `wt-web`.** A1 merges, into a
-  `wt-release` cut off `wt-web`, running the full gate after **every single
-  merge** — not at the end, or you cannot tell which merge went red.
-- **Nobody but A1 runs the gate, applies a migration, or touches production.**
-  The leads verify their own work in their own sandbox; the **authoritative**
-  gate is A1's, and it is the one that decides whether something merges.
+- **Nobody merges their own lane into `wt-core`,** and nobody but the advisor
+  pushes `wt-web`.
+- **Nobody but the advisor applies a migration.** Write it; the advisor applies it.
 
 ---
 
-## One executor
+## Handoffs — how each lane learns what the others did
 
-**Execution is single-threaded, by ruling.** The advisor is the only session
-that runs the gate, merges, or touches production. The leads write code in
-their own worktrees and push; they do not integrate.
-
-This is what makes the whole arrangement fit. Three people writing in parallel
-costs nothing extra; three people *executing* in parallel costs ports, memory
-and a merge order nobody is holding. Measured on the founder's machine,
-24 August 2026: 15 GB total, 7 GB available, and each running lane is a Next
-server plus a browser at 3–4 GB. `journalctl -k` shows `next-server` OOM-killed
-at 2.3 GB anon-rss on 22 August, and a prior session recorded 22 kernel OOM
-kills in three hours with four sessions running.
-
-**The advisor may still run several lanes at once** — it launches them, and
-before starting another it checks:
-
-```bash
-free -g
-journalctl -k | grep -i "killed process" | tail -5
-ss -ltnp | grep -E ":(32[4-9][0-9])"
-```
-
-Under 6 GB available, do not start another. **Four concurrent lanes is the
-practical ceiling** and it is set by review bandwidth long before memory:
-sessions run in parallel, ruling on their reports is serial, and an unread
-report is worse than no report because it looks like coverage.
-
-**Leads working in cloud sandboxes do not consume this at all** — their compute
-is their own. See `09_CLOUD_SESSIONS.md`.
-
----
-
-## Learning what the others did
-
-Do not build a new mechanism. Three exist and are in use:
-
-| Channel | What it is |
-|---|---|
-| `apps/web/REQUESTS.md` | the cross-lane request log — 987 lines, tracked, un-ignored by name at `.gitignore:114` |
-| `LEARNINGS.md` | the running record, one line per PR — 216 lines, tracked |
-| `docs/workflow/handoffs/` | one dated file per role per session, written by `/handoff` |
-
-**`/handoff` persists; `/kickoff` reads.** At the end of a session `/handoff`
-writes `docs/workflow/handoffs/<role>-<date>.md` and commits it on that role's own
-branch. At the start of the next one, `/kickoff` fetches and reads the newest
-handoff from each *other* role's branch before planning anything.
+`/handoff` writes `docs/workflow/handoffs/<name>-<date>.md` and commits it.
+`/kickoff` pulls, reads **your own** newest handoff to resume, then each other
+lane's to learn what moved under you.
 
 That loop is git-backed, so it needs no live coordination and survives everyone
-being asleep. Live messaging between sessions exists — `ListAgents` and
-`SendMessage` reach peer sessions on this account — but it is a convenience, not
-the record. **If it is not in git, it did not happen.**
+being asleep. **If it is not in git, it did not happen.**
+
+Two sections are where the value hides and both are easy to skip: **every shared
+surface touched**, and **every guard written with the mutation that proved it.**
+
+Also in use, and older than this file: `apps/web/REQUESTS.md` (987 lines, the
+cross-lane request log) and `LEARNINGS.md` (one line per PR).

@@ -16,11 +16,18 @@ restriction is declaration — see _Staying out of the other lane's way_ below.
 **1 · Establish where you are and restore your context.**
 
 ```bash
-git fetch --all
+git fetch --all --prune
+git pull --ff-only origin "$(git branch --show-current)"   # ALWAYS. Before anything.
 git branch --show-current
 git status --short
 git log --oneline -5
+find apps/web/src/app -name page.tsx | wc -l    # 58 = the product
 ```
+
+**Pulling first is the rule that comes before every other rule.** Three lanes
+move independently and a stale checkout writes against code that no longer
+exists. If `--ff-only` refuses, your lane has diverged from the remote: say so
+and stop rather than letting a merge happen by accident.
 
 Read **your own newest handoff** to resume where you left off:
 
@@ -37,17 +44,17 @@ ls docs/workflow/handoffs/advisor-*.md  docs/workflow/handoffs/design-*.md 2>/de
 If one is not on your branch yet, read it from its own:
 
 ```bash
-git show origin/wt-design:docs/workflow/handoffs/<newest>
+git show origin/wt-jiban:docs/workflow/handoffs/<newest>
 ```
 
 If a file does not exist, say so and move on. **Do not invent a handoff.**
 
-**2 · If you are not on `wt-research`, create it** — cut from `origin/wt-web`,
+**2 · If you are not on `wt-jiban`, create it** — cut from `origin/wt-web`,
 **never from `main`** (every `main` here is 690+ commits behind and carries a
 20-route skeleton of a 58-route product):
 
 ```bash
-git checkout -b wt-research origin/wt-web
+git checkout -b wt-jiban origin/wt-web
 git branch --show-current          # VERIFY — never assume a checkout succeeded
 pnpm install
 ```
@@ -168,11 +175,11 @@ If your work is mostly in `components/` or `tokens.css`, say so in
   staging.
 - **Never `DROP`, `TRUNCATE`, or `DELETE`/`UPDATE` without a `WHERE`** against
   real data.
-- **Never merge to `wt-web`** and never force-push a shared branch.
+- **Never merge to `wt-core` or `wt-web`** and never force-push a shared branch.
 
 ## Finishing
 
-Commit and push `wt-research`, then `/handoff` — it writes
+Commit and push `wt-jiban`, then `/handoff` — it writes
 `docs/workflow/handoffs/research-<date>.md` and commits it, which is how the
 advisor and the other lead learn what you did. If it is not in git, it did not
 happen.
