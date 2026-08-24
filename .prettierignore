@@ -27,3 +27,12 @@ apps/web/playwright-report/
 # not read .gitignore, so without this line stage 4 lints the artifact stage 1
 # wrote — the gate failing on its own output.
 .gate/
+
+# Vendored upstream skill (own LICENSE, upstream `version: 2.9.1`) whose exact
+# text IS the artifact — CLAUDE.md's copy-style section is built on its 33
+# patterns. Same reason as `docs/` above, plus a measured content regression:
+# `prettier --write` on SKILL.md swallows 33 of its 35 standalone `**After:**`
+# labels into the preceding blockquote, collapsing every Before/After pair into
+# one quote. That is a corruption, not a reformat, so the file is excluded
+# rather than rewritten. Re-check after any upstream resync.
+.agents/skills/humanizer/
