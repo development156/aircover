@@ -1087,3 +1087,44 @@ in `turbo.json` or it can never be switched on), or move it out of vitest into
 suites and the DB-URL-gated files by grep. A suite that reaches a database
 through a helper I did not name, or through raw `fetch` to PostgREST rather than
 `pg`, is not covered by what I looked at.
+
+## 15 · Nothing in CI runs the gate, so a green PR says only that Vercel built
+
+**Found while checking my own PR's checks, 2026-08-24. Reported, not fixed** —
+adding a CI workflow is an owner decision with a runner-minutes cost and a
+secrets requirement, and it is not mine to make.
+
+`.github/workflows/` holds five files. **Not one triggers on `pull_request` or
+`push`:**
+
+| workflow            | trigger                                   |
+| ------------------- | ----------------------------------------- |
+| `audience-nightly`  | `schedule` + `workflow_dispatch`          |
+| `metrics-nightly`   | `schedule` + `workflow_dispatch`          |
+| `radar-nightly`     | `schedule` + `workflow_dispatch`          |
+| `status-page`       | `schedule` + `workflow_dispatch`          |
+| `post-deploy-smoke` | `deployment_status` + `workflow_dispatch` |
+
+PR #4 reports two checks: `Vercel Preview Comments` (success) and `probe`
+(skipped). `probe` is `post-deploy-smoke`, and its skip is **correct and
+deliberate** — its own `if:` is Production-only, because previews sit behind
+Vercel deployment protection and probing one measures a login page. That comment
+is already in the file.
+
+So a PR here can be green with `pnpm gate` never having run against it. **The
+gate exists only on somebody's machine.** That is the mechanism behind the defect
+in §13 above: `pnpm format:check` sits outside turbo AND outside CI, which is how
+CLAUDE.md's "silently red for months" happened and how it happened again the
+moment `8077df3` landed. The two facts compound — a leg no turbo count can see,
+on a repository where no automation runs any leg at all.
+
+Worth stating plainly because the reverse is easy to assume: **a green check mark
+on a pull request in this repository is not evidence that the tests pass.** It is
+evidence that Vercel finished a build.
+
+If a gate workflow is wanted, note the constraint before costing it: per
+CLAUDE.md the e2e half needs `apps/web/.env.local` with Clerk keys, so a CI gate
+is either unit-only or needs secrets. And per `docs/workflow/01_CONTEXT.md`
+GitHub schedules only from the DEFAULT branch, which is `main` — 692 commits
+behind — so anything added on a lane will not fire on a timer until that is
+resolved.
