@@ -79,7 +79,23 @@ export interface FolderMeta {
   count: number
   /** ISO of the newest file in this folder, or null when it holds none. */
   lastAdded: string | null
+  /**
+   * Signed preview URLs for the newest files in this folder, newest first, at
+   * most `PEEK`. These are the REAL photos — the same signed links the tiles
+   * below use — so a folder shows what is actually in it rather than a
+   * decoration standing in for content.
+   *
+   * Only non-null URLs appear. `signMediaPreviews` degrades to `url: null` per
+   * row rather than throwing, so a folder holding files whose links did not
+   * sign returns FEWER previews than it has files — which is why the component
+   * still draws a plain slip in that case. A folder that looks empty because
+   * signing hiccuped would be a lie about the library.
+   */
+  previews: string[]
 }
+
+/** How many photos peek out of a folder's mouth. Two reads as a stack; three crowds it. */
+export const PEEK = 2
 
 /**
  * Count and last-added date per folder, both read off the rows on screen.
@@ -99,7 +115,21 @@ export function folderMeta(cards: AssetCard[]): Record<FolderId, FolderMeta> {
     for (const card of held) {
       if (newest === null || card.createdAt > newest) newest = card.createdAt
     }
-    out[folder.id] = { count: held.length, lastAdded: newest }
+    // Newest first, so the photo on top of the stack is the one the date line
+    // underneath is talking about.
+    //
+    // Sorting in place is safe here and the reason is worth stating: `held` is
+    // already `cards.filter(...)`, which returns a NEW array, so this never
+    // touches the caller's — and the file grid below renders from `cards`. A
+    // test was written for that invariant and then deleted, because it could
+    // not be made to fail: `filter` guarantees it structurally, so the test
+    // asserted the language rather than this code.
+    const previews = held
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+      .map((card) => card.previewUrl)
+      .filter((url): url is string => url !== null)
+      .slice(0, PEEK)
+    out[folder.id] = { count: held.length, lastAdded: newest, previews }
   }
   return out
 }
