@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-import { ASSET_FOLDERS, folderCounts, folderMeta } from './folders'
+import { ASSET_FOLDERS, PEEK, folderCounts, folderMeta } from './folders'
 import type { AssetCard } from './view'
 
 /**
@@ -96,6 +96,32 @@ describe('asset folders', () => {
     expect(meta.unused.count).toBe(0)
     expect(meta.unused.lastAdded).toBeNull()
     expect(meta['in-use'].lastAdded).not.toBeNull()
+  })
+
+  it('peeks the NEWEST photos, newest first, capped', () => {
+    // The photo on top of the stack must be the one the date line underneath is
+    // talking about, so order is part of the claim and not decoration.
+    const cards = [
+      card({ createdAt: '2026-01-01T00:00:00Z', previewUrl: 'old' }),
+      card({ createdAt: '2026-08-24T00:00:00Z', previewUrl: 'newest' }),
+      card({ createdAt: '2026-03-01T00:00:00Z', previewUrl: 'mid' }),
+    ]
+
+    expect(folderMeta(cards).image.previews).toEqual(['newest', 'mid'])
+    expect(folderMeta(cards).image.previews.length).toBeLessThanOrEqual(PEEK)
+  })
+
+  it('drops files whose preview link did not sign, and never invents one', () => {
+    // signMediaPreviews degrades to null per row. A folder still COUNTS those
+    // files — it holds them — but cannot show a picture it does not have.
+    const cards = [
+      card({ createdAt: '2026-08-24T00:00:00Z', previewUrl: null }),
+      card({ createdAt: '2026-08-23T00:00:00Z', previewUrl: 'signed' }),
+    ]
+    const meta = folderMeta(cards).image
+
+    expect(meta.count).toBe(2)
+    expect(meta.previews).toEqual(['signed'])
   })
 
   it('has no folder for a kind the product cannot accept', () => {

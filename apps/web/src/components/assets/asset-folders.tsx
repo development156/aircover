@@ -96,7 +96,7 @@ export function AssetFolders({
         {ASSET_FOLDERS.map((folder) => {
           const Glyph = GLYPH[folder.id]
           const on = active === folder.id
-          const { count, lastAdded } = meta[folder.id]
+          const { count, lastAdded, previews } = meta[folder.id]
           return (
             <button
               key={folder.id}
@@ -125,24 +125,53 @@ export function AssetFolders({
                 />
               </span>
 
-              {/* ── SHEETS: what the folder holds, peeking out of the mouth.
-                  Two, offset, so it reads as a stack rather than one card. They
-                  slide UP on hover into the gap the front panel leaves.
+              {/* ── WHAT IS ACTUALLY IN HERE, peeking out of the mouth ─────
+                  These are the REAL photos — the same signed links the tiles
+                  below use — fanned so the newest sits on top, which is the one
+                  the date line underneath is talking about.
 
-                  MEASURED and cut back: at h-7 spanning 30-61px and 161-181px
-                  of a 226px folder, at 25%/40% of a light grey, they rendered as
-                  two bright slabs filling the mouth — the loudest thing in the
-                  component, and reading as a header bar rather than paper. A
-                  sheet edge is a SLIVER: only ~14px of each shows above the
-                  front panel, and the opacity is halved. */}
-              <span
-                aria-hidden
-                className="absolute top-[44px] right-[24%] left-[20%] h-6 rounded-t-[4px] bg-ink-mute/15 transition-panel group-hover:top-[36px]"
-              />
-              <span
-                aria-hidden
-                className="absolute top-[47px] right-[17%] left-[14%] h-6 rounded-t-[5px] bg-ink-mute/25 transition-panel group-hover:top-[40px]"
-              />
+                  A plain slip is drawn instead when a folder holds files whose
+                  links did not sign: `signMediaPreviews` degrades per row, and
+                  a folder that looked empty because signing hiccuped would be a
+                  lie about the library. An EMPTY folder draws nothing, because
+                  there is nothing to show.
+
+                  MEASURED and cut back once: as abstract slips these were h-7
+                  spanning 30-61px and 161-181px of a 226px folder at 25%/40%,
+                  which rendered as two bright slabs filling the mouth. A sheet
+                  edge is a SLIVER. */}
+              {previews.length > 0
+                ? previews.map((url, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={url}
+                      src={url}
+                      alt=""
+                      aria-hidden
+                      loading="lazy"
+                      decoding="async"
+                      className={cn(
+                        'absolute h-14 rounded-t-[5px] bg-s2 object-cover transition-panel',
+                        i === 0
+                          ? 'top-[44px] right-[24%] left-[20%] group-hover:top-[34px]'
+                          : 'top-[47px] right-[17%] left-[14%] group-hover:top-[38px]',
+                      )}
+                    />
+                  ))
+                : count > 0
+                  ? [0, 1].map((i) => (
+                      <span
+                        key={i}
+                        aria-hidden
+                        className={cn(
+                          'absolute h-6 rounded-t-[4px] transition-panel',
+                          i === 0
+                            ? 'top-[44px] right-[24%] left-[20%] bg-ink-mute/15 group-hover:top-[36px]'
+                            : 'top-[47px] right-[17%] left-[14%] bg-ink-mute/25 group-hover:top-[40px]',
+                        )}
+                      />
+                    ))
+                  : null}
 
               {/* ── FRONT: rises only 2px against the folder's 4, and the 2 that
                   do not cancel are the mouth opening. ───────────────────────── */}
