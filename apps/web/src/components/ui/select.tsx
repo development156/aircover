@@ -19,11 +19,23 @@ import { cn } from '@/lib/utils'
  */
 export function Select({
   className,
+  /**
+   * The WRAPPER's classes. The 280px cap below is right for a short enumeration
+   * (a state, a country) and wrong for a long sentence: on /settings/plan the
+   * tax-kind option "A business or person in India without a GSTIN" was cut
+   * mid-word by it. Callers that hold long options pass `max-w-none`.
+   *
+   * It is a separate prop because `className` lands on the `select` itself, and
+   * the constraint being overridden is on the span around it.
+   */
+  wrapperClassName,
   children,
   ...props
-}: React.ComponentPropsWithoutRef<'select'>) {
+}: React.ComponentPropsWithoutRef<'select'> & { wrapperClassName?: string }) {
   return (
-    <span className="relative inline-flex w-full max-w-[280px] items-center">
+    <span
+      className={cn('relative inline-flex w-full max-w-[280px] items-center', wrapperClassName)}
+    >
       <select
         className={cn(
           'h-input w-full appearance-none rounded-sm border border-line bg-surface pr-8 pl-3 text-[13px]',
