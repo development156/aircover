@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-import { ASSET_FOLDERS, folderCounts } from './folders'
+import { ASSET_FOLDERS, folderCounts, folderMeta } from './folders'
 import type { AssetCard } from './view'
 
 /**
@@ -73,6 +73,29 @@ describe('asset folders', () => {
     }
     const counts = folderCounts(cards)
     expect(counts['in-use'] + counts.unused).toBe(cards.length)
+  })
+
+  it('reports the NEWEST file in each folder, not the first it walked past', () => {
+    // Order of the input must not decide the answer. Built deliberately with the
+    // newest in the middle, because a max written as "last one wins" and a max
+    // written as "first one wins" both pass on a sorted fixture.
+    const cards = [
+      card({ createdAt: '2026-01-01T00:00:00Z' }),
+      card({ createdAt: '2026-08-24T00:00:00Z' }),
+      card({ createdAt: '2026-03-01T00:00:00Z' }),
+    ]
+
+    expect(folderMeta(cards).image.lastAdded).toBe('2026-08-24T00:00:00Z')
+  })
+
+  it('says NULL for an empty folder rather than inventing a date', () => {
+    // "There is no newest file" and "the newest file is today" are different
+    // claims. A fallback date here would make an empty folder state the second.
+    const meta = folderMeta([card({ kind: 'image', usage })])
+
+    expect(meta.unused.count).toBe(0)
+    expect(meta.unused.lastAdded).toBeNull()
+    expect(meta['in-use'].lastAdded).not.toBeNull()
   })
 
   it('has no folder for a kind the product cannot accept', () => {

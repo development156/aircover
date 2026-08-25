@@ -74,3 +74,32 @@ export function folderCounts(cards: AssetCard[]): Record<FolderId, number> {
   }
   return counts
 }
+
+export interface FolderMeta {
+  count: number
+  /** ISO of the newest file in this folder, or null when it holds none. */
+  lastAdded: string | null
+}
+
+/**
+ * Count and last-added date per folder, both read off the rows on screen.
+ *
+ * The reference this row is built from puts a date under the count ("Last added
+ * time Oct 13, 2025"), and unlike the item counts it asked for, this one is
+ * derivable: `created_at` is on every asset. So it is the real maximum, and
+ * **null when the folder is empty** rather than a fallback date — "there is no
+ * newest file" and "the newest file is today" are different claims, and a
+ * folder holding nothing must not be able to state the second.
+ */
+export function folderMeta(cards: AssetCard[]): Record<FolderId, FolderMeta> {
+  const out = {} as Record<FolderId, FolderMeta>
+  for (const folder of ASSET_FOLDERS) {
+    const held = cards.filter(folder.match)
+    let newest: string | null = null
+    for (const card of held) {
+      if (newest === null || card.createdAt > newest) newest = card.createdAt
+    }
+    out[folder.id] = { count: held.length, lastAdded: newest }
+  }
+  return out
+}
