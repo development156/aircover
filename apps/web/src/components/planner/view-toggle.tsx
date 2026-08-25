@@ -1,22 +1,27 @@
 import Link from 'next/link'
-import { CalendarDays, LayoutGrid, List } from 'lucide-react'
+import { CalendarDays, CalendarRange, LayoutGrid, List } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
-export type PlannerView = 'month' | 'week' | 'list'
+export type PlannerView = 'day' | 'week' | 'month' | 'list'
 
 /**
- * The reference's primary planner view is a MONTH CALENDAR — `Calendar` sits
- * first in its `.seg`, ahead of `Board`. This app had only List and Week, so
- * the question "what does my month look like" had no answer anywhere.
+ * Day · Week · Month · List, in the order a scheduling tool reads: tightest
+ * window first, widest last, and the list — which is not a window at all — at
+ * the end.
  *
- * `month` therefore leads. `week` and `list` stay: the week grid is what the
- * Home strip links into, and the list is the only view that shows unscheduled
- * work, which a calendar structurally cannot.
+ * `month` was previously labelled "Calendar" and led the group. It is now named
+ * for what it shows, because with a DAY and a WEEK beside it every one of them
+ * is a calendar and the word had stopped distinguishing anything.
+ *
+ * `list` stays and is still the DEFAULT (see the route). It is the only view
+ * that can show unscheduled work — a post with no `scheduled_at` has no cell to
+ * sit in — and the seeded approve tour anchors on its rows.
  */
 const VIEWS: ReadonlyArray<{ view: PlannerView; label: string; icon: typeof List }> = [
-  { view: 'month', label: 'Calendar', icon: CalendarDays },
+  { view: 'day', label: 'Day', icon: CalendarRange },
   { view: 'week', label: 'Week', icon: LayoutGrid },
+  { view: 'month', label: 'Month', icon: CalendarDays },
   { view: 'list', label: 'List', icon: List },
 ]
 
