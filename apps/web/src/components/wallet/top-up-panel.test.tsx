@@ -39,6 +39,12 @@ const rupees = (n: number): string => `₹${n.toLocaleString('en-IN')}`
  * look wrong. This asserts the CHAIN — click, then the money sentence — rather
  * than the classes, because the classes are what would still be right.
  *
+ * The SEPARATOR between plan and price moved from a comma to a middot when the
+ * footer became two columns. That is punctuation, not a claim, so these
+ * assertions were retargeted rather than loosened: they still pin the plan NAME
+ * and the plan's PRICE together in one sentence, which is the thing that must
+ * never disagree with what the checkout is about to charge.
+ *
  * Figures come from PLAN_CATALOG, never typed in: a test that hardcodes ₹1,499
  * stops testing the catalog the moment pricing moves, which is the exact defect
  * `channel-tile.test.tsx` recorded for a hardcoded ration.
@@ -48,7 +54,7 @@ describe('the top-up plan cards', () => {
     render(<TopUpPanel />)
 
     expect(screen.getByRole('radio', { name: /starter/i })).toBeChecked()
-    expect(summary()).toContain(`Starter, ${rupees(PLAN_CATALOG.starter.priceInr)} per month`)
+    expect(summary()).toContain(`Starter · ${rupees(PLAN_CATALOG.starter.priceInr)} per month`)
   })
 
   it('moves the checkout to the plan whose card was clicked', async () => {
@@ -62,7 +68,7 @@ describe('the top-up plan cards', () => {
 
     expect(screen.getByRole('radio', { name: /growth/i })).toBeChecked()
     expect(screen.getByRole('radio', { name: /starter/i })).not.toBeChecked()
-    expect(summary()).toContain(`Growth, ${rupees(PLAN_CATALOG.growth.priceInr)} per month`)
+    expect(summary()).toContain(`Growth · ${rupees(PLAN_CATALOG.growth.priceInr)} per month`)
     // And the old plan is gone from that sentence, so a stale summary cannot sit
     // beside a fresh one.
     expect(summary()).not.toContain('Starter')

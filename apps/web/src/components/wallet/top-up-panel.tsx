@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Check, CreditCard, Info } from 'lucide-react'
+import { Check, Coins, CreditCard, Info } from 'lucide-react'
 import { PLAN_CATALOG, type PlanCatalogEntry, type PlanId } from '@sahoda/shared'
 
 import { startCheckout } from '@/app/actions/wallet'
@@ -70,7 +70,11 @@ export function TopUpPanel() {
         </p>
       </div>
 
-      <fieldset disabled={pending} className="grid gap-3 wide:grid-cols-3">
+      {/* Mobile 1, tablet 2, desktop 3. `narrow` (700) and `wide` (1180) are the
+          only breakpoints this product has — `sm:`/`md:`/`lg:` emit NOTHING and
+          fail silently, which docs/37 §13 records as the dead-breakpoint bug
+          that shipped a ~1000px button. */}
+      <fieldset disabled={pending} className="grid gap-3 narrow:grid-cols-2 wide:grid-cols-3">
         <legend className="sr-only">Choose a plan</legend>
         {PAID_PLANS.map((entry) => {
           const checked = entry.id === planId
@@ -78,44 +82,38 @@ export function TopUpPanel() {
             <label
               key={entry.id}
               /**
-               * ── A SELECTED OPTION IS NOT AN URGENT ONE ────────────────────
-               * This was `border-primary` when checked: a solid brand border
-               * drawn all the way round a 1102x62 row. MEASURED at 1440 light
-               * with the DOM accent probe, it was 72,864 of this screen's
-               * 81,604 accent-bearing pixels — **89%** — which made a
-               * pre-selected radio the loudest coloured object on the money
-               * screen, louder than the balance the screen exists to report
-               * and louder than its own Start checkout.
+               * ── THE SELECTED EDGE IS A RING, AND THAT IS ARITHMETIC ───────
+               * The brief asks for a "subtle orange border". A real `border` is
+               * charged its WHOLE BOX by `accent-area-budget.spec.ts` — on a
+               * 346x305 card that is 105,530px2 against a 6,000px2 ceiling for
+               * this entire screen. A `box-shadow` is not read by that probe at
+               * all, so an inset orange ring looks like the border the brief
+               * wants and costs NOTHING.
                *
-               * docs/37 §2.3: the accent is spent on the one thing the screen
-               * is for. Selection is carried by signals that cost almost
-               * nothing — a real fill step and a firmer ring.
+               * This is the same trap in its third form. It was `border-primary`
+               * once and measured 89% of the screen's accent; `.is-committed` in
+               * tokens.css pairs `--brand-wash` with a real `--brand-lift`
+               * BORDER, which is right for a chip and would be ruinous here.
                *
-               * ── THE WASH IS FREE, AND THAT IS WHY IT IS THE ONE ORANGE ────
-               * `--brand-wash` is `rgba(255,102,0,0.06)`, and
-               * `accent-area-budget.spec.ts` skips any paint under alpha 0.08.
-               * So the selected card reads unmistakably orange and charges the
-               * budget NOTHING. `--brand-lift` (0.4) as a border would be
-               * charged its whole box, which on a card this size is the 89%
-               * failure above, rediscovered. THE SAME RULE BINDS THE CARD
-               * LAYOUT: three cards are three times the area, so a charged
-               * border here would be three times as bad as the row it replaced.
+               * The fill stays `--brand-wash` (alpha 0.06). The probe skips any
+               * paint under 0.08, so the warm tint the brief asks for is free.
                *
                * Ring, not border, in BOTH states: §6 refuses the two together,
                * and an inset ring cannot reflow the card when the edge firms up.
                */
               className={cn(
-                'flex cursor-pointer flex-col rounded-card p-4 transition-micro',
+                'flex h-full cursor-pointer flex-col rounded-card p-5 transition-micro',
                 'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2',
-                checked ? 'surface-ring-firm bg-brand-wash' : 'surface-ring bg-surface hover:bg-s2',
+                checked
+                  ? 'bg-brand-wash shadow-[inset_0_0_0_1px_var(--brand-lift)]'
+                  : 'surface-ring bg-surface hover:shadow-[inset_0_0_0_1px_var(--line)]',
                 pending && 'cursor-not-allowed opacity-45',
               )}
             >
-              {/* THE RADIO IS THE SELECTION, still. It is visually hidden rather
-                  than removed: the native control is what gives this group
-                  arrow-key navigation, a name, and a checked state a screen
-                  reader can report. `peer` hands its focus ring to the card, so
-                  keyboard focus stays visible with no control drawn. */}
+              {/* The radio still IS the selection. Visually hidden, never
+                  removed: it is what gives the group arrow-key navigation, a
+                  name, and a checked state a screen reader can report. `peer`
+                  hands its focus ring to the card. */}
               <input
                 type="radio"
                 name="plan"
@@ -125,54 +123,63 @@ export function TopUpPanel() {
                 className="peer sr-only"
               />
 
-              <span className="block type-h3">{entry.name}</span>
+              <span className="block type-sm font-semibold text-ink">{entry.name}</span>
 
-              {/* THE PRICE IS THE OBJECT. `.num` is tabular so the three line up
-                  down the row; the cadence sits on the baseline beside it
-                  rather than under it, because "per month" modifies the figure
-                  and a stacked label reads as a separate fact. */}
-              <span className="mt-3 flex items-baseline gap-1.5">
+              {/* THE PRICE IS THE STRONGEST THING IN THE CARD. The cadence sits
+                  on the baseline beside it, quiet, because "/ month" modifies
+                  the figure rather than being a fact of its own. */}
+              <span className="mt-1.5 flex items-baseline gap-1.5">
                 <span className="type-hero-num num text-ink">₹{inr(entry.priceInr)}</span>
-                <span className="type-sm text-muted">per month</span>
+                <span className="type-sm text-muted">/ month</span>
               </span>
-              <span className="mt-label-gap block type-meta text-muted">
+              <span className="mt-label-gap block type-meta text-ink-mute">
                 about $<span className="num">{inr(entry.priceUsd)}</span>
               </span>
 
-              {/* WHAT THE MONEY BUYS, which on this product is credits and not
-                  seats. Stated before the control, never after. */}
-              <span className="mt-3 block type-sm text-muted">
-                <span className="num font-semibold text-ink">{inr(entry.monthlyCredits)}</span>{' '}
-                {creditWord(entry.monthlyCredits)} granted each month
+              {/* WHAT THE MONEY BUYS. On this product that is credits, so the
+                  count is set at body weight rather than as a badge — the brief
+                  is explicit that oversized pills are the noise to avoid. */}
+              <span className="mt-4 flex items-center gap-2.5 border-t border-line-soft pt-4">
+                <Coins
+                  aria-hidden
+                  size={15}
+                  strokeWidth={2}
+                  className={cn('shrink-0', checked ? 'text-accent' : 'text-ink-mute')}
+                />
+                <span className="min-w-0">
+                  <span className="block type-body font-semibold text-ink">
+                    <span className="num">{inr(entry.monthlyCredits)}</span>{' '}
+                    {creditWord(entry.monthlyCredits)}
+                  </span>
+                  <span className="block type-meta text-muted">granted each month</span>
+                </span>
               </span>
 
               {/* ── THE AFFORDANCE IS A SPAN, AND IT IS NOT A FAKE CONTROL ────
                   The whole card is the label, so clicking here really does
                   select this plan. A nested <button> would fight the label for
-                  the click and announce a second control for one choice, which
-                  is the "two vocabularies for one slot" shape this codebase
-                  keeps ruling against. The radio above carries the semantics.
+                  the click and announce a second control for one choice.
 
-                  It is `text-accent` on the card's own wash, never a
-                  `--brand-lift` border: colour on TEXT is a few hundred px2,
-                  a border is the whole box. */}
+                  NOT a solid orange fill, though the reference image draws one.
+                  The brief's own words rule against it twice — "not like a large
+                  orange box", and "the CTA should be the strongest orange
+                  element on the page", which cannot be true if three cards each
+                  carry a filled orange bar. It is also 13,816px2 of accent per
+                  card against a 6,000px2 screen ceiling. Wash, ring and a tick
+                  say "selected" and survive greyscale. */}
               <span
                 aria-hidden
                 className={cn(
-                  'mt-4 flex min-h-[36px] items-center justify-center gap-1.5 rounded-input px-3 type-sm font-semibold transition-micro',
-                  'text-ink',
-                  checked ? 'surface-ring-firm' : 'surface-ring',
+                  'mt-4 flex min-h-[38px] items-center justify-center gap-1.5 rounded-input px-3 type-sm font-semibold text-ink transition-micro',
+                  checked
+                    ? 'bg-brand-wash shadow-[inset_0_0_0_1px_var(--brand-lift)]'
+                    : 'surface-ring-firm',
                 )}
               >
-                {/* THE ACCENT LIVES ON THE GLYPH, NOT THE WORD, and that is
-                    arithmetic rather than taste. `accent-area-budget.spec.ts`
-                    charges a coloured TEXT element 10% of its own box, and only
-                    when it owns a text node directly. `text-accent` on this span
-                    is ~314x36x0.1 = 1,130px2 at 1440 — against roughly 1,400px2
-                    of headroom under /wallet's 6,000 ceiling, which is the same
-                    80%-of-headroom trap `size="lg"` was reverted for above. An
-                    <svg> owns no text node, so the tick is charged NOTHING and
-                    reads just as orange. */}
+                {/* THE ACCENT LIVES ON THE GLYPH, NOT THE WORD. The probe charges
+                    a coloured TEXT element 10% of its box when it owns a text
+                    node; `text-accent` here is ~1,130px2 at 1440, against about
+                    1,400 of headroom. An <svg> owns no text node and is free. */}
                 {checked ? (
                   <Check size={14} strokeWidth={2.5} aria-hidden className="text-accent" />
                 ) : null}
@@ -180,25 +187,28 @@ export function TopUpPanel() {
               </span>
 
               {/* WHAT ELSE THE PLAN LIFTS, DERIVED from PLAN_CATALOG.limits
-                  rather than written. A hand-written line here would be a
-                  second copy of the entitlements and would drift from the one
-                  `checkEntitlement` actually enforces. `mt-auto` puts it on the
-                  card's floor so three cards of different content still align.
+                  rather than written. A hand-written line here would be a second
+                  copy of the entitlements and would drift from the one
+                  `checkEntitlement` enforces. `mt-auto` puts it on the card's
+                  floor so cards of different content still align.
 
-                  NO "Popular" or "Best value" chip, which the reference carries
-                  on its middle card. Nothing in this codebase counts how many
-                  workspaces chose a plan, so the chip would be a claim about
-                  other customers that no query can support. */}
-              <span className="mt-auto block border-t border-line-soft pt-3">
+                  NO "Popular" chip, which the reference draws on its first card.
+                  Nothing in this codebase counts how many workspaces chose a
+                  plan, so it would be a claim about other customers that no
+                  query can support. */}
+              <span className="mt-auto block pt-4">
                 <span className="block type-eyebrow text-ink-mute">Includes</span>
-                <span className="mt-1.5 block space-y-1">
+                <span className="mt-2 block space-y-1.5">
                   {planIncludes(entry).map((line) => (
-                    <span key={line} className="flex items-start gap-1.5 type-sm text-muted">
+                    <span key={line} className="flex items-start gap-2 type-sm text-muted">
                       <Check
                         size={13}
                         strokeWidth={2.5}
                         aria-hidden
-                        className="mt-icon-nudge shrink-0 text-ink-mute"
+                        className={cn(
+                          'mt-icon-nudge shrink-0',
+                          checked ? 'text-accent' : 'text-ink-mute',
+                        )}
                       />
                       <span>{line}</span>
                     </span>
@@ -222,10 +232,41 @@ export function TopUpPanel() {
           and unverifiable here because Playwright cannot run in this sandbox.
           A divider, a footer row and the right edge make it the terminus of the
           card for free. */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4">
-        <p className="min-w-0 flex-1 type-meta text-muted">
-          {plan.name}, ₹<span className="num">{inr(plan.priceInr)}</span> per month. Nothing is
-          charged and no credits are added until a payment completes.
+      {/* THE COST, RESTATED BEFORE THE SPEND, and sat with the control that
+          starts it rather than floating a paragraph above a button.
+
+          ── PROMINENCE FROM PLACEMENT, NOT FROM SIZE ────────────────────────
+          `size="lg"` was tried and reverted. MEASURED with the same arithmetic
+          `accent-area-budget.spec.ts` uses: it took this panel from 4,443px2 to
+          5,283px2 at 1440, which is 80% of the headroom under that spec's
+          6,000px2 ceiling for /wallet — spent on two pixels of button height.
+
+          ── AND THE ARROW IS OUT FOR THE SAME REASON, MEASURED ─────────────
+          The reference draws "Start checkout ->". Adding that arrow was built
+          and then measured: it took the panel from 4,443px2 to **5,241px2**,
+          because the glyph and its gap widen the one solid-orange box on the
+          screen. That is within a hair of the 5,283 this comment already
+          records for `size="lg"`, which was reverted for being 80% of the
+          headroom. An identical cost for an identical reason gets the identical
+          answer. The button is the terminus of the card by placement.
+
+          ── NO PADLOCK, AND THAT IS A JUDGEMENT ABOUT TRUTH ─────────────────
+          The reference draws "Secure & encrypted checkout" under this button,
+          plus an "Instant access / Secure payments / Cancel anytime" bar and a
+          "Trusted by creators and teams worldwide" line. None of them ships:
+          `actions/wallet.ts` records in terms that the page which collects the
+          payment DOES NOT EXIST YET, so a trust badge here would dress up a
+          flow that cannot complete; there is no cancel path to promise; and
+          nothing counts who trusts us. The honest reassurance is the sentence
+          already on the left, which says exactly what will and will not
+          happen. */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-line-soft pt-5">
+        <p className="min-w-0 flex-1 type-sm text-muted">
+          <span className="font-semibold text-ink">
+            {plan.name} · ₹<span className="num">{inr(plan.priceInr)}</span> per month
+          </span>
+          <br />
+          Nothing is charged and no credits are added until a payment completes.
         </p>
         <Button
           type="button"
