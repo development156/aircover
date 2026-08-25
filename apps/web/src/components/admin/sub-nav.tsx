@@ -29,6 +29,10 @@ const SECTIONS: readonly Section[] = [
   // invisible for a different reason until migration 20260822160000: the table
   // had one member-scoped policy, so an operator's view of it was empty.
   { label: 'Dead letters', href: '/admin/jobs' },
+  // The Marketing Brain's store. In the nav because it is the ONLY window onto
+  // a table customers cannot see: hidden and unobservable is how a job that
+  // writes nothing goes unnoticed for a season.
+  { label: 'Marketing Brain', href: '/admin/brain' },
   { label: 'Team', href: '/admin/team' },
 ]
 

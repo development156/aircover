@@ -1565,3 +1565,51 @@ turbo configuration.
   That is the part that matters beyond this bug: a count of skipped tests that
   silently includes tests which were supposed to run is the same defect twice in
   one file's history.
+
+---
+
+## 24. `20260825000000_marketing_observations.sql` is written and NOT applied
+
+The Marketing Brain's one table. Everything above it in the stack is built, gated
+and merged-ready: the computer, the store, the weekly cron, the read, the report
+block, the admin page and the mesh provider. None of it has a table to talk to.
+
+Applying a migration to the one live database is a founder action and there is no
+staging, so this lane stopped at the file. Until it is applied:
+
+- `/api/cron/brain` returns `{ ok: false, error: 'BRAIN_CRON_FAILED' }` on every
+  tick, and the heartbeat still records that the schedule fired — which is
+  correct and is exactly why `recordCronRun` sits outside the try.
+- `/report`'s "What Sahoda noticed" block renders the READ-FAILED sentence, not
+  the empty one. That is the honest arm: nothing has established that this
+  workspace has no observations.
+- `/admin/brain` renders its read-failed arm for the same reason.
+- `e2e/marketing-brain.spec.ts` skips, with the migration named in the skip
+  reason. It probes the TABLE rather than a flag, so the day the migration lands
+  it runs with no edit here and nobody having to remember it exists.
+
+**The command is `supabase db push` against ref `rloztdhzfliyvpvxsgjl`, run by a
+person.** The migration creates one table, one index and two SELECT policies. It
+drops nothing, alters nothing and touches no existing row.
+
+## 25. Playwright cannot run in the claude.ai/code remote sandbox
+
+MEASURED 2026-08-25. Playwright's bundled Chromium cannot complete any outbound
+HTTPS request from a cloud session: `https://example.com/` fails with
+`net::ERR_CONNECTION_RESET`, identically to Clerk's host. Loopback is fine — a
+trivial Node server on the same port answers Chromium with 200 — so it is not the
+app and not the port.
+
+The cause is the session's agent proxy: it re-terminates TLS with its own CA, and
+Playwright's Chromium ships its own profile rather than reading the system trust
+store the proxy configures. Every `@smoke` spec signs in through Clerk, so the
+whole smoke leg of `pnpm gate` is unrunnable here.
+
+The one-line "fix" is `--ignore-certificate-errors` / `ignoreHTTPSErrors`, which
+is disabling TLS verification, so it was not used and should not be.
+
+**What would actually fix it:** point Chromium at the proxy CA at launch —
+`chromium.launch({ args: ['--use-nss-certs'] })` with the bundle imported into an
+NSS profile, or Playwright's `clientCertificates`/CA support if a version in this
+repo's range exposes one. Worth someone's afternoon: it is the difference between
+a cloud session that can run the gate and one that can run four fifths of it.

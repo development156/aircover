@@ -40,6 +40,13 @@ export {
   MAX_QUERY_TERMS,
 } from './knowledge-context'
 export type { KnowledgeContextProvider } from './knowledge-context'
+export type { MarketContextProvider, ObservationLine } from './market-context'
+export {
+  buildMarketMessage,
+  createPostgrestMarketContext,
+  MarketContextError,
+  MARKET_OBSERVATION_LIMIT,
+} from './market-context'
 export type { BrandContext, BrandContextProvider } from './brand-context'
 
 // Routing tables (typed Alpha stand-in for ai_model_routes).

@@ -51,13 +51,14 @@ not a description somebody wrote down — it is a fact about how the database is
 holding a customer's data carries a `workspace_id` column, and the boundary between two customers is
 enforced by the database itself (PostgreSQL row-level security), not by the application.
 
-**MEASURED 2026-08-23: 48 tables.** They are listed in full in §3, and
+**MEASURED 2026-08-25: 49 tables.** They are listed in full in §3, and
 `packages/db/tests/data_handling_doc.pglite.test.ts` fails the build if that number or that list
-stops matching the database.
+stops matching the database. (It read 48 on 2026-08-23, the figure this sentence carried until now;
+the forty-ninth is `marketing_observations`.)
 
-> **Production holds 47 of those 48 today.** The forty-eighth,
-> `ledger_actor_redactions`, is created by a migration that is written and deliberately not yet
-> applied — see §5. Counted from production directly on 2026-08-23.
+> **Production holds 47 of those 49 today.** Two are created by migrations that are written and
+> deliberately not yet applied: `ledger_actor_redactions` (see §5) and `marketing_observations`.
+> Counted from production directly on 2026-08-23.
 
 Three tables hold personal data and do **not** carry a `workspace_id`, so they are invisible to any
 sweep built on that rule. This was a real gap and it is worth stating plainly because it is the kind
@@ -109,6 +110,7 @@ the table belongs to one identified workspace.
 | `loop_channel_autonomy` | how much the Loop may do on each channel | `created_by` | removed |
 | `loop_cycles` | every week the Loop ran | `created_by` | removed |
 | `loop_settings` | your Loop settings | no direct identifiers | removed |
+| `marketing_observations` | what Sahoda worked out about your marketing | no direct identifiers | removed |
 | `memory_events` | changes to your Brand Brain | no direct identifiers | removed |
 | `ops_credit_requests` | credit top-up requests | no direct identifiers | removed |
 | `planner_events` | your planner | `title` | removed |
@@ -220,7 +222,7 @@ back. Both are re-checked on the server and the name is checked a third time by 
 because the delete is an addressable endpoint whatever the screen does. Only the **owner** of a
 workspace can do it.
 
-**What is removed:** every row in all 48 tables except the four in the next paragraph, plus every
+**What is removed:** every row in all 49 tables except the four in the next paragraph, plus every
 file in storage, plus the encrypted keys for the linked social accounts, plus the sign-in profile of every member
 for whom this was their last workspace — not only the person who pressed the button.
 
@@ -617,10 +619,10 @@ would be doing the thing it warns about.
 - Every base table carrying a `workspace_id`, from the database's own catalogue, on every build.
 - Whether each one is in the export list, and whether its stated readability matches its actual
   policies.
-- One complete cycle: create a workspace, fill all 48 tables, delete it, and count what is left —
+- One complete cycle: create a workspace, fill all 49 tables, delete it, and count what is left —
   including a second workspace that must be untouched.
 - That a FAILED deletion leaves everything exactly as it was. A trigger is installed that refuses to
-  let one table go; the deletion raises, naming the table, and all 48 tables still hold every row.
+  let one table go; the deletion raises, naming the table, and all 49 tables still hold every row.
   This is the only thing that demonstrates "all or nothing" rather than asserting it.
 - Whether the deletion writes to the financial ledger. It does not, and that is asserted against the
   function's own source.

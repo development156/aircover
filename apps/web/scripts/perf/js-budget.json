@@ -54,6 +54,7 @@
   "/admin/team": 670929,
   "/admin/qa": 685821,
   "/admin/jobs": 603167,
+  "/admin/brain": 603632,
   "/(app)/brain/layout": 636025,
   "/(app)/brain/competitors": 603167,
   "/(app)/ads/layout": 637234,
