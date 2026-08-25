@@ -1090,9 +1090,29 @@ through a helper I did not name, or through raw `fetch` to PostgREST rather than
 
 ## 15 · Nothing in CI runs the gate, so a green PR says only that Vercel built
 
-**Found while checking my own PR's checks, 2026-08-24. Reported, not fixed** —
-adding a CI workflow is an owner decision with a runner-minutes cost and a
-secrets requirement, and it is not mine to make.
+**Found while checking my own PR's checks, 2026-08-24.**
+
+**RESOLVED 2026-08-25** — the founder asked for it, so `.github/workflows/gate.yml`
+now runs three of the gate's five stages on every pull request: turbo
+typecheck + lint + test, root vitest, and prettier. No secrets required, because
+none of those three touches the network.
+
+The two it does NOT run are named in the workflow with their reasons, and pinned
+by `scripts/lib/ci-gate-coverage.test.mjs` so a sixth stage cannot be added
+without somebody deciding whether CI covers it:
+
+- `turbo test:smoke` — it drives a browser through the real app, and the app has
+  one database, which is production. On every pull request that would write test
+  workspaces into the customer database automatically. It is a `workflow_dispatch`
+  job instead, gated on typing the project ref into `SAHODA_E2E_ACK_TARGET`.
+- `turbo build` — Vercel already builds every pull request, `js-budget.mjs`
+  included.
+
+Six mutations were run against the coverage guard and all six went red: a sixth
+gate stage CI ignores, the workflow dropping prettier, a stage renamed while this
+file still claims it, the smoke suite wired into the pull-request job, the
+acknowledgement given a default so a click would do, and turbo declaring an env
+var the workflow never supplies.
 
 `.github/workflows/` holds five files. **Not one triggers on `pull_request` or
 `push`:**
@@ -1626,8 +1646,45 @@ Same for importing the proxy CA into `~/.pki/nssdb`: there is no certificate to
 distrust when there is no connection.
 
 **What would actually fix it** is outside the repo: allow the Chromium process's
-egress on 443, or run the smoke leg somewhere Chromium has ordinary network. The
-practical answer today is the second one — run `pnpm gate` on a laptop or in CI
-before merging a lane, and treat a cloud session as covering four of the five
-legs. Which is also REQUESTS §15: **no CI workflow runs the gate.** Fixing that
-one fixes this one.
+egress on 443, or run the smoke leg somewhere Chromium has ordinary network.
+
+**PARTLY ADDRESSED 2026-08-25.** The `smoke` job on `.github/workflows/gate.yml`
+is exactly that somewhere: a hosted runner with ordinary network, so the leg is
+now runnable by anyone with the repository rather than only by whoever is at a
+laptop. It is `workflow_dispatch` and requires the operator to type the Supabase
+project ref, because the suite writes to production — that guard is not
+loosened by moving the runner.
+
+What is NOT fixed: a cloud session still cannot run the suite itself. It can
+dispatch the job and read the result, which is the difference between "unrunnable"
+and "not runnable here".
+
+## 26. Two mutation-harness tests cannot pass as root, and this sandbox is root
+
+MEASURED 2026-08-25. `scripts/lib/mutation-harness.test.mjs` fails two of its
+twenty-three tests in a claude.ai/code session:
+
+- `refuses the whole run when the scratch directory cannot be used`
+- the sibling case that asserts the same refusal rejects
+
+Both do `chmodSync(scratch, 0o500)` and then expect a write to be refused. The
+session runs as **uid 0**, and root bypasses the permission bits: the write
+succeeds, so the harness does not raise, so the assertion fails. Proven directly
+— a `writeFileSync` into a fresh `0500` directory returns normally here and
+reports `uid 0`.
+
+It is **pre-existing and not caused by any lane**: the same two fail on a clean
+tree at `cc2e5fb`. On a GitHub Actions runner, which runs as an unprivileged
+user, they pass — so the new `gate.yml` workflow covers this leg better than any
+cloud session can, which is a second argument for it beyond the first.
+
+**Consequence worth stating plainly:** `pnpm gate`'s stage 2 (root vitest) is red
+in every cloud session, always, for a reason that has nothing to do with the code
+under review. Anyone reporting the gate from a cloud session must say so rather
+than reporting four green legs. I reported four green legs earlier in this lane
+and it was wrong; corrected here and in `docs/54`.
+
+**What would fix it:** make the two tests skip when `process.getuid?.() === 0`,
+with the reason in the skip, so a root run reports "not applicable" instead of
+"failing". That is a change to another lane's file, so it is recorded rather than
+made.
