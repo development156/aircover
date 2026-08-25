@@ -1459,3 +1459,67 @@ screen must not claim otherwise. That number is also the customer-facing version
 of the moat — outputs needing less fixing is a thing a person feels.
 
 Only the db lane writes migrations, and this research lane cannot apply one.
+
+---
+
+## 23 · Three billing suites fail under `turbo run test` and report their 22 tests as SKIPPED
+
+**MEASURED 25 August 2026, on this cloud container.** Not a flake, and it was
+dismissed as one twice before it was diagnosed, which is the reason this entry
+exists.
+
+`packages/billing`'s three PGlite-backed integration suites —
+`entitlements.integration.test.ts`, `applyPlanGrant.integration.test.ts`,
+`webhooks.integration.test.ts` — fail their `beforeAll` with **"Hook timed out in
+60000ms"** whenever the whole monorepo's tests run in parallel. Each one boots a
+PGlite instance from `packages/db`'s real migration files, and on a container
+this size, with every other package's vitest running beside it, that boot does
+not finish inside the hook timeout.
+
+**The dangerous part is not the failure. It is the reporting.** The run prints:
+
+```
+Test Files  3 failed | 27 passed | 1 skipped (31)
+     Tests  379 passed | 35 skipped (414)
+```
+
+Three files failed and **not one test is listed as failed**. The 22 tests inside
+them are counted as SKIPPED, so a reader comparing "379 passed" against a
+remembered "401 passed" sees a smaller number with no failure beside it. That is
+precisely the failure mode `entitlements.integration.test.ts`'s own header was
+written about: it records that these suites sat behind `describe.skipIf` and had
+**never executed**, while vitest reported the package as 270 passed / 26 skipped,
+because "vitest reports a suite that ran nothing exactly as it reports one that
+passed".
+
+The skip was removed in August. The timeout has quietly reinstated it.
+
+### What was measured, so nobody re-diagnoses it
+
+- The three files **pass in isolation**: 3 files, 23 tests, green.
+- `pnpm --filter @sahoda/billing test` **passes**: 401 passed, 13 skipped.
+- Under `turbo run test`, the same package is 379 passed, **35** skipped.
+  The 22-test difference is the three suites.
+- First guess was wrong and is recorded so it is not repeated: this is **not**
+  the missing DNS route to production. `export-drift.test.ts` fails that way
+  (`ENOTFOUND db.rloztdhzfliyvpvxsgjl.supabase.co`) and these do not touch the
+  network at all — `openDbUnderTest()` uses PGlite unless
+  `SAHODA_ALLOW_LIVE_TESTS=1`.
+
+### Why this is not the research lane's to fix
+
+`git diff origin/wt-core...HEAD -- packages/billing packages/db turbo.json` is
+**empty** on this branch. Nothing here touches billing, the migrations, or the
+turbo configuration.
+
+### What would fix it, for whoever owns it
+
+- Raise the hook timeout for the PGlite suites specifically. A cold PGlite boot
+  is not a 60-second operation because something is wrong; it is a database
+  starting up, and it is competing for one container's CPU.
+- Or make a shared PGlite instance boot once for the package instead of once per
+  suite, which also cuts the wall clock.
+- **And separately, make a file-level failure impossible to read as a skip.**
+  That is the part that matters beyond this bug: a count of skipped tests that
+  silently includes tests which were supposed to run is the same defect twice in
+  one file's history.
