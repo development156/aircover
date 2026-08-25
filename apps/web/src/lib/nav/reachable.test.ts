@@ -57,6 +57,34 @@ const APP_DIR = join(repoRoot(), 'apps/web/src/app/(app)')
  * way, and that claim is the thing a reviewer should check.
  */
 const NOT_A_NAV_SECTION: Readonly<Record<string, string>> = {
+  // ── HIDDEN BY FOUNDER'S RULING, 2026-08-25 ─────────────────────────────────
+  // These three differ in kind from the entries below them, and the difference
+  // is worth stating rather than blurring: every other exception here is a
+  // screen reached some OTHER way. Two of these are reached NO way.
+  //
+  // They are built, they work, and they are deliberately out of the rail, the
+  // command palette and the phone's More sheet. That is a product decision about
+  // what a shop owner should be offered, not a claim about the code.
+  //
+  // Removing an entry from `NAV_GROUPS` is all it takes to hide a section, so
+  // the thing that could go wrong here is silence: a route quietly orphaned and
+  // nobody noticing for months. That is exactly what this list exists to stop,
+  // which is why hiding one costs a sentence.
+  playbooks:
+    'Built and working — `readPlaybooksSnapshot` renders live rows — and hidden ' +
+    'from all three navigation surfaces by founder ruling on 2026-08-25. ' +
+    'Reachable only by typing /playbooks. Restore it by putting its NavSection ' +
+    'back in the Automate group in lib/nav/sections.ts.',
+  remix:
+    'Built and working, and hidden from all three navigation surfaces by founder ' +
+    'ruling on 2026-08-25. Reachable only by typing /remix. Restore it by putting ' +
+    'its NavSection back in the Create group in lib/nav/sections.ts.',
+  sites:
+    'Hidden from all three navigation surfaces by founder ruling on 2026-08-25, ' +
+    'but NOT unreachable: the Leads page links to it from the embed-code panel ' +
+    '("Make one", app/(app)/leads/page.tsx), which is the door a person actually ' +
+    'arrives through — they want a form to collect enquiries and the site is what ' +
+    'carries it. Restore it to the Publish group in lib/nav/sections.ts.',
   billing:
     'Not a section and deliberately not in the rail: there is no /billing page, only ' +
     '/billing/checkout/{orderId}. It is where a payment lands — `CheckoutSession.url` ' +
@@ -315,5 +343,61 @@ describe('the rail projects the map, and hides nothing from the product', () => 
       ROADMAP_SECTIONS.length,
       'no `soon` sections left — delete these three tests deliberately, do not let them idle',
     ).toBeGreaterThan(0)
+  })
+})
+
+/**
+ * THE THREE HIDDEN SECTIONS STAY HIDDEN, ON EVERY SURFACE.
+ *
+ * Founder's ruling, 2026-08-25: `/playbooks`, `/remix` and `/sites` are out of
+ * the navigation. Hiding one costs a single deletion from `NAV_GROUPS`, which
+ * makes the reverse just as cheap — and a section quietly reappearing is the
+ * failure nobody would report, because a menu item showing up looks like a
+ * feature rather than a regression.
+ *
+ * ASSERTED PER SURFACE, not once against `NAV_GROUPS`. The three projections
+ * fall out of the same array today, so one assertion would pass for all three
+ * and would keep passing if a future surface started reading its own list. That
+ * is precisely how the palette and the rail drifted apart before this file
+ * existed — the header of `sections.ts` opens with that story.
+ *
+ * The routes themselves are NOT asserted gone. They are built and they still
+ * work; this is a decision about what is offered, not about what exists.
+ */
+describe('the hidden sections are hidden everywhere', () => {
+  const HIDDEN = ['/playbooks', '/remix', '/sites'] as const
+
+  test('none reaches the rail', () => {
+    const shown = RAIL_GROUPS.flatMap((g) => g.items)
+      .map((s) => s.href)
+      .filter((href) => (HIDDEN as readonly string[]).includes(href))
+    expect(shown, 'a hidden section came back to the sidebar').toEqual([])
+  })
+
+  test('none reaches the command palette', () => {
+    const shown = ALL_SECTIONS.map((s) => s.href).filter((href) =>
+      (HIDDEN as readonly string[]).includes(href),
+    )
+    expect(shown, 'a hidden section came back to the search bar').toEqual([])
+  })
+
+  test('none reaches the phone More sheet', () => {
+    const shown = NAV_GROUPS.flatMap((g) => g.items)
+      .map((s) => s.href)
+      .filter((href) => (HIDDEN as readonly string[]).includes(href))
+    expect(shown, 'a hidden section came back to the phone More sheet').toEqual([])
+  })
+
+  /**
+   * Each hidden route must still be DECLARED, with how it is reached now. This
+   * is what stops "hidden" from decaying into "orphaned and forgotten": the
+   * coverage test above would already fail on an undeclared route, and this one
+   * fails if somebody removes the reason to make that failure go away.
+   */
+  test('each one says, in NOT_A_NAV_SECTION, how it is reached now', () => {
+    const undeclared = HIDDEN.map((href) => href.slice(1)).filter(
+      (segment) => !(segment in NOT_A_NAV_SECTION),
+    )
+    expect(undeclared, 'hidden, but with no note saying how a person gets there').toEqual([])
   })
 })
