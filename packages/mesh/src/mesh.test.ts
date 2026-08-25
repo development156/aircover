@@ -26,6 +26,9 @@ function router(): { fetchImpl: FetchLike; calls: Recorded[] } {
     if (url.includes('/rest/v1/ai_provider_logs')) {
       return new Response(null, { status: 201 })
     }
+    if (url.includes('/rest/v1/knowledge_current_chunks')) {
+      return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } })
+    }
     // chat completion
     return new Response(
       JSON.stringify({
@@ -96,5 +99,19 @@ describe('createMesh (wired end-to-end)', () => {
 
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error.code).toBe('VALIDATION_ERROR')
+  })
+  it('reads the knowledge library for a grounded task, scoped to the workspace', async () => {
+    // THE WIRING, which every other knowledge test is blind to: the provider and
+    // the engine can both be right while `createMesh` never hands one to the
+    // other, and the feature is then a well-tested unit nothing calls.
+    const { fetchImpl, calls } = router()
+    const mesh = createMesh({ env, fetchImpl })
+    const input = CaptionRewriteInputSchema.parse({ text: 'come by', instruction: 'rewrite' })
+
+    await mesh.runTask(captionRewriteTask.def, input, ctx)
+
+    const read = calls.find((c) => c.url.includes('/rest/v1/knowledge_current_chunks'))
+    expect(read, 'createMesh did not give the runner a knowledgeContext').toBeDefined()
+    expect(read!.url).toContain(`workspace_id=eq.${ctx.workspaceId}`)
   })
 })

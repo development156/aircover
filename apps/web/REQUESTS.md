@@ -1340,3 +1340,36 @@ An auto-correct on blur fails 1, 2 and 3 at once, which is why it was rejected.
 The screen half: the field, the suggestion beside it, accept and decline, the
 states, and the guards. Roughly a day. It needs the task and the schema to exist
 first, and a price if the answer to question 1 is that it costs one.
+
+---
+
+## 20 · For the db lane — the library search that reaches a model is unranked
+
+`packages/mesh/src/knowledge-context.ts` retrieves five library passages for
+`caption_rewrite` and `content_variants`. It is honest about being
+**filter-then-truncate**, not rank-then-take, and this is the note that asks for
+the missing half.
+
+**Why it cannot rank today.** PostgREST can filter on the generated `tsv`
+column, and it cannot order by `ts_rank(tsv, query)` — a computed expression is
+not a sortable column. So the five passages are five of the matches in whatever
+order the database returns them, and a passage that mentions the tasting menu
+nine times sorts no higher than one that mentions it once.
+
+**Why the obvious alternative is worse.** `searchLibrary` uses
+`plainto_tsquery`, which ANDs every lexeme. That is right for a search box.
+Handed a whole caption it matches nothing at all — no passage contains all
+twenty words of a post — so an AND query would have shipped a feature that
+returned zero passages forever and looked exactly like an empty library. The OR
+buys recall at the cost of precision, and the ranking is the precision.
+
+**What would fix it.** A `search_knowledge_ranked(p_workspace_id uuid, p_query
+text, p_limit int)` function in `packages/db`, `security definer` with its own
+membership check (or `security invoker` if the mesh is given a scoped key),
+ordering by `ts_rank_cd`. `packages/mesh` would call it as an RPC and the
+`workspace_id` filter would move inside the function, where it stops being one
+URL edit away from a cross-tenant read.
+
+**Only the db lane writes that**, and this research lane cannot apply a
+migration. Until it exists the constant `KNOWLEDGE_PASSAGE_LIMIT = 5` is the
+whole cost control, and `knowledge-context.test.ts` holds it there.

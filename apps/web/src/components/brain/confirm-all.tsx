@@ -77,11 +77,11 @@ export function ConfirmAll({ targets }: { targets: readonly ConfirmAllTarget[] }
       </div>
       {/* Says what the press does before it is pressed, in the same words the
           per-field button uses, so the two read as one action at two scales. */}
-      <p className="text-[12.5px] text-muted">
+      <p className="type-sm text-muted">
         Marks every remaining guess here as yours, exactly as written.
       </p>
       {error ? (
-        <p role="alert" className="text-[12.5px] text-danger">
+        <p role="alert" className="type-sm text-danger">
           {error}
         </p>
       ) : null}
