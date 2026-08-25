@@ -184,4 +184,13 @@ describe('captionRewriteTask brand grounding', () => {
     expect(seen[0]!.messages.some((m) => m.content.includes('BRAND BRAIN'))).toBe(false)
     expect(seen[0]!.messages).toHaveLength(2)
   })
+  it('retrieves library passages against the text it is asked to rewrite', () => {
+    // The selection when the editor sends one, the whole caption otherwise —
+    // the same target buildMessages puts last, so the passages are chosen from
+    // what the model is actually editing and not from something beside it.
+    expect(captionRewriteTask.knowledgeQuery?.(input)).toBe('Our revolutionary new blend!')
+    expect(captionRewriteTask.knowledgeQuery?.({ ...input, selection: 'the tasting menu' })).toBe(
+      'the tasting menu',
+    )
+  })
 })

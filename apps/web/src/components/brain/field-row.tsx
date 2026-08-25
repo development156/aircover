@@ -184,7 +184,7 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
               confirm, which has no editor open to put it in — without this the
               press would fail silently and the mark would simply not change. */}
           {error ? (
-            <p role="alert" className="text-[12.5px] text-danger">
+            <p role="alert" className="type-sm text-danger">
               {error}
             </p>
           ) : null}

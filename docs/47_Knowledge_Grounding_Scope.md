@@ -1,8 +1,11 @@
 # 47 · Scope — grounding the writing tasks in the knowledge library
 
-**25 August 2026, research lane, at `60cf74d`.** Step 2 of the `docs/46` repairs,
-scoped and not built. Needs an owner ruling on cost and an advisor review of the
-mesh change before a line is written.
+**25 August 2026, research lane, at `60cf74d`.** Step 2 of the `docs/46` repairs.
+
+**BUILT on 25 August, to the recommended shape.** What shipped, what changed
+against this scope, and what is still open is at the bottom under
+"What was actually built". The body below is the scope as written, unedited, so
+the two can be compared.
 
 ---
 
@@ -137,3 +140,51 @@ by the model calling a tool.
 And it does not measure whether captions get better. That needs someone reading
 the output against a real library, which is the same missing input `docs/46`
 ends on.
+
+---
+
+## What was actually built
+
+Shipped in `packages/mesh`: `knowledge-context.ts` (the provider, the query
+builder and the fenced block), the engine seam, and the declaration on
+`caption_rewrite` and `content_variants`. Nine files, 19 new tests, every guard
+below proved by mutation.
+
+### Where it followed the scope
+
+- **D1 query-relevant, D2 five passages.** `KNOWLEDGE_PASSAGE_LIMIT = 5`, its own
+  constant with the cost table above written beside it. `MAX_EVIDENCE_CHUNKS`
+  (25) is not reused and the test that counts blocks reds if it ever is.
+- **D3 the boundary.** Service key, `security_invoker` view, so the
+  `workspace_id=eq.` term is the whole tenant boundary. The test's fake is a
+  two-tenant table that reads the filters off the URL, so dropping the filter
+  serves the other business's row and the assertion reds. Proved.
+- **D3 fencing.** Passages go through `buildEvidenceSet`, which is
+  `quarantineBlock`'s fence and `neutralize`'s markers. Not a second fence.
+- **D4 nothing.** Empty query, no match, and a failed read are three paths and
+  none of them fails the action: the caption is produced ungrounded.
+
+### Where it did not
+
+- **Build order 1 is not done.** `resolveFromLibrary`'s read was not lifted into
+  a shared helper. The mesh provider is a second read of the same view through a
+  different transport (PostgREST + service key vs. the server Supabase client),
+  because the mesh has no Supabase client and adding one to reuse eight lines
+  would be the larger change. Two reads of one view is a drift risk and is
+  recorded here rather than hidden.
+- **Build order 5 is not done.** No guard traces a figure in a caption back to a
+  passage. It needs the model to cite, and neither task's output schema has a
+  field to cite in: `CaptionRewriteOutput` is `{ text }`. That is a shared
+  contract change and a separate piece of work.
+- **The retrieval is not ranked.** The scope assumed `searchLibrary`'s relevance
+  carried over. It does not: `plainto_tsquery` ANDs every lexeme, which matches
+  nothing when the query is a whole caption, so the query builder ORs the terms
+  instead. That buys recall and gives up ordering, because PostgREST cannot sort
+  by `ts_rank`. **The five passages are five of the matches, not the best five.**
+  A `ts_rank` RPC is the fix and only the db lane can write it:
+  `apps/web/REQUESTS.md` §20.
+
+### Still not measured
+
+Whether captions get better. Unchanged from the scope, and unchanged from
+`docs/46`: it needs somebody reading output against a real library.
