@@ -1406,3 +1406,56 @@ stays — it is read by `/loop` today and removing it is a separate change with
 its own blast radius.
 
 Only the db lane writes migrations, and this research lane cannot apply one.
+
+---
+
+## 22 · For the db lane, and it is losing data every day — the model's draft is overwritten by the edit
+
+**The founder's ruling on the Brand Brain moat, 25 August: store CORRECTIONS,
+not conclusions.** The visible Brain already holds conclusions, and a hidden
+layer holding more of them is a second copy of something a competitor
+reproduces the moment a customer re-types it somewhere else. What cannot be
+reproduced is the record of how a business fixes what Sahoda wrote, because that
+only exists if Sahoda wrote the draft.
+
+**The schema destroys it.** `posts.body` and `post_variants.body` are single
+mutable columns (`20260718000004_content.sql`), and there is no revision table
+anywhere in the migrations — checked by name and by grep; `audit_logs` and
+`ops_audit_log` are ops tables and hold no post text. So every save overwrites
+what the model produced, and the difference between the generated caption and
+the published one has never been recorded for any customer.
+
+Every day this stands, another day of the best signal in the product is thrown
+away. It is also the only item on the moat list that gets HARDER to fix later:
+the other two streams can be started whenever, and this one silently loses its
+history until it is stopped.
+
+**The smallest thing that stops the bleeding**, and the db lane's call between
+them:
+
+- a `generated_body text` beside `body`, written once when a model produces it
+  and never updated, or
+- a `post_revisions` row per save, which also answers "what did this look like
+  last Tuesday" and costs a table.
+
+The first is smaller and enough for the delta. The second is the one that does
+not need revisiting.
+
+**Two things to decide with it, and neither is mine.** Retention: these are
+customer drafts, so how long they are kept belongs in the same conversation as
+the rest of the data policy. And whether `caption_rewrite` counts — the rewrite
+task takes existing text and returns new text, so it produces a
+before-and-after even when nothing is published.
+
+**What it unlocks.** Rewrite deltas per workspace: what was cut, what was added,
+whether the opening line survived, length change, emoji added or stripped, CTA
+changed. That is a model of one business's taste that no brand description
+captures, it accumulates from day one with no evidence floor to clear, and it is
+invisible to anyone outside the product.
+
+**The measure that keeps it honest:** average edit distance per post should FALL
+over months, per workspace. If it does not, the learning is decorative and the
+screen must not claim otherwise. That number is also the customer-facing version
+of the moat — outputs needing less fixing is a thing a person feels.
+
+Only the db lane writes migrations, and this research lane cannot apply one.
