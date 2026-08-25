@@ -137,7 +137,28 @@ for (const theme of ['light', 'dark'] as const) {
         `page beside it ${besideL.toFixed(3)}`,
     ).toBeGreaterThan(besideL)
 
-    // ── 3 · THE FOCUS RING STAYS INSIDE THE PANEL ────────────────────────────
+    // ── 3 · THE PANEL OPENS UNDER THE FIELD THAT OPENED IT ───────────────────
+    // The defect two earlier passes could not see, because both measured the
+    // panel against ITSELF — its scrim, its fill, its ring against its own corner
+    // — and never against the trigger. MEASURED at 1920 with the rail expanded:
+    // the trigger centred at x=1061 and the panel at x=960, 101px apart, because
+    // the overlay centres on the VIEWPORT and the trigger on the CONTENT COLUMN.
+    //
+    // Asserted only where the trigger is actually on screen: it carries
+    // `max-narrow:hidden`, and below that width there is nothing to align to.
+    const trigger = page.getByRole('button', { name: 'Search Sahoda' })
+    if (await trigger.isVisible()) {
+      const triggerBox = (await trigger.boundingBox())!
+      const triggerCx = triggerBox.x + triggerBox.width / 2
+      const panelCx = panelBox.x + panelBox.width / 2
+      expect(
+        Math.abs(panelCx - triggerCx),
+        `the palette must open under its own trigger in ${theme}: trigger centre ` +
+          `${triggerCx.toFixed(0)}, panel centre ${panelCx.toFixed(0)}`,
+      ).toBeLessThanOrEqual(1)
+    }
+
+    // ── 4 · THE FOCUS RING STAYS INSIDE THE PANEL ────────────────────────────
     const field = page.getByRole('textbox', { name: 'Search destinations' })
     await field.focus()
     const fieldBox = (await field.boundingBox())!
@@ -173,7 +194,7 @@ for (const theme of ['light', 'dark'] as const) {
       `the palette's field should carry the global focus ring, got ${JSON.stringify(ring)}`,
     ).toBe(true)
 
-    // ── 4 · THE SCRIM IS TRANSLUCENT ─────────────────────────────────────────
+    // ── 5 · THE SCRIM IS TRANSLUCENT ─────────────────────────────────────────
     // An opaque `fixed inset-0` fill is the black rectangle this was reported
     // as. Chromium supports `color-mix`, so this reads the SUPPORTED value and
     // cannot see the no-color-mix fallback rule; `palette-scrim.test.ts` covers
