@@ -179,7 +179,29 @@ export function CommandPalette() {
             aria-modal="true"
             aria-label="Search Sahoda"
             onClick={(event) => event.stopPropagation()}
-            className="glass w-full max-w-[520px] overflow-hidden rounded-xl shadow-lg"
+            /**
+             * OPAQUE, not `glass`, and this is a deliberate departure from
+             * docs/37, which lists the command palette among the surfaces glass
+             * is ALLOWED on.
+             *
+             * The rest of that list is chrome you look past — a topbar, a rail,
+             * a bottom bar. This is a list of destinations you have to READ, and
+             * it floats over whatever screen you opened it from. Glass only
+             * stays legible there while `backdrop-filter` is actually blurring
+             * the page underneath, and MEASURED 2026-08-25 it was not: the rows
+             * behind the panel read sharply through it, word for word.
+             *
+             * The `@supports` guard added to `glass` on the same day fixes the
+             * case where a browser does not SUPPORT the property. It cannot help
+             * where a browser supports it and the effect still does not land —
+             * an extension, a GPU fallback, a compositing setting. Legibility of
+             * a menu must not depend on a GPU effect arriving.
+             *
+             * `shadow-lg` and the ring do the lifting instead: the panel reads
+             * as floating because of its edge and its shadow, not because the
+             * page shows through it.
+             */
+            className="surface-ring w-full max-w-[520px] overflow-hidden rounded-xl bg-surface shadow-lg"
           >
             <div className="flex items-center gap-2 border-b border-line-soft px-3">
               <Search size={15} className="shrink-0 text-muted" aria-hidden />
