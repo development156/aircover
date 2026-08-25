@@ -1373,3 +1373,36 @@ URL edit away from a cross-tenant read.
 **Only the db lane writes that**, and this research lane cannot apply a
 migration. Until it exists the constant `KNOWLEDGE_PASSAGE_LIMIT = 5` is the
 whole cost control, and `knowledge-context.test.ts` holds it there.
+
+---
+
+## 21 · For the db lane — four of the five reflect reasons are computed and thrown away
+
+`lib/loop/reflect.ts` returns a `NoLearningReason` whenever a week produced no
+learning, and there are five of them: `no_history`, `too_few_posts`,
+`single_group`, `difference_too_small`, `numbers_too_small`. They are five
+different sentences to a reader, and the file is careful about that.
+
+`loop_cycles` can store exactly one: `reflect_skipped_no_history boolean`.
+`run-loop.ts` passes `reflection.skippedNoHistory` and drops
+`reflection.reason` on the floor. So every Sunday the product works out why it
+had nothing to say about a business and then forgets it, and the owner is shown
+a silence with no account of itself.
+
+This matters more than a missing column usually would, because it is the exact
+question `docs/49` had to answer by hand: **why has the Brand Brain never
+learned anything?** The code computes that answer weekly and keeps none of it.
+
+It is also the discipline this codebase already enforces elsewhere.
+`lib/inbox/emptiness.ts` exists to keep eight kinds of nothing apart, and
+`no-impossible-remedy.spec.ts` fails a screen that offers a remedy for the wrong
+one. Five kinds collapsing into one boolean is the same defect those two files
+were written to prevent.
+
+**What it needs:** a nullable `reflect_no_learning_reason text` on
+`loop_cycles`, checked against the five literals, written by
+`setCycleStatus` alongside the boolean that already goes there. The boolean
+stays — it is read by `/loop` today and removing it is a separate change with
+its own blast radius.
+
+Only the db lane writes migrations, and this research lane cannot apply one.

@@ -7,6 +7,19 @@ production row was sampled.
 
 Rendered version: the artifact published with this commit.
 
+> ## ⚠ CORRECTION, 25 August 2026 — Q4 IS WRONG
+>
+> The second of the two findings below, and the Q4 section it rests on, are
+> wrong. There IS a fourth writer to `brand_memory` and the empty table waiting
+> to fill DOES exist. `docs/49` carries the corrected picture and what step 4
+> actually is; read that before acting on anything Q4 says.
+>
+> **How it was missed:** the trace grepped TypeScript for writers to
+> `brand_memory`. The fourth writer is the accept branch of
+> `public.resolve_memory_event`, which lives in SQL, in
+> `20260820000400_loop_rpcs.sql`. A detector inherits the blind spot of the code
+> it audits, and this one could not see Postgres.
+
 ---
 
 ## The two findings that matter
@@ -15,10 +28,15 @@ Rendered version: the artifact published with this commit.
 Brain fields are resolved from those four, and two of the four come from a page
 fetch that can fail.
 
-**Nothing feeds it afterwards.** All three writers are a person pressing a
+**Nothing feeds it afterwards.** ~~All three writers are a person pressing a
 button. `apps/jobs` — the Loop, the metric collectors, Radar — contains no
 reference to the Brand Brain at all. The accumulation you are describing has no
-mechanism.
+mechanism.~~ **WRONG — see the correction above and `docs/49`.** The mechanism
+exists end to end: `memory_events` is the proposal queue,
+`public.propose_memory_event` writes into it, `/loop` shows what is pending,
+`public.resolve_memory_event` accepts one into a new brain version, and a Vercel
+cron fires the whole cycle every Sunday at 21:00 UTC. What is true is that it
+has never produced anything, and `docs/49` says why.
 
 ---
 
@@ -111,9 +129,21 @@ gate.
 | resolve console        | a person pressing resolve      | manual   |
 | field confirm or edit  | a person on `/brain`           | manual   |
 
-The version history is real and append-only, so the machinery for accumulation
+~~The version history is real and append-only, so the machinery for accumulation
 exists. Nothing puts anything into it. The hidden, months-of-use layer does not
-exist in any form — not as an empty table waiting to fill.
+exist in any form — not as an empty table waiting to fill.~~
+
+**WRONG. The table exists and it is `memory_events`**, migrated on 18 July with
+`source`, `diff`, `status pending|accepted|rejected|auto`, `evidence_refs` and
+`applied_memory_version`. The writer table above is missing its fourth row:
+
+| writer                       | trigger                                | source   |
+| ---------------------------- | -------------------------------------- | -------- |
+| `resolve_memory_event`, accept | a person accepting a proposed learning | system   |
+
+and the proposer of those learnings is a job, not a person. `docs/49` has the
+full corrected picture: what exists, and the three separate reasons it has never
+produced a single learning.
 
 ---
 
