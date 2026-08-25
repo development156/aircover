@@ -138,7 +138,10 @@ function ComingSoonTile({ entry }: { entry: CatalogueEntry }) {
       data-channel={entry.id}
       data-coming-soon="true"
       data-connected="false"
-      className="is-proposed flex h-full flex-col gap-3 rounded-card p-4"
+      /* The same lift, so a planned channel reads as a card on a roadmap
+         rather than a dead box — while `.is-proposed` keeps it visibly
+         provisional. No shadow: it is not offering an action. */
+      className="is-proposed flex h-full flex-col gap-3 rounded-card p-4 transition-micro hover:-translate-y-px"
     >
       <ChannelHeader entry={entry} />
       {/* NOT "Not connected". That is the sentence a CONNECTABLE channel uses, and
@@ -178,7 +181,13 @@ export function ChannelTile({
       data-channel={entry.id}
       data-connected={connection ? 'true' : 'false'}
       data-readiness={entry.readiness}
-      className="surface-ring flex h-full flex-col rounded-card bg-surface p-4"
+      /* ── HOVER IS A LIFT, AND IT COSTS NOTHING ──────────────────────────
+         A 1px rise, a firmer ring and the card shadow — no colour change, so
+         the tile's two status ladders stay the only things saying anything.
+         `transition-micro` is the product's own duration/easing pair, and
+         tokens.css zeroes it under `prefers-reduced-motion`, so this needs no
+         media query of its own and no dependency. */
+      className="surface-ring flex h-full flex-col rounded-card bg-surface p-4 transition-micro hover:-translate-y-px hover:shadow-card hover:surface-ring-firm"
     >
       <ChannelHeader entry={entry} />
 
