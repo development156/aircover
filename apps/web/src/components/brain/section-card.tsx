@@ -6,6 +6,7 @@ import { fieldsInSection, type BrainSection } from '@/lib/brand/fields'
 import { readLeaf } from '@/lib/brand/leaf'
 import { stateOf, type Provenance } from '@/lib/brand/provenance'
 
+import { ConfirmAll, type ConfirmAllTarget } from './confirm-all'
 import { FieldRow } from './field-row'
 
 /**
@@ -24,6 +25,19 @@ export function SectionCard({
 }) {
   const fields = fieldsInSection(section.key)
   const tally = sectionTally(provenance, section.key)
+
+  /**
+   * Every field in this section that is still a guess, with the value the
+   * confirm would record. Built here rather than in the button so the button
+   * confirms exactly what this card rendered — a client component fetching its
+   * own list could confirm a field the reader never saw.
+   */
+  const unconfirmed: ConfirmAllTarget[] = fields.flatMap((field) => {
+    const value = readLeaf(brain, field.path)
+    if (value === undefined) return []
+    if (stateOf(provenance, field.path) === 'confirmed') return []
+    return [{ path: field.path, value }]
+  })
 
   return (
     <Card data-guide={`brain.section.${section.key}`} className="flex flex-col gap-4">
@@ -57,6 +71,8 @@ export function SectionCard({
           )
         })}
       </div>
+
+      <ConfirmAll targets={unconfirmed} />
     </Card>
   )
 }
