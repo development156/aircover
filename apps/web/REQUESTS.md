@@ -1247,3 +1247,32 @@ at the copy that already exists, and a click handler that no-ops.
 **What I cannot see:** I read `e2e/**` and grepped the repo for consumers of
 `manifest.jsonl`. A check living somewhere I did not look, or one reaching these
 measurements by another route, is not covered by that.
+
+## 18 · The QA capture hook attributes every gate run to whatever card is in progress
+
+**Small, and it writes false audit records, which is why it is here rather than
+in a shrug. Found 2026-08-24 (research lane).**
+
+Running `pnpm turbo run typecheck test` appends two entries to
+`ops/state/qa.pending.json`, one per suite, each stamped
+`"task_code": "SL-054"`, `"actor": "claude"`, `"status": "pass"`.
+
+**SL-054 is "Production was down for 22 hours 40 minutes"** — an incident card in
+the in-progress column of `ops/state/board.json`. My gate runs have nothing to do
+with it. The hook appears to tag whatever card is currently in progress, not the
+work that actually ran, so any session running the gate deposits pass evidence on
+a stranger's card.
+
+Committing those rows would put QA evidence on an incident nobody QA'd, so this
+lane reverted the file each time instead (four times over this session). Stating
+that plainly because a discarded artifact leaves no trace, and the next person
+will see the same dirty file and reasonably assume it is theirs to commit.
+
+**What is right about it, so nobody breaks it while fixing this:** the summary is
+honest where it counts. It says "this run was filtered and does not cover the
+workspace" rather than claiming a full pass, which is exactly the distinction
+this project cares about.
+
+The narrow defect is attribution alone. A run with no identifiable card is better
+recorded with a null `task_code`, or not recorded, than recorded against a card
+that happens to be open.
