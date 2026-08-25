@@ -136,10 +136,40 @@ export default async function ConnectionsPage({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start gap-3">
-        <PageTitle sub="Connect the places you post, and see what each one can do.">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <PageTitle sub="Connect your channels and manage where Sahoda publishes your content.">
           Connections
         </PageTitle>
+        {/* ── THE COUNT, PROMOTED OUT OF THE GROUP HEADING ──────────────────
+            It was `type-sm` grey text beside "Connect now", which put the one
+            number answering "where do I stand" at the same weight as the lead
+            line under it. Here it is the first thing read on the right.
+
+            Rendered ONLY when the connections read succeeded. On `unreadable`
+            this whole branch is not reached, so the card can never print "0 of
+            4 connected" off a failed read — which would be a reading of the
+            customer's account drawn from a query that never answered. */}
+        {connections.status === 'ok' ? (
+          <div className="surface-ring flex items-center gap-3 rounded-card bg-surface px-4 py-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-pill bg-brand-wash text-accent dark:bg-s2">
+              <Link2 aria-hidden className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="type-h3">
+                <span className="num">{live}</span> of{' '}
+                <span className="num">{CONNECTABLE.length}</span> connected
+              </p>
+              {/* NOT "4 channels available" as the reference words it. Available
+                  is what the other four are NOT — they have no adapter — and a
+                  reader who counts eight cards and reads "4 available" has been
+                  told the wrong thing about the four below. This says which four
+                  the fraction is about. */}
+              <p className="type-sm mt-label-gap text-muted">
+                <span className="num">{CONNECTABLE.length}</span> channels Sahoda can post to
+              </p>
+            </div>
+          </div>
+        ) : null}
       </header>
 
       {/* What just happened comes before what is there now. */}
@@ -181,9 +211,10 @@ export default async function ConnectionsPage({
           ) : null}
 
           <ChannelGroup
-            name="Connect now"
+            name="Connect your channels"
             lead="Each card says what Sahoda can do there, and whether this workspace has linked it."
-            count={`${live} of ${CONNECTABLE.length} connected`}
+            /* The count moved into the header card. Printing it here as well
+               would put one number in two places, which is how they drift. */
             guide="connections.connect_now"
           >
             {CONNECTABLE.map((entry) => (

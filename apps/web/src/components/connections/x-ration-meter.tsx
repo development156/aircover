@@ -54,7 +54,10 @@ export function XRationMeter(props: XRationMeterProps) {
     )
   }
 
-  const { used, remaining } = props
+  // `used` stays on the props contract — the page reads it from the same query
+  // that produces `remaining`, and a future "N of M" view would need it — but the
+  // summary counts DOWN, so only `remaining` is rendered here.
+  const { remaining } = props
   const exhausted = remaining === 0
 
   /**
@@ -65,36 +68,60 @@ export function XRationMeter(props: XRationMeterProps) {
    * on it is exact: billing detail should not hold the primary visual
    * hierarchy.
    *
-   * So the SENTENCE moves into a disclosure and the COUNT stays visible. What
-   * does NOT change is the claim, and the summary is written so it cannot be
-   * read as X's allowance: "of Sahoda's 12" says whose limit it is on the one
-   * line everybody sees. Dropping "Sahoda's" and printing "12 posts remaining
-   * this month" would be the vaguer-than-the-truth failure — X has no monthly
-   * write allowance to remain against, which is the whole reason this component
-   * refuses a "247 of 500" shape in the first place.
+   * So the pricing sentence lives in a disclosure.
+   *
+   * ── WHY IT COUNTS DOWN, NOT UP ───────────────────────────────────────────
+   * It read "3 of 12 X posts this month, from Sahoda's ration" — a used-of-total
+   * pair. The reference counts down, and down is the number a person acts on:
+   * nobody rations their posting against what they have already spent.
+   *
+   * ── AND WHY LINE TWO IS NOT OPTIONAL ─────────────────────────────────────
+   * This file previously recorded that printing "12 posts remaining this month"
+   * would be the vaguer-than-the-truth failure, because X has no monthly write
+   * allowance to remain against — as of February 2026 the API is pay-per-use —
+   * so an unattributed countdown invents a limit X does not impose. That
+   * reasoning still holds exactly.
+   *
+   * What changed is only WHERE the attribution sits: "From Sahoda's ration" is
+   * now the second line of the summary rather than a clause in the first. It is
+   * still outside the disclosure and still visible without opening anything, so
+   * the number is never read without whose limit it is. **If that second line is
+   * ever dropped, the line above it becomes a false claim about X.**
    *
    * `<details>` rather than state: it is keyboard-reachable, it needs no
    * client component on a server-rendered tile, and it cannot desynchronise
-   * from anything.
+   * from anything. The chevron points DOWN and rotates rather than pointing
+   * right as the reference draws it — a right chevron promises navigation, and
+   * this expands in place.
    */
   return (
-    <details className="group mt-3 rounded-input bg-s2 px-3 py-2">
-      <summary className="type-sm flex cursor-pointer list-none items-center gap-1.5 text-muted marker:content-none max-narrow:min-h-[44px]">
+    <details className="group surface-ring mt-3 rounded-input px-3 py-2">
+      <summary className="flex cursor-pointer list-none items-center gap-2 marker:content-none max-narrow:min-h-[44px]">
         <span className="min-w-0 flex-1">
-          <span className="num font-semibold text-ink">
-            {used} of {X_MONTHLY_RATION}
-          </span>{' '}
-          X posts this month, from Sahoda&rsquo;s ration
+          <span className="type-sm block font-semibold text-ink">
+            <span className="num">{remaining}</span> posts remaining this month
+          </span>
+          {/* The denominator's OWNER, in words. See above: without this line the
+              one above it claims a limit X does not impose.
+
+              `type-sm`, NOT `type-eyebrow`. Eyebrow is uppercase with tracking,
+              which is a LABEL treatment — and MEASURED in the frame, it set this
+              sentence as "FROM SAHODA'S RATION, RESETS ON THE 1ST" across two
+              shouting lines directly under the figure. This is a sentence about
+              whose allowance it is, so it is set as one. */}
+          <span className="type-sm mt-label-gap block text-muted">
+            From Sahoda&rsquo;s ration, resets on the 1st
+          </span>
         </span>
         <ChevronDown
           aria-hidden
-          className="size-3.5 shrink-0 transition-micro group-open:rotate-180"
+          className="size-3.5 shrink-0 text-ink-mute transition-micro group-open:rotate-180"
         />
       </summary>
-      <p className="type-sm mt-2 text-muted">
+      <p className="type-sm mt-2 border-t border-line-soft pt-2 text-muted">
         {exhausted
-          ? 'None left this month. Sahoda holds the rest until the month turns rather than spending on them.'
-          : `${remaining} left. X bills Sahoda ${usd(X_API_PRICE_USD.createPost)} a post, and ${usd(X_API_PRICE_USD.createPostWithLink)} when it carries a link, so this allowance is ours rather than X\u2019s.`}
+          ? `None left this month. Sahoda has spent all ${X_MONTHLY_RATION} and holds the rest until the month turns rather than spending on them.`
+          : `X bills Sahoda ${usd(X_API_PRICE_USD.createPost)} a post, and ${usd(X_API_PRICE_USD.createPostWithLink)} when it carries a link, so this allowance is ours rather than X\u2019s.`}
       </p>
     </details>
   )
