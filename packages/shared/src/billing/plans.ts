@@ -19,7 +19,6 @@ export interface PlanCatalogEntry {
   name: string
   monthlyCredits: number
   priceInr: number
-  priceUsd: number
   limits: PlanLimits
 }
 
@@ -32,15 +31,12 @@ export interface PlanCatalogEntry {
  * up (Growth 5,000 to 4,000; Studio 15,000 to 12,000): this is a reprice, not an
  * increase, so any copy that calls a higher tier "more credits" is now wrong.
  *
- * `priceUsd` is a rounded marketing price, NOT a conversion, and the gap is wide
- * enough that calling it "about $25" in the UI is doing real work. At the ₹95.5 per
- * USD recorded as MEASURED in finance/pricing-model.json, the rupee prices convert
- * to $20.93, $41.87 and $83.76 — so $25, $49 and $99 carry a premium of 19.4%,
- * 17.0% and 18.2% over what an Indian customer pays for the same plan.
- *
- * That is a deliberate second price for a customer billed in dollars, not an
- * arithmetic slip, and it is written down here because the next person to read
- * these two numbers side by side will assume one was derived from the other.
+ * THERE IS NO `priceUsd`. It was removed on 2026-08-24 and replaced by a live
+ * conversion — see `currency.ts`. It had been a second hand-set price sitting
+ * 17 to 19 percent above what the rupee price actually converted to, and it
+ * drifted on its own terms because nothing tied it to a rate. Every plan is
+ * billed in RUPEES; a figure in any other currency is an approximation of a
+ * rupee charge and must be rendered as one.
  *
  * The deck also states these prices are GST INCLUSIVE. That claim is NOT encoded
  * here, deliberately: `GstSupplierConfig.priceIncludesTax` is the field that decides
@@ -53,7 +49,6 @@ export const PLAN_CATALOG: Record<PlanId, PlanCatalogEntry> = {
     name: 'Free',
     monthlyCredits: 100,
     priceInr: 0,
-    priceUsd: 0,
     limits: { channels: 2, sites: 0, seats: 1, loopLevel: 1, twinSize: 0 },
   },
   starter: {
@@ -61,7 +56,6 @@ export const PLAN_CATALOG: Record<PlanId, PlanCatalogEntry> = {
     name: 'Starter',
     monthlyCredits: 1500,
     priceInr: 1999,
-    priceUsd: 25,
     limits: { channels: 4, sites: 1, seats: 1, loopLevel: 2, twinSize: 25 },
   },
   growth: {
@@ -69,7 +63,6 @@ export const PLAN_CATALOG: Record<PlanId, PlanCatalogEntry> = {
     name: 'Growth',
     monthlyCredits: 4000,
     priceInr: 3999,
-    priceUsd: 49,
     limits: { channels: 8, sites: 3, seats: 3, loopLevel: 3, twinSize: 100 },
   },
   /**
@@ -85,7 +78,6 @@ export const PLAN_CATALOG: Record<PlanId, PlanCatalogEntry> = {
     name: 'Studio',
     monthlyCredits: 12000,
     priceInr: 7999,
-    priceUsd: 99,
     limits: { channels: 12, sites: 10, seats: 10, loopLevel: 3, twinSize: 100 },
   },
 }

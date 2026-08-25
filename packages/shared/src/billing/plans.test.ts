@@ -14,14 +14,25 @@ describe('plan catalog', () => {
    * could have landed with no test going red. A catalog whose GRANTS are asserted
    * and whose PRICES are not is guarding the cheaper half of the same row.
    */
-  it('charges the deck prices, in both currencies', () => {
+  it('charges the deck prices', () => {
     expect(PLAN_CATALOG.starter.priceInr).toBe(1999)
     expect(PLAN_CATALOG.growth.priceInr).toBe(3999)
     expect(PLAN_CATALOG.agency.priceInr).toBe(7999)
+  })
 
-    expect(PLAN_CATALOG.starter.priceUsd).toBe(25)
-    expect(PLAN_CATALOG.growth.priceUsd).toBe(49)
-    expect(PLAN_CATALOG.agency.priceUsd).toBe(99)
+  /**
+   * There is ONE price per plan and it is in rupees. `priceUsd` was a second
+   * hand-set price that drifted 17 to 19 percent away from what the rupee price
+   * converted to; it is now a live approximation in `currency.ts`.
+   *
+   * Asserted rather than assumed, because the tempting "fix" for a missing
+   * dollar figure is to add the field back, and a second stored price is the
+   * defect, not the absence of one.
+   */
+  it('stores no second currency', () => {
+    for (const plan of Object.values(PLAN_CATALOG)) {
+      expect(plan).not.toHaveProperty('priceUsd')
+    }
   })
 
   /**
