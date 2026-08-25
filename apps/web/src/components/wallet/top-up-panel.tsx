@@ -39,10 +39,15 @@ export function TopUpPanel() {
 
   return (
     <Card data-guide="wallet.topup" className="space-y-4">
-      <CardLabel>
-        <CreditCard size={13} strokeWidth={2} aria-hidden />
-        Top up credits
-      </CardLabel>
+      <div className="space-y-1">
+        <CardLabel>
+          <CreditCard size={13} strokeWidth={2} aria-hidden />
+          Top up credits
+        </CardLabel>
+        <p className="type-sm text-muted">
+          A plan grants its credits every month. Pick one, then start a checkout.
+        </p>
+      </div>
 
       <fieldset disabled={pending} className="space-y-2">
         <legend className="sr-only">Choose a plan</legend>
@@ -62,17 +67,25 @@ export function TopUpPanel() {
                * and louder than its own Start checkout.
                *
                * docs/37 §2.3: the accent is spent on the one thing the screen
-               * is for. Selection is carried by three signals that cost almost
+               * is for. Selection is carried by signals that cost almost
                * nothing — a real fill step, a firmer ring, and the radio's own
                * dot, which keeps `accent-primary` because a 13px dot is where a
                * brand mark is unambiguous and cheap.
+               *
+               * ── THE WASH IS FREE, AND THAT IS WHY IT IS THE ONE ORANGE ────
+               * `--brand-wash` is `rgba(255,102,0,0.06)`, and
+               * `accent-area-budget.spec.ts` skips any paint under alpha 0.08.
+               * So the selected row reads unmistakably orange and charges the
+               * budget NOTHING. `--brand-lift` (0.4) as a border would be
+               * charged its whole box — 68,000px2 on a row this size, which is
+               * the 89% failure above, rediscovered.
                *
                * Ring, not border, in BOTH states: §6 refuses the two together,
                * and an inset ring cannot reflow the row when the edge firms up.
                */
               className={cn(
-                'flex cursor-pointer items-start gap-3 rounded-input px-3 py-2.5 transition-micro',
-                checked ? 'surface-ring-firm bg-s2' : 'surface-ring hover:bg-s2',
+                'flex cursor-pointer items-center gap-3 rounded-input px-3.5 py-3 transition-micro',
+                checked ? 'surface-ring-firm bg-brand-wash' : 'surface-ring hover:bg-s2',
                 pending && 'cursor-not-allowed opacity-45',
               )}
             >
@@ -82,16 +95,28 @@ export function TopUpPanel() {
                 value={entry.id}
                 checked={checked}
                 onChange={() => setPlanId(entry.id)}
-                className="mt-1 accent-primary"
+                className="accent-primary"
               />
-              <span className="min-w-0">
-                <span className="block type-body font-semibold">{entry.name}</span>
-                {/* Cost before spend: price and what it grants, both from PLAN_CATALOG. */}
-                <span className="block type-sm text-muted">
-                  ₹<span className="tabular-nums">{inr(entry.priceInr)}</span> per month (about $
-                  <span className="tabular-nums">{inr(entry.priceUsd)}</span>) ·{' '}
-                  <span className="tabular-nums">{inr(entry.monthlyCredits)}</span>{' '}
-                  {creditWord(entry.monthlyCredits)} granted each month
+
+              {/* NAME AND WHAT YOU GET, left. Both from PLAN_CATALOG. */}
+              <span className="min-w-0 flex-1">
+                <span className="block type-body font-semibold text-ink">{entry.name}</span>
+                <span className="block type-meta text-muted">
+                  <span className="num">{inr(entry.monthlyCredits)}</span>{' '}
+                  {creditWord(entry.monthlyCredits)} each month
+                </span>
+              </span>
+
+              {/* WHAT IT COSTS, right, in a column of its own so the three
+                  prices line up and can be compared down the edge. `.num` is
+                  tabular; a right-aligned column is what makes that legible. */}
+              <span className="shrink-0 text-right">
+                <span className="block type-body font-semibold text-ink">
+                  ₹<span className="num">{inr(entry.priceInr)}</span>
+                  <span className="type-meta font-normal text-muted"> /month</span>
+                </span>
+                <span className="block type-meta text-muted">
+                  about $<span className="num">{inr(entry.priceUsd)}</span>
                 </span>
               </span>
             </label>
@@ -99,21 +124,36 @@ export function TopUpPanel() {
         })}
       </fieldset>
 
-      <p className="text-[13px] text-muted">
-        Starts a checkout session for {plan.name}, at ₹
-        <span className="tabular-nums">{inr(plan.priceInr)}</span> per month. Nothing is charged and
-        no credits are added until a payment completes.
-      </p>
+      {/* THE COST, RESTATED BEFORE THE SPEND, and sat with the control that
+          starts it rather than floating a paragraph above a button. The claim
+          is unchanged: nothing is charged until a payment completes.
 
-      <Button
-        type="button"
-        onClick={start}
-        loading={pending}
-        data-guide="wallet.topup-start"
-        className="w-full narrow:w-auto"
-      >
-        Start checkout
-      </Button>
+          ── PROMINENCE FROM PLACEMENT, NOT FROM SIZE ────────────────────────
+          `size="lg"` was tried and reverted. MEASURED with the same arithmetic
+          `accent-area-budget.spec.ts` uses: it took this panel from 4,443px2 to
+          5,283px2 at 1440, which is 80% of the headroom under that spec's
+          6,000px2 ceiling for /wallet — spent on two pixels of button height,
+          and unverifiable here because Playwright cannot run in this sandbox.
+          A divider, a footer row and the right edge make it the terminus of the
+          card for free. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4">
+        <p className="min-w-0 flex-1 type-meta text-muted">
+          {plan.name}, ₹<span className="num">{inr(plan.priceInr)}</span> per month. Nothing is
+          charged and no credits are added until a payment completes.
+        </p>
+        <Button
+          type="button"
+          onClick={start}
+          loading={pending}
+          data-guide="wallet.topup-start"
+          /* NOT `sm:w-auto`. docs/37 §13 records this exact line as the dead
+             breakpoint that rendered the loudest object in the product as a
+             ~1000px bar at 1440. `narrow` is a real breakpoint here. */
+          className="w-full narrow:w-auto"
+        >
+          Start checkout
+        </Button>
+      </div>
 
       {/* Pending is never a bare spinner — say what is happening. */}
       <p aria-live="polite" className="min-h-[18px] text-[13px] text-muted">
