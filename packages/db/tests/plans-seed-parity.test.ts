@@ -58,8 +58,11 @@ describe('plans seed parity', () => {
     const entry = PLAN_CATALOG[planId]
 
     expect(numberField(statement, 'price_inr')).toBe(entry.priceInr)
-    expect(numberField(statement, 'price_usd')).toBe(entry.priceUsd)
     expect(numberField(statement, 'monthly_credits')).toBe(entry.monthlyCredits)
+    // `price_usd` is NOT compared. The catalog no longer carries a dollar price
+    // — see currency.ts — so there is nothing on the TypeScript side to compare
+    // the column against. The column itself survives only because it is NOT NULL
+    // in a live table; nothing reads it.
   })
 
   it.each(REPRICED)('%s grants the same limits in SQL as in PLAN_CATALOG', (planId) => {

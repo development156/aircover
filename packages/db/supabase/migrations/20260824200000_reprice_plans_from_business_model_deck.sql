@@ -39,6 +39,15 @@
 --     `GstSupplierConfig.priceIncludesTax` is what actually decides it, and gst.ts
 --     is explicit that this is a tax opinion, not arithmetic.
 --
+-- `price_usd` IS WRITTEN HERE BUT IS DEAD. The catalog no longer carries a dollar
+-- price: a customer outside India now sees a LIVE approximation of the rupee
+-- charge (packages/shared/src/billing/currency.ts), because the old stored figure
+-- was a second hand-set price that drifted 17 to 19 percent from what the rupee
+-- price actually converted to. The column stays because it is `not null` on a
+-- live table and dropping a column is irreversible; it is set here only so the
+-- row is not left carrying the superseded 12/29/79. Nothing reads it. If it is
+-- ever dropped, that is its own migration and its own decision.
+--
 -- Mirrors PLAN_CATALOG in packages/shared/src/billing/plans.ts. The two are checked
 -- against each other by plans-seed-parity.test.ts, which reads THIS file.
 -- ─────────────────────────────────────────────────────────────────────────────

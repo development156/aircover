@@ -2,7 +2,14 @@
 
 import { useState, useTransition } from 'react'
 import { CreditCard, Info } from 'lucide-react'
-import { PLAN_CATALOG, type PlanCatalogEntry, type PlanId } from '@sahoda/shared'
+import {
+  PLAN_CATALOG,
+  describeApproxPrice,
+  type DisplayCurrency,
+  type FxRates,
+  type PlanCatalogEntry,
+  type PlanId,
+} from '@sahoda/shared'
 
 import { startCheckout } from '@/app/actions/wallet'
 import { Card, CardLabel } from '@/components/ui/card'
@@ -23,12 +30,42 @@ const DEFAULT_PLAN: PlanId = 'starter'
 
 const inr = (value: number): string => value.toLocaleString('en-IN')
 
-export function TopUpPanel() {
+export interface TopUpPanelProps {
+  /**
+   * The currency to approximate in, or null to show rupees alone. Resolved on
+   * the server from the customer's declared billing country, falling back to the
+   * edge's guess. Null is the ordinary case, not a failure.
+   */
+  currency?: DisplayCurrency | null
+  /** Today's rates, or null when none could be fetched. Null shows rupees alone. */
+  fx?: FxRates | null
+}
+
+/** The date a rate was read, for an "as of" line. Never a relative "today". */
+const asOf = (iso: string): string =>
+  new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'Asia/Kolkata',
+  }).format(new Date(iso))
+
+export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {
   const [planId, setPlanId] = useState<PlanId>(DEFAULT_PLAN)
   const [result, setResult] = useState<CheckoutState | null>(null)
   const [pending, startTransition] = useTransition()
 
   const plan = PLAN_CATALOG[planId]
+
+  /**
+   * The sentence that keeps the two figures apart, or null when only one is on
+   * screen. Built here rather than in the markup so the "no approximation" case
+   * renders NOTHING — an explanation of a number nobody can see is noise.
+   */
+  const selected = describeApproxPrice(plan.priceInr, currency, fx)
+  const approxNote =
+    selected.approx === null || selected.rateFetchedAt === null
+      ? null
+      : `Your card is charged in rupees. The ${currency} figure is an approximation at the rate published on ${asOf(selected.rateFetchedAt)}, and your bank will use its own rate and may add a foreign transaction fee.`
 
   function start() {
     setResult(null)
@@ -88,9 +125,26 @@ export function TopUpPanel() {
                 <span className="block type-body font-semibold">{entry.name}</span>
                 {/* Cost before spend: price and what it grants, both from PLAN_CATALOG. */}
                 <span className="block type-sm text-muted">
-                  ₹<span className="tabular-nums">{inr(entry.priceInr)}</span> per month (about $
-                  <span className="tabular-nums">{inr(entry.priceUsd)}</span>) ·{' '}
-                  <span className="tabular-nums">{inr(entry.monthlyCredits)}</span>{' '}
+                  ₹<span className="tabular-nums">{inr(entry.priceInr)}</span> per month
+                  {/*
+                    The approximation, when there is an honest one to make. It is
+                    rendered AFTER the rupee figure and marked "about" on purpose:
+                    the charge settles in rupees, so this number is never what
+                    reaches the card. The customer's own bank converts at its own
+                    rate on the day and adds its own fee, and neither is visible
+                    here — so presenting this as the price would be a figure no
+                    query produced.
+                  */}
+                  {(() => {
+                    const { approx } = describeApproxPrice(entry.priceInr, currency, fx)
+                    return approx === null ? null : (
+                      <>
+                        {' '}
+                        (about <span className="tabular-nums">{approx}</span>)
+                      </>
+                    )
+                  })()}{' '}
+                  · <span className="tabular-nums">{inr(entry.monthlyCredits)}</span>{' '}
                   {creditWord(entry.monthlyCredits)} granted each month
                 </span>
               </span>
@@ -104,6 +158,20 @@ export function TopUpPanel() {
         <span className="tabular-nums">{inr(plan.priceInr)}</span> per month. Nothing is charged and
         no credits are added until a payment completes.
       </p>
+
+      {/*
+        SAYS WHAT THE OTHER FIGURE IS, and only when one was shown.
+
+        Without this the panel carries two numbers and no statement of which one
+        is the charge. The approximation is the more legible of the two to a
+        customer reading in their own currency, so silence here would let the
+        wrong number read as the price.
+
+        It names the rate's DATE rather than calling it current. A rate is a
+        published daily figure, not a live quote, and an undated one is exactly
+        the shape the old hardcoded 88 took while it drifted.
+      */}
+      {approxNote !== null ? <p className="type-sm text-muted">{approxNote}</p> : null}
 
       <Button
         type="button"

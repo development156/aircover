@@ -9,6 +9,10 @@ import { TopUpPanel } from '@/components/wallet/top-up-panel'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { holdReaperFromEnv, staleHoldNote } from '@/lib/wallet/balance'
 import { HISTORY_LIMIT, readBalance, readLedger, readOpenHolds } from '@/lib/wallet/read'
+import { readBillingProfile } from '@/lib/billing/read'
+import { detectedCountry, pickDisplayCountry } from '@/lib/billing/display-country'
+import { getFxRates } from '@/lib/billing/fx-store'
+import { displayCurrencyForCountry } from '@sahoda/shared'
 
 export const metadata = { title: 'Wallet' }
 
@@ -18,11 +22,41 @@ export const metadata = { title: 'Wallet' }
  * panel here, because nothing persists or produces those yet.
  */
 export default async function WalletPage() {
-  const [balance, ledger, openHolds] = await Promise.all([
+  /**
+   * ALL SIX IN ONE ROUND TRIP, including the two that feed the price
+   * approximation.
+   *
+   * The tempting shape is to read the billing profile, then derive a country,
+   * then fetch rates only if that country needs them — which would skip a fetch
+   * for Indian customers. It is also a three-deep chain on a page that already
+   * makes four reads, and `read-waterfall.test.ts` rejected it at 6 to 8
+   * sequential reads.
+   *
+   * So the rates are fetched unconditionally and sometimes go unused. That costs
+   * one cached Upstash GET beside four database reads already in flight, and it
+   * buys back a serial round trip on the money screen. The waste is real and it
+   * is the cheaper side of the trade.
+   */
+  const [balance, ledger, openHolds, profile, detected, fx] = await Promise.all([
     readBalance(),
     readLedger(),
     readOpenHolds(),
+    readBillingProfile(),
+    detectedCountry(),
+    getFxRates(),
   ])
+
+  /**
+   * The local-currency approximation on the top-up panel.
+   *
+   * Every input here is allowed to come back empty and none of them can fail the
+   * page: the rupee price is the charge, and an approximation that cannot be
+   * made is simply not shown. A profile that is unreadable contributes no
+   * declared country, which falls through to the edge's guess, which may itself
+   * be absent — and all three roads end at the rupee price alone.
+   */
+  const declaredCountry = profile.status === 'ok' ? (profile.data?.country_code ?? null) : null
+  const currency = displayCurrencyForCountry(pickDisplayCountry(declaredCountry, detected))
 
   // A user with no workspace has no wallet — not a broken one. This is the
   // whole page, not a banner above the usual furniture: an empty ledger and a
@@ -94,7 +128,7 @@ export default async function WalletPage() {
         )}
       </section>
 
-      <TopUpPanel />
+      <TopUpPanel currency={currency} fx={fx} />
     </div>
   )
 }
