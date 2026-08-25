@@ -5,8 +5,6 @@ import type { BrandMemoryPayload } from '@sahoda/shared'
 
 import { saveBrandMemory, type BrandMemorySource } from '@/app/actions/brand-resolve'
 import { resolveOnboarding } from '@/app/actions/onboarding-resolve'
-import { addUrlDocument } from '@/app/actions/knowledge'
-import { addCompetitor } from '@/app/actions/radar'
 import { saveWorkspaceTheme } from '@/app/actions/theme'
 import { refineWithDoorText } from '@/lib/onboarding/classify'
 import { storedIntakeFrom } from '@/lib/onboarding/to-stored-intake'
@@ -428,6 +426,23 @@ export function useBuild({
 }
 
 /**
+ * ── WHY THE TWO ACTIONS BELOW ARE IMPORTED INSIDE THE FUNCTIONS ──────────────
+ * They run once, on the last press of the last screen, so the first load of
+ * screen 01 is the wrong place for them.
+ *
+ * MEASURED, and smaller than it sounds: moving these two off the static graph
+ * took `/(onboarding)/onboarding` from 789.2 kB to 788.9 kB. 0.3 kB, not the
+ * several this was expected to save — the route's weight is dominated by a
+ * shared vendor chunk, not by these. Kept because it is still the right shape
+ * and costs nothing, and recorded at its real size so the next person does not
+ * re-derive it hoping for more.
+ *
+ * The budget script says in its own header that it cannot see a dynamic import,
+ * so this moves bytes out of the measured window rather than deleting them.
+ * Honest here, and it would not be for code the FIRST screen needs.
+ */
+
+/**
  * Read the picked knowledge sources into the library, and say what did not land.
  *
  * `addUrlDocument` fetches the address, stores the document and indexes it, and
@@ -448,6 +463,7 @@ async function sendSources(
       const form = new FormData()
       form.set('url', url)
       form.set('title', key)
+      const { addUrlDocument } = await import('@/app/actions/knowledge')
       const result = await addUrlDocument(form)
       if (!result.ok) failed.push(key)
     } catch {
@@ -471,6 +487,7 @@ async function sendWatchList(rivals: readonly Rival[]): Promise<string | null> {
   const failed: string[] = []
   for (const rival of sendable) {
     try {
+      const { addCompetitor } = await import('@/app/actions/radar')
       const result = await addCompetitor(rival.name, rival.url, rival.kind)
       if (!result.ok) failed.push(rival.name)
     } catch {

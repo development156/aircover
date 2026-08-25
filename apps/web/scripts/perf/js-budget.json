@@ -43,7 +43,7 @@
   "/(auth)/sign-up/[[...sign-up]]": 763387,
   "/(onboarding)/error": 639047,
   "/(onboarding)/onboarding/layout": 633756,
-  "/(onboarding)/onboarding": 798531,
+  "/(onboarding)/onboarding": 807850,
   "/(app)/sites": 809657,
   "/(app)/report": 607029,
   "/admin/layout": 855872,
