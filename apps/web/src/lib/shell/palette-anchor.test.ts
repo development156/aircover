@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { panelShift } from './palette-anchor'
+import { panelShift, panelWidthFor } from './palette-anchor'
 
 /**
  * THE PALETTE OPENS UNDER THE FIELD THAT OPENED IT.
@@ -70,5 +70,43 @@ describe('and it centres rather than guessing', () => {
     // would reach the DOM as `translateX(NaNpx)`, which the browser drops — so the
     // panel would silently stop being positioned at all.
     expect(panelShift({ ...AT_1920, triggerCenterX: Number.NaN })).toBe(0)
+  })
+})
+
+describe('the panel is as wide as the bar it opens from', () => {
+  const AT_1920_W = { triggerWidth: 420, pad: 10, ringOverhang: 4, max: 520 }
+
+  test('so the focus ring ends up exactly the trigger’s width', () => {
+    const panel = panelWidthFor(AT_1920_W)!
+    // The claim, computed the same way the browser lays it out: the field spans
+    // the panel minus its padding, and the ring overhangs the field on each side.
+    const field = panel - 2 * AT_1920_W.pad
+    const ring = field + 2 * AT_1920_W.ringOverhang
+    expect(ring).toBe(AT_1920_W.triggerWidth)
+  })
+
+  test('and with the shared centre, the two boxes are identical', () => {
+    // MEASURED before this: ring 759->1222 against a trigger 769->1189, off by
+    // -10 at one end and +33 at the other. Both ends, not just the width.
+    const triggerLeft = 769
+    const panel = panelWidthFor(AT_1920_W)!
+    const panelLeft = triggerLeft + AT_1920_W.triggerWidth / 2 - panel / 2
+    const ringLeft = panelLeft + AT_1920_W.pad - AT_1920_W.ringOverhang
+    const ringRight = ringLeft + (panel - 2 * AT_1920_W.pad) + 2 * AT_1920_W.ringOverhang
+    expect([ringLeft, ringRight]).toEqual([triggerLeft, triggerLeft + AT_1920_W.triggerWidth])
+  })
+
+  test('never wider than the stylesheet’s own cap', () => {
+    // A very wide trigger must not grow the palette past the size it was
+    // designed and measured at.
+    expect(panelWidthFor({ ...AT_1920_W, triggerWidth: 4000 })).toBe(520)
+  })
+
+  test('and NULL when there is no trigger, so the stylesheet keeps deciding', () => {
+    // The phone: `max-narrow:hidden`. Overriding a correct responsive rule with
+    // an invented constant is worse than not overriding it.
+    expect(panelWidthFor({ ...AT_1920_W, triggerWidth: null })).toBeNull()
+    expect(panelWidthFor({ ...AT_1920_W, triggerWidth: 0 })).toBeNull()
+    expect(panelWidthFor({ ...AT_1920_W, triggerWidth: Number.NaN })).toBeNull()
   })
 })
