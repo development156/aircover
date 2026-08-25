@@ -1462,19 +1462,24 @@ Only the db lane writes migrations, and this research lane cannot apply one.
 
 ---
 
-## 23 · Three billing suites fail under `turbo run test` and report their 22 tests as SKIPPED
+## 23 · PGlite-backed suites fail under parallel `turbo run test`, and report their tests as SKIPPED
 
 **MEASURED 25 August 2026, on this cloud container.** Not a flake, and it was
 dismissed as one twice before it was diagnosed, which is the reason this entry
 exists.
 
-`packages/billing`'s three PGlite-backed integration suites —
-`entitlements.integration.test.ts`, `applyPlanGrant.integration.test.ts`,
-`webhooks.integration.test.ts` — fail their `beforeAll` with **"Hook timed out in
-60000ms"** whenever the whole monorepo's tests run in parallel. Each one boots a
-PGlite instance from `packages/db`'s real migration files, and on a container
-this size, with every other package's vitest running beside it, that boot does
-not finish inside the hook timeout.
+**It is not one package.** Any suite that boots PGlite in a `beforeAll` can lose
+the race, and which one loses depends on scheduling:
+
+- `packages/billing` — `entitlements.integration.test.ts`,
+  `applyPlanGrant.integration.test.ts`, `webhooks.integration.test.ts`
+- `apps/jobs` — `backfill/store.pglite.test.ts`
+
+Both were seen failing on separate runs of the same command, and both pass alone.
+Each boots a PGlite instance from `packages/db`'s real migration files, and on a
+container this size, with every other package's vitest running beside it, that
+boot does not finish inside the **60-second hook timeout** — the failure reads
+`Hook timed out in 60000ms`.
 
 **The dangerous part is not the failure. It is the reporting.** The run prints:
 
@@ -1496,7 +1501,9 @@ The skip was removed in August. The timeout has quietly reinstated it.
 
 ### What was measured, so nobody re-diagnoses it
 
-- The three files **pass in isolation**: 3 files, 23 tests, green.
+- The three billing files **pass in isolation**: 3 files, 23 tests, green.
+- `apps/jobs`' `backfill/store.pglite.test.ts` **passes in isolation**: 14 tests,
+  green — after failing inside a parallel run of the same command.
 - `pnpm --filter @sahoda/billing test` **passes**: 401 passed, 13 skipped.
 - Under `turbo run test`, the same package is 379 passed, **35** skipped.
   The 22-test difference is the three suites.
@@ -1505,6 +1512,18 @@ The skip was removed in August. The timeout has quietly reinstated it.
   (`ENOTFOUND db.rloztdhzfliyvpvxsgjl.supabase.co`) and these do not touch the
   network at all — `openDbUnderTest()` uses PGlite unless
   `SAHODA_ALLOW_LIVE_TESTS=1`.
+
+### It makes `pnpm gate` itself unreliable here, which is the real cost
+
+The gate is `turbo run typecheck lint test && turbo run test:smoke && prettier
+--check .`, and its first leg is the parallel run described above. So on a
+container this size the gate can come back with a smaller passing count, no
+failing test named, and a reader with no reason to look twice. CLAUDE.md already
+carries the sentence this repeats: "a suite that ran nothing reports as passing,
+which is how twenty-six billing tests never executed for months."
+
+Until the timeout is fixed, `turbo run test --concurrency=1` is the run to trust
+on this hardware. It is slower and it is honest.
 
 ### Why this is not the research lane's to fix
 
@@ -1519,6 +1538,8 @@ turbo configuration.
   starting up, and it is competing for one container's CPU.
 - Or make a shared PGlite instance boot once for the package instead of once per
   suite, which also cuts the wall clock.
+- Raise it wherever PGlite is booted, not only in billing — `apps/jobs` has the
+  same shape and the same failure.
 - **And separately, make a file-level failure impossible to read as a skip.**
   That is the part that matters beyond this bug: a count of skipped tests that
   silently includes tests which were supposed to run is the same defect twice in
