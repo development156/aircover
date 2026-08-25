@@ -111,10 +111,15 @@ arms, which is the honest state.
 
 **The smoke leg was not run.** REQUESTS.md §25. Playwright's Chromium cannot make
 any outbound HTTPS request in a claude.ai/code sandbox — `https://example.com/`
-resets identically to Clerk's host — because it does not trust the agent proxy's
-CA. Every @smoke spec signs in through Clerk. The fix is to disable TLS
-verification, so it was not used. The other four legs of `pnpm gate` are green:
-27 of 27 turbo tasks, and `prettier --check .` clean.
+resets identically to Clerk's host — and every @smoke spec signs in through
+Clerk. The first diagnosis here said the cause was CA trust and it was wrong:
+Chromium loads the agent proxy's own HTTP endpoint and plain-HTTP `example.com`
+with 200, the proxy logs no attempt for any HTTPS one, and Playwright's Node-side
+request context fetches the same URL fine from the same process. Outbound 443
+from the Chromium process is reset before it reaches anything, which makes
+`--ignore-certificate-errors` both forbidden and beside the point. The other four
+legs of `pnpm gate` are green: 27 of 27 turbo tasks, and `prettier --check .`
+clean.
 
 ## Next, in the order docs/53 set
 
