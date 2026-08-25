@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PLAN_CATALOG } from '@sahoda/shared'
 
@@ -83,6 +83,32 @@ describe('the top-up plan cards', () => {
     await user.click(screen.getByText('Agency'))
     expect(screen.getAllByText('Selected')).toHaveLength(1)
     expect(screen.getByRole('radio', { name: /agency/i })).toBeChecked()
+  })
+
+  it('recommends exactly one plan, and it is Growth', () => {
+    render(<TopUpPanel />)
+
+    // ONE. A badge on two cards is not a recommendation, and a badge on none is
+    // a constant that silently stopped matching a plan id.
+    const chips = screen.getAllByText('Recommended')
+    expect(chips).toHaveLength(1)
+
+    // AND IT IS ON THE RIGHT CARD. Asserting only the count would pass with the
+    // chip on Agency, which is the defect a reader would actually be misled by.
+    const card = chips[0]!.closest('label')!
+    expect(within(card).getByRole('radio')).toHaveAttribute('value', 'growth')
+  })
+
+  it('recommends one plan and pre-selects a DIFFERENT one, deliberately', () => {
+    // Recommending and pre-selecting are separate acts: the second decides what
+    // the checkout charges if someone presses the button without reading. If
+    // these ever become the same plan it should be because somebody chose that,
+    // so this pins the current, deliberate split.
+    render(<TopUpPanel />)
+
+    const recommended = screen.getByText('Recommended').closest('label')!
+    expect(within(recommended).getByRole('radio')).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: /starter/i })).toBeChecked()
   })
 
   it('reads its feature lines off PLAN_CATALOG.limits rather than prose', () => {
