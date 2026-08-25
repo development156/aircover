@@ -14,7 +14,6 @@
  */
 
 /** Shown on every reference card. Not a status — a statement of intent. */
-export const REF_PENDING_NOTE = 'queued for analysis'
 
 /**
  * The hostname, or the raw text when it is not a URL at all.

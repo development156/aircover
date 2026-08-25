@@ -46,7 +46,10 @@ export function ResultStep({
   onReview,
 }: ResultStepProps) {
   const c = confidenceOf(data)
-  const knowledge = data.sources.length + data.docs.length
+  // Sources only. `docs` used to be added here, and an uploaded file was
+  // `{ name, size }` with no bytes — so a person who dropped in three PDFs was
+  // told Sahoda had three more sources to draw on than it had.
+  const knowledge = data.sources.length
 
   // Animated from 0 so the bar reads as a measurement being taken. The VALUE is
   // computed above and never moves; only its rendering is deferred a frame.
@@ -69,7 +72,6 @@ export function ResultStep({
       </>,
     ],
     ['Knowledge', knowledge ? `${knowledge} source${knowledge === 1 ? '' : 's'}` : 'None yet'],
-    ['References', data.refs.length ? `${data.refs.length} queued` : 'None yet'],
     [
       'Confidence',
       <div className="conf">
@@ -106,11 +108,7 @@ export function ResultStep({
   if (knowledge) {
     bits.push(
       <>
-        I have {knowledge} knowledge source{knowledge === 1 ? '' : 's'} to draw on
-        {data.refs.length
-          ? `, plus ${data.refs.length} reference${data.refs.length === 1 ? '' : 's'} to study`
-          : ''}
-        .
+        I have {knowledge} knowledge source{knowledge === 1 ? '' : 's'} to draw on.
       </>,
     )
   }

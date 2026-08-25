@@ -1,49 +1,40 @@
 'use client'
 
-import { FileText, Upload } from 'lucide-react'
-import { useEffect, useState } from 'react'
-
-import { DropZone } from '../drop-zone'
-import { fmtSize } from '../refs'
 import { SWATCH_KEYS, type SwatchKey } from '../store'
 import type { StepProps } from './types'
 
 /**
  * 04 — Visual identity. Entirely optional; Continue is never gated here.
  *
- * The logo preview is an object URL, which is a handle into THIS document and
- * dies with it. Only the file NAME is persisted, so a resumed session shows the
- * name it was given rather than a broken image element pointing at a revoked
- * blob — the browser renders that as the alt text with a torn-page icon, which
- * reads as "your upload failed" about an upload that succeeded.
+ * ── IT ASKED FOR TWO UPLOADS AND KEPT NEITHER FILE ───────────────────────────
+ * A logo dropzone and a brand-guidelines dropzone were removed here, and this
+ * note is the record of why so neither is reinstated as a nicety.
+ *
+ * The logo persisted as `f.name`. The bytes were turned into an object URL for
+ * the preview, the preview died with the document, and what survived was a
+ * string like `logo-final-2.png`. It did not even feed the palette: colour
+ * extraction is `app/actions/theme.ts`, which this screen never called, so
+ * uploading a teal logo changed nothing about the workspace's colours.
+ *
+ * The guidelines dropzone kept `{ name, size }` — the same shape, with no bytes
+ * — for files a person believed had been read.
+ *
+ * Both also COUNTED. `signalIds` pushed `logo` and one id per document, so the
+ * confidence figure on the result screen and the orb's density both rose for
+ * inputs that reached nothing. The number is a claim about how much Sahoda was
+ * told, so it was overstated by the act of discarding something.
+ *
+ * The colours stay, because the colours are real: `use-build.ts` sends the
+ * swatches that were moved to `saveWorkspaceTheme`, and falls back to colours
+ * pulled off the website when none were moved.
+ *
+ * ── WHAT IT WOULD TAKE TO BRING THE UPLOADS BACK ─────────────────────────────
+ * Real file plumbing: bytes to storage through the assets path, then a logo
+ * column or an asset row to point at, then extraction into the palette for the
+ * logo and into the knowledge library for the documents. That is a feature, not
+ * a dropzone, and it should return as one.
  */
 export function VisualStep({ data, patch }: StepProps) {
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
-
-  // Revoked on unmount and on replacement: an object URL pins its blob in
-  // memory for the lifetime of the document until it is released.
-  useEffect(() => {
-    return () => {
-      if (logoUrl) URL.revokeObjectURL(logoUrl)
-    }
-  }, [logoUrl])
-
-  function takeLogo(files: FileList): void {
-    const f = files[0]
-    if (!f || !f.type.startsWith('image/')) return
-    setLogoUrl((old) => {
-      if (old) URL.revokeObjectURL(old)
-      return URL.createObjectURL(f)
-    })
-    patch({ logo: f.name })
-  }
-
-  function takeDocs(files: FileList): void {
-    patch({
-      docs: [...data.docs, ...[...files].map((f) => ({ name: f.name, size: f.size }))],
-    })
-  }
-
   function setColor(key: SwatchKey, value: string): void {
     patch({
       colors: { ...data.colors, [key]: value.toUpperCase() },
@@ -61,28 +52,13 @@ export function VisualStep({ data, patch }: StepProps) {
       <div className="step__head rise">
         <p className="micro step__eyebrow">Visual identity</p>
         <h2 className="display">Let&rsquo;s make sure Sahoda sees your brand the way you do.</h2>
+        <p className="lead step__lead">
+          Set the colours Sahoda uses for your workspace. Leave them and it reads the colours off
+          your website instead.
+        </p>
       </div>
       <div className="rise">
-        <DropZone
-          id="logo-drop"
-          label="Upload your logo"
-          detail="PNG · SVG · JPG"
-          accept="image/*"
-          icon={<Upload className="drop__ic" size={24} strokeWidth={1.6} aria-hidden />}
-          onFiles={takeLogo}
-        >
-          {data.logo ? (
-            <>
-              {logoUrl ? <img src={logoUrl} alt={data.logo} /> : null}
-              <span className="drop__t" style={{ marginTop: 8 }}>
-                {data.logo}
-              </span>
-              <span className="drop__d">Click to replace</span>
-            </>
-          ) : null}
-        </DropZone>
-
-        <p className="label" style={{ margin: '26px 0 12px' }}>
+        <p className="label" style={{ margin: '0 0 12px' }}>
           Brand colours
         </p>
         <div className="swatches" id="swatches">
@@ -98,29 +74,6 @@ export function VisualStep({ data, patch }: StepProps) {
               />
               <div className="sw__l">{k}</div>
               <div className="sw__v">{data.colors[k]}</div>
-            </div>
-          ))}
-        </div>
-
-        <DropZone
-          id="doc-drop"
-          label="Upload brand guidelines"
-          detail="Optional · PDF · PPT · DOCX · ZIP · Images"
-          multiple
-          style={{ marginTop: 26, padding: 20 }}
-          icon={<FileText className="drop__ic" size={24} strokeWidth={1.6} aria-hidden />}
-          onFiles={takeDocs}
-        />
-        <div className="filelist" id="filelist">
-          {data.docs.map((doc, i) => (
-            <div
-              className="filerow"
-              key={`${doc.name}-${i}`}
-              style={{ animationDelay: `${i * 70}ms` }}
-            >
-              <FileText size={16} strokeWidth={1.6} aria-hidden />
-              <b>{doc.name}</b>
-              <span>{fmtSize(doc.size)}</span>
             </div>
           ))}
         </div>

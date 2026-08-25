@@ -1,6 +1,6 @@
 # 48 · Run the onboarding session — a script for watching one real person
 
-**25 August 2026, research lane, at `0ba53fc`.** Step 3 of the `docs/46`
+**25 August 2026, research lane. Screens re-checked at `HEAD`.** Step 3 of the `docs/46`
 repairs. It is the only step with no engineering in it, and the only one that
 tells you whether steps 1 and 2 helped.
 
@@ -57,34 +57,28 @@ between screens.
 
 ## What each screen actually does
 
-Nine screens: an intro, six numbered, the competitor step, and the result. Read
-this column before the session so you are never surprised in the room, and never
-during it.
+Eight screens: an intro, five numbered, the competitor step, and the result.
+Read this column before the session so you are never surprised in the room, and
+never during it.
 
-| # | Screen | What it asks | Where the answer actually goes |
-|---|--------|--------------|-------------------------------|
-| — | Intro | Nothing. Begin, or review an existing brain | Shows the price, or "free the first time" |
-| 1 | Basics | Brand name, website (optional) | Name to `source.name`; the URL is fetched and its text becomes the evidence the whole resolve reads |
-| 2 | Positioning | What the brand does; a category chip or a typed trade; anything Sahoda should never say | The sentence to `source.one_liner`, the trade to the classifier, the never-say to `taboo.avoid_topics` |
-| 3 | Audience | Ideal customer, plus age, place, role, interests | Joined into `customer.description` |
-| 4 | Visual | Logo, colour swatches | Colours become the workspace theme when they press Finish: the swatches they moved, or colours pulled off their website if they moved none. **The logo does not leave the browser — only its filename is kept** |
-| 5 | References | Pages whose style they like, and why | **Nothing. Neither the links nor the note leaves the browser, and the result screen still says "plus N references to study"** |
-| 6 | Knowledge | A website, an Instagram, a product catalogue | Each address is fetched, stored and indexed into the library. Free: no model is called |
-| — | Competitors | Name, kind, public address | Sent to Radar's watch list after the brain is built |
-| — | Result | Nothing | Says the first brain was free and nothing was charged |
+**This table is shorter than it was.** The first draft listed nine screens and
+flagged two of them as the product lying. Those two were fixed rather than
+observed: the References screen is gone, and so are the two uploads that kept no
+file. What follows is what a participant will actually meet.
 
-**Two of those rows are the product lying.** Screen 4 keeps a filename where a
-logo should be, and screen 5 collects work that is discarded while the result
-screen thanks them for it. They are the same defect this branch already removed
-from the Knowledge screen and the competitor card, in the two places it was not
-yet removed.
+| #   | Screen      | What it asks                                                                                | Where the answer actually goes                                                                            |
+| --- | ----------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| —   | Intro       | Nothing. Begin, or review an existing brain                                                   | Shows the price, or "free the first time"                                                                   |
+| 1   | Basics      | Brand name, website (optional)                                                                | Name to `source.name`; the URL is fetched and its text becomes the evidence the whole resolve reads         |
+| 2   | Positioning | What the brand does; a category chip or a typed trade; anything Sahoda should never say       | The sentence to `source.one_liner`, the trade to the classifier, the never-say to `taboo.avoid_topics`      |
+| 3   | Audience    | Ideal customer, plus age, place, role, interests                                              | Joined into `customer.description`                                                                          |
+| 4   | Visual      | Colour swatches only                                                                          | The workspace theme: the swatches they moved, or colours pulled off their website if they moved none        |
+| 5   | Knowledge   | A website, an Instagram, a product catalogue                                                  | Each address is fetched, stored and indexed into the library. Free: no model is called                      |
+| —   | Competitors | Name, kind, public address                                                                    | Sent to Radar's watch list after the brain is built                                                         |
+| —   | Result      | Nothing                                                                                       | Says the first brain was free and nothing was charged                                                       |
 
-**Decide before the session** whether to run on the branch as it stands or to
-fix those two sentences first. Running as-is is defensible: you will see what a
-real person does with a screen that asks for effort and throws it away, and
-whether they ever notice. Fixing first is also defensible, because everything
-they say about screens 4 and 5 will otherwise be about a bug rather than about
-the product. **Pick one on purpose. Do not discover it mid-session.**
+Every row now reaches something. That was not true when this file was written,
+and the two rows that did not are why the flow is one screen shorter.
 
 ---
 
@@ -105,16 +99,13 @@ anything you wanted to say here and could not?*
 **3 · Audience.** Four small fields after one big one. Do they fill all of them
 or abandon after the first? Ask: *which of those felt like a real question?*
 
-**4 · Visual.** Do they upload a logo? Do they touch the colours at all, or
-accept what is there? Untouched swatches are not neutral: the product then
-themes the workspace from colours it pulled off their website instead. Ask:
-*what did you expect to happen to your logo?*
+**4 · Visual.** Do they touch the colours at all, or accept what is there?
+Untouched swatches are not neutral: the product then themes the workspace from
+colours pulled off their website instead. Watch for somebody hunting for a logo
+upload, which used to sit here and was removed because it kept only the file
+name. Ask: *was anything missing from that screen?*
 
-**5 · References.** The highest-effort screen in the flow and the one that
-currently keeps nothing. Do they add links? How many? Do they write the note?
-Ask: *what were you hoping we would do with those?*
-
-**6 · Knowledge.** Three tiles, each asking for an address. Do they understand
+**5 · Knowledge.** Three tiles, each asking for an address. Do they understand
 that a tile is a page and not an account connection? Ask: *did you think you had
 connected something?*
 

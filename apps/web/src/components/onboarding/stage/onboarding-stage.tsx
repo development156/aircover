@@ -37,7 +37,6 @@ import { AudienceStep } from './steps/audience-step'
 import { BasicsStep } from './steps/basics-step'
 import { IntroStep } from './steps/intro-step'
 import { KnowledgeStep } from './steps/knowledge-step'
-import { ReferencesStep } from './steps/references-step'
 import { ResultStep } from './steps/result-step'
 import { RivalsStep } from './steps/rivals-step'
 import { VisualStep } from './steps/visual-step'
@@ -460,8 +459,6 @@ export function OnboardingStage({
     ) : step === '4' ? (
       <VisualStep data={data} patch={patch} />
     ) : step === '5' ? (
-      <ReferencesStep data={data} patch={patch} />
-    ) : step === '6' ? (
       <KnowledgeStep data={data} patch={patch} />
     ) : step === 'comp' ? (
       <RivalsStep data={data} patch={patch} />
