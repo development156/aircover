@@ -1343,7 +1343,7 @@ first, and a price if the answer to question 1 is that it costs one.
 
 ---
 
-## 20 · For the db lane — the library search that reaches a model is unranked
+## 20 · The library search that reaches a model is unranked
 
 `packages/mesh/src/knowledge-context.ts` retrieves five library passages for
 `caption_rewrite` and `content_variants`. It is honest about being
@@ -1370,13 +1370,19 @@ ordering by `ts_rank_cd`. `packages/mesh` would call it as an RPC and the
 `workspace_id` filter would move inside the function, where it stops being one
 URL edit away from a cross-tenant read.
 
-**Only the db lane writes that**, and this research lane cannot apply a
-migration. Until it exists the constant `KNOWLEDGE_PASSAGE_LIMIT = 5` is the
-whole cost control, and `knowledge-context.test.ts` holds it there.
+Until it exists the constant `KNOWLEDGE_PASSAGE_LIMIT = 5` is the whole cost
+control, and `knowledge-context.test.ts` holds it there.
+
+**SUPERSEDED, 25 August 2026.** The founder's ruling on `wt-core`
+(`docs/workflow/08_ROLES.md`) makes every lane autonomous: writing a migration
+file is free in any lane, and only APPLYING one to production is gated, from
+`wt-core`. So this is no longer an ask parked with somebody else — this lane can
+write it. Left here as the specification; the reason it is still unwritten is
+sequencing, not permission.
 
 ---
 
-## 21 · For the db lane — four of the five reflect reasons are computed and thrown away
+## 21 · Four of the five reflect reasons are computed and thrown away
 
 `lib/loop/reflect.ts` returns a `NoLearningReason` whenever a week produced no
 learning, and there are five of them: `no_history`, `too_few_posts`,
@@ -1405,11 +1411,16 @@ were written to prevent.
 stays — it is read by `/loop` today and removing it is a separate change with
 its own blast radius.
 
-Only the db lane writes migrations, and this research lane cannot apply one.
+**SUPERSEDED, 25 August 2026.** The founder's ruling on `wt-core`
+(`docs/workflow/08_ROLES.md`) makes every lane autonomous: writing a migration
+file is free in any lane, and only APPLYING one to production is gated, from
+`wt-core`. So this is no longer an ask parked with somebody else — this lane can
+write it. Left here as the specification; the reason it is still unwritten is
+sequencing, not permission.
 
 ---
 
-## 22 · For the db lane, and it is losing data every day — the model's draft is overwritten by the edit
+## 22 · Losing data every day — the model's draft is overwritten by the edit
 
 **The founder's ruling on the Brand Brain moat, 25 August: store CORRECTIONS,
 not conclusions.** The visible Brain already holds conclusions, and a hidden
@@ -1458,7 +1469,12 @@ over months, per workspace. If it does not, the learning is decorative and the
 screen must not claim otherwise. That number is also the customer-facing version
 of the moat — outputs needing less fixing is a thing a person feels.
 
-Only the db lane writes migrations, and this research lane cannot apply one.
+**SUPERSEDED, 25 August 2026.** The founder's ruling on `wt-core`
+(`docs/workflow/08_ROLES.md`) makes every lane autonomous: writing a migration
+file is free in any lane, and only APPLYING one to production is gated, from
+`wt-core`. So this is no longer an ask parked with somebody else — this lane can
+write it. Left here as the specification; the reason it is still unwritten is
+sequencing, not permission.
 
 ---
 
@@ -1526,6 +1542,11 @@ Until the timeout is fixed, `turbo run test --concurrency=1` is the run to trust
 on this hardware. It is slower and it is honest.
 
 ### Why this is not the research lane's to fix
+
+(Still true after the 25 August autonomy ruling: that ruling frees a lane to
+write anything in ITS OWN branch. `packages/billing`'s test configuration is
+another lane's work in flight, and two lanes editing the same concept is the
+silent failure `08_ROLES.md` warns about.)
 
 `git diff origin/wt-core...HEAD -- packages/billing packages/db turbo.json` is
 **empty** on this branch. Nothing here touches billing, the migrations, or the
