@@ -110,3 +110,63 @@ describe('a saved blob is untrusted input', () => {
     expect(loadState(WS)?.data.colors.Primary).toBe(DEFAULT_COLORS.Primary)
   })
 })
+
+/**
+ * A saved session predates the day competitors gained an address.
+ *
+ * `competitors` was `string[]` until this lane sent them to Radar. Anyone
+ * mid-onboarding at that moment has a `string[]` sitting in localStorage under
+ * their workspace key, and `loadState` is the only thing between that and a
+ * screen that maps over `c.name`.
+ *
+ * Dropping those rows would be the quiet option and the wrong one: they are
+ * answers a person already gave. They come back named, unwatchable until an
+ * address is added, and the step says so on the card rather than pretending.
+ */
+describe('a session saved before competitors had an address', () => {
+  it('keeps the names rather than dropping the answers', () => {
+    window.localStorage.setItem(
+      storageKey(WS),
+      JSON.stringify({
+        step: '6',
+        data: { ...DEFAULT_DATA, competitors: ['Blossom', 'Champaca'] },
+      }),
+    )
+
+    const resumed = loadState(WS)
+
+    expect(resumed?.data.competitors).toEqual([
+      { name: 'Blossom', url: '', kind: 'website' },
+      { name: 'Champaca', url: '', kind: 'website' },
+    ])
+  })
+
+  it('refuses a kind that is not one Radar can read', () => {
+    // localStorage is writable by anything on the origin, so the kind coming
+    // back is untrusted input. A bad one falls back to `website` rather than
+    // reaching `addCompetitor`, which would refuse it.
+    window.localStorage.setItem(
+      storageKey(WS),
+      JSON.stringify({
+        step: '6',
+        data: {
+          ...DEFAULT_DATA,
+          competitors: [{ name: 'Blossom', url: 'https://b.in', kind: 'tiktok' }],
+        },
+      }),
+    )
+
+    expect(loadState(WS)?.data.competitors).toEqual([
+      { name: 'Blossom', url: 'https://b.in', kind: 'website' },
+    ])
+  })
+
+  it('drops a row with no usable name at all', () => {
+    window.localStorage.setItem(
+      storageKey(WS),
+      JSON.stringify({ step: '6', data: { ...DEFAULT_DATA, competitors: ['', '   ', null, 7] } }),
+    )
+
+    expect(loadState(WS)?.data.competitors).toEqual([])
+  })
+})

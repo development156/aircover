@@ -39,6 +39,19 @@ export const COMPETITOR_KIND_LABELS: Record<CompetitorKind, string> = {
 }
 
 /**
+ * Is this one of the three kinds Radar can actually read?
+ *
+ * Derived from `COMPETITOR_KIND_LABELS` rather than written out again, so a
+ * fourth kind cannot be added to the labels and be silently rejected here. Added
+ * for the onboarding lane, which rehydrates a saved competitor from
+ * localStorage — anything on that origin can write it, so the kind arriving back
+ * is untrusted input and not a value this code put there.
+ */
+export function isCompetitorKind(value: unknown): value is CompetitorKind {
+  return typeof value === 'string' && value in COMPETITOR_KIND_LABELS
+}
+
+/**
  * A business being watched.
  *
  * OWNED BY THE `competitors` TABLE, which the wt-radar lane is building. This is
