@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react'
 import { X_API_PRICE_USD, X_MONTHLY_RATION } from '@sahoda/publishing'
 
 import { Unreadable } from '@/components/design-system/absence-row'
@@ -56,17 +57,45 @@ export function XRationMeter(props: XRationMeterProps) {
   const { used, remaining } = props
   const exhausted = remaining === 0
 
+  /**
+   * ── THE COUNT LEADS; THE PRICING IS ONE CLICK AWAY ───────────────────────
+   * This block used to be the heaviest object on the X tile — a filled well
+   * carrying a `type-h3` figure and a two-clause sentence about per-post API
+   * pricing, on a card whose job is "connect this channel". The founder's note
+   * on it is exact: billing detail should not hold the primary visual
+   * hierarchy.
+   *
+   * So the SENTENCE moves into a disclosure and the COUNT stays visible. What
+   * does NOT change is the claim, and the summary is written so it cannot be
+   * read as X's allowance: "of Sahoda's 12" says whose limit it is on the one
+   * line everybody sees. Dropping "Sahoda's" and printing "12 posts remaining
+   * this month" would be the vaguer-than-the-truth failure — X has no monthly
+   * write allowance to remain against, which is the whole reason this component
+   * refuses a "247 of 500" shape in the first place.
+   *
+   * `<details>` rather than state: it is keyboard-reachable, it needs no
+   * client component on a server-rendered tile, and it cannot desynchronise
+   * from anything.
+   */
   return (
-    <div className="mt-3 rounded-input bg-s2 px-3 py-2">
-      <p className="type-eyebrow text-muted">X posts this month</p>
-      <p className="type-h3 num mt-label-gap">
-        {used} <span className="text-muted">of {X_MONTHLY_RATION}</span>
-      </p>
-      <p className="type-sm mt-1 text-muted">
+    <details className="group mt-3 rounded-input bg-s2 px-3 py-2">
+      <summary className="type-sm flex cursor-pointer list-none items-center gap-1.5 text-muted marker:content-none max-narrow:min-h-[44px]">
+        <span className="min-w-0 flex-1">
+          <span className="num font-semibold text-ink">
+            {used} of {X_MONTHLY_RATION}
+          </span>{' '}
+          X posts this month, from Sahoda&rsquo;s ration
+        </span>
+        <ChevronDown
+          aria-hidden
+          className="size-3.5 shrink-0 transition-micro group-open:rotate-180"
+        />
+      </summary>
+      <p className="type-sm mt-2 text-muted">
         {exhausted
           ? 'None left this month. Sahoda holds the rest until the month turns rather than spending on them.'
           : `${remaining} left. X bills Sahoda ${usd(X_API_PRICE_USD.createPost)} a post, and ${usd(X_API_PRICE_USD.createPostWithLink)} when it carries a link, so this allowance is ours rather than X\u2019s.`}
       </p>
-    </div>
+    </details>
   )
 }

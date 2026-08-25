@@ -111,13 +111,21 @@ describe('the X spend meter', () => {
       />,
     )
 
-    const meter = screen.getByText(/X posts this month/i).parentElement!
-    expect(within(meter).getByText(/^3$/)).toBeInTheDocument()
+    const meter = screen.getByText(/X posts this month/i).closest('details')!
     // The CONSTANT, never the literal. This line read `/of 40/` and was the only
     // thing in the repo still pinning the old ration — a grep of the meter component
     // and its data source both missed it, and the gate did not. A denominator test
     // that hardcodes the denominator asserts nothing about the denominator.
-    expect(within(meter).getByText(new RegExp(`of ${X_MONTHLY_RATION}`))).toBeInTheDocument()
+    //
+    // RETARGETED, not weakened, when the meter's pricing sentence moved into a
+    // disclosure: the count and the ration are now ONE figure ("3 of 12") rather
+    // than two nodes, so `/^3$/` matched nothing. Asserting the pair together is
+    // the stronger claim — it pins that the numerator is never rendered without
+    // the denominator that gives it meaning, which is this meter's whole point.
+    expect(within(meter).getByText(new RegExp(`^3 of ${X_MONTHLY_RATION}$`))).toBeInTheDocument()
+    // And the sentence naming WHOSE ration it is survives the move, on the line
+    // that is visible without opening anything.
+    expect(within(meter).getByText(/from Sahoda’s ration/i)).toBeInTheDocument()
   })
 
   it('is absent from every other channel', () => {
