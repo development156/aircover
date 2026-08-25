@@ -1,5 +1,6 @@
 'use client'
 
+import { ColorField } from '../color-field'
 import { SWATCH_KEYS, type SwatchKey } from '../store'
 import type { StepProps } from './types'
 
@@ -53,8 +54,8 @@ export function VisualStep({ data, patch }: StepProps) {
         <p className="micro step__eyebrow">Visual identity</p>
         <h2 className="display">Let&rsquo;s make sure Sahoda sees your brand the way you do.</h2>
         <p className="lead step__lead">
-          Set the colours Sahoda uses for your workspace. Leave them and it reads the colours off
-          your website instead.
+          Paste your brand hex, pick one from the grid, or sample a colour off your screen. Leave
+          them and Sahoda reads the colours off your website instead.
         </p>
       </div>
       <div className="rise">
@@ -63,18 +64,7 @@ export function VisualStep({ data, patch }: StepProps) {
         </p>
         <div className="swatches" id="swatches">
           {SWATCH_KEYS.map((k) => (
-            <div className="sw" key={k}>
-              <div className="sw__dot" style={{ background: data.colors[k] }} />
-              <input
-                className="sw__in"
-                type="color"
-                value={data.colors[k]}
-                onChange={(e) => setColor(k, e.target.value)}
-                aria-label={`${k} colour`}
-              />
-              <div className="sw__l">{k}</div>
-              <div className="sw__v">{data.colors[k]}</div>
-            </div>
+            <ColorField key={k} label={k} value={data.colors[k]} onChange={(v) => setColor(k, v)} />
           ))}
         </div>
       </div>

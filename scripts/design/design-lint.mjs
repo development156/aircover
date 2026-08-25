@@ -51,6 +51,19 @@ const HEX_EXEMPT_FILES = [
      anything. The stylesheet beside it, `styles/onboarding.css`, carries zero
      raw hex and stays enforced. */
   'components/onboarding/stage/store.ts',
+  /* The brand-colour picker's two test files. Same class as the line above, and
+     the clearest case of it: a test for a colour picker asserts on colours. They
+     pin what a pasted `0068d6` normalises to, that `#06d` expands to `#0066DD`,
+     that `#12345` is refused, which swatch the grid marks selected, and what the
+     eyedropper returns. None can be written without the value, and every one is
+     DATA a customer chooses rather than styling this product applies.
+
+     The two SOURCE files stay enforced and both are clean: `color-field.tsx`
+     carries no hex, and `palette.ts` computes its whole grid from HSL precisely
+     so that it needs no literals. `styles/onboarding.css` beside them is
+     enforced too. */
+  'components/onboarding/stage/color-field.test.tsx',
+  'components/onboarding/stage/palette.test.ts',
   /* The DPDP export's readable page. Same class again, and it is the strongest
      case in the list: this file does not style anything in this app. It
      GENERATES a standalone HTML document that lands in the customer's Downloads

@@ -888,28 +888,6 @@
   color: var(--onb-ink);
 }
 
-.back {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--onb-muted);
-  margin-bottom: 20px;
-  transition:
-    color var(--onb-d-fast) var(--onb-ease),
-    transform var(--onb-d-fast) var(--onb-ease);
-}
-
-.back:hover {
-  color: var(--onb-ink);
-  transform: translateX(-3px);
-}
-.back svg {
-  width: 14px;
-  height: 14px;
-}
-
 .enterkey {
   font-size: 12px;
   color: var(--ink-faint);
@@ -1287,32 +1265,33 @@
   flex-wrap: wrap;
 }
 
-.sw {
+/* ── brand colour field ─────────────────────────────────────────────────────
+   Replaced `.sw*`, which was a dot with an invisible `<input type="color">`
+   stretched over it. See `color-field.tsx` for why the native control stopped
+   being the whole interface. Zero raw hex here, as everywhere in this file. */
+.cf {
   position: relative;
 }
 
-.sw__dot {
+.cf__dot {
   width: 46px;
   height: 46px;
   border-radius: 12px;
   box-shadow: inset 0 0 0 1px var(--onb-hairline);
   cursor: pointer;
+  display: block;
   transition:
     transform var(--onb-d-fast) var(--onb-ease),
     border-radius var(--onb-d-fast) var(--onb-ease);
 }
 
-.sw:hover .sw__dot {
+.cf:hover .cf__dot,
+.cf__dot:focus-visible {
   transform: scale(1.07);
   border-radius: 14px;
 }
-.sw__in {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-.sw__l {
+
+.cf__l {
   font-size: var(--onb-fs-micro);
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -1320,10 +1299,182 @@
   color: var(--onb-muted);
   margin-top: 7px;
 }
-.sw__v {
+
+.cf__v {
   font-size: 12px;
   color: var(--onb-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* The popover. Anchored under its own swatch and never wider than the pane. */
+.cpick {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 10px);
+  left: 0;
+  width: min(320px, calc(100vw - 40px));
+  padding: 12px;
+  border-radius: var(--r-lg);
+  background: var(--onb-paper);
+  box-shadow:
+    inset 0 0 0 1px var(--onb-hairline),
+    var(--sh-pop);
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  animation: cpick-in var(--onb-d-fast) var(--onb-ease) both;
+}
+
+@keyframes cpick-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cpick {
+    animation: none;
+  }
+}
+
+.cpick__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cpick__row {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  gap: 5px;
+}
+
+/* The neutrals row is seven wide against eleven, so it spans rather than
+   leaving four empty cells the eye reads as missing colours. */
+.cpick__row:first-child {
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.cpick__sw {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  /* LITERAL white, and the dark variant literal black, because the ground here
+     is a colour the CUSTOMER chose and not a themed surface. A token would flip
+     with the theme and put a dark tick on a dark swatch in one of them. Same
+     argument docs/26 §1.6 makes for platform brand marks; `white` is already
+     used as a keyword three rules above this one. */
+  color: white;
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+  transition: transform var(--onb-d-fast) var(--onb-ease);
+}
+
+.cpick__sw:hover,
+.cpick__sw:focus-visible {
+  transform: scale(1.14);
+}
+
+.cpick__sw.on {
+  box-shadow:
+    inset 0 0 0 1px var(--onb-hairline),
+    0 0 0 2px var(--onb-ink);
+}
+
+/* A white tick on a pale swatch is an invisible selection. `isLight` decides. */
+.cpick__tick--dark {
+  color: black;
+}
+
+.cpick__foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cpick__prev {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+}
+
+.cpick__hexwrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  background: var(--onb-ink-04);
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+}
+
+.cpick__hexwrap:focus-within {
+  box-shadow: inset 0 0 0 1.5px var(--onb-orange);
+}
+
+.cpick__hash {
+  font-size: 13px;
+  color: var(--onb-muted);
+}
+
+.cpick__hex {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--onb-ink);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  outline: none;
+}
+
+.cpick__tool {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  color: var(--onb-muted);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--onb-hairline);
+  transition: color var(--onb-d-fast) var(--onb-ease);
+}
+
+.cpick__tool:hover {
+  color: var(--onb-ink);
+}
+
+/* The escape hatch, deliberately quiet: it opens the operating system dialog. */
+.cpick__native {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--onb-muted);
+  cursor: pointer;
+}
+
+.cpick__native input {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
 }
 
 .filelist {
