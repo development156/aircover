@@ -1276,3 +1276,67 @@ this project cares about.
 The narrow defect is attribution alone. A run with no identifiable card is better
 recorded with a null `task_code`, or not recorded, than recorded against a card
 that happens to be open.
+
+## 19 · For the advisor — refining what a person types in onboarding
+
+**Owner ruling wanted, plus two things this lane may not write.** Asked for by
+the founder on 2026-08-24 against screen 03 (Audience): _"the user might write 2
+words but the meaning is not derived properly, or the grammar might be
+incorrect. its an important input for brand brain."_ The founder chose
+**suggest-and-accept** over silent rewriting when the options were put.
+
+### Why it cannot be built in this lane
+
+Three of the four pieces are outside it:
+
+| piece                                    | where it lives             | this lane        |
+| ---------------------------------------- | -------------------------- | ---------------- |
+| the task and its prompt                  | `packages/mesh/src/tasks/` | writable         |
+| input and output schemas                 | `packages/shared`          | **frozen**       |
+| a price                                  | `pricing.config.json`      | **do not touch** |
+| the screen and the accept/reject control | `apps/web`                 | writable         |
+
+`caption-rewrite` is the nearest existing task and its price is
+`caption_rewrite: 1`. A refine task would be a sibling of it, not a reuse: the
+caption prompt rewrites marketing copy for a channel, and this one must not
+market anything. It is closer to a transcription clean-up.
+
+### The product rule that shapes it, not a preference
+
+The Brand Brain's whole architecture separates CONFIRMED (a person wrote this)
+from INFERRED (a model guessed). Screen 03 already reads the answer back
+verbatim: _"Everything I write will be aimed at GenZ, College students who wants
+to learn a new skill…"_. If a model rewrites that sentence and the field keeps
+its confirmed standing, the product is quoting **our** words back as **theirs**,
+on the one surface built to keep those apart.
+
+So the shape has to be:
+
+1. the person's text is what is stored until they say otherwise,
+2. the suggestion is shown BESIDE it, never in place of it,
+3. accepting is an explicit press, and the accepted text is then theirs —
+   the same act `confirmBrainField` performs on `/brain`,
+4. declining costs nothing and leaves the field exactly as typed.
+
+An auto-correct on blur fails 1, 2 and 3 at once, which is why it was rejected.
+
+### Questions only the owner can settle
+
+1. **Does it cost a credit, and is it free during onboarding?** The first resolve
+   is free and onboarding is where trust is won. A refine that quietly spends
+   from 100 credits before the brain exists is a bad first transaction, and
+   "costs shown before spend" means the screen would have to carry a price on
+   four or five fields.
+2. **Which fields?** Only the audience sentence, or every free-text answer
+   (name, positioning, audience, the typed trade from screen 02)? Each one is a
+   call.
+3. **What is it allowed to change?** Grammar and clarity only, or may it expand
+   two words into a sentence? Expansion is the ask that helps most and invents
+   most: "students" to "college students in tier-two cities" is a claim about
+   their business that nobody made.
+
+### What this lane can do once those are answered
+
+The screen half: the field, the suggestion beside it, accept and decline, the
+states, and the guards. Roughly a day. It needs the task and the schema to exist
+first, and a price if the answer to question 1 is that it costs one.
