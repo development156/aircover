@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Check, Coins, CreditCard, Info } from 'lucide-react'
+import { Check, Coins, CreditCard, Info, Sparkles } from 'lucide-react'
 import { PLAN_CATALOG, type PlanCatalogEntry, type PlanId } from '@sahoda/shared'
 
 import { startCheckout } from '@/app/actions/wallet'
@@ -20,6 +20,33 @@ const PAID_PLANS: readonly PlanCatalogEntry[] = Object.values(PLAN_CATALOG).filt
 )
 
 const DEFAULT_PLAN: PlanId = 'starter'
+
+/**
+ * The plan Sahoda points at. Founder's call, 25 August 2026.
+ *
+ * ── WHY THIS IS ALLOWED WHERE "POPULAR" WAS NOT ──────────────────────────────
+ * A "Popular" chip was declined twice on this panel, and the reason was never
+ * that badges are tacky. It is that "popular" is a claim about OTHER CUSTOMERS
+ * — how many workspaces chose this plan — and nothing in this codebase counts
+ * that, so the chip would be a number we cannot produce, dressed as a fact.
+ *
+ * "Recommended" is a claim about US. It says Sahoda suggests this one, which is
+ * true by construction the moment someone decides it, and it is checkable by
+ * asking that person. Same shape of chip, completely different epistemics.
+ *
+ * ── AND IT IS DELIBERATELY NOT THE DEFAULT SELECTION ─────────────────────────
+ * `DEFAULT_PLAN` stays `starter`. Recommending a plan and pre-selecting it are
+ * different acts: the second decides what the checkout will charge if someone
+ * presses the button without reading, and that was not asked for. Flip this only
+ * on purpose.
+ *
+ * ── AND IT LIVES HERE, NOT IN PLAN_CATALOG ───────────────────────────────────
+ * A `recommended` field in `packages/shared` would be the tidier home, but the
+ * advisor lane is editing pricing in that exact file right now and this branch
+ * already carries one unresolved conflict with them. Which plan a screen points
+ * at is a presentation choice; the catalog stays the contract.
+ */
+const RECOMMENDED_PLAN: PlanId = 'growth'
 
 const inr = (value: number): string => value.toLocaleString('en-IN')
 
@@ -122,6 +149,25 @@ export function TopUpPanel() {
                 onChange={() => setPlanId(entry.id)}
                 className="peer sr-only"
               />
+
+              {/* THE CHIP ROW IS RESERVED ON EVERY CARD, and rendered on one.
+                  Without the reserved height the recommended card's name, price
+                  and credits would all sit ~22px lower than its neighbours' —
+                  the brief asks for "perfectly aligned content", and a badge
+                  that only exists on one card is exactly how three cards stop
+                  agreeing about where their rows are.
+
+                  `--brand-wash` is alpha 0.06, which `accent-area-budget`
+                  skips, so the fill is free; the text is charged 10% of a
+                  ~90x20 box, which is ~180px2. */}
+              <span className="mb-2 flex min-h-[22px] items-start">
+                {entry.id === RECOMMENDED_PLAN ? (
+                  <span className="inline-flex items-center gap-1 rounded-pill bg-brand-wash px-2 py-0.5 type-chip text-accent">
+                    <Sparkles size={11} strokeWidth={2.5} aria-hidden />
+                    Recommended
+                  </span>
+                ) : null}
+              </span>
 
               <span className="block type-sm font-semibold text-ink">{entry.name}</span>
 
