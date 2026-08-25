@@ -154,6 +154,12 @@ const EXPECTED_PUBLIC_EXCLUDED = new Set([
   '/api/cron/metrics',
   '/api/cron/loop',
   '/api/cron/playbooks',
+  // Added 2026-08-25 with the weekly Radar scan. It is the FIFTH cron and the
+  // first one that spends money on a provider, so a missing exemption here would
+  // not merely report a green heartbeat over a 307 — it would report a green
+  // heartbeat over a scan that never collected anything, for weeks, while the
+  // pages it was meant to be watching changed and were never read again.
+  '/api/cron/radar',
   '/api/webhooks/cashfree',
   '/api/webhooks/clerk',
   // Added 2026-08-23. It arrived on `isPublicRoute` with the wt-webhooks merge and

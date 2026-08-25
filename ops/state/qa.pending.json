@@ -1,4 +1,70 @@
 {
   "version": 1,
-  "runs": []
+  "runs": [
+    {
+      "client_id": "qa-mt8wrieb-4c10c4f1",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-25T16:57:38.529Z",
+      "finished_at": "2026-08-25T16:57:38.529Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks passed for @sahoda/web, @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
+      "details": "@sahoda/web:lint:   ok    hand-written font size — 732 known, none new (baseline 732)\n@sahoda/web:lint: \n@sahoda/web:lint:   1186 files scanned in apps/web/src\n@sahoda/web:lint: lint ok: @sahoda/web  (test-only=0 assertionless-test=0 console-log=1 uncollected-tests=0 stale-exception=0)\n@sahoda/db:typecheck: cache miss, executing 0b0de1e93ca5e782\n@sahoda/sites:typecheck: cache miss, executing b56ff8c6c86f32bd\n@sahoda/billing:typecheck: cache miss, executing aaeccd6eb71439cc\n@sahoda/research:typecheck: cache miss, executing 9cd4f5f7e98005f5\n@sahoda/mesh:typecheck: cache miss, executing d67211b43ae52906\n@sahoda/publishing:typecheck: cache miss, executing a483cb81f36a9d22\n@sahoda/research:typecheck: $ tsc --noEmit\n@sahoda/db:typecheck: $ tsc --noEmit\n@sahoda/billing:typecheck: $ tsc --noEmit\n@sahoda/sites:typecheck: $ tsc --noEmit\n@sahoda/publishing:typecheck: $ tsc --noEmit\n@sahoda/mesh:typecheck: $ tsc --noEmit\n@sahoda/jobs:typecheck: cache miss, executing 362394fdaed3df25\n@sahoda/jobs:typecheck: $ tsc --noEmit\n@sahoda/web:typecheck: cache miss, executing 32f6a80d0764fdd7\n@sahoda/web:typecheck: $ tsc --noEmit\n\n Tasks:    11 successful, 11 total\nCached:    0 cached, 11 total\n  Time:    15.822s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mt8wrieb-cd7c98b3",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-25T16:57:38.529Z",
+      "finished_at": "2026-08-25T16:57:38.529Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks passed for @sahoda/web, @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
+      "details": "@sahoda/web:lint:   ok    hand-written font size — 732 known, none new (baseline 732)\n@sahoda/web:lint: \n@sahoda/web:lint:   1186 files scanned in apps/web/src\n@sahoda/web:lint: lint ok: @sahoda/web  (test-only=0 assertionless-test=0 console-log=1 uncollected-tests=0 stale-exception=0)\n@sahoda/db:typecheck: cache miss, executing 0b0de1e93ca5e782\n@sahoda/sites:typecheck: cache miss, executing b56ff8c6c86f32bd\n@sahoda/billing:typecheck: cache miss, executing aaeccd6eb71439cc\n@sahoda/research:typecheck: cache miss, executing 9cd4f5f7e98005f5\n@sahoda/mesh:typecheck: cache miss, executing d67211b43ae52906\n@sahoda/publishing:typecheck: cache miss, executing a483cb81f36a9d22\n@sahoda/research:typecheck: $ tsc --noEmit\n@sahoda/db:typecheck: $ tsc --noEmit\n@sahoda/billing:typecheck: $ tsc --noEmit\n@sahoda/sites:typecheck: $ tsc --noEmit\n@sahoda/publishing:typecheck: $ tsc --noEmit\n@sahoda/mesh:typecheck: $ tsc --noEmit\n@sahoda/jobs:typecheck: cache miss, executing 362394fdaed3df25\n@sahoda/jobs:typecheck: $ tsc --noEmit\n@sahoda/web:typecheck: cache miss, executing 32f6a80d0764fdd7\n@sahoda/web:typecheck: $ tsc --noEmit\n\n Tasks:    11 successful, 11 total\nCached:    0 cached, 11 total\n  Time:    15.822s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mt8wsmsj-8840fc9c",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-25T16:58:30.881Z",
+      "finished_at": "2026-08-25T16:58:30.881Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed (396 passed) for @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
+      "details": "@sahoda/jobs:test:  ✓ src/publish/runClaimedPublish.test.ts (4 tests) 7ms\n@sahoda/jobs:test:  ✓ src/publish/store-options.test.ts (8 tests) 6ms\n@sahoda/jobs:test:  ✓ src/publish/gbp-cta.test.ts (3 tests) 8ms\n@sahoda/jobs:test:  ✓ src/ai/plan-week.test.ts (1 test) 4ms\n@sahoda/jobs:test: \n@sahoda/jobs:test:  Test Files  34 passed (34)\n@sahoda/jobs:test:       Tests  396 passed (396)\n@sahoda/jobs:test:    Start at  16:57:44\n@sahoda/jobs:test:    Duration  46.15s (transform 2.74s, setup 0ms, import 9.78s, tests 122.12s, environment 4ms)\n@sahoda/jobs:test: \n\n Tasks:    6 successful, 6 total\nCached:    5 cached, 6 total\n  Time:    47.556s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mt8x3wmd-f88ecdc4",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-25T17:07:16.835Z",
+      "finished_at": "2026-08-25T17:07:16.835Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks passed for @sahoda/web, @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
+      "details": "@sahoda/jobs:lint: lint ok: @sahoda/jobs  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/web:lint:   ok    raw hex colour\n@sahoda/web:lint:   ok    disabled coming-soon button\n@sahoda/web:lint:   ok    hardcoded spacing — 134 known, none new (baseline 134)\n@sahoda/web:lint:   ok    dead breakpoint variant — 0 known, none new (baseline 0)\n@sahoda/web:lint:   ok    hand-written font size — 732 known, none new (baseline 732)\n@sahoda/web:lint: lint ok: @sahoda/web  (test-only=0 assertionless-test=0 console-log=1 uncollected-tests=0 stale-exception=0)\n Tasks:    2 successful, 2 total\napps/jobs/package.json 11ms (unchanged)\nturbo.json 3ms (unchanged)\napps/web/vercel.json 1ms (unchanged)\nChecking formatting...\nAll matched files use Prettier code style!",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mt8x3wmd-b33c9780",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-25T17:07:16.835Z",
+      "finished_at": "2026-08-25T17:07:16.835Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed for @sahoda/web, @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
+      "details": "@sahoda/jobs:lint: lint ok: @sahoda/jobs  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/web:lint:   ok    raw hex colour\n@sahoda/web:lint:   ok    disabled coming-soon button\n@sahoda/web:lint:   ok    hardcoded spacing — 134 known, none new (baseline 134)\n@sahoda/web:lint:   ok    dead breakpoint variant — 0 known, none new (baseline 0)\n@sahoda/web:lint:   ok    hand-written font size — 732 known, none new (baseline 732)\n@sahoda/web:lint: lint ok: @sahoda/web  (test-only=0 assertionless-test=0 console-log=1 uncollected-tests=0 stale-exception=0)\n Tasks:    2 successful, 2 total\napps/jobs/package.json 11ms (unchanged)\nturbo.json 3ms (unchanged)\napps/web/vercel.json 1ms (unchanged)\nChecking formatting...\nAll matched files use Prettier code style!",
+      "duration_ms": null
+    }
+  ]
 }

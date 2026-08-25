@@ -118,6 +118,23 @@ export type ChangeKind =
   | 'offer_ended'
   /** Page copy changed in a way that is not covered above. */
   | 'page_changed'
+  /**
+   * The follower count on a social profile moved between two reads.
+   *
+   * ADDED 2026-08-25, when the collector was bound to this screen. It is the one
+   * change the collector emits that had no home here: it writes
+   * `new_posts | audience_moved | page_content`, and this union had six kinds
+   * that were not those. Two mapped cleanly; this one had to be admitted or
+   * dropped, and dropping it would have meant a stored, observed change that the
+   * feed silently never showed.
+   *
+   * It is a MEASUREMENT, not the engagement rate this screen refuses to print:
+   * both numbers come from a profile Radar actually read, each cites the snapshot
+   * it came from, and `diffSnapshots` emits nothing at all unless BOTH sides were
+   * present. A count the platform declined to state on either day produces no
+   * change rather than a zero.
+   */
+  | 'audience_moved'
 
 export const CHANGE_KIND_LABELS: Record<ChangeKind, string> = {
   post_published: 'Posted',
@@ -126,6 +143,7 @@ export const CHANGE_KIND_LABELS: Record<ChangeKind, string> = {
   offer_appeared: 'New offer',
   offer_ended: 'Offer ended',
   page_changed: 'Page edited',
+  audience_moved: 'Followers',
 }
 
 /**
