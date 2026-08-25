@@ -221,6 +221,29 @@ describe('confirming without editing', () => {
     expect(screen.getByRole('button', { name: /Edit/ })).toBeInTheDocument()
   })
 
+  test('looks like a control, not a caption', () => {
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+
+    // THE DEFECT THIS PINS. Shipped first as `variant="ghost"` — `text-muted`,
+    // no ring — and the founder read past it, and past the section's
+    // "Confirm all", reporting the latter missing while looking at a screenshot
+    // that contained it. `surface-ring-firm` is the hairline the `secondary`
+    // variant paints, and it is what makes the control read as pressable.
+    //
+    // WHAT THIS CANNOT SEE: whether it looks pressable to a person. jsdom
+    // resolves no stylesheet, so this asserts the variant was chosen, not the
+    // pixels it produces. The pixels were checked on the preview.
+    expect(screen.getByRole('button', { name: /Confirm/ })).toHaveClass('surface-ring-firm')
+  })
+
+  test('does not spend the one primary this view is allowed', () => {
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+
+    // §6 rations the orange fill to ONE per view and /brain renders fifteen of
+    // these rows. `bg-primary` here would be fifteen.
+    expect(screen.getByRole('button', { name: /Confirm/ })).not.toHaveClass('bg-primary')
+  })
+
   test('says so when the confirm fails, rather than leaving the mark unchanged and silent', async () => {
     confirmBrainField.mockResolvedValue({ ok: false, message: 'Sahoda could not save that.' })
     render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)

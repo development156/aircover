@@ -105,14 +105,24 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
             {/* Only while it is still a guess. On a confirmed field this would
                 be a button that records nothing, next to a mark already saying
                 the field is confirmed. */}
+            {/* SECONDARY, not ghost, and that is the whole point of it.
+                Shipped as a ghost first and the founder read straight past it —
+                and past the section's "Confirm all" too, reporting it missing
+                while looking at a screenshot containing it. `ghost` is
+                `text-muted` with no ring: it reads as a caption, not a control,
+                and a control nobody recognises is a control nobody presses.
+                NOT `primary`: that variant is rationed to one per view (§6) and
+                this screen renders fifteen of these. `secondary` is the button
+                shape without the accent — the variant's own comment calls it
+                the workhorse. */}
             {state !== 'confirmed' ? (
               <Button
                 type="button"
-                variant="ghost"
+                variant="secondary"
                 size="sm"
                 loading={pending}
                 onClick={confirmInPlace}
-                className="px-2"
+                className="px-2.5"
               >
                 <Check size={13} aria-hidden />
                 Confirm · free

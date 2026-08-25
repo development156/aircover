@@ -68,7 +68,9 @@ export function ConfirmAll({ targets }: { targets: readonly ConfirmAllTarget[] }
   return (
     <div className="flex flex-col gap-1.5">
       <div>
-        <Button type="button" variant="ghost" size="sm" loading={pending} onClick={confirmAll}>
+        {/* See the note in `field-row.tsx`: this shipped as a ghost and was
+            reported missing by someone looking at it. */}
+        <Button type="button" variant="secondary" size="sm" loading={pending} onClick={confirmAll}>
           <Check size={13} aria-hidden />
           Confirm all {targets.length} · free
         </Button>
