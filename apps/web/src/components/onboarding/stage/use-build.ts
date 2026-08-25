@@ -5,13 +5,14 @@ import type { BrandMemoryPayload } from '@sahoda/shared'
 
 import { saveBrandMemory, type BrandMemorySource } from '@/app/actions/brand-resolve'
 import { resolveOnboarding } from '@/app/actions/onboarding-resolve'
+import { addCompetitor } from '@/app/actions/radar'
 import { saveWorkspaceTheme } from '@/app/actions/theme'
 import { refineWithDoorText } from '@/lib/onboarding/classify'
 import { storedIntakeFrom } from '@/lib/onboarding/to-stored-intake'
 
 import { doorColors, doorText, type DoorOutcome } from './door-outcome'
 import type { OrbHandle } from './orb'
-import type { OnboardingData } from './store'
+import type { OnboardingData, Rival } from './store'
 import { waitForDoor } from './wait-for-door'
 
 /**
@@ -96,6 +97,15 @@ export function useBuild({
   const [failure, setFailure] = useState<BuildFailure | null>(null)
   const [brain, setBrain] = useState<BrandMemoryPayload | null>(null)
   const [brainSource, setBrainSource] = useState<BrandMemorySource>('resolved')
+  /**
+   * What became of the watch list, when some of it did not land.
+   *
+   * `null` covers both "there were none to send" and "every one landed", which
+   * are the two cases with nothing to say. A partial failure must not be
+   * silent — the brain is built and charged by then, so losing a competitor
+   * quietly would leave the person believing a page is being watched.
+   */
+  const [watchListNote, setWatchListNote] = useState<string | null>(null)
   const [wasFree, setWasFree] = useState(false)
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -273,6 +283,18 @@ export function useBuild({
 
       setBrain(state.brain)
       setBrainSource(state.kind === 'fallback' ? 'system' : 'resolved')
+
+      /**
+       * The watch list, sent to the same action the Radar screen uses.
+       *
+       * AFTER the resolve and never before it, and it cannot fail the build.
+       * By this line the brain exists and the credits are spent; throwing that
+       * away because a competitor URL was malformed would lose the expensive
+       * half to protect the free one. Rows without an address are skipped
+       * rather than sent — a session saved before this screen asked for one
+       * comes back holding them, and `addCompetitor` would refuse them anyway.
+       */
+      setWatchListNote(await sendWatchList(data.competitors))
       setWasFree(state.kind === 'free')
       setFallbackMessage(state.kind === 'fallback' ? state.message : null)
 
@@ -386,6 +408,7 @@ export function useBuild({
     failure,
     wasFree,
     fallbackMessage,
+    watchListNote,
     saving,
     saveError,
     themeError,
@@ -393,6 +416,43 @@ export function useBuild({
     dismiss,
     finish,
   }
+}
+
+/**
+ * Put the competitors on the Radar watch list, and say what did not land.
+ *
+ * Sequential rather than `Promise.all`: each call is a workspace-scoped write
+ * behind RLS, and firing five at once at a free-tier database to save a few
+ * hundred milliseconds on a screen the user is already watching an animation on
+ * is a bad trade. Returns `null` when there is nothing to report.
+ */
+async function sendWatchList(rivals: readonly Rival[]): Promise<string | null> {
+  const sendable = rivals.filter((r) => r.url.trim() !== '')
+  const failed: string[] = []
+  for (const rival of sendable) {
+    try {
+      const result = await addCompetitor(rival.name, rival.url, rival.kind)
+      if (!result.ok) failed.push(rival.name)
+    } catch {
+      // A throw and an `ok: false` are the same outcome to the person reading
+      // the sentence: this one is not being watched.
+      failed.push(rival.name)
+    }
+  }
+  const skipped = rivals.length - sendable.length
+  if (failed.length === 0 && skipped === 0) return null
+  const parts: string[] = []
+  if (failed.length > 0) {
+    parts.push(
+      `Sahoda could not add ${failed.join(', ')} to your watch list. Your Brand Brain is saved. Add ${failed.length === 1 ? 'it' : 'them'} again on Radar.`,
+    )
+  }
+  if (skipped > 0) {
+    parts.push(
+      `${skipped} ${skipped === 1 ? 'competitor has' : 'competitors have'} no address, so ${skipped === 1 ? 'it was' : 'they were'} not added to the watch list.`,
+    )
+  }
+  return parts.join(' ')
 }
 
 /**

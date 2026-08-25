@@ -23,6 +23,7 @@
  * counter to drift, and clearing an answer removes its signal rather than
  * leaving a credit for something no longer held.
  */
+import { isCompetitorKind, type CompetitorKind } from '@/lib/radar/types'
 
 /** A colour the user actually moved off its default. See `signalIds`. */
 export type SwatchKey = 'Primary' | 'Secondary' | 'Background'
@@ -38,6 +39,25 @@ export interface RefLink {
 export interface DocFile {
   name: string
   size: number
+}
+
+/**
+ * A competitor, in the vocabulary Radar actually stores.
+ *
+ * `kind` and the three values it may take are NOT redefined here: they are
+ * `CompetitorKind` from `@/lib/radar/types`, the same union `addCompetitor`
+ * validates against. A second spelling of that list is how a screen ends up
+ * offering a kind the write path rejects.
+ *
+ * This used to be a bare string. It was collected, kept in localStorage and
+ * never sent anywhere, under a card that read "tracked for positioning" — so
+ * the shape had no reason to carry an address. It is sent now, and Radar needs
+ * a public URL to watch and a kind to know what it is looking at.
+ */
+export interface Rival {
+  name: string
+  url: string
+  kind: CompetitorKind
 }
 
 export interface OnboardingData {
@@ -62,7 +82,7 @@ export interface OnboardingData {
   refs: RefLink[]
   refNote: string
   sources: string[]
-  competitors: string[]
+  competitors: Rival[]
 }
 
 /**
@@ -133,7 +153,7 @@ export function signalIds(data: OnboardingData): string[] {
   for (const ref of data.refs) ids.push(`ref:${ref.url}`)
   if (data.refNote.trim()) ids.push('refnote')
   for (const source of data.sources) ids.push(`src:${source}`)
-  for (const rival of data.competitors) ids.push(`comp:${rival}`)
+  for (const rival of data.competitors) ids.push(`comp:${rival.name}`)
   return ids
 }
 
@@ -295,7 +315,30 @@ export function loadState(workspaceId: string): OnboardingState | null {
       refs: arr<RefLink>(saved.refs).filter((r) => r && typeof r.url === 'string'),
       refNote: str(saved.refNote),
       sources: arr<string>(saved.sources).filter((s) => typeof s === 'string'),
-      competitors: arr<string>(saved.competitors).filter((s) => typeof s === 'string'),
+      /**
+       * Reads BOTH shapes. A session saved before competitors carried an
+       * address comes back as `string[]`, and dropping those rows would lose
+       * answers somebody already gave us — a resume that silently forgets is
+       * worse than one that comes back incomplete. An old row keeps its name,
+       * gets an empty url and defaults to `website`, which is the kind the
+       * Radar form itself opens on. It cannot be sent until the url is filled,
+       * and the step shows it needing one.
+       */
+      competitors: arr<unknown>(saved.competitors)
+        .map((row): Rival | null => {
+          if (typeof row === 'string') {
+            return row.trim() ? { name: row, url: '', kind: 'website' } : null
+          }
+          if (!row || typeof row !== 'object') return null
+          const r = row as Partial<Rival>
+          if (typeof r.name !== 'string' || !r.name.trim()) return null
+          return {
+            name: r.name,
+            url: typeof r.url === 'string' ? r.url : '',
+            kind: isCompetitorKind(r.kind) ? r.kind : 'website',
+          }
+        })
+        .filter((r): r is Rival => r !== null),
     },
   }
 }

@@ -43,7 +43,7 @@ describe('signalIds — the count is what was actually given', () => {
         { url: 'b.com', host: 'b.com', kind: 'Website' },
       ],
       sources: ['Website', 'Instagram'],
-      competitors: ['Rival'],
+      competitors: [{ name: 'Rival', url: 'https://rival.com', kind: 'website' }],
     })
     expect(signalCount(d)).toBe(5)
   })
@@ -129,7 +129,10 @@ describe('confidenceOf — derived, and never a full bar', () => {
       })),
       refNote: 'calm, unhurried',
       sources: ['Website', 'Instagram', 'Notion'],
-      competitors: ['Blossom', 'Champaca'],
+      competitors: [
+        { name: 'Blossom', url: 'https://blossom.in', kind: 'website' },
+        { name: 'Champaca', url: 'https://instagram.com/champaca', kind: 'instagram' },
+      ],
     })
     const c = confidenceOf(everything)
     expect(signalCount(everything)).toBeGreaterThan(16)
@@ -151,7 +154,13 @@ describe('energyOf — the orb reads a different denominator on purpose', () => 
   })
 
   it('is clamped at 1', () => {
-    const many = data({ competitors: Array.from({ length: 40 }, (_, i) => `c${i}`) })
+    const many = data({
+      competitors: Array.from({ length: 40 }, (_, i) => ({
+        name: `c${i}`,
+        url: `https://c${i}.com`,
+        kind: 'website' as const,
+      })),
+    })
     expect(energyOf(many)).toBe(1)
   })
 })

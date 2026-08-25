@@ -471,6 +471,7 @@ export function OnboardingStage({
         door={door}
         wasFree={build.wasFree}
         fallbackMessage={build.fallbackMessage}
+        watchListNote={build.watchListNote}
         saving={build.saving || launching}
         saveError={build.saveError}
         themeError={build.themeError}
