@@ -117,6 +117,33 @@ export function WhatStep({ data, patch }: StepProps) {
             </p>
           </div>
         ) : null}
+        {/* WHAT THEY WILL NOT CLAIM, beside what they do.
+            Feeds `taboo.avoid_topics`, which was empty on every resolve — the
+            flow stopped asking, so every Red line on /brain was the model's
+            invention. Optional, and a blank stays blank: the reason the
+            question was dropped was that GUESSING here creates a binding rule,
+            and asking is not guessing. */}
+        <p className="label" style={{ margin: '22px 0 11px' }}>
+          Anything Sahoda should never say?
+        </p>
+        <div className="field">
+          <input
+            className="inp"
+            id="f-never"
+            type="text"
+            value={data.neverSay}
+            onChange={(e) => patch({ neverSay: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.preventDefault()
+            }}
+            placeholder="No discounts, never call us cheap, no medical claims"
+            aria-label="Anything Sahoda should never say"
+          />
+        </div>
+        <p className="micro" style={{ marginTop: 7, opacity: 0.72 }}>
+          Optional. This becomes a red line on your Brand Brain, and Sahoda writes around it.
+        </p>
+
         {/* A statement of intent about what happens next, not a finding. */}
         <AiLine show={Boolean(data.category)}>
           Got it, <em>{data.category}</em>. I&rsquo;ll weight channels and formats that actually

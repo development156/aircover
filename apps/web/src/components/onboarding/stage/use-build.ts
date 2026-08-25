@@ -260,10 +260,27 @@ export function useBuild({
       form.set('regime', classified.intake.regime)
       form.set('locale', classified.intake.locale)
       form.set('doorText', doorText(settled))
-      // The flow no longer asks for a tone-to-avoid — it is set on /brain against
-      // real output. A blank is a truthful "we were not told"; a guess here would
-      // become a red line the model treats as binding.
-      form.set('refusal', '')
+      /**
+       * The answers screen 02 and 03 collect, which used to stop at the browser.
+       *
+       * Until now this form carried model, regime, locale, doorText, an empty
+       * refusal and a name. Everything else a person typed over six screens was
+       * read for keywords by the classifier and then dropped — age, location,
+       * role and interests reached nothing at all, and the positioning sentence
+       * survived only as three enum values.
+       *
+       * `refusal` was hardcoded empty with the note that "a guess here would
+       * become a red line the model treats as binding". That reasoning is about
+       * guessing, and it stands: this sends what the person actually wrote, and
+       * an untouched field still sends nothing.
+       */
+      form.set('refusal', data.neverSay.trim())
+      form.set('positioning', data.what.trim())
+      form.set('audience', data.audience.trim())
+      form.set('audienceAge', data.age.trim())
+      form.set('audienceLoc', data.loc.trim())
+      form.set('audienceRole', data.role.trim())
+      form.set('audienceInterests', data.interests.trim())
       form.set(
         'name',
         data.name.trim() || (settled.kind === 'read' ? settled.foundName : '') || workspaceName,

@@ -81,6 +81,19 @@ export interface OnboardingData {
   docs: DocFile[]
   refs: RefLink[]
   refNote: string
+  /**
+   * What Sahoda must never say about them, in their words.
+   *
+   * This feeds `taboo.avoid_topics`, which was empty on EVERY resolve until
+   * now: `use-build.ts` hardcoded `refusal: ''`, so every Red line on /brain was
+   * invented by the model with nothing from the user behind it.
+   *
+   * The field was removed once, deliberately, and the reason is worth keeping:
+   * "a guess here would become a red line the model treats as binding". That
+   * argument is about GUESSING on the user's behalf, and it still holds — this
+   * asks instead, and a blank stays blank rather than becoming an inferred rule.
+   */
+  neverSay: string
   sources: string[]
   /**
    * The address given for each picked source, keyed by its `SOURCES` key.
@@ -124,6 +137,7 @@ export const DEFAULT_DATA: OnboardingData = {
   refs: [],
   refNote: '',
   sources: [],
+  neverSay: '',
   sourceUrls: {},
   competitors: [],
 }
@@ -163,6 +177,7 @@ export function signalIds(data: OnboardingData): string[] {
   data.docs.forEach((doc, i) => ids.push(`doc:${doc.name}${i}`))
   for (const ref of data.refs) ids.push(`ref:${ref.url}`)
   if (data.refNote.trim()) ids.push('refnote')
+  if (data.neverSay.trim()) ids.push('neversay')
   for (const source of data.sources) ids.push(`src:${source}`)
   for (const rival of data.competitors) ids.push(`comp:${rival.name}`)
   return ids
@@ -325,6 +340,7 @@ export function loadState(workspaceId: string): OnboardingState | null {
       docs: arr<DocFile>(saved.docs).filter((d) => d && typeof d.name === 'string'),
       refs: arr<RefLink>(saved.refs).filter((r) => r && typeof r.url === 'string'),
       refNote: str(saved.refNote),
+      neverSay: str(saved.neverSay),
       sources: arr<string>(saved.sources).filter((s) => typeof s === 'string'),
       // Values only; the keys are whatever was picked and are checked against
       // SOURCES at the point of use, not here.
