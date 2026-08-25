@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { CreditCard, Info } from 'lucide-react'
+import { Check, CreditCard, Info } from 'lucide-react'
 import { PLAN_CATALOG, type PlanCatalogEntry, type PlanId } from '@sahoda/shared'
 
 import { startCheckout } from '@/app/actions/wallet'
@@ -22,6 +22,27 @@ const PAID_PLANS: readonly PlanCatalogEntry[] = Object.values(PLAN_CATALOG).filt
 const DEFAULT_PLAN: PlanId = 'starter'
 
 const inr = (value: number): string => value.toLocaleString('en-IN')
+
+/**
+ * What a plan lifts besides credits, READ OFF `limits` rather than written.
+ *
+ * A hand-written feature list here would be a second copy of the entitlements,
+ * and the one that drifts is always the copy — `cheapestPlanWithAtLeast` exists
+ * in `packages/shared` for exactly this reason, and its own comment records a
+ * hand-written upgrade sentence that named a plan three times the price of the
+ * one the customer needed. Derived lines cannot make that mistake.
+ *
+ * `loopLevel` and `twinSize` are deliberately absent: they are internal scales,
+ * not quantities a person buying credits can act on.
+ */
+function planIncludes(entry: PlanCatalogEntry): string[] {
+  const { channels, sites, seats } = entry.limits
+  return [
+    `${channels} connected ${channels === 1 ? 'channel' : 'channels'}`,
+    `${sites} published ${sites === 1 ? 'site' : 'sites'}`,
+    `${seats} ${seats === 1 ? 'seat' : 'seats'}`,
+  ]
+}
 
 export function TopUpPanel() {
   const [planId, setPlanId] = useState<PlanId>(DEFAULT_PLAN)
@@ -49,7 +70,7 @@ export function TopUpPanel() {
         </p>
       </div>
 
-      <fieldset disabled={pending} className="space-y-2">
+      <fieldset disabled={pending} className="grid gap-3 wide:grid-cols-3">
         <legend className="sr-only">Choose a plan</legend>
         {PAID_PLANS.map((entry) => {
           const checked = entry.id === planId
@@ -68,55 +89,120 @@ export function TopUpPanel() {
                *
                * docs/37 §2.3: the accent is spent on the one thing the screen
                * is for. Selection is carried by signals that cost almost
-               * nothing — a real fill step, a firmer ring, and the radio's own
-               * dot, which keeps `accent-primary` because a 13px dot is where a
-               * brand mark is unambiguous and cheap.
+               * nothing — a real fill step and a firmer ring.
                *
                * ── THE WASH IS FREE, AND THAT IS WHY IT IS THE ONE ORANGE ────
                * `--brand-wash` is `rgba(255,102,0,0.06)`, and
                * `accent-area-budget.spec.ts` skips any paint under alpha 0.08.
-               * So the selected row reads unmistakably orange and charges the
+               * So the selected card reads unmistakably orange and charges the
                * budget NOTHING. `--brand-lift` (0.4) as a border would be
-               * charged its whole box — 68,000px2 on a row this size, which is
-               * the 89% failure above, rediscovered.
+               * charged its whole box, which on a card this size is the 89%
+               * failure above, rediscovered. THE SAME RULE BINDS THE CARD
+               * LAYOUT: three cards are three times the area, so a charged
+               * border here would be three times as bad as the row it replaced.
                *
                * Ring, not border, in BOTH states: §6 refuses the two together,
-               * and an inset ring cannot reflow the row when the edge firms up.
+               * and an inset ring cannot reflow the card when the edge firms up.
                */
               className={cn(
-                'flex cursor-pointer items-center gap-3 rounded-input px-3.5 py-3 transition-micro',
-                checked ? 'surface-ring-firm bg-brand-wash' : 'surface-ring hover:bg-s2',
+                'flex cursor-pointer flex-col rounded-card p-4 transition-micro',
+                'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2',
+                checked ? 'surface-ring-firm bg-brand-wash' : 'surface-ring bg-surface hover:bg-s2',
                 pending && 'cursor-not-allowed opacity-45',
               )}
             >
+              {/* THE RADIO IS THE SELECTION, still. It is visually hidden rather
+                  than removed: the native control is what gives this group
+                  arrow-key navigation, a name, and a checked state a screen
+                  reader can report. `peer` hands its focus ring to the card, so
+                  keyboard focus stays visible with no control drawn. */}
               <input
                 type="radio"
                 name="plan"
                 value={entry.id}
                 checked={checked}
                 onChange={() => setPlanId(entry.id)}
-                className="accent-primary"
+                className="peer sr-only"
               />
 
-              {/* NAME AND WHAT YOU GET, left. Both from PLAN_CATALOG. */}
-              <span className="min-w-0 flex-1">
-                <span className="block type-body font-semibold text-ink">{entry.name}</span>
-                <span className="block type-meta text-muted">
-                  <span className="num">{inr(entry.monthlyCredits)}</span>{' '}
-                  {creditWord(entry.monthlyCredits)} each month
-                </span>
+              <span className="block type-h3">{entry.name}</span>
+
+              {/* THE PRICE IS THE OBJECT. `.num` is tabular so the three line up
+                  down the row; the cadence sits on the baseline beside it
+                  rather than under it, because "per month" modifies the figure
+                  and a stacked label reads as a separate fact. */}
+              <span className="mt-3 flex items-baseline gap-1.5">
+                <span className="type-hero-num num text-ink">₹{inr(entry.priceInr)}</span>
+                <span className="type-sm text-muted">per month</span>
+              </span>
+              <span className="mt-label-gap block type-meta text-muted">
+                about $<span className="num">{inr(entry.priceUsd)}</span>
               </span>
 
-              {/* WHAT IT COSTS, right, in a column of its own so the three
-                  prices line up and can be compared down the edge. `.num` is
-                  tabular; a right-aligned column is what makes that legible. */}
-              <span className="shrink-0 text-right">
-                <span className="block type-body font-semibold text-ink">
-                  ₹<span className="num">{inr(entry.priceInr)}</span>
-                  <span className="type-meta font-normal text-muted"> /month</span>
-                </span>
-                <span className="block type-meta text-muted">
-                  about $<span className="num">{inr(entry.priceUsd)}</span>
+              {/* WHAT THE MONEY BUYS, which on this product is credits and not
+                  seats. Stated before the control, never after. */}
+              <span className="mt-3 block type-sm text-muted">
+                <span className="num font-semibold text-ink">{inr(entry.monthlyCredits)}</span>{' '}
+                {creditWord(entry.monthlyCredits)} granted each month
+              </span>
+
+              {/* ── THE AFFORDANCE IS A SPAN, AND IT IS NOT A FAKE CONTROL ────
+                  The whole card is the label, so clicking here really does
+                  select this plan. A nested <button> would fight the label for
+                  the click and announce a second control for one choice, which
+                  is the "two vocabularies for one slot" shape this codebase
+                  keeps ruling against. The radio above carries the semantics.
+
+                  It is `text-accent` on the card's own wash, never a
+                  `--brand-lift` border: colour on TEXT is a few hundred px2,
+                  a border is the whole box. */}
+              <span
+                aria-hidden
+                className={cn(
+                  'mt-4 flex min-h-[36px] items-center justify-center gap-1.5 rounded-input px-3 type-sm font-semibold transition-micro',
+                  'text-ink',
+                  checked ? 'surface-ring-firm' : 'surface-ring',
+                )}
+              >
+                {/* THE ACCENT LIVES ON THE GLYPH, NOT THE WORD, and that is
+                    arithmetic rather than taste. `accent-area-budget.spec.ts`
+                    charges a coloured TEXT element 10% of its own box, and only
+                    when it owns a text node directly. `text-accent` on this span
+                    is ~314x36x0.1 = 1,130px2 at 1440 — against roughly 1,400px2
+                    of headroom under /wallet's 6,000 ceiling, which is the same
+                    80%-of-headroom trap `size="lg"` was reverted for above. An
+                    <svg> owns no text node, so the tick is charged NOTHING and
+                    reads just as orange. */}
+                {checked ? (
+                  <Check size={14} strokeWidth={2.5} aria-hidden className="text-accent" />
+                ) : null}
+                {checked ? 'Selected' : 'Select plan'}
+              </span>
+
+              {/* WHAT ELSE THE PLAN LIFTS, DERIVED from PLAN_CATALOG.limits
+                  rather than written. A hand-written line here would be a
+                  second copy of the entitlements and would drift from the one
+                  `checkEntitlement` actually enforces. `mt-auto` puts it on the
+                  card's floor so three cards of different content still align.
+
+                  NO "Popular" or "Best value" chip, which the reference carries
+                  on its middle card. Nothing in this codebase counts how many
+                  workspaces chose a plan, so the chip would be a claim about
+                  other customers that no query can support. */}
+              <span className="mt-auto block border-t border-line-soft pt-3">
+                <span className="block type-eyebrow text-ink-mute">Includes</span>
+                <span className="mt-1.5 block space-y-1">
+                  {planIncludes(entry).map((line) => (
+                    <span key={line} className="flex items-start gap-1.5 type-sm text-muted">
+                      <Check
+                        size={13}
+                        strokeWidth={2.5}
+                        aria-hidden
+                        className="mt-icon-nudge shrink-0 text-ink-mute"
+                      />
+                      <span>{line}</span>
+                    </span>
+                  ))}
                 </span>
               </span>
             </label>
