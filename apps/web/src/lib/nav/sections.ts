@@ -70,7 +70,36 @@ import type { NavIconName } from '@/components/shell/nav-item'
  * (`readLoop`, `readRanking`, `readPlaybooksSnapshot`) and render rows out of
  * the database; `/studio` and `/ads` open no read at all and are drawings.
  * `/radar` reads live but its own page says the weekly scan is not built, so it
- * stays `soon` — a person still cannot use it today.
+ * stays `soon` — a person still cannot use it today. (SUPERSEDED 2026-08-25;
+ * see the block below. The sentence is kept because the ruling that replaced it
+ * only makes sense against what it replaced.)
+ *
+ * ── RADAR IS IN THE RAIL (2026-08-25) ────────────────────────────────────────
+ * Founder's ruling, from a screenshot: "Radar is not showing on sidebar, only
+ * showing on search bar." It is `live` now, and the two facts that make that
+ * honest rather than a loosening were both MEASURED against the production
+ * database on the day:
+ *
+ *   · All five tables exist — `competitors`, `competitor_sources`,
+ *     `competitor_snapshots`, `competitor_changes`, `competitor_subscriptions`
+ *     — each with RLS policies on it.
+ *   · A member can really subscribe. `public.radar_subscribe` is granted to
+ *     `authenticated` and `lib/radar/store.ts` is bound to it, so adding a
+ *     business to the watch list writes a row and removing one deletes it.
+ *
+ * `roadmap-honesty.spec.ts` had already reached the same conclusion from the
+ * other direction and dropped `/radar` from its ALLOWED list, with the reasoning
+ * written out at the removal: "a screen that reads a real table and states
+ * precisely which half of itself is unbound is not a roadmap section". This flag
+ * was the last place still calling it one.
+ *
+ * WHAT IS STILL NOT BUILT, so that `live` is not read as more than it says: the
+ * weekly scan does not run. `runRadarPass` exists in `apps/jobs/src/radar/` and
+ * nothing calls it but its own tests and a manual script — there is no
+ * `schedules.task` for it — so every one of those five tables is EMPTY. The
+ * screen says so itself, in its own words, rather than drawing an empty feed as
+ * "nothing changed". `live` here means the section works as far as it claims to,
+ * which is the same standard every other `live` section is held to.
  *
  * So three of the six SOON labels the rail was showing were on working screens.
  * Correcting them is not a loosening: it removes the word from three sections
@@ -250,7 +279,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: 'radar',
         guide: 'nav.radar',
         hint: 'What the businesses beside you are doing',
-        state: 'soon',
+        // `live` since 2026-08-25 — see "RADAR IS IN THE RAIL" in the header.
+        state: 'live',
       },
     ],
   },

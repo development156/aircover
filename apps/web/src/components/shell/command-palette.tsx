@@ -170,7 +170,39 @@ export function CommandPalette() {
 
       {open ? (
         <div
-          className="fixed inset-0 z-40 flex items-start justify-center bg-ink/30 p-4 pt-[12vh]"
+          data-palette-overlay
+          /**
+           * `bg-[var(--scrim)]`, NOT `bg-ink/30`. Same ruling `modal.tsx` carries
+           * at its own backdrop, and this was the one overlay in the app that
+           * ignored it.
+           *
+           * ── WHAT `bg-ink/30` ACTUALLY PAINTED ──────────────────────────────
+           * MEASURED 2026-08-25 in Chromium against the real tokens:
+           *
+           *   light  page rgb(250) -> rgb(175). Dimmer, but 30% where the token
+           *          says 40%.
+           *   dark   `--ink` IS `#ffffff`. The overlay was WHITE at 30% and it
+           *          LIT the page: rgb(13) -> rgb(86), luminance 0.004 -> 0.093,
+           *          a 23x lift. The page ended up BRIGHTER than the panel over
+           *          it, so the palette read as a hole punched in a page that had
+           *          just been washed out. An inverted scrim is worse than none.
+           *
+           * And the compiled CSS carries a second, worse rule. Tailwind emits an
+           * alpha utility as a PAIR:
+           *
+           *   .bg-ink\/30{background-color:var(--ink)}
+           *   @supports (color:color-mix(in lab,red,red)){ .bg-ink\/30{…30%…} }
+           *
+           * so a browser without `color-mix` got a FULLY OPAQUE viewport-filling
+           * rectangle — solid black on light, solid white on dark. That is the
+           * black background this was reported as, and it is the same shape as
+           * the `glass` fallback fixed the day before: a declaration nobody
+           * checked because the supported path looked right.
+           *
+           * `--scrim` is a plain `rgb(0 0 0 / a)` in both themes. One rule, no
+           * `@supports` pair, no theme inversion, nothing to get wrong.
+           */
+          className="fixed inset-0 z-40 flex items-start justify-center bg-[var(--scrim)] p-4 pt-[12vh]"
           onClick={close}
           role="presentation"
         >
@@ -200,23 +232,61 @@ export function CommandPalette() {
              * `shadow-lg` and the ring do the lifting instead: the panel reads
              * as floating because of its edge and its shadow, not because the
              * page shows through it.
+             *
+             * ── AND IN DARK THE FILL CANNOT DO IT, SO THE EDGE MUST ──────────
+             * `dark:bg-surface-3`, not `bg-surface` in both. MEASURED against
+             * the real tokens with the scrim corrected:
+             *
+             *   light  panel #ffffff over a scrimmed rgb(150)  2.96:1
+             *   dark   panel --surface rgb(23) over rgb(5)     1.14:1
+             *          panel --surface-3 rgb(41) over rgb(5)   1.40:1
+             *
+             * Darkening the page harder cannot help in dark — black minus more
+             * black is still black — so the panel climbs to the TOP of the
+             * elevation ladder instead, which is what `--surface` already is in
+             * light. Even then 1.40:1 is a step, not a separation, which is why
+             * `surface-ring-firm` replaced `surface-ring`: apps/web/CLAUDE.md's
+             * standing rule is that anything which must read as a distinct
+             * object in dark carries its own edge, because the fills are 1.04:1
+             * apart and cannot.
              */
-            className="surface-ring w-full max-w-[520px] overflow-hidden rounded-xl bg-surface shadow-lg"
+            className="surface-ring-firm w-full max-w-[520px] overflow-hidden rounded-xl bg-surface shadow-lg dark:bg-surface-3"
           >
-            <div className="flex items-center gap-2 border-b border-line-soft px-3">
-              <Search size={15} className="shrink-0 text-muted" aria-hidden />
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value)
-                  setCursor(0)
-                }}
-                onKeyDown={onInputKey}
-                placeholder="Go to…"
-                aria-label="Search destinations"
-                className="h-[46px] w-full bg-transparent text-[13px] text-ink outline-none placeholder:text-muted"
-              />
+            {/*
+              THE SEARCH ROW IS INSET, AND THAT IS A BUG FIX RATHER THAN A STYLE.
+
+              tokens.css paints `:focus-visible` UNLAYERED — a 2px outline at 2px
+              offset plus a 4px shadow spread, so 4px beyond the focused box on
+              every side — which outranks the `outline-none` this input used to
+              carry. That class removed nothing; it only made the source read as
+              though it had.
+
+              The input is also focused the whole time the palette is open, so
+              that ring is not a focus state a reader sees arrive. It is simply
+              part of the panel, permanently, and it has to sit somewhere sane.
+
+              MEASURED with the old full-bleed 46px input in a 12px-padded row:
+              the ring's top edge landed 4px ABOVE the panel's own top edge, and
+              `--r-xl` is 28px, so it cut straight across the rounded corner and
+              the divider. Inset like this it sits 7px inside the top where the
+              corner needs 2.3px, and 17px inside the right edge.
+            */}
+            <div className="p-2.5">
+              <div className="flex items-center gap-2 rounded-lg border border-line bg-bg px-2.5">
+                <Search size={15} className="shrink-0 text-muted" aria-hidden />
+                <input
+                  ref={inputRef}
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value)
+                    setCursor(0)
+                  }}
+                  onKeyDown={onInputKey}
+                  placeholder="Go to…"
+                  aria-label="Search destinations"
+                  className="h-[38px] w-full rounded-sm bg-transparent type-sm text-ink placeholder:text-muted"
+                />
+              </div>
             </div>
 
             {results.length === 0 ? (
@@ -227,7 +297,7 @@ export function CommandPalette() {
                 Nothing here matches “{query.trim()}”. This searches pages, not content.
               </p>
             ) : (
-              <ul className="max-h-[320px] overflow-y-auto p-2">
+              <ul className="max-h-[320px] overflow-y-auto px-2.5 pb-2.5">
                 {results.map((destination, index) => (
                   <li key={destination.href}>
                     <Link
