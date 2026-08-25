@@ -62,7 +62,7 @@
  * because the way to check a claim like this is to go and read the file it names,
  * and doing that here produces "no such file" rather than "no such guard".
  */
-export type CronJob = 'sweeps' | 'metrics' | 'loop' | 'playbooks'
+export type CronJob = 'sweeps' | 'metrics' | 'loop' | 'playbooks' | 'brain'
 
 export interface CronSchedule {
   /** How often the job is scheduled, in ms. From the cron expression, not a guess. */
@@ -102,6 +102,12 @@ export const CRON_SCHEDULES: Record<CronJob, CronSchedule> = {
   // seven-day lead time checked once a week would miss a festival entirely
   // whenever the check landed on the wrong side of it.
   playbooks: { periodMs: 24 * HOUR, missesBeforeStopped: 2, label: 'Daily Playbook check' },
+  // `30 21 * * 0` — Sunday evening, half an hour after the Loop.
+  //
+  // Same one-miss tolerance as the Loop, for the same reason: a weekly job has
+  // no delivery-hiccup tolerance to spend, because for seven days a hiccup and
+  // an outage look identical.
+  brain: { periodMs: 7 * 24 * HOUR, missesBeforeStopped: 1, label: 'Weekly Marketing Brain pass' },
 }
 
 export type HeartbeatState = 'beating' | 'late' | 'stopped' | 'unknown'

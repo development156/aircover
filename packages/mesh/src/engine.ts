@@ -15,6 +15,7 @@ import { FREE_PDF_ENGINE } from './providers/openrouter'
 import type { LogSink, ProviderLogRow } from './telemetry'
 import type { BrandContextProvider } from './brand-context'
 import type { KnowledgeContextProvider } from './knowledge-context'
+import type { MarketContextProvider } from './market-context'
 
 /** One ordered provider+model to try for a task (primary OpenRouter, then OpenAI). */
 export interface Attempt {
@@ -39,6 +40,7 @@ export interface MeshTaskSpec<I, O> {
     ctx: MeshContext,
     brand?: ChatMessage,
     knowledge?: ChatMessage,
+    market?: ChatMessage,
   ) => ChatMessage[]
   /**
    * The text to retrieve library passages against — the brief the model is about
@@ -52,6 +54,17 @@ export interface MeshTaskSpec<I, O> {
    * share a switch.
    */
   knowledgeQuery?: (input: I) => string
+  /**
+   * Whether this task should be told what the Marketing Brain has measured.
+   *
+   * A boolean and not a function, unlike `knowledgeQuery`, because there is
+   * nothing to select on: a workspace has a handful of observations and every
+   * one of them bears on what to write. A third flag rather than a third meaning
+   * for either of the two above, for the reason the knowledge one gives — these
+   * three blocks have three different lifetimes (per brand version, per request,
+   * per week) and must not share a switch.
+   */
+  wantsMarketContext?: boolean
   /** brand_guidelines only — served (flagged) on a double JSON failure. */
   fallbackPayload?: (input: I) => O
 }
@@ -87,6 +100,8 @@ export interface MeshRunnerDeps {
   brandContext?: BrandContextProvider
   /** Retrieves library passages for tasks declaring `knowledgeQuery` (best-effort). */
   knowledgeContext?: KnowledgeContextProvider
+  /** Retrieves observations for tasks declaring `wantsMarketContext` (best-effort). */
+  marketContext?: MarketContextProvider
   /**
    * Called whenever a first attempt fails its schema. Best-effort observability
    * — it must never break the user's action, so it is wrapped in a try.
@@ -231,7 +246,7 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
     // a fetch hiccup must never fail a paid action; the model still returns real
     // output, just less grounded. Concurrent because they are two independent
     // reads and a user is waiting on the sum of them.
-    const [brand, knowledge] = await Promise.all([
+    const [brand, knowledge, market] = await Promise.all([
       (async (): Promise<ChatMessage | undefined> => {
         if (def.cachePrefix !== 'brand_context' || !deps.brandContext) return undefined
         try {
@@ -249,9 +264,17 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
           return undefined /* proceed without passages */
         }
       })(),
+      (async (): Promise<ChatMessage | undefined> => {
+        if (!spec.wantsMarketContext || !deps.marketContext) return undefined
+        try {
+          return (await deps.marketContext.get(ctx.workspaceId)) ?? undefined
+        } catch {
+          return undefined /* proceed without observations */
+        }
+      })(),
     ])
 
-    const messages = spec.buildMessages(input, ctx, brand, knowledge)
+    const messages = spec.buildMessages(input, ctx, brand, knowledge, market)
 
     // A file may only go to a provider that can honour an explicit PDF engine.
     // The chain is [OpenRouter, OpenAI] and only the first has the file-parser

@@ -55,3 +55,7 @@ export * from './ops/qa-export'
 
 export * from './radar/snapshot'
 export * from './radar/diff'
+
+// The Marketing Brain (docs/51, docs/53) — computed observations about how a
+// brand is performing. Stored apart from the Brand Brain and never user-edited.
+export * from './brain/observations'

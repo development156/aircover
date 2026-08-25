@@ -67,6 +67,8 @@ function buildMessages(
   input: PlanWeekInput,
   _ctx: MeshContext,
   brand?: ChatMessage,
+  _knowledge?: ChatMessage,
+  market?: ChatMessage,
 ): ChatMessage[] {
   const channels: Channel[] = input.channels
   const today = isoDay(input.nowIso)
@@ -85,9 +87,14 @@ function buildMessages(
       : []),
     'Plan exactly 5 briefs for the coming week.',
   ].join('\n')
+  // Brand before market, deliberately. The Brand Brain is who this business
+  // says it is and the Marketing Brain is what its numbers show; when the two
+  // pull in different directions the brand wins, and the order the model reads
+  // them in is the cheapest way to say so.
   return [
     { role: 'system', content: SYSTEM },
     ...(brand ? [brand] : []),
+    ...(market ? [market] : []),
     { role: 'user', content: user },
   ]
 }
@@ -96,4 +103,14 @@ function buildMessages(
 export const planWeekTask: MeshTaskSpec<PlanWeekInput, PlanWeekOutput> = {
   def,
   buildMessages,
+  /**
+   * The FIRST and only task reading the Marketing Brain, on purpose.
+   *
+   * docs/53's build order: one task means the effect is attributable. If next
+   * week's plans get better, nothing else moved; if they get worse, there is one
+   * thing to turn off. Planning is also the task with the most to gain — it is
+   * the one place where "your Tuesday posts do better" changes what gets made
+   * rather than how a sentence is worded.
+   */
+  wantsMarketContext: true,
 }

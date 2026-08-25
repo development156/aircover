@@ -16,6 +16,7 @@ import { createOpenAIProvider } from './providers/openai'
 import { createPostgrestLogSink } from './telemetry'
 import { createPostgrestBrandContext } from './brand-context'
 import { createPostgrestKnowledgeContext } from './knowledge-context'
+import { createPostgrestMarketContext } from './market-context'
 import {
   createMeshRunner,
   type Attempt,
@@ -126,6 +127,16 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
     fetchImpl: opts.fetchImpl,
   })
 
+  // What the Marketing Brain has measured, for tasks declaring
+  // `wantsMarketContext`. Same service key and the same best-effort contract as
+  // the two blocks above; see market-context.ts for why the `workspace_id`
+  // filter there is the whole tenant boundary.
+  const marketContext = createPostgrestMarketContext({
+    supabaseUrl: cfg.supabaseUrl,
+    serviceKey: cfg.supabaseServiceKey,
+    fetchImpl: opts.fetchImpl,
+  })
+
   const runner = createMeshRunner({
     planAttempts,
     logSink,
@@ -133,6 +144,7 @@ export function createMesh(opts: CreateMeshOptions = {}): Mesh {
     price: estimateCostUsd,
     brandContext,
     knowledgeContext,
+    marketContext,
     planImage,
     ...(opts.onRepair ? { onRepair: opts.onRepair } : {}),
   })

@@ -159,6 +159,11 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   },
   { table: 'loop_cycles', readability: 'readable', describes: 'every week the Loop ran' },
   { table: 'loop_settings', readability: 'readable', describes: 'your Loop settings' },
+  {
+    table: 'marketing_observations',
+    readability: 'readable',
+    describes: 'what Sahoda worked out about your marketing',
+  },
   { table: 'memory_events', readability: 'readable', describes: 'changes to your Brand Brain' },
   { table: 'ops_credit_requests', readability: 'readable', describes: 'credit top-up requests' },
   {

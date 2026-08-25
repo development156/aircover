@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/playbooks",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/brain",
+      "schedule": "30 21 * * 0"
     }
   ]
 }
