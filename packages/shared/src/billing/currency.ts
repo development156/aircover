@@ -11,10 +11,12 @@ import { z } from 'zod'
  * issuer applies its own rate on the day, plus whatever foreign-transaction fee
  * it charges, and neither number is visible to us.
  *
- * That is why `describeApproxPrice` returns the rupee figure and the converted
- * one TOGETHER, and why there is no function here that returns a converted
- * amount on its own. A caller cannot accidentally render the dollar figure as
- * the price, because it never receives one it could mistake for the price.
+ * A price ROW shows one figure, in the customer's own currency (founder's
+ * ruling, 2026-08-25). So `describePlanPrice` returns that figure together with
+ * `chargeInr` and an `isApproximate` flag: the caller is handed the real amount
+ * and told when it differs, and the panel states it before the checkout button.
+ * A converted figure with the charge nowhere on the screen would be a price the
+ * customer cannot reconcile against their own statement.
  *
  * This replaces `priceUsd`, a second hand-set price that sat 17 to 19 percent
  * above what the rupee price actually converted to and drifted on its own terms.
@@ -113,17 +115,31 @@ export const FxRatesSchema = z.object({
 })
 export type FxRates = z.infer<typeof FxRatesSchema>
 
-/** A rupee price alongside its approximation, or alongside nothing. */
-export interface ApproxPrice {
-  /** The charge. Always rupees, always exact, always present. */
-  inr: string
+/** What a plan costs, as the customer reads it and as the card is charged. */
+export interface PlanPriceDisplay {
   /**
-   * The approximation, already formatted with its symbol, or null when there is
-   * none to make. Null is the default answer, not an error state: no country, no
-   * rate, an unreachable feed and an Indian customer all land here.
+   * The ONE figure a price row shows. Local currency where there is a rate for
+   * the customer's country, rupees everywhere else.
    */
-  approx: string | null
-  /** ISO timestamp of the rate used, for an "as of" line. Null whenever approx is. */
+  display: string
+  /**
+   * The charge, always in rupees, always exact, always present — whatever
+   * `display` ended up being.
+   *
+   * Separate from `display` because it is a DIFFERENT FACT, not a formatting of
+   * the same one. Whenever `isApproximate` is true these two disagree, and the
+   * caller is required to put this one in front of the customer before they
+   * commit: a local figure with no charge beside it anywhere is a price nobody
+   * can check against their own statement.
+   */
+  chargeInr: string
+  /**
+   * True when `display` is a conversion rather than the charge. Drives the
+   * sentence that says so; a caller that ignores it renders a foreign figure as
+   * if it were the amount taken.
+   */
+  isApproximate: boolean
+  /** ISO timestamp of the rate behind `display`, or null when it is the charge itself. */
   rateFetchedAt: string | null
 }
 
@@ -133,39 +149,56 @@ function formatInr(rupees: number): string {
 }
 
 /**
- * A rupee price and, when one can be made honestly, its local approximation.
+ * A plan's price in the currency the customer reads, plus the rupee charge behind it.
  *
- * Rounded to a whole unit. A converted price is already an estimate, and
- * "$23.94" claims a precision the number does not have — it implies the cents
- * are meaningful when the true charge is a rupee amount the customer's bank will
- * convert at a different rate anyway.
+ * ## One number on the row, and why that needs care
+ *
+ * Founder's ruling, 2026-08-25: a price row shows a SINGLE figure, in the
+ * customer's own currency. Not "₹1,999 (about £15)" — just "£15".
+ *
+ * That is a normal thing for an international product to do and it reads far
+ * better. It also means the number on the row is, for anyone outside India, NOT
+ * the number their bank takes: the charge settles in rupees, their issuer
+ * converts at its own rate on the day and adds its own fee, so a £15 row lands
+ * near £15 on a statement and never exactly on it.
+ *
+ * So `chargeInr` is returned ALONGSIDE, always, and the panel puts it on the
+ * checkout line. The row is for comparing plans; the charge is stated before the
+ * button. Dropping that line would leave a figure the customer cannot reconcile
+ * with anything, which is the one class of number this product may not show.
+ *
+ * Rounded to a whole unit: a converted price is an estimate, and "£15.34"
+ * claims a precision it does not have.
  */
-export function describeApproxPrice(
+export function describePlanPrice(
   rupees: number,
   currency: DisplayCurrency | null,
   fx: FxRates | null,
-): ApproxPrice {
+): PlanPriceDisplay {
   const inr = formatInr(rupees)
-  if (currency === null || fx === null) return { inr, approx: null, rateFetchedAt: null }
+  const asCharge: PlanPriceDisplay = {
+    display: inr,
+    chargeInr: inr,
+    isApproximate: false,
+    rateFetchedAt: null,
+  }
+  if (currency === null || fx === null) return asCharge
 
   const rate = fx.rates[currency]
-  // A rate that is missing, zero or negative yields no approximation rather than
-  // a zero price. `0 <= 0` on a subscription is the exact shape of a figure with
-  // nothing behind it.
-  if (typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0) {
-    return { inr, approx: null, rateFetchedAt: null }
-  }
+  // A rate that is missing, zero or negative shows the RUPEE price rather than a
+  // zero one. Falling back to the charge is always safe; falling back to `0` in a
+  // foreign currency advertises a paid subscription as free.
+  if (typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0) return asCharge
 
   const converted = Math.round(rupees * rate)
-  // A price that rounds to zero is not a price. Better to say nothing than to
-  // advertise a subscription as free in someone's local currency.
-  if (converted <= 0) return { inr, approx: null, rateFetchedAt: null }
+  // A price that rounds to zero is not a price.
+  if (converted <= 0) return asCharge
 
-  const approx = new Intl.NumberFormat('en', {
+  const display = new Intl.NumberFormat('en', {
     style: 'currency',
     currency,
     maximumFractionDigits: 0,
   }).format(converted)
 
-  return { inr, approx, rateFetchedAt: fx.fetchedAt }
+  return { display, chargeInr: inr, isApproximate: true, rateFetchedAt: fx.fetchedAt }
 }
