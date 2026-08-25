@@ -1,11 +1,9 @@
 'use client'
 
 import { useId, useState, useTransition } from 'react'
-import { ChevronDown } from 'lucide-react'
 
 import { updateLeadContact } from '@/app/actions/leads'
 import { PlatformMark } from '@/components/leads/platform-mark'
-import { cn } from '@/lib/utils'
 import type { LeadView } from '@/lib/leads/read'
 
 /**
@@ -33,6 +31,23 @@ import type { LeadView } from '@/lib/leads/read'
  * and the edit inputs inside a control, which is invalid HTML and behaves badly:
  * a click on a text field would toggle the card shut under the cursor.
  */
+
+/**
+ * Class joining WITHOUT `cn`.
+ *
+ * MEASURED 2026-08-25: `cn` is clsx plus tailwind-merge, and importing it into
+ * this CLIENT component pulled a 26.7 kB shared chunk into the /leads route —
+ * the bulk of a 31.8 kB regression that failed the js-budget and with it the
+ * Vercel build. No client component on this route used `cn` before; `board.tsx`
+ * beside it already joins classes by hand for the same reason.
+ *
+ * tailwind-merge earns its bytes where classes CONFLICT and the later must win.
+ * Nothing here conflicts: every call is a base string plus one optional
+ * modifier, which is what `filter(Boolean).join(' ')` is for.
+ */
+function classes(...parts: Array<string | false | null | undefined>): string {
+  return parts.filter(Boolean).join(' ')
+}
 
 export interface LeadCardProps {
   lead: LeadView
@@ -64,11 +79,32 @@ export function LeadCard({ lead, actions, busy }: LeadCardProps) {
           instead of ellipsing.
         */}
         <span className="min-w-0 flex-1 truncate type-body text-ink">{name}</span>
-        <ChevronDown
-          size={14}
+        {/*
+          AN INLINE CHEVRON, NOT `lucide-react`.
+
+          Worth 0.5 kB, and it is NOT what broke the budget — `cn` was, at
+          26.7 kB. Lucide was the first guess and MEASURED wrong: removing it
+          took /leads from 629.9 kB to 629.4 kB against a 598.1 kB budget. The
+          note survives because the saving is real and one path beats a module
+          import, not because it fixed anything.
+
+          If this card ever needs a second icon, reach for the library and RAISE
+          the budget deliberately rather than discovering it in a failed deploy.
+        */}
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
           aria-hidden
-          className={cn('shrink-0 text-muted transition-micro', open && 'rotate-180')}
-        />
+          className={classes('shrink-0 text-muted transition-micro', open && 'rotate-180')}
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </button>
 
       {/*
@@ -132,7 +168,7 @@ function Detail({
   return (
     <div className="grid grid-cols-[auto_1fr] gap-x-2">
       <dt className="type-sm text-muted">{label}</dt>
-      <dd className={cn('type-sm break-words text-ink-body', numeric && 'num')}>{value}</dd>
+      <dd className={classes('type-sm break-words text-ink-body', numeric && 'num')}>{value}</dd>
     </div>
   )
 }
@@ -232,7 +268,7 @@ function Field({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className={cn(
+        className={classes(
           'h-input w-full rounded-input border border-line bg-bg px-2.5 type-sm text-ink disabled:opacity-60',
           numeric && 'num',
         )}
