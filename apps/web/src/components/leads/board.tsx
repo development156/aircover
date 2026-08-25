@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 
 import { setLeadStatus } from '@/app/actions/leads'
+import { LeadCard } from '@/components/leads/lead-card'
 import { STAGES, nextStatus, type Stage } from '@/lib/leads/stages'
 import type { LeadView } from '@/lib/leads/read'
 
@@ -116,30 +117,37 @@ export function Board({ leads }: BoardProps) {
               ) : (
                 <ul className="grid gap-2">
                   {inStage.map((lead) => (
-                    <li key={lead.id} className="rounded-input bg-subtle p-2.5">
-                      <p className="type-body text-ink">{lead.name?.trim() || 'No name given'}</p>
-                      {lead.email ? <p className="type-sm text-muted">{lead.email}</p> : null}
-                      {lead.phone ? <p className="type-sm num text-muted">{lead.phone}</p> : null}
-                      {lead.message ? (
-                        <p className="type-sm mt-1 text-muted">{lead.message}</p>
-                      ) : null}
-                      <p className="type-sm mt-1 text-muted">{lead.from}</p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {nextStatus(stage.status) ? (
-                          <MoveButton
-                            label={STAGES.find((s) => s.status === nextStatus(stage.status))!.name}
-                            disabled={pending}
-                            onClick={() => move(lead, nextStatus(stage.status)!)}
-                          />
-                        ) : null}
-                        {stage.status !== 'lost' ? (
-                          <MoveButton
-                            label="Lost"
-                            disabled={pending}
-                            onClick={() => move(lead, 'lost')}
-                          />
-                        ) : null}
-                      </div>
+                    <li key={lead.id}>
+                      {/*
+                        The card is closed to a name and a platform mark; every
+                        other detail, and these stage controls, live inside it.
+                        The controls stay the BOARD's — moving a lead is a
+                        pipeline event, and the card knows nothing about stages.
+                      */}
+                      <LeadCard
+                        lead={lead}
+                        busy={pending}
+                        actions={
+                          <>
+                            {nextStatus(stage.status) ? (
+                              <MoveButton
+                                label={
+                                  STAGES.find((s) => s.status === nextStatus(stage.status))!.name
+                                }
+                                disabled={pending}
+                                onClick={() => move(lead, nextStatus(stage.status)!)}
+                              />
+                            ) : null}
+                            {stage.status !== 'lost' ? (
+                              <MoveButton
+                                label="Lost"
+                                disabled={pending}
+                                onClick={() => move(lead, 'lost')}
+                              />
+                            ) : null}
+                          </>
+                        }
+                      />
                     </li>
                   ))}
                 </ul>
