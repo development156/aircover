@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { CreditCard, Info } from 'lucide-react'
 import {
   PLAN_CATALOG,
-  describeApproxPrice,
+  describePlanPrice,
   type DisplayCurrency,
   type FxRates,
   type PlanCatalogEntry,
@@ -57,15 +57,22 @@ export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {
   const plan = PLAN_CATALOG[planId]
 
   /**
-   * The sentence that keeps the two figures apart, or null when only one is on
-   * screen. Built here rather than in the markup so the "no approximation" case
-   * renders NOTHING — an explanation of a number nobody can see is noise.
+   * The selected plan's price, and the sentence that names the real charge.
+   *
+   * The rows show one figure in the customer's own currency. That figure is a
+   * conversion, so for anyone outside India it is NOT what the bank takes — and
+   * this is the only place the actual amount appears. It is not optional
+   * garnish: without it the price on the row cannot be reconciled against a
+   * statement by anyone.
+   *
+   * Null when the row already shows the charge, because then there is nothing to
+   * reconcile and the sentence would explain a difference that does not exist.
    */
-  const selected = describeApproxPrice(plan.priceInr, currency, fx)
-  const approxNote =
-    selected.approx === null || selected.rateFetchedAt === null
+  const selected = describePlanPrice(plan.priceInr, currency, fx)
+  const chargeNote =
+    !selected.isApproximate || selected.rateFetchedAt === null
       ? null
-      : `Your card is charged in rupees. The ${currency} figure is an approximation at the rate published on ${asOf(selected.rateFetchedAt)}, and your bank will use its own rate and may add a foreign transaction fee.`
+      : `Your card is charged ${selected.chargeInr} in rupees. The ${currency} figure is a conversion at the rate published on ${asOf(selected.rateFetchedAt)}; your bank will use its own rate and may add a foreign transaction fee.`
 
   function start() {
     setResult(null)
@@ -125,26 +132,16 @@ export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {
                 <span className="block type-body font-semibold">{entry.name}</span>
                 {/* Cost before spend: price and what it grants, both from PLAN_CATALOG. */}
                 <span className="block type-sm text-muted">
-                  ₹<span className="tabular-nums">{inr(entry.priceInr)}</span> per month
                   {/*
-                    The approximation, when there is an honest one to make. It is
-                    rendered AFTER the rupee figure and marked "about" on purpose:
-                    the charge settles in rupees, so this number is never what
-                    reaches the card. The customer's own bank converts at its own
-                    rate on the day and adds its own fee, and neither is visible
-                    here — so presenting this as the price would be a figure no
-                    query produced.
+                    ONE figure, in the customer's own currency. The rupee charge
+                    behind it is stated on the checkout line below, not repeated
+                    on every row — a row is for comparing plans, and two numbers
+                    per row made the comparison harder to read.
                   */}
-                  {(() => {
-                    const { approx } = describeApproxPrice(entry.priceInr, currency, fx)
-                    return approx === null ? null : (
-                      <>
-                        {' '}
-                        (about <span className="tabular-nums">{approx}</span>)
-                      </>
-                    )
-                  })()}{' '}
-                  · <span className="tabular-nums">{inr(entry.monthlyCredits)}</span>{' '}
+                  <span className="tabular-nums">
+                    {describePlanPrice(entry.priceInr, currency, fx).display}
+                  </span>{' '}
+                  per month · <span className="tabular-nums">{inr(entry.monthlyCredits)}</span>{' '}
                   {creditWord(entry.monthlyCredits)} granted each month
                 </span>
               </span>
@@ -153,25 +150,32 @@ export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {
         })}
       </fieldset>
 
+      {/*
+        Quotes the SAME figure the selected row shows. Naming a different
+        currency here than the one the customer just clicked would put two prices
+        back on the panel, which is the thing the single-figure row removed.
+      */}
       <p className="text-[13px] text-muted">
-        Starts a checkout session for {plan.name}, at ₹
-        <span className="tabular-nums">{inr(plan.priceInr)}</span> per month. Nothing is charged and
+        Starts a checkout session for {plan.name}, at{' '}
+        <span className="tabular-nums">{selected.display}</span> per month. Nothing is charged and
         no credits are added until a payment completes.
       </p>
 
       {/*
-        SAYS WHAT THE OTHER FIGURE IS, and only when one was shown.
+        THE ONLY PLACE THE REAL AMOUNT APPEARS, and it only appears when the
+        figure above is a conversion.
 
-        Without this the panel carries two numbers and no statement of which one
-        is the charge. The approximation is the more legible of the two to a
-        customer reading in their own currency, so silence here would let the
-        wrong number read as the price.
+        Every other number on this panel is in the customer's own currency, and
+        for anyone outside India none of them is what the bank takes. Without
+        this line the price could not be reconciled against a statement by
+        anyone — so it names the rupee amount outright rather than saying
+        "charged in rupees" and leaving the sum to be guessed.
 
-        It names the rate's DATE rather than calling it current. A rate is a
+        It gives the rate's DATE rather than calling it current. A rate is a
         published daily figure, not a live quote, and an undated one is exactly
         the shape the old hardcoded 88 took while it drifted.
       */}
-      {approxNote !== null ? <p className="type-sm text-muted">{approxNote}</p> : null}
+      {chargeNote !== null ? <p className="type-sm text-muted">{chargeNote}</p> : null}
 
       <Button
         type="button"
