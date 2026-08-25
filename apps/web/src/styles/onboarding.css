@@ -707,12 +707,30 @@
 
 /* ================================================================== CTA */
 
+/* ── THE ACTION ROW SITS RIGHT ───────────────────────────────────────────────
+   Founder's call, 25 August, after the colour picker landed on top of these
+   buttons twice. Moving the row is the fix at the source: the swatches and every
+   other input live in the left column, so nothing this flow opens downward can
+   reach the buttons once they are on the other side.
+
+   The "Press Enter" hint takes `order: -1` and `margin-right: auto` so it holds
+   the left edge instead of trailing off the right end of the pair, where it read
+   as a caption belonging to Back.
+
+   Under 960px none of this applies: the row is fixed to the bottom, the buttons
+   flex to fill the width, and the hint is hidden. */
 .cta-row {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
   margin-top: clamp(20px, 3vh, 32px);
   flex-wrap: wrap;
+}
+
+.cta-row .enterkey {
+  order: -1;
+  margin-right: auto;
 }
 
 .stage .btn,
