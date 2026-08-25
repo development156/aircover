@@ -117,9 +117,13 @@ Chromium loads the agent proxy's own HTTP endpoint and plain-HTTP `example.com`
 with 200, the proxy logs no attempt for any HTTPS one, and Playwright's Node-side
 request context fetches the same URL fine from the same process. Outbound 443
 from the Chromium process is reset before it reaches anything, which makes
-`--ignore-certificate-errors` both forbidden and beside the point. The other four
-legs of `pnpm gate` are green: 27 of 27 turbo tasks, and `prettier --check .`
-clean.
+`--ignore-certificate-errors` both forbidden and beside the point. Of the other four legs of
+`pnpm gate`, three are green: 27 of 27 turbo tasks and `prettier --check .`
+clean. The fourth, root vitest, has **two failures that no lane caused** —
+`mutation-harness.test.ts` chmods a directory to `0500` and expects a write to be
+refused, and this sandbox runs as uid 0, where root bypasses the bits. Verified
+pre-existing on a clean tree at `cc2e5fb` and recorded as REQUESTS §26. An
+earlier version of this section said four legs were green, which was wrong.
 
 ## Next, in the order docs/53 set
 

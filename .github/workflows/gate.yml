@@ -1,0 +1,209 @@
+# Run the gate on every pull request, so a lane cannot merge on a check nobody ran.
+#
+# ── WHY THIS EXISTS ──────────────────────────────────────────────────────────
+# REQUESTS §15: no CI workflow ran the gate. The five workflows already here are
+# nightly jobs and a post-deploy probe, so until now every typecheck, lint and
+# unit test this project has ever run has run on a developer's laptop, at a time
+# of that developer's choosing, on the branch they happened to be standing on.
+# Three lanes move independently and merge into `wt-core`; "I ran the gate" was
+# an assertion nobody could check.
+#
+# ── WHAT IT RUNS, AND WHAT IT DELIBERATELY DOES NOT ──────────────────────────
+# `pnpm gate` is five stages (scripts/gate.mjs). This runs three of them and
+# names the two it skips, because a CI file that silently covers less than its
+# name suggests is the same defect as a stale number on a screen.
+#
+#   1  turbo typecheck + lint + test   RUNS
+#   2  vitest (root)                   RUNS
+#   3  turbo test:smoke  (Playwright)  SKIPPED — see below, and the dispatch job
+#   4  prettier --check .              RUNS
+#   5  turbo build                     SKIPPED — Vercel already builds every PR
+#
+# **Stage 3 is skipped because it WRITES TO PRODUCTION.** There is exactly one
+# Supabase project in this account and it is `rloztdhzfliyvpvxsgjl`. Every
+# `@smoke` spec mints a Clerk user, signs it in, and lets the app create a
+# workspace and a credit ledger. Running that on every pull request would not
+# check the product — it would put test workspaces into the customer database
+# automatically, which is the accident `src/lib/testing/e2e-target.ts` exists to
+# stop. `post-deploy-smoke.yml` reached the same conclusion first and this file
+# does not overturn it. The suite stays a deliberate act, and the `smoke` job
+# below is how you perform it on a runner instead of a laptop.
+#
+# **Stage 5 is skipped because Vercel already runs it**, including
+# `scripts/perf/js-budget.mjs`, on every push to a branch with an open pull
+# request. Duplicating it here would need a dozen build-time secrets in GitHub to
+# tell us something a green Vercel check already tells us.
+#
+# ── WHAT A GREEN TICK HERE EARNS, STATED PLAINLY ─────────────────────────────
+# The code typechecks, passes lint including the design lint, passes every unit
+# and PGlite suite, and is formatted. It says NOTHING about whether the app
+# builds (read the Vercel check) or whether a signed-in customer can complete a
+# journey (run the `smoke` job, or `pnpm gate` locally).
+
+name: gate
+
+on:
+  pull_request:
+  # Pushes to the integration branches, so a merge that goes wrong is caught on
+  # the branch it went wrong on rather than on the next lane's pull request.
+  push:
+    branches: [wt-core, wt-web, main]
+  workflow_dispatch:
+    inputs:
+      ack_target:
+        description: >-
+          To also run the Playwright @smoke suite, type the Supabase project ref
+          it will write to. Leave EMPTY to run the checks only. A boolean would
+          be satisfiable by anyone who wanted the error to go away; a ref cannot
+          be typed without naming the database you are about to write into.
+        required: false
+        default: ''
+
+# Two pushes to the same branch: the older run is pointless the moment the newer
+# one starts, and a queue of superseded runs is how a ten-minute check becomes a
+# forty-minute one.
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: typecheck · lint · test · format
+    runs-on: ubuntu-latest
+    # MEASURED on the container this repo develops in: the three stages take
+    # about six minutes serially. Twenty is room for a cold pnpm store and a slow
+    # PGlite boot, and short enough that a hung job is noticed the same morning.
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.3.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # ── THE THREE STAGES, EACH AS ITS OWN STEP ─────────────────────────────
+      # Not one `pnpm gate --only=…` call, because a failed step name is the
+      # first thing a person reads on a red pull request, and "gate" tells them
+      # nothing about which half of it broke.
+      #
+      # `--concurrency=1` for the same reason `scripts/gate.mjs` uses it: the
+      # PGlite integration suites boot a real Postgres per file and time out at
+      # 60 seconds under a parallel fan-out (REQUESTS §23). A hosted runner has
+      # fewer cores than the development machine, not more, so the risk is
+      # higher here rather than lower — and a PGlite timeout reports its tests as
+      # SKIPPED, which is the shape that reads as green.
+      - name: Typecheck, lint and test
+        run: pnpm turbo run typecheck lint test --concurrency=1
+
+      - name: Root vitest
+        run: pnpm exec vitest run
+
+      - name: Formatting
+        run: pnpm exec prettier --check .
+
+      # A suite that ran nothing reports as passing, which is how twenty-six
+      # billing tests never executed for months. This makes the skip count
+      # visible on every run so a number that climbs is something somebody sees
+      # rather than something somebody could have looked up.
+      - name: Report what was skipped
+        if: always()
+        run: |
+          echo "### Gate coverage" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Ran: turbo typecheck + lint + test, root vitest, prettier." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Not run here, by design:**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`turbo test:smoke\` (Playwright) — it writes to the one production database. Run the \`smoke\` job on this workflow deliberately, or \`pnpm gate\` locally." >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`turbo build\` — Vercel builds every pull request, including the JS budget." >> "$GITHUB_STEP_SUMMARY"
+
+  # ── THE SMOKE LEG, ON PURPOSE AND NEVER BY ACCIDENT ────────────────────────
+  # This is the job that makes a cloud session's missing leg runnable at all:
+  # Playwright's bundled Chromium cannot complete an outbound HTTPS request in a
+  # claude.ai/code sandbox (REQUESTS §25), so an agent cannot run the smoke suite
+  # even when it should. A hosted runner has ordinary network.
+  #
+  # It is `workflow_dispatch` only, and it requires the operator to TYPE the
+  # project ref they are about to write to. That is `SAHODA_E2E_ACK_TARGET`'s own
+  # design — a boolean would be satisfiable by anyone who wanted the error to go
+  # away, and a ref cannot be typed without naming the destination. The input is
+  # not defaulted, so nobody can run this by clicking through.
+  smoke:
+    name: Playwright @smoke (writes to the named database)
+    if: github.event_name == 'workflow_dispatch' && inputs.ack_target != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.3.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Refuses before installing a browser or starting a server, so a run with
+      # nothing configured costs seconds and says exactly what is missing rather
+      # than dying inside `global-setup.ts` with a stack trace.
+      - name: Refuse without the keys the suite needs
+        env:
+          CLERK_PUBLISHABLE: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET: ${{ secrets.CLERK_SECRET_KEY }}
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        run: |
+          missing=""
+          [ -z "$CLERK_PUBLISHABLE" ] && missing="$missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+          [ -z "$CLERK_SECRET" ] && missing="$missing CLERK_SECRET_KEY"
+          [ -z "$SUPABASE_URL" ] && missing="$missing NEXT_PUBLIC_SUPABASE_URL"
+          if [ -n "$missing" ]; then
+            echo "::error::Repository secrets are not configured:$missing"
+            echo "Add them under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - name: Install Chromium
+        run: pnpm --filter @sahoda/web exec playwright install --with-deps chromium
+
+      - name: Run the smoke suite
+        env:
+          # The acknowledgement, typed by a person at dispatch time. Declared on
+          # the `test:smoke` task in turbo.json — Turborepo 2.x defaults to
+          # `envMode: "strict"` and strips anything undeclared, so an
+          # acknowledged run without that line would be refused anyway.
+          SAHODA_E2E_ACK_TARGET: ${{ inputs.ack_target }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: pnpm turbo run test:smoke --concurrency=1
+
+      # The traces are the only thing worth having from a failed browser run, and
+      # they are the first thing lost when a runner is torn down.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7
