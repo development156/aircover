@@ -82,6 +82,16 @@ export interface OnboardingData {
   refs: RefLink[]
   refNote: string
   sources: string[]
+  /**
+   * The address given for each picked source, keyed by its `SOURCES` key.
+   *
+   * A separate map rather than a shape change to `sources`, deliberately: this
+   * lane already migrated `competitors` in the same commit range, and a second
+   * simultaneous migration doubles the ways a resumed session can come back
+   * wrong for no gain. A key with no entry, or an empty one, is a source that
+   * was picked and never addressed — it is not sent.
+   */
+  sourceUrls: Record<string, string>
   competitors: Rival[]
 }
 
@@ -114,6 +124,7 @@ export const DEFAULT_DATA: OnboardingData = {
   refs: [],
   refNote: '',
   sources: [],
+  sourceUrls: {},
   competitors: [],
 }
 
@@ -315,6 +326,15 @@ export function loadState(workspaceId: string): OnboardingState | null {
       refs: arr<RefLink>(saved.refs).filter((r) => r && typeof r.url === 'string'),
       refNote: str(saved.refNote),
       sources: arr<string>(saved.sources).filter((s) => typeof s === 'string'),
+      // Values only; the keys are whatever was picked and are checked against
+      // SOURCES at the point of use, not here.
+      sourceUrls: Object.fromEntries(
+        Object.entries(
+          (saved.sourceUrls && typeof saved.sourceUrls === 'object'
+            ? saved.sourceUrls
+            : {}) as Record<string, unknown>,
+        ).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+      ),
       /**
        * Reads BOTH shapes. A session saved before competitors carried an
        * address comes back as `string[]`, and dropping those rows would lose

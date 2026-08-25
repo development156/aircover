@@ -5,6 +5,7 @@ import type { BrandMemoryPayload } from '@sahoda/shared'
 
 import { saveBrandMemory, type BrandMemorySource } from '@/app/actions/brand-resolve'
 import { resolveOnboarding } from '@/app/actions/onboarding-resolve'
+import { addUrlDocument } from '@/app/actions/knowledge'
 import { addCompetitor } from '@/app/actions/radar'
 import { saveWorkspaceTheme } from '@/app/actions/theme'
 import { refineWithDoorText } from '@/lib/onboarding/classify'
@@ -98,14 +99,16 @@ export function useBuild({
   const [brain, setBrain] = useState<BrandMemoryPayload | null>(null)
   const [brainSource, setBrainSource] = useState<BrandMemorySource>('resolved')
   /**
-   * What became of the watch list, when some of it did not land.
+   * What did not land after the brain was built — a competitor, a source, or
+   * both. Named for the moment rather than for one of the two things it can
+   * report, because it carries either.
    *
    * `null` covers both "there were none to send" and "every one landed", which
    * are the two cases with nothing to say. A partial failure must not be
    * silent — the brain is built and charged by then, so losing a competitor
    * quietly would leave the person believing a page is being watched.
    */
-  const [watchListNote, setWatchListNote] = useState<string | null>(null)
+  const [afterBuildNote, setWatchListNote] = useState<string | null>(null)
   const [wasFree, setWasFree] = useState(false)
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -294,7 +297,13 @@ export function useBuild({
        * rather than sent — a session saved before this screen asked for one
        * comes back holding them, and `addCompetitor` would refuse them anyway.
        */
-      setWatchListNote(await sendWatchList(data.competitors))
+      const [watchNote, sourcesNote] = [
+        await sendWatchList(data.competitors),
+        await sendSources(data.sources, data.sourceUrls),
+      ]
+      // Joined rather than nested: two independent things went wrong or did
+      // not, and the reader needs both sentences, not the first one only.
+      setWatchListNote([watchNote, sourcesNote].filter(Boolean).join(' ') || null)
       setWasFree(state.kind === 'free')
       setFallbackMessage(state.kind === 'fallback' ? state.message : null)
 
@@ -408,7 +417,7 @@ export function useBuild({
     failure,
     wasFree,
     fallbackMessage,
-    watchListNote,
+    afterBuildNote,
     saving,
     saveError,
     themeError,
@@ -416,6 +425,37 @@ export function useBuild({
     dismiss,
     finish,
   }
+}
+
+/**
+ * Read the picked knowledge sources into the library, and say what did not land.
+ *
+ * `addUrlDocument` fetches the address, stores the document and indexes it, and
+ * costs nothing — `knowledge.ts` states that no action on that path is priced,
+ * because no model is called on it. A source picked without an address is
+ * skipped rather than sent: the step never gates, so leaving the field empty is
+ * a thing people will do, and posting an empty URL just earns a refusal.
+ */
+async function sendSources(
+  picked: readonly string[],
+  urls: Readonly<Record<string, string>>,
+): Promise<string | null> {
+  const failed: string[] = []
+  for (const key of picked) {
+    const url = (urls[key] ?? '').trim()
+    if (!url) continue
+    try {
+      const form = new FormData()
+      form.set('url', url)
+      form.set('title', key)
+      const result = await addUrlDocument(form)
+      if (!result.ok) failed.push(key)
+    } catch {
+      failed.push(key)
+    }
+  }
+  if (failed.length === 0) return null
+  return `Sahoda could not read ${failed.join(', ')}. Your Brand Brain is saved. Try ${failed.length === 1 ? 'that source' : 'those sources'} again from Knowledge.`
 }
 
 /**

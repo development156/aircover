@@ -13,8 +13,8 @@ export interface ResultStepProps {
   wasFree: boolean
   /** Set when the model could not be reached and a sample was shown instead. */
   fallbackMessage: string | null
-  /** What did not reach the Radar watch list. `null` when there is nothing to say. */
-  watchListNote: string | null
+  /** What did not save after the build — a competitor, a source, or both. `null` when all of it did. */
+  afterBuildNote: string | null
   saving: boolean
   /** The BRAIN failed to save. This blocks entry. */
   saveError: string | null
@@ -38,7 +38,7 @@ export function ResultStep({
   door,
   wasFree,
   fallbackMessage,
-  watchListNote,
+  afterBuildNote,
   saving,
   saveError,
   themeError,
@@ -150,7 +150,7 @@ export function ResultStep({
       {/* Shown beside the fallback note and not folded into it: a model that
           could not be reached and a competitor that did not save are different
           failures, and one sentence covering both would be true of neither. */}
-      {watchListNote ? <p className="hint">{watchListNote}</p> : null}
+      {afterBuildNote ? <p className="hint">{afterBuildNote}</p> : null}
       {wasFree ? (
         <p className="hint">Your first Brand Brain was free. Nothing was charged.</p>
       ) : null}
