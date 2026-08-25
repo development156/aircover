@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import type { Channel } from '@sahoda/shared'
 import { CalendarDays } from 'lucide-react'
 
@@ -7,7 +8,10 @@ import { PageTitle } from '@/components/page-title'
 import { PlanWeekPanel } from '@/components/planner/plan-week-panel'
 import { PlannerRow } from '@/components/planner/planner-row'
 import { ViewToggle, type PlannerView } from '@/components/planner/view-toggle'
-import { WeekGrid } from '@/components/planner/week-grid'
+import { WeekTimeline } from '@/components/planner/week-timeline'
+import { PlannerSummary } from '@/components/planner/planner-summary'
+import { WeekNav } from '@/components/planner/week-nav'
+import { istDayKey, weekWindow } from '@/lib/planner/week-window'
 import { MonthGrid } from '@/components/planner/month-grid'
 import { firstGridDay, MONTH_GRID_DAYS } from '@/lib/planner/month'
 import { bucketWeek } from '@/lib/planner/week'
@@ -26,9 +30,9 @@ export const metadata = { title: 'Planner' }
 export default async function PlannerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>
+  searchParams: Promise<{ view?: string; week?: string }>
 }) {
-  const { view: rawView } = await searchParams
+  const { view: rawView, week: rawWeek } = await searchParams
   // LIST is the default on purpose: approve and reschedule live on list rows,
   // and the seeded approve.first_tour targets `planner.approve` on THIS route —
   // defaulting to the week grid would put the tour's anchor (and Alpha item 7's
@@ -40,7 +44,13 @@ export default async function PlannerPage({
   // the seeded tour anchors `planner.approve` on this route, so defaulting to a
   // grid would put the tour's anchor behind a toggle nobody has found yet.
   // Calendar is one click away and is the first segment in the control.
-  const view: PlannerView = rawView === 'week' ? 'week' : rawView === 'month' ? 'month' : 'list'
+  const view: PlannerView =
+    rawView === 'week' ? 'week' : rawView === 'day' ? 'day' : rawView === 'month' ? 'month' : 'list'
+  // A week offset that is not a finite integer is not a week. Falling back to 0
+  // shows THIS week rather than throwing, and never renders a window derived
+  // from NaN — which would produce seven Invalid Date columns.
+  const parsedWeek = Number(rawWeek)
+  const weekOffset = Number.isFinite(parsedWeek) ? Math.trunc(parsedWeek) : 0
   // THREE answers. "Your week shows up here" was rendered for a failed read and
   // for an account with no workspace as readily as for a genuinely empty plan —
   // and the panel above it offers to draft five posts into a week that cannot
@@ -64,6 +74,14 @@ export default async function PlannerPage({
   // must not be computed against two different clocks.
   const autoPublish = autoPublishEnabled()
   const now = new Date()
+
+  // The Monday-anchored window this view is looking at. `bucketWeek` starts at
+  // TODAY, which cannot be navigated: "previous week" would move by a
+  // different amount depending on the weekday you asked on.
+  const window = weekWindow(now, weekOffset)
+  const todayKey = istDayKey(now)
+  const isToday = (day: Date): boolean => istDayKey(day) === todayKey
+  const windowKeys = new Set(window.days.map(istDayKey))
 
   // The provider's seed, assembled from reads this page has ALREADY done —
   // `listPosts` returns `status` and `scheduled_at`, and the two maps are right
@@ -97,6 +115,12 @@ export default async function PlannerPage({
 
   const shown = posts.map(forDisplay)
 
+  // No date at all, or a date this window does not cover.
+
+  const offGrid = shown.filter(
+    (p) => p.scheduled_at === null || !windowKeys.has(istDayKey(new Date(p.scheduled_at))),
+  ).length
+
   return (
     <PublishStateProvider initial={liveSeed}>
       {/* ── THE PLAN COMES FIRST. AT EVERY WIDTH. ────────────────────────────────
@@ -107,7 +131,7 @@ export default async function PlannerPage({
 
           MEASURED on this lane's baseline capture, 1440 light: it is worse on
           desktop, not better. On `?view=month` — a view the reader reached by
-          deliberately clicking "Calendar" — the calendar begins at y=580 of a
+          deliberately clicking "Month" — the calendar begins at y=580 of a
           900px viewport, so more than half the screen is spent before the thing
           they asked for. The panel above it is 260px of a PAID action nobody
           requested. The phone ruling was not a mobile accommodation; it was the
@@ -126,6 +150,10 @@ export default async function PlannerPage({
         </div>
 
         <ConnectFirstNote connections={connected} />
+
+        {/* Counts of the posts on this page, so the tiles and the grid below can
+            never disagree about how many there are. */}
+        {posts.length > 0 ? <PlannerSummary posts={shown} /> : null}
 
         <div>
           {read.status === 'unreadable' ? (
@@ -160,13 +188,37 @@ export default async function PlannerPage({
               buckets={bucketWeek(shown, firstGridDay(now), MONTH_GRID_DAYS)}
               monthAnchor={now}
             />
-          ) : view === 'week' ? (
-            <WeekGrid
-              buckets={bucketWeek(shown, now)}
-              now={now}
-              variantStates={variantStates}
-              autoPublish={autoPublish}
-            />
+          ) : view === 'week' || view === 'day' ? (
+            <div className="space-y-3">
+              <WeekNav days={window.days} offset={weekOffset} view={view} />
+              <WeekTimeline
+                days={view === 'day' ? window.days.filter(isToday) : window.days}
+                posts={shown}
+                variantStates={variantStates}
+                today={now}
+              />
+              {/* WHAT THE TIMELINE STRUCTURALLY CANNOT SHOW, SAID RATHER THAN
+                  DROPPED. A post with no `scheduled_at` has no minute to sit at,
+                  and one scheduled outside this window belongs to another week.
+                  Rendering `WeekGrid` underneath would have covered them — and
+                  would also have redrawn every post already on the timeline, so
+                  the week appeared twice. The note names the count and points at
+                  List, the one view that can show them without inventing a date
+                  for them. */}
+              {offGrid > 0 ? (
+                <p className="type-meta text-muted">
+                  {offGrid === 1 ? '1 post is' : `${offGrid} posts are`} not on this week&rsquo;s
+                  grid, with no date yet or a date outside it.{' '}
+                  <Link
+                    href={{ pathname: '/planner', query: { view: 'list' } }}
+                    className="card-link text-accent"
+                  >
+                    See them in List
+                  </Link>
+                  .
+                </p>
+              ) : null}
+            </div>
           ) : (
             <ul className="space-y-2" data-guide="planner.list">
               {shown.map((post) => (
