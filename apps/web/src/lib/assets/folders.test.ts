@@ -1,0 +1,85 @@
+import { describe, it, expect } from 'vitest'
+
+import { ASSET_FOLDERS, folderCounts } from './folders'
+import type { AssetCard } from './view'
+
+/**
+ * THE COUNT UNDER A FOLDER IS A PROMISE ABOUT THE LIST BELOW IT.
+ *
+ * These folders exist because the named ones asked for (Brand Assets, Campaigns,
+ * …) had no column behind them, so "12 assets" would have been a number no query
+ * could produce. That makes ONE property load-bearing: every count here must be
+ * exactly what the same predicate selects. A folder saying 3 over a list of 2 is
+ * the defect this whole design was chosen to avoid, reintroduced.
+ *
+ * So these tests never assert a literal. They assert the IDENTITY between the
+ * count and the filter — which is the only thing that cannot rot when the
+ * fixtures change.
+ */
+const card = (over: Partial<AssetCard>): AssetCard => ({
+  id: crypto.randomUUID(),
+  title: null,
+  alt: null,
+  kind: 'image',
+  mime: 'image/png',
+  bytes: 100,
+  width: 10,
+  height: 10,
+  createdAt: '2026-08-25T00:00:00Z',
+  previewUrl: null,
+  usage: [],
+  ...over,
+})
+
+const usage = [{ postId: 'p1' }] as unknown as AssetCard['usage']
+
+describe('asset folders', () => {
+  it('counts exactly what its own filter selects, for every folder', () => {
+    const cards = [
+      card({ kind: 'image', usage: [] }),
+      card({ kind: 'image', usage }),
+      card({ kind: 'video', usage }),
+    ]
+    const counts = folderCounts(cards)
+
+    // The identity, not a literal. If someone rewrites `match` and forgets the
+    // count, or counts one thing and filters another, this is red.
+    for (const folder of ASSET_FOLDERS) {
+      expect(counts[folder.id], `${folder.name} count disagrees with its filter`).toBe(
+        cards.filter(folder.match).length,
+      )
+    }
+  })
+
+  it('reports zero rather than dropping the folder', () => {
+    // A folder that vanishes when it empties makes its absence something a
+    // person has to interpret. "There is no Not used yet folder" and "nothing is
+    // unused" are different sentences.
+    const counts = folderCounts([card({ kind: 'image', usage })])
+
+    expect(counts.unused).toBe(0)
+    expect(Object.keys(counts)).toHaveLength(ASSET_FOLDERS.length)
+  })
+
+  it('splits in-use from unused with no file in both and none in neither', () => {
+    // The two usage folders must PARTITION the library. An asset in both would
+    // be double-counted against a library that holds it once.
+    const cards = [card({ usage: [] }), card({ usage }), card({ usage: [] })]
+    const inUse = ASSET_FOLDERS.find((f) => f.id === 'in-use')!
+    const unused = ASSET_FOLDERS.find((f) => f.id === 'unused')!
+
+    for (const c of cards) {
+      expect(inUse.match(c) === unused.match(c), 'a file is in both folders or neither').toBe(false)
+    }
+    const counts = folderCounts(cards)
+    expect(counts['in-use'] + counts.unused).toBe(cards.length)
+  })
+
+  it('has no folder for a kind the product cannot accept', () => {
+    // Videos and documents render as inert "not yet" chips because nothing can
+    // upload them. A folder for them would be a container for a thing that
+    // cannot exist.
+    expect(ASSET_FOLDERS.map((f) => f.id)).not.toContain('video')
+    expect(ASSET_FOLDERS.map((f) => f.id)).not.toContain('document')
+  })
+})
