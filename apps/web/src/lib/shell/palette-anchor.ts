@@ -71,3 +71,70 @@ export function panelShift({
   const wanted = triggerCenterX - viewportCenterX
   return Math.max(-room, Math.min(room, wanted))
 }
+
+/**
+ * HOW WIDE THE PANEL MUST BE FOR ITS FIELD TO MATCH THE SEARCH BAR.
+ *
+ * ── THE DEFECT THIS EXISTS FOR ───────────────────────────────────────────────
+ * Centring the panel on the trigger (`panelShift`) put the two on the same axis
+ * and left them different sizes, so the field still did not line up with the bar
+ * that opens it. MEASURED at 1879x1007 with the panel anchored and the field
+ * focused:
+ *
+ *     trigger pill   769 -> 1189   width 420
+ *     focus ring     759 -> 1222   width 463
+ *     delta          left -10, right +33, width +43
+ *
+ * Wider AND lopsided. The lopsidedness is the tell: the magnifier sat in flow at
+ * the left of the row, pushing the input rightward, so the ring overhung the
+ * trigger by 10px on one side and 33px on the other. Two shapes that are meant
+ * to read as the same control cannot be off by different amounts at each end.
+ *
+ * ── WHY THE PANEL RESIZES RATHER THAN THE FIELD ─────────────────────────────
+ * A 412px pill floating inside a 520px panel would align with the bar and look
+ * like a mistake, because the list beneath it would be wider than the field
+ * above. The panel is the thing that should equal the search bar: the palette
+ * then reads as that bar opening downward, which is what it is.
+ *
+ * ── THE ARITHMETIC, STATED SO IT CAN BE CHECKED ─────────────────────────────
+ * The field spans the panel minus its padding on both sides, and the focus ring
+ * (tokens.css, unlayered) extends `ringOverhang` beyond the field on every side:
+ *
+ *     ring width = (panelWidth - 2*pad) + 2*ringOverhang
+ *
+ * Setting that equal to the trigger's width gives the return value below. With
+ * `panelShift` already centring the panel on the trigger, equal widths and a
+ * shared centre make the two boxes identical — which is the claim, and it is
+ * asserted in `palette-anchor.test.ts` rather than left as a comment.
+ */
+export interface PanelWidthInput {
+  /** The trigger's measured width, or null when there is no trigger on screen. */
+  triggerWidth: number | null
+  /** The panel's own horizontal padding around the field. */
+  pad: number
+  /** How far the global focus ring extends beyond the field. */
+  ringOverhang: number
+  /** The widest the panel may be, whatever the trigger does. */
+  max: number
+}
+
+/**
+ * The panel's width in pixels, or NULL to leave it to the stylesheet.
+ *
+ * Null rather than a default number: with no trigger to match (the phone, where
+ * it is `max-narrow:hidden`) there is no width to derive, and inventing one
+ * would override a responsive rule that is already correct with a constant that
+ * is not.
+ */
+export function panelWidthFor({
+  triggerWidth,
+  pad,
+  ringOverhang,
+  max,
+}: PanelWidthInput): number | null {
+  if (triggerWidth === null || !Number.isFinite(triggerWidth) || triggerWidth <= 0) return null
+  const wanted = triggerWidth + 2 * pad - 2 * ringOverhang
+  // Never wider than the stylesheet's own cap. A very wide trigger would
+  // otherwise grow the palette past the size it was designed and measured at.
+  return Math.min(wanted, max)
+}

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Search } from 'lucide-react'
 
 import { ALL_SECTIONS } from '@/lib/nav/sections'
-import { panelShift } from '@/lib/shell/palette-anchor'
+import { panelShift, panelWidthFor } from '@/lib/shell/palette-anchor'
 import { cn } from '@/lib/utils'
 
 /**
@@ -58,6 +58,15 @@ const DESTINATIONS: readonly Destination[] = [
   })),
 ]
 
+/** The stylesheet's own cap, so the derived width can never exceed it. */
+const PANEL_MAX = 520
+
+/**
+ * How far tokens.css's unlayered `:focus-visible` ring extends beyond its box —
+ * `outline: 2px` at `outline-offset: 2px`, plus a 4px shadow spread.
+ */
+const RING_OVERHANG = 4
+
 function matches(d: Destination, q: string): boolean {
   const needle = q.trim().toLowerCase()
   if (needle === '') return true
@@ -76,6 +85,7 @@ export function CommandPalette() {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const [shiftX, setShiftX] = useState(0)
+  const [panelWidth, setPanelWidth] = useState<number | null>(null)
   // Results are real anchors, and Enter activates the highlighted one through
   // its own ref rather than through `useRouter`. Two reasons, in order:
   // middle-click, ⌘-click and "copy link address" all keep working; and the
@@ -149,10 +159,26 @@ export function CommandPalette() {
       // that is NOT the same as being at x=0 — treating it as a position would
       // slam the panel into the left edge on every phone.
       const centre = box && box.width > 0 ? box.left + box.width / 2 : null
+
+      // WIDTH FIRST, THEN THE SHIFT, and both from the TRIGGER rather than from
+      // each other. The shift needs the panel's width, and the width now depends
+      // on the trigger — reading the panel's laid-out width here would feed the
+      // previous frame's answer back into this one.
+      const wanted = panelWidthFor({
+        triggerWidth: box && box.width > 0 ? box.width : null,
+        // `p-2.5` around the field, and the ring's overhang. Named rather than
+        // read from computed style, which would make this depend on the panel
+        // having been painted already.
+        pad: 10,
+        ringOverhang: RING_OVERHANG,
+        max: PANEL_MAX,
+      })
+      setPanelWidth(wanted)
+
       setShiftX(
         panelShift({
           triggerCenterX: centre,
-          panelWidth: panel.getBoundingClientRect().width,
+          panelWidth: wanted ?? panel.getBoundingClientRect().width,
           viewportWidth: window.innerWidth,
           // The overlay's own `p-4`. Named here rather than read back out of the
           // computed style: it is the same 16px either way, and a style read would
@@ -298,7 +324,12 @@ export function CommandPalette() {
                 // the overlay's flexbox; a transform moves the painted result without
                 // touching that layout, so the width this was measured from cannot
                 // change underneath it and the measurement cannot feed itself.
-                style={shiftX === 0 ? undefined : { transform: `translateX(${shiftX}px)` }}
+                style={{
+                  ...(shiftX === 0 ? {} : { transform: `translateX(${shiftX}px)` }),
+                  // Null leaves `max-w-[520px]` in charge, which is right when
+                  // there is no trigger to match.
+                  ...(panelWidth === null ? {} : { maxWidth: `${panelWidth}px` }),
+                }}
                 /**
                  * OPAQUE, not `glass`, and this is a deliberate departure from
                  * docs/37, which lists the command palette among the surfaces glass
@@ -360,8 +391,28 @@ export function CommandPalette() {
               corner needs 2.3px, and 17px inside the right edge.
             */}
                 <div className="p-2.5">
-                  <div className="flex items-center gap-2 rounded-lg border border-line bg-bg px-2.5">
-                    <Search size={15} className="shrink-0 text-muted" aria-hidden />
+                  {/*
+                    THE ICON IS OUT OF FLOW, AND THAT IS WHAT MAKES THE PILL LINE
+                    UP. It used to be a flex sibling, so it pushed the input
+                    rightward inside the row. MEASURED: the focus ring then sat
+                    10px past the trigger on the left and 33px past it on the
+                    right — the same control, off by a different amount at each
+                    end.
+
+                    Out of flow, the input spans the panel's padded width, so the
+                    ring is symmetric about the panel's centre. `panelShift` puts
+                    that centre on the trigger and `panelWidthFor` makes the two
+                    widths equal; the boxes then coincide.
+
+                    `pointer-events-none` because a click on the magnifier should
+                    land in the field it decorates, not on nothing.
+                  */}
+                  <div className="relative">
+                    <Search
+                      size={15}
+                      aria-hidden
+                      className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
+                    />
                     <input
                       ref={inputRef}
                       value={query}
@@ -372,7 +423,7 @@ export function CommandPalette() {
                       onKeyDown={onInputKey}
                       placeholder="Go to…"
                       aria-label="Search destinations"
-                      className="h-[38px] w-full rounded-sm bg-transparent type-sm text-ink placeholder:text-muted"
+                      className="h-9 w-full rounded-lg border border-line bg-bg pl-8 pr-3 type-sm text-ink placeholder:text-muted"
                     />
                   </div>
                 </div>
