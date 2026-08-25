@@ -76,6 +76,24 @@ import type { NavIconName } from '@/components/shell/nav-item'
  * Correcting them is not a loosening: it removes the word from three sections
  * that had stopped deserving it, and `roadmap-honesty.spec.ts` is what would
  * catch it if any of them started lying again.
+ *
+ * ── THREE BUILT SECTIONS LEFT THE MENU ENTIRELY (2026-08-25) ─────────────────
+ * Founder's ruling: `/playbooks`, `/remix` and `/sites` are hidden. Not marked
+ * `soon`, not moved down a group — REMOVED from this list, and so from all three
+ * surfaces at once.
+ *
+ * `soon` would have been the wrong tool and the wrong claim. It means "drawn,
+ * not built", and all three of these are built and working. Labelling a working
+ * screen "Soon" to get it out of the rail is the kind of small lie the two
+ * rulings above exist to prevent.
+ *
+ * So they are simply absent, and each is declared in `NOT_A_NAV_SECTION` in
+ * `reachable.test.ts` with how it is now reached. `/sites` still has a real door
+ * — the Leads page links to it. `/playbooks` and `/remix` have none and are
+ * URL-only, which is stated there rather than left to be discovered.
+ *
+ * The routes are untouched. Hiding a section is one deletion from this array;
+ * restoring it is one addition. Nothing else needs to change.
  */
 
 /** Built and connected, or drawn and honest about it. There is no third state. */
@@ -147,18 +165,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         hint: 'Photos you can reuse on any post',
         state: 'live',
       },
-      // Remix moved ABOVE Studio on 2026-08-21, and the move is the ordering rule
-      // working rather than a preference: it became `live`, and `reachable.test.ts`
-      // requires everything built to come before everything unbuilt inside a
-      // group. Leaving it in place would have failed that test.
-      {
-        href: '/remix',
-        label: 'Remix',
-        icon: 'shuffle',
-        guide: 'nav.remix',
-        hint: 'Turn one post into a week of them',
-        state: 'live',
-      },
       {
         href: '/studio',
         label: 'Studio',
@@ -186,14 +192,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: 'check-check',
         guide: 'nav.approvals',
         hint: 'Everything waiting on your decision',
-        state: 'live',
-      },
-      {
-        href: '/sites',
-        label: 'Sites',
-        icon: 'globe',
-        guide: 'nav.sites',
-        hint: 'Generate a website from your Brand Brain',
         state: 'live',
       },
       {
@@ -265,14 +263,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: 'refresh-cw',
         guide: 'nav.loop',
         hint: 'The weekly cycle, and how much it may do alone',
-        state: 'live',
-      },
-      {
-        href: '/playbooks',
-        label: 'Playbooks',
-        icon: 'book-open',
-        guide: 'nav.playbooks',
-        hint: 'When this happens, write that',
         state: 'live',
       },
     ],
