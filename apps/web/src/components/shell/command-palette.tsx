@@ -2,10 +2,11 @@
 
 import type { Route } from 'next'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 
 import { ALL_SECTIONS } from '@/lib/nav/sections'
+import { panelShift } from '@/lib/shell/palette-anchor'
 import { cn } from '@/lib/utils'
 
 /**
@@ -67,6 +68,13 @@ export function CommandPalette() {
   const [query, setQuery] = useState('')
   const [cursor, setCursor] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  // The TRIGGER's own element, not whatever had focus. `returnFocusRef` holds the
+  // latter and is deliberately different: ⌘K can be pressed from anywhere, and
+  // aligning the panel to a text field the reader happened to be typing in would
+  // be worse than not aligning it at all.
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [shiftX, setShiftX] = useState(0)
   // Results are real anchors, and Enter activates the highlighted one through
   // its own ref rather than through `useRouter`. Two reasons, in order:
   // middle-click, ⌘-click and "copy link address" all keep working; and the
@@ -118,6 +126,45 @@ export function CommandPalette() {
     return () => document.removeEventListener('keydown', onKey)
   }, [close])
 
+  /**
+   * ALIGN THE PANEL WITH THE FIELD THAT OPENED IT.
+   *
+   * `useLayoutEffect`, not `useEffect`: this runs before paint, so the panel is
+   * never shown at the wrong place and then jumped. A visible jump on every open
+   * is a worse defect than the offset it corrects.
+   *
+   * Re-measured on resize because the rail's width is a runtime fact — three
+   * widths, and the reader can collapse it — so the content column's centre moves
+   * and no constant tracks it. See `palette-anchor.ts`.
+   */
+  useLayoutEffect(() => {
+    if (!open) return
+    function measure() {
+      const trigger = triggerRef.current
+      const panel = panelRef.current
+      if (!panel) return
+      const box = trigger?.getBoundingClientRect()
+      // A hidden trigger (`max-narrow:hidden`) measures as a zero-width box, and
+      // that is NOT the same as being at x=0 — treating it as a position would
+      // slam the panel into the left edge on every phone.
+      const centre = box && box.width > 0 ? box.left + box.width / 2 : null
+      setShiftX(
+        panelShift({
+          triggerCenterX: centre,
+          panelWidth: panel.getBoundingClientRect().width,
+          viewportWidth: window.innerWidth,
+          // The overlay's own `p-4`. Named here rather than read back out of the
+          // computed style: it is the same 16px either way, and a style read would
+          // make this depend on the panel having been painted already.
+          pad: 16,
+        }),
+      )
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [open])
+
   useEffect(() => {
     if (open) inputRef.current?.focus()
   }, [open])
@@ -147,6 +194,7 @@ export function CommandPalette() {
           dialog rather than accepting text in place — an actual <input> here
           would promise inline search it does not do. */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={(event) => {
           returnFocusRef.current = event.currentTarget
@@ -207,10 +255,16 @@ export function CommandPalette() {
           role="presentation"
         >
           <div
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-label="Search Sahoda"
             onClick={(event) => event.stopPropagation()}
+            // A TRANSFORM, not a margin or a left. The panel is already centred by
+            // the overlay's flexbox; a transform moves the painted result without
+            // touching that layout, so the width this was measured from cannot
+            // change underneath it and the measurement cannot feed itself.
+            style={shiftX === 0 ? undefined : { transform: `translateX(${shiftX}px)` }}
             /**
              * OPAQUE, not `glass`, and this is a deliberate departure from
              * docs/37, which lists the command palette among the surfaces glass

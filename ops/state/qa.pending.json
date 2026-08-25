@@ -65,6 +65,32 @@
       "summary_plain": "The unit checks passed for @sahoda/web, @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
       "details": "@sahoda/jobs:lint: lint ok: @sahoda/jobs  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/web:lint:   ok    raw hex colour\n@sahoda/web:lint:   ok    disabled coming-soon button\n@sahoda/web:lint:   ok    hardcoded spacing — 134 known, none new (baseline 134)\n@sahoda/web:lint:   ok    dead breakpoint variant — 0 known, none new (baseline 0)\n@sahoda/web:lint:   ok    hand-written font size — 732 known, none new (baseline 732)\n@sahoda/web:lint: lint ok: @sahoda/web  (test-only=0 assertionless-test=0 console-log=1 uncollected-tests=0 stale-exception=0)\n Tasks:    2 successful, 2 total\napps/jobs/package.json 11ms (unchanged)\nturbo.json 3ms (unchanged)\napps/web/vercel.json 1ms (unchanged)\nChecking formatting...\nAll matched files use Prettier code style!",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mt90sa04-1e02df04",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-25T18:50:12.770Z",
+      "finished_at": "2026-08-25T18:50:12.770Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "spec updated: False\n@sahoda/web:lint:   ok    raw hex colour\n@sahoda/web:lint:   ok    disabled coming-soon button\n@sahoda/web:lint:   ok    hardcoded spacing — 134 known, none new (baseline 134)\n@sahoda/web:lint:   ok    dead breakpoint variant — 0 known, none new (baseline 0)\n@sahoda/web:lint:   ok    hand-written font size — 732 known, none new (baseline 732)\n@sahoda/web:lint: lint ok: @sahoda/web  (test-only=0 assertionless-test=0 console-log=1 uncollected-tests=0 stale-exception=0)\n Tasks:    10 successful, 10 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mt90sa04-846c9afe",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-25T18:50:12.770Z",
+      "finished_at": "2026-08-25T18:50:12.770Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "spec updated: False\n@sahoda/web:lint:   ok    raw hex colour\n@sahoda/web:lint:   ok    disabled coming-soon button\n@sahoda/web:lint:   ok    hardcoded spacing — 134 known, none new (baseline 134)\n@sahoda/web:lint:   ok    dead breakpoint variant — 0 known, none new (baseline 0)\n@sahoda/web:lint:   ok    hand-written font size — 732 known, none new (baseline 732)\n@sahoda/web:lint: lint ok: @sahoda/web  (test-only=0 assertionless-test=0 console-log=1 uncollected-tests=0 stale-exception=0)\n Tasks:    10 successful, 10 total",
+      "duration_ms": null
     }
   ]
 }
