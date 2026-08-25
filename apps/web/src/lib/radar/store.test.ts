@@ -86,11 +86,41 @@ describe('the Supabase binding uses the registry the migration describes', () =>
     expect(CODE).toContain('display_name')
   })
 
-  test('reports watch-list-only, never reading, while the change feed is unbound', () => {
-    // `reading` means an empty feed genuinely says "nothing changed". Claiming it
-    // before the changes are queried would render silence as good news.
-    expect(CODE).toContain("collector: 'watch-list-only'")
-    expect(CODE).not.toContain("collector: 'reading'")
+  /**
+   * RETARGETED 2026-08-25, NOT DELETED, and the distinction is the point.
+   *
+   * This used to read "reports watch-list-only, NEVER reading, while the change
+   * feed is unbound" and asserted `not.toContain("collector: 'reading'")`. The
+   * feed is bound now, so that literal is in the file and the old assertion
+   * fails — but the GUARANTEE it existed for has not expired by one word:
+   *
+   *   `reading` means an empty feed genuinely says "nothing changed".
+   *   Claiming it over a read that did not happen renders silence as good news.
+   *
+   * The old spelling could only ever say "the feed is unbound". This says the
+   * thing that has to stay true now that it is bound: every degraded path still
+   * lands on `watch-list-only`, and `reading` is reachable only after a change
+   * read that came back.
+   */
+  test('claims `reading` only after a change read that actually returned', () => {
+    expect(CODE).toContain("collector: 'reading'")
+
+    // The failure path is explicit and lands on the honest state. `readChanges`
+    // answers null when it could not read, and null must not become an empty
+    // feed.
+    expect(CODE).toMatch(/feed === null\) return \{ collector: 'watch-list-only'/)
+
+    // And `reading` is returned exactly once, from the one place that has the
+    // feed in hand. A second site is a second chance to claim it without one.
+    expect([...CODE.matchAll(/collector: 'reading'/g)]).toHaveLength(1)
+  })
+
+  test('a failed change read is never rendered as an empty feed', () => {
+    // The whole reason `readChanges` returns `RadarDay[] | null` rather than
+    // `RadarDay[]`. A `?? []` anywhere on that path turns "we could not look"
+    // into "we looked and nothing moved", about somebody else's business.
+    expect(CODE).not.toMatch(/readChanges\([^)]*\)\s*\)?\s*\?\?\s*\[\]/)
+    expect(CODE).toContain('Promise<RadarDay[] | null>')
   })
 
   test('never invents a last-observed timestamp', () => {
