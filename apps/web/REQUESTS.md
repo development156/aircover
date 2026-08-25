@@ -1594,22 +1594,40 @@ drops nothing, alters nothing and touches no existing row.
 
 ## 25. Playwright cannot run in the claude.ai/code remote sandbox
 
-MEASURED 2026-08-25. Playwright's bundled Chromium cannot complete any outbound
-HTTPS request from a cloud session: `https://example.com/` fails with
-`net::ERR_CONNECTION_RESET`, identically to Clerk's host. Loopback is fine — a
-trivial Node server on the same port answers Chromium with 200 — so it is not the
-app and not the port.
-
-The cause is the session's agent proxy: it re-terminates TLS with its own CA, and
-Playwright's Chromium ships its own profile rather than reading the system trust
-store the proxy configures. Every `@smoke` spec signs in through Clerk, so the
+MEASURED 2026-08-25, and the second measurement corrected the first. What is
+true: Playwright's bundled Chromium cannot complete any **HTTPS** request from a
+cloud session. `https://example.com/` fails with `net::ERR_CONNECTION_RESET`,
+identically to Clerk's host. Every `@smoke` spec signs in through Clerk, so the
 whole smoke leg of `pnpm gate` is unrunnable here.
 
-The one-line "fix" is `--ignore-certificate-errors` / `ignoreHTTPSErrors`, which
-is disabling TLS verification, so it was not used and should not be.
+**It is NOT a certificate problem, and the first version of this entry said it
+was.** The evidence against that reading, all from the same session:
 
-**What would actually fix it:** point Chromium at the proxy CA at launch —
-`chromium.launch({ args: ['--use-nss-certs'] })` with the bundle imported into an
-NSS profile, or Playwright's `clientCertificates`/CA support if a version in this
-repo's range exposes one. Worth someone's afternoon: it is the difference between
-a cloud session that can run the gate and one that can run four fifths of it.
+- Chromium loads `http://127.0.0.1:45233/__agentproxy/status` — the agent proxy's
+  own endpoint — with **200**. Loopback is fine.
+- Chromium loads `http://example.com/` over plain HTTP with **200**. Outbound
+  port 80 is fine.
+- Chromium fails every `https://` URL with RESET, with no proxy flag, with
+  `proxy: { server: 'http://127.0.0.1:45233' }`, and with
+  `--proxy-server=… --proxy-bypass-list=<-loopback>`.
+- **The proxy's `recentRelayFailures` stays empty across all of those.** It never
+  saw the attempt.
+- Playwright's Node-side `APIRequestContext` fetches `https://example.com/` with
+  **200** from the same process, through the same proxy.
+
+A CA-trust failure would surface as `ERR_CERT_AUTHORITY_INVALID` and would appear
+in the proxy log, because the tunnel would have been established first. Neither
+happens. Outbound TCP 443 from the Chromium process is being reset before it
+reaches anything.
+
+So `--ignore-certificate-errors` would **not** fix this. It is the wrong remedy
+for the wrong diagnosis, and it is also the one thing nobody should reach for.
+Same for importing the proxy CA into `~/.pki/nssdb`: there is no certificate to
+distrust when there is no connection.
+
+**What would actually fix it** is outside the repo: allow the Chromium process's
+egress on 443, or run the smoke leg somewhere Chromium has ordinary network. The
+practical answer today is the second one — run `pnpm gate` on a laptop or in CI
+before merging a lane, and treat a cloud session as covering four of the five
+legs. Which is also REQUESTS §15: **no CI workflow runs the gate.** Fixing that
+one fixes this one.
