@@ -9,6 +9,7 @@ import {
   energyOf,
   signalCount,
   signalIds,
+  resumeStep,
   type OnboardingData,
 } from './store'
 
@@ -36,16 +37,37 @@ describe('signalIds — the count is what was actually given', () => {
     expect(signalIds(data({ what: 'we sell loose-leaf tea' }))).toEqual(['what'])
   })
 
-  it('counts each reference, source and rival exactly once', () => {
+  it('counts each source and rival exactly once', () => {
     const d = data({
-      refs: [
-        { url: 'a.com', host: 'a.com', kind: 'Website' },
-        { url: 'b.com', host: 'b.com', kind: 'Website' },
-      ],
       sources: ['Website', 'Instagram'],
       competitors: [{ name: 'Rival', url: 'https://rival.com', kind: 'website' }],
     })
-    expect(signalCount(d)).toBe(5)
+    expect(signalCount(d)).toBe(3)
+  })
+
+  /**
+   * THE COUNT IS A CLAIM ABOUT HOW MUCH SAHODA WAS TOLD.
+   *
+   * A logo persisted as a file name, an uploaded document as `{name, size}`
+   * with no bytes, and a reference as a URL no request ever carried — and each
+   * one raised this number and the orb's density. Four inputs that reached
+   * nothing, inflating the one figure the design promises is real.
+   *
+   * Written against the saved SHAPE rather than the type, because that is what
+   * a returning user's localStorage actually holds and the type can no longer
+   * express it.
+   */
+  it('does not count a logo, an uploaded file, a reference or a taste note', () => {
+    const withDead = {
+      ...data({ name: 'Chai & Chapters' }),
+      logo: 'logo-final-2.png',
+      docs: [{ name: 'guidelines.pdf', size: 90210 }],
+      refs: [{ url: 'https://admired.example', host: 'admired.example', kind: 'Website' }],
+      refNote: 'calm, unhurried',
+    } as unknown as OnboardingData
+
+    expect(signalCount(withDead)).toBe(signalCount(data({ name: 'Chai & Chapters' })))
+    expect(signalIds(withDead)).toEqual(['name'])
   })
 
   /**
@@ -61,10 +83,7 @@ describe('signalIds — the count is what was actually given', () => {
     const before = data({
       name: 'Chai & Chapters',
       audience: 'weekend readers',
-      refs: [
-        { url: 'https://instagram.com/x', host: 'instagram.com', kind: 'Instagram account' },
-        { url: 'https://pinterest.com/y', host: 'pinterest.com', kind: 'Pinterest board' },
-      ],
+      sources: ['Website', 'Instagram'],
     })
     // A round trip through JSON is what persistence actually does to it.
     const after = JSON.parse(JSON.stringify(before)) as OnboardingData
@@ -98,7 +117,7 @@ describe('confidenceOf — derived, and never a full bar', () => {
     const thin = confidenceOf(data({ name: 'Chai', audience: 'readers' }))
     const fourCore = confidenceOf(core)
     // Two more real signals is what crosses the line.
-    const past = confidenceOf({ ...core, refNote: 'calm', sources: ['Website'] })
+    const past = confidenceOf({ ...core, neverSay: 'never call us cheap', sources: ['Website'] })
 
     expect(thin.pct).toBe(23)
     expect(thin.label).toBe('Getting started')
@@ -119,15 +138,8 @@ describe('confidenceOf — derived, and never a full bar', () => {
       loc: 'Bengaluru',
       role: 'reader',
       interests: 'books, tea',
-      logo: 'logo.png',
       colorsTouched: ['Primary', 'Secondary', 'Background'],
-      docs: Array.from({ length: 6 }, (_, i) => ({ name: `d${i}.pdf`, size: 1000 })),
-      refs: Array.from({ length: 6 }, (_, i) => ({
-        url: `r${i}.com`,
-        host: `r${i}.com`,
-        kind: 'Website',
-      })),
-      refNote: 'calm, unhurried',
+      neverSay: 'never call us cheap',
       sources: ['Website', 'Instagram', 'Notion'],
       competitors: [
         { name: 'Blossom', url: 'https://blossom.in', kind: 'website' },
@@ -182,10 +194,25 @@ describe('canAdvance — a wall in front of an optional question is a lie', () =
     expect(canAdvance('3', data({ audience: 'readers' }))).toBe(true)
   })
 
-  it('leaves 04, 05, 06 and the rivals step OPEN with nothing filled in', () => {
-    for (const step of ['4', '5', '6', 'comp'] as const) {
+  it('leaves 04, 05 and the rivals step OPEN with nothing filled in', () => {
+    for (const step of ['4', '5', 'comp'] as const) {
       expect(canAdvance(step, data())).toBe(true)
     }
+  })
+})
+
+describe('resumeStep', () => {
+  it("maps the retired '6' onto Knowledge, which is now '5'", () => {
+    expect(resumeStep('6')).toBe('5')
+  })
+
+  it("resumes '5' on Knowledge too, which is the screen References ran into", () => {
+    expect(resumeStep('5')).toBe('5')
+  })
+
+  it('still refuses anything that was never a step', () => {
+    expect(resumeStep('9')).toBe('intro')
+    expect(resumeStep(null)).toBe('intro')
   })
 })
 

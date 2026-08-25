@@ -44,18 +44,14 @@ describe('save and exit → resume', () => {
     const before = data({
       name: 'Chai & Chapters',
       audience: 'weekend readers',
-      refs: [
-        { url: 'https://instagram.com/a', host: 'instagram.com', kind: 'Instagram account' },
-        { url: 'https://pinterest.com/b', host: 'pinterest.com', kind: 'Pinterest board' },
-      ],
-      sources: ['Website'],
+      sources: ['Website', 'Instagram'],
     })
     saveState(WS, { step: '5', data: before })
 
     const resumed = loadState(WS)
     expect(resumed).not.toBeNull()
     expect(signalCount(resumed!.data)).toBe(signalCount(before))
-    expect(signalCount(resumed!.data)).toBe(5)
+    expect(signalCount(resumed!.data)).toBe(4)
   })
 
   it('returns null for a workspace that has nothing saved', () => {
@@ -94,11 +90,10 @@ describe('a saved blob is untrusted input', () => {
   it('drops values of the wrong type instead of rendering them', () => {
     window.localStorage.setItem(
       storageKey(WS),
-      JSON.stringify({ step: '2', data: { name: 42, refs: 'nope', sources: [7, 'Website'] } }),
+      JSON.stringify({ step: '2', data: { name: 42, sources: [7, 'Website'] } }),
     )
     const resumed = loadState(WS)
     expect(resumed?.data.name).toBe('')
-    expect(resumed?.data.refs).toEqual([])
     expect(resumed?.data.sources).toEqual(['Website'])
   })
 
@@ -168,5 +163,24 @@ describe('a session saved before competitors had an address', () => {
     )
 
     expect(loadState(WS)?.data.competitors).toEqual([])
+  })
+  /**
+   * THE TWO POSITIONS THAT NO LONGER EXIST.
+   *
+   * `'5'` was References, which was removed, and `'6'` was Knowledge, which
+   * took the number 5. Anybody part-way through the flow when this shipped is
+   * holding one of those in localStorage. Falling through to the `isStepId`
+   * default would send them back to the intro — their typed answers intact and
+   * their PLACE gone, which reads as the product having lost the session.
+   */
+  it('resumes a retired position on Knowledge rather than at the intro', () => {
+    for (const saved of ['5', '6']) {
+      window.localStorage.setItem(
+        storageKey(WS),
+        JSON.stringify({ step: saved, data: { name: 'Chai & Chapters' } }),
+      )
+      expect(loadState(WS)?.step, `a saved step of '${saved}'`).toBe('5')
+      expect(loadState(WS)?.data.name).toBe('Chai & Chapters')
+    }
   })
 })
