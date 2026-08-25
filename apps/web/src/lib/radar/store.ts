@@ -108,6 +108,32 @@ function kindFromRegistry(kind: string): CompetitorKind {
   return kind === 'instagram' ? 'instagram' : 'website'
 }
 
+/** One row of `competitor_sources`, as this screen reads it. */
+interface RegistrySource {
+  kind: string
+  locator: string
+  last_seen_at: string | null
+}
+
+/**
+ * The most recent SUCCESSFUL read across a competitor's sources, or null.
+ *
+ * The latest rather than the earliest, and null unless at least one source has
+ * actually been seen. A competitor watched on two addresses where only one has
+ * ever loaded HAS been observed — reporting null there would say Radar has never
+ * managed to read them, which is a different and worse claim than the truth.
+ *
+ * A row whose `last_seen_at` is null contributes nothing rather than counting as
+ * a zero date, which would sort ahead of every real timestamp.
+ */
+function lastObservedFrom(sources: readonly RegistrySource[]): string | null {
+  const seen = sources
+    .map((s) => s.last_seen_at)
+    .filter((at): at is string => typeof at === 'string' && at !== '')
+  if (seen.length === 0) return null
+  return seen.reduce((latest, at) => (Date.parse(at) > Date.parse(latest) ? at : latest))
+}
+
 export function supabaseRadarStore(): RadarStore {
   return {
     /**
@@ -126,7 +152,21 @@ export function supabaseRadarStore(): RadarStore {
       const supabase = await createServerSupabase()
       const { data, error } = await supabase
         .from('competitor_subscriptions')
-        .select('competitor_id, label, created_at, competitors(id, display_name, created_at)')
+        // ONE STRING LITERAL, NOT A CONCATENATION. supabase-js parses this at
+        // the TYPE level to shape the result; built with `+` it degrades to
+        // `GenericStringError` and every field access below fails to compile.
+        // The compile error is the good outcome — the same select assembled at
+        // runtime would have typed as `any` and shipped.
+        //
+        // The SOURCES carry the address, the kind and the last successful read.
+        // Before this they were `url: ''`, a hardcoded `website` and a flat
+        // `null` — three fields the screen printed without having looked. Column
+        // names come from `information_schema.columns` against the production
+        // project on 2026-08-25, not from a doc: guessing them is what cost every
+        // /radar request a 500 the first time.
+        .select(
+          'competitor_id, label, created_at, competitors(id, display_name, created_at, competitor_sources(kind, locator, last_seen_at))',
+        )
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: true })
 
@@ -143,23 +183,35 @@ export function supabaseRadarStore(): RadarStore {
           id: string
           display_name: string
           created_at: string
+          competitor_sources?: RegistrySource[] | null
         } | null
+        const sources = c?.competitor_sources ?? []
+        // The FIRST source is the one the screen shows. A competitor may carry
+        // several (a website and an Instagram account), and the watch list has
+        // one line per business rather than per address — so this names one and
+        // the others are not silently merged into it.
+        const primary = sources[0] ?? null
+
         return {
           id: c?.id ?? String(row.competitor_id),
           // `display_name`, NOT `name`. The column the first binding guessed at
           // does not exist, and the guess cost every /radar request a 500.
           name: row.label ?? c?.display_name ?? 'Competitor',
           // The registry stores a normalised LOCATOR per source, not one url on
-          // the competitor. Sources are a separate read this binding does not do
-          // yet, so the honest answer is an empty string rather than a fabricated
-          // address.
-          url: '',
-          kind: kindFromRegistry('website'),
+          // the competitor. An address that is genuinely absent stays an empty
+          // string — the screen draws nothing for it — rather than becoming a
+          // guess at the competitor's home page.
+          url: primary?.locator ?? '',
+          kind: kindFromRegistry(primary?.kind ?? 'website'),
           addedOn: String(row.created_at ?? c?.created_at ?? ''),
-          // NEVER inferred. No successful read has been recorded for anyone —
-          // competitor_snapshots is empty — and inventing a timestamp here is
-          // exactly the fabrication the screen's provenance guard exists to stop.
-          lastObservedAt: null,
+          // STILL NEVER INFERRED — but it is now READ rather than assumed.
+          //
+          // `last_seen_at` moves only on a successful read (apps/jobs pg.ts sets
+          // it under `seen`), which is exactly the contract this field states.
+          // Null still means no successful read has ever happened, which is true
+          // of every row today because nothing runs the scan — the difference is
+          // that it is now the database saying so rather than this file.
+          lastObservedAt: lastObservedFrom(sources),
         }
       })
 
