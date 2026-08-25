@@ -1306,12 +1306,27 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The popover. Anchored under its own swatch and never wider than the pane. */
+/* The popover.
+   ── IT OPENS TO THE RIGHT, AND IT USED TO OPEN DOWNWARD ────────────────────
+   Below the swatch it ran straight into the Continue and Back buttons, which
+   sit at the bottom of every step and are FIXED to the viewport under 960px.
+   The founder photographed it half-covered by them.
+   Opening beside the swatch clears that row entirely without moving a single
+   button — the swatches sit in the left column and the space to their right is
+   empty on this screen. Nudged slightly ABOVE the swatch's centre (-56%, not
+   -50%) so the tall grid leans away from the action row rather than toward it.
+   Under 960px there is no room to the right and the button row is fixed, so it
+   flips ABOVE the swatch instead — the one direction nothing occupies. */
 .cpick {
   position: absolute;
   z-index: 40;
-  top: calc(100% + 10px);
-  left: 0;
+  left: calc(100% + 14px);
+  top: 50%;
+  /* `transform`, while the entry animation drives `translate`. Two separate
+     properties on purpose: the keyframe used to animate `transform` and its
+     `to { transform: none }` would have wiped this centring the moment the
+     animation finished. */
+  transform: translateY(-56%);
   width: min(320px, calc(100vw - 40px));
   padding: 12px;
   border-radius: var(--r-lg);
@@ -1328,11 +1343,11 @@
 @keyframes cpick-in {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    translate: -4px 0;
   }
   to {
     opacity: 1;
-    transform: none;
+    translate: 0 0;
   }
 }
 
@@ -2219,6 +2234,18 @@
 
   .pane {
     padding-bottom: 8px;
+  }
+
+  /* No room to the right of the swatch at this width, and the button row below
+     is FIXED to the viewport — so the popover flips above, the one direction
+     with nothing in it. Left-aligned to the pane rather than to its swatch: the
+     third swatch is far enough across that anchoring to it would push a 320px
+     panel off the right edge. */
+  .cpick {
+    left: 0;
+    top: auto;
+    bottom: calc(100% + 12px);
+    transform: none;
   }
 
   /* Pinned bottom CTA with blur backdrop in dark and light themes */
