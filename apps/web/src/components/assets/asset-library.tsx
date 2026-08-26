@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import dynamic from 'next/dynamic'
 import { ImagePlus } from 'lucide-react'
 import { folderPath, type AssetFolder, type AssetSmartFolder } from '@sahoda/shared'
 
@@ -11,7 +12,6 @@ import { BulkBar } from '@/components/assets/bulk-bar'
 import { FolderBreadcrumb } from '@/components/assets/folder-breadcrumb'
 import { FolderMenu } from '@/components/assets/folder-menu'
 import { FolderRow } from '@/components/assets/folder-row'
-import { SmartFolderBuilder } from '@/components/assets/smart-folder-builder'
 import { SmartFolderMenu } from '@/components/assets/smart-folder-menu'
 import type { FolderId } from '@/lib/assets/folders'
 import { ROOT, contentsAt, locationName, type LibraryLocation } from '@/lib/assets/organize-view'
@@ -37,6 +37,31 @@ import { AssetDetail } from './asset-detail'
  * or a saved smart question. The kind chips and the folder row both write to
  * it, so the screen can never show one place while labelling it another.
  */
+/**
+ * THE RULE BUILDER IS NOT FIRST-LOAD MATERIAL.
+ *
+ * It renders only inside a modal nobody has opened yet, and it carries
+ * `SmartQuerySchema` — a zod schema — into the browser with it. Loading it with
+ * the library meant every visit to /assets downloaded a form most visits never
+ * see, and MEASURED it put this route 33.5 kB over its JavaScript budget.
+ *
+ * `next/dynamic` fetches it when the modal opens instead. `js-budget.mjs` says
+ * in its own header that it cannot see bytes fetched AFTER load, so this is not
+ * hiding the weight from the guard: the weight genuinely moves off the path a
+ * person pays to look at their photos.
+ *
+ * `ssr: false` is deliberate. This subtree is behind `open`, so there is nothing
+ * to server-render, and asking for it would cost a server round trip to produce
+ * markup for a closed modal.
+ */
+const SmartFolderBuilder = dynamic(
+  () => import('@/components/assets/smart-folder-builder').then((m) => m.SmartFolderBuilder),
+  {
+    ssr: false,
+    loading: () => <p className="type-sm text-muted">Getting the rule builder ready.</p>,
+  },
+)
+
 export function AssetLibrary({
   cards,
   capped,
