@@ -1,19 +1,24 @@
 # Handoff — design — 2026-08-26
 
-> **OWNER UNKNOWN.** Nobody declared who runs this lane, so the filename falls
-> back to the branch slug. Set it once with `git config sahoda.owner <name>` or
-> the `SAHODA_LANE_OWNER` environment variable, and the record becomes readable
-> by a person instead of by a branch id.
->
-> This file was written as `design-2026-08-26.md`, the convention at the time.
-> `d21bac3` changed it to `<owner>-<role>-<date>.md` and reached this lane via
-> `372fcdf`. **The rename is not cosmetic:** `scripts/auto-handoff.mjs` decides
-> whether a real handoff already exists by testing `existsSync` on the *new*
-> path, so under the old name the stop hook would have written a machine-written
-> stub beside this file and today would have carried two handoffs for one
-> session. See the defect note below before editing this header.
+**Owner** jiban
 
-**Branch** `claude/lead-design-7m7ios` at `f2bc4b1`, cut from `wt-core`. Pushed: yes.
+> This file has been renamed twice in one day, and both renames were forced.
+> It was written as `design-2026-08-26.md`, the convention at the time. `d21bac3`
+> changed that to owner-first and reached this lane via `372fcdf`, so it became
+> `claude-lead-design-7m7ios-design-2026-08-26.md` — the branch-slug fallback,
+> because nobody had declared an owner. **jiban declared it**, so it is now
+> `jiban-design-2026-08-26.md` and `git config sahoda.owner jiban` is set in this
+> lane.
+>
+> **The name is not cosmetic:** `scripts/auto-handoff.mjs` decides whether a real
+> handoff already exists by testing `existsSync` on the owner-derived path. Under
+> any other name it does not see this file and writes a stub beside it, and the
+> day carries two handoffs for one session. MEASURED, both directions, below.
+
+**Branch** `claude/lead-design-7m7ios` at `b3c0f19`, cut from `wt-core`. Pushed: yes.
+
+Sessions 12 and 13 below are one continuous session; 13 begins where the founder
+declared the owner and the lane had already been integrated by the advisor.
 
 This is **Session 12**. Sessions 1 to 11 are in `design-2026-08-25.md` (1903 lines) and
 are still the record for every design item. Nothing in that file is superseded here.
@@ -407,3 +412,167 @@ Unchanged from Session 9. Do not invent work against these; they are rulings, no
 
 **Plus two tasks:** a real "Notify me" flow if wanted, and the `js-budget.json` collision
 above.
+
+---
+
+# Session 13 — design — 2026-08-26
+
+**Owner** jiban · **Branch** `claude/lead-design-7m7ios` at `b3c0f19`, cut from
+`wt-core`. Pushed: yes.
+
+Session 12 above is the same sitting. This section covers what happened after it
+was written, which is mostly other people's work arriving and this lane reacting
+to it.
+
+## What shipped
+
+| # | what | proof | test that covers it |
+|---|---|---|---|
+| 1 | The owner is declared | `git config sahoda.owner` = `jiban` (MEASURED) | none — it is a config value |
+| 2 | This handoff filed under the owner-derived name | `jiban-design-2026-08-26.md` | `scripts/auto-handoff.mjs` exits without writing, MEASURED both directions |
+| 3 | `scripts/auto-handoff.mjs` formatted, unblocking the format gate | `ad07c37` | CI `typecheck · lint · test · format` green on `4e17dfe` and `b3c0f19` |
+| 4 | CLAUDE.md's Playwright figures re-measured | `CLAUDE.md:29` | **none — and that is the point, see below** |
+| 5 | A live defect in `auto-handoff.mjs` documented, not fixed | this file, "A LIVE DEFECT" | reproduction runs in both directions |
+
+**Item 3 was somebody else's red, and it blocked everyone.** CI failed on
+`9724cb2` — a head another session pushed into this lane. From the job log, not a
+guess:
+
+```
+Run pnpm exec prettier --check .
+[warn] scripts/auto-handoff.mjs
+##[error]Process completed with exit code 1.
+```
+
+The file arrived from `wt-web` via `9b219be` already unformatted, so `wt-core`'s
+format leg was red for **every** lane. Prettier's own output, nothing hand-edited.
+INFERRED-then-CHECKED: stripping all whitespace from both versions still shows
+differences, because quote style and arrow parens are not whitespace, so every
+difference was read individually rather than trusted to that test.
+
+## What was NOT done, and why
+
+- **No design work.** None invented. The ten founder decisions from Session 9 are
+  still decisions.
+- **`scripts/auto-handoff.mjs`'s defect is documented, not fixed.** It came from
+  `wt-web` and runs in every session; a design lane rewriting a stop hook is not
+  its call.
+- **Playwright is UNRUN, not passed.** 5 of 6 legs ran. `--list` works without a
+  browser; executing anything does not.
+- **`packages/db/tests/connections.test.ts` proved nothing here.** It reports
+  **10 skipped, 0 run** locally for want of database credentials. That is the
+  "a suite that ran nothing reports as passing" trap CLAUDE.md names. CI runs it
+  where the credentials exist.
+- **`wt-jiban` was requested and this session did not move to it.** See "changes
+  an assumption".
+
+## Shared surfaces touched
+
+**Two, and both are read by every other lane.**
+
+1. **`CLAUDE.md:29`** — the Playwright figures. Numbers only; no rule changed. It
+   is a READ surface: nothing constructs from it, so nothing breaks. It is
+   corrected, not extended.
+2. **`scripts/auto-handoff.mjs`** — formatting only, and it is a Stop hook that
+   runs in **every session in every lane**. Semantically identical; verified by
+   running it after the change and watching it still skip correctly.
+
+Nothing in `packages/*`. No migration, no server action, no query, no dependency,
+no token.
+
+## Guards written, and the mutation that proved each
+
+**None written.** One existing guard was exercised, and one was proved by
+destroying this file with it.
+
+**`.githooks/pre-commit`, watched refusing.** Staged `ops/state/qa.pending.json`
+and ran `git commit` with no escape hatch:
+
+```
+Refusing the commit: ops/state/qa.pending.json is staged.
+```
+
+No commit was created (`git log -1` unchanged). Only then was `ALLOW_QA_PENDING=1`
+used, for the adjacent case the hook documents.
+
+**`scripts/auto-handoff.mjs`, proved in both directions.** ARMED (correct name, no
+marker in prose) → exits, writes nothing, file intact at 409 lines. MUTATION A
+(marker injected into prose) → **overwrote the handoff, 343 lines became 38**.
+MUTATION B (old filename) → wrote a *second* handoff for the same day.
+
+**`scripts/lib/pre-commit-hook.test.mjs`** passes under vitest, 4 tests.
+
+## Anything retracted
+
+**One retraction, and it is mine, MEASURED.**
+
+Earlier today I reported the smoke count as `115 tests in 35 files` and called it
+"byte-identical to the figure CLAUDE.md has carried since 2026-08-24", presenting
+it as evidence the figure had not drifted. **That was wrong.** CLAUDE.md's live
+figure was `116 in 36`, measured 2026-08-25; `115 / 35` is the *superseded*
+2026-08-24 figure the same sentence records as history. My pre-integration base
+simply lacked the research lane's `marketing-brain.spec.ts`. **I reported a match
+that did not exist**, by reading the parenthetical instead of the claim.
+
+Re-measured on `b3c0f19`: **277 tests in 72 files**, `--grep @smoke` **118 in 37**.
+CLAUDE.md is updated with those, and the delta is fully accounted: the new file is
+`palette-legibility.spec.ts`, whose 2 tests are **both** tagged, which is why both
+halves moved by exactly 2 and the file counts by exactly 1. `277 − 118 = 159`, so
+the "159 outside the tag" sentence is still correct and was left alone.
+
+The earlier finding that **Clerk is not the Playwright blocker** stands and is
+unaffected: `.env.local` exists, the server reaches `Ready in 6.7s`, and the only
+failure is `chromium_headless_shell-1228` absent where the image holds 1194.
+
+## Anything that changes an assumption
+
+1. **`design-lint` scans 1218 files, not 1185.** That count is the tell that the
+   working directory was right, and it is used that way in briefings. The merged
+   tree grew it. Anyone still checking for 1185 will misread a correct run as a
+   `cd` accident.
+
+2. **CLAUDE.md's own figures have NO guard.** The file says a stale number there
+   is "the same defect as a stale number on a screen", but nothing asserts them —
+   MEASURED: nothing under `apps/web/e2e` or `apps/web/src` reads CLAUDE.md's
+   counts. `roadmap-honesty` guards the *roadmap* doc's header, not this one. The
+   figures drifted for a day and only a manual re-measure caught it, which is
+   exactly the failure mode the sentence warns about.
+
+3. **`wt-jiban` does not exist and this session did not create it.** The founder's
+   arguments named `branch:wt-jiban`. This lane's work sits on
+   `claude/lead-design-7m7ios`, which is where **PR #6 is open** and where four
+   other sessions have pushed today. Moving the branch would strand that PR, and
+   the harness pins this session's pushes to the current lane. Renaming a lane
+   that other sessions are actively writing into is not a thing to do on an
+   inference. **Say whether you want the lane renamed, and it happens next
+   session; nothing is lost by it sitting where it is.**
+
+4. **Other sessions push into this lane without warning.** It happened four times
+   today (`4b45cbe`, `372fcdf`, `9724cb2`, `7ae5c37`). A rejected push means
+   `pull` and `merge`. **Never force.** I reached for `--force-with-lease` once,
+   on a push that turned out to be a no-op — the lease would have refused if the
+   remote had moved, and nothing was damaged, but it was the wrong reflex on a
+   branch other people write to.
+
+5. **The design work is NOT in production.** `wt-core` is far ahead of `wt-web`
+   and `bbcc8bd` is not an ancestor of it. The gated step is the founder's.
+
+## Gate
+
+Run on `b3c0f19`, clean tree, from the repo root except where noted. **No leg was
+piped.** Every exit code was read from `$?` on the command itself.
+
+| leg | result | real output |
+|---|---|---|
+| `turbo run typecheck lint test --force` | **PASS** | `Tasks: 27 successful, 27 total` · `Cached: 0 cached, 27 total` · `4m3.99s` |
+| ↳ `@sahoda/web:test` | **PASS** | `389 passed \| 3 skipped (392)` files, `4931 passed \| 13 skipped (4944)` tests |
+| ↳ `@sahoda/db:test` | **PASS** | `33 passed \| 12 skipped (45)` files, `610 passed \| 207 skipped (817)` tests |
+| `prettier --check .` (root) | **PASS** | `All matched files use Prettier code style!` |
+| `design-lint.mjs` (root) | **PASS** | `1218 files scanned` · `hand-written font size — 731 known, none new` |
+| `pnpm run build` in `apps/web` | **PASS** | exit 0 · `js-budget ok: 81 routes within budget` |
+| **Playwright `test:smoke`** | **UNRUN** | NOT passed. `--list` gives `118 tests in 37 files`; launching fails on `chromium_headless_shell-1228` vs 1194 on disk |
+| **CI** | **PASS** | both `typecheck · lint · test · format` runs green on `b3c0f19` |
+
+`Cached: 0 cached, 27 total` is the line that makes the pass mean anything. A run
+reporting `Cached: 19 cached` in 1.3s verified nothing, and several earlier "gate
+green" claims in this lane rested on exactly that.
