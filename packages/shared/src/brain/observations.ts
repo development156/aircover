@@ -67,6 +67,16 @@ export const OBSERVATION_KINDS = [
    * `OBSERVATION_BASIS`.
    */
   'audience_growth',
+  /**
+   * Which shape of caption earns more attention. Arithmetic over caption length
+   * against `post_metric_snapshots`; no model call.
+   *
+   * The pair to `channel_return`: that one says WHERE to spend the next hour,
+   * this says what to write when you get there. Split at the customer's own
+   * median rather than a fixed character count, because "short" differs between
+   * a bakery and a law firm and any constant would be wrong for one of them.
+   */
+  'format_effect',
 ] as const
 
 export type ObservationKind = (typeof OBSERVATION_KINDS)[number]
@@ -143,6 +153,7 @@ export const OBSERVATION_BASIS = {
   edit_distance: 'posts',
   channel_return: 'posts',
   audience_growth: 'audience',
+  format_effect: 'posts',
 } as const satisfies Record<ObservationKind, 'posts' | 'audience'>
 
 export type ObservationBasis = (typeof OBSERVATION_BASIS)[ObservationKind]

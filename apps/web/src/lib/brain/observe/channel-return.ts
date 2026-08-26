@@ -102,8 +102,14 @@ export const MIN_RATE = 0.02
  */
 export const MIN_RATIO = 1.5
 
-/** Engagement per person reached, for one post. */
-export function engagementRate(outcome: ChannelOutcome): number {
+/**
+ * Engagement per person reached, for one post.
+ *
+ * Takes the two numbers rather than a `ChannelOutcome`, because `format_effect`
+ * needs the same arithmetic over a different row shape and a shared rate must
+ * not drag one computer's row type into another's.
+ */
+export function engagementRate(outcome: { engagement: number; reach: number }): number {
   if (outcome.reach <= 0) return 0
   return outcome.engagement / outcome.reach
 }

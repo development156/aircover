@@ -7,11 +7,13 @@ import { reportServerError } from '@/lib/observability/report'
 import { audienceGrowth, type NoGrowthReason } from './observe/audience-growth'
 import { channelReturn, type NoChannelReason } from './observe/channel-return'
 import { editDistance, type NoDeltaReason } from './observe/edit-distance'
+import { formatEffect, type NoFormatReason } from './observe/format-effect'
 import { toneDrift, type NoDriftReason } from './observe/tone-drift'
 import {
   readAudienceReadings,
   readCapturedPosts,
   readChannelOutcomes,
+  readFeaturedPosts,
   readPublishedPosts,
   saveObservation,
   workspacesWithAudience,
@@ -103,7 +105,7 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
 
   const decline = (
     kind: string,
-    reason: NoDriftReason | NoDeltaReason | NoChannelReason | NoGrowthReason,
+    reason: NoDriftReason | NoDeltaReason | NoChannelReason | NoGrowthReason | NoFormatReason,
   ): void => {
     const key = `${kind}:${reason}`
     result.declined[key] = (result.declined[key] ?? 0) + 1
@@ -113,7 +115,7 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
     workspaceId: string,
     kind: string,
     outcome: { observation: MarketingObservation | null; reason: string | null },
-    fallback: NoDriftReason | NoDeltaReason | NoChannelReason | NoGrowthReason,
+    fallback: NoDriftReason | NoDeltaReason | NoChannelReason | NoGrowthReason | NoFormatReason,
   ): Promise<void> => {
     if (!outcome.observation) {
       // Each computer returns exactly one of the two and its type says so. The
@@ -121,7 +123,8 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
       // count would silently stop adding up.
       decline(
         kind,
-        (outcome.reason as NoDriftReason | NoDeltaReason | NoChannelReason | NoGrowthReason) ??
+        (outcome.reason as
+          NoDriftReason | NoDeltaReason | NoChannelReason | NoGrowthReason | NoFormatReason) ??
           fallback,
       )
       return
@@ -158,6 +161,19 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
        */
       const outcomes = await readChannelOutcomes(workspaceId, MAX_POSTS_CONSIDERED * 2)
       await record(workspaceId, 'channel_return', channelReturn(outcomes, computedOn), 'no_metrics')
+
+      /**
+       * One row per POST here, where channel_return takes one per post per
+       * channel. A caption cross-published three times is one caption, and the
+       * reader collapses it before this sees it.
+       */
+      const featured = await readFeaturedPosts(workspaceId, MAX_POSTS_CONSIDERED * 2)
+      await record(
+        workspaceId,
+        'format_effect',
+        formatEffect(featured.slice(-MAX_POSTS_CONSIDERED), computedOn),
+        'no_metrics',
+      )
 
       /**
        * One observation PER CHANNEL, which is why this is the only computer the

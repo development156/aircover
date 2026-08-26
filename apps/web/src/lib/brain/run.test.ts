@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 import type { AudienceReading } from './observe/audience-growth'
 import type { ChannelOutcome } from './observe/channel-return'
+import type { FeaturedPost } from './observe/format-effect'
 import type { CapturedPost } from './observe/edit-distance'
 import type { PublishedPost } from './observe/tone-drift'
 
@@ -53,6 +54,7 @@ const store = vi.hoisted(() => ({
   metricWorkspaces: [] as string[],
   outcomesBy: new Map<string, ChannelOutcome[]>(),
   audienceWorkspaces: [] as string[],
+  featuredBy: new Map<string, FeaturedPost[]>(),
   readingsBy: new Map<string, AudienceReading[]>(),
   saved: [] as Array<{ workspaceId: string; claim: string; computedOn: string }>,
   inserted: true,
@@ -79,6 +81,10 @@ vi.mock('./store', () => ({
   readChannelOutcomes: async (workspaceId: string) => {
     if (store.throwFor.has(workspaceId)) throw new Error('read failed')
     return store.outcomesBy.get(workspaceId) ?? []
+  },
+  readFeaturedPosts: async (workspaceId: string) => {
+    if (store.throwFor.has(workspaceId)) throw new Error('read failed')
+    return store.featuredBy.get(workspaceId) ?? []
   },
   workspacesWithAudience: async () => store.audienceWorkspaces,
   readAudienceReadings: async (workspaceId: string) => {
@@ -138,6 +144,7 @@ describe('runMarketingBrainPass', () => {
     store.metricWorkspaces = []
     store.outcomesBy = new Map()
     store.audienceWorkspaces = []
+    store.featuredBy = new Map()
     store.readingsBy = new Map()
     store.saved = []
     store.inserted = true
@@ -198,6 +205,7 @@ describe('runMarketingBrainPass', () => {
       'edit_distance:no_captured_drafts': 2,
       'channel_return:no_metrics': 2,
       'audience_growth:no_audience_data': 2,
+      'format_effect:no_metrics': 2,
     })
   })
 
@@ -219,6 +227,7 @@ describe('runMarketingBrainPass', () => {
       'edit_distance:no_captured_drafts': 1,
       'channel_return:no_metrics': 1,
       'audience_growth:no_audience_data': 1,
+      'format_effect:no_metrics': 1,
     })
   })
 

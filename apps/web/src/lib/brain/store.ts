@@ -5,6 +5,7 @@ import type { MarketingObservation } from '@sahoda/shared'
 
 import type { AudienceReading } from './observe/audience-growth'
 import type { ChannelOutcome } from './observe/channel-return'
+import type { FeaturedPost } from './observe/format-effect'
 import type { CapturedPost } from './observe/edit-distance'
 import type { PublishedPost } from './observe/tone-drift'
 
@@ -294,6 +295,71 @@ export async function workspacesWithAudience(limit = 500): Promise<string[]> {
     [limit],
   )
   return r.rows.map((row) => row.workspace_id)
+}
+
+/**
+ * Published captions with what they earned, one row per post.
+ *
+ * ── WHY THIS IS NOT `readChannelOutcomes` PLUS A JOIN AT THE CALLER ──────────
+ * That reader returns one row per post PER CHANNEL, because comparing channels
+ * is its whole job. This compares CAPTIONS, and a post cross-published to three
+ * channels is one caption — counting it three times would let a business that
+ * cross-posts more widely dominate its own comparison, which is a claim about
+ * distribution wearing the clothes of a claim about writing. Same reasoning as
+ * `readPublishedPosts`, and the same `distinct on (p.id)`.
+ *
+ * Engagement and reach are SUMMED across the channels a post went out on,
+ * because the question is what that caption earned in total. The metric rows
+ * are already the latest per post per channel before they are added.
+ */
+export async function readFeaturedPosts(workspaceId: string, limit = 400): Promise<FeaturedPost[]> {
+  const r = await getPool().query<{
+    post_id: string
+    body: string
+    engagement: string | number
+    reach: string | number
+    measured_on: string
+  }>(
+    `with latest as (
+       select distinct on (post_id, channel, metric)
+              post_id, channel, metric, value, measured_on
+         from post_metric_snapshots
+        where workspace_id = $1
+          and metric in ('engagement', 'reach')
+        order by post_id, channel, metric, measured_on desc
+     ),
+     totals as (
+       select post_id,
+              sum(value) filter (where metric = 'engagement') as engagement,
+              sum(value) filter (where metric = 'reach')       as reach,
+              max(measured_on)::text                           as measured_on
+         from latest
+        group by post_id
+     ),
+     caption as (
+       select distinct on (p.id) p.id as post_id, v.body as body
+         from posts p
+         join post_variants v
+           on v.post_id = p.id and v.workspace_id = p.workspace_id
+        where p.workspace_id = $1
+          and length(btrim(v.body)) > 0
+        order by p.id, v.created_at asc
+     )
+     select t.post_id, c.body, t.engagement, t.reach, t.measured_on
+       from totals t
+       join caption c on c.post_id = t.post_id
+      order by t.measured_on asc
+      limit $2`,
+    [workspaceId, limit],
+  )
+  const num = (v: string | number): number => (typeof v === 'number' ? v : Number(v))
+  return r.rows.map((row) => ({
+    postId: row.post_id,
+    body: row.body,
+    engagement: num(row.engagement),
+    reach: num(row.reach),
+    measuredOn: row.measured_on,
+  }))
 }
 
 /** Workspaces with any measured post outcome, for the weekly pass's union. */
