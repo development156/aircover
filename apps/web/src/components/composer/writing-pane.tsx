@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 
+import { ImproveCopy } from '@/components/posts/improve-copy'
 import { InlineRewrite } from '@/components/posts/inline-rewrite'
 import { Textarea } from '@/components/ui/textarea'
 import { NotBuiltYet } from '@/components/composer/not-built-yet'
@@ -104,6 +105,11 @@ export function WritingPane({ body, onBodyChange }: WritingPaneProps) {
         onClear={() => onBodyChange('')}
         onInsert={insert}
       />
+
+      {/* Under the tools row, NOT in it. Everything in that row edits the text
+          immediately, cannot fail and costs nothing; this one calls a model,
+          spends a credit and can be refused. See `copy-tools.tsx`. */}
+      <ImproveCopy target="your post" body={body} onAccept={onBodyChange} />
 
       {/* The splice runs against the CURRENT body, not the one captured when the
           rewrite was requested: the box stays editable while the model works, and
