@@ -39,6 +39,45 @@
       "summary_plain": "The unit checks ran and everything passed.",
       "details": "@sahoda/web:test:    Duration  113.01s (transform 15.30s, setup 18.14s, import 85.81s, tests 83.67s, environment 85.75s)\n@sahoda/web:test: \n@sahoda/web:typecheck: cache hit, replaying logs 69c5821acc98e5c2\n@sahoda/web:typecheck: $ tsc --noEmit\n@sahoda/research:lint: $ node ../../scripts/lint.mjs .\n@sahoda/research:lint: lint ok: @sahoda/research  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/publishing:lint: $ node ../../scripts/lint.mjs .\n@sahoda/mesh:lint: $ node ../../scripts/lint.mjs .\n@sahoda/billing:lint: $ node ../../scripts/lint.mjs .\n@sahoda/db:lint: $ node ../../scripts/lint.mjs .\n@sahoda/mesh:lint: lint ok: @sahoda/mesh  (test-only=0 assertionless-test=0 console-log=3 uncollected-tests=0 stale-exception=0)\n@sahoda/shared:lint: $ node ../../scripts/lint.mjs .\n@sahoda/sites:lint: $ node ../../scripts/lint.mjs .\n@sahoda/db:lint: lint ok: @sahoda/db  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/jobs:lint: $ node ../../scripts/lint.mjs .\n@sahoda/publishing:lint: lint ok: @sahoda/publishing  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/billing:lint: lint ok: @sahoda/billing  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/shared:lint: lint ok: @sahoda/shared  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/sites:lint: lint ok: @sahoda/sites  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/jobs:lint: lint ok: @sahoda/jobs  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n\n Tasks:    27 successful, 27 total\nCached:    19 cached, 27 total\n  Time:    1.356s",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mt9nrwav-1bfb7e60",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T05:33:46.181Z",
+      "finished_at": "2026-08-26T05:33:46.181Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran (5339 passed), but 220 tests did NOT run — this does not prove the suite passes.",
+      "details": "EXIT=0\n@sahoda/db:test:  Test Files  31 passed | 12 skipped (43)\n@sahoda/db:test:       Tests  583 passed | 207 skipped (790)\n@sahoda/db:test:    Start at  05:30:01\n@sahoda/db:test:    Duration  222.49s (transform 4.01s, setup 0ms, import 9.52s, tests 201.08s, environment 5ms)\n@sahoda/db:test: \n@sahoda/web:test:  ✓  ui  src/components/onboarding/stage/persistence.test.tsx (9 tests) 9ms\n@sahoda/web:test:  ✓  ui  src/components/posts/variant-state.test.tsx (5 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/app/layout.test.tsx (3 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/components/knowledge/add-document.test.tsx (2 tests) 4ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  373 passed | 3 skipped (376)\n@sahoda/web:test:       Tests  4756 passed | 13 skipped (4769)\n@sahoda/web:test:    Start at  05:30:32\n@sahoda/web:test:    Duration  193.18s (transform 23.64s, setup 23.92s, import 148.77s, tests 171.77s, environment 108.76s)\n@sahoda/web:test: \n\n Tasks:    27 successful, 27 total\nCached:    0 cached, 27 total\n  Time:    3m54.413s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mt9nrwav-fb549730",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T05:33:46.181Z",
+      "finished_at": "2026-08-26T05:33:46.181Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran (5339 passed), but 220 tests did NOT run — this does not prove the suite passes.",
+      "details": "EXIT=0\n@sahoda/db:test:  Test Files  31 passed | 12 skipped (43)\n@sahoda/db:test:       Tests  583 passed | 207 skipped (790)\n@sahoda/db:test:    Start at  05:30:01\n@sahoda/db:test:    Duration  222.49s (transform 4.01s, setup 0ms, import 9.52s, tests 201.08s, environment 5ms)\n@sahoda/db:test: \n@sahoda/web:test:  ✓  ui  src/components/onboarding/stage/persistence.test.tsx (9 tests) 9ms\n@sahoda/web:test:  ✓  ui  src/components/posts/variant-state.test.tsx (5 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/app/layout.test.tsx (3 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/components/knowledge/add-document.test.tsx (2 tests) 4ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  373 passed | 3 skipped (376)\n@sahoda/web:test:       Tests  4756 passed | 13 skipped (4769)\n@sahoda/web:test:    Start at  05:30:32\n@sahoda/web:test:    Duration  193.18s (transform 23.64s, setup 23.92s, import 148.77s, tests 171.77s, environment 108.76s)\n@sahoda/web:test: \n\n Tasks:    27 successful, 27 total\nCached:    0 cached, 27 total\n  Time:    3m54.413s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mt9nrwav-e348b006",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T05:33:46.181Z",
+      "finished_at": "2026-08-26T05:33:46.181Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran (5339 passed), but 220 tests did NOT run — this does not prove the suite passes.",
+      "details": "EXIT=0\n@sahoda/db:test:  Test Files  31 passed | 12 skipped (43)\n@sahoda/db:test:       Tests  583 passed | 207 skipped (790)\n@sahoda/db:test:    Start at  05:30:01\n@sahoda/db:test:    Duration  222.49s (transform 4.01s, setup 0ms, import 9.52s, tests 201.08s, environment 5ms)\n@sahoda/db:test: \n@sahoda/web:test:  ✓  ui  src/components/onboarding/stage/persistence.test.tsx (9 tests) 9ms\n@sahoda/web:test:  ✓  ui  src/components/posts/variant-state.test.tsx (5 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/app/layout.test.tsx (3 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/components/knowledge/add-document.test.tsx (2 tests) 4ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  373 passed | 3 skipped (376)\n@sahoda/web:test:       Tests  4756 passed | 13 skipped (4769)\n@sahoda/web:test:    Start at  05:30:32\n@sahoda/web:test:    Duration  193.18s (transform 23.64s, setup 23.92s, import 148.77s, tests 171.77s, environment 108.76s)\n@sahoda/web:test: \n\n Tasks:    27 successful, 27 total\nCached:    0 cached, 27 total\n  Time:    3m54.413s",
+      "duration_ms": null
     }
   ]
 }
