@@ -41,19 +41,6 @@
       "duration_ms": null
     },
     {
-      "client_id": "qa-mt8x3wmd-f88ecdc4",
-      "task_code": "SL-054",
-      "kind": "auto",
-      "actor": "claude",
-      "started_at": "2026-08-25T17:07:16.835Z",
-      "finished_at": "2026-08-25T17:07:16.835Z",
-      "suite": "lint",
-      "status": "pass",
-      "summary_plain": "The lint checks passed for @sahoda/web, @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
-      "details": "@sahoda/jobs:lint: lint ok: @sahoda/jobs  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/web:lint:   ok    raw hex colour\n@sahoda/web:lint:   ok    disabled coming-soon button\n@sahoda/web:lint:   ok    hardcoded spacing — 134 known, none new (baseline 134)\n@sahoda/web:lint:   ok    dead breakpoint variant — 0 known, none new (baseline 0)\n@sahoda/web:lint:   ok    hand-written font size — 732 known, none new (baseline 732)\n@sahoda/web:lint: lint ok: @sahoda/web  (test-only=0 assertionless-test=0 console-log=1 uncollected-tests=0 stale-exception=0)\n Tasks:    2 successful, 2 total\napps/jobs/package.json 11ms (unchanged)\nturbo.json 3ms (unchanged)\napps/web/vercel.json 1ms (unchanged)\nChecking formatting...\nAll matched files use Prettier code style!",
-      "duration_ms": null
-    },
-    {
       "client_id": "qa-mt8x3wmd-b33c9780",
       "task_code": "SL-054",
       "kind": "auto",
@@ -63,6 +50,19 @@
       "suite": "unit",
       "status": "pass",
       "summary_plain": "The unit checks passed for @sahoda/web, @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
+      "details": "@sahoda/jobs:lint: lint ok: @sahoda/jobs  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/web:lint:   ok    raw hex colour\n@sahoda/web:lint:   ok    disabled coming-soon button\n@sahoda/web:lint:   ok    hardcoded spacing — 134 known, none new (baseline 134)\n@sahoda/web:lint:   ok    dead breakpoint variant — 0 known, none new (baseline 0)\n@sahoda/web:lint:   ok    hand-written font size — 732 known, none new (baseline 732)\n@sahoda/web:lint: lint ok: @sahoda/web  (test-only=0 assertionless-test=0 console-log=1 uncollected-tests=0 stale-exception=0)\n Tasks:    2 successful, 2 total\napps/jobs/package.json 11ms (unchanged)\nturbo.json 3ms (unchanged)\napps/web/vercel.json 1ms (unchanged)\nChecking formatting...\nAll matched files use Prettier code style!",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mt8x3wmd-f88ecdc4",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-25T17:07:16.835Z",
+      "finished_at": "2026-08-25T17:07:16.835Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks passed for @sahoda/web, @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
       "details": "@sahoda/jobs:lint: lint ok: @sahoda/jobs  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/web:lint:   ok    raw hex colour\n@sahoda/web:lint:   ok    disabled coming-soon button\n@sahoda/web:lint:   ok    hardcoded spacing — 134 known, none new (baseline 134)\n@sahoda/web:lint:   ok    dead breakpoint variant — 0 known, none new (baseline 0)\n@sahoda/web:lint:   ok    hand-written font size — 732 known, none new (baseline 732)\n@sahoda/web:lint: lint ok: @sahoda/web  (test-only=0 assertionless-test=0 console-log=1 uncollected-tests=0 stale-exception=0)\n Tasks:    2 successful, 2 total\napps/jobs/package.json 11ms (unchanged)\nturbo.json 3ms (unchanged)\napps/web/vercel.json 1ms (unchanged)\nChecking formatting...\nAll matched files use Prettier code style!",
       "duration_ms": null
     },
@@ -90,6 +90,45 @@
       "status": "pass",
       "summary_plain": "The lint checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
       "details": "spec updated: False\n@sahoda/web:lint:   ok    raw hex colour\n@sahoda/web:lint:   ok    disabled coming-soon button\n@sahoda/web:lint:   ok    hardcoded spacing — 134 known, none new (baseline 134)\n@sahoda/web:lint:   ok    dead breakpoint variant — 0 known, none new (baseline 0)\n@sahoda/web:lint:   ok    hand-written font size — 732 known, none new (baseline 732)\n@sahoda/web:lint: lint ok: @sahoda/web  (test-only=0 assertionless-test=0 console-log=1 uncollected-tests=0 stale-exception=0)\n Tasks:    10 successful, 10 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mt98enjo-91153097",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-25T22:23:34.066Z",
+      "finished_at": "2026-08-25T22:23:34.066Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed.",
+      "details": "@sahoda/web:test:    Duration  113.01s (transform 15.30s, setup 18.14s, import 85.81s, tests 83.67s, environment 85.75s)\n@sahoda/web:test: \n@sahoda/web:typecheck: cache hit, replaying logs 69c5821acc98e5c2\n@sahoda/web:typecheck: $ tsc --noEmit\n@sahoda/research:lint: $ node ../../scripts/lint.mjs .\n@sahoda/research:lint: lint ok: @sahoda/research  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/publishing:lint: $ node ../../scripts/lint.mjs .\n@sahoda/mesh:lint: $ node ../../scripts/lint.mjs .\n@sahoda/billing:lint: $ node ../../scripts/lint.mjs .\n@sahoda/db:lint: $ node ../../scripts/lint.mjs .\n@sahoda/mesh:lint: lint ok: @sahoda/mesh  (test-only=0 assertionless-test=0 console-log=3 uncollected-tests=0 stale-exception=0)\n@sahoda/shared:lint: $ node ../../scripts/lint.mjs .\n@sahoda/sites:lint: $ node ../../scripts/lint.mjs .\n@sahoda/db:lint: lint ok: @sahoda/db  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/jobs:lint: $ node ../../scripts/lint.mjs .\n@sahoda/publishing:lint: lint ok: @sahoda/publishing  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/billing:lint: lint ok: @sahoda/billing  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/shared:lint: lint ok: @sahoda/shared  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/sites:lint: lint ok: @sahoda/sites  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/jobs:lint: lint ok: @sahoda/jobs  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n\n Tasks:    27 successful, 27 total\nCached:    19 cached, 27 total\n  Time:    1.356s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mt98enjo-d0757225",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-25T22:23:34.066Z",
+      "finished_at": "2026-08-25T22:23:34.066Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran and everything passed.",
+      "details": "@sahoda/web:test:    Duration  113.01s (transform 15.30s, setup 18.14s, import 85.81s, tests 83.67s, environment 85.75s)\n@sahoda/web:test: \n@sahoda/web:typecheck: cache hit, replaying logs 69c5821acc98e5c2\n@sahoda/web:typecheck: $ tsc --noEmit\n@sahoda/research:lint: $ node ../../scripts/lint.mjs .\n@sahoda/research:lint: lint ok: @sahoda/research  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/publishing:lint: $ node ../../scripts/lint.mjs .\n@sahoda/mesh:lint: $ node ../../scripts/lint.mjs .\n@sahoda/billing:lint: $ node ../../scripts/lint.mjs .\n@sahoda/db:lint: $ node ../../scripts/lint.mjs .\n@sahoda/mesh:lint: lint ok: @sahoda/mesh  (test-only=0 assertionless-test=0 console-log=3 uncollected-tests=0 stale-exception=0)\n@sahoda/shared:lint: $ node ../../scripts/lint.mjs .\n@sahoda/sites:lint: $ node ../../scripts/lint.mjs .\n@sahoda/db:lint: lint ok: @sahoda/db  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/jobs:lint: $ node ../../scripts/lint.mjs .\n@sahoda/publishing:lint: lint ok: @sahoda/publishing  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/billing:lint: lint ok: @sahoda/billing  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/shared:lint: lint ok: @sahoda/shared  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/sites:lint: lint ok: @sahoda/sites  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/jobs:lint: lint ok: @sahoda/jobs  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n\n Tasks:    27 successful, 27 total\nCached:    19 cached, 27 total\n  Time:    1.356s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mt98enjo-d58747e",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-25T22:23:34.066Z",
+      "finished_at": "2026-08-25T22:23:34.066Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran and everything passed.",
+      "details": "@sahoda/web:test:    Duration  113.01s (transform 15.30s, setup 18.14s, import 85.81s, tests 83.67s, environment 85.75s)\n@sahoda/web:test: \n@sahoda/web:typecheck: cache hit, replaying logs 69c5821acc98e5c2\n@sahoda/web:typecheck: $ tsc --noEmit\n@sahoda/research:lint: $ node ../../scripts/lint.mjs .\n@sahoda/research:lint: lint ok: @sahoda/research  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/publishing:lint: $ node ../../scripts/lint.mjs .\n@sahoda/mesh:lint: $ node ../../scripts/lint.mjs .\n@sahoda/billing:lint: $ node ../../scripts/lint.mjs .\n@sahoda/db:lint: $ node ../../scripts/lint.mjs .\n@sahoda/mesh:lint: lint ok: @sahoda/mesh  (test-only=0 assertionless-test=0 console-log=3 uncollected-tests=0 stale-exception=0)\n@sahoda/shared:lint: $ node ../../scripts/lint.mjs .\n@sahoda/sites:lint: $ node ../../scripts/lint.mjs .\n@sahoda/db:lint: lint ok: @sahoda/db  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/jobs:lint: $ node ../../scripts/lint.mjs .\n@sahoda/publishing:lint: lint ok: @sahoda/publishing  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/billing:lint: lint ok: @sahoda/billing  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/shared:lint: lint ok: @sahoda/shared  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/sites:lint: lint ok: @sahoda/sites  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n@sahoda/jobs:lint: lint ok: @sahoda/jobs  (test-only=0 assertionless-test=0 console-log=0 uncollected-tests=0 stale-exception=0)\n\n Tasks:    27 successful, 27 total\nCached:    19 cached, 27 total\n  Time:    1.356s",
       "duration_ms": null
     },
     {
