@@ -461,6 +461,17 @@
     ]
   },
   {
+    "route": "/admin/brain",
+    "awaits": [
+      "requireOpsAdmin",
+      "getOpsAdmin",
+      "read",
+      "soft",
+      "requireOpsAdmin",
+      "readMarketingObservations"
+    ]
+  },
+  {
     "route": "/admin/credits",
     "awaits": ["requireOpsAdmin", "getOpsAdmin", "read", "soft", "requireOpsAdmin"]
   },

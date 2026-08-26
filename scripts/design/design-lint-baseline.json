@@ -1,6 +1,6 @@
 {
   "_": "Debt register for the ratcheted rules. Counts may only go DOWN — see design-lint.mjs.",
-  "spacing_total": 139,
+  "spacing_total": 134,
   "spacing": {
     "app/(app)/brain/page.tsx": 1,
     "app/(app)/campaigns/[id]/page.tsx": 1,
@@ -42,7 +42,6 @@
     "components/embed/beta-form.tsx": 2,
     "components/home/activity-feed.tsx": 2,
     "components/home/first-run.tsx": 1,
-    "components/home/greeting-banner.tsx": 3,
     "components/home/needs-attention.tsx": 1,
     "components/inbox/comment-card.tsx": 2,
     "components/inbox/commented-post-row.tsx": 1,
@@ -77,7 +76,6 @@
     "components/shell/credit-chip.tsx": 2,
     "components/shell/more-sheet.tsx": 1,
     "components/shell/nav-item.tsx": 3,
-    "components/shell/rail.tsx": 2,
     "components/shell/workspace-switcher.tsx": 1,
     "components/ui/badge.tsx": 1,
     "components/ui/button.tsx": 2,
@@ -87,7 +85,7 @@
   },
   "breakpoint_total": 0,
   "breakpoint": {},
-  "typesize_total": 733,
+  "typesize_total": 732,
   "typesize": {
     "app/(app)/approvals/page.tsx": 2,
     "app/(app)/assets/page.tsx": 1,
@@ -252,7 +250,7 @@
     "components/settings/workspace-name-field.tsx": 2,
     "components/shell/bottom-nav.tsx": 1,
     "components/shell/brain-ring.tsx": 5,
-    "components/shell/command-palette.tsx": 6,
+    "components/shell/command-palette.tsx": 5,
     "components/shell/credit-chip.tsx": 1,
     "components/shell/more-sheet.tsx": 2,
     "components/shell/nav-item.tsx": 2,

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Pencil } from 'lucide-react'
+import { Check, Pencil } from 'lucide-react'
 
 import { confirmBrainField } from '@/app/actions/brand-field'
 import { Button } from '@/components/ui/button'
@@ -55,6 +55,27 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
     setEditing(false)
   }
 
+  /**
+   * Agree with the guess exactly as it stands, without opening the editor.
+   *
+   * The editor already offered this — its button reads "Confirm · free" when the
+   * draft is untouched — but reaching it meant pressing Edit on a field that
+   * needed no editing, and then pressing again. For a brain where most fields
+   * are right on the first pass that is two presses of friction per field, on
+   * the screen whose whole purpose is turning guesses into confirmations.
+   *
+   * Sends `value`, the server's own truth, and never `draft`. A draft can be
+   * stale: it is seeded when the row mounts, and a regenerate landing since then
+   * would make this press confirm a value the field no longer holds.
+   */
+  function confirmInPlace() {
+    setError(null)
+    startSaving(async () => {
+      const result = await confirmBrainField(field.path, value)
+      if (!result.ok) setError(result.message)
+    })
+  }
+
   function save() {
     setError(null)
     startSaving(async () => {
@@ -80,16 +101,38 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
         <span className="text-[13px] font-semibold text-ink">{field.label}</span>
         <CertaintyMark state={state} />
         {!editing ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={beginEdit}
-            className="ml-auto px-2"
-          >
-            <Pencil size={13} aria-hidden />
-            Edit
-          </Button>
+          <div className="ml-auto flex items-center gap-1">
+            {/* Only while it is still a guess. On a confirmed field this would
+                be a button that records nothing, next to a mark already saying
+                the field is confirmed. */}
+            {/* SECONDARY, not ghost, and that is the whole point of it.
+                Shipped as a ghost first and the founder read straight past it —
+                and past the section's "Confirm all" too, reporting it missing
+                while looking at a screenshot containing it. `ghost` is
+                `text-muted` with no ring: it reads as a caption, not a control,
+                and a control nobody recognises is a control nobody presses.
+                NOT `primary`: that variant is rationed to one per view (§6) and
+                this screen renders fifteen of these. `secondary` is the button
+                shape without the accent — the variant's own comment calls it
+                the workhorse. */}
+            {state !== 'confirmed' ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                loading={pending}
+                onClick={confirmInPlace}
+                className="px-2.5"
+              >
+                <Check size={13} aria-hidden />
+                Confirm · free
+              </Button>
+            ) : null}
+            <Button type="button" variant="ghost" size="sm" onClick={beginEdit} className="px-2">
+              <Pencil size={13} aria-hidden />
+              Edit
+            </Button>
+          </div>
         ) : null}
       </div>
 
@@ -135,7 +178,17 @@ export function FieldRow({ field, value, state }: FieldRowProps) {
           </div>
         </div>
       ) : (
-        <FieldValue field={field} value={value} state={state} />
+        <>
+          <FieldValue field={field} value={value} state={state} />
+          {/* The editor renders its own error. This one belongs to the inline
+              confirm, which has no editor open to put it in — without this the
+              press would fail silently and the mark would simply not change. */}
+          {error ? (
+            <p role="alert" className="type-sm text-danger">
+              {error}
+            </p>
+          ) : null}
+        </>
       )}
     </div>
   )

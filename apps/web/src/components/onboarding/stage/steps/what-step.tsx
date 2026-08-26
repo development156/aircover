@@ -1,12 +1,49 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
+
 import { AiLine } from '../ai-line'
 import { CATEGORIES } from '../refs'
 import type { StepProps } from './types'
 
+/**
+ * Is this category something the person typed rather than a chip they pressed?
+ *
+ * `data.category` is a free string everywhere it is read, so the custom value
+ * lives in the same field and needs no second one. That matters: the field is
+ * persisted to localStorage and rehydrated by `store.ts`, and a second field
+ * would have to be defaulted, parsed and kept in step with this one forever.
+ */
+function isCustom(category: string): boolean {
+  return category !== '' && !(CATEGORIES as readonly string[]).includes(category)
+}
+
 /** 02 — Positioning. Either the sentence or the chip is enough to continue. */
 export function WhatStep({ data, patch }: StepProps) {
+  // "Other" is open when they are typing one, or when a typed one came back
+  // from a resumed session.
+  const [otherOpen, setOtherOpen] = useState(() => isCustom(data.category))
+  const otherRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (otherOpen) otherRef.current?.focus()
+  }, [otherOpen])
+
   function pick(value: string): void {
+    if (value === 'Other') {
+      // Toggling Other shut clears what was typed, the same way pressing a
+      // selected chip clears it. Leaving the text behind would keep a category
+      // the person just switched off.
+      if (otherOpen) {
+        setOtherOpen(false)
+        patch({ category: '' })
+        return
+      }
+      setOtherOpen(true)
+      patch({ category: '' })
+      return
+    }
+    setOtherOpen(false)
     // Clicking the selected chip clears it — the source's toggle, kept because
     // a picker with no way back is a picker people get stuck in.
     patch({ category: data.category === value ? '' : value })
@@ -36,18 +73,77 @@ export function WhatStep({ data, patch }: StepProps) {
           role="group"
           aria-label="Business type"
         >
-          {CATEGORIES.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={`chip ${data.category === c ? 'on' : ''}`}
-              aria-pressed={data.category === c}
-              onClick={() => pick(c)}
-            >
-              {c}
-            </button>
-          ))}
+          {CATEGORIES.map((c) => {
+            const on = c === 'Other' ? otherOpen : data.category === c
+            return (
+              <button
+                key={c}
+                type="button"
+                className={`chip ${on ? 'on' : ''}`}
+                aria-pressed={on}
+                aria-expanded={c === 'Other' ? otherOpen : undefined}
+                onClick={() => pick(c)}
+              >
+                {c}
+              </button>
+            )
+          })}
         </div>
+        {otherOpen ? (
+          <div className="field" style={{ marginTop: 11 }}>
+            <input
+              ref={otherRef}
+              className="inp"
+              id="f-cat-other"
+              type="text"
+              value={isCustom(data.category) ? data.category : ''}
+              onChange={(e) => patch({ category: e.target.value })}
+              /**
+               * Enter must not reach the rail. The stage advances on Enter, and
+               * a person finishing a word they are still typing would be carried
+               * off the screen mid-answer.
+               */
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.preventDefault()
+              }}
+              placeholder="Say it in a few words, like wedding photography or dental clinic"
+              aria-label="Your kind of business"
+            />
+            {/* Why the words matter, said plainly. `intakeTextOf` joins this
+                field into the text the classifier reads, so a real trade name is
+                evidence in the way the word "Other" cannot be. */}
+            <p className="micro" style={{ marginTop: 7, opacity: 0.72 }}>
+              Sahoda reads these words the same way it reads your sentence above.
+            </p>
+          </div>
+        ) : null}
+        {/* WHAT THEY WILL NOT CLAIM, beside what they do.
+            Feeds `taboo.avoid_topics`, which was empty on every resolve — the
+            flow stopped asking, so every Red line on /brain was the model's
+            invention. Optional, and a blank stays blank: the reason the
+            question was dropped was that GUESSING here creates a binding rule,
+            and asking is not guessing. */}
+        <p className="label" style={{ margin: '22px 0 11px' }}>
+          Anything Sahoda should never say?
+        </p>
+        <div className="field">
+          <input
+            className="inp"
+            id="f-never"
+            type="text"
+            value={data.neverSay}
+            onChange={(e) => patch({ neverSay: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.preventDefault()
+            }}
+            placeholder="No discounts, never call us cheap, no medical claims"
+            aria-label="Anything Sahoda should never say"
+          />
+        </div>
+        <p className="micro" style={{ marginTop: 7, opacity: 0.72 }}>
+          Optional. This becomes a red line on your Brand Brain, and Sahoda writes around it.
+        </p>
+
         {/* A statement of intent about what happens next, not a finding. */}
         <AiLine show={Boolean(data.category)}>
           Got it, <em>{data.category}</em>. I&rsquo;ll weight channels and formats that actually

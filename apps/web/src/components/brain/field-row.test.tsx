@@ -160,3 +160,96 @@ describe('FieldRow', () => {
     })
   })
 })
+
+/**
+ * Confirming a right answer must not cost an edit.
+ *
+ * The editor already offered this — its button reads "Confirm · free" on an
+ * untouched draft — but the only way in was Edit, on a field needing none. Two
+ * presses of friction per field, on the screen whose whole job is turning
+ * guesses into confirmations.
+ */
+describe('confirming without editing', () => {
+  test('offers Confirm beside a guess', () => {
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+
+    expect(screen.getByRole('button', { name: /Confirm/ })).toBeInTheDocument()
+  })
+
+  test('records the value the server holds, in one press', async () => {
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+
+    await userEvent.click(screen.getByRole('button', { name: /Confirm/ }))
+
+    // The path and the STORED value: sending anything else would confirm a
+    // wording the reader did not agree to.
+    expect(confirmBrainField).toHaveBeenCalledWith('hook.primary_emotion', 'Relief')
+    expect(confirmBrainField).toHaveBeenCalledTimes(1)
+  })
+
+  test('confirms the value that arrived, not the one the row mounted with', async () => {
+    // THE MUTATION THIS EXISTS FOR. Sending `draft` instead of `value` passes
+    // every other test in this block, because `draft` is seeded from `value` and
+    // nothing in those tests makes them differ. This one makes them differ the
+    // way the product does: a regenerate lands while the row sits open, the
+    // prop changes, and the mounted draft is now stale text.
+    const { rerender } = render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+    rerender(<FieldRow field={TEXT_FIELD} value="Reassurance" state="guessed" />)
+
+    await userEvent.click(screen.getByRole('button', { name: /Confirm/ }))
+
+    expect(confirmBrainField).toHaveBeenCalledWith('hook.primary_emotion', 'Reassurance')
+    expect(confirmBrainField).not.toHaveBeenCalledWith('hook.primary_emotion', 'Relief')
+  })
+
+  test('does not open the editor to do it', async () => {
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+
+    await userEvent.click(screen.getByRole('button', { name: /Confirm/ }))
+
+    // The question only renders while editing, so its absence is the claim that
+    // the editor never opened.
+    expect(screen.queryByText(TEXT_FIELD.question)).not.toBeInTheDocument()
+  })
+
+  test('offers nothing to press on a field already confirmed', () => {
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="confirmed" />)
+
+    // A button that records nothing, beside a mark already saying it is
+    // confirmed, is an invitation to a no-op.
+    expect(screen.queryByRole('button', { name: /Confirm/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Edit/ })).toBeInTheDocument()
+  })
+
+  test('looks like a control, not a caption', () => {
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+
+    // THE DEFECT THIS PINS. Shipped first as `variant="ghost"` — `text-muted`,
+    // no ring — and the founder read past it, and past the section's
+    // "Confirm all", reporting the latter missing while looking at a screenshot
+    // that contained it. `surface-ring-firm` is the hairline the `secondary`
+    // variant paints, and it is what makes the control read as pressable.
+    //
+    // WHAT THIS CANNOT SEE: whether it looks pressable to a person. jsdom
+    // resolves no stylesheet, so this asserts the variant was chosen, not the
+    // pixels it produces. The pixels were checked on the preview.
+    expect(screen.getByRole('button', { name: /Confirm/ })).toHaveClass('surface-ring-firm')
+  })
+
+  test('does not spend the one primary this view is allowed', () => {
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+
+    // §6 rations the orange fill to ONE per view and /brain renders fifteen of
+    // these rows. `bg-primary` here would be fifteen.
+    expect(screen.getByRole('button', { name: /Confirm/ })).not.toHaveClass('bg-primary')
+  })
+
+  test('says so when the confirm fails, rather than leaving the mark unchanged and silent', async () => {
+    confirmBrainField.mockResolvedValue({ ok: false, message: 'Sahoda could not save that.' })
+    render(<FieldRow field={TEXT_FIELD} value="Relief" state="guessed" />)
+
+    await userEvent.click(screen.getByRole('button', { name: /Confirm/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sahoda could not save that.')
+  })
+})

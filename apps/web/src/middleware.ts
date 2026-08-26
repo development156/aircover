@@ -96,6 +96,23 @@ const isPublicRoute = createRouteMatcher([
   // about, with the heartbeat reporting green the whole time because the
   // schedule did fire and got a 307.
   '/api/cron/playbooks',
+  // The weekly Radar scan. Same reasoning as its four siblings, and an EXACT
+  // path — nothing else under /api/cron is exposed by adding it. Vercel cron
+  // presents CRON_SECRET as an Authorization header and does NOT follow the
+  // redirect to /sign-in, so behind the middleware this route would answer a
+  // redirect every Monday and the scan would look green while collecting
+  // nothing. `isAuthorizedCronRequest` is what actually guards it, and it
+  // refuses outright when CRON_SECRET is unset rather than running open — which
+  // matters more here than on any sibling, because this is the one that spends.
+  '/api/cron/radar',
+
+  // The weekly Marketing Brain pass. Same reasoning, same exact-path form. This
+  // one spends nothing at all — no model call, no ledger — so what a missing
+  // line here would cost is the quiet failure again: a 307 to /sign-in that the
+  // heartbeat records as a run that fired, while the observations table stays
+  // empty and every report block that reads it says the customer has published
+  // too little to notice anything about.
+  '/api/cron/brain',
 ])
 
 // The `/admin` surface and its authenticated APIs. The token-authed ingest route
@@ -334,12 +351,12 @@ export const config = {
     // It is a marketing animation shown to every new customer, with nothing in
     // it that is theirs — the same category as the poster beside it, which has
     // been public all along.
-    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|mp4|webm|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/cron/radar$|api/cron/brain$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|mp4|webm|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Shaped as `/(…)` — ONE group holding the whole expression — because that is the
     // only place Next accepts a raw regex. `'/(?!…)(api|trpc)(.*)'` reads to
     // path-to-regexp as a group opening with invalid content and fails the BUILD with
     // `Error parsing … invalid-route-source`. Loud and before deploy, which is the right
     // direction for this file, but it is why the lookahead lives inside the parentheses.
-    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$)(?:api|trpc).*)',
+    '/((?!api/cron/sweeps$|api/cron/metrics$|api/cron/loop$|api/cron/playbooks$|api/cron/radar$|api/cron/brain$|api/webhooks/cashfree$|api/webhooks/clerk$|api/webhooks/zernio$)(?:api|trpc).*)',
   ],
 }

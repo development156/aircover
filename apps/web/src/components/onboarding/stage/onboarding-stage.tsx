@@ -37,7 +37,6 @@ import { AudienceStep } from './steps/audience-step'
 import { BasicsStep } from './steps/basics-step'
 import { IntroStep } from './steps/intro-step'
 import { KnowledgeStep } from './steps/knowledge-step'
-import { ReferencesStep } from './steps/references-step'
 import { ResultStep } from './steps/result-step'
 import { RivalsStep } from './steps/rivals-step'
 import { VisualStep } from './steps/visual-step'
@@ -460,8 +459,6 @@ export function OnboardingStage({
     ) : step === '4' ? (
       <VisualStep data={data} patch={patch} />
     ) : step === '5' ? (
-      <ReferencesStep data={data} patch={patch} />
-    ) : step === '6' ? (
       <KnowledgeStep data={data} patch={patch} />
     ) : step === 'comp' ? (
       <RivalsStep data={data} patch={patch} />
@@ -471,6 +468,7 @@ export function OnboardingStage({
         door={door}
         wasFree={build.wasFree}
         fallbackMessage={build.fallbackMessage}
+        afterBuildNote={build.afterBuildNote}
         saving={build.saving || launching}
         saveError={build.saveError}
         themeError={build.themeError}
@@ -509,11 +507,6 @@ export function OnboardingStage({
               id={`s-${step}`}
               data-step={step}
             >
-              {showBack ? (
-                <button type="button" className="back" onClick={back}>
-                  <ArrowLeft size={14} strokeWidth={2} aria-hidden /> Back
-                </button>
-              ) : null}
               {stepBody}
             </section>
           </div>
@@ -535,6 +528,25 @@ export function OnboardingStage({
               </span>
               <ArrowRight className="arw" size={18} strokeWidth={1.9} aria-hidden />
             </button>
+            {/* BACK SITS WITH THE OTHER ACTIONS. It used to be a small muted
+                text link alone above the heading, and the founder reported
+                there was "no option to go back to the previous question" while
+                looking at a screen that had one.
+
+                Second time on this flow: the Confirm controls were reported
+                missing when they shipped as ghosts. A control nobody finds is a
+                control that is not there, and the fix is the same both times —
+                put it where the actions live and let it look pressable.
+
+                AFTER the primary, not before: every screen in this flow anchors
+                its primary button at the left edge of the row, and moving that
+                to make room would restyle eight screens to fix one. */}
+            {showBack ? (
+              <button type="button" className="btn btn--ghost" id="back" onClick={back}>
+                <ArrowLeft size={16} strokeWidth={1.9} aria-hidden />
+                Back
+              </button>
+            ) : null}
             {step === 'comp' ? (
               <button
                 type="button"

@@ -46,6 +46,20 @@ export interface JobsEnv {
    * It is NOT a boot failure — the other rails work without it.
    */
   zernioApiKey: string | undefined
+  /**
+   * Apify, which reads Instagram profiles. Optional: absent means every
+   * Instagram source is recorded as a gap rather than checked. Social has no
+   * free rung — no platform shows a stranger's account to a plain HTTP request —
+   * so this key IS the Instagram half of Radar.
+   */
+  apifyToken: string | undefined
+  /**
+   * Zyte, the last rung of the website ladder. Optional: absent means a page
+   * behind a bot wall is recorded as a gap instead of being bought. Ordinary
+   * pages never reach this — they are served by a conditional GET that costs
+   * nothing — so most of Radar works without it.
+   */
+  zyteApiKey: string | undefined
   supabaseUrl: string
   serviceRoleKey: string
   databaseUrl: string
@@ -110,6 +124,22 @@ export function loadJobsEnv(source: NodeJS.ProcessEnv = process.env): JobsEnv {
     invalid.push('ZERNIO_API_KEY')
   }
 
+  // ── RADAR'S TWO PROVIDERS ──────────────────────────────────────────────────
+  // Optional, and absent is a SUPPORTED state rather than a broken one: a source
+  // whose provider is not configured is recorded as a GAP by `runRadarPass` — "we
+  // could not check" — which is a sentence the Radar screen already knows how to
+  // draw. That is why neither is pushed onto `missing`: the pass still runs, the
+  // free conditional-GET rung still works, and nothing is silently reported as a
+  // quiet day.
+  //
+  // No shape check on either. `ZERNIO_API_KEY` gets one because its format is
+  // documented and stable; these two are not, and a regex guessed from a single
+  // example would reject a valid key at BOOT, taking down every other task in the
+  // process with it. A wrong key here fails at the provider, on one source, and
+  // is recorded as the gap it is.
+  const apifyToken = source.APIFY_TOKEN || undefined
+  const zyteApiKey = source.ZYTE_API_KEY || undefined
+
   const dispatchMode = readMode(source, 'SAHODA_PUBLISH_DISPATCH_MODE', invalid)
   const holdSweepMode = readMode(source, 'SAHODA_HOLD_SWEEP_MODE', invalid)
   const reconcileMode = readMode(source, 'SAHODA_RECONCILE_MODE', invalid)
@@ -135,6 +165,8 @@ export function loadJobsEnv(source: NodeJS.ProcessEnv = process.env): JobsEnv {
   return {
     publishMode,
     zernioApiKey,
+    apifyToken,
+    zyteApiKey,
     supabaseUrl: toOrigin(rawUrl),
     serviceRoleKey,
     databaseUrl,

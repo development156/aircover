@@ -24,7 +24,7 @@ const vercelConfig = JSON.parse(readFileSync(resolve(WEB, 'vercel.json'), 'utf8'
 const middleware = readFileSync(resolve(WEB, 'src/middleware.ts'), 'utf8')
 
 describe('cron wiring', () => {
-  it('schedules exactly the four jobs, on their own cadences', () => {
+  it('schedules exactly the five jobs, on their own cadences', () => {
     // Pinned as a SET of exact entries rather than a count, so a job cannot
     // arrive quietly and so a schedule cannot be edited without a decision. It
     // did its job when the third arrived, and again when the fourth did — the
@@ -48,11 +48,27 @@ describe('cron wiring', () => {
     // outright whenever the check landed on the wrong side of it. 06:00 UTC is
     // 11:30 IST — inside the working day, so a preview waiting for approval is
     // seen the day it appears rather than the morning after.
+    //
+    // The Radar scan is WEEKLY because that is the cadence the product PROMISES:
+    // /radar tells the reader "one scan per business per week" and prices it per
+    // scan, so a nightly pass would charge seven times what the screen says. It
+    // is the only cron here whose wrong cadence is a BILLING error rather than a
+    // freshness one. Monday 03:40 UTC is 09:10 IST — the readings are waiting at
+    // the start of the week rather than arriving mid-week.
+    // The Marketing Brain pass is weekly and lands half an hour after the Loop.
+    // Weekly because it describes a HABIT: it compares two runs of published
+    // posts, and a daily re-run would recompute the same two arms and write the
+    // same sentence. Half an hour after rather than at the same minute so the
+    // two weekly jobs are not competing for function concurrency on the one
+    // evening they both fire. It spends nothing, which is why it has no
+    // enable-flag of its own and the Loop next door does.
     expect(vercelConfig.crons).toEqual([
       { path: '/api/cron/sweeps', schedule: '*/5 * * * *' },
       { path: '/api/cron/metrics', schedule: '20 1 * * *' },
       { path: '/api/cron/loop', schedule: '0 21 * * 0' },
       { path: '/api/cron/playbooks', schedule: '0 6 * * *' },
+      { path: '/api/cron/radar', schedule: '40 3 * * 1' },
+      { path: '/api/cron/brain', schedule: '30 21 * * 0' },
     ])
   })
 
@@ -112,6 +128,8 @@ describe('cron wiring', () => {
         // The route authenticates itself in-route and spends nothing — it
         // proposes and halts at the cost preview.
         '/api/cron/playbooks',
+        '/api/cron/radar',
+        '/api/cron/brain',
         '/api/public/beta-apply',
         // Door one into `leads`, added 2026-08-21. Deliberate for the same reason
         // /api/cron/loop was: this guard failing is what made it deliberate. It

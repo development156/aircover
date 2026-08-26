@@ -50,15 +50,16 @@ describe('unusedBasisPoints', () => {
 describe('computeProration — upgrading', () => {
   it('halfway through the month, Starter → Growth costs half the difference', () => {
     const p = prorate()
-    // ₹1499 for half a month, less ₹499 already paid for half a month.
+    // ₹3,999 for half a month, less ₹1,999 already paid for half a month.
+    // Credits are the DIFFERENCE in allotment, halved: (4,000 − 1,500) / 2.
     expect(p).toMatchObject({
       kind: 'upgrade',
       immediate: true,
       unusedBasisPoints: 5_000,
-      remainderChargePaise: 74_950,
-      unusedCreditPaise: 24_950,
-      amountDuePaise: 50_000,
-      creditsGranted: 1_750,
+      remainderChargePaise: 199_950,
+      unusedCreditPaise: 99_950,
+      amountDuePaise: 100_000,
+      creditsGranted: 1_250,
     })
     expect(ProrationSchema.parse(p)).toEqual(p)
   })

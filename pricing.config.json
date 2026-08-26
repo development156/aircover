@@ -1,5 +1,5 @@
 {
-  "currency_note": "credits; INR plans 499/1499/3999, USD 12/29/79; grants: free 100, starter 1500, growth 5000, agency 15000",
+  "currency_note": "credits; INR plans 1999/3999/7999, USD 25/49/99; grants: free 100, starter 1500, growth 4000, agency 12000. Repriced 2026-08-24 from the business model deck. This line is a NOTE, not a source: PLAN_CATALOG in packages/shared/src/billing/plans.ts is authoritative for plan prices and grants, and only the actions map below is read by code.",
   "rollover_cap_x": 2,
   "perf_reward": {
     "per_post": 2,

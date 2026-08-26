@@ -246,6 +246,9 @@ importers:
 
   packages/mesh:
     dependencies:
+      '@sahoda/research':
+        specifier: workspace:*
+        version: link:../research
       '@sahoda/shared':
         specifier: workspace:*
         version: link:../shared
