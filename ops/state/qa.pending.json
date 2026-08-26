@@ -468,6 +468,84 @@
       "summary_plain": "The unit checks ran and something failed (47 passed, 2 failed).",
       "details": "     × is a page the browser will RENDER, not a redirect it will follow 5ms\n     × sends no Location on a FAILED popup either, and keeps the 5xx 2ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 47 passed (49)",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtadj4w1-89006e31",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T17:34:47.422Z",
+      "finished_at": "2026-08-26T17:34:47.422Z",
+      "suite": "typecheck",
+      "status": "fail",
+      "summary_plain": "The typecheck checks ran and something failed.",
+      "details": "--- web ---\napps/web/src/app/(app)/settings/integrations/page.tsx(53,20): error TS7053: Element implicitly has an 'any' type because expression of type '\"discord\" | \"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"pinterest\" | \"reddit\" | \"slack\" | \"telegram\" | \"threads\" | \"tiktok\" | \"whatsapp\" | \"x\" | \"youtube\"' can't be used to index type 'Readonly<Record<\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\", string>>'.\n  Property 'discord' does not exist on type 'Readonly<Record<\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\", string>>'.\napps/web/src/app/(app)/settings/integrations/page.tsx(55,35): error TS2322: Type '\"discord\" | \"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"pinterest\" | \"reddit\" | \"slack\" | \"telegram\" | \"threads\" | \"tiktok\" | \"whatsapp\" | \"x\" | \"youtube\"' is not assignable to type 'CatalogueChannel'.\n  Type '\"discord\"' is not assignable to type 'CatalogueChannel'.\napps/web/src/app/api/oauth/zernio/start/route.ts(183,44): error TS2345: Argument of type '\"discord\" | \"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"pinterest\" | \"reddit\" | \"slack\" | \"threads\" | \"tiktok\" | \"whatsapp\" | \"x\" | \"youtube\"' is not assignable to parameter of type '\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\"'.\n  Type '\"discord\"' is not assignable to type '\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\"'.\napps/web/src/components/connections/connection-health-banner.tsx(42,28): error TS7053: Element implicitly has an 'any' type because expression of type '\"discord\" | \"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"pinterest\" | \"reddit\" | \"slack\" | \"telegram\" | \"threads\" | \"tiktok\" | \"whatsapp\" | \"x\" | \"youtube\"' can't be used to index type 'Readonly<Record<\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\", string>>'.\n  Property 'discord' does not exist on type 'Readonly<Record<\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\", string>>'.\napps/web/src/components/home/rail-cards.tsx(226,30): error TS2322: Type '\"discord\" | \"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"pinterest\" | \"reddit\" | \"slack\" | \"telegram\" | \"threads\" | \"tiktok\" | \"whatsapp\" | \"x\" | \"youtube\"' is not assignable to type 'CatalogueChannel'.\n  Type '\"discord\"' is not assignable to type 'CatalogueChannel'.\napps/web/src/components/home/rail-cards.tsx(229,22): error TS7053: Element implicitly has an 'any' type because expression of type '\"discord\" | \"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"pinterest\" | \"reddit\" | \"slack\" | \"telegram\" | \"threads\" | \"tiktok\" | \"whatsapp\" | \"x\" | \"youtube\"' can't be used to index type 'Readonly<Record<\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\", string>>'.\n  Property 'discord' does not exist on type 'Readonly<Record<\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\", string>>'.",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtadl9xd-4def4dd5",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T17:36:27.263Z",
+      "finished_at": "2026-08-26T17:36:27.263Z",
+      "suite": "typecheck",
+      "status": "fail",
+      "summary_plain": "The typecheck checks ran and something failed.",
+      "details": "apps/web/src/app/(app)/settings/integrations/page.tsx(53,20): error TS7053: Element implicitly has an 'any' type because expression of type '\"discord\" | \"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"pinterest\" | \"reddit\" | \"slack\" | \"telegram\" | \"threads\" | \"tiktok\" | \"whatsapp\" | \"x\" | \"youtube\"' can't be used to index type 'Readonly<Record<\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\", string>>'.\n  Property 'discord' does not exist on type 'Readonly<Record<\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\", string>>'.\napps/web/src/app/api/oauth/zernio/start/route.ts(183,44): error TS2345: Argument of type '\"discord\" | \"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"pinterest\" | \"reddit\" | \"slack\" | \"threads\" | \"tiktok\" | \"whatsapp\" | \"x\" | \"youtube\"' is not assignable to parameter of type '\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\"'.\n  Type '\"discord\"' is not assignable to type '\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\"'.\napps/web/src/components/connections/connection-health-banner.tsx(42,28): error TS7053: Element implicitly has an 'any' type because expression of type '\"discord\" | \"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"pinterest\" | \"reddit\" | \"slack\" | \"telegram\" | \"threads\" | \"tiktok\" | \"whatsapp\" | \"x\" | \"youtube\"' can't be used to index type 'Readonly<Record<\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\", string>>'.\n  Property 'discord' does not exist on type 'Readonly<Record<\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\", string>>'.\napps/web/src/components/home/rail-cards.tsx(229,22): error TS7053: Element implicitly has an 'any' type because expression of type '\"discord\" | \"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"pinterest\" | \"reddit\" | \"slack\" | \"telegram\" | \"threads\" | \"tiktok\" | \"whatsapp\" | \"x\" | \"youtube\"' can't be used to index type 'Readonly<Record<\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\", string>>'.\n  Property 'discord' does not exist on type 'Readonly<Record<\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\", string>>'.\napps/web/src/lib/connections/details.ts(42,50): error TS2366: Function lacks ending return statement and return type does not include 'undefined'.\n=== hb 35-50 ===\n  const attention = needsAttention(connections, now)\n  if (attention.length === 0) return null\n\n  return (\n    <div role=\"alert\" className=\"space-y-1.5 rounded-card border border-warn bg-warn-bg p-3\">\n      <p className=\"type-eyebrow flex items-center gap-1.5 text-warn\">\n        <AlertTriangle size={13} aria-hidden />\n        {attention.length === 1 ? 'A channel needs attention' : 'Channels need attention'}\n      </p>\n      <ul className=\"space-y-1\">\n        {attention.map(({ connection, health }) => (\n          <li key={connection.id} className=\"text-[13px] text-warn\">\n            {healthMessage(CHANNEL_LABELS[connection.platform], health)}\n          </li>\n        ))}\n      </ul>\n      <p className=\"text-[12px] text-warn opacity-80\">\n        Scheduled posts on a channel that has run out will not go out.\n      </p>\n    </div>\n  )\n=== rail 218-232 ===\n      ) : (\n        <ul className=\"grid grid-cols-2 gap-2 p-4\">\n          {connections.slice(0, 4).map((connection) => (\n            <li key={connection.id}>\n              <Link\n                href=\"/connections\"\n                className=\"surface-ring flex items-center gap-2 rounded-[8px] p-2 transition-micro hover:shadow-[inset_0_0_0_1px_var(--line-firm)]\"\n              >\n                <ChannelLogo channel={connection.platform} size={18} />\n                <span className=\"min-w-0 flex-1\">\n                  <span className=\"block truncate type-meta font-[550] text-ink\">\n                    {CHANNEL_LABELS[connection.platform]}\n                  </span>\n                  <span className=\"block type-meta text-muted\">\n                    {connection.status === 'active' ? 'Connected' : 'Needs attention'}",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtadlw8z-eba9156a",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T17:36:56.193Z",
+      "finished_at": "2026-08-26T17:36:56.193Z",
+      "suite": "typecheck",
+      "status": "fail",
+      "summary_plain": "The typecheck checks ran and something failed.",
+      "details": "apps/web/src/app/api/oauth/zernio/start/route.ts(183,44): error TS2345: Argument of type '\"discord\" | \"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"pinterest\" | \"reddit\" | \"slack\" | \"threads\" | \"tiktok\" | \"whatsapp\" | \"x\" | \"youtube\"' is not assignable to parameter of type '\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\"'.\n  Type '\"discord\"' is not assignable to type '\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\"'.\napps/web/src/lib/connections/details.ts(42,50): error TS2366: Function lacks ending return statement and return type does not include 'undefined'.",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtadpz7t-892490c5",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T17:40:06.663Z",
+      "finished_at": "2026-08-26T17:40:06.663Z",
+      "suite": "typecheck",
+      "status": "fail",
+      "summary_plain": "The typecheck checks ran and something failed.",
+      "details": "apps/web/src/components/connections/channel-tile.tsx(268,11): error TS2322: Type '\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\" | null' is not assignable to type '\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\"'.\n  Type 'null' is not assignable to type '\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\"'.\napps/web/src/components/connections/channel-tile.tsx(325,11): error TS2322: Type '\"discord\" | \"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"pinterest\" | \"reddit\" | \"slack\" | \"telegram\" | \"threads\" | \"tiktok\" | \"whatsapp\" | \"x\" | \"youtube\"' is not assignable to type '\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\"'.\n  Type '\"discord\"' is not assignable to type '\"facebook\" | \"gbp\" | \"instagram\" | \"linkedin\" | \"telegram\" | \"x\"'.",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtadqfrq-607bf0f2",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T17:40:28.115Z",
+      "finished_at": "2026-08-26T17:40:28.115Z",
+      "suite": "typecheck",
+      "status": "fail",
+      "summary_plain": "The typecheck checks ran and something failed.",
+      "details": "apps/web/src/components/connections/reconnect-button.tsx(28,66): error TS2304: Cannot find name 'Channel'.",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtadylrd-d3a99239",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T17:46:49.127Z",
+      "finished_at": "2026-08-26T17:46:49.127Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (2 failed).",
+      "details": "     × renders no placeholder for any channel the screen names 94ms\n     × gives each platform a DISTINCT mark, not the same one twice 31ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed (2)",
+      "duration_ms": null
     }
   ]
 }

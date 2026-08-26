@@ -2,7 +2,7 @@
 
 import { RefreshCw } from 'lucide-react'
 
-import type { Channel } from '@sahoda/shared'
+import type { ConnectionPlatform } from '@sahoda/shared'
 
 import { Button } from '@/components/ui/button'
 import { useConnectFlow } from '@/lib/connections/use-connect-flow'
@@ -25,7 +25,13 @@ import { useConnectFlow } from '@/lib/connections/use-connect-flow'
  * change to one silently gave the product two different connect experiences
  * depending on which control the customer happened to press.
  */
-export function ReconnectButton({ platform, label }: { platform: Channel; label: string }) {
+export function ReconnectButton({
+  platform,
+  label,
+}: {
+  platform: ConnectionPlatform
+  label: string
+}) {
   const { pending, error, start } = useConnectFlow(platform)
 
   return (
