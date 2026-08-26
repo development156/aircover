@@ -89,14 +89,34 @@ exception, and it never leaks into buttons, text or surfaces.
 | `#ff6600` on `#ffffff` | **2.94:1** | fails AA, and fails the 3:1 UI-boundary floor |
 | `#ffffff` on `#ff6600` | **2.94:1** | so white text on the brand fill is not allowed |
 | `#000000` on `#ff6600` | **7.15:1** | **this is `--pfg`** |
-| `#bd4b00` on `#ffffff / #fafafa / #f2f2f3` | **5.04 / 4.82 / 4.50:1** | **this is `--acc`**, accent TEXT on light |
-| `#ff6600` on `#171717` | **6.11:1** | so in dark, and on the inverse surface, `--acc` returns to the brand orange |
+| `#f60` on `#ffffff / #fafafa / #f2f2f3` | **2.94 / 2.81 / 2.62:1** | **this is `--acc`**, accent TEXT on light — fails AA, by ruling |
+| `#bd4b00` on `#ffffff / #fafafa / #f2f2f3` | **5.04 / 4.82 / 4.50:1** | what `--acc` was until 2026-08-26 — cleared AA on all three |
+| `#ff6600` on `#171717` | **6.11:1** | dark is unchanged; `--acc` was already the brand orange there |
 
-`--acc` was **re-solved for v5** because the ground moved. v4's `#c95100` measures
-**4.32:1** on the new `#fafafa` canvas — below AA. Carrying it forward would have
-shipped a silent contrast regression the moment the page ground changed.
-`own-medicine.test.ts` grades the shipped tokens against `brandSkinVars()`, the
-same Readability Guard every *customer* theme passes through.
+**`--acc` is now `#f60` in both themes, and it does not clear AA on light.** That
+is a **founder's ruling of 2026-08-26**, taken with the three ratios above in
+hand and reaffirmed after they were put in writing. Brand brightness was chosen
+over the contrast floor. It is a deliberate trade, not an oversight, and it
+should not be quietly reverted by anyone reading only the numbers.
+
+**What it costs.** AA wants 4.5:1 for body text and 3:1 for large text; `#f60`
+clears neither on any of the three light grounds. So orange alone is no longer an
+accessible affordance on light: anywhere the colour is the ONLY signal that
+something is a link or an action, pair it with an underline, a weight step or an
+icon.
+
+The history is worth keeping, because it shows how tight the room was. `--acc`
+was **re-solved for v5** when the ground moved: v4's `#c95100` measures
+**4.32:1** on the `#fafafa` canvas, below AA, and `#bd4b00` was then the
+*brightest* orange that cleared all three. There was never an AA-passing orange
+brighter than `#bd4b00` — `#f60` is not a better solution to that problem, it is
+a decision to stop solving it.
+
+`own-medicine.test.ts` still grades the shipped tokens against `brandSkinVars()`,
+the same Readability Guard every *customer* theme passes through. Its `--acc`
+assertion was **retargeted, not removed**: it now pins `#ff6600` exactly and
+asserts the 2.94:1 shortfall out loud, so the token cannot drift to some third
+value unnoticed and the cost cannot rot into a claim that this pair is fine.
 
 ### 2.3 THE ACCENT IS A BUDGET, AND THE BUDGET IS PER SCREEN
 

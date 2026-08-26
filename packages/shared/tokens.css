@@ -69,20 +69,32 @@
                          black is the commitment. */
 
   /* Accent TEXT — links, and any orange word on a light surface.
-     SOLVED, not picked, and RE-SOLVED for v5 because the ground moved.
 
-     v4 solved this against --surface alone, when --surface and --canvas were
-     both #ffffff. v5 moves the page ground to #fafafa and adds a #f2f2f3 well,
-     so accent text now has THREE grounds and the darkest one decides.
+     ── FOUNDER'S RULING, 2026-08-26: BRAND BRIGHTNESS OVER THE AA FLOOR ──────
+     This token was #bd4b00 from v5 until now, and #bd4b00 was SOLVED rather
+     than picked: it was the brightest orange that still cleared AA on all
+     three light grounds. It was replaced with the brand orange on an explicit
+     instruction, given with these measurements in hand and reaffirmed after
+     they were put in writing. It is a deliberate trade, not an oversight, and
+     it must not be quietly reverted by anyone who reads only the numbers.
 
-       #ff6600  on #ffffff 2.94:1 · #fafafa 2.81:1 · #f2f2f3 2.62:1
-       #c95100  (v4's value) on the NEW canvas: 4.32:1 — BELOW AA
-       #bd4b00  5.04:1 / 4.82:1 / 4.50:1 — clears AA on all three
+     WHAT THE TRADE COSTS, MEASURED — every one of these is a real shortfall:
 
-     Carrying v4's #c95100 forward would have shipped a silent AA regression
-     the moment the canvas moved. The brand orange is not weakened, it is
-     RATIONED: --p still paints every fill, chip and focus halo. */
-  --acc: #bd4b00;
+       #ff6600  (SHIPPED) on #ffffff 2.94:1 · #fafafa 2.81:1 · #f2f2f3 2.62:1
+       #bd4b00  (was)         5.04:1 / 4.82:1 / 4.50:1 — cleared AA on all three
+       #c95100  (v4's value)  4.51:1 / 4.32:1 / 4.03:1 — rejected for v5 as BELOW AA
+
+     WCAG AA body text wants 4.5:1 and large text wants 3:1. The shipped value
+     clears NEITHER on any of the three grounds. Accent text is therefore a
+     legibility risk wherever it carries meaning a reader must actually read,
+     and it is no longer safe to treat "it is orange, so it is a link" as an
+     accessible affordance on its own — pair it with an underline, a weight
+     step or an icon anywhere the colour is the only signal.
+
+     Dark is unaffected and always was: --acc is #ff6600 there too, and on
+     #171717 it measures 6.11:1. This ruling closes the gap between the themes
+     by moving light DOWN to dark's value, not by moving dark. */
+  --acc: #ff6600;
 
   /* Tints are orange AT ALPHA, not solid steps, so they composite correctly on
      #ffffff, on #fafafa, on a well and on dark without a second set of values.
