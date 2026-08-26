@@ -312,3 +312,176 @@ good and it will catch you if you forget, but only after the file is misnamed.
 **And check `.sahoda-setup-status` first, every time.** This session's whole shape
 was set by a setup script that never ran, and `/kickoff` step 0 exists to catch
 exactly that.
+
+---
+
+# Session 2
+
+**Branch** `claude/divas-kickoff-xdoxoa` at `fa1790f`. Lane `wt-divas3`. Role
+advisor. Pushed: yes (handoff commit only; the lane's code is unchanged).
+
+**Do not quote the skeleton marker in this file.** Session 1's warning still
+holds and the defect it names is still live. See the follow-up table.
+
+## What this session was
+
+**No task was given.** The session opened with a context clear and the next
+input was `/handoff`. So there is no product work to report, and inventing a
+narrative for a session that did none would be the exact defect this file
+format exists to prevent.
+
+What it did instead is worth the entry: it **fast-forwarded the lane 43 commits
+onto `wt-core`, ran the gate cold, and measured whether Session 1's five
+follow-ups actually landed.** Three did. Two did not, and one of those two is
+the one Session 1 called "everything else is downstream of it".
+
+## Session 1's five follow-ups, MEASURED on `fa1790f`
+
+| # | Follow-up | State | Proof |
+| --- | --- | --- | --- |
+| 1 | Fix the Stop hook's `jq` quoting | **NOT DONE** | `.claude/settings.json:96` still reads `echo $INPUT \| jq -r '.stop_hook_active'`, unquoted. The re-entry guard still cannot be read. |
+| 1b | (same line) base the hook's gate on `wt-web`, not `main` | **NOT DONE** | same line, still `--filter="...[origin/main]"` |
+| 2 | Land the format fix so `wt-core`'s format leg goes green | **DONE** | `1ddcc8e` is in `wt-core`'s history; `prettier --check .` exits **0** on `fa1790f` |
+| 3 | Land research's CI-concurrency fix | **DONE** | `.github/workflows/gate.yml:98` now reads `gate-${{ github.head_ref \|\| github.ref_name }}`. `ref_name`, not `ref` — the two events can now share a group. |
+| 4 | Land `scripts/lib/auto-handoff.test.mjs` on `wt-core` | **DONE** | `git ls-tree origin/wt-core -- scripts/lib/auto-handoff.test.mjs` returns blob `8ec95ce` |
+| 5 | Widen the skeleton's shared-surface filter | **NOT DONE** | `scripts/auto-handoff.mjs:149-151` is byte-identical to the filter Session 1 quoted |
+
+**The ordering Session 1 gave was right and the cheapest item is the one still
+open.** Items 2, 3 and 4 were the ones needing a merge; they merged. Item 1 is a
+one-character edit to a file nobody had to merge, and it is still there.
+
+## The sandbox, checked because `/kickoff` step 0 exists
+
+MEASURED, and **materially better than Session 1's**:
+
+| thing | this session | Session 1 |
+| --- | --- | --- |
+| git author | **`SAHODALABS <development@sahodalabs.com>`** — correct | `Claude <noreply@anthropic.com>`, would have blocked Vercel |
+| `node_modules` | **present** at root | absent |
+| `.env` / `apps/web/.env.local` | **absent** | absent |
+| `core.hooksPath` | **UNSET** — `.githooks/pre-commit` is DISARMED | UNSET |
+| `.sahoda-setup-status` | absent | absent |
+
+So `scripts/cloud-setup.sh` still did not run, but the harness's own clone got
+the author row right this time. **The disarmed pre-commit hook is unchanged and
+still the thing that lets a spool file into a commit unchallenged.**
+
+## What shipped
+
+| # | What | Proof |
+| --- | --- | --- |
+| 1 | Lane fast-forwarded 43 commits, `184b268` → `fa1790f` | `git merge --ff-only origin/wt-core`, clean fast-forward, zero of this lane's own commits displaced |
+| 2 | This handoff section | the commit carrying it |
+
+**No code was written.** No file outside `docs/workflow/handoffs/` was touched.
+
+## What was NOT done, and why
+
+- **No task, so no feature, no fix, no refactor.** None was given.
+- **Follow-up 1 not fixed, despite being one character.** `.claude/settings.json`
+  is the file Session 1 declined to race two other lanes on. That reasoning has
+  now cost two sessions. **INFERRED**, and worth a ruling: at some point the
+  cheap fix nobody will race for is worth just taking.
+- **Follow-up 5 not fixed.** Same file two other lanes write.
+- **Playwright: UNRUN, not passed.** No `apps/web/.env.local`, so
+  `e2e/global-setup.ts` throws on the missing Clerk names before a browser
+  opens; and REQUESTS §25's outbound-443 reset applies to this sandbox too.
+  **UNRUN.**
+- **Nothing pushed to `wt-core`.** `origin/wt-divas3` is already exactly
+  `fa1790f`; there is no lane work to hand up.
+
+## Shared surfaces touched
+
+**By me: none.** One file changed, `docs/workflow/handoffs/divas-wt-divas3-2026-08-26.md`.
+
+**Arrived on the lane in the 43 commits, and whoever merges should know:**
+
+| file | shape | breaks constructors? |
+| --- | --- | --- |
+| `packages/shared/src/db/content.ts` | `generated_body` added to `PostSchema`, `PostInsertSchema`, `PostVariantSchema` — every one `.nullable().optional()` | **No.** Optional, so existing constructors still parse. Deliberately ABSENT from both Update schemas because the column is write-once. |
+| `packages/shared/src/brain/observations.ts` | `'edit_distance'` appended to `OBSERVATION_KINDS` | **No** for constructors; an exhaustive `switch` over the union goes non-exhaustive and typecheck catches it. Typecheck is green, so nothing in-tree had one. |
+| `packages/db/supabase/migrations/20260826090000_generated_body_draft_capture.sql` | new, 127 lines | not mine, not modified |
+
+That migration and those two contract changes are **another lane's** (`wt-jiban`
+draft-capture work). Flagged, not asserted correct.
+
+## Contract, migration or money
+
+**None by me.** The two `packages/shared` additions and the one migration listed
+above arrived from another lane; I neither wrote nor edited them. No price, no
+ledger path, no `pricing.config.json`.
+
+## Guards written, and the mutation that proved each
+
+**None. No test was written, so no mutation was run.** A session that wrote no
+code has no guard to prove, and a table here would be padding.
+
+The one guard fact worth carrying: `scripts/lib/auto-handoff.test.mjs` is now on
+`wt-core` (follow-up 4), so the file every lane keeps breaking finally has its
+harness on the integration branch. **I did not re-run Session 1's marker
+mutation** — it eats a real handoff by design and this file is the one it would
+eat. Its result stands as Session 1 measured it, unretested here.
+
+## Anything retracted
+
+**Nothing.** No claim from Session 1 was found wrong. Three of its five
+follow-ups are confirmed landed, which is the opposite of a retraction.
+
+One figure moved and is worth recording rather than retracting:
+**`design-lint` now scans 1220 files.** Session 1 measured 1218; the design lane
+before that measured 1185. The number drifts upward with every lane's new files,
+so **anyone treating a specific count as a pass condition will read a correct run
+as a failure.** The ratchets themselves are unchanged: `hardcoded spacing` 132
+known against baseline 134, `hand-written font size` 731 against 732. **Both
+still have room to tighten and both are still untightened**, for the merge-time
+reason Session 1 gave.
+
+## What the next session in THIS lane should pick up
+
+1. **Take follow-up 1.** One character, `.claude/settings.json:96`:
+   `echo "$INPUT"`. Two sessions have now deferred it to avoid a race, and it is
+   the reason a session that was told to wait did work anyway. While in that
+   line, change `origin/main` to `origin/wt-web` — `main` is 800+ commits behind
+   and `09_CLOUD_SESSIONS.md` names it the one ref never to reason from.
+2. **Then follow-up 5**, the shared-surface filter at
+   `scripts/auto-handoff.mjs:149`.
+3. **Ask for a task before doing either if a human is present.** Both of Session
+   1's and Session 2's shapes were set by nobody being there to ask.
+
+## Gate
+
+Run on `fa1790f`, clean tree, repo root. **No leg was piped** — every exit code
+was read from the command itself, never through `tail`.
+
+| leg | result | real output |
+| --- | --- | --- |
+| `prettier --check .` | **PASS** | `All matched files use Prettier code style!` · exit **0** |
+| `turbo run typecheck lint test --force --concurrency=1` | **PASS** | `Tasks: 27 successful, 27 total` · **`Cached: 0 cached, 27 total`** · 6m1.46s · exit **0** |
+| ↳ `@sahoda/web:test` | PASS | `390 passed \| 3 skipped (393)` files · `4951 passed \| 13 skipped (4964)` tests |
+| ↳ `@sahoda/db:test` | PASS | `34 passed \| 12 skipped (46)` files · `618 passed \| **207 skipped** (825)` tests |
+| ↳ `@sahoda/billing:test` | PASS | `30 passed \| 1 skipped (31)` files · `401 passed \| **13 skipped** (414)` tests |
+| ↳ `@sahoda/web:lint` | PASS | `1220 files scanned`; both ratchets `ok`, none new |
+| `turbo build` / `js-budget` | **NOT RUN** | no `apps/web` source changed by me. **INFERRED** safe, not measured. |
+| root `vitest` (`scripts/`) | **NOT RUN** | two root-only chmod tests fail here regardless (REQUESTS §26) |
+| **Playwright `test:smoke`** | **UNRUN** | no `apps/web/.env.local`; REQUESTS §25. **UNRUN, not passed.** |
+
+`Cached: 0 cached, 27 total` is what makes the turbo leg mean anything. A leg
+under a second is a cache replay and verifies nothing.
+
+**A green gate here still includes 233 tests that did not run** — `@sahoda/db`
+207, billing 13, web 13. Unchanged from Session 1. **Read the skip counts, not
+the exit code.**
+
+### Left uncommitted in the tree, deliberately
+
+`ops/state/qa.pending.json` was **modified by a hook and NOT committed.** The QA capture
+hook spooled this session's three gate legs into it and attributed all three to
+**`SL-054`**, a task code this session was never given and never worked on.
+MEASURED: 54 lines added, three `"actor": "claude"` rows, `"kind": "auto"`.
+
+This is Session 1's finding reproducing exactly. `core.hooksPath` is UNSET, so
+`.githooks/pre-commit` is disarmed and **nothing but the committer's attention
+stops those rows entering a commit.** `lane-sync push` then refused the dirty tree, correctly,
+and the three rows were reverted with `git restore` rather than committed. That
+refusal is the only thing in this chain that worked as designed. **Do not
+`git add -A` in this repo.**
