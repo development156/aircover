@@ -17,8 +17,8 @@ import {
  * reads the LATEST snapshot per post rather than summing eight days of
  * re-reported totals. That is the single most consequential decision in this
  * feature and it lives in `store.ts` SQL, which these tests do not execute.
- * `readChannelOutcomes` needs a PGlite test before this measurement is trusted
- * against real data.
+ * `store.pglite.test.ts` covers that decision against a real Postgres; these
+ * tests still cannot see it.
  *
  * They also say nothing about whether `engagement` and `reach` mean the same
  * thing on Instagram as on LinkedIn. The arithmetic is sound; the comparability
