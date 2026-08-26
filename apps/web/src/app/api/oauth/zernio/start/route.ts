@@ -3,8 +3,9 @@ import { ensureZernioProfile } from '@sahoda/publishing'
 import { isZernioPlatform, type ZernioPlatform } from '@sahoda/shared'
 
 import { checkCountableLimit } from '@/lib/billing/entitlements'
-import { setPendingConnect, type ConnectMode } from '@/lib/connections/pending-connect'
+import { setPendingConnectHeader, type ConnectMode } from '@/lib/connections/pending-connect'
 import { readConnectionSlots } from '@/lib/connections/read'
+import { connectPlatformFor } from '@/lib/zernio/connect-platform'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { readActiveWorkspace } from '@/lib/workspaces'
@@ -157,21 +158,44 @@ export async function POST(request: Request): Promise<Response> {
       )
     }
 
-    const authUrl = await client.connectUrl(platform, profileId, returnTo)
+    // ── OUR NAME FOR THE CHANNEL IS NOT ZERNIO'S ─────────────────────────────
+    // `x` and `gbp` are OUR ids. Connect wants `twitter` and `googlebusiness`,
+    // and passing ours straight through is why those two buttons answered
+    // "Couldn't start the connection. Try again." on every press, while
+    // Instagram, LinkedIn and Facebook worked — for those three the two names
+    // happen to be the same string. See lib/zernio/connect-platform.ts: this is
+    // the FOURTH platform vocabulary in this integration and the only one nobody
+    // had mapped.
+    const connectName = connectPlatformFor(platform)
+    if (connectName === null) {
+      // Telegram. `GET /v1/connect/telegram` returns an access CODE for a bot,
+      // not an authUrl, so there is no consent screen to open. Refused here
+      // rather than discovered downstream when `connectUrl` throws for want of a
+      // field — which is exactly how it was found.
+      return fail('This channel is connected a different way, and that flow isn’t built yet.', 400)
+    }
+
+    const authUrl = await client.connectUrl(connectName, profileId, returnTo)
 
     // ── THE ONLY RECORD OF WHAT THE CUSTOMER ASKED FOR ────────────────────────
-    // Set LAST, after every refusal above has had its chance. A cookie written
-    // before a 403 would authorise a create for a connect that never happened, and
-    // it would still be sitting there on the customer's next trip back.
+    // Written as a HEADER on this very response, not through `cookies()`. This
+    // route answers with a `Response` it builds itself, and mutating the
+    // request-scoped cookie store put nothing on it — so the cookie was never
+    // sent and the return trip always read `null`. Two reported bugs came out of
+    // that one omission: the popup showed the app instead of closing, and a
+    // genuine connect wrote no row at all. See lib/connections/pending-connect.ts.
     //
-    // The return route reads this to decide which platform may have a row CREATED
-    // for it. Without it that route reconciles all four and re-adopts accounts the
-    // customer deliberately disconnected — see lib/connections/pending-connect.ts.
-    await setPendingConnect({ platform, mode })
-
+    // Attached LAST, after every refusal above has had its chance. A cookie set
+    // before a 403 would authorise a create for a connect that never happened.
     return Response.json(
       { ok: true, authUrl },
-      { status: 200, headers: { 'cache-control': 'no-store' } },
+      {
+        status: 200,
+        headers: {
+          'cache-control': 'no-store',
+          'set-cookie': setPendingConnectHeader({ platform, mode }),
+        },
+      },
     )
   } catch (error) {
     await reportServerError(error, { action: 'zernioStart', workspaceId })

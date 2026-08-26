@@ -30,8 +30,8 @@ const state = vi.hoisted(() => ({
   profileEnsured: 0,
   rpcCalls: 0,
   connectUrlCalls: 0,
-  /** What the route recorded as the pending connect, as `<platform>.<mode>`. */
-  pendingWrites: [] as string[],
+  /** The platform string actually sent to Zernio's connect endpoint, in order. */
+  connectUrlPlatforms: [] as string[],
 }))
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -42,8 +42,9 @@ vi.mock('@/lib/zernio/server', () => ({
   zernioClient: () =>
     state.clientPresent
       ? {
-          connectUrl: () => {
+          connectUrl: (platform: string) => {
             state.connectUrlCalls += 1
+            state.connectUrlPlatforms.push(platform)
             return Promise.resolve('https://zernio.example/consent')
           },
         }
@@ -86,15 +87,6 @@ vi.mock('@/lib/billing/entitlements', () => ({
   checkCountableLimit: () => Promise.resolve(state.limitVerdict),
 }))
 
-// The start route records what the customer pressed before sending them away.
-// Mocked as a SEAM: the cookie's wire shape is `pending-connect.test.ts`'s job.
-vi.mock('@/lib/connections/pending-connect', () => ({
-  setPendingConnect: (pending: { platform: string; mode: string }) => {
-    state.pendingWrites.push(`${pending.platform}.${pending.mode}`)
-    return Promise.resolve()
-  },
-}))
-
 vi.mock('@/lib/observability/report', () => ({ reportServerError: () => Promise.resolve() }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -129,7 +121,7 @@ beforeEach(() => {
   state.profileEnsured = 0
   state.rpcCalls = 0
   state.connectUrlCalls = 0
-  state.pendingWrites = []
+  state.connectUrlPlatforms = []
 })
 
 describe('the channels plan limit is enforced before the consent screen', () => {
@@ -253,33 +245,50 @@ describe('the workspace read tells "none" apart from "could not tell"', () => {
 /**
  * WHAT THE CUSTOMER PRESSED, RECORDED BEFORE THEY LEAVE.
  *
- * The return route reads this to decide which platform may have a row CREATED for
- * it. Without it that route reconciles all four platforms and re-adopts accounts
- * the customer deliberately disconnected — the "disconnect and the other platforms
- * come back" defect. See lib/connections/pending-connect.ts.
+ * ── ASSERTED ON THE REAL `Set-Cookie` HEADER, AND THAT IS THE POINT ──────────
+ * These tests used to mock `setPendingConnect` and assert it had been CALLED.
+ * It was called. It just did nothing: the old implementation went through
+ * `cookies().set()`, and this route answers with a `Response.json(...)` it builds
+ * itself, so the mutation never became a header. A seam that records the call
+ * cannot tell "we asked for a cookie" from "a cookie was sent", and the whole
+ * failure lived in that gap.
+ *
+ * Two reported bugs came out of it — the popup showed the app instead of closing,
+ * and a genuine connect wrote no row — and this file was green throughout.
+ *
+ * So nothing is mocked now. `setPendingConnectHeader` is a pure function and the
+ * assertion reads what actually leaves the route.
  */
 describe('the pending connect is recorded, and only for a connect that happens', () => {
-  it('records the platform that was asked for, not the default', async () => {
+  it('SENDS a Set-Cookie header, not merely a call to a cookie helper', async () => {
     const res = await post({ platform: 'linkedin' })
 
     expect(res.status).toBe(200)
-    expect(state.pendingWrites).toEqual(['linkedin.redirect'])
+    const cookie = res.headers.get('set-cookie') ?? ''
+    expect(cookie).toContain('sahoda_connect=linkedin.redirect')
+    // The attributes the return trip depends on. `SameSite=Lax` in particular is
+    // load-bearing: the trip home is a cross-site top-level navigation, which
+    // `Lax` allows and `Strict` would drop.
+    expect(cookie).toContain('HttpOnly')
+    expect(cookie).toContain('SameSite=Lax')
+    expect(cookie).toContain('Path=/')
   })
 
   it('records the mode, so the return trip knows how to answer', async () => {
-    await post({ platform: 'instagram', mode: 'popup' })
-    expect(state.pendingWrites).toEqual(['instagram.popup'])
+    const res = await post({ platform: 'instagram', mode: 'popup' })
+    expect(res.headers.get('set-cookie')).toContain('sahoda_connect=instagram.popup')
   })
 
   it('treats anything that is not the literal "popup" as a redirect', async () => {
     // The older path is the fallback for a blocked popup, so an absent or unknown
     // mode must never select the newer one.
-    await post({ platform: 'instagram', mode: 'iframe' })
-    await post({ platform: 'instagram' })
-    expect(state.pendingWrites).toEqual(['instagram.redirect', 'instagram.redirect'])
+    const odd = await post({ platform: 'instagram', mode: 'iframe' })
+    const bare = await post({ platform: 'instagram' })
+    expect(odd.headers.get('set-cookie')).toContain('instagram.redirect')
+    expect(bare.headers.get('set-cookie')).toContain('instagram.redirect')
   })
 
-  it('records NOTHING when the plan refuses the connect', async () => {
+  it('sends NO cookie when the plan refuses the connect', async () => {
     // A cookie written before a refusal would authorise a create for a connect
     // that never happened, and it would still be there on the next trip back.
     state.slots = { count: 2, keys: new Set() }
@@ -288,15 +297,53 @@ describe('the pending connect is recorded, and only for a connect that happens',
     const res = await post({ platform: 'instagram' })
 
     expect(res.status).toBe(403)
-    expect(state.pendingWrites).toEqual([])
+    expect(res.headers.get('set-cookie')).toBeNull()
   })
 
-  it('records NOTHING when there is no workspace to connect into', async () => {
+  it('sends NO cookie when there is no workspace to connect into', async () => {
     state.workspace = null
 
     const res = await post({ platform: 'instagram' })
 
     expect(res.status).toBe(400)
-    expect(state.pendingWrites).toEqual([])
+    expect(res.headers.get('set-cookie')).toBeNull()
+  })
+})
+
+/**
+ * OUR NAME FOR A CHANNEL IS NOT ZERNIO'S, AND THREE BUTTONS DIED OF IT.
+ *
+ * X and Google Business answered "Couldn't start the connection. Try again." on
+ * every press while Instagram, LinkedIn and Facebook worked — because for those
+ * three our id and Zernio's happen to be the same string. `/connect/x` and
+ * `/connect/gbp` are not platforms Zernio has ever had.
+ */
+describe('the connect endpoint is asked for ZERNIO’s name for the channel', () => {
+  it('sends twitter for x and googlebusiness for gbp', async () => {
+    await post({ platform: 'x' })
+    expect(state.connectUrlPlatforms).toEqual(['twitter'])
+
+    state.connectUrlPlatforms = []
+    await post({ platform: 'gbp' })
+    expect(state.connectUrlPlatforms).toEqual(['googlebusiness'])
+  })
+
+  it('sends our own name where the two agree', async () => {
+    await post({ platform: 'instagram' })
+    await post({ platform: 'linkedin' })
+    await post({ platform: 'facebook' })
+    expect(state.connectUrlPlatforms).toEqual(['instagram', 'linkedin', 'facebook'])
+  })
+
+  it('refuses Telegram before calling Zernio, because it has no OAuth flow', async () => {
+    // `GET /v1/connect/telegram` returns an access CODE for a bot, not an
+    // authUrl. Sending a customer there is sending them nowhere.
+    const res = await post({ platform: 'telegram' })
+
+    expect(res.status).toBe(400)
+    expect(state.connectUrlPlatforms).toEqual([])
+    // And it must not leave a cookie authorising a create for a trip that cannot
+    // happen.
+    expect(res.headers.get('set-cookie')).toBeNull()
   })
 })

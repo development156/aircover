@@ -87,19 +87,40 @@ export function parsePendingConnect(raw: string | undefined): PendingConnect | n
   return { platform: platform as ZernioPlatform, mode: mode as ConnectMode }
 }
 
-/** Record the platform and the mode before the customer leaves for the consent screen. */
-export async function setPendingConnect(pending: PendingConnect): Promise<void> {
-  const store = await cookies()
-  store.set(PENDING_CONNECT_COOKIE, encode(pending), {
-    httpOnly: true,
-    sameSite: 'lax',
-    // Not hardcoded true: the local dev server is plain HTTP, and a `secure`
-    // cookie there is silently never sent — which would make every local connect
-    // look like a replay and send anyone debugging this straight past the cause.
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: MAX_AGE_SECONDS,
-  })
+/**
+ * The `Set-Cookie` VALUE that records a press, as a literal header.
+ *
+ * ── WHY THIS IS NO LONGER A `cookies().set()` CALL ───────────────────────────
+ * It was, and it silently did nothing. The start route answers with
+ * `Response.json(...)` — a plain Web `Response` it builds itself — and mutating
+ * the request-scoped cookie store does not put a header on an object the
+ * framework never sees. So the cookie was never sent, and everything downstream
+ * that depended on it read `null`:
+ *
+ *   · the return trip served a 303 to /connections instead of the popup closer,
+ *     so the popup showed the whole app again and the opener sat on "Opening…"
+ *     forever. Reported exactly that way.
+ *   · create-scoping fell through to its fail-closed branch, so a genuine
+ *     connect wrote NO row at all.
+ *
+ * One missing header, two bugs that looked unrelated.
+ *
+ * The doubt was already written down for the CLEARING cookie below — "trusting
+ * the framework to merge the result into a hand-built Response is a guess about
+ * behaviour nobody on this route has proven" — and then the SET was left going
+ * through the store anyway. The rule now applies to both directions: a header
+ * string is applied because it is written, and it is visible to `curl -I`.
+ *
+ * `secure` is conditional, not hardcoded: the local dev server is plain HTTP and
+ * a `Secure` cookie there is silently never sent, which would make every local
+ * connect look like a replay and send anyone debugging this past the cause.
+ */
+export function setPendingConnectHeader(pending: PendingConnect): string {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : ''
+  return (
+    `${PENDING_CONNECT_COOKIE}=${encode(pending)}` +
+    `; Path=/; Max-Age=${MAX_AGE_SECONDS}; HttpOnly; SameSite=Lax${secure}`
+  )
 }
 
 /** What the customer asked for on this trip, or null if we cannot tell. */

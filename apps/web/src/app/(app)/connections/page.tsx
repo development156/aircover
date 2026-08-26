@@ -286,7 +286,13 @@ export default async function ConnectionsPage({
                         ? railReady
                           ? undefined
                           : 'Publishing key isn’t set in this environment.'
-                        : 'Secure token flow still being wired.'
+                        : // NOT "secure token flow still being wired", which was
+                          // written for a different cause and is now false. A
+                          // channel outside ZERNIO_PLATFORMS is one whose connect
+                          // is not an OAuth handoff at all — Telegram wants a bot
+                          // code and a poll. Naming the real reason is what stops
+                          // this reading as a fault someone could wait out.
+                          'This channel connects a different way, and that isn’t built yet.'
                 }
               />
             ))}
