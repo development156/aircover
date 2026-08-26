@@ -7,6 +7,7 @@ import type {
 } from '@sahoda/shared'
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
+import { PROSE_RULES } from '../prose-rules'
 
 const MAX_TOKENS = 512
 
@@ -44,7 +45,7 @@ function buildMessages(
   knowledge?: ChatMessage,
 ): ChatMessage[] {
   return [
-    { role: 'system', content: `${SYSTEM_BASE} ${DIRECTIVES[input.instruction]}` },
+    { role: 'system', content: `${SYSTEM_BASE} ${DIRECTIVES[input.instruction]} ${PROSE_RULES}` },
     ...(brand ? [brand] : []),
     ...(knowledge ? [knowledge] : []),
     { role: 'user', content: target(input) },

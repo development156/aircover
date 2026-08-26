@@ -3,6 +3,7 @@ import { ChannelSchema, ContentVariantsOutputSchema, CONSTRAINTS } from '@sahoda
 import type { Channel, ContentVariantsOutput, MeshContext, MeshTaskDef } from '@sahoda/shared'
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
+import { PROSE_RULES } from '../prose-rules'
 
 /** 2048: measured 925 x 1.4 (token-budget.ts). 1024 left 10% headroom. */
 const MAX_TOKENS = 2048
@@ -20,7 +21,8 @@ Output ONLY a JSON object matching:
   "extras": { "hashtags"?: string[], "gbpCta"?: string } } ] }
 Rules: exactly one variant per requested channel; stay within each channel's character
 limit; follow each platform's norms for hashtags, links, and (GBP) call-to-action; keep
-the core message and the brand voice. No markdown, no commentary.`
+the core message and the brand voice. No markdown, no commentary.
+${PROSE_RULES}`
 
 /** One-line limit brief per channel, sourced from the shared Constraint Engine (one source of truth). */
 function channelBrief(channel: Channel): string {
