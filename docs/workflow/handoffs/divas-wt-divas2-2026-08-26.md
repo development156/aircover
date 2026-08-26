@@ -355,8 +355,10 @@ is accumulated, not accidental.
 
 `ChannelSettings` folds six per-channel settings behind one `<details>`. The kind
 of post deliberately stays out. MEASURED across all four cards at default state:
-24 controls → **19**, 105 text-carrying elements → **76**; Google Business
-Profile 29 → **16**.
+24 controls → **19**, and 101 text-carrying elements → **80**. BOTH −21%.
+(An earlier line said 105 → 76, −28%. An adversarial audit refuted it and a
+re-measurement against genuinely pre-fold code agrees: the "before" had been
+counted on the post-fold tree. Corrected in REQUESTS §29 and docs/50.)
 
 Guarded by `channel-settings.test.tsx`, 10 tests, four mutations each watched
 going red (welded open, welded shut, collaborators by key presence, summary stops

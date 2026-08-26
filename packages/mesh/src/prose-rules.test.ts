@@ -3,6 +3,9 @@ import { describe, expect, test } from 'vitest'
 import { PROSE_RULES, findBannedDashes, obeysProseRules } from './prose-rules'
 import { contentVariantsTask } from './tasks/content-variants'
 import { captionRewriteTask } from './tasks/caption-rewrite'
+import { siteGenerateTask } from './tasks/site-generate'
+import { planWeekTask } from './tasks/plan-week'
+import { brandGuidelinesTask } from './tasks/brand-guidelines'
 
 /**
  * THE DASH RULE REACHES THE MODEL, AND KEEPS ITS HANDS OFF THE HYPHEN.
@@ -77,6 +80,31 @@ describe('every task that writes a published caption carries the rule', () => {
       ctx,
     )
     const system = messages.find((m) => m.role === 'system')
+    expect(system?.content).toContain(PROSE_RULES)
+  })
+
+  test("site_generate — marketing copy published under the customer's own name", () => {
+    // AN AUDIT CAUGHT THIS ONE MISSING. The first version of this rule reached
+    // only the two caption tasks, while site_generate writes the words on a
+    // customer's actual website. "Every task that writes a published caption"
+    // was the claim; three tasks were outside it.
+    const system = siteGenerateTask
+      .buildMessages({ brief: 'A bakery in Pune.', sections: ['hero'] } as never, ctx)
+      .find((m) => m.role === 'system')
+    expect(system?.content).toContain(PROSE_RULES)
+  })
+
+  test('plan_week — the briefs the customer reads', () => {
+    const system = planWeekTask
+      .buildMessages({ goal: 'More walk-ins', channels: ['x'], count: 3 } as never, ctx)
+      .find((m) => m.role === 'system')
+    expect(system?.content).toContain(PROSE_RULES)
+  })
+
+  test('brand_guidelines — sample hooks land in the Brand Brain', () => {
+    const system = brandGuidelinesTask
+      .buildMessages({ business: 'A bakery in Pune.' } as never, ctx)
+      .find((m) => m.role === 'system')
     expect(system?.content).toContain(PROSE_RULES)
   })
 
