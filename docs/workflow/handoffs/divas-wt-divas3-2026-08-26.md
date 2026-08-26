@@ -729,3 +729,72 @@ session needs to move a baseline, move the one line.**
    installed and the wrong one cost me a false base-wide finding.
 5. **The Stop hook fix is one `case` statement**, written out above, for whoever
    can edit `.claude/settings.json`.
+
+
+# Session 3, addendum — THE MIGRATION IS APPLIED
+
+**Founder said "apply the migrations" on 2026-08-26. Asked which**, because seven
+were unapplied and only one was mine. **Ruling: `asset_folder_system` only.** The
+other six are other lanes' and one of them reprices plans.
+
+`asset_folders`, `asset_folder_items` and `asset_smart_folders` are **LIVE in
+production** (`rloztdhzfliyvpvxsgjl`), recorded as migration `asset_folder_system`.
+
+## Verified in production, not assumed from `success: true`
+
+| check | result |
+| --- | --- |
+| three tables exist, RLS enabled | **yes**, `relrowsecurity = true` on all three |
+| policies | **4 each** |
+| triggers | folders 2 (guard + updated_at), smart 1, items 0, as designed |
+| assets rows touched | **0**. 13 before, 13 after |
+
+**Every guard was then BROKEN in production and watched to refuse**, inside a
+`do` block that ends in a `raise` so all probe rows roll back:
+
+```
+cycle_refused=true | seventh_level_refused=true | over_deep_subtree_refused=true
+root_dup_refused=true | bad_query_refused=true | good_query_accepted=true
+```
+
+`over_deep_subtree_refused` is the one that matters: it is the half a per-row
+trigger cannot see, live on production data. `good_query_accepted` is there so
+the CHECK is not passing by refusing everything.
+
+**MEASURED after: 0 folders, 0 filings, 0 smart folders, 0 rows named `ZZ%`.**
+The probe left nothing.
+
+## `docs/38` was wrong, and one half of it was wrong when I wrote it
+
+MEASURED against production: **51 workspace-owned tables, not 47.** Exactly one
+is unapplied, `ledger_actor_redactions`.
+
+The paragraph I edited earlier this session said "47 of those 52" and named five
+unapplied tables. **`marketing_observations` was already applied at that moment**
+and I carried the claim forward from a 2026-08-23 reading instead of counting.
+Corrected, with the correction stated in the file itself, because this document
+goes to a lawyer.
+
+## A finding, reported rather than silently fixed
+
+The Supabase security advisor returns **72 findings, none at ERROR level.** One
+names my work: `function_search_path_mutable` on `app.asset_folders_guard_tree`.
+
+**It is the house norm, not an anomaly I introduced: 16 functions carry it**,
+including `app.set_updated_at`, `app.apply_tenant_policies`, `app.block_mutations`
+and `charge_if_affordable`. Mine is a plain trigger function and **not**
+`SECURITY DEFINER`, so its exploit path is weaker than most of the other 15.
+
+**Not fixed.** Fixing one of sixteen does not close the class, and a pass over
+core functions like `apply_tenant_policies` is somebody's deliberate piece of
+work, not a side effect of a folders feature. The other classes are
+`authenticated_security_definer_function_executable` (44) and
+`rls_enabled_no_policy` (11); **none of the 11 is mine.**
+
+## Still not applied, deliberately
+
+`ledger_actor_redactions`, `clerk_id_remap`,
+`clerk_webhook_stops_flooding_the_audit_log`,
+`ops_owner_count_requires_a_linked_user`, `reprice_plans_from_business_model_deck`
+and `variant_formats_story_thread`. **`reprice_plans` changes what customers are
+charged; do not apply it as a side effect of anything.**

@@ -57,10 +57,18 @@ stops matching the database. (It read 49 on 2026-08-25, the figure this sentence
 the three new ones are the library's folder system, `asset_folders`, `asset_folder_items` and
 `asset_smart_folders`. It read 48 on 2026-08-23; the forty-ninth was `marketing_observations`.)
 
-> **Production holds 47 of those 52 today.** Five are created by migrations that are written and
-> deliberately not yet applied: `ledger_actor_redactions` (see §5), `marketing_observations`, and
-> the three folder tables above. Counted from production directly on 2026-08-23, and unchanged
-> since: nothing in this pass was applied.
+> **Production holds 51 of those 52 today.** MEASURED against production on 2026-08-26 by counting
+> `public` base tables carrying a `workspace_id` column, not inferred from the migration list.
+>
+> **Exactly one is missing: `ledger_actor_redactions`** (see §5), whose migration is written and
+> deliberately not applied.
+>
+> This paragraph said "47 of those 52" and named five unapplied tables an hour before this edit,
+> and it was wrong in both halves. `marketing_observations` had already been applied when that was
+> written; the count was carried forward from a 2026-08-23 reading rather than re-measured. **The
+> three folder tables were applied on 2026-08-26** and are now live. If you are about to quote a
+> figure from this file, re-measure it first: that is the second time this one paragraph has gone
+> stale by being copied instead of counted.
 
 Three tables hold personal data and do **not** carry a `workspace_id`, so they are invisible to any
 sweep built on that rule. This was a real gap and it is worth stating plainly because it is the kind
