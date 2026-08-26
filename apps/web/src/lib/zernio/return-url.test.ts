@@ -103,3 +103,47 @@ describe('an environment that cannot answer says so', () => {
     expect(returnOrigin({ vercelEnv: 'preview', vercelBranchUrl: '   ', appUrl: '' })).toBeNull()
   })
 })
+
+describe('the intent travels in the URL, because the cookie did not survive', () => {
+  it('carries nothing at all when no intent is given', () => {
+    // The old shape. A caller that says nothing gets the URL it always got, so
+    // the redirect path stays the default in the absence of every signal.
+    expect(returnUrl({ appUrl: APP })).toBe(`${APP}/api/oauth/zernio/return`)
+    expect(returnUrl({ appUrl: APP }, {})).toBe(`${APP}/api/oauth/zernio/return`)
+  })
+
+  it('writes mode=popup, and writes it ONLY for popup', () => {
+    expect(returnUrl({ appUrl: APP }, { mode: 'popup' })).toBe(
+      `${APP}/api/oauth/zernio/return?mode=popup`,
+    )
+    // `redirect` is the absence, not a value. Anything that strips the query
+    // string therefore lands on the behaviour that has always worked.
+    expect(returnUrl({ appUrl: APP }, { mode: 'redirect' })).toBe(`${APP}/api/oauth/zernio/return`)
+  })
+
+  it('writes the platform, which is what makes a create possible at all', () => {
+    // Losing this is not cosmetic: without it the return route's create-scoping
+    // falls to its fail-closed branch and a real connect writes NO row.
+    expect(returnUrl({ appUrl: APP }, { platform: 'linkedin' })).toBe(
+      `${APP}/api/oauth/zernio/return?platform=linkedin`,
+    )
+  })
+
+  it('carries both at once', () => {
+    const url = new URL(returnUrl({ appUrl: APP }, { mode: 'popup', platform: 'gbp' }) as string)
+    expect(url.searchParams.get('mode')).toBe('popup')
+    expect(url.searchParams.get('platform')).toBe('gbp')
+  })
+
+  it('still returns null when the environment cannot name an origin', () => {
+    // The intent must never conjure a URL out of an environment that has none —
+    // a return trip to nowhere costs the customer a real grant at the platform.
+    expect(returnUrl({}, { mode: 'popup', platform: 'instagram' })).toBeNull()
+  })
+
+  it('keeps the preview origin, which is the bug this file was made for', () => {
+    expect(
+      returnUrl({ vercelEnv: 'preview', vercelBranchUrl: BRANCH, appUrl: APP }, { mode: 'popup' }),
+    ).toBe(`https://${BRANCH}/api/oauth/zernio/return?mode=popup`)
+  })
+})

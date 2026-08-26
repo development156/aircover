@@ -91,7 +91,14 @@ vi.mock('@sahoda/publishing', () => ({
 
 // TWO platforms, not one. A partial outcome cannot exist in a one-platform world,
 // so the old single-entry mock could not have caught the collapse this file now pins.
-vi.mock('@sahoda/shared', () => ({ ZERNIO_PLATFORMS: ['instagram', 'linkedin'] }))
+// Two platforms, so a test can prove a third is not written. `isZernioPlatform`
+// is derived from the same short list rather than restated — a mock that answered
+// `true` for everything would make the allowlist test pass without an allowlist.
+const MOCK_PLATFORMS = ['instagram', 'linkedin']
+vi.mock('@sahoda/shared', () => ({
+  ZERNIO_PLATFORMS: MOCK_PLATFORMS,
+  isZernioPlatform: (value: unknown) => MOCK_PLATFORMS.includes(value as string),
+}))
 
 // The connection count and the plan verdict are mocked as SEAMS, not simulated
 // through the supabase mock: this file is about what the route does with an answer,
@@ -685,10 +692,91 @@ describe('the popup closer does not depend on window.opener', () => {
   })
 })
 
-describe('the query string is still ignored wholesale', () => {
+/**
+ * THE INTENT NOW ARRIVES TWO WAYS, AND EITHER IS ENOUGH.
+ *
+ * The cookie kept not surviving our origin -> Zernio -> Google -> Zernio -> us,
+ * and two reported defects came out of that one absence: the popup got a 303 and
+ * loaded the app inside itself, and create-scoping fell to its fail-closed branch
+ * so a genuine connect wrote no row. These tests pin the fallback with the cookie
+ * ABSENT, because that is the condition it exists for.
+ */
+describe('the intent survives a lost cookie, because it also rides in the URL', () => {
+  const IG_ID = '6a75caf7d0fe733d1afcc1f4'
+  const withParams = (query: string) =>
+    GET(new Request(`https://app.sahodalabs.com/api/oauth/zernio/return?${query}`))
+
+  it('closes the popup on the URL alone', async () => {
+    state.pending = null
+
+    const res = await withParams('connected=1&mode=popup&platform=instagram')
+
+    // Not a 303. A redirect is what the popup was getting, and it is why it
+    // showed a second copy of /connections instead of shutting.
+    expect(res.headers.get('content-type')).toContain('text/html')
+    expect(await res.text()).toContain('BroadcastChannel')
+  })
+
+  it('authorises the create on the URL alone', async () => {
+    // The louder half. Without this the customer presses Connect, approves at the
+    // platform, and nothing lands in our table at all.
+    state.pending = null
+    state.slots = { count: 0, keys: new Set() }
+
+    await withParams('connected=1&platform=instagram')
+
+    expect(state.rpcCalls).toEqual([`instagram:${IG_ID}`])
+  })
+
+  it('still SCOPES that create — it does not open the door to every platform', async () => {
+    // The disconnect-then-reconnect fix has to survive the fallback. LinkedIn is
+    // live at Zernio and deliberately not ours; pressing Instagram must not
+    // bring it back.
+    state.pending = null
+    state.slots = { count: 0, keys: new Set() }
+
+    await withParams('connected=1&platform=instagram')
+
+    expect(state.rpcCalls.some((c) => c.startsWith('linkedin:'))).toBe(false)
+  })
+
+  it('refuses a platform that is not on the allowlist', async () => {
+    // Validated, not passed through. An unknown string is the fail-closed branch.
+    state.pending = null
+    state.slots = { count: 0, keys: new Set() }
+
+    await withParams('connected=1&platform=myspace')
+
+    expect(state.rpcCalls).toEqual([])
+  })
+
+  it('the cookie still wins when it did arrive', async () => {
+    // The parameter is a fallback, never an override. A forged one must not be
+    // able to redirect a create the cookie already scoped.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    state.slots = { count: 0, keys: new Set() }
+
+    await withParams('connected=1&platform=linkedin')
+
+    expect(state.rpcCalls).toEqual([`instagram:${IG_ID}`])
+  })
+
+  it('a missing mode is still a redirect', async () => {
+    state.pending = null
+
+    const res = await withParams('connected=1&platform=instagram')
+
+    expect(res.status).toBe(303)
+    expect(await res.text()).toBe('')
+  })
+})
+
+describe('the query string is read for intent and NOTHING else', () => {
   it('never reads connected/profileId/accountId off the redirect', async () => {
     // doc 13 §3: a wrong accountId does not error, it publishes to someone else and
-    // returns 200. The only safe reading of this query string is none at all.
+    // returns 200. `mode` and `platform` are ours and are read; every id on this
+    // URL still is not, and that is the line — a channel NAME from a five-item
+    // allowlist cannot name another tenant's account, an id can.
     const res = await GET(
       new Request(
         'https://app.sahodalabs.com/api/oauth/zernio/return' +

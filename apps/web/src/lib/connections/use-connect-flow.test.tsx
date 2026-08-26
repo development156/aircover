@@ -36,6 +36,7 @@ function fakePopup() {
   return {
     closed: false,
     close: vi.fn(),
+    focus: vi.fn(),
     location: { replace: vi.fn() },
   }
 }
@@ -200,5 +201,31 @@ describe('the button never waits for something that is not coming', () => {
     expect(popup.close).toHaveBeenCalled()
     expect(await screen.findByRole('alert')).toHaveTextContent('Every slot on your plan is in use.')
     expect(screen.getByRole('button')).toHaveTextContent('Connect')
+  })
+
+  it('raises the window it opened, because a named window is reused unfocused', async () => {
+    // `window.open('', 'sahoda-connect', …)` on a second press returns the window
+    // already open rather than making a new one, and does not bring it forward.
+    // Behind the main window that reads as nothing happening at all — reported
+    // as "does not even open".
+    const popup = fakePopup()
+    vi.stubGlobal(
+      'open',
+      vi.fn(() => popup),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ ok: true, authUrl: 'https://zernio.com/oauth/x' }),
+        }),
+      ),
+    )
+
+    render(<Harness />)
+    await userEvent.click(screen.getByRole('button'))
+
+    expect(popup.focus).toHaveBeenCalled()
   })
 })

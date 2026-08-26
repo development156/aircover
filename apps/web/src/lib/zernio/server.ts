@@ -11,7 +11,7 @@ import {
 } from '@sahoda/publishing'
 
 import { env } from '@/lib/env'
-import { returnUrl } from '@/lib/zernio/return-url'
+import { returnUrl, type ReturnIntent } from '@/lib/zernio/return-url'
 
 /**
  * The Zernio client for this request, or null when the key is not provisioned.
@@ -88,11 +88,14 @@ export function zernioAvailable(): boolean {
  * OWN origin; the caller must refuse to start the flow instead, because the grant
  * at the platform is real and cannot be undone once given.
  */
-export function zernioReturnUrl(): string | null {
-  return returnUrl({
-    vercelEnv: process.env.VERCEL_ENV,
-    vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
-    vercelUrl: process.env.VERCEL_URL,
-    appUrl: env.NEXT_PUBLIC_APP_URL,
-  })
+export function zernioReturnUrl(intent?: ReturnIntent): string | null {
+  return returnUrl(
+    {
+      vercelEnv: process.env.VERCEL_ENV,
+      vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
+      vercelUrl: process.env.VERCEL_URL,
+      appUrl: env.NEXT_PUBLIC_APP_URL,
+    },
+    intent,
+  )
 }
