@@ -415,3 +415,82 @@ help text, the three separate "unsaved" vocabularies `composer.tsx` deliberately
 keeps apart, and four cards restating one structure. Cutting further means
 changing what the card SAYS, and every one of those sentences is pinned by a
 shape gate. That is a copy pass with guards to move, not a layout pass.
+
+---
+
+## Session 3 — the composer research, and two rules that had never been enforced
+
+**Branch** `claude/divas-kickoff-03y2g2` at `6b7fdc0`, pushed. PR
+[#15](https://github.com/development156/sahodalabs/pull/15) → `wt-core`, draft.
+
+**The task was large and mostly research.** Four parallel Explore agents mapped
+the composer's buttons, the AI-rewrite contract, the trending-hashtag question
+adversarially, and undo/redo/emoji/studio feasibility. Written up in
+**`docs/50_Composer_Layout_Research.md`**, which is the deliverable.
+
+### The three findings that decide the feature list
+
+1. **`/(app)/posts/[id]` is 959,704 bytes, the heaviest route in the product, with
+   8 kB of slack before the Vercel build fails.** An emoji-picker library is
+   150 kB to 1.5 MB. It is impossible, and `next/dynamic` is not a way round it:
+   `js-budget.mjs:17-25` says bytes fetched after load are outside the measurement,
+   so a lazy picker passes the check while still shipping the bytes.
+2. **Trending hashtags, SEO and GEO cannot be built honestly.** No trend source,
+   no keyword data, no geographic data exists anywhere. The one honest substitute
+   is hashtag lift over the customer's OWN measured posts, which needs one
+   migration widening `marketing_observations.kind`.
+3. **A wizard is not coming back.** `/create/post` WAS one and was deleted for
+   reasons in the code; `campaigns.spec.ts:104` asserts no tabs.
+
+### What shipped
+
+| # | what | proof |
+| --- | --- | --- |
+| 1 | `PROSE_RULES` reaches content_variants and all three caption_rewrite instructions | `packages/mesh/src/prose-rules.ts`, 9 tests, 4 mutations red |
+| 2 | Third-person voice enforced for the first time | `apps/web/src/lib/copy/sahoda-voice.ts`, 12 tests, 4 mutations red |
+| 3 | One first-person stray fixed | `inline-rewrite.tsx:145` |
+
+**The dash rule is NOT "never emit a hyphen".** The founder asked for that
+literally; `CLAUDE.md` rules the hyphen stays because removing it breaks English,
+and a caption is where that bites. What is banned is the dash as PUNCTUATION.
+Every test proving a dash is caught has a partner proving a hyphen is not.
+
+**The voice guard found six more strays than it was written for**, all in
+`onboarding/stage/`, and they are a coherent first-person mascot voice rather than
+typos. QUARANTINED with the reason beside them, plus a test asserting the
+quarantine still holds real strays so it cannot become a silent pass. **Needs a
+founder ruling**: either onboarding moves to third person, or `CLAUDE.md` gains a
+stated exception.
+
+**A mutation caught a blind spot in my own guard.** Removing HTML-entity support
+left the whole suite green, because the unit cases used the character forms and
+the only entity occurrences were quarantined. Pinned now.
+
+### Gate
+
+| leg | result |
+| --- | --- |
+| typecheck + lint + test, all packages | **PASS** — 27/27, exit 0, unpiped. Both changed packages were cache MISSES, verified in the log |
+| `design-lint` | **PASS** — it flagged `&#8217;` as a raw hex colour, a false positive on an HTML numeric entity. Pattern rewritten as `&#\d+;`, which is also a wider net |
+| `format:check` (root) | **PASS** |
+| Playwright `@smoke` | **UNRUN** — REQUESTS §25 |
+
+### What was NOT done, and why
+
+- **No layout change.** The empty gap on the left column is a grid row-stretch and
+  its mechanism is written up in docs/50 §2, but a CSS fix cannot be verified in
+  this sandbox and I will not push one blind.
+- **No new buttons.** Clear, undo/redo, emoji, the improve modes and the
+  Schedule/Post split are all specified in docs/50 §8 with their file lists. Undo
+  and redo in particular is six integration points, not a button (§5).
+- **No GitHub skills downloaded.** Pulling third-party code into a production repo
+  is a supply-chain act needing the founder's approval, not a drive-by.
+- **The `[keyword]` format needs a ruling first** — internal annotation stripped
+  before publishing, or literal text? Different features (docs/50 §6.3).
+
+### Still true from Session 2
+
+**CI has not run on ANY branch since 11:08Z.** REQUESTS §30. Median run duration
+4 seconds, no runner assigned. Every lane's red tick is meaningless until the
+GitHub Actions billing is settled. The only real evidence is `pnpm gate` locally,
+unpiped, with its `Cached:` count stated.
