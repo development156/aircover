@@ -91,15 +91,35 @@ export interface ReconciledAccount {
  * Every row is re-checked against the profile we asked for anyway: doc 13 §3 records
  * that Zernio validates an accountId against the whole TEAM, so "it came back from a
  * scoped query" is a weaker guarantee than it sounds.
+ *
+ * ── `platform` IS ZERNIO'S NAME, NOT OURS, AND THAT IS THE WHOLE BUG ─────────
+ * It is compared with `===` against `account.platform`, which is a string ZERNIO
+ * writes. Callers were passing OUR channel id, so the filter matched only where
+ * the two vocabularies happen to agree.
+ *
+ * MEASURED 2026-08-26 against the live API. A real account created minutes
+ * earlier by a customer pressing Connect on X:
+ *
+ *   { "_id": "6a8f392d…", "platform": "twitter", "displayName": "DIVAS MAHAPATRA" }
+ *
+ * Asked for `'x'`, that account is filtered out. The connect had SUCCEEDED — the
+ * grant was given, the account existed at Zernio, `GET /v1/accounts` returned it
+ * — and this line made it invisible, so no row was ever written and the screen
+ * said "Not connected". Google Business was the same, `gbp` against
+ * `googlebusiness`. Instagram and LinkedIn worked throughout for one reason
+ * only: for those two the strings happen to be identical.
+ *
+ * The parameter is named for what it is now, so a caller passing a channel id is
+ * a thing somebody has to type past rather than the natural mistake it was.
  */
 export async function reconcileAccounts(
   client: ZernioClient,
-  args: { profileId: string; platform: string },
+  args: { profileId: string; zernioPlatform: string },
 ): Promise<ReconciledAccount[]> {
   const accounts = await client.listAccounts(args.profileId)
 
   return accounts
-    .filter((a) => a.platform === args.platform)
+    .filter((a) => a.platform === args.zernioPlatform)
     .filter((a) => profileIdOf(a) === args.profileId)
     .map((a) => ({
       accountId: a._id,

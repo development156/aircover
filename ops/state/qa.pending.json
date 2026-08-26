@@ -546,6 +546,45 @@
       "summary_plain": "The unit checks ran and something failed (2 failed).",
       "details": "     × renders no placeholder for any channel the screen names 94ms\n     × gives each platform a DISTINCT mark, not the same one twice 31ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed (2)",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtahrzdr-a52fb002",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T19:33:38.652Z",
+      "finished_at": "2026-08-26T19:33:38.652Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (3 passed, 2 failed).",
+      "details": "     × still returns nothing for OUR id, which is what the caller must not pass 8ms\n     × does not hand back another platform’s account 1ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 3 passed (5)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtai1xq7-7ea1318f",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T19:41:23.069Z",
+      "finished_at": "2026-08-26T19:41:23.069Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed (49 passed).",
+      "details": "      Tests  49 passed (49)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtai2qsz-7ccf6299",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T19:42:00.753Z",
+      "finished_at": "2026-08-26T19:42:00.753Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (51 passed, 1 failed).",
+      "details": "     × asks for \"twitter\", never for our \"x\" 7ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 51 passed (52)",
+      "duration_ms": null
     }
   ]
 }

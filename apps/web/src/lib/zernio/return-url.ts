@@ -88,7 +88,7 @@ export const ZERNIO_RETURN_PATH = '/api/oauth/zernio/return'
  * `platform` does scope a create, and it is the harder call, so the argument is
  * spelt out rather than asserted. It is a channel NAME from a five-item
  * allowlist, not an id. It cannot reach another tenant: the accounts it scopes
- * come from `reconcileAccounts(client, { profileId, platform })`, where
+ * come from `reconcileAccounts(client, { profileId, zernioPlatform })`, where
  * `profileId` was read from our own table keyed by the workspace derived from
  * the Clerk session. It cannot admit an account over the plan limit; that gate
  * is downstream and unchanged. The MOST a forged value can do is record a

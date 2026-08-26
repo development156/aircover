@@ -20,6 +20,8 @@ const state = vi.hoisted(() => ({
   /** Per-platform write results. Null means `rpcError` applies to all of them. */
   rpcErrorByPlatform: null as Record<string, { message: string } | null> | null,
   throwOnAuth: false,
+  /** Every `zernioPlatform` the route asked `reconcileAccounts` for, in order. */
+  askedFor: [] as string[],
   /** What this workspace already holds. `null` = the read failed. */
   slots: { count: 0, keys: new Set<string>() } as { count: number; keys: Set<string> } | null,
   /**
@@ -80,21 +82,41 @@ vi.mock('@/lib/workspaces', () => ({
 
 vi.mock('@/lib/observability/report', () => ({ reportServerError: () => Promise.resolve() }))
 
+/**
+ * ── THIS MOCK IS KEYED ON ZERNIO'S NAME, AND THAT IS THE POINT ──────────────
+ * It read `args.platform` and the real function's parameter is now
+ * `zernioPlatform`, so the rename turned every lookup into `undefined` and eight
+ * tests went red. That is the mock doing its job: it proves the route's argument
+ * is genuinely exercised here rather than passed into a black hole.
+ *
+ * The fixture keys stay OUR ids because the tests are written in our vocabulary,
+ * so the mock translates on the way in — the same direction the route does, and
+ * `askedFor` below records what it was actually handed so a test can check it.
+ */
 vi.mock('@sahoda/publishing', () => ({
-  reconcileAccounts: (_client: unknown, args: { platform: string }) => {
-    if (state.readThrowsFor.includes(args.platform)) {
-      return Promise.reject(new Error(`listAccounts failed for ${args.platform}`))
+  reconcileAccounts: (_client: unknown, args: { zernioPlatform: string }) => {
+    state.askedFor.push(args.zernioPlatform)
+    // Zernio's name back to ours, for the fixtures. `twitter` is the one that
+    // differs among the mocked platforms, and it is mocked FOR that reason.
+    const ours = args.zernioPlatform === 'twitter' ? 'x' : args.zernioPlatform
+    if (state.readThrowsFor.includes(ours)) {
+      return Promise.reject(new Error(`listAccounts failed for ${ours}`))
     }
-    return Promise.resolve(state.accountsByPlatform?.[args.platform] ?? state.accounts)
+    return Promise.resolve(state.accountsByPlatform?.[ours] ?? state.accounts)
   },
 }))
 
 // TWO platforms, not one. A partial outcome cannot exist in a one-platform world,
 // so the old single-entry mock could not have caught the collapse this file now pins.
-// Two platforms, so a test can prove a third is not written. `isZernioPlatform`
+// THREE platforms, and the third is load-bearing. It was `['instagram','linkedin']`
+// — the only two channels whose id is identical to Zernio's name — so this file
+// could not have caught a route that passed OUR id to `reconcileAccounts`. It
+// didn't, and a customer's real X connect vanished because of it. `x` is here so
+// the vocabulary gap sits INSIDE the fixture rather than outside it.
+// `isZernioPlatform`
 // is derived from the same short list rather than restated — a mock that answered
 // `true` for everything would make the allowlist test pass without an allowlist.
-const MOCK_PLATFORMS = ['instagram', 'linkedin']
+const MOCK_PLATFORMS = ['instagram', 'linkedin', 'x']
 vi.mock('@sahoda/shared', () => ({
   ZERNIO_PLATFORMS: MOCK_PLATFORMS,
   isZernioPlatform: (value: unknown) => MOCK_PLATFORMS.includes(value as string),
@@ -167,6 +189,7 @@ beforeEach(() => {
   state.limitVerdict = { kind: 'allowed', limit: 8 }
   state.limitCalls = []
   state.rpcCalls = []
+  state.askedFor = []
   state.pending = { platform: 'instagram', mode: 'redirect' }
 })
 
@@ -251,7 +274,13 @@ describe('a partial connect is reported as partial, never as connected', () => {
   })
 
   it('every read failing is a real failure, not "nothing"', async () => {
-    state.readThrowsFor = ['instagram', 'linkedin']
+    // DERIVED, not the two names it used to list. The claim is "EVERY read
+    // failed", and spelling that as a literal pair meant adding a third platform
+    // to the fixture silently turned this into "two of three failed" — which is
+    // the `partial` path, not this one. The assertion below still passed for
+    // three of the four tests that had the same literal, which is exactly how a
+    // stale list survives.
+    state.readThrowsFor = [...MOCK_PLATFORMS]
 
     const res = await call()
 
@@ -602,7 +631,7 @@ describe('a connect only ever creates a row for the platform that was pressed', 
     const okRes = await call()
     expect(okRes.headers.get('set-cookie')).toContain('Max-Age=0')
 
-    state.readThrowsFor = ['instagram', 'linkedin']
+    state.readThrowsFor = [...MOCK_PLATFORMS]
     const failRes = await call()
     expect(failRes.status).toBe(500)
     expect(failRes.headers.get('set-cookie')).toContain('Max-Age=0')
@@ -670,7 +699,7 @@ describe('the popup closer does not depend on window.opener', () => {
 
   it('tells the truth when the trip failed, and keeps the failing status', async () => {
     state.pending = { platform: 'instagram', mode: 'popup' }
-    state.readThrowsFor = ['instagram', 'linkedin']
+    state.readThrowsFor = [...MOCK_PLATFORMS]
 
     const res = await call()
     const body = await res.text()
@@ -707,7 +736,7 @@ describe('the popup closer does not depend on window.opener', () => {
     // one. The failing status still has to survive: this route exists because a
     // failure leaving as a success was invisible to a log filter.
     state.pending = { platform: 'instagram', mode: 'popup' }
-    state.readThrowsFor = ['instagram', 'linkedin']
+    state.readThrowsFor = [...MOCK_PLATFORMS]
 
     const res = await call()
 
@@ -735,6 +764,53 @@ describe('the popup closer does not depend on window.opener', () => {
  * so a genuine connect wrote no row. These tests pin the fallback with the cookie
  * ABSENT, because that is the condition it exists for.
  */
+/**
+ * THE BUG THAT MADE A REAL CONNECT VANISH, GUARDED AT THE ROUTE.
+ *
+ * `reconcileAccounts` filters `account.platform === …` against a string ZERNIO
+ * writes. This route passed OUR channel id. MEASURED 2026-08-26 against the live
+ * API: a customer's X account, created minutes after they pressed Connect, reads
+ * `"platform": "twitter"` — so asking for `'x'` matched nothing, no row was
+ * written, and the screen said "Not connected" over a grant that had succeeded.
+ *
+ * Instagram and LinkedIn were unaffected, and that is why nobody caught it: for
+ * those two the two names are the same string.
+ *
+ * ── WHY THIS ASSERTS `askedFor` AND NOT AN OUTCOME ──────────────────────────
+ * An outcome assertion cannot see this. The fixture translates Zernio's name back
+ * to ours so the test data stays readable, so a route passing `'x'` and a route
+ * passing `'twitter'` both end up at the same fixture key and both produce the
+ * same rows. MEASURED: with the defect restored, all 49 tests in this file still
+ * passed. The only thing that separates right from wrong here is the string the
+ * route actually handed over, so that is what is checked.
+ */
+describe('the route asks Zernio in Zernio’s own vocabulary', () => {
+  it('asks for "twitter", never for our "x"', async () => {
+    await call()
+
+    expect(state.askedFor).toContain('twitter')
+    expect(state.askedFor).not.toContain('x')
+  })
+
+  it('leaves the names that already agree alone', async () => {
+    // The translation must not invent a difference where there is none. Instagram
+    // is `instagram` on both sides and a mapping that mangled it would break the
+    // two channels that have worked all along.
+    await call()
+
+    expect(state.askedFor).toContain('instagram')
+    expect(state.askedFor).toContain('linkedin')
+  })
+
+  it('asks once per platform, and for every platform', async () => {
+    // A translation that returned null would silently skip a platform rather
+    // than fail, which is the quiet direction this route must never fail in.
+    await call()
+
+    expect(state.askedFor).toHaveLength(MOCK_PLATFORMS.length)
+  })
+})
+
 describe('the intent survives a lost cookie, because it also rides in the URL', () => {
   const IG_ID = '6a75caf7d0fe733d1afcc1f4'
   const withParams = (query: string) =>
