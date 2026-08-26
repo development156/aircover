@@ -1719,9 +1719,17 @@ branch.
 **What was done about it:** the trigger no longer depends on that event. `on:
 push` now covers every branch, because a push is the thing that certainly
 happened: the commit is on the remote. `pull_request` is kept for anything
-arriving without a push here, and the concurrency group is keyed on the head
-commit rather than the ref so the two events collapse into one run per commit
-instead of doubling the bill.
+arriving without a push here. VERIFIED: runs 4 and 5 both fired automatically on
+`push`, seconds after their commits landed.
+
+**And a mistake made in the same change, since it took four minutes to appear.**
+The concurrency group was first keyed on the head COMMIT, to collapse the
+push/pull_request pair for one commit into one run. It does that, and it also
+stops a newer push cancelling an older run, because two commits are two groups.
+MEASURED at once: amending a commit left run 4 grinding through twelve minutes
+for a SHA no longer on the branch. Keying on `github.head_ref || github.ref` —
+the BRANCH from either event — gets both halves right, and is the idiom for
+exactly this pair of triggers.
 
 **Why this is recorded rather than closed:** a check that silently does not run
 is worse than no check, because the pull request looks covered. If a run goes
