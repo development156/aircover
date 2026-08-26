@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
+import type { AudienceReading } from './observe/audience-growth'
 import type { ChannelOutcome } from './observe/channel-return'
 import type { CapturedPost } from './observe/edit-distance'
 import type { PublishedPost } from './observe/tone-drift'
@@ -36,6 +37,14 @@ function winner(seed: string): ChannelOutcome[] {
   return rows
 }
 
+/** One account's series over a month, clearing every growth floor. */
+function grew(accountId: string, channel: string, from: number, to: number): AudienceReading[] {
+  return [
+    { accountId, channel, measuredOn: '2026-02-01', total: from },
+    { accountId, channel, measuredOn: '2026-03-05', total: to },
+  ]
+}
+
 const store = vi.hoisted(() => ({
   workspaces: [] as string[],
   postsBy: new Map<string, PublishedPost[]>(),
@@ -43,6 +52,8 @@ const store = vi.hoisted(() => ({
   capturedWorkspaces: [] as string[],
   metricWorkspaces: [] as string[],
   outcomesBy: new Map<string, ChannelOutcome[]>(),
+  audienceWorkspaces: [] as string[],
+  readingsBy: new Map<string, AudienceReading[]>(),
   saved: [] as Array<{ workspaceId: string; claim: string; computedOn: string }>,
   inserted: true,
   throwFor: new Set<string>(),
@@ -68,6 +79,11 @@ vi.mock('./store', () => ({
   readChannelOutcomes: async (workspaceId: string) => {
     if (store.throwFor.has(workspaceId)) throw new Error('read failed')
     return store.outcomesBy.get(workspaceId) ?? []
+  },
+  workspacesWithAudience: async () => store.audienceWorkspaces,
+  readAudienceReadings: async (workspaceId: string) => {
+    if (store.throwFor.has(workspaceId)) throw new Error('read failed')
+    return store.readingsBy.get(workspaceId) ?? []
   },
   saveObservation: async (
     workspaceId: string,
@@ -121,6 +137,8 @@ describe('runMarketingBrainPass', () => {
     store.capturedWorkspaces = []
     store.metricWorkspaces = []
     store.outcomesBy = new Map()
+    store.audienceWorkspaces = []
+    store.readingsBy = new Map()
     store.saved = []
     store.inserted = true
     store.throwFor = new Set()
@@ -179,6 +197,7 @@ describe('runMarketingBrainPass', () => {
       'tone_drift:window_too_short': 1,
       'edit_distance:no_captured_drafts': 2,
       'channel_return:no_metrics': 2,
+      'audience_growth:no_audience_data': 2,
     })
   })
 
@@ -199,6 +218,7 @@ describe('runMarketingBrainPass', () => {
     expect(result.declined).toEqual({
       'edit_distance:no_captured_drafts': 1,
       'channel_return:no_metrics': 1,
+      'audience_growth:no_audience_data': 1,
     })
   })
 
@@ -263,6 +283,31 @@ describe('runMarketingBrainPass', () => {
 
     expect(result.workspaces).toBe(1)
     expect(result.inserted).toBe(1)
+  })
+
+  it('says a workspace has no audience data rather than going silent about it', async () => {
+    // No readings means no channel to loop over. Without an explicit decline
+    // this workspace would produce no audience entry at all, which reads the
+    // same as the computer never having run.
+    store.workspaces = ['ws-a']
+
+    const result = await runMarketingBrainPass(new Date('2026-03-08T00:00:00Z'))
+
+    expect(result.declined['audience_growth:no_audience_data']).toBe(1)
+  })
+
+  it('files one growth observation per channel, so two platforms cannot collide', async () => {
+    store.workspaces = ['ws-a']
+    store.readingsBy.set('ws-a', [
+      ...grew('ig-1', 'instagram', 100, 140),
+      ...grew('li-1', 'linkedin', 200, 260),
+    ])
+
+    const result = await runMarketingBrainPass(new Date('2026-03-08T00:00:00Z'))
+
+    expect(result.inserted).toBe(2)
+    expect(store.saved.map((s) => s.claim).join(' ')).toContain('Instagram')
+    expect(store.saved.map((s) => s.claim).join(' ')).toContain('Linkedin')
   })
 
   it('reports the workspaces it considered, so a pass over none is visible', async () => {

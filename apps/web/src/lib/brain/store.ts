@@ -3,6 +3,7 @@ import 'server-only'
 import { createPgLedgerPort, loadBillingEnv, type PgLedgerPort } from '@sahoda/billing'
 import type { MarketingObservation } from '@sahoda/shared'
 
+import type { AudienceReading } from './observe/audience-growth'
 import type { ChannelOutcome } from './observe/channel-return'
 import type { CapturedPost } from './observe/edit-distance'
 import type { PublishedPost } from './observe/tone-drift'
@@ -251,6 +252,48 @@ export async function readChannelOutcomes(
     byKey.set(key, existing)
   }
   return [...byKey.values()]
+}
+
+/**
+ * Every follower reading a workspace has, oldest first.
+ *
+ * Only the `total` bucket. `gained` and `lost` are read by nothing: MEASURED in
+ * production 2026-08-26 they are zero on every row, so a computer built on them
+ * would decline forever for a reason that looked like flat growth.
+ */
+export async function readAudienceReadings(
+  workspaceId: string,
+  limit = 800,
+): Promise<AudienceReading[]> {
+  const r = await getPool().query<{
+    account_id: string
+    channel: string
+    measured_on: string
+    value: string | number
+  }>(
+    `select account_id, channel, measured_on::text as measured_on, value
+       from audience_snapshots
+      where workspace_id = $1
+        and bucket = 'total'
+      order by measured_on asc
+      limit $2`,
+    [workspaceId, limit],
+  )
+  return r.rows.map((row) => ({
+    accountId: row.account_id,
+    channel: row.channel,
+    measuredOn: row.measured_on,
+    total: typeof row.value === 'number' ? row.value : Number(row.value),
+  }))
+}
+
+/** Workspaces with any follower reading, for the weekly pass's union. */
+export async function workspacesWithAudience(limit = 500): Promise<string[]> {
+  const r = await getPool().query<{ workspace_id: string }>(
+    `select distinct workspace_id from audience_snapshots where bucket = 'total' limit $1`,
+    [limit],
+  )
+  return r.rows.map((row) => row.workspace_id)
 }
 
 /** Workspaces with any measured post outcome, for the weekly pass's union. */
