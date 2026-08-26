@@ -80,13 +80,22 @@ on:
 # left run 4 grinding through twelve minutes for a SHA that no longer existed on
 # the branch, which is exactly the waste the comment claimed to prevent.
 #
-# The branch is the right key. `github.head_ref` is the source branch on a pull
-# request and empty on a push, where `github.ref` is the branch — so this one
-# expression names the same branch from either event. Both halves work again: a
-# newer push cancels the older run, and the push/pull_request pair for one
-# commit collapses because they share a group.
+# The branch is the right key, and getting the EXPRESSION right took two tries
+# after getting the concept right. `github.head_ref || github.ref` looks correct
+# and is not: on a push `github.ref` is `refs/heads/<branch>` while on a pull
+# request `github.head_ref` is the bare `<branch>`. Two different strings, two
+# groups, nothing collapses.
+#
+# MEASURED 2026-08-26, on the merge that brought three lanes together: SEVEN
+# gate runs in flight at once, of which three were push/pull_request PAIRS for
+# the same branch at the same SHA — lead-research, advisor and design each
+# running the same eleven minutes twice.
+#
+# `github.ref_name` is the bare branch name, which is what `head_ref` already
+# is. On a pull request `ref_name` would be `<n>/merge`, but `head_ref` is
+# non-empty there and wins, so the pair resolves to one string from both events.
 concurrency:
-  group: gate-${{ github.head_ref || github.ref }}
+  group: gate-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:

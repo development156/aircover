@@ -1722,14 +1722,25 @@ happened: the commit is on the remote. `pull_request` is kept for anything
 arriving without a push here. VERIFIED: runs 4 and 5 both fired automatically on
 `push`, seconds after their commits landed.
 
-**And a mistake made in the same change, since it took four minutes to appear.**
-The concurrency group was first keyed on the head COMMIT, to collapse the
-push/pull_request pair for one commit into one run. It does that, and it also
-stops a newer push cancelling an older run, because two commits are two groups.
-MEASURED at once: amending a commit left run 4 grinding through twelve minutes
-for a SHA no longer on the branch. Keying on `github.head_ref || github.ref` —
-the BRANCH from either event — gets both halves right, and is the idiom for
-exactly this pair of triggers.
+**And the concurrency group on that same line was wrong TWICE.** Recorded in
+full, because the second version is the kind that reads correctly:
+
+1. Keyed on the head COMMIT, to collapse the push/pull_request pair. It does
+   that, and it also stops a newer push cancelling an older run, because two
+   commits are two groups. MEASURED at once: amending a commit left run 4
+   grinding twelve minutes for a SHA no longer on the branch.
+2. Keyed on `github.head_ref || github.ref`. This looks right and is not. On a
+   push `github.ref` is `refs/heads/<branch>`; on a pull request `head_ref` is
+   the bare `<branch>`. Two strings, two groups, nothing collapses. MEASURED on
+   the three-lane merge: SEVEN gate runs in flight, of which three were
+   push/pull_request PAIRS for the same branch at the same SHA — lead-research,
+   advisor and design each running the same eleven minutes twice.
+3. `github.head_ref || github.ref_name` is correct. `ref_name` is the bare
+   branch name, which is what `head_ref` already is.
+
+`scripts/lib/ci-gate-coverage.test.mjs` now asserts the exact expression, and
+names both wrong ones. Three mutations, all red: back to version 2, back to
+version 1, and the block deleted.
 
 **Why this is recorded rather than closed:** a check that silently does not run
 is worse than no check, because the pull request looks covered. If a run goes
