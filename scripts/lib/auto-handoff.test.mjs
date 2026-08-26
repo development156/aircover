@@ -110,17 +110,99 @@ describe('the stop hook writes a skeleton only when there is no real handoff', (
     expect(run(dir)).toEqual([own])
   })
 
-  it('DOES overwrite a previous skeleton, because that is not a person’s work', () => {
+  it('does NOT eat a real handoff that merely MENTIONS the skeleton marker', () => {
+    // THE REGRESSION. MEASURED 2026-08-26: a 520-line handoff was overwritten with a
+    // 29-line skeleton because one table row in it read "Drop the AUTOMATIC SKELETON
+    // exemption". The guard searched the whole document for the words and found them
+    // in a QUOTATION of itself.
+    //
+    // The text below is the actual row that did it, so this test fails the moment the
+    // check goes back to a substring search.
     const dir = repo()
     const date = today()
-    const own = `claude-advisor-qvz5wn-advisor-${date}.md`
-    writeFileSync(join(dir, HANDOFFS, own), '# stale\n\nAUTOMATIC SKELETON\n')
+    const name = `advisor-${date}.md`
+    writeFileSync(
+      join(dir, HANDOFFS, name),
+      [
+        '# Handoff — advisor — today',
+        '',
+        '## Guards written, and the mutation that proved each',
+        '',
+        '| Mutation | Watched go red |',
+        '|---|---|',
+        '| Drop the `AUTOMATIC SKELETON` exemption | `DOES overwrite a previous skeleton` |',
+        '',
+        'A person wrote every line of this.',
+      ].join('\n'),
+    )
+
+    expect(
+      run(dir),
+      'the hook overwrote a handoff for quoting the very marker it uses to recognise ' +
+        'its own output — the better the handoff documents this hook, the more surely ' +
+        'it is destroyed',
+    ).toEqual([name])
+    expect(readFileOf(dir, name)).toContain('A person wrote every line of this.')
+  })
+
+  it('does NOT eat a handoff that QUOTES the marker line verbatim, deep in its body', () => {
+    // Stronger than the test above, and not hypothetical: a handoff explaining this
+    // hook will paste the template's own line to show what it looks like. That line
+    // IS the structural marker, so the anchor alone cannot tell it from the real
+    // thing — only its POSITION can. The self-declaration belongs at the top; a
+    // quotation lives in the body.
+    const dir = repo()
+    const date = today()
+    const name = `advisor-${date}.md`
+    const body = [
+      '# Handoff — advisor — today',
+      '',
+      '## What shipped',
+      '',
+      ...Array.from({ length: 40 }, (_, i) => `- line ${i} of a real session's real work`),
+      '',
+      '## How the stop hook marks its own output',
+      '',
+      '> **AUTOMATIC SKELETON.** Written by the Stop hook because this session ended',
+      '',
+      'A person wrote every line of this.',
+    ].join('\n')
+    writeFileSync(join(dir, HANDOFFS, name), body)
+
+    expect(
+      run(dir),
+      'the marker was quoted at line 48, far below any self-declaration, and the hook ' +
+        'still treated the document as its own output',
+    ).toEqual([name])
+    expect(readFileOf(dir, name)).toContain('A person wrote every line of this.')
+  })
+
+  it('DOES overwrite a previous skeleton, because that is not a person’s work', () => {
+    // The stale skeleton is produced by RUNNING the script, not hand-written. An
+    // earlier draft hand-wrote a bare `AUTOMATIC SKELETON` line, which the template
+    // never emits — so it tested a file shape that cannot occur, and went red the
+    // moment the real marker became structural. A fixture that drifts from the thing
+    // it stands in for is the same defect as a harness with the wrong nesting.
+    const dir = repo()
+    const first = run(dir)
+    expect(first).toHaveLength(1)
+    const own = first[0]
+
+    // A second commit the stale skeleton cannot know about.
+    execFileSync(
+      'git',
+      ['commit', '-qm', 'feat: landed after the first skeleton', '--allow-empty'],
+      {
+        cwd: dir,
+        stdio: 'pipe',
+      },
+    )
 
     expect(run(dir)).toEqual([own])
     expect(
       readFileOf(dir, own),
       'a stale skeleton must be refreshed, not preserved — it names the wrong commits',
-    ).toContain('feat: something worth recording')
+    ).toContain('feat: landed after the first skeleton')
   })
 })
 
