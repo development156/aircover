@@ -93,7 +93,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "INPUT=$(cat); [ \"$(echo $INPUT | jq -r '.stop_hook_active')\" = 'true' ] && exit 0; pnpm turbo run typecheck test --filter=\"...[origin/main]\" && pnpm format:check || { echo 'Gates failing \u2014 fix before stopping' >&2; exit 2; }"
+            "command": "INPUT=$(cat); [ \"$(printf '%s' \"$INPUT\" | jq -r '.stop_hook_active')\" = 'true' ] && exit 0; pnpm turbo run typecheck test --filter=\"...[origin/main]\" && pnpm format:check || { echo 'Gates failing \u2014 fix before stopping' >&2; exit 2; }"
           },
           {
             "type": "command",
