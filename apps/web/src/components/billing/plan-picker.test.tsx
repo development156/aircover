@@ -119,10 +119,12 @@ describe('pricing a change before it is charged', () => {
     effectiveAt: '2026-08-16T12:00:00.000Z',
     immediate: true,
     unusedBasisPoints: 5_000,
-    remainderChargePaise: 74_950,
-    unusedCreditPaise: 24_950,
-    amountDuePaise: 50_000,
-    creditsGranted: 1_750,
+    // Half a month of Growth at ₹3,999, less half a month of Starter at ₹1,999.
+    // Credits are the DIFFERENCE in allotment, halved: (4,000 − 1,500) / 2.
+    remainderChargePaise: 199_950,
+    unusedCreditPaise: 99_950,
+    amountDuePaise: 100_000,
+    creditsGranted: 1_250,
   }
 
   it('shows the arithmetic and puts the amount on the button', async () => {
@@ -133,13 +135,13 @@ describe('pricing a change before it is charged', () => {
     await user.click(screen.getByRole('button', { name: /^Growth/ }))
 
     expect(
-      await screen.findByText(/Growth for the rest of this month: ₹749.50\./),
+      await screen.findByText(/Growth for the rest of this month: ₹1,999.50\./),
     ).toBeInTheDocument()
-    expect(screen.getByText(/Less the ₹249\.50 of Starter/)).toBeInTheDocument()
-    expect(screen.getByText(/You pay ₹500 today, then ₹1,499 a month\./)).toBeInTheDocument()
+    expect(screen.getByText(/Less the ₹999\.50 of Starter/)).toBeInTheDocument()
+    expect(screen.getByText(/You pay ₹1,000 today, then ₹3,999 a month\./)).toBeInTheDocument()
     // "Continue" would leave the customer to guess what pressing it costs.
     expect(
-      screen.getByRole('button', { name: 'Pay ₹500 and switch to Growth' }),
+      screen.getByRole('button', { name: 'Pay ₹1,000 and switch to Growth' }),
     ).toBeInTheDocument()
   })
 
@@ -221,7 +223,7 @@ describe('pricing a change before it is charged', () => {
     render(<PlanPicker subscription={view({ planId: 'starter' })} />)
 
     await user.click(screen.getByRole('button', { name: /^Growth/ }))
-    await user.click(await screen.findByRole('button', { name: 'Pay ₹500 and switch to Growth' }))
+    await user.click(await screen.findByRole('button', { name: 'Pay ₹1,000 and switch to Growth' }))
 
     const status = await screen.findByText(/sandbox order was opened/i)
     expect(status).toHaveTextContent(/Nothing was charged and no credits were added/)

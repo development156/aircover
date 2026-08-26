@@ -107,7 +107,7 @@ describe('the grant for a plan change', () => {
       event({ planChange: { changeId: 'chg-2', credits: 1_750 } }),
     )
     expect(res.ok && res.data.granted).toBe(1_750)
-    expect(PLAN_CATALOG.growth.monthlyCredits).toBe(5_000)
+    expect(PLAN_CATALOG.growth.monthlyCredits).toBe(4_000)
   })
 
   it('records the change id on the entry, so a ledger row explains itself', async () => {
@@ -178,7 +178,7 @@ describe('the order tags a plan change travels in', () => {
     const parsed = parseCashfreeWebhook(body({ ...BASE, ...CHANGE }, 500), { mode: 'sandbox' })
     expect(parsed.planChange).toEqual({ changeId: 'chg-1', credits: 1750 })
     // The catalogue price would have rejected this order outright.
-    expect(PLAN_CATALOG.growth.priceInr).toBe(1499)
+    expect(PLAN_CATALOG.growth.priceInr).toBe(3999)
   })
 
   it('REFUSES an order whose amount disagrees with its own plan-change tag', () => {
@@ -204,7 +204,7 @@ describe('the order tags a plan change travels in', () => {
     expect(() => parseCashfreeWebhook(body(BASE, 1), { mode: 'sandbox' })).toThrow(
       /does not match the growth plan amount/,
     )
-    const fine = parseCashfreeWebhook(body(BASE, 1499), { mode: 'sandbox' })
+    const fine = parseCashfreeWebhook(body(BASE, 3999), { mode: 'sandbox' })
     expect(fine.eventType).toBe('payment_succeeded')
   })
 })

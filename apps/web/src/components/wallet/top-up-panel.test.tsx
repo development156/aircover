@@ -80,9 +80,19 @@ describe('the top-up plan cards', () => {
     render(<TopUpPanel />)
 
     expect(screen.getAllByText('Selected')).toHaveLength(1)
-    await user.click(screen.getByText('Agency'))
+    // RETARGETED at the wt-core merge, not deleted. This clicked `Agency` and
+    // looked for a radio named `/agency/i`; the reprice renamed that plan's
+    // LABEL to "Studio" while keeping the id `agency`, because that id is the
+    // `plan_id` on every live subscription row.
+    //
+    // So the click goes by the label a reader sees, and the assertion goes by
+    // the VALUE the checkout will send — which is a stronger pair than the
+    // original, because it is exactly where the two are meant to disagree.
+    // `plans.test.ts` asserts that divergence at the catalog; this holds the
+    // screen to it.
+    await user.click(screen.getByText('Studio'))
     expect(screen.getAllByText('Selected')).toHaveLength(1)
-    expect(screen.getByRole('radio', { name: /agency/i })).toBeChecked()
+    expect(screen.getByRole('radio', { checked: true })).toHaveAttribute('value', 'agency')
   })
 
   it('recommends exactly one plan, and it is Growth', () => {
@@ -94,7 +104,7 @@ describe('the top-up plan cards', () => {
     expect(chips).toHaveLength(1)
 
     // AND IT IS ON THE RIGHT CARD. Asserting only the count would pass with the
-    // chip on Agency, which is the defect a reader would actually be misled by.
+    // chip on Studio, which is the defect a reader would actually be misled by.
     const card = chips[0]!.closest('label')!
     expect(within(card).getByRole('radio')).toHaveAttribute('value', 'growth')
   })

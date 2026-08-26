@@ -22,8 +22,17 @@ import { fireEvent, render, screen } from '@testing-library/react'
  * nothing else in the repository.
  */
 
-const { move } = vi.hoisted(() => ({ move: vi.fn(async () => ({ ok: true })) }))
-vi.mock('@/app/actions/leads', () => ({ setLeadStatus: move }))
+const { move, saveContact } = vi.hoisted(() => ({
+  move: vi.fn(async () => ({ ok: true })),
+  saveContact: vi.fn(async () => ({ ok: true })),
+}))
+// BOTH actions, because `vi.mock` replaces the WHOLE module. The card imports
+// `updateLeadContact` from here, and a partial mock leaves it undefined — which
+// surfaces as a crash on click rather than as a missing-mock error.
+vi.mock('@/app/actions/leads', () => ({
+  setLeadStatus: move,
+  updateLeadContact: saveContact,
+}))
 
 import { Board } from './board'
 import type { LeadView } from '@/lib/leads/read'
@@ -41,6 +50,7 @@ function lead(overrides: Partial<LeadView> = {}): LeadView {
     readAt: null,
     createdAt: new Date(Date.now() - HOUR).toISOString(),
     from: 'Your site',
+    platform: null,
     ...overrides,
   }
 }
@@ -68,18 +78,35 @@ describe('the pipeline', () => {
     expect(won.textContent).not.toMatch(/\b0\b/)
   })
 
+  /**
+   * Open a lead's card.
+   *
+   * The collapsed card shows a NAME and a platform mark and nothing else
+   * (founder's ruling, 2026-08-25), so every detail and every stage control now
+   * sits behind this. These tests assert what the card CONTAINS, which has not
+   * changed; only the number of clicks to reach it has.
+   */
+  function open(name = 'Priya') {
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(name) }))
+  }
+
   test('moves a lead along the pipeline, one press at a time', () => {
     render(<Board leads={[lead()]} />)
+    open()
     fireEvent.click(screen.getByRole('button', { name: 'Contacted' }))
     expect(move).toHaveBeenCalledWith('l1', 'contacted')
   })
 
   test('lost is reachable from anywhere and is not the step after won', () => {
     render(<Board leads={[lead({ status: 'won' })]} />)
+    open()
     const won = screen.getByRole('region', { name: 'Won' })
     expect(won.textContent).toMatch(/Lost/)
-    // Nothing follows Won on the happy path.
-    expect(won.querySelectorAll('button')).toHaveLength(1)
+    // Nothing follows Won on the happy path. Three buttons now: the card's own
+    // header toggle, this Lost, and Edit details. Counting them is what proves
+    // no fourth "next stage" control appeared.
+    const labels = [...won.querySelectorAll('button')].map((b) => b.textContent)
+    expect(labels).toEqual(['Priya', 'Lost', 'Edit details'])
   })
 
   test('searches the name, the address, the number and the words', () => {
@@ -113,6 +140,7 @@ describe('the pipeline', () => {
 
   test('carries where each one came from, and never guesses', () => {
     render(<Board leads={[lead({ from: 'Not recorded' })]} />)
+    open()
     expect(screen.getByText('Not recorded')).toBeTruthy()
   })
 

@@ -19,11 +19,11 @@ function body(overrides: Record<string, unknown> = {}): string {
     data: {
       order: {
         order_id: 'ord_1',
-        order_amount: 1499,
+        order_amount: 3999,
         order_currency: 'INR',
         order_tags: { workspace_id: 'ws-1', plan_id: 'growth', period: '2026-08' },
       },
-      payment: { cf_payment_id: 'pay_1', payment_amount: 1499, payment_status: 'SUCCESS' },
+      payment: { cf_payment_id: 'pay_1', payment_amount: 3999, payment_status: 'SUCCESS' },
     },
     ...overrides,
   })
@@ -113,7 +113,7 @@ describe('verifyCashfreeWebhook — the only way to mint a LiveVerifiedBody', ()
   it('REJECTS a tampered body — the amount cannot be edited after signing', () => {
     const raw = body()
     const signature = sign(raw, SECRET)
-    const tampered = raw.replace('"order_amount":1499', '"order_amount":1')
+    const tampered = raw.replace('"order_amount":3999', '"order_amount":1')
     expect(
       verifyCashfreeWebhook({
         rawBody: tampered,

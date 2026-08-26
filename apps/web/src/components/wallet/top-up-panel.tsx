@@ -2,7 +2,14 @@
 
 import { useState, useTransition } from 'react'
 import { Check, Coins, CreditCard, Info, Sparkles } from 'lucide-react'
-import { PLAN_CATALOG, type PlanCatalogEntry, type PlanId } from '@sahoda/shared'
+import {
+  PLAN_CATALOG,
+  describePlanPrice,
+  type DisplayCurrency,
+  type FxRates,
+  type PlanCatalogEntry,
+  type PlanId,
+} from '@sahoda/shared'
 
 import { startCheckout } from '@/app/actions/wallet'
 import { Card, CardLabel } from '@/components/ui/card'
@@ -71,12 +78,50 @@ function planIncludes(entry: PlanCatalogEntry): string[] {
   ]
 }
 
-export function TopUpPanel() {
+export interface TopUpPanelProps {
+  /**
+   * The currency to approximate in, or null to show rupees alone. Resolved on
+   * the server from the customer's declared billing country, falling back to the
+   * edge's guess. Null is the ordinary case, not a failure.
+   */
+  currency?: DisplayCurrency | null
+  /** Today's rates, or null when none could be fetched. Null shows rupees alone. */
+  fx?: FxRates | null
+}
+
+/** The date a rate was read, for an "as of" line. Never a relative "today". */
+const asOf = (iso: string): string =>
+  new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'Asia/Kolkata',
+  }).format(new Date(iso))
+
+export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {
   const [planId, setPlanId] = useState<PlanId>(DEFAULT_PLAN)
   const [result, setResult] = useState<CheckoutState | null>(null)
   const [pending, startTransition] = useTransition()
 
   const plan = PLAN_CATALOG[planId]
+
+  /**
+   * The selected plan's price, and the sentence that names the real charge.
+   *
+   * The cards show one figure in the customer's own currency. That figure is a
+   * conversion, so for anyone outside India it is NOT what the bank takes — and
+   * the note below is the only place the actual amount appears. It is not
+   * optional garnish: without it the price on the card cannot be reconciled
+   * against a statement by anyone.
+   *
+   * Null when the card already shows the charge, because then there is nothing
+   * to reconcile and the sentence would explain a difference that does not
+   * exist.
+   */
+  const selected = describePlanPrice(plan.priceInr, currency, fx)
+  const chargeNote =
+    !selected.isApproximate || selected.rateFetchedAt === null
+      ? null
+      : `Your card is charged ${selected.chargeInr} in rupees. The ${currency} figure is a conversion at the rate published on ${asOf(selected.rateFetchedAt)}; your bank will use its own rate and may add a foreign transaction fee.`
 
   function start() {
     setResult(null)
@@ -174,12 +219,22 @@ export function TopUpPanel() {
               {/* THE PRICE IS THE STRONGEST THING IN THE CARD. The cadence sits
                   on the baseline beside it, quiet, because "/ month" modifies
                   the figure rather than being a fact of its own. */}
+              {/*
+                ONE figure, in the customer's own currency, and the second line
+                is GONE rather than converted.
+
+                It used to read `about $<priceUsd>` under the rupee price.
+                `priceUsd` no longer exists — it was a hand-set second price that
+                had drifted 17-19% from what the rupees actually converted to —
+                and the founder's ruling is that a card shows one price, the
+                reader's own. The rupee charge is named once, at the point of
+                commitment, in the note beside the button.
+              */}
               <span className="mt-1.5 flex items-baseline gap-1.5">
-                <span className="type-hero-num num text-ink">₹{inr(entry.priceInr)}</span>
+                <span className="type-hero-num num text-ink">
+                  {describePlanPrice(entry.priceInr, currency, fx).display}
+                </span>
                 <span className="type-sm text-muted">/ month</span>
-              </span>
-              <span className="mt-label-gap block type-meta text-ink-mute">
-                about $<span className="num">{inr(entry.priceUsd)}</span>
               </span>
 
               {/* WHAT THE MONEY BUYS. On this product that is credits, so the
@@ -309,10 +364,26 @@ export function TopUpPanel() {
       <div className="flex flex-wrap items-center justify-between gap-4 border-t border-line-soft pt-5">
         <p className="min-w-0 flex-1 type-sm text-muted">
           <span className="font-semibold text-ink">
-            {plan.name} · ₹<span className="num">{inr(plan.priceInr)}</span> per month
+            {plan.name} · <span className="num">{selected.display}</span> per month
           </span>
           <br />
           Nothing is charged and no credits are added until a payment completes.
+          {/*
+            THE ONLY PLACE THE REAL AMOUNT APPEARS, and it only appears when the
+            figure above is a conversion. Every other number on this panel is in
+            the customer's own currency, and for anyone outside India none of
+            them is what the bank takes — so this names the rupee amount outright
+            rather than saying "charged in rupees" and leaving the sum to be
+            guessed. It gives the rate's DATE rather than calling it current: a
+            rate is a published daily figure, not a live quote, and an undated
+            one is exactly the shape the old hardcoded 88 took while it drifted.
+          */}
+          {chargeNote !== null ? (
+            <>
+              <br />
+              {chargeNote}
+            </>
+          ) : null}
         </p>
         <Button
           type="button"
