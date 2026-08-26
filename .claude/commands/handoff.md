@@ -1,103 +1,116 @@
 ---
-description: End the session — write a durable handoff the other roles will read.
+description: Save this lane — write a durable handoff keyed to owner and lane.
+argument-hint: owner:<name> , branch:<wt-branch>
 ---
 
-Write this session's handoff **to a file and commit it**. A handoff that lives
-only in the conversation is not a handoff; the next session cannot read it.
+Arguments: `$ARGUMENTS` — for example `owner:girija , branch: wt-girija2`.
 
-## 1 · Establish where you are
+## 1 · Establish owner and lane
 
 ```bash
+OWNER=$(git config sahoda.owner)     # or from owner: in the arguments
+LANE=$(git config sahoda.lane)       # or from branch: in the arguments
+echo "$OWNER / $LANE"
+```
+
+Arguments win over git config. **If you cannot get both, stop and ask.** Do not
+fall back to the branch name — the harness may have put you on a `claude/...`
+branch, and filing this session under that id makes it unfindable by the person
+who owns the lane.
+
+```bash
+date +%F        # do not guess the date
 git branch --show-current
-git log --oneline -10
+git log --oneline -12
 git status --short
 ```
 
-**Role by substring, owner by declaration.** `design` in the branch name is the
-design role, `research` is research, `advisor` is advisor — matching `wt-design`
-exactly resolves every real branch to `advisor`, which is what it did until
-2026-08-26. The owner comes from `git config sahoda.owner` or
-`$SAHODA_LANE_OWNER`; if neither is set, **ask** rather than guess.
-
-Get today's date with `date +%F` — do not guess it.
-
 ## 2 · Verify before you claim
 
-Run the gate legs that apply and record their **real output**. Then:
+Run the gate legs that apply and record their **real output**.
 
-- **Never report an unrun suite as passed.** If a leg did not run, the handoff
-  says UNRUN, not passed.
-- **A leg finishing in under a second is a cache replay** and verified nothing.
-- **Never pipe the gate** — a pipe returns the pipe's exit code, not the gate's.
-- **Group failures by error message, never count them.** Six unrelated tests
-  failing at once is an environment; one test failing is a diff.
+- **Never report an unrun suite as passed.** A leg that did not run is UNRUN.
+- **A leg under one second is a cache replay** and verified nothing. Force it.
+- **Never pipe the gate** — a pipe returns the pipe's exit code.
+- **Group failures by error message, never count them.** Six unrelated suites
+  red at once is an environment; one is a diff.
+- `@sahoda/db` talks to one shared live database. Two overlapping runs strand
+  fixtures and the next run trips on them — that is a collision, not a defect.
 
-## 3 · Write the file
+## 3 · Write it
 
-Write to `docs/workflow/handoffs/<owner>-<role>-<YYYY-MM-DD>.md`. If that file already
-exists, append a new `## Session <n>` section rather than overwriting it.
+**`docs/workflow/handoffs/<owner>-<lane>-<YYYY-MM-DD>.md`**
+
+The lane is in the filename because one person runs three of them.
+`girija-research-<date>.md` is the same file for `wt-girija`, `wt-girija2` and
+`wt-girija3` — three lanes overwriting one record. That already happened: two
+sessions both wrote `girija-research-2026-08-26.md` on 26 August.
+
+If that exact file exists and is a real handoff, append `## Session <n>` rather
+than overwriting. If it is an `AUTOMATIC SKELETON`, replace it.
 
 Required sections, all of them, by name:
 
 ```markdown
-# Handoff — <role> — <YYYY-MM-DD>
+# Handoff — <owner> — <lane> — <YYYY-MM-DD>
 
-**Branch** `<branch>` at `<sha>`, cut from `<base>`. Pushed: yes/no.
+**Branch** `<actual branch>` at `<sha>`. Lane `<lane>`. Pushed: yes/no.
 
 ## What shipped
 
-One row per item: what it is, the file:line or SHA that proves it, and the
-named test that covers it.
+One row per item: what it is, the file:line or SHA that proves it, the named
+test that covers it.
 
 ## What was NOT done, and why
 
-State your own boundaries. A session that says "I did not run Playwright — it
-needs the lane's keys, so this is 4 of 5 legs and it is UNRUN, not passed" is
-a session worth trusting.
+State your own boundaries. "I did not run Playwright — it needs keys this
+sandbox lacks, so this is UNRUN, not passed" is a session worth trusting.
 
 ## Shared surfaces touched
 
-Every shared primitive, shared type, fixture or token another role consumes.
-A required field breaks constructors, not readers — say which. Lanes have
-broken each other four times through this exact omission: `adapterFor` gained
-a required third parameter, `decideAttach` a fourth, `violation-copy` changed
-app-wide, `BrainRead` gained a required field.
-Write "none" if none. Do not leave the section out.
+Every shared primitive, type, fixture, token or config another lane consumes.
+A required field breaks constructors, not readers — say which. Write "none" if
+none; do not omit the section. Lanes have broken each other four times through
+exactly this omission.
+
+## Contract, migration or money
+
+Anything touching `packages/shared`, a price, a migration, or the ledger. You
+may do these freely — but whoever merges must know.
 
 ## Guards written, and the mutation that proved each
 
-For every guard: the mutation you applied, and that you watched it go red.
-A guard never shown to fail is not a guard.
+The mutation you applied, and that you WATCHED it go red. A guard never shown
+to fail is not a guard.
 
 ## Anything retracted
 
-With the measurement that justifies it. State what you MEASURED, never what
-you inferred — a wrong retraction is worse than no check.
+With the measurement that justifies it. State what you MEASURED, never what you
+inferred.
 
-## Anything that changes an assumption
+## What the next session in THIS lane should pick up
 
-Something the next person would otherwise get wrong.
+The one section your future self reads first.
 
 ## Gate
 
-Each leg named, with its real output, marked PASS / FAIL / UNRUN.
+Each leg named, real output, PASS / FAIL / UNRUN.
 ```
 
 Mark every claim **MEASURED** or **INFERRED**. A "done" claim needs a
-`file:line`, a named passing test, a git SHA, or a live URL. Status codes and
-exit codes are not evidence.
+`file:line`, a named passing test, a git SHA, or a live URL.
 
-## 4 · Commit and push it
+## 4 · Commit and push
 
 ```bash
 git add docs/workflow/handoffs/
-git commit -m "handoff(<role>): <one line>"
-git push origin <branch>
+git commit -m "handoff(<owner>/<lane>): <one line>"
+git push origin HEAD
 ```
 
-If the working tree carries files that are not yours, leave them alone and say
-so in the handoff rather than committing them under an unrelated message.
+If the working tree holds files that are not yours, leave them and say so in the
+handoff rather than committing them under an unrelated message.
 
 ## 5 · Then tell me
 
-Print the same content in the conversation, and give me the path and the SHA.
+Print the same content here, and give me the path, the branch and the SHA.
