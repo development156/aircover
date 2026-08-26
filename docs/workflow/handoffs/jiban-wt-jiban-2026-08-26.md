@@ -1,6 +1,6 @@
 # Handoff — design — 2026-08-26
 
-**Owner** jiban
+**Owner** jiban · **Lane** `wt-jiban` · **Branch** `claude/lead-design-7m7ios`
 
 > This file has been renamed twice in one day, and both renames were forced.
 > It was written as `design-2026-08-26.md`, the convention at the time. `d21bac3`
@@ -576,3 +576,95 @@ piped.** Every exit code was read from `$?` on the command itself.
 `Cached: 0 cached, 27 total` is the line that makes the pass mean anything. A run
 reporting `Cached: 19 cached` in 1.3s verified nothing, and several earlier "gate
 green" claims in this lane rested on exactly that.
+
+---
+
+# Session 14 — integrating wt-core, and the answer to "wt-jiban"
+
+`wt-core` moved from `7ae5c37` to `60b8577` while this lane sat: **12 commits**,
+65,115 insertions, mostly `.claude/skills` and `.claude/agents` reaching cloud
+sessions. Merged in. One conflict, in `scripts/auto-handoff.mjs`.
+
+## `branch:wt-jiban` MEANT A LANE, NOT A GIT BRANCH
+
+The founder's `/handoff` arguments said `owner:jiban , branch:wt-jiban`. Two
+sessions ago this was left open because renaming the git branch would strand
+PR #6. **`a4bd0fe` answers it**, and `.claude/commands/kickoff.md` says so in its
+own words:
+
+> If the harness has put you on a `claude/...` branch it created and will not let
+> you leave it, **say that plainly and carry on there** — but keep `sahoda.lane`
+> set to the lane you were given, because that is what the handoff is keyed on.
+
+That is exactly this session. So:
+
+```
+git config sahoda.owner jiban      (already set)
+git config sahoda.lane  wt-jiban   (set now)
+branch: claude/lead-design-7m7ios  (harness-pinned; NOT renamed, NOT stranded)
+```
+
+**No git branch was renamed and PR #6 is untouched.** The lane name is a declared
+identity, and it is now declared. This handoff is `jiban-wt-jiban-2026-08-26.md`.
+
+## The naming scheme changed AGAIN, and their reason beats mine
+
+Three schemes in one day: `<role>-<date>` → `<owner>-<role>-<date>` (`d21bac3`)
+→ **`<owner>-<lane>-<date>`** (`a4bd0fe`). The third is right and my second was
+not, on evidence I did not have: **two sessions both wrote
+`girija-research-2026-08-26.md`** — different lanes, one filename, and the second
+would have overwritten the first at merge. A role cannot distinguish lanes,
+because one person runs three.
+
+**The conflict was resolved by taking `wt-core`'s side whole.** Mine derived the
+ROLE from the branch by substring; theirs drops role entirely. Nothing of mine
+was worth keeping there — the substring fix it carried is obsolete under a scheme
+that no longer asks the branch anything.
+
+## THE DEFECT I DOCUMENTED IS STILL LIVE — `scripts/auto-handoff.mjs:68`
+
+`a4bd0fe` and `6d6234b` rewrote the identity half of this file and **did not
+touch the destructive half**:
+
+```js
+if (existsSync(path) && !readFileSync(path, 'utf8').includes('AUTOMATIC ' + 'SKELETON')   // split HERE so this file survives)
+```
+
+Still a substring search over the WHOLE file. A handoff that discusses stubs
+still matches and still gets overwritten — it did exactly that to this file
+earlier today, 343 lines to 38. MEASURED again after the merge: line 68,
+unchanged. **Never write that marker verbatim into a real handoff.** The Session
+13 write-up above stands in full, including that nothing tests this branch.
+
+## Shared surfaces touched by this merge (INCOMING, not mine)
+
+Read these before assuming your session behaves as it did yesterday:
+
+- **`scripts/auto-handoff.mjs`** — path scheme changed. If `sahoda.lane` is
+  unset it falls back to the branch slug, so an undeclared lane files under an
+  ugly unique name rather than colliding.
+- **`.prettierignore` is NEW** (`0902995`). Prettier does not read `.gitignore`,
+  so tool scratch directories turned the format leg red for every lane. If
+  `prettier --check .` fails on a path you did not write, check this file first.
+- **`docs/workflow/10_TASK_PREAMBLE.md` is NEW**, and 22 skills plus 26 agents
+  now reach cloud sessions (`1b0e608`).
+- **`ops/state/qa.pending.json` moved by 159 lines in the merge.** It is still
+  never committed by hand; the rule is unchanged.
+
+## Gate after the merge
+
+Run on the merged tree, clean, from the repo root. Nothing piped.
+
+| leg | result | real output |
+|---|---|---|
+| `turbo run typecheck lint test --force` | **PASS** | `27 successful, 27 total` · `Cached: 0 cached, 27 total` · `4m22.18s` |
+| ↳ `@sahoda/web:test` | **PASS** | `389 passed \| 3 skipped (392)` files, `4931 passed \| 13 skipped (4944)` tests |
+| ↳ `@sahoda/db:test` | **PASS** | `33 passed \| 12 skipped (45)` files, `610 passed \| 207 skipped (817)` tests |
+| `prettier --check .` (root) | **PASS** | `All matched files use Prettier code style!` |
+| `design-lint.mjs` (root) | **PASS** | `1218 files scanned` |
+| `pnpm build` | **PASS** | exit 0 · `js-budget ok: 81 routes within budget` |
+| Playwright | **UNRUN** | NOT passed — chromium 1228 wanted, 1194 on disk |
+
+Identical counts to the pre-merge run: 65,115 insertions of skills and agents
+changed no test outcome, which is what you would expect from files nothing
+imports, and is worth having checked rather than assumed.
