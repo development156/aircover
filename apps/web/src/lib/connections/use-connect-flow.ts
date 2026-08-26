@@ -99,6 +99,16 @@ export function useConnectFlow(platform: ConnectionPlatform): ConnectFlowState {
     router.refresh()
   }, [router])
 
+  /**
+   * `finish` is now reachable from FOUR signals — the channel, the opener
+   * message, the close poll and regaining focus — and more than one of them
+   * fires on a normal connect. That is deliberate and it is safe: `refresh()` is
+   * idempotent, and the effect below is torn down the moment `pending` goes
+   * false, so the duplicates stop after the first. Guarding against the second
+   * call would mean choosing one signal to trust, which is what left the tiles
+   * stale in the first place.
+   */
+
   useEffect(() => {
     if (!pending) return
 
@@ -145,8 +155,27 @@ export function useConnectFlow(platform: ConnectionPlatform): ConnectFlowState {
       if (popupRef.current?.closed) finish()
     }, CLOSE_POLL_MS)
 
+    // ── AND THE SIGNAL THAT CANNOT BE THROTTLED: GETTING FOCUS BACK ─────────
+    // Reported as "after the popup closes nothing happens, only when I refresh
+    // does X connected appear". The row HAD been written — a manual reload
+    // showed it — so the message arrived and `router.refresh()` ran, and the
+    // tiles still did not change.
+    //
+    // The reason is that all three signals above fire while THIS TAB IS IN THE
+    // BACKGROUND: the popup holds focus until the moment it closes. Browsers
+    // throttle background tabs — `setInterval` is clamped, and a refresh started
+    // there can be deprioritised long enough to look like nothing happened.
+    //
+    // Regaining focus is the one event that happens AFTER the popup is gone and
+    // in the foreground, which is exactly when a re-render can actually paint.
+    // It is additive: the message path still does the work when it lands, and
+    // this makes sure the answer is on screen rather than merely fetched.
+    const onFocus = () => finish()
+    window.addEventListener('focus', onFocus)
+
     return () => {
       window.removeEventListener('message', onMessage)
+      window.removeEventListener('focus', onFocus)
       channel?.close()
       window.clearInterval(timer)
     }

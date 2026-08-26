@@ -51,30 +51,50 @@ export function DisconnectButton({ connectionId, label }: DisconnectButtonProps)
   }
 
   return (
-    <span className="flex flex-col items-end gap-1">
+    /* ── FULL WIDTH, AND THAT IS THE FIX ────────────────────────────────────
+       Armed, this used to be a right-aligned column with a `max-w-[220px]`
+       sentence, rendered INSIDE the row that also holds Reconnect. On a tile
+       whose inner column is barely wider than that maximum, the sentence
+       refused to shrink and the button beside it was squeezed until "Reconnect
+       X" broke onto two lines and the confirm block sat over the card. Visible
+       in the founder's screenshot and reported as "there is a visual bug too".
+
+       `w-full` makes the parent's `flex-wrap` do its job: the confirm block
+       takes its own line instead of competing for one. The sentence then wraps
+       inside the tile rather than setting a floor wider than it. */
+    <span className="flex w-full flex-col items-stretch gap-1.5">
       <Button size="sm" variant="destructive" onClick={run} disabled={pending} loading={pending}>
         Confirm disconnect
       </Button>
       {/* ── WHAT DISCONNECT ACTUALLY DOES, SAID BEFORE IT IS DONE ────────────
-          The button used to arm and confirm with no sentence at all, and the
-          toast afterwards said "Disconnected Instagram", which claims more than
-          happens. Deleting the row cascades the sealed tokens away, so Sahoda
-          genuinely cannot publish there any more — that half is true and is what
-          the customer is asking for.
+          ⚠ THIS SENTENCE WAS FALSE AND HAD TO CHANGE. It read: "The account
+          stays linked at the publishing provider, so connecting this channel
+          again brings it back." That was true while no removal endpoint was
+          wired, and the old comment here said so and named itself as "the
+          sentence to delete on the day a revoke exists".
 
-          The half that was not said: the account stays linked at Zernio. There
-          is no removal endpoint wired and the client exposes no method that
-          could call one, so pressing Connect on this channel again re-adopts
-          whatever Zernio still holds, including this account. Naming it here is
-          the difference between a surprise and a documented behaviour, and it is
-          the sentence to delete on the day a revoke exists. */}
+          That day was 2026-08-26. `disconnectConnection` now calls
+          `DELETE /v1/accounts/{id}` FIRST and deletes our row only if it
+          succeeds. MEASURED against the live API: after the founder pressed
+          Disconnect on X, `GET /v1/accounts` returned zero accounts across
+          every profile on the key — the account really is gone at the provider.
+
+          So the old sentence told a customer their account was still linked
+          somewhere it no longer is, and promised that reconnecting would bring
+          it back without a sign-in. Both halves wrong, in the direction that
+          makes a person think less happened than did.
+
+          What it says now is the sequence the action actually performs, and the
+          consequence the customer can act on: they will have to sign in again.
+          If the provider call fails, nothing is deleted and the action says so
+          separately — that refusal is not this sentence's job. */}
       {/* `type-sm`, not a hand-written size. docs/37 §3.3 owns the type steps and
           `design-lint` refuses a literal here — correctly: a one-off px value is
           how a screen ends up with four sizes that are each nearly one of the four
           real ones. */}
-      <span className="type-sm max-w-[220px] text-right text-muted">
-        Sahoda stops posting here. The account stays linked at the publishing provider, so
-        connecting this channel again brings it back.
+      <span className="type-sm text-muted">
+        Sahoda stops posting here and removes the account at the publishing provider. To use this
+        channel again you will need to sign in to it again.
       </span>
     </span>
   )

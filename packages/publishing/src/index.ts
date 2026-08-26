@@ -176,6 +176,7 @@ export {
 export {
   ensureZernioProfile,
   reconcileAccounts,
+  reconcileFromAccounts,
   profileNameForWorkspace,
   ZERNIO_DEFAULT_PROFILE_ID,
   type ReconciledAccount,

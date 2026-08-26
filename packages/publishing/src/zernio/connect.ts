@@ -116,8 +116,38 @@ export async function reconcileAccounts(
   client: ZernioClient,
   args: { profileId: string; zernioPlatform: string },
 ): Promise<ReconciledAccount[]> {
-  const accounts = await client.listAccounts(args.profileId)
+  return reconcileFromAccounts(await client.listAccounts(args.profileId), args)
+}
 
+/**
+ * The same reconcile, over accounts the caller ALREADY fetched.
+ *
+ * ── WHY THIS EXISTS: ONE TRIP WAS MAKING THIRTEEN IDENTICAL REQUESTS ────────
+ * `listAccounts(profileId)` is not filtered by platform. It returns every
+ * account under the profile and `reconcileAccounts` narrows the list in memory.
+ * The return route calls it once per platform, so a single connect fired one
+ * request per entry in `ZERNIO_PLATFORMS` — thirteen requests for one answer,
+ * twelve of them thrown away.
+ *
+ * That is not merely wasteful. MEASURED 2026-08-26 from the live response
+ * headers: `x-ratelimit-limit: 60` per minute, and `x-ratelimit-remaining` was
+ * 47 at the time of the check. Thirteen per trip means three connect attempts
+ * inside a minute come close to the ceiling on their own, and a 429 surfaces as
+ * a READ failure — so the account the customer connected thirty seconds ago is
+ * reported as not found, on a trip where nothing was actually wrong with it.
+ *
+ * The list was five long until 2026-08-26 and became thirteen the same day the
+ * connect-only platforms landed, so this got 2.6x worse in the change that
+ * introduced them.
+ *
+ * Splitting the fetch from the filter lets a caller pay for one request and ask
+ * it thirteen questions. `reconcileAccounts` above keeps the one-platform form
+ * for callers that genuinely want a single answer.
+ */
+export function reconcileFromAccounts(
+  accounts: readonly ZernioAccount[],
+  args: { profileId: string; zernioPlatform: string },
+): ReconciledAccount[] {
   return accounts
     .filter((a) => a.platform === args.zernioPlatform)
     .filter((a) => profileIdOf(a) === args.profileId)

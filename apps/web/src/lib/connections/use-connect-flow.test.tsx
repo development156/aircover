@@ -228,4 +228,70 @@ describe('the button never waits for something that is not coming', () => {
 
     expect(popup.focus).toHaveBeenCalled()
   })
+
+  it('refreshes when the tab gets focus back, not only when a message lands', async () => {
+    // THE REGRESSION. Every other signal fires while this tab is in the
+    // BACKGROUND — the popup holds focus until it closes — and a background tab
+    // is throttled. Reported as "after the popup closes nothing happens, only
+    // when I refresh does X connected appear", with the row already written.
+    const popup = fakePopup()
+    vi.stubGlobal(
+      'open',
+      vi.fn(() => popup),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ ok: true, authUrl: 'https://zernio.com/oauth/x' }),
+        }),
+      ),
+    )
+
+    render(<Harness />)
+    await userEvent.click(screen.getByRole('button'))
+    refresh.mockClear()
+
+    // No message, no close — only focus coming back, which is what actually
+    // happens the instant the popup goes away.
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+
+    expect(refresh).toHaveBeenCalled()
+    expect(screen.getByRole('button')).toHaveTextContent('Connect')
+  })
+
+  it('stops listening for focus once the wait is over', async () => {
+    // A focus listener that outlived the connect would refresh the page every
+    // time the customer came back to the tab, forever.
+    const popup = fakePopup()
+    vi.stubGlobal(
+      'open',
+      vi.fn(() => popup),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ ok: true, authUrl: 'https://zernio.com/oauth/x' }),
+        }),
+      ),
+    )
+
+    render(<Harness />)
+    await userEvent.click(screen.getByRole('button'))
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    refresh.mockClear()
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+
+    expect(refresh).not.toHaveBeenCalled()
+  })
 })

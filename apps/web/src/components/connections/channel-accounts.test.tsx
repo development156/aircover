@@ -161,12 +161,34 @@ describe('disconnect claims only what disconnect does', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /disconnect/i }))
 
-    // Deleting the row cascades the sealed tokens away, so Sahoda genuinely
-    // cannot publish there. That half is true. The half that was never said is
-    // that the account stays linked at Zernio — there is no removal endpoint
-    // wired — so connecting this channel again re-adopts it. A customer who is
-    // not told that meets it as a bug.
-    expect(screen.getByText(/stays linked at the publishing provider/i)).toBeInTheDocument()
+    // RETARGETED, because the BEHAVIOUR changed and the sentence had to follow.
+    // This asserted "stays linked at the publishing provider", which was exactly
+    // right while no removal endpoint was wired. `disconnectConnection` now
+    // calls DELETE /v1/accounts/{id} first and only deletes our row if that
+    // succeeds — MEASURED: after a real disconnect, Zernio held zero accounts
+    // across every profile on the key.
+    //
+    // The CLAIM this guards is unchanged: the customer is told what happens to
+    // the provider-side account BEFORE the destructive press. Only the true
+    // answer moved.
+    expect(screen.getByText(/removes the account at the publishing provider/i)).toBeInTheDocument()
+    // And the consequence they can act on. Without this the sentence says a
+    // thing was deleted and leaves them to guess what reconnecting costs.
+    expect(screen.getByText(/sign in to it again/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /confirm disconnect/i })).toBeInTheDocument()
+  })
+
+  it('never claims the account survives at the provider', async () => {
+    // THE FORBIDDEN CLAIM, asserted separately from the true one. A rewrite that
+    // reintroduced "stays linked" would be telling a customer their account is
+    // somewhere it is not — the direction that makes them think LESS happened
+    // than did, which is the worse way for this particular sentence to be wrong.
+    const { default: userEvent } = await import('@testing-library/user-event')
+    render(<ChannelTile entry={ENTRY.instagram} connections={[shop]} now={NOW} />)
+
+    await userEvent.click(screen.getByRole('button', { name: /disconnect/i }))
+
+    expect(screen.queryByText(/stays linked/i)).toBeNull()
+    expect(screen.queryByText(/brings it back/i)).toBeNull()
   })
 })
