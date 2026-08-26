@@ -166,3 +166,50 @@ describe('the X spend meter', () => {
     expect(screen.getByText(/could not be read/i)).toBeInTheDocument()
   })
 })
+
+/**
+ * ── A CARD THAT CANNOT BE PRESSED MUST NOT OFFER THE PRESS GESTURE ───────────
+ *
+ * The coming-soon tile carried the connectable tile's `hover:-translate-y-px`.
+ * The intent was good — a planned channel should not read as a dead box — but a
+ * lift on pointer-over is precisely the gesture every other card on this page
+ * uses to mean "this does something", and this one has nothing to press: no
+ * button, no link, nothing to tab to. The header of the component is at pains to
+ * guarantee that, refusing even `<button disabled>` on the grounds that offering
+ * an action and then swallowing it reads as a broken app rather than an unbuilt
+ * feature. A hover lift makes the identical promise with motion instead of
+ * markup, and breaks it the same way.
+ *
+ * The tile still answers the pointer — its ground settles onto `--surface-2` —
+ * so this asserts the ABSENCE of the press gesture, not the absence of feedback.
+ * Both halves matter: dropping the hover entirely would pass an "is not
+ * translated" check while re-introducing the dead box.
+ */
+describe('the coming-soon tile does not pretend to be pressable', () => {
+  it('offers no lift, because there is nothing under the pointer to press', () => {
+    render(<ChannelTile entry={ENTRY.youtube!} now={NOW} />)
+    const tile = document.querySelector('[data-coming-soon="true"]')!
+
+    // The press affordance, by any spelling Tailwind gives it.
+    expect(tile.className).not.toMatch(/hover:-?translate/)
+  })
+
+  it('still answers the pointer, so it does not read as a dead box', () => {
+    render(<ChannelTile entry={ENTRY.youtube!} now={NOW} />)
+    const tile = document.querySelector('[data-coming-soon="true"]')!
+
+    expect(tile.className).toMatch(/hover:/)
+    // And it keeps the transition, or the answer would snap rather than ease.
+    expect(tile.className).toContain('transition-micro')
+  })
+
+  it('the CONNECTABLE tile keeps its lift — the gesture is right where a press exists', () => {
+    // The contrast is the point. If a future change strips hover motion from the
+    // whole page, the first assertion above would still pass and would be
+    // asserting nothing; this one goes red instead.
+    render(<ChannelTile entry={ENTRY.linkedin!} now={NOW} />)
+    const tile = document.querySelector('[data-channel="linkedin"]')!
+
+    expect(tile.className).toMatch(/hover:-translate-y-px/)
+  })
+})

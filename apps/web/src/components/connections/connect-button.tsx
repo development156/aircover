@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronRight, Link2 } from 'lucide-react'
+import { ChevronRight, Link2, Loader2 } from 'lucide-react'
 import { useState, useTransition } from 'react'
 
 import type { Channel } from '@sahoda/shared'
@@ -82,11 +82,28 @@ export function ConnectButton({
            once and none of them outranks the others. */
         className="w-full justify-between"
         disabled={disabled || pending}
+        /* \u2500\u2500 WHY `aria-busy` IS SET HERE RATHER THAN VIA `loading` \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+           `Button`'s own `loading` prop renders its spinner as a SIBLING of
+           children, which on a `justify-between` control makes three flex
+           children instead of two \u2014 the spinner and the leading mark would
+           push apart and the chevron would stop sitting at the right edge.
+           So the spin is swapped in for the leading mark below, in place,
+           and the one thing `loading` does that a caller cannot see is set
+           explicitly. Without it a screen reader is told nothing at all
+           happened for as long as the round trip takes. */
+        aria-busy={pending || undefined}
         onClick={start}
         data-guide={disabled ? undefined : `connections.connect_${platform}`}
       >
         <span className="inline-flex min-w-0 items-center gap-2">
-          <Link2 aria-hidden className="size-3.5 shrink-0" />
+          {/* The mark BECOMES the spinner rather than sitting beside one, so
+              the control's width and the label's start never move. A button
+              that reflows on click reads as a mis-click. */}
+          {pending ? (
+            <Loader2 aria-hidden className="size-3.5 shrink-0 animate-spin" />
+          ) : (
+            <Link2 aria-hidden className="size-3.5 shrink-0" />
+          )}
           <span className="truncate">
             {pending ? `Opening ${label}\u2026` : `Connect ${label}`}
           </span>
