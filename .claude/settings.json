@@ -24,7 +24,13 @@
       "Read(**/secrets/**)",
       "Bash(rm -rf:*)",
       "Bash(curl:*)",
-      "Bash(supabase db reset:*)"
+      "Bash(supabase db reset:*)",
+      "Write(./.env*)",
+      "Edit(./.env*)",
+      "Read(**/.env*)",
+      "Write(**/.env*)",
+      "Edit(**/.env*)",
+      "Write(**/secrets/**)"
     ],
     "ask": [
       "Bash(git push:*)",
