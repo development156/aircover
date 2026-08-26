@@ -63,16 +63,16 @@ work around it.
 ```
 Repository:  development156/sahodalabs
 Base branch: wt-web            ← never main
-Your branch: wt-girija (Girija) · wt-jiban (Jiban) · wt-divas (Divas)
-Your work goes to: wt-core     ← then the advisor reviews and promotes to wt-web
+Your branch: whatever this session assigns you. That IS your lane.
+Your work goes to: wt-core     ← the one gated step is wt-core -> wt-web
 ```
 
 **First four commands, every session, in order:**
 
 ```bash
 git fetch --all --prune
-git checkout wt-girija || git checkout -b wt-girija origin/wt-web   # your own lane
-git pull --ff-only origin wt-girija
+git branch --show-current      # this is your lane. Do not rename it.
+git pull --ff-only origin "$(git branch --show-current)"
 git branch --show-current                    # VERIFY — never assume a checkout succeeded
 find apps/web/src/app -name page.tsx | wc -l # 58 = the product, ~20 = a stale main
 pnpm install
@@ -184,11 +184,11 @@ commit not authored `SAHODALABS <development@sahodalabs.com>`.
 
 ## Before you hand your branch over
 
-**You do not run the authoritative gate and you do not merge.** The advisor
-pulls your branch, gates it, and merges. What you owe is a branch that is honest
-about its own state.
+**You own your lane and may merge it into `wt-core` yourself.** What you owe is
+a branch that is honest about its own state, and a handoff that says what you
+could not verify.
 
-Verify what you cheaply can in your own sandbox, then:
+The one thing you may not do is write to `wt-web`. Verify what you can, then:
 
 - `pnpm turbo run typecheck lint test --filter=...[origin/wt-web] && pnpm format:check`
 - **Never pipe the gate.** `pnpm gate | tail -60` returns *tail's* exit code.
@@ -203,8 +203,9 @@ Verify what you cheaply can in your own sandbox, then:
   the advisor and the other lead learn what you did**, and it is what your own
   next session reads to restore context. If it is not in git, it did not
   happen.
-- Push your branch. Open a PR against **`wt-web`** if you want the discussion
-  in one place — but **never merge it yourself**; the advisor integrates.
+- Push your branch, then merge it into `wt-core` when it is ready. Run the full
+  gate after that merge, not before it — a merge is exactly when things go red.
+  **`wt-core` → `wt-web` is the one gated step** and is not yours to take.
 
 **Say plainly in the handoff what you could NOT verify.** A lead who writes
 "the smoke suite is UNRUN here, it needs Clerk keys this sandbox does not

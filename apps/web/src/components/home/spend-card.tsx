@@ -1,3 +1,4 @@
+import { Info, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 
 import { Bars, type BarPoint } from '@/components/charts/bars'
@@ -113,8 +114,9 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
         trailing={
           <Link
             href="/wallet"
-            className="card-link rounded-sm type-meta font-[550] text-muted transition-micro hover:text-accent"
+            className="card-link inline-flex items-center gap-1.5 rounded-pill border border-brand-lift px-3 py-1.5 type-meta font-[550] text-accent transition-micro hover:bg-brand-wash max-narrow:min-h-[44px]"
           >
+            <TrendingUp aria-hidden className="size-3.5" />
             See activity
           </Link>
         }
@@ -145,9 +147,12 @@ export function SpendCard({ spend }: { spend: SpendRead }) {
               activity rather than the chart withholding itself. Above three the
               shape speaks for itself and this line is not rendered. */}
           {activeDays > 0 && activeDays < 3 ? (
-            <p className="type-meta text-muted">
-              {activeDays === 1 ? 'One day' : `${activeDays} days`} with activity so far, not enough
-              to read as a trend.
+            <p className="flex items-start gap-2 rounded-sm bg-surface-2 px-3 py-2 type-meta text-muted">
+              <Info aria-hidden className="mt-icon-nudge size-3.5 shrink-0 text-ink-mute" />
+              <span>
+                {activeDays === 1 ? 'One day' : `${activeDays} days`} with activity so far, not
+                enough to read as a trend.
+              </span>
             </p>
           ) : null}
           {/* ── A TOTAL AND ITS ONLY CATEGORY ARE THE SAME NUMBER ───────────

@@ -84,10 +84,17 @@ export default async function SettingsPlanPage() {
 
       <PlanPicker subscription={subscription.data} />
 
-      <section data-guide="plan.invoices" className="space-y-3">
-        <h2 className="type-h2">Invoices</h2>
+      {/* ONE GRAMMAR. This was a bare `type-h2` above a table that brings its
+          own bordered container, beside a Billing details card with a second
+          `type-h2`, beside a Credits card with a `type-h3` head — three
+          treatments and two heading levels for three sibling sections. All
+          three are `SettingCard` now, so the page reads as one screen. */}
+      <SettingCard title="Invoices" data-guide="plan.invoices">
         {invoices.status === 'ok' ? (
-          <InvoiceTable invoices={invoices.data} />
+          // `border-0` because the card already draws the edge; a table with its
+          // own ring inside a ringed card is the border-on-border docs/37 §6
+          // refuses.
+          <InvoiceTable invoices={invoices.data} className="my-4 border-0" />
         ) : invoices.status === 'unavailable' ? (
           // The invoice store is not deployed here. Payments and credits work; the paperwork
           // does not exist yet. A different claim from a failed read, and a different remedy.
@@ -96,12 +103,12 @@ export default async function SettingsPlanPage() {
           // Unreadable is not "no invoices". Telling a customer they have never been
           // invoiced, because a query failed, is a claim about their records that we have no
           // basis for.
-          <p role="alert" className="type-body text-muted">
+          <p role="alert" className="py-4 type-body text-muted">
             Sahoda could not read your invoices just now. Reload to try again. Nothing has changed
             and no document has been lost.
           </p>
         )}
-      </section>
+      </SettingCard>
 
       {/*
         No form while the invoice store is undeployed. A form whose Save cannot succeed is
@@ -113,12 +120,28 @@ export default async function SettingsPlanPage() {
       )}
 
       <SettingCard title="Credits">
+        {/* ── THE BALANCE LEADS, BECAUSE THAT IS WHAT THIS CARD IS FOR ────────
+            docs/37 §16 rule 2: one number this section exists to report, so it
+            is set at `type-hero-num` and everything else is context for it.
+            This page renders no other hero number, so the "at most one per
+            view" consequence still holds.
+
+            The absence mark is kept for the two states that are NOT a zero: a
+            workspace that does not exist yet, and a read that failed. Printing
+            0 for either would state a balance nobody measured. */}
         <SettingRow
           label="Available"
           hint={AVAILABLE_HINT[balance.status]}
           control={
-            <span className="type-h3 num text-ink">
-              {balance.status === 'ok' ? balance.balance.available : '—'}
+            <span className="type-hero-num num text-ink">
+              {balance.status === 'ok' ? (
+                balance.balance.available
+              ) : (
+                <>
+                  <span aria-hidden>—</span>
+                  <span className="sr-only">Not available</span>
+                </>
+              )}
             </span>
           }
         />
