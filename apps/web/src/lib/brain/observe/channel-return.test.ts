@@ -49,25 +49,11 @@ function outcomes(
 
 describe('engagementRate', () => {
   it('is engagement over the people reached', () => {
-    expect(
-      engagementRate({
-        postId: UUID(1),
-        channel: 'x',
-        engagement: 5,
-        reach: 100,
-        measuredOn: '2026-01-01',
-      }),
-    ).toBe(0.05)
+    expect(engagementRate({ engagement: 5, reach: 100 })).toBe(0.05)
   })
 
   it('is zero when nobody was reached, rather than a division by zero', () => {
-    const rate = engagementRate({
-      postId: UUID(1),
-      channel: 'x',
-      engagement: 5,
-      reach: 0,
-      measuredOn: '2026-01-01',
-    })
+    const rate = engagementRate({ engagement: 5, reach: 0 })
     expect(Number.isFinite(rate)).toBe(true)
     expect(rate).toBe(0)
   })
