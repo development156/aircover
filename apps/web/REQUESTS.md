@@ -1297,6 +1297,24 @@ The narrow defect is attribution alone. A run with no identifiable card is bette
 recorded with a null `task_code`, or not recorded, than recorded against a card
 that happens to be open.
 
+**IT ALSO WRITES `fail` ROWS, AND THAT IS WORSE THAN THE PASS ROWS ABOVE.**
+Observed 2026-08-26 (`wt-divas2`, advisor). A deliberate `pnpm exec vitest run`,
+run to reproduce a CI failure, deposited a row stamped `"task_code": "SL-054"`,
+`"status": "fail"`, `"summary_plain": "The unit checks ran and something failed
+(229 passed, 2 failed)."`
+
+The two failures were REQUESTS §26's `mutation-harness` tests, which assert a
+`0500` directory is unwritable and **cannot** fail on an unprivileged runner.
+They are an artefact of this sandbox running as uid 0, they pass on CI, and they
+have nothing to do with SL-054 — which is the card recording that **production
+was down for 22 hours 40 minutes.**
+
+So the hook stands ready to file a fabricated QA FAILURE against a production
+incident. A false pass inflates confidence; a false fail on an incident card
+corrupts the record of the incident itself, and an incident review is exactly
+where somebody reads these rows as evidence. Reverted here too, which makes at
+least five reverts across three sessions.
+
 ## 19 · For the advisor — refining what a person types in onboarding
 
 **Owner ruling wanted, plus two things this lane may not write.** Asked for by
