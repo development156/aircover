@@ -26,7 +26,7 @@ pnpm+Turborepo · apps/web Next.js 15 App Router+TS+Tailwind+shadcn · apps/jobs
 
 pnpm install · pnpm dev · **the gate = `pnpm gate`** · supabase migration new <name> (db push = ASK)
 
-`pnpm gate` = `turbo run typecheck lint test && turbo run test:smoke && prettier --check .` — one command, because the two halves that used to sit outside it were both silently red for months. `format:check` is a ROOT script outside turbo, so a green turbo count says nothing about formatting. And `turbo test` runs VITEST ONLY: the Playwright suite sat outside the gate for twenty runs while `golden-path` was failing the whole time, because a product change turned "Create post" from a `<button>` into a `<Link>` and nothing was watching. MEASURED 2026-08-25 on `claude/lead-research-tz63ld`: `playwright test --list` reports **275 tests in 71 files** and `--grep @smoke` reports **116 tests in 36 files**. (It read **274 / 115 in 70 / 35 files** on 2026-08-24 on `wt-release`, the figure this sentence carried until now; the new @smoke test is `marketing-brain.spec.ts` ×1.) **The smoke leg has NOT been run on this lane, and the reason is the environment, not the suite:** in the claude.ai/code remote sandbox, Playwright's bundled Chromium cannot complete any outbound HTTPS request — MEASURED, `https://example.com/` resets the same as Clerk's host does — and every @smoke spec signs in through Clerk. It is NOT a certificate problem: Chromium loads the agent proxy's own HTTP endpoint and plain-HTTP `example.com` with 200, the proxy logs no attempt for any HTTPS one, and Playwright's Node-side request context fetches the same URL fine. Outbound 443 from the Chromium process is reset before it reaches anything, so `--ignore-certificate-errors` is both forbidden and useless here. REQUESTS §25 carries the six measurements. Run the smoke leg where Chromium has a normal network before merging this lane — the `smoke` job on `.github/workflows/gate.yml` is that, dispatched by hand with the project ref typed in. The last full smoke run remains the 2026-08-24 one: **115 passed, none skipped** (15.6m). (It read **229 / 110 in 60 / 32 files** on 2026-08-23 on `wt-page-rest`, the figure this sentence carried until now; the five new @smoke tests are wt-boot's, wt-infra's, and `accent-area-budget` ×1 — which exists because wt-dash2 and wt-page-rest independently wrote DIFFERENT guards into the same filename and the merge kept both.) (It read **209 / 102 in 50 / 28 files** on 2026-08-22 on `wt-integrate2`, the figure this sentence carried until now; the eight new @smoke tests are this lane's `auth-contrast` ×4, `auth-already-signed-in` ×2, `accent-budget` ×1 and `roadmap-figures-scan` ×1. This figure moved TWICE inside this lane — it was re-measured at 109 and a ninth spec landed after — which is the drift this sentence exists to catch, caught on itself.) (It read 76/19 and 67 on 2026-08-20, then 102/32 and 91 earlier on 2026-08-22 — the figure this sentence carried until now, and wrong in both halves by the time it was read. wt-playbooks, wt-knowledge, wt-webhooks, wt-media, wt-radar, wt-radar-ui and wt-remix each brought specs; six routes were added to `no-impossible-remedy` at integration, and `roadmap-honesty` gained a guard that asserts its OWN header count for exactly this reason.) The 159 outside the tag are deliberate and each says why in its own header — `assets.spec.ts` uploads real bytes to storage, `design-audit.spec.ts` is a screenshot tool, `onboarding-build.spec.ts` and `onboarding-money-guard.spec.ts` each drive eight screens and mint a Clerk user. The gate runs the 116, not "every one of them". **A stale number here is the same defect as a stale number on a screen** — re-measure it in the same commit that moves it.
+`pnpm gate` = `turbo run typecheck lint test && turbo run test:smoke && prettier --check .` — one command, because the two halves that used to sit outside it were both silently red for months. `format:check` is a ROOT script outside turbo, so a green turbo count says nothing about formatting. And `turbo test` runs VITEST ONLY: the Playwright suite sat outside the gate for twenty runs while `golden-path` was failing the whole time, because a product change turned "Create post" from a `<button>` into a `<Link>` and nothing was watching. MEASURED 2026-08-26 on `claude/lead-design-7m7ios` at `b3c0f19`, after the advisor integrated every lane: `playwright test --list` reports **277 tests in 72 files** and `--grep @smoke` reports **118 tests in 37 files**. (It read **275 / 116 in 71 / 36 files** on 2026-08-25 on `claude/lead-research-tz63ld`, the figure this sentence carried until now; the new file is `palette-legibility.spec.ts`, whose 2 tests are BOTH tagged, which is why both halves moved by the same 2 and the file counts by the same 1.) (It read **274 / 115 in 70 / 35 files** on 2026-08-24 on `wt-release`; the new @smoke test then was `marketing-brain.spec.ts` ×1.) **The smoke leg has NOT been run on this lane, and the reason is the environment, not the suite:** in the claude.ai/code remote sandbox, Playwright's bundled Chromium cannot complete any outbound HTTPS request — MEASURED, `https://example.com/` resets the same as Clerk's host does — and every @smoke spec signs in through Clerk. It is NOT a certificate problem: Chromium loads the agent proxy's own HTTP endpoint and plain-HTTP `example.com` with 200, the proxy logs no attempt for any HTTPS one, and Playwright's Node-side request context fetches the same URL fine. Outbound 443 from the Chromium process is reset before it reaches anything, so `--ignore-certificate-errors` is both forbidden and useless here. REQUESTS §25 carries the six measurements. Run the smoke leg where Chromium has a normal network before merging this lane — the `smoke` job on `.github/workflows/gate.yml` is that, dispatched by hand with the project ref typed in. The last full smoke run remains the 2026-08-24 one: **115 passed, none skipped** (15.6m). (It read **229 / 110 in 60 / 32 files** on 2026-08-23 on `wt-page-rest`, the figure this sentence carried until now; the five new @smoke tests are wt-boot's, wt-infra's, and `accent-area-budget` ×1 — which exists because wt-dash2 and wt-page-rest independently wrote DIFFERENT guards into the same filename and the merge kept both.) (It read **209 / 102 in 50 / 28 files** on 2026-08-22 on `wt-integrate2`, the figure this sentence carried until now; the eight new @smoke tests are this lane's `auth-contrast` ×4, `auth-already-signed-in` ×2, `accent-budget` ×1 and `roadmap-figures-scan` ×1. This figure moved TWICE inside this lane — it was re-measured at 109 and a ninth spec landed after — which is the drift this sentence exists to catch, caught on itself.) (It read 76/19 and 67 on 2026-08-20, then 102/32 and 91 earlier on 2026-08-22 — the figure this sentence carried until now, and wrong in both halves by the time it was read. wt-playbooks, wt-knowledge, wt-webhooks, wt-media, wt-radar, wt-radar-ui and wt-remix each brought specs; six routes were added to `no-impossible-remedy` at integration, and `roadmap-honesty` gained a guard that asserts its OWN header count for exactly this reason.) The 159 outside the tag are deliberate and each says why in its own header — `assets.spec.ts` uploads real bytes to storage, `design-audit.spec.ts` is a screenshot tool, `onboarding-build.spec.ts` and `onboarding-money-guard.spec.ts` each drive eight screens and mint a Clerk user. The gate runs the 118, not "every one of them". **A stale number here is the same defect as a stale number on a screen** — re-measure it in the same commit that moves it.
 
 `pnpm gate` needs `apps/web/.env.local` (Clerk keys) for the e2e half; without it `e2e/global-setup.ts` throws with the missing names.
 
@@ -96,20 +96,44 @@ integration branch move independently; a stale checkout writes against code that
 no longer exists. If `--ff-only` refuses, the lane has diverged — say so and
 stop, do not merge past it.
 
-**Branches and permission.** Your lane is **whatever branch this session is on**
-— a cloud session assigns its own name and that is fine. **You own your lane
-completely and need approval for nothing inside it**: any file, any dependency,
-any migration file, commit and push freely. Lanes merge into `wt-core`. The one
-gated step in the whole system is **`wt-core` → `wt-web`**, which is production.
-Never cut from `main` — every `main` here is 690+ commits behind and carries a
-20-route skeleton of a 58-route product. See `docs/workflow/08_ROLES.md`.
+**Lanes.** There are nine: `wt-girija`, `wt-girija2`, `wt-girija3` and the same
+for `wt-jiban` and `wt-divas`. A session is started with both facts given, never
+inferred:
+
+```
+/kickoff owner:girija , branch: wt-girija2 , /lead-research
+```
+
+`/kickoff` pins them into `git config sahoda.owner` and `sahoda.lane`, and every
+handoff is filed as **`<owner>-<lane>-<date>.md`**. Both halves are load-bearing:
+every commit is authored `SAHODALABS`, so git cannot say WHO; and one person runs
+three lanes, so a role cannot say WHICH. On 26 August two sessions both wrote
+`girija-research-2026-08-26.md` under the old scheme — different lanes, one
+filename, and the second would have overwritten the first at merge.
+
+**The role is whatever role command you were given.** It is not read off the
+branch name. `wt-girija` running `/lead-research` is correct and normal.
+
+**A cloud session may be pinned to a `claude/...` branch it cannot leave.** That
+is fine: work there, keep `sahoda.lane` set to the lane you were given, and say
+so in the handoff. **Never abandon a branch another session or a PR is tracking**
+— two lead sessions independently refused to do that on 26 August and both were
+right.
+
+**You own your lane completely and need approval for nothing inside it**: any
+file, any dependency, any migration file, commit and push freely. Lanes merge
+into `wt-core`. The one gated step in the whole system is **`wt-core` →
+`wt-web`**, which is production. Never cut from `main` — every `main` here is
+800+ commits behind and carries a 12-route skeleton of a 59-route product. See
+`docs/workflow/08_ROLES.md`.
 
 **All three people share one Claude account and one GitHub account.** So every
 commit is authored `SAHODALABS` and `git blame` can never tell you who did what:
 **the branch is the identity** and the handoff names the person. It also means
 two sessions can land on the same branch with no warning until a push is
 rejected — `scripts/cloud-setup.sh` checks the lane against its remote at
-startup, and when it says DIVERGED, do not force-push.
+startup, and when it says DIVERGED, do not force-push. **One person, one lane,
+at a time.**
 
 ## The one rule
 
