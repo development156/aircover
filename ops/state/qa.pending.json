@@ -1,4 +1,18 @@
 {
   "version": 1,
-  "runs": []
+  "runs": [
+    {
+      "client_id": "qa-mta6r75r-97e77c5e",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T14:25:06.300Z",
+      "finished_at": "2026-08-26T14:25:06.300Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks passed for @sahoda/mesh ONLY — this run was filtered and does not cover the workspace.",
+      "details": "mesh_lint_exit=0\n Tasks:    1 successful, 1 total",
+      "duration_ms": null
+    }
+  ]
 }
