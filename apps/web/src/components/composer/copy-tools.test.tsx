@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { Post, PostVariant } from '@sahoda/shared'
 
 import { Composer } from './composer'
@@ -171,25 +171,21 @@ describe('undo and redo follow the words of one channel only', () => {
  * pass today and go red the moment the split it exists to protect is real.
  */
 describe('the emoji and symbol picker', () => {
-  function panel(target: string): HTMLElement {
-    return screen
-      .getByLabelText(`Search emoji and symbols for ${target}`)
-      .closest('details') as HTMLElement
+  function toggle(target: string): HTMLElement {
+    return screen.getByRole('button', { name: `Add an emoji or symbol to ${target}` })
   }
 
   // NOT named `open`. `window.open` exists in jsdom, so a helper of that name
   // that failed to be declared would resolve to it silently and every case here
   // would run against an unopened picker — which is exactly what happened once.
   async function openPicker(target: string) {
-    fireEvent.click(within(panel(target)).getByText('Add an emoji or symbol'))
+    fireEvent.click(toggle(target))
     // The first glyph to arrive proves the chunk resolved and rendered.
-    await within(panel(target)).findByRole('button', { name: `Insert rupee into ${target}` })
+    await screen.findByRole('button', { name: `Insert rupee into ${target}` })
   }
 
   function pick(target: string, name: string) {
-    fireEvent.click(
-      within(panel(target)).getByRole('button', { name: `Insert ${name} into ${target}` }),
-    )
+    fireEvent.click(screen.getByRole('button', { name: `Insert ${name} into ${target}` }))
   }
 
   test('ships no glyph with the route — the table arrives when the picker is opened', async () => {
@@ -197,15 +193,33 @@ describe('the emoji and symbol picker', () => {
     // Nothing before the click. If this ever passes with the panel already
     // populated, the dynamic import has been turned back into a static one and
     // the composer's build budget is 9.7 kB worse than it looks.
-    expect(
-      within(panel('X copy')).queryByRole('button', { name: 'Insert rupee into X copy' }),
-    ).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Insert rupee into X copy' })).toBeNull()
 
     await openPicker('X copy')
 
-    expect(
-      within(panel('X copy')).getByRole('button', { name: 'Insert rupee into X copy' }),
-    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Insert rupee into X copy' })).toBeTruthy()
+  })
+
+  test('the toggle says whether the panel is open, and names its panel', () => {
+    composer()
+    expect(toggle('X copy').getAttribute('aria-expanded')).toBe('false')
+    const controls = toggle('X copy').getAttribute('aria-controls')
+    expect(controls).toBeTruthy()
+    // Closed, so the panel it points at is genuinely absent rather than hidden.
+    expect(document.getElementById(controls as string)).toBeNull()
+
+    fireEvent.click(toggle('X copy'))
+
+    expect(toggle('X copy').getAttribute('aria-expanded')).toBe('true')
+    expect(document.getElementById(controls as string)).toBeTruthy()
+  })
+
+  test('each channel opens its own panel and leaves the others shut', async () => {
+    composer()
+    await openPicker('X copy')
+
+    expect(toggle('LinkedIn copy').getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('button', { name: 'Insert rupee into LinkedIn copy' })).toBeNull()
   })
 
   test('inserts AT THE CARET, not at the end of the box', async () => {
@@ -253,16 +267,15 @@ describe('the emoji and symbol picker', () => {
   test('searching narrows to the matching names and says so when nothing matches', async () => {
     composer()
     await openPicker('X copy')
-    const picker = panel('X copy')
     const search = screen.getByLabelText('Search emoji and symbols for X copy')
 
     fireEvent.change(search, { target: { value: 'rupee' } })
-    expect(within(picker).queryByRole('button', { name: 'Insert sparkles into X copy' })).toBeNull()
-    expect(within(picker).getByRole('button', { name: 'Insert rupee into X copy' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Insert sparkles into X copy' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Insert rupee into X copy' })).toBeTruthy()
 
     fireEvent.change(search, { target: { value: 'zzz' } })
     // The claim is about THIS SET, not about emoji: the writer's own device still
     // has every one of them, and saying otherwise would be a false remedy.
-    expect(within(picker).getByText(/device/i)).toBeTruthy()
+    expect(screen.getByText(/device/i)).toBeTruthy()
   })
 })
