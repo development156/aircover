@@ -416,6 +416,45 @@
       "summary_plain": "The unit checks ran and everything passed.",
       "details": "exit=0\n Tasks:    27 successful, 27 total\nAll matched files use Prettier code style!",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mta9twjq-ca114aa8",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T15:51:11.364Z",
+      "finished_at": "2026-08-26T15:51:11.364Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (14 passed, 2 failed).",
+      "details": "     × writes the platform, which is what makes a create possible at all 6ms\n     × carries both at once 3ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n FAIL  |lib| src/lib/zernio/return-url.test.ts > the intent travels in the URL, because the cookie did not survive > writes the platform, which is what makes a create possible at all\n FAIL  |lib| src/lib/zernio/return-url.test.ts > the intent travels in the URL, because the cookie did not survive > carries both at once\n      Tests  2 failed | 14 passed (16)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mta9vl4i-cc06f85c",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T15:52:29.872Z",
+      "finished_at": "2026-08-26T15:52:29.872Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (45 passed, 2 failed).",
+      "details": "     × closes the popup on the URL alone 6ms\n     × authorises the create on the URL alone 4ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 45 passed (47)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mta9wq5z-6e4fb655",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T15:53:23.061Z",
+      "finished_at": "2026-08-26T15:53:23.061Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (5 passed, 1 failed).",
+      "details": "     × raises the window it opened, because a named window is reused unfocused 17ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 5 passed (6)",
+      "duration_ms": null
     }
   ]
 }

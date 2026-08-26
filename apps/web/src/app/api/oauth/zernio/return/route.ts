@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { reconcileAccounts } from '@sahoda/publishing'
-import { ZERNIO_PLATFORMS } from '@sahoda/shared'
+import { isZernioPlatform, ZERNIO_PLATFORMS } from '@sahoda/shared'
 
 import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { CLEAR_PENDING_CONNECT, readPendingConnect } from '@/lib/connections/pending-connect'
@@ -8,6 +8,7 @@ import { connectionKey, readConnectionSlots } from '@/lib/connections/read'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { readActiveWorkspace } from '@/lib/workspaces'
+import { RETURN_MODE_PARAM, RETURN_PLATFORM_PARAM } from '@/lib/zernio/return-url'
 import { zernioClient } from '@/lib/zernio/server'
 
 /**
@@ -244,7 +245,45 @@ export async function GET(request: Request): Promise<Response> {
    * What it may not do without this is CREATE.
    */
   const pending = await readPendingConnect()
-  const popup = pending?.mode === 'popup'
+
+  /**
+   * ── THE ONE QUERY PARAMETER THIS ROUTE READS, AND WHY IT IS ALLOWED ────────
+   * The cookie above is still the only thing that can authorise a CREATE, and
+   * that has not changed. But it turned out not to survive the round trip
+   * reliably, and the popup flag rode on it: the customer pressed Connect, a
+   * popup opened, and the return trip answered with a 303 because `pending` was
+   * null — so the popup loaded a second copy of /connections instead of closing.
+   * Reported three times, most recently as "the popup still not closing".
+   *
+   * `mode` steers PRESENTATION and nothing else: an HTML page that says "you can
+   * close this window" versus a redirect. Forging it changes which of those two a
+   * customer sees. It cannot name a workspace, a platform, an account or a plan,
+   * and it cannot cause one row to be written. That is the whole distinction the
+   * header of this file draws, and this value sits on the safe side of it.
+   *
+   * EITHER source is enough. The cookie still works where it survives, and the
+   * absence of both still means redirect, so the older path remains what a
+   * stripped or mangled value produces.
+   */
+  const params = new URL(request.url).searchParams
+  const popup = pending?.mode === 'popup' || params.get(RETURN_MODE_PARAM) === 'popup'
+
+  /**
+   * WHICH PLATFORM MAY HAVE A ROW CREATED FOR IT ON THIS TRIP.
+   *
+   * The cookie first, always. The parameter is the fallback for the trip it did
+   * not survive, and it is validated against the shared allowlist rather than
+   * used as given: an unknown string produces `null`, which is the fail-closed
+   * branch, not a create for a channel nobody has heard of.
+   *
+   * `null` still means no create. Losing both a cookie and a query parameter
+   * leaves the trip doing what it has always done for a replay — refreshing every
+   * row we already hold and creating none.
+   */
+  const askedPlatform = params.get(RETURN_PLATFORM_PARAM)
+  const createFor: string | null =
+    pending?.platform ??
+    (askedPlatform !== null && isZernioPlatform(askedPlatform) ? askedPlatform : null)
 
   const ok = (status: 'connected' | 'nothing' | 'limit', detail?: string) =>
     popup ? popupCloser(request, 303, status, detail) : backOk(request, status, detail)
@@ -399,17 +438,18 @@ export async function GET(request: Request): Promise<Response> {
          * one would put correct behaviour in the failure channel, which is the
          * mistake the `overLimit` branch below already exists to avoid.
          */
-        if (pending !== null && account.platform !== pending.platform) continue
+        if (createFor !== null && account.platform !== createFor) continue
 
         /**
-         * NO PENDING RECORD, NO CREATE. A replay of this URL, a cookie that
-         * expired mid-consent, a browser that dropped it. Refusing to create is
+         * NO RECORD OF A PRESS, NO CREATE — neither cookie nor parameter. A
+         * replay of this URL, or an attempt abandoned long enough for both to be
+         * gone. Refusing to create is
          * the fail-closed direction: the customer presses Connect again and the
          * next trip has a fresh cookie, which costs one click. Creating instead
          * costs them the disconnect they asked for, silently, and that is the
          * defect being fixed.
          */
-        if (pending === null) continue
+        if (createFor === null) continue
 
         if (admitted >= headroom) {
           overLimit.push(account.platform)

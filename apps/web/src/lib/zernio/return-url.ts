@@ -53,6 +53,59 @@ export interface ReturnUrlEnv {
 export const ZERNIO_RETURN_PATH = '/api/oauth/zernio/return'
 
 /**
+ * The two query parameters the return route is allowed to read.
+ *
+ * ── WHY QUERY PARAMETERS, ON THE ROUTE THAT IGNORES THEM ALL ─────────────────
+ * Both of these rode in an httpOnly `SameSite=Lax` cookie. They kept not
+ * arriving, and the journey explains why: our origin -> Zernio -> Google ->
+ * Zernio -> our origin, four hops and two cross-site boundaries, through
+ * browsers with bounce-tracking and partition mitigations of their own. `Lax`
+ * should carry it and evidently did not, and a mechanism that "should" work is
+ * not one to build a feature on.
+ *
+ * It cost two visible defects at once, because two different things depended on
+ * that one cookie:
+ *
+ *   mode      the popup got a 303, so it loaded a second copy of /connections
+ *             instead of closing. Reported three times.
+ *   platform  create-scoping fell to its fail-closed branch, so a genuine
+ *             connect wrote NO ROW AT ALL. Reported as "still not able to
+ *             connect with many platforms".
+ *
+ * MEASURED from Zernio's own spec for `GET /v1/connect/{platform}`: "Result
+ * params are appended with the URL API, so an existing query string is
+ * preserved." So a parameter we put on the return URL comes back to us.
+ *
+ * ── AND THIS DOES NOT REOPEN THE RULE IT LOOKS LIKE IT BREAKS ────────────────
+ * The return route ignores every query parameter because doc 13 §3 records that
+ * a wrong `accountId` does not error: it publishes to somebody else's Instagram
+ * and returns 200. That rule is about a value that NAMES A RESOURCE BELONGING TO
+ * SOMEONE ELSE. Neither of these can.
+ *
+ * `mode` steers no write at all. It chooses between an HTML page saying "you can
+ * close this window" and a 303 to /connections.
+ *
+ * `platform` does scope a create, and it is the harder call, so the argument is
+ * spelt out rather than asserted. It is a channel NAME from a five-item
+ * allowlist, not an id. It cannot reach another tenant: the accounts it scopes
+ * come from `reconcileAccounts(client, { profileId, platform })`, where
+ * `profileId` was read from our own table keyed by the workspace derived from
+ * the Clerk session. It cannot admit an account over the plan limit; that gate
+ * is downstream and unchanged. The MOST a forged value can do is record a
+ * channel this workspace really has connected at Zernio — which is exactly what
+ * this route did for all five platforms before create-scoping existed. So it
+ * still only ever NARROWS, and a forged value narrows to a different subset of
+ * the same set.
+ *
+ * The cookie is still set and still read FIRST. This is the fallback for the
+ * trip it does not survive, not a replacement.
+ */
+export const RETURN_MODE_PARAM = 'mode'
+
+/** See RETURN_MODE_PARAM. Validated against the shared allowlist on arrival. */
+export const RETURN_PLATFORM_PARAM = 'platform'
+
+/**
  * Turn a bare Vercel host into an origin.
  *
  * `VERCEL_URL` and `VERCEL_BRANCH_URL` arrive WITHOUT a scheme — `example.vercel.app`,
@@ -90,8 +143,31 @@ export function returnOrigin(env: ReturnUrlEnv): string | null {
   return origin(env.appUrl)
 }
 
-/** The full return URL, or `null` when the origin cannot be determined. */
-export function returnUrl(env: ReturnUrlEnv): string | null {
+/** What the customer pressed, as far as the return trip needs to know it. */
+export interface ReturnIntent {
+  /** Only `popup` is ever written; absence means redirect. */
+  mode?: 'popup' | 'redirect' | undefined
+  /** Our channel id, not Zernio's connect name. */
+  platform?: string | undefined
+}
+
+/**
+ * The full return URL, or `null` when the origin cannot be determined.
+ *
+ * The intent is carried in the URL as well as in a cookie, because the cookie did
+ * not survive the trip. Zernio appends its own parameters to whatever we give it
+ * and preserves an existing query string, so ours arrives alongside theirs.
+ *
+ * A missing, stripped or mangled value produces the OLD behaviour in both cases:
+ * no `mode` means redirect, and no `platform` means the route falls back to the
+ * cookie and then to refusing to create. That is the same direction every other
+ * default in this flow fails in.
+ */
+export function returnUrl(env: ReturnUrlEnv, intent?: ReturnIntent): string | null {
   const base = returnOrigin(env)
-  return base === null ? null : `${base}${ZERNIO_RETURN_PATH}`
+  if (base === null) return null
+  const url = new URL(`${base}${ZERNIO_RETURN_PATH}`)
+  if (intent?.mode === 'popup') url.searchParams.set(RETURN_MODE_PARAM, 'popup')
+  if (intent?.platform) url.searchParams.set(RETURN_PLATFORM_PARAM, intent.platform)
+  return url.toString()
 }

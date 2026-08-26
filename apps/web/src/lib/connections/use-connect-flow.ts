@@ -159,6 +159,19 @@ export function useConnectFlow(platform: Channel): ConnectFlowState {
     popupRef.current = popup
     setPending(true)
 
+    // ── AND BRING IT TO THE FRONT ────────────────────────────────────────────
+    // The window is NAMED, so a second press reuses the one already open rather
+    // than opening a second. A reused window is not raised, so a popup sitting
+    // behind the main window means the customer presses Connect and sees nothing
+    // happen at all — reported exactly that way, as "does not even open".
+    // Wrapped: `focus` is refused in some embedded and mobile browsers, and a
+    // throw here would abandon the fetch below.
+    try {
+      popup?.focus()
+    } catch {
+      // Nothing to do. The window is open either way.
+    }
+
     void (async () => {
       try {
         const res = await fetch('/api/oauth/zernio/start', {

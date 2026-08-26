@@ -150,7 +150,21 @@ export async function POST(request: Request): Promise<Response> {
     // so the customer approved access at the platform and was returned to
     // zernio.com. Stopping here costs them nothing; the grant they would have
     // given is real and cannot be taken back.
-    const returnTo = zernioReturnUrl()
+    //
+    // ── AND THE INTENT RIDES ON IT, NOT ONLY IN THE COOKIE ───────────────────
+    // Both the mode and the platform were carried by `sahoda_connect` alone, and
+    // it kept not arriving: our origin -> Zernio -> Google -> Zernio -> us is four
+    // hops and two cross-site boundaries, and a `SameSite=Lax` cookie that
+    // "should" survive that evidently does not in every browser. Two reported
+    // defects came out of the one missing cookie — the popup answered with a 303
+    // and loaded the app inside itself, and create-scoping fell to its fail-closed
+    // branch so a real connect wrote no row. Zernio appends its own result params
+    // with the URL API and preserves an existing query string, so what we put here
+    // comes back. The cookie is still set, still read first, and this is the
+    // fallback for the trip it does not survive. RETURN_MODE_PARAM in
+    // lib/zernio/return-url.ts carries the argument for why neither value can
+    // widen anything.
+    const returnTo = zernioReturnUrl({ mode, platform })
     if (!returnTo) {
       return fail(
         'Connecting isn’t available right now. This deployment has no return address.',
