@@ -44,8 +44,16 @@ export function ReconnectButton({ platform, label }: { platform: string; label: 
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button size="sm" onClick={run} disabled={pending}>
-        <RefreshCw size={14} aria-hidden />
+      {/* `loading` rather than a hand-rolled spin: this control has no
+          `justify-between`, so `Button`'s spinner-then-children order is
+          already the right order, and using the prop means it also sets
+          `aria-busy` and the disable in one place. It was previously
+          `disabled={pending}` with the label swapped to "Opening…" — a
+          sighted user got a word, a screen-reader user got silence, and the
+          one control on this page that DOES use `loading` (Disconnect)
+          behaved differently from the two that did not. */}
+      <Button size="sm" onClick={run} loading={pending}>
+        {pending ? null : <RefreshCw size={14} aria-hidden />}
         {pending ? 'Opening…' : `Reconnect ${label}`}
       </Button>
       {error ? <span className="text-[12px] text-danger">{error}</span> : null}

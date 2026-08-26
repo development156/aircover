@@ -138,10 +138,25 @@ function ComingSoonTile({ entry }: { entry: CatalogueEntry }) {
       data-channel={entry.id}
       data-coming-soon="true"
       data-connected="false"
-      /* The same lift, so a planned channel reads as a card on a roadmap
-         rather than a dead box — while `.is-proposed` keeps it visibly
-         provisional. No shadow: it is not offering an action. */
-      className="is-proposed flex h-full flex-col gap-3 rounded-card p-4 transition-micro hover:-translate-y-px"
+      /* ── ALIVE, BUT NOT PRESSABLE ────────────────────────────────────────
+         This used to carry the connectable tile's `hover:-translate-y-px`,
+         with the reason "so a planned channel reads as a card on a roadmap
+         rather than a dead box". The intent is right and is kept; the
+         mechanism was not. A lift on pointer-over is the press affordance
+         every OTHER card on this page uses to mean "this does something",
+         and there is nothing here to press — no button, no link, nothing to
+         tab to, which the header above is at pains to guarantee. Offering
+         the gesture and then swallowing the click is the same broken
+         promise as `<button disabled>`, made with motion instead of markup.
+
+         The GROUND lifts instead. `.is-proposed` rests on `transparent`, so
+         settling it onto `--surface-2` on hover is a real, visible answer to
+         the pointer with no motion in it at all. It is also a property
+         `transition-micro` actually animates — `background-color` is on its
+         list, `filter` is not, so a brightness hover would have snapped
+         rather than eased. The dashed edge is untouched: this card stays
+         visibly provisional, which is the one thing it must keep saying. */
+      className="is-proposed flex h-full flex-col gap-3 rounded-card p-4 transition-micro hover:bg-s2"
     >
       <ChannelHeader entry={entry} />
       {/* What the channel is FOR. Present tense describes the channel, not an
