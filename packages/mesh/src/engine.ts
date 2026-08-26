@@ -14,6 +14,8 @@ import { ProviderCallError } from './providers/types'
 import { FREE_PDF_ENGINE } from './providers/openrouter'
 import type { LogSink, ProviderLogRow } from './telemetry'
 import type { BrandContextProvider } from './brand-context'
+import type { KnowledgeContextProvider } from './knowledge-context'
+import type { MarketContextProvider } from './market-context'
 
 /** One ordered provider+model to try for a task (primary OpenRouter, then OpenAI). */
 export interface Attempt {
@@ -33,7 +35,36 @@ export interface MeshTaskSpec<I, O> {
    * user payload last. `brand` is supplied by the runner only for tasks whose def
    * declares `cachePrefix: 'brand_context'`; brand-less tasks ignore it.
    */
-  buildMessages: (input: I, ctx: MeshContext, brand?: ChatMessage) => ChatMessage[]
+  buildMessages: (
+    input: I,
+    ctx: MeshContext,
+    brand?: ChatMessage,
+    knowledge?: ChatMessage,
+    market?: ChatMessage,
+  ) => ChatMessage[]
+  /**
+   * The text to retrieve library passages against — the brief the model is about
+   * to write from, in the task's own words.
+   *
+   * Present ONLY on tasks that should read the knowledge library. It lives here
+   * and not on `MeshTaskDef` because a def is a frozen shared contract and this
+   * is a function over the task's own input; and it is a second flag rather than
+   * a second meaning for `cachePrefix` because brand and knowledge have opposite
+   * cache behaviour (one block per workspace vs. one per request) and must not
+   * share a switch.
+   */
+  knowledgeQuery?: (input: I) => string
+  /**
+   * Whether this task should be told what the Marketing Brain has measured.
+   *
+   * A boolean and not a function, unlike `knowledgeQuery`, because there is
+   * nothing to select on: a workspace has a handful of observations and every
+   * one of them bears on what to write. A third flag rather than a third meaning
+   * for either of the two above, for the reason the knowledge one gives — these
+   * three blocks have three different lifetimes (per brand version, per request,
+   * per week) and must not share a switch.
+   */
+  wantsMarketContext?: boolean
   /** brand_guidelines only — served (flagged) on a double JSON failure. */
   fallbackPayload?: (input: I) => O
 }
@@ -67,6 +98,10 @@ export interface MeshRunnerDeps {
   price: (usage: ProviderUsage) => number
   /** Resolves the Brand Brain prefix for `cachePrefix: 'brand_context'` tasks (best-effort). */
   brandContext?: BrandContextProvider
+  /** Retrieves library passages for tasks declaring `knowledgeQuery` (best-effort). */
+  knowledgeContext?: KnowledgeContextProvider
+  /** Retrieves observations for tasks declaring `wantsMarketContext` (best-effort). */
+  marketContext?: MarketContextProvider
   /**
    * Called whenever a first attempt fails its schema. Best-effort observability
    * — it must never break the user's action, so it is wrapped in a try.
@@ -206,19 +241,40 @@ export function createMeshRunner(deps: MeshRunnerDeps) {
   ): Promise<MeshResult<O>> {
     const { def } = spec
 
-    // Brand grounding: fetch the cache-controlled Brand Brain prefix for tasks that
-    // ask for it. Best-effort — a brand-fetch hiccup must never fail the action (the
-    // model still returns real output, just less grounded).
-    let brand: ChatMessage | undefined
-    if (def.cachePrefix === 'brand_context' && deps.brandContext) {
-      try {
-        brand = (await deps.brandContext.get(ctx.workspaceId))?.message
-      } catch {
-        /* proceed brand-less */
-      }
-    }
+    // Grounding: the cache-controlled Brand Brain prefix for tasks that ask for it,
+    // and library passages for tasks that declare a query. BOTH are best-effort —
+    // a fetch hiccup must never fail a paid action; the model still returns real
+    // output, just less grounded. Concurrent because they are two independent
+    // reads and a user is waiting on the sum of them.
+    const [brand, knowledge, market] = await Promise.all([
+      (async (): Promise<ChatMessage | undefined> => {
+        if (def.cachePrefix !== 'brand_context' || !deps.brandContext) return undefined
+        try {
+          return (await deps.brandContext.get(ctx.workspaceId))?.message
+        } catch {
+          return undefined /* proceed brand-less */
+        }
+      })(),
+      (async (): Promise<ChatMessage | undefined> => {
+        if (!spec.knowledgeQuery || !deps.knowledgeContext) return undefined
+        try {
+          const brief = spec.knowledgeQuery(input)
+          return (await deps.knowledgeContext.get(ctx.workspaceId, brief)) ?? undefined
+        } catch {
+          return undefined /* proceed without passages */
+        }
+      })(),
+      (async (): Promise<ChatMessage | undefined> => {
+        if (!spec.wantsMarketContext || !deps.marketContext) return undefined
+        try {
+          return (await deps.marketContext.get(ctx.workspaceId)) ?? undefined
+        } catch {
+          return undefined /* proceed without observations */
+        }
+      })(),
+    ])
 
-    const messages = spec.buildMessages(input, ctx, brand)
+    const messages = spec.buildMessages(input, ctx, brand, knowledge, market)
 
     // A file may only go to a provider that can honour an explicit PDF engine.
     // The chain is [OpenRouter, OpenAI] and only the first has the file-parser

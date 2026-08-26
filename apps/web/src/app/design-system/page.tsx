@@ -10,7 +10,7 @@ import { V5Primitives } from '@/components/design-system/v5-primitives'
 import { GreyscaleToggle } from '@/components/design-system/greyscale-toggle'
 
 export const metadata: Metadata = {
-  title: 'Design system · Sahoda',
+  title: 'Design system',
   description: 'Every token and primitive, in every state.',
 }
 

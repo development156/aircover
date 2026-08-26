@@ -31,6 +31,22 @@ export type { SiteGenerateInput } from './tasks/site-generate'
 
 // Brand grounding (server-only) — the cache-controlled Brand Brain prefix.
 export { createPostgrestBrandContext, buildBrandMessage } from './brand-context'
+export {
+  createPostgrestKnowledgeContext,
+  buildKnowledgeMessage,
+  buildKnowledgeQuery,
+  KnowledgeContextError,
+  KNOWLEDGE_PASSAGE_LIMIT,
+  MAX_QUERY_TERMS,
+} from './knowledge-context'
+export type { KnowledgeContextProvider } from './knowledge-context'
+export type { MarketContextProvider, ObservationLine } from './market-context'
+export {
+  buildMarketMessage,
+  createPostgrestMarketContext,
+  MarketContextError,
+  MARKET_OBSERVATION_LIMIT,
+} from './market-context'
 export type { BrandContext, BrandContextProvider } from './brand-context'
 
 // Routing tables (typed Alpha stand-in for ai_model_routes).

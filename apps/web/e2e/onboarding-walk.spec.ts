@@ -201,28 +201,23 @@ seeded.describe('the onboarding stage', () => {
           await expect(page.getByRole('button', { name: /^Continue$/ })).toBeEnabled()
           await page.getByRole('button', { name: /^Continue$/ }).click()
 
-          /* ── 05 references ── */
-          await expect(page.getByRole('heading', { name: /what .good. looks like/i })).toBeVisible()
-          await shoot(page, view.name, theme, '05-references-empty')
-          await expect(page.getByRole('button', { name: /^Continue$/ })).toBeEnabled()
-          await page.locator('#f-ref').fill('https://www.instagram.com/blossombookhouse')
-          await page.locator('#f-ref').press('Enter')
-          // The card names what the link IS. It must NOT describe how it looks.
-          await expect(page.getByText(/Instagram account · queued for analysis/i)).toBeVisible()
-          await shoot(page, view.name, theme, '05-references-filled')
-          await page.getByRole('button', { name: /^Continue$/ }).click()
-
-          /* ── 06 knowledge ── */
+          /* ── 05 knowledge — the References screen used to sit here ──
+             It asked for pages the customer admires and kept none of them:
+             nothing in the submitted form has ever carried a reference. Removed
+             rather than left asking, so the walk goes 04 → 05 knowledge. */
+          await expect(page.getByRole('heading', { name: /what .good. looks like/i })).toHaveCount(
+            0,
+          )
           await expect(
             page.getByRole('heading', { name: /what should your AI already know/i }),
           ).toBeVisible()
-          await shoot(page, view.name, theme, '06-knowledge-empty')
+          await shoot(page, view.name, theme, '05-knowledge-empty')
           await expect(page.getByRole('button', { name: /^Continue$/ })).toBeEnabled()
-          await page.getByRole('button', { name: /^Website Crawl your pages$/ }).click()
+          await page.getByRole('button', { name: /^Website\b/ }).click()
           // "Queued", never "Connected": nothing was fetched and no token exists.
           await expect(page.getByText(/Queued/).first()).toBeVisible()
           await expect(page.getByText(/\bConnected\b/)).toHaveCount(0)
-          await shoot(page, view.name, theme, '06-knowledge-filled')
+          await shoot(page, view.name, theme, '05-knowledge-filled')
           await page.getByRole('button', { name: /^Continue$/ }).click()
 
           /* ── rivals — the step the brief's list omits ── */

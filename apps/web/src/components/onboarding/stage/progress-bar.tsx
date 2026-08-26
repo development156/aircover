@@ -3,11 +3,17 @@
 import { NUMBERED, type StepId } from './store'
 
 /**
- * A hairline, not a bar. The count lives in type ("01 — 06") and the dot rides
+ * A hairline, not a bar. The count lives in type ("01 — 05") and the dot rides
  * the end of the line so progress has a POSITION, not just a length.
  *
- * The rivals step is past the last numbered question, so it holds at 06/100%
- * rather than inventing an "07 — 06".
+ * The rivals step is past the last numbered question, so it holds at the last
+ * number and 100% rather than inventing an "06 — 05".
+ *
+ * ── THE TOTAL IS DERIVED, BECAUSE IT WAS HARDCODED AND WENT STALE ────────────
+ * It read `— 06` as a literal. Removing the References screen took `NUMBERED`
+ * to five and the rail went on promising six, so the last screen would have
+ * read "05 — 06" and a person would have been waiting for a question that no
+ * longer exists. A count printed beside a list must come FROM the list.
  */
 export function ProgressBar({ step }: { step: StepId }) {
   const index = NUMBERED.indexOf(step)
@@ -20,7 +26,7 @@ export function ProgressBar({ step }: { step: StepId }) {
   return (
     <div className="prog" id="prog">
       <span className="prog__n tnum">
-        <b id="pn">{String(value).padStart(2, '0')}</b> — 06
+        <b id="pn">{String(value).padStart(2, '0')}</b> — {String(NUMBERED.length).padStart(2, '0')}
       </span>
       <div
         className="prog__track"

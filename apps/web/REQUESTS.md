@@ -985,3 +985,754 @@ checked by that guard. It invents no figure today and nothing there will notice 
 starts. If you would rather it stayed covered, the entry to restore is
 `['/radar', [price('radar_scan')]]` — but it will fail until the screen says "coming soon"
 again, which would now be untrue.
+
+---
+
+## 13 · The format gate is red on an untouched tree, and the fix is an ignore, not a reformat
+
+**Lane:** research (Jiban), 2026-08-24. **Scope declared:** `.prettierignore`, one
+block. Nothing under `apps/web/src`, nothing in `components/`, no token. Under an
+hour.
+
+`pnpm format:check` fails on `bc9b97b` with **nothing edited**:
+
+```
+[warn] .agents/skills/humanizer/README.md
+[warn] .agents/skills/humanizer/SKILL.md
+[warn] Code style issues found in 2 files.
+```
+
+That leg sits OUTSIDE turbo, so no turbo count can see it, and CLAUDE.md already
+records that this exact leg "was silently red for months". It is red again, from
+the moment `8077df3` tracked the skill.
+
+**Why the fix is `.prettierignore` and not `prettier --write`.**
+`.agents/skills/humanizer/` is vendored upstream content, not ours. It ships its
+own `LICENSE`, its own `.github/workflows/validate.yml`, and its own
+`scripts/validate-package.py`. Reformatting it diverges it from upstream and puts
+our copy under a validator we did not write and do not run.
+
+`.prettierignore` already protects exactly this class, and says so in its own
+comment: `docs/` is excluded to keep "the numbered spec pack from prettier
+drift". A vendored skill is the same argument.
+
+**One thing I checked rather than assumed.** Prettier's SKILL.md edit looked at
+first like a content change: it rewrites `**After:**` to `> **After:**`. It is
+not. `**After:**` follows a `>` line with no blank between, so CommonMark **lazy
+continuation** already pulls it into the blockquote. Prettier is making the
+existing render explicit. The label reads as part of the quote today, which the
+author plainly did not intend, but that is upstream's bug to fix and not ours to
+bake in.
+
+## 14 · `export-drift.test.ts` is protected by turbo's env allowlist, not by what its header claims
+
+**Owed to:** whoever owns `apps/web/src/lib/privacy/`, and the advisor. **I have
+not changed this file.** Reporting only, because the repair is a judgement call
+about who is allowed to dial production and that is not mine to make alone.
+
+That file's header says it skips safely because **"the sandbox has no `.env`"**.
+CLAUDE.md withdrew that premise **today**: "The cloud sandbox now GETS a `.env`
+... Changed 2026-08-24; this line previously said the sandbox has none by
+design."
+
+Its only condition is `DB_URL === ''`. In this cloud session `SUPABASE_DB_URL`
+**is set**, and points at `db.rloztdhzfliyvpvxsgjl.supabase.co` — production, the
+one project, 26 real workspaces.
+
+**MEASURED, both halves:**
+
+```
+apps/web $ pnpm run test          # turbo bypassed
+  × knows about every workspace-owned table, and invents none
+  Error: getaddrinfo ENOTFOUND db.rloztdhzfliyvpvxsgjl.supabase.co
+
+$ pnpm turbo run test --filter=@sahoda/web --force
+  ↓ src/lib/privacy/export-drift.test.ts (2 tests | 2 skipped)
+```
+
+So the gate is fine. What makes it fine is **`turbo.json`'s `test` task declaring
+`env: ["SAHODA_ALLOW_LIVE_TESTS"]` under turbo 2.x strict mode**, which strips
+`SUPABASE_DB_URL` before vitest starts. Proven directly with a throwaway task:
+inside a turbo task the variable reads `NO(stripped)`; under `pnpm exec` in the
+same shell it reads `YES`.
+
+**Why this is worth writing down.** Two artifacts hold half a fact each and
+nothing tests the seam. The test believes credentials are absent. They are
+present, and an allowlist nobody wrote for this purpose is the only thing
+standing between a plain `pnpm test` and a live connection to production. Add
+`SUPABASE_DB_URL` to that `env` list for any reason — and something already wants
+it, `@sahoda/billing: missing required env — SUPABASE_DB_URL` appears in the web
+test output today — and this file starts dialling production on every gate run,
+green, with nobody told.
+
+It is read-only (`begin read only`, one `information_schema` query, rollback), so
+this is not a data-loss report. It is a trust-boundary report. Note that
+`packages/db` refuses this destination by identity —
+`FORBIDDEN_PROJECT_REFS = ['rloztdhzfliyvpvxsgjl']`, "even with the flag set,
+even with valid credentials, even if someone typed it deliberately" — and this
+file calls neither that check nor the `SAHODA_ALLOW_LIVE_TESTS` flag.
+
+**Why I did not simply add the flag.** The header is explicit that this file
+exists to be pointed AT production and "run by hand when somebody has the
+credential" — it is the only thing that can say what production holds. Banning
+the ref would make it useless. Its real defect is that it carries a _script's_
+trust model (deliberate by invocation) while living in vitest (runs whenever the
+suite runs). The sanctioned prod readers next door — `prod-probe.mjs`,
+`ledger-invariants.mjs` — are scripts for exactly that reason. **THE DECISION IS
+YOURS:** give it its own explicit opt-in (`SAHODA_EXPORT_DRIFT_LIVE=1`, declared
+in `turbo.json` or it can never be switched on), or move it out of vitest into
+`packages/db/scripts/` where its trust model already holds.
+
+**And one caveat on my own detector.** I checked the `describe.skip`/`skipIf`
+suites and the DB-URL-gated files by grep. A suite that reaches a database
+through a helper I did not name, or through raw `fetch` to PostgREST rather than
+`pg`, is not covered by what I looked at.
+
+## 15 · Nothing in CI runs the gate, so a green PR says only that Vercel built
+
+**Found while checking my own PR's checks, 2026-08-24.**
+
+**RESOLVED 2026-08-25** — the founder asked for it, so `.github/workflows/gate.yml`
+now runs three of the gate's five stages on every pull request: turbo
+typecheck + lint + test, root vitest, and prettier. No secrets required, because
+none of those three touches the network.
+
+The two it does NOT run are named in the workflow with their reasons, and pinned
+by `scripts/lib/ci-gate-coverage.test.mjs` so a sixth stage cannot be added
+without somebody deciding whether CI covers it:
+
+- `turbo test:smoke` — it drives a browser through the real app, and the app has
+  one database, which is production. On every pull request that would write test
+  workspaces into the customer database automatically. It is a `workflow_dispatch`
+  job instead, gated on typing the project ref into `SAHODA_E2E_ACK_TARGET`.
+- `turbo build` — Vercel already builds every pull request, `js-budget.mjs`
+  included.
+
+Six mutations were run against the coverage guard and all six went red: a sixth
+gate stage CI ignores, the workflow dropping prettier, a stage renamed while this
+file still claims it, the smoke suite wired into the pull-request job, the
+acknowledgement given a default so a click would do, and turbo declaring an env
+var the workflow never supplies.
+
+`.github/workflows/` holds five files. **Not one triggers on `pull_request` or
+`push`:**
+
+| workflow            | trigger                                   |
+| ------------------- | ----------------------------------------- |
+| `audience-nightly`  | `schedule` + `workflow_dispatch`          |
+| `metrics-nightly`   | `schedule` + `workflow_dispatch`          |
+| `radar-nightly`     | `schedule` + `workflow_dispatch`          |
+| `status-page`       | `schedule` + `workflow_dispatch`          |
+| `post-deploy-smoke` | `deployment_status` + `workflow_dispatch` |
+
+PR #4 reports two checks: `Vercel Preview Comments` (success) and `probe`
+(skipped). `probe` is `post-deploy-smoke`, and its skip is **correct and
+deliberate** — its own `if:` is Production-only, because previews sit behind
+Vercel deployment protection and probing one measures a login page. That comment
+is already in the file.
+
+So a PR here can be green with `pnpm gate` never having run against it. **The
+gate exists only on somebody's machine.** That is the mechanism behind the defect
+in §13 above: `pnpm format:check` sits outside turbo AND outside CI, which is how
+CLAUDE.md's "silently red for months" happened and how it happened again the
+moment `8077df3` landed. The two facts compound — a leg no turbo count can see,
+on a repository where no automation runs any leg at all.
+
+Worth stating plainly because the reverse is easy to assume: **a green check mark
+on a pull request in this repository is not evidence that the tests pass.** It is
+evidence that Vercel finished a build.
+
+If a gate workflow is wanted, note the constraint before costing it: per
+CLAUDE.md the e2e half needs `apps/web/.env.local` with Clerk keys, so a CI gate
+is either unit-only or needs secrets. And per `docs/workflow/01_CONTEXT.md`
+GitHub schedules only from the DEFAULT branch, which is `main` — 692 commits
+behind — so anything added on a lane will not fire on a timer until that is
+resolved.
+
+## 16 · `turbo-env-wiring` scans gitignored scratch, so a local file can fail the gate
+
+Small, self-inflicted, and worth one paragraph because the next person will lose
+the same twenty minutes. Found 2026-08-24 (research lane).
+
+`src/lib/turbo-env-wiring.test.ts` walks `apps/web` for `process.env.X` reads and
+requires each to be declared in `turbo.json`. Its walker skips exactly three
+names: `node_modules`, `.next`, `.turbo` (line 110). It does **not** consult
+`.gitignore`.
+
+I put a throwaway Playwright capture script in `apps/web/.ui-port-shots/` — a
+gitignored directory — and it read `process.env.FULLPAGE`. The gate went red
+with `FULLPAGE (read in .ui-port-shots/shoot.mjs)`. **That red cannot be fixed by
+any commit**, because the offending file is not in the repository; you fix it by
+editing or deleting an untracked local file, which is a confusing place to end up
+when the failure names `turbo.json`.
+
+The guard itself is good and should not be loosened casually — it is the thing
+standing between a stripped variable and a silently broken production build, and
+it even self-tests (`the scanner sees both process.env forms and ignores
+lookalikes`). Two honest options if it is ever worth touching: skip dot-directories
+in the walker, or read `.gitignore`. Neither is urgent, and the second is the one
+that keeps a real `src/.something` covered.
+
+Workaround meanwhile: take scratch configuration from `process.argv`, not the
+environment.
+
+## 17 · The UX detectors run on every screen and nothing can fail
+
+**Research lane, 2026-08-24. Scope declaration and a measured defect list.** I am
+about to work in `apps/web/src/components/` and page-level UI. Girija: read this
+before starting a design session, per `08_ROLES.md`.
+
+### What I ran
+
+`e2e/ux-j3-sweep.spec.ts`, all six combos, against a production `next start`:
+**240 frames, 40 routes, 390/1024/1440, light and dark**, one fresh Clerk account
+per combo. 229 distinct by SHA. The 11 identical-frame groups are two redirects,
+confirmed from the manifest's final URLs: `/create/post` to `/posts/new` and
+`/brain/competitors` to `/radar`. So **38 real screens from 40 routes**, nothing
+silently skipped: the spec asserts one frame per route, which is the only thing
+between "forty screens audited" and "forty screens listed".
+
+### The finding that outranks the defects
+
+**`deadEnds`, `invisibleText`, `invisibleFill`, `touch`, `headings` and `motion`
+are computed for all 240 frames, written to `.ux/manifest.jsonl`, and no
+assertion anywhere reads them.**
+
+- `deadEnds` appears exactly once outside its own definition:
+  `ux-detector-selftest.spec.ts`, which tests the DETECTOR against a synthetic
+  fixture. Good practice, and not a check on the product.
+- `scripts/ux-report.mjs` does rank them, under the heading "DISABLED CONTROLS (a
+  dead end wearing an action's clothes)". It contains no `throw` and no
+  `process.exit`, and it is referenced by no `package.json` script, no
+  `turbo.json` task and no workflow. **Nothing runs it and it cannot fail.**
+
+This is `shell-probe.spec.ts` again, one layer further out: there, the 44px floor
+was measured and asserted nothing. Here a whole apparatus measures nine things
+well, self-tests its own instruments, writes a ranked report, and stops one step
+short of anything that goes red.
+
+Its default view is `summary`; the defects are behind `--view=defects`, which is
+a flag, not a positional. `node scripts/ux-report.mjs defects` silently prints
+the summary, which is how you can run this tool and see none of its findings.
+
+### The ranked list, all measured, phone first
+
+Discount `/design-system` throughout: it is a reference page that renders swatches
+and demo controls on purpose, and it dominates several rankings as a result. Every
+count below is at **390px**, which `01_CONTEXT.md` says is the product's primary
+viewport.
+
+1. **Brand-orange fills, 52 frames over the one-primary rule (docs §1.5).**
+   `/brain/knowledge` and `/connections` paint **3** at 390; `/home` and `/posts`
+   paint 2. `01_CONTEXT.md` names "four orange buttons shouting at each other" as
+   a defect a human found in a browser in the first minute. **Caveat before
+   anyone acts on this: `accent-budget.spec.ts` and `accent-area-budget.spec.ts`
+   already exist.** I have not read them, so I do not know whether they measure
+   count or area, or what threshold they allow. Read them first; this may be a
+   threshold disagreement rather than an unguarded defect.
+2. **Elements painted past the viewport, 22 frames, every one at 390.**
+   `/wallet` 11, `/ads/performance` 8, `/ads` and `/ads/budget` 7, and all six
+   `/brain/*` pages 2 each. **Stated precisely, because the two are different
+   numbers:** these are elements whose box extends past 390, which is not the
+   same as the page scrolling sideways. By `docWidth > viewport`, only
+   `/design-system` actually scrolls. The rest are painted out of view or
+   clipped, and each needs a frame opened to say which.
+3. **Three disabled controls on customer screens** — `/loop` "Plan my week · 20
+   credits", `/sites` "Generate site · 100 credits", `/settings` "Save". All six
+   combos. `docs/26 §10.3` bans `<button disabled>` for this: unfocusable,
+   unhoverable, unexplained.
+
+### What is clean, so nobody re-checks it
+
+Zero across all 240 frames: interactive elements with no accessible name, text
+under 1.25:1 against its own ground, clickable things wearing an arrow cursor,
+theme mismatches, frames under 6KB.
+
+### On the three disabled controls, corrected by looking
+
+The detector reads only `aria-describedby` and `title`, and by those it reports
+all three as unexplained. **Opening the frames says otherwise**, and the detector
+cannot see it: `/loop` prints "Connect a channel first. Sahoda has nowhere to plan
+for." directly beneath the button. That is precise copy naming a remedy that
+works, which is the product's doctrine done right.
+
+So the defect is narrower than the detector implies, and it is real:
+`generate-site-panel.tsx:162` is `disabled={blocked || name.trim() === ''}`, a
+true `disabled`, so the control leaves the tab order entirely. A keyboard or
+screen-reader user never reaches it and never hears the sentence that would tell
+them what to do, because the sentence is a sibling paragraph with nothing tying
+it to the button. The repair is `aria-disabled` plus `aria-describedby` pointing
+at the copy that already exists, and a click handler that no-ops.
+
+**What I cannot see:** I read `e2e/**` and grepped the repo for consumers of
+`manifest.jsonl`. A check living somewhere I did not look, or one reaching these
+measurements by another route, is not covered by that.
+
+## 18 · The QA capture hook attributes every gate run to whatever card is in progress
+
+**Small, and it writes false audit records, which is why it is here rather than
+in a shrug. Found 2026-08-24 (research lane).**
+
+Running `pnpm turbo run typecheck test` appends two entries to
+`ops/state/qa.pending.json`, one per suite, each stamped
+`"task_code": "SL-054"`, `"actor": "claude"`, `"status": "pass"`.
+
+**SL-054 is "Production was down for 22 hours 40 minutes"** — an incident card in
+the in-progress column of `ops/state/board.json`. My gate runs have nothing to do
+with it. The hook appears to tag whatever card is currently in progress, not the
+work that actually ran, so any session running the gate deposits pass evidence on
+a stranger's card.
+
+Committing those rows would put QA evidence on an incident nobody QA'd, so this
+lane reverted the file each time instead (four times over this session). Stating
+that plainly because a discarded artifact leaves no trace, and the next person
+will see the same dirty file and reasonably assume it is theirs to commit.
+
+**What is right about it, so nobody breaks it while fixing this:** the summary is
+honest where it counts. It says "this run was filtered and does not cover the
+workspace" rather than claiming a full pass, which is exactly the distinction
+this project cares about.
+
+The narrow defect is attribution alone. A run with no identifiable card is better
+recorded with a null `task_code`, or not recorded, than recorded against a card
+that happens to be open.
+
+## 19 · For the advisor — refining what a person types in onboarding
+
+**Owner ruling wanted, plus two things this lane may not write.** Asked for by
+the founder on 2026-08-24 against screen 03 (Audience): _"the user might write 2
+words but the meaning is not derived properly, or the grammar might be
+incorrect. its an important input for brand brain."_ The founder chose
+**suggest-and-accept** over silent rewriting when the options were put.
+
+### Why it cannot be built in this lane
+
+Three of the four pieces are outside it:
+
+| piece                                    | where it lives             | this lane        |
+| ---------------------------------------- | -------------------------- | ---------------- |
+| the task and its prompt                  | `packages/mesh/src/tasks/` | writable         |
+| input and output schemas                 | `packages/shared`          | **frozen**       |
+| a price                                  | `pricing.config.json`      | **do not touch** |
+| the screen and the accept/reject control | `apps/web`                 | writable         |
+
+`caption-rewrite` is the nearest existing task and its price is
+`caption_rewrite: 1`. A refine task would be a sibling of it, not a reuse: the
+caption prompt rewrites marketing copy for a channel, and this one must not
+market anything. It is closer to a transcription clean-up.
+
+### The product rule that shapes it, not a preference
+
+The Brand Brain's whole architecture separates CONFIRMED (a person wrote this)
+from INFERRED (a model guessed). Screen 03 already reads the answer back
+verbatim: _"Everything I write will be aimed at GenZ, College students who wants
+to learn a new skill…"_. If a model rewrites that sentence and the field keeps
+its confirmed standing, the product is quoting **our** words back as **theirs**,
+on the one surface built to keep those apart.
+
+So the shape has to be:
+
+1. the person's text is what is stored until they say otherwise,
+2. the suggestion is shown BESIDE it, never in place of it,
+3. accepting is an explicit press, and the accepted text is then theirs —
+   the same act `confirmBrainField` performs on `/brain`,
+4. declining costs nothing and leaves the field exactly as typed.
+
+An auto-correct on blur fails 1, 2 and 3 at once, which is why it was rejected.
+
+### Questions only the owner can settle
+
+1. **Does it cost a credit, and is it free during onboarding?** The first resolve
+   is free and onboarding is where trust is won. A refine that quietly spends
+   from 100 credits before the brain exists is a bad first transaction, and
+   "costs shown before spend" means the screen would have to carry a price on
+   four or five fields.
+2. **Which fields?** Only the audience sentence, or every free-text answer
+   (name, positioning, audience, the typed trade from screen 02)? Each one is a
+   call.
+3. **What is it allowed to change?** Grammar and clarity only, or may it expand
+   two words into a sentence? Expansion is the ask that helps most and invents
+   most: "students" to "college students in tier-two cities" is a claim about
+   their business that nobody made.
+
+### What this lane can do once those are answered
+
+The screen half: the field, the suggestion beside it, accept and decline, the
+states, and the guards. Roughly a day. It needs the task and the schema to exist
+first, and a price if the answer to question 1 is that it costs one.
+
+---
+
+## 20 · The library search that reaches a model is unranked
+
+`packages/mesh/src/knowledge-context.ts` retrieves five library passages for
+`caption_rewrite` and `content_variants`. It is honest about being
+**filter-then-truncate**, not rank-then-take, and this is the note that asks for
+the missing half.
+
+**Why it cannot rank today.** PostgREST can filter on the generated `tsv`
+column, and it cannot order by `ts_rank(tsv, query)` — a computed expression is
+not a sortable column. So the five passages are five of the matches in whatever
+order the database returns them, and a passage that mentions the tasting menu
+nine times sorts no higher than one that mentions it once.
+
+**Why the obvious alternative is worse.** `searchLibrary` uses
+`plainto_tsquery`, which ANDs every lexeme. That is right for a search box.
+Handed a whole caption it matches nothing at all — no passage contains all
+twenty words of a post — so an AND query would have shipped a feature that
+returned zero passages forever and looked exactly like an empty library. The OR
+buys recall at the cost of precision, and the ranking is the precision.
+
+**What would fix it.** A `search_knowledge_ranked(p_workspace_id uuid, p_query
+text, p_limit int)` function in `packages/db`, `security definer` with its own
+membership check (or `security invoker` if the mesh is given a scoped key),
+ordering by `ts_rank_cd`. `packages/mesh` would call it as an RPC and the
+`workspace_id` filter would move inside the function, where it stops being one
+URL edit away from a cross-tenant read.
+
+Until it exists the constant `KNOWLEDGE_PASSAGE_LIMIT = 5` is the whole cost
+control, and `knowledge-context.test.ts` holds it there.
+
+**SUPERSEDED, 25 August 2026.** The founder's ruling on `wt-core`
+(`docs/workflow/08_ROLES.md`) makes every lane autonomous: writing a migration
+file is free in any lane, and only APPLYING one to production is gated, from
+`wt-core`. So this is no longer an ask parked with somebody else — this lane can
+write it. Left here as the specification; the reason it is still unwritten is
+sequencing, not permission.
+
+---
+
+## 21 · Four of the five reflect reasons are computed and thrown away
+
+`lib/loop/reflect.ts` returns a `NoLearningReason` whenever a week produced no
+learning, and there are five of them: `no_history`, `too_few_posts`,
+`single_group`, `difference_too_small`, `numbers_too_small`. They are five
+different sentences to a reader, and the file is careful about that.
+
+`loop_cycles` can store exactly one: `reflect_skipped_no_history boolean`.
+`run-loop.ts` passes `reflection.skippedNoHistory` and drops
+`reflection.reason` on the floor. So every Sunday the product works out why it
+had nothing to say about a business and then forgets it, and the owner is shown
+a silence with no account of itself.
+
+This matters more than a missing column usually would, because it is the exact
+question `docs/49` had to answer by hand: **why has the Brand Brain never
+learned anything?** The code computes that answer weekly and keeps none of it.
+
+It is also the discipline this codebase already enforces elsewhere.
+`lib/inbox/emptiness.ts` exists to keep eight kinds of nothing apart, and
+`no-impossible-remedy.spec.ts` fails a screen that offers a remedy for the wrong
+one. Five kinds collapsing into one boolean is the same defect those two files
+were written to prevent.
+
+**What it needs:** a nullable `reflect_no_learning_reason text` on
+`loop_cycles`, checked against the five literals, written by
+`setCycleStatus` alongside the boolean that already goes there. The boolean
+stays — it is read by `/loop` today and removing it is a separate change with
+its own blast radius.
+
+**SUPERSEDED, 25 August 2026.** The founder's ruling on `wt-core`
+(`docs/workflow/08_ROLES.md`) makes every lane autonomous: writing a migration
+file is free in any lane, and only APPLYING one to production is gated, from
+`wt-core`. So this is no longer an ask parked with somebody else — this lane can
+write it. Left here as the specification; the reason it is still unwritten is
+sequencing, not permission.
+
+---
+
+## 22 · Losing data every day — the model's draft is overwritten by the edit
+
+**The founder's ruling on the Brand Brain moat, 25 August: store CORRECTIONS,
+not conclusions.** The visible Brain already holds conclusions, and a hidden
+layer holding more of them is a second copy of something a competitor
+reproduces the moment a customer re-types it somewhere else. What cannot be
+reproduced is the record of how a business fixes what Sahoda wrote, because that
+only exists if Sahoda wrote the draft.
+
+**The schema destroys it.** `posts.body` and `post_variants.body` are single
+mutable columns (`20260718000004_content.sql`), and there is no revision table
+anywhere in the migrations — checked by name and by grep; `audit_logs` and
+`ops_audit_log` are ops tables and hold no post text. So every save overwrites
+what the model produced, and the difference between the generated caption and
+the published one has never been recorded for any customer.
+
+Every day this stands, another day of the best signal in the product is thrown
+away. It is also the only item on the moat list that gets HARDER to fix later:
+the other two streams can be started whenever, and this one silently loses its
+history until it is stopped.
+
+**The smallest thing that stops the bleeding**, and the db lane's call between
+them:
+
+- a `generated_body text` beside `body`, written once when a model produces it
+  and never updated, or
+- a `post_revisions` row per save, which also answers "what did this look like
+  last Tuesday" and costs a table.
+
+The first is smaller and enough for the delta. The second is the one that does
+not need revisiting.
+
+**Two things to decide with it, and neither is mine.** Retention: these are
+customer drafts, so how long they are kept belongs in the same conversation as
+the rest of the data policy. And whether `caption_rewrite` counts — the rewrite
+task takes existing text and returns new text, so it produces a
+before-and-after even when nothing is published.
+
+**What it unlocks.** Rewrite deltas per workspace: what was cut, what was added,
+whether the opening line survived, length change, emoji added or stripped, CTA
+changed. That is a model of one business's taste that no brand description
+captures, it accumulates from day one with no evidence floor to clear, and it is
+invisible to anyone outside the product.
+
+**The measure that keeps it honest:** average edit distance per post should FALL
+over months, per workspace. If it does not, the learning is decorative and the
+screen must not claim otherwise. That number is also the customer-facing version
+of the moat — outputs needing less fixing is a thing a person feels.
+
+**SUPERSEDED, 25 August 2026.** The founder's ruling on `wt-core`
+(`docs/workflow/08_ROLES.md`) makes every lane autonomous: writing a migration
+file is free in any lane, and only APPLYING one to production is gated, from
+`wt-core`. So this is no longer an ask parked with somebody else — this lane can
+write it. Left here as the specification; the reason it is still unwritten is
+sequencing, not permission.
+
+---
+
+## 23 · PGlite-backed suites fail under parallel `turbo run test`, and report their tests as SKIPPED
+
+**MEASURED 25 August 2026, on this cloud container.** Not a flake, and it was
+dismissed as one twice before it was diagnosed, which is the reason this entry
+exists.
+
+**It is not one package.** Any suite that boots PGlite in a `beforeAll` can lose
+the race, and which one loses depends on scheduling:
+
+- `packages/billing` — `entitlements.integration.test.ts`,
+  `applyPlanGrant.integration.test.ts`, `webhooks.integration.test.ts`
+- `apps/jobs` — `backfill/store.pglite.test.ts`
+
+Both were seen failing on separate runs of the same command, and both pass alone.
+Each boots a PGlite instance from `packages/db`'s real migration files, and on a
+container this size, with every other package's vitest running beside it, that
+boot does not finish inside the **60-second hook timeout** — the failure reads
+`Hook timed out in 60000ms`.
+
+**The dangerous part is not the failure. It is the reporting.** The run prints:
+
+```
+Test Files  3 failed | 27 passed | 1 skipped (31)
+     Tests  379 passed | 35 skipped (414)
+```
+
+Three files failed and **not one test is listed as failed**. The 22 tests inside
+them are counted as SKIPPED, so a reader comparing "379 passed" against a
+remembered "401 passed" sees a smaller number with no failure beside it. That is
+precisely the failure mode `entitlements.integration.test.ts`'s own header was
+written about: it records that these suites sat behind `describe.skipIf` and had
+**never executed**, while vitest reported the package as 270 passed / 26 skipped,
+because "vitest reports a suite that ran nothing exactly as it reports one that
+passed".
+
+The skip was removed in August. The timeout has quietly reinstated it.
+
+### What was measured, so nobody re-diagnoses it
+
+- The three billing files **pass in isolation**: 3 files, 23 tests, green.
+- `apps/jobs`' `backfill/store.pglite.test.ts` **passes in isolation**: 14 tests,
+  green — after failing inside a parallel run of the same command.
+- `pnpm --filter @sahoda/billing test` **passes**: 401 passed, 13 skipped.
+- Under `turbo run test`, the same package is 379 passed, **35** skipped.
+  The 22-test difference is the three suites.
+- First guess was wrong and is recorded so it is not repeated: this is **not**
+  the missing DNS route to production. `export-drift.test.ts` fails that way
+  (`ENOTFOUND db.rloztdhzfliyvpvxsgjl.supabase.co`) and these do not touch the
+  network at all — `openDbUnderTest()` uses PGlite unless
+  `SAHODA_ALLOW_LIVE_TESTS=1`.
+
+### It makes `pnpm gate` itself unreliable here, which is the real cost
+
+The gate is `turbo run typecheck lint test && turbo run test:smoke && prettier
+--check .`, and its first leg is the parallel run described above. So on a
+container this size the gate can come back with a smaller passing count, no
+failing test named, and a reader with no reason to look twice. CLAUDE.md already
+carries the sentence this repeats: "a suite that ran nothing reports as passing,
+which is how twenty-six billing tests never executed for months."
+
+Until the timeout is fixed, `turbo run test --concurrency=1` is the run to trust
+on this hardware. It is slower and it is honest.
+
+### Why this is not the research lane's to fix
+
+(Still true after the 25 August autonomy ruling: that ruling frees a lane to
+write anything in ITS OWN branch. `packages/billing`'s test configuration is
+another lane's work in flight, and two lanes editing the same concept is the
+silent failure `08_ROLES.md` warns about.)
+
+`git diff origin/wt-core...HEAD -- packages/billing packages/db turbo.json` is
+**empty** on this branch. Nothing here touches billing, the migrations, or the
+turbo configuration.
+
+### What would fix it, for whoever owns it
+
+- Raise the hook timeout for the PGlite suites specifically. A cold PGlite boot
+  is not a 60-second operation because something is wrong; it is a database
+  starting up, and it is competing for one container's CPU.
+- Or make a shared PGlite instance boot once for the package instead of once per
+  suite, which also cuts the wall clock.
+- Raise it wherever PGlite is booted, not only in billing — `apps/jobs` has the
+  same shape and the same failure.
+- **And separately, make a file-level failure impossible to read as a skip.**
+  That is the part that matters beyond this bug: a count of skipped tests that
+  silently includes tests which were supposed to run is the same defect twice in
+  one file's history.
+
+---
+
+## 24. `20260825000000_marketing_observations.sql` is written and NOT applied
+
+The Marketing Brain's one table. Everything above it in the stack is built, gated
+and merged-ready: the computer, the store, the weekly cron, the read, the report
+block, the admin page and the mesh provider. None of it has a table to talk to.
+
+Applying a migration to the one live database is a founder action and there is no
+staging, so this lane stopped at the file. Until it is applied:
+
+- `/api/cron/brain` returns `{ ok: false, error: 'BRAIN_CRON_FAILED' }` on every
+  tick, and the heartbeat still records that the schedule fired — which is
+  correct and is exactly why `recordCronRun` sits outside the try.
+- `/report`'s "What Sahoda noticed" block renders the READ-FAILED sentence, not
+  the empty one. That is the honest arm: nothing has established that this
+  workspace has no observations.
+- `/admin/brain` renders its read-failed arm for the same reason.
+- `e2e/marketing-brain.spec.ts` skips, with the migration named in the skip
+  reason. It probes the TABLE rather than a flag, so the day the migration lands
+  it runs with no edit here and nobody having to remember it exists.
+
+**The command is `supabase db push` against ref `rloztdhzfliyvpvxsgjl`, run by a
+person.** The migration creates one table, one index and two SELECT policies. It
+drops nothing, alters nothing and touches no existing row.
+
+## 25. Playwright cannot run in the claude.ai/code remote sandbox
+
+MEASURED 2026-08-25, and the second measurement corrected the first. What is
+true: Playwright's bundled Chromium cannot complete any **HTTPS** request from a
+cloud session. `https://example.com/` fails with `net::ERR_CONNECTION_RESET`,
+identically to Clerk's host. Every `@smoke` spec signs in through Clerk, so the
+whole smoke leg of `pnpm gate` is unrunnable here.
+
+**It is NOT a certificate problem, and the first version of this entry said it
+was.** The evidence against that reading, all from the same session:
+
+- Chromium loads `http://127.0.0.1:45233/__agentproxy/status` — the agent proxy's
+  own endpoint — with **200**. Loopback is fine.
+- Chromium loads `http://example.com/` over plain HTTP with **200**. Outbound
+  port 80 is fine.
+- Chromium fails every `https://` URL with RESET, with no proxy flag, with
+  `proxy: { server: 'http://127.0.0.1:45233' }`, and with
+  `--proxy-server=… --proxy-bypass-list=<-loopback>`.
+- **The proxy's `recentRelayFailures` stays empty across all of those.** It never
+  saw the attempt.
+- Playwright's Node-side `APIRequestContext` fetches `https://example.com/` with
+  **200** from the same process, through the same proxy.
+
+A CA-trust failure would surface as `ERR_CERT_AUTHORITY_INVALID` and would appear
+in the proxy log, because the tunnel would have been established first. Neither
+happens. Outbound TCP 443 from the Chromium process is being reset before it
+reaches anything.
+
+So `--ignore-certificate-errors` would **not** fix this. It is the wrong remedy
+for the wrong diagnosis, and it is also the one thing nobody should reach for.
+Same for importing the proxy CA into `~/.pki/nssdb`: there is no certificate to
+distrust when there is no connection.
+
+**What would actually fix it** is outside the repo: allow the Chromium process's
+egress on 443, or run the smoke leg somewhere Chromium has ordinary network.
+
+**PARTLY ADDRESSED 2026-08-25.** The `smoke` job on `.github/workflows/gate.yml`
+is exactly that somewhere: a hosted runner with ordinary network, so the leg is
+now runnable by anyone with the repository rather than only by whoever is at a
+laptop. It is `workflow_dispatch` and requires the operator to type the Supabase
+project ref, because the suite writes to production — that guard is not
+loosened by moving the runner.
+
+What is NOT fixed: a cloud session still cannot run the suite itself. It can
+dispatch the job and read the result, which is the difference between "unrunnable"
+and "not runnable here".
+
+## 26. Two mutation-harness tests cannot pass as root, and this sandbox is root
+
+MEASURED 2026-08-25. `scripts/lib/mutation-harness.test.mjs` fails two of its
+twenty-three tests in a claude.ai/code session:
+
+- `refuses the whole run when the scratch directory cannot be used`
+- the sibling case that asserts the same refusal rejects
+
+Both do `chmodSync(scratch, 0o500)` and then expect a write to be refused. The
+session runs as **uid 0**, and root bypasses the permission bits: the write
+succeeds, so the harness does not raise, so the assertion fails. Proven directly
+— a `writeFileSync` into a fresh `0500` directory returns normally here and
+reports `uid 0`.
+
+It is **pre-existing and not caused by any lane**: the same two fail on a clean
+tree at `cc2e5fb`. **CONFIRMED on the runner**, not predicted: `gate.yml` run 2 (commit `3394d38`)
+reports root vitest as **14 files, 218 tests, 0 failed** in 3.72s. The same
+command here reports 2 failed. GitHub's runner is an unprivileged user, so the
+`0500` directory is genuinely unwritable and the harness raises as designed.
+That makes the workflow cover this leg better than any cloud session can, which
+is a second argument for it beyond the first.
+
+**Consequence worth stating plainly:** `pnpm gate`'s stage 2 (root vitest) is red
+in every cloud session, always, for a reason that has nothing to do with the code
+under review. Anyone reporting the gate from a cloud session must say so rather
+than reporting four green legs. I reported four green legs earlier in this lane
+and it was wrong; corrected here and in `docs/54`.
+
+**What would fix it:** make the two tests skip when `process.getuid?.() === 0`,
+with the reason in the skip, so a root run reports "not applicable" instead of
+"failing". That is a change to another lane's file, so it is recorded rather than
+made.
+
+## 27. The gate workflow fired on two pushes and then silently stopped
+
+MEASURED 2026-08-26, within an hour of adding it. `.github/workflows/gate.yml`
+produced runs for `98849d9` (cancelled by the next push) and `3394d38` (green,
+11m31s), and then produced **nothing** for `eb227bb` or `2a5c9d4`. Both commits
+reached the remote — Vercel built and deployed each — and `2a5c9d4`'s check list
+on the pull request held only Vercel's own two entries.
+
+Ruled out by checking rather than by reasoning:
+
+- **Not a broken file.** The YAML parses; the only change between the last
+  firing and the first miss is a comment.
+- **Not disabled.** `GET /actions/workflows` reports `state: active`.
+- **Not an account-wide Actions block.** `post-deploy smoke` ran at 04:35 and
+  04:37, `status page` at 04:30.
+- **Not unrunnable.** A manual `workflow_dispatch` on the same head started
+  immediately and went green (run 3, 10m41s).
+
+So the workflow is fine and the `pull_request` synchronize event did not arrive
+twice in a row. **The cause is unknown.** The tempting story — that pushes made
+with a session's proxy-injected GitHub credentials do not raise the event — does
+not survive the first two runs, which came from the same credentials on the same
+branch.
+
+**What was done about it:** the trigger no longer depends on that event. `on:
+push` now covers every branch, because a push is the thing that certainly
+happened: the commit is on the remote. `pull_request` is kept for anything
+arriving without a push here. VERIFIED: runs 4 and 5 both fired automatically on
+`push`, seconds after their commits landed.
+
+**And a mistake made in the same change, since it took four minutes to appear.**
+The concurrency group was first keyed on the head COMMIT, to collapse the
+push/pull_request pair for one commit into one run. It does that, and it also
+stops a newer push cancelling an older run, because two commits are two groups.
+MEASURED at once: amending a commit left run 4 grinding through twelve minutes
+for a SHA no longer on the branch. Keying on `github.head_ref || github.ref` —
+the BRANCH from either event — gets both halves right, and is the idiom for
+exactly this pair of triggers.
+
+**Why this is recorded rather than closed:** a check that silently does not run
+is worse than no check, because the pull request looks covered. If a run goes
+missing again after this change, the `push` event has failed too and the next
+step is to stop trusting the Actions UI as evidence — a lane's own
+`pnpm gate` output is then the only thing that says the gate ran.

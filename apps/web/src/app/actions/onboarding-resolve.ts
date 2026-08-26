@@ -182,11 +182,23 @@ export async function resolveOnboarding(
       return { ok: false, kind: 'error', message: 'Pick what you are before resolving.' }
     }
 
+    const field = (key: string): string => String(formData.get(key) ?? '')
+
     const input = toResolveInput({
       intake: intake.data,
-      doorText: String(formData.get('doorText') ?? ''),
-      refusal: String(formData.get('refusal') ?? ''),
-      name: String(formData.get('name') ?? '') || workspace.name,
+      doorText: field('doorText'),
+      refusal: field('refusal'),
+      name: field('name') || workspace.name,
+      // Collected across screens 02 and 03 and, until now, dropped here: the
+      // form carried six values and the rest of what a person typed reached
+      // nothing. Absent keys stay absent — `toResolveInput` treats each as
+      // optional and contributes no clause for a blank.
+      positioning: field('positioning'),
+      audience: field('audience'),
+      audienceAge: field('audienceAge'),
+      audienceLoc: field('audienceLoc'),
+      audienceRole: field('audienceRole'),
+      audienceInterests: field('audienceInterests'),
     })
 
     const args: ResolveArgs = { workspaceId: workspace.id, userId, input }
