@@ -256,8 +256,22 @@ describe.skipIf(!hasRlsEnv)('public.upsert_connection', () => {
   })
 
   it('rejects a bad platform, a missing account id, and a non-object secret', async () => {
-    const badPlatform = await upsert(owner, { p_platform: 'instagram' })
-    expect(badPlatform.error!.message).toContain('INVALID_PLATFORM')
+    // 'facebook' and NOT 'instagram'. Instagram was outside the vocabulary when
+    // this test was written and stopped being so on 2026-08-01, when
+    // 20260801000001_widen_connection_platform.sql widened both the table CHECK
+    // and this RPC's guard to ['x','gbp','linkedin','instagram'] in one
+    // transaction. The database has been right and this line wrong ever since;
+    // it only surfaced when a worktree finally had the .env that stops
+    // `describe.skipIf(!hasRlsEnv)` skipping the whole suite.
+    //
+    // Read the rejection out of the RPC rather than dereferencing null: an
+    // absent error made this fail as `Cannot read properties of null` — an
+    // accidental TypeError wearing a guard's clothes, which says nothing about
+    // WHAT the database did.
+    const badPlatform = await upsert(owner, { p_platform: 'facebook' })
+    expect(badPlatform.error?.message ?? 'NO ERROR — the RPC ACCEPTED it').toContain(
+      'INVALID_PLATFORM',
+    )
 
     const noId = await upsert(owner, { p_external_account: { handle: 'no-id' } })
     expect(noId.error!.message).toContain('INVALID_ACCOUNT')
