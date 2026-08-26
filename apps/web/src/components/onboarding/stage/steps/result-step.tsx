@@ -13,6 +13,8 @@ export interface ResultStepProps {
   wasFree: boolean
   /** Set when the model could not be reached and a sample was shown instead. */
   fallbackMessage: string | null
+  /** What did not save after the build — a competitor, a source, or both. `null` when all of it did. */
+  afterBuildNote: string | null
   saving: boolean
   /** The BRAIN failed to save. This blocks entry. */
   saveError: string | null
@@ -36,6 +38,7 @@ export function ResultStep({
   door,
   wasFree,
   fallbackMessage,
+  afterBuildNote,
   saving,
   saveError,
   themeError,
@@ -43,7 +46,10 @@ export function ResultStep({
   onReview,
 }: ResultStepProps) {
   const c = confidenceOf(data)
-  const knowledge = data.sources.length + data.docs.length
+  // Sources only. `docs` used to be added here, and an uploaded file was
+  // `{ name, size }` with no bytes — so a person who dropped in three PDFs was
+  // told Sahoda had three more sources to draw on than it had.
+  const knowledge = data.sources.length
 
   // Animated from 0 so the bar reads as a measurement being taken. The VALUE is
   // computed above and never moves; only its rendering is deferred a frame.
@@ -66,7 +72,6 @@ export function ResultStep({
       </>,
     ],
     ['Knowledge', knowledge ? `${knowledge} source${knowledge === 1 ? '' : 's'}` : 'None yet'],
-    ['References', data.refs.length ? `${data.refs.length} queued` : 'None yet'],
     [
       'Confidence',
       <div className="conf">
@@ -103,11 +108,7 @@ export function ResultStep({
   if (knowledge) {
     bits.push(
       <>
-        I have {knowledge} knowledge source{knowledge === 1 ? '' : 's'} to draw on
-        {data.refs.length
-          ? `, plus ${data.refs.length} reference${data.refs.length === 1 ? '' : 's'} to study`
-          : ''}
-        .
+        I have {knowledge} knowledge source{knowledge === 1 ? '' : 's'} to draw on.
       </>,
     )
   }
@@ -144,6 +145,10 @@ export function ResultStep({
       {door.kind === 'unread' ? <p className="hint">{door.message}</p> : null}
       {door.kind === 'blocked' ? <p className="hint">{door.message}</p> : null}
       {fallbackMessage ? <p className="hint">{fallbackMessage}</p> : null}
+      {/* Shown beside the fallback note and not folded into it: a model that
+          could not be reached and a competitor that did not save are different
+          failures, and one sentence covering both would be true of neither. */}
+      {afterBuildNote ? <p className="hint">{afterBuildNote}</p> : null}
       {wasFree ? (
         <p className="hint">Your first Brand Brain was free. Nothing was charged.</p>
       ) : null}

@@ -28,6 +28,7 @@
         "SUPABASE_DB_URL",
         "SUPABASE_SERVICE_ROLE_KEY",
         "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
         "E2E_PORT",
         "E2E_SERVER_CMD",
         "SAHODA_E2E_ACK_TARGET"
@@ -100,7 +101,10 @@
         "TURNSTILE_SECRET_KEY",
         "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
         "ZERNIO_API_KEY",
-        "NEXT_PUBLIC_APP_URL"
+        "NEXT_PUBLIC_APP_URL",
+        "APIFY_TOKEN",
+        "ZYTE_API_KEY",
+        "SAHODA_RADAR_SCAN_MODE"
       ]
     },
     "dev": {

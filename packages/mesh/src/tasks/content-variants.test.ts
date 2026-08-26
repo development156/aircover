@@ -87,4 +87,11 @@ describe('contentVariantsTask', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error.code).toBe('PROVIDER_ERROR')
   })
+  it('retrieves library passages against the canonical body only', () => {
+    // Not the channel limits: those are our own framing, and words like
+    // "hashtags" and "chars" would match passages about nothing the post is for.
+    const query = contentVariantsTask.knowledgeQuery?.(input)
+    expect(query).toBe(input.body)
+    expect(query).not.toContain('hashtags')
+  })
 })

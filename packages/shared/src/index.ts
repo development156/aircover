@@ -27,6 +27,7 @@ export * from './playbooks/festivals'
 export * from './ledger/pricing'
 export * from './ledger/entries'
 export * from './billing/plans'
+export * from './billing/currency'
 export * from './billing/gst'
 export * from './billing/lifecycle'
 export * from './billing/withCredits'
@@ -55,3 +56,7 @@ export * from './ops/qa-export'
 
 export * from './radar/snapshot'
 export * from './radar/diff'
+
+// The Marketing Brain (docs/51, docs/53) — computed observations about how a
+// brand is performing. Stored apart from the Brand Brain and never user-edited.
+export * from './brain/observations'

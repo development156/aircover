@@ -299,6 +299,12 @@ const SHAPE_OVERRIDES: Readonly<Record<string, Readonly<Record<string, string>>>
     bytes: '1',
     recipe: "'0-0-1-1-jpg-1'",
   },
+  // `check (evidence ? 'data' and evidence ? 'postIds')` — the Marketing Brain
+  // refuses a claim with no arithmetic behind it. That is a rule about the
+  // CONTENTS of a jsonb value, and the ladder's only jsonb rung is `'{}'`, which
+  // is precisely the value the check exists to reject. Empty arrays satisfy the
+  // key requirement without pretending the fixture has real evidence in it.
+  marketing_observations: { evidence: `'{"data": [], "postIds": []}'::jsonb` },
 }
 
 function candidates(

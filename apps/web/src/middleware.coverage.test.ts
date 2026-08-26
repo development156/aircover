@@ -154,6 +154,17 @@ const EXPECTED_PUBLIC_EXCLUDED = new Set([
   '/api/cron/metrics',
   '/api/cron/loop',
   '/api/cron/playbooks',
+  // Added 2026-08-25 with the weekly Radar scan. It is the FIFTH cron and the
+  // first one that spends money on a provider, so a missing exemption here would
+  // not merely report a green heartbeat over a 307 — it would report a green
+  // heartbeat over a scan that never collected anything, for weeks, while the
+  // pages it was meant to be watching changed and were never read again.
+  '/api/cron/radar',
+  // Added 2026-08-25 with the Marketing Brain's weekly pass. On the rail for the
+  // same reason as its four siblings: Vercel cron presents CRON_SECRET as an
+  // Authorization header and does not follow redirects, so without the exemption
+  // every tick is a 307 to /sign-in that the heartbeat records as a run.
+  '/api/cron/brain',
   '/api/webhooks/cashfree',
   '/api/webhooks/clerk',
   // Added 2026-08-23. It arrived on `isPublicRoute` with the wt-webhooks merge and

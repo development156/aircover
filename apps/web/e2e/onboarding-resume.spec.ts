@@ -100,25 +100,30 @@ test('the resumed session does not inflate the signal count', async ({ page, sig
   await bootstrapWorkspace(page)
   await answerThroughToVisual(page)
 
-  // Add references — the shape the source double-counted, because it persisted
-  // the counter and re-added each card on resume with an empty `seen` Set.
+  // Add list-shaped signals — the shape the source double-counted, because it
+  // persisted the counter and re-added every item on resume with an empty
+  // `seen` Set. This was written against the References screen, which has been
+  // removed; the knowledge tiles are the same shape (one signal per item, added
+  // on the way past) and are what the defect would recur on now.
   await page.getByRole('button', { name: /^Continue$/ }).click()
-  for (const url of ['https://instagram.com/a', 'https://pinterest.com/b']) {
-    await page.locator('#f-ref').fill(url)
-    await page.locator('#f-ref').press('Enter')
-  }
+  await pwExpect(
+    page.getByRole('heading', { name: /what should your AI already know/i }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: /^Website\b/ }).click()
+  await page.getByRole('button', { name: /^Instagram/ }).click()
   const before = await page.locator('[data-onb-signals]').getAttribute('data-onb-signals')
 
   await page.getByRole('button', { name: /save & exit/i }).click()
   await page.waitForURL(/\/home/, { timeout: 30_000 })
   await page.goto('/onboarding')
-  await pwExpect(page.getByRole('heading', { name: /what .good. looks like/i })).toBeVisible({
-    timeout: 30_000,
-  })
+  await pwExpect(
+    page.getByRole('heading', { name: /what should your AI already know/i }),
+  ).toBeVisible({ timeout: 30_000 })
 
   const after = await page.locator('[data-onb-signals]').getAttribute('data-onb-signals')
   expect(after).toBe(before)
   // Named, so a regression reads as arithmetic rather than as a mismatch.
+  // name + what + audience + two sources.
   expect(Number(after)).toBe(5)
 })
 

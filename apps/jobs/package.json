@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./sweeps": "./src/sweeps.ts",
-    "./publish": "./src/publish.ts"
+    "./publish": "./src/publish.ts",
+    "./radar": "./src/radar.ts"
   },
   "types": "./src/index.ts",
   "scripts": {
