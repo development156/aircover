@@ -34,7 +34,20 @@ git fetch --all --prune
 git checkout "$LANE" 2>/dev/null || git checkout -b "$LANE" "origin/$LANE"
 git branch --show-current                 # VERIFY — never assume a checkout worked
 git pull --ff-only origin "$LANE"
+
+node scripts/lane-sync.mjs pull           # take wt-core into this lane
 ```
+
+`lane-sync pull` merges `wt-core` and resolves the three conflict classes that
+are provably mechanical: two lanes that each wrote a handoff (keeps **both**),
+two sides that differ only by formatting (prettier decides), and a generated
+artifact (names the regeneration command rather than picking a side).
+
+**It stops on anything else, and that is the feature.** On 26 August five lanes
+carried a formatting-only fix to one file and a sixth carried a real one. They
+looked identical to git. A rule that picks a side would have taken the
+formatting fix five times and thrown the real fix away with nothing failing.
+When it stops: read **both** sides before touching either.
 
 If `--ff-only` refuses, this lane diverged from the remote. **Say so and stop.**
 Someone else pushed into it, and merging past that on a guess is how work gets
