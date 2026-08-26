@@ -52,7 +52,9 @@ describe('every figure is read from the engine that enforces it', () => {
 
 describe('a channel with no adapter states no limits at all', () => {
   it('renders no invented figure for a planned channel', () => {
-    const { rows } = channelDetailContent(ENTRY.facebook, 0)
+    // RETARGETED from facebook, which became a real channel on 2026-08-26. The
+    // guarantee is unchanged; the example moved to one that is still planned.
+    const { rows } = channelDetailContent(ENTRY.pinterest, 0)
 
     // `CONSTRAINTS` has no entry to read, and a plausible-looking number that no
     // engine enforces is the fabricated-figure failure this project has hit before.
@@ -67,7 +69,8 @@ describe('a channel with no adapter states no limits at all', () => {
   })
 
   it('says plainly that connecting is not possible', () => {
-    const { rows } = channelDetailContent(ENTRY.telegram, 0)
+    // RETARGETED from telegram for the same reason as above.
+    const { rows } = channelDetailContent(ENTRY.pinterest, 0)
     expect(rows[0]?.detail).toMatch(/cannot post here yet/i)
   })
 })

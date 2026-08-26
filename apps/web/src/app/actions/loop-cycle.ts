@@ -10,6 +10,7 @@ import {
   toChannelSet,
   type Channel,
   type WithCreditsFn,
+  ChannelSchema,
 } from '@sahoda/shared'
 
 import { reportPaidActionFailure } from '@/lib/actions/paid-failure'
@@ -111,8 +112,14 @@ async function connectedChannels(
   // A read we could not complete is NOT an empty channel list — see the note
   // above. Checked BEFORE anything is derived from `data`.
   if (error) return null
+  // FILTERED THROUGH THE SCHEMA, not through a literal list restated here.
+  // This was `['x','gbp','linkedin','instagram'] as const`, a fifth copy of the
+  // channel vocabulary — and when facebook and telegram were added it silently
+  // dropped both from every Loop decision while typechecking cleanly against a
+  // `Channel` that no longer matched it. `ChannelSchema.options` cannot drift
+  // from the enum it is.
   const rows = (data ?? []).filter((row) =>
-    (['x', 'gbp', 'linkedin', 'instagram'] as const).includes(row.platform as Channel),
+    (ChannelSchema.options as readonly string[]).includes(row.platform as string),
   )
   const pick = (match: (status: string) => boolean): Channel[] => [
     ...toChannelSet(

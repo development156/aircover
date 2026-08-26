@@ -257,6 +257,38 @@ export interface ZernioClient {
   /** `GET /connect/{platform}` → the URL to send the user to. */
   connectUrl(platform: string, profileId: string, redirectUrl: string): Promise<string>
   listAccounts(profileId: string): Promise<ZernioAccount[]>
+  /**
+   * Disconnect a connected social account AT ZERNIO.
+   *
+   * ── THIS ENDPOINT WAS BELIEVED NOT TO EXIST ────────────────────────────────
+   * Five places in this repository stated, in the strongest terms, that Zernio
+   * offered no way to remove an account: `REQUESTS.md` §29 finding 7 called it
+   * "NOT FIXABLE HERE", `docs/38_Data_Handling.md` recorded that a customer's
+   * data survives erasure at Zernio because of it, and a permanent test in
+   * `apps/web/src/app/api/oauth/zernio/return/route.test.ts` carried it as a
+   * header comment. Every one of those was reasoning from THIS FILE's surface
+   * rather than from Zernio's spec.
+   *
+   * MEASURED 2026-08-26 against `https://docs.zernio.com/api/openapi`
+   * (2,379,342 bytes, 411 top-level paths, 64 of them under `/v1/accounts`):
+   *
+   *   /v1/accounts/{accountId}  →  PUT, PATCH, DELETE
+   *   operationId: deleteAccount
+   *   summary: "Disconnect account"
+   *   description: "Disconnects and removes a connected social account."
+   *   responses: 200 { message }, 401, 404
+   *
+   * Nobody had ever scanned the spec for it. The lesson is recorded in
+   * `docs/13` §11 rather than here: an absence in our client is not an absence
+   * in their API, and the difference cost this product a real privacy gap.
+   *
+   * ── THE ACCOUNT ID MUST BE SCOPED BEFORE IT REACHES HERE ───────────────────
+   * doc 13 §3: Zernio validates an accountId against your whole TEAM, not
+   * against the profile in the request. So a mis-scoped id here does not error
+   * — it disconnects ANOTHER CUSTOMER'S account and returns 200. Callers must
+   * pass an id that came from a query already scoped to their workspace.
+   */
+  disconnectAccount(accountId: string): Promise<void>
   presignMedia(input: {
     filename: string
     contentType: string
@@ -454,6 +486,36 @@ export function createZernioClient(deps: ZernioClientDeps): ZernioClient {
         return data.accounts ?? []
       } catch (err) {
         if (err instanceof ZernioError && err.status === 404) return []
+        throw err
+      }
+    },
+
+    async disconnectAccount(accountId) {
+      // Same shape guard `listAccounts` puts on a profileId, and for a sharper
+      // reason: this call DESTROYS a connection. A malformed id that reached
+      // Zernio would be a DELETE against an unvalidated path segment.
+      if (!ZERNIO_ID_RE.test(accountId)) {
+        throw new ZernioError({
+          message: 'disconnectAccount: accountId must be a 24-char hex Zernio id.',
+          status: 0,
+          code: 'INVALID_ACCOUNT_ID',
+          type: 'client_error',
+          rateLimit: { limit: null, remaining: null, reset: null },
+        })
+      }
+      try {
+        await json<{ message?: string }>(
+          'DELETE',
+          `/accounts/${encodeURIComponent(accountId)}`,
+          'disconnectAccount',
+        )
+      } catch (err) {
+        // 404 IS SUCCESS HERE, and that is a deliberate reading. The caller's
+        // intent is "this account must not be connected"; an account Zernio has
+        // already forgotten satisfies it. Treating it as a failure would make a
+        // retry after a half-completed disconnect permanently red, and would
+        // block our own row from being deleted on the second attempt.
+        if (err instanceof ZernioError && err.status === 404) return
         throw err
       }
     },

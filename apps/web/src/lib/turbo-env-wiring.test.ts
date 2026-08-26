@@ -78,6 +78,11 @@ const SYSTEM_ENV: ReadonlySet<string> = new Set([
   'VERCEL',
   'VERCEL_ENV',
   'VERCEL_URL',
+  // The STABLE per-branch alias, e.g. `app-git-my-branch-team.vercel.app`.
+  // Platform-set like the two above, and read at REQUEST time by
+  // `lib/zernio/return-url.ts` so a preview deployment tells Zernio to send the
+  // customer back to the branch they were actually on rather than to production.
+  'VERCEL_BRANCH_URL',
   'VERCEL_REGION',
   'VERCEL_GIT_COMMIT_SHA',
 ])

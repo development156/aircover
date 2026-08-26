@@ -142,7 +142,22 @@ export async function POST(request: Request): Promise<Response> {
       return fail('Couldn’t start the connection. Try again.', 500)
     }
 
-    const authUrl = await client.connectUrl(platform, profileId, zernioReturnUrl())
+    // ── REFUSE RATHER THAN SEND THEM SOMEWHERE THAT CANNOT RECEIVE THEM ──────
+    // `zernioReturnUrl()` is null when no environment variable can name an
+    // absolute origin. It used to fall back to `''`, producing the relative
+    // `/api/oauth/zernio/return`, which Zernio resolves against its OWN host —
+    // so the customer approved access at the platform and was returned to
+    // zernio.com. Stopping here costs them nothing; the grant they would have
+    // given is real and cannot be taken back.
+    const returnTo = zernioReturnUrl()
+    if (!returnTo) {
+      return fail(
+        'Connecting isn’t available right now. This deployment has no return address.',
+        503,
+      )
+    }
+
+    const authUrl = await client.connectUrl(platform, profileId, returnTo)
 
     // ── THE ONLY RECORD OF WHAT THE CUSTOMER ASKED FOR ────────────────────────
     // Set LAST, after every refusal above has had its chance. A cookie written
