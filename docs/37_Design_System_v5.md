@@ -100,10 +100,31 @@ over the contrast floor. It is a deliberate trade, not an oversight, and it
 should not be quietly reverted by anyone reading only the numbers.
 
 **What it costs.** AA wants 4.5:1 for body text and 3:1 for large text; `#f60`
-clears neither on any of the three light grounds. So orange alone is no longer an
-accessible affordance on light: anywhere the colour is the ONLY signal that
-something is a link or an action, pair it with an underline, a weight step or an
-icon.
+clears neither on any light ground. So orange alone is no longer an accessible
+affordance on light: anywhere the colour is the ONLY signal that something is a
+link or an action, pair it with an underline, a weight step or an icon.
+
+**The flat grounds are not the worst case.** Accent text most often sits on a
+tint, and a tint darkens the ground. Shipped value first, previous in brackets:
+
+| ground under `text-accent` | `#f60` | (`#bd4b00`) |
+|---|---|---|
+| `--t50` 6% over `#ffffff` → `#fff6f0` | **2.75:1** | 4.72:1 |
+| `--t50` 6% over `#fafafa` → `#faf1eb` | **2.63:1** | 4.52:1 |
+| `--t100` 16% over `#ffffff` → `#ffe7d6` | **2.47:1** | 4.23:1 |
+| `--t100` 16% over `#f2f2f3` → `#f4dccc` | **2.23:1** | 3.83:1 |
+
+**2.23:1 is the real floor, not the 2.62:1 the flat table shows.** The settings
+section nav — the pill that prompted this ruling — is the 2.75:1 row.
+
+**It is not only text.** `--acc` also paints `border-accent` and
+`outline-accent` at four admin call sites. Those are non-text UI boundaries;
+WCAG 1.4.11 wants 3:1 and they now measure **2.94:1**, having been 5.04:1. That
+is the same 0.06 miss `tokens.css` cites as the reason the global focus ring is
+an ink core plus an orange halo rather than plain orange, so those four sites now
+do what that note forbids and no spec covers the admin routes. **Open, pending a
+ruling** — and it must not be closed by darkening `--acc`, which would reverse
+the ruling above by the back door.
 
 The history is worth keeping, because it shows how tight the room was. `--acc`
 was **re-solved for v5** when the ground moved: v4's `#c95100` measures

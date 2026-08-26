@@ -98,18 +98,41 @@ export const TOKENS_CSS = `/* ==================================================
      they were put in writing. It is a deliberate trade, not an oversight, and
      it must not be quietly reverted by anyone who reads only the numbers.
 
-     WHAT THE TRADE COSTS, MEASURED — every one of these is a real shortfall:
+     WHAT THE TRADE COSTS, MEASURED — every one of these is a real shortfall.
+
+     THE FLAT GROUNDS:
 
        #ff6600  (SHIPPED) on #ffffff 2.94:1 · #fafafa 2.81:1 · #f2f2f3 2.62:1
        #bd4b00  (was)         5.04:1 / 4.82:1 / 4.50:1 — cleared AA on all three
        #c95100  (v4's value)  4.51:1 / 4.32:1 / 4.03:1 — rejected for v5 as BELOW AA
 
+     AND THE TINTED GROUNDS, WHICH ARE WHERE ACCENT TEXT MOST OFTEN SITS — the
+     settings section nav, badges, empty states, the palette, status marks. An
+     earlier draft of this note listed only the flat three and read as complete;
+     it understated the real floor by 0.39 and named 2.62 as the worst case when
+     the worst case is 2.23. Composited, SHIPPED value first, (was) second:
+
+       --t50  6%  over #ffffff → #fff6f0   2.75:1   (4.72:1)  ← the settings pill
+       --t50  6%  over #fafafa → #faf1eb   2.63:1   (4.52:1)
+       --t100 16% over #ffffff → #ffe7d6   2.47:1   (4.23:1)
+       --t100 16% over #f2f2f3 → #f4dccc   2.23:1   (3.83:1)  ← the real floor
+
      WCAG AA body text wants 4.5:1 and large text wants 3:1. The shipped value
-     clears NEITHER on any of the three grounds. Accent text is therefore a
+     clears NEITHER on ANY ground, flat or tinted. Accent text is therefore a
      legibility risk wherever it carries meaning a reader must actually read,
      and it is no longer safe to treat "it is orange, so it is a link" as an
      accessible affordance on its own — pair it with an underline, a weight
      step or an icon anywhere the colour is the only signal.
+
+     NOT ONLY TEXT. \`--acc\` also paints a few BORDERS and focus outlines
+     (\`border-accent\`, \`outline-accent\` — four admin call sites at the time of
+     the ruling). Those are non-text UI boundaries: WCAG 1.4.11 wants 3:1 and
+     they now measure 2.94:1 on white, having been 5.04:1. That is the same
+     0.06 miss the FOCUS RING note further down this file cites as the reason
+     the global ring is an ink core plus an orange halo rather than plain
+     orange. Those four sites now do what that note forbids, and no spec covers
+     the admin routes. Left standing pending a ruling — do not "fix" it by
+     darkening --acc, which would reverse the ruling above by the back door.
 
      Dark is unaffected and always was: --acc is #ff6600 there too, and on
      #171717 it measures 6.11:1. This ruling closes the gap between the themes
