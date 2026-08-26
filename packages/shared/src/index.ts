@@ -46,6 +46,9 @@ export * from './assets/delete-gate'
 // membership that can drift from the rows it claims to describe).
 export * from './assets/organize'
 export * from './assets/folder-tree'
+// What you type in the search box, compiled into the rules above. This is what
+// replaced the smart-folder rule builder: same engine, no modal.
+export * from './assets/search-tokens'
 export * from './publishing/constraints'
 export * from './publishing/adapter'
 export * from './publishing/schedule'
