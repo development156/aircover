@@ -130,6 +130,10 @@ export async function runCreateStage(cycleId: string): Promise<CreateStageState>
             workspace_id: workspaceId,
             title: brief.title,
             body: brief.body,
+            // Draft capture (REQUESTS.md §22). `loop_briefs` holds the brief;
+            // this holds the body as generated, so the customer's later edit
+            // can be measured against it without a join to the brief table.
+            generated_body: brief.body,
             status: level === 2 ? 'approved' : 'draft',
             channels: [...brief.channels],
             scheduled_at: level === 2 ? brief.suggested_slot : null,
