@@ -1722,17 +1722,82 @@ happened: the commit is on the remote. `pull_request` is kept for anything
 arriving without a push here. VERIFIED: runs 4 and 5 both fired automatically on
 `push`, seconds after their commits landed.
 
-**And a mistake made in the same change, since it took four minutes to appear.**
-The concurrency group was first keyed on the head COMMIT, to collapse the
-push/pull_request pair for one commit into one run. It does that, and it also
-stops a newer push cancelling an older run, because two commits are two groups.
-MEASURED at once: amending a commit left run 4 grinding through twelve minutes
-for a SHA no longer on the branch. Keying on `github.head_ref || github.ref` —
-the BRANCH from either event — gets both halves right, and is the idiom for
-exactly this pair of triggers.
+**And the concurrency group on that same line was wrong TWICE.** Recorded in
+full, because the second version is the kind that reads correctly:
+
+1. Keyed on the head COMMIT, to collapse the push/pull_request pair. It does
+   that, and it also stops a newer push cancelling an older run, because two
+   commits are two groups. MEASURED at once: amending a commit left run 4
+   grinding twelve minutes for a SHA no longer on the branch.
+2. Keyed on `github.head_ref || github.ref`. This looks right and is not. On a
+   push `github.ref` is `refs/heads/<branch>`; on a pull request `head_ref` is
+   the bare `<branch>`. Two strings, two groups, nothing collapses. MEASURED on
+   the three-lane merge: SEVEN gate runs in flight, of which three were
+   push/pull_request PAIRS for the same branch at the same SHA — lead-research,
+   advisor and design each running the same eleven minutes twice.
+3. `github.head_ref || github.ref_name` is correct. `ref_name` is the bare
+   branch name, which is what `head_ref` already is.
+
+`scripts/lib/ci-gate-coverage.test.mjs` now asserts the exact expression, and
+names both wrong ones. Three mutations, all red: back to version 2, back to
+version 1, and the block deleted.
 
 **Why this is recorded rather than closed:** a check that silently does not run
 is worse than no check, because the pull request looks covered. If a run goes
 missing again after this change, the `push` event has failed too and the next
 step is to stop trusting the Actions UI as evidence — a lane's own
 `pnpm gate` output is then the only thing that says the gate ran.
+
+## 28. The gate's concurrency group never collapses the push/pull_request pair, so every commit runs it twice
+
+**Owed to:** whoever owns `.github/workflows/gate.yml` — §27's author, who is
+actively iterating on it. **I have not changed the file.** Reporting only,
+because editing another lane's live surface mid-iteration is how two designs of
+one thing both survive, and this lane already lost a design that way today.
+
+MEASURED 2026-08-26 on `claude/divas-kickoff-03y2g2`, head `2244c97`. Two gate
+runs, both `in_progress`, same head, same workflow:
+
+| run | event          | id          |
+| --- | -------------- | ----------- |
+| 106 | `pull_request` | 32950279065 |
+| 107 | `push`         | 32950281597 |
+
+§27 added `on: push` because the `pull_request` event went missing twice, kept
+`pull_request` as well, and keyed concurrency on the branch specifically so the
+pair would collapse into one run. The comment in the file states that outcome as
+achieved. **It is not**, and the reason is one expression:
+
+```yaml
+concurrency:
+  group: gate-${{ github.head_ref || github.ref }}
+```
+
+`github.head_ref` is the bare branch on a `pull_request` and **empty on a
+push**, where the fallback `github.ref` is a **fully qualified ref**. So the two
+events produce two different group names for the same branch:
+
+```
+pull_request -> gate-claude/divas-kickoff-03y2g2
+push         -> gate-refs/heads/claude/divas-kickoff-03y2g2
+```
+
+Two groups never cancel each other. The half §27 did fix works: within the push
+group, runs 93, 95 and 103 were each cancelled by the next push, exactly as
+intended. Only the cross-event collapse fails.
+
+**The cost is the shared quota.** `08_ROLES.md` records that all three people
+draw on one usage pool. Every commit on every branch with an open pull request
+currently runs the full gate twice, and the run is 10 to 12 minutes.
+
+**The fix is one token:** `github.ref_name` is the branch name without the
+`refs/heads/` prefix, so both events resolve to the same string.
+
+```yaml
+group: gate-${{ github.head_ref || github.ref_name }}
+```
+
+**How to prove it rather than assume it**, since the current comment is a claim
+nobody watched fail: push a commit to a branch with an open pull request and
+count the runs on that head. Two today, one after. That check is the whole test,
+and it is the reason this entry exists rather than a silent patch.

@@ -45,3 +45,11 @@ apps/web/playwright-report/
 # one quote. That is a corruption, not a reformat, so the file is excluded
 # rather than rewritten. Re-check after any upstream resync.
 .agents/skills/humanizer/
+
+# Tool scratch. Prettier does NOT read .gitignore, so a file git already ignores
+# still fails `prettier --check .` and turns the format leg red with nothing
+# wrong in the code. MEASURED 2026-08-26: the Stop-hook gate went red on
+# .remember/tmp/last-save.json, which .remember/.gitignore already ignores.
+.remember/
+.playwright-mcp/
+.claude/worktrees/
