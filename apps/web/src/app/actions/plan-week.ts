@@ -166,10 +166,17 @@ export async function planMyWeek(goals: unknown, channels: unknown): Promise<Pla
           const briefChannels = clampChannels(brief.channels, requested)
           const slot = normalizeSlot(brief.suggestedSlot, briefChannels, now, index)
           if (slot.clamped) clamped += 1
+          // Draft capture (REQUESTS.md §22). `generated_body` is the CLAMPED
+          // text, the same value `body` is given, and deliberately not the raw
+          // model output: the clamp is ours, so charging it to the customer's
+          // edit distance would report a change nobody made. What is stored is
+          // exactly what the customer was first shown.
+          const generated = clampBriefText(brief.body, BRIEF_BODY_MAX_CHARS)
           return PostInsertSchema.parse({
             workspace_id: workspace.id,
             title: clampBriefText(brief.title, BRIEF_TITLE_MAX_CHARS),
-            body: clampBriefText(brief.body, BRIEF_BODY_MAX_CHARS),
+            body: generated,
+            generated_body: generated,
             status: 'draft',
             channels: briefChannels,
             scheduled_at: slot.scheduledAt,
