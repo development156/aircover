@@ -4,6 +4,7 @@ import type { Channel, ContentVariantsOutput, MeshContext, MeshTaskDef } from '@
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
 import { PROSE_RULES } from '../prose-rules'
+import { SEARCH_SURFACE_RULE, SEO_RULES } from '../seo-rules'
 
 /** 2048: measured 925 x 1.4 (token-budget.ts). 1024 left 10% headroom. */
 const MAX_TOKENS = 2048
@@ -22,6 +23,8 @@ Output ONLY a JSON object matching:
 Rules: exactly one variant per requested channel; stay within each channel's character
 limit; follow each platform's norms for hashtags, links, and (GBP) call-to-action; keep
 the core message and the brand voice. No markdown, no commentary.
+${SEO_RULES}
+${SEARCH_SURFACE_RULE}
 ${PROSE_RULES}`
 
 /** One-line limit brief per channel, sourced from the shared Constraint Engine (one source of truth). */
