@@ -19,13 +19,29 @@ export interface PlanCatalogEntry {
   name: string
   monthlyCredits: number
   priceInr: number
-  priceUsd: number
   limits: PlanLimits
 }
 
 /**
- * Canonical plan catalog (PRD §7.1). The single source for the `plans` table seed
- * and for entitlement reads. (Action credit costs are separate — see pricing.ts.)
+ * Canonical plan catalog. The single source for the `plans` table seed and for
+ * entitlement reads. (Action credit costs are separate — see pricing.ts.)
+ *
+ * Repriced 2026-08-24 from the business model deck, which supersedes PRD §7.1 for
+ * every figure below. Note that the credit allowances went DOWN as the prices went
+ * up (Growth 5,000 to 4,000; Studio 15,000 to 12,000): this is a reprice, not an
+ * increase, so any copy that calls a higher tier "more credits" is now wrong.
+ *
+ * THERE IS NO `priceUsd`. It was removed on 2026-08-24 and replaced by a live
+ * conversion — see `currency.ts`. It had been a second hand-set price sitting
+ * 17 to 19 percent above what the rupee price actually converted to, and it
+ * drifted on its own terms because nothing tied it to a rate. Every plan is
+ * billed in RUPEES; a figure in any other currency is an approximation of a
+ * rupee charge and must be rendered as one.
+ *
+ * The deck also states these prices are GST INCLUSIVE. That claim is NOT encoded
+ * here, deliberately: `GstSupplierConfig.priceIncludesTax` is the field that decides
+ * it, and gst.ts calls it a tax opinion the founder confirms with a CA. A price
+ * constant cannot settle a tax treatment.
  */
 export const PLAN_CATALOG: Record<PlanId, PlanCatalogEntry> = {
   free: {
@@ -33,32 +49,36 @@ export const PLAN_CATALOG: Record<PlanId, PlanCatalogEntry> = {
     name: 'Free',
     monthlyCredits: 100,
     priceInr: 0,
-    priceUsd: 0,
     limits: { channels: 2, sites: 0, seats: 1, loopLevel: 1, twinSize: 0 },
   },
   starter: {
     id: 'starter',
     name: 'Starter',
     monthlyCredits: 1500,
-    priceInr: 499,
-    priceUsd: 12,
+    priceInr: 1999,
     limits: { channels: 4, sites: 1, seats: 1, loopLevel: 2, twinSize: 25 },
   },
   growth: {
     id: 'growth',
     name: 'Growth',
-    monthlyCredits: 5000,
-    priceInr: 1499,
-    priceUsd: 29,
+    monthlyCredits: 4000,
+    priceInr: 3999,
     limits: { channels: 8, sites: 3, seats: 3, loopLevel: 3, twinSize: 100 },
   },
+  /**
+   * Customers see "Studio"; the id stays `agency`.
+   *
+   * The id is a stored value — it is the `plan_id` on every existing subscription
+   * row and a foreign key into `plans` — so renaming it is a migration over live
+   * money rows, not a rename. The label is the half customers read, and it is the
+   * half the business model deck changed. Founder's ruling, 2026-08-24.
+   */
   agency: {
     id: 'agency',
-    name: 'Agency',
-    monthlyCredits: 15000,
-    priceInr: 3999,
-    priceUsd: 79,
-    limits: { channels: 8, sites: 10, seats: 10, loopLevel: 3, twinSize: 100 },
+    name: 'Studio',
+    monthlyCredits: 12000,
+    priceInr: 7999,
+    limits: { channels: 12, sites: 10, seats: 10, loopLevel: 3, twinSize: 100 },
   },
 }
 

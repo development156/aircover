@@ -23,7 +23,13 @@ import {
  * refund or a chargeback. It gets a plain label saying which it is, not a warning treatment.
  * The customer is not in trouble; the paperwork is simply complete.
  */
-export function InvoiceTable({ invoices }: { invoices: readonly Invoice[] }) {
+export function InvoiceTable({
+  invoices,
+  className,
+}: {
+  invoices: readonly Invoice[]
+  className?: string
+}) {
   const rows = invoices.map((invoice) => {
     const gross = invoicePaise(invoice.gross_paise)
     const isNote = invoice.document_type === 'credit_note'
@@ -62,6 +68,7 @@ export function InvoiceTable({ invoices }: { invoices: readonly Invoice[] }) {
         { key: 'amount', header: 'Amount', numeric: true },
       ]}
       rows={rows}
+      className={className}
       empty="No invoice yet. One is issued the first time a payment completes."
     />
   )

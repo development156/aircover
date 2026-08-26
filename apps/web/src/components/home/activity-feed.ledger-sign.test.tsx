@@ -88,4 +88,40 @@ describe('Home reports a spend as a spend', () => {
     )
     expect(screen.queryByText('+20')).toBeNull()
   })
+
+  /**
+   * THE PILL CARRIES THE SAME THREE-WAY CLAIM AS THE SIGN, AND NOTHING WATCHED IT.
+   *
+   * The tests above assert the SIGN, which is the half that already went wrong
+   * once. The redesign added a coloured pill and a glyph, and a binary
+   * spent/not-spent split there renders a neutral HOLD in the same tone as
+   * money arriving — the original defect again, in a channel no assertion
+   * reached. So the tone is asserted per direction, by CLASS rather than by
+   * colour string: the classes are token names, and comparing resolved colours
+   * would pass on hue, which docs/37 §1 forbids from being load-bearing.
+   */
+  it('gives debit, credit and neutral three different pills', () => {
+    const toneOf = (label: string): string =>
+      screen.getByText(label).closest('li')!.lastElementChild!.className
+
+    render(
+      <ActivityFeed
+        entries={[
+          entry({ seq: 1, entry_type: 'DEBIT', amount: 100, action_type: 'brand_research' }),
+          entry({ seq: 2, entry_type: 'GRANT', amount: 100, idempotency_key: 'grant:1' }),
+          entry({ seq: 3, entry_type: 'HOLD', amount: 100, idempotency_key: 'hold:1' }),
+        ]}
+      />,
+    )
+
+    const debit = toneOf('-100')
+    const credit = toneOf('+100')
+    const neutral = toneOf('100')
+
+    expect(debit).toContain('bg-brand-wash')
+    expect(credit).toContain('bg-ok-bg')
+    expect(neutral).toContain('bg-s2')
+    // And all three differ from each other, so collapsing any pair goes red.
+    expect(new Set([debit, credit, neutral]).size).toBe(3)
+  })
 })

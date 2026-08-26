@@ -76,6 +76,9 @@ const PUBLIC_PATTERNS = [
   // because a half-done edit HERE is a schedule that fires, gets a 307, and
   // reports green forever.
   '/api/cron/playbooks',
+  // The fifth, 2026-08-25. Same shape, same reason, and the sentence above is
+  // worth re-reading with a fifth entry in hand.
+  '/api/cron/radar',
   '/api/cron/brain',
 ]
 
@@ -132,6 +135,7 @@ const CLERK_BYPASS_PATHS = [
   // below" and "these four"; both counts were already wrong.
   '/api/cron/loop',
   '/api/cron/playbooks',
+  '/api/cron/radar',
   '/api/cron/brain',
   '/api/webhooks/cashfree',
   '/api/webhooks/clerk',

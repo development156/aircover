@@ -111,13 +111,26 @@ describe('the X spend meter', () => {
       />,
     )
 
-    const meter = screen.getByText(/X posts this month/i).parentElement!
-    expect(within(meter).getByText(/^3$/)).toBeInTheDocument()
+    const meter = screen.getByText(/posts remaining this month/i).closest('details')!
     // The CONSTANT, never the literal. This line read `/of 40/` and was the only
     // thing in the repo still pinning the old ration — a grep of the meter component
     // and its data source both missed it, and the gate did not. A denominator test
     // that hardcodes the denominator asserts nothing about the denominator.
-    expect(within(meter).getByText(new RegExp(`of ${X_MONTHLY_RATION}`))).toBeInTheDocument()
+    //
+    // RETARGETED TWICE, weakened neither time. First when the pricing sentence moved
+    // into a disclosure and the pair became one figure ("3 of 12"), killing `/^3$/`.
+    // Now again because the meter COUNTS DOWN: it renders what is left, so a
+    // used-of-total assertion matches nothing. Derived from the constant, so it
+    // still cannot drift with the ration.
+    expect(within(meter).getByText(new RegExp(`^${X_MONTHLY_RATION - 3}$`))).toBeInTheDocument()
+    // ── THE LINE THIS METER CANNOT LOSE ────────────────────────────────────
+    // "9 posts remaining this month" on its own is a false claim about X: X has
+    // no monthly write allowance to remain against (pay-per-use since Feb 2026),
+    // so an unattributed countdown invents a limit X does not impose. The
+    // attribution has to be OUTSIDE the disclosure — visible without opening
+    // anything — or the number is read alone. That is what this pins, and it is
+    // why the assertion names the reset too: both halves are claims we make.
+    expect(within(meter).getByText(/From Sahoda’s ration, resets on the 1st/i)).toBeInTheDocument()
   })
 
   it('is absent from every other channel', () => {

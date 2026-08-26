@@ -1,3 +1,4 @@
+import { TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
@@ -172,22 +173,25 @@ export function Bars({
         })}
       </div>
 
-      {/* The one number worth printing. The rest are readable from the shape. */}
-      {peakIndex >= 0 ? (
-        <p className="mt-3 type-meta text-muted">
-          Highest:{' '}
-          <span className="num font-semibold text-ink">{peak.toLocaleString('en-IN')}</span> {unit}{' '}
-          on {points[peakIndex]!.label}
-        </p>
-      ) : null}
-
-      <div
-        aria-hidden
-        className="mt-2 flex justify-between gap-4 border-t border-line-soft pt-2 type-meta text-muted"
-      >
+      {/* THE AXIS SITS UNDER THE CHART IT LABELS. It used to sit BELOW the peak
+          caption, which put a sentence about one day between the bars and the
+          dates those bars run between. */}
+      <div aria-hidden className="mt-2 flex justify-between gap-4 type-meta text-muted">
         <span>{points[0]?.label}</span>
         <span>{points[points.length - 1]?.label}</span>
       </div>
+
+      {/* The one number worth printing. The rest are readable from the shape. */}
+      {peakIndex >= 0 ? (
+        <p className="mt-3 flex items-center gap-2 rounded-sm bg-surface-2 px-3 py-2 type-meta text-muted">
+          <TrendingUp aria-hidden className="size-3.5 shrink-0 text-accent" />
+          <span>
+            Highest:{' '}
+            <span className="num font-semibold text-ink">{peak.toLocaleString('en-IN')}</span>{' '}
+            {unit} on {points[peakIndex]!.label}
+          </span>
+        </p>
+      ) : null}
 
       {hatchLabel ? (
         <p className="mt-2 flex items-center gap-2 type-meta text-muted">

@@ -169,7 +169,8 @@ describe('plans table matches PLAN_CATALOG', () => {
       expect(row!.name).toBe(entry.name)
       expect(row!.monthly_credits).toBe(entry.monthlyCredits)
       expect(row!.price_inr).toBe(entry.priceInr)
-      expect(row!.price_usd).toBe(entry.priceUsd)
+      // No `price_usd` comparison: the catalog has one price and it is in rupees.
+      // The column remains only because it is NOT NULL on a live table.
       // Parsed, not compared raw: the column is loose jsonb, so this also proves the stored
       // shape is a valid PlanLimits and not merely deep-equal to one.
       expect(PlanLimitsSchema.parse(row!.limits)).toEqual(entry.limits)

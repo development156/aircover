@@ -10,7 +10,11 @@ Sahoda is an AI marketing employee for Indian small businesses — shop owners, 
 
 **The user is a bakery owner in Bhubaneswar on a mid-range Android, on Indian mobile data, who has never used a marketing tool.** That sentence should decide most design arguments. It is not a persona exercise; it is why 44px touch targets and 390px-first are non-negotiable, and why a heavy blur or a 4MB video is a real cost rather than a taste question.
 
-**Pricing:** Starter ₹499 · Growth ₹1,499 · Agency ₹3,999 per month, with 1,500 / 5,000 / 15,000 credits. **There is no free tier.** Every user pays. A `Free` row existed and was removed — if you find code assuming it, that is a bug.
+**Pricing:** Starter ₹1,999 · Growth ₹3,999 · Studio ₹7,999 per month, with 1,500 / 4,000 / 12,000 credits. Repriced 2026-08-24 from the business model deck; the previous ₹499 / ₹1,499 / ₹3,999 at 1,500 / 5,000 / 15,000 is what customers saw before that date. Note the allowances went DOWN as the prices went up. `PLAN_CATALOG` in `packages/shared/src/billing/plans.ts` is the source; this line is a summary of it.
+
+**"Studio" is a label, not an id.** The plan's id is still `agency`, because that id is the `plan_id` on every live subscription row. Code says `agency`, customers read "Studio", and `plans.test.ts` asserts they disagree on purpose.
+
+**There is no free tier to SELL, but `free` is not dead code.** This file previously said a `Free` row "was removed" and that code assuming it is a bug. That was wrong, and acting on it would break access control. MEASURED 2026-08-24: `free` is in `PLAN_CATALOG`, in the `plans` seed, and is the **entitlement floor** — `packages/billing/src/entitlements/pg.ts:8` resolves a workspace with no live subscription to `free`, and `packages/shared/src/billing/lifecycle.ts:96` falls back to it once suspended. Removing it would change what an unsubscribed or suspended workspace may do. What is true is that nobody is sold a permanent free plan.
 
 ---
 

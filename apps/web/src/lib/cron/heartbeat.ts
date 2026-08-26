@@ -62,7 +62,7 @@
  * because the way to check a claim like this is to go and read the file it names,
  * and doing that here produces "no such file" rather than "no such guard".
  */
-export type CronJob = 'sweeps' | 'metrics' | 'loop' | 'playbooks' | 'brain'
+export type CronJob = 'sweeps' | 'metrics' | 'loop' | 'playbooks' | 'radar' | 'brain'
 
 export interface CronSchedule {
   /** How often the job is scheduled, in ms. From the cron expression, not a guess. */
@@ -102,6 +102,16 @@ export const CRON_SCHEDULES: Record<CronJob, CronSchedule> = {
   // seven-day lead time checked once a week would miss a festival entirely
   // whenever the check landed on the wrong side of it.
   playbooks: { periodMs: 24 * HOUR, missesBeforeStopped: 2, label: 'Daily Playbook check' },
+  // `40 3 * * 1` — Monday morning, once a week.
+  //
+  // `missesBeforeStopped: 1`, for the reason `loop` gives above: two would mean a
+  // FORTNIGHT of silence before anybody was told, and a weekly job has no
+  // delivery-hiccup tolerance to spend because the hiccup and the outage look
+  // identical for seven days. It matters more here than anywhere else on this
+  // list — a missed Radar week cannot be collected later, since the pages have
+  // already changed, and a silently dead scan is indistinguishable on screen from
+  // competitors who happened to do nothing.
+  radar: { periodMs: 7 * 24 * HOUR, missesBeforeStopped: 1, label: 'Weekly Radar scan' },
   // `30 21 * * 0` — Sunday evening, half an hour after the Loop.
   //
   // Same one-miss tolerance as the Loop, for the same reason: a weekly job has

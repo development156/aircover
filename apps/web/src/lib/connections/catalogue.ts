@@ -69,6 +69,17 @@ export interface CatalogueEntry {
   short: string
   /** What this channel DOES for the business — answers "why is GBP in this list". */
   kind: string
+  /**
+   * One sentence naming what Sahoda does with this channel, for the reader who
+   * does not already know what "Local listing" buys them.
+   *
+   * Present tense on a CONNECTABLE channel is a claim we can keep. On a PLANNED
+   * one it describes the intent, and the tile carries "Coming soon" plus its own
+   * "Sahoda can't post here yet" line so the sentence can never be read as an
+   * offer — the blurb says what the channel is for, the card says whether we can
+   * do it yet, and those are different claims kept in different places.
+   */
+  blurb: string
   readiness: Readiness
 }
 
@@ -100,43 +111,56 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     id: 'instagram',
     label: 'Instagram',
     short: 'Instagram',
-    kind: 'Feed',
+    kind: 'Social feed',
+    blurb: 'Publish posts, reels and stories directly to Instagram.',
     readiness: 'publishes-today',
   },
   {
     id: 'linkedin',
     label: 'LinkedIn',
     short: 'LinkedIn',
-    kind: 'Feed',
+    kind: 'Social feed',
+    blurb: 'Share content and engage with your professional network.',
     readiness: 'publishes-today',
   },
-  { id: 'x', label: 'X', short: 'X', kind: 'Feed', readiness: 'built-not-proven' },
+  {
+    id: 'x',
+    label: 'X',
+    short: 'X',
+    kind: 'Social feed',
+    blurb: 'Post updates and grow your presence on X.',
+    readiness: 'built-not-proven',
+  },
   {
     id: 'gbp',
     label: 'Google Business Profile',
     short: 'Google Business',
     kind: 'Local listing',
+    blurb: 'Manage your business profile and local presence.',
     readiness: 'built-not-proven',
   },
   {
     id: 'facebook',
     label: 'Facebook Pages',
     short: 'Facebook',
-    kind: 'Feed',
+    kind: 'Social feed',
+    blurb: 'Publish and manage your Facebook presence.',
     readiness: 'not-built',
   },
   {
     id: 'youtube',
     label: 'YouTube',
     short: 'YouTube',
-    kind: 'Short video',
+    kind: 'Video platform',
+    blurb: 'Upload, manage and grow your YouTube channel.',
     readiness: 'not-built',
   },
   {
     id: 'pinterest',
     label: 'Pinterest',
     short: 'Pinterest',
-    kind: 'Boards',
+    kind: 'Visual discovery',
+    blurb: 'Share pins and reach more people on Pinterest.',
     readiness: 'not-built',
   },
   {
@@ -144,6 +168,7 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     label: 'Telegram',
     short: 'Telegram',
     kind: 'Broadcast',
+    blurb: 'Broadcast updates and engage with your Telegram community.',
     readiness: 'not-built',
   },
 ]

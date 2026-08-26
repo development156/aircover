@@ -81,11 +81,19 @@ export function SettingCard({
   hint,
   children,
   className,
+  /**
+   * A Sahoda Guide anchor. Optional, and forwarded rather than dropped: a card
+   * that adopts this grammar must not lose the tour step that points at it.
+   * `anchor-integrity` scans SOURCE text, so only a real attribute in the DOM
+   * decides whether a tour actually shows.
+   */
+  'data-guide': dataGuide,
 }: {
   title: string
   hint?: string
   children: React.ReactNode
   className?: string
+  'data-guide'?: string
 }) {
   /**
    * A <section> with no accessible name is not exposed as a region at all, so a
@@ -101,6 +109,7 @@ export function SettingCard({
   return (
     <section
       aria-labelledby={headingId}
+      data-guide={dataGuide}
       className={cn('surface-ring rounded-card bg-surface', className)}
     >
       <header className="flex min-h-[46px] flex-col justify-center gap-1 border-b border-line-soft px-4 py-3">
