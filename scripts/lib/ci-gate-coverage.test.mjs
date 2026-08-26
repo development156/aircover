@@ -110,6 +110,29 @@ describe('the CI workflow covers the gate, or says which part it does not', () =
     }
   })
 
+  it('collapses the push and pull_request runs for one branch into one', () => {
+    // THIS LINE HAS BEEN WRONG TWICE. First keyed on the head commit, which
+    // collapses the pair and silently stops a newer push cancelling an older
+    // run. Then `github.head_ref || github.ref`, which reads correctly and is
+    // not: on a push `github.ref` is `refs/heads/<branch>` while `head_ref` on a
+    // pull request is the bare `<branch>`. Two strings, two groups, nothing
+    // collapses — MEASURED as three duplicate push/pull_request pairs running at
+    // once across three lanes.
+    //
+    // `ref_name` is the bare branch name and is the only one of the two that
+    // matches `head_ref`. Asserted as an exact expression rather than "contains
+    // a branch-ish thing", because the whole defect was two expressions that
+    // both name the branch and do not match each other.
+    const group = /concurrency:\s*\n\s*group: (.+)/.exec(WORKFLOW)?.[1]
+    expect(group, 'no concurrency group').toBeDefined()
+    expect(group).toBe('gate-${{ github.head_ref || github.ref_name }}')
+    // Named explicitly: `github.ref` carries a `refs/heads/` prefix that
+    // `head_ref` does not, so pairing the two can never collapse.
+    expect(group).not.toMatch(/github\.ref\s*\}\}/)
+    // And not the commit, which turns cancellation off.
+    expect(group).not.toContain('sha')
+  })
+
   it('keeps the smoke job behind a typed acknowledgement, never a click', () => {
     // `SAHODA_E2E_ACK_TARGET=1` would be satisfiable by anyone who wanted the
     // error to go away. A defaulted input would be satisfiable by pressing a
