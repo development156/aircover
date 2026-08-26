@@ -1,5 +1,17 @@
 # Handoff — research — 2026-08-26
 
+**Owner** jiban. Filed as `research-2026-08-26.md` and RENAMED to
+`jiban-research-2026-08-26.md` the same day, after `d21bac3` changed the
+convention to `<owner>-<role>-<date>.md`. The rename is not cosmetic: `/kickoff`
+looks for `docs/workflow/handoffs/*-<role>-*.md`, and `research-2026-08-26.md`
+has no hyphen before `research`, so it did not match. MEASURED — `ls
+*-research-*.md` returned nothing.
+
+**`design-2026-08-25.md` is orphaned the same way and I have NOT renamed it.**
+`ls *-design-*.md` also returns nothing, so the design lead's own kickoff will
+not find their own handoff. It needs their owner name, which I do not know, and
+a guess in a filename is worse than a flag. One `git mv` fixes it.
+
 **Branch** `claude/lead-research-tz63ld` at `00eaa15`, cut from `wt-core`
 (`5480260`). Pushed: yes. Pull request #4, open, draft.
 
