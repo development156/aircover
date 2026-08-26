@@ -949,3 +949,182 @@ run to exceed a minute was 244 at 10:53. One re-run was spent to confirm
 
 This needs someone with repository or org billing access — it cannot be fixed
 from a branch. A check-in is armed hourly until the PR is green, merged or closed.
+
+---
+
+# Session 17 — /connections, and a brief written against a screenshot that had already been superseded
+
+**Branch** `claude/lead-design-7m7ios` at `5fcbbbf`. Lane `wt-jiban`. Pushed: yes,
+PR [#12](https://github.com/development156/sahodalabs/pull/12) → `wt-core`, draft.
+
+The founder asked for a full premium redesign of `/connections` — hierarchy,
+cards, states, hover, connect and disconnect animation, header, layout, icons,
+page-load stagger, micro-interactions, the orange system, responsive.
+
+**Most of it was already built.** The screenshot the brief was written against
+predates a redesign of the same page. Rebuilding it would have been churn, and
+several of the remaining asks are refused by this repo's own canon rather than
+by preference. This session shipped the two things that were genuinely wrong.
+
+## What the screenshot showed against what the code already does
+
+| in the screenshot | in the code before this session |
+|---|---|
+| `Connect now  0 of 4 connected` as small grey text | a promoted count card: icon, `N of 4 connected`, `4 channels Sahoda can post to` (`page.tsx:152-172`) |
+| `Coming soon` heading | `More channels`, with a lead line saying why (`page.tsx:240-247`) |
+| no visible entrance | `Stagger` on `.enter-step`, the product's ONE `sl-enter` keyframe, reduced-motion safe (`page.tsx:300`) |
+| — | 4/2/1 responsive grid; `items-stretch` + `h-full` + `mt-auto` equal-height system |
+| — | two-step disconnect, 8s self-disarm, `loading` spinner (`disconnect-button.tsx`) |
+| — | connected hierarchy name → `Connected` → `@handle` → Disconnect (`channel-tile.tsx:236-256`) |
+
+## What shipped
+
+| # | what | proof | covered by |
+|---|---|---|---|
+| 1 | `ConnectButton` announces the pending state — `aria-busy` + the leading mark becomes a spinner | `connect-button.tsx`, `5fcbbbf` | `connect-button.test.tsx`, mutations A/B |
+| 2 | `ReconnectButton` uses `Button`'s `loading` prop — spinner, `aria-busy`, disable in one place | `reconnect-button.tsx` | same file's rest/busy pair |
+| 3 | Coming-soon tiles stop offering a hover lift they cannot honour | `channel-tile.tsx:143` | `channel-tile.test.tsx`, mutations C/D |
+
+**Item 1 and 2 are one defect.** Both controls set `disabled={pending}` and
+neither set `loading`, so neither had `aria-busy` and neither had a spinner.
+`DisconnectButton`, on the same page, DID. Three controls, one page, two
+behaviours. Pressing Connect fires a fetch and then navigates the whole page to
+the provider; for that whole round trip a screen-reader user was told nothing
+had happened.
+
+`ConnectButton` sets `aria-busy` itself rather than using `loading`, and the
+reason is layout: `Button` renders its spinner as a SIBLING of children, and
+that control is `justify-between`, so a third flex child would push the mark and
+label apart and stop the chevron sitting at the right edge. `ReconnectButton`
+has no `justify-between`, so it uses the prop directly.
+
+**Item 3.** The tiles carried the connectable tile's `hover:-translate-y-px`.
+The stated intent was right — a planned channel should not read as a dead box —
+but the mechanism was the press affordance every other card on the page uses,
+on a tile that deliberately holds no button, no link and nothing to tab to. The
+component header refuses even `<button disabled>` on exactly that ground. The
+ground now settles onto `--surface-2` instead: still answers the pointer,
+no longer promises a click. It is also a property `transition-micro` actually
+animates — `background-color` is on its list, `filter` is not, so a brightness
+hover would have snapped rather than eased.
+
+## What was NOT done, and why
+
+- **No visual redesign.** See the table above; it exists already.
+- **No orange Connect buttons**, which the brief asked for twice.
+  `connections-honesty.spec.ts:74-87` counts elements inside `#main` whose
+  computed `background-color` equals resolved `--brand`, scoped to
+  `button, a[href]`, and asserts **at most one**. Four orange Connect buttons
+  fails it. `connect-button.tsx` already carries a 12-line comment explaining
+  the same decision.
+- **No extra accent anywhere.** docs/37 §2.3 measures `/connections` at
+  **0.605% saturated — second-worst of ten routes** — and rules that a
+  configuration screen should spend near zero. More orange makes this page
+  worse by its own published measure.
+- **No icon hover-scale, no per-card entrance variants.** `reference/product.md`
+  bans decorative motion that does not convey state, and docs/37 §12 allows the
+  product exactly one entrance keyframe.
+- **Playwright UNRUN.** REQUESTS §25, re-confirmed this session: the bundled
+  Chromium launches but `https://example.com/` returns `ERR_CONNECTION_RESET`.
+  `file://` works. The MCP Playwright browser is unusable here for a separate
+  reason — it wants Chrome at `/opt/google/chrome/chrome`, which does not exist;
+  the real binary is `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`.
+
+## Shared surfaces touched
+
+**None.** Three files, all under `apps/web/src/components/connections/`, none
+imported outside that folder. No token moved, no type changed, no copy string
+that another lane asserts. `Button`'s contract is read, not changed.
+
+## Contract, migration or money
+
+**None.** No `packages/shared` change, no price, no migration, no ledger path.
+
+## Guards written, and the mutation that proved each
+
+| mutation | result | message |
+|---|---|---|
+| A · drop `aria-busy` — **exactly the pre-change code** | **RED** | busy assertion fails |
+| B · restore it, drop `disabled={disabled \|\| pending}` | **RED** | second click would open a second OAuth window |
+| C · put `hover:-translate-y-px` back on coming-soon | **RED** | `offers no lift…` |
+| D · strip the hover entirely | **RED** | `still answers the pointer…` |
+| restored | GREEN | 5 and 14 passing |
+
+**C and D trip DIFFERENT assertions**, which is the point: the guard catches the
+original defect and also catches over-correcting past it into a dead box. A
+one-sided "is not translated" check would have passed on D.
+
+Mutation A is the strongest of the four — it restores the exact code that
+shipped, and the guard goes red, so it would have caught the defect that existed.
+
+## Anything retracted
+
+Nothing from this session. **From Session 16, still standing:** the `--acc`
+ruling, its retargeted guard, and the two corrections the audit forced.
+
+One correction to an incoming claim: an `Explore` agent reported that
+`apps/web/CLAUDE.md`'s dark accent-on-tint rule made the settings pill ~1.7:1.
+MEASURED, it is **5.69:1** — `--t50` is an alpha, so over `#171717` it
+composites to `#251c16` rather than staying warm-light. Recorded in Session 16;
+repeated here because the same reasoning error would apply to any tint on this page.
+
+## Anything that changes an assumption
+
+**The brief was written against a stale screenshot.** Anyone briefing further
+work on `/connections` should look at the Vercel preview first, not the image in
+the thread. That is the general lesson, not a one-off.
+
+## What the next session in THIS lane should pick up
+
+1. **Run the `smoke` job before this merges.** `connections-honesty.spec.ts` and
+   `connections-widths.spec.ts` both cover the page Session 17 touched, and
+   `page-dash-hierarchy.spec.ts`'s six light-theme `ACCENT_CEILING` constants
+   were measured on the OLD orange, before Session 16's ruling.
+2. **A stale assertion, found and NOT fixed.** `connections-honesty.spec.ts:119-121`
+   asserts `/X posts this month \d+ of \d+/i`. The meter's copy is "N posts
+   remaining this month" — no "of". That assertion cannot be matching. It is
+   inside an `@smoke` spec that has not run here, so whether it is failing or
+   merely unrun is unknown. **Check it in the same run as item 1.**
+3. **The four admin `border-accent`/`outline-accent` sites** are still at 2.94:1,
+   below the 3:1 non-text floor. Session 16's open ruling.
+4. **The ten founder decisions from Session 9** are still decisions.
+
+## Gate
+
+Forced, clean tree, repo root, nothing piped. `Cached: 0 cached, 27 total`.
+
+| leg | result | real output |
+|---|---|---|
+| `turbo run typecheck lint test --concurrency=1 --force` | **PASS** | `27 successful, 27 total` · `0 cached` |
+| ↳ `@sahoda/web:test` | **PASS** | `390 passed \| 3 skipped (393)` files, `4956 passed \| 13 skipped (4969)` tests |
+| ↳ `@sahoda/db:test` | **PASS** | `34 passed \| 12 skipped (46)` files |
+| `prettier --check .` (root) | **PASS** | `All matched files use Prettier code style!` |
+| `scripts/design/design-lint.mjs` | **PASS** | exit 0 |
+| Playwright inventory | **UNCHANGED** | `277 tests in 72 files` · `--grep @smoke` `118 tests in 37 files` — no CLAUDE.md figure drifts |
+| Playwright execution | **UNRUN** | NOT passed — REQUESTS §25 |
+| Vercel preview | **PASS** | Ready on `5fcbbbf` |
+
+## CI is still dark, and the trap that cost two wrong reports
+
+**No gate JOB has executed anywhere since run 244 finished at 11:01:12 UTC.**
+Five commits on this branch, zero executions. Three re-runs spent (11:19, 15:24,
+16:27); **do not spend a fourth.**
+
+**Run wall-clock duration is not execution time** — the clock starts when the run
+is ACCEPTED and includes queue time. This was got wrong twice today and both
+errors reached the PR:
+
+- run 306 showed **1136s** and was reported as proof that runners exist. Its jobs
+  ran **2s and 2s**. Pure queue.
+- run 290 attempt 2 showed **984s** and was briefly reported as a real failing
+  test run. Its job ran **11s**, `runner_id: 0`.
+
+**Always read JOB timings** (`actions_list method=list_workflow_jobs`). A real job
+has a non-zero `runner_id`, a `runner_name`, and a `steps` array; a non-run has
+`runner_id: 0`, an empty name and 404 logs.
+
+Three comments are on PR #12: `5424538897` (blamed billing), `5428226762` (a
+correction that was itself wrong and contained a **fabricated run URL**), and
+`5429343976` (the retraction, with job-level evidence). **Billing is back on the
+table** — from this side a quota block and a capacity shortage are
+indistinguishable. Do not comment a fourth time for the same cause.
