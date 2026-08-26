@@ -3,6 +3,7 @@ import { reconcileAccounts } from '@sahoda/publishing'
 import { ZERNIO_PLATFORMS } from '@sahoda/shared'
 
 import { checkCountableLimit } from '@/lib/billing/entitlements'
+import { CLEAR_PENDING_CONNECT, readPendingConnect } from '@/lib/connections/pending-connect'
 import { connectionKey, readConnectionSlots } from '@/lib/connections/read'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -70,7 +71,17 @@ function backOk(
   status: 'connected' | 'nothing' | 'limit',
   detail?: string,
 ): Response {
-  return Response.redirect(connectionsUrl(request, status, detail), 303)
+  // Hand-built rather than `Response.redirect`, whose headers are immutable, so
+  // the pending-connect cookie can be spent on the way out. Same 303, same
+  // `Location` — `real outcomes keep their 303` still holds.
+  return new Response(null, {
+    status: 303,
+    headers: {
+      location: connectionsUrl(request, status, detail),
+      'set-cookie': CLEAR_PENDING_CONNECT,
+      'cache-control': 'no-store',
+    },
+  })
 }
 
 /** The sentence in the fallback body. Ours, never a message from Zernio or Postgres. */
@@ -121,6 +132,9 @@ function backError(
       headers: {
         'content-type': 'text/html; charset=utf-8',
         'cache-control': 'no-store',
+        // Spent on a failure too. A cookie surviving a failed trip would sit
+        // there authorising a create on whatever the customer did next.
+        'set-cookie': CLEAR_PENDING_CONNECT,
         // Not followed by browsers on a 4xx/5xx, and deliberately kept anyway: it is
         // what makes the intended destination visible to a log reader and to curl -I.
         location: target,
@@ -211,6 +225,20 @@ export async function GET(request: Request): Promise<Response> {
     const unreadable = reads.filter((r) => !r.read).map((r) => r.platform)
     const accounts = reads.flatMap((r) => r.accounts)
 
+    /**
+     * ── WHAT THE CUSTOMER ACTUALLY PRESSED ────────────────────────────────────
+     * Read from an httpOnly cookie our own start route set, never from the query
+     * string — see lib/connections/pending-connect.ts for why that distinction is
+     * load-bearing on this route in particular.
+     *
+     * `null` when the cookie expired, was never set (a bookmarked replay), or the
+     * browser dropped it. That is not an error: the trip still REFRESHES every row
+     * we already hold, which is the whole of the documented self-heal that matters
+     * — a token that moved, an expiry that shifted, a handle that changed. What it
+     * may not do without this is CREATE.
+     */
+    const pending = await readPendingConnect()
+
     // NOTHING could be read. Deliberately not `ok('nothing')`: that status claims we
     // asked Zernio and it had no accounts, and here we never successfully asked. A
     // measurement we did not make must not be reported as a measurement.
@@ -265,6 +293,33 @@ export async function GET(request: Request): Promise<Response> {
       const isRefresh = slots.keys.has(connectionKey(account.platform, account.accountId))
 
       if (!isRefresh) {
+        /**
+         * ── A ROW IS ONLY EVER CREATED FOR THE PLATFORM THE CUSTOMER PRESSED ──
+         * This is the disconnect-then-reconnect fix, and it is deliberately the
+         * narrowest rule that closes it. Every account we ALREADY hold is still
+         * refreshed, whatever platform it is on, so the self-heal this route was
+         * built around keeps working. What can no longer happen is a platform the
+         * customer never touched — or one they explicitly disconnected — arriving
+         * back in the table as a side effect of connecting something else.
+         *
+         * Skipped SILENTLY rather than counted as `overLimit` or `unwritten`. It
+         * is neither: the plan had room and the write did not fail. Nothing was
+         * refused and nothing broke, so there is no outcome to report — reporting
+         * one would put correct behaviour in the failure channel, which is the
+         * mistake the `overLimit` branch below already exists to avoid.
+         */
+        if (pending !== null && account.platform !== pending.platform) continue
+
+        /**
+         * NO PENDING RECORD, NO CREATE. A replay of this URL, a cookie that
+         * expired mid-consent, a browser that dropped it. Refusing to create is
+         * the fail-closed direction: the customer presses Connect again and the
+         * next trip has a fresh cookie, which costs one click. Creating instead
+         * costs them the disconnect they asked for, silently, and that is the
+         * defect being fixed.
+         */
+        if (pending === null) continue
+
         if (admitted >= headroom) {
           overLimit.push(account.platform)
           continue

@@ -30,6 +30,8 @@ const state = vi.hoisted(() => ({
   profileEnsured: 0,
   rpcCalls: 0,
   connectUrlCalls: 0,
+  /** What the route recorded as the pending connect, as `<platform>.<mode>`. */
+  pendingWrites: [] as string[],
 }))
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -84,6 +86,15 @@ vi.mock('@/lib/billing/entitlements', () => ({
   checkCountableLimit: () => Promise.resolve(state.limitVerdict),
 }))
 
+// The start route records what the customer pressed before sending them away.
+// Mocked as a SEAM: the cookie's wire shape is `pending-connect.test.ts`'s job.
+vi.mock('@/lib/connections/pending-connect', () => ({
+  setPendingConnect: (pending: { platform: string; mode: string }) => {
+    state.pendingWrites.push(`${pending.platform}.${pending.mode}`)
+    return Promise.resolve()
+  },
+}))
+
 vi.mock('@/lib/observability/report', () => ({ reportServerError: () => Promise.resolve() }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -97,11 +108,14 @@ vi.mock('@/lib/supabase/server', () => ({
 
 const { POST } = await import('./route')
 
-const call = () =>
+const call = () => post({ platform: 'instagram' })
+
+/** One press, with whatever body the test wants to send. */
+const post = (body: Record<string, unknown>) =>
   POST(
     new Request('https://app.sahodalabs.com/api/oauth/zernio/start', {
       method: 'POST',
-      body: JSON.stringify({ platform: 'instagram' }),
+      body: JSON.stringify(body),
     }),
   )
 
@@ -115,6 +129,7 @@ beforeEach(() => {
   state.profileEnsured = 0
   state.rpcCalls = 0
   state.connectUrlCalls = 0
+  state.pendingWrites = []
 })
 
 describe('the channels plan limit is enforced before the consent screen', () => {
@@ -232,5 +247,56 @@ describe('the workspace read tells "none" apart from "could not tell"', () => {
     // that failed would leave an orphan for a workspace we never identified.
     expect(state.profileEnsured).toBe(0)
     expect(state.connectUrlCalls).toBe(0)
+  })
+})
+
+/**
+ * WHAT THE CUSTOMER PRESSED, RECORDED BEFORE THEY LEAVE.
+ *
+ * The return route reads this to decide which platform may have a row CREATED for
+ * it. Without it that route reconciles all four platforms and re-adopts accounts
+ * the customer deliberately disconnected — the "disconnect and the other platforms
+ * come back" defect. See lib/connections/pending-connect.ts.
+ */
+describe('the pending connect is recorded, and only for a connect that happens', () => {
+  it('records the platform that was asked for, not the default', async () => {
+    const res = await post({ platform: 'linkedin' })
+
+    expect(res.status).toBe(200)
+    expect(state.pendingWrites).toEqual(['linkedin.redirect'])
+  })
+
+  it('records the mode, so the return trip knows how to answer', async () => {
+    await post({ platform: 'instagram', mode: 'popup' })
+    expect(state.pendingWrites).toEqual(['instagram.popup'])
+  })
+
+  it('treats anything that is not the literal "popup" as a redirect', async () => {
+    // The older path is the fallback for a blocked popup, so an absent or unknown
+    // mode must never select the newer one.
+    await post({ platform: 'instagram', mode: 'iframe' })
+    await post({ platform: 'instagram' })
+    expect(state.pendingWrites).toEqual(['instagram.redirect', 'instagram.redirect'])
+  })
+
+  it('records NOTHING when the plan refuses the connect', async () => {
+    // A cookie written before a refusal would authorise a create for a connect
+    // that never happened, and it would still be there on the next trip back.
+    state.slots = { count: 2, keys: new Set() }
+    state.limitVerdict = { kind: 'blocked', sentence: 'Your Free plan includes 2 channels.' }
+
+    const res = await post({ platform: 'instagram' })
+
+    expect(res.status).toBe(403)
+    expect(state.pendingWrites).toEqual([])
+  })
+
+  it('records NOTHING when there is no workspace to connect into', async () => {
+    state.workspace = null
+
+    const res = await post({ platform: 'instagram' })
+
+    expect(res.status).toBe(400)
+    expect(state.pendingWrites).toEqual([])
   })
 })

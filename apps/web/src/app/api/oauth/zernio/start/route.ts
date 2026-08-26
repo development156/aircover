@@ -3,6 +3,7 @@ import { ensureZernioProfile } from '@sahoda/publishing'
 import { isZernioPlatform, type ZernioPlatform } from '@sahoda/shared'
 
 import { checkCountableLimit } from '@/lib/billing/entitlements'
+import { setPendingConnect, type ConnectMode } from '@/lib/connections/pending-connect'
 import { readConnectionSlots } from '@/lib/connections/read'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
@@ -44,6 +45,13 @@ export async function POST(request: Request): Promise<Response> {
     // no adapter can publish, producing a connection that looks live and is not.
     // Defaults to instagram so the existing caller keeps working unchanged.
     let platform: ZernioPlatform = 'instagram'
+    /**
+     * How the customer started this. `redirect` is the default because it is the
+     * behaviour that has always worked and the one every caller falls back to when
+     * the browser blocks a popup — a missing or unrecognised value must never
+     * produce the newer path.
+     */
+    let mode: ConnectMode = 'redirect'
     try {
       const body: unknown = await request.json()
       const asked = (body as { platform?: unknown } | null)?.platform
@@ -51,6 +59,7 @@ export async function POST(request: Request): Promise<Response> {
         if (!isZernioPlatform(asked)) return fail('That channel cannot be connected here.', 400)
         platform = asked
       }
+      if ((body as { mode?: unknown } | null)?.mode === 'popup') mode = 'popup'
     } catch {
       // No body at all is fine — instagram is the default.
     }
@@ -134,6 +143,17 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const authUrl = await client.connectUrl(platform, profileId, zernioReturnUrl())
+
+    // ── THE ONLY RECORD OF WHAT THE CUSTOMER ASKED FOR ────────────────────────
+    // Set LAST, after every refusal above has had its chance. A cookie written
+    // before a 403 would authorise a create for a connect that never happened, and
+    // it would still be sitting there on the customer's next trip back.
+    //
+    // The return route reads this to decide which platform may have a row CREATED
+    // for it. Without it that route reconciles all four and re-adopts accounts the
+    // customer deliberately disconnected — see lib/connections/pending-connect.ts.
+    await setPendingConnect({ platform, mode })
+
     return Response.json(
       { ok: true, authUrl },
       { status: 200, headers: { 'cache-control': 'no-store' } },
