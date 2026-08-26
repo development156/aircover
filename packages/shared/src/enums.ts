@@ -318,15 +318,18 @@ export type OpsArtifactMime = z.infer<typeof OpsArtifactMimeSchema>
  * that asks Zernio for an auth URL, the RPC allowlist in Postgres, and the adapter
  * selector. A platform in one and not the others produces a connection row that
  * looks live and can never publish.
+ *
+ * ── THIS IS A SUBSET OF `Channel`, AND TELEGRAM IS WHY ───────────────────────
+ * It reads "channels connectable through the OAuth rail", not "channels we
+ * support". Telegram is a real `Channel` whose publish adapter works, and it is
+ * absent here because `GET /v1/connect/telegram` returns a bot access CODE
+ * rather than an `authUrl` — there is no consent screen to send anyone to.
+ * Listing it made its Connect button answer "Couldn't start the connection. Try
+ * again." on every press.
+ *
+ * So: a channel belongs here when it can complete THIS flow, not when it exists.
  */
-export const ZERNIO_PLATFORMS = [
-  'instagram',
-  'x',
-  'gbp',
-  'linkedin',
-  'facebook',
-  'telegram',
-] as const
+export const ZERNIO_PLATFORMS = ['instagram', 'x', 'gbp', 'linkedin', 'facebook'] as const
 export type ZernioPlatform = (typeof ZERNIO_PLATFORMS)[number]
 
 export function isZernioPlatform(value: unknown): value is ZernioPlatform {

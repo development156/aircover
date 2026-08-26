@@ -67,6 +67,13 @@ import { ChannelSchema, type Channel } from '@sahoda/shared'
  *              image-shaped end to end.
  *   pinterest  needs a destination link and a BOARD id, and `FormattedContent`
  *              has nowhere to carry a board.
+
+ * TELEGRAM is not here, and that is deliberate rather than an omission. It IS a
+ * real `Channel` — the publish adapter is the generic Zernio one and works — so
+ * it cannot live in a union defined as "not assignable to Channel". What it
+ * cannot do is CONNECT through the OAuth rail, and that is expressed where it
+ * belongs: `ZERNIO_PLATFORMS` no longer lists it, so its button is disabled with
+ * a reason. See its catalogue entry below.
  *
  * Shipping either would mean writing limits no engine enforces, which is exactly
  * the fabricated figure the Constraint Engine exists to prevent.
@@ -205,8 +212,28 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     short: 'Telegram',
     kind: 'Broadcast',
     blurb: 'Broadcast updates and engage with your Telegram community.',
-    // Same standing as Facebook above: built through the generic Zernio adapter,
-    // never proven live.
+    /**
+     * PUBLISHING IS BUILT. CONNECTING IS NOT, AND THOSE ARE DIFFERENT CLAIMS —
+     * which is the whole reason this file keeps readiness and connectability
+     * apart in the first place.
+     *
+     * The adapter is the generic Zernio one, so a Telegram post would send. But
+     * MEASURED against the spec, `GET /v1/connect/telegram` does NOT return an
+     * `authUrl`: it returns an access CODE valid 15 minutes. The customer adds
+     * Zernio's bot as an admin of their channel, sends the bot that code plus
+     * their @channel, and the app polls `PATCH /v1/connect/telegram` until it
+     * lands. No consent screen, no popup, no return trip — the entire shape every
+     * other channel on this screen uses.
+     *
+     * Shipping it on the OAuth rail anyway gave a button that answered "Couldn't
+     * start the connection. Try again." on every press: a retry that can never
+     * succeed, which is the impossible remedy `no-impossible-remedy.spec` forbids.
+     * So `ZERNIO_PLATFORMS` drops it and the button disables with a reason,
+     * rather than the readiness rung being bent to carry a fact about connecting.
+     *
+     * What building it needs, so nobody rediscovers this: a code-and-poll surface
+     * of its own.
+     */
     readiness: 'built-not-proven',
   },
 ]

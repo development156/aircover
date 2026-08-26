@@ -338,6 +338,45 @@
       "summary_plain": "The unit checks ran and everything passed.",
       "details": "exit=0\n Tasks:    27 successful, 27 total\nCached:    0 cached, 27 total",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mta81nti-2dbbc217",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T15:01:14.068Z",
+      "finished_at": "2026-08-26T15:01:14.068Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran and everything passed.",
+      "details": "restored\nexit=0\n Tasks:    27 successful, 27 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mta81nti-34ec061d",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T15:01:14.068Z",
+      "finished_at": "2026-08-26T15:01:14.068Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks ran and everything passed.",
+      "details": "restored\nexit=0\n Tasks:    27 successful, 27 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mta81nti-66abaaff",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T15:01:14.068Z",
+      "finished_at": "2026-08-26T15:01:14.068Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran and everything passed.",
+      "details": "restored\nexit=0\n Tasks:    27 successful, 27 total",
+      "duration_ms": null
     }
   ]
 }
