@@ -69,9 +69,21 @@ try {
   const date = sh('date +%F') || new Date().toISOString().slice(0, 10)
   const path = `docs/workflow/handoffs/${who}-${role}-${date}.md`
 
-  // A REAL handoff already exists for today. Never overwrite a human's work.
-  if (existsSync(path) && !readFileSync(path, 'utf8').includes('AUTOMATIC SKELETON'))
-    process.exit(0)
+  // A REAL handoff already exists for today. Never overwrite a human's work, and
+  // never write a SECOND file alongside it saying the session ended without one.
+  //
+  // BOTH NAMES HAVE TO BE CHECKED, and missing the second one is not theoretical:
+  // on 2026-08-26 this hook wrote `claude-advisor-qvz5wn-advisor-2026-08-26.md`
+  // into a lane that HAD run /handoff, because /handoff writes `<role>-<date>.md`
+  // and this looks for `<who>-<role>-<date>.md`. The skeleton then opened with
+  // "this session ended without /handoff", which was false, in a file whose whole
+  // purpose is to be the record. A guard that cannot see the thing it is guarding
+  // against does not fail loudly — it fabricates.
+  const candidates = [path, `docs/workflow/handoffs/${role}-${date}.md`]
+  const realHandoffExists = candidates.some(
+    (p) => existsSync(p) && !readFileSync(p, 'utf8').includes('AUTOMATIC SKELETON'),
+  )
+  if (realHandoffExists) process.exit(0)
 
   // Shared surfaces: the things that break other lanes.
   const shared = files.filter(
