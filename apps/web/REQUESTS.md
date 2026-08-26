@@ -1895,3 +1895,42 @@ everything under `apps/web/src/components/connections/`,
 **Not in this lane's scope, and why:** adding a fifth channel needs a CHECK
 constraint migration across seven tables and only `wt-db` edits applied
 migrations. Named in the report, not attempted here.
+
+### What shipped against §29, and the one thing that cannot be fixed here
+
+| #   | Finding                                                                                          | State                                                                            |
+| --- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| 1   | The screen collapsed every account on a platform to one                                          | **FIXED** — one row per account, each with its own status, expiry and Disconnect |
+| 2   | Connect vanished once a platform had any account, so a second could never be added               | **FIXED** — always offered, reading "Add another account" when linked            |
+| 3   | The header said "2 of 4 connected" against the number of channels SAHODA has built, not the plan | **FIXED** — slots used against the plan's own allowance                          |
+| 4   | The return trip created a row for every platform Zernio still held                               | **FIXED** — creates only for the platform the customer pressed                   |
+| 5   | Two active accounts on one platform crashed /analytics and silently emptied /audience            | **FIXED** — both reads were `.maybeSingle()`, which errors on two rows           |
+| 6   | Disconnect claimed more than it does                                                             | **NARROWED** — the copy now says the account stays linked upstream               |
+| 7   | **Zernio exposes no way to remove an account**                                                   | **NOT FIXABLE HERE**                                                             |
+
+**On 7, because it is the one that stays open.** `packages/publishing/src/zernio/client.ts`
+lists `listProfiles · createProfile · connectUrl · listAccounts · editPost ·
+unpublishPost · retryPost · presignMedia · uploadMedia · headMedia · createPost ·
+getPost` and nothing that deletes an account. `docs/13` §2.5 documents only the
+inbound `account.disconnected` webhook, never an outbound call. So a customer who
+disconnects still has Sahoda's access sitting on their Instagram at the provider,
+and pressing Connect on that channel re-adopts it.
+
+**That is a privacy claim, not a tidiness one, and the fix is not a copy edit.** It
+needs either a Zernio endpoint we have not found or a `connection_dismissals`
+tombstone table that the reconcile consults — a migration, which this lane may
+write but may not apply. Neither was attempted here. **What was done instead is to
+stop the resurrection happening as a SIDE EFFECT of connecting something else,
+which is what was actually reported**, and to say plainly on the confirm step what
+disconnect does and does not do.
+
+**Adding a fifth channel is still not this lane's work**, and the audit made it
+more expensive rather than less: the catalogue header said seven tables carry the
+channel CHECK constraint and it is **ten**, plus `app.is_channel_set` and four
+PL/pgSQL guards with the list inline. That comment is corrected in this lane. The
+four planned channels are not equal: Facebook is close to free (Zernio marks it
+`[LIVE]`, and the logos already ship), Telegram and Pinterest each need a
+`PlatformSpec` measured against Zernio's validate endpoint rather than copied from
+docs, and **YouTube is video** — `PlatformSpec` has `imageDims` and `aspectRange`
+and no duration, codec or resolution field, and the whole media pipeline is
+image-shaped. It is an epic, not a channel.
