@@ -118,6 +118,13 @@ const EXPECTED_OPERATOR_ONLY = [
   // publishes were visible to nobody but the tenant they happened to, and
   // apps/web has no service-role client to fetch them with.
   'post_publish_logs',
+  // Added 2026-08-25 with migration 20260825000000. Same reasoning as the line
+  // above, and a stronger case: the Marketing Brain is HIDDEN from customers by
+  // design (docs/51), so /admin is not a second window onto this table, it is
+  // the only one. Both policies are permissive and therefore OR-ed, so a member
+  // still reads exactly their own observations and an operator reads all of
+  // them. This guard failing is what made the operator policy a decision.
+  'marketing_observations',
 ]
 
 /**

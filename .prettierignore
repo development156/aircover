@@ -9,6 +9,15 @@ pnpm-lock.yaml
 # demo HTMLs and the numbered spec pack from prettier drift).
 docs/
 
+# Vendored upstream skill — same argument as docs/, one step stronger. It ships
+# its own LICENSE, its own .github/workflows/validate.yml and its own
+# scripts/validate-package.py, so reformatting our copy diverges it from
+# upstream and puts it under a validator we do not run. CLAUDE.md's Copy style
+# section cites it as an authority; an authority we have quietly restyled is a
+# worse authority. Added 2026-08-24, when `pnpm format:check` was found red on
+# an untouched tree for README.md and SKILL.md.
+.agents/skills/humanizer/
+
 # Binary assets
 public/
 SAHODA-ASSETS/

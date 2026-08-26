@@ -69,6 +69,38 @@ export interface OnboardingAnswers {
   refusal: string
   /** Best available name. The workspace name is the honest last resort. */
   name: string
+  /** Screen 02's positioning sentence, in their words. Empty when untyped. */
+  positioning?: string
+  /** Screen 03: the ideal customer, then the four optional details. */
+  audience?: string
+  audienceAge?: string
+  audienceLoc?: string
+  audienceRole?: string
+  audienceInterests?: string
+}
+
+/**
+ * The audience answers as one sentence, or '' when none were given.
+ *
+ * JOINED, NOT INVENTED. Each clause is prefixed with the label the person
+ * answered under, so "25-35" arrives as "aged 25-35" and not as a bare number
+ * the model has to guess the meaning of. Nothing is added that was not typed,
+ * and an untouched field contributes no clause — an empty result stays empty
+ * rather than becoming "no particular audience", which would be a claim.
+ */
+export function audienceDescription(a: OnboardingAnswers): string {
+  const parts: string[] = []
+  const base = (a.audience ?? '').trim()
+  if (base) parts.push(base)
+  const age = (a.audienceAge ?? '').trim()
+  if (age) parts.push(`aged ${age}`)
+  const loc = (a.audienceLoc ?? '').trim()
+  if (loc) parts.push(`in ${loc}`)
+  const role = (a.audienceRole ?? '').trim()
+  if (role) parts.push(`working as ${role}`)
+  const interests = (a.audienceInterests ?? '').trim()
+  if (interests) parts.push(`interested in ${interests}`)
+  return parts.join(', ')
 }
 
 /** Split into sentences without pretending to be a tokenizer. */
@@ -108,6 +140,25 @@ export function toResolveInput(answers: OnboardingAnswers): ResolveInput {
   // passed through a form field a client could disagree with.
   const rule = refusalToRule(refusal, questionFor(intake).ask).rule
 
+  /**
+   * THEIR OWN SENTENCE OUTRANKS THEIR HOMEPAGE, and that is the whole ordering.
+   *
+   * `one_liner` used to come only from the fetched page. A sentence the person
+   * typed about their own business on screen 02 is better evidence than a
+   * sentence a crawler happened to pick off their site, and it is theirs
+   * without qualification. So the typed line wins when there is one, and the
+   * page's first sentence is the fallback it always was.
+   *
+   * NOT QUARANTINED when it is the typed line. The fence exists because door
+   * text comes from an arbitrary URL and a live crawl has already hit a real
+   * prompt injection on a public page. What the customer typed into our own
+   * form is the same trust level as `source.name`, which is not fenced either.
+   */
+  const typed = (answers.positioning ?? '').trim()
+  const oneLiner = typed
+    ? typed.slice(0, MAX_ONE_LINER)
+    : quarantineInline(firstSentence(doorText), 'the page or document you gave us')
+
   return ResolveInputSchema.parse({
     source: {
       name: name.trim() || 'This business',
@@ -117,11 +168,17 @@ export function toResolveInput(answers: OnboardingAnswers): ResolveInput {
       // jurisdiction and `category` is a free-text description; dropping it
       // would throw away the pick that decides which regulator is real.
       category: `${MODEL_NOUN[intake.model]} in ${REGIME_NOUN[intake.regime]}, in ${LOCALE_LABEL[intake.locale]}`,
-      // FENCED, because this sentence is not ours and not the founder's — it is
-      // whatever was on a page or in a PDF at an address they typed. See below.
-      one_liner: quarantineInline(firstSentence(doorText), 'the page or document you gave us'),
+      one_liner: oneLiner,
+    },
+    customer: {
+      // Literally a description of the customer, assembled from the screen that
+      // asks for one. This is the field those answers were always for; they
+      // simply never left the browser.
+      description: audienceDescription(answers),
     },
     brand: {
+      // FENCED, because this sentence is not ours and not the founder's — it is
+      // whatever was on a page or in a PDF at an address they typed.
       proof_point: quarantineInline(firstProofPoint(doorText), 'the page or document you gave us'),
     },
     taboo: {

@@ -23,21 +23,30 @@
  * counter to drift, and clearing an answer removes its signal rather than
  * leaving a credit for something no longer held.
  */
+import { isCompetitorKind, type CompetitorKind } from '@/lib/radar/types'
 
 /** A colour the user actually moved off its default. See `signalIds`. */
 export type SwatchKey = 'Primary' | 'Secondary' | 'Background'
 
 export const SWATCH_KEYS: readonly SwatchKey[] = ['Primary', 'Secondary', 'Background']
 
-export interface RefLink {
-  url: string
-  host: string
-  kind: string
-}
-
-export interface DocFile {
+/**
+ * A competitor, in the vocabulary Radar actually stores.
+ *
+ * `kind` and the three values it may take are NOT redefined here: they are
+ * `CompetitorKind` from `@/lib/radar/types`, the same union `addCompetitor`
+ * validates against. A second spelling of that list is how a screen ends up
+ * offering a kind the write path rejects.
+ *
+ * This used to be a bare string. It was collected, kept in localStorage and
+ * never sent anywhere, under a card that read "tracked for positioning" — so
+ * the shape had no reason to carry an address. It is sent now, and Radar needs
+ * a public URL to watch and a kind to know what it is looking at.
+ */
+export interface Rival {
   name: string
-  size: number
+  url: string
+  kind: CompetitorKind
 }
 
 export interface OnboardingData {
@@ -50,7 +59,6 @@ export interface OnboardingData {
   loc: string
   role: string
   interests: string
-  logo: string | null
   colors: Record<SwatchKey, string>
   /**
    * Which swatches were MOVED. Without this the three defaults would each read
@@ -58,11 +66,31 @@ export interface OnboardingData {
    * invented signals on the one number the design promises is real.
    */
   colorsTouched: SwatchKey[]
-  docs: DocFile[]
-  refs: RefLink[]
-  refNote: string
+  /**
+   * What Sahoda must never say about them, in their words.
+   *
+   * This feeds `taboo.avoid_topics`, which was empty on EVERY resolve until
+   * now: `use-build.ts` hardcoded `refusal: ''`, so every Red line on /brain was
+   * invented by the model with nothing from the user behind it.
+   *
+   * The field was removed once, deliberately, and the reason is worth keeping:
+   * "a guess here would become a red line the model treats as binding". That
+   * argument is about GUESSING on the user's behalf, and it still holds — this
+   * asks instead, and a blank stays blank rather than becoming an inferred rule.
+   */
+  neverSay: string
   sources: string[]
-  competitors: string[]
+  /**
+   * The address given for each picked source, keyed by its `SOURCES` key.
+   *
+   * A separate map rather than a shape change to `sources`, deliberately: this
+   * lane already migrated `competitors` in the same commit range, and a second
+   * simultaneous migration doubles the ways a resumed session can come back
+   * wrong for no gain. A key with no entry, or an empty one, is a source that
+   * was picked and never addressed — it is not sent.
+   */
+  sourceUrls: Record<string, string>
+  competitors: Rival[]
 }
 
 /**
@@ -87,22 +115,42 @@ export const DEFAULT_DATA: OnboardingData = {
   loc: '',
   role: '',
   interests: '',
-  logo: null,
   colors: { ...DEFAULT_COLORS },
   colorsTouched: [],
-  docs: [],
-  refs: [],
-  refNote: '',
   sources: [],
+  neverSay: '',
+  sourceUrls: {},
   competitors: [],
 }
 
-/** The step ids, in order. `comp` is optional; `result` is the end. */
-export const ORDER = ['intro', '1', '2', '3', '4', '5', '6', 'comp', 'result'] as const
+/**
+ * The step ids, in order. `comp` is optional; `result` is the end.
+ *
+ * ── FIVE, NOT SIX. THE REFERENCES SCREEN WAS REMOVED ─────────────────────────
+ * It asked for pages whose style the customer admires, plus a note on what they
+ * liked, and sent neither anywhere: `use-build.ts` posts model, regime, locale,
+ * doorText, name, refusal, positioning and the audience answers, and no request
+ * has ever carried a reference. The card under each link said "queued for
+ * analysis" and the result screen said "plus N references to study". Nothing was
+ * queued and nothing studied them.
+ *
+ * They could not simply be pointed at `addUrlDocument` either, which is what the
+ * Knowledge screen does with an address. The library grounds captions as FACTS
+ * ABOUT THIS BUSINESS, and a reference is explicitly somebody else's page — the
+ * screen's own words were "competitors: anything you admire". Indexing those
+ * would let a caption state a rival's prices as the customer's own.
+ *
+ * So the ask is removed rather than made vaguer, which is the same call already
+ * made for the Notion, Google Drive and Shopify tiles.
+ *
+ * Knowledge KEEPS ITS SCREEN and takes the number 5. `loadState` maps both
+ * retired positions onto it, so nobody mid-flow is thrown back to the intro.
+ */
+export const ORDER = ['intro', '1', '2', '3', '4', '5', 'comp', 'result'] as const
 export type StepId = (typeof ORDER)[number]
 
-/** The six that carry a number in the progress rail. */
-export const NUMBERED: readonly StepId[] = ['1', '2', '3', '4', '5', '6']
+/** The five that carry a number in the progress rail. */
+export const NUMBERED: readonly StepId[] = ['1', '2', '3', '4', '5']
 
 export interface OnboardingState {
   step: StepId
@@ -127,13 +175,17 @@ export function signalIds(data: OnboardingData): string[] {
   if (data.loc.trim()) ids.push('loc')
   if (data.role.trim()) ids.push('role')
   if (data.interests.trim()) ids.push('int')
-  if (data.logo) ids.push('logo')
+  // A LOGO, A GUIDELINES FILE, A REFERENCE AND A TASTE NOTE ARE NOT SIGNALS.
+  //
+  // They were, and each one raised the confidence reading and the orb's density
+  // for an input that reached nothing: the logo persisted as a FILE NAME, an
+  // uploaded document as `{name, size}` with no bytes, and a reference as a URL
+  // no request ever carried. The number on the result screen is a claim about
+  // how much Sahoda was told, so counting them overstated it by up to four.
   for (const key of SWATCH_KEYS) if (data.colorsTouched.includes(key)) ids.push(`color:${key}`)
-  data.docs.forEach((doc, i) => ids.push(`doc:${doc.name}${i}`))
-  for (const ref of data.refs) ids.push(`ref:${ref.url}`)
-  if (data.refNote.trim()) ids.push('refnote')
+  if (data.neverSay.trim()) ids.push('neversay')
   for (const source of data.sources) ids.push(`src:${source}`)
-  for (const rival of data.competitors) ids.push(`comp:${rival}`)
+  for (const rival of data.competitors) ids.push(`comp:${rival.name}`)
   return ids
 }
 
@@ -186,11 +238,7 @@ export const CAP_LABELS: Record<string, string> = {
   loc: 'Audience',
   role: 'Audience',
   int: 'Audience',
-  logo: 'Logo',
   color: 'Brand colour',
-  doc: 'Guidelines',
-  ref: 'Reference',
-  refnote: 'Taste',
   src: 'Knowledge',
   comp: 'Competitor',
 }
@@ -243,6 +291,23 @@ export function isStepId(value: unknown): value is StepId {
 }
 
 /**
+ * Where a saved position resumes, including the two that no longer exist.
+ *
+ * `'5'` WAS References and `'6'` WAS Knowledge. Falling through to `isStepId`
+ * would send anybody holding either of those back to the intro, on a flow they
+ * are part-way through — their typed answers would survive and their PLACE
+ * would not, which reads as the product having lost the session.
+ *
+ * Both resume on Knowledge, which is the screen that followed References and is
+ * now `'5'` itself. Nobody is shown a screen they already finished, and nobody
+ * skips one they have not.
+ */
+export function resumeStep(value: unknown): StepId {
+  if (value === '6') return '5'
+  return isStepId(value) ? value : 'intro'
+}
+
+/**
  * Read a saved position. Every field is checked rather than trusted: this is
  * localStorage, which any script on the origin can write and which survives a
  * deploy that changed the shape. A bad value resumes at `intro` with nothing,
@@ -277,7 +342,7 @@ export function loadState(workspaceId: string): OnboardingState | null {
   }
 
   return {
-    step: isStepId(parsed.step) ? parsed.step : 'intro',
+    step: resumeStep(parsed.step),
     data: {
       name: str(saved.name),
       site: str(saved.site),
@@ -288,14 +353,43 @@ export function loadState(workspaceId: string): OnboardingState | null {
       loc: str(saved.loc),
       role: str(saved.role),
       interests: str(saved.interests),
-      logo: typeof saved.logo === 'string' ? saved.logo : null,
       colors,
       colorsTouched: arr<SwatchKey>(saved.colorsTouched).filter((k) => SWATCH_KEYS.includes(k)),
-      docs: arr<DocFile>(saved.docs).filter((d) => d && typeof d.name === 'string'),
-      refs: arr<RefLink>(saved.refs).filter((r) => r && typeof r.url === 'string'),
-      refNote: str(saved.refNote),
+      neverSay: str(saved.neverSay),
       sources: arr<string>(saved.sources).filter((s) => typeof s === 'string'),
-      competitors: arr<string>(saved.competitors).filter((s) => typeof s === 'string'),
+      // Values only; the keys are whatever was picked and are checked against
+      // SOURCES at the point of use, not here.
+      sourceUrls: Object.fromEntries(
+        Object.entries(
+          (saved.sourceUrls && typeof saved.sourceUrls === 'object'
+            ? saved.sourceUrls
+            : {}) as Record<string, unknown>,
+        ).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+      ),
+      /**
+       * Reads BOTH shapes. A session saved before competitors carried an
+       * address comes back as `string[]`, and dropping those rows would lose
+       * answers somebody already gave us — a resume that silently forgets is
+       * worse than one that comes back incomplete. An old row keeps its name,
+       * gets an empty url and defaults to `website`, which is the kind the
+       * Radar form itself opens on. It cannot be sent until the url is filled,
+       * and the step shows it needing one.
+       */
+      competitors: arr<unknown>(saved.competitors)
+        .map((row): Rival | null => {
+          if (typeof row === 'string') {
+            return row.trim() ? { name: row, url: '', kind: 'website' } : null
+          }
+          if (!row || typeof row !== 'object') return null
+          const r = row as Partial<Rival>
+          if (typeof r.name !== 'string' || !r.name.trim()) return null
+          return {
+            name: r.name,
+            url: typeof r.url === 'string' ? r.url : '',
+            kind: isCompetitorKind(r.kind) ? r.kind : 'website',
+          }
+        })
+        .filter((r): r is Rival => r !== null),
     },
   }
 }
