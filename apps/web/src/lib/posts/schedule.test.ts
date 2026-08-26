@@ -40,7 +40,12 @@ describe('earliestScheduleAt', () => {
   test('ignores an unrecognised channel rather than throwing on stale stored data', () => {
     // Channels arrive from DB rows typed as Channel. A row written before a
     // channel was renamed must degrade to "no extra lead", not crash the editor.
-    const stale = 'facebook' as Channel
+    //
+    // RETARGETED from `facebook`, which became a REAL channel on 2026-08-26 and
+    // therefore stopped being unrecognised — the assertion started measuring the
+    // opposite of what it was written for. `myspace` cannot become real by
+    // accident, which is what a probe for "not in the union" needs to be.
+    const stale = 'myspace' as Channel
 
     expect(earliestScheduleAt([stale], NOW).getTime()).toBe(NOW.getTime())
     expect(earliestScheduleAt([stale, 'x'], NOW).getTime()).toBe(NOW.getTime() + 5 * MINUTE)

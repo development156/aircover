@@ -1,5 +1,5 @@
 import { Link2 } from 'lucide-react'
-import type { ConnectionPlatform } from '@sahoda/shared'
+import { ZERNIO_PLATFORMS } from '@sahoda/shared'
 
 import { ChannelTile } from '@/components/connections/channel-tile'
 import { Stagger } from '@/components/motion/stagger'
@@ -36,8 +36,11 @@ export const metadata = { title: 'Connections' }
  * four-column grid." A group of one is not a group; it is a heading with a
  * paperweight under it.
  *
- * The grouping is now **by readiness**, which is both the honest cut and an even
- * one — four connectable channels, four that are named and unbuilt. The question
+ * The grouping is now **by readiness**, which is both the honest cut and the one
+ * that keeps moving on its own: six channels can be connected today and two are
+ * named and unbuilt, and those counts changed on 2026-08-26 without this file
+ * being edited, because both groups are filtered from the catalogue rather than
+ * counted by hand. The question
  * the old grouping answered ("why is Google Business Profile in with Instagram?")
  * is answered better on the tile itself, where each channel states its `kind`
  * — *Feed*, *Local listing*, *Short video*, *Broadcast* — beside its own name,
@@ -58,13 +61,17 @@ export const metadata = { title: 'Connections' }
  * unbuilt; routing them through Zernio removes that dependency entirely — Zernio
  * holds the credential, exactly as it does for instagram — so the buttons do what
  * they say.
+ *
+ * ── DERIVED FROM THE SHARED ALLOWLIST, NOT RESTATED ─────────────────────────
+ *
+ * This was a hand-written set of four. It is the same list `ZERNIO_PLATFORMS`
+ * already holds — the one both OAuth routes validate against — so keeping a
+ * second copy here meant a channel could be connectable at the route and
+ * disabled on the screen, or the reverse, with nothing failing. When facebook
+ * and telegram were added the literal would have silently kept both buttons
+ * dead while the routes happily accepted them.
  */
-const LIVE_VIA_ZERNIO: ReadonlySet<string> = new Set<ConnectionPlatform>([
-  'instagram',
-  'x',
-  'gbp',
-  'linkedin',
-])
+const LIVE_VIA_ZERNIO: ReadonlySet<string> = new Set<string>(ZERNIO_PLATFORMS)
 
 /**
  * How many slots this workspace has used, and how many the plan allows.

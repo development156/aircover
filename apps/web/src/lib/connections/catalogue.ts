@@ -56,8 +56,22 @@ import { ChannelSchema, type Channel } from '@sahoda/shared'
 /**
  * Channels the product will offer and has not built. Presentation only — nothing
  * in this list may reach the database, the composer or an adapter.
+ *
+ * ── FACEBOOK AND TELEGRAM LEFT THIS LIST ON 2026-08-26 ───────────────────────
+ * They are now real `Channel` values, carried by the migration that widened the
+ * CHECK constraint on ten tables. YouTube and Pinterest stay, and the reason is
+ * not effort — it is that neither can be given an honest `PlatformSpec`:
+ *
+ *   youtube    is VIDEO. `PlatformSpec` has `imageDims` and `aspectRange` and no
+ *              duration, codec or resolution field, and the media pipeline is
+ *              image-shaped end to end.
+ *   pinterest  needs a destination link and a BOARD id, and `FormattedContent`
+ *              has nowhere to carry a board.
+ *
+ * Shipping either would mean writing limits no engine enforces, which is exactly
+ * the fabricated figure the Constraint Engine exists to prevent.
  */
-export const PLANNED_CHANNELS = ['facebook', 'youtube', 'pinterest', 'telegram'] as const
+export const PLANNED_CHANNELS = ['youtube', 'pinterest'] as const
 export type PlannedChannel = (typeof PLANNED_CHANNELS)[number]
 
 /** Every channel `/connections` names, built or planned. */
@@ -161,7 +175,13 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     short: 'Facebook',
     kind: 'Social feed',
     blurb: 'Publish and manage your Facebook presence.',
-    readiness: 'not-built',
+    // BUILT 2026-08-26 and NOT YET PROVEN. The adapter is the generic Zernio one
+    // — `createZernioAdapter(channel, deps)` — so no per-platform publish code
+    // was written; what changed is the schema, the spec and the catalogue.
+    // Nothing has been published to a real Facebook page from Sahoda, so this
+    // stays on the middle rung until a live send succeeds. Move it the day the
+    // evidence changes, not the day the code lands.
+    readiness: 'built-not-proven',
   },
   {
     id: 'youtube',
@@ -185,7 +205,9 @@ export const CATALOGUE: readonly CatalogueEntry[] = [
     short: 'Telegram',
     kind: 'Broadcast',
     blurb: 'Broadcast updates and engage with your Telegram community.',
-    readiness: 'not-built',
+    // Same standing as Facebook above: built through the generic Zernio adapter,
+    // never proven live.
+    readiness: 'built-not-proven',
   },
 ]
 

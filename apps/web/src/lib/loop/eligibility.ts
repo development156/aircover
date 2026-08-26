@@ -210,6 +210,8 @@ const CHANNEL_NAMES: Record<Channel, string> = {
   gbp: 'Google Business Profile',
   linkedin: 'LinkedIn',
   instagram: 'Instagram',
+  facebook: 'Facebook Pages',
+  telegram: 'Telegram',
 }
 
 function list(channels: readonly Channel[]): string {

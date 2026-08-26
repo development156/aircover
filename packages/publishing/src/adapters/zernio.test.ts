@@ -43,6 +43,10 @@ function stubClient(post: ZernioPost): ZernioClient {
     createProfile: unexpected('createProfile') as never,
     connectUrl: unexpected('connectUrl') as never,
     listAccounts: unexpected('listAccounts') as never,
+    // Wired to THROW, like the recovery surface below and for the same reason: a
+    // publish must never disconnect an account, and this makes that an assertion
+    // rather than an assumption.
+    disconnectAccount: unexpected('disconnectAccount') as never,
     presignMedia: unexpected('presignMedia') as never,
     uploadMedia: unexpected('uploadMedia') as never,
     headMedia: unexpected('headMedia') as never,

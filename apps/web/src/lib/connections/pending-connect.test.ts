@@ -26,7 +26,12 @@ describe('a pending connect is read whole or not at all', () => {
   it('refuses a platform that is not one we connect', () => {
     // The return route uses this to decide what may be CREATED. A platform outside
     // the allowlist reaching that decision would name a channel with no adapter.
-    expect(parsePendingConnect('facebook.redirect')).toBeNull()
+    //
+    // RETARGETED from `facebook`, which joined ZERNIO_PLATFORMS on 2026-08-26.
+    // `youtube` is a real Zernio platform we deliberately do NOT connect, which
+    // makes it a sharper probe than an invented string: it proves the allowlist
+    // is OURS rather than a passthrough of whatever the provider supports.
+    expect(parsePendingConnect('youtube.redirect')).toBeNull()
     expect(parsePendingConnect('../../etc.redirect')).toBeNull()
   })
 

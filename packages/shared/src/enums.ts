@@ -4,8 +4,33 @@ import { z } from 'zod'
 // constraints mirror these exact string sets. Adding a value = editing here AND
 // the mirroring migration CHECK (text + CHECK strategy, decision D9).
 
-/** Publishable/target channels. Alpha publishes to x + gbp (+ linkedin stretch); instagram is text-rules only. */
-export const ChannelSchema = z.enum(['x', 'gbp', 'linkedin', 'instagram'])
+/**
+ * Publishable/target channels.
+ *
+ * ── WIDENED 2026-08-26 WITH facebook AND telegram ────────────────────────────
+ * Adding a value here is not a one-file change. It MUST move together with
+ * `20260826120000_widen_channels_facebook_telegram.sql`, which re-adds the CHECK
+ * constraint on TEN tables and rewrites `app.is_channel_set` plus three PL/pgSQL
+ * guards. Widening this enum alone makes the app accept at the edge what the
+ * database refuses at the write.
+ *
+ * ── WHY THESE TWO AND NOT THE OTHER FOURTEEN ─────────────────────────────────
+ * Zernio's spec lists sixteen connectable platforms (MEASURED against
+ * `docs.zernio.com/api/openapi`, `/v1/connect/{platform}`). These two are the
+ * ones whose posts are shaped like the posts `PlatformSpec` already describes:
+ * text plus images, with a character cap.
+ *
+ *   youtube    is VIDEO. `PlatformSpec` carries `imageDims` and `aspectRange`
+ *              and has no duration, codec or resolution field, and the whole
+ *              media pipeline is image-shaped. An epic, not a channel.
+ *   pinterest  needs a destination link and a BOARD id, and there is nowhere in
+ *              `FormattedContent` or `PlatformSpec` to put a board.
+ *
+ * Adding a channel whose spec cannot be stated honestly would mean inventing
+ * limits no engine enforces, which is the failure the whole Constraint Engine
+ * exists to prevent.
+ */
+export const ChannelSchema = z.enum(['x', 'gbp', 'linkedin', 'instagram', 'facebook', 'telegram'])
 export type Channel = z.infer<typeof ChannelSchema>
 
 /** Content lifecycle (FSD 0.5). */
@@ -144,7 +169,14 @@ export type PlannerEventKind = z.infer<typeof PlannerEventKindSchema>
  * MUST MOVE TOGETHER with `connections_platform_check` and the p_platform guard in
  * `upsert_connection`.
  */
-export const ConnectionPlatformSchema = z.enum(['x', 'gbp', 'linkedin', 'instagram'])
+export const ConnectionPlatformSchema = z.enum([
+  'x',
+  'gbp',
+  'linkedin',
+  'instagram',
+  'facebook',
+  'telegram',
+])
 export type ConnectionPlatform = z.infer<typeof ConnectionPlatformSchema>
 
 export const ConnectionStatusSchema = z.enum(['active', 'expired', 'revoked', 'error'])
@@ -287,7 +319,14 @@ export type OpsArtifactMime = z.infer<typeof OpsArtifactMimeSchema>
  * selector. A platform in one and not the others produces a connection row that
  * looks live and can never publish.
  */
-export const ZERNIO_PLATFORMS = ['instagram', 'x', 'gbp', 'linkedin'] as const
+export const ZERNIO_PLATFORMS = [
+  'instagram',
+  'x',
+  'gbp',
+  'linkedin',
+  'facebook',
+  'telegram',
+] as const
 export type ZernioPlatform = (typeof ZERNIO_PLATFORMS)[number]
 
 export function isZernioPlatform(value: unknown): value is ZernioPlatform {

@@ -40,7 +40,7 @@ describe('a channel with no adapter', () => {
     // `docs/26` §10.2. A `<button disabled>` is still announced as a button: the
     // screen reader offers the action, the user takes it, nothing happens, and the
     // failure reads as "broken app" rather than "unbuilt feature".
-    const { container } = render(<ChannelTile entry={ENTRY.facebook} connections={[]} now={NOW} />)
+    const { container } = render(<ChannelTile entry={ENTRY.pinterest} connections={[]} now={NOW} />)
 
     // RETARGETED, and the claim is narrower than it looks. The rule is that a
     // channel with no adapter must offer no control that PURPORTS TO CONNECT IT
@@ -79,7 +79,7 @@ describe('a channel with no adapter', () => {
   it('carries no number about the customer', () => {
     // A container labelled coming soon is a promise we control; a figure inside
     // one is a claim about their business no query can support.
-    const { container } = render(<ChannelTile entry={ENTRY.telegram} connections={[]} now={NOW} />)
+    const { container } = render(<ChannelTile entry={ENTRY.pinterest} connections={[]} now={NOW} />)
 
     expect(container.textContent ?? '').not.toMatch(/\d/)
   })
