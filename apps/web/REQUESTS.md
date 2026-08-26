@@ -1964,12 +1964,24 @@ to be visible where its consequences are.
 
 **MEASURED**, same method as above, before and after:
 
-| across all four cards                       | before | after  | change |
-| ------------------------------------------- | ------ | ------ | ------ |
-| form controls                               | 24     | **19** | −21%   |
-| elements carrying their own text            | 105    | **76** | −28%   |
-| Google Business Profile card, text elements | 29     | **16** | −45%   |
-| Instagram card, text elements               | 31     | **23** | −26%   |
+| across all four cards            | before | after  | change |
+| -------------------------------- | ------ | ------ | ------ |
+| form controls on screen          | 24     | **19** | −21%   |
+| elements carrying their own text | 101    | **80** | −21%   |
+
+> **CORRECTED, AND THIS IS THE SECOND FIGURE IN THIS SECTION TO HAVE FLATTERED
+> THE FIX.** It first read 105 → 76 (−28%), with per-card rows claiming −45% on
+> Google Business Profile. An adversarial audit refuted it and a re-measurement
+> against the genuinely pre-fold component (`c68b491^`) agrees: "before" had been
+> counted on the POST-fold tree, so it carried four "More settings" labels that
+> did not exist before, and "after" excluded those same four labels although a
+> reader plainly sees them. Both metrics are **−21%**.
+>
+> **The metric flatters itself a second way.** 26 of those 101 elements are
+> `<option>`s inside collapsed `<select>`s, which nobody meets until a dropdown
+> is opened, and roughly a third of the counted reduction is options moving into
+> the fold. Honest headline: **about a fifth less on screen, and less than that
+> in the things a writer actually reads.**
 
 **This is a real improvement and a moderate one, and the difference matters.** It
 is not the wholesale simplification the brief asked for. The remaining weight is
@@ -1982,7 +1994,7 @@ card SAYS, and every one of those sentences is pinned by a shape gate.
 
 It opens itself whenever any of the six carries a value, and the summary names
 what is set even when shut. Guarded by `channel-settings.test.tsx` (10 tests) and
-proved by four mutations, each watched going red:
+proved by four mutations, each watched going red (a fifth, added after the audit, restores the naive comment-strip and turns two more red):
 
 | mutation                                                     | test that caught it                                 |
 | ------------------------------------------------------------ | --------------------------------------------------- |

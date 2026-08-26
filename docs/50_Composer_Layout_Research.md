@@ -183,7 +183,7 @@ must never be labelled a trend.**
 
 ### 6.2 SEO keywords — NOT BUILDABLE HONESTLY as measurement
 
-`keyword` appears 8 times repo-wide and **not once in a search sense**. There is
+`keyword` appears 12 times repo-wide (an earlier count of 8 was low) and **not once in a search sense**. There is
 no keyword table, no search-volume column, no SERP client, no Search Console
 connection. `pricing.config.json` carries an `seo_article` price for a task that
 does not exist, and `lib/remix/catalogue.ts:186-189` says so in user-facing copy:
@@ -193,6 +193,21 @@ does not exist, and `lib/remix/catalogue.ts:186-189` says so in user-facing copy
 a prompt change and it is honest, as long as nothing on screen calls the result
 "SEO optimised", which would claim an optimisation against a ranking nobody
 measured.
+
+### 6.2b A correction on GEO, from the audit
+
+**The flat claim above is wrong and is withdrawn.** Geographic data DOES exist:
+`packages/db/supabase/migrations/20260820220000_audience_snapshots.sql:93`
+constrains `dimension in ('age','gender','city','country','follower_count')`, and
+`apps/jobs/src/audience/deps.ts:124` requests `breakdown: 'age,city,country,gender'`
+from Zernio daily. So the product measures, per workspace, **which cities the
+customer's own Instagram audience is in**.
+
+What that is NOT: the business's own location, a targeting input, or a signal
+about anyone who is not already following them. It is a demographic readout of an
+audience already acquired, and there is no join from it to any tag. So a GEO
+FEATURE still has nothing to stand on, but "no geographic data exists anywhere"
+was too strong and should not have been written.
 
 ### 6.3 `[keyword]` bracket format instead of hashtags — BUILDABLE, and it needs a ruling first
 
@@ -215,7 +230,7 @@ typo to the reader.
 
 | # | Change | Proof |
 | --- | --- | --- |
-| 1 | The dash rule now reaches the model | `packages/mesh/src/prose-rules.ts`, 9 tests, 4 mutations |
+| 1 | The dash rule now reaches the model, on **all five** copy-writing tasks | `packages/mesh/src/prose-rules.ts`, 12 tests, 5 mutations |
 | 2 | Sahoda's third-person voice is enforced for the first time | `apps/web/src/lib/copy/sahoda-voice.ts`, 12 tests, 4 mutations |
 | 3 | One first-person stray fixed | `inline-rewrite.tsx:145` |
 
@@ -232,8 +247,15 @@ model reaches for when the glyph is refused. That is the same line
 `.agents/skills/humanizer` §14 already draws for human copy, and the gap was that
 **no prompt in `packages/mesh/src/tasks` had ever mentioned a dash** — so every
 caption this product has generated was free to open with one. `PROSE_RULES` now
-rides in the system prompt of `content_variants` and all three `caption_rewrite`
-instructions, and a test asserts it reaches each one.
+rides in the system prompt of `content_variants`, all three `caption_rewrite`
+instructions, `site_generate`, `plan_week` and `brand_guidelines`, and a test
+names each one. **The first version reached only the two caption tasks**, while
+`site_generate` writes the words on a customer's real website; an audit caught
+that and the coverage test now asserts each task individually.
+
+**One honest limit.** `findBannedDashes` is a detector nothing calls in
+production. The rule reaches the model as an instruction; nothing yet checks the
+model obeyed it.
 
 Every test proving a dash is caught has a partner proving a hyphen is not.
 Mutating the detector to flag ordinary hyphens turns **two** tests red.
@@ -247,11 +269,19 @@ didn't replace anything"* — the defect twice in one sentence, on a paid action
 while explaining that the customer had been charged.
 
 The guard that would have caught it did not exist. It does now, and on its first
-run it found **6 more** in the onboarding flow (`onboarding/stage/`), which is a
-coherent first-person mascot voice across two files rather than a typo. Those are
+run it found **5 more** in the onboarding flow — four in `result-step.tsx`, one
+in `what-step.tsx` — a coherent first-person mascot voice across two files rather
+than a typo. (An earlier draft said six. That came from a grep; the detector
+decides, and it says five.) Those are
 **quarantined with the reason written next to them**, not excused, and a second
 test asserts the quarantine still holds real strays so it can never become a
 silent pass.
+
+**What the guard does NOT cover, stated so nobody reads silence as coverage.** It
+globs `src/components/**/*.tsx`, which is 327 files. Roughly 750 further files
+carrying user-facing strings sit outside it: `app/**`, `lib/**`, `packages/**`
+and `apps/jobs/**`. And the pattern is a closed verb list, so `I looked`,
+`I checked`, `I saved` and `Let me try again` are invisible to it today.
 
 ---
 

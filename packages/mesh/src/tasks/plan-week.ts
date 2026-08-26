@@ -3,6 +3,7 @@ import { ChannelSchema, PlanWeekOutputSchema } from '@sahoda/shared'
 import type { Channel, MeshContext, MeshTaskDef, PlanWeekOutput } from '@sahoda/shared'
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
+import { PROSE_RULES } from '../prose-rules'
 
 /** 3072: measured 1,855 x 1.4 (token-budget.ts). 2048 left 9% headroom — one cliff away. */
 const MAX_TOKENS = 3072
@@ -92,7 +93,7 @@ function buildMessages(
   // pull in different directions the brand wins, and the order the model reads
   // them in is the cheapest way to say so.
   return [
-    { role: 'system', content: SYSTEM },
+    { role: 'system', content: `${SYSTEM}\n${PROSE_RULES}` },
     ...(brand ? [brand] : []),
     ...(market ? [market] : []),
     { role: 'user', content: user },
