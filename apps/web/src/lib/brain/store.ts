@@ -26,6 +26,20 @@ import type { PublishedPost } from './observe/tone-drift'
  * pooler, the idle-client error guard that a module-level singleton must have,
  * and no `pg` type import so the lockfile does not move.
  */
+/**
+ * The narrow slice of a Postgres client these readers need.
+ *
+ * Identical in shape to `lib/zernio/webhook-store.ts`'s, and here for the same
+ * reason: it lets a PGlite-backed test drive the REAL SQL below rather than a
+ * copy of it pasted into a test file. A copied query proves the copy works and
+ * says nothing about the one that ships, which matters more here than usual —
+ * the three most consequential decisions in these features are all in SQL that
+ * a unit test cannot see.
+ */
+export interface Queryable {
+  query<R = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: R[] }>
+}
+
 let portSingleton: PgLedgerPort | undefined
 
 function getPool(): PgLedgerPort['pool'] {
@@ -216,8 +230,9 @@ export async function readCapturedPosts(workspaceId: string, limit = 200): Promi
 export async function readChannelOutcomes(
   workspaceId: string,
   limit = 400,
+  db: Queryable = getPool(),
 ): Promise<ChannelOutcome[]> {
-  const r = await getPool().query<{
+  const r = await db.query<{
     post_id: string
     channel: string
     metric: string
@@ -265,8 +280,9 @@ export async function readChannelOutcomes(
 export async function readAudienceReadings(
   workspaceId: string,
   limit = 800,
+  db: Queryable = getPool(),
 ): Promise<AudienceReading[]> {
-  const r = await getPool().query<{
+  const r = await db.query<{
     account_id: string
     channel: string
     measured_on: string
@@ -312,8 +328,12 @@ export async function workspacesWithAudience(limit = 500): Promise<string[]> {
  * because the question is what that caption earned in total. The metric rows
  * are already the latest per post per channel before they are added.
  */
-export async function readFeaturedPosts(workspaceId: string, limit = 400): Promise<FeaturedPost[]> {
-  const r = await getPool().query<{
+export async function readFeaturedPosts(
+  workspaceId: string,
+  limit = 400,
+  db: Queryable = getPool(),
+): Promise<FeaturedPost[]> {
+  const r = await db.query<{
     post_id: string
     body: string
     engagement: string | number
