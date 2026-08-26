@@ -11,7 +11,7 @@ import { storedIntakeFrom } from '@/lib/onboarding/to-stored-intake'
 
 import { doorColors, doorText, type DoorOutcome } from './door-outcome'
 import type { OrbHandle } from './orb'
-import type { OnboardingData } from './store'
+import type { OnboardingData, Rival } from './store'
 import { waitForDoor } from './wait-for-door'
 
 /**
@@ -96,6 +96,17 @@ export function useBuild({
   const [failure, setFailure] = useState<BuildFailure | null>(null)
   const [brain, setBrain] = useState<BrandMemoryPayload | null>(null)
   const [brainSource, setBrainSource] = useState<BrandMemorySource>('resolved')
+  /**
+   * What did not land after the brain was built — a competitor, a source, or
+   * both. Named for the moment rather than for one of the two things it can
+   * report, because it carries either.
+   *
+   * `null` covers both "there were none to send" and "every one landed", which
+   * are the two cases with nothing to say. A partial failure must not be
+   * silent — the brain is built and charged by then, so losing a competitor
+   * quietly would leave the person believing a page is being watched.
+   */
+  const [afterBuildNote, setWatchListNote] = useState<string | null>(null)
   const [wasFree, setWasFree] = useState(false)
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -249,10 +260,27 @@ export function useBuild({
       form.set('regime', classified.intake.regime)
       form.set('locale', classified.intake.locale)
       form.set('doorText', doorText(settled))
-      // The flow no longer asks for a tone-to-avoid — it is set on /brain against
-      // real output. A blank is a truthful "we were not told"; a guess here would
-      // become a red line the model treats as binding.
-      form.set('refusal', '')
+      /**
+       * The answers screen 02 and 03 collect, which used to stop at the browser.
+       *
+       * Until now this form carried model, regime, locale, doorText, an empty
+       * refusal and a name. Everything else a person typed over six screens was
+       * read for keywords by the classifier and then dropped — age, location,
+       * role and interests reached nothing at all, and the positioning sentence
+       * survived only as three enum values.
+       *
+       * `refusal` was hardcoded empty with the note that "a guess here would
+       * become a red line the model treats as binding". That reasoning is about
+       * guessing, and it stands: this sends what the person actually wrote, and
+       * an untouched field still sends nothing.
+       */
+      form.set('refusal', data.neverSay.trim())
+      form.set('positioning', data.what.trim())
+      form.set('audience', data.audience.trim())
+      form.set('audienceAge', data.age.trim())
+      form.set('audienceLoc', data.loc.trim())
+      form.set('audienceRole', data.role.trim())
+      form.set('audienceInterests', data.interests.trim())
       form.set(
         'name',
         data.name.trim() || (settled.kind === 'read' ? settled.foundName : '') || workspaceName,
@@ -273,6 +301,24 @@ export function useBuild({
 
       setBrain(state.brain)
       setBrainSource(state.kind === 'fallback' ? 'system' : 'resolved')
+
+      /**
+       * The watch list, sent to the same action the Radar screen uses.
+       *
+       * AFTER the resolve and never before it, and it cannot fail the build.
+       * By this line the brain exists and the credits are spent; throwing that
+       * away because a competitor URL was malformed would lose the expensive
+       * half to protect the free one. Rows without an address are skipped
+       * rather than sent — a session saved before this screen asked for one
+       * comes back holding them, and `addCompetitor` would refuse them anyway.
+       */
+      const [watchNote, sourcesNote] = [
+        await sendWatchList(data.competitors),
+        await sendSources(data.sources, data.sourceUrls),
+      ]
+      // Joined rather than nested: two independent things went wrong or did
+      // not, and the reader needs both sentences, not the first one only.
+      setWatchListNote([watchNote, sourcesNote].filter(Boolean).join(' ') || null)
       setWasFree(state.kind === 'free')
       setFallbackMessage(state.kind === 'fallback' ? state.message : null)
 
@@ -386,6 +432,7 @@ export function useBuild({
     failure,
     wasFree,
     fallbackMessage,
+    afterBuildNote,
     saving,
     saveError,
     themeError,
@@ -393,6 +440,93 @@ export function useBuild({
     dismiss,
     finish,
   }
+}
+
+/**
+ * ── WHY THE TWO ACTIONS BELOW ARE IMPORTED INSIDE THE FUNCTIONS ──────────────
+ * They run once, on the last press of the last screen, so the first load of
+ * screen 01 is the wrong place for them.
+ *
+ * MEASURED, and smaller than it sounds: moving these two off the static graph
+ * took `/(onboarding)/onboarding` from 789.2 kB to 788.9 kB. 0.3 kB, not the
+ * several this was expected to save — the route's weight is dominated by a
+ * shared vendor chunk, not by these. Kept because it is still the right shape
+ * and costs nothing, and recorded at its real size so the next person does not
+ * re-derive it hoping for more.
+ *
+ * The budget script says in its own header that it cannot see a dynamic import,
+ * so this moves bytes out of the measured window rather than deleting them.
+ * Honest here, and it would not be for code the FIRST screen needs.
+ */
+
+/**
+ * Read the picked knowledge sources into the library, and say what did not land.
+ *
+ * `addUrlDocument` fetches the address, stores the document and indexes it, and
+ * costs nothing — `knowledge.ts` states that no action on that path is priced,
+ * because no model is called on it. A source picked without an address is
+ * skipped rather than sent: the step never gates, so leaving the field empty is
+ * a thing people will do, and posting an empty URL just earns a refusal.
+ */
+async function sendSources(
+  picked: readonly string[],
+  urls: Readonly<Record<string, string>>,
+): Promise<string | null> {
+  const failed: string[] = []
+  for (const key of picked) {
+    const url = (urls[key] ?? '').trim()
+    if (!url) continue
+    try {
+      const form = new FormData()
+      form.set('url', url)
+      form.set('title', key)
+      const { addUrlDocument } = await import('@/app/actions/knowledge')
+      const result = await addUrlDocument(form)
+      if (!result.ok) failed.push(key)
+    } catch {
+      failed.push(key)
+    }
+  }
+  if (failed.length === 0) return null
+  return `Sahoda could not read ${failed.join(', ')}. Your Brand Brain is saved. Try ${failed.length === 1 ? 'that source' : 'those sources'} again from Knowledge.`
+}
+
+/**
+ * Put the competitors on the Radar watch list, and say what did not land.
+ *
+ * Sequential rather than `Promise.all`: each call is a workspace-scoped write
+ * behind RLS, and firing five at once at a free-tier database to save a few
+ * hundred milliseconds on a screen the user is already watching an animation on
+ * is a bad trade. Returns `null` when there is nothing to report.
+ */
+async function sendWatchList(rivals: readonly Rival[]): Promise<string | null> {
+  const sendable = rivals.filter((r) => r.url.trim() !== '')
+  const failed: string[] = []
+  for (const rival of sendable) {
+    try {
+      const { addCompetitor } = await import('@/app/actions/radar')
+      const result = await addCompetitor(rival.name, rival.url, rival.kind)
+      if (!result.ok) failed.push(rival.name)
+    } catch {
+      // A throw and an `ok: false` are the same outcome to the person reading
+      // the sentence: this one is not being watched.
+      failed.push(rival.name)
+    }
+  }
+  const skipped = rivals.length - sendable.length
+  if (failed.length === 0 && skipped === 0) return null
+  const parts: string[] = []
+  if (failed.length > 0) {
+    parts.push(
+      `Sahoda could not add ${failed.join(', ')} to your watch list. Your Brand Brain is saved. Add ${failed.length === 1 ? 'it' : 'them'} again on Radar.`,
+    )
+  }
+  if (skipped > 0) {
+    parts.push(
+      `${skipped} ${skipped === 1 ? 'competitor has' : 'competitors have'} no address, so ${skipped === 1 ? 'it was' : 'they were'} not added to the watch list.`,
+    )
+  }
+  return parts.join(' ')
 }
 
 /**

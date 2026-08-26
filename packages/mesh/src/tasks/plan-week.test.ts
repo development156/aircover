@@ -39,6 +39,35 @@ const briefsJson = (n: number) =>
   JSON.stringify({ briefs: Array.from({ length: n }, (_, i) => brief(i)) })
 
 describe('planWeekTask', () => {
+  it('asks for the Marketing Brain, and is the only task that does', () => {
+    // The build order's reason, in a guard: one reader means any change in plan
+    // quality is attributable to this one wire. If a second task ever wants it,
+    // that is a decision, and this assertion failing is where it gets made.
+    expect(planWeekTask.wantsMarketContext).toBe(true)
+  })
+
+  it('puts the brand block ABOVE the market block, which is the arbitration rule', () => {
+    // docs/51: the Brand Brain keeps the brand original, the Marketing Brain
+    // says what the numbers show, and when the two disagree the brand wins.
+    // Reading order is the cheapest way to say so to a model, so it is pinned.
+    const brand = { role: 'system' as const, content: 'BRAND', cache: true }
+    const market = { role: 'system' as const, content: 'MEASURED' }
+    const messages = planWeekTask.buildMessages(input, ctx, brand, undefined, market)
+    expect(messages.map((m) => m.content)).toEqual([
+      messages[0]!.content,
+      'BRAND',
+      'MEASURED',
+      messages[3]!.content,
+    ])
+  })
+
+  it('plans without observations when the workspace has none', () => {
+    const brand = { role: 'system' as const, content: 'BRAND', cache: true }
+    const messages = planWeekTask.buildMessages(input, ctx, brand)
+    expect(messages).toHaveLength(3)
+    expect(messages.some((m) => m.content === 'MEASURED')).toBe(false)
+  })
+
   it('is the standard-tier, brand-grounded plan_week task', () => {
     expect(planWeekTask.def.name).toBe('plan_week')
     expect(planWeekTask.def.tier).toBe('standard')

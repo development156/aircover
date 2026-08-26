@@ -220,9 +220,17 @@ else
   ok "All ${#ENV_REQUIRED[@]} required present; $SET_COUNT set in total."
   { echo "OK"; echo "set_count=$SET_COUNT"; } > "$STATUS" 2>/dev/null
 fi
+# ── THE SCRATCH-FILE GUARD ───────────────────────────────────────────────────
+# `.githooks/pre-commit` refuses a commit that stages `ops/state/qa.pending.json`,
+# which every gate run rewrites. Pointed at here rather than left to each person
+# to remember, because the rule was broken twice in three commits by `git add -A`
+# on 2026-08-25 — once immediately after being fixed for the same reason.
+git config core.hooksPath .githooks 2>/dev/null || true
+
 echo
 echo "  Next: run /kickoff. It pulls, restores your own context from the last"
 echo "  handoff, and reads what the other two lanes did before you plan."
+
 
 # ALWAYS succeed. A non-zero exit here stops Claude Code from starting at all,
 # and a session that cannot start cannot tell you what is wrong.

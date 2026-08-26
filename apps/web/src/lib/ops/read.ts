@@ -389,3 +389,46 @@ export const readPublishDeadLetters = cache(async (): Promise<OpsRead<PublishDea
       .limit(100),
   )
 })
+
+/**
+ * Every Marketing Brain observation, newest first. The ONLY window onto this
+ * store.
+ *
+ * ── WHY IT IS HERE AND NOT ON A CUSTOMER SCREEN ─────────────────────────────
+ * The Marketing Brain is deliberately hidden: docs/51 settled that a customer
+ * has no direct access to it and reads it only where it says something on a page
+ * they already look at. That decision leaves an operator with no way to answer
+ * "is the weekly pass writing anything, and is what it writes any good" — and
+ * `post_publish_logs` is the standing lesson about what an unobservable table
+ * costs. Migration 20260825000000 adds the ops policy that makes this read
+ * return more than the operator's own workspace.
+ *
+ * `evidence` is passed through as `unknown` rather than parsed against
+ * `marketingObservationSchema`. That is deliberate for THIS reader only: the
+ * customer-facing read drops rows it cannot parse, so a row with a broken shape
+ * would be invisible on both screens at once and an operator would be debugging
+ * a store whose broken rows it hides. The screen renders it as JSON.
+ */
+const OpsObservationSchema = z.object({
+  id: z.string(),
+  workspace_id: z.string(),
+  kind: z.string(),
+  subject: z.string(),
+  claim: z.string(),
+  evidence: z.unknown(),
+  computed_on: z.string(),
+  updated_at: z.string(),
+})
+
+export type OpsObservation = z.infer<typeof OpsObservationSchema>
+
+export const readMarketingObservations = cache(async (): Promise<OpsRead<OpsObservation[]>> => {
+  const supabase = createServerSupabase()
+  return readAll('marketing_observations', z.array(OpsObservationSchema), () =>
+    supabase
+      .from('marketing_observations')
+      .select('id,workspace_id,kind,subject,claim,evidence,computed_on,updated_at')
+      .order('computed_on', { ascending: false })
+      .limit(100),
+  )
+})

@@ -32,17 +32,22 @@ const def: MeshTaskDef<CaptionRewriteInput, CaptionRewriteOutput> = {
   cachePrefix: 'brand_context',
 }
 
+/** Rewrite the selection when the editor sends one; otherwise the whole caption. */
+function target(input: CaptionRewriteInput): string {
+  return input.selection ?? input.text
+}
+
 function buildMessages(
   input: CaptionRewriteInput,
   _ctx: MeshContext,
   brand?: ChatMessage,
+  knowledge?: ChatMessage,
 ): ChatMessage[] {
-  // Rewrite the selection when the editor sends one; otherwise the whole caption.
-  const target = input.selection ?? input.text
   return [
     { role: 'system', content: `${SYSTEM_BASE} ${DIRECTIVES[input.instruction]}` },
     ...(brand ? [brand] : []),
-    { role: 'user', content: target },
+    ...(knowledge ? [knowledge] : []),
+    { role: 'user', content: target(input) },
   ]
 }
 
@@ -51,4 +56,7 @@ function buildMessages(
 export const captionRewriteTask: MeshTaskSpec<CaptionRewriteInput, CaptionRewriteOutput> = {
   def,
   buildMessages,
+  // Retrieved against the same text the model is asked to rewrite, so a caption
+  // about the tasting menu draws the passage about the tasting menu.
+  knowledgeQuery: target,
 }

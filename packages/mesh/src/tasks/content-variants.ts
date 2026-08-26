@@ -44,6 +44,7 @@ function buildMessages(
   input: ContentVariantsInput,
   _ctx: MeshContext,
   brand?: ChatMessage,
+  knowledge?: ChatMessage,
 ): ChatMessage[] {
   const user = [
     'Canonical post:',
@@ -57,6 +58,7 @@ function buildMessages(
   return [
     { role: 'system', content: SYSTEM },
     ...(brand ? [brand] : []),
+    ...(knowledge ? [knowledge] : []),
     { role: 'user', content: user },
   ]
 }
@@ -65,4 +67,7 @@ function buildMessages(
 export const contentVariantsTask: MeshTaskSpec<ContentVariantsInput, ContentVariantsOutput> = {
   def,
   buildMessages,
+  // The canonical body only. The channel limits are our own framing and would
+  // just widen the query with words like "hashtags" that match every passage.
+  knowledgeQuery: (input) => input.body,
 }

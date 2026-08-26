@@ -14,7 +14,6 @@
  */
 
 /** Shown on every reference card. Not a status — a statement of intent. */
-export const REF_PENDING_NOTE = 'queued for analysis'
 
 /**
  * The hostname, or the raw text when it is not a URL at all.
@@ -68,19 +67,68 @@ export interface KnowledgeSource {
   key: string
   icon: string
   detail: string
+  /** What the tile asks for once it is picked. */
+  ask: string
+  placeholder: string
 }
 
-/** Step 06's grid. Keys and copy are the source's, verbatim. */
+/**
+ * Step 06's grid — only the sources this product can actually read.
+ *
+ * ── WHAT WAS REMOVED, AND WHY IT IS NOT HIDDEN SOMEWHERE ────────────────────
+ * Notion, Google Drive and Shopify were on this grid and are gone. Each needs
+ * an OAuth handshake and an adapter, and `knowledge-step.tsx` said so in its own
+ * header before this change: "for Notion, Drive and Shopify no adapter exists at
+ * all". A tile that records an intention it cannot act on is a promise, and the
+ * grid gave no way to tell those three apart from the ones that work.
+ *
+ * They are listed in `UNBUILT_SOURCES` rather than deleted, so the next person
+ * knows they were considered and why they are absent.
+ *
+ * ── EVERY SOURCE HERE TAKES A URL ────────────────────────────────────────────
+ * Because `addUrlDocument` is the write path, and it takes an address, fetches
+ * it and indexes what comes back. Brand guidelines and Manual upload were file
+ * tiles; they are not in this list yet, because `DocFile` in the store carries
+ * `{ name, size }` and no bytes, so wiring them needs real file plumbing
+ * through to `addPdfDocument`. Offering an upload that records a filename and
+ * discards the file is the defect this change exists to remove, so they wait
+ * for the commit that can carry them.
+ */
 export const SOURCES: readonly KnowledgeSource[] = [
-  { key: 'Website', icon: 'i-globe', detail: 'Crawl your pages' },
-  { key: 'Instagram', icon: 'i-at', detail: 'Read your posts' },
-  { key: 'Brand guidelines', icon: 'i-file', detail: 'Use uploaded files' },
-  { key: 'Product catalog', icon: 'i-bag', detail: 'Names, prices, copy' },
-  { key: 'Notion', icon: 'i-grid', detail: 'Selected pages' },
-  { key: 'Google Drive', icon: 'i-db', detail: 'Selected folders' },
-  { key: 'Shopify', icon: 'i-bag', detail: 'Products and orders' },
-  { key: 'Manual upload', icon: 'i-up', detail: 'PDFs and docs' },
+  {
+    key: 'Website',
+    icon: 'i-globe',
+    detail: 'Read your pages',
+    ask: 'Which address should Sahoda read?',
+    placeholder: 'yourbakery.in',
+  },
+  {
+    key: 'Instagram',
+    icon: 'i-at',
+    detail: 'Read your profile',
+    ask: 'Which profile should Sahoda read?',
+    placeholder: 'instagram.com/yourbakery',
+  },
+  {
+    key: 'Product catalog',
+    icon: 'i-bag',
+    detail: 'Names, prices, copy',
+    ask: 'Which page lists what you sell?',
+    placeholder: 'yourbakery.in/menu',
+  },
 ]
+
+/**
+ * Considered and not offered. Each needs an OAuth handshake and an adapter that
+ * does not exist. Restoring one means building that first, not adding a tile.
+ */
+export const UNBUILT_SOURCES = ['Notion', 'Google Drive', 'Shopify'] as const
+
+/**
+ * File-backed sources, waiting on real upload plumbing rather than on a
+ * decision. See the note above `SOURCES`.
+ */
+export const FILE_SOURCES_PENDING = ['Brand guidelines', 'Manual upload'] as const
 
 /** Step 02's chips. */
 export const CATEGORIES = [

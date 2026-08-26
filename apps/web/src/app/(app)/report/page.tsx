@@ -1,7 +1,9 @@
 import Link from 'next/link'
 
+import { ObservationNote } from '@/components/brain/observation-note'
 import { PageTitle } from '@/components/page-title'
 import { reflectionWindow } from '@/lib/loop/iso-week'
+import { readBrainObservations, type BrainRead } from '@/lib/brain/read'
 import { readLoop } from '@/lib/loop/read'
 import { readCycleLearnings, readRanking } from '@/lib/loop/report'
 import { creditWord } from '@/lib/credit-words'
@@ -48,6 +50,10 @@ const REPORT_OUTLINE: ReadonlyArray<{ title: string; what: string }> = [
     what: 'The single best-performing post of the week, and the one that did least, named only when at least two were measured.',
   },
   {
+    title: 'What Sahoda noticed',
+    what: 'Things Sahoda worked out about your marketing on its own, each shown with the numbers behind it.',
+  },
+  {
     title: 'What Sahoda learned',
     what: 'The part that changes things: what the week suggests about what to write next.',
   },
@@ -59,7 +65,12 @@ const REPORT_OUTLINE: ReadonlyArray<{ title: string; what: string }> = [
 ]
 
 export default async function ReportPage() {
-  const read = await readLoop()
+  // Read together, and the Marketing Brain read is NOT conditional on a cycle.
+  // That is the point of the second brain: a workspace that has never run the
+  // Loop has still published captions, and "you have stopped using exclamation
+  // marks" is computable from those alone. Gating this behind a cycle would have
+  // hidden the one block that works before a customer has spent anything.
+  const [read, brain] = await Promise.all([readLoop(), readBrainObservations()])
 
   // "You have no workspace" and "we could not look" are different claims with
   // different remedies, and this page used to make the first one on both arms.
@@ -127,6 +138,8 @@ export default async function ReportPage() {
             , which reports what actually went out.
           </p>
         </section>
+
+        <BrainBlock brain={brain} />
 
         <div>
           <p className="type-eyebrow text-muted">What Monday&rsquo;s report says</p>
@@ -204,6 +217,9 @@ export default async function ReportPage() {
             </Block>
           </>
         ) : null}
+
+        {/* ── WHAT IT NOTICED, UNPROMPTED ───────────────────────────────── */}
+        <BrainBlock brain={brain} />
 
         {/* ── WHAT IT LEARNED ───────────────────────────────────────────── */}
         <Block eyebrow="The part that changes things" title="What Sahoda learned">
@@ -300,6 +316,52 @@ function fullDay(isoDay: string): string {
     month: 'long',
     timeZone: 'UTC',
   })
+}
+
+/**
+ * THE MARKETING BRAIN'S BLOCK — the same shape in both branches of this page.
+ *
+ * ── FOUR STATES, AND THE TWO EMPTY ONES SAY DIFFERENT THINGS ────────────────
+ * `lib/inbox/emptiness.ts` exists because "we never asked" and "we asked and got
+ * nothing" are different sentences, and this block has the same pair. A failed
+ * read must not say the customer has published too little, and a customer who
+ * has published too little must not be offered a reload. Both would be the
+ * impossible remedy `no-impossible-remedy.spec.ts` guards against.
+ *
+ * ── AND IT NAMES THE FLOOR RATHER THAN THE OUTCOME ──────────────────────────
+ * "Sahoda has not noticed anything yet" is true and useless. It reads as a
+ * product that is not working. Saying that observations need a run of published
+ * posts behind them tells the reader what would change it, which is the same
+ * distinction the Loop's refusal copy draws.
+ */
+function BrainBlock({ brain }: { brain: BrainRead }) {
+  return (
+    <Block eyebrow="Noticed on its own" title="What Sahoda noticed">
+      {brain.status === 'error' ? (
+        <p className="type-body max-w-[68ch] text-muted">
+          Sahoda couldn&rsquo;t read what it has noticed just now, so this block can&rsquo;t say
+          whether there is anything. Try again in a moment.
+        </p>
+      ) : brain.status === 'no-workspace' ? (
+        <p className="type-body max-w-[68ch] text-muted">
+          Finish setting up your workspace and this fills in.
+        </p>
+      ) : brain.observations.length === 0 ? (
+        <p className="type-body max-w-[68ch] text-muted">
+          Nothing yet. Sahoda looks at your published posts once a week and only says something when
+          the numbers are strong enough to stand behind. That takes a run of posts, not a few.
+        </p>
+      ) : (
+        <ul className="grid gap-2">
+          {brain.observations.map((observation) => (
+            <li key={`${observation.kind}:${observation.subject}:${observation.computedOn}`}>
+              <ObservationNote observation={observation} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </Block>
+  )
 }
 
 function Block({
