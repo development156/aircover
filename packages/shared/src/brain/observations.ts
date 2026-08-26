@@ -43,6 +43,16 @@ export const OBSERVATION_KINDS = [
    * corrections moat honest rather than decorative.
    */
   'edit_distance',
+  /**
+   * Which channel returns more attention per person reached. Arithmetic over
+   * `post_metric_snapshots`, which the platforms reported; no model call.
+   *
+   * The first kind that answers "did it work" rather than "how do you write".
+   * docs/55 records why that matters: a measurement earns its place only by
+   * naming the decision it changes, and this one names spending the next
+   * evening on the channel that pays.
+   */
+  'channel_return',
 ] as const
 
 export type ObservationKind = (typeof OBSERVATION_KINDS)[number]
