@@ -204,6 +204,36 @@ warning was correctly counting a real dirty file and I misread it as the bug.
 
 ---
 
+## One finding recorded rather than fixed: REQUESTS §28
+
+**Every commit on a branch with an open pull request runs the gate TWICE.**
+MEASURED on this branch at `2244c97`: two runs, both `in_progress`, same head —
+run 106 (`pull_request`) and run 107 (`push`).
+
+`REQUESTS.md` §27 added `on: push` because the `pull_request` event went missing
+twice, kept `pull_request` as well, and keyed concurrency on the branch so the
+pair would collapse. **The file's own comment states that outcome as achieved. It
+is not.** `github.head_ref` is empty on a push and the fallback `github.ref` is
+fully qualified, so one branch produces two group names:
+
+```
+pull_request -> gate-claude/divas-kickoff-03y2g2
+push         -> gate-refs/heads/claude/divas-kickoff-03y2g2
+```
+
+Two groups never cancel each other. The half §27 did fix works — runs 93, 95 and
+103 were each cancelled by the next push inside the push group. Only the
+cross-event collapse fails. The fix is one token: `github.ref_name`.
+
+**Not fixed here, deliberately.** `gate.yml` is another lane's live surface and
+its owner is mid-iteration on it. This lane lost a design today by building the
+same concept in parallel with someone else, and doing it again to a CI file
+would be worse. Recorded in the cross-lane log instead, with the check that
+proves it: count the runs on a head. Two today, one after.
+
+The cost is the shared usage pool `08_ROLES.md` describes, twice per commit, at
+10 to 12 minutes a run.
+
 ## Stale figures, all MEASURED today
 
 | Claim | Where it is written | Actual |
