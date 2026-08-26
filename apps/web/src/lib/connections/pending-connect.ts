@@ -82,6 +82,7 @@ export function parsePendingConnect(raw: string | undefined): PendingConnect | n
   const parts = raw.split('.')
   if (parts.length !== 2) return null
   const [platform, mode] = parts
+  if (platform === undefined || mode === undefined) return null
   if (!PLATFORMS.has(platform) || !MODES.has(mode)) return null
   return { platform: platform as ZernioPlatform, mode: mode as ConnectMode }
 }

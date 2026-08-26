@@ -63,6 +63,61 @@ function escapeAttr(value: string): string {
 }
 
 /**
+ * THE POPUP'S LAST DOCUMENT — it tells the opener and shuts itself.
+ *
+ * ── WHY THIS IS SERVED FROM THE ROUTE AND NOT A PAGE ─────────────────────────
+ * A `/connections/done` page would be a second place the outcome vocabulary
+ * lives, reachable directly, and it would need the same allowlist this route
+ * already applies. Serving the closer here keeps one owner for the whole trip.
+ *
+ * ── THE STATUS LINE IS UNTOUCHED ─────────────────────────────────────────────
+ * This route exists in its current shape because a failure leaving as 303 was
+ * invisible to a 4xx/5xx log filter. A popup does not change what happened, so it
+ * does not change the status code: a failed popup connect is still a 5xx, and only
+ * the BODY differs. `httpStatus` is passed in for exactly that reason.
+ *
+ * ── AND IT DEGRADES WHEN THERE IS NO OPENER ──────────────────────────────────
+ * `window.opener` is null if the customer middle-clicked, if the chain was severed,
+ * or if a `Cross-Origin-Opener-Policy` header is ever added to this app. The script
+ * then navigates this window to /connections instead of closing it, so the worst
+ * case is the old full-page behaviour rather than a window that will not shut and
+ * says nothing.
+ */
+function popupCloser(
+  request: Request,
+  httpStatus: number,
+  status: string,
+  detail?: string,
+): Response {
+  const target = connectionsUrl(request, status, detail)
+  const safe = escapeAttr(target)
+  return new Response(
+    `<!doctype html><html lang="en"><head><meta charset="utf-8">` +
+      `<title>Finishing up</title></head>` +
+      `<body><p>You can close this window. ` +
+      `<a href="${safe}">Go back to Connections</a>.</p>` +
+      `<script>(function(){` +
+      // `location.origin` and nothing else. A wildcard target would post the
+      // outcome to whatever happened to open this window.
+      `try{if(window.opener&&!window.opener.closed){` +
+      `window.opener.postMessage({type:"sahoda:connect-outcome"},window.location.origin);` +
+      `window.close();return;}}catch(e){}` +
+      `window.location.replace(${JSON.stringify(target)});` +
+      `})();</script></body></html>`,
+    {
+      status: httpStatus,
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'no-store',
+        'set-cookie': CLEAR_PENDING_CONNECT,
+        // Kept for the log reader and for `curl -I`, exactly as `backError` does.
+        location: target,
+      },
+    },
+  )
+}
+
+/**
  * A real outcome: the connect worked, or there was genuinely nothing new to record.
  * 303 is correct here and the logs are already truthful about it.
  */
@@ -144,10 +199,32 @@ function backError(
 }
 
 export async function GET(request: Request): Promise<Response> {
+  /**
+   * ── WHAT THE CUSTOMER PRESSED, READ FIRST ─────────────────────────────────
+   * Read from an httpOnly cookie our own start route set, never from the query
+   * string — see lib/connections/pending-connect.ts for why that distinction is
+   * load-bearing on this route in particular.
+   *
+   * Read at the TOP because it decides the SHAPE of every answer below, failures
+   * included: a popup that gets a 303 just leaves a second copy of /connections
+   * sitting in a 620px window, and the customer has to close it and work out for
+   * themselves whether anything happened.
+   *
+   * `null` when the cookie expired, was never set (a bookmarked replay), or the
+   * browser dropped it. That is not an error: the trip still REFRESHES every row
+   * we already hold, which is the whole of the documented self-heal that matters.
+   * What it may not do without this is CREATE.
+   */
+  const pending = await readPendingConnect()
+  const popup = pending?.mode === 'popup'
+
   const ok = (status: 'connected' | 'nothing' | 'limit', detail?: string) =>
-    backOk(request, status, detail)
+    popup ? popupCloser(request, 303, status, detail) : backOk(request, status, detail)
   /** Each failure carries the status a log reader would expect for that cause. */
-  const fail = (httpStatus: number, detail: string) => backError(request, httpStatus, detail)
+  const fail = (httpStatus: number, detail: string) =>
+    popup
+      ? popupCloser(request, httpStatus, 'error', detail)
+      : backError(request, httpStatus, detail)
 
   let workspaceId: string | undefined
   try {
@@ -224,20 +301,6 @@ export async function GET(request: Request): Promise<Response> {
 
     const unreadable = reads.filter((r) => !r.read).map((r) => r.platform)
     const accounts = reads.flatMap((r) => r.accounts)
-
-    /**
-     * ── WHAT THE CUSTOMER ACTUALLY PRESSED ────────────────────────────────────
-     * Read from an httpOnly cookie our own start route set, never from the query
-     * string — see lib/connections/pending-connect.ts for why that distinction is
-     * load-bearing on this route in particular.
-     *
-     * `null` when the cookie expired, was never set (a bookmarked replay), or the
-     * browser dropped it. That is not an error: the trip still REFRESHES every row
-     * we already hold, which is the whole of the documented self-heal that matters
-     * — a token that moved, an expiry that shifted, a handle that changed. What it
-     * may not do without this is CREATE.
-     */
-    const pending = await readPendingConnect()
 
     // NOTHING could be read. Deliberately not `ok('nothing')`: that status claims we
     // asked Zernio and it had no accounts, and here we never successfully asked. A
@@ -383,7 +446,9 @@ export async function GET(request: Request): Promise<Response> {
     // same thing: an account they connected at Zernio that this app cannot see.
     const missed = [...unreadable, ...unwritten]
     if (missed.length > 0)
-      return backError(request, 500, `${missed.length}-not-recorded`, 'partial')
+      return popup
+        ? popupCloser(request, 500, 'partial', `${missed.length}-not-recorded`)
+        : backError(request, 500, `${missed.length}-not-recorded`, 'partial')
 
     // Some accounts were declined by the PLAN. Ranked below `partial` on purpose: a
     // genuine failure outranks a policy decision, and reporting a limit while a write

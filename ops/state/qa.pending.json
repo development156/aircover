@@ -1,4 +1,83 @@
 {
   "version": 1,
-  "runs": []
+  "runs": [
+    {
+      "client_id": "qa-mta1lb7h-de37074a",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T12:00:33.530Z",
+      "finished_at": "2026-08-26T12:00:33.530Z",
+      "suite": "typecheck",
+      "status": "fail",
+      "summary_plain": "The typecheck checks ran and something failed.",
+      "details": "@sahoda/web:typecheck: src/app/(app)/connections/page.tsx(297,16): error TS2741: Property 'connections' is missing in type '{ key: CatalogueChannel; entry: CatalogueEntry; }' but required in type 'ChannelTileProps'.\n@sahoda/web:typecheck: src/components/connections/channel-tile.test.tsx(38,35): error TS2741: Property 'connections' is missing in type '{ entry: CatalogueEntry; now: Date; }' but required in type 'ChannelTileProps'.\n@sahoda/web:typecheck: src/components/connections/channel-tile.test.tsx(48,35): error TS2741: Property 'connections' is missing in type '{ entry: CatalogueEntry; now: Date; }' but required in type 'ChannelTileProps'.\n@sahoda/web:typecheck: src/components/connections/channel-tile.test.tsx(54,13): error TS2741: Property 'connections' is missing in type '{ entry: CatalogueEntry; now: Date; }' but required in type 'ChannelTileProps'.\n@sahoda/web:typecheck: src/components/connections/channel-tile.test.tsx(62,35): error TS2741: Property 'connections' is missing in type '{ entry: CatalogueEntry; now: Date; }' but required in type 'ChannelTileProps'.\n@sahoda/web:typecheck: src/components/connections/channel-tile.test.tsx(73,49): error TS2322: Type '{ entry: CatalogueEntry; connection: { id: string; workspace_id: string; platform: \"x\" | \"linkedin\" | \"instagram\" | \"gbp\"; status: \"error\" | \"expired\" | \"active\" | \"revoked\"; ... 6 more ...; updated_at: string; }; now: Date; }' is not assignable to type 'IntrinsicAttributes & ChannelTileProps'.\n@sahoda/web:typecheck: src/components/connections/channel-tile.test.tsx(80,35): error TS2741: Property 'connections' is missing in type '{ entry: CatalogueEntry; now: Date; }' but required in type 'ChannelTileProps'.\n@sahoda/web:typecheck: src/components/connections/channel-tile.test.tsx(94,9): error TS2322: Type '{ entry: CatalogueEntry; connection: { id: string; workspace_id: string; platform: \"x\" | \"linkedin\" | \"instagram\" | \"gbp\"; status: \"error\" | \"expired\" | \"active\" | \"revoked\"; ... 6 more ...; updated_at: string; }; now: Date; }' is not assignable to type 'IntrinsicAttributes & ChannelTileProps'.\n@sahoda/web:typecheck: src/components/connections/channel-tile.test.tsx(107,8): error TS2741: Property 'connections' is missing in type '{ entry: CatalogueEntry; ration: { status: \"ok\"; used: number; remaining: number; }; now: Date; }' but required in type 'ChannelTileProps'.\n@sahoda/web:typecheck: src/components/connections/channel-tile.test.tsx(137,13): error TS2741: Property 'connections' is missing in type '{ entry: CatalogueEntry; now: Date; }' but required in type 'ChannelTileProps'.\n@sahoda/web:typecheck: src/components/connections/channel-tile.test.tsx(147,8): error TS2741: Property 'connections' is missing in type '{ entry: CatalogueEntry; ration: { status: \"ok\"; used: number; remaining: number; }; now: Date; }' but required in type 'ChannelTileProps'.\n@sahoda/web:typecheck: src/components/connections/channel-tile.test.tsx(160,13): error TS2741: Property 'connections' is missing in type '{ entry: CatalogueEntry; ration: { status: \"unreadable\"; }; now: Date; }' but required in type 'ChannelTileProps'.\n@sahoda/web:typecheck: src/lib/connections/details.ts(36,26): error TS2322: Type 'string | undefined' is not assignable to type 'string | null'.\n@sahoda/web:typecheck: src/lib/connections/pending-connect.ts(85,22): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.\n@sahoda/web:typecheck: src/lib/connections/pending-connect.ts(85,46): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.\n@sahoda/web:typecheck: src/lib/connections/slots.test.ts(53,12): error TS2532: Object is possibly 'undefined'.\n Tasks:    8 successful, 9 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mta1nhmi-1aab340c",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T12:02:15.160Z",
+      "finished_at": "2026-08-26T12:02:15.160Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": " Tasks:    9 successful, 9 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mta1r7nh-b886f9c3",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T12:05:08.858Z",
+      "finished_at": "2026-08-26T12:05:08.858Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "35\n Tasks:    10 successful, 10 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mta1r7nh-962c361a",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T12:05:08.858Z",
+      "finished_at": "2026-08-26T12:05:08.858Z",
+      "suite": "lint",
+      "status": "pass",
+      "summary_plain": "The lint checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "35\n Tasks:    10 successful, 10 total",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mta1uup3-50bdce55",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T12:07:58.693Z",
+      "finished_at": "2026-08-26T12:07:58.693Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The typecheck, lint, unit checks ran together and something failed.",
+      "details": "@sahoda/billing:typecheck: $ tsc --noEmit\n@sahoda/sites:typecheck: cache bypass, force executing 1cfa8db9358fdc2e\n@sahoda/sites:typecheck: $ tsc --noEmit\n@sahoda/research:typecheck: cache bypass, force executing c9ee550a70048069\n@sahoda/research:typecheck: $ tsc --noEmit\n@sahoda/mesh:typecheck: cache bypass, force executing a9307276a90e97f2\n@sahoda/mesh:typecheck: $ tsc --noEmit\n@sahoda/jobs:typecheck: cache bypass, force executing 80eeda49c5e07a1a\n@sahoda/jobs:typecheck: $ tsc --noEmit\n@sahoda/web:typecheck: cache bypass, force executing 1b348ac356668409\n@sahoda/web:typecheck: $ tsc --noEmit\n@sahoda/web:typecheck: src/lib/connections/use-connect-flow.test.tsx(105,30): error TS2352: Conversion of type 'undefined' to type '{ body: string; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n@sahoda/web:typecheck: src/lib/connections/use-connect-flow.test.tsx(105,56): error TS2493: Tuple type '[]' of length '0' has no element at index '1'.\n@sahoda/web:typecheck: src/lib/connections/use-connect-flow.test.tsx(127,30): error TS2352: Conversion of type 'undefined' to type '{ body: string; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n@sahoda/web:typecheck: src/lib/connections/use-connect-flow.test.tsx(127,56): error TS2493: Tuple type '[]' of length '0' has no element at index '1'.\n@sahoda/web:typecheck: [ELIFECYCLE] Command failed with exit code 2.\n@sahoda/web:test: cache bypass, force executing 61a1f9f519124c5e\n@sahoda/web#typecheck:  ERROR  command (/home/user/sahodalabs/apps/web) /opt/node22/bin/pnpm run typecheck exited (2)\n\n Tasks:    9 successful, 11 total\nCached:    0 cached, 11 total\n  Time:    18.209s \nFailed:    @sahoda/web#typecheck\n\n ERROR  run failed: command  exited (2)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mta1yv8n-5e0d8405",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T12:11:06.021Z",
+      "finished_at": "2026-08-26T12:11:06.021Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "typed\n Tasks:    9 successful, 9 total",
+      "duration_ms": null
+    }
+  ]
 }

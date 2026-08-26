@@ -20,14 +20,30 @@ import { ChannelSchema, type Channel } from '@sahoda/shared'
  *
  * ── WHY A PLANNED CHANNEL IS NOT A `Channel` ─────────────────────────────────
  * `ChannelSchema` is not a wish list. It is mirrored by a Postgres CHECK
- * constraint on SEVEN tables — verified against production on 2026-08-19:
+ * constraint on TEN tables, RE-MEASURED against the migrations on 2026-08-26:
  *
  *   connections · post_variants · post_publish_logs · inbox_threads
  *   post_metric_snapshots · asset_usages · templates
+ *   loop_channel_autonomy · audience_snapshots · remix_derivatives
  *
- * all of them `CHECK (… = ANY (ARRAY['x','gbp','linkedin','instagram']))`. Adding
- * facebook to that union means a migration across all seven, and only wt-db edits
- * migrations (root `CLAUDE.md`).
+ * all of them `CHECK (… = ANY (ARRAY['x','gbp','linkedin','instagram']))`, plus
+ * `app.is_channel_set(text[])` which carries the same literal for `loop_briefs`
+ * and `playbook_run_items`, and four PL/pgSQL guards with the list inline
+ * (`upsert_connection`, `upsert_zernio_connection`,
+ * `assert_account_for_scheduled_post`, `publish_claim`).
+ *
+ * ── THIS COUNT WAS WRONG FOR SIX DAYS AND NOTHING SAID SO ────────────────────
+ * It read SEVEN, verified 2026-08-19, and three migrations landed on the 20th and
+ * 21st that each added a table nobody came back to add here. A stale inventory is
+ * the exact failure mode that ships a channel which passes typecheck and then
+ * violates a CHECK constraint on `remix_derivatives` in production, because the
+ * whole cost model for adding a channel is "know every place the vocabulary is
+ * written down". Re-run the grep, do not trust this paragraph:
+ *
+ *   grep -rn "'gbp'" packages/db/supabase/migrations | grep -i check
+ *
+ * Adding facebook means a migration across all ten plus the five functions, and
+ * only wt-db edits applied migrations (root `CLAUDE.md`).
  *
  * That constraint is a feature here, not an obstacle. A planned channel has no
  * adapter, so it can never hold a connection row, so it must never look
