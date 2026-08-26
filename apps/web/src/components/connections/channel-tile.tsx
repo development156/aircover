@@ -9,6 +9,7 @@ import {
   READINESS_CLASS,
   READINESS_LABEL,
   asChannel,
+  asPlatform,
   type CatalogueEntry,
 } from '@/lib/connections/catalogue'
 import { channelDetailContent } from '@/lib/connections/details'
@@ -78,7 +79,7 @@ function ChannelHeader({
   details: ReturnType<typeof channelDetailContent>
 }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5">
       <div className="flex items-start gap-2">
         <ChannelLogo channel={entry.id} />
         {/* NO `truncate`. The name is this tile's whole subject and it comes from
@@ -110,6 +111,14 @@ function ChannelHeader({
           that change a customer's account. It is also the one control every tile
           has, connectable or not, which is why it is beside the rung that is also
           on every tile. */}
+      {/* ── THE RUNG MOVED BESIDE `kind`, NOT BESIDE THE NAME ─────────────
+          The argument above is about the NAME: it is variable-width and comes
+          from the catalogue, so a fixed-width chip sharing its row is paid for
+          by it in silence. `kind` is neither — one or two short words from the
+          same eight-row table — so the chip can sit with it and the tile loses a
+          whole row. That row mattered: this grid went from eight tiles to
+          twenty on 2026-08-26, so every row of tile chrome is now paid for
+          twenty times and the screen was reported as looking bad. */}
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <span
           /* A DISTINCT hook from the tile's own `data-readiness`. Both carried the
@@ -155,13 +164,9 @@ function ComingSoonTile({ entry }: { entry: CatalogueEntry }) {
       /* The same lift, so a planned channel reads as a card on a roadmap
          rather than a dead box — while `.is-proposed` keeps it visibly
          provisional. No shadow: it is not offering an action. */
-      className="is-proposed flex h-full flex-col gap-3 rounded-card p-4 transition-micro hover:-translate-y-px"
+      className="is-proposed flex h-full flex-col gap-2.5 rounded-card p-3.5 transition-micro hover:-translate-y-px"
     >
       <ChannelHeader entry={entry} details={channelDetailContent(entry, 0)} />
-      {/* What the channel is FOR. Present tense describes the channel, not an
-          offer — the "Coming soon" rung above and the line below both say we
-          cannot do it yet, so this sentence never has to carry that too. */}
-      <p className="type-sm text-muted">{entry.blurb}</p>
       {/* NOT "Not connected". That is the sentence a CONNECTABLE channel uses, and
           on a tile with no adapter it implies the customer could fix it by
           connecting — the exact confusion between "unbuilt" and "unconfigured"
@@ -178,9 +183,16 @@ function ComingSoonTile({ entry }: { entry: CatalogueEntry }) {
           remedy.spec.ts` exists to catch, and the same failure this component's
           header rejects a `<button disabled>` for. The floor keeps the honest
           sentence until the notify flow is real. */}
-      <p className="type-sm mt-auto border-t border-line-soft pt-3 text-muted">
-        Sahoda can&rsquo;t post here yet.
-      </p>
+      {/* ── THE ONE SENTENCE, AND IT SAYS WHICH KIND OF NOTHING THIS IS ────
+          The blurb above it was removed with every other tile's: it described
+          the channel and this line describes US, and only the second is what a
+          reader on this row needs. It is the entry's own words rather than a
+          constant, because "Sahoda can't post here yet" was true of eight
+          different situations and is now true of one — a platform we cannot even
+          link. Snapchat is not unbuilt, it is refused: 403
+          `PLATFORM_BETA_RESTRICTED`. A remedy-shaped sentence there would be the
+          impossible remedy `no-impossible-remedy.spec.ts` forbids. */}
+      <p className="type-sm mt-auto border-t border-line-soft pt-2.5 text-muted">{entry.blurb}</p>
     </div>
   )
 }
@@ -193,11 +205,23 @@ export function ChannelTile({
   ration,
   now = new Date(),
 }: ChannelTileProps) {
+  /**
+   * ── THE BRANCH IS ABOUT LINKING, NOT ABOUT PUBLISHING ────────────────────
+   * This was `asChannel`, which asks "can Sahoda POST here". Those were the same
+   * question only while every connectable platform was also publishable. Eight
+   * are now connect-only, and under the old branch all eight would have rendered
+   * as unbuilt cards with no control at all — while the schema, the start route
+   * and the plan gate were every one of them willing.
+   *
+   * `asPlatform` asks the question this component is actually about: can a row
+   * exist in `connections` for this id. A planned id cannot — the CHECK
+   * constraint sees to that — so this branch is still the type system and the
+   * schema agreeing rather than a runtime guess.
+   */
+  const platform = asPlatform(entry.id)
+  if (platform === null) return <ComingSoonTile entry={entry} />
+  /** Publishable channels only. Drives nothing but the account rows' own copy. */
   const channel = asChannel(entry.id)
-  // A planned channel cannot hold a connection row — the database CHECK
-  // constraint sees to that — so this branch is the type system and the schema
-  // agreeing rather than a runtime guess.
-  if (channel === null) return <ComingSoonTile entry={entry} />
 
   const linked = connections.length > 0
   const details = channelDetailContent(entry, connections.length)
@@ -218,25 +242,31 @@ export function ChannelTile({
          `transition-micro` is the product's own duration/easing pair, and
          tokens.css zeroes it under `prefers-reduced-motion`, so this needs no
          media query of its own and no dependency. */
-      className="surface-ring flex h-full flex-col rounded-card bg-surface p-4 transition-micro hover:-translate-y-px hover:shadow-card hover:surface-ring-firm"
+      className="surface-ring flex h-full flex-col rounded-card bg-surface p-3.5 transition-micro hover:-translate-y-px hover:shadow-card hover:surface-ring-firm"
     >
       <ChannelHeader entry={entry} details={details} />
 
-      {/* What Sahoda does with this channel, in one sentence. It sits ABOVE the
-          divider because it is a claim about the CHANNEL, which is what this
-          zone is for — putting it below would file "what Instagram is for"
-          under "what your workspace has done about it". */}
-      <p className="type-sm mt-2 text-muted">{entry.blurb}</p>
+      {/* ── THE BLURB LEFT THE TILE FACE, AND IT DID NOT LEAVE THE SCREEN ──
+          It read "Publish posts, reels and stories directly to Instagram." on
+          every card. One sentence is ~40px, twenty cards is ~800px of prose
+          nobody reads twice, and it answered a question ("what is Instagram
+          for") that almost nobody on this screen is asking. It is still one tap
+          away, verbatim, inside Details — `channelDetailContent` passes the same
+          string — which is where the reader who IS asking will look.
+
+          What replaced it is nothing. The tile is shorter, and shorter is the
+          whole request. */}
 
       {/* THE DIVIDER IS THE AXIS. Above: the channel. Below: your accounts.
           A hairline rather than a gap, because §6 is explicit that a gap past a
           point wants to be a divider — and because two zones separated only by
           space read as one zone with awkward spacing. */}
-      <hr className="my-3 border-0 border-t border-line-soft" />
+      <hr className="my-2.5 border-0 border-t border-line-soft" />
 
       {linked ? (
         <ChannelAccounts
           channel={channel}
+          platform={platform}
           label={entry.short}
           connections={connections}
           now={now}
@@ -276,7 +306,7 @@ export function ChannelTile({
           The tiles carry different amounts of content — X alone holds the spend
           row, and a channel with three accounts holds three rows — so without a
           rule the buttons floated at whatever height their own card ended at. */}
-      <div className="mt-auto flex items-center gap-2 border-t border-line-soft pt-3">
+      <div className="mt-auto flex items-center gap-2 border-t border-line-soft pt-2.5">
         {/* ── CONNECT IS ALWAYS OFFERED, AND THAT IS THE FIX ────────────────
             The tile used to render Connect ONLY when the platform had no
             connection at all, so once a workspace linked one Instagram account
@@ -292,7 +322,7 @@ export function ChannelTile({
             flow that the start route would refuse with a 403 after the customer
             had gone to the consent screen. */}
         <ConnectButton
-          platform={channel}
+          platform={platform}
           label={entry.short}
           addingAnother={linked}
           disabled={disabled}

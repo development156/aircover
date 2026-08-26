@@ -1,4 +1,4 @@
-import type { Channel } from '@sahoda/shared'
+import type { Channel, ConnectionPlatform } from '@sahoda/shared'
 
 /**
  * Display names for every `ChannelSchema` value. Presentation only — the channel
@@ -28,4 +28,31 @@ export const CHANNEL_SHORT: Readonly<Record<Channel, string>> = {
   // surface Sahoda posts to, and a pill tab has no room for the distinction.
   facebook: 'Facebook',
   telegram: 'Telegram',
+}
+
+/**
+ * Display names for every `ConnectionPlatformSchema` value — the name of a thing
+ * a customer can LINK.
+ *
+ * ── WHY THIS IS NOT `CHANNEL_LABELS` WITH MORE ROWS ──────────────────────────
+ * `Channel` is what Sahoda can PUBLISH to (six values) and `ConnectionPlatform`
+ * is what it can hold a binding for (fourteen). Three screens were indexing
+ * `CHANNEL_LABELS` with `connection.platform`, which typechecked only while the
+ * two sets happened to be equal. The day eight connect-only platforms landed, the
+ * compiler handed those three over as a to-do list — which is the whole reason
+ * both maps are exhaustive `Record`s rather than partials with a fallback.
+ *
+ * Use CHANNEL_LABELS when the subject is a post going out. Use this when the
+ * subject is an account being linked.
+ */
+export const PLATFORM_LABELS: Readonly<Record<ConnectionPlatform, string>> = {
+  ...CHANNEL_LABELS,
+  discord: 'Discord',
+  pinterest: 'Pinterest',
+  reddit: 'Reddit',
+  slack: 'Slack',
+  threads: 'Threads',
+  tiktok: 'TikTok',
+  whatsapp: 'WhatsApp',
+  youtube: 'YouTube',
 }

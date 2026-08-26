@@ -35,12 +35,25 @@ const connection = (over: Partial<Connection> = {}): Connection =>
     ...over,
   }) as Connection
 
+/**
+ * ── THE EXAMPLE MOVED FROM PINTEREST TO SNAPCHAT, AND THE CLAIM DID NOT ──────
+ * Every test below used `ENTRY.pinterest` as its stand-in for "a channel Sahoda
+ * cannot connect". On 2026-08-26 Pinterest stopped being one: `GET
+ * /v1/connect/pinterest` answers 200 with a real authUrl, so it became a
+ * connect-only platform with a working Connect button, and these tests started
+ * failing because their EXAMPLE had changed rather than because the rule had.
+ *
+ * Snapchat is the honest replacement, and a sharper one. It is a platform Zernio
+ * genuinely names and genuinely refuses us — 403 `PLATFORM_BETA_RESTRICTED` —
+ * so the tile really cannot offer a control, rather than merely not having one
+ * yet. Retargeted, never deleted: the rule these assert is unchanged.
+ */
 describe('a channel with no adapter', () => {
   it('renders a div and offers NO control at all', () => {
     // `docs/26` §10.2. A `<button disabled>` is still announced as a button: the
     // screen reader offers the action, the user takes it, nothing happens, and the
     // failure reads as "broken app" rather than "unbuilt feature".
-    const { container } = render(<ChannelTile entry={ENTRY.pinterest} connections={[]} now={NOW} />)
+    const { container } = render(<ChannelTile entry={ENTRY.snapchat} connections={[]} now={NOW} />)
 
     // RETARGETED, and the claim is narrower than it looks. The rule is that a
     // channel with no adapter must offer no control that PURPORTS TO CONNECT IT
@@ -71,7 +84,7 @@ describe('a channel with no adapter', () => {
   })
 
   it('says coming soon in words, not only in a border', () => {
-    render(<ChannelTile entry={ENTRY.pinterest} connections={[]} now={NOW} />)
+    render(<ChannelTile entry={ENTRY.snapchat} connections={[]} now={NOW} />)
 
     expect(screen.getByText(/coming soon/i)).toBeInTheDocument()
   })
@@ -79,7 +92,7 @@ describe('a channel with no adapter', () => {
   it('carries no number about the customer', () => {
     // A container labelled coming soon is a promise we control; a figure inside
     // one is a claim about their business no query can support.
-    const { container } = render(<ChannelTile entry={ENTRY.pinterest} connections={[]} now={NOW} />)
+    const { container } = render(<ChannelTile entry={ENTRY.snapchat} connections={[]} now={NOW} />)
 
     expect(container.textContent ?? '').not.toMatch(/\d/)
   })

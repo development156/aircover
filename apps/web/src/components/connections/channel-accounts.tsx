@@ -5,7 +5,7 @@ import { ReconnectButton } from '@/components/connections/reconnect-button'
 import { Badge, type Rung } from '@/components/ui/badge'
 import { accountLabel } from '@/lib/connections/account-label'
 import { connectionHealth, handleOf } from '@/lib/connections/health'
-import type { Channel } from '@sahoda/shared'
+import type { Channel, ConnectionPlatform } from '@sahoda/shared'
 
 /**
  * ONE ROW PER ACCOUNT, BECAUSE ONE ACCOUNT IS ONE SLOT.
@@ -55,11 +55,24 @@ export function displayNameFor(connection: Connection): string {
 
 export function ChannelAccounts({
   channel,
+  platform,
   label,
   connections,
   now,
 }: {
-  channel: Channel
+  /**
+   * The publishable channel, or `null` on a connect-only platform.
+   *
+   * Two fields rather than one, because the rows below ask two different
+   * questions of them and only one has an answer everywhere: `platform` is what
+   * a reconnect flow is started for, and `channel` is what a publishing figure
+   * would be looked up by. A connect-only platform has the first and not the
+   * second, and collapsing them would mean either casting a lie or hiding the
+   * accounts of eight platforms that genuinely have them.
+   */
+  channel: Channel | null
+  /** The linked platform. Always present — these rows exist because a row does. */
+  platform: ConnectionPlatform
   /** The channel's short name, for the reconnect control's own sentence. */
   label: string
   connections: readonly Connection[]
@@ -95,7 +108,9 @@ export function ChannelAccounts({
             <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1.5">
               <Badge rung={status.rung}>{status.label}</Badge>
               <span className="flex items-center gap-1">
-                {health.kind !== 'ok' ? <ReconnectButton platform={channel} label={label} /> : null}
+                {health.kind !== 'ok' ? (
+                  <ReconnectButton platform={platform} label={label} />
+                ) : null}
                 {/* Labelled with the ACCOUNT, never the channel. "Disconnect
                     Instagram" beside two Instagram accounts names neither of
                     them, and the confirm step is the last thing a person reads

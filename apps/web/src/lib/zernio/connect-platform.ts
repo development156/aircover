@@ -1,4 +1,4 @@
-import { type Channel } from '@sahoda/shared'
+import { type ConnectionPlatform } from '@sahoda/shared'
 
 /**
  * ZERNIO'S NAME FOR A CHANNEL ON THE CONNECT ENDPOINT.
@@ -12,11 +12,20 @@ import { type Channel } from '@sahoda/shared'
  * to work. Instagram, LinkedIn and Facebook worked throughout, because for those
  * three our name and Zernio's happen to be the same string.
  *
- * MEASURED against `docs.zernio.com/api/openapi`, `GET /v1/connect/{platform}`:
+ * MEASURED 2026-08-26 by PROBING the live endpoint, one platform per request,
+ * `GET /v1/connect/{platform}?profileId=…` against a real profile:
  *
- *   [facebook, instagram, linkedin, twitter, tiktok, youtube, threads, reddit,
- *    pinterest, bluesky, googlebusiness, telegram, snapchat, discord, slack,
- *    whatsapp]
+ *   200 + authUrl  twitter instagram facebook linkedin googlebusiness discord
+ *                  pinterest reddit slack threads tiktok whatsapp youtube bluesky
+ *   200 + code     telegram — {code, expiresAt, expiresIn, botUsername, instructions}
+ *   400            x  gbp  google_business  mastodon  medium  substack
+ *   403            snapchat — PLATFORM_BETA_RESTRICTED
+ *
+ * The probe replaced a list read out of `docs.zernio.com/llms-full.txt`, which
+ * named `x`, `mastodon`, `medium` and `substack` as connectable (all four are
+ * 400) and omitted `reddit`, `slack` and `googlebusiness` (all three are 200).
+ * Documentation is not a measurement, and this file exists because a name that
+ * looks right is not one.
  *
  * ── THIS IS THE FOURTH VOCABULARY, AND THE REPO ALREADY KNEW ABOUT THREE ─────
  * `zernio/recovery.ts` documents that edit, unpublish and publish each name these
@@ -28,7 +37,7 @@ import { type Channel } from '@sahoda/shared'
  * So: never reuse `ZERNIO_PLATFORM_NAME` here. It maps `gbp` to `google`, which
  * connect refuses just as unpublish does.
  */
-export const CONNECT_PLATFORM: Readonly<Record<Channel, string | null>> = {
+export const CONNECT_PLATFORM: Readonly<Record<ConnectionPlatform, string | null>> = {
   // Ours is `x`; Zernio still calls it twitter, as it does on edit and unpublish.
   x: 'twitter',
   // `googlebusiness`, NOT `google`. The publish endpoint's name is refused here.
@@ -52,9 +61,30 @@ export const CONNECT_PLATFORM: Readonly<Record<Channel, string | null>> = {
    * have started one.
    */
   telegram: null,
+
+  /**
+   * ── THE EIGHT WHOSE NAME IS SIMPLY THEIR NAME ──────────────────────────────
+   * Every one MEASURED 2026-08-26, one probe each against
+   * `GET /v1/connect/{platform}` with a live profile id: all eight answered
+   * HTTP 200 with an `authUrl` under exactly the id written here.
+   *
+   * Written out rather than defaulted through `?? channel`. A default would have
+   * silently produced `/connect/x` and `/connect/gbp` — the precise bug at the
+   * top of this file, where a plausible fallback shipped two buttons that could
+   * never work. An exhaustive `Record` makes a new platform a compile error and
+   * makes every value here something somebody had to type on purpose.
+   */
+  discord: 'discord',
+  pinterest: 'pinterest',
+  reddit: 'reddit',
+  slack: 'slack',
+  threads: 'threads',
+  tiktok: 'tiktok',
+  whatsapp: 'whatsapp',
+  youtube: 'youtube',
 }
 
-/** Zernio's connect name, or null where this channel has no OAuth flow. */
-export function connectPlatformFor(channel: Channel): string | null {
-  return CONNECT_PLATFORM[channel]
+/** Zernio's connect name, or null where this platform has no OAuth flow. */
+export function connectPlatformFor(platform: ConnectionPlatform): string | null {
+  return CONNECT_PLATFORM[platform]
 }

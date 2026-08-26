@@ -163,8 +163,11 @@ export type PlannerEventKind = z.infer<typeof PlannerEventKindSchema>
  *     token and our app never sees one (doc 13 §7).
  *
  * Still deliberately NOT the same set as `Channel`: a channel we can address is not
- * the same as a channel we can hold a binding for. They coincide today at four
- * values; do not collapse them.
+ * the same as a channel we can hold a binding for. They no longer coincide at
+ * all — this set has fourteen values and `Channel` has six — and the gap is the
+ * point. Connecting proves a customer owns an account. Publishing needs a
+ * measured `PlatformSpec`, and inventing one is the fabricated figure the
+ * Constraint Engine exists to prevent. Do not collapse them.
  *
  * MUST MOVE TOGETHER with `connections_platform_check` and the p_platform guard in
  * `upsert_connection`.
@@ -176,6 +179,30 @@ export const ConnectionPlatformSchema = z.enum([
   'instagram',
   'facebook',
   'telegram',
+  // ── THE EIGHT THAT MADE THIS SET GENUINELY WIDER THAN `Channel` ───────────
+  // Added 2026-08-26. Until now the two enums "coincided at four values" and the
+  // paragraph above was a warning about a distinction nothing had yet exercised.
+  // These eight exercise it: each can be CONNECTED and none can be PUBLISHED to,
+  // because publishing needs a `PlatformSpec` and a spec needs measured limits.
+  //
+  // MEASURED against the live API, not read off documentation. Each was probed
+  // with `GET /v1/connect/{platform}?profileId=…` against a real profile and
+  // returned HTTP 200 carrying an `authUrl`:
+  //
+  //   discord  pinterest  reddit  slack  threads  tiktok  whatsapp  youtube
+  //
+  // The probe mattered. `docs.zernio.com/llms-full.txt` lists `x`, `mastodon`,
+  // `medium` and `substack` as connectable — all four answer 400
+  // `platform_not_supported` — and omits `reddit`, `slack` and `googlebusiness`,
+  // which all answer 200. A documented enum is not a measurement.
+  'discord',
+  'pinterest',
+  'reddit',
+  'slack',
+  'threads',
+  'tiktok',
+  'whatsapp',
+  'youtube',
 ])
 export type ConnectionPlatform = z.infer<typeof ConnectionPlatformSchema>
 
@@ -329,7 +356,41 @@ export type OpsArtifactMime = z.infer<typeof OpsArtifactMimeSchema>
  *
  * So: a channel belongs here when it can complete THIS flow, not when it exists.
  */
-export const ZERNIO_PLATFORMS = ['instagram', 'x', 'gbp', 'linkedin', 'facebook'] as const
+/**
+ * Channels whose connect flow is an OAUTH HANDOFF — a consent screen we can send
+ * a customer to and get them back from.
+ *
+ * MEASURED 2026-08-26 by probing `GET /v1/connect/{platform}` against a real
+ * profile, one platform at a time. Thirteen of ours answered 200 with an
+ * `authUrl`. Two facts from the same probe are load-bearing and are why our ids
+ * are translated rather than passed through (see `connect-platform.ts`):
+ *
+ *   `x`   answers 400 `platform_not_supported`. Zernio's name is `twitter`.
+ *   `gbp` answers 400 too, as does `google_business`. Its name is `googlebusiness`.
+ *
+ * TELEGRAM IS ABSENT AND THAT IS THE MEASUREMENT, not an omission.
+ * `GET /v1/connect/telegram` returns 200 with NO `authUrl` — the body is
+ * `{code, expiresAt, expiresIn, botUsername, instructions}`, an access code valid
+ * fifteen minutes. There is no consent screen to open, so putting it on this rail
+ * gives a button that can only ever fail.
+ *
+ * SNAPCHAT is absent for a third reason: 403 `PLATFORM_BETA_RESTRICTED`.
+ */
+export const ZERNIO_PLATFORMS = [
+  'instagram',
+  'x',
+  'gbp',
+  'linkedin',
+  'facebook',
+  'discord',
+  'pinterest',
+  'reddit',
+  'slack',
+  'threads',
+  'tiktok',
+  'whatsapp',
+  'youtube',
+] as const
 export type ZernioPlatform = (typeof ZERNIO_PLATFORMS)[number]
 
 export function isZernioPlatform(value: unknown): value is ZernioPlatform {

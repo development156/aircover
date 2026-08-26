@@ -48,8 +48,14 @@ function readinessDetail(entry: CatalogueEntry): string {
       // truth: the code is there and has run, it has just never reached the
       // platform for real, and that is a checkable statement.
       return 'Sahoda can send to this platform, and no post has yet been proven to arrive.'
+    case 'connect-only':
+      // TWO CLAIMS, and the second is the one that makes the first useful. A
+      // reader who is told only "we can't post here" concludes the tile is dead
+      // and the Connect button under it is a mistake. Linking is a real thing
+      // they can do today and the sentence has to say so first.
+      return 'You can link your account. Sahoda cannot post here yet, so it will not appear as a target when you write a post.'
     case 'not-built':
-      return 'Sahoda cannot post here yet. Connecting it is not possible.'
+      return 'Sahoda cannot post here yet, and this platform is not open to us for linking either.'
   }
 }
 

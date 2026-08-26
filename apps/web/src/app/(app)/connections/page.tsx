@@ -166,6 +166,51 @@ export default async function ConnectionsPage({
   // simply never matches a row, because the database cannot hold one.
   const byChannel = groupByPlatform(rows)
 
+  /**
+   * ── THREE GROUPS, EACH ANSWERING A DIFFERENT QUESTION ────────────────────
+   * Derived, never hand-listed. `LIVE_VIA_ZERNIO` is `ZERNIO_PLATFORMS` and
+   * `byChannel` is the customer's own rows, so both cuts move on their own the
+   * day either changes — which is the property the old two literal groups
+   * lacked, and how a channel once ended up connectable at the route and
+   * disabled on the screen with nothing failing.
+   *
+   *   linked    an account exists            → what is live
+   *   open      connectable, none linked yet → what you can add
+   *   stalled   named, and we cannot link it → why not
+   */
+  const linkedEntries = CONNECTABLE.filter(
+    (entry) => LIVE_VIA_ZERNIO.has(entry.id) && (byChannel.get(entry.id)?.length ?? 0) > 0,
+  )
+  const openEntries = CONNECTABLE.filter(
+    (entry) => LIVE_VIA_ZERNIO.has(entry.id) && (byChannel.get(entry.id)?.length ?? 0) === 0,
+  )
+  const stalledEntries = CONNECTABLE.filter((entry) => !LIVE_VIA_ZERNIO.has(entry.id))
+
+  /**
+   * Why Connect is unavailable on this tile, or `undefined` when it is not.
+   *
+   * ── ONE FUNCTION BECAUSE THE ORDER OF THESE IS LOAD-BEARING ──────────────
+   * It was a nested ternary inlined at one call site and there are now three, so
+   * copying it would be three places for the precedence to drift. The order:
+   * the plan first, because a full plan blocks every tile and saying anything
+   * else would be answering a question the customer did not reach yet; then the
+   * environment; then the platform's own reason last, because it is the only one
+   * that differs per tile.
+   */
+  function connectBlocker(id: string): string | undefined {
+    if (planFull) return 'Every slot on your plan is in use.'
+    if (slots.limit === null) return 'Sahoda couldn’t check how many slots your plan includes.'
+    if (!railReady) return 'Publishing key isn’t set in this environment.'
+    if (LIVE_VIA_ZERNIO.has(id)) return undefined
+    // NOT "secure token flow still being wired", which was written for a
+    // different cause and is now false. A platform outside ZERNIO_PLATFORMS is
+    // one whose connect is not an OAuth handoff at all — MEASURED, Telegram's
+    // returns a bot code and a fifteen-minute expiry instead of an authUrl.
+    // Naming the real reason is what stops this reading as a fault someone could
+    // wait out by pressing again.
+    return 'This channel connects with a bot code instead, and that isn’t built yet.'
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -263,58 +308,94 @@ export default async function ConnectionsPage({
             </p>
           ) : null}
 
+          {/* ── LINKED FIRST, AND ONLY WHEN THERE IS SOMETHING TO SHOW ───────
+              The grid went from eight tiles to twenty on 2026-08-26, and at
+              twenty the old single grid stopped answering the screen's first
+              question. "Which of my channels is live" was a hunt through four
+              rows of mostly-identical cards for the two carrying an account.
+
+              Rendered only when at least one account exists. An empty "Your
+              channels" heading over nothing is a section that exists to say the
+              customer has done nothing, which is a worse first line than simply
+              starting at "Add a channel". */}
+          {linkedEntries.length > 0 ? (
+            <ChannelGroup
+              name="Your channels"
+              lead="Linked accounts Sahoda can reach. Open Details on any card for what it can do."
+              guide="connections.linked"
+            >
+              {linkedEntries.map((entry) => (
+                <ChannelTile
+                  key={entry.id}
+                  entry={entry}
+                  connections={byChannel.get(entry.id) ?? []}
+                  ration={entry.id === 'x' ? ration : undefined}
+                  disabled={!(railReady && roomLeft)}
+                  disabledReason={connectBlocker(entry.id)}
+                />
+              ))}
+            </ChannelGroup>
+          ) : null}
+
           <ChannelGroup
-            name="Connect your channels"
-            lead="Each card says what Sahoda can do there, and whether this workspace has linked it."
+            name={linkedEntries.length > 0 ? 'Add a channel' : 'Connect your channels'}
+            lead="Every one of these opens a sign-in window and comes straight back."
             /* The count moved into the header card. Printing it here as well
                would put one number in two places, which is how they drift. */
             guide="connections.connect_now"
           >
-            {CONNECTABLE.map((entry) => (
+            {openEntries.map((entry) => (
               <ChannelTile
                 key={entry.id}
                 entry={entry}
-                connections={byChannel.get(entry.id) ?? []}
+                connections={[]}
                 ration={entry.id === 'x' ? ration : undefined}
-                disabled={!(LIVE_VIA_ZERNIO.has(entry.id) && railReady && roomLeft)}
-                disabledReason={
-                  planFull
-                    ? 'Every slot on your plan is in use.'
-                    : slots.limit === null
-                      ? 'Sahoda couldn’t check how many slots your plan includes.'
-                      : LIVE_VIA_ZERNIO.has(entry.id)
-                        ? railReady
-                          ? undefined
-                          : 'Publishing key isn’t set in this environment.'
-                        : // NOT "secure token flow still being wired", which was
-                          // written for a different cause and is now false. A
-                          // channel outside ZERNIO_PLATFORMS is one whose connect
-                          // is not an OAuth handoff at all — Telegram wants a bot
-                          // code and a poll. Naming the real reason is what stops
-                          // this reading as a fault someone could wait out.
-                          'This channel connects a different way, and that isn’t built yet.'
-                }
+                disabled={!(railReady && roomLeft)}
+                disabledReason={connectBlocker(entry.id)}
               />
             ))}
           </ChannelGroup>
 
-          <ChannelGroup
-            name="More channels"
-            lead="Sahoda can't post to these yet. Each one says so on its own card."
-            /* No count. "0 of 4 connected" on a group nothing can connect to
-               would be a fraction whose numerator can never move — a number
-               that looks like progress and is a constant. */
-            guide="connections.coming_soon"
-          >
-            {/* `connections` is required and explicitly EMPTY, not optional. A
-                planned channel cannot hold a row — the CHECK constraint sees to
-                it — and making the prop required means the type system asks
-                every call site the question rather than defaulting one of them
-                to a silent `undefined`. */}
-            {PLANNED.map((entry) => (
-              <ChannelTile key={entry.id} entry={entry} connections={[]} />
-            ))}
-          </ChannelGroup>
+          {/* ── ONE GROUP FOR EVERY KIND OF "NO", AND EACH CARD SAYS WHICH ────
+              Telegram and Snapchat are both unconnectable and for completely
+              different reasons: Telegram's connect endpoint answers 200 with a
+              bot CODE rather than an authUrl, so the OAuth rail cannot carry it
+              and the surface it needs is unbuilt; Snapchat answers 403
+              `PLATFORM_BETA_RESTRICTED`, so nothing we build would help. Both
+              MEASURED 2026-08-26.
+
+              They share a heading because what the reader can do about them is
+              the same — nothing, today — and they carry different sentences
+              because "we never built it" and "they will not let us" are
+              different claims and this product does not blur those. */}
+          {stalledEntries.length > 0 || PLANNED.length > 0 ? (
+            <ChannelGroup
+              name="Not available yet"
+              lead="Sahoda can't link these today. Each card says why, and they are different reasons."
+              /* No count. A fraction on a group nothing can connect to would have
+                 a numerator that can never move — a number that looks like
+                 progress and is a constant. */
+              guide="connections.coming_soon"
+            >
+              {stalledEntries.map((entry) => (
+                <ChannelTile
+                  key={entry.id}
+                  entry={entry}
+                  connections={byChannel.get(entry.id) ?? []}
+                  disabled
+                  disabledReason={connectBlocker(entry.id)}
+                />
+              ))}
+              {/* `connections` is required and explicitly EMPTY, not optional. A
+                  planned channel cannot hold a row — the CHECK constraint sees to
+                  it — and making the prop required means the type system asks
+                  every call site the question rather than defaulting one of them
+                  to a silent `undefined`. */}
+              {PLANNED.map((entry) => (
+                <ChannelTile key={entry.id} entry={entry} connections={[]} />
+              ))}
+            </ChannelGroup>
+          ) : null}
         </>
       )}
     </div>

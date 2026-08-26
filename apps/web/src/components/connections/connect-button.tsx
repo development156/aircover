@@ -2,7 +2,7 @@
 
 import { ChevronRight, Link2, Plus } from 'lucide-react'
 
-import type { Channel } from '@sahoda/shared'
+import type { ConnectionPlatform } from '@sahoda/shared'
 
 import { Button } from '@/components/ui/button'
 import { useConnectFlow } from '@/lib/connections/use-connect-flow'
@@ -21,7 +21,7 @@ export function ConnectButton({
   disabled,
   disabledReason,
 }: {
-  platform: Channel
+  platform: ConnectionPlatform
   label: string
   /**
    * True when this channel already has an account linked.

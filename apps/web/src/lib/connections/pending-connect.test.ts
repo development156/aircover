@@ -31,7 +31,13 @@ describe('a pending connect is read whole or not at all', () => {
     // `youtube` is a real Zernio platform we deliberately do NOT connect, which
     // makes it a sharper probe than an invented string: it proves the allowlist
     // is OURS rather than a passthrough of whatever the provider supports.
-    expect(parsePendingConnect('youtube.redirect')).toBeNull()
+    // RETARGETED FROM `youtube`, which stopped being an example of this on
+    // 2026-08-26 — it is a connection platform now and `youtube.redirect` is a
+    // legitimate cookie. `snapchat` is the sharper replacement for exactly the
+    // reason the comment above gives: Zernio really names it, and we really
+    // cannot connect it (403 PLATFORM_BETA_RESTRICTED), so it proves the
+    // allowlist is OURS rather than a passthrough of Zernio's.
+    expect(parsePendingConnect('snapchat.redirect')).toBeNull()
     expect(parsePendingConnect('../../etc.redirect')).toBeNull()
   })
 

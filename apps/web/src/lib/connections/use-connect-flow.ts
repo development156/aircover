@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import type { Channel } from '@sahoda/shared'
+import type { ConnectionPlatform } from '@sahoda/shared'
 
 /**
  * THE ONE PLACE A CONNECT WINDOW IS OPENED.
@@ -72,7 +72,13 @@ export interface ConnectFlowState {
   start: () => void
 }
 
-export function useConnectFlow(platform: Channel): ConnectFlowState {
+/**
+ * `ConnectionPlatform`, not `Channel`. What this hook starts is a LINK, and eight
+ * platforms can be linked without Sahoda being able to publish to them. Typing it
+ * as `Channel` made those eight unreachable from the only button that opens the
+ * flow.
+ */
+export function useConnectFlow(platform: ConnectionPlatform): ConnectFlowState {
   const router = useRouter()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
