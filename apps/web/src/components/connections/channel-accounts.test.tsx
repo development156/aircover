@@ -153,3 +153,20 @@ describe('adding another account is offered at all', () => {
     expect(screen.getByText(/every slot on your plan is in use/i)).toBeInTheDocument()
   })
 })
+
+describe('disconnect claims only what disconnect does', () => {
+  it('names what happens BEFORE the destructive press, not after', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event')
+    render(<ChannelTile entry={ENTRY.instagram} connections={[shop]} now={NOW} />)
+
+    await userEvent.click(screen.getByRole('button', { name: /disconnect/i }))
+
+    // Deleting the row cascades the sealed tokens away, so Sahoda genuinely
+    // cannot publish there. That half is true. The half that was never said is
+    // that the account stays linked at Zernio — there is no removal endpoint
+    // wired — so connecting this channel again re-adopts it. A customer who is
+    // not told that meets it as a bug.
+    expect(screen.getByText(/stays linked at the publishing provider/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /confirm disconnect/i })).toBeInTheDocument()
+  })
+})
