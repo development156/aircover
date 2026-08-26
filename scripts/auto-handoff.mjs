@@ -43,55 +43,37 @@ try {
   // Nothing happened. Do not write a file for a session that did nothing.
   if (commits.length === 0 && dirty.length === 0) process.exit(0)
 
-  // ROLE comes from the branch — substring, not equality, because the harness
-  // assigns names like `claude/lead-design-7m7ios` and an exact match on
-  // `wt-design` resolves EVERY real branch to 'advisor'. Measured 2026-08-26.
-  //
-  // But a branch need not carry a role word at all. A /kickoff session is named
-  // `claude/divas-kickoff-03y2g2` — owner and command, no role — and fell through
-  // to 'lane', so an advisor's handoff landed at `divas-lane-<date>.md` where
-  // `ls *-advisor-*.md` could never find it. Measured 2026-08-26, on this hook's
-  // own output. So the role is DECLARABLE, exactly as the owner below is:
-  //   env SAHODA_LANE_ROLE, or `git config sahoda.role <role>`.
-  // A declaration wins; the branch is the fallback; 'lane' is the last resort.
-  const declaredRole = (process.env.SAHODA_LANE_ROLE || sh('git config sahoda.role') || '')
-    .trim()
-    .toLowerCase()
-  const role =
-    declaredRole ||
-    (/design/.test(branch)
-      ? 'design'
-      : /research/.test(branch)
-        ? 'research'
-        : /advisor/.test(branch)
-          ? 'advisor'
-          : 'lane')
+  // OWNER and LANE are both declared by /kickoff. Neither can be derived:
+  //   - every commit is authored SAHODALABS, so git cannot say WHO;
+  //   - one person runs three lanes, so a role cannot say WHICH.
+  // Measured 2026-08-26: two sessions both wrote girija-research-2026-08-26.md
+  // under the old <owner>-<role>-<date> scheme. Different lanes, one filename,
+  // and the second would have overwritten the first at merge.
+  const owner = (process.env.SAHODA_LANE_OWNER || sh('git config sahoda.owner') || '').trim()
+  const lane = (process.env.SAHODA_LANE || sh('git config sahoda.lane') || '').trim()
 
-  // OWNER is a different question and the branch cannot answer it. Two people
-  // both running /lead-design get two branches that both say "design", and both
-  // would write design-<date>.md over each other. So the owner is declared:
-  //   env SAHODA_LANE_OWNER, or `git config sahoda.owner <name>`.
-  // With neither, fall back to the branch slug, which is at least unique.
+  // Fall back to the branch slug only when the lane was never declared. It is
+  // unique, which is the property that matters, and the file says so loudly.
   const slug = branch
     .replace(/[^A-Za-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .toLowerCase()
-  const owner = (process.env.SAHODA_LANE_OWNER || sh('git config sahoda.owner') || '').trim()
-  const who = owner || slug
+  const who = owner || 'unknown'
+  const where = lane || slug
 
   const date = sh('date +%F') || new Date().toISOString().slice(0, 10)
-  const path = `docs/workflow/handoffs/${who}-${role}-${date}.md`
+  const path = `docs/workflow/handoffs/${who}-${where}-${date}.md`
 
   // This hook's OWN output is not the lane's uncommitted work. It reported
-  // "1 file(s) UNCOMMITTED" naming only the skeleton it had just written —
-  // a real warning firing on itself, which teaches a reader to ignore it.
+  // "1 file(s) UNCOMMITTED" naming only the skeleton it had just written — a
+  // real warning about a real hazard, firing on itself, which teaches a reader
+  // to ignore it. Measured 2026-08-26 on this hook's own output.
   //
-  // Ask git to exclude it rather than parsing columns. The first attempt sliced
-  // the path off at column 4, and it was WRONG for the first line of the output:
-  // sh() trims, so a ` M`/` D` entry arrives as `M …` and slice(3) ate a
-  // character of the path. It happened to work for `??` entries, which is why a
-  // mutation test passed over a broken filter. Measured 2026-08-26. A pathspec
-  // has no column to get wrong.
+  // Ask git to exclude it rather than parsing columns. A first attempt sliced
+  // the path off at column 4 and was WRONG for the first line: sh() trims, so
+  // a ` M`/` D` entry arrives as `M …` and slice(3) ate a character. It worked
+  // for `??` entries, so a mutation test using one passed over a broken filter.
+  // A pathspec has no column to get wrong.
   const dirtyOther = sh(`git status --porcelain -- . ':(exclude)${path}'`)
     .split('\n')
     .filter(Boolean)
@@ -110,13 +92,14 @@ try {
 
   const contract = commits.filter((c) => /\[contract\]|BREAKING|migration/i.test(c))
 
-  const ownerLine = owner
-    ? `**Owner** ${owner}`
-    : `> **OWNER UNKNOWN.** Nobody declared who runs this lane, so the filename\n> falls back to the branch slug. Set it once with \`git config sahoda.owner <name>\`\n> or the SAHODA_LANE_OWNER environment variable, and the record becomes\n> readable by a person instead of by a branch id.`
+  const warn =
+    !owner || !lane
+      ? `> **NOT FULLY DECLARED.** owner=${owner || 'MISSING'} lane=${lane || 'MISSING'}.\n> This session did not run \`/kickoff owner:<name> , branch:<lane>\`, so part of\n> this filename is a branch id rather than a person and a lane. The next session\n> in that lane will not find this file by looking for its own name.`
+      : `**Owner** ${owner} · **Lane** ${lane}`
 
-  const body = `# Handoff — ${role} — ${date}
+  const body = `# Handoff — ${who} — ${where} — ${date}
 
-${ownerLine}
+${warn}
 
 > **AUTOMATIC SKELETON.** Written by the Stop hook because this session ended
 > without \`/handoff\`. It records WHAT changed. It does not know WHY, and the

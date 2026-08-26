@@ -1,8 +1,14 @@
-# Handoff — advisor — 2026-08-26
+# Handoff — divas — wt-divas2 — 2026-08-26
 
-**Owner** divas. **Branch** `claude/divas-kickoff-03y2g2` at `6950771`, cut level
-with `origin/wt-core` at `7ae5c37`. Pushed: **yes**. PR
+**Owner** divas · **Lane** wt-divas2 · role advisor. **Branch**
+`claude/divas-kickoff-03y2g2` — a cloud session pinned to a harness-assigned
+name it cannot leave, carrying lane `wt-divas2`. Cut level with `origin/wt-core`
+at `7ae5c37`, since merged up to `c5a9c5e`. Pushed: **yes**. PR
 [#8](https://github.com/development156/sahodalabs/pull/8) → `wt-core`, draft.
+
+**Filed under the owner+lane scheme from `a4bd0fe`, not the owner+role one.**
+This file was originally written as `divas-advisor-2026-08-26.md` and renamed
+when that lane's work merged. See the supersession note below.
 
 **This is the first advisor handoff.** Before it, `docs/workflow/handoffs/` held
 exactly two files on every branch: `README.md` and `design-2026-08-25.md`. A
@@ -142,21 +148,34 @@ defect 1 being a *loop*: with the role resolving to `lane`, the hook rewrites
 `divas-lane-<date>.md` on every single stop, so leaving it meant committing a
 junk file beside the real handoff on every session, forever.
 
-**Fix for 1** mirrors the owner pattern the file already uses: the role is
-declarable via `SAHODA_LANE_ROLE` or `git config sahoda.role`, a declaration
-wins, the branch substring is the fallback, `lane` is the last resort. Set for
-this lane: `git config sahoda.role advisor`.
+**Fix for 1 was SUPERSEDED before it merged, by a better design that is also the
+founder's.** I made the role declarable via `SAHODA_LANE_ROLE` / `git config
+sahoda.role`, mirroring the owner pattern. It worked, and I proved it three
+directions. It is still the wrong answer.
 
-Proved three directions by running the hook and reading the filename it wrote:
+`a4bd0fe` on another lane removed role from the filename **entirely**, keying on
+`<owner>-<lane>-<date>` instead. Two reasons, and I had neither:
 
-| declaration | file written |
-|---|---|
-| `SAHODA_LANE_ROLE=advisor` | `divas-advisor-2026-08-26.md` |
-| none — falls back to the branch, which carries no role word | `divas-lane-2026-08-26.md` |
-| `SAHODA_LANE_ROLE=design` | `divas-design-2026-08-26.md` |
+1. **It found a live collision I did not.** MEASURED there: `claude/lead-research-tz63ld`
+   and `claude/lead-research-kickoff-qexr94` had BOTH written
+   `girija-research-2026-08-26.md`. One person runs three lanes, so a role can
+   never disambiguate them; at merge the second silently overwrites the first.
+   My fix would have filed advisor sessions correctly and left that collision
+   untouched.
+2. **The role mapping I relied on is not the founder's.** `08_ROLES.md` says
+   design-in-the-name means the design role. The actual assignment is
+   girija → `/lead-research` and jiban → `/lead-design`. **`08_ROLES.md` is wrong
+   about this and I built on it.** Inferring a role from a branch was the defect,
+   not the substring matching.
 
-Row 2 is the important one: the fallback still works, so this is additive and no
-existing lane's filename moves.
+So I took their file wholesale at the merge and dropped my change. `git config
+sahoda.owner divas` and `sahoda.lane wt-divas2` are set for this lane;
+`sahoda.role` is unset, because nothing reads it any more.
+
+**The lesson is the one `08_ROLES.md` states and I still walked into.** Two lanes
+edited the same *concept*, not the same *lines*. Git would have merged both
+mechanisms silently if the text had not happened to collide, and the repository
+would have carried two competing filename schemes with only one of them right.
 
 **Fix for 2** excludes the hook's own output with a git pathspec:
 `git status --porcelain -- . ':(exclude)<path>'`.
