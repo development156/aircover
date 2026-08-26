@@ -439,8 +439,11 @@ export async function writeVariants(
   const pool = getPool()
   for (const v of variants) {
     await pool.query(
-      `insert into post_variants (workspace_id, post_id, channel, body, extras, char_count)
-       values ($1, $2, $3, $4, $5::jsonb, $6)`,
+      // `generated_body` takes the same `$4` as `body`: draft capture
+      // (REQUESTS.md §22). Every variant reaching this function is model output,
+      // so both columns start equal and only `body` moves when a person edits.
+      `insert into post_variants (workspace_id, post_id, channel, body, generated_body, extras, char_count)
+       values ($1, $2, $3, $4, $4, $5::jsonb, $6)`,
       [workspaceId, postId, v.channel, v.body, JSON.stringify(v.extras ?? null), v.body.length],
     )
   }

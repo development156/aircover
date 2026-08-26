@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
+import type { CapturedPost } from './observe/edit-distance'
 import type { PublishedPost } from './observe/tone-drift'
 
 /**
@@ -17,6 +18,8 @@ import type { PublishedPost } from './observe/tone-drift'
 const store = vi.hoisted(() => ({
   workspaces: [] as string[],
   postsBy: new Map<string, PublishedPost[]>(),
+  capturedBy: new Map<string, CapturedPost[]>(),
+  capturedWorkspaces: [] as string[],
   saved: [] as Array<{ workspaceId: string; claim: string; computedOn: string }>,
   inserted: true,
   throwFor: new Set<string>(),
@@ -24,9 +27,16 @@ const store = vi.hoisted(() => ({
 
 vi.mock('./store', () => ({
   workspacesWithPublishedPosts: async () => store.workspaces,
+  // Empty by default, so every existing case below exercises exactly what it
+  // used to and the edit-distance computer simply declines beside it.
+  workspacesWithCapturedDrafts: async () => store.capturedWorkspaces,
   readPublishedPosts: async (workspaceId: string) => {
     if (store.throwFor.has(workspaceId)) throw new Error('read failed')
     return store.postsBy.get(workspaceId) ?? []
+  },
+  readCapturedPosts: async (workspaceId: string) => {
+    if (store.throwFor.has(workspaceId)) throw new Error('read failed')
+    return store.capturedBy.get(workspaceId) ?? []
   },
   saveObservation: async (
     workspaceId: string,
@@ -59,10 +69,25 @@ function drifter(prefix: string): PublishedPost[] {
   ]
 }
 
+/** Ten drafted posts: heavily rewritten early, barely touched lately. */
+function improver(prefix: string): CapturedPost[] {
+  const draft = 'a'.repeat(100)
+  const make = (share: number, month: string, from: number) =>
+    Array.from({ length: 5 }, (_, i) => ({
+      id: `${prefix}0000-0000-4000-8000-${String(from + i).padStart(12, '0')}`.slice(-36),
+      generatedBody: draft,
+      body: 'b'.repeat(share) + 'a'.repeat(100 - share),
+      createdOn: `2026-${month}-0${i + 1}`,
+    }))
+  return [...make(60, '01', 0), ...make(5, '03', 5)]
+}
+
 describe('runMarketingBrainPass', () => {
   beforeEach(() => {
     store.workspaces = []
     store.postsBy = new Map()
+    store.capturedBy = new Map()
+    store.capturedWorkspaces = []
     store.saved = []
     store.inserted = true
     store.throwFor = new Set()
@@ -112,7 +137,15 @@ describe('runMarketingBrainPass', () => {
     expect(result.inserted).toBe(0)
     // Two workspaces, two DIFFERENT reasons. A single "produced nothing: 2"
     // reads as a broken job; these two read as a product waiting for data.
-    expect(result.declined).toEqual({ no_posts: 1, window_too_short: 1 })
+    // Two workspaces, two DIFFERENT tone reasons, and both also decline the
+    // edit-distance computer because neither has a captured draft. The prefixes
+    // are what keep those four facts apart: without them the two computers'
+    // `window_too_short` would add together into one number meaning neither.
+    expect(result.declined).toEqual({
+      'tone_drift:no_posts': 1,
+      'tone_drift:window_too_short': 1,
+      'edit_distance:no_captured_drafts': 2,
+    })
   })
 
   it('keeps going when one workspace throws, and counts it apart from a decline', async () => {
@@ -124,8 +157,51 @@ describe('runMarketingBrainPass', () => {
 
     expect(result.failed).toBe(1)
     expect(result.inserted).toBe(1)
-    // "we could not look" is not "we looked and there was nothing".
-    expect(result.declined).toEqual({})
+    // "we could not look" is not "we looked and there was nothing". The broken
+    // workspace contributes NOTHING to `declined` - the only entry belongs to
+    // ws-a, which was read successfully and has no captured drafts. If the throw
+    // were folded in, this count would be 2 and the failure would be invisible.
+    expect(result.declined).toEqual({ 'edit_distance:no_captured_drafts': 1 })
+  })
+
+  it('runs the edit-distance computer too, and saves what it finds', async () => {
+    // The seam test. Both computers live behind one pass, and a wiring that
+    // reads the captured posts but never calls the computer would leave every
+    // other test here green while the feature produced nothing forever.
+    store.capturedWorkspaces = ['ws-c']
+    store.capturedBy.set('ws-c', improver('c'))
+
+    const result = await runMarketingBrainPass(new Date('2026-03-08T00:00:00Z'))
+
+    expect(result.inserted).toBe(1)
+    expect(store.saved[0]?.claim).toMatch(/changing less of what Sahoda drafts/i)
+  })
+
+  it('considers a workspace that has drafts but has published nothing', async () => {
+    // `workspacesWithPublishedPosts` would not return this one. If the runner
+    // took that list alone instead of the union, this workspace would never be
+    // looked at and the count would read 0 with nothing saying why.
+    store.workspaces = []
+    store.capturedWorkspaces = ['ws-d']
+    store.capturedBy.set('ws-d', improver('d'))
+
+    const result = await runMarketingBrainPass(new Date('2026-03-08T00:00:00Z'))
+
+    expect(result.workspaces).toBe(1)
+    expect(result.inserted).toBe(1)
+  })
+
+  it('counts a workspace once when both lists name it', async () => {
+    store.workspaces = ['ws-a']
+    store.capturedWorkspaces = ['ws-a']
+    store.postsBy.set('ws-a', drifter('a'))
+    store.capturedBy.set('ws-a', improver('a'))
+
+    const result = await runMarketingBrainPass(new Date('2026-03-08T00:00:00Z'))
+
+    expect(result.workspaces).toBe(1)
+    // Both computers produced something for the one workspace.
+    expect(result.inserted).toBe(2)
   })
 
   it('reports the workspaces it considered, so a pass over none is visible', async () => {
