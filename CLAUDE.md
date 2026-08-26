@@ -96,12 +96,13 @@ integration branch move independently; a stale checkout writes against code that
 no longer exists. If `--ff-only` refuses, the lane has diverged — say so and
 stop, do not merge past it.
 
-**Branches.** `wt-girija`, `wt-jiban` and `wt-divas` are the working lanes, each
-cut from `origin/wt-web` and never from `main` (every `main` here is 690+
-commits behind and carries a 20-route skeleton of a 58-route product). Lanes
-merge into `wt-core`; the advisor reviews `wt-core` and alone promotes it to
-`wt-web`. Read `docs/workflow/08_ROLES.md` for who does what and
-`docs/workflow/09_CLOUD_SESSIONS.md` for the cloud setup.
+**Branches and permission.** Your lane is **whatever branch this session is on**
+— a cloud session assigns its own name and that is fine. **You own your lane
+completely and need approval for nothing inside it**: any file, any dependency,
+any migration file, commit and push freely. Lanes merge into `wt-core`. The one
+gated step in the whole system is **`wt-core` → `wt-web`**, which is production.
+Never cut from `main` — every `main` here is 690+ commits behind and carries a
+20-route skeleton of a 58-route product. See `docs/workflow/08_ROLES.md`.
 
 **All three people share one Claude account and one GitHub account.** So every
 commit is authored `SAHODALABS` and `git blame` can never tell you who did what:

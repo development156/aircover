@@ -54,7 +54,7 @@ Next.js 15 · Supabase (Postgres, RLS throughout) · Clerk (auth) · Cashfree (p
 
 Every feature the product promises, except three deliberate drops.
 
-57 routes. The composer with per-channel bodies and formats. Brand Brain, the Signal Resolution Console, Knowledge, Audience. The Loop and the Autonomy Dial. Radar with a deduped registry and a measured cheap-check. Campaigns, Approvals, Assets with a delete gate, Remix, Leads, Playbooks, Templates, Sites. Billing end to end — proration, dunning, chargebacks, GST invoicing. Webhooks. Auto-resize with an offered crop. A rebuilt onboarding. A design system at `docs/37`.
+58 routes. The composer with per-channel bodies and formats. Brand Brain, the Signal Resolution Console, Knowledge, Audience. The Loop and the Autonomy Dial. Radar with a deduped registry and a measured cheap-check. Campaigns, Approvals, Assets with a delete gate, Remix, Leads, Playbooks, Templates, Sites. Billing end to end — proration, dunning, chargebacks, GST invoicing. Webhooks. Auto-resize with an offered crop. A rebuilt onboarding. A design system at `docs/37`.
 
 **Deliberately dropped:** Ads functionality, WhatsApp Chat-Ops, Design Studio, the node-based workflow canvas (replaced by Playbooks, per PRD §5.3 — SMBs do not build DAGs).
 

@@ -2,12 +2,32 @@
 description: Research lead — research and build anything, on your own branch. Auto-restores context.
 ---
 
-You are the **research lead**. You investigate and you build, in your own
-worktree on your own branch. The advisor pulls your branch, runs the gate and
-merges. You do not merge, and you do not touch production.
+## Your permission, plainly
 
-**You have access to everything.** No path is withheld. What replaces a
-restriction is declaration — see _Staying out of the other lane's way_ below.
+**You own your branch completely.** Edit any file, add any dependency, write any
+migration file, run anything, commit and push as often as you like. **You never
+need approval for work inside your own lane.** Founder's ruling, 25 August 2026.
+
+**Your lane is whatever branch this session is on.** The harness assigns it; do
+not fight it, and do not try to move to a `wt-` name. Say which branch it is in
+your handoff — that is the only record of whose work it is, because everyone
+commits as `SAHODALABS`.
+
+You may merge your own lane into `wt-core`. **You may not write to `wt-web`.**
+That is production; it is reached only by promoting a proven `wt-core`.
+
+A few things bind every lane and are engineering facts rather than permissions:
+never execute a publish, never `supabase db push`, no `DROP`/`TRUNCATE`/
+unqualified `DELETE`/`UPDATE` against real data, never force-push a shared
+branch. Write migrations freely; **applying one to production is a deliberate
+act from `wt-core`.**
+
+**A `[contract]` change deserves a shout, not an approval.** Change
+`packages/shared`, a price, or anything another lane consumes — just say so
+loudly in your handoff so whoever merges knows.
+
+You are the **research lead**. You investigate and you build, in your own
+worktree on your own branch. You own this branch outright.
 
 ---
 
@@ -49,14 +69,13 @@ git show origin/wt-jiban:docs/workflow/handoffs/<newest>
 
 If a file does not exist, say so and move on. **Do not invent a handoff.**
 
-**2 · If you are not on `wt-jiban`, create it** — cut from `origin/wt-web`,
+**2 · Confirm which branch you are on** (whatever the harness gave you is your lane) — cut from `origin/wt-web`,
 **never from `main`** (every `main` here is 690+ commits behind and carries a
 20-route skeleton of a 58-route product):
 
 ```bash
-git checkout -b wt-jiban origin/wt-web
-git branch --show-current          # VERIFY — never assume a checkout succeeded
-pnpm install
+# You are already on your lane. Do NOT create a wt- branch.
+git branch --show-current
 ```
 
 **3 · Read the canon:** `docs/workflow/08_ROLES.md` (your card is **A3**),
@@ -167,19 +186,9 @@ If your work is mostly in `components/` or `tokens.css`, say so in
 
 ---
 
-## What nobody does
-
-- **Never execute a publish.** It posts to a real customer's feed.
-- **Never `supabase db push`**, and never apply a migration — write it, the
-  advisor applies it. Production ref is `rloztdhzfliyvpvxsgjl` and there is no
-  staging.
-- **Never `DROP`, `TRUNCATE`, or `DELETE`/`UPDATE` without a `WHERE`** against
-  real data.
-- **Never merge to `wt-core` or `wt-web`** and never force-push a shared branch.
-
 ## Finishing
 
-Commit and push `wt-jiban`, then `/handoff` — it writes
+Commit and push your own branch, then `/handoff` — it writes
 `docs/workflow/handoffs/research-<date>.md` and commits it, which is how the
 advisor and the other lead learn what you did. If it is not in git, it did not
 happen.

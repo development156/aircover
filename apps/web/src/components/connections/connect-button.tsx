@@ -1,5 +1,6 @@
 'use client'
 
+import { ChevronRight, Link2 } from 'lucide-react'
 import { useState, useTransition } from 'react'
 
 import type { Channel } from '@sahoda/shared'
@@ -74,12 +75,23 @@ export function ConnectButton({
            place a screen genuinely has a primary action. */
         variant="secondary"
         size="sm"
-        className="w-full"
+        /* `justify-between` with a leading mark and a trailing chevron, so the
+           control reads as "this leaves the app and goes there" rather than as
+           a generic submit. The chevron is the same affordance the spend row
+           above it uses. Still `secondary` \u2014 see above; four of these render at
+           once and none of them outranks the others. */
+        className="w-full justify-between"
         disabled={disabled || pending}
         onClick={start}
         data-guide={disabled ? undefined : `connections.connect_${platform}`}
       >
-        {pending ? `Opening ${label}\u2026` : `Connect ${label}`}
+        <span className="inline-flex min-w-0 items-center gap-2">
+          <Link2 aria-hidden className="size-3.5 shrink-0" />
+          <span className="truncate">
+            {pending ? `Opening ${label}\u2026` : `Connect ${label}`}
+          </span>
+        </span>
+        <ChevronRight aria-hidden className="size-3.5 shrink-0" />
       </Button>
       {disabled && disabledReason ? (
         <span className="text-[11px] text-muted">{disabledReason}</span>
