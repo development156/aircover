@@ -79,8 +79,9 @@ function getPool(): PgLedgerPort['pool'] {
 export async function readPublishedPosts(
   workspaceId: string,
   limit = 200,
+  db: Queryable = getPool(),
 ): Promise<PublishedPost[]> {
-  const r = await getPool().query<{ id: string; body: string; published_on: string }>(
+  const r = await db.query<{ id: string; body: string; published_on: string }>(
     `select id, body, published_on from (
        select distinct on (p.id)
               p.id   as id,
@@ -177,8 +178,12 @@ export async function workspacesWithPublishedPosts(limit = 500): Promise<string[
  * post a person typed, and handing it to the computer as a zero-distance post
  * would manufacture an improvement out of Sahoda being used less.
  */
-export async function readCapturedPosts(workspaceId: string, limit = 200): Promise<CapturedPost[]> {
-  const r = await getPool().query<{
+export async function readCapturedPosts(
+  workspaceId: string,
+  limit = 200,
+  db: Queryable = getPool(),
+): Promise<CapturedPost[]> {
+  const r = await db.query<{
     id: string
     generated_body: string
     body: string

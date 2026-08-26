@@ -11,8 +11,8 @@ import { featuresOf, hashtagCount, opensWithQuestion } from './post-features'
  * The store collapses a cross-published post to ONE caption before this
  * computer runs. That `distinct on (p.id)` lives in SQL these tests do not
  * execute, so nothing here proves a post published to three channels is
- * counted once. `readFeaturedPosts` needs a PGlite test before this is trusted
- * against a cross-posting business.
+ * counted once. `store.pglite.test.ts` covers that against a real Postgres;
+ * these tests still cannot see it.
  *
  * They also say nothing about whether length CAUSES the difference. The claim
  * this computer writes is a correlation stated as one, and a customer who

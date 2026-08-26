@@ -11,7 +11,7 @@ import { audienceGrowth, MIN_AUDIENCE, type AudienceReading } from './audience-g
  * `total` bucket rather than `gained`/`lost`. That choice is the whole reason
  * this computer works against real data — MEASURED, both other buckets are zero
  * on every production row — and it lives in `store.ts` SQL, which these do not
- * execute.
+ * execute. `store.pglite.test.ts` does.
  *
  * They also cannot see whether a platform's follower count is comparable with
  * itself over time. A platform that re-bases its own definition would look
