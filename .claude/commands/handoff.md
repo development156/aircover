@@ -13,9 +13,13 @@ git log --oneline -10
 git status --short
 ```
 
-Derive your role from the branch: `wt-design` is `design`, `wt-research` is
-`research`, anything else is `advisor` unless you were told otherwise. Get
-today's date with `date +%F` — do not guess it.
+**Role by substring, owner by declaration.** `design` in the branch name is the
+design role, `research` is research, `advisor` is advisor — matching `wt-design`
+exactly resolves every real branch to `advisor`, which is what it did until
+2026-08-26. The owner comes from `git config sahoda.owner` or
+`$SAHODA_LANE_OWNER`; if neither is set, **ask** rather than guess.
+
+Get today's date with `date +%F` — do not guess it.
 
 ## 2 · Verify before you claim
 
@@ -30,7 +34,7 @@ Run the gate legs that apply and record their **real output**. Then:
 
 ## 3 · Write the file
 
-Write to `docs/workflow/handoffs/<role>-<YYYY-MM-DD>.md`. If that file already
+Write to `docs/workflow/handoffs/<owner>-<role>-<YYYY-MM-DD>.md`. If that file already
 exists, append a new `## Session <n>` section rather than overwriting it.
 
 Required sections, all of them, by name:
