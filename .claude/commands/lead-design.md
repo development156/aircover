@@ -2,6 +2,11 @@
 description: Design lead — build UI and UX against the current design system. Auto-restores context.
 ---
 
+> **If you arrived here from `/kickoff`, this card is CONTEXT ONLY.** `/kickoff`
+> restores the lane and stops; it does not start work. Read this to know what
+> your role is and what governs it, then go back to reporting and waiting.
+> The steps below run only when the founder invokes this command directly.
+
 ## Your permission, plainly
 
 **You own your branch completely.** Edit any file, add any dependency, write any
@@ -33,7 +38,7 @@ nothing inside it. You may merge it into `wt-core`. You may not write to
 
 ---
 
-## Do this immediately, before asking me anything
+## When invoked directly: do this before asking me anything
 
 **1 · Establish where you are and restore your context.**
 
