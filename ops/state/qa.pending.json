@@ -455,6 +455,19 @@
       "summary_plain": "The unit checks ran and something failed (5 passed, 1 failed).",
       "details": "     × raises the window it opened, because a named window is reused unfocused 17ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 5 passed (6)",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtaaincu-a9452a74",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T16:10:25.852Z",
+      "finished_at": "2026-08-26T16:10:25.852Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (47 passed, 2 failed).",
+      "details": "     × is a page the browser will RENDER, not a redirect it will follow 5ms\n     × sends no Location on a FAILED popup either, and keeps the 5xx 2ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 47 passed (49)",
+      "duration_ms": null
     }
   ]
 }

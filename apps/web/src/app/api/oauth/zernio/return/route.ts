@@ -89,11 +89,26 @@ function escapeAttr(value: string): string {
  * copy of the product in a window too small to use it, which is worse than doing
  * nothing at all.
  *
- * ── THE STATUS LINE IS UNTOUCHED ─────────────────────────────────────────────
+ * ── AND IT MUST NOT BE A REDIRECT, WHICH IS WHAT IT ACTUALLY WAS ────────────
+ * THIS is why every earlier attempt at closing the popup failed, including the
+ * COOP work above and the query-parameter work below it. This page was served
+ * with `status: 303` and a `Location` header. A browser FOLLOWS a 303 — the body
+ * is never rendered, no script in it ever runs, and the popup navigates to
+ * /connections. Reported four times, most precisely as: "it is opening this
+ * website in the same popup itself ... /connections?zernio=connected".
+ *
+ * The `Location` header was copied from `backError`, where it is inert because a
+ * 4xx/5xx `Location` is not followed and it exists only to make the intended
+ * destination visible to a log reader and to `curl -I`. On a 303 it is not inert
+ * at all. So the closer sends NO `Location`, ever: the destination is in the body
+ * as a real link, which is the only place a popup should be offered one.
+ *
+ * ── THE STATUS LINE STILL TELLS THE TRUTH ────────────────────────────────────
  * This route exists in its current shape because a failure leaving as 303 was
- * invisible to a 4xx/5xx log filter. A popup does not change what happened, so it
- * does not change the status code: a failed popup connect is still a 5xx, and
- * only the BODY differs.
+ * invisible to a 4xx/5xx log filter, and that property is kept: a failed popup
+ * connect is still a 5xx. What changes is the SUCCESS status, from 303 to 200.
+ * Both are "this worked" to the filter that matters, and only one of them makes
+ * the browser walk away from the page before it can run.
  */
 function popupCloser(
   request: Request,
@@ -139,8 +154,10 @@ function popupCloser(
         'content-type': 'text/html; charset=utf-8',
         'cache-control': 'no-store',
         'set-cookie': CLEAR_PENDING_CONNECT,
-        // Kept for the log reader and for `curl -I`, exactly as `backError` does.
-        location: target,
+        // NO `location`. See the header: this response is HTML that must RENDER,
+        // and a `Location` on the 3xx this used to send made the browser follow
+        // it instead. `backError` can keep one only because 4xx/5xx are not
+        // followed.
       },
     },
   )
@@ -286,7 +303,11 @@ export async function GET(request: Request): Promise<Response> {
     (askedPlatform !== null && isZernioPlatform(askedPlatform) ? askedPlatform : null)
 
   const ok = (status: 'connected' | 'nothing' | 'limit', detail?: string) =>
-    popup ? popupCloser(request, 303, status, detail) : backOk(request, status, detail)
+    // 200, NOT 303. A 303 is a redirect and a browser follows it, so the closer's
+    // body never rendered and its script never ran — the whole reason the popup
+    // kept showing /connections instead of shutting. Still a success status, so
+    // the 4xx/5xx log filter this route was built around reads it the same way.
+    popup ? popupCloser(request, 200, status, detail) : backOk(request, status, detail)
   /** Each failure carries the status a log reader would expect for that cause. */
   const fail = (httpStatus: number, detail: string) =>
     popup
