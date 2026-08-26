@@ -66,6 +66,10 @@ function repo(branch = 'claude/advisor-qvz5wn') {
   return dir
 }
 
+function git2(dir, ...args) {
+  execFileSync('git', args, { cwd: dir, stdio: 'pipe' })
+}
+
 function run(dir) {
   // Copy rather than run in place, so the test exercises the file as shipped.
   const local = join(dir, 'auto-handoff.mjs')
@@ -103,11 +107,29 @@ describe('the stop hook writes a skeleton only when there is no real handoff', (
   })
 
   it('writes NOTHING when a real handoff sits at its own filename either', () => {
+    // The hook's own name is `<owner>-<lane>-<date>.md`, and with neither declared
+    // that is `unknown-<branch-slug>-<date>.md`. Retargeted, not deleted: this case
+    // pins "a real handoff at the name I would write means stop", and the merge with
+    // wt-core changed what that name IS, not whether the rule holds.
     const dir = repo()
     const date = today()
-    const own = `claude-advisor-qvz5wn-advisor-${date}.md`
+    const own = `unknown-claude-advisor-qvz5wn-${date}.md`
     writeFileSync(join(dir, HANDOFFS, own), REAL)
     expect(run(dir)).toEqual([own])
+  })
+
+  it('writes NOTHING when a real handoff sits under the older `<owner>-<role>-<date>.md`', () => {
+    // Not hypothetical, and this is why the role derivation survived the merge:
+    // docs/workflow/handoffs/divas-advisor-2026-08-26.md is on disk in this
+    // repository, written under the scheme that came before <owner>-<lane>. A hook
+    // that cannot see it writes a second file claiming the session ended without a
+    // handoff, which is the exact fabrication this suite exists to stop.
+    const dir = repo()
+    const date = today()
+    git2(dir, 'config', 'sahoda.owner', 'divas')
+    const legacy = `divas-advisor-${date}.md`
+    writeFileSync(join(dir, HANDOFFS, legacy), REAL)
+    expect(run(dir)).toEqual([legacy])
   })
 
   it('does NOT eat a real handoff that merely MENTIONS the skeleton marker', () => {
@@ -141,6 +163,38 @@ describe('the stop hook writes a skeleton only when there is no real handoff', (
       'the hook overwrote a handoff for quoting the very marker it uses to recognise ' +
         'its own output — the better the handoff documents this hook, the more surely ' +
         'it is destroyed',
+    ).toEqual([name])
+    expect(readFileOf(dir, name)).toContain('A person wrote every line of this.')
+  })
+
+  it('does NOT eat a handoff that quotes the marker INLINE, high in the file', () => {
+    // This earns the `^` anchor, and it was added because dropping the anchor left the
+    // whole suite GREEN. The clamp to HEAD_LINES hides the anchor for any quotation
+    // far down the page, so only a mention near the TOP can tell the two apart, and
+    // without this case the anchor was an untested bound — which this project treats
+    // as no guard at all.
+    //
+    // The sentence below is the shape a handoff explaining the hook actually takes:
+    // the marker quoted mid-line, inside the header note, in the first few lines.
+    const dir = repo()
+    const date = today()
+    const name = `advisor-${date}.md`
+    writeFileSync(
+      join(dir, HANDOFFS, name),
+      [
+        '# Handoff — advisor — today',
+        '',
+        '> **On the Stop hook.** Its opening line reads > **AUTOMATIC SKELETON.** and',
+        '> that is the whole tell.',
+        '',
+        'A person wrote every line of this.',
+      ].join('\n'),
+    )
+
+    expect(
+      run(dir),
+      'a handoff was destroyed for quoting the marker inside a sentence near its top, ' +
+        'which is precisely where an explanation of this hook belongs',
     ).toEqual([name])
     expect(readFileOf(dir, name)).toContain('A person wrote every line of this.')
   })
