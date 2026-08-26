@@ -3,6 +3,7 @@ import 'server-only'
 import { createPgLedgerPort, loadBillingEnv, type PgLedgerPort } from '@sahoda/billing'
 import type { MarketingObservation } from '@sahoda/shared'
 
+import type { CapturedPost } from './observe/edit-distance'
 import type { PublishedPost } from './observe/tone-drift'
 
 /**
@@ -130,6 +131,75 @@ export async function workspacesWithPublishedPosts(limit = 500): Promise<string[
     `select distinct p.workspace_id
        from posts p
       where p.status = 'published'
+      limit $1`,
+    [limit],
+  )
+  return r.rows.map((row) => row.workspace_id)
+}
+
+/**
+ * Posts that carry a model draft, oldest first.
+ *
+ * ── WHY posts.body HERE, WHERE `readPublishedPosts` USES post_variants ───────
+ * Those two functions answer different questions and the difference is the
+ * point. A habit claim has to read what a READER read, so it takes the channel
+ * copy. This is a claim about what the CUSTOMER changed, so it must compare the
+ * same column before and after: `generated_body` was written from `body` at
+ * generation, and `body` is what the edit moved. Reading the draft from one
+ * column and the result from another would measure the per-channel trim as if
+ * the customer had made it.
+ *
+ * ── PUBLISHED IS NOT REQUIRED, AND THAT IS DELIBERATE ────────────────────────
+ * The edit happens when the draft is corrected, not when it goes out. A post
+ * rewritten and never published still says what the business wanted changed,
+ * which is the signal. Requiring `published` would throw away every correction
+ * on a draft that was abandoned - and those are the most informative ones.
+ *
+ * ── NULL DRAFTS ARE FILTERED IN SQL, NOT DEFAULTED ───────────────────────────
+ * `generated_body is not null` is the whole exclusion. A row without one is a
+ * post a person typed, and handing it to the computer as a zero-distance post
+ * would manufacture an improvement out of Sahoda being used less.
+ */
+export async function readCapturedPosts(workspaceId: string, limit = 200): Promise<CapturedPost[]> {
+  const r = await getPool().query<{
+    id: string
+    generated_body: string
+    body: string
+    created_on: string
+  }>(
+    `select id,
+            generated_body,
+            coalesce(body, '') as body,
+            (created_at at time zone 'utc')::date::text as created_on
+       from posts
+      where workspace_id = $1
+        and generated_body is not null
+      order by created_at asc
+      limit $2`,
+    [workspaceId, limit],
+  )
+  return r.rows.map((row) => ({
+    id: row.id,
+    generatedBody: row.generated_body,
+    body: row.body,
+    createdOn: row.created_on,
+  }))
+}
+
+/**
+ * Every workspace holding at least one captured draft.
+ *
+ * Separate from `workspacesWithPublishedPosts` because the two computers need
+ * different populations: a business can have drafted with Sahoda for a month and
+ * published none of it, and it still has a rewrite history worth measuring.
+ * Unioning the two lists in the runner is what stops either computer being
+ * silently skipped for a workspace the other one does not care about.
+ */
+export async function workspacesWithCapturedDrafts(limit = 500): Promise<string[]> {
+  const r = await getPool().query<{ workspace_id: string }>(
+    `select distinct workspace_id
+       from posts
+      where generated_body is not null
       limit $1`,
     [limit],
   )

@@ -335,6 +335,9 @@ async function writeDraft(input: {
     workspace_id: input.workspaceId,
     title: null,
     body: canonical,
+    // Draft capture (REQUESTS.md §22): Remix is a model writing text, so the
+    // post it creates carries the model's own words alongside the mutable copy.
+    generated_body: canonical,
     // A DRAFT. Never scheduled, never approved, never published — Remix has no
     // branch that writes any other status, which is what makes "every derivative
     // is a draft a person approves" a property rather than a promise.
@@ -359,6 +362,9 @@ async function writeDraft(input: {
         post_id: postId,
         channel: derivative.channel,
         body,
+        // Per channel, because the per-channel body is what the model actually
+        // wrote for that channel and what the customer will edit there.
+        generated_body: body,
         format: derivative.format,
         char_count: charCountFor(CONSTRAINTS[derivative.channel], {
           body,
