@@ -4,14 +4,17 @@ import type { MarketingObservation } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
 
+import { audienceGrowth, type NoGrowthReason } from './observe/audience-growth'
 import { channelReturn, type NoChannelReason } from './observe/channel-return'
 import { editDistance, type NoDeltaReason } from './observe/edit-distance'
 import { toneDrift, type NoDriftReason } from './observe/tone-drift'
 import {
+  readAudienceReadings,
   readCapturedPosts,
   readChannelOutcomes,
   readPublishedPosts,
   saveObservation,
+  workspacesWithAudience,
   workspacesWithCapturedDrafts,
   workspacesWithChannelMetrics,
   workspacesWithPublishedPosts,
@@ -86,6 +89,7 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
       ...(await workspacesWithPublishedPosts()),
       ...(await workspacesWithCapturedDrafts()),
       ...(await workspacesWithChannelMetrics()),
+      ...(await workspacesWithAudience()),
     ]),
   ]
 
@@ -97,7 +101,10 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
     failed: 0,
   }
 
-  const decline = (kind: string, reason: NoDriftReason | NoDeltaReason | NoChannelReason): void => {
+  const decline = (
+    kind: string,
+    reason: NoDriftReason | NoDeltaReason | NoChannelReason | NoGrowthReason,
+  ): void => {
     const key = `${kind}:${reason}`
     result.declined[key] = (result.declined[key] ?? 0) + 1
   }
@@ -106,13 +113,17 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
     workspaceId: string,
     kind: string,
     outcome: { observation: MarketingObservation | null; reason: string | null },
-    fallback: NoDriftReason | NoDeltaReason | NoChannelReason,
+    fallback: NoDriftReason | NoDeltaReason | NoChannelReason | NoGrowthReason,
   ): Promise<void> => {
     if (!outcome.observation) {
       // Each computer returns exactly one of the two and its type says so. The
       // fallback is here because a future one could return neither, and the
       // count would silently stop adding up.
-      decline(kind, (outcome.reason as NoDriftReason | NoDeltaReason | NoChannelReason) ?? fallback)
+      decline(
+        kind,
+        (outcome.reason as NoDriftReason | NoDeltaReason | NoChannelReason | NoGrowthReason) ??
+          fallback,
+      )
       return
     }
     const { inserted } = await saveObservation(workspaceId, outcome.observation)
@@ -147,6 +158,43 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
        */
       const outcomes = await readChannelOutcomes(workspaceId, MAX_POSTS_CONSIDERED * 2)
       await record(workspaceId, 'channel_return', channelReturn(outcomes, computedOn), 'no_metrics')
+
+      /**
+       * One observation PER CHANNEL, which is why this is the only computer the
+       * runner loops over. A workspace on two platforms is growing on one and
+       * shrinking on the other as often as not, and a single blended number
+       * would hide exactly the fact worth acting on. `subject` carries the
+       * channel, so the unique key keeps them apart.
+       */
+      const readings = await readAudienceReadings(workspaceId)
+      const channels = [...new Set(readings.map((r) => r.channel))]
+      if (channels.length === 0) {
+        /**
+         * Declared, not skipped. With no readings there is no channel to loop
+         * over, so without this line a workspace with no connected account
+         * would produce no `audience_growth` entry of any kind — silence that
+         * reads identically to the computer never having run. Every sibling
+         * says why it produced nothing and so does this one.
+         */
+        await record(
+          workspaceId,
+          'audience_growth',
+          { observation: null, reason: 'no_audience_data' },
+          'no_audience_data',
+        )
+      }
+      for (const channel of channels) {
+        await record(
+          workspaceId,
+          'audience_growth',
+          audienceGrowth(
+            readings.filter((r) => r.channel === channel),
+            channel,
+            computedOn,
+          ),
+          'no_audience_data',
+        )
+      }
     } catch (error) {
       // One workspace's failure must not end the pass for the rest. Counted
       // separately from `declined`, because "we could not look" and "we looked
