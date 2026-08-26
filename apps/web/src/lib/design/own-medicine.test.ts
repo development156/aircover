@@ -78,14 +78,43 @@ describe('the default theme passes the guard it applies to customers', () => {
     ).toBeGreaterThanOrEqual(AA_BODY)
   })
 
-  it('the SHIPPED --acc is readable as text on --surface', () => {
+  /**
+   * ── RETARGETED 2026-08-26, AND WHAT IT NO LONGER CLAIMS ────────────────────
+   * This assertion used to read `--acc must clear AA` and it PASSED, because
+   * --acc was #bd4b00 at 5.04:1. The founder ruled the brand orange in at
+   * 2.94:1 with that number in front of them, so the old assertion would now
+   * fail for a reason nobody intends to fix.
+   *
+   * It is retargeted rather than deleted or skipped, because the thing worth
+   * guarding did not go away — it CHANGED. What must not happen silently is
+   * --acc drifting to some third value that nobody ruled on. So this pins the
+   * ruled value exactly and states the shortfall it accepts out loud.
+   *
+   * Read the failure message before "fixing" a red here: if --acc is back at
+   * #bd4b00 the product is MORE accessible, not less, and the right response
+   * is to ask whether the ruling was reversed, not to re-pin the constant.
+   */
+  it('--acc is the ruled brand orange, and its AA shortfall is stated not hidden', () => {
     const acc = token('--acc')
     expect(acc.startsWith('#'), '--acc is expected to be a hex literal').toBe(true)
+    expect(
+      acc,
+      `--acc is ${acc}. The 2026-08-26 ruling pins it to #ff6600. A different ` +
+        `value means someone changed the accent without a ruling — do not ` +
+        `re-pin this constant to match, find out who moved it and why.`,
+    ).toBe('#ff6600')
+
+    // The cost, asserted rather than described, so it cannot rot into a claim
+    // that this pair is fine. If a future change makes accent text clear AA,
+    // THIS line goes red and that is a good day — reverse the ruling above.
     const ratio = contrastRatio(hexToRgb(acc), SURFACE_RGB)
     expect(
       ratio,
-      `--acc ${acc} measures ${ratio.toFixed(2)}:1 on --surface — accent TEXT must clear AA`,
-    ).toBeGreaterThanOrEqual(AA_BODY)
+      `--acc ${acc} measures ${ratio.toFixed(2)}:1 on --surface. This is BELOW ` +
+        `AA ${AA_BODY}:1 by ruling. If this figure has risen above the floor, ` +
+        `the ruling has been superseded and this test should assert AA again.`,
+    ).toBeLessThan(AA_BODY)
+    expect(Number(ratio.toFixed(2))).toBe(2.94)
   })
 
   /**
