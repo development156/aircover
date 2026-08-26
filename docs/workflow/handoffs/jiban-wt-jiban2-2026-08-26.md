@@ -201,9 +201,30 @@ Run on `fd02cd5`, clean tree, from the repo root. **No leg was piped.**
 | `design-lint.mjs` | **PASS** | `1221 files scanned`, `0 new` on all five rules; `132 spacing`, `724 typesize`, `0 breakpoint` |
 | `lint.mjs .` (apps/web) | **PASS** | `lint ok: @sahoda/web (test-only=0 assertionless-test=0 console-log=1 …)` — the 1 is the pre-existing `url-door.ts:234` baseline |
 | `prettier --check .` (root) | **PASS** | `All matched files use Prettier code style!` |
-| `turbo typecheck test --filter='!@sahoda/web' --force` | **FAIL under contention, PASSES in isolation** | reported `13 successful, 16 total`, red on billing/jobs/db while an auditor agent was running vitest concurrently. `@sahoda/billing` alone: `30 passed \| 1 skipped (31)` files, `401 passed \| 13 skipped (414)`. This is REQUESTS §23, not a defect |
+| `turbo typecheck test` (non-web) | **FAIL under contention, PASSES in isolation** | see the §23 row below |
 | `pnpm build` / js-budget | **NOT RUN** | a real gap — route code changed. CI covers it |
 | **Playwright `test:smoke`** | **UNRUN** | **NOT passed.** Unchanged environmental reason, REQUESTS §25 |
+
+### REQUESTS §23 reproduced, twice, on this tree
+
+**The parallel turbo leg went red three times in this session and named a
+DIFFERENT package each time**, which is the tell §23 was written about: a PGlite
+instance booting from `packages/db`'s real migrations does not finish inside the
+60-second hook timeout when every other package's vitest is running beside it.
+
+| run | package the parallel run blamed | that package ALONE | MEASURED |
+| --- | --- | --- | --- |
+| mine, `--filter='!@sahoda/web'` | `@sahoda/billing` | `30 passed \| 1 skipped (31)` files · `401 passed \| 13 skipped (414)` tests | PASS, exit 0 |
+| Stop hook | `@sahoda/billing` | same as above | PASS |
+| Stop hook | `@sahoda/jobs` | `34 passed (34)` files · `396 passed (396)` tests | PASS, exit 0 |
+
+**This lane cannot be the cause and that is checked, not assumed.**
+`git diff --name-only origin/wt-core...HEAD` returns seven files: two components,
+two test files, `LEARNINGS.md`, this handoff and the design-lint register.
+**Nothing under `apps/jobs` or `packages/`.** MEASURED.
+
+§23's own closing line is the run to trust on this hardware:
+`turbo run test --concurrency=1`. It is slower and it is honest.
 
 **`ops/state/qa.pending.json` was reverted, not committed**, per the project rule
 and the `.githooks/pre-commit` guard. The QA capture hook wrote to it on every
