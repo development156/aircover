@@ -26,6 +26,21 @@ export interface AssetCard {
   /** Short-lived signed URL. null means it could not be minted; the FILE exists. */
   previewUrl: string | null
   usage: AssetUsageSite[]
+  /**
+   * Every folder this file is filed in, from `asset_folder_items`.
+   *
+   * An ARRAY, because membership is a table and not a `folder_id` column: one
+   * photo genuinely belongs in both "Diwali campaign" and "Storefront", and the
+   * single-parent model forces a person to pick one and lose it from the other.
+   *
+   * `[]` means FILED NOWHERE. `null` means this read did not ask — the composer's
+   * library picker builds cards without a memberships query, because it renders
+   * no filing anywhere and a second query for data nobody displays is waste. The
+   * two are kept apart for the same reason `usage` keeps them apart: an empty
+   * array is a claim about the customer's library, and "we did not look" is a
+   * claim about us. Nothing may render a folder from `null`.
+   */
+  folderIds: string[] | null
 }
 
 /** Posts using this file that would refuse a delete. */
