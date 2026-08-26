@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { EyeOff } from 'lucide-react'
 import { CONSTRAINTS, type Channel, type PostMedia } from '@sahoda/shared'
-import { refuseFormat, refuseFormatMedia, type PostFormat } from '@sahoda/publishing/format'
+import { type PostFormat } from '@sahoda/publishing/format'
 
 import { Button } from '@/components/ui/button'
 import { ChannelMark } from '@/components/posts/channel-mark'
@@ -14,13 +14,19 @@ import { InlineRewrite } from '@/components/posts/inline-rewrite'
 import { LiveLink } from '@/components/posts/live-link'
 import { Textarea } from '@/components/ui/textarea'
 import { VariantConflictNotice } from '@/components/posts/variant-conflict-notice'
-import { hasLink } from '@/lib/posts/detect-link'
-import { meterFor, withFormat } from '@/lib/posts/counters'
-import { asThread, previewThread } from '@/lib/posts/thread-preview'
-import { selectedText, spliceSelection, type SelectionRange } from '@/lib/posts/splice-selection'
+import { versionVerdict } from '@/lib/posts/version-verdict'
+import {
+  normalizeSelection,
+  selectedText,
+  spliceSelection,
+  type SelectionRange,
+} from '@/lib/posts/splice-selection'
+import { useCaretBox } from '@/lib/posts/use-caret-box'
+import { useTextHistory } from '@/lib/posts/use-text-history'
 import type { VariantExtras } from '@/lib/posts/variant-extras'
 import type { VariantState } from '@/components/posts/use-variants'
 
+import { CopyTools } from './copy-tools'
 import { HashtagField } from './hashtag-field'
 import { RelinkControl } from './relink-control'
 import { trimToFit } from './trim-to-fit'
@@ -95,60 +101,31 @@ export function VersionCard({
 }: VersionCardProps) {
   const spec = CONSTRAINTS[channel]
   const label = CHANNEL_LABELS[channel]
-  const [selection, setSelection] = useState<SelectionRange | null>(null)
+  const box = useCaretBox()
+  const history = useTextHistory(state.body, onBodyChange, box.io)
+
+  /**
+   * THE CARET, KEPT EVEN WHEN IT IS EMPTY — which it did not used to be.
+   *
+   * This was `SelectionRange | null` and `captureSelection` stored null the
+   * moment `selectionStart === selectionEnd`, because the only consumer was
+   * `InlineRewrite`, which genuinely needs a non-empty selection: there is
+   * nothing to rewrite when nothing is selected.
+   *
+   * Inserting an emoji is the opposite case. A collapsed selection is exactly
+   * the normal one — the writer has a cursor somewhere in the sentence and wants
+   * a character there — and throwing it away meant the only place left to insert
+   * was the end of the text. So the range is kept whole and the null is DERIVED
+   * one line below, which leaves the rewrite panel's contract untouched.
+   */
+  const [range, setRange] = useState<SelectionRange>({ start: 0, end: 0 })
+  const selection = range.start === range.end ? null : range
 
   const hashtags = state.extras.hashtags
-  // ── TWO VERDICTS, FROM TWO SOURCES, ON ONE CARD ─────────────────────────────
-  // The engine says what this CHANNEL allows; the format says what the WRITER
-  // meant. `runPublishPost` asks them in exactly this order and so does this
-  // card, so what the writer sees here is what the publisher will decide — a
-  // photo post with no photo is red before Publish rather than after.
   const mediaCount = media.length
-
-  // ── THE FORMAT'S SHAPE RULE, RE-RUN WHENEVER THE FORMAT CHANGES ─────────────
-  // `decideAttach` checks a file against the format in force AT ATTACH TIME.
-  // Changing the format afterwards changes the rule, and nothing re-ran it. This
-  // scores the files already on the post against the format on THIS card, so the
-  // verdict follows the choice rather than the upload.
-  //
-  // First offender only: four cards each listing the same three bad photos is
-  // the wall of text docs/27 §1 is about, and one sentence is enough to send the
-  // writer to the media well.
-  const shapeRefusal =
-    media
-      .map((row) =>
-        refuseFormatMedia(spec, format, {
-          ...(row.width === null ? {} : { width: row.width }),
-          ...(row.height === null ? {} : { height: row.height }),
-        }),
-      )
-      .find((refusal) => refusal !== null) ?? null
-
-  const draft = {
-    body: state.body,
-    hashtags,
-    hasLink: hasLink(state.body),
-    mediaCount,
-  }
-
-  // ── THE POSTS THIS BECOMES, WHEN IT BECOMES MORE THAN ONE ───────────────────
-  // Null for every version that is not a thread, which is the signal the preview
-  // and the meter both read — an absent plan cannot be rendered by accident.
-  const thread = previewThread(channel, draft, format === 'thread')
-
-  // ── THREE VERDICTS, IN THE ORDER THE PUBLISHER ASKS THEM ────────────────────
-  // `asThread` is OUTERMOST because it is the one that removes a rule rather than
-  // adding one: for a thread the whole-body character limit is the wrong
-  // question, and it must come out after everything that could have added to it.
-  // It removes exactly MAX_CHARS and nothing else, the same single swap
-  // `runPublishPost` makes — so a thread with too many hashtags is still red.
-  const meter = asThread(
-    withFormat(
-      withFormat(meterFor(channel, draft), refuseFormat(spec, format, mediaCount)),
-      shapeRefusal,
-    ),
-    thread,
-  )
+  // Every verdict on this card comes from here, which is the Constraint Engine
+  // plus the format rules, in the order `runPublishPost` asks them.
+  const { meter, thread } = versionVerdict(channel, state.body, hashtags, format, media)
 
   // MAX_MEDIA_COUNT deliberately gets no entry. Media lives on the post and this
   // card cannot detach a file, so a "Remove extra media" button would do nothing;
@@ -173,11 +150,24 @@ export function VersionCard({
 
   function captureSelection(event: React.SyntheticEvent<HTMLTextAreaElement>) {
     const element = event.currentTarget
-    setSelection(
-      element.selectionStart === element.selectionEnd
-        ? null
-        : { start: element.selectionStart, end: element.selectionEnd },
-    )
+    setRange({ start: element.selectionStart, end: element.selectionEnd })
+  }
+
+  /**
+   * Insert at the caret, replacing a selection if there is one.
+   *
+   * `spliceSelection` is reused rather than a slice written here, and that is not
+   * tidiness: it snaps both bounds onto code-point boundaries, so inserting next
+   * to an emoji already in the caption cannot cut a surrogate pair in half and
+   * turn it into mojibake — which would also miscount against the channel's
+   * character limit, since the Constraint Engine counts code points.
+   */
+  function insert(glyph: string) {
+    const at = normalizeSelection(state.body, range)
+    onBodyChange(spliceSelection(state.body, range, glyph))
+    const caret = at.start + glyph.length
+    setRange({ start: caret, end: caret })
+    box.place(caret)
   }
 
   return (
@@ -216,6 +206,7 @@ export function VersionCard({
           {label} copy
         </label>
         <Textarea
+          ref={box.ref}
           id={`variant-${channel}`}
           data-variant-editor={channel}
           value={state.body}
@@ -226,6 +217,16 @@ export function VersionCard({
           onSelect={captureSelection}
         />
       </div>
+
+      {/* Directly under the box, because everything in it edits the box and
+          nothing in it can fail. See `copy-tools.tsx` for why Save is not here. */}
+      <CopyTools
+        target={`${label} copy`}
+        history={history}
+        canClear={state.body !== ''}
+        onClear={() => onBodyChange('')}
+        onInsert={insert}
+      />
 
       <ChannelMeterView meter={meter} fixes={fixes} />
 
@@ -252,7 +253,9 @@ export function VersionCard({
         onReplace={(range, replacement, expected) => {
           if (selectedText(state.body, range) !== expected) return false
           onBodyChange(spliceSelection(state.body, range, replacement))
-          setSelection(null)
+          const caret = normalizeSelection(state.body, range).start + replacement.length
+          setRange({ start: caret, end: caret })
+          box.place(caret)
           return true
         }}
       />
@@ -291,19 +294,26 @@ export function VersionCard({
         onUndo={onUndoRelink}
       />
 
-      <div className="flex items-center gap-3">
+      {/* ── THE ONLY CONTROL HERE THAT LEAVES THE BROWSER ──────────────────────
+          It was `size="sm"` — 28px, the smallest control on the card — on the
+          action a writer performs more than any other on this screen, once per
+          channel per edit. It is now the full 34px control height with a minimum
+          width, so four of them down the page form a straight edge instead of
+          four different-width chips, and it is the last thing in the card
+          because it is the end of the work. */}
+      <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="secondary"
-          size="sm"
           aria-label={`Save ${label} copy`}
           onClick={onSave}
           loading={state.saving}
           disabled={!state.dirty || state.body === ''}
+          className="min-w-[104px]"
         >
           Save
         </Button>
         {state.body === '' ? (
-          <span className="text-[12px] text-muted">Nothing to save. This channel has no copy.</span>
+          <span className="type-meta text-muted">Nothing to save. This channel has no copy.</span>
         ) : null}
       </div>
     </section>
