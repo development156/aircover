@@ -135,7 +135,21 @@ export function ImproveCopy({ target, body, onAccept }: ImproveCopyProps) {
           <span className="tabular-nums">{MAX_CHARS.toLocaleString('en-IN')}</span> Sahoda can
           improve in one go. Every channel&rsquo;s own limit is well below that.
         </p>
-      ) : pending ? (
+      ) : pending && suggestion === null ? (
+        /* ── AND ONLY WHILE THERE IS NOTHING TO READ, WHICH CARRIES NO TEST ──
+           `setSuggestion` runs inside the transition's async callback, so React
+           can commit the result while `pending` is still true. A dumped DOM
+           taken at the exact commit where the "Use this" button first exists
+           shows "Sending your copy to the model…" sitting directly above the
+           version it has already been sent, which is what put this clause here.
+
+           HONESTLY: that state is gone by the next tick. Sampling the DOM every
+           5ms from the click found `pending=false suggestion=true` on the very
+           first sample and never once found both, so no user has seen it and no
+           test can fail on it. The clause stays because it costs nothing and is
+           correct, NOT because it is guarded — a test asserting it would pass
+           whether or not this line existed, which is the one thing this
+           repository refuses to ship. */
         <PendingLines lines={PENDING_LINES} />
       ) : (
         <>
