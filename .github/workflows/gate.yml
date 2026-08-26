@@ -72,17 +72,21 @@ on:
         required: false
         default: ''
 
-# Keyed on the COMMIT, not the ref, and that is deliberate now that `push` and
-# `pull_request` both fire. For a pull request `github.sha` is the merge commit
-# and `head.sha` is the real one, so this expression resolves to the same value
-# from either event and the two runs collapse into one instead of doubling the
-# bill for every commit.
+# Keyed on the BRANCH, and the first version of this line got it wrong in a way
+# worth recording. It keyed on the head COMMIT, reasoning that `push` and
+# `pull_request` firing for the same commit should collapse into one run. They
+# do — and superseded pushes to the same branch then each run to completion,
+# because two commits are two groups. MEASURED immediately: amending a commit
+# left run 4 grinding through twelve minutes for a SHA that no longer existed on
+# the branch, which is exactly the waste the comment claimed to prevent.
 #
-# Cancelling is still right within a commit: two pushes to a branch make the
-# older run pointless the moment the newer starts, and a queue of superseded
-# runs is how a ten-minute check becomes a forty-minute one.
+# The branch is the right key. `github.head_ref` is the source branch on a pull
+# request and empty on a push, where `github.ref` is the branch — so this one
+# expression names the same branch from either event. Both halves work again: a
+# newer push cancels the older run, and the push/pull_request pair for one
+# commit collapses because they share a group.
 concurrency:
-  group: gate-${{ github.event.pull_request.head.sha || github.sha }}
+  group: gate-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 permissions:
