@@ -46,13 +46,26 @@ try {
   // ROLE comes from the branch — substring, not equality, because the harness
   // assigns names like `claude/lead-design-7m7ios` and an exact match on
   // `wt-design` resolves EVERY real branch to 'advisor'. Measured 2026-08-26.
-  const role = /design/.test(branch)
-    ? 'design'
-    : /research/.test(branch)
-      ? 'research'
-      : /advisor/.test(branch)
-        ? 'advisor'
-        : 'lane'
+  //
+  // But a branch need not carry a role word at all. A /kickoff session is named
+  // `claude/divas-kickoff-03y2g2` — owner and command, no role — and fell through
+  // to 'lane', so an advisor's handoff landed at `divas-lane-<date>.md` where
+  // `ls *-advisor-*.md` could never find it. Measured 2026-08-26, on this hook's
+  // own output. So the role is DECLARABLE, exactly as the owner below is:
+  //   env SAHODA_LANE_ROLE, or `git config sahoda.role <role>`.
+  // A declaration wins; the branch is the fallback; 'lane' is the last resort.
+  const declaredRole = (process.env.SAHODA_LANE_ROLE || sh('git config sahoda.role') || '')
+    .trim()
+    .toLowerCase()
+  const role =
+    declaredRole ||
+    (/design/.test(branch)
+      ? 'design'
+      : /research/.test(branch)
+        ? 'research'
+        : /advisor/.test(branch)
+          ? 'advisor'
+          : 'lane')
 
   // OWNER is a different question and the branch cannot answer it. Two people
   // both running /lead-design get two branches that both say "design", and both
@@ -68,6 +81,20 @@ try {
 
   const date = sh('date +%F') || new Date().toISOString().slice(0, 10)
   const path = `docs/workflow/handoffs/${who}-${role}-${date}.md`
+
+  // This hook's OWN output is not the lane's uncommitted work. It reported
+  // "1 file(s) UNCOMMITTED" naming only the skeleton it had just written —
+  // a real warning firing on itself, which teaches a reader to ignore it.
+  //
+  // Ask git to exclude it rather than parsing columns. The first attempt sliced
+  // the path off at column 4, and it was WRONG for the first line of the output:
+  // sh() trims, so a ` M`/` D` entry arrives as `M …` and slice(3) ate a
+  // character of the path. It happened to work for `??` entries, which is why a
+  // mutation test passed over a broken filter. Measured 2026-08-26. A pathspec
+  // has no column to get wrong.
+  const dirtyOther = sh(`git status --porcelain -- . ':(exclude)${path}'`)
+    .split('\n')
+    .filter(Boolean)
 
   // A REAL handoff already exists for today. Never overwrite a human's work.
   if (existsSync(path) && !readFileSync(path, 'utf8').includes('AUTOMATIC SKELETON'))
@@ -96,7 +123,7 @@ ${ownerLine}
 > why is the half that matters. Whoever owns this lane should replace it.
 
 **Branch** \`${branch}\` at \`${sh('git rev-parse --short HEAD')}\`, ${commits.length} commit(s) beyond \`${sh(`git rev-parse --short ${base}`)}\`.
-${dirty.length ? `\n> **${dirty.length} file(s) UNCOMMITTED** when the session ended. A lane can hold its whole output uncommitted, and \`git merge\` will then succeed having merged nothing.\n` : ''}
+${dirtyOther.length ? `\n> **${dirtyOther.length} file(s) UNCOMMITTED** when the session ended. A lane can hold its whole output uncommitted, and \`git merge\` will then succeed having merged nothing.\n` : ''}
 ## Commits
 
 ${commits.length ? commits.map((c) => `- ${c}`).join('\n') : '_none_'}
