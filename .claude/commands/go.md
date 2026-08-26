@@ -115,6 +115,33 @@ is bold, nothing is.
 **Mark every claim MEASURED or INFERRED.** Not decoration — it is the difference
 between a report I can act on and one I have to re-verify.
 
+**Write so a non-technical person can follow it.** This is not optional and it
+is not a nicety — the person reading this report decides what happens next, and
+a decision cannot be made from a sentence that has to be decoded first.
+
+Two ways to satisfy it, and either is fine:
+
+- **Write the whole report in plain language.** Name things the way a person
+  would: "the screen that shows credits", not "the WalletBalanceCard component".
+  Say what broke and what it meant, not which symbol was undefined.
+- **Or keep the technical detail and add a short paragraph under a heading
+  `In plain terms`** that explains the same thing with no jargon. One paragraph,
+  three or four sentences, no code, no file paths, no acronyms.
+
+The test: **could somebody who has never opened this codebase read your report
+and tell you whether it went well?** If not, it is not finished.
+
+What that means in practice:
+
+| Instead of                                                       | Write                                                                                                      |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| "`describe.skipIf` reported a suite that ran nothing as passing" | "26 tests were being skipped, and the report counted them as passing"                                      |
+| "the RPC returned null so the assertion threw a TypeError"       | "the database accepted something it should have rejected, and the test crashed instead of failing cleanly" |
+| "the js-budget leg failed, +10.3 kB on /layout"                  | "two screens got about 10 kB heavier than the limit allows"                                                |
+
+Keep the exact figures. **Plain language is not vaguer language** — a rewrite
+that is less specific is a defect, not an improvement.
+
 **End with exactly two things:**
 
 1. **What you did NOT do, and why.** The sentence that makes the rest

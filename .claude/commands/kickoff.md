@@ -1,17 +1,36 @@
 ---
-description: Start a lane — pin owner and branch, restore that lane's own memory.
-argument-hint: owner:<name> , branch:<wt-branch>
+description: Restore a lane's context and STOP. Never starts work.
+argument-hint: owner:<name> , branch:<wt-branch> , /<role>
 ---
 
 Arguments: `$ARGUMENTS` — for example
-`owner:girija , branch: wt-girija2` followed by the role command you want.
+`owner:girija , branch: wt-girija2 , /lead-research`.
 
-## 0 · Pin who and where, before anything else
+# THIS COMMAND DOES NOT START WORK
 
-Parse `owner:` and `branch:` out of the arguments. **If either is missing, stop
-and ask.** Do not guess and do not fall back to the branch name — with nine
-lanes and three people, a wrong guess files this session's memory under someone
-else's lane and nothing will ever say so.
+**Read, report, stop. That is the whole job.**
+
+You will see a role command in the arguments — `/lead-research`, `/lead-design`,
+`/advisor`. **Note which one it is and do not run it.** It tells you which card
+to read for context. It is not an instruction to begin.
+
+You will find unfinished work in the handoffs. **Do not resume it.** Listing it
+is the point; continuing it is not.
+
+**Do not plan. Do not propose. Do not touch a file.** The founder tells you the
+task after this report, and it may have nothing to do with what is unfinished.
+
+This command exists because it used to end with "plan" and a role card that said
+"do this immediately", so pressing it started nine sessions working on things
+nobody had asked for.
+
+---
+
+## 1 · Pin who and where
+
+Parse `owner:` and `branch:` from the arguments. **If either is missing, stop and
+ask.** Do not guess — with nine lanes and three people a wrong guess files this
+session's memory under someone else's lane and nothing ever says so.
 
 ```bash
 OWNER=<from owner:>        # girija | jiban | divas
@@ -22,12 +41,11 @@ git config sahoda.lane  "$LANE"
 git config sahoda.owner && git config sahoda.lane      # VERIFY both stuck
 ```
 
-**These two are the whole identity of this session.** Every commit here is
-authored `SAHODALABS`, so git can never tell you whose work this is or which of
-that person's three lanes it belongs to. `sahoda.owner` and `sahoda.lane` are
-the only record.
+Every commit here is authored `SAHODALABS`, so git can never say whose work this
+is or which of that person's three lanes it belongs to. These two values are the
+only record.
 
-## 1 · Get onto the lane
+## 2 · Get onto the lane and take the trunk
 
 ```bash
 git fetch --all --prune
@@ -38,75 +56,76 @@ git pull --ff-only origin "$LANE"
 node scripts/lane-sync.mjs pull           # take wt-core into this lane
 ```
 
-`lane-sync pull` merges `wt-core` and resolves the three conflict classes that
-are provably mechanical: two lanes that each wrote a handoff (keeps **both**),
-two sides that differ only by formatting (prettier decides), and a generated
-artifact (names the regeneration command rather than picking a side).
+`lane-sync pull` resolves only what it can prove is mechanical and **stops on
+anything else**. If it stops, say so in your report and leave it. Resolving a
+conflict is work, and this command does not do work.
 
-**It stops on anything else, and that is the feature.** On 26 August five lanes
-carried a formatting-only fix to one file and a sixth carried a real one. They
-looked identical to git. A rule that picks a side would have taken the
-formatting fix five times and thrown the real fix away with nothing failing.
-When it stops: read **both** sides before touching either.
-
-If `--ff-only` refuses, this lane diverged from the remote. **Say so and stop.**
-Someone else pushed into it, and merging past that on a guess is how work gets
-lost.
-
-If the harness has put you on a `claude/...` branch it created and will not let
-you leave it, **say that plainly and carry on there** — but keep
-`sahoda.lane` set to the lane you were given, because that is what the handoff
-must be filed under. Never abandon a branch another session or a PR is tracking.
+If the harness has pinned you to a `claude/...` branch you cannot leave, say so
+plainly and stay there — but keep `sahoda.lane` set to the lane you were given.
+**Never abandon a branch another session or a PR is tracking.**
 
 ```bash
-find apps/web/src/app -name page.tsx | wc -l    # 59 = the product. ~12 or ~20 = a stale base.
+find apps/web/src/app -name page.tsx | wc -l    # 59 = the product
 cat .sahoda-setup-status 2>/dev/null            # OK, or INCOMPLETE naming what is missing
 ```
 
-## 2 · Restore THIS lane's memory
-
-Handoffs are `<owner>-<lane>-<date>.md`. The lane is in the name because one
-person runs three of them, and `girija-research-<date>.md` would be the same
-file for `wt-girija`, `wt-girija2` and `wt-girija3` — three lanes overwriting
-one record. That already happened once.
+## 3 · Read this lane's own memory
 
 ```bash
 ls -t docs/workflow/handoffs/${OWNER}-${LANE}-*.md 2>/dev/null | head -1
 ```
 
-Read the newest. **That is where you left off in this lane** — what shipped,
-what was deliberately not done, what was owed. Resume from it rather than
-starting cold. If there is none, say so; a first session is a first session,
+Read the newest. If there is none, say so — a first session is a first session,
 not a lost one.
 
-## 3 · Read what the other lanes did
+## 4 · Read what the other lanes did
 
 ```bash
 ls -t docs/workflow/handoffs/*.md | head -10
 ```
 
-Read the newest from each **other** lane — especially the other two run by the
-same person, because those are the ones most likely to be in your ground.
+Read the newest from each **other** lane, especially the other two run by the
+same person. Then the tail of `apps/web/REQUESTS.md` for declared scope.
 
-Then read the tail of `apps/web/REQUESTS.md` for scope anyone has declared.
+## 5 · Read your role card, for context only
 
-**Report in four lines before planning:** where you left off · what the others
-changed · what you propose · anything you found that contradicts an assumption.
+Whichever role appeared in the arguments: `.claude/commands/lead-design.md`,
+`lead-research.md` or `advisor.md`. **Read it. Do not act on it.** Those cards
+open with "do this immediately" — that instruction is for when the founder
+invokes them directly, not now.
 
-## 4 · Then the role command
+---
 
-The founder passes it with the arguments — `/lead-research`, `/lead-design` or
-`/advisor`. **The role is whatever they ask for, not whatever the branch name
-suggests.** `wt-girija` running `/lead-research` is correct and normal.
+# 6 · Report, in exactly this shape, then STOP
 
-## 5 · Plan
+```
+LANE
+  owner · lane · branch you are actually on · SHA · routes · setup status
 
-State, before touching anything: what you will do and what must remain true ·
-which files · **for each fix, the mutation that would reveal its absence** ·
-which traps from `05_TRAPS.md` this task meets · what you will not be able to
-verify, and why.
+DONE — what this lane already finished
+  From your own newest handoff. What shipped, with the SHA or file:line.
+  If there is no handoff: "no previous session in this lane".
 
-Declare scope in `apps/web/REQUESTS.md` before the first edit if you are working
-outside your usual ground. With nine lanes that is not politeness — two lanes
-editing the same _file_ is a conflict git shows you; two lanes editing the same
-_concept_ is two designs of one thing where only one survives, silently.
+NOT DONE — what this lane deliberately left
+  From the same handoff's "what was NOT done" section, plus anything it said
+  was owed. Say WHY each was left, not just that it was.
+
+WHAT MOVED UNDER YOU
+  What the other lanes changed since your last session here. Shared surfaces
+  first — those are the ones that break you.
+
+BLOCKED OR NEEDS A DECISION
+  Anything lane-sync stopped on, any INCOMPLETE setup, any question the last
+  session left open. One line each. "Nothing" if nothing.
+
+READY.
+What would you like me to work on?
+```
+
+**Then stop and wait.** Do not suggest a task. Do not say "I could start with".
+Do not open a file to "prepare". The founder has a task in mind and it is
+probably not the one you would have picked.
+
+If the lane is genuinely clean and empty, the whole report is four lines and
+"READY. What would you like me to work on?" — that is a good report, not a thin
+one.
