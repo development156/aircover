@@ -37,24 +37,23 @@ try {
   // Nothing happened. Do not write a file for a session that did nothing.
   if (commits.length === 0 && dirty.length === 0) process.exit(0)
 
-  // ROLE comes from the branch — substring, not equality, because the harness
-  // assigns names like `claude/lead-design-7m7ios` and an exact match on
-  // `wt-design` resolves EVERY real branch to 'advisor'. Measured 2026-08-26.
-  const role = /design/.test(branch) ? 'design'
-             : /research/.test(branch) ? 'research'
-             : /advisor/.test(branch) ? 'advisor' : 'lane'
-
-  // OWNER is a different question and the branch cannot answer it. Two people
-  // both running /lead-design get two branches that both say "design", and both
-  // would write design-<date>.md over each other. So the owner is declared:
-  //   env SAHODA_LANE_OWNER, or `git config sahoda.owner <name>`.
-  // With neither, fall back to the branch slug, which is at least unique.
-  const slug = branch.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase()
+  // OWNER and LANE are both declared by /kickoff. Neither can be derived:
+  //   - every commit is authored SAHODALABS, so git cannot say WHO;
+  //   - one person runs three lanes, so a role cannot say WHICH.
+  // Measured 2026-08-26: two sessions both wrote girija-research-2026-08-26.md
+  // under the old <owner>-<role>-<date> scheme. Different lanes, one filename,
+  // and the second would have overwritten the first at merge.
   const owner = (process.env.SAHODA_LANE_OWNER || sh('git config sahoda.owner') || '').trim()
-  const who = owner || slug
+  const lane  = (process.env.SAHODA_LANE || sh('git config sahoda.lane') || '').trim()
+
+  // Fall back to the branch slug only when the lane was never declared. It is
+  // unique, which is the property that matters, and the file says so loudly.
+  const slug = branch.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase()
+  const who  = owner || 'unknown'
+  const where = lane || slug
 
   const date = sh("date +%F") || new Date().toISOString().slice(0,10)
-  const path = `docs/workflow/handoffs/${who}-${role}-${date}.md`
+  const path = `docs/workflow/handoffs/${who}-${where}-${date}.md`
 
   // A REAL handoff already exists for today. Never overwrite a human's work.
   if (existsSync(path) && !readFileSync(path,'utf8').includes('AUTOMATIC SKELETON')) process.exit(0)
@@ -66,13 +65,13 @@ try {
 
   const contract = commits.filter(c => /\[contract\]|BREAKING|migration/i.test(c))
 
-  const ownerLine = owner
-    ? `**Owner** ${owner}`
-    : `> **OWNER UNKNOWN.** Nobody declared who runs this lane, so the filename\n> falls back to the branch slug. Set it once with \`git config sahoda.owner <name>\`\n> or the SAHODA_LANE_OWNER environment variable, and the record becomes\n> readable by a person instead of by a branch id.`
+  const warn = (!owner || !lane)
+    ? `> **NOT FULLY DECLARED.** owner=${owner || 'MISSING'} lane=${lane || 'MISSING'}.\n> This session did not run \`/kickoff owner:<name> , branch:<lane>\`, so part of\n> this filename is a branch id rather than a person and a lane. The next session\n> in that lane will not find this file by looking for its own name.`
+    : `**Owner** ${owner} · **Lane** ${lane}`
 
-  const body = `# Handoff — ${role} — ${date}
+  const body = `# Handoff — ${who} — ${where} — ${date}
 
-${ownerLine}
+${warn}
 
 > **AUTOMATIC SKELETON.** Written by the Stop hook because this session ended
 > without \`/handoff\`. It records WHAT changed. It does not know WHY, and the
