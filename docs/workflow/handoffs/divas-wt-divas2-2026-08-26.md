@@ -455,9 +455,11 @@ literally; `CLAUDE.md` rules the hyphen stays because removing it breaks English
 and a caption is where that bites. What is banned is the dash as PUNCTUATION.
 Every test proving a dash is caught has a partner proving a hyphen is not.
 
-**The voice guard found six more strays than it was written for**, all in
-`onboarding/stage/`, and they are a coherent first-person mascot voice rather than
-typos. QUARANTINED with the reason beside them, plus a test asserting the
+**The voice guard found FIVE more strays than it was written for**, across two
+files in `onboarding/stage/`, and they are a coherent first-person mascot voice
+rather than typos. (An earlier line in this session said SIX. That came from a
+grep, not from the detector; the detector is the thing that decides and it says
+five: four in `result-step.tsx`, one in `what-step.tsx`.) QUARANTINED with the reason beside them, plus a test asserting the
 quarantine still holds real strays so it cannot become a silent pass. **Needs a
 founder ruling**: either onboarding moves to third person, or `CLAUDE.md` gains a
 stated exception.

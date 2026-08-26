@@ -97,16 +97,46 @@ describe('what the scanner refuses to read', () => {
     // `//` inside https:// must not start a comment strip.
     expect(stripNonCopy('const u = "https://example.com/a" ')).toContain('example.com')
   })
+
+  test('comment MARKERS INSIDE A STRING do not eat the copy between them', () => {
+    // THE REVIEW BROKE THE OLD IMPLEMENTATION WITH EXACTLY THIS LINE. Three
+    // regexes had no idea the delimiters were inside strings, so everything
+    // between them was deleted and the stray in the middle was never scanned.
+    // A guard that reports clean because it threw the evidence away is worse
+    // than no guard, because it is trusted.
+    const tricky = `const a = "/*"; const msg = "I cannot do that"; const b = "*/"`
+    expect(findVoiceStrays(tricky).map((s) => s.phrase)).toEqual(['I cannot'])
+  })
+
+  test('a protocol-relative URL does not eat the rest of its line', () => {
+    // The same hole in the `//` rule. `"//cdn.example.com"` is not a comment.
+    const proto = `const u = "//cdn.example.com"; const m = "I cannot do that"`
+    expect(findVoiceStrays(proto).map((s) => s.phrase)).toEqual(['I cannot'])
+  })
+
+  test('an apostrophe in prose does not swallow the rest of the file', () => {
+    // The hazard the scanner INTRODUCES, pinned so it cannot regress into a
+    // false negative. String contents are emitted rather than stripped — they
+    // are copy — so an unclosed quote costs at most a missed comment strip,
+    // which shows up as a false POSITIVE. That is the safe direction to fail:
+    // a false positive is visible, a false negative is silent.
+    const jsx = `<p>Sahoda couldn't reach it</p>\n<p>I cannot do that</p>`
+    expect(findVoiceStrays(jsx).map((s) => s.phrase)).toEqual(['I cannot'])
+  })
 })
 
 /**
  * ONE FILE IS QUARANTINED, AND IT IS NOT AN APPROVAL.
  *
- * `result-step.tsx` — the onboarding reveal — is written in the first person
- * throughout: "I'll plan for a bakery business", "I read your website and kept
- * what it says about you", "I have 3 knowledge sources to draw on", "I have not
- * settled on a tone of voice yet". FOUR sentences, deliberately consistent with
- * each other.
+ * The onboarding flow is written in the first person throughout. MEASURED with
+ * this module's own detector, not by eye: FIVE strays across TWO files —
+ * `result-step.tsx` has four ("I'll plan for a bakery business", "I read your
+ * website and kept what it says about you", "I have 3 knowledge sources to draw
+ * on", "I have not settled on a tone of voice yet") and `what-step.tsx` has one
+ * ("I'll weight channels and formats that actually…").
+ *
+ * An earlier count of SIX came from a grep rather than the detector and was
+ * wrong. The figure is the detector's, because that is the thing that decides.
  *
  * That is not a typo somebody can fix in passing; it is a voice decision on the
  * screen where the product introduces itself, and it contradicts `CLAUDE.md`
