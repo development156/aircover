@@ -61,12 +61,36 @@ every session to read it — so this check is not hypothetical.
 
 ## 3 · Restore your own context
 
-Your role comes from your branch: `wt-design` is `design`, `wt-research` is
-`research`, anything else is `advisor`.
+**Who you are is two separate facts, and the branch only answers one.**
+
+```bash
+git branch --show-current
+git config sahoda.owner          # or: echo "$SAHODA_LANE_OWNER"
+```
+
+**Your ROLE comes from the branch, by substring — never by equality.** A cloud
+session is named `claude/lead-design-7m7ios`, so a rule matching `wt-design`
+exactly resolves EVERY real branch to `advisor`. Measured 2026-08-26, when it
+did exactly that. Match on the word: `design` in the name is the design role,
+`research` is research, `advisor` is advisor.
+
+**Your OWNER is declared, because no branch can carry it.** Two people both
+running `/lead-design` get two branches that both say "design". Without an owner
+they would both write `design-<date>.md` and silently overwrite each other.
+
+Set it once per lane, and it persists:
+
+```bash
+git config sahoda.owner girija      # or jiban, or divas
+```
+
+If it is unset, say so and ask who owns this lane before writing anything. Do
+not guess a name, and do not carry on silently — the handoff is the only record
+of whose work this is, because every commit is authored `SAHODALABS`.
 
 ```bash
 git fetch --all
-ls docs/workflow/handoffs/<role>-*.md 2>/dev/null | tail -1
+ls docs/workflow/handoffs/*-<role>-*.md 2>/dev/null | tail -1   # yours
 ```
 
 Read your own newest handoff **first**. It is where you left off: what you
@@ -78,9 +102,14 @@ If there is none, say so — a first session is a first session, not a lost one.
 ## 4 · Read what the other roles did
 
 ```bash
-git fetch --all
-ls docs/workflow/handoffs/
+git fetch --all --prune
+ls -t docs/workflow/handoffs/*.md | head -8
 ```
+
+Filenames are `<owner>-<role>-<date>.md`, so `ls -t` puts the newest first and
+you can see at a glance who has been in which lane. Read the newest from each
+**role that is not yours**, and if two owners share a role, read both — that is
+two people in the same ground and exactly the collision worth knowing about.
 
 Read the **newest handoff from each role that is not yours**, on its own
 branch if it is not on yours yet:
