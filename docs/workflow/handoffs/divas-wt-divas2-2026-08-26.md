@@ -325,3 +325,93 @@ conflict open since design Session 6.
 have to learn the hard way because they wrote it down:** run `pnpm build`, not
 `pnpm exec next build`. The latter skips `js-budget.mjs` and every "gate green"
 in design Sessions 1 to 10 was missing that leg.
+
+---
+
+## Session 2 — the composer's density, and a wizard that is not coming back
+
+**Branch** `claude/divas-kickoff-03y2g2` at `c68b491`, pushed. PR
+[#15](https://github.com/development156/sahodalabs/pull/15) → `wt-core`, draft,
+subscribed. Cut level with `origin/wt-core` at `fa1790f`, then `3137bc3` landed
+under me mid-session (another lane rewrote `/kickoff` and `CLAUDE.md`'s reporting
+rules while I was measuring).
+
+**This session got a real task**, unlike Session 1: redesign `/posts/new`.
+
+### The call, and why it was already made
+
+The founder left sequence-vs-one-page to me. **One page, and the repository had
+already decided it.** `/create/post` WAS a five-step wizard (`composer.tsx:47`);
+it was deleted because it could not generate variants and because
+`version-options.tsx:50` records that it collected ONE format answer and wrote it
+to EVERY variant. `e2e/campaigns.spec.ts:104` asserts the composer has no tabs. A
+wizard is a tab strip over time.
+
+**Read the code before redesigning from a screenshot.** Every layout decision in
+that directory carries a measured justification in its own comment. The density
+is accumulated, not accidental.
+
+### What shipped
+
+`ChannelSettings` folds six per-channel settings behind one `<details>`. The kind
+of post deliberately stays out. MEASURED across all four cards at default state:
+24 controls → **19**, 105 text-carrying elements → **76**; Google Business
+Profile 29 → **16**.
+
+Guarded by `channel-settings.test.tsx`, 10 tests, four mutations each watched
+going red (welded open, welded shut, collaborators by key presence, summary stops
+naming).
+
+### Two corrections, both mine
+
+1. **"Roughly forty controls" was wrong.** I wrote it into REQUESTS §29 from a
+   screenshot before measuring. The real figure is 24. Corrected in the same
+   commit, with the correction stated rather than quietly swapped. It was wrong in
+   the direction that flattered my own fix, which is the direction to distrust.
+2. **I nearly added a connection banner.** 0 credits and four "not connected"
+   chips looked like `docs/37` §16 rule 1, a blocker that should lead. It is not a
+   blocker: a writer with no connection can still write, save, template and
+   schedule. `publish-now.tsx:193` already states it at the publish button in two
+   tested sentences, and `schedule-field.tsx` at the schedule. A third statement
+   would have broken the rule I was invoking. **Nothing was added.**
+
+### A trap I walked into and the repo caught
+
+I piped the gate. `pnpm turbo … | grep` returned the PIPE's exit code — **0 while
+lint was failing.** CLAUDE.md's "never pipe the gate" is exactly this, and I read
+it earlier the same session. Re-run redirected: `GATE_EXIT=0`, 27/27, `Cached: 0`.
+
+`design-lint` then caught two hand-written font sizes in my new file on its first
+real run. Fixed to `type-sm` / `type-meta`.
+
+### Gate
+
+| leg | result |
+| --- | --- |
+| typecheck + lint + test, all packages, `--force` | **PASS** — 27/27, `Cached: 0`, exit 0 unpiped |
+| `design-lint` | **PASS** — none new |
+| `format:check` (root, outside turbo) | **PASS** |
+| Playwright `@smoke` | **UNRUN** — REQUESTS §25, Chromium's outbound 443 is reset here |
+
+**On the UNRUN leg.** The change hides controls and Playwright fails on a hidden
+control, so I checked every selector before writing: **zero tests touch the six
+folded settings.** The kind of post was left OUT of the fold precisely because
+three specs `selectOption` on it. Run the `smoke` job on `gate.yml` before merge.
+
+### What was NOT done
+
+- **No further density work.** The hashtag help line still renders per card,
+  differing only by the channel name. I left it: it is a live hint next to its own
+  control, and it changes text when tags exist. Candidate, not a defect.
+- **`wt-core` → `wt-web` still unpromoted**, still 212 ahead and a clean
+  fast-forward. Session 1's top item, untouched, because this session had a task.
+- **`cloud-setup.sh` still never ran.** No `.sahoda-setup-status`. Third session.
+- **Nothing visual was verified.** I could not see the fold in a browser.
+
+### For whoever picks this up
+
+The remaining weight on that screen is NOT in the settings. It is in the per-card
+help text, the three separate "unsaved" vocabularies `composer.tsx` deliberately
+keeps apart, and four cards restating one structure. Cutting further means
+changing what the card SAYS, and every one of those sentences is pinned by a
+shape gate. That is a copy pass with guards to move, not a layout pass.
