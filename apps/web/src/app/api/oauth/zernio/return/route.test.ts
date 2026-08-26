@@ -681,6 +681,40 @@ describe('the popup closer does not depend on window.opener', () => {
     expect(body).not.toContain('Connected. You can close')
   })
 
+  /**
+   * THE BLIND SPOT THIS BLOCK HAD, AND WHY EVERY FIX ABOVE LOOKED LIKE IT WORKED.
+   *
+   * Every assertion above reads `res.text()`, which returns the body whatever the
+   * status line says. The route served this page as a **303 with a `Location`
+   * header** — a redirect, which a browser FOLLOWS. The body was never rendered
+   * and none of that carefully-argued script ever ran. So the COOP fix, the
+   * BroadcastChannel fix and the query-parameter fix all passed their tests and
+   * all did nothing, four reports in a row, because no test here ever asked
+   * whether the response could be displayed at all.
+   */
+  it('is a page the browser will RENDER, not a redirect it will follow', async () => {
+    const res = await popupCall()
+
+    // 3xx means the browser leaves before the script runs. That is the defect.
+    expect(res.status).toBeLessThan(300)
+    expect(res.headers.get('location')).toBeNull()
+    expect(res.headers.get('content-type')).toContain('text/html')
+  })
+
+  it('sends no Location on a FAILED popup either, and keeps the 5xx', async () => {
+    // A 4xx/5xx Location is not followed, so this one was harmless — but the
+    // header has no reader in a popup and leaving it is how the success path got
+    // one. The failing status still has to survive: this route exists because a
+    // failure leaving as a success was invisible to a log filter.
+    state.pending = { platform: 'instagram', mode: 'popup' }
+    state.readThrowsFor = ['instagram', 'linkedin']
+
+    const res = await call()
+
+    expect(res.status).toBe(500)
+    expect(res.headers.get('location')).toBeNull()
+  })
+
   it('is used ONLY for a popup — a redirect trip still gets its 303', async () => {
     state.pending = { platform: 'instagram', mode: 'redirect' }
 
