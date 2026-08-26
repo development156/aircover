@@ -9,6 +9,24 @@ Everything below applies. Do not restate it back to me — just work under it.
 
 ---
 
+## First: size the job
+
+**Match the machinery to the task.** Everything below is available, not
+mandatory. Over-tooling a small job is a real cost here, not a harmless one —
+all three people share one usage quota, so a fan-out from this lane eats what
+the other two have.
+
+| The job is                                            | Do this                                                            |
+| ----------------------------------------------------- | ------------------------------------------------------------------ |
+| a question, a one-line answer, reading one file       | **Just answer it.** No agents, no skills. Skip to _How to report_. |
+| one file, a known fix, a rename, a copy change        | Do it yourself. Load a skill only if it governs that file.         |
+| several files, a feature, a bug you cannot yet locate | Agents and skills, as below.                                       |
+| a claim you are about to make                         | A second agent to refute it, whatever the size.                    |
+
+Say which of those you picked in one line, then work. If you reach for three
+agents to answer something you could have read in one file, that is the wrong
+call and it costs the other lanes.
+
 ## Use agents, in parallel
 
 **Send them in ONE message or they run one after another and you lose the point.**
