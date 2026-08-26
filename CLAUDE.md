@@ -135,6 +135,29 @@ rejected — `scripts/cloud-setup.sh` checks the lane against its remote at
 startup, and when it says DIVERGED, do not force-push. **One person, one lane,
 at a time.**
 
+## How to report
+
+**Open with the answer**, not a summary of the question and not a preamble. If
+it worked, say so and give the SHA; if it did not, say that first.
+
+**A table whenever there are three or more comparable things** — branches,
+files, counts, before-and-after. Read in two seconds; the same content as prose
+is not read at all.
+
+**Short paragraphs, three or four sentences.** Bold only the load-bearing
+phrase, once or twice a section. Every claim marked **MEASURED** or
+**INFERRED**.
+
+**End with exactly two things:** what you did NOT do and why, then anything
+needing a decision — one line each, or "nothing needs a decision".
+
+**Do not** narrate steps as you go, pad with what you did not change, apologise,
+or write a conclusion that restates the opening. If the answer is one line, make
+it one line. Length is not effort.
+
+`/go <task>` carries this plus the agent and skill routing. Use it for any real
+task.
+
 ## The one rule
 
 A guard never shown to fail is not a guard. Break the thing it tests.
