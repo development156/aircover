@@ -585,6 +585,58 @@
       "summary_plain": "The unit checks ran and something failed (51 passed, 1 failed).",
       "details": "     × asks for \"twitter\", never for our \"x\" 7ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 51 passed (52)",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtaj0ln0-dddf0306",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T20:08:20.358Z",
+      "finished_at": "2026-08-26T20:08:20.358Z",
+      "suite": "typecheck",
+      "status": "fail",
+      "summary_plain": "The typecheck checks ran and something failed.",
+      "details": "apps/web/src/app/api/oauth/zernio/return/route.ts(41,56): error TS2552: Cannot find name 'reconcileAccounts'. Did you mean 'reconcileFromAccounts'?\nTS done",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtaj2gld-23d566cc",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T20:09:47.135Z",
+      "finished_at": "2026-08-26T20:09:47.135Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (14 passed, 2 failed).",
+      "details": "     × refreshes when the tab gets focus back, not only when a message lands 17ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 7 passed (8)\n--- mutation B: never remove the listener ---\n     × stops listening for focus once the wait is over 18ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  1 failed | 7 passed (8)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtaj45lq-b10fab83",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T20:11:06.204Z",
+      "finished_at": "2026-08-26T20:11:06.204Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (8 passed, 2 failed).",
+      "details": "     × names what happens BEFORE the destructive press, not after 73ms\n     × never claims the account survives at the provider 33ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 8 passed (10)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtajisdk-5fbc6076",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-26T20:22:28.902Z",
+      "finished_at": "2026-08-26T20:22:28.902Z",
+      "suite": "unit",
+      "status": "fail",
+      "summary_plain": "The unit checks ran and something failed (50 passed, 2 failed).",
+      "details": "### MUTATION A — pass OUR channel id again (the shipped bug)\n     × records the X account that Zernio stores as \"twitter\" 10ms\n     × reaches every platform from ONE read 2ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  2 failed | 50 passed (52)\n### MUTATION B — a failed read reported as 'nothing'\n     × a failed read is all-or-nothing now, and says so 8ms\n     × every read failing is a real failure, not \"nothing\" 2ms\n     × spends the pending-connect cookie on the way out, on success and on failure 1ms\n     × tells the truth when the trip failed, and keeps the failing status 1ms\n     × sends no Location on a FAILED popup either, and keeps the 5xx 1ms",
+      "duration_ms": null
     }
   ]
 }

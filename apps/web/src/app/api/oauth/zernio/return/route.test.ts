@@ -14,14 +14,25 @@ const state = vi.hoisted(() => ({
   ] as Record<string, unknown>[],
   /** Per-platform accounts. Null means "same list for every platform". */
   accountsByPlatform: null as Record<string, Record<string, unknown>[]> | null,
-  /** Platforms whose `reconcileAccounts` call rejects — a READ failure, not a write one. */
-  readThrowsFor: [] as string[],
+  /**
+   * Does the ONE account read fail?
+   *
+   * ── THIS WAS A PER-PLATFORM LIST AND CANNOT BE ONE ANY MORE ───────────────
+   * `readThrowsFor: string[]` let a test fail linkedin's read while instagram's
+   * succeeded, because the route made one request PER PLATFORM. It now makes a
+   * single `listAccounts` call and filters the result thirteen ways — one
+   * request, so exactly one thing to fail, and when it fails every platform is
+   * genuinely unreadable.
+   *
+   * A boolean is the honest shape. Keeping the array would let tests describe a
+   * partial read that the route can no longer produce, which is a fixture
+   * asserting a fiction.
+   */
+  readThrows: false,
   rpcError: null as { message: string } | null,
   /** Per-platform write results. Null means `rpcError` applies to all of them. */
   rpcErrorByPlatform: null as Record<string, { message: string } | null> | null,
   throwOnAuth: false,
-  /** Every `zernioPlatform` the route asked `reconcileAccounts` for, in order. */
-  askedFor: [] as string[],
   /** What this workspace already holds. `null` = the read failed. */
   slots: { count: 0, keys: new Set<string>() } as { count: number; keys: Set<string> } | null,
   /**
@@ -56,8 +67,50 @@ vi.mock('@clerk/nextjs/server', () => ({
   },
 }))
 
+/**
+ * ── THE CLIENT NOW HAS A REAL METHOD, BECAUSE THE ROUTE CALLS ONE ───────────
+ * It was `{}`. The route used to reach Zernio only through `reconcileAccounts`,
+ * which this file mocked wholesale, so an empty object was enough. The route now
+ * fetches the account list ITSELF, once, and filters it thirteen ways — so
+ * `listAccounts` has to exist and has to answer in ZERNIO'S SHAPE: `_id`, and a
+ * `platform` spelled the way Zernio spells it.
+ *
+ * That shape is what makes the vocabulary guard real rather than notional. The
+ * fixtures below are written in our vocabulary and translated on the way out, so
+ * a route that asked for `x` instead of `twitter` genuinely finds nothing here,
+ * exactly as it genuinely found nothing in production.
+ */
+const ZERNIO_NAME: Record<string, string> = { x: 'twitter', gbp: 'googlebusiness' }
+
 vi.mock('@/lib/zernio/server', () => ({
-  zernioClient: () => (state.clientPresent ? {} : null),
+  zernioClient: () =>
+    state.clientPresent
+      ? {
+          listAccounts: () => {
+            // ONE read for every platform, so ONE way for it to fail. See the
+            // note on `readThrows`.
+            if (state.readThrows) return Promise.reject(new Error('listAccounts failed'))
+            return Promise.resolve(
+              MOCK_PLATFORMS.flatMap((ours) => {
+                // A per-platform fixture is EXHAUSTIVE: a platform it does not
+                // mention has no accounts. It used to fall through to the default
+                // list, which was invisible while the fixture named every platform
+                // there was — and became wrong the moment a third one existed.
+                const per = state.accountsByPlatform
+                const list = per ? (per[ours] ?? []) : state.accounts
+                return list.map((a) => ({
+                  _id: (a as { accountId?: string }).accountId,
+                  platform: ZERNIO_NAME[ours] ?? ours,
+                  // Fixtures written before the profile filter mattered omit it.
+                  // Defaulting to the workspace's own profile keeps them meaning
+                  // what they meant; a test about the tenant boundary sets it.
+                  profileId: (a as { profileId?: string }).profileId ?? state.mapping?.profile_id,
+                }))
+              }),
+            )
+          },
+        }
+      : null,
 }))
 
 vi.mock('@/lib/workspaces', () => ({
@@ -94,18 +147,32 @@ vi.mock('@/lib/observability/report', () => ({ reportServerError: () => Promise.
  * `askedFor` below records what it was actually handed so a test can check it.
  */
 vi.mock('@sahoda/publishing', () => ({
-  reconcileAccounts: (_client: unknown, args: { zernioPlatform: string }) => {
-    state.askedFor.push(args.zernioPlatform)
-    // Zernio's name back to ours, for the fixtures. `twitter` is the one that
-    // differs among the mocked platforms, and it is mocked FOR that reason.
-    const ours = args.zernioPlatform === 'twitter' ? 'x' : args.zernioPlatform
-    if (state.readThrowsFor.includes(ours)) {
-      return Promise.reject(new Error(`listAccounts failed for ${ours}`))
-    }
-    return Promise.resolve(state.accountsByPlatform?.[ours] ?? state.accounts)
-  },
+  /**
+   * A FAITHFUL REIMPLEMENTATION, not a lookup table. The real function filters
+   * `account.platform === args.zernioPlatform` and then re-checks the profile,
+   * and both filters are the thing under test here: the first is what made a
+   * live X connect invisible, the second is the tenant boundary.
+   *
+   * Written out rather than keyed off a fixture map on purpose. A mock that
+   * returned "whatever was asked for" would pass whichever spelling the route
+   * used, which is precisely the blind spot that let the bug ship.
+   */
+  reconcileFromAccounts: (
+    accounts: { _id: string; platform: string; profileId: string }[],
+    args: { profileId: string; zernioPlatform: string },
+  ) =>
+    accounts
+      .filter((a) => a.platform === args.zernioPlatform)
+      .filter((a) => a.profileId === args.profileId)
+      .map((a) => ({
+        accountId: a._id,
+        profileId: args.profileId,
+        username: null,
+        needsReconnection: false,
+        platformStatus: null,
+        tokenExpiresAt: null,
+      })),
 }))
-
 // TWO platforms, not one. A partial outcome cannot exist in a one-platform world,
 // so the old single-entry mock could not have caught the collapse this file now pins.
 // THREE platforms, and the third is load-bearing. It was `['instagram','linkedin']`
@@ -181,7 +248,7 @@ beforeEach(() => {
     { accountId: '6a75caf7d0fe733d1afcc1f4', profileId: '6a75cae32853ee463c6419d6' },
   ]
   state.accountsByPlatform = null
-  state.readThrowsFor = []
+  state.readThrows = false
   state.rpcError = null
   state.rpcErrorByPlatform = null
   state.throwOnAuth = false
@@ -189,7 +256,6 @@ beforeEach(() => {
   state.limitVerdict = { kind: 'allowed', limit: 8 }
   state.limitCalls = []
   state.rpcCalls = []
-  state.askedFor = []
   state.pending = { platform: 'instagram', mode: 'redirect' }
 })
 
@@ -240,22 +306,38 @@ describe('a partial connect is reported as partial, never as connected', () => {
     expect(res.headers.get('location')).toContain('zernio=partial')
   })
 
-  it('one platform cannot be read at all, and the others still record', async () => {
-    state.readThrowsFor = ['linkedin']
+  it('a failed read is all-or-nothing now, and says so', async () => {
+    // RETARGETED. This asserted "one platform cannot be read at all, and the
+    // others still record" — a partial READ. The route made one request per
+    // platform then, so that state existed. It now makes a SINGLE
+    // `listAccounts` call and filters the result, because thirteen identical
+    // requests per connect was burning a 60-per-minute rate limit.
+    //
+    // So there is one read and one way for it to fail, and when it fails no
+    // platform was read. Asserting the old partial would be asserting a state
+    // the route can no longer reach. The claim that survives is the important
+    // one: a read that failed is never reported as a read that found nothing.
+    state.readThrows = true
 
     const res = await call()
 
     expect(res.status).not.toBe(303)
-    expect(res.headers.get('location')).toContain('zernio=partial')
+    expect(res.headers.get('location')).toContain('zernio=error')
+    expect(res.headers.get('location')).toContain('reason=read')
+    expect(res.headers.get('location')).not.toContain('zernio=nothing')
   })
 
-  it('a read failure no longer discards the platforms that read fine', async () => {
-    // The `Promise.all` version threw here, so the instagram account that WAS read
-    // never reached upsert_zernio_connection at all.
-    state.readThrowsFor = ['linkedin']
+  it('a failed read writes nothing at all, rather than half of something', async () => {
+    // The other half of the same guarantee, and the one with a customer cost:
+    // the old `Promise.all` threw on the first rejection and discarded accounts
+    // that had already been read successfully. Nothing is read now, so nothing
+    // is written — and `reason=unexpected`, the generic outcome that failure
+    // used to hide behind, must not appear.
+    state.readThrows = true
 
     const res = await call()
 
+    expect(state.rpcCalls).toEqual([])
     expect(res.headers.get('location')).not.toContain('reason=unexpected')
   })
 
@@ -264,13 +346,21 @@ describe('a partial connect is reported as partial, never as connected', () => {
     // platform answers with no accounts, another cannot be read at all. No write is
     // ever attempted, so `written` is 0 — and reporting that as "every write failed"
     // would name the wrong thing entirely.
-    state.accountsByPlatform = { instagram: [], linkedin: [] }
-    state.readThrowsFor = ['linkedin']
+    //
+    // RETARGETED off a read failure and onto the PLAN LIMIT, which is the other
+    // path to the same state and the one that still exists. A read failure can
+    // no longer be partial (see above), but a plan with no headroom still leaves
+    // `accounts.length > 0` while `attempted` stays 0 — exactly the condition
+    // `written === 0 && attempted > 0` was written to distinguish.
+    state.slots = { count: 2, keys: new Set() }
+    state.limitVerdict = { kind: 'blocked', sentence: 'Your Free plan includes 2 channels.' }
 
     const res = await call()
 
-    expect(res.headers.get('location')).toContain('zernio=partial')
+    // Not "every write failed". No write was ever attempted.
     expect(res.headers.get('location')).not.toContain('reason=write')
+    expect(res.headers.get('location')).toContain('zernio=limit')
+    expect(state.rpcCalls).toEqual([])
   })
 
   it('every read failing is a real failure, not "nothing"', async () => {
@@ -280,7 +370,7 @@ describe('a partial connect is reported as partial, never as connected', () => {
     // the `partial` path, not this one. The assertion below still passed for
     // three of the four tests that had the same literal, which is exactly how a
     // stale list survives.
-    state.readThrowsFor = [...MOCK_PLATFORMS]
+    state.readThrows = true
 
     const res = await call()
 
@@ -631,7 +721,7 @@ describe('a connect only ever creates a row for the platform that was pressed', 
     const okRes = await call()
     expect(okRes.headers.get('set-cookie')).toContain('Max-Age=0')
 
-    state.readThrowsFor = [...MOCK_PLATFORMS]
+    state.readThrows = true
     const failRes = await call()
     expect(failRes.status).toBe(500)
     expect(failRes.headers.get('set-cookie')).toContain('Max-Age=0')
@@ -699,7 +789,7 @@ describe('the popup closer does not depend on window.opener', () => {
 
   it('tells the truth when the trip failed, and keeps the failing status', async () => {
     state.pending = { platform: 'instagram', mode: 'popup' }
-    state.readThrowsFor = [...MOCK_PLATFORMS]
+    state.readThrows = true
 
     const res = await call()
     const body = await res.text()
@@ -736,7 +826,7 @@ describe('the popup closer does not depend on window.opener', () => {
     // one. The failing status still has to survive: this route exists because a
     // failure leaving as a success was invisible to a log filter.
     state.pending = { platform: 'instagram', mode: 'popup' }
-    state.readThrowsFor = [...MOCK_PLATFORMS]
+    state.readThrows = true
 
     const res = await call()
 
@@ -785,29 +875,60 @@ describe('the popup closer does not depend on window.opener', () => {
  * route actually handed over, so that is what is checked.
  */
 describe('the route asks Zernio in Zernio’s own vocabulary', () => {
-  it('asks for "twitter", never for our "x"', async () => {
+  const ACC = '6a75caf7d0fe733d1afcc1f4'
+  /** Everything already ours, so create-scoping is not the thing under test. */
+  const allHeld = () => ({
+    count: 3,
+    keys: new Set(MOCK_PLATFORMS.map((p) => `${p}:${ACC}`)),
+  })
+
+  it('records the X account that Zernio stores as "twitter"', async () => {
+    // THE REGRESSION, asserted through an OUTCOME rather than a spy.
+    //
+    // `listAccounts` answers in Zernio's shape and `reconcileFromAccounts` is a
+    // faithful copy of the real filter, so a route that asked for `x` finds
+    // nothing here for the same reason it found nothing in production: the
+    // account is stored under `twitter`. No row is written and this fails.
+    //
+    // MEASURED 2026-08-26 — the customer's real account, created minutes after
+    // they pressed Connect: { "_id": "6a8f392d…", "platform": "twitter" }.
+    //
+    // `pending` is X because create-scoping only ever creates the platform that
+    // was pressed. That rule is not what is being tested; it is what makes the
+    // fixture honest about a real single-platform press.
+    state.pending = { platform: 'x', mode: 'redirect' }
+    state.slots = { count: 0, keys: new Set() }
+
     await call()
 
-    expect(state.askedFor).toContain('twitter')
-    expect(state.askedFor).not.toContain('x')
+    expect(state.rpcCalls.some((c) => c.startsWith('x:'))).toBe(true)
   })
 
   it('leaves the names that already agree alone', async () => {
-    // The translation must not invent a difference where there is none. Instagram
-    // is `instagram` on both sides and a mapping that mangled it would break the
-    // two channels that have worked all along.
+    // The translation must not invent a difference where there is none.
+    // Instagram and LinkedIn are spelled identically on both sides and are the
+    // two channels that worked throughout; a mapping that mangled them would
+    // break the only part of this flow that was never broken.
+    //
+    // Every account is already held, so all three are REFRESHES and reach the
+    // write regardless of which platform was pressed.
+    state.slots = allHeld()
+
     await call()
 
-    expect(state.askedFor).toContain('instagram')
-    expect(state.askedFor).toContain('linkedin')
+    expect(state.rpcCalls.some((c) => c.startsWith('instagram:'))).toBe(true)
+    expect(state.rpcCalls.some((c) => c.startsWith('linkedin:'))).toBe(true)
   })
 
-  it('asks once per platform, and for every platform', async () => {
-    // A translation that returned null would silently skip a platform rather
-    // than fail, which is the quiet direction this route must never fail in.
+  it('reaches every platform from ONE read', async () => {
+    // The point of the change. Three platforms are reconciled from a single
+    // `listAccounts` call, and a translation that returned null for one would
+    // drop it silently — the quiet direction this route must never fail in.
+    state.slots = allHeld()
+
     await call()
 
-    expect(state.askedFor).toHaveLength(MOCK_PLATFORMS.length)
+    expect(state.rpcCalls).toHaveLength(MOCK_PLATFORMS.length)
   })
 })
 

@@ -1,5 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
-import { reconcileAccounts } from '@sahoda/publishing'
+import { reconcileFromAccounts } from '@sahoda/publishing'
 import { isZernioPlatform, ZERNIO_PLATFORMS } from '@sahoda/shared'
 
 import { checkCountableLimit } from '@/lib/billing/entitlements'
@@ -35,10 +35,11 @@ export const dynamic = 'force-dynamic'
 /**
  * One account Zernio returned, tagged with the platform it was asked for.
  *
- * Derived from `reconcileAccounts` rather than restated — a field added there shows
- * up here as a type error rather than being silently dropped on the way to the RPC.
+ * Derived from `reconcileFromAccounts` rather than restated — a field added there
+ * shows up here as a type error rather than being silently dropped on the way to
+ * the RPC.
  */
-type ReconciledForPlatform = Awaited<ReturnType<typeof reconcileAccounts>>[number] & {
+type ReconciledForPlatform = ReturnType<typeof reconcileFromAccounts>[number] & {
   platform: (typeof ZERNIO_PLATFORMS)[number]
 }
 
@@ -376,36 +377,56 @@ export async function GET(request: Request): Promise<Response> {
     // OTHER platform had already returned, and the whole trip left as a generic
     // `unexpected`. Each read is now caught where it happens and becomes its own
     // recorded outcome, so the platforms that answered are still recorded.
-    const reads = await Promise.all(
-      ZERNIO_PLATFORMS.map(async (platform) => {
-        try {
-          // ── ASK IN ZERNIO'S VOCABULARY, RECORD IN OURS ───────────────────
-          // `reconcileAccounts` filters `account.platform === …` against a string
-          // Zernio writes, and this passed OUR channel id. MEASURED: a live X
-          // account reads `"platform": "twitter"`, so asking for `x` returned
-          // nothing and a successful connect vanished — reported as "except
-          // instagram and linkedin everything else is not getting connected",
-          // and those two worked only because for them the two names are the
-          // same string.
-          //
-          // Non-null by construction: `ZERNIO_PLATFORMS` is exactly the set with
-          // an OAuth flow, and `connectPlatformFor` returns null only for
-          // Telegram, which is not in it. Handled anyway rather than asserted —
-          // the two lists are edited in different files.
-          const zernioPlatform = connectPlatformFor(platform)
-          if (zernioPlatform === null) {
-            return { platform, read: true, accounts: [] as ReconciledForPlatform[] }
-          }
-          const found = await reconcileAccounts(client, { profileId, zernioPlatform })
-          // Tagged with OUR id on the way out. The row we write, the plan gate and
-          // the screen all speak our vocabulary; only the question was theirs.
-          return { platform, read: true, accounts: found.map((a) => ({ ...a, platform })) }
-        } catch (error) {
-          await reportServerError(error, { action: 'zernioReturn', workspaceId })
-          return { platform, read: false, accounts: [] as ReconciledForPlatform[] }
-        }
-      }),
-    )
+    /**
+     * ── ONE REQUEST, THIRTEEN QUESTIONS ──────────────────────────────────────
+     * This was `Promise.all(ZERNIO_PLATFORMS.map(… reconcileAccounts …))`, and
+     * `reconcileAccounts` fetches the WHOLE account list and filters it. So a
+     * single connect fired one identical request per platform — thirteen, twelve
+     * of them discarded.
+     *
+     * MEASURED from the live response headers: `x-ratelimit-limit: 60` a minute.
+     * Three connect attempts inside a minute therefore approached the ceiling on
+     * their own, and a 429 arrives here as a READ FAILURE — so the account the
+     * customer connected seconds ago is reported as not found, on a trip where
+     * nothing about it was wrong. The list was five long before 2026-08-26, so
+     * the change that added the connect-only platforms made this 2.6x worse.
+     *
+     * `listAccounts` is not platform-filtered, so one call answers every
+     * platform. The per-platform loop below is now pure in-memory filtering.
+     */
+    let all: Awaited<ReturnType<typeof client.listAccounts>> | null = null
+    try {
+      all = await client.listAccounts(profileId)
+    } catch (error) {
+      await reportServerError(error, { action: 'zernioReturn', workspaceId })
+    }
+
+    /**
+     * ── AND THE FAILURE SEMANTICS ARE UNCHANGED ON PURPOSE ───────────────────
+     * Each platform used to catch its own error so one platform's failure could
+     * not discard the accounts another had already returned. With a single call
+     * there is only one thing to fail, and when it does EVERY platform is
+     * genuinely unreadable — which is what the shape below still says. The
+     * downstream branches (`unreadable.length === ZERNIO_PLATFORMS.length` and
+     * the `partial` report) therefore keep working without knowing anything
+     * changed, and "we never successfully asked" is still never reported as
+     * "we asked and there was nothing".
+     */
+    const reads = ZERNIO_PLATFORMS.map((platform) => {
+      if (all === null) {
+        return { platform, read: false, accounts: [] as ReconciledForPlatform[] }
+      }
+      // See the header on connect-platform.ts: `x` is `twitter` to Zernio and
+      // `gbp` is `googlebusiness`. Asking in our own vocabulary is what made a
+      // real X connect invisible.
+      const zernioPlatform = connectPlatformFor(platform)
+      if (zernioPlatform === null) {
+        return { platform, read: true, accounts: [] as ReconciledForPlatform[] }
+      }
+      const found = reconcileFromAccounts(all, { profileId, zernioPlatform })
+      // Tagged with OUR id on the way out. Only the question was theirs.
+      return { platform, read: true, accounts: found.map((a) => ({ ...a, platform })) }
+    })
 
     const unreadable = reads.filter((r) => !r.read).map((r) => r.platform)
     const accounts = reads.flatMap((r) => r.accounts)
