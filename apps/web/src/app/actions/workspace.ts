@@ -140,6 +140,94 @@ export async function setActiveWorkspace(formData: FormData): Promise<void> {
  * meaning anywhere — nothing branches on it. That is the whole reason the slug
  * stays out: it IS a pointer, and this is not.
  */
+/**
+ * A zone name this runtime can actually resolve.
+ *
+ * `Intl.DateTimeFormat` throws `RangeError` on a zone it does not know, which
+ * makes it the real test rather than a shape test. `Asia/Kolkatta` is one
+ * keystroke from the real zone, would pass any regex, and would then quietly
+ * shift every hour this product ever reports for that customer.
+ *
+ * The database trigger `workspaces_timezone_is_real` refuses the same value, so
+ * this is the first of two independent checks rather than the only one. It is
+ * here so the customer gets a sentence instead of a failed write.
+ */
+function isRealTimezone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: zone })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Record where this business is, or withdraw the answer.
+ *
+ * ── NULL IS A REAL ANSWER AND CLEARING MUST STAY POSSIBLE ────────────────────
+ * `null` means nobody has told us, which is true of 32 of the 33 workspaces
+ * that exist. Somebody who set the wrong zone has to be able to take it back to
+ * "unknown" rather than being forced to leave a wrong answer standing.
+ *
+ * ── WHAT THIS DOES NOT DO ────────────────────────────────────────────────────
+ * Nothing in the product reads this column yet. Every time on every screen is
+ * still rendered in IST, from 38 hardcoded sites. The field says so, because a
+ * setting that silently changes nothing is the same defect as a figure no query
+ * produced.
+ */
+export async function setWorkspaceTimezone(
+  workspaceId: string,
+  timezone: string | null,
+): Promise<{ ok: true; timezone: string | null } | { ok: false; message: string }> {
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to change this setting.' }
+
+    const id = z.uuid().safeParse(workspaceId)
+    if (!id.success) return { ok: false, message: 'That workspace could not be found.' }
+
+    const trimmed = timezone === null ? null : timezone.trim()
+    const next = trimmed === null || trimmed.length === 0 ? null : trimmed
+    if (next !== null && !isRealTimezone(next)) {
+      return { ok: false, message: `Sahoda does not recognise the time zone ${next}.` }
+    }
+
+    const supabase = createServerSupabase()
+    // `.select()` for the reason `renameWorkspace` gives: PostgREST returns a
+    // null error for an UPDATE that matched no rows, so an update RLS refused
+    // would otherwise report success. The returned row is the evidence.
+    const { data, error } = await supabase
+      .from('workspaces')
+      .update({ timezone: next })
+      .eq('id', id.data)
+      .select('timezone')
+      .maybeSingle()
+
+    if (error) return { ok: false, message: 'Could not save the time zone. Try again.' }
+    /**
+     * NO ROW IS ITS OWN ANSWER, AND IT NEEDS ITS OWN SENTENCE.
+     *
+     * PostgREST reports a null error for an UPDATE that matched nothing, so
+     * this arm is RLS having refused the write: the workspace is not this
+     * caller's, or is not there. "Try again" is a remedy that cannot work for
+     * that, and offering one is the defect `no-impossible-remedy` exists to
+     * catch.
+     *
+     * Found by mutation. While both arms shared a sentence, deleting `!data`
+     * left every test green: `data` was null, reading `.timezone` threw, and
+     * the catch produced the same message. The guard was being enforced by an
+     * exception nobody had noticed, and one `data?.timezone ?? null` later it
+     * would have reported success on a refused write.
+     */
+    if (!data) return { ok: false, message: 'That workspace could not be found.' }
+
+    revalidatePath('/settings')
+    return { ok: true, timezone: (data as { timezone: string | null }).timezone }
+  } catch {
+    return { ok: false, message: 'Could not save the time zone. Try again.' }
+  }
+}
+
 export async function renameWorkspace(
   workspaceId: string,
   name: string,

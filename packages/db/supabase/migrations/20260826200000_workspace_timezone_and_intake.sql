@@ -58,8 +58,8 @@
 -- REVERSIBLE: yes.
 --   drop trigger if exists workspaces_timezone_is_real on public.workspaces;
 --   drop function if exists public.refuse_unknown_timezone();
---   drop trigger if exists workspaces_clear_profile_on_erase on public.workspaces;
---   drop function if exists public.clear_workspace_profile_on_erase();
+--   -- and reverse 20260826210000 first, which adds a second trigger to this
+--   -- table and is the erasure half of this change.
 --   alter table public.workspaces
 --     drop column timezone, drop column business_model,
 --     drop column regime,   drop column locale;
@@ -69,7 +69,7 @@
 -- ROW and never to a subset of its columns. `ws_update` lets a member update
 -- their own workspace, which is what the settings screen needs.
 
--- ── 1 of 5 · the columns ─────────────────────────────────────────────────────
+-- ── 1 of 4 · the columns ─────────────────────────────────────────────────────
 
 alter table public.workspaces
   -- An IANA zone name, e.g. `Asia/Kolkata`. NULL means nobody has told us where
@@ -78,7 +78,7 @@ alter table public.workspaces
   -- The three onboarding picks, promoted out of `brand_memory.payload.intake`
   -- so a cohort query is an index scan rather than a jsonb sweep. The value
   -- lists mirror BUSINESS_MODELS, REGIMES and LOCALES in
-  -- `apps/web/src/lib/onboarding/intake.ts`; `workspace-intake-drift.test.ts`
+  -- `apps/web/src/lib/onboarding/intake.ts`; `workspaces-contract.pglite.test.ts`
   -- fails if the two ever separate.
   add column if not exists business_model text,
   add column if not exists regime text,
@@ -93,7 +93,7 @@ comment on column public.workspaces.regime is
 comment on column public.workspaces.locale is
   'Jurisdiction: whose regulator applies and which counterparty reads as real. One of LOCALES. NULL means unasked. This is not a timezone and must never be used as one - AE alone spans one zone but IN, US and other do not agree.';
 
--- ── 2 of 5 · closed value lists ──────────────────────────────────────────────
+-- ── 2 of 4 · closed value lists ──────────────────────────────────────────────
 -- Named constraints so `check-constraints.test.ts` can read them and adjudicate
 -- every `.eq('regime', …)` in the app against this list.
 
@@ -117,7 +117,7 @@ alter table public.workspaces
   add constraint workspaces_locale_check
   check (locale is null or locale in ('IN', 'US', 'GB', 'AE', 'SG', 'other'));
 
--- ── 3 of 5 · the timezone must be a zone Postgres knows ──────────────────────
+-- ── 3 of 4 · the timezone must be a zone Postgres knows ──────────────────────
 --
 -- A CHECK cannot do this: validating against `pg_timezone_names` is a catalog
 -- lookup, which is STABLE and not IMMUTABLE, and a CHECK may only call the
@@ -157,7 +157,7 @@ create trigger workspaces_timezone_is_real
   -- even if the value is unchanged, so an ordinary rename never reaches this.
   execute function public.refuse_unknown_timezone();
 
--- ── 4 of 5 · backfill only what was actually recorded ────────────────────────
+-- ── 4 of 4 · backfill only what was actually recorded ────────────────────────
 --
 -- Two sources, both of them things a person already told us. Nothing is
 -- inferred, and no row without a stored answer is given one.
@@ -209,46 +209,14 @@ update public.workspaces w
   from latest l
  where l.workspace_id = w.id;
 
--- ── 5 of 5 · these columns go when the workspace is erased ───────────────────
---
--- WHY THIS IS NOT OPTIONAL. `public.erase_workspace` (20260823000000, step 8)
--- redacts `name`, `slug`, `created_by` and blanks `settings`. The one workspace
--- that holds a timezone today holds it INSIDE `settings`, so today that value
--- is erased. Section 4 above copies it into a column, and without this section
--- the copy would survive an erasure the original did not — a deletion promise
--- quietly weakened by a migration that was not about deletion at all.
---
--- WHY A TRIGGER AND NOT AN EDIT TO `erase_workspace`. That function is in an
--- applied migration, which is never edited, and replacing it would mean
--- restating roughly 150 lines that walk 47 foreign keys and guard the financial
--- record. Restating that to add four assignments is the larger risk by a wide
--- margin. This fires on the same UPDATE, inside the same transaction.
---
--- `deleted_at` going from NULL to set is the erasure and happens once. A row
--- already erased does not re-enter this, and no ordinary workspace update
--- reaches it.
-
-create or replace function public.clear_workspace_profile_on_erase()
-returns trigger
-language plpgsql
-set search_path = ''
-as $$
-begin
-  if new.deleted_at is not null and old.deleted_at is null then
-    new.timezone       := null;
-    new.business_model := null;
-    new.regime         := null;
-    new.locale         := null;
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists workspaces_clear_profile_on_erase on public.workspaces;
-create trigger workspaces_clear_profile_on_erase
-  before update of deleted_at on public.workspaces
-  for each row
-  execute function public.clear_workspace_profile_on_erase();
+-- THE ERASURE HALF IS A SEPARATE FILE, AND THE REASON MATTERS.
+-- These columns must be cleared when a workspace is erased, and that trigger
+-- lives in 20260826210000 rather than here because it needs
+-- `workspaces.deleted_at`, which `20260823000000_dpdp_erasure` adds. MEASURED
+-- 2026-08-26: that migration is in this repository and is NOT applied to
+-- production, so a trigger on `deleted_at` cannot be created there today.
+-- Splitting keeps each file applicable on its own, and keeps what production
+-- ran identical to what this repository says it ran.
 
 -- ── indexes ──────────────────────────────────────────────────────────────────
 -- Partial, because the majority of rows are NULL on both and a cohort query
