@@ -1801,3 +1801,59 @@ group: gate-${{ github.head_ref || github.ref_name }}
 nobody watched fail: push a commit to a branch with an open pull request and
 count the runs on that head. Two today, one after. That check is the whole test,
 and it is the reason this entry exists rather than a silent patch.
+
+## 28 · Draft capture is BUILT — what it covers, and the one path it does not
+
+**Lane** `claude/lead-research-tz63ld` (owner girija, `sahoda.lane=wt-girija`),
+2026-08-26. This closes the build half of §22. §22 stays as the specification.
+
+**What is stored.** `posts.generated_body` and `post_variants.generated_body`,
+both nullable, both write-once, enforced by a database trigger rather than by
+TypeScript — four insert paths write these rows today and a fifth added next
+month would silently opt out of a guarantee that lived in the application.
+
+**NULL is a real answer and must stay one.** It means a person wrote this text.
+Nothing backfills it from `body`, and nothing may: doing so would invent a model
+draft for human writing and report an edit distance of zero for work the model
+never touched.
+
+### ⚠ THE COMPOSER PATH IS NOT CAPTURED, AND THAT IS A CORRECTNESS CALL
+
+`posts-ai.ts` runs `content_variants` and `caption_rewrite` and **persists
+nothing** — it returns text to the writing pane and the customer saves through
+`saveVariant`, the same compare-and-set path a hand-typed variant uses. So a
+variant generated in the composer stores `generated_body = null`.
+
+**This was NOT left for effort.** Capturing at that save would record whatever
+is in the pane at the moment the person clicks save, and by then they may
+already have edited it. That text would be stored as "what the model wrote",
+and every later comparison against it would report a smaller edit distance than
+really happened. **A wrong draft is worse than no draft**: null declines
+honestly, a wrong value produces a confident false figure, which is the
+fabricated-number failure this project has hit before.
+
+Capturing it properly needs the untouched model output carried from
+`posts-ai.ts` through the pane to the save action as a separate field, and
+`public.save_post_variant` gaining a parameter. That is a real change to a
+function on the CAS path and it belongs in its own pass, with its own tests.
+**Whoever picks it up: do not shortcut it by copying the pane's current text.**
+
+### What the measure will actually say today: nothing, and honestly
+
+No row in production carries a `generated_body` — the column is new and nothing
+backfills. `editDistance` therefore declines with `no_captured_drafts` for every
+workspace, and the pass counts it under that name. The measure becomes available
+as customers generate, which is the earliest it could ever be true.
+
+### `marketing_observations.kind` gained a value
+
+`check (kind in ('tone_drift'))` became `check (kind in ('tone_drift',
+'edit_distance'))`. The 2026-08-25 migration is applied to production and was
+not edited; the constraint is replaced in the new migration.
+
+### The decline keys changed shape — `<kind>:<reason>`
+
+`BrainPassResult.declined` was keyed by a bare reason. Both computers decline
+with `too_few_posts` and with `window_too_short`, meaning different things about
+different populations, so a bare key adds two unrelated facts together. Anything
+reading those keys needs the prefix.
