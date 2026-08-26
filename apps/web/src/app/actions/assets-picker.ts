@@ -48,6 +48,10 @@ export async function listAssetsForPicker(): Promise<PickerRead> {
         height: asset.height,
         createdAt: asset.created_at,
         previewUrl: urlById.get(asset.id) ?? null,
+        // NOT `[]`. The picker renders no filing, so it runs no memberships
+        // query, and an empty array here would state that every photo in the
+        // composer is filed nowhere. `null` says we did not look.
+        folderIds: null,
         usage,
       })),
     }
