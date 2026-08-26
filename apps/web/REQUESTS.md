@@ -1987,3 +1987,49 @@ failed. A third statement at the top would have broken the rule it invoked.
 **So no connection banner was added.** Recorded because it looked correct from a
 screenshot and was wrong against the code, which is the whole argument for
 reading before designing.
+
+---
+
+## 30. The gate has not run on ANY branch since 11:08Z, and a red tick currently means nothing
+
+**Lane** `wt-divas2` (owner divas), 2026-08-26, advisor. Found while driving PR
+[#15](https://github.com/development156/sahodalabs/pull/15) to green.
+
+**MEASURED over the 30 most recent `gate.yml` runs (254 → 283): every one
+failed.** Five branches, all three trigger events, `workflow_dispatch` included.
+
+|                      |                                        |
+| -------------------- | -------------------------------------- |
+| successes in 30 runs | **0**                                  |
+| median run duration  | **4 seconds**                          |
+| branches affected    | every branch that pushed in the window |
+
+**The job never starts.** Job `98188669059`: `started_at` 13:06:56Z,
+`completed_at` 13:06:58Z, `runner_id: 0`, `runner_name: ""`, and **no `steps`
+array at all**. The check run's `output.title`, `output.summary` and
+`output.text` are empty, and the logs endpoint 404s on every run including old
+ones. `gate.yml`'s own header records a real run at **11m31s**.
+
+One re-run was spent to rule out a transient: attempt 2 ran **7 seconds** and
+failed identically.
+
+**It is not the lockfile and it is not the code.** All four CI steps were run
+locally, verbatim: `pnpm install --frozen-lockfile` exits 0 "Already up to
+date"; `pnpm turbo run typecheck lint test --concurrency=1` is 27/27 exit 0;
+`pnpm exec prettier --check .` is clean; root `vitest` is 229 passed with the
+two §26 root-only failures that pass on an unprivileged runner.
+
+**The remedy is on the GitHub account** — Actions billing, a spending limit, or
+exhausted minutes — which no lane can push. Founder action.
+
+### Why this is worse than an ordinary red
+
+**A green tick is currently unobtainable and a red one carries no information
+about the diff.** §15 exists because nothing in CI ran the gate for months, and
+§27 records this workflow silently not firing twice. This is that same condition
+arriving a third way, and every lane is reading its own red tick as if it were
+about their own work. Anyone who "fixes" their diff to chase this will be
+chasing a runner that was never allocated.
+
+**Until it is resolved, a lane's only real evidence is `pnpm gate` run locally,
+unpiped, and stated with its `Cached:` count.**
