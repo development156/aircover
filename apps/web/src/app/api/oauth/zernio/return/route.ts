@@ -5,6 +5,7 @@ import { isZernioPlatform, ZERNIO_PLATFORMS } from '@sahoda/shared'
 import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { CLEAR_PENDING_CONNECT, readPendingConnect } from '@/lib/connections/pending-connect'
 import { connectionKey, readConnectionSlots } from '@/lib/connections/read'
+import { connectPlatformFor } from '@/lib/zernio/connect-platform'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { readActiveWorkspace } from '@/lib/workspaces'
@@ -378,7 +379,26 @@ export async function GET(request: Request): Promise<Response> {
     const reads = await Promise.all(
       ZERNIO_PLATFORMS.map(async (platform) => {
         try {
-          const found = await reconcileAccounts(client, { profileId, platform })
+          // ── ASK IN ZERNIO'S VOCABULARY, RECORD IN OURS ───────────────────
+          // `reconcileAccounts` filters `account.platform === …` against a string
+          // Zernio writes, and this passed OUR channel id. MEASURED: a live X
+          // account reads `"platform": "twitter"`, so asking for `x` returned
+          // nothing and a successful connect vanished — reported as "except
+          // instagram and linkedin everything else is not getting connected",
+          // and those two worked only because for them the two names are the
+          // same string.
+          //
+          // Non-null by construction: `ZERNIO_PLATFORMS` is exactly the set with
+          // an OAuth flow, and `connectPlatformFor` returns null only for
+          // Telegram, which is not in it. Handled anyway rather than asserted —
+          // the two lists are edited in different files.
+          const zernioPlatform = connectPlatformFor(platform)
+          if (zernioPlatform === null) {
+            return { platform, read: true, accounts: [] as ReconciledForPlatform[] }
+          }
+          const found = await reconcileAccounts(client, { profileId, zernioPlatform })
+          // Tagged with OUR id on the way out. The row we write, the plan gate and
+          // the screen all speak our vocabulary; only the question was theirs.
           return { platform, read: true, accounts: found.map((a) => ({ ...a, platform })) }
         } catch (error) {
           await reportServerError(error, { action: 'zernioReturn', workspaceId })
