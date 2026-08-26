@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
+import type { ChannelOutcome } from './observe/channel-return'
 import type { CapturedPost } from './observe/edit-distance'
 import type { PublishedPost } from './observe/tone-drift'
 
@@ -15,11 +16,33 @@ import type { PublishedPost } from './observe/tone-drift'
  * conclusions about whether the job is broken.
  */
 
+/** Two channels, one plainly ahead, spread wide enough to clear the window. */
+function winner(seed: string): ChannelOutcome[] {
+  const rows: ChannelOutcome[] = []
+  for (const [channel, engagement] of [
+    ['linkedin', 20],
+    ['instagram', 2],
+  ] as const) {
+    for (let i = 0; i < 5; i += 1) {
+      rows.push({
+        postId: `00000000-0000-4000-8000-${seed}${channel[0]}${String(i).padStart(10, '0')}`,
+        channel,
+        engagement,
+        reach: 100,
+        measuredOn: new Date(Date.UTC(2026, 1, 1 + i * 7)).toISOString().slice(0, 10),
+      })
+    }
+  }
+  return rows
+}
+
 const store = vi.hoisted(() => ({
   workspaces: [] as string[],
   postsBy: new Map<string, PublishedPost[]>(),
   capturedBy: new Map<string, CapturedPost[]>(),
   capturedWorkspaces: [] as string[],
+  metricWorkspaces: [] as string[],
+  outcomesBy: new Map<string, ChannelOutcome[]>(),
   saved: [] as Array<{ workspaceId: string; claim: string; computedOn: string }>,
   inserted: true,
   throwFor: new Set<string>(),
@@ -37,6 +60,14 @@ vi.mock('./store', () => ({
   readCapturedPosts: async (workspaceId: string) => {
     if (store.throwFor.has(workspaceId)) throw new Error('read failed')
     return store.capturedBy.get(workspaceId) ?? []
+  },
+  // Empty by default for the same reason as the drafts list above: every case
+  // written before this computer existed keeps exercising exactly what it did,
+  // and channel-return declines beside them rather than changing their counts.
+  workspacesWithChannelMetrics: async () => store.metricWorkspaces,
+  readChannelOutcomes: async (workspaceId: string) => {
+    if (store.throwFor.has(workspaceId)) throw new Error('read failed')
+    return store.outcomesBy.get(workspaceId) ?? []
   },
   saveObservation: async (
     workspaceId: string,
@@ -88,6 +119,8 @@ describe('runMarketingBrainPass', () => {
     store.postsBy = new Map()
     store.capturedBy = new Map()
     store.capturedWorkspaces = []
+    store.metricWorkspaces = []
+    store.outcomesBy = new Map()
     store.saved = []
     store.inserted = true
     store.throwFor = new Set()
@@ -145,6 +178,7 @@ describe('runMarketingBrainPass', () => {
       'tone_drift:no_posts': 1,
       'tone_drift:window_too_short': 1,
       'edit_distance:no_captured_drafts': 2,
+      'channel_return:no_metrics': 2,
     })
   })
 
@@ -158,10 +192,14 @@ describe('runMarketingBrainPass', () => {
     expect(result.failed).toBe(1)
     expect(result.inserted).toBe(1)
     // "we could not look" is not "we looked and there was nothing". The broken
-    // workspace contributes NOTHING to `declined` - the only entry belongs to
-    // ws-a, which was read successfully and has no captured drafts. If the throw
-    // were folded in, this count would be 2 and the failure would be invisible.
-    expect(result.declined).toEqual({ 'edit_distance:no_captured_drafts': 1 })
+    // workspace contributes NOTHING to `declined` - both entries belong to
+    // ws-a, which was read successfully and has neither a captured draft nor a
+    // measured outcome. If the throw were folded in, each count would be 2 and
+    // the failure would be invisible.
+    expect(result.declined).toEqual({
+      'edit_distance:no_captured_drafts': 1,
+      'channel_return:no_metrics': 1,
+    })
   })
 
   it('runs the edit-distance computer too, and saves what it finds', async () => {
@@ -202,6 +240,29 @@ describe('runMarketingBrainPass', () => {
     expect(result.workspaces).toBe(1)
     // Both computers produced something for the one workspace.
     expect(result.inserted).toBe(2)
+  })
+
+  it('runs the channel-return computer too, and saves what it finds', async () => {
+    store.workspaces = ['ws-a']
+    store.outcomesBy.set('ws-a', winner('a'))
+
+    const result = await runMarketingBrainPass(new Date('2026-03-08T00:00:00Z'))
+
+    expect(result.inserted).toBe(1)
+    expect(store.saved[0]?.claim).toContain('earn more attention per reader')
+  })
+
+  it('considers a workspace known only by its measured outcomes', async () => {
+    // Not in `workspaces` and not in `capturedWorkspaces`, so without the third
+    // list in the union this workspace is never visited and its metrics are
+    // invisible. The union is what makes a connected account enough.
+    store.metricWorkspaces = ['ws-metrics-only']
+    store.outcomesBy.set('ws-metrics-only', winner('m'))
+
+    const result = await runMarketingBrainPass(new Date('2026-03-08T00:00:00Z'))
+
+    expect(result.workspaces).toBe(1)
+    expect(result.inserted).toBe(1)
   })
 
   it('reports the workspaces it considered, so a pass over none is visible', async () => {

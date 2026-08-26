@@ -3,6 +3,7 @@ import 'server-only'
 import { createPgLedgerPort, loadBillingEnv, type PgLedgerPort } from '@sahoda/billing'
 import type { MarketingObservation } from '@sahoda/shared'
 
+import type { ChannelOutcome } from './observe/channel-return'
 import type { CapturedPost } from './observe/edit-distance'
 import type { PublishedPost } from './observe/tone-drift'
 
@@ -195,6 +196,72 @@ export async function readCapturedPosts(workspaceId: string, limit = 200): Promi
  * Unioning the two lists in the runner is what stops either computer being
  * silently skipped for a workspace the other one does not care about.
  */
+/**
+ * What each post earned on each channel, at its most recent measurement.
+ *
+ * ── WHY `distinct on` AND NOT `sum` ──────────────────────────────────────────
+ * MEASURED in production 2026-08-26: `post_metric_snapshots` holds 40 rows for
+ * 5 Instagram posts across 8 days. The platform is re-reported daily and the
+ * value is the running total, so SUMMING would multiply one post's engagement
+ * by the number of days we happened to poll — a number that says more about our
+ * cron than about the customer's audience. The latest row per (post, channel,
+ * metric) is the only honest reading.
+ *
+ * Rows are pivoted in TypeScript rather than with `filter (where …)` aggregates
+ * so that a metric name we do not know about yet is ignored rather than folded
+ * into a column it does not belong in.
+ */
+export async function readChannelOutcomes(
+  workspaceId: string,
+  limit = 400,
+): Promise<ChannelOutcome[]> {
+  const r = await getPool().query<{
+    post_id: string
+    channel: string
+    metric: string
+    value: string | number
+    measured_on: string
+  }>(
+    `select distinct on (post_id, channel, metric)
+            post_id, channel, metric, value,
+            measured_on::text as measured_on
+       from post_metric_snapshots
+      where workspace_id = $1
+        and metric in ('engagement', 'reach')
+      order by post_id, channel, metric, measured_on desc
+      limit $2`,
+    [workspaceId, limit],
+  )
+
+  const byKey = new Map<string, ChannelOutcome>()
+  for (const row of r.rows) {
+    const key = `${row.post_id}:${row.channel}`
+    const existing = byKey.get(key) ?? {
+      postId: row.post_id,
+      channel: row.channel,
+      engagement: 0,
+      reach: 0,
+      measuredOn: row.measured_on,
+    }
+    const value = typeof row.value === 'number' ? row.value : Number(row.value)
+    if (row.metric === 'engagement') existing.engagement = value
+    if (row.metric === 'reach') existing.reach = value
+    /** The later of the two metric rows dates the pair. */
+    if (row.measured_on > existing.measuredOn) existing.measuredOn = row.measured_on
+    byKey.set(key, existing)
+  }
+  return [...byKey.values()]
+}
+
+/** Workspaces with any measured post outcome, for the weekly pass's union. */
+export async function workspacesWithChannelMetrics(limit = 500): Promise<string[]> {
+  const r = await getPool().query<{ workspace_id: string }>(
+    `select distinct workspace_id from post_metric_snapshots limit $1`,
+    [limit],
+  )
+  return r.rows.map((row) => row.workspace_id)
+}
+
 export async function workspacesWithCapturedDrafts(limit = 500): Promise<string[]> {
   const r = await getPool().query<{ workspace_id: string }>(
     `select distinct workspace_id
