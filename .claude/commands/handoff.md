@@ -105,7 +105,20 @@ Mark every claim **MEASURED** or **INFERRED**. A "done" claim needs a
 ```bash
 git add docs/workflow/handoffs/
 git commit -m "handoff(<owner>/<lane>): <one line>"
-git push origin HEAD
+
+node scripts/lane-sync.mjs push
+```
+
+`lane-sync push` refuses a dirty tree, takes `wt-core` **first** so you never
+hand over a lane that has not seen the trunk, pushes your lane, and then prints
+the gate you must run before `wt-core` takes it.
+
+**It does not push to `wt-core` for you.** That is deliberate: `wt-core` is what
+reaches `wt-web`, and an ungated push into it turns every other lane's next pull
+red for a reason they did not cause. Run the gate, then:
+
+```bash
+git push origin HEAD:wt-core
 ```
 
 If the working tree holds files that are not yours, leave them and say so in the
