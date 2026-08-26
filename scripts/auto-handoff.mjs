@@ -18,7 +18,13 @@ import { execSync } from 'node:child_process'
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 
-const sh = (c) => { try { return execSync(c, { encoding: 'utf8', stdio: ['ignore','pipe','ignore'] }).trim() } catch { return '' } }
+const sh = (c) => {
+  try {
+    return execSync(c, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  } catch {
+    return ''
+  }
+}
 
 try {
   const root = sh('git rev-parse --show-toplevel')
@@ -31,8 +37,8 @@ try {
   if (!base) process.exit(0)
 
   const commits = sh(`git log --oneline ${base}..HEAD`).split('\n').filter(Boolean)
-  const files   = sh(`git diff --name-only ${base}...HEAD`).split('\n').filter(Boolean)
-  const dirty   = sh('git status --porcelain').split('\n').filter(Boolean)
+  const files = sh(`git diff --name-only ${base}...HEAD`).split('\n').filter(Boolean)
+  const dirty = sh('git status --porcelain').split('\n').filter(Boolean)
 
   // Nothing happened. Do not write a file for a session that did nothing.
   if (commits.length === 0 && dirty.length === 0) process.exit(0)
@@ -44,30 +50,38 @@ try {
   // under the old <owner>-<role>-<date> scheme. Different lanes, one filename,
   // and the second would have overwritten the first at merge.
   const owner = (process.env.SAHODA_LANE_OWNER || sh('git config sahoda.owner') || '').trim()
-  const lane  = (process.env.SAHODA_LANE || sh('git config sahoda.lane') || '').trim()
+  const lane = (process.env.SAHODA_LANE || sh('git config sahoda.lane') || '').trim()
 
   // Fall back to the branch slug only when the lane was never declared. It is
   // unique, which is the property that matters, and the file says so loudly.
-  const slug = branch.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase()
-  const who  = owner || 'unknown'
+  const slug = branch
+    .replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase()
+  const who = owner || 'unknown'
   const where = lane || slug
 
-  const date = sh("date +%F") || new Date().toISOString().slice(0,10)
+  const date = sh('date +%F') || new Date().toISOString().slice(0, 10)
   const path = `docs/workflow/handoffs/${who}-${where}-${date}.md`
 
   // A REAL handoff already exists for today. Never overwrite a human's work.
-  if (existsSync(path) && !readFileSync(path,'utf8').includes('AUTOMATIC SKELETON')) process.exit(0)
+  if (existsSync(path) && !readFileSync(path, 'utf8').includes('AUTOMATIC SKELETON'))
+    process.exit(0)
 
   // Shared surfaces: the things that break other lanes.
-  const shared = files.filter(f =>
-    f.startsWith('packages/shared/') || f.includes('/migrations/') ||
-    /pricing\.config|turbo\.json|vercel\.json|middleware\.ts|tokens\.css|\.gitignore/.test(f))
+  const shared = files.filter(
+    (f) =>
+      f.startsWith('packages/shared/') ||
+      f.includes('/migrations/') ||
+      /pricing\.config|turbo\.json|vercel\.json|middleware\.ts|tokens\.css|\.gitignore/.test(f),
+  )
 
-  const contract = commits.filter(c => /\[contract\]|BREAKING|migration/i.test(c))
+  const contract = commits.filter((c) => /\[contract\]|BREAKING|migration/i.test(c))
 
-  const warn = (!owner || !lane)
-    ? `> **NOT FULLY DECLARED.** owner=${owner || 'MISSING'} lane=${lane || 'MISSING'}.\n> This session did not run \`/kickoff owner:<name> , branch:<lane>\`, so part of\n> this filename is a branch id rather than a person and a lane. The next session\n> in that lane will not find this file by looking for its own name.`
-    : `**Owner** ${owner} · **Lane** ${lane}`
+  const warn =
+    !owner || !lane
+      ? `> **NOT FULLY DECLARED.** owner=${owner || 'MISSING'} lane=${lane || 'MISSING'}.\n> This session did not run \`/kickoff owner:<name> , branch:<lane>\`, so part of\n> this filename is a branch id rather than a person and a lane. The next session\n> in that lane will not find this file by looking for its own name.`
+      : `**Owner** ${owner} · **Lane** ${lane}`
 
   const body = `# Handoff — ${who} — ${where} — ${date}
 
@@ -81,15 +95,18 @@ ${warn}
 ${dirty.length ? `\n> **${dirty.length} file(s) UNCOMMITTED** when the session ended. A lane can hold its whole output uncommitted, and \`git merge\` will then succeed having merged nothing.\n` : ''}
 ## Commits
 
-${commits.length ? commits.map(c => `- ${c}`).join('\n') : '_none_'}
+${commits.length ? commits.map((c) => `- ${c}`).join('\n') : '_none_'}
 
 ## Shared surfaces touched
 
-${shared.length ? shared.map(f => `- \`${f}\``).join('\n') + '\n\n**These break other lanes.** A required field breaks constructors, not readers — say which.' : '_none detected_'}
-${contract.length ? `\n## Contract or migration commits\n\n${contract.map(c=>`- ${c}`).join('\n')}\n\n**Whoever merges needs to know about these.**\n` : ''}
+${shared.length ? shared.map((f) => `- \`${f}\``).join('\n') + '\n\n**These break other lanes.** A required field breaks constructors, not readers — say which.' : '_none detected_'}
+${contract.length ? `\n## Contract or migration commits\n\n${contract.map((c) => `- ${c}`).join('\n')}\n\n**Whoever merges needs to know about these.**\n` : ''}
 ## Files changed (${files.length})
 
-${files.slice(0,60).map(f => `- \`${f}\``).join('\n')}${files.length>60 ? `\n- _…and ${files.length-60} more_` : ''}
+${files
+  .slice(0, 60)
+  .map((f) => `- \`${f}\``)
+  .join('\n')}${files.length > 60 ? `\n- _…and ${files.length - 60} more_` : ''}
 
 ## NOT recorded by this skeleton
 
@@ -102,6 +119,10 @@ Run \`/handoff\` to replace this with the real thing.
 `
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, body)
-  console.error(`[auto-handoff] wrote skeleton ${path} (${commits.length} commits). Run /handoff to replace it.`)
-} catch { /* never fail a session */ }
+  console.error(
+    `[auto-handoff] wrote skeleton ${path} (${commits.length} commits). Run /handoff to replace it.`,
+  )
+} catch {
+  /* never fail a session */
+}
 process.exit(0)
