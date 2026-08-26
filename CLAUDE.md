@@ -148,6 +148,12 @@ is not read at all.
 phrase, once or twice a section. Every claim marked **MEASURED** or
 **INFERRED**.
 
+**Write so a non-technical person can follow it.** Either write the whole
+report in plain language, or keep the detail and add a short `In plain terms`
+paragraph — three or four sentences, no jargon, no file paths. The test: could
+someone who has never opened this codebase tell whether it went well? **Plain
+is not vaguer** — keep every figure exact.
+
 **End with exactly two things:** what you did NOT do and why, then anything
 needing a decision — one line each, or "nothing needs a decision".
 

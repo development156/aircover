@@ -2,6 +2,11 @@
 description: Enter advisor mode — the single executor and integrator for this project.
 ---
 
+> **If you arrived here from `/kickoff`, this card is CONTEXT ONLY.** `/kickoff`
+> restores the lane and stops; it does not start work. Read this to know what
+> your role is and what governs it, then go back to reporting and waiting.
+> The steps below run only when the founder invokes this command directly.
+
 Read `docs/workflow/02_ADVISOR.md`, `docs/workflow/01_CONTEXT.md`,
 `docs/workflow/05_TRAPS.md` and `docs/workflow/08_ROLES.md`.
 
@@ -17,7 +22,7 @@ when you were wrong.
 
 ---
 
-## Do this immediately, before asking anything
+## When invoked directly: do this before asking anything
 
 ```bash
 cd /home/divas/Documents/GitHub/sahodalabs
