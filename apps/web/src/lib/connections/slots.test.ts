@@ -50,7 +50,7 @@ describe('a slot holds one account, not one platform', () => {
     // the account at the top of the card is the account /analytics is about. If
     // this order flips, the screen and the analytics page disagree in silence.
     const grouped = groupByPlatform([row('instagram', 'older'), row('instagram', 'newer')])
-    expect(grouped.get('instagram')?.[0].id).toBe('older')
+    expect(grouped.get('instagram')?.[0]?.id).toBe('older')
   })
 })
 

@@ -1,5 +1,5 @@
 import { Link2 } from 'lucide-react'
-import type { Connection, ConnectionPlatform } from '@sahoda/shared'
+import type { ConnectionPlatform } from '@sahoda/shared'
 
 import { ChannelTile } from '@/components/connections/channel-tile'
 import { Stagger } from '@/components/motion/stagger'
@@ -12,6 +12,7 @@ import { PageTitle } from '@/components/page-title'
 import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { CONNECTABLE, PLANNED } from '@/lib/connections/catalogue'
 import { readConnections, readConnectionSlots } from '@/lib/connections/read'
+import { groupByPlatform, hasHeadroom, slotSentence, type SlotUsage } from '@/lib/connections/slots'
 import { readXUsage } from '@/lib/connections/x-usage'
 import { getActiveWorkspace } from '@/lib/workspaces'
 import { zernioAvailable } from '@/lib/zernio/server'
@@ -66,23 +67,39 @@ const LIVE_VIA_ZERNIO: ReadonlySet<string> = new Set<ConnectionPlatform>([
 ])
 
 /**
- * The plan sentence when this workspace has no room for another channel, else null.
+ * How many slots this workspace has used, and how many the plan allows.
+ *
+ * ── ONE READ, TWO NUMBERS, AND BOTH ARE ABOUT THE CUSTOMER ───────────────────
+ * This used to return a SENTENCE and nothing else, which was all the screen
+ * needed while the only thing it drew was a banner. A meter needs the
+ * denominator, and parsing it back out of English is the sort of thing that
+ * works until the copy is rewritten — so `checkCountableLimit` now carries the
+ * limit on `blocked` as well as on `allowed`.
  *
  * Read from the DATABASE, never from the query string — the same rule
  * `ConnectOutcomeNotice` follows when it refuses to render counts off the address
- * bar. Null on every "could not tell" case: the return route fails closed
- * regardless, so nothing is admitted by this being null; what it avoids is telling
- * someone their plan is full when the truth is we could not read it.
+ * bar. `limit: null` on every "could not tell" case, and `hasHeadroom` treats
+ * that as no room: the two OAuth routes fail closed regardless, so nothing is
+ * admitted by this being unknown; what it avoids is telling someone their plan is
+ * full when the truth is we could not read it.
  */
-async function channelLimitNotice(): Promise<string | null> {
+async function readSlotUsage(): Promise<SlotUsage & { blockedSentence: string | null }> {
+  const unknown = { used: 0, limit: null, blockedSentence: null }
+
   const workspace = await getActiveWorkspace()
-  if (!workspace) return null
+  if (!workspace) return unknown
 
   const slots = await readConnectionSlots(workspace.id)
-  if (slots === null) return null
+  if (slots === null) return unknown
 
   const verdict = await checkCountableLimit(workspace.id, 'channels', slots.count)
-  return verdict.kind === 'blocked' ? verdict.sentence : null
+  if (verdict.kind === 'unknown') return { ...unknown, used: slots.count }
+
+  return {
+    used: slots.count,
+    limit: verdict.limit,
+    blockedSentence: verdict.kind === 'blocked' ? verdict.sentence : null,
+  }
 }
 
 /**
@@ -116,23 +133,31 @@ export default async function ConnectionsPage({
    */
   searchParams: Promise<{ zernio?: string | string[] }>
 }) {
-  const [connections, { zernio }, channelLimit, ration] = await Promise.all([
+  const [connections, { zernio }, slots, ration] = await Promise.all([
     readConnections(),
     searchParams,
-    channelLimitNotice(),
+    readSlotUsage(),
     xRation(),
   ])
   const railReady = zernioAvailable()
-  const planFull = channelLimit !== null
+  // `hasHeadroom` is the single question every control on this page asks, and an
+  // UNKNOWN limit answers it "no" — the same direction both OAuth routes fail in.
+  const roomLeft = hasHeadroom(slots)
+  const planFull = slots.blockedSentence !== null
 
   // One lookup, so a channel appears exactly once whether or not it is linked.
   const rows = connections.status === 'ok' ? connections.connections : []
+  // ── EVERY ACCOUNT, NOT THE LAST ONE WRITTEN ───────────────────────────────
+  // This was `new Map(rows.map((c) => [c.platform, c]))`. A Map keeps the LAST
+  // value for a key and the rows arrive oldest first, so a workspace with two
+  // Instagram accounts rendered the newer one and the older one appeared nowhere
+  // on this screen, while still holding a slot and still publishing.
+  //
   // Keyed by STRING, not by `ConnectionPlatform`. A catalogue id is the wider
   // union, and casting it narrow at four call sites to satisfy the map would be
   // asserting the very thing `asChannel` exists to check. A planned channel
   // simply never matches a row, because the database cannot hold one.
-  const byChannel = new Map<string, Connection>(rows.map((c) => [c.platform, c]))
-  const live = CONNECTABLE.filter((entry) => byChannel.get(entry.id)?.status === 'active').length
+  const byChannel = groupByPlatform(rows)
 
   return (
     <div className="space-y-6">
@@ -155,18 +180,33 @@ export default async function ConnectionsPage({
               <Link2 aria-hidden className="size-4" />
             </span>
             <div className="min-w-0">
+              {/* ── SLOTS USED, NOT CHANNELS CONNECTED ──────────────────────
+                  This read "2 of 4 connected", where the 4 was the number of
+                  channels SAHODA has built. It moved when we shipped an adapter
+                  and never when the customer changed plan: on Studio (12 slots)
+                  it still said "of 4", and on Free (2 slots) it said "of 4" too,
+                  two paragraphs above a banner that said "Your Free plan includes
+                  2 channels". One screen, two denominators, and the small grey
+                  one was the true one.
+
+                  The number that decides whether Connect works is the ACCOUNT
+                  count against the plan's allowance, so that is the number here.
+                  A slot holds one account: four Instagram accounts are four
+                  slots, one channel. */}
               <p className="type-h3">
-                <span className="num">{live}</span> of{' '}
-                <span className="num">{CONNECTABLE.length}</span> connected
+                {slots.limit === null ? (
+                  <>
+                    <span className="num">{slots.used}</span> {slots.used === 1 ? 'slot' : 'slots'}{' '}
+                    used
+                  </>
+                ) : (
+                  <>
+                    <span className="num">{slots.used}</span> of{' '}
+                    <span className="num">{slots.limit}</span> slots used
+                  </>
+                )}
               </p>
-              {/* NOT "4 channels available" as the reference words it. Available
-                  is what the other four are NOT — they have no adapter — and a
-                  reader who counts eight cards and reads "4 available" has been
-                  told the wrong thing about the four below. This says which four
-                  the fraction is about. */}
-              <p className="type-sm mt-label-gap text-muted">
-                <span className="num">{CONNECTABLE.length}</span> channels Sahoda can post to
-              </p>
+              <p className="type-sm mt-label-gap text-muted">{slotSentence(slots)}</p>
             </div>
           </div>
         ) : null}
@@ -201,12 +241,18 @@ export default async function ConnectionsPage({
               further down. It also owns this screen's single primary action. */}
           <ConnectionHealthBanner connections={rows} />
 
-          {planFull ? (
+          {slots.blockedSentence ? (
             <p
               className="surface-ring rounded-card bg-s2 px-3 py-2.5 type-body text-muted"
               role="status"
             >
-              {channelLimit}
+              {slots.blockedSentence}{' '}
+              {/* The sentence from the gate names the plan and the count. This
+                  half names what a slot IS, because "channels" and "slots" are
+                  different counts on this screen and the reader is owed the
+                  difference: two Instagram accounts and a LinkedIn page is three
+                  slots and two channels. */}
+              Each connected account uses one slot.
             </p>
           ) : null}
 
@@ -221,17 +267,19 @@ export default async function ConnectionsPage({
               <ChannelTile
                 key={entry.id}
                 entry={entry}
-                connection={byChannel.get(entry.id)}
+                connections={byChannel.get(entry.id) ?? []}
                 ration={entry.id === 'x' ? ration : undefined}
-                disabled={!(LIVE_VIA_ZERNIO.has(entry.id) && railReady && !planFull)}
+                disabled={!(LIVE_VIA_ZERNIO.has(entry.id) && railReady && roomLeft)}
                 disabledReason={
                   planFull
-                    ? 'Your plan has no room for another channel.'
-                    : LIVE_VIA_ZERNIO.has(entry.id)
-                      ? railReady
-                        ? undefined
-                        : 'Publishing key isn’t set in this environment.'
-                      : 'Secure token flow still being wired.'
+                    ? 'Every slot on your plan is in use.'
+                    : slots.limit === null
+                      ? 'Sahoda couldn’t check how many slots your plan includes.'
+                      : LIVE_VIA_ZERNIO.has(entry.id)
+                        ? railReady
+                          ? undefined
+                          : 'Publishing key isn’t set in this environment.'
+                        : 'Secure token flow still being wired.'
                 }
               />
             ))}
@@ -245,8 +293,13 @@ export default async function ConnectionsPage({
                that looks like progress and is a constant. */
             guide="connections.coming_soon"
           >
+            {/* `connections` is required and explicitly EMPTY, not optional. A
+                planned channel cannot hold a row — the CHECK constraint sees to
+                it — and making the prop required means the type system asks
+                every call site the question rather than defaulting one of them
+                to a silent `undefined`. */}
             {PLANNED.map((entry) => (
-              <ChannelTile key={entry.id} entry={entry} />
+              <ChannelTile key={entry.id} entry={entry} connections={[]} />
             ))}
           </ChannelGroup>
         </>
