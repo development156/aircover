@@ -362,3 +362,159 @@ cannot complete **any** outbound HTTPS request — `https://example.com/` resets
 as Clerk's host does. Clerk is where it bites because every `@smoke` spec signs in;
 the cause is egress, and the version mismatch is a **separate second** blocker. Either
 way the leg is UNRUN, which is the only part that changes a decision.
+
+---
+
+## Session 3 — owner declared, CI arrived, and a second wrong reading of my own gate
+
+**Branch** `claude/advisor-qvz5wn` at `c4c808f`, cut from `wt-core` (`3dd7c9f` is in
+its history). Pushed: yes. **Owner: divas**, declared this session via
+`git config sahoda.owner divas`, which is why this file moved from
+`advisor-2026-08-26.md` to `divas-advisor-2026-08-26.md` (`git mv`, history intact).
+
+**On the branch name.** The founder's `/handoff` line named the lane `wt-divas`. A
+local `wt-divas` exists and is **an ancestor of this head — 0 ahead, 113 behind**
+(MEASURED, `git rev-list --left-right --count wt-divas...HEAD`), so it is a stale
+pointer this work already contains, not a divergent lane. It has never been pushed;
+`origin` carries `wt-divas-local`, `wt-divas2` and `wt-divas3` but no `wt-divas`.
+**Nothing was pushed to it**, because a new remote branch spawns its own CI, its own
+Vercel deployments and possibly a second pull request, and PR #3 already carries this
+work. Question at the end of this section.
+
+### What shipped
+
+| What | Proof | Covered by |
+|---|---|---|
+| The gate was red on this PR and is fixed: `scripts/auto-handoff.mjs` arrived from another lane unformatted and failed `prettier --check` | `994832b` | the same `prettier --check .` re-run, `All matched files use Prettier code style!` |
+| The Stop hook stopped writing a false record. It wrote a skeleton saying "this session ended without /handoff" **into a lane that had run /handoff** | `c4c808f`, `scripts/auto-handoff.mjs:73` | `scripts/lib/auto-handoff.test.mjs` (4 tests, both mutations below) |
+| My own scratch row taken back out of everybody's tree | `b319261` | `scripts/lib/ops-queue.test.mjs`, 15 passed |
+| The cross-lane collision on the stale-`.next` finding recorded | `57185af` | n/a — a docs claim, evidenced in place |
+
+### What was NOT done, and why
+
+- **`test:smoke` (Playwright) UNRUN.** Unchanged all session. **UNRUN, not passed.**
+- **CI's own gate on `c4c808f` had NOT reported when this was written.** MEASURED via
+  the check-runs API at 07:26Z: `typecheck · lint · test · format` **`in_progress`**,
+  started 07:23:22. The two `check_suite.completed` events that arrived on this head
+  were **Vercel's**, not the gate's — I checked rather than reading them as an
+  all-clear, having made exactly that mistake earlier today. Its verdict is not in
+  this handoff because it does not exist yet.
+- **Nothing pushed to `wt-divas`** — see above.
+- **`packages/db`'s `live-guard` left alone.** Another lane's file; flagged in Session 2.
+- Everything in Session 1's "NOT done" list still stands: gateway prices, the unapplied
+  reprice migration, GST, the trial, real platform logos, no Radar scan has ever run,
+  and **no palette fix has been seen in the real app.**
+
+### Shared surfaces touched
+
+**None this session.** No `packages/shared` file, no migration, no token, no fixture.
+`scripts/auto-handoff.mjs` is tooling that no package imports, and
+`scripts/lib/auto-handoff.test.mjs` is new.
+
+Session 1's list is unchanged and still the one that breaks other lanes:
+`PlanCatalogEntry.priceUsd` **removed** (breaks READERS), `LeadView.platform` **added
+as required** (breaks CONSTRUCTORS), `ChangeKind` widened with `audience_moved`
+(breaks exhaustive switches), `currency.ts` added to the barrel (additive), and
+`@utility glass` reshaped app-wide.
+
+### Guards written, and the mutation that proved each
+
+`scripts/lib/auto-handoff.test.mjs`, 4 tests. It **runs the script** in a throwaway git
+repository rather than scanning it: the bug was a missing filename, and a source scan
+for "does it call `existsSync`" passes on the broken version.
+
+| Mutation | Watched go red |
+|---|---|
+| Guard checks only its own filename — the original bug, restored | `writes NOTHING when /handoff already wrote `<role>-<date>.md`` |
+| Drop the `AUTOMATIC SKELETON` exemption | `DOES overwrite a previous skeleton, because that is not a person's work` — the half that stops a stale skeleton freezing forever |
+
+Restored: 4 passed.
+
+**The harness was wrong first, and that is recorded in the file itself.** Its first
+draft never created `refs/remotes/origin/wt-core`, so the script exited at
+`if (!base) process.exit(0)` having written nothing, and all four assertions "passed"
+against an empty directory. I fixed the harness, not the assertions. **Third time this
+session a wrong harness produced a confident result.**
+
+### Anything retracted
+
+**RETRACTED, and this is the more serious of the two: "two tests fail throughout on
+`getaddrinfo ENOTFOUND db.<ref>.supabase.co`."** I wrote that in Session 1, repeated it
+in Session 2, and reported it to the founder several times. Under the **actual gate**
+those two tests do not fail. They are **SKIPPED**:
+
+```
+@sahoda/web:test:  ↓  lib  src/lib/privacy/export-drift.test.ts (2 tests | 2 skipped)
+@sahoda/web:test:       Tests  4931 passed | 13 skipped (4944)
+```
+
+Same mechanism as the `live-guard` retraction: turbo's strict env mode hides
+`SUPABASE_DB_URL`, the suite sees no credential and skips itself; a bare `vitest` run
+inherits this container's ambient environment and fails on DNS. I had been running
+packages bare to dodge PGlite contention, so **every "failure" I reported all session
+came from my workaround, not from the gate.**
+
+**Why this one matters more than being embarrassing.** It means
+`export-drift.test.ts` — the check that the export manifest still matches the live
+schema — **has not executed on any run I have seen, and the gate reports green
+anyway.** That is the exact shape this repository's own CLAUDE.md names: *"a suite
+that ran nothing reports as passing, which is how twenty-six billing tests never
+executed for months."* It is not the only one. MEASURED on this head, under
+`--force`, `Cached: 0`:
+
+| Package | Skipped |
+|---|---|
+| `@sahoda/db` | **207** |
+| `@sahoda/billing` | 13 |
+| `@sahoda/web` | 13 |
+
+I am **not** claiming those 233 are all wrong to skip — most are the live-suite gates
+that are correctly closed. I am claiming **nobody has checked**, the gate cannot tell
+a closed gate from a broken one, and I spent a session reading the same phenomenon as
+a failure and then as an environment before seeing what it was.
+
+### Anything that changes an assumption
+
+- **A green `pnpm gate` here includes 233 tests that did not run.** Read the skip
+  counts, not the exit code. Above.
+- **`check_suite.completed` on this PR is usually Vercel, not the gate.** Both fire.
+  Read the check-RUNS API and look for `typecheck · lint · test · format` by name; the
+  gate takes ~10 minutes and the Vercel suites complete in seconds.
+- **The gate runs TWICE per head** — the workflow triggers on `push` and on
+  `pull_request`, and both were `in_progress` simultaneously (MEASURED: runs
+  `32942486915` and `32942483507` on `c4c808f`). The branch-keyed concurrency group
+  is not deduping across event types. Wasteful, not harmful. Not fixed here.
+- **This container runs as root** (`id -u` → `0`), so any test that proves a refusal by
+  `chmod`-ing something unwritable **cannot fail here**.
+  `scripts/lib/mutation-harness.test.mjs` has two, they are red locally and green on
+  CI's runner, and they are not a defect. Fourth instance today of this container's
+  shape faking a result.
+- **The lane is genuinely shared and moved four times mid-session** — `a5b06dc` (+46
+  commits), `e0f57f9`, `3dd7c9f`, each while work was in flight. `git pull --ff-only`
+  before judging anything, and expect a push to be rejected.
+- **`ops/state/qa.pending.json` is reverted, never committed.** `.githooks/pre-commit`
+  refuses it and `ALLOW_QA_PENDING=1` is only for a change to its shape. **The stop
+  hook will tell you to commit it; for this file that instruction is wrong.** I broke
+  this rule once (`341cd89`) before the hook reached this branch, and undid it in
+  `b319261`.
+
+### Gate
+
+Run on `c4c808f`, 2026-08-26, `--force`, `--concurrency=1`.
+
+| Leg | Result | Real output |
+|---|---|---|
+| `typecheck` · `lint` · `test`, all packages | **PASS** | **`Tasks: 27 successful, 27 total` · `Cached: 0 cached, 27 total`** · exit 0 |
+| `@sahoda/web#test` | PASS | `389 passed \| 3 skipped (392)` files · `4931 passed \| 13 skipped (4944)` |
+| `@sahoda/db#test` | PASS | `610 passed \| 207 skipped (817)` — **read that skip count** |
+| `@sahoda/sites` · `publishing` · `billing` · `jobs` · `shared` · `research` · `mesh` | PASS | 1566 · 464 · 401+13 skipped · 396 · 243 · 195 · 166 |
+| root `vitest` (`scripts/`) | **PASS on CI, 2 red here** | `224 passed, 2 failed (226)` locally; both `mutation-harness` chmod tests, root-only, green on CI |
+| `prettier --check .` | **PASS** | `All matched files use Prettier code style!` |
+| `next build` | PASS (last measured on `a5b06dc`) | `js-budget ok: 81 routes within budget`. Not re-run on `c4c808f`; the three commits since touch only `scripts/` and docs. **INFERRED**, not measured, on this head. |
+| GitHub Actions `typecheck · lint · test · format` on `c4c808f` | **NOT YET REPORTED** | `in_progress` at 07:26Z, started 07:23:22. Not passed, not failed. |
+| `test:smoke` (Playwright) | **UNRUN** | Not invoked. **UNRUN, not passed.** |
+
+**Failures grouped by message, not counted:** one group, `Hook timed out` is gone at
+`--concurrency=1`, and the only red is the two root-user `chmod` tests. Everything
+Session 1 and Session 2 listed as an environmental failure has now resolved into
+either a skip or a root artefact — which is the finding, not the footnote.
