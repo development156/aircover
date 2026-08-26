@@ -1,5 +1,18 @@
 # Handoff — design — 2026-08-26
 
+> **OWNER UNKNOWN.** Nobody declared who runs this lane, so the filename falls
+> back to the branch slug. Set it once with `git config sahoda.owner <name>` or
+> the `SAHODA_LANE_OWNER` environment variable, and the record becomes readable
+> by a person instead of by a branch id.
+>
+> This file was written as `design-2026-08-26.md`, the convention at the time.
+> `d21bac3` changed it to `<owner>-<role>-<date>.md` and reached this lane via
+> `372fcdf`. **The rename is not cosmetic:** `scripts/auto-handoff.mjs` decides
+> whether a real handoff already exists by testing `existsSync` on the *new*
+> path, so under the old name the stop hook would have written a machine-written
+> stub beside this file and today would have carried two handoffs for one
+> session. See the defect note below before editing this header.
+
 **Branch** `claude/lead-design-7m7ios` at `f2bc4b1`, cut from `wt-core`. Pushed: yes.
 
 This is **Session 12**. Sessions 1 to 11 are in `design-2026-08-25.md` (1903 lines) and
@@ -21,6 +34,59 @@ bbcc8bd  Merge the design lane into wt-core (#2)             ← the 31 commits
 
 MEASURED: `git merge-base --is-ancestor origin/claude/lead-design-7m7ios origin/wt-core`
 returns 0. `origin/wt-web` is `5480260`, untouched.
+
+---
+
+## ⚠ A LIVE DEFECT IN `scripts/auto-handoff.mjs` — it ate this file once
+
+**Do not write the two words that mark a machine stub into any real handoff.**
+Spell it some other way, as this document now does. The hook's skip check is:
+
+```js
+if (existsSync(path) && !readFileSync(path, 'utf8').includes('AUTOMATIC ' + 'SKELETON'))
+  process.exit(0)
+```
+
+(deliberately broken across a concatenation here so that this document does not
+trip the thing it is describing.)
+
+It asks "is the file at this path a stub?" by **substring search over the whole
+file**. A real handoff that *discusses* stubs answers yes, and the hook overwrites
+it. MEASURED, on this file, today: I added a sentence containing that marker to
+explain the rename, ran the hook to verify it would skip, and it **replaced 343
+lines of handoff with a 38-line stub**. Recovered from `636def1`; nothing was
+lost, because it had already been committed.
+
+**Two things are wrong, and they are separable.**
+
+1. **The marker is checked against the whole file rather than the header.** Any
+   handoff that mentions the mechanism destroys itself. A fix is to test only the
+   first few lines, where the hook writes the marker, or to use a sentinel that
+   prose would not contain.
+2. **The check is a guard on the destructive path, and it is checked only one
+   way.** `existsSync` false means write, and that branch is exercised constantly.
+   The `includes(...)` half decides whether to overwrite a human's work, and
+   nothing tests it. `git log -1 --format=%B` on the commit that added the hook
+   says self-tested for owner collisions and the undeclared fallback, which is
+   the filename half; the do-not-clobber half is not among them.
+
+**This is not filed as a fix.** `scripts/auto-handoff.mjs` came from `wt-web`
+through `9b219be` and belongs to whoever wrote it; this lane changing a stop hook
+that runs in everyone's session is not a design-lead call. It is written down
+here, precisely, with the reproduction.
+
+**Reproduction, both directions:**
+
+```
+# ARMED: real handoff at the slug path, no marker in it
+node scripts/auto-handoff.mjs   ->  exits, writes nothing        (correct)
+
+# MUTATION A: add the marker string anywhere in the prose
+node scripts/auto-handoff.mjs   ->  OVERWRITES the handoff       (the defect)
+
+# MUTATION B: rename the file to the old <role>-<date>.md convention
+node scripts/auto-handoff.mjs   ->  writes a second handoff for the same day
+```
 
 ---
 
