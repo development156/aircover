@@ -33,6 +33,18 @@ export interface LeadView {
   readonly createdAt: string
   /** Where it came from, in the reader's words. Never an invented provenance. */
   readonly from: string
+  /**
+   * The raw platform key an inbox lead arrived on — `instagram`, `whatsapp` — or
+   * null for a site form and for a row whose source records nothing.
+   *
+   * Separate from `from`, which is a SENTENCE. A card that shows a platform mark
+   * needs the key, and parsing it back out of "Your inbox · instagram" would be
+   * a second decoder that could disagree with the first.
+   *
+   * Null is a real answer: a site form has no platform, and neither does a lead
+   * that predates both doors. Neither gets a mark rather than being assigned one.
+   */
+  readonly platform: string | null
 }
 
 export type LeadsRead =
@@ -59,6 +71,21 @@ function fromOf(source: unknown): string {
   return 'Not recorded'
 }
 
+/**
+ * The platform key, or null when the row does not carry one.
+ *
+ * Reads the same `source` object `fromOf` does, and deliberately applies the
+ * same rule: only an `inbox` source has a channel. A `site_form` lead has no
+ * platform and gets null rather than a default, for the reason `fromOf`'s own
+ * header gives — every lead in this table predates both doors.
+ */
+function platformOf(source: unknown): string | null {
+  if (typeof source !== 'object' || source === null) return null
+  if ((source as { kind?: unknown }).kind !== 'inbox') return null
+  const channel = (source as { channel?: unknown }).channel
+  return typeof channel === 'string' && channel.trim() !== '' ? channel : null
+}
+
 function toView(lead: Lead): LeadView {
   return {
     id: lead.id,
@@ -70,6 +97,7 @@ function toView(lead: Lead): LeadView {
     readAt: lead.read_at,
     createdAt: lead.created_at,
     from: fromOf(lead.source),
+    platform: platformOf(lead.source),
   }
 }
 

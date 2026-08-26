@@ -26,9 +26,9 @@ describe('audiences', () => {
   })
 
   it('rejects two primaries — the same bug twice', () => {
-    expect(
-      AudiencesSchema.safeParse([audience(), audience({ id: 'students' })]).success,
-    ).toBe(false)
+    expect(AudiencesSchema.safeParse([audience(), audience({ id: 'students' })]).success).toBe(
+      false,
+    )
   })
 
   it('accepts several audiences with one primary — a school has parents AND students', () => {

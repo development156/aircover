@@ -49,6 +49,12 @@ describe('cron wiring', () => {
     // 11:30 IST — inside the working day, so a preview waiting for approval is
     // seen the day it appears rather than the morning after.
     //
+    // The Radar scan is WEEKLY because that is the cadence the product PROMISES:
+    // /radar tells the reader "one scan per business per week" and prices it per
+    // scan, so a nightly pass would charge seven times what the screen says. It
+    // is the only cron here whose wrong cadence is a BILLING error rather than a
+    // freshness one. Monday 03:40 UTC is 09:10 IST — the readings are waiting at
+    // the start of the week rather than arriving mid-week.
     // The Marketing Brain pass is weekly and lands half an hour after the Loop.
     // Weekly because it describes a HABIT: it compares two runs of published
     // posts, and a daily re-run would recompute the same two arms and write the
@@ -61,6 +67,7 @@ describe('cron wiring', () => {
       { path: '/api/cron/metrics', schedule: '20 1 * * *' },
       { path: '/api/cron/loop', schedule: '0 21 * * 0' },
       { path: '/api/cron/playbooks', schedule: '0 6 * * *' },
+      { path: '/api/cron/radar', schedule: '40 3 * * 1' },
       { path: '/api/cron/brain', schedule: '30 21 * * 0' },
     ])
   })
@@ -121,6 +128,7 @@ describe('cron wiring', () => {
         // The route authenticates itself in-route and spends nothing — it
         // proposes and halts at the cost preview.
         '/api/cron/playbooks',
+        '/api/cron/radar',
         '/api/cron/brain',
         '/api/public/beta-apply',
         // Door one into `leads`, added 2026-08-21. Deliberate for the same reason

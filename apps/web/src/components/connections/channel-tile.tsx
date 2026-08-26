@@ -138,9 +138,16 @@ function ComingSoonTile({ entry }: { entry: CatalogueEntry }) {
       data-channel={entry.id}
       data-coming-soon="true"
       data-connected="false"
-      className="is-proposed flex h-full flex-col gap-3 rounded-card p-4"
+      /* The same lift, so a planned channel reads as a card on a roadmap
+         rather than a dead box — while `.is-proposed` keeps it visibly
+         provisional. No shadow: it is not offering an action. */
+      className="is-proposed flex h-full flex-col gap-3 rounded-card p-4 transition-micro hover:-translate-y-px"
     >
       <ChannelHeader entry={entry} />
+      {/* What the channel is FOR. Present tense describes the channel, not an
+          offer — the "Coming soon" rung above and the line below both say we
+          cannot do it yet, so this sentence never has to carry that too. */}
+      <p className="type-sm text-muted">{entry.blurb}</p>
       {/* NOT "Not connected". That is the sentence a CONNECTABLE channel uses, and
           on a tile with no adapter it implies the customer could fix it by
           connecting — the exact confusion between "unbuilt" and "unconfigured"
@@ -148,8 +155,18 @@ function ComingSoonTile({ entry }: { entry: CatalogueEntry }) {
 
           A sentence about SAHODA, never a figure about the customer: a container
           labelled coming soon is a promise we control, while a number inside one
-          is a claim about their business no query in this codebase can support. */}
-      <p className="type-sm mt-auto text-muted">Sahoda can&rsquo;t post here yet.</p>
+          is a claim about their business no query in this codebase can support.
+
+          ── AND IT IS NOT A "NOTIFY ME" BUTTON ─────────────────────────────
+          The reference for this page puts a control here. There is no table, no
+          action and no sender behind one, so it would be a button that promises
+          a message nobody can send — the impossible remedy `no-impossible-
+          remedy.spec.ts` exists to catch, and the same failure this component's
+          header rejects a `<button disabled>` for. The floor keeps the honest
+          sentence until the notify flow is real. */}
+      <p className="type-sm mt-auto border-t border-line-soft pt-3 text-muted">
+        Sahoda can&rsquo;t post here yet.
+      </p>
     </div>
   )
 }
@@ -178,9 +195,21 @@ export function ChannelTile({
       data-channel={entry.id}
       data-connected={connection ? 'true' : 'false'}
       data-readiness={entry.readiness}
-      className="surface-ring flex h-full flex-col rounded-card bg-surface p-4"
+      /* ── HOVER IS A LIFT, AND IT COSTS NOTHING ──────────────────────────
+         A 1px rise, a firmer ring and the card shadow — no colour change, so
+         the tile's two status ladders stay the only things saying anything.
+         `transition-micro` is the product's own duration/easing pair, and
+         tokens.css zeroes it under `prefers-reduced-motion`, so this needs no
+         media query of its own and no dependency. */
+      className="surface-ring flex h-full flex-col rounded-card bg-surface p-4 transition-micro hover:-translate-y-px hover:shadow-card hover:surface-ring-firm"
     >
       <ChannelHeader entry={entry} />
+
+      {/* What Sahoda does with this channel, in one sentence. It sits ABOVE the
+          divider because it is a claim about the CHANNEL, which is what this
+          zone is for — putting it below would file "what Instagram is for"
+          under "what your workspace has done about it". */}
+      <p className="type-sm mt-2 text-muted">{entry.blurb}</p>
 
       {/* THE DIVIDER IS THE AXIS. Above: the channel. Below: your account.
           A hairline rather than a gap, because §6 is explicit that a gap past a
@@ -192,7 +221,26 @@ export function ChannelTile({
         {status ? (
           <Badge rung={status.rung}>{status.label}</Badge>
         ) : (
-          <span className="type-sm text-muted">Not connected</span>
+          /* ── A CHIP, AND THE DOT IS NOT THE MESSAGE ──────────────────────
+             "Not connected" was plain grey text beside a Badge on the
+             connected tiles: one slot, two vocabularies, which is the exact
+             §3.3 defect the divider above was introduced to end — it fixed
+             the SUBJECT split and left the TREATMENT split standing.
+
+             It is not a `Badge`, because the ladder ranks how much a thing
+             NEEDS YOU and an unconnected channel needs nothing; rung 4 would
+             put a tick on it. So it is a chip in the same shape at a quieter
+             weight.
+
+             The wash is `--brand-wash` at alpha 0.06, which
+             `accent-area-budget.spec.ts` skips (it ignores any paint under
+             0.08), so four of these cost the screen's accent budget nothing.
+             The dot is decorative and the WORDS carry the claim — hue is
+             never load-bearing here (docs/37 §1). */
+          <span className="type-chip inline-flex items-center gap-1.5 rounded-pill bg-brand-wash px-2 py-1 text-muted">
+            <span aria-hidden className="size-1.5 rounded-pill bg-brand" />
+            Not connected
+          </span>
         )}
         {/* The expiry line. 60 days, no refresh, no warning from anyone — so a
             tile that says "Connected" without saying "for how much longer" is
@@ -216,7 +264,12 @@ export function ChannelTile({
           above it holds. Eight tiles in one grid with the buttons at eight
           different heights is the "loose template inside tight chrome" §3.4
           describes. */}
-      <div className="mt-auto flex items-center gap-2 pt-3">
+      {/* A HAIRLINE OVER THE CONTROL, matching the one that splits the tile.
+          The tiles carry different amounts of content — X alone holds the spend
+          row — so without a rule the buttons floated at whatever height their
+          own card ended at. `mt-auto` already pinned them to the floor; the
+          border makes that floor visible, so eight cards read as one row. */}
+      <div className="mt-auto flex items-center gap-2 border-t border-line-soft pt-3">
         {connection ? (
           <>
             {health && health.kind !== 'ok' ? (

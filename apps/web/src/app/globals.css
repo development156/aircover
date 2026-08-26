@@ -562,16 +562,46 @@
              carrying a value, a status or a certainty mark
 
    `backdrop-filter` is the expensive half; `-webkit-` first for Safari, which
-   still needs the prefix. The fallback background is OPAQUE on purpose: a
-   browser without backdrop-filter support gets a solid panel rather than a
-   see-through one, which fails safe instead of illegible.
+   still needs the prefix.
+
+   ── THE OPAQUE FALLBACK WAS CLAIMED AND DID NOT EXIST (2026-08-25) ───────────
+   This block used to read:
+
+       background: var(--surface);   |* opaque fallback *|
+       background: var(--glass-bg);  |* translucent     *|
+
+   with a comment promising "a browser without backdrop-filter support gets a
+   solid panel rather than a see-through one, which fails safe instead of
+   illegible."
+
+   It could not do that. Two declarations of the same property gate on whether
+   the browser understands the VALUE — and every browser understands `rgba()`,
+   so the second line always won. The fallback never applied to anything. The
+   moment `backdrop-filter` failed to take effect the panel was translucent with
+   no blur behind it, which is the exact failure the comment describes: page text
+   reading straight through a menu, sharp and unblurred.
+
+   MEASURED 2026-08-25 from a screenshot of the command palette over /analytics:
+   the rows behind the panel were legible letter by letter. Blur was not
+   applying; the transparency was.
+
+   `@supports` is what actually asks the question. Opaque is now the default and
+   the translucent treatment is the enhancement, so the failure mode is a solid
+   panel — the thing the old comment promised.
+
+   This is the same defect this repo has already paid for once: `backdrop-filter`
+   and `background` are separate properties, and a test that asserts the TOKEN
+   cannot see which of them the browser actually applied.
    ============================================================ */
 @utility glass {
   background: var(--surface);
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   border-color: var(--glass-line);
+
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  }
 }
 
 /* The opaque well a glass surface must give any status-bearing element.

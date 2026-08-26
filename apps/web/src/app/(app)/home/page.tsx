@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { creditCost } from '@sahoda/shared'
@@ -327,9 +328,10 @@ export default async function HomePage() {
                 <h2 className="type-h3">Recent activity</h2>
                 <Link
                   href="/wallet"
-                  className="card-link ml-auto type-meta font-[550] text-muted hover:text-accent"
+                  className="card-link ml-auto inline-flex items-center gap-1 type-meta font-[550] text-accent transition-micro hover:gap-1.5 max-narrow:min-h-[44px]"
                 >
                   View all
+                  <ArrowRight aria-hidden className="size-3.5" />
                 </Link>
               </header>
               <ActivityFeed entries={ledger.entries.slice(0, 4)} />

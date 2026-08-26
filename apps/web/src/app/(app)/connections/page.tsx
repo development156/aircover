@@ -2,6 +2,7 @@ import { Link2 } from 'lucide-react'
 import type { Connection, ConnectionPlatform } from '@sahoda/shared'
 
 import { ChannelTile } from '@/components/connections/channel-tile'
+import { Stagger } from '@/components/motion/stagger'
 import { ConnectionHealthBanner } from '@/components/connections/connection-health-banner'
 import { ConnectOutcomeNotice } from '@/components/connections/connect-outcome-notice'
 import type { XRationMeterProps } from '@/components/connections/x-ration-meter'
@@ -135,10 +136,40 @@ export default async function ConnectionsPage({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start gap-3">
-        <PageTitle sub="Connect the places you post, and see what each one can do.">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <PageTitle sub="Connect your channels and manage where Sahoda publishes your content.">
           Connections
         </PageTitle>
+        {/* ── THE COUNT, PROMOTED OUT OF THE GROUP HEADING ──────────────────
+            It was `type-sm` grey text beside "Connect now", which put the one
+            number answering "where do I stand" at the same weight as the lead
+            line under it. Here it is the first thing read on the right.
+
+            Rendered ONLY when the connections read succeeded. On `unreadable`
+            this whole branch is not reached, so the card can never print "0 of
+            4 connected" off a failed read — which would be a reading of the
+            customer's account drawn from a query that never answered. */}
+        {connections.status === 'ok' ? (
+          <div className="surface-ring flex items-center gap-3 rounded-card bg-surface px-4 py-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-pill bg-brand-wash text-accent dark:bg-s2">
+              <Link2 aria-hidden className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="type-h3">
+                <span className="num">{live}</span> of{' '}
+                <span className="num">{CONNECTABLE.length}</span> connected
+              </p>
+              {/* NOT "4 channels available" as the reference words it. Available
+                  is what the other four are NOT — they have no adapter — and a
+                  reader who counts eight cards and reads "4 available" has been
+                  told the wrong thing about the four below. This says which four
+                  the fraction is about. */}
+              <p className="type-sm mt-label-gap text-muted">
+                <span className="num">{CONNECTABLE.length}</span> channels Sahoda can post to
+              </p>
+            </div>
+          </div>
+        ) : null}
       </header>
 
       {/* What just happened comes before what is there now. */}
@@ -180,8 +211,10 @@ export default async function ConnectionsPage({
           ) : null}
 
           <ChannelGroup
-            name="Connect now"
-            count={`${live} of ${CONNECTABLE.length} connected`}
+            name="Connect your channels"
+            lead="Each card says what Sahoda can do there, and whether this workspace has linked it."
+            /* The count moved into the header card. Printing it here as well
+               would put one number in two places, which is how they drift. */
             guide="connections.connect_now"
           >
             {CONNECTABLE.map((entry) => (
@@ -205,7 +238,8 @@ export default async function ConnectionsPage({
           </ChannelGroup>
 
           <ChannelGroup
-            name="Coming soon"
+            name="More channels"
+            lead="Sahoda can't post to these yet. Each one says so on its own card."
             /* No count. "0 of 4 connected" on a group nothing can connect to
                would be a fraction whose numerator can never move — a number
                that looks like progress and is a constant. */
@@ -233,28 +267,42 @@ export default async function ConnectionsPage({
  */
 function ChannelGroup({
   name,
+  lead,
   count,
   guide,
   children,
 }: {
   name: string
+  /** One line saying what the group IS, when the heading alone cannot. */
+  lead?: string
   count?: string
   guide: string
   children: React.ReactNode
 }) {
   return (
     <section className="space-y-3" data-guide={guide}>
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <h2 className="type-h2">{name}</h2>
-        {/* Words, not a pill. The old `2/4` badge was a hand-rolled chip that
-            existed nowhere else in the system, and a bare fraction beside a
-            heading reads as a score. "2 of 4 connected" says which two things
-            are being compared. */}
-        {count ? <span className="type-sm num text-muted">{count}</span> : null}
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <h2 className="type-h2">{name}</h2>
+          {/* Words, not a pill. The old `2/4` badge was a hand-rolled chip that
+              existed nowhere else in the system, and a bare fraction beside a
+              heading reads as a score. "2 of 4 connected" says which two things
+              are being compared. */}
+          {count ? <span className="type-sm num text-muted">{count}</span> : null}
+        </div>
+        {lead ? <p className="type-sm text-muted">{lead}</p> : null}
       </div>
-      <div className="grid items-stretch gap-4 wide:grid-cols-4 max-wide:grid-cols-2 max-narrow:grid-cols-1">
+      {/* `.enter-step` is this product's ONE entrance (docs/37 §12) and it is
+          already reduced-motion safe in tokens.css, which zeroes delay as well
+          as duration — without that, `fill: both` left staggered rows invisible
+          for the length of their delay. Using the primitive rather than a new
+          animation is also why no dependency was added for this. */}
+      <Stagger
+        className="grid items-stretch gap-4 wide:grid-cols-4 max-wide:grid-cols-2 max-narrow:grid-cols-1"
+        itemClassName="h-full"
+      >
         {children}
-      </div>
+      </Stagger>
     </section>
   )
 }

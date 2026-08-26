@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react'
 import { ImagePlus, Lock, Search } from 'lucide-react'
 import type { AssetKind } from '@sahoda/shared'
 
+import { AssetFolders } from '@/components/assets/asset-folders'
+import { ASSET_FOLDERS, type FolderId } from '@/lib/assets/folders'
 import { KINDS_NOT_YET_UPLOADABLE, KINDS_WITH_UPLOAD, labelForKind } from '@/lib/assets/kind'
 import type { AssetCard } from '@/lib/assets/view'
 import { displayName, lockedSites, usageLine } from '@/lib/assets/view'
@@ -36,7 +38,16 @@ import { AssetThumb } from './asset-thumb'
  * greyscale.
  */
 const ALL = 'all' as const
-type Filter = typeof ALL | AssetKind
+/**
+ * ONE selection, written by two controls.
+ *
+ * The folder row and the kind chips both set this. They are two views of the
+ * same state rather than two filters, so they cannot disagree — picking the
+ * Photos folder lights the Photos chip, and there is never a moment where the
+ * page is showing one thing and labelling it another. A second filter would
+ * have made "which folder am I in" unanswerable the moment both were set.
+ */
+type Filter = typeof ALL | AssetKind | Exclude<FolderId, AssetKind>
 
 export function AssetLibrary({ cards, capped }: { cards: AssetCard[]; capped: boolean }) {
   const [query, setQuery] = useState('')
@@ -46,7 +57,15 @@ export function AssetLibrary({ cards, capped }: { cards: AssetCard[]; capped: bo
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return cards.filter((card) => {
-      if (kind !== ALL && card.kind !== kind) return false
+      // A folder id and a kind id share this one slot, so the folder's own
+      // predicate is the authority — `ASSET_FOLDERS` owns what "In use" means,
+      // and restating it here is how the row and the count drift apart.
+      if (kind !== ALL) {
+        const folder = ASSET_FOLDERS.find((entry) => entry.id === kind)
+        if (folder) {
+          if (!folder.match(card)) return false
+        } else if (card.kind !== kind) return false
+      }
       if (needle === '') return true
       // Searched over what a person can SEE on the tile — the name and the
       // description they wrote. Not the storage path, which is a uuid nobody
@@ -123,6 +142,16 @@ export function AssetLibrary({ cards, capped }: { cards: AssetCard[]; capped: bo
           </span>
         ))}
       </div>
+
+      {/* FOLDERS SIT ABOVE THE FILES, and below the search and chips that scope
+          them — the brief's own order. `onPick` toggles: clicking the folder you
+          are already in leaves it, so the row is never a trap with no way out
+          except the All chip. */}
+      <AssetFolders
+        cards={cards}
+        active={ASSET_FOLDERS.some((folder) => folder.id === kind) ? (kind as FolderId) : null}
+        onPick={(id) => setKind((current) => (current === id ? ALL : id))}
+      />
 
       <p className="text-[12.5px] text-muted" role="status">
         <span className="num">{visible.length}</span>

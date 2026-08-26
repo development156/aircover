@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { SELECTABLE_GST_STATES, type BillingProfile } from '@sahoda/shared'
 
 import { saveBillingDetails } from '@/app/actions/billing'
+import { SettingCard } from '@/components/settings/setting-row'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -59,23 +60,42 @@ export function BillingDetailsForm({ profile }: { profile: BillingProfile | null
     })
   }
 
+  /**
+   * ── ONE CARD GRAMMAR PER SCREEN, REDISCOVERED ────────────────────────────────
+   * This built its OWN card — `surface-ring rounded-card bg-surface` with an
+   * inline `type-h2` — while the Credits card beside it used `SettingCard` with
+   * a `type-h3` head and the Invoices table brought a third container of its
+   * own. Three treatments and two heading levels for three sibling sections on
+   * one page, which is what made it read as a collection of forms rather than a
+   * screen.
+   *
+   * `setting-row.tsx` already carries this exact finding: "Two treatments on one
+   * screen read as two products", written when `YourDataPanel` did the same
+   * thing on `/settings`. The fix there was to adopt `SettingCard`, and it is
+   * the fix here. Nothing about the form's behaviour, fields or actions moves.
+   */
   return (
-    <section
+    <SettingCard
+      title="Billing details"
+      hint="These go on every invoice Sahoda issues from now on. Invoices already issued do not change. A tax invoice cannot be edited, and a correction is a separate credit note."
       data-guide="plan.billing-details"
-      className="surface-ring rounded-card bg-surface px-4 py-4"
     >
-      <h2 className="type-h2">Billing details</h2>
-      <p className="type-body mt-1 text-muted">
-        These go on every invoice Sahoda issues from now on. Invoices already issued do not change.
-        A tax invoice cannot be edited, and a correction is a separate credit note.
-      </p>
-
-      <fieldset disabled={pending} className="mt-4 space-y-4">
+      <fieldset disabled={pending} className="space-y-4 py-4">
         <legend className="sr-only">Billing details</legend>
 
         <div className="space-y-1.5">
-          <Label htmlFor="tax-kind">Where your business is registered</Label>
+          <Label className="block" htmlFor="tax-kind">
+            Where your business is registered
+          </Label>
+          {/* ── WHY THE LABELS ARE `block` HERE ────────────────────────────
+              `Label` renders inline, `Input` is `w-full` (block) and `Select`
+              wraps in an `inline-flex`. So a row STACKED after an Input and sat
+              on ONE LINE after a Select, and this form has both — which is why
+              "Where your business is registered" and "State" hugged their
+              controls while "Legal name" and "Address" did not. The layout was
+              deciding itself from whichever control happened to follow. */}
           <Select
+            wrapperClassName="max-w-none"
             id="tax-kind"
             value={taxKind}
             onChange={(e) => setTaxKind(e.target.value as TaxKind)}
@@ -89,7 +109,9 @@ export function BillingDetailsForm({ profile }: { profile: BillingProfile | null
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="legal-name">Legal name</Label>
+          <Label className="block" htmlFor="legal-name">
+            Legal name
+          </Label>
           <Input
             id="legal-name"
             value={legalName}
@@ -101,7 +123,9 @@ export function BillingDetailsForm({ profile }: { profile: BillingProfile | null
 
         {taxKind === 'registered' ? (
           <div className="space-y-1.5">
-            <Label htmlFor="gstin">GSTIN</Label>
+            <Label className="block" htmlFor="gstin">
+              GSTIN
+            </Label>
             <Input
               id="gstin"
               value={gstin}
@@ -125,8 +149,11 @@ export function BillingDetailsForm({ profile }: { profile: BillingProfile | null
 
         {taxKind === 'unregistered' ? (
           <div className="space-y-1.5">
-            <Label htmlFor="state-code">State</Label>
+            <Label className="block" htmlFor="state-code">
+              State
+            </Label>
             <Select
+              wrapperClassName="max-w-none"
               id="state-code"
               value={stateCode}
               onChange={(e) => setStateCode(e.target.value)}
@@ -143,7 +170,9 @@ export function BillingDetailsForm({ profile }: { profile: BillingProfile | null
 
         {taxKind === 'overseas' ? (
           <div className="space-y-1.5">
-            <Label htmlFor="country-code">Country</Label>
+            <Label className="block" htmlFor="country-code">
+              Country
+            </Label>
             <Input
               id="country-code"
               value={countryCode}
@@ -157,7 +186,9 @@ export function BillingDetailsForm({ profile }: { profile: BillingProfile | null
         ) : null}
 
         <div className="space-y-1.5">
-          <Label htmlFor="billing-address">Address</Label>
+          <Label className="block" htmlFor="billing-address">
+            Address
+          </Label>
           <Input
             id="billing-address"
             value={address}
@@ -168,24 +199,28 @@ export function BillingDetailsForm({ profile }: { profile: BillingProfile | null
         </div>
       </fieldset>
 
-      <Button type="button" onClick={save} loading={pending} variant="secondary" className="mt-4">
-        Save billing details
-      </Button>
-
-      <p aria-live="polite" className="type-sm mt-2 min-h-[18px] text-muted">
-        {pending ? 'Saving…' : ''}
-      </p>
+      {/* THE ACTION SITS ON ITS OWN RULE, so the card ends somewhere instead of
+          trailing off into whitespace. `min-h` on the status line is kept: it
+          reserves the row so the button does not jump when saving starts. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line-soft py-4">
+        <Button type="button" onClick={save} loading={pending} variant="secondary">
+          Save billing details
+        </Button>
+        <p aria-live="polite" className="min-h-[18px] type-meta text-muted">
+          {pending ? 'Saving…' : ''}
+        </p>
+      </div>
 
       {outcome ? (
         <div
           role="status"
-          className={`type-body rounded-input px-3 py-2.5 ${
+          className={`mb-4 type-body rounded-input px-3 py-2.5 ${
             outcome.ok ? 'bg-ok-bg text-ok' : 'bg-danger-bg text-danger'
           }`}
         >
           {outcome.message}
         </div>
       ) : null}
-    </section>
+    </SettingCard>
   )
 }
