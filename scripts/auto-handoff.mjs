@@ -37,12 +37,24 @@ try {
   // Nothing happened. Do not write a file for a session that did nothing.
   if (commits.length === 0 && dirty.length === 0) process.exit(0)
 
-  // Role from the branch name; the person is named by whoever runs /handoff.
+  // ROLE comes from the branch — substring, not equality, because the harness
+  // assigns names like `claude/lead-design-7m7ios` and an exact match on
+  // `wt-design` resolves EVERY real branch to 'advisor'. Measured 2026-08-26.
   const role = /design/.test(branch) ? 'design'
              : /research/.test(branch) ? 'research'
              : /advisor/.test(branch) ? 'advisor' : 'lane'
+
+  // OWNER is a different question and the branch cannot answer it. Two people
+  // both running /lead-design get two branches that both say "design", and both
+  // would write design-<date>.md over each other. So the owner is declared:
+  //   env SAHODA_LANE_OWNER, or `git config sahoda.owner <name>`.
+  // With neither, fall back to the branch slug, which is at least unique.
+  const slug = branch.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase()
+  const owner = (process.env.SAHODA_LANE_OWNER || sh('git config sahoda.owner') || '').trim()
+  const who = owner || slug
+
   const date = sh("date +%F") || new Date().toISOString().slice(0,10)
-  const path = `docs/workflow/handoffs/${role}-${date}.md`
+  const path = `docs/workflow/handoffs/${who}-${role}-${date}.md`
 
   // A REAL handoff already exists for today. Never overwrite a human's work.
   if (existsSync(path) && !readFileSync(path,'utf8').includes('AUTOMATIC SKELETON')) process.exit(0)
@@ -54,7 +66,13 @@ try {
 
   const contract = commits.filter(c => /\[contract\]|BREAKING|migration/i.test(c))
 
+  const ownerLine = owner
+    ? `**Owner** ${owner}`
+    : `> **OWNER UNKNOWN.** Nobody declared who runs this lane, so the filename\n> falls back to the branch slug. Set it once with \`git config sahoda.owner <name>\`\n> or the SAHODA_LANE_OWNER environment variable, and the record becomes\n> readable by a person instead of by a branch id.`
+
   const body = `# Handoff — ${role} — ${date}
+
+${ownerLine}
 
 > **AUTOMATIC SKELETON.** Written by the Stop hook because this session ended
 > without \`/handoff\`. It records WHAT changed. It does not know WHY, and the
