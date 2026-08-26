@@ -41,6 +41,11 @@ export * from './gate/verdict'
 export * from './gate/brain-rules'
 export * from './gate/port'
 export * from './assets/delete-gate'
+// The library's organisation: real nested folders a person makes, and smart
+// folders that are a saved QUESTION re-asked on every render (never a stored
+// membership that can drift from the rows it claims to describe).
+export * from './assets/organize'
+export * from './assets/folder-tree'
 export * from './publishing/constraints'
 export * from './publishing/adapter'
 export * from './publishing/schedule'
