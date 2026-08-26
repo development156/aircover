@@ -26,6 +26,54 @@ const sh = (c) => {
   }
 }
 
+/**
+ * Is this file one of OUR skeletons, rather than something a person wrote?
+ *
+ * ── WHY THIS IS NOT `includes('AUTOMATIC SKELETON')` ────────────────────────
+ * Because that reads a file the wrong way round, and it DESTROYED A REAL HANDOFF
+ * on 2026-08-26. `divas-advisor-2026-08-26.md` was 520 lines a session had written,
+ * and one line of it was a table row naming a mutation: "Drop the AUTOMATIC
+ * SKELETON exemption". A substring search over the whole document found that,
+ * concluded the document was a skeleton, and overwrote all 520 lines with 29.
+ *
+ * The irony is the point: a handoff that DOCUMENTS this mechanism is exactly the
+ * handoff most likely to be eaten by it, so the more carefully somebody writes
+ * about the hook, the more certainly they lose their work.
+ *
+ * ── WHAT IT CHECKS INSTEAD ──────────────────────────────────────────────────
+ * The marker as the TEMPLATE EMITS IT: a blockquote line, at the start of a line,
+ * in the file's opening block. Prose that mentions the words — in a table, in
+ * backticks, in a sentence — cannot match, because prose does not begin a line
+ * with `> **AUTOMATIC SKELETON.**`.
+ *
+ * A structural marker is a claim the file makes about ITSELF. A substring is a
+ * claim about any text that happens to be inside it, including a quotation of
+ * somebody else's.
+ *
+ * ── WHAT THIS STILL CANNOT SEE, stated because a guard that hides its blind spot
+ *    is worse than no guard ────────────────────────────────────────────────────
+ * A handoff that quotes the marker at the START of a wrapped blockquote line, in
+ * its opening block, is indistinguishable from the template and WILL be treated
+ * as a skeleton. MEASURED 2026-08-26 while writing the test that earns the anchor:
+ * a two-line blockquote explaining the hook wrapped so the marker began line four,
+ * and this function called that file a skeleton. Nothing here can separate the two
+ * — the quotation is byte-identical to the claim, in the position the claim is made.
+ * Quote it inline, as the test fixture beneath it now does, or indent it.
+ */
+function isSkeleton(file) {
+  const head = readFileSync(file, 'utf8').split('\n').slice(0, HEAD_LINES).join('\n')
+  return /^> \*\*AUTOMATIC SKELETON\.\*\*/m.test(head)
+}
+
+/**
+ * How far into a file the self-declaration must appear.
+ *
+ * The template puts it within the first ten lines. Twenty is slack for a title or
+ * an owner note above it, and small enough that a mention buried in the body of a
+ * long handoff can never reach it.
+ */
+const HEAD_LINES = 20
+
 try {
   const root = sh('git rev-parse --show-toplevel')
   if (!root) process.exit(0)
@@ -64,23 +112,36 @@ try {
   const date = sh('date +%F') || new Date().toISOString().slice(0, 10)
   const path = `docs/workflow/handoffs/${who}-${where}-${date}.md`
 
-  // This hook's OWN output is not the lane's uncommitted work. It reported
-  // "1 file(s) UNCOMMITTED" naming only the skeleton it had just written — a
-  // real warning about a real hazard, firing on itself, which teaches a reader
-  // to ignore it. Measured 2026-08-26 on this hook's own output.
-  //
-  // Ask git to exclude it rather than parsing columns. A first attempt sliced
-  // the path off at column 4 and was WRONG for the first line: sh() trims, so
-  // a ` M`/` D` entry arrives as `M …` and slice(3) ate a character. It worked
-  // for `??` entries, so a mutation test using one passed over a broken filter.
-  // A pathspec has no column to get wrong.
-  const dirtyOther = sh(`git status --porcelain -- . ':(exclude)${path}'`)
-    .split('\n')
-    .filter(Boolean)
+  // ROLE is derived here for ONE purpose: recognising a real handoff that is
+  // already on disk under a name this scheme no longer writes. It is a substring
+  // test, never equality — the harness assigns `claude/lead-design-7m7ios`, and
+  // matching `wt-design` exactly resolves EVERY real branch to 'advisor'.
+  const role = /design/.test(branch)
+    ? 'design'
+    : /research/.test(branch)
+      ? 'research'
+      : /advisor/.test(branch)
+        ? 'advisor'
+        : 'lane'
 
-  // A REAL handoff already exists for today. Never overwrite a human's work.
-  if (existsSync(path) && !readFileSync(path, 'utf8').includes('AUTOMATIC SKELETON'))
-    process.exit(0)
+  // A REAL handoff already exists for today. Never overwrite a human's work, and
+  // never write a SECOND file alongside it saying the session ended without one.
+  //
+  // EVERY NAME IT CAN SIT UNDER HAS TO BE CHECKED, and missing one is not
+  // theoretical: on 2026-08-26 this hook wrote a skeleton into a lane that HAD run
+  // /handoff, because the two conventions passed each other in one directory. The
+  // skeleton then opened with "this session ended without /handoff", which was
+  // false, in the one file whose whole purpose is to be the record. A guard that
+  // cannot see the thing it guards against does not fail loudly — it fabricates.
+  //
+  // The older names stay here because handoffs written under them are still on
+  // disk. `divas-advisor-2026-08-26.md` is one, in this repository, today.
+  const candidates = [
+    path,
+    `docs/workflow/handoffs/${who}-${role}-${date}.md`,
+    `docs/workflow/handoffs/${role}-${date}.md`,
+  ]
+  if (candidates.some((c) => existsSync(c) && !isSkeleton(c))) process.exit(0)
 
   // Shared surfaces: the things that break other lanes.
   const shared = files.filter(
@@ -106,7 +167,7 @@ ${warn}
 > why is the half that matters. Whoever owns this lane should replace it.
 
 **Branch** \`${branch}\` at \`${sh('git rev-parse --short HEAD')}\`, ${commits.length} commit(s) beyond \`${sh(`git rev-parse --short ${base}`)}\`.
-${dirtyOther.length ? `\n> **${dirtyOther.length} file(s) UNCOMMITTED** when the session ended. A lane can hold its whole output uncommitted, and \`git merge\` will then succeed having merged nothing.\n` : ''}
+${dirty.length ? `\n> **${dirty.length} file(s) UNCOMMITTED** when the session ended. A lane can hold its whole output uncommitted, and \`git merge\` will then succeed having merged nothing.\n` : ''}
 ## Commits
 
 ${commits.length ? commits.map((c) => `- ${c}`).join('\n') : '_none_'}
