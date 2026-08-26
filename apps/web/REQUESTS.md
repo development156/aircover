@@ -1857,3 +1857,133 @@ not edited; the constraint is replaced in the new migration.
 with `too_few_posts` and with `window_too_short`, meaning different things about
 different populations, so a bare key adds two unrelated facts together. Anything
 reading those keys needs the prefix.
+
+---
+
+## 29 · Scope claim — the composer's density, and why the wizard is NOT coming back
+
+**Lane** `wt-divas2` (owner divas, branch `claude/divas-kickoff-03y2g2`),
+2026-08-26, advisor. Declared BEFORE the first edit, per `08_ROLES.md`: two lanes
+editing the same _file_ is a conflict git shows you; two lanes editing the same
+_concept_ is two designs of one thing where only one survives.
+
+**Claimed:** `apps/web/src/components/composer/*` and the screen at
+`/posts/[id]` (`/posts/new`). Not `packages/publishing`, not `packages/shared`,
+no migration, no price.
+
+### The founder's brief, and the part of it that is already answered
+
+The ask was "make this far easier to navigate, sequence flow or one page, your
+call". **The call is one page, and it is not a preference — it is a decision this
+repository already made, with reasons, and reversing it would re-break what it
+fixed.** Recorded here so the next lane does not re-litigate it:
+
+- `composer.tsx:47` — `/create/post` WAS a five-step wizard. It was deleted
+  because it **could not generate variants**, and because a writer met one of two
+  different editors depending on which link they clicked.
+- `version-options.tsx:50` — the wizard collected **one** Format answer on a
+  Format step and wrote it to **every** variant, so choosing a carousel for
+  Instagram forced a carousel on X. Format is a per-channel column and the wizard
+  flattened it.
+- `version-card.tsx:65` — stacked cards over tabs is deliberate: "a control that
+  shows one at a time hides exactly" the one thing no competitor does, which is a
+  separate body, limit and publish state per channel.
+
+A wizard is a tab strip over time. Both hide three of four versions, and the
+non-negotiable in `/go` — _never collapse per-channel variants into one body_ —
+is the same rule pointed at the same defect.
+
+### So what IS wrong, stated as a count rather than a feeling
+
+An untouched channel that merely follows the post still renders its heading,
+state, editor, character meter, hashtag field with help text, inline-rewrite
+affordance, a "Kind of post" select with its own help text, the channel's extras
+(poll, first comment, co-author, or Google's button and topic), a relink control,
+and a Save button with a "nothing to save" note beside it, for a channel nobody
+has typed into.
+
+**MEASURED** by rendering all four `VersionCard`s in jsdom at their default state
+(no format chosen, no extras set) and counting what a writer actually meets:
+
+| across all four cards                                   | count   |
+| ------------------------------------------------------- | ------- |
+| form controls (`input`, `select`, `textarea`, `button`) | **24**  |
+| elements carrying their own text                        | **105** |
+
+> **A CORRECTION, KEPT ON THE RECORD.** The first version of this section said
+> "roughly forty controls". That was an eyeball estimate written from a
+> screenshot, and the measurement above contradicts it: the real figure is 24.
+> `docs/37` §17 forbids rendering a number the product cannot prove, and a
+> planning document does not get an exemption from its own rule. The estimate was
+> wrong in the direction that flattered the fix.
+
+That is the defect. It is not that the screen is one page; it is that the page
+has **no hierarchy and no progressive disclosure**, which `docs/37` §16 names as
+the property that cannot be checked one element at a time. Every one of those ten
+blocks is individually correct and well-argued in its own comment. That is
+precisely the founder's v4 verdict repeating: _"every one an individually
+defensible decision nobody weighed against its neighbours."_
+
+### The second defect, which the screenshot shows and no code comment mentions
+
+The captured session has **0 credits** and **four channels reading "not
+connected"**. `docs/37` §16 rule 1 says a blocker leads and nothing competes with
+it; `docs/37` §15 says one absence gets one statement. The screen currently
+states the same absence four times in chips, offers an orange "Adapt for 4
+channels · 3 credits" button to a wallet holding zero, and leads with none of it.
+
+**What this lane is changing:** hierarchy and disclosure only. No per-channel
+body is merged, no constraint is loosened, no engine verdict is moved out of
+`meterFor`.
+
+### What shipped, and how much it actually moved
+
+`ChannelSettings` (`apps/web/src/components/composer/channel-settings.tsx`) folds
+six per-channel settings behind one `<details>`: Google's button, Google's topic,
+the poll, the first comment, the co-author and the AI label. The kind of post
+stays out, because changing it changes that card's media rules and a control has
+to be visible where its consequences are.
+
+**MEASURED**, same method as above, before and after:
+
+| across all four cards                       | before | after  | change |
+| ------------------------------------------- | ------ | ------ | ------ |
+| form controls                               | 24     | **19** | −21%   |
+| elements carrying their own text            | 105    | **76** | −28%   |
+| Google Business Profile card, text elements | 29     | **16** | −45%   |
+| Instagram card, text elements               | 31     | **23** | −26%   |
+
+**This is a real improvement and a moderate one, and the difference matters.** It
+is not the wholesale simplification the brief asked for. The remaining weight is
+not in the settings; it is in the per-card help text, three separate "unsaved"
+vocabularies that `composer.tsx` deliberately keeps apart, and the fact that four
+cards each restate the same structure. Cutting further means changing what the
+card SAYS, and every one of those sentences is pinned by a shape gate.
+
+### The fold never swallows state
+
+It opens itself whenever any of the six carries a value, and the summary names
+what is set even when shut. Guarded by `channel-settings.test.tsx` (10 tests) and
+proved by four mutations, each watched going red:
+
+| mutation                                                     | test that caught it                                 |
+| ------------------------------------------------------------ | --------------------------------------------------- |
+| fold welded open                                             | `starts shut on a channel with nothing set` (2 red) |
+| fold welded shut                                             | `opens itself when a setting carries a value`       |
+| `collaborators` tested by key presence rather than emptiness | `an emptied box is not a setting`                   |
+| summary stops naming what is set                             | `names what is set … once the writer shuts it`      |
+
+### One thing the screenshot suggested that turned out NOT to be a defect
+
+The captured session shows 0 credits and four channels reading "not connected",
+so the obvious call was `docs/37` §16 rule 1: a blocker leads. **It is not a
+blocker for this screen.** A writer with no connection can still write, save,
+template and schedule; only publishing is blocked, and `publish-now.tsx:193`
+already states it there, in two tested sentences that distinguish "some channels
+can still receive this" from "nothing goes out at all". `schedule-field.tsx` says
+it at the schedule, and `connection-gap.ts` keeps both honest when the read
+failed. A third statement at the top would have broken the rule it invoked.
+
+**So no connection banner was added.** Recorded because it looked correct from a
+screenshot and was wrong against the code, which is the whole argument for
+reading before designing.
