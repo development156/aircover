@@ -26,10 +26,40 @@ import { contrastRatio, oklchToRgb, parseOklch } from '@/lib/brand/oklch'
 const require_ = createRequire(import.meta.url)
 const TOKENS = readFileSync(require_.resolve('@sahoda/shared/tokens.css'), 'utf8')
 
-/** Pull a `--name: value;` out of the :root block of the real token file. */
+/**
+ * The BARE `:root` block — the light theme — sliced out before any lookup.
+ *
+ * ── WHY THIS EXISTS, AND WHAT IT WAS BEFORE ──────────────────────────────────
+ * This helper's docstring has always said "out of the :root block". It did not
+ * do that: it ran `/^\s*--name:\s*([^;]+);/m` over the WHOLE file, and `m`
+ * anchors to a LINE, not to a block. So it returned the first declaration of
+ * that name anywhere, including from `[data-theme='dark']` or
+ * `[data-surface='inverse']`.
+ *
+ * That was survivable only while light and dark held DIFFERENT values — a
+ * fallthrough landed on the dark value and the old `>= 4.5` assertion refused
+ * it. The 2026-08-26 ruling made all three declarations of `--acc` byte
+ * identical, which silently converted the bug into a blind spot: deleting the
+ * light `--acc` outright would fall through to dark, read `#ff6600`, and PASS.
+ *
+ * MEASURED, before this fix: mutating the dark scope to `#00ff00` left the
+ * suite green, and deleting the `:root` declaration entirely left it green.
+ * Both go red now. A detector that inherits the blind spot of the thing it
+ * audits is not a detector.
+ */
+const ROOT_BLOCK = (() => {
+  const open = TOKENS.match(/^:root\s*\{$/m)
+  if (!open || open.index === undefined) throw new Error('tokens.css has no bare :root block')
+  const from = open.index + open[0].length
+  const close = TOKENS.indexOf('\n}', from)
+  if (close === -1) throw new Error('tokens.css :root block is unterminated')
+  return TOKENS.slice(from, close)
+})()
+
+/** Pull a `--name: value;` out of the bare `:root` block of the real token file. */
 function token(name: string): string {
-  const match = TOKENS.match(new RegExp(`^\\s*${name}:\\s*([^;]+);`, 'm'))
-  if (!match) throw new Error(`tokens.css has no ${name}`)
+  const match = ROOT_BLOCK.match(new RegExp(`^\\s*${name}:\\s*([^;]+);`, 'm'))
+  if (!match) throw new Error(`tokens.css :root has no ${name}`)
   return match[1]!.trim()
 }
 
