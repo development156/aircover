@@ -1857,3 +1857,41 @@ not edited; the constraint is replaced in the new migration.
 with `too_few_posts` and with `window_too_short`, meaning different things about
 different populations, so a bare key adds two unrelated facts together. Anything
 reading those keys needs the prefix.
+
+## 29 · Connections: slots are per ACCOUNT, and disconnect does not stick
+
+**Lane** `claude/advisor-qvz5wn` (owner divas, `sahoda.lane=wt-divas`), 2026-08-26.
+Scope declared before the first edit, because `/connections` is a screen three
+lanes have touched.
+
+**Files this lane is taking:** `apps/web/src/app/(app)/connections/page.tsx`,
+everything under `apps/web/src/components/connections/`,
+`apps/web/src/lib/connections/`, and the two Zernio OAuth routes under
+`apps/web/src/app/api/oauth/zernio/`. Nobody else should be in those this week.
+
+**The three findings that set the scope**, each MEASURED by reading the code:
+
+1. **The slot model is already per-account in the database and per-platform in the
+   UI.** `connections_ws_platform_account` is
+   `unique (workspace_id, platform, (external_account ->> 'id'))`
+   (`20260718000005_connections.sql:21`), so two Instagram accounts are two rows and
+   `readConnectionSlots` counts ROWS. But `page.tsx` builds
+   `new Map(rows.map((c) => [c.platform, c]))`, so a second account on a platform
+   has nowhere to render and is invisible. The limit is right; the screen cannot
+   express it.
+
+2. **Disconnect deletes our row and nothing else, and the return route re-adopts
+   the account.** `disconnectConnection` is a bare Supabase delete; the Zernio
+   client exposes no removal method at all. The return route then reconciles ALL
+   FOUR platforms on every trip and upserts everything Zernio still holds. So
+   disconnect Instagram, connect anything, and Instagram is back — along with every
+   other platform still live upstream. The route's own comment calls this a
+   "self-heal"; against a deliberate disconnect it is a resurrection.
+
+3. **The Disconnect button overstates what it does.** The account stays live at
+   Zernio and Sahoda keeps a working token for it. That is a privacy claim, not a
+   tidiness one.
+
+**Not in this lane's scope, and why:** adding a fifth channel needs a CHECK
+constraint migration across seven tables and only `wt-db` edits applied
+migrations. Named in the report, not attempted here.

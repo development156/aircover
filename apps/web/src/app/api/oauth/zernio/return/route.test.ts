@@ -34,6 +34,17 @@ const state = vi.hoisted(() => ({
   limitCalls: [] as number[],
   /** Every upsert the route actually ATTEMPTED, as `platform:accountId`. */
   rpcCalls: [] as string[],
+  /**
+   * What the customer pressed Connect on, as the start route recorded it.
+   *
+   * Defaults to a roomy `instagram` press so every test written before the
+   * create-scoping existed still exercises the path it was written for — the same
+   * move `limitVerdict` above makes. `null` is the replayed-URL case.
+   */
+  pending: { platform: 'instagram', mode: 'redirect' } as {
+    platform: string
+    mode: string
+  } | null,
 }))
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -90,6 +101,14 @@ vi.mock('@/lib/connections/read', () => ({
   readConnectionSlots: () => Promise.resolve(state.slots),
 }))
 
+// A SEAM, like the slot count and the plan verdict beside it. What the cookie
+// looks like on the wire is `pending-connect.test.ts`'s job; this file is about
+// what the ROUTE does with the answer.
+vi.mock('@/lib/connections/pending-connect', () => ({
+  CLEAR_PENDING_CONNECT: 'sahoda_connect=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+  readPendingConnect: () => Promise.resolve(state.pending),
+}))
+
 vi.mock('@/lib/billing/entitlements', () => ({
   checkCountableLimit: (_workspaceId: string, _dimension: string, currentUsage: number) => {
     state.limitCalls.push(currentUsage)
@@ -141,6 +160,7 @@ beforeEach(() => {
   state.limitVerdict = { kind: 'allowed', limit: 8 }
   state.limitCalls = []
   state.rpcCalls = []
+  state.pending = { platform: 'instagram', mode: 'redirect' }
 })
 
 /**
@@ -164,6 +184,21 @@ beforeEach(() => {
  * account are byte-identical afterwards.
  */
 describe('a partial connect is reported as partial, never as connected', () => {
+  /**
+   * RETARGETED, not weakened. Every test below drives a trip that touches TWO
+   * platforms, and a single press of Connect now only ever CREATES a row for the
+   * platform it named — so a two-platform trip is a trip that REFRESHES two rows
+   * this workspace already holds. That is a real and common trip (it is what the
+   * self-heal was always about), and the guarantee under test is unchanged: one
+   * platform succeeding must never be reported as though both did.
+   */
+  beforeEach(() => {
+    state.slots = {
+      count: 2,
+      keys: new Set(['instagram:6a75caf7d0fe733d1afcc1f4', 'linkedin:6a75caf7d0fe733d1afcc1f4']),
+    }
+  })
+
   it('one platform records and another fails to write', async () => {
     state.rpcErrorByPlatform = { instagram: null, linkedin: { message: 'denied' } }
 
@@ -363,6 +398,9 @@ describe('real outcomes keep their 303', () => {
 describe('the channels plan limit', () => {
   const IG = 'instagram:6a75caf7d0fe733d1afcc1f4'
   const LI = 'linkedin:6a75caf7d0fe733d1afcc1f4'
+  /** Two DIFFERENT Instagram accounts — two rows, two slots, one channel. */
+  const IG_A = '6a75caf7d0fe733d1afcc1f4'
+  const IG_B = '6a75cb0be1ff844e2bfdd205'
 
   it('a full plan writes nothing new and says the plan is full — not that it failed', async () => {
     state.slots = { count: 2, keys: new Set() }
@@ -381,6 +419,15 @@ describe('the channels plan limit', () => {
 
   it('admits up to the limit and reports the remainder, rather than all-or-nothing', async () => {
     // Room for exactly one more; Zernio returns two new accounts.
+    //
+    // RETARGETED to two accounts on ONE platform, which is both what a single
+    // press can now create and the case this screen was rebuilt for: a slot holds
+    // an ACCOUNT, so two Instagram accounts draw two slots. The partition being
+    // tested — admit up to the headroom, report the rest — is unchanged.
+    state.accountsByPlatform = {
+      instagram: [{ accountId: IG_A }, { accountId: IG_B }],
+      linkedin: [],
+    }
     state.slots = { count: 1, keys: new Set() }
     state.limitVerdict = { kind: 'allowed', limit: 2 }
 
@@ -435,6 +482,12 @@ describe('the channels plan limit', () => {
   })
 
   it('a plan with room is invisible: every account is still recorded', async () => {
+    // Two Instagram accounts, both new, plenty of room. Retargeted onto one
+    // platform for the reason given above.
+    state.accountsByPlatform = {
+      instagram: [{ accountId: IG_A }, { accountId: IG_B }],
+      linkedin: [],
+    }
     state.slots = { count: 0, keys: new Set() }
     state.limitVerdict = { kind: 'allowed', limit: 8 }
 
@@ -442,6 +495,110 @@ describe('the channels plan limit', () => {
 
     expect(state.rpcCalls).toHaveLength(2)
     expect(res.headers.get('location')).toContain('zernio=connected')
+  })
+})
+
+/**
+ * THE DISCONNECT THAT WOULD NOT STICK.
+ *
+ * Reported as "when you disconnect and connect again the other platforms get
+ * connected automatically". The mechanism, in four steps:
+ *
+ *   1. the customer disconnects LinkedIn — `disconnectConnection` deletes our row
+ *   2. Zernio still holds that account. There is no removal endpoint wired, and
+ *      the client in packages/publishing exposes no method that could call one
+ *   3. the customer connects Instagram
+ *   4. this route asked Zernio for EVERY platform and wrote back everything it
+ *      found, so LinkedIn reappeared, connected, having been deliberately removed
+ *
+ * The rule that closes it: a row is only ever CREATED for the platform the
+ * customer pressed. Refreshing rows we already hold is untouched, so the
+ * self-heal this route was built around still works.
+ */
+describe('a connect only ever creates a row for the platform that was pressed', () => {
+  const IG_ID = '6a75caf7d0fe733d1afcc1f4'
+
+  it('does not resurrect a platform the customer disconnected', async () => {
+    // Instagram was pressed. LinkedIn is still live at Zernio because we cannot
+    // remove it there, and we hold no row for it because the customer removed it.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    state.slots = { count: 0, keys: new Set() }
+
+    const res = await call()
+
+    // The whole assertion. `linkedin` must not appear at all.
+    expect(state.rpcCalls).toEqual([`instagram:${IG_ID}`])
+    expect(state.rpcCalls.some((c) => c.startsWith('linkedin:'))).toBe(false)
+    // And it is a plain success: nothing was refused and nothing failed.
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=connected')
+  })
+
+  it('still refreshes every account we already hold, whatever platform it is on', async () => {
+    // The self-heal, which must survive the fix. LinkedIn is ours already, so it
+    // is a refresh — a token that moved or an expiry that shifted still lands.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    state.slots = {
+      count: 2,
+      keys: new Set([`instagram:${IG_ID}`, `linkedin:${IG_ID}`]),
+    }
+
+    await call()
+
+    expect(state.rpcCalls.sort()).toEqual([`instagram:${IG_ID}`, `linkedin:${IG_ID}`].sort())
+  })
+
+  it('creates nothing at all when there is no record of a press', async () => {
+    // A bookmarked replay of this URL, or a cookie that expired mid-consent.
+    // Fail closed: pressing Connect again costs one click, whereas creating here
+    // costs the customer the disconnect they asked for, silently.
+    state.pending = null
+    state.slots = { count: 0, keys: new Set() }
+
+    const res = await call()
+
+    expect(state.rpcCalls).toEqual([])
+    // NOT an error. Nothing went wrong and nothing was refused by the plan.
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).not.toContain('zernio=error')
+  })
+
+  it('refreshes on a replay even though it creates nothing', async () => {
+    // The half of the self-heal that survives with no cookie: rows we hold are
+    // still brought up to date. Only creation needs a press behind it.
+    state.pending = null
+    state.slots = { count: 1, keys: new Set([`linkedin:${IG_ID}`]) }
+
+    await call()
+
+    expect(state.rpcCalls).toEqual([`linkedin:${IG_ID}`])
+  })
+
+  it('a skipped platform is not reported as a plan refusal or a failure', async () => {
+    // It is neither: the plan had room and no write failed. Reporting it would put
+    // correct behaviour into the failure channel this route exists to keep clean.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    state.slots = { count: 0, keys: new Set() }
+    state.limitVerdict = { kind: 'allowed', limit: 8 }
+
+    const res = await call()
+
+    const location = res.headers.get('location') ?? ''
+    expect(location).not.toContain('zernio=limit')
+    expect(location).not.toContain('zernio=partial')
+    expect(location).toContain('zernio=connected')
+  })
+
+  it('spends the pending-connect cookie on the way out, on success and on failure', async () => {
+    // One press authorises one create pass. A cookie that survived the trip would
+    // let the next replay re-create the row the customer just disconnected.
+    const okRes = await call()
+    expect(okRes.headers.get('set-cookie')).toContain('Max-Age=0')
+
+    state.readThrowsFor = ['instagram', 'linkedin']
+    const failRes = await call()
+    expect(failRes.status).toBe(500)
+    expect(failRes.headers.get('set-cookie')).toContain('Max-Age=0')
   })
 })
 
