@@ -96,20 +96,44 @@ integration branch move independently; a stale checkout writes against code that
 no longer exists. If `--ff-only` refuses, the lane has diverged — say so and
 stop, do not merge past it.
 
-**Branches and permission.** Your lane is **whatever branch this session is on**
-— a cloud session assigns its own name and that is fine. **You own your lane
-completely and need approval for nothing inside it**: any file, any dependency,
-any migration file, commit and push freely. Lanes merge into `wt-core`. The one
-gated step in the whole system is **`wt-core` → `wt-web`**, which is production.
-Never cut from `main` — every `main` here is 690+ commits behind and carries a
-20-route skeleton of a 58-route product. See `docs/workflow/08_ROLES.md`.
+**Lanes.** There are nine: `wt-girija`, `wt-girija2`, `wt-girija3` and the same
+for `wt-jiban` and `wt-divas`. A session is started with both facts given, never
+inferred:
+
+```
+/kickoff owner:girija , branch: wt-girija2 , /lead-research
+```
+
+`/kickoff` pins them into `git config sahoda.owner` and `sahoda.lane`, and every
+handoff is filed as **`<owner>-<lane>-<date>.md`**. Both halves are load-bearing:
+every commit is authored `SAHODALABS`, so git cannot say WHO; and one person runs
+three lanes, so a role cannot say WHICH. On 26 August two sessions both wrote
+`girija-research-2026-08-26.md` under the old scheme — different lanes, one
+filename, and the second would have overwritten the first at merge.
+
+**The role is whatever role command you were given.** It is not read off the
+branch name. `wt-girija` running `/lead-research` is correct and normal.
+
+**A cloud session may be pinned to a `claude/...` branch it cannot leave.** That
+is fine: work there, keep `sahoda.lane` set to the lane you were given, and say
+so in the handoff. **Never abandon a branch another session or a PR is tracking**
+— two lead sessions independently refused to do that on 26 August and both were
+right.
+
+**You own your lane completely and need approval for nothing inside it**: any
+file, any dependency, any migration file, commit and push freely. Lanes merge
+into `wt-core`. The one gated step in the whole system is **`wt-core` →
+`wt-web`**, which is production. Never cut from `main` — every `main` here is
+800+ commits behind and carries a 12-route skeleton of a 59-route product. See
+`docs/workflow/08_ROLES.md`.
 
 **All three people share one Claude account and one GitHub account.** So every
 commit is authored `SAHODALABS` and `git blame` can never tell you who did what:
 **the branch is the identity** and the handoff names the person. It also means
 two sessions can land on the same branch with no warning until a push is
 rejected — `scripts/cloud-setup.sh` checks the lane against its remote at
-startup, and when it says DIVERGED, do not force-push.
+startup, and when it says DIVERGED, do not force-push. **One person, one lane,
+at a time.**
 
 ## The one rule
 
