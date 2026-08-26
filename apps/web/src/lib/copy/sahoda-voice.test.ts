@@ -19,6 +19,24 @@ import { findVoiceStrays, stripNonCopy } from './sahoda-voice'
  * sentence and the verdict it must get, and the repository sweep is the
  * application of a detector that has already been shown to fire and to hold its
  * fire.
+ *
+ * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
+ * The sweep reads SOURCE, so it only ever sees a sentence that is written out as
+ * a literal in a file it globs. Four ways a first-person stray reaches a reader
+ * without ever appearing that way on disk, and none of them is hypothetical:
+ *
+ *  - A sentence ASSEMBLED at runtime. `${verb} what I meant` holds no stray in
+ *    the source; the reader gets one. `stripNonCopy` keeps template literals
+ *    precisely so the fixed halves are still scanned, but the interpolated half
+ *    is a value this file never evaluates.
+ *  - A sentence that comes from the DATABASE or from a model. Every mesh task
+ *    writes prose that no file here contains — a caption, a plan, a guideline —
+ *    and the prompt rules in `packages/mesh` are what govern those, not this.
+ *  - A sentence in a file outside the glob: `apps/jobs`, `packages/*`, an email
+ *    template, a migration's seed text.
+ *  - A phrase the pattern does not enumerate. It matches `I` as a subject and
+ *    its contractions; "let me", "my own", "we could not" and "sorry" all read
+ *    as the product speaking in its own voice and none of them is caught here.
  */
 
 describe('what counts as Sahoda speaking in the first person', () => {
