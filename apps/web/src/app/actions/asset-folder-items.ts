@@ -56,7 +56,21 @@ export async function fileAssets(folderId: string, assetIds: string[]): Promise<
           asset_id: assetId,
           added_by: ctx.userId,
         })),
-        { onConflict: 'workspace_id,folder_id,asset_id', ignoreDuplicates: true },
+        // ── THE CONFLICT TARGET IS THE PRIMARY KEY, EXACTLY ──────────────────
+        // `asset_folder_items` is keyed `primary key (folder_id, asset_id)`, and
+        // Postgres matches an ON CONFLICT target against a real unique index by
+        // its exact column set. This once read `workspace_id,folder_id,asset_id`
+        // — a set no constraint has — and every single call raised
+        // `42P10: there is no unique or exclusion constraint matching the ON
+        // CONFLICT specification`. Filing never worked, not once.
+        //
+        // Adding `workspace_id` looked like tenant-scoping and was not: the row
+        // is already scoped by the composite foreign keys and by RLS. It only
+        // named a constraint that does not exist.
+        //
+        // MEASURED against production, both shapes in one transaction: this
+        // target inserts, the three-column one raises 42P10.
+        { onConflict: 'folder_id,asset_id', ignoreDuplicates: true },
       )
       .select('asset_id')
 

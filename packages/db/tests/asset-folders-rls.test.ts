@@ -267,6 +267,82 @@ describe('Asset folder system RLS + tree guard (real Postgres, policies enforced
     expect(Number(depth.rows[0]!.d)).toBe(3)
   })
 
+  /**
+   * THE UPSERT SHAPE THE APP ACTUALLY SENDS, AGAINST A REAL POSTGRES.
+   *
+   * `fileAssets` files in bulk with ON CONFLICT DO NOTHING so a partial overlap
+   * is a normal outcome rather than an error. Postgres matches that target
+   * against a real unique index BY ITS EXACT COLUMN SET, and this table is keyed
+   * `primary key (folder_id, asset_id)`.
+   *
+   * The action once named `(workspace_id, folder_id, asset_id)`. No constraint
+   * has that column set, so every call raised 42P10 and filing never worked
+   * once. Twenty-seven action tests passed straight through it, because they
+   * mock Supabase and a mock has no ON CONFLICT semantics to get wrong.
+   *
+   * That is why this guard lives HERE, in the suite that runs real SQL. It
+   * asserts BOTH directions: the shape the app sends inserts, and the shape it
+   * used to send still raises. A test that only proved the good path would go
+   * green again the moment somebody re-added a column to the target.
+   */
+  it('accepts the filing upsert the app sends, and REFUSES the shape that never worked', async () => {
+    const folder = await db.query<Row>(
+      `insert into asset_folders (workspace_id, name, created_by)
+       values ('${WS_A}', 'Filing target', '${USER_A}') returning id`,
+    )
+    const folderId = folder.rows[0]!.id
+
+    const asset = await db.query<Row>(
+      `insert into assets (workspace_id, storage_path, kind, created_by)
+       values ('${WS_A}', '${WS_A}/library/filing-probe.jpg', 'image', '${USER_A}') returning id`,
+    )
+    const assetId = asset.rows[0]!.id
+
+    // The shape the action sends today. Runs twice: the second is the overlap
+    // case, which must be a no-op and NOT an error.
+    // ── ALL OF IT INSIDE ONE TRANSACTION, DELIBERATELY ────────────────────
+    // `asMember` rolls its transaction back, which is what keeps this suite
+    // repeatable. So the second insert and the count have to happen in the SAME
+    // block as the first, or the count reads a table the rollback already
+    // emptied and the test fails for a reason that has nothing to do with the
+    // constraint it exists to check.
+    const result = await asMember(db, USER_A, async (tx) => {
+      const insert = `insert into asset_folder_items (workspace_id, folder_id, asset_id, added_by)
+         values ($1, $2, $3, $4) on conflict (folder_id, asset_id) do nothing`
+      const args = [WS_A, folderId, assetId, USER_A]
+
+      const first = await probe(tx, insert, args)
+      // The overlap case: filing the same photo twice must be a no-op, not an
+      // error, because that is what makes a partial bulk file a success.
+      const again = await probe(tx, insert, args)
+
+      const rows = await tx.query<{ n: number }>(
+        `select count(*)::int as n from asset_folder_items where folder_id = '${folderId}'`,
+      )
+
+      // The shape that shipped broken, in the same transaction.
+      const wrong = await probe(
+        tx,
+        `insert into asset_folder_items (workspace_id, folder_id, asset_id, added_by)
+         values ($1, $2, $3, $4) on conflict (workspace_id, folder_id, asset_id) do nothing`,
+        args,
+      )
+
+      return { first, again, filings: rows.rows[0]?.n ?? -1, wrong }
+    })
+
+    expect(result.first).not.toHaveProperty('denied')
+    expect(result.again).not.toHaveProperty('denied')
+    // Exactly one filing, so the second insert really was a no-op rather than a
+    // duplicate row.
+    expect(result.filings).toBe(1)
+
+    expect(result.wrong).toHaveProperty('denied')
+    expect((result.wrong as { denied: string }).denied).toMatch(
+      /no unique or exclusion constraint matching the ON CONFLICT/i,
+    )
+  })
+
   // ── case-insensitive sibling uniqueness, INCLUDING the root (null) case ──────
 
   it('refuses "Diwali" then "diwali" under the SAME parent', async () => {
