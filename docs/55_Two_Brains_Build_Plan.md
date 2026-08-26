@@ -69,16 +69,47 @@ search path.
 
 ---
 
-## Two assumptions, stated because the founder has not ruled yet
+## Two standing rulings — settled, do not re-litigate
 
-1. **Brand-has-veto is the arbitration rule.** Currently encoded only as prompt
-   ordering in `plan-week.ts` and pinned by a test. Open since 2026-08-25.
-   If the ruling goes the other way, step 7 changes shape.
-2. **Tone drift moves rather than dies.** This plan relocates it to the Brand
-   Brain as a consistency check. If the founder prefers deletion, step 6 gets
-   simpler and no other step moves.
+Both were ruled by the founder on **2026-08-26**, in their own words: *"yes brand
+has veto, and move tone drift to brand brain"*. They had been open since
+2026-08-25.
 
-Everything else below stands regardless of those two.
+### RULING 1 · Brand has veto
+
+**When the two hemispheres disagree, the Brand Brain wins.** The right brain is
+who the business says it is; the left brain is what its numbers show. If the
+brand says "calm and understated" and the best-performing posts are loud, the
+brand wins and the measurement is reported rather than obeyed.
+
+Encoded today only as **prompt ordering** in `packages/mesh/src/tasks/plan-week.ts`
+— brand block before market block — and pinned by a test. That was correct as an
+implementation and is now insufficient as a *record*: an ordering is a
+convention a future refactor can quietly reverse. Step 7 must make the rule
+explicit and store the conflicts it resolves.
+
+Until then, **the ordering in `plan-week.ts` is load-bearing.** Anyone moving
+those two blocks is changing a founder ruling, not tidying an array.
+
+### RULING 2 · Tone drift moves to the Brand Brain
+
+`tone_drift` becomes a **consistency check against the declared voice** — *"you
+said you sound calm; your last ten posts do not"* — and stops being a marketing
+measurement. It is not deleted. The arithmetic is sound and the sentence is
+useful; it is simply a right-brain sentence.
+
+**⚠ SEQUENCING, AND IT IS NOT NEGOTIABLE.** Do not execute this before step 2
+lands. `tone_drift` is currently the *only* measurement the Marketing Brain has.
+Retiring it first leaves the left hemisphere with **zero** computers and no
+ability to produce anything at all. The order is: build the replacement, prove
+it, then move this. Step 6 sits where it sits for that reason.
+
+**A second trap for whoever executes it.** Narrowing `kind` back to exclude
+`'tone_drift'` needs a NEW migration. `20260825000000` and `20260826090000` are
+both applied to production and must not be edited. The narrowed constraint will
+also be validated against existing rows, so any `tone_drift` row written between
+now and then must be migrated or removed in the same migration, or the
+`ALTER TABLE` fails.
 
 ---
 
@@ -146,13 +177,11 @@ lead capture path. **Do not fake it with a `source` string parse.**
 
 ### 6 · Move tone drift to the Brand Brain
 
-Relocate as a consistency check against the declared voice: *"you said you sound
-calm; your last ten posts do not."* That is a right-brain sentence and a useful
-one. It stops being a marketing metric.
-
-Retire `tone_drift` from `OBSERVATION_KINDS`. Note the applied CHECK constraint
-must be narrowed in a new migration; the 2026-08-25 and 2026-08-26 migrations are
-applied and must not be edited.
+**Founder ruling, 2026-08-26.** See RULING 2 above for the full statement, the
+sequencing constraint and the migration trap. In short: relocate it as a
+consistency check against the declared voice, retire `tone_drift` from
+`OBSERVATION_KINDS`, narrow the CHECK in a NEW migration, and **do not start
+this until step 2 has landed** or the left hemisphere is left with nothing.
 
 ### 7 · The connective tissue
 
@@ -161,7 +190,14 @@ Today the two hemispheres meet in exactly one place: prompt ordering inside
 and no channel for the left brain to propose a change to the right brain other
 than the general `memory_events` queue, which nothing currently uses for this.
 
-Build: a recorded conflict, its resolution, and the rule that resolved it.
+Build: a recorded conflict, its resolution, and the rule that resolved it. The
+rule is settled — **brand has veto**, RULING 1 above — so this step encodes a
+decision rather than making one. What it must add is durability: an ordering
+inside a message array is a convention, and a convention cannot tell you that a
+conflict happened, how often, or which way it went.
+
+That record is also what makes the disagreement findings of step 9 possible.
+A conflict nobody stored is a conflict nobody can learn from.
 
 ### 8 · The feedback loop — the step that makes it a brain
 
