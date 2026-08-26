@@ -128,14 +128,29 @@ write_env .env
 write_env apps/web/.env
 write_env apps/web/.env.local
 
-say "3 · Git identity"
+say "3 · Lane owner"
+# The BRANCH says the role. It cannot say the person: two people both running
+# /lead-design get two branches that both say "design". Declared, or the handoff
+# filename falls back to a branch id nobody can read.
+if [ -n "${SAHODA_LANE_OWNER:-}" ]; then
+  git config sahoda.owner "$SAHODA_LANE_OWNER" 2>/dev/null
+  ok "owner = $SAHODA_LANE_OWNER"
+elif [ -n "$(git config sahoda.owner 2>/dev/null)" ]; then
+  ok "owner = $(git config sahoda.owner)"
+else
+  gap "SAHODA_LANE_OWNER not set. Handoffs will be filed under the branch id."
+  echo "         Set it in this environment's variables (girija | jiban | divas)"
+  echo "         or run: git config sahoda.owner <name>"
+fi
+
+say "4 · Git identity"
 # A fresh checkout is authored as the personal account, and Vercel BLOCKS a
 # deployment whose HEAD is not authored SAHODALABS.
 git config user.name  "SAHODALABS"
 git config user.email "development@sahodalabs.com"
 ok "$(git config user.name) <$(git config user.email)>"
 
-say "4 · Dependencies"
+say "5 · Dependencies"
 if command -v pnpm >/dev/null 2>&1; then
   pnpm install --frozen-lockfile >/tmp/pnpm-install.log 2>&1 \
     && ok "pnpm install" \
@@ -144,7 +159,7 @@ else
   bad "pnpm not found"
 fi
 
-say "5 · Where you are"
+say "6 · Where you are"
 git fetch --all --prune --quiet 2>/dev/null || true
 ROUTES=$(find apps/web/src/app -name 'page.tsx' 2>/dev/null | wc -l)
 BRANCH=$(git branch --show-current 2>/dev/null || echo '?')
@@ -192,7 +207,7 @@ else
   gap "origin/$BRANCH does not exist yet"
 fi
 
-say "6 · MCP"
+say "7 · MCP"
 if [ -f .mcp.json ]; then
   ok "$(grep -cE '^\s{4}"[a-z0-9-]+":' .mcp.json 2>/dev/null || echo '?') servers declared"
   [ -z "${CONTEXT7_API_KEY:-}" ] && gap "CONTEXT7_API_KEY, context7 starts but cannot authenticate"
