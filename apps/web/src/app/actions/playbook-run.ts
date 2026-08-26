@@ -313,6 +313,8 @@ export async function executeRun(runId: string): Promise<ExecuteRunState> {
             workspace_id: workspaceId,
             title: item.title,
             body: item.body,
+            // Draft capture (REQUESTS.md §22): a playbook item is model output.
+            generated_body: item.body,
             status: level === 2 ? 'approved' : 'draft',
             channels: [...item.channels],
             scheduled_at: level === 2 ? item.suggested_slot : null,

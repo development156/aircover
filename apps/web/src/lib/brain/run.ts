@@ -1,9 +1,18 @@
 import 'server-only'
 
+import type { MarketingObservation } from '@sahoda/shared'
+
 import { reportServerError } from '@/lib/observability/report'
 
+import { editDistance, type NoDeltaReason } from './observe/edit-distance'
 import { toneDrift, type NoDriftReason } from './observe/tone-drift'
-import { readPublishedPosts, saveObservation, workspacesWithPublishedPosts } from './store'
+import {
+  readCapturedPosts,
+  readPublishedPosts,
+  saveObservation,
+  workspacesWithCapturedDrafts,
+  workspacesWithPublishedPosts,
+} from './store'
 
 /**
  * ONE WEEKLY PASS OF THE MARKETING BRAIN.
@@ -29,7 +38,16 @@ export interface BrainPassResult {
   inserted: number
   /** Rows that already existed for today and were refreshed by a re-run. */
   refreshed: number
-  /** How many workspaces produced nothing, by the reason they produced nothing. */
+  /**
+   * How many workspaces produced nothing, by the reason they produced nothing.
+   *
+   * Keys are `<kind>:<reason>`. The prefix is load-bearing rather than tidy:
+   * `tone_drift` and `edit_distance` both decline with `too_few_posts` and with
+   * `window_too_short`, and those mean different things about different
+   * populations. Merged under a bare reason, "31 too_few_posts" would be two
+   * unrelated facts added together, and no reader could tell which computer was
+   * waiting on data.
+   */
   declined: Record<string, number>
   /** Workspaces whose pass threw. Counted, never silently folded into `declined`. */
   failed: number
@@ -54,7 +72,16 @@ export const MAX_POSTS_CONSIDERED = 200
 
 export async function runMarketingBrainPass(today: Date): Promise<BrainPassResult> {
   const computedOn = today.toISOString().slice(0, 10)
-  const workspaceIds = await workspacesWithPublishedPosts()
+  // The union, not either list. A workspace that has published nothing can still
+  // have a month of corrections worth measuring, and one that published before
+  // draft capture existed has no drafts at all. Taking one list would silently
+  // skip a whole computer for every workspace outside it.
+  const workspaceIds = [
+    ...new Set([
+      ...(await workspacesWithPublishedPosts()),
+      ...(await workspacesWithCapturedDrafts()),
+    ]),
+  ]
 
   const result: BrainPassResult = {
     workspaces: workspaceIds.length,
@@ -64,27 +91,46 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
     failed: 0,
   }
 
-  const decline = (reason: NoDriftReason): void => {
-    result.declined[reason] = (result.declined[reason] ?? 0) + 1
+  const decline = (kind: string, reason: NoDriftReason | NoDeltaReason): void => {
+    const key = `${kind}:${reason}`
+    result.declined[key] = (result.declined[key] ?? 0) + 1
+  }
+
+  const record = async (
+    workspaceId: string,
+    kind: string,
+    outcome: { observation: MarketingObservation | null; reason: string | null },
+    fallback: NoDriftReason | NoDeltaReason,
+  ): Promise<void> => {
+    if (!outcome.observation) {
+      // Each computer returns exactly one of the two and its type says so. The
+      // fallback is here because a future one could return neither, and the
+      // count would silently stop adding up.
+      decline(kind, (outcome.reason as NoDriftReason | NoDeltaReason) ?? fallback)
+      return
+    }
+    const { inserted } = await saveObservation(workspaceId, outcome.observation)
+    if (inserted) result.inserted += 1
+    else result.refreshed += 1
   }
 
   for (const workspaceId of workspaceIds) {
     try {
+      // Both computers run for every workspace in the union, and each declines
+      // on its own population. A workspace with published posts and no captured
+      // drafts declines `edit_distance:no_captured_drafts`, which is a true
+      // statement and a visibly different one from having produced nothing.
       const all = await readPublishedPosts(workspaceId, MAX_POSTS_CONSIDERED * 2)
       const posts = all.slice(-MAX_POSTS_CONSIDERED)
-      const { observation, reason } = toneDrift(posts, computedOn)
+      await record(workspaceId, 'tone_drift', toneDrift(posts, computedOn), 'no_posts')
 
-      if (!observation) {
-        // `toneDrift` returns exactly one of the two, and the type says so. The
-        // fallback is here because a future computer could return neither and
-        // the count would silently stop adding up.
-        decline(reason ?? 'no_posts')
-        continue
-      }
-
-      const { inserted } = await saveObservation(workspaceId, observation)
-      if (inserted) result.inserted += 1
-      else result.refreshed += 1
+      const captured = await readCapturedPosts(workspaceId, MAX_POSTS_CONSIDERED * 2)
+      await record(
+        workspaceId,
+        'edit_distance',
+        editDistance(captured.slice(-MAX_POSTS_CONSIDERED), computedOn),
+        'no_captured_drafts',
+      )
     } catch (error) {
       // One workspace's failure must not end the pass for the rest. Counted
       // separately from `declined`, because "we could not look" and "we looked

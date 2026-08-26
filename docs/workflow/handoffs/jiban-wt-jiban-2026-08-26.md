@@ -1,6 +1,6 @@
 # Handoff — design — 2026-08-26
 
-**Owner** jiban
+**Owner** jiban · **Lane** `wt-jiban` · **Branch** `claude/lead-design-7m7ios`
 
 > This file has been renamed twice in one day, and both renames were forced.
 > It was written as `design-2026-08-26.md`, the convention at the time. `d21bac3`
@@ -20,7 +20,7 @@
 Sessions 12 and 13 below are one continuous session; 13 begins where the founder
 declared the owner and the lane had already been integrated by the advisor.
 
-This is **Session 12**. Sessions 1 to 11 are in `design-2026-08-25.md` (1903 lines) and
+This is **Session 12**. Sessions 1 to 11 are in `jiban-wt-jiban-2026-08-25.md` (1903 lines) and
 are still the record for every design item. Nothing in that file is superseded here.
 
 **Read this first, because it changes the shape of the lane:** the 31 design commits are
@@ -576,3 +576,170 @@ piped.** Every exit code was read from `$?` on the command itself.
 `Cached: 0 cached, 27 total` is the line that makes the pass mean anything. A run
 reporting `Cached: 19 cached` in 1.3s verified nothing, and several earlier "gate
 green" claims in this lane rested on exactly that.
+
+---
+
+# Session 14 — integrating wt-core, and the answer to "wt-jiban"
+
+`wt-core` moved from `7ae5c37` to `60b8577` while this lane sat: **12 commits**,
+65,115 insertions, mostly `.claude/skills` and `.claude/agents` reaching cloud
+sessions. Merged in. One conflict, in `scripts/auto-handoff.mjs`.
+
+## `branch:wt-jiban` MEANT A LANE, NOT A GIT BRANCH
+
+The founder's `/handoff` arguments said `owner:jiban , branch:wt-jiban`. Two
+sessions ago this was left open because renaming the git branch would strand
+PR #6. **`a4bd0fe` answers it**, and `.claude/commands/kickoff.md` says so in its
+own words:
+
+> If the harness has put you on a `claude/...` branch it created and will not let
+> you leave it, **say that plainly and carry on there** — but keep `sahoda.lane`
+> set to the lane you were given, because that is what the handoff is keyed on.
+
+That is exactly this session. So:
+
+```
+git config sahoda.owner jiban      (already set)
+git config sahoda.lane  wt-jiban   (set now)
+branch: claude/lead-design-7m7ios  (harness-pinned; NOT renamed, NOT stranded)
+```
+
+**No git branch was renamed and PR #6 is untouched.** The lane name is a declared
+identity, and it is now declared. This handoff is `jiban-wt-jiban-2026-08-26.md`.
+
+## The naming scheme changed AGAIN, and their reason beats mine
+
+Three schemes in one day: `<role>-<date>` → `<owner>-<role>-<date>` (`d21bac3`)
+→ **`<owner>-<lane>-<date>`** (`a4bd0fe`). The third is right and my second was
+not, on evidence I did not have: **two sessions both wrote
+`girija-research-2026-08-26.md`** — different lanes, one filename, and the second
+would have overwritten the first at merge. A role cannot distinguish lanes,
+because one person runs three.
+
+**The conflict was resolved by taking `wt-core`'s side whole.** Mine derived the
+ROLE from the branch by substring; theirs drops role entirely. Nothing of mine
+was worth keeping there — the substring fix it carried is obsolete under a scheme
+that no longer asks the branch anything.
+
+## THE DEFECT I DOCUMENTED IS STILL LIVE — `scripts/auto-handoff.mjs:68`
+
+`a4bd0fe` and `6d6234b` rewrote the identity half of this file and **did not
+touch the destructive half**:
+
+```js
+if (existsSync(path) && !readFileSync(path, 'utf8').includes('AUTOMATIC ' + 'SKELETON')   // split HERE so this file survives)
+```
+
+Still a substring search over the WHOLE file. A handoff that discusses stubs
+still matches and still gets overwritten — it did exactly that to this file
+earlier today, 343 lines to 38. MEASURED again after the merge: line 68,
+unchanged. **Never write that marker verbatim into a real handoff.** The Session
+13 write-up above stands in full, including that nothing tests this branch.
+
+## Shared surfaces touched by this merge (INCOMING, not mine)
+
+Read these before assuming your session behaves as it did yesterday:
+
+- **`scripts/auto-handoff.mjs`** — path scheme changed. If `sahoda.lane` is
+  unset it falls back to the branch slug, so an undeclared lane files under an
+  ugly unique name rather than colliding.
+- **`.prettierignore` is NEW** (`0902995`). Prettier does not read `.gitignore`,
+  so tool scratch directories turned the format leg red for every lane. If
+  `prettier --check .` fails on a path you did not write, check this file first.
+- **`docs/workflow/10_TASK_PREAMBLE.md` is NEW**, and 22 skills plus 26 agents
+  now reach cloud sessions (`1b0e608`).
+- **`ops/state/qa.pending.json` moved by 159 lines in the merge.** It is still
+  never committed by hand; the rule is unchanged.
+
+## Gate after the merge
+
+Run on the merged tree, clean, from the repo root. Nothing piped.
+
+| leg | result | real output |
+|---|---|---|
+| `turbo run typecheck lint test --force` | **PASS** | `27 successful, 27 total` · `Cached: 0 cached, 27 total` · `4m22.18s` |
+| ↳ `@sahoda/web:test` | **PASS** | `389 passed \| 3 skipped (392)` files, `4931 passed \| 13 skipped (4944)` tests |
+| ↳ `@sahoda/db:test` | **PASS** | `33 passed \| 12 skipped (45)` files, `610 passed \| 207 skipped (817)` tests |
+| `prettier --check .` (root) | **PASS** | `All matched files use Prettier code style!` |
+| `design-lint.mjs` (root) | **PASS** | `1218 files scanned` |
+| `pnpm build` | **PASS** | exit 0 · `js-budget ok: 81 routes within budget` |
+| Playwright | **UNRUN** | NOT passed — chromium 1228 wanted, 1194 on disk |
+
+Identical counts to the pre-merge run: 65,115 insertions of skills and agents
+changed no test outcome, which is what you would expect from files nothing
+imports, and is worth having checked rather than assumed.
+
+---
+
+# Session 15 — PR #6 merged, and the defect got fixed by someone else
+
+## PR #6 IS MERGED. It went in at `108ea6c`, not at my last push.
+
+So `wt-core` carries Sessions 12 and 13 and the re-measured CLAUDE.md figures
+(VERIFIED: `git show origin/wt-core:CLAUDE.md` contains both "277 tests in 72
+files" and "118 tests in 37 files"). It did **not** carry `5ff2a3b` — the rename
+to the owner+lane scheme and Session 14 — which was pushed about two minutes
+before the merge landed. That content is in this commit instead.
+
+**A merged PR cannot carry follow-up work**, so this needs a new one. The branch
+was NOT restarted and nothing was force-pushed: it held one real unmerged commit,
+and the rule for that case is to keep it, so `wt-core` was merged in on top.
+
+## THE DEFECT I FILED TWICE IS FIXED, AND NOT BY ME — RETRACTED
+
+Sessions 12, 13 and 14 each said `scripts/auto-handoff.mjs` decides "is a real
+handoff already here?" by substring-searching the WHOLE file, and Session 14 said
+it was **still live** after the merge. **That is no longer true.** It was fixed in
+the 40 commits that landed while this lane sat:
+
+```js
+function isSkeleton(file) {
+  const head = readFileSync(file, 'utf8').split('\n').slice(0, HEAD_LINES).join('\n')
+  return /^> \*\*AUTOMATIC SKELETON\.\*\*/m.test(head)   // HEAD_LINES = 20
+}
+```
+
+Both halves of what I reported are addressed. The search is bounded to the first
+twenty lines, so a mention buried in a long body can never reach it; and it is
+anchored to the template's own line-start form rather than to a bare substring, so
+prose that quotes the marker inline does not match.
+
+**It also has tests now** — `scripts/lib/auto-handoff.test.mjs`, 269 lines, 8
+tests, MEASURED passing. That closes the second half of what Session 13 filed:
+"the includes(...) branch decides whether to destroy a person's work and NOTHING
+tests it."
+
+**And it was not just my file it ate.** Their fixture records the same regression
+hitting a **520-line** handoff, overwritten with a 29-line skeleton because one
+table row in it quoted the marker. So this was a real defect that bit at least
+twice, and the fix is better than the one I would have written.
+
+**My role-substring work survived too**, at `scripts/auto-handoff.mjs:115-125` —
+kept for recognising a real handoff sitting under a name the current scheme no
+longer writes, with the same "substring, never equality" reasoning.
+
+VERIFIED on this tree after the merge: hook run against this file, 670 lines
+before and 670 after, no stray file written beside it.
+
+## What is NOT done
+
+- **Playwright still UNRUN.** Unchanged.
+- **The ten founder decisions from Session 9 are still decisions.** No design work
+  this session.
+- **`jiban-lane-2026-08-26.md` is a different session's file** (`claude/kickoff-jiban-4fvij0`,
+  PR #9) and is left alone. It says so itself and cross-references this one.
+
+## Gate
+
+Merged tree, clean, from the repo root. Nothing piped.
+
+| leg | result | real output |
+|---|---|---|
+| `scripts/lib/auto-handoff.test.mjs` | **PASS** | `Test Files 1 passed (1)` · `Tests 8 passed (8)` |
+| `turbo run typecheck lint test --force` | **PASS** | `27 successful, 27 total` · `Cached: 0 cached, 27 total` · `4m4.653s` |
+| ↳ `@sahoda/web:test` | **PASS** | `389 passed \| 3 skipped (392)` files, `4931 passed \| 13 skipped (4944)` tests |
+| ↳ `@sahoda/db:test` | **PASS** | `33 passed \| 12 skipped (45)` files, `610 passed \| 207 skipped (817)` tests |
+| `prettier --check .` (root) | **PASS** | `All matched files use Prettier code style!` |
+| `design-lint.mjs` (root) | **PASS** | `1218 files scanned` |
+| `pnpm build` | **PASS** | `js-budget ok: 81 routes within budget` |
+| Playwright | **UNRUN** | NOT passed — chromium 1228 wanted, 1194 on disk |

@@ -36,6 +36,13 @@ import { z } from 'zod'
 export const OBSERVATION_KINDS = [
   /** A measurable drift in how the business writes. Arithmetic over published text. */
   'tone_drift',
+  /**
+   * How much the customer rewrites what Sahoda drafted, and whether that is
+   * falling. Arithmetic over `posts.generated_body` against `posts.body`; needs
+   * no model call. REQUESTS.md §22 names this the measure that keeps the
+   * corrections moat honest rather than decorative.
+   */
+  'edit_distance',
 ] as const
 
 export type ObservationKind = (typeof OBSERVATION_KINDS)[number]
