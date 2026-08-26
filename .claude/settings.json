@@ -94,6 +94,14 @@
             "command": "node scripts/ops-sync.mjs --heartbeat stop 2>/dev/null || true"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/auto-handoff.mjs 2>&1 || true"
+          }
+        ]
       }
     ],
     "SessionStart": [
