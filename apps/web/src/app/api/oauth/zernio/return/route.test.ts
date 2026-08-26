@@ -602,6 +602,89 @@ describe('a connect only ever creates a row for the platform that was pressed', 
   })
 })
 
+/**
+ * THE POPUP THAT WOULD NOT CLOSE.
+ *
+ * Reported with a screenshot: the popup finished signing in and then loaded the
+ * WHOLE APP at `/connections?zernio=connected` inside a 620px window, while the
+ * opener sat on "Opening…" forever.
+ *
+ * The cause is upstream of us. Google's sign-in serves
+ * `Cross-Origin-Opener-Policy: same-origin`, which moves the popup into a new
+ * browsing context group and severs `window.opener` for good — returning to our
+ * own origin afterwards does not bring it back. The closer's opener check
+ * therefore failed, and its fallback was `location.replace(...)`.
+ *
+ * Both halves of the fix are pinned here: signal on a channel COOP cannot reach,
+ * and never load the app into the popup again.
+ */
+describe('the popup closer does not depend on window.opener', () => {
+  const popupCall = () => {
+    state.pending = { platform: 'instagram', mode: 'popup' }
+    return call()
+  }
+
+  it('signals over BroadcastChannel, which is scoped by origin', async () => {
+    const body = await (await popupCall()).text()
+
+    // THE ASSERTION THAT MATTERS. `opener.postMessage` alone was the bug: COOP
+    // cuts it and nothing arrives.
+    expect(body).toContain('new BroadcastChannel("sahoda-connect")')
+    expect(body).toContain('sahoda:connect-outcome')
+  })
+
+  it('still tries the opener, for the case where the chain survived', async () => {
+    const body = await (await popupCall()).text()
+    expect(body).toContain('window.opener.postMessage')
+    // Never a wildcard target — that would post the outcome to whatever happened
+    // to open this window.
+    expect(body).toContain('window.location.origin')
+    expect(body).not.toContain("'*'")
+  })
+
+  it('NEVER navigates the popup to the app', async () => {
+    const body = await (await popupCall()).text()
+
+    // The exact fallback that produced the reported screenshot. `window.close()`
+    // can also be refused once COOP has changed the browsing context group, so
+    // the page has to stand on its own instead of loading the product into a
+    // window too small to use it.
+    expect(body).not.toContain('location.replace')
+    expect(body).toContain('window.close()')
+  })
+
+  it('says what happened in one sentence, and offers a link rather than a redirect', async () => {
+    const body = await (await popupCall()).text()
+
+    expect(body).toContain('Connected. You can close this window.')
+    // A link the customer may take, not a navigation taken for them.
+    expect(body).toContain('Open Connections')
+  })
+
+  it('tells the truth when the trip failed, and keeps the failing status', async () => {
+    state.pending = { platform: 'instagram', mode: 'popup' }
+    state.readThrowsFor = ['instagram', 'linkedin']
+
+    const res = await call()
+    const body = await res.text()
+
+    // A popup does not change what happened, so it does not change the status.
+    expect(res.status).toBe(500)
+    expect(body).toContain('didn’t finish')
+    expect(body).not.toContain('Connected. You can close')
+  })
+
+  it('is used ONLY for a popup — a redirect trip still gets its 303', async () => {
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+
+    const res = await call()
+
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=connected')
+    expect(await res.text()).toBe('')
+  })
+})
+
 describe('the query string is still ignored wholesale', () => {
   it('never reads connected/profileId/accountId off the redirect', async () => {
     // doc 13 §3: a wrong accountId does not error, it publishes to someone else and

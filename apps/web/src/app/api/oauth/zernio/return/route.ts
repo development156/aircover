@@ -65,23 +65,34 @@ function escapeAttr(value: string): string {
 /**
  * THE POPUP'S LAST DOCUMENT — it tells the opener and shuts itself.
  *
- * ── WHY THIS IS SERVED FROM THE ROUTE AND NOT A PAGE ─────────────────────────
- * A `/connections/done` page would be a second place the outcome vocabulary
- * lives, reachable directly, and it would need the same allowlist this route
- * already applies. Serving the closer here keeps one owner for the whole trip.
+ * ── WHY IT DOES NOT USE `window.opener` AS ITS PRIMARY SIGNAL ────────────────
+ * It did, and it failed every time in the real world. Google's sign-in pages
+ * serve `Cross-Origin-Opener-Policy: same-origin`; the moment the popup lands on
+ * one the browser moves it into a NEW browsing context group and **severs
+ * `window.opener` permanently**. Coming back to our own origin afterwards does
+ * not restore it. Our own headers were never the question.
+ *
+ * So the closer's `opener`-is-null fallback ran, and its fallback was
+ * `location.replace('/connections?…')` — which loaded the ENTIRE APP inside a
+ * 620px window while the opener sat on "Opening…". Reported as "it opens a popup
+ * and it opens another new website and connects there".
+ *
+ * `BroadcastChannel` is scoped by ORIGIN rather than by window relationship, so
+ * it crosses that boundary. `opener.postMessage` is still attempted for the case
+ * where the chain survived, and costs nothing when it did not.
+ *
+ * ── AND IT NEVER LOADS THE APP AGAIN ─────────────────────────────────────────
+ * `window.close()` can also be refused once COOP has changed the browsing context
+ * group, so this page must be readable on its own. It says one sentence and
+ * stops. The old fallback replaced a self-contained confirmation with a second
+ * copy of the product in a window too small to use it, which is worse than doing
+ * nothing at all.
  *
  * ── THE STATUS LINE IS UNTOUCHED ─────────────────────────────────────────────
  * This route exists in its current shape because a failure leaving as 303 was
  * invisible to a 4xx/5xx log filter. A popup does not change what happened, so it
- * does not change the status code: a failed popup connect is still a 5xx, and only
- * the BODY differs. `httpStatus` is passed in for exactly that reason.
- *
- * ── AND IT DEGRADES WHEN THERE IS NO OPENER ──────────────────────────────────
- * `window.opener` is null if the customer middle-clicked, if the chain was severed,
- * or if a `Cross-Origin-Opener-Policy` header is ever added to this app. The script
- * then navigates this window to /connections instead of closing it, so the worst
- * case is the old full-page behaviour rather than a window that will not shut and
- * says nothing.
+ * does not change the status code: a failed popup connect is still a 5xx, and
+ * only the BODY differs.
  */
 function popupCloser(
   request: Request,
@@ -91,18 +102,35 @@ function popupCloser(
 ): Response {
   const target = connectionsUrl(request, status, detail)
   const safe = escapeAttr(target)
+  const worked = status === 'connected' || status === 'nothing' || status === 'limit'
+  const line = worked
+    ? 'Connected. You can close this window.'
+    : 'That connection didn’t finish. You can close this window and try again.'
+
   return new Response(
     `<!doctype html><html lang="en"><head><meta charset="utf-8">` +
-      `<title>Finishing up</title></head>` +
-      `<body><p>You can close this window. ` +
-      `<a href="${safe}">Go back to Connections</a>.</p>` +
+      `<meta name="viewport" content="width=device-width,initial-scale=1">` +
+      `<title>${worked ? 'Connected' : 'Didn’t finish'}</title>` +
+      `<style>body{font:16px/1.5 system-ui,sans-serif;margin:0;display:grid;` +
+      `place-items:center;min-height:100vh;padding:24px;text-align:center}` +
+      `a{color:inherit}</style></head>` +
+      `<body><div><p>${line}</p>` +
+      // A link, never an auto-navigate. Someone whose window will not close can
+      // get back to the app deliberately; nobody has the app loaded at them.
+      `<p><a href="${safe}">Open Connections</a></p></div>` +
       `<script>(function(){` +
-      // `location.origin` and nothing else. A wildcard target would post the
-      // outcome to whatever happened to open this window.
+      // FIRST, and the one that actually works: origin-scoped, so COOP cannot
+      // reach it. The channel name matches lib/connections/use-connect-flow.ts.
+      `try{var c=new BroadcastChannel("sahoda-connect");` +
+      `c.postMessage({type:"sahoda:connect-outcome"});c.close();}catch(e){}` +
+      // SECOND, for the case where the opener chain did survive. `location.origin`
+      // and nothing else — a wildcard would post the outcome to whatever happened
+      // to open this window.
       `try{if(window.opener&&!window.opener.closed){` +
-      `window.opener.postMessage({type:"sahoda:connect-outcome"},window.location.origin);` +
-      `window.close();return;}}catch(e){}` +
-      `window.location.replace(${JSON.stringify(target)});` +
+      `window.opener.postMessage({type:"sahoda:connect-outcome"},window.location.origin);}}catch(e){}` +
+      // THIRD. May be refused after COOP changed the browsing context group, which
+      // is why the sentence above stands on its own.
+      `try{window.close();}catch(e){}` +
       `})();</script></body></html>`,
     {
       status: httpStatus,
