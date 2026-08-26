@@ -485,3 +485,209 @@ stops those rows entering a commit.** `lane-sync push` then refused the dirty tr
 and the three rows were reverted with `git restore` rather than committed. That
 refusal is the only thing in this chain that worked as designed. **Do not
 `git add -A` in this repo.**
+
+# Session 3 — a task, at last, and it was built
+
+**Branch** `claude/divas-kickoff-xdoxoa` at `7ea9eab`. Lane `wt-divas3`. Owner
+divas. Role advisor. Pushed: yes. PR
+[#18](https://github.com/development156/sahodalabs/pull/18) into `wt-core`, draft,
+watched.
+
+**Do not quote the skeleton marker in this file.** Sessions 1 and 2 said so and
+the defect is still live.
+
+## What was asked, and what shipped
+
+`/go in /assets make folder systems and smart organize features and it should be
+better than google drive in terms of functionality`.
+
+Two commits. **The gate is green cold: 27 successful, 27 total, `Cached: 0 cached,
+27 total`, 5m11.338s.**
+
+| SHA | What |
+| --- | --- |
+| `d89e061` | contract in `packages/shared`, the migration and its RLS suite, and the registration a new table owes |
+| `7ea9eab` | read layer, nine server actions, eleven components, the page wired |
+
+Three tables: `asset_folders`, `asset_folder_items`, `asset_smart_folders`.
+**The migration is WRITTEN AND NOT APPLIED.**
+
+### The design, and why it is not Drive
+
+The 25 August ruling in `lib/assets/folders.ts` refused named folders because no
+column could answer them, and named its own condition for revisiting: a column
+existing. This adds the columns and **keeps all three predicate folders.**
+
+| Property | How, and why Drive does not |
+| --- | --- |
+| a file in many folders at once | membership is a TABLE, not a `folder_id` column. Drive removed multi-parenting in 2020 |
+| both counts, always | "3 here, 12 with sub-folders". Drive shows the first only |
+| a folder that says what it could not check | `matchesRule` returns `yes` / `no` / `unknown` |
+| the folder's contents before you save it | the builder runs `matchesQuery` live over the tiles on screen |
+| find files with no description | a rule no Drive search can express |
+
+**The three-valued answer is the load-bearing idea.** "Landscape photos" is
+undecidable for a row with no recorded width. Drive resolves that to false and
+drops the file silently. Returning `unknown` lets the screen say "8 files, 1
+could not be checked", which is a different and truer claim.
+
+## Two findings, both from measuring rather than reasoning
+
+### 1 · A tree-depth trigger that checks only the written row is half a guard
+
+Moving a folder re-depths everything beneath it, and **not one of those rows has
+its own `parent_id` touched, so the trigger never fires for them.**
+
+MEASURED against real Postgres, before the fix: a move that left the dragged
+folder at a legal depth **5** was **ALLOWED** and left its grandchild at **7**,
+past the table's own limit of 6.
+
+Fixed with a second walk downward in the same trigger, `above + below > 6`. Both
+walks carry a runaway bound. Filed as **REQUESTS §30**, because the general rule
+is not about folders: **any constraint on a POSITION in a hierarchy is a
+constraint on a subtree**, and a per-row trigger sees only the node whose
+position a person can already see.
+
+### 2 · A new table owes three registrations, and this repo enforces all three
+
+Five db suites went red. I nearly reported them as environmental. **The honest
+test was to move the migration aside: 8 failures with it, 1 without.**
+
+| Obligation | What was wrong |
+| --- | --- |
+| `docs/38_Data_Handling.md` | three tables unnamed, count stale at 49. Now 52. **This document goes to a lawyer** |
+| `apps/web/src/lib/privacy/export-manifest.ts` | three tables absent, so they would have been missing from **every customer data export** |
+| `tests/helpers/pglite-tenant.ts` | `asset_smart_folders` could not be seeded: the ladder's only jsonb rung is `'{}'`, which is exactly what the `query` CHECK rejects |
+
+**A side effect worth knowing: 24 erasure tests that reported as SKIPPED now run
+and pass.** Read skip counts, not exit codes.
+
+## THREE THINGS I GOT WRONG AND CORRECTED, ONE OF THEM THIS FILE'S OWN
+
+### ⚠ RETRACTED: the Stop hook is NOT fixed by `echo "$INPUT"`
+
+**Sessions 1 and 2 both recorded follow-up 1 as "one character fixes it".** It is
+wrong, and the fix would not have worked.
+
+MEASURED, both ways: the payload carries **raw ANSI escapes (U+001B)** from
+captured test output inside a string value, and `jq` refuses the document
+**identically whether `$INPUT` is quoted or not.** I reproduced the failure with
+a raw ESC and with a raw newline; quoting changes nothing that matters.
+
+The guard has to **stop using `jq`**. A textual test works:
+
+```sh
+case "$INPUT" in *'"stop_hook_active":true'*) exit 0;; esac
+```
+
+**NOT APPLIED:** editing `.claude/settings.json` is blocked by this sandbox's
+permission classifier. Whoever can edit it should, and should also change
+`--filter="...[origin/main]"` to `origin/wt-web`.
+
+### ⚠ RETRACTED: the format leg is NOT red on the base
+
+I reported 51 unformatted files and "the fifth time this lane has found it".
+**Both wrong.** A global **prettier 3.8.1** sits on `/opt/node22/bin/prettier`;
+the repo pins **3.9.5**. I was running the bare command.
+
+MEASURED with the repo's binary: `pnpm exec prettier --check .` says **"All
+matched files use Prettier code style!"** on this branch, and a clean
+`origin/wt-core` worktree is clean too. `read.ts` never needed fixing.
+
+**Always `pnpm exec prettier`, never bare `prettier`, in this sandbox.**
+
+### ⚠ RETRACTED: CI is not failing on formatting, or on anything in the diff
+
+MEASURED from the GitHub API: the job ran **`16:35:14` → `16:35:16`, two
+seconds**, with **`runner_id: 0` and an empty `runner_name`**. Logs 404 because
+nothing executed.
+
+**Every branch is failing the same way.** Six in one window: `wt-divas3`,
+`lead-research-kickoff-dw8slw`, `lead-research-tz63ld`, `advisor-qvz5wn`,
+`divas-kickoff-03y2g2`, `lead-research-kickoff-qexr94`. **GitHub Actions cannot
+allocate a runner for this repository** — an Actions-minutes or spending limit,
+needing someone with billing access. Commented once on PR #18; no re-run spent,
+because six branches answer the question more strongly than a seventh attempt.
+
+**Vercel deployed `d89e061` to `Ready`**, which is the one real green signal on
+the PR and also proves the author row is correct.
+
+## Gate
+
+Run on the tree that became `7ea9eab`. **No leg piped**, every exit code read
+from the command itself.
+
+| leg | result | real output |
+| --- | --- | --- |
+| `turbo run typecheck lint test --force --concurrency=1` | **PASS** | `27 successful, 27 total` · **`Cached: 0 cached, 27 total`** · 5m11.338s |
+| ↳ `@sahoda/web:test` | PASS | `5018 passed \| 13 skipped (5031)` |
+| ↳ `@sahoda/db:test` | PASS | `630 passed \| **207 skipped** (837)` |
+| ↳ `@sahoda/billing:test` | PASS | `401 passed \| **13 skipped** (414)` |
+| ↳ `@sahoda/shared:test` | PASS | `290 passed` — the two new files carry 47 |
+| ↳ lint, all nine | PASS | `lint ok` each |
+| `pnpm exec prettier --check .` | **PASS** | whole tree |
+| new RLS suite alone | **PASS** | `10 passed`, 0 skipped, real Postgres, policies enforced |
+| `turbo build` / `js-budget` | **NOT RUN** | eleven new components. **INFERRED safe, NOT measured.** The one real gap |
+| **Playwright `test:smoke`** | **UNRUN** | REQUESTS §25, no `apps/web/.env.local`. **UNRUN, not passed** |
+| CI `typecheck · lint · test · format` | **NO RUNNER** | not failed on merit; see above |
+| Vercel preview | **PASS** | `Ready` on `d89e061` |
+
+**A green gate here still includes 233 tests that did not run** — db 207,
+billing 13, web 13.
+
+## Mutations, because a guard never shown to fail is not a guard
+
+| mutation | result |
+| --- | --- |
+| remove the subtree half of the depth trigger | refused move returns `{"rows":[]}`; 2 red |
+| collapse `unknown` into `no` in `matchesQuery` | 3 red |
+| measure the dragged folder alone, not its subtree | exactly the one discriminating test red |
+| drop `asset_folders_root_name_uidx` | `Diwali` then `diwali` at the ROOT allowed |
+| drop the tree trigger | the `A→B→A` move succeeds |
+| drop a smart folder's unknown-count clause | `folder-row` red |
+| strip the `canMoveFolder` filter from the move picker | a descendant is offered as a destination |
+| return fixture rows ignoring recorded filters (in the actions' mock) | **the mock itself was fixed** — `eq(col, null)` matches nothing in SQL, and without that the root-duplicate test proved nothing |
+
+## Shared surfaces touched
+
+| file | why it matters |
+| --- | --- |
+| `packages/shared/src/assets/{organize,folder-tree}.ts` + `index.ts` | new exports only, nothing redefined, no existing shape changed |
+| `packages/db/tests/helpers/pglite-tenant.ts` | **the seeder every RLS suite uses.** One additive `SHAPE_OVERRIDES` entry |
+| `apps/web/src/lib/privacy/export-manifest.ts` | the DPDP export. Three entries added |
+| `docs/38_Data_Handling.md` | goes to a lawyer. Count 49 → 52 |
+| `apps/web/src/lib/assets/view.ts` | **`AssetCard.folderIds` is a NEW REQUIRED field**, `string[] \| null`. Every constructor updated |
+
+No price, no ledger path, no `pricing.config.json`, no token, no dependency.
+
+## What was NOT done, and why
+
+- **`turbo build` / `js-budget` NOT RUN.** Eleven new components on `/assets` and
+  the JS budget is unmeasured. **The next session should run this first** — this
+  lane has a recorded history of `/leads` blowing its budget on one `cn` import.
+- **Playwright UNRUN, not passed.**
+- **The migration is not applied.** Founder's call.
+- **The Stop hook not fixed** — diagnosed correctly at last, blocked by the
+  sandbox's permission classifier.
+- **`ops/state/qa.pending.json` reverted twice, not committed.** Third session
+  running. `core.hooksPath` is UNSET so `.githooks/pre-commit` is DISARMED.
+  **Do not `git add -A` in this repo.**
+- **Both ratchets still untightened**, for the merge-time reason Session 1 gave.
+- **The `assets.sha256` duplicate-detection idea was designed and dropped** from
+  scope: it needs the upload path to hash bytes and an honest null for every
+  pre-existing row. Worth doing; not smuggled in here.
+
+## For whoever picks this up
+
+1. **Run `pnpm turbo build` and read the js-budget line.** The only unmeasured
+   thing in this feature.
+2. **Ask the founder to apply `20260826120000_asset_folder_system.sql`.** Until
+   then `/assets` shows the three predicate folders and nothing else, correctly,
+   because `readFolderTree` returns `unreadable` against tables that do not
+   exist and the screen says so rather than claiming you have no folders.
+3. **CI needs a human with billing access.** Nothing merges anywhere until a
+   runner can be allocated.
+4. **Use `pnpm exec prettier`, never bare `prettier`.** Two versions are
+   installed and the wrong one cost me a false base-wide finding.
+5. **The Stop hook fix is one `case` statement**, written out above, for whoever
+   can edit `.claude/settings.json`.
