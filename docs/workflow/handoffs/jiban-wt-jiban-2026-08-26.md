@@ -668,3 +668,78 @@ Run on the merged tree, clean, from the repo root. Nothing piped.
 Identical counts to the pre-merge run: 65,115 insertions of skills and agents
 changed no test outcome, which is what you would expect from files nothing
 imports, and is worth having checked rather than assumed.
+
+---
+
+# Session 15 — PR #6 merged, and the defect got fixed by someone else
+
+## PR #6 IS MERGED. It went in at `108ea6c`, not at my last push.
+
+So `wt-core` carries Sessions 12 and 13 and the re-measured CLAUDE.md figures
+(VERIFIED: `git show origin/wt-core:CLAUDE.md` contains both "277 tests in 72
+files" and "118 tests in 37 files"). It did **not** carry `5ff2a3b` — the rename
+to the owner+lane scheme and Session 14 — which was pushed about two minutes
+before the merge landed. That content is in this commit instead.
+
+**A merged PR cannot carry follow-up work**, so this needs a new one. The branch
+was NOT restarted and nothing was force-pushed: it held one real unmerged commit,
+and the rule for that case is to keep it, so `wt-core` was merged in on top.
+
+## THE DEFECT I FILED TWICE IS FIXED, AND NOT BY ME — RETRACTED
+
+Sessions 12, 13 and 14 each said `scripts/auto-handoff.mjs` decides "is a real
+handoff already here?" by substring-searching the WHOLE file, and Session 14 said
+it was **still live** after the merge. **That is no longer true.** It was fixed in
+the 40 commits that landed while this lane sat:
+
+```js
+function isSkeleton(file) {
+  const head = readFileSync(file, 'utf8').split('\n').slice(0, HEAD_LINES).join('\n')
+  return /^> \*\*AUTOMATIC SKELETON\.\*\*/m.test(head)   // HEAD_LINES = 20
+}
+```
+
+Both halves of what I reported are addressed. The search is bounded to the first
+twenty lines, so a mention buried in a long body can never reach it; and it is
+anchored to the template's own line-start form rather than to a bare substring, so
+prose that quotes the marker inline does not match.
+
+**It also has tests now** — `scripts/lib/auto-handoff.test.mjs`, 269 lines, 8
+tests, MEASURED passing. That closes the second half of what Session 13 filed:
+"the includes(...) branch decides whether to destroy a person's work and NOTHING
+tests it."
+
+**And it was not just my file it ate.** Their fixture records the same regression
+hitting a **520-line** handoff, overwritten with a 29-line skeleton because one
+table row in it quoted the marker. So this was a real defect that bit at least
+twice, and the fix is better than the one I would have written.
+
+**My role-substring work survived too**, at `scripts/auto-handoff.mjs:115-125` —
+kept for recognising a real handoff sitting under a name the current scheme no
+longer writes, with the same "substring, never equality" reasoning.
+
+VERIFIED on this tree after the merge: hook run against this file, 670 lines
+before and 670 after, no stray file written beside it.
+
+## What is NOT done
+
+- **Playwright still UNRUN.** Unchanged.
+- **The ten founder decisions from Session 9 are still decisions.** No design work
+  this session.
+- **`jiban-lane-2026-08-26.md` is a different session's file** (`claude/kickoff-jiban-4fvij0`,
+  PR #9) and is left alone. It says so itself and cross-references this one.
+
+## Gate
+
+Merged tree, clean, from the repo root. Nothing piped.
+
+| leg | result | real output |
+|---|---|---|
+| `scripts/lib/auto-handoff.test.mjs` | **PASS** | `Test Files 1 passed (1)` · `Tests 8 passed (8)` |
+| `turbo run typecheck lint test --force` | **PASS** | `27 successful, 27 total` · `Cached: 0 cached, 27 total` · `4m4.653s` |
+| ↳ `@sahoda/web:test` | **PASS** | `389 passed \| 3 skipped (392)` files, `4931 passed \| 13 skipped (4944)` tests |
+| ↳ `@sahoda/db:test` | **PASS** | `33 passed \| 12 skipped (45)` files, `610 passed \| 207 skipped (817)` tests |
+| `prettier --check .` (root) | **PASS** | `All matched files use Prettier code style!` |
+| `design-lint.mjs` (root) | **PASS** | `1218 files scanned` |
+| `pnpm build` | **PASS** | `js-budget ok: 81 routes within budget` |
+| Playwright | **UNRUN** | NOT passed — chromium 1228 wanted, 1194 on disk |
