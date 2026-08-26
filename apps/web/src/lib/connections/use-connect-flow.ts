@@ -13,13 +13,28 @@ import type { Channel } from '@sahoda/shared'
  * the app away, and the customer came back to a fresh server render with a notice
  * at the top. Everything they had open elsewhere went with it.
  *
- * A popup keeps the app mounted. It is possible here for one specific reason
- * worth stating, because it is the thing that would silently break it: the LAST
- * hop of the flow lands on OUR origin (`/api/oauth/zernio/return`), so the popup's
- * final document is same-origin with the opener and can talk to it. Framing
- * headers are irrelevant to a popup — it is a window, not an iframe — but
- * `Cross-Origin-Opener-Policy` is not, and this repo sets none. If one is ever
- * added, `window.opener` goes null and this degrades to the redirect below.
+ * A popup keeps the app mounted. The last hop of the flow lands on OUR origin
+ * (`/api/oauth/zernio/return`), so the popup's final document is same-origin with
+ * this one and the two can talk.
+ *
+ * ── BUT NOT THROUGH `window.opener`, AND THAT IS THE WHOLE LESSON ────────────
+ * The first version signalled with `window.opener.postMessage`. It failed in the
+ * real world every time, and the reason is upstream of us: Google's sign-in pages
+ * serve `Cross-Origin-Opener-Policy: same-origin`. The moment the popup lands on
+ * one, the browser moves it into a NEW browsing context group and **severs
+ * `window.opener` permanently** — navigating back to our origin afterwards does
+ * not restore it. Our own headers were never the question; this repo sets no COOP
+ * and it made no difference.
+ *
+ * Reported as "it opens a popup and it opens another new website and connects
+ * there", with a screenshot of the popup showing the whole app at
+ * `/connections?zernio=connected`. That was the closer's `opener`-is-null
+ * fallback doing exactly what it was told.
+ *
+ * `BroadcastChannel` is the mechanism that does not care. It is scoped by ORIGIN,
+ * not by window relationship, so a message posted from the popup reaches this tab
+ * whatever the browsing context group. `opener.postMessage` is kept as a second
+ * attempt for the case where it does survive, and costs nothing when it does not.
  *
  * ── `window.open` MUST BE CALLED IN THE CLICK, BEFORE THE FETCH ──────────────
  * The previous shape awaited `/api/oauth/zernio/start` and only then navigated. A
@@ -38,6 +53,15 @@ import type { Channel } from '@sahoda/shared'
 
 /** What the popup posts home. Nothing else on this channel is acted on. */
 const MESSAGE_TYPE = 'sahoda:connect-outcome'
+
+/**
+ * The origin-scoped channel the closer speaks on.
+ *
+ * Must match the literal in `popupCloser` in the return route byte for byte. It
+ * is a string on both sides because the closer is inline script in a hand-built
+ * HTML response and cannot import anything.
+ */
+const CHANNEL_NAME = 'sahoda-connect'
 
 /** How often to notice a popup the customer closed without finishing. */
 const CLOSE_POLL_MS = 500
@@ -88,14 +112,36 @@ export function useConnectFlow(platform: Channel): ConnectFlowState {
 
     window.addEventListener('message', onMessage)
 
+    // ── THE CHANNEL THAT ACTUALLY CARRIES THE ANSWER ────────────────────────
+    // `BroadcastChannel` is scoped by ORIGIN. It does not care that Google's
+    // COOP moved the popup into a different browsing context group and cut
+    // `window.opener`, which is why the postMessage above never arrived.
+    //
+    // No origin check here and none is possible: the API only delivers between
+    // same-origin contexts, which is the guarantee `event.origin` was being used
+    // to establish. The shape is still checked — a same-origin script could post
+    // anything.
+    let channel: BroadcastChannel | null = null
+    try {
+      channel = new BroadcastChannel(CHANNEL_NAME)
+      channel.onmessage = (event: MessageEvent) => {
+        if ((event.data as { type?: unknown } | null)?.type === MESSAGE_TYPE) finish()
+      }
+    } catch {
+      // Not every browser has it. The close-poll below still ends the wait, so a
+      // customer on an old engine gets a slower finish rather than a stuck button.
+    }
+
     // A closed popup fires no message. Without this poll the button waits for
-    // something that is never coming.
+    // something that is never coming — and it is also the safety net for a
+    // browser with no BroadcastChannel and a severed opener.
     const timer = window.setInterval(() => {
       if (popupRef.current?.closed) finish()
     }, CLOSE_POLL_MS)
 
     return () => {
       window.removeEventListener('message', onMessage)
+      channel?.close()
       window.clearInterval(timer)
     }
   }, [pending, finish])
@@ -105,7 +151,11 @@ export function useConnectFlow(platform: Channel): ConnectFlowState {
 
     // SYNCHRONOUS, inside the click. See the header — after an await this is
     // blocked by every browser that takes popup blocking seriously.
-    const popup = window.open('', 'sahoda-connect', 'width=620,height=780,noopener=no')
+    // NO `noopener` TOKEN IN ANY FORM. `noopener=no` was here, on the reasoning
+    // that the value turns it off. Browsers disagree about that, and there was
+    // never a reason to name the feature at all — omitting it is the only
+    // unambiguous way to keep the opener relationship.
+    const popup = window.open('', 'sahoda-connect', 'width=620,height=780')
     popupRef.current = popup
     setPending(true)
 
