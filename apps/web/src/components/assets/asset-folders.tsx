@@ -24,10 +24,18 @@ import { cn } from '@/lib/utils'
  * cannot reach it.
  *
  * ── THE COLOURS ARE TOKENS, NOT THE REFERENCE'S PURPLE ───────────────────────
- * `--surface-2` for the back and `--surface` for the front, so the two steps
- * hold in BOTH themes: charcoal on near-black in dark, grey on white in light.
- * The brief describes the dark case only, and hard-coding it would have made a
+ * `--surface-2` for the back, and for the front `--surface` in light but
+ * `--surface-3` in dark. Hard-coding the brief's dark case would have made a
  * black folder on a white page for every light-theme reader.
+ *
+ * **This paragraph used to end "so the two steps hold in BOTH themes". It did
+ * not, and the correction is worth keeping because of HOW it hid.** The step
+ * was always present and always cleared the 1.03 ladder floor, so every
+ * contrast check passed. What was wrong was its DIRECTION: `--surface` is the
+ * lightest rung in light and the DARKEST in dark, so `bg-surface` on the front
+ * put the lid BEHIND the body in dark — 1.113:1 the wrong way. A ratio has no
+ * sign, which is exactly why no guard caught it. The guard added below asserts
+ * the ORDER, not the gap.
  *
  * ── DEPTH ON HOVER IS A DIFFERENCE OF TWO LIFTS ──────────────────────────────
  * The whole folder rises 4px; the front panel rises only 2. The 2px that do not
@@ -174,10 +182,31 @@ export function AssetFolders({
                   : null}
 
               {/* ── FRONT: rises only 2px against the folder's 4, and the 2 that
-                  do not cancel are the mouth opening. ───────────────────────── */}
+                  do not cancel are the mouth opening. ─────────────────────────
+
+                  ── THE `dark:` SWAP IS THE WHOLE POINT OF THIS PANEL ────────
+                  `bg-surface` alone was INVERTED in dark, and the header's
+                  claim that "the two steps hold in BOTH themes" was wrong.
+                  MEASURED, front against back:
+
+                    light  #ffffff over #f2f2f3  = 1.119  front LIGHTER  ✓
+                    dark   #171717 over #212121  = 1.113  front DARKER   ✗
+                    dark   #292929 over #212121  = 1.107  front LIGHTER  ✓
+
+                  The step was always there — the ladder floor is 1.03 and all
+                  three clear it — so no contrast test could see this. What was
+                  wrong is the DIRECTION: `--surface` is the lightest rung in
+                  light and the DARKEST in dark, so the front panel receded
+                  behind its own back and the folder read as a pale slab with a
+                  dark plate stuck on it rather than a lid over a body.
+
+                  `--surface-3` is nominally the hover/pressed rung. It is used
+                  here as a resting fill on purpose: what this panel needs is
+                  "one step LIGHTER than the back", and in dark that is the only
+                  rung that is. Light is untouched. */}
               <span
                 className={cn(
-                  'absolute inset-x-0 bottom-0 flex h-[104px] flex-col justify-between rounded-[14px] bg-surface p-3 transition-panel group-hover:translate-y-[2px] group-hover:shadow-card',
+                  'absolute inset-x-0 bottom-0 flex h-[104px] flex-col justify-between rounded-[14px] bg-surface p-3 transition-panel group-hover:translate-y-[2px] group-hover:shadow-card dark:bg-surface-3',
                   on
                     ? 'shadow-[inset_0_0_0_1px_var(--brand-lift)]'
                     : 'surface-ring group-hover:shadow-[inset_0_0_0_1px_var(--brand-lift)]',
