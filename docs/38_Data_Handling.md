@@ -51,14 +51,16 @@ not a description somebody wrote down — it is a fact about how the database is
 holding a customer's data carries a `workspace_id` column, and the boundary between two customers is
 enforced by the database itself (PostgreSQL row-level security), not by the application.
 
-**MEASURED 2026-08-25: 49 tables.** They are listed in full in §3, and
+**MEASURED 2026-08-26: 52 tables.** They are listed in full in §3, and
 `packages/db/tests/data_handling_doc.pglite.test.ts` fails the build if that number or that list
-stops matching the database. (It read 48 on 2026-08-23, the figure this sentence carried until now;
-the forty-ninth is `marketing_observations`.)
+stops matching the database. (It read 49 on 2026-08-25, the figure this sentence carried until now;
+the three new ones are the library's folder system, `asset_folders`, `asset_folder_items` and
+`asset_smart_folders`. It read 48 on 2026-08-23; the forty-ninth was `marketing_observations`.)
 
-> **Production holds 47 of those 49 today.** Two are created by migrations that are written and
-> deliberately not yet applied: `ledger_actor_redactions` (see §5) and `marketing_observations`.
-> Counted from production directly on 2026-08-23.
+> **Production holds 47 of those 52 today.** Five are created by migrations that are written and
+> deliberately not yet applied: `ledger_actor_redactions` (see §5), `marketing_observations`, and
+> the three folder tables above. Counted from production directly on 2026-08-23, and unchanged
+> since: nothing in this pass was applied.
 
 Three tables hold personal data and do **not** carry a `workspace_id`, so they are invisible to any
 sweep built on that rule. This was a real gap and it is worth stating plainly because it is the kind
@@ -87,6 +89,9 @@ the table belongs to one identified workspace.
 | --- | --- | --- | --- |
 | `ai_provider_logs` | AI usage records | no direct identifiers | removed |
 | `asset_derivatives` | the per-channel crops made from your pictures | `created_by` | removed |
+| `asset_folder_items` | which folders you filed each picture in | `added_by` | removed |
+| `asset_folders` | the folders you made, and their names | `name` `created_by` | removed |
+| `asset_smart_folders` | the saved searches you named, and their rules | `name` `query` `created_by` | removed |
 | `asset_usages` | where each picture is used | no direct identifiers | removed |
 | `assets` | your picture library | `title` `created_by` | removed |
 | `audience_snapshots` | who follows you | no direct identifiers | removed |
@@ -222,7 +227,7 @@ back. Both are re-checked on the server and the name is checked a third time by 
 because the delete is an addressable endpoint whatever the screen does. Only the **owner** of a
 workspace can do it.
 
-**What is removed:** every row in all 49 tables except the four in the next paragraph, plus every
+**What is removed:** every row in all 52 tables except the four in the next paragraph, plus every
 file in storage, plus the encrypted keys for the linked social accounts, plus the sign-in profile of every member
 for whom this was their last workspace — not only the person who pressed the button.
 
@@ -619,10 +624,10 @@ would be doing the thing it warns about.
 - Every base table carrying a `workspace_id`, from the database's own catalogue, on every build.
 - Whether each one is in the export list, and whether its stated readability matches its actual
   policies.
-- One complete cycle: create a workspace, fill all 49 tables, delete it, and count what is left —
+- One complete cycle: create a workspace, fill all 52 tables, delete it, and count what is left —
   including a second workspace that must be untouched.
 - That a FAILED deletion leaves everything exactly as it was. A trigger is installed that refuses to
-  let one table go; the deletion raises, naming the table, and all 49 tables still hold every row.
+  let one table go; the deletion raises, naming the table, and all 52 tables still hold every row.
   This is the only thing that demonstrates "all or nothing" rather than asserting it.
 - Whether the deletion writes to the financial ledger. It does not, and that is asserted against the
   function's own source.

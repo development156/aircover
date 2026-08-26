@@ -1857,3 +1857,42 @@ not edited; the constraint is replaced in the new migration.
 with `too_few_posts` and with `window_too_short`, meaning different things about
 different populations, so a bare key adds two unrelated facts together. Anything
 reading those keys needs the prefix.
+
+## 30 · A tree-depth trigger that checks only the row being written is half a guard
+
+**MEASURED on `claude/divas-kickoff-xdoxoa`, against real Postgres (PGlite), while
+building the `/assets` folder system.**
+
+`asset_folders` limits nesting to six levels, enforced by a `before insert or
+update of parent_id` trigger that walks the ancestor chain of the row being
+written. That is the obvious shape and it is wrong by half.
+
+**Moving a folder re-depths every folder beneath it, and not one of those rows
+has its own `parent_id` touched, so the trigger never fires for any of them.**
+
+The probe, run before the fix existed: a host chain four deep, and a three-level
+subtree moved under it.
+
+| thing                                      | value                             |
+| ------------------------------------------ | --------------------------------- |
+| depth the dragged folder landed at         | **5**, comfortably legal          |
+| result of the move                         | **ALLOWED**, no error             |
+| depth of the deepest descendant afterwards | **7**, past the table's own limit |
+
+The dragged folder itself fits, which is why a guard measuring only the written
+row reports nothing wrong. The rows that broke the rule were never inspected.
+
+**The fix** is a second half in the same trigger: a recursive walk DOWN from the
+row being written, giving the height of its subtree, checked as
+`above + below > 6`. On insert a new row has no descendants, so that reduces to
+the plain depth rule and costs nothing. Both walks carry a runaway bound, because
+a walk over a graph you did not build is an infinite loop waiting for one bad row.
+
+**The general rule, which is not specific to folders:** any constraint on a
+POSITION in a hierarchy is a constraint on a subtree, and a trigger that fires
+per-row sees only the node whose position a person can already see. The nodes
+that break the rule are the ones whose rows nobody wrote.
+
+`packages/db/tests/asset-folders-rls.test.ts` carries the guard, and it was
+mutation-proven: removing the subtree half makes the refused move return
+`{"rows":[]}` (allowed) and turns two tests red.
