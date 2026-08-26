@@ -55,7 +55,7 @@ const APOSTROPHE = "(?:['’]|&rsquo;|&apos;|&#\\d+;)"
  */
 const FIRST_PERSON = new RegExp(
   [
-    `\\bI ${APOSTROPHE}?(?:m|ll|ve|d)\\b`,
+    `\\bI ${APOSTROPHE}(?:m|ll|ve|d)\\b`,
     `\\bI${APOSTROPHE}(?:m|ll|ve|d)\\b`,
     '\\bI (?:am|was|will|would|can|could|have|has|had|did|do|does|found|made|think|thought|need|want|tried|see|saw|know|knew|got|kept|left|put|sent|read|wrote)\\b',
     `\\bI (?:can|could|did|do|does|was|were|have|had|would|will)n${APOSTROPHE}?t\\b`,
@@ -101,12 +101,67 @@ export interface VoiceStray {
  * cried wolf on its own documentation would be turned off within a week.
  *
  * Imports go too — a path like `@/lib/I18n` has no opinion about voice.
+ *
+ * ── WHY THIS IS A SCANNER AND NOT THREE REGEXES ──────────────────────────────
+ * It was three regexes, and a review broke it in one line:
+ *
+ *     const a = "/*"; const msg = "I'll rewrite it for you"; const b = "*\/"
+ *
+ * `/\/\*[\s\S]*?\*\//` has no idea those delimiters are inside strings, so it
+ * deleted everything between them and the stray in the middle was never scanned.
+ * The `//` rule had the same hole: a protocol-relative `"//cdn.example.com"` ate
+ * the rest of its line. Both fail SILENTLY and in the direction that matters —
+ * a guard reporting clean because it threw the evidence away is worse than no
+ * guard, because it is trusted.
+ *
+ * So this walks the source once and tracks whether it is inside a string, a
+ * template literal or a comment. Quotes inside comments and comment markers
+ * inside quotes both stop being special, which is the whole point.
  */
 export function stripNonCopy(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ')
-    .replace(/^\s*import[\s\S]*?from\s+['"][^'"]*['"]/gm, ' ')
+  let out = ''
+  let i = 0
+  // Which quote character opened the string we are inside, or null.
+  let quote: string | null = null
+
+  while (i < source.length) {
+    const ch = source[i] as string
+    const next = source[i + 1]
+
+    if (quote !== null) {
+      // A backslash escapes the next character, so an escaped quote does not
+      // close the string. Copied through, because it may be part of the copy.
+      if (ch === '\\') {
+        out += source.slice(i, i + 2)
+        i += 2
+        continue
+      }
+      if (ch === quote) quote = null
+      out += ch
+      i += 1
+      continue
+    }
+
+    if (ch === '/' && next === '*') {
+      const end = source.indexOf('*/', i + 2)
+      i = end === -1 ? source.length : end + 2
+      out += ' '
+      continue
+    }
+
+    if (ch === '/' && next === '/') {
+      const end = source.indexOf('\n', i)
+      i = end === -1 ? source.length : end
+      out += ' '
+      continue
+    }
+
+    if (ch === '"' || ch === "'" || ch === '`') quote = ch
+    out += ch
+    i += 1
+  }
+
+  return out.replace(/^\s*import[\s\S]*?from\s+['"][^'"]*['"]/gm, ' ')
 }
 
 /**
