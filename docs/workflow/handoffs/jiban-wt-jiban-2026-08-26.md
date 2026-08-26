@@ -20,7 +20,7 @@
 Sessions 12 and 13 below are one continuous session; 13 begins where the founder
 declared the owner and the lane had already been integrated by the advisor.
 
-This is **Session 12**. Sessions 1 to 11 are in `design-2026-08-25.md` (1903 lines) and
+This is **Session 12**. Sessions 1 to 11 are in `jiban-wt-jiban-2026-08-25.md` (1903 lines) and
 are still the record for every design item. Nothing in that file is superseded here.
 
 **Read this first, because it changes the shape of the lane:** the 31 design commits are
