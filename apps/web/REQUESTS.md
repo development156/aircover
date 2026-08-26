@@ -1691,3 +1691,40 @@ and it was wrong; corrected here and in `docs/54`.
 with the reason in the skip, so a root run reports "not applicable" instead of
 "failing". That is a change to another lane's file, so it is recorded rather than
 made.
+
+## 27. The gate workflow fired on two pushes and then silently stopped
+
+MEASURED 2026-08-26, within an hour of adding it. `.github/workflows/gate.yml`
+produced runs for `98849d9` (cancelled by the next push) and `3394d38` (green,
+11m31s), and then produced **nothing** for `eb227bb` or `2a5c9d4`. Both commits
+reached the remote — Vercel built and deployed each — and `2a5c9d4`'s check list
+on the pull request held only Vercel's own two entries.
+
+Ruled out by checking rather than by reasoning:
+
+- **Not a broken file.** The YAML parses; the only change between the last
+  firing and the first miss is a comment.
+- **Not disabled.** `GET /actions/workflows` reports `state: active`.
+- **Not an account-wide Actions block.** `post-deploy smoke` ran at 04:35 and
+  04:37, `status page` at 04:30.
+- **Not unrunnable.** A manual `workflow_dispatch` on the same head started
+  immediately and went green (run 3, 10m41s).
+
+So the workflow is fine and the `pull_request` synchronize event did not arrive
+twice in a row. **The cause is unknown.** The tempting story — that pushes made
+with a session's proxy-injected GitHub credentials do not raise the event — does
+not survive the first two runs, which came from the same credentials on the same
+branch.
+
+**What was done about it:** the trigger no longer depends on that event. `on:
+push` now covers every branch, because a push is the thing that certainly
+happened: the commit is on the remote. `pull_request` is kept for anything
+arriving without a push here, and the concurrency group is keyed on the head
+commit rather than the ref so the two events collapse into one run per commit
+instead of doubling the bill.
+
+**Why this is recorded rather than closed:** a check that silently does not run
+is worse than no check, because the pull request looks covered. If a run goes
+missing again after this change, the `push` event has failed too and the next
+step is to stop trusting the Actions UI as evidence — a lane's own
+`pnpm gate` output is then the only thing that says the gate ran.

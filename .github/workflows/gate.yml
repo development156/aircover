@@ -43,11 +43,24 @@
 name: gate
 
 on:
-  pull_request:
-  # Pushes to the integration branches, so a merge that goes wrong is caught on
-  # the branch it went wrong on rather than on the next lane's pull request.
+  # EVERY branch, not only the integration ones, and this is the important line.
+  #
+  # MEASURED 2026-08-26: this workflow fired on two pushes to an open pull
+  # request (runs 1 and 2) and then did NOT fire on the next two — `eb227bb` and
+  # `2a5c9d4` both landed, both deployed on Vercel, and neither produced a run.
+  # The workflow was valid and `state: active` throughout, other workflows ran in
+  # the same minutes, and a manual dispatch of this one succeeded immediately
+  # (run 3, green). So the `pull_request` synchronize event is not something to
+  # depend on here; the cause is still unknown and is recorded in REQUESTS §27.
+  #
+  # A push to a branch is the event that certainly happened, because the commit
+  # is on the remote. Keying off it means coverage does not rest on GitHub
+  # deciding to tell us about a pull request.
   push:
-    branches: [wt-core, wt-web, main]
+  # Kept as well, for anything that arrives as a pull request without a push to
+  # this repository. The concurrency group below collapses the pair so one
+  # commit still costs one run.
+  pull_request:
   workflow_dispatch:
     inputs:
       ack_target:
@@ -59,11 +72,17 @@ on:
         required: false
         default: ''
 
-# Two pushes to the same branch: the older run is pointless the moment the newer
-# one starts, and a queue of superseded runs is how a ten-minute check becomes a
-# forty-minute one.
+# Keyed on the COMMIT, not the ref, and that is deliberate now that `push` and
+# `pull_request` both fire. For a pull request `github.sha` is the merge commit
+# and `head.sha` is the real one, so this expression resolves to the same value
+# from either event and the two runs collapse into one instead of doubling the
+# bill for every commit.
+#
+# Cancelling is still right within a commit: two pushes to a branch make the
+# older run pointless the moment the newer starts, and a queue of superseded
+# runs is how a ten-minute check becomes a forty-minute one.
 concurrency:
-  group: gate-${{ github.ref }}
+  group: gate-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 permissions:
