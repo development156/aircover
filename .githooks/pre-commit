@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+#
+# Refuse a commit that stages a file which is scratch, not work.
+#
+# ── WHY THIS EXISTS ──────────────────────────────────────────────────────────
+# `ops/state/qa.pending.json` is rewritten by EVERY gate run and attributes that
+# run to whichever card is open (REQUESTS §18). It is tracked, because other
+# lanes read it, so `.gitignore` is the wrong tool. The rule has always been
+# "revert it, never commit it" — and on 2026-08-25 one session committed it
+# twice in three commits, both times via `git add -A`, once IMMEDIATELY after
+# reverting it for the same reason.
+#
+# A rule that lives only in somebody's head is a rule that gets broken by a
+# habit. This puts it where the habit runs.
+#
+# ── HOW TO INSTALL ───────────────────────────────────────────────────────────
+#   git config core.hooksPath .githooks
+#
+# `scripts/cloud-setup.sh` does it for cloud sessions. On a laptop it is a
+# one-off, and `scripts/lib/pre-commit-hook.test.mjs` fails if the hook stops
+# refusing, so a broken hook is caught even where nobody installed it.
+#
+# ── THE ESCAPE HATCH, AND WHEN IT IS RIGHT ───────────────────────────────────
+# `ALLOW_QA_PENDING=1 git commit …`. There is one legitimate case: a deliberate
+# change to the file's SHAPE rather than to a run's contents. That is rare
+# enough to be worth typing.
+set -euo pipefail
+
+SCRATCH='ops/state/qa.pending.json'
+
+if [ -n "${ALLOW_QA_PENDING:-}" ]; then
+  exit 0
+fi
+
+if git diff --cached --name-only | grep -qx "$SCRATCH"; then
+  echo "Refusing the commit: $SCRATCH is staged." >&2
+  echo >&2
+  echo "  That file is scratch — every gate run rewrites it and attributes the" >&2
+  echo "  run to whichever card is open (REQUESTS §18). Committing it puts one" >&2
+  echo "  session's local run into everybody else's tree." >&2
+  echo >&2
+  echo "  Unstage it:   git restore --staged $SCRATCH" >&2
+  echo "  And revert:   git checkout -- $SCRATCH" >&2
+  echo >&2
+  echo "  Genuinely changing its SHAPE?  ALLOW_QA_PENDING=1 git commit ..." >&2
+  exit 1
+fi
+
+exit 0

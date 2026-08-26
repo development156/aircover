@@ -83,7 +83,14 @@ export default async function BrainKnowledgePage({
           title="Give Sahoda something to read"
           body="Your menu, your rate card, your returns policy, the answer to the question customers keep asking. Sahoda keeps the words and remembers which document each one came from."
           action={<AddDocument />}
-          tip="A post that names a price should be naming one you gave me, not one I guessed."
+          /* WAS: "A post that names a price should be naming one you gave me,
+             not one I guessed." Nothing grounds a post's price in this library —
+             `packages/mesh` has no reference to knowledge at all, and no
+             composer, posts or gate path reads a passage. The sentence
+             described behaviour that does not exist. What IS true is the
+             resolve: `resolveFromLibrary` reads these passages and writes the
+             Brand Brain from them. See docs/46. */
+          tip="Resolve your Brand Brain from these and I write from your words, not from what I guessed about you."
         />
       </Shell>
     )
@@ -150,9 +157,9 @@ function Shell({ children, action = false }: { children: React.ReactNode; action
         <div className="min-w-0">
           <h1 className="type-h1">Knowledge</h1>
           <p className="mt-1 max-w-[62ch] type-body text-muted">
-            The documents Sahoda has read about your business, and the passages it can quote. A post
-            that names a price uses one from here, or it does not name one. Adding a document is
-            free.
+            The documents Sahoda has read about your business, and the passages you can search.
+            Resolve your Brand Brain from them and it works from your words rather than its guesses.
+            Adding a document is free.
           </p>
         </div>
         {action ? (

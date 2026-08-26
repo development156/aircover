@@ -13,6 +13,7 @@
     "lint": "node ../../scripts/lint.mjs ."
   },
   "dependencies": {
+    "@sahoda/research": "workspace:*",
     "@sahoda/shared": "workspace:*",
     "zod": "^4.4.3"
   }

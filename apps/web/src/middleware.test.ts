@@ -79,6 +79,7 @@ const PUBLIC_PATTERNS = [
   // The fifth, 2026-08-25. Same shape, same reason, and the sentence above is
   // worth re-reading with a fifth entry in hand.
   '/api/cron/radar',
+  '/api/cron/brain',
 ]
 
 /**
@@ -135,6 +136,7 @@ const CLERK_BYPASS_PATHS = [
   '/api/cron/loop',
   '/api/cron/playbooks',
   '/api/cron/radar',
+  '/api/cron/brain',
   '/api/webhooks/cashfree',
   '/api/webhooks/clerk',
   // Added 2026-08-23, by two lanes independently, and both reasons are kept
