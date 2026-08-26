@@ -1315,6 +1315,21 @@ corrupts the record of the incident itself, and an incident review is exactly
 where somebody reads these rows as evidence. Reverted here too, which makes at
 least five reverts across three sessions.
 
+**A NINTH revert, 2026-08-26, wt-divas2, and this one names a new cause.** Four
+more rows queued against SL-054, all `"status": "pass"`, all `"actor": "claude"`.
+None came from a gate run: they are a SUBAGENT's throwaway probe files, run and
+deleted inside one audit. The tests they record **no longer exist**.
+
+So the hook does not merely misattribute a real run. It will file pass evidence
+for a suite that has been deleted, onto a production-incident card, from a
+process the person at the keyboard never started. Anything that shells out to
+vitest deposits a row, including an agent measuring something for thirty seconds.
+
+Two things follow for whoever fixes this. The `task_code` should come from the
+work, not from whatever sits in the board's in-progress column. And a run whose
+test files are gone by the time the row is written is not evidence of anything
+and should not be queued at all.
+
 ## 19 · For the advisor — refining what a person types in onboarding
 
 **Owner ruling wanted, plus two things this lane may not write.** Asked for by
