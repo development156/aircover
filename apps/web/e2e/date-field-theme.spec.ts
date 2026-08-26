@@ -40,6 +40,25 @@ test.describe('date fields follow the app theme', () => {
     await page.waitForURL(/\/onboarding/, { timeout: 90_000 })
     await page.goto('/posts/new')
     await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 90_000 })
+
+    /**
+     * ── TWO CLICKS TO REACH THE FIELD, AND THE FIRST ONE IS NEW ───────────────
+     * `FinishPanel` now asks which route the post takes before offering either
+     * set of controls, so the schedule side has to be opened.
+     *
+     * The SECOND click is not new and this spec never made it. `ScheduleField`
+     * has rendered the native `datetime-local` only behind "Pick an exact time"
+     * since the named-times redesign — the whole point of that change was that
+     * the raw `dd/mm/yyyy, --:--` mask stopped being the interface. So
+     * `#post-schedule` was not in the DOM when this file asserted it was
+     * visible, and the assertion could not have passed.
+     *
+     * It went unnoticed because this spec carries no `@smoke` tag, and
+     * `turbo test` runs Vitest only: nothing in the gate has ever executed it.
+     * That is the same gap CLAUDE.md records for `golden-path`, found again.
+     */
+    await page.getByRole('button', { name: /^Schedule it/ }).click()
+    await page.locator('[data-schedule-choice="exact"]').click()
     await expect(page.locator(FIELD)).toBeVisible()
 
     // THE DISCRIMINATING CONDITION. playwright.config.ts declares no
