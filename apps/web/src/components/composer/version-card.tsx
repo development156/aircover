@@ -10,6 +10,7 @@ import { ChannelMark } from '@/components/posts/channel-mark'
 import { ChannelMeterView } from '@/components/posts/channel-meter'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
 import { InlineError } from '@/components/posts/inline-error'
+import { ImproveCopy } from '@/components/posts/improve-copy'
 import { InlineRewrite } from '@/components/posts/inline-rewrite'
 import { LiveLink } from '@/components/posts/live-link'
 import { Textarea } from '@/components/ui/textarea'
@@ -227,6 +228,11 @@ export function VersionCard({
         onClear={() => onBodyChange('')}
         onInsert={insert}
       />
+
+      {/* Under the tools row, NOT in it. Everything in that row edits the text
+          immediately, cannot fail and costs nothing; this one calls a model,
+          spends a credit and can be refused. See `copy-tools.tsx`. */}
+      <ImproveCopy target={`${label} copy`} body={state.body} onAccept={onBodyChange} />
 
       <ChannelMeterView meter={meter} fixes={fixes} />
 

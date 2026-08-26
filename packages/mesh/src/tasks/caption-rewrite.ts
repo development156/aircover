@@ -9,16 +9,58 @@ import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
 import { PROSE_RULES } from '../prose-rules'
 
-const MAX_TOKENS = 512
+/**
+ * A WHOLE-BODY BUDGET, NOT A FRAGMENT ONE.
+ *
+ * 512 was right while the only caller was the selection toolbar, which sends a
+ * phrase. The tone modes send the WHOLE caption, and the longest legal one is
+ * LinkedIn's 3,000 characters — roughly 750 to 1,000 tokens of English before
+ * JSON escaping, and more for a script that does not tokenise as cheaply as
+ * Latin. A 512-token ceiling would have truncated those mid-sentence and
+ * returned the fragment as a finished rewrite, which is a silent corruption of
+ * the writer's post rather than a visible failure.
+ *
+ * It costs nothing on the short calls. `maxTokens` is a ceiling, not a target:
+ * the model stops when the caption is finished, and a three-word shorten still
+ * bills three words. The schema's own 8,000-character cap is what bounds the
+ * INPUT side of the same flat charge.
+ */
+const MAX_TOKENS = 1_600
+
+/**
+ * The one sentence every tone mode carries.
+ *
+ * Separate from each directive rather than repeated inside them, because the
+ * repetition is the thing that drifts: four near-identical clauses is four
+ * chances for one of them to be softened by a later edit, and a mode that lost
+ * it would start inventing claims about a real business. `MEANING_RULE` is
+ * asserted directly by the tests, so removing it from the prompt is visible.
+ */
+const MEANING_RULE =
+  'Keep every fact, claim, number, name and offer exactly as written. Invent nothing and remove nothing. Fix spelling, grammar and punctuation. The result must say what the author said.'
 
 const DIRECTIVES: Record<CaptionRewriteInput['instruction'], string> = {
   rewrite: 'Rewrite it to read clearer and more on-brand, at roughly the same length and meaning.',
   shorten: 'Make it noticeably shorter and tighter without losing the core message.',
   hookify: 'Rework the opening into a strong, scroll-stopping hook; keep the rest intact.',
+  // ── THE FOUR TONE MODES ────────────────────────────────────────────────────
+  // Each one changes HOW the caption reads and nothing about WHAT it says. The
+  // meaning rule is appended to all four below.
+  polish: `Fix the writing without changing the voice: grammar, spelling, punctuation and word order only. Keep the author's own phrasing wherever it is already correct, and keep the length close to what it was. ${MEANING_RULE}`,
+  professional: `Rewrite it in a measured, professional register: precise wording, complete sentences, no slang and no filler. Do not make it stiff or corporate. ${MEANING_RULE}`,
+  friendly: `Rewrite it in a warm, conversational register, the way the owner would say it to a regular customer. Plain words, contractions welcome. ${MEANING_RULE}`,
+  // The founder's own word for this mode. It means more expressive LANGUAGE and
+  // never a new fact, which is why the rule below is stated twice over: once
+  // here in the mode's own terms, and once in MEANING_RULE.
+  creative: `Rewrite it with more vivid, concrete language and a livelier rhythm. Be expressive about the things the author already mentioned; do NOT add details, examples, benefits or claims they did not write. ${MEANING_RULE}`,
 }
 
 const SYSTEM_BASE =
   'You edit social captions. Output ONLY a JSON object {"text": string} — no markdown, no commentary. Preserve @mentions, #hashtags, and links exactly.'
+
+/** Exported for the tests, which assert the rule reaches every tone mode. */
+export const TONE_MODES = ['polish', 'professional', 'friendly', 'creative'] as const
+export { MEANING_RULE }
 
 const def: MeshTaskDef<CaptionRewriteInput, CaptionRewriteOutput> = {
   name: 'caption_rewrite',
