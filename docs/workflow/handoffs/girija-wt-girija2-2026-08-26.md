@@ -401,3 +401,54 @@ immediately before the commit, which added exactly the two files it covers.
 
 **Last read at 16:23:49Z. The GitHub MCP server disconnected afterwards, so
 anything later than that is unverified from this session.**
+
+---
+
+## Addendum — the FORCED full gate, and why it is red for a reason that is not this diff
+
+Run after the handoff commit, because `lane-sync push` names it as the gate
+`wt-core` requires. **It is worth recording because it goes RED and the next
+person to run it will otherwise blame this lane.**
+
+```
+pnpm turbo run typecheck lint test --force
+  Tasks:    26 successful, 27 total
+  Cached:    0 cached, 27 total
+  Time:    5m20.216s
+  Failed:    @sahoda/web#test          exit 1
+```
+
+**One test, and it is a TIMEOUT, not an assertion:**
+
+```
+FAIL src/lib/media/crop-geometry.test.ts > fitInBand >
+     every result over a wide sweep of sizes verifies against the engine
+Error: Test timed out in 5000ms.
+```
+
+**MEASURED, three ways, and they agree:**
+
+| run | same suite | result | duration |
+| --- | --- | --- | --- |
+| `--filter=@sahoda/web`, earlier, same tree | 4989 | **4976 passed, 0 failed** | 136.61s |
+| `--force`, all 27 tasks concurrent, no cache | 4989 | 4975 passed, **1 failed** | **260.13s** |
+| `crop-geometry.test.ts` ALONE | 28 | **28 passed** | **3.26s** |
+
+The suite runs **1.9× slower** under a full no-cache fan-out, and a property
+sweep with a 5-second budget is the first thing to fall off. Alone it finishes
+in 3.26 seconds, which is 1500ms of headroom against its own limit.
+
+**It cannot be this diff.** `c288317` changes two files —
+`apps/web/src/lib/clerk-appearance.ts` and
+`apps/web/src/lib/design/clerk-dark-legibility.test.ts`. Neither is imported by
+`src/lib/media/crop-geometry.ts`, and neither is touched by it.
+
+**This is NOT filed as "a flake".** It is a real contention limit with a
+reproducible trigger, and it is the same shape REQUESTS §23 already records for
+the PGlite suites — `scripts/gate.mjs` passes `--concurrency=1` for exactly this
+reason, and `--force` on its own does not. **A hosted CI runner has fewer cores
+than this container**, so if the gate ever executes on GitHub this test is a
+candidate to fall over there too, and a timeout reports differently from a
+failed assertion. Worth a `testTimeout` on that one sweep, or
+`--concurrency=1` beside `--force` wherever that command is documented. Not done
+here: it is another lane's file and outside what this session was asked for.
