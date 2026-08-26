@@ -1,5 +1,14 @@
 # Handoff — design — 2026-08-25
 
+**Owner** jiban · **Lane** `wt-jiban` · **Branch** `claude/lead-design-7m7ios`
+
+> Renamed 2026-08-26 from `design-2026-08-25.md`. It predated the owner+lane
+> scheme (`a4bd0fe`), so `ls jiban-wt-jiban-*.md` did not return it and this
+> lane's own kickoff could not find its own first eleven sessions. girija's
+> research handoff flagged it as orphaned and deliberately did NOT rename it,
+> having already been burned once by inferring an owner. They were right to
+> leave it: this is jiban's lane, and only this lane could say so.
+
 **Branch** `claude/lead-design-7m7ios`, cut from `origin/wt-web` (level with it
 at session start, 0/0). Pushed: **yes**. PR
 [#2](https://github.com/development156/sahodalabs/pull/2) → `wt-core`, draft.
