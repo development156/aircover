@@ -73,9 +73,13 @@ jobs:
   checks:
     name: typecheck · lint · test · format
     runs-on: ubuntu-latest
-    # MEASURED on the container this repo develops in: the three stages take
-    # about six minutes serially. Twenty is room for a cold pnpm store and a slow
-    # PGlite boot, and short enough that a hung job is noticed the same morning.
+    # MEASURED on this workflow's own first run (run 2, commit 3394d38, a cold
+    # cache): 11m31s end to end — 18s to install, 10m15s for turbo, 5s for root
+    # vitest, 27s for prettier. Not the six minutes the same three stages take on
+    # the development container: a hosted runner has fewer cores than that
+    # machine, and `--concurrency=1` gives turbo no way to use more anyway.
+    # Twenty leaves room for a slower runner and is short enough that a hung job
+    # is noticed the same morning.
     timeout-minutes: 20
 
     steps:

@@ -1674,9 +1674,12 @@ succeeds, so the harness does not raise, so the assertion fails. Proven directly
 reports `uid 0`.
 
 It is **pre-existing and not caused by any lane**: the same two fail on a clean
-tree at `cc2e5fb`. On a GitHub Actions runner, which runs as an unprivileged
-user, they pass — so the new `gate.yml` workflow covers this leg better than any
-cloud session can, which is a second argument for it beyond the first.
+tree at `cc2e5fb`. **CONFIRMED on the runner**, not predicted: `gate.yml` run 2 (commit `3394d38`)
+reports root vitest as **14 files, 218 tests, 0 failed** in 3.72s. The same
+command here reports 2 failed. GitHub's runner is an unprivileged user, so the
+`0500` directory is genuinely unwritable and the harness raises as designed.
+That makes the workflow cover this leg better than any cloud session can, which
+is a second argument for it beyond the first.
 
 **Consequence worth stating plainly:** `pnpm gate`'s stage 2 (root vitest) is red
 in every cloud session, always, for a reason that has nothing to do with the code
