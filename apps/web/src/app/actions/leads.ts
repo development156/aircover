@@ -141,3 +141,77 @@ export async function promoteThreadToLead(input: PromoteInput): Promise<PromoteS
     return { ok: false, message: 'Could not save that as a lead. Try again.' }
   }
 }
+
+/** What a person may correct on a lead. */
+export interface LeadContactEdit {
+  name: string
+  email: string
+  phone: string
+}
+
+/**
+ * Correct a lead's contact details.
+ *
+ * ── WHY THESE THREE AND NOT `message` OR `source` ────────────────────────────
+ * These are the fields a person KNOWS BETTER than the row does: a name typed
+ * into a form wrong, a number with a digit missing, an email a customer gave
+ * over the phone. Correcting them is bookkeeping.
+ *
+ * `message` and `source` are RECORDS OF WHAT HAPPENED — what the person actually
+ * wrote, and which door they came through. Editing either turns the lead from a
+ * record into a note, and the inbox conversation it was promoted from would then
+ * disagree with the lead beside it. Neither is editable here, deliberately.
+ *
+ * `status` has its own action above, because moving a lead is a pipeline event
+ * and not a correction.
+ *
+ * ── EMPTY MEANS EMPTY, AND THAT IS A REAL EDIT ───────────────────────────────
+ * A blank field writes NULL rather than being skipped. Clearing a wrong phone
+ * number is a correction a person is entitled to make, and treating blank as
+ * "no change" would make the one edit they cannot perform the one that removes
+ * bad data. `''` and `null` are collapsed to null so the column never carries an
+ * empty string that reads as a value in every `lead.phone ? …` check.
+ */
+export async function updateLeadContact(
+  leadId: string,
+  edit: LeadContactEdit,
+): Promise<LeadActionState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to edit this lead.' }
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const trim = (value: unknown): string | null => {
+      if (typeof value !== 'string') return null
+      const clean = value.trim()
+      return clean === '' ? null : clean
+    }
+
+    // Bounded before it reaches the column. These are `text`, so a paste of a
+    // whole document would otherwise be stored and then rendered back into every
+    // card on the board.
+    const cap = (value: string | null, max: number): string | null =>
+      value === null ? null : value.slice(0, max)
+
+    const supabase = createServerSupabase()
+    const { error } = await supabase
+      .from('leads')
+      .update({
+        name: cap(trim(edit.name), 200),
+        email: cap(trim(edit.email), 320),
+        phone: cap(trim(edit.phone), 40),
+      })
+      .eq('id', leadId)
+      .eq('workspace_id', workspaceId)
+
+    if (error) return { ok: false, message: 'Could not save those details. Try again.' }
+    revalidatePath('/leads')
+    return { ok: true }
+  } catch (error) {
+    reportServerError(error, { action: 'updateLeadContact', workspaceId })
+    return { ok: false, message: 'Could not save those details. Try again.' }
+  }
+}

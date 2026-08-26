@@ -70,12 +70,59 @@ import type { NavIconName } from '@/components/shell/nav-item'
  * (`readLoop`, `readRanking`, `readPlaybooksSnapshot`) and render rows out of
  * the database; `/studio` and `/ads` open no read at all and are drawings.
  * `/radar` reads live but its own page says the weekly scan is not built, so it
- * stays `soon` — a person still cannot use it today.
+ * stays `soon` — a person still cannot use it today. (SUPERSEDED 2026-08-25;
+ * see the block below. The sentence is kept because the ruling that replaced it
+ * only makes sense against what it replaced.)
+ *
+ * ── RADAR IS IN THE RAIL (2026-08-25) ────────────────────────────────────────
+ * Founder's ruling, from a screenshot: "Radar is not showing on sidebar, only
+ * showing on search bar." It is `live` now, and the two facts that make that
+ * honest rather than a loosening were both MEASURED against the production
+ * database on the day:
+ *
+ *   · All five tables exist — `competitors`, `competitor_sources`,
+ *     `competitor_snapshots`, `competitor_changes`, `competitor_subscriptions`
+ *     — each with RLS policies on it.
+ *   · A member can really subscribe. `public.radar_subscribe` is granted to
+ *     `authenticated` and `lib/radar/store.ts` is bound to it, so adding a
+ *     business to the watch list writes a row and removing one deletes it.
+ *
+ * `roadmap-honesty.spec.ts` had already reached the same conclusion from the
+ * other direction and dropped `/radar` from its ALLOWED list, with the reasoning
+ * written out at the removal: "a screen that reads a real table and states
+ * precisely which half of itself is unbound is not a roadmap section". This flag
+ * was the last place still calling it one.
+ *
+ * WHAT IS STILL NOT BUILT, so that `live` is not read as more than it says: the
+ * weekly scan does not run. `runRadarPass` exists in `apps/jobs/src/radar/` and
+ * nothing calls it but its own tests and a manual script — there is no
+ * `schedules.task` for it — so every one of those five tables is EMPTY. The
+ * screen says so itself, in its own words, rather than drawing an empty feed as
+ * "nothing changed". `live` here means the section works as far as it claims to,
+ * which is the same standard every other `live` section is held to.
  *
  * So three of the six SOON labels the rail was showing were on working screens.
  * Correcting them is not a loosening: it removes the word from three sections
  * that had stopped deserving it, and `roadmap-honesty.spec.ts` is what would
  * catch it if any of them started lying again.
+ *
+ * ── THREE BUILT SECTIONS LEFT THE MENU ENTIRELY (2026-08-25) ─────────────────
+ * Founder's ruling: `/playbooks`, `/remix` and `/sites` are hidden. Not marked
+ * `soon`, not moved down a group — REMOVED from this list, and so from all three
+ * surfaces at once.
+ *
+ * `soon` would have been the wrong tool and the wrong claim. It means "drawn,
+ * not built", and all three of these are built and working. Labelling a working
+ * screen "Soon" to get it out of the rail is the kind of small lie the two
+ * rulings above exist to prevent.
+ *
+ * So they are simply absent, and each is declared in `NOT_A_NAV_SECTION` in
+ * `reachable.test.ts` with how it is now reached. `/sites` still has a real door
+ * — the Leads page links to it. `/playbooks` and `/remix` have none and are
+ * URL-only, which is stated there rather than left to be discovered.
+ *
+ * The routes are untouched. Hiding a section is one deletion from this array;
+ * restoring it is one addition. Nothing else needs to change.
  */
 
 /** Built and connected, or drawn and honest about it. There is no third state. */
@@ -147,18 +194,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         hint: 'Photos you can reuse on any post',
         state: 'live',
       },
-      // Remix moved ABOVE Studio on 2026-08-21, and the move is the ordering rule
-      // working rather than a preference: it became `live`, and `reachable.test.ts`
-      // requires everything built to come before everything unbuilt inside a
-      // group. Leaving it in place would have failed that test.
-      {
-        href: '/remix',
-        label: 'Remix',
-        icon: 'shuffle',
-        guide: 'nav.remix',
-        hint: 'Turn one post into a week of them',
-        state: 'live',
-      },
       {
         href: '/studio',
         label: 'Studio',
@@ -186,14 +221,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: 'check-check',
         guide: 'nav.approvals',
         hint: 'Everything waiting on your decision',
-        state: 'live',
-      },
-      {
-        href: '/sites',
-        label: 'Sites',
-        icon: 'globe',
-        guide: 'nav.sites',
-        hint: 'Generate a website from your Brand Brain',
         state: 'live',
       },
       {
@@ -252,7 +279,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: 'radar',
         guide: 'nav.radar',
         hint: 'What the businesses beside you are doing',
-        state: 'soon',
+        // `live` since 2026-08-25 — see "RADAR IS IN THE RAIL" in the header.
+        state: 'live',
       },
     ],
   },
@@ -265,14 +293,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: 'refresh-cw',
         guide: 'nav.loop',
         hint: 'The weekly cycle, and how much it may do alone',
-        state: 'live',
-      },
-      {
-        href: '/playbooks',
-        label: 'Playbooks',
-        icon: 'book-open',
-        guide: 'nav.playbooks',
-        hint: 'When this happens, write that',
         state: 'live',
       },
     ],

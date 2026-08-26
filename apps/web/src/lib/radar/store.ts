@@ -1,12 +1,36 @@
 import 'server-only'
 
+import {
+  bindChanges,
+  type CollectorChangeRow,
+  type CollectorSnapshotRow,
+  type SourceFacts,
+} from './from-collector'
 import { UNWIRED, type RadarStore } from './port'
 import { createServerSupabase } from '@/lib/supabase/server'
 
-import type { Competitor, CompetitorKind, RadarSnapshot } from './types'
+import type { Competitor, CompetitorKind, RadarChange, RadarDay, RadarSnapshot } from './types'
 
 /**
- * RADAR OVER SUPABASE — DELIBERATELY NOT BOUND, AND THIS IS THE SECOND VERSION.
+ * RADAR OVER SUPABASE — BOUND, AND THIS IS THE THIRD VERSION.
+ *
+ * ── BOUND 2026-08-25, WATCH LIST AND CHANGE FEED BOTH ───────────────────────
+ * The two blocks below describe the first version (which guessed a column name
+ * and 500'd every request) and the second (which deliberately bound nothing).
+ * Both are kept because this version is the answer to them and would read as
+ * recklessness without them.
+ *
+ * What changed is that the guessing stopped. Every name in every query here was
+ * read out of `information_schema.columns` against the production project; every
+ * embed was checked against `pg_constraint` for a real foreign key; and every
+ * table's RLS policy was read before the query was written, because a policy that
+ * does not admit the caller returns an EMPTY RESULT rather than an error, and a
+ * silently empty change feed is the claim "nothing changed" about somebody else's
+ * business.
+ *
+ * The one thing still unbound is `attempts` — see `groupByDay`. The collector
+ * records failed fetches in `radar_fetch_log` and this file does not read it, so
+ * the feed can say what moved and cannot yet say who it failed to reach.
  *
  * ── WHAT THE FIRST VERSION DID, AND WHAT IT COST ────────────────────────────
  * It queried `competitors` for `id, name, url, kind, added_on, last_observed_at`
@@ -62,20 +86,17 @@ import type { Competitor, CompetitorKind, RadarSnapshot } from './types'
  * a correct binding returns an honest empty state rather than rows — which means
  * "it renders" proves nothing here, and only a query that actually runs does.
  *
- * ── WHAT WT-RADAR OWES, AND WHERE IT GOES ───────────────────────────────────
- * `port.ts` holds the full contract. Binding it is this one file:
+ * ── THE CONTRACT `port.ts` SET, AND WHERE EACH CLAUSE LANDED ────────────────
  *
  *   · `read()` — the watch list AND the change records, returning
- *     `collector: 'reading'` once BOTH are queried. Return
- *     `'watch-list-only'` if the changes are not available yet, so an empty feed
- *     is never rendered as the claim "nothing changed".
- *   · `add()` / `remove()` — against that lane's real columns.
- *   · Scan attempts MUST be stored on FAILURE too, or "we could not check
- *     today" cannot be rendered, and that state is the point of the screen.
- *
- * Until then every workspace sees `collector: 'absent'`, which the screen draws
- * as "the weekly scan is not built yet" — true of this branch, and the sentence
- * `roadmap-honesty` holds `/radar` to.
+ *     `collector: 'reading'` once BOTH are queried. DONE. `watch-list-only` is
+ *     still returned when the change read FAILS, which is what keeps an empty
+ *     feed from ever being rendered as "nothing changed".
+ *   · `add()` / `remove()` — against the real columns. DONE.
+ *   · Scan attempts stored on FAILURE too, so "we could not check today" can be
+ *     rendered. NOT DONE HERE: `radar_fetch_log` exists and this file does not
+ *     read it, so `attempts` is empty on every day. That state is the point of
+ *     the screen, and it is the honest gap left in this binding.
  */
 
 /**
@@ -108,6 +129,140 @@ function kindFromRegistry(kind: string): CompetitorKind {
   return kind === 'instagram' ? 'instagram' : 'website'
 }
 
+/**
+ * The change feed for a set of watched competitors, or null if it could not be read.
+ *
+ * NULL IS A REAL ANSWER AND NOT AN ERROR TO SWALLOW. The caller turns it into
+ * `watch-list-only` — "Radar cannot tell you either way" — because an empty feed
+ * rendered after a failed read is the claim "nothing changed", about somebody
+ * else's business, made out of a broken query.
+ *
+ * ── TWO ROUND TRIPS, ON PURPOSE ───────────────────────────────────────────────
+ * `competitor_changes` carries TWO foreign keys to `competitor_snapshots`
+ * (`from_snapshot_id`, `to_snapshot_id`), so embedding both in one PostgREST
+ * select means disambiguating by constraint name — a spelling that lives in the
+ * database and fails at RUNTIME, not at compile time, when it drifts. This file
+ * has already paid for one of those: a guessed column name cost every /radar
+ * request a 500. Two plain selects and a join in TypeScript cannot fail that way.
+ *
+ * RLS does the tenancy, and it was READ before this was written rather than
+ * assumed: `competitor_changes.t_select` and `competitor_snapshots.t_select` each
+ * admit a member through `competitor_sources -> competitor_subscriptions ->
+ * app.member_workspace_ids()`. The `in` filters below are a correctness filter on
+ * top of that, never the boundary.
+ */
+async function readChanges(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  competitors: readonly Competitor[],
+): Promise<RadarDay[] | null> {
+  const names = new Map(competitors.map((c) => [c.id, c.name]))
+
+  const { data: sourceRows, error: sourceError } = await supabase
+    .from('competitor_sources')
+    .select('id, competitor_id, locator')
+    .in(
+      'competitor_id',
+      competitors.map((c) => c.id),
+    )
+  if (sourceError || !sourceRows) return null
+  if (sourceRows.length === 0) return []
+
+  const sources = new Map<string, SourceFacts>(
+    sourceRows.map((row) => [
+      String(row.id),
+      { competitorId: String(row.competitor_id), locator: String(row.locator ?? '') },
+    ]),
+  )
+
+  const { data: changeRows, error: changeError } = await supabase
+    .from('competitor_changes')
+    .select(
+      'id, source_id, from_snapshot_id, to_snapshot_id, change_kind, day_span, summary, detail, detected_at',
+    )
+    .in('source_id', [...sources.keys()])
+    .order('detected_at', { ascending: false })
+    .limit(CHANGE_LIMIT)
+  if (changeError || !changeRows) return null
+  if (changeRows.length === 0) return []
+
+  const rows = changeRows as unknown as CollectorChangeRow[]
+  const snapshotIds = [...new Set(rows.flatMap((r) => [r.from_snapshot_id, r.to_snapshot_id]))]
+
+  const { data: snapshotRows, error: snapshotError } = await supabase
+    .from('competitor_snapshots')
+    .select('id, source_id, captured_at')
+    .in('id', snapshotIds)
+  // Changes we can see whose EVIDENCE we cannot is not a feed with gaps in it —
+  // it is a feed with no provenance, and this screen may not print one.
+  if (snapshotError || !snapshotRows) return null
+
+  const snapshots = new Map<string, CollectorSnapshotRow>(
+    snapshotRows.map((row) => [String(row.id), row as unknown as CollectorSnapshotRow]),
+  )
+
+  const { changes } = bindChanges(rows, snapshots, sources, names)
+  return groupByDay(changes)
+}
+
+/**
+ * Changes into days, newest first.
+ *
+ * `attempts` is EMPTY on every day, and that is a real gap rather than an
+ * oversight. The screen models a scan that was tried and failed — "we asked and
+ * the answer did not come back" — and the collector records those in
+ * `radar_fetch_log`, a table this binding does not read. So the feed can say what
+ * moved and cannot yet say which competitor it failed to reach on a given day.
+ * An empty list is the honest shape for that: `ScanAttempt` has a `not_attempted`
+ * outcome, and inventing one per competitor per day would be asserting scans that
+ * may never have run.
+ */
+function groupByDay(changes: readonly RadarChange[]): RadarDay[] {
+  const byDate = new Map<string, RadarChange[]>()
+  for (const change of changes) {
+    const bucket = byDate.get(change.observedOn)
+    if (bucket) bucket.push(change)
+    else byDate.set(change.observedOn, [change])
+  }
+  return [...byDate.entries()]
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([date, list]) => ({ date, changes: list, attempts: [] }))
+}
+
+/**
+ * How many changes one screen reads.
+ *
+ * A wall on the query, not on the truth: the feed is newest-first, so this drops
+ * the OLDEST changes rather than a random slice. Radar writes at most a handful
+ * of rows per source per week, so 200 is several months of a real watch list.
+ */
+const CHANGE_LIMIT = 200
+
+/** One row of `competitor_sources`, as this screen reads it. */
+interface RegistrySource {
+  kind: string
+  locator: string
+  last_seen_at: string | null
+}
+
+/**
+ * The most recent SUCCESSFUL read across a competitor's sources, or null.
+ *
+ * The latest rather than the earliest, and null unless at least one source has
+ * actually been seen. A competitor watched on two addresses where only one has
+ * ever loaded HAS been observed — reporting null there would say Radar has never
+ * managed to read them, which is a different and worse claim than the truth.
+ *
+ * A row whose `last_seen_at` is null contributes nothing rather than counting as
+ * a zero date, which would sort ahead of every real timestamp.
+ */
+function lastObservedFrom(sources: readonly RegistrySource[]): string | null {
+  const seen = sources
+    .map((s) => s.last_seen_at)
+    .filter((at): at is string => typeof at === 'string' && at !== '')
+  if (seen.length === 0) return null
+  return seen.reduce((latest, at) => (Date.parse(at) > Date.parse(latest) ? at : latest))
+}
+
 export function supabaseRadarStore(): RadarStore {
   return {
     /**
@@ -126,7 +281,21 @@ export function supabaseRadarStore(): RadarStore {
       const supabase = await createServerSupabase()
       const { data, error } = await supabase
         .from('competitor_subscriptions')
-        .select('competitor_id, label, created_at, competitors(id, display_name, created_at)')
+        // ONE STRING LITERAL, NOT A CONCATENATION. supabase-js parses this at
+        // the TYPE level to shape the result; built with `+` it degrades to
+        // `GenericStringError` and every field access below fails to compile.
+        // The compile error is the good outcome — the same select assembled at
+        // runtime would have typed as `any` and shipped.
+        //
+        // The SOURCES carry the address, the kind and the last successful read.
+        // Before this they were `url: ''`, a hardcoded `website` and a flat
+        // `null` — three fields the screen printed without having looked. Column
+        // names come from `information_schema.columns` against the production
+        // project on 2026-08-25, not from a doc: guessing them is what cost every
+        // /radar request a 500 the first time.
+        .select(
+          'competitor_id, label, created_at, competitors(id, display_name, created_at, competitor_sources(kind, locator, last_seen_at))',
+        )
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: true })
 
@@ -143,27 +312,60 @@ export function supabaseRadarStore(): RadarStore {
           id: string
           display_name: string
           created_at: string
+          competitor_sources?: RegistrySource[] | null
         } | null
+        const sources = c?.competitor_sources ?? []
+        // The FIRST source is the one the screen shows. A competitor may carry
+        // several (a website and an Instagram account), and the watch list has
+        // one line per business rather than per address — so this names one and
+        // the others are not silently merged into it.
+        const primary = sources[0] ?? null
+
         return {
           id: c?.id ?? String(row.competitor_id),
           // `display_name`, NOT `name`. The column the first binding guessed at
           // does not exist, and the guess cost every /radar request a 500.
           name: row.label ?? c?.display_name ?? 'Competitor',
           // The registry stores a normalised LOCATOR per source, not one url on
-          // the competitor. Sources are a separate read this binding does not do
-          // yet, so the honest answer is an empty string rather than a fabricated
-          // address.
-          url: '',
-          kind: kindFromRegistry('website'),
+          // the competitor. An address that is genuinely absent stays an empty
+          // string — the screen draws nothing for it — rather than becoming a
+          // guess at the competitor's home page.
+          url: primary?.locator ?? '',
+          kind: kindFromRegistry(primary?.kind ?? 'website'),
           addedOn: String(row.created_at ?? c?.created_at ?? ''),
-          // NEVER inferred. No successful read has been recorded for anyone —
-          // competitor_snapshots is empty — and inventing a timestamp here is
-          // exactly the fabrication the screen's provenance guard exists to stop.
-          lastObservedAt: null,
+          // STILL NEVER INFERRED — but it is now READ rather than assumed.
+          //
+          // `last_seen_at` moves only on a successful read (apps/jobs pg.ts sets
+          // it under `seen`), which is exactly the contract this field states.
+          // Null still means no successful read has ever happened, which is true
+          // of every row today because nothing runs the scan — the difference is
+          // that it is now the database saying so rather than this file.
+          lastObservedAt: lastObservedFrom(sources),
         }
       })
 
-      return { collector: 'watch-list-only', competitors, days: [] }
+      // ── THE CHANGE FEED ───────────────────────────────────────────────────
+      // Bound 2026-08-25. Until then this returned `watch-list-only`
+      // unconditionally and the feed could never render, whatever the collector
+      // had stored.
+      //
+      // A workspace watching NOBODY has no feed to read and no claim to make
+      // about one, so it keeps `watch-list-only` rather than reporting `reading`
+      // over a query that would have returned nothing anyway. The screen draws
+      // its own "you are not watching anyone yet" from `competitors` being empty.
+      if (competitors.length === 0) {
+        return { collector: 'watch-list-only', competitors, days: [] }
+      }
+
+      const feed = await readChanges(supabase, competitors)
+      // A FAILED READ IS NOT AN EMPTY FEED. `watch-list-only` is the honest
+      // answer — "Radar cannot tell you either way" — and it is the sentence the
+      // screen already has for exactly this. Returning `reading` with no days
+      // would state that nothing changed, which is the one claim this screen must
+      // never make by accident.
+      if (feed === null) return { collector: 'watch-list-only', competitors, days: [] }
+
+      return { collector: 'reading', competitors, days: feed }
     },
 
     /**

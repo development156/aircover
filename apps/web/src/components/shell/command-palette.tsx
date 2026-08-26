@@ -2,10 +2,12 @@
 
 import type { Route } from 'next'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 
 import { ALL_SECTIONS } from '@/lib/nav/sections'
+import { panelShift, panelWidthFor } from '@/lib/shell/palette-anchor'
 import { cn } from '@/lib/utils'
 
 /**
@@ -56,6 +58,15 @@ const DESTINATIONS: readonly Destination[] = [
   })),
 ]
 
+/** The stylesheet's own cap, so the derived width can never exceed it. */
+const PANEL_MAX = 520
+
+/**
+ * How far tokens.css's unlayered `:focus-visible` ring extends beyond its box —
+ * `outline: 2px` at `outline-offset: 2px`, plus a 4px shadow spread.
+ */
+const RING_OVERHANG = 4
+
 function matches(d: Destination, q: string): boolean {
   const needle = q.trim().toLowerCase()
   if (needle === '') return true
@@ -67,6 +78,14 @@ export function CommandPalette() {
   const [query, setQuery] = useState('')
   const [cursor, setCursor] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  // The TRIGGER's own element, not whatever had focus. `returnFocusRef` holds the
+  // latter and is deliberately different: ⌘K can be pressed from anywhere, and
+  // aligning the panel to a text field the reader happened to be typing in would
+  // be worse than not aligning it at all.
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [shiftX, setShiftX] = useState(0)
+  const [panelWidth, setPanelWidth] = useState<number | null>(null)
   // Results are real anchors, and Enter activates the highlighted one through
   // its own ref rather than through `useRouter`. Two reasons, in order:
   // middle-click, ⌘-click and "copy link address" all keep working; and the
@@ -118,6 +137,61 @@ export function CommandPalette() {
     return () => document.removeEventListener('keydown', onKey)
   }, [close])
 
+  /**
+   * ALIGN THE PANEL WITH THE FIELD THAT OPENED IT.
+   *
+   * `useLayoutEffect`, not `useEffect`: this runs before paint, so the panel is
+   * never shown at the wrong place and then jumped. A visible jump on every open
+   * is a worse defect than the offset it corrects.
+   *
+   * Re-measured on resize because the rail's width is a runtime fact — three
+   * widths, and the reader can collapse it — so the content column's centre moves
+   * and no constant tracks it. See `palette-anchor.ts`.
+   */
+  useLayoutEffect(() => {
+    if (!open) return
+    function measure() {
+      const trigger = triggerRef.current
+      const panel = panelRef.current
+      if (!panel) return
+      const box = trigger?.getBoundingClientRect()
+      // A hidden trigger (`max-narrow:hidden`) measures as a zero-width box, and
+      // that is NOT the same as being at x=0 — treating it as a position would
+      // slam the panel into the left edge on every phone.
+      const centre = box && box.width > 0 ? box.left + box.width / 2 : null
+
+      // WIDTH FIRST, THEN THE SHIFT, and both from the TRIGGER rather than from
+      // each other. The shift needs the panel's width, and the width now depends
+      // on the trigger — reading the panel's laid-out width here would feed the
+      // previous frame's answer back into this one.
+      const wanted = panelWidthFor({
+        triggerWidth: box && box.width > 0 ? box.width : null,
+        // `p-2.5` around the field, and the ring's overhang. Named rather than
+        // read from computed style, which would make this depend on the panel
+        // having been painted already.
+        pad: 10,
+        ringOverhang: RING_OVERHANG,
+        max: PANEL_MAX,
+      })
+      setPanelWidth(wanted)
+
+      setShiftX(
+        panelShift({
+          triggerCenterX: centre,
+          panelWidth: wanted ?? panel.getBoundingClientRect().width,
+          viewportWidth: window.innerWidth,
+          // The overlay's own `p-4`. Named here rather than read back out of the
+          // computed style: it is the same 16px either way, and a style read would
+          // make this depend on the panel having been painted already.
+          pad: 16,
+        }),
+      )
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [open])
+
   useEffect(() => {
     if (open) inputRef.current?.focus()
   }, [open])
@@ -147,6 +221,7 @@ export function CommandPalette() {
           dialog rather than accepting text in place — an actual <input> here
           would promise inline search it does not do. */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={(event) => {
           returnFocusRef.current = event.currentTarget
@@ -168,82 +243,240 @@ export function CommandPalette() {
         </kbd>
       </button>
 
-      {open ? (
-        <div
-          className="fixed inset-0 z-40 flex items-start justify-center bg-ink/30 p-4 pt-[12vh]"
-          onClick={close}
-          role="presentation"
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Search Sahoda"
-            onClick={(event) => event.stopPropagation()}
-            className="glass w-full max-w-[520px] overflow-hidden rounded-xl shadow-lg"
-          >
-            <div className="flex items-center gap-2 border-b border-line-soft px-3">
-              <Search size={15} className="shrink-0 text-muted" aria-hidden />
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value)
-                  setCursor(0)
-                }}
-                onKeyDown={onInputKey}
-                placeholder="Go to…"
-                aria-label="Search destinations"
-                className="h-[46px] w-full bg-transparent text-[13px] text-ink outline-none placeholder:text-muted"
-              />
-            </div>
+      {/*
+        THROUGH A PORTAL TO <body>, AND THAT IS A BUG FIX RATHER THAN TIDYING.
 
-            {results.length === 0 ? (
-              /* An empty state that says what it searched, not just "no
+        ── THE DEFECT ──────────────────────────────────────────────────────────
+        `<CommandPalette />` is rendered INSIDE `<header className="glass">`
+        (topbar.tsx), and `glass` sets `backdrop-filter`. An element with a
+        `backdrop-filter` other than `none` becomes a CONTAINING BLOCK for every
+        descendant, INCLUDING `position: fixed` ones. So `fixed inset-0` here
+        never meant the viewport — it meant the topbar.
+
+        MEASURED in Chromium against the shipped stylesheet, viewport 1879x1007,
+        header 60px tall, `backdrop-filter: blur(20px) saturate(1.6)`:
+
+          palette inside the header   overlay box  1834 x 137  at (45, 0)
+          palette at <body>           overlay box  1879 x 1007 at (0, 0)
+
+        The scrim therefore covered a STRIP ACROSS THE TOP and the page beneath
+        was never dimmed at all. Reported as three separate defects — a "black
+        background bug" (that strip), "no difference contrast in background and
+        foreground" (an undimmed page under a floating panel), and a panel that
+        would not line up — and all three are this one fact.
+
+        ── WHY IT SURVIVED THREE PASSES ────────────────────────────────────────
+        Every earlier reproduction rendered the palette at body level, so every
+        measurement of the scrim, the panel fill and the anchor was taken in a
+        DOM that did not have this trap in it. The numbers were right about the
+        markup they were given and the markup was wrong.
+
+        A portal is the fix rather than removing `glass` from the topbar: the
+        blur there is deliberate and is the reference design's, and an overlay
+        does not belong inside a header regardless.
+      */}
+      {open && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              data-palette-overlay
+              /**
+               * `bg-[var(--scrim)]`, NOT `bg-ink/30`. Same ruling `modal.tsx` carries
+               * at its own backdrop, and this was the one overlay in the app that
+               * ignored it.
+               *
+               * ── WHAT `bg-ink/30` ACTUALLY PAINTED ──────────────────────────────
+               * MEASURED 2026-08-25 in Chromium against the real tokens:
+               *
+               *   light  page rgb(250) -> rgb(175). Dimmer, but 30% where the token
+               *          says 40%.
+               *   dark   `--ink` IS `#ffffff`. The overlay was WHITE at 30% and it
+               *          LIT the page: rgb(13) -> rgb(86), luminance 0.004 -> 0.093,
+               *          a 23x lift. The page ended up BRIGHTER than the panel over
+               *          it, so the palette read as a hole punched in a page that had
+               *          just been washed out. An inverted scrim is worse than none.
+               *
+               * And the compiled CSS carries a second, worse rule. Tailwind emits an
+               * alpha utility as a PAIR:
+               *
+               *   .bg-ink\/30{background-color:var(--ink)}
+               *   @supports (color:color-mix(in lab,red,red)){ .bg-ink\/30{…30%…} }
+               *
+               * so a browser without `color-mix` got a FULLY OPAQUE viewport-filling
+               * rectangle — solid black on light, solid white on dark. That is the
+               * black background this was reported as, and it is the same shape as
+               * the `glass` fallback fixed the day before: a declaration nobody
+               * checked because the supported path looked right.
+               *
+               * `--scrim` is a plain `rgb(0 0 0 / a)` in both themes. One rule, no
+               * `@supports` pair, no theme inversion, nothing to get wrong.
+               */
+              className="fixed inset-0 z-40 flex items-start justify-center bg-[var(--scrim)] p-4 pt-[12vh]"
+              onClick={close}
+              role="presentation"
+            >
+              <div
+                ref={panelRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Search Sahoda"
+                onClick={(event) => event.stopPropagation()}
+                // A TRANSFORM, not a margin or a left. The panel is already centred by
+                // the overlay's flexbox; a transform moves the painted result without
+                // touching that layout, so the width this was measured from cannot
+                // change underneath it and the measurement cannot feed itself.
+                style={{
+                  ...(shiftX === 0 ? {} : { transform: `translateX(${shiftX}px)` }),
+                  // Null leaves `max-w-[520px]` in charge, which is right when
+                  // there is no trigger to match.
+                  ...(panelWidth === null ? {} : { maxWidth: `${panelWidth}px` }),
+                }}
+                /**
+                 * OPAQUE, not `glass`, and this is a deliberate departure from
+                 * docs/37, which lists the command palette among the surfaces glass
+                 * is ALLOWED on.
+                 *
+                 * The rest of that list is chrome you look past — a topbar, a rail,
+                 * a bottom bar. This is a list of destinations you have to READ, and
+                 * it floats over whatever screen you opened it from. Glass only
+                 * stays legible there while `backdrop-filter` is actually blurring
+                 * the page underneath, and MEASURED 2026-08-25 it was not: the rows
+                 * behind the panel read sharply through it, word for word.
+                 *
+                 * The `@supports` guard added to `glass` on the same day fixes the
+                 * case where a browser does not SUPPORT the property. It cannot help
+                 * where a browser supports it and the effect still does not land —
+                 * an extension, a GPU fallback, a compositing setting. Legibility of
+                 * a menu must not depend on a GPU effect arriving.
+                 *
+                 * `shadow-lg` and the ring do the lifting instead: the panel reads
+                 * as floating because of its edge and its shadow, not because the
+                 * page shows through it.
+                 *
+                 * ── AND IN DARK THE FILL CANNOT DO IT, SO THE EDGE MUST ──────────
+                 * `dark:bg-surface-3`, not `bg-surface` in both. MEASURED against
+                 * the real tokens with the scrim corrected:
+                 *
+                 *   light  panel #ffffff over a scrimmed rgb(150)  2.96:1
+                 *   dark   panel --surface rgb(23) over rgb(5)     1.14:1
+                 *          panel --surface-3 rgb(41) over rgb(5)   1.40:1
+                 *
+                 * Darkening the page harder cannot help in dark — black minus more
+                 * black is still black — so the panel climbs to the TOP of the
+                 * elevation ladder instead, which is what `--surface` already is in
+                 * light. Even then 1.40:1 is a step, not a separation, which is why
+                 * `surface-ring-firm` replaced `surface-ring`: apps/web/CLAUDE.md's
+                 * standing rule is that anything which must read as a distinct
+                 * object in dark carries its own edge, because the fills are 1.04:1
+                 * apart and cannot.
+                 */
+                className="surface-ring-firm w-full max-w-[520px] overflow-hidden rounded-xl bg-surface shadow-lg dark:bg-surface-3"
+              >
+                {/*
+              THE SEARCH ROW IS INSET, AND THAT IS A BUG FIX RATHER THAN A STYLE.
+
+              tokens.css paints `:focus-visible` UNLAYERED — a 2px outline at 2px
+              offset plus a 4px shadow spread, so 4px beyond the focused box on
+              every side — which outranks the `outline-none` this input used to
+              carry. That class removed nothing; it only made the source read as
+              though it had.
+
+              The input is also focused the whole time the palette is open, so
+              that ring is not a focus state a reader sees arrive. It is simply
+              part of the panel, permanently, and it has to sit somewhere sane.
+
+              MEASURED with the old full-bleed 46px input in a 12px-padded row:
+              the ring's top edge landed 4px ABOVE the panel's own top edge, and
+              `--r-xl` is 28px, so it cut straight across the rounded corner and
+              the divider. Inset like this it sits 7px inside the top where the
+              corner needs 2.3px, and 17px inside the right edge.
+            */}
+                <div className="p-2.5">
+                  {/*
+                    THE ICON IS OUT OF FLOW, AND THAT IS WHAT MAKES THE PILL LINE
+                    UP. It used to be a flex sibling, so it pushed the input
+                    rightward inside the row. MEASURED: the focus ring then sat
+                    10px past the trigger on the left and 33px past it on the
+                    right — the same control, off by a different amount at each
+                    end.
+
+                    Out of flow, the input spans the panel's padded width, so the
+                    ring is symmetric about the panel's centre. `panelShift` puts
+                    that centre on the trigger and `panelWidthFor` makes the two
+                    widths equal; the boxes then coincide.
+
+                    `pointer-events-none` because a click on the magnifier should
+                    land in the field it decorates, not on nothing.
+                  */}
+                  <div className="relative">
+                    <Search
+                      size={15}
+                      aria-hidden
+                      className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
+                    />
+                    <input
+                      ref={inputRef}
+                      value={query}
+                      onChange={(event) => {
+                        setQuery(event.target.value)
+                        setCursor(0)
+                      }}
+                      onKeyDown={onInputKey}
+                      placeholder="Go to…"
+                      aria-label="Search destinations"
+                      className="h-9 w-full rounded-lg border border-line bg-bg pl-8 pr-3 type-sm text-ink placeholder:text-muted"
+                    />
+                  </div>
+                </div>
+
+                {results.length === 0 ? (
+                  /* An empty state that says what it searched, not just "no
                  results" — otherwise the user cannot tell a typo from a
                  surface that was never searchable. */
-              <p className="px-3 py-6 text-center text-[13px] text-muted">
-                Nothing here matches “{query.trim()}”. This searches pages, not content.
-              </p>
-            ) : (
-              <ul className="max-h-[320px] overflow-y-auto p-2">
-                {results.map((destination, index) => (
-                  <li key={destination.href}>
-                    <Link
-                      href={destination.href}
-                      ref={(node) => {
-                        linkRefs.current[index] = node
-                      }}
-                      onClick={close}
-                      onMouseEnter={() => setCursor(index)}
-                      aria-current={index === active ? 'true' : undefined}
-                      className={cn(
-                        'flex h-[38px] w-full items-center gap-3 rounded-sm px-[9px] text-left text-[13px] transition-micro',
-                        index === active ? 'bg-brand-wash text-accent' : 'text-ink-body',
-                      )}
-                    >
-                      <span className="font-medium">{destination.label}</span>
-                      <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
-                        {destination.hint}
-                      </span>
-                      {/* The same word the rail and the phone sheet use. A
+                  <p className="px-3 py-6 text-center text-[13px] text-muted">
+                    Nothing here matches “{query.trim()}”. This searches pages, not content.
+                  </p>
+                ) : (
+                  <ul className="max-h-[320px] overflow-y-auto px-2.5 pb-2.5">
+                    {results.map((destination, index) => (
+                      <li key={destination.href}>
+                        <Link
+                          href={destination.href}
+                          ref={(node) => {
+                            linkRefs.current[index] = node
+                          }}
+                          onClick={close}
+                          onMouseEnter={() => setCursor(index)}
+                          aria-current={index === active ? 'true' : undefined}
+                          className={cn(
+                            'flex h-[38px] w-full items-center gap-3 rounded-sm px-[9px] text-left text-[13px] transition-micro',
+                            index === active ? 'bg-brand-wash text-accent' : 'text-ink-body',
+                          )}
+                        >
+                          <span className="font-medium">{destination.label}</span>
+                          <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
+                            {destination.hint}
+                          </span>
+                          {/* The same word the rail and the phone sheet use. A
                           searchable roadmap section must say so in the result,
                           or the reader follows it expecting a working feature. */}
-                      {destination.soon ? (
-                        <>
-                          <span aria-hidden className="type-eyebrow flex-none text-muted">
-                            Soon
-                          </span>
-                          <span className="sr-only">, not built yet</span>
-                        </>
-                      ) : null}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      ) : null}
+                          {destination.soon ? (
+                            <>
+                              <span aria-hidden className="type-eyebrow flex-none text-muted">
+                                Soon
+                              </span>
+                              <span className="sr-only">, not built yet</span>
+                            </>
+                          ) : null}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   )
 }

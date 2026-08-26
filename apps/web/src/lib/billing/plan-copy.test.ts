@@ -194,10 +194,10 @@ describe('the dunning notice', () => {
 describe('the proration summary — costs shown before spend', () => {
   it('shows the charge, the set-off and the total as separate lines', () => {
     const lines = prorationSummary(prorate())
-    expect(lines[0]).toBe('Growth for the rest of this month: ₹749.50.')
-    expect(lines[1]).toMatch(/Less the ₹249\.50 of Starter/)
-    expect(lines[2]).toBe('You pay ₹500 today, then ₹1,499 a month.')
-    expect(lines[3]).toBe('1,750 credits land as soon as the payment clears.')
+    expect(lines[0]).toBe('Growth for the rest of this month: ₹1,999.50.')
+    expect(lines[1]).toMatch(/Less the ₹999\.50 of Starter/)
+    expect(lines[2]).toBe('You pay ₹1,000 today, then ₹3,999 a month.')
+    expect(lines[3]).toBe('1,250 credits land as soon as the payment clears.')
   })
 
   it('omits the set-off line when there is nothing to set off', () => {
@@ -215,7 +215,7 @@ describe('the proration summary — costs shown before spend', () => {
   })
 
   it('names the outcome on the button rather than saying "Continue"', () => {
-    expect(planChangeAction(prorate())).toBe('Pay ₹500 and switch to Growth')
+    expect(planChangeAction(prorate())).toBe('Pay ₹1,000 and switch to Growth')
     expect(planChangeAction(prorate({ fromPlanId: 'growth', toPlanId: 'starter' }))).toBe(
       'Move to Starter on 1 Sept 2026',
     )
