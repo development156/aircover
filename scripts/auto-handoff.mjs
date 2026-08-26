@@ -26,6 +26,44 @@ const sh = (c) => {
   }
 }
 
+/**
+ * Is this file one of OUR skeletons, rather than something a person wrote?
+ *
+ * ── WHY THIS IS NOT `includes('AUTOMATIC SKELETON')` ────────────────────────
+ * Because that reads a file the wrong way round, and it DESTROYED A REAL HANDOFF
+ * on 2026-08-26. `divas-advisor-2026-08-26.md` was 520 lines a session had written,
+ * and one line of it was a table row naming a mutation: "Drop the AUTOMATIC
+ * SKELETON exemption". A substring search over the whole document found that,
+ * concluded the document was a skeleton, and overwrote all 520 lines with 29.
+ *
+ * The irony is the point: a handoff that DOCUMENTS this mechanism is exactly the
+ * handoff most likely to be eaten by it, so the more carefully somebody writes
+ * about the hook, the more certainly they lose their work.
+ *
+ * ── WHAT IT CHECKS INSTEAD ──────────────────────────────────────────────────
+ * The marker as the TEMPLATE EMITS IT: a blockquote line, at the start of a line,
+ * in the file's opening block. Prose that mentions the words — in a table, in
+ * backticks, in a sentence — cannot match, because prose does not begin a line
+ * with `> **AUTOMATIC SKELETON.**`.
+ *
+ * A structural marker is a claim the file makes about ITSELF. A substring is a
+ * claim about any text that happens to be inside it, including a quotation of
+ * somebody else's.
+ */
+function isSkeleton(file) {
+  const head = readFileSync(file, 'utf8').split('\n').slice(0, HEAD_LINES).join('\n')
+  return /^> \*\*AUTOMATIC SKELETON\.\*\*/m.test(head)
+}
+
+/**
+ * How far into a file the self-declaration must appear.
+ *
+ * The template puts it within the first ten lines. Twenty is slack for a title or
+ * an owner note above it, and small enough that a mention buried in the body of a
+ * long handoff can never reach it.
+ */
+const HEAD_LINES = 20
+
 try {
   const root = sh('git rev-parse --show-toplevel')
   if (!root) process.exit(0)
@@ -80,9 +118,7 @@ try {
   // purpose is to be the record. A guard that cannot see the thing it is guarding
   // against does not fail loudly — it fabricates.
   const candidates = [path, `docs/workflow/handoffs/${role}-${date}.md`]
-  const realHandoffExists = candidates.some(
-    (p) => existsSync(p) && !readFileSync(p, 'utf8').includes('AUTOMATIC SKELETON'),
-  )
+  const realHandoffExists = candidates.some((p) => existsSync(p) && !isSkeleton(p))
   if (realHandoffExists) process.exit(0)
 
   // Shared surfaces: the things that break other lanes.
