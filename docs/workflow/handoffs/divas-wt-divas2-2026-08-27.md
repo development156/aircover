@@ -381,3 +381,77 @@ Everything in Round one's list stands unchanged. Nothing new was deferred.
 ## Needs a decision
 
 The same four as Round one. None has been answered.
+
+---
+
+## Session 3 — the Actions outage ended, and the gate finally executed
+
+**Branch** `claude/divas-kickoff-03y2g2` at `3296b118`. Lane `wt-divas2`. Pushed: yes (nothing new to push; this session wrote no product code until this file).
+
+Harness-pinned to a `claude/...` branch, so the lane was never checked out directly. `sahoda.owner=divas` and `sahoda.lane=wt-divas2` both verified set.
+
+### What shipped
+
+No product code. This session's whole output is a verification result and one PR comment.
+
+| item | proof |
+| --- | --- |
+| The gate EXECUTED on this lane for the first time | run [33084277349](https://github.com/development156/sahodalabs/actions/runs/33084277349), `runner_id: 1000000539`, 15:46:55 to 15:58:46Z, **success** |
+| Confirmed on a second, independent runner | run [33084273203](https://github.com/development156/sahodalabs/actions/runs/33084273203), `runner_id: 1000000547`, 15:59:24 to 16:11:53Z, **success** |
+| The `@smoke` refusal recorded where reviewers read it | [issuecomment-5441984995](https://github.com/development156/sahodalabs/pull/15#issuecomment-5441984995) |
+
+**MEASURED — the outage is over.** Every gate run from 2026-08-26 11:08Z to 2026-08-27 15:14Z settled in one to four seconds with `runner_id: 0`, an empty `runner_name` and no steps array. From 15:46:55Z runs carry a real runner id and a real steps array, and the `Typecheck, lint and test` step alone took **10m10s**. That duration is the evidence: a non-start could not produce it.
+
+### What was NOT done, and why
+
+- **The `@smoke` suite is UNRUN. It is not passed and it did not fail.** Dispatched by hand on the founder's instruction with `ack_target: rloztdhzfliyvpvxsgjl`, it refused at its own step 6, `Refuse without the keys the suite needs`: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` and `NEXT_PUBLIC_SUPABASE_URL` are all absent from repository secrets. `Install Chromium` and `Run the smoke suite` are both `skipped`. **Zero tests executed and nothing was written to the production database.**
+- **The three secrets were not supplied and the guard was not relaxed.** Either would defeat the check. CLAUDE.md's ruling is explicit: an absent REQUIRED variable is a settings problem to report, not a value to invent.
+- **The `@smoke` job was not re-run.** A re-run reproduces the same refusal to the second, because the secrets are still absent. Recorded in the PR comment rather than spent.
+- **No local gate leg was run this session.** The CI runs above are the evidence, and they are stronger than a sandbox run.
+- **The duplicate `§36` in `apps/web/REQUESTS.md` was not renumbered** (line 2341 from `0a956fde`, line 2366 from `8fda6ed2`). Found by kickoff, left as found, because this session was not given it.
+- **`apps/web/e2e/helpers/node-transport.ts` was not tried.** It arrived from `wt-core` in `4fe5474b`/`d4a8b029` and may be what finally lets a browser suite run in a sandbox. Untested by this session.
+
+### Shared surfaces touched
+
+**None.** No file under `packages/`, no token, no fixture, no config. The only repository change in this session is this handoff.
+
+### Contract, migration or money
+
+**None this session.** Session 2's `CaptionRewriteInputSchema` change stands unaltered and is still the thing whoever merges must read.
+
+### Guards written, and the mutation that proved each
+
+**None written.** No guard was added, so none was mutated. Stating that plainly rather than reciting Session 2's table again.
+
+One guard was OBSERVED doing its job, which is not the same as proving it: gate.yml's `Refuse without the keys the suite needs` blocked a run against production with three empty variables. It was not mutated, so it is evidence of a refusal that happened, not proof the guard cannot be bypassed.
+
+### Anything retracted
+
+**One.** Session 2 and the standing check-in both recorded the outage as unresolved and reaching 28 hours, with `wt-core` red under the same signature. That is now false. **MEASURED**: runners were allocated again from 15:46:55Z on 27 August. The outage lasted roughly 29 hours and has ended. The earlier statement was true when written; it is superseded, not wrong.
+
+The claim that `sandbox-probe.mjs` reports `NO_BROWSER` also needs a caveat. **MEASURED**: `/opt/pw-browsers` contains `chromium`, `chromium-1194`, `chromium_headless_shell-1194` and `ffmpeg-1011`, and `PLAYWRIGHT_BROWSERS_PATH` is set to that directory. Chromium IS installed here; the probe looked elsewhere and reported it missing. **INFERRED** that the probe checks a default cache path. Not investigated and not fixed — it was outside what this session was asked to do, and it makes the probe's verdict unreliable in this container.
+
+### What the next session in THIS lane should pick up
+
+**Read this first: CI works now.** A red tick on this branch is a real signal again for the first time since 26 August. Do not carry forward the "assume the outage" reasoning from the earlier sections of this file.
+
+Then, in order of what is worth most:
+
+1. **The three repository secrets.** Until an admin adds them, the `@smoke` leg is permanently UNRUN in CI and no amount of re-running changes it.
+2. **`node-transport.ts`, untried.** The one plausible route to running a browser suite without those secrets and without production.
+3. **The duplicate `§36`.** Small, and a renumber is safe.
+4. **The four decisions from Round one, still unanswered**, plus the keywords wording, the Instagram 30-cap sentence, and whether the bottom bar's Save stays a real save.
+
+### Gate
+
+| leg | result | evidence |
+| --- | --- | --- |
+| `turbo typecheck lint test` | **PASS** | CI job `98578862894`, step 6, 10m10s. Not a cache replay: a fresh runner has no turbo cache |
+| root `vitest` | **PASS** | CI job `98578862894`, step 7 |
+| `prettier --check .` | **PASS** | CI job `98578862894`, step 8, 30s |
+| the same three, on a second runner | **PASS** | CI job `98582919841`, 12m29s end to end |
+| `next build` + `js-budget` | **PASS** | Vercel, on this head |
+| Playwright `@smoke` | **UNRUN** | refused for three missing secrets. Zero tests executed |
+| a third checks job | **IN PROGRESS at handoff** | job `98587673225`, same SHA as the two that passed |
+
+The third job is recorded as in progress and NOT as passed. Two identical runs on the same commit passed, which makes a third failure unlikely — that is an inference, not a result.
