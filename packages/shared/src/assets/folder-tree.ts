@@ -117,7 +117,17 @@ export type AssetSmartFolderUpdate = z.infer<typeof AssetSmartFolderUpdateSchema
  * by the caller rather than stored as an invisible folder.
  */
 export function normalizeFolderName(raw: string): string | null {
-  const name = raw.replace(/\s+/g, ' ').trim()
+  // ── NFC FIRST, AND IT IS NOT COSMETIC ──────────────────────────────────────
+  // "café" can be typed two ways: e-acute as ONE code point, or a plain e
+  // followed by a combining acute. They render identically and are different
+  // strings. MEASURED: the two are unequal even after `toLowerCase()`, so
+  // without this line a person can make two folders with visibly the same name
+  // and never understand why both exist.
+  //
+  // NFC is the composed form and the one every platform's paste produces most
+  // often, so normalising to it changes almost nothing while closing the hole.
+  // The database index normalises the same way, in the same migration.
+  const name = raw.normalize('NFC').replace(/\s+/g, ' ').trim()
   if (name === '') return null
   return name.slice(0, MAX_FOLDER_NAME)
 }

@@ -343,6 +343,54 @@ describe('Asset folder system RLS + tree guard (real Postgres, policies enforced
     )
   })
 
+  /**
+   * THE TWO SPELLINGS OF AN ACCENTED NAME ARE ONE NAME.
+   *
+   * "café" can be a single e-acute code point or a plain e plus a combining
+   * acute. They render identically and are different strings, so an index on
+   * `lower(name)` alone treats them as two folders and a person sees two rows
+   * with the same visible name and no explanation.
+   *
+   * The application normalises on write and this index normalises on compare.
+   * Both halves are asserted here: the premise (they really do differ as raw
+   * text, so the test is not vacuous) and the guarantee (the second insert is
+   * refused).
+   */
+  it('refuses two root folders whose names differ only by Unicode normalisation', async () => {
+    const composed = 'Caf\u00e9 shots' // e-acute, one code point
+    const decomposed = 'Cafe\u0301 shots' // e + combining acute
+
+    // The premise. Without this the test could pass on a plain duplicate.
+    expect(composed).not.toBe(decomposed)
+    expect(composed.toLowerCase()).not.toBe(decomposed.toLowerCase())
+
+    await db.query(
+      `insert into asset_folders (workspace_id, name, created_by) values ($1, $2, $3)`,
+      [WS_A, composed, USER_A],
+    )
+
+    const got = await asMember(db, USER_A, (tx) =>
+      probe(tx, `insert into asset_folders (workspace_id, name, created_by) values ($1, $2, $3)`, [
+        WS_A,
+        decomposed,
+        USER_A,
+      ]),
+    )
+    expect(got).toHaveProperty('denied')
+    expect((got as { denied: string }).denied).toMatch(/duplicate key|unique/i)
+
+    // And the case-folded spelling of the OTHER form is refused too, so the
+    // index folds case and normalises rather than doing only one of them.
+    const lower = await asMember(db, USER_A, (tx) =>
+      probe(tx, `insert into asset_folders (workspace_id, name, created_by) values ($1, $2, $3)`, [
+        WS_A,
+        decomposed.toLowerCase(),
+        USER_A,
+      ]),
+    )
+    expect(lower).toHaveProperty('denied')
+  })
+
   // ── case-insensitive sibling uniqueness, INCLUDING the root (null) case ──────
 
   it('refuses "Diwali" then "diwali" under the SAME parent', async () => {

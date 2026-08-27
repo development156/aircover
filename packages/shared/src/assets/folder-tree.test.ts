@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AssetSmartFolderSchema,
   MAX_FOLDER_DEPTH,
+  MAX_FOLDER_NAME,
   canMoveFolder,
   descendantIds,
   folderDepth,
@@ -31,6 +32,32 @@ describe('normalizeFolderName', () => {
     expect(normalizeFolderName('   ')).toBeNull()
     expect(normalizeFolderName('')).toBeNull()
     expect(normalizeFolderName('\n\t')).toBeNull()
+  })
+
+  // ── The bug the file manager spec's edge-case list predicted, and it was real ──
+  // Both spellings render as "café". Before NFC normalisation they were two
+  // different folders that looked identical, at the root and under any parent.
+  it('treats the two spellings of an accented name as ONE name', () => {
+    const composed = 'caf\u00e9' // e-acute as a single code point
+    const decomposed = 'cafe\u0301' // plain e plus a combining acute
+
+    // The premise: they really are different strings, so this is not a no-op.
+    expect(composed).not.toBe(decomposed)
+    expect(composed.toLowerCase()).not.toBe(decomposed.toLowerCase())
+
+    // And after normalisation they are the same folder.
+    expect(normalizeFolderName(composed)).toBe(normalizeFolderName(decomposed))
+    expect(sameFolderName(composed, decomposed)).toBe(true)
+    expect(sameFolderName(composed, 'CAF\u00c9')).toBe(true)
+  })
+
+  it('normalises before the length cap, so a decomposed name is not cut short', () => {
+    // Decomposed text spends more code points per character. Capping first
+    // would truncate an accented name earlier than an unaccented one of the
+    // same visible length.
+    const decomposed = 'e\u0301'.repeat(MAX_FOLDER_NAME)
+    const out = normalizeFolderName(decomposed) ?? ''
+    expect([...out]).toHaveLength(MAX_FOLDER_NAME)
   })
 
   it('treats case and spacing as the same name', () => {
