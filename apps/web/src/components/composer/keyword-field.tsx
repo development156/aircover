@@ -20,6 +20,9 @@ export interface KeywordFieldProps {
    */
   hashtags: string[] | undefined
   onChange: (hashtags: string[] | undefined) => void
+  /** Whether the published tail wears brackets. Absent in storage means true. */
+  brackets: boolean
+  onBracketsChange: (brackets: boolean) => void
 }
 
 /**
@@ -61,7 +64,14 @@ export interface KeywordFieldProps {
  * do nothing at all and `formatForPlatform` drops them, which is why that card
  * says so rather than offering an empty promise.
  */
-export function KeywordField({ channel, label, hashtags, onChange }: KeywordFieldProps) {
+export function KeywordField({
+  channel,
+  label,
+  hashtags,
+  onChange,
+  brackets,
+  onBracketsChange,
+}: KeywordFieldProps) {
   const spec = CONSTRAINTS[channel]
   /**
    * What the writer is typing, kept separately from the stored list.
@@ -71,8 +81,14 @@ export function KeywordField({ channel, label, hashtags, onChange }: KeywordFiel
    * the space stripped, and a duplicate would vanish mid-word. So the raw text
    * is local and the normalised list is what is stored.
    */
+  // The BOX always shows brackets, whatever gets published. They are what makes
+  // `chai in pune, monsoon` legible as two things rather than four words, and the
+  // line beneath states the published form separately — so the two never have to
+  // carry the same job.
   const [raw, setRaw] = useState(() => normalizeKeywords(hashtags).join(' '))
   const tags = normalizeKeywords(parseKeywordInput(raw))
+  /** What actually goes out, which is the only string the reader needs pinned. */
+  const published = normalizeKeywords(parseKeywordInput(raw), brackets)
   const over = spec.maxHashtags !== undefined && tags.length > spec.maxHashtags
 
   // Google Business posts are local business updates. `formatForPlatform`
@@ -125,9 +141,37 @@ export function KeywordField({ channel, label, hashtags, onChange }: KeywordFiel
           brackets as published. */}
       <p className="type-sm text-muted">
         {tags.length === 0
-          ? `Separate them with commas. They are published at the end of the ${label} copy as ${'[keyword]'}, and count towards its limit.`
-          : `Published at the end as ${tags.join(' ')}, and already counted in the ${label} limit above.`}
+          ? `Separate them with commas. They are published at the end of the ${label} copy${brackets ? ' as [keyword]' : ''}, and count towards its limit.`
+          : `Published at the end as ${published.join(' ')}, and already counted in the ${label} limit above.`}
       </p>
+
+      {/* ── THE BRACKETS ARE A CHOICE ─────────────────────────────────────────
+          Founder's ruling, REQUESTS §35. The original brief asked for the
+          `[marketing]` format and never said whether it reaches the platform, so
+          §34 shipped it literally and made the consequence visible. This is the
+          answer: the writer decides, per channel, and the line above always
+          states the exact string that will go out either way.
+
+          Ticked is the DEFAULT and absence means ticked — every row written
+          since §34 publishes with brackets, and making absence mean "off" would
+          silently change what those posts put out. */}
+      <label className="flex items-start gap-2 type-sm text-ink">
+        <input
+          type="checkbox"
+          data-keyword-brackets={channel}
+          checked={brackets}
+          onChange={(event) => onBracketsChange(event.target.checked)}
+          className="mt-icon-nudge size-4 shrink-0 accent-[var(--acc)]"
+        />
+        <span>
+          Publish them in square brackets
+          <span className="block type-meta text-muted">
+            {brackets
+              ? 'Followers see the brackets. Untick to publish the words on their own.'
+              : 'Followers see the words on their own. Tick to publish them as [keyword].'}
+          </span>
+        </span>
+      </label>
       {/* ── NO "cannot suggest hashtags" NOTE HERE, AND THAT IS DELIBERATE ──
           It was here, and MEASURED in a 1440 screenshot it printed the same
           paragraph on every version card — four identical apologies on one

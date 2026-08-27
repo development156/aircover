@@ -25,17 +25,24 @@ import { KeywordField } from './keyword-field'
  * disagree once before.
  */
 
-function setup(channel: 'x' | 'instagram' | 'gbp' = 'instagram', initial?: string[]) {
+function setup(
+  channel: 'x' | 'instagram' | 'gbp' = 'instagram',
+  initial?: string[],
+  brackets = true,
+) {
   const onChange = vi.fn()
+  const onBracketsChange = vi.fn()
   render(
     <KeywordField
       channel={channel}
       label={channel === 'instagram' ? 'Instagram' : channel === 'x' ? 'X' : 'Google Business'}
       hashtags={initial}
       onChange={onChange}
+      brackets={brackets}
+      onBracketsChange={onBracketsChange}
     />,
   )
-  return { onChange }
+  return { onChange, onBracketsChange }
 }
 
 const box = () => screen.getByLabelText('Keywords')
@@ -163,6 +170,76 @@ describe('Google Business gets no box, and is told why', () => {
 
     expect(screen.queryByLabelText('Keywords')).not.toBeInTheDocument()
     expect(screen.getByText(/does nothing on a Google Business post/i)).toBeInTheDocument()
+  })
+})
+
+/**
+ * THE BRACKETS ARE A CHOICE NOW (REQUESTS §35).
+ *
+ * §34 shipped `[marketing]` publishing literally, because the brief asked for
+ * that format and never said whether a follower should see it. The founder's
+ * answer was to make it a tick box. These pin the two things that decide whether
+ * that box is trustworthy: the line beneath states the string that will ACTUALLY
+ * go out, and it changes with the box.
+ */
+describe('the brackets are the writer’s choice', () => {
+  test('ticked publishes them, and says so', async () => {
+    setup()
+    await userEvent.type(box(), 'chai, pune')
+
+    expect(screen.getByText(/Published at the end as \[chai\] \[pune\]/)).toBeInTheDocument()
+  })
+
+  test('unticked publishes the bare words, and says THAT', async () => {
+    // THE ONE THAT MATTERS. A tick box that changed nothing about the stated
+    // outcome would be a control the reader cannot verify, on the one string
+    // that reaches a live account.
+    setup('instagram', undefined, false)
+    await userEvent.type(box(), 'chai, pune')
+
+    expect(screen.getByText(/Published at the end as chai pune/)).toBeInTheDocument()
+    expect(screen.queryByText(/\[chai\]/)).not.toBeInTheDocument()
+  })
+
+  test('the box itself keeps its brackets either way', async () => {
+    // Deliberate: in the INPUT the brackets are what makes `chai in pune,
+    // monsoon` legible as two things rather than four words. What publishes is
+    // stated separately, on its own line, so neither string has to do both jobs.
+    setup('instagram', undefined, false)
+    await userEvent.type(box(), 'chai in pune')
+
+    expect(screen.getByText(/Published at the end as chai in pune/)).toBeInTheDocument()
+  })
+
+  test('reports the tick, so the caller can store it', async () => {
+    const { onBracketsChange } = setup()
+
+    await userEvent.click(screen.getByRole('checkbox'))
+
+    expect(onBracketsChange).toHaveBeenLastCalledWith(false)
+  })
+
+  test('the empty-box hint drops the format when brackets are off', async () => {
+    // Promising `[keyword]` to somebody who has turned brackets off is the same
+    // defect as showing the wrong tail: a claim the press will not honour.
+    //
+    // SCOPED TO THE HELP LINE. My first version queried the whole screen and
+    // failed against correct markup — the tick box's own hint says "Tick to
+    // publish them as [keyword]", which is a description of what the box WOULD
+    // do and is the one place that string still belongs.
+    setup('instagram', undefined, false)
+
+    const hint = screen.getByText(/Separate them with commas/i)
+    expect(hint).toBeInTheDocument()
+    expect(hint.textContent).not.toMatch(/\[keyword\]/)
+  })
+
+  test('and keeps it when brackets are on', async () => {
+    // The counterweight. A hint that never named the format would satisfy the
+    // assertion above and tell a first-time reader nothing.
+    setup()
+
+    expect(screen.getByText(/Separate them with commas/i).textContent).toMatch(/\[keyword\]/)
   })
 })
 

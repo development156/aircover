@@ -296,11 +296,26 @@ describe('never leaks internals', () => {
   ]
 
   test('every violation carries readable copy naming a real limit', () => {
+    /**
+     * ── RETARGETED TO THE CLAIM, NOT THE PROXY ───────────────────────────────
+     * This asserted `/allows/i`, which was a stand-in for "names a real limit"
+     * and held only because every engine message happened to use that one verb.
+     * MAX_HASHTAGS now reads "Sahoda takes at most 30 keywords per instagram
+     * post." — the number moved to Sahoda because Instagram's 30 is a HASHTAG
+     * limit and the field stopped holding hashtags (REQUESTS §34).
+     *
+     * The claim is unchanged and the assertion is now stronger than the word it
+     * replaces: a real limit is a NUMBER, and readable copy is a sentence.
+     */
     const messages = violatingMeters.flatMap((m) => m.violations.map((v) => v.message))
     expect(messages.length).toBeGreaterThan(0)
     for (const message of messages) {
-      expect(message).toMatch(/allows/i)
-      expect(message.trim().length).toBeGreaterThan(0)
+      // A real limit, quoted rather than described.
+      expect(message, message).toMatch(/\d/)
+      // A sentence, not a code or a fragment.
+      expect(message, message).toMatch(/\.$/)
+      // And never an identifier that leaked out of the engine.
+      expect(message, message).not.toMatch(/[A-Z]{2,}_[A-Z]/)
     }
   })
 

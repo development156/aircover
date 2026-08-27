@@ -1,7 +1,13 @@
 import { CONSTRAINTS } from '@sahoda/shared'
 import { describe, expect, test } from 'vitest'
 
-import { gbpCtaTypes, isValidGbpCta, parseExtras, VariantExtrasSchema } from './variant-extras'
+import {
+  gbpCtaTypes,
+  isValidGbpCta,
+  keywordBracketsOn,
+  parseExtras,
+  VariantExtrasSchema,
+} from './variant-extras'
 
 describe('parseExtras', () => {
   test('round-trips a fully populated extras object unchanged', () => {
@@ -181,5 +187,78 @@ describe('isValidGbpCta', () => {
   test('does not fall through to Object.prototype members', () => {
     expect(isValidGbpCta('toString')).toBe(false)
     expect(isValidGbpCta('constructor')).toBe(false)
+  })
+})
+
+/**
+ * ── THE DEFAULT THAT DECIDES WHAT EVERY EXISTING POST PUBLISHES ─────────────
+ *
+ * `keywordBrackets` is absent on every row written before the tick box existed,
+ * and all of those publish WITH brackets (REQUESTS §34/§35). Absence must read
+ * as true.
+ *
+ * THIS TEST EXISTS BECAUSE A MUTATION SURVIVED. The reading lived inline in
+ * `version-card.tsx` as `state.extras.keywordBrackets !== false`; flipping it to
+ * `=== true` — which strips the brackets from every post ever written — left
+ * every suite in the repository green. Nothing rendered the card and nothing
+ * else could see the line. It is a named function now so it has somewhere to be
+ * tested.
+ */
+describe('keywordBracketsOn — absence means brackets', () => {
+  test('absent reads as ON, so nothing already written changes', () => {
+    expect(keywordBracketsOn({})).toBe(true)
+  })
+
+  test('an explicit false reads as OFF, which is the only way to turn them off', () => {
+    expect(keywordBracketsOn({ keywordBrackets: false })).toBe(false)
+  })
+
+  test('an explicit true reads as ON', () => {
+    expect(keywordBracketsOn({ keywordBrackets: true })).toBe(true)
+  })
+
+  test('survives a round trip through the parser', () => {
+    // `extras` is untyped jsonb and every save is a read-modify-write. A flag
+    // that parsed away would silently re-enable brackets on the next save.
+    expect(keywordBracketsOn(parseExtras({ keywordBrackets: false }))).toBe(false)
+    expect(keywordBracketsOn(parseExtras({}))).toBe(true)
+  })
+})
+
+/**
+ * ── WHAT DECLARING THE FIELD ACTUALLY BUYS ──────────────────────────────────
+ *
+ * A mutation asked the question: deleting `keywordBrackets` from the schema left
+ * every test AND the typecheck green, because `VariantExtrasSchema` is loose on
+ * purpose (unknown keys pass through untouched, so one lane's save cannot delete
+ * another's data) and the inferred type is permissive to match.
+ *
+ * So the declaration is not documentation. It is the only thing that RUNTIME
+ * TYPE-CHECKS the value, and the case that matters is a non-boolean: `"false"`
+ * as a string reads as `!== false`, which turns the brackets back ON for a
+ * writer who turned them off. `extras` is jsonb written by more than one lane,
+ * so a wrong-typed value is reachable rather than theoretical.
+ */
+describe('keywordBrackets is type-checked on the way in', () => {
+  test('a STRING "false" is not allowed to masquerade as the flag', () => {
+    const parsed = parseExtras({ keywordBrackets: 'false' })
+
+    // Salvaged away by the declared field schema rather than kept as a string.
+    expect(parsed.keywordBrackets).toBeUndefined()
+    // And the reading therefore falls back to the safe default rather than to
+    // a truthy string that happens to spell the opposite.
+    expect(keywordBracketsOn(parsed)).toBe(true)
+  })
+
+  test('a real boolean survives, so the salvage is not just deleting things', () => {
+    expect(parseExtras({ keywordBrackets: false }).keywordBrackets).toBe(false)
+  })
+
+  test('and the rest of extras is untouched by that salvage', () => {
+    // The loose-schema contract: one bad field must not take its neighbours with
+    // it, because `extras` is a single column that several lanes write to.
+    const parsed = parseExtras({ keywordBrackets: 'false', hashtags: ['[chai]'] })
+
+    expect(parsed.hashtags).toEqual(['[chai]'])
   })
 })

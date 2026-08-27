@@ -38,6 +38,13 @@ export function versionVerdict(
    * have been made and wasn't.
    */
   media: readonly PostMedia[],
+  /**
+   * Whether the keyword tail wears brackets. Threaded through because it changes
+   * the LENGTH of what publishes — `[chai] [pune]` is four characters longer
+   * than `chai pune` — so a meter that ignored it would read short on every post
+   * whose writer unticked the box.
+   */
+  keywordBrackets = true,
 ): VersionVerdict {
   const spec = CONSTRAINTS[channel]
 
@@ -63,7 +70,13 @@ export function versionVerdict(
       )
       .find((refusal) => refusal !== null) ?? null
 
-  const draft = { body, hashtags, hasLink: hasLink(body), mediaCount: media.length }
+  const draft = {
+    body,
+    hashtags,
+    hasLink: hasLink(body),
+    mediaCount: media.length,
+    keywordBrackets,
+  }
   const thread = previewThread(channel, draft, format === 'thread')
 
   /**
