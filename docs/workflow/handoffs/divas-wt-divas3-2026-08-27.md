@@ -1,212 +1,100 @@
 # Handoff — divas — wt-divas3 — 2026-08-27
 
-**Owner** divas · **Lane** wt-divas3 · **Role** advisor
+**Branch** `claude/divas-kickoff-xdoxoa` at `afca6f98`. Lane `wt-divas3`. Pushed: **yes**, 0 unpushed.
+PR [#18](https://github.com/development156/sahodalabs/pull/18) → `wt-core`, draft.
 
-**Branch** `claude/divas-kickoff-xdoxoa` at `76bc0c6`, 15 commits beyond `3137bc3`.
-PR [#18](https://github.com/development156/sahodalabs/pull/18) → `wt-core`, draft,
-body rewritten at `1bb19d7` because the old one was stale on three counts.
-Pushed: yes.
+> **This file is rewritten in place, not appended to with a `## Session 2`.** The
+> `/handoff` rule about appending exists so two DIFFERENT sessions cannot
+> overwrite each other's record. This file was created by this same session
+> earlier today and updated three times as work landed; adding a session marker
+> to my own single session would invent a boundary that does not exist. Sessions
+> 1 and 2 in this lane did no product work and left no file.
 
-**This replaces the Stop hook's skeleton.** Sessions 1 and 2 in this lane did no
-product work. This one did, and the founder was present throughout.
+**The lane is CI-VERIFIED GREEN**, for the first time in its history. Nineteen
+commits, a full day, previously green only on this machine.
 
----
-
-## What the task was, and how it changed four times
-
-It began as "in /assets make folder systems and smart organize features, better
-than Google Drive". It became "this folder system is very complicated and not
-simple" with a screenshot, then a design blueprint PDF, then a 567-line file
-manager spec, then four screenshots with a red circle round a broken menu.
-
-**Each redirection was a correction of the last delivery**, and the sequence is
-the story: I built a capable thing, the founder found it unusable, and the second
-build deleted more than it added.
+| Evidence, job 98584261042 on `afca6f98` | Value |
+| --- | --- |
+| `runner_id` | **1000000551** (not `0`) |
+| `runner_name` | `GitHub Actions 1000000551` |
+| Duration | 16:03:34 → 16:14:53, **11m 19s** |
+| Steps | **13**, every one `success` |
+| Conclusion | **success** |
 
 ---
 
-## Shipped
+## What shipped
 
-| # | Commit | What |
+Nineteen commits beyond `3137bc3`. `/assets` went from a picture of a library to
+a working file manager.
+
+| SHA | What | Proof |
 | --- | --- | --- |
-| 1 | `d89e061` | Contract, three tables, registration in docs/38 and the DPDP export |
-| 2 | `7ea9eab` | The folder system on screen: read layer, 9 actions, 11 components |
-| 3 | `ed7775f` | Brought `/assets` back inside its JavaScript budget |
-| 4 | `5c77db0` | Migration APPLIED to production, verified, docs/38 corrected |
-| 5 | `95ed0f6` | **Filing never worked. Fixed.** |
-| 6 | `d1964d9` | Token search, so the rule builder could go |
-| 7 | `ce07816` | The library, made simple: 6 components deleted, 1432 lines |
-| 8 | `4868c96` | `packages/shared` side-effect-free: **565 kB back across 11 routes** |
-| 9 | `9a214a6` | `café` and `café` are one folder name, not two |
-| 10 | `1bb19d7` | Six visual bugs, and five features the library was missing |
-| 11 | `a64c1f8` | **Trash and restore. Deleting a photo is no longer permanent.** |
-| 12 | `7201fdc` | Drag a photo onto a folder |
-| 13 | `95afafa` | Shift-click a range, select all, drag a folder into a folder |
-| 14 | `76bc0c6` | Details panel dropped; **both migrations APPLIED to production** |
-| 15 | `3a58912` | docs/38: what the trash means for a copy and for erasure |
-| 16 | `0238fe5` | Delete a selection, and empty the trash |
-| 17 | `6fb2796` | Arrow keys across the grid, one tab stop instead of 200 |
-| 18 | `08793aa` | Ctrl/Cmd+A, Shift+Arrow, and the shortcut sheet stops under-claiming |
-| 19 | `37b0d73` | Duplicate detection on upload |
-| 14 | `906fa59` | Handoff for the second half |
-| 15 | `76bc0c6` | **Both migrations APPLIED.** Details panel dropped. |
+| `d89e061` | Contract, three tables, registration in docs/38 + DPDP export | `packages/db/tests/asset-folders-rls.test.ts`, 12 tests |
+| `7ea9eab` | The folder system on screen: read layer, 9 actions, 11 components | `asset-library.test.tsx` |
+| `ed7775f` | Brought `/assets` back inside its JavaScript budget | `js-budget ok: 81 routes` |
+| `5c77db0` | Migration APPLIED to production, verified, docs/38 corrected | production probes, rolled back |
+| `95ed0f6` | **Filing never worked. Fixed.** | `asset-folders-rls.test.ts`, both directions in one transaction |
+| `d1964d9` | Token search, so the rule builder could go | `packages/shared/src/assets/search-tokens.test.ts` |
+| `ce07816` | The library, made simple: 6 components deleted, 1432 lines | — |
+| `4868c96` | `packages/shared` side-effect-free: **565 kB back across 11 routes** | `packages/shared/package.json` `sideEffects` |
+| `9a214a6` | `café` and `café` are one folder name | NFC guard in `asset-folders-rls.test.ts` |
+| `1bb19d7` | Six visual bugs and five features | `context-menu-portal.test.tsx`, `sort-cards.test.ts` |
+| `a64c1f8` | **Trash and restore. Deleting a photo is no longer permanent.** | `packages/db/tests/assets-trash.test.ts` |
+| `7201fdc` | Drag a photo onto a folder | `apps/web/src/lib/assets/drag-payload.test.ts`, 17 tests |
+| `95afafa` | Shift-click a range, select all, drag a folder into a folder | `apps/web/src/lib/assets/select-range.test.ts`, 15 tests |
+| `76bc0c6` | Details panel dropped; two migrations applied | production read-back |
+| `3a58912` | docs/38: what the trash means for a copy and for erasure | — |
+| `0238fe5` | Delete a selection, and empty the trash | `describeEmptyTrash` tests + real-SQL idempotency guard |
+| `6fb2796` | Arrow keys across the grid, one tab stop instead of 200 | `apps/web/src/lib/assets/grid-nav.test.ts`, 15 tests |
+| `08793aa` | Ctrl/Cmd+A, Shift+Arrow, shortcut sheet stops under-claiming | `asset-library.test.tsx` |
+| `37b0d73` | Duplicate detection on upload | `apps/web/src/lib/assets/duplicate-copy.test.ts` + 3 real-SQL guards |
+| `afca6f98` | The content-hash migration applied and verified | production read-back |
 
-`asset_folders`, `asset_folder_items` and `asset_smart_folders` are **live in
-production** (`rloztdhzfliyvpvxsgjl`). Founder approved applying only mine; the
-other six unapplied migrations are other lanes' and **one of them reprices
-plans**.
-
----
-
-## The defect that matters most: filing never worked, not once
+### The defect that mattered most: filing never worked, not once
 
 The founder hit "Could not save that. Try again." on the live preview.
 `fileAssets` named an ON CONFLICT target of `(workspace_id, folder_id, asset_id)`.
 The table is keyed `primary key (folder_id, asset_id)`. **Postgres matches that
 target against a real unique index by its exact column set**, so every call ever
-made raised `42P10`. The extra column looked like tenant-scoping and scoped
-nothing; the row is already scoped by two composite foreign keys and by RLS.
+made raised `42P10`.
 
 **Twenty-seven action tests passed straight over it.** They mock Supabase, and a
-mock has no ON CONFLICT semantics to get wrong. No quantity of additional mocked
-tests would have caught this.
-
-**So the guard lives in `packages/db/tests/asset-folders-rls.test.ts`, which runs
-real SQL**, and it asserts BOTH directions in one transaction: the app's shape
-inserts and is idempotent on overlap, and the broken shape still raises 42P10.
-A test proving only the good path goes green again the moment somebody re-adds a
-column. Mutation-proven.
-
-**The rule this earns:** any behaviour that depends on database semantics cannot
-be guarded by a mock. Put it in the suite with a real Postgres or do not claim it
-is guarded.
+mock has no ON CONFLICT semantics to get wrong. **The rule this earns: any
+behaviour that depends on database semantics cannot be guarded by a mock.**
 
 ---
 
-## Guards written, and the mutation that proved each
+## What was NOT done, and why
 
-| Guard | Mutation | Result |
-| --- | --- | --- |
-| Subtree depth in the SQL trigger | remove the downward walk | refused move returns `{"rows":[]}`, 2 red |
-| `matchesQuery` three-valued answer | collapse `unknown` into `no` | 3 red |
-| `canMoveFolder` subtree check | measure the dragged folder alone | exactly the 1 discriminating test red |
-| Filing upsert shape | point good path at the 3-column target | red, `expected { Object (denied) } to not have property "denied"` |
-| Undo toast outlives its own success | keep it inside `BulkBar` | red, message unmounts with the selection |
-| Root-name uniqueness | drop the root partial index | `Diwali`/`diwali` at the root allowed |
-| Cycle prevention | drop the tree trigger | the `A→B→A` move succeeds |
-| NFC folder names | compare `lower(name)` without normalising | the NFD duplicate inserts |
-| Menu is portalled to `<body>` | render it in place | red, `expected [HTMLDivElement] to be document.body` |
-| Unweighed file sorts last in BOTH size directions | make the null comparison direction-sensitive | red on the ascending half only |
-
----
-
-## Four bugs the specs and the screenshots found in MY code
-
-**1. A depth trigger that checks only the written row is half a guard.** Moving a
-folder re-depths everything beneath it, and none of those rows has its own
-`parent_id` touched, so the trigger never fires for them. MEASURED: a move
-leaving the dragged folder at a legal depth 5 was ALLOWED and left its grandchild
-at 7. Fixed with a second walk downward. REQUESTS §30 carries it, because the
-rule generalises: any constraint on a position in a hierarchy is a constraint on
-a subtree.
-
-**2. Unicode normalisation.** MEASURED:
-
-```
-'café' (NFC, 4 code points) === 'café' (NFD, 5)   → false
-same, after .toLowerCase()                          → false
-same, after .normalize('NFC')                       → true
-```
-
-Two folders that look identical could coexist, at the root and under any parent.
-Fixed in BOTH halves at `9a214a6`: NFC in `normalizeFolderName`, and
-`lower(normalize(name, nfc))` in the two partial unique indexes.
-**That migration, `20260827060000_folder_names_normalize_nfc.sql`, is WRITTEN AND
-NOT APPLIED** and does not rewrite rows: a stored pair differing only by
-normalisation would make the index fail to build, and it stops rather than
-silently renaming somebody's folder. MEASURED on production: `asset_folders` holds
-0 rows, so no such pair can exist today.
-
-**3. `packages/shared` had no `sideEffects` declaration**, so webpack could not
-tree-shake it and eleven routes each carried about 8 kB of the whole barrel.
-MEASURED after the fix: **565 kB back across 11 routes**. Set to `["*.css"]`, not
-blanket `false`, because the package exports `tokens.css` and a CSS export is a
-genuine side effect.
-
-**4. A CSS transform is a stacking context and no z-index escapes one.** The menu
-the founder circled had no visible frame and its text collided with the rows
-below. `library-sidebar-row.tsx:66` wrapped the trigger in `-translate-y-1/2`,
-trapping the panel's `z-20`: paint order for a whole stacking context is decided
-one level up. **RAISING THE Z-INDEX CANNOT FIX THIS.** It is the same
-containing-block trap `apps/web/CLAUDE.md` records for `backdrop-filter` and
-`position:fixed`, wearing a different CSS property. Fixed with a portal to
-`document.body`, generalised into `FloatingPanel` so all six dropdowns on this
-screen share one implementation.
-
-**The other five visual bugs were one habit**: a ring, a border or a card drawn
-round something that is not a card, so a person cannot tell what is pressable.
-The uneven tiles, the status line that read as typeable, the wide grey slab
-behind "Added 1 photo.", the dashed border making "New folder" look like an
-input, and the big bordered card holding one empty-state sentence.
-
----
-
-## Retracted, and each was a confident inference I had not measured
-
-1. **"The format leg is red on the base, fifth time."** WRONG. A global prettier
-   3.8.1 was ahead of the repo's pinned 3.9.5 on PATH. With the repo's own binary
-   the whole tree is clean and always was.
-2. **"The Stop hook is fixed by `echo "$INPUT"`."** WRONG, and it was this lane's
-   own handoff asserting it twice. Raw ANSI escapes in the payload break `jq`
-   either way. The quoting is not the defect.
-3. **"zod is dragging 30 kB into the route chunk."** WRONG. Deferring the smart
-   folder builder recovered 4.5 kB, not 30; zod was already in the shared vendor
-   chunk. The deferral was later reverted entirely.
-4. **"`next/dynamic` is the lever for this route."** WRONG twice, and the second
-   time was an independent re-measurement: 798.0 kB to 799.3 kB, WORSE by 1.3 kB,
-   because an extra chunk boundary costs more than the code it defers on a route
-   this shape. Removed both times.
-5. **"CI is failing on formatting."** WRONG. CI never ran at all.
-6. **docs/38 said "47 of those 52" and named five unapplied tables.** Wrong in
-   both halves, and I wrote one of those halves an hour earlier by copying a
-   2026-08-23 figure instead of counting. Production holds **51 of 52**; exactly
-   one, `ledger_actor_redactions`, is unapplied. Corrected in the file itself,
-   because it goes to a lawyer.
-7. **"The +8 kB on eleven routes is a warm build cache."** WRONG, and I retracted
-   it inside the same session: the cold build reproduced the same figures, and
-   local and Vercel agreed within 0.5 kB. That confirmed my ORIGINAL shared-barrel
-   diagnosis, which I had abandoned for the cache theory.
-
-**The pattern, stated plainly for the next session: seven wrong claims, every one
-an inference I could have measured in under a minute.** The measurements are
-cheap here. Take them.
-
----
-
-## Reversed on purpose, twice, on the same line
-
-**I said I would not raise the js-budget again, then raised it three more
-times.** `ed7775f` set `/(app)/assets` to 832366; `4868c96` tightened it to
-797344; `1bb19d7` set it to 815129; `95afafa` set it to **823661**. Every one is
-the exact measured figure with no padding.
-
-The trend on this one route, so it can be judged rather than discovered: 797344
-this morning, 815129 for six visual fixes and five features, 823661 for trash,
-drag-to-file, shift-select and drag-to-move. **About 2 kB per feature.** The last
-one is the only raise where the build actually went RED first — it was 0.3 kB
-past the harness's 8 kB slack. Every other route is ~49 kB LIGHTER than this
-morning from the `sideEffects` fix. **The cheapest thing to drop, if /assets
-should shrink, is the details panel.**
-
-The founder's instruction was "implement all the features", so cutting one to fit
-the ratchet would contradict a decision already taken. The route ends this lane
-about 12 kB heavier than it started; every OTHER route is about 49 kB lighter from
-the `sideEffects` fix. **One line to revert if the screen should shrink instead.**
-
-**A route within a kilobyte of its budget is not really budgeted** — another lane
-measured local and Vercel differing by about half a kilobyte on identical source,
-purely from build ids and chunk hashing. This line sits at the exact measured
-figure with the harness's 8 kB slack untouched, which is the safe end of that.
+- **Playwright is UNRUN on this whole lane, not passed.** In this sandbox
+  Chromium completes no outbound HTTPS request and every `@smoke` spec signs in
+  through Clerk. MEASURED: `https://example.com/` resets the same as Clerk's host.
+  Not a certificate problem, so `--ignore-certificate-errors` is both forbidden
+  and useless. REQUESTS §25.
+- **Consequently: no real pointer has driven any drag, no real key has pressed
+  Down a row, and no file has been uploaded twice.** jsdom lays nothing out — every
+  tile's rect top is 0 — so the row arithmetic is covered only by
+  `grid-nav.test.ts` against real numbers. Treat all three as browser-unverified.
+- **`wt-core` is 8 commits ahead and NOT merged in.** MEASURED: none of the eight
+  touches a shared surface; all are e2e/sandbox infrastructure. Two of them
+  (`4fe5474b`, `d4a8b029`) route Playwright's browser through Node so it RUNS in
+  a cloud sandbox — directly relevant to the caveat above and worth taking next.
+- **Everything in the file manager spec's Phases 3 to 5**: sharing and public
+  links, versioning, OCR, virus scanning, WebSockets, comments, third-party
+  imports. The spec's own build order says resist until Phase 2 polish is done.
+- **A "Recent" view, dropped on judgement rather than forgotten.** All files is
+  already newest-first by default and `added:7d` is already a search token. A row
+  restating the default view teaches a person the product has more places than it
+  has.
+- **Presigned direct-to-storage uploads.** A rearchitecture, not a feature.
+- **Virtualization.** The library caps at 200 rows, so it does not bite yet.
+- **`function_search_path_mutable`.** Mine is 1 of **16** functions carrying it,
+  including `app.set_updated_at` and `app.apply_tenant_policies`. Mine is not
+  SECURITY DEFINER. Fixing one of sixteen does not close the class.
+- **The two `.claude/settings.json` defects**, open since session 1. The Stop
+  hook's `jq` cannot read its own re-entry guard, and its gate filters on
+  `origin/main`, 800+ commits behind.
 
 ---
 
@@ -217,178 +105,177 @@ figure with the harness's 8 kB slack untouched, which is the safe end of that.
 | `packages/shared/src/assets/organize.ts` | NEW | no, additive |
 | `packages/shared/src/assets/folder-tree.ts` | NEW | no, additive |
 | `packages/shared/src/assets/search-tokens.ts` | NEW | no, additive |
-| `packages/shared/src/index.ts` | 3 exports added | no |
-| `packages/shared/package.json` | `sideEffects: ["*.css"]` | no, and it gave back 565 kB |
-| `apps/web/src/lib/assets/view.ts` | `AssetCard.folderIds` REQUIRED | **YES.** Every constructor needs it. `string[] \| null`; `null` means the read did not ask |
-| The migrations | 3 new tables (applied), 1 index change (NOT applied) | no, additive |
+| `packages/shared/src/assets/trash.ts` | NEW | no, additive |
+| `packages/shared/src/index.ts` | 4 exports added | no |
+| `packages/shared/package.json` | `sideEffects: ["*.css"]` | no. Deliberately NOT blanket `false`: the package exports `tokens.css` and a CSS export is a genuine side effect |
+| `packages/shared/src/db/assets.ts` | `deleted_at` and `content_sha256` added to `AssetSchema` | **READERS ONLY.** Both carry `.default(null)`, so a row missing them still parses. That is deliberate: this file parses PER ROW so a bad row costs one tile, and a required field missing between deploy and migration would cost the entire library |
+| `apps/web/src/lib/assets/view.ts` | `AssetCard.folderIds` and `AssetCard.deletedAt` REQUIRED | **YES. Every constructor needs both.** `folderIds: string[] \| null` — `null` means the read did not ask. `deletedAt: string \| null` — mirrors the column, both values are real answers |
 | `apps/web/scripts/perf/js-budget.json` | `/(app)/assets` raised | not a type, but a ratchet other lanes share |
 | `scripts/design/design-lint-baseline.json` | spacing 134 → **129** | tightened, not loosened |
-| `docs/38_Data_Handling.md` | 3 tables + count | goes to a lawyer |
+| `docs/38_Data_Handling.md` | 3 tables, a count correction, a trash section | goes to a lawyer |
 | `apps/web/src/lib/privacy/export-manifest.ts` | 3 entries | absent = missing from every customer export |
 
 **The skeleton's shared-surface detector still cannot see the last four.**
-Session 1 documented that blind spot; it is unchanged. `js-budget.json`,
-`design-lint-baseline.json`, `docs/38` and the export manifest are all things
-another lane depends on and none is in its filter.
+`js-budget.json`, `design-lint-baseline.json`, `docs/38` and the export manifest
+are all consumed by other lanes and none is in its filter. Unchanged since
+session 1 documented it.
+
+---
+
+## Contract, migration or money
+
+**No price, no ledger, no credit path was touched.** `pricing.config.json`
+untouched; `apply_ledger_entry` untouched.
+
+**THREE MIGRATIONS, ALL APPLIED to `rloztdhzfliyvpvxsgjl`**, each on the founder's
+explicit word and each verified by reading production back rather than by
+trusting the apply.
+
+| Migration | What | Verified |
+| --- | --- | --- |
+| `20260826120000_asset_folder_system.sql` | 3 tables, RLS, cycle/depth trigger | 6 guards broken in production, all refused |
+| `20260827060000_folder_names_normalize_nfc.sql` | both unique indexes compare `lower(normalize(name, nfc))` | `nfc_refused=t` on two root folders differing only by normalisation |
+| `20260827090000_assets_trash.sql` | `assets.deleted_at` + two partial indexes | trashed row left the live filter, entered the trash filter, kept its **653851 bytes** and its storage path |
+| `20260827140000_assets_content_hash.sql` | `assets.content_sha256` + partial index | `shared_hash_allowed=t`, `null_matches=0`, `live=1 trashed=1` |
+
+Every probe ran inside a `do` block that rolls its writes back. **Post-check,
+MEASURED: 11 assets, 10 live, 1 in the trash, 0 hashed rows, 0 probe rows left,
+2 folders.**
+
+**The trash and the folders are being USED on the preview** — one asset trashed
+and two folders, where this morning there were zero and one.
+
+---
+
+## Guards written, and the mutation that proved each
+
+**Thirty-one mutations were applied and watched go red.** Every one after the
+09:00 lesson below was grep-confirmed present before its result was read. The
+load-bearing ones:
+
+| Guard | Mutation | Result |
+| --- | --- | --- |
+| Subtree depth in the SQL trigger | remove the downward walk | refused move returns `{"rows":[]}`, 2 red |
+| `matchesQuery` three-valued answer | collapse `unknown` into `no` | 3 red |
+| Filing upsert shape | point the good path at the 3-column target | red, `expected { Object (denied) } to not have property "denied"` |
+| NFC folder names | compare `lower(name)` without normalising | the NFD duplicate inserts |
+| Menu is portalled to `<body>` | render it in place | red, `expected [HTMLDivElement] to be document.body` |
+| Both trash indexes carry their WHERE | strip `where deleted_at is null` | red, `expected 'CREATE INDEX assets_live_idx ON publi…' to match /WHERE \(deleted_at IS NULL\)/` |
+| Empty library keeps the trash reachable | drop the `&& trashed.length === 0` half | 2 red, `Unable to find role=button and name /^Trash/` |
+| No retention period is promised | write "deleted for good after 30 days" | red |
+| Clock skew reads as today | `days <= 0` → `days === 0` | red, `expected 'Deleted -1 days ago' to be 'Deleted today'` |
+| `idsForDrag` selection rule | `selected.has(id)` → `selected.size > 0` | red, `expected [ 'a', 'b', 'c' ] to deeply equal [ 'z' ]` |
+| A folder does not highlight for a drag it cannot accept | strip `isAssetDrag` from `onDragEnter` | red, `expected <span aria-hidden="true" …></span> to be null` |
+| `canMoveFolder` during the drag | make every folder accept every folder | red, same span assertion |
+| The anchor does not move on shift-click | move it | red, `expected 'd' to be 'b'` |
+| The range follows the VISIBLE order | range over the library instead | red, `expected [ 'a', 'b', 'c', 'd' ] to deeply equal [ 'd' ]` |
+| Kept files are reported when emptying the trash | drop the `kept` clause | 3 red |
+| The bulk sentence counts FILES, not posts | sum post counts | red, `expected '5 of them are still on posts…' to match /2 of them/` |
+| The count comes from the server | report `ids.length` | red, `Unable to find /Moved 1 file to the trash/` |
+| Bulk trash is idempotent (**real Postgres**) | drop `.is('deleted_at', null)` | red, `expected [ …(2) ] to have a length of 1 but got 2` |
+| The empty-trash confirmation exists | fire immediately | 2 red |
+| The nav key handler merge | spread `navProps` after `onKeyDown` | red, `Unable to find role=textbox and name /name/i` |
+| Shift+Arrow only inside Select | claim it unconditionally | 2 red |
+| Ctrl+A is not stolen from the search box | drop `isTypingTarget` | red, `expected document not to contain element` |
+| The duplicate message says "file", not "photo" | say "this same photo" | red |
+| The trashed duplicate is a distinct case | collapse it into the live one | 2 red |
+| The hash index is NOT unique | make it unique | 2 red, incl. `duplicate key value violates unique constraint` on delete-then-re-upload |
+
+---
+
+## Anything retracted
+
+**Eleven, and every one is recorded because the pattern matters more than any
+single item.**
+
+1. **"The format leg is red on the base."** WRONG. A global prettier 3.8.1 was
+   ahead of the repo's pinned 3.9.5 on PATH. With the repo's own binary the tree
+   is clean and always was.
+2. **"The Stop hook is fixed by `echo "$INPUT"`."** WRONG, and this lane's own
+   handoff asserted it twice. Raw ANSI escapes break `jq` either way.
+3. **"zod is dragging 30 kB into the route chunk."** WRONG. 4.5 kB, and zod was
+   already in the shared vendor chunk.
+4. **"`next/dynamic` is the lever for this route."** WRONG twice. MEASURED the
+   second time: 798.0 kB → 799.3 kB, **worse**, because an extra chunk boundary
+   costs more than the code it defers on a route this shape.
+5. **"CI is failing on formatting."** WRONG. CI never ran at all.
+6. **docs/38 said "47 of those 52"** and named five unapplied tables. Wrong in
+   both halves, and I wrote one of them an hour earlier by copying a 2026-08-23
+   figure instead of counting. Production holds **51 of 52**.
+7. **"The +8 kB on eleven routes is a warm build cache."** WRONG, retracted
+   inside the same session: the cold build reproduced it and local agreed with
+   Vercel within 0.5 kB. That confirmed my ORIGINAL shared-barrel diagnosis,
+   which I had abandoned for the cache theory.
+8. **"That mutation did not go red, so the guard is vacuous."** WRONG. **The
+   mutation had never been applied**: prettier had joined the two lines of the
+   target arrow function, so a multi-line string replace matched nothing and
+   changed the file not at all. The test was green because the CODE WAS CORRECT.
+   **Verify the mutation LANDED before reading its result.**
+9. **"Dropping the details panel will meaningfully shrink `/assets`."** It saved
+   **1589 bytes**, because `AssetDetail` stays in the route for Quick Look. A
+   claim made without measuring, offered to the founder as a lever, and recorded
+   as such.
+10. **Three tests passed for a reason other than the one written above them.**
+    (a) "A foreign drag never reaches fileAssets" stayed green with the type check
+    removed, because `getData` returns `''` and the length check stops it anyway.
+    (b) Three negative assertions fired before the `startTransition` they were
+    meant to catch. (c) "The keys this file already owned still work" used Space,
+    and `user.keyboard(' ')` on a `<button>` fires a CLICK — the panel opened
+    through `onClick`. All three rewritten.
+    **The rule: assert the thing ONLY the code under test can produce.**
+11. **A comment claiming protection the code does not give.** It said
+    destructuring `navProps` prevents it clobbering the key handler. MEASURED: a
+    whole spread THERE is harmless, because JSX is last-wins. The protection is
+    prop ORDER, which is invisible. Corrected in place.
+
+---
+
+## What the next session in THIS lane should pick up
+
+1. **Take `wt-core` in.** 8 commits, none touching a shared surface, and two of
+   them route Playwright's browser through Node so it can RUN in a cloud sandbox.
+   That directly attacks this lane's biggest standing gap.
+2. **Then actually run the drags, the arrow keys and a double upload in a real
+   browser.** Everything in this lane is jsdom-verified only, and drag-and-drop is
+   exactly what jsdom models loosely.
+3. **Build trash-and-restore's remaining edge if you want it: an auto-purge.**
+   There is deliberately none, and `assets-trash.test.ts` asserts NO function
+   reads `deleted_at` — so the day a sweeper is added that guard goes red and the
+   copy must change in the same commit. That is the design, not an oversight.
+4. **Do not trust a mocked test with a database claim.** That is what let filing
+   ship broken through 27 green tests.
+5. **A CSS `transform` or `backdrop-filter` on any ancestor traps a dropdown.**
+   Reach for a portal before reaching for a z-index. `FloatingPanel` is the
+   pattern.
+6. **`ops/state/qa.pending.json` is rewritten by the QA hook every session** and
+   was reverted rather than committed, for the fifth session running.
+   `core.hooksPath` is UNSET so `.githooks/pre-commit` is disarmed. **Never
+   `git add -A`.**
 
 ---
 
 ## Gate
 
-Run cold on the tree at `1bb19d7`, from the repo root, no leg piped.
+**The authoritative run is CI's, on this exact SHA.** MEASURED, job
+98584261042 on `afca6f98`, runner 1000000551, 11m 19s, 13 steps, all success.
 
 | Leg | Result | Output |
 | --- | --- | --- |
-| `turbo run typecheck lint test --force` | **PASS** | 27 successful / 27 · **`0 cached, 27 total`** · exit 0 |
-| ↳ `@sahoda/web:test` | PASS | **5067 passed \| 13 skipped** |
-| ↳ `@sahoda/shared:test` | PASS | 332 passed |
-| ↳ `@sahoda/db:test` | PASS | 634 passed \| **207 skipped** |
-| ↳ `sites` `billing` `publishing` `jobs` `mesh` `research` | PASS | 3188 passed \| 13 skipped |
-| ↳ lint, all nine packages | PASS | `lint ok` ×9 |
-| `pnpm build` + js-budget | **PASS** | exit 0 · `js-budget ok: 81 routes within budget` |
-| `prettier --check .` | **PASS** | whole tree, with the REPO's binary |
-| Playwright `test:smoke` | **UNRUN, not passed** | REQUESTS §25 |
-| Production probes | **PASS** | 6 guards broken in prod and watched to refuse, all rows rolled back |
+| CI `typecheck · lint · test · format` on `afca6f98` | **PASS** | **success**, real runner, 11m 19s, 13 steps |
+| ↳ CI step "Typecheck, lint and test" | PASS | 10m 18s |
+| ↳ CI step "Root vitest" | PASS | the leg that fails locally because this sandbox runs as uid 0 and `chmod 0o500` does not block root. **MEASURED not to reproduce in CI**, as predicted |
+| ↳ CI step "Formatting" | PASS | 31s |
+| Local `turbo typecheck lint test --force` on the `37b0d73` tree | **PASS** | 27/27, **0 cached**, exit 0 |
+| ↳ `@sahoda/web` | PASS | 5151 passed \| 13 skipped |
+| ↳ `@sahoda/db` | PASS | 643 passed \| **207 skipped** |
+| ↳ `@sahoda/shared` | PASS | 351 passed |
+| ↳ `sites` `publishing` `billing` `jobs` `mesh` `research` | PASS | 1566 · 464 · 401\|13 · 396 · 166 · 195 |
+| Local `turbo build` + js-budget | **PASS** | exit 0, `js-budget ok: 81 routes within budget` |
+| Local `prettier --check .` | **PASS** | whole tree, repo's own pinned binary |
+| `design-lint` | **PASS** | 5 checks ok, none new |
+| Playwright `test:smoke` | **UNRUN, not passed** | REQUESTS §25. Not a failure — it did not run |
+| Production probes, all three migrations | **PASS** | guards broken and watched to refuse, every write rolled back |
 
-**Read the skip counts, not the exit code: 233 tests did not run.**
-
----
-
-## CI has no runner, and it is not this PR's
-
-All gate runs on this branch complete in **2 to 5 seconds** with `runner_id: 0`
-and an empty runner name. **Run 246 at 11:05 UTC predates this session's work
-entirely.** Six other branches fail identically in the same window. Nothing
-executed, so there is no failure in any diff to fix.
-
-One standing-down comment is posted on PR #18. **No re-run was spent**, and
-deliberately: a re-run only asks again whether a runner can be allocated, which
-six branches already answer. **This needs someone with billing access to check
-Actions minutes or the spending limit.** Nothing in the repository can merge
-until then.
-
----
-
-## The second half of the session: four more features, founder-directed
-
-"keep building next features dont stop / make a list of features and keep
-executing". The list, in the order it was worked:
-
-| # | Feature | Commit |
-| --- | --- | --- |
-| 1 | Trash and restore | `a64c1f8` |
-| 2 | Drag a photo onto a folder | `7201fdc` |
-| 3 | Shift-click a range, and select all | `95afafa` |
-| 4 | A Recent view | **NOT BUILT, deliberately** |
-| 5 | Drag a folder into a folder | `95afafa` |
-| 6 | Delete a selection, and empty the trash | `0238fe5` |
-| 7 | Arrow keys + roving tabindex | `6fb2796` |
-| 8 | Ctrl/Cmd+A and Shift+Arrow | `08793aa` |
-
-**Recent was dropped on judgement, not forgotten.** All files is already sorted
-newest-first by default and `added:7d` is already a search token, so a sidebar
-row for it would re-state the default view. A control that teaches a person the
-product has more places than it has is a cost, not a feature.
-
-### Three measurement failures of mine, all worth carrying forward
-
-**1. A string replace that matched nothing looks exactly like a guard that does
-not guard.** I reported a mutation on `canAcceptFolder` as NOT going red and
-concluded the guard was vacuous. The mutation had never been applied: prettier
-had joined the two lines of that arrow function, so a multi-line replace changed
-the file not at all. Applied properly it goes red.
-**Verify the mutation landed before reading the result.**
-
-**2. I named a lever without measuring it.** Offering the founder a way to
-shrink `/assets`, I said "the cheapest thing to drop is the details panel". They
-said drop it. **MEASURED: 823661 -> 822072, which is 1589 bytes.** The panel was
-a thin WRAPPER around `AssetDetail`, and `AssetDetail` stays in the route because
-Quick Look renders it — so there was never more than the wrapper to save. The
-route is genuinely smaller and the ratchet is tightened, but I presented 1.6 kB
-as if it were the answer to an 8 kB problem. **Measure a saving before you offer
-it as one.**
-
-**3. A negative assertion with no settle is an assertion about nothing.** Every
-action on this screen runs inside `startTransition`, so
-`expect(fn).not.toHaveBeenCalled()` immediately after a `fireEvent` passes
-whether or not the call was about to happen. THREE tests were doing that. A
-`settle()` helper now flushes pending transitions first and its comment carries
-the measurement. A fourth checked a drag highlight AFTER the drop, when it is
-cleared unconditionally.
-
-### One real bug the tests drove out
-
-A folder row lit up for a folder drop it was about to reject. The cause is
-fundamental: `getData` returns `''` during `dragover` in every browser, so a
-target cannot tell WHICH folder is being dragged and had nothing to run
-`canMoveFolder` against. `types` IS readable throughout, so the dragged id now
-travels in a second parameterised MIME type,
-`application/x-sahoda-folder+<id>`, and the refusal happens before the drop.
-
-The drag test also caught, on its first run, that `dragIds` had reached the LIST
-branch of `library-grid.tsx` and not the GRID branch — the default view. Dragging
-from the grid did nothing at all.
-
-### The trash's one forbidden claim
-
-**No retention period, and no auto-purge.** Nothing in this repository runs on a
-schedule against `assets.deleted_at`, so "deleted after 30 days" would be a
-promise no process could keep — in both directions. `assets-trash.test.ts`
-asserts that NO function anywhere reads that column, so the day a sweeper is
-added the guard goes red and the copy has to change in the same commit.
-
----
-
-## What was NOT done, and why
-- ~~Two migrations unapplied~~ **BOTH ARE NOW APPLIED** to `rloztdhzfliyvpvxsgjl`
-  on the founder's word, and verified by reading production back rather than by
-  trusting the apply. Six guards were broken in production and watched to
-  refuse, inside a `do` block that rolls every write back: the NFC index raised
-  `unique_violation` on two root folders differing only by normalisation, and a
-  trashed row left the live filter, entered the trash filter, and kept both its
-  bytes (653851) and its storage path. **11 assets, all live, nothing touched.**
-- **ALL THREE MIGRATIONS ARE NOW APPLIED** to `rloztdhzfliyvpvxsgjl`, each on the
-  founder's word and each verified by reading production back rather than by
-  trusting the apply. The third, `20260827140000_assets_content_hash.sql`, went
-  in at 15:2xZ and three guards were broken inside a rolled-back `do` block:
-  `shared_hash_allowed=t` (two rows CAN share a hash, which is what keeps
-  delete-then-re-upload working and what a unique index would have broken),
-  `null_matches=0` (a pre-existing NULL hash is invisible to the lookup rather
-  than falsely reported as a duplicate), and `live=1 trashed=1` (the live-versus-
-  trashed ordering the action relies on). Post-check: **11 assets, 10 live, 1 in
-  the trash, 0 hashed rows, 0 probe rows left, 2 folders.**
-  MEASURED and worth knowing: the trash and the folders are BEING USED on the
-  preview — one asset is trashed and there are now two folders, where this
-  morning there were none and one.
-- **Every drag is jsdom-tested only.** No real pointer has driven one on this
-  lane, because Playwright cannot run here. Drag and drop is exactly the kind of
-  thing jsdom models loosely, so treat the browser check as outstanding.
-- **Everything in the file manager spec's Phases 3 to 5**: sharing and public
-  links, versioning and dedupe, OCR, virus scanning, WebSockets, comments,
-  GraphQL, third-party imports. Some would be wrong in a marketing tool, some
-  cannot be built honestly here, and the spec's own build order says to resist
-  them until Phase 2 polish is done.
-- **Presigned direct-to-storage uploads.** A real rearchitecture, not a feature.
-- **Virtualization.** The library caps at 200 rows, so it does not bite yet.
-- **`function_search_path_mutable` on `app.asset_folders_guard_tree`.** One of
-  **16** functions carrying it, including `app.set_updated_at` and
-  `app.apply_tenant_policies`. Mine is not SECURITY DEFINER. Fixing one of
-  sixteen does not close the class.
-- **The two `.claude/settings.json` defects.** Still open from session 1. The
-  Stop hook's `jq` still cannot read its own re-entry guard, and its gate still
-  filters on `origin/main`, which is 800+ commits behind.
-
----
-
-## For whoever picks this lane up
-
-1. **Build trash and restore.** Permanent delete is the sharpest edge left.
-2. **Apply the NFC migration** (or decide not to, deliberately).
-3. **Do not trust a mocked test with a database claim.** That is what let filing
-   ship broken through 27 green tests.
-4. **A CSS transform or a `backdrop-filter` on any ancestor traps a dropdown.**
-   `FloatingPanel` is the pattern; `apps/web/CLAUDE.md` records the other half.
-   Reach for a portal before reaching for a z-index.
-5. **`ops/state/qa.pending.json` was rewritten by the QA hook again** and reverted
-   rather than committed, for the fourth session running. `core.hooksPath` is
-   still UNSET so `.githooks/pre-commit` is disarmed. **Do not `git add -A`.**
+**Read the skip counts, not the exit code: 220 tests did not run** in the local
+leg. `/(app)/assets` measured **827620** against its **822072** budget, inside
+the harness's 8 kB slack with about 2.6 kB left.
