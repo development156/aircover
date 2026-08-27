@@ -134,12 +134,48 @@ export function TopUpPanel({ currency = null, fx = null }: TopUpPanelProps) {
   return (
     <Card data-guide="wallet.topup" className="space-y-4">
       <div className="space-y-1">
+        {/* ── "MONTHLY PLANS", AND NEITHER OF THE TWO OBVIOUS NAMES ──────────
+            "Top up credits" was wrong and the founder is right about it: a
+            top-up is a one-off purchase of credits, and this box sells PLANS —
+            each one carrying channel, site and seat entitlements that
+            `checkEntitlement` reads, not just a credit balance.
+
+            "Subscription plans" was the founder's own suggestion and is NOT
+            used, because it claims a renewal this product does not perform.
+            MEASURED: `subscriptions` exists as a table, with `status`,
+            `current_period_end` and `cancel_at_period_end` — and NOTHING in
+            production code ever inserts or updates a row in it. Only the
+            integration tests do. `startCheckout` opens a single Cashfree
+            ORDER, and `applyPlanGrant` keys the grant on `monthlyGrantKey`,
+            which is (plan, period, workspace). So one payment buys one period.
+            Nothing schedules the next one and nothing takes it.
+
+            The word "subscription" tells a reader their card will be charged
+            again. It will not be, because no code does that. That is the
+            "no mock-success in prod paths" rule applied to a heading.
+
+            "Monthly plans" is what is true on both axes: the price is monthly,
+            the credits are granted monthly, and it promises no renewal. Change
+            it to "Subscription" in the same commit that makes a subscription,
+            not before. */}
         <CardLabel>
           <CreditCard size={13} strokeWidth={2} aria-hidden />
-          Top up credits
+          Monthly plans
         </CardLabel>
+        {/* ── THE SAME OVER-CLAIM AS "SUBSCRIPTION", ONE LINE DOWN ──────────
+            This read "A plan grants its credits every month", which tells a
+            reader credits will keep arriving. They will not: one payment is one
+            `monthlyGrantKey` = (plan, period, workspace), and nothing schedules
+            or takes the next one. Refusing "Subscription" in the heading while
+            leaving this sentence promising the same thing would have made that
+            refusal decorative.
+
+            The per-card "granted each month" line is left alone deliberately.
+            It states the PLAN'S RATE — what this plan is worth per month, a
+            property of the catalog entry — rather than making a promise about
+            what will happen to the reader's card. */}
         <p className="type-sm text-muted">
-          A plan grants its credits every month. Pick one, then start a checkout.
+          Each plan grants its credits for the month you pay for. Pick one, then start a checkout.
         </p>
       </div>
 
