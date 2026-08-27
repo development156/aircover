@@ -105,21 +105,55 @@ export interface SelectionRedirect {
  * returns depends on whether Zernio appends or replaces. So `ours` comes from the
  * STEP, which only Zernio sets and which has exactly one meaning.
  */
-export function readSelectionRedirect(params: URLSearchParams): SelectionRedirect | null {
-  const step = params.get('step')
-  if (step === null) return null
-  const platform = STEPS[step]
-  if (platform === undefined) return null
+export function readSelectionRedirect(
+  params: URLSearchParams,
+  /**
+   * The platform the customer actually pressed Connect on, as the return route
+   * already resolved it from the cookie and the return URL. Used only to
+   * RECOGNISE a pick this function would otherwise fail to name — never to
+   * decide that a pick is pending. See below.
+   */
+  pressed: ZernioPlatform | null = null,
+): SelectionRedirect | null {
+  /**
+   * ── THE TOKEN IS THE EVIDENCE, AND `step` IS ONLY THE LABEL ───────────────
+   * The first version required `step` to be exactly `select_page` or
+   * `select_location`, read off the OpenAPI spec. Those two strings are the only
+   * part of this redirect that has never been observed on the wire, and a wrong
+   * guess is silent in the worst way: this function returns null, the trip falls
+   * through to the ordinary reconcile, finds no facebook account — because Zernio
+   * has not created one — and answers `zernio=nothing`. The customer sees exactly
+   * the failure this whole flow was built to remove, and we learn nothing.
+   *
+   * So the primary evidence is now the TOKEN, which the spec states in prose
+   * twice: "Extract tempToken and userProfile from the OAuth redirect params."
+   * A `tempToken` or a `pendingDataToken` on this URL means one thing and cannot
+   * mean anything else — Zernio is holding an authorised OAuth session that has
+   * not yet resolved to an account, and it is waiting to be told which one.
+   *
+   * `step` is still read FIRST and still decides the platform when it is one we
+   * know, because it is the unambiguous signal. `pressed` is the fallback, and it
+   * is safe as a fallback in a way it would not be as a trigger: it comes from
+   * our own cookie or our own return URL, it is validated against the shared
+   * allowlist upstream, and on its own it authorises nothing. Both paths still
+   * require a token AND a profile id, and the caller still compares that profile
+   * against the one it read from our own table.
+   */
+  const step = params.get('step')?.trim() || null
+  const profileId = params.get('profileId')?.trim()
+  const tempToken = params.get('tempToken')?.trim() || undefined
+  const pendingDataToken = params.get('pendingDataToken')?.trim() || undefined
+
+  if (!profileId) return null
+  if (!tempToken && !pendingDataToken) return null
+
+  const platform =
+    (step === null ? undefined : STEPS[step]) ??
+    (pressed === null ? null : selectionPlatformFor(pressed))
+  if (!platform) return null
 
   const ours = ourPlatformFor(platform)
   if (ours === null) return null
-
-  const profileId = params.get('profileId')?.trim()
-  if (!profileId) return null
-
-  const tempToken = params.get('tempToken')?.trim() || undefined
-  const pendingDataToken = params.get('pendingDataToken')?.trim() || undefined
-  if (!tempToken && !pendingDataToken) return null
 
   return {
     platform,
@@ -131,6 +165,31 @@ export function readSelectionRedirect(params: URLSearchParams): SelectionRedirec
       userProfile: readUserProfile(params.get('userProfile')),
     },
   }
+}
+
+/**
+ * A connect that SHOULD have ended in a pick and did not — named, so it can be
+ * reported instead of disappearing into "we found nothing".
+ *
+ * ── WHY THIS EXISTS ──────────────────────────────────────────────────────────
+ * Facebook and Google Business create no account at Zernio until a choice is
+ * committed. So for those two, "the customer pressed Connect, came back, and
+ * there is no account" is not the ordinary empty answer that `zernio=nothing`
+ * describes — it is a step that failed, and the two must not read the same.
+ *
+ * Returns the PARAMETER NAMES that arrived, never their values. `tempToken` is a
+ * live Facebook user access token and `connect_token` is a Zernio credential;
+ * the names alone say which shape came back, which is the whole diagnostic, and
+ * they are safe to put in an error report.
+ */
+export function unresolvedSelection(
+  pressed: ZernioPlatform | null,
+  params: URLSearchParams,
+): { platform: ZernioSelectionPlatform; sawParams: string[] } | null {
+  if (pressed === null) return null
+  const platform = selectionPlatformFor(pressed)
+  if (platform === null) return null
+  return { platform, sawParams: [...new Set([...params.keys()])].sort() }
 }
 
 /**
