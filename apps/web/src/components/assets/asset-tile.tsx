@@ -54,7 +54,13 @@ export function AssetTile({
   onOpen: () => void
   selectable?: boolean
   selected?: boolean
-  onToggleSelect?: () => void
+  /**
+   * Selection click, carrying whether SHIFT was held. The flag comes from the
+   * event rather than from a keyboard listener because a listener can be out of
+   * date by a frame, and a stale shift is the difference between selecting one
+   * file and selecting forty.
+   */
+  onToggleSelect?: (shift: boolean) => void
   /** Space toggles Quick Look; a click still opens the detail drawer. */
   onQuickLook?: () => void
   /** Destinations for the menu's "File into folder". */
@@ -90,7 +96,7 @@ export function AssetTile({
         // "..." trigger, and making that draggable would mean grabbing the
         // menu button started a drag of the file instead of opening the menu.
         {...(dragIds !== undefined ? drag : {})}
-        onClick={selectable ? onToggleSelect : onOpen}
+        onClick={selectable ? (event) => onToggleSelect?.(event.shiftKey) : onOpen}
         onKeyDown={(event) => {
           if (event.key === ' ' || event.code === 'Space') {
             event.preventDefault()

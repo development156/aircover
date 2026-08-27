@@ -12,6 +12,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { canMoveFolder } from '@sahoda/shared'
 import type { AssetFolder, AssetSmartFolder } from '@sahoda/shared'
 
 import { FolderRow } from '@/components/assets/folder-row'
@@ -55,6 +56,7 @@ export function LibrarySidebar({
   onOpenSmart,
   trashedCount,
   onDropFiles,
+  onMoveFolder,
   foldersUnreadable,
   droppedFolders,
   droppedSmart,
@@ -87,6 +89,8 @@ export function LibrarySidebar({
    * drops, rather than rows that light up and then do nothing.
    */
   onDropFiles?: (folderId: string, ids: string[]) => void
+  /** A folder dragged inside another folder. Absent means folders cannot be dragged. */
+  onMoveFolder?: (draggedId: string, newParentId: string) => void
   foldersUnreadable: boolean
   droppedFolders: number
   droppedSmart: number
@@ -122,6 +126,17 @@ export function LibrarySidebar({
           collapsed={collapsed}
           onGoTo={onGoTo}
           onDropFiles={onDropFiles}
+          canAcceptFolder={
+            onMoveFolder
+              ? // The SAME `canMoveFolder` the menu's move list already filters
+                // with, and the same one the server and the trigger re-check.
+                // Answered here so an impossible target never highlights, rather
+                // than accepting the drop and explaining afterwards.
+                (draggedId) =>
+                  draggedId !== folder.id && canMoveFolder(folders, draggedId, folder.id).ok
+              : undefined
+          }
+          onMoveFolder={onMoveFolder}
           renderMenu={renderFolderMenu}
         />,
         ...folderRows(folder.id, depth + 1),

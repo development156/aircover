@@ -20,6 +20,8 @@ export function LibraryToolbar({
   onViewChange,
   selectMode,
   onToggleSelectMode,
+  allSelected,
+  onSelectAll,
   onOpenSidebarOnPhone,
   sort,
   onSortChange,
@@ -31,6 +33,10 @@ export function LibraryToolbar({
   onViewChange: (view: LibraryView) => void
   selectMode: boolean
   onToggleSelectMode: () => void
+  /** True when every file on screen is already selected. Flips the label. */
+  allSelected: boolean
+  /** Selects everything on screen, or clears it when it is already all selected. */
+  onSelectAll: () => void
   onOpenSidebarOnPhone: () => void
   sort: SortOption
   onSortChange: (next: SortOption) => void
@@ -84,6 +90,24 @@ export function LibraryToolbar({
           onClick={() => onViewChange('list')}
         />
       </div>
+
+      {/* ── NEXT TO Select, NOT IN THE BULK BAR ────────────────────────────
+          The bulk bar renders nothing until something is selected, so a
+          select-all living there could never be the FIRST thing you press —
+          which is the only time anyone wants it. Here it appears the moment
+          select mode is on, beside the control that turned it on. */}
+      {selectMode ? (
+        <button
+          type="button"
+          onClick={onSelectAll}
+          className="flex shrink-0 items-center gap-1.5 rounded-pill bg-s2 px-3 py-1.5 type-sm font-semibold text-ink transition-micro hover:bg-s1 max-narrow:min-h-[44px]"
+        >
+          <ListChecks size={14} aria-hidden />
+          {/* The label says what the press DOES, not what is true now. "All
+              selected" would be a status pretending to be a button. */}
+          {allSelected ? 'Select none' : 'Select all'}
+        </button>
+      ) : null}
 
       <button
         type="button"

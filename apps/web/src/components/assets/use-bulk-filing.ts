@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 
 import { fileAssets, unfileAssets } from '@/app/actions/asset-folder-items'
+import { moveFolder } from '@/app/actions/asset-folders'
 import { restoreAsset, trashAsset } from '@/app/actions/assets'
 import type { AssetCard } from '@/lib/assets/view'
 
@@ -56,6 +57,13 @@ export interface BulkFiling {
   removeFromFolder: (folderId: string, folderName: string, ids: readonly string[]) => void
   /** One file to the trash, with Undo. See `trashOne` for why it is here. */
   trashOne: (id: string, fileName: string) => void
+  /** A folder dragged inside another folder, with the outcome named. */
+  moveFolderInto: (
+    draggedId: string,
+    draggedName: string,
+    parentId: string,
+    parentName: string,
+  ) => void
   dismiss: () => void
 }
 
@@ -197,12 +205,49 @@ export function useBulkFiling(cards: readonly AssetCard[], onDone: () => void): 
     })
   }
 
+  /**
+   * A folder dragged inside another folder.
+   *
+   * ── WHY THIS REPORTS AND THE MENU'S MOVE DOES NOT ──────────────────────────
+   * The menu's move is a list of names you pick from, and the folder you picked
+   * is right there on screen when it happens. A DRAG ends with the pointer
+   * somewhere else and the tree already re-drawn, so "did that land where I
+   * meant" is a real question — and if it did not, the only evidence is a
+   * sentence.
+   *
+   * `refused` cannot normally arrive here: `canMoveFolder` ran while the drag
+   * was in the air and again at the drop, so an impossible move never gets this
+   * far. It is still handled, because the tree can change between the drop and
+   * the write, and a refusal reaching the person as silence would be worse than
+   * one reaching them as a sentence.
+   */
+  function moveFolderInto(
+    draggedId: string,
+    draggedName: string,
+    parentId: string,
+    parentName: string,
+  ) {
+    setOutcome(null)
+    startBulk(async () => {
+      const result = await moveFolder(draggedId, parentId)
+      if (!result.ok) {
+        setOutcome({
+          tone: 'error',
+          message: result.reason === 'refused' ? result.decision.message : result.message,
+        })
+        return
+      }
+      setOutcome({ tone: 'ok', message: `Moved ${draggedName} into ${parentName}.` })
+    })
+  }
+
   return {
     pending,
     outcome,
     fileInto,
     removeFromFolder,
     trashOne,
+    moveFolderInto,
     dismiss: () => setOutcome(null),
   }
 }

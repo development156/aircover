@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import type { AssetFolder } from '@sahoda/shared'
@@ -14,10 +14,11 @@ vi.mock('@/app/actions/asset-folder-items', () => ({
   unfileAssets: (...args: unknown[]) => unfileAssets(...args),
 }))
 
+const moveFolder = vi.fn()
 vi.mock('@/app/actions/asset-folders', () => ({
   createFolder: vi.fn(),
   renameFolder: vi.fn(),
-  moveFolder: vi.fn(),
+  moveFolder: (...args: unknown[]) => moveFolder(...args),
   deleteFolder: vi.fn(),
 }))
 
@@ -376,6 +377,22 @@ describe('the trash view', () => {
  * nothing else, so both are exercised through the real `isAssetDrag` and
  * `decodeAssetDrag` rather than being asserted directly.
  */
+/**
+ * Let React's pending transitions run before a NEGATIVE assertion.
+ *
+ * MEASURED, and it invalidated three tests in this file: every action here goes
+ * through `startTransition`, so `expect(fn).not.toHaveBeenCalled()` fired
+ * immediately after a `fireEvent` passes whether or not the call was about to
+ * happen. Mutating `canAcceptFolder` to `() => true` left the self-drop test
+ * GREEN for exactly that reason. A negative assertion with no settle is a
+ * negative assertion about nothing.
+ */
+async function settle() {
+  await act(async () => {
+    await Promise.resolve()
+  })
+}
+
 function stubDataTransfer() {
   const store = new Map<string, string>()
   return {
@@ -455,6 +472,7 @@ describe('dragging a file onto a folder files it', () => {
 
     fireEvent.dragEnter(target, { dataTransfer })
     fireEvent.drop(target, { dataTransfer })
+    await settle()
 
     expect(fileAssets).not.toHaveBeenCalled()
   })
@@ -501,5 +519,215 @@ describe('the type check is what makes a refusal VISIBLE', () => {
     fireEvent.dragStart(tile, { dataTransfer: ours })
     fireEvent.dragEnter(target, { dataTransfer: ours })
     expect(row.querySelector('.ring-accent')).not.toBeNull()
+  })
+})
+
+// ── SHIFT-CLICK AND SELECT ALL, THROUGH THE REAL SCREEN ─────────────────────
+describe('selecting more than one file', () => {
+  it('shift-click selects the range between two tiles', async () => {
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[card('one'), card('two'), card('three')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Select' }))
+
+    const tileFor = (name: string) =>
+      screen.getByText(`${name}.jpg`).closest('button') as HTMLElement
+
+    // Default sort is newest-added first and every fixture shares a timestamp,
+    // so the order on screen is the order given. Clicking the first and
+    // shift-clicking the last must take all three.
+    await user.click(tileFor('one'))
+    // Shift is HELD across the click, which is the only way user-event applies
+    // it — a `{ shiftKey: true }` option on `click` is silently ignored and the
+    // test then passes a plain click off as a range. That mistake showed up
+    // here as "2 files selected" instead of 3.
+    await user.keyboard('{Shift>}')
+    await user.click(tileFor('three'))
+    await user.keyboard('{/Shift}')
+
+    const bar = await screen.findByRole('region', { name: 'Bulk actions' })
+    await waitFor(() => expect(bar.textContent).toMatch(/3\s*files selected/))
+  })
+
+  it('a plain click after a range does not extend it', async () => {
+    // The premise for the guard above: without this, a test that selected
+    // everything by accident would look identical.
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[card('one'), card('two'), card('three')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Select' }))
+    await user.click(screen.getByText('one.jpg').closest('button') as HTMLElement)
+
+    const bar = screen.getByRole('region', { name: 'Bulk actions' })
+    expect(bar.textContent).toMatch(/1\s*file selected/)
+  })
+
+  it('Select all takes everything on screen, and then reads Select none', async () => {
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[card('one'), card('two')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Select' }))
+    await user.click(screen.getByRole('button', { name: 'Select all' }))
+
+    const bar = screen.getByRole('region', { name: 'Bulk actions' })
+    expect(bar.textContent).toMatch(/2\s*files selected/)
+
+    // The label states what the next press DOES. A button reading "All
+    // selected" would be a status pretending to be a control.
+    await user.click(screen.getByRole('button', { name: 'Select none' }))
+    expect(screen.queryByRole('region', { name: 'Bulk actions' })).not.toBeInTheDocument()
+  })
+
+  it('Select all is not offered before select mode is on', async () => {
+    // It would have nothing to act on, and a control that does nothing is
+    // worse than no control.
+    render(
+      <AssetLibrary
+        cards={[card('one')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    expect(await screen.findByRole('button', { name: 'Select' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Select all' })).not.toBeInTheDocument()
+  })
+})
+
+// ── DRAG A FOLDER INTO A FOLDER ─────────────────────────────────────────────
+describe('dragging a folder into another folder', () => {
+  it('moves it, through the same action the menu uses', async () => {
+    moveFolder.mockResolvedValue({ ok: true })
+
+    render(
+      <AssetLibrary
+        cards={[card('one')]}
+        capped={false}
+        folders={[folder('a', 'Autumn'), folder('b', 'Brand')]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    const source = await screen.findByRole('button', { name: /^Autumn/ })
+    const target = screen.getByRole('button', { name: /^Brand/ })
+    const dataTransfer = stubDataTransfer()
+
+    fireEvent.dragStart(source, { dataTransfer })
+    fireEvent.dragOver(target, { dataTransfer })
+    fireEvent.drop(target, { dataTransfer })
+
+    await waitFor(() => expect(moveFolder).toHaveBeenCalledWith('a', 'b'))
+  })
+
+  it('a folder cannot be dropped on ITSELF, and does not highlight', async () => {
+    // `canMoveFolder` refuses it, so the row never lights up and the browser
+    // draws the no-entry cursor. Accepting the drop and explaining afterwards
+    // would make a person complete a gesture that was never going to work.
+    moveFolder.mockClear()
+
+    render(
+      <AssetLibrary
+        cards={[card('one')]}
+        capped={false}
+        folders={[folder('a', 'Autumn')]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    const row = await screen.findByRole('button', { name: /^Autumn/ })
+    const wrapper = row.parentElement as HTMLElement
+    const dataTransfer = stubDataTransfer()
+
+    fireEvent.dragStart(row, { dataTransfer })
+    fireEvent.dragOver(row, { dataTransfer })
+
+    // Checked WHILE the drag is over the row. After the drop the highlight is
+    // cleared unconditionally, so asserting it there would pass on a row that
+    // had lit up brightly a moment earlier.
+    expect(wrapper.querySelector('.ring-accent')).toBeNull()
+
+    fireEvent.drop(row, { dataTransfer })
+    await settle()
+    expect(moveFolder).not.toHaveBeenCalled()
+  })
+
+  it('a FILE drag and a FOLDER drag on the same row do not cross', async () => {
+    // Both sets of handlers sit on one row and each ignores the other's MIME
+    // type. If they did not, dropping files on a folder would try to move a
+    // folder whose id was never in the payload.
+    fileAssets.mockClear()
+    moveFolder.mockClear()
+    fileAssets.mockResolvedValue({ ok: true, added: 1, alreadyThere: 0 })
+
+    render(
+      <AssetLibrary
+        cards={[card('one')]}
+        capped={false}
+        folders={[folder('a', 'Autumn')]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    const tile = (await screen.findByText('one.jpg')).closest('button') as HTMLElement
+    const target = screen.getByRole('button', { name: /^Autumn/ })
+    const dataTransfer = stubDataTransfer()
+
+    fireEvent.dragStart(tile, { dataTransfer })
+    fireEvent.dragEnter(target, { dataTransfer })
+    fireEvent.drop(target, { dataTransfer })
+
+    await waitFor(() => expect(fileAssets).toHaveBeenCalled())
+    await settle()
+    expect(moveFolder).not.toHaveBeenCalled()
   })
 })

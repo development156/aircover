@@ -19,6 +19,14 @@ import { useLibraryFiling } from '@/components/assets/use-library-filing'
 import { useLibraryShortcuts } from '@/components/assets/use-library-shortcuts'
 import { EmptyState } from '@/components/empty-state'
 import { ROOT, contentsAt, type LibraryLocation } from '@/lib/assets/organize-view'
+import {
+  EMPTY_SELECTION,
+  allVisibleSelected,
+  deselectVisible,
+  selectAll,
+  selectWithRange,
+  type SelectionState,
+} from '@/lib/assets/select-range'
 import { sortCards, type SortOption } from '@/lib/assets/sort-cards'
 import type { AssetCard } from '@/lib/assets/view'
 
@@ -63,7 +71,11 @@ export function AssetLibrary({
   const [unfiledOnly, setUnfiledOnly] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [selectMode, setSelectMode] = useState(false)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  // A SelectionState rather than a bare Set, because a shift-click needs an
+  // ANCHOR and the anchor has to live wherever the selection does or the two
+  // drift apart. `select-range.ts` owns every rule about how they move.
+  const [selection, setSelection] = useState<SelectionState>(EMPTY_SELECTION)
+  const selected = selection.selected
   const [view, setView] = useState<LibraryView>(() => readLibraryView())
   const [sort, setSort] = useState<SortOption>(() => readLibrarySort())
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -77,7 +89,7 @@ export function AssetLibrary({
   const searchRef = useRef<HTMLInputElement>(null)
 
   const now = useMemo(() => new Date(), [])
-  const clearSelection = () => setSelected(new Set())
+  const clearSelection = () => setSelection(EMPTY_SELECTION)
   const {
     bulkPending,
     bulkOutcome,
@@ -89,6 +101,7 @@ export function AssetLibrary({
     onFileDeleted,
     trashSingle,
     dropIntoFolder,
+    dropFolderInto,
   } = useLibraryFiling({
     cards,
     folders,
@@ -98,7 +111,8 @@ export function AssetLibrary({
     clearSelection,
     openId,
     setOpenId,
-    setSelected,
+    setSelected: (updater: (current: Set<string>) => Set<string>) =>
+      setSelection((current) => ({ ...current, selected: updater(new Set(current.selected)) })),
   })
 
   function goTo(next: LibraryLocation) {
@@ -194,6 +208,7 @@ export function AssetLibrary({
 
   const currentFolderPath = location.at === 'folder' ? folderPath(folders, location.id) : []
   const selectedCards = cards.filter((c) => selected.has(c.id))
+  const visibleIds = visible.map((card) => card.id)
   const openCard = openId === null ? null : (cards.find((c) => c.id === openId) ?? null)
   const insideFolderId = location.at === 'folder' && !unfiledOnly ? location.id : null
 
@@ -208,6 +223,7 @@ export function AssetLibrary({
     onGoUnfiled: goUnfiled,
     trashedCount: trashed.length,
     onDropFiles: dropIntoFolder,
+    onMoveFolder: dropFolderInto,
     onOpenSmart: openSmartSearch,
     foldersUnreadable,
     droppedFolders,
@@ -231,6 +247,13 @@ export function AssetLibrary({
           setSelectMode((mode) => !mode)
           clearSelection()
         },
+        allSelected: allVisibleSelected(selection, visibleIds),
+        onSelectAll: () =>
+          setSelection((current) =>
+            allVisibleSelected(current, visibleIds)
+              ? deselectVisible(current, visibleIds)
+              : selectAll(current, visibleIds),
+          ),
         onOpenSidebarOnPhone: () => setSidebarOpenOnPhone(true),
         sort,
         onSortChange: setSortOption,
@@ -270,13 +293,19 @@ export function AssetLibrary({
         selectMode,
         selected,
         onOpen: setOpenId,
-        onToggleSelect: (id) =>
-          setSelected((current) => {
-            const next = new Set(current)
-            if (next.has(id)) next.delete(id)
-            else next.add(id)
-            return next
-          }),
+        // `visible.map(id)` is the order AS DRAWN — filtered and sorted. A
+        // range measured over `cards` would select tiles that are not on
+        // screen, and the bulk bar's count would then exceed what a person can
+        // see.
+        onToggleSelect: (id, shift) =>
+          setSelection((current) =>
+            selectWithRange(
+              current,
+              id,
+              shift,
+              visible.map((card) => card.id),
+            ),
+          ),
         onQuickLook: setOpenId,
         onClearSearch: () => setQuery(''),
         insideFolderId,

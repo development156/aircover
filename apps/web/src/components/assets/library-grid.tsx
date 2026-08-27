@@ -35,7 +35,7 @@ export function LibraryGrid({
   selectMode: boolean
   selected: ReadonlySet<string>
   onOpen: (id: string) => void
-  onToggleSelect: (id: string) => void
+  onToggleSelect: (id: string, shift: boolean) => void
   onQuickLook: (id: string) => void
   /** Clears the search box. Only ever offered while `narrowing` is true — a
    *  remedy that removes the one thing standing between "here" and "nothing". */
@@ -94,7 +94,7 @@ export function LibraryGrid({
               onOpen={() => onOpen(card.id)}
               selectable={selectMode}
               selected={selected.has(card.id)}
-              onToggleSelect={() => onToggleSelect(card.id)}
+              onToggleSelect={(shift) => onToggleSelect(card.id, shift)}
               onQuickLook={() => onQuickLook(card.id)}
               folders={folders}
               insideFolderId={insideFolderId}
@@ -119,7 +119,7 @@ export function LibraryGrid({
             onOpen={() => onOpen(card.id)}
             selectable={selectMode}
             selected={selected.has(card.id)}
-            onToggleSelect={() => onToggleSelect(card.id)}
+            onToggleSelect={(shift) => onToggleSelect(card.id, shift)}
             onQuickLook={() => onQuickLook(card.id)}
             folders={folders}
             insideFolderId={insideFolderId}

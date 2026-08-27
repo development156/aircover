@@ -39,6 +39,7 @@ export function useLibraryFiling({
     fileInto: fileIntoRaw,
     removeFromFolder,
     trashOne,
+    moveFolderInto,
     outcome: bulkOutcome,
     dismiss: dismissBulkOutcome,
   } = useBulkFiling(cards, clearSelection)
@@ -89,6 +90,11 @@ export function useLibraryFiling({
     fileIntoRaw(folderId, folderName(folderId), ids)
   }
 
+  /** A folder dropped inside another folder. Names both for the outcome line. */
+  function dropFolderInto(draggedId: string, newParentId: string) {
+    moveFolderInto(draggedId, folderName(draggedId), newParentId, folderName(newParentId))
+  }
+
   function trashSingle(id: string) {
     const card = cards.find((entry) => entry.id === id)
     trashOne(id, card === undefined ? 'that file' : displayName(card))
@@ -114,6 +120,7 @@ export function useLibraryFiling({
     removeFromCurrentFolder,
     removeSingleFromCurrentFolder,
     dropIntoFolder,
+    dropFolderInto,
     trashSingle,
     onFileDeleted,
   }

@@ -21,6 +21,53 @@
 export const ASSET_DRAG_MIME = 'application/x-sahoda-assets'
 
 /**
+ * A FOLDER being dragged, under its own type.
+ *
+ * Separate from `ASSET_DRAG_MIME` so a target can tell the two apart during the
+ * drag, when the payload is unreadable. They mean opposite things — dropping
+ * files ADDS memberships and keeps every other one, dropping a folder MOVES it
+ * and it leaves where it was — so a target that could not distinguish them
+ * would have to guess, and would guess wrong half the time.
+ */
+export const FOLDER_DRAG_MIME = 'application/x-sahoda-folder'
+
+/**
+ * The dragged folder's id, ENCODED INTO A SECOND MIME TYPE.
+ *
+ * ── WHY THE ID CANNOT LIVE ONLY IN THE PAYLOAD ───────────────────────────────
+ * `getData` returns '' during `dragover` in every browser; the payload is
+ * readable only on `drop`. So a target deciding whether it can accept THIS
+ * folder — not folders in general — has nothing to read.
+ *
+ * `types` IS readable throughout. Putting the id in a type name is the standard
+ * way out, and it is what lets a folder refuse a drop BEFORE it happens rather
+ * than accepting it and explaining afterwards. Without this the row highlights
+ * for a move it will then reject, which is a control that looks like it can do
+ * the thing and cannot.
+ *
+ * Lowercased on the way out and compared lowercased, because the drag-and-drop
+ * spec lowercases type strings. Folder ids are UUIDs, so nothing is lost.
+ */
+export function folderDragType(folderId: string): string {
+  return `${FOLDER_DRAG_MIME}+${folderId}`.toLowerCase()
+}
+
+/** The dragged folder's id, read from the types list. Null when this is not a folder drag. */
+export function folderIdFromTypes(
+  types: readonly string[] | DOMStringList | undefined,
+): string | null {
+  if (types === undefined) return null
+  const prefix = `${FOLDER_DRAG_MIME}+`
+  for (const type of Array.from(types as readonly string[])) {
+    if (type.startsWith(prefix)) {
+      const id = type.slice(prefix.length)
+      if (id !== '') return id
+    }
+  }
+  return null
+}
+
+/**
  * WHICH FILES A DRAG MOVES, given the one that was picked up.
  *
  * ── THE RULE EVERY FILE MANAGER SHARES, AND WHY ──────────────────────────────
@@ -75,9 +122,18 @@ export function decodeAssetDrag(raw: string | null | undefined): string[] {
  * decide whether to highlight would never highlight.
  */
 export function isAssetDrag(types: readonly string[] | DOMStringList | undefined): boolean {
+  return hasType(types, ASSET_DRAG_MIME)
+}
+
+/** Is this drag a folder being re-parented? Same reasoning as `isAssetDrag`. */
+export function isFolderDrag(types: readonly string[] | DOMStringList | undefined): boolean {
+  return hasType(types, FOLDER_DRAG_MIME)
+}
+
+function hasType(types: readonly string[] | DOMStringList | undefined, wanted: string): boolean {
   if (types === undefined) return false
   for (const type of Array.from(types as readonly string[])) {
-    if (type === ASSET_DRAG_MIME) return true
+    if (type === wanted) return true
   }
   return false
 }

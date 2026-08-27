@@ -33,6 +33,7 @@ export function SidebarRow({
   onKeyDown,
   menu,
   dropProps,
+  dragProps,
   isDropTarget = false,
 }: {
   icon: LucideIcon
@@ -63,7 +64,16 @@ export function SidebarRow({
     onDragLeave: (event: React.DragEvent) => void
     onDrop: (event: React.DragEvent) => void
   }
-  /** Whether files are hovering over this row right now. */
+  /**
+   * Makes this row itself draggable — a folder being moved into another
+   * folder. On the BUTTON rather than the wrapper, so grabbing the "..."
+   * trigger opens the menu instead of starting a drag of the folder.
+   */
+  dragProps?: {
+    draggable: boolean
+    onDragStart: (event: React.DragEvent) => void
+  }
+  /** Whether something is hovering over this row right now. */
   isDropTarget?: boolean
 }) {
   return (
@@ -81,6 +91,7 @@ export function SidebarRow({
       ) : null}
       <button
         type="button"
+        {...dragProps}
         onClick={onClick}
         onContextMenu={onContextMenu}
         onKeyDown={onKeyDown}
