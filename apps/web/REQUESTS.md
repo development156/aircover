@@ -2529,6 +2529,7 @@ broken read it is disabled and says which of the three nothings applies: a
 failed read is not an empty library, and neither is a missing workspace. A
 search that matches nothing says so in its own words and keeps `3 saved` on
 screen to prove the library is not empty.
+
 ## 30 · A tree-depth trigger that checks only the row being written is half a guard
 
 **MEASURED on `claude/divas-kickoff-xdoxoa`, against real Postgres (PGlite), while
