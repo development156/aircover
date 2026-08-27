@@ -308,8 +308,10 @@ export function VersionCard({
           four different-width chips, and it is the last thing in the card
           because it is the end of the work. */}
       <div className="flex flex-wrap items-center gap-3">
+        {/* THE BRAND FILL, on the card's one committing action. Founder's
+            ruling, REQUESTS §31 — see `one-fill.test.tsx` for what that does to
+            docs/37 §2.3 and why the guard was retargeted rather than deleted. */}
         <Button
-          variant="secondary"
           aria-label={`Save ${label} copy`}
           onClick={onSave}
           loading={state.saving}

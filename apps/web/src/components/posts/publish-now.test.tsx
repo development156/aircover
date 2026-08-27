@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 import { toChannelSet, type Channel } from '@sahoda/shared'
 
@@ -37,6 +37,29 @@ const renderPublish = (channels: Channel[], connected?: ReadonlySet<Channel>) =>
   )
 
 const set = (...channels: Channel[]) => new Set<Channel>(channels)
+
+/**
+ * THE SHAPE CHANGED; THE CLAIMS DID NOT.
+ *
+ * Publishing used to be one press: a "Publish to X" button that sent the post
+ * to a live account with nothing between the pointer landing and the post
+ * existing. It is now pick-then-confirm, so the rail carries a chip per channel
+ * and a second, named button does the act.
+ *
+ * Every assertion below was written against the old shape and is retargeted
+ * rather than deleted — the thing each one protects (a channel named once, a
+ * footnote that cannot describe an impossible action, Instagram's wait appearing
+ * only where Instagram is involved) is unchanged and still worth guarding.
+ */
+const pick = (root: HTMLElement, channel: Channel): HTMLElement | null =>
+  root.querySelector(`[data-publish-pick="${channel}"]`)
+
+/** Choose a channel, which is what now reveals the confirm panel and its copy. */
+function choose(root: HTMLElement, channel: Channel) {
+  const chip = pick(root, channel)
+  if (chip === null) throw new Error(`no pick chip for ${channel}`)
+  fireEvent.click(chip)
+}
 
 describe('PublishNow — the unconnected-channel warning', () => {
   test('names a single unconnected channel, and offers to connect that one by name', () => {
@@ -86,17 +109,17 @@ describe('PublishNow — the unconnected-channel warning', () => {
     // `connected === undefined` means the read did not happen. Claiming a channel is
     // unconnected would send someone to reconnect an account that is fine, and hiding
     // the button would break publishing over a missing prop.
-    renderPublish(['linkedin'], undefined)
+    const { container } = renderPublish(['linkedin'], undefined)
 
     expect(screen.queryByText(/isn’t connected yet/)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Publish to LinkedIn/ })).toBeInTheDocument()
+    expect(pick(container, 'linkedin')).toBeInTheDocument()
   })
 
   test('says nothing when every picked channel is connected', () => {
-    renderPublish(['x', 'linkedin'], set('x', 'linkedin'))
+    const { container } = renderPublish(['x', 'linkedin'], set('x', 'linkedin'))
 
     expect(screen.queryByText(/connected yet/)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Publish to X/ })).toBeInTheDocument()
+    expect(pick(container, 'x')).toBeInTheDocument()
   })
 
   test('does not warn about a channel that is not on the live rail', () => {
@@ -107,13 +130,13 @@ describe('PublishNow — the unconnected-channel warning', () => {
     expect(screen.queryByText(/connected yet/)).not.toBeInTheDocument()
   })
 
-  test('a repeated CONNECTED channel offers one button, not two identical ones', () => {
+  test('a repeated CONNECTED channel offers one chip, not two identical ones', () => {
     // Same `text[]` hazard on the other branch of the split: `live` is derived from
-    // the same duplicated list. Two identical "Publish to X" buttons is both a wrong
-    // screen and a duplicate React key.
-    renderPublish(['x', 'x'], set('x'))
+    // the same duplicated list. Two identical X chips is both a wrong screen and a
+    // duplicate React key.
+    const { container } = renderPublish(['x', 'x'], set('x'))
 
-    expect(screen.getAllByRole('button', { name: /Publish to X/ })).toHaveLength(1)
+    expect(container.querySelectorAll('[data-publish-pick="x"]')).toHaveLength(1)
   })
 })
 
@@ -130,7 +153,11 @@ describe('PublishNow — the unconnected-channel warning', () => {
  * this line. That is the argument for these four.
  */
 describe('PublishNow — what the footnote may claim', () => {
-  const FOOTNOTE = /posts for real, straight away/i
+  // The CLAIM, not the sentence. It reads "This posts to LinkedIn for real,
+  // straight away" now that the confirm panel names its channel, so an
+  // assertion anchored to the old word order would fail on correct copy.
+  // Retargeted per CLAUDE.md rule 5 rather than deleted.
+  const FOOTNOTE = /for real, straight away/i
   const INSTAGRAM_WAIT = /fifteen seconds/i
 
   test('says nothing about publishing when nothing can be published', () => {
@@ -148,29 +175,61 @@ describe('PublishNow — what the footnote may claim', () => {
     expect(screen.queryByText(INSTAGRAM_WAIT)).not.toBeInTheDocument()
   })
 
-  test('does describe the publish when a channel can actually receive it', () => {
+  test('does describe the publish once a channel is picked', () => {
     // The counterweight: silencing the line everywhere would be the other
     // failure, and a test that only asserts absence passes against a deleted
-    // component.
-    renderPublish(['x'], set('x'))
+    // component. It now lives in the confirm panel, which is where a person is
+    // about to act rather than where they are still choosing.
+    const { container } = renderPublish(['x'], set('x'))
+    choose(container, 'x')
+
     expect(screen.getByText(FOOTNOTE)).toBeInTheDocument()
   })
 
+  test('says nothing about publishing until a channel is picked', () => {
+    // NEW, and it is the point of the confirm step: before a pick there is no
+    // act to describe, and the old screen described one anyway.
+    renderPublish(['x'], set('x'))
+    expect(screen.queryByText(FOOTNOTE)).not.toBeInTheDocument()
+  })
+
   test('keeps the Instagram wait where Instagram is the thing being published', () => {
-    renderPublish(['instagram'], set('instagram'))
+    const { container } = renderPublish(['instagram'], set('instagram'))
+    choose(container, 'instagram')
+
     expect(screen.getByText(INSTAGRAM_WAIT)).toBeInTheDocument()
   })
 
-  test('a mixed post keeps the wait, because Instagram is one of the buttons', () => {
-    renderPublish(['instagram', 'x'], set('instagram', 'x'))
+  /**
+   * ── THIS CASE'S CLAIM CHANGED, AND IT CHANGED FOR THE BETTER ─────────────
+   * It read "a mixed post keeps the wait, because Instagram is one of the
+   * buttons". That was correct about the old screen and it was the weaker
+   * behaviour: one footnote had to cover every button, so a person about to
+   * publish to X was told how long Instagram takes.
+   *
+   * The confirm panel is per channel, so the sentence is now about the channel
+   * actually being sent to. Retargeted rather than deleted, and the new
+   * assertion is the opposite of the old one on purpose.
+   */
+  test('a mixed post names the wait only for the channel being sent to', () => {
+    const { container } = renderPublish(['instagram', 'x'], set('instagram', 'x'))
+
+    choose(container, 'x')
+    expect(screen.queryByText(INSTAGRAM_WAIT)).not.toBeInTheDocument()
+
+    choose(container, 'x') // toggle off
+    choose(container, 'instagram')
     expect(screen.getByText(INSTAGRAM_WAIT)).toBeInTheDocument()
   })
 
   test('a mixed post where only the OTHER channel is connected drops the wait', () => {
     // `live` is the set a press would reach, not the set that was picked. With
-    // Instagram unconnected the Instagram button does not exist, so neither
-    // does the sentence about how long Instagram takes.
-    renderPublish(['instagram', 'x'], set('x'))
+    // Instagram unconnected there is no Instagram chip to pick, so neither the
+    // sentence nor the act is reachable.
+    const { container } = renderPublish(['instagram', 'x'], set('x'))
+
+    expect(pick(container, 'instagram')).toBeNull()
+    choose(container, 'x')
     expect(screen.getByText(FOOTNOTE)).toBeInTheDocument()
     expect(screen.queryByText(INSTAGRAM_WAIT)).not.toBeInTheDocument()
   })

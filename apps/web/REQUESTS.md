@@ -2078,3 +2078,54 @@ chasing a runner that was never allocated.
 
 **Until it is resolved, a lane's only real evidence is `pnpm gate` run locally,
 unpiped, and stated with its `Cached:` count.**
+
+---
+
+## 31 · The brand fill now marks what COMMITS — founder's ruling
+
+**Ruled by the founder, 2026-08-27**, looking at the composer:
+
+> "make clickable buttons like send and schedule orange with black text or more
+> like save cancel things like that should be highlighted"
+
+### What it replaces
+
+`docs/37` §2.3 and §16: "exactly one solid-brand-fill element per view.
+Everything else is a secondary or a link." That budget does not survive the
+ruling, and leaving a permanently red guard in the tree to honour a rule the
+owner has overruled would be worse than saying so plainly.
+
+### The rule that replaces it, because a ruling with no shape is not enforceable
+
+**Every button that COMMITS carries the fill. Nothing else does.**
+
+Committing means it writes to the row or sends to a platform:
+
+| carries the fill                                       | does not                                            |
+| ------------------------------------------------------ | --------------------------------------------------- |
+| Save (per channel)                                     | Undo, Redo, Clear, Emoji                            |
+| Save all versions                                      | Polish / Professional / Friendly / Creative         |
+| Adapt for N channels (spends credits, writes variants) | Schedule it / Post now (they open, they do not act) |
+| Confirm schedule                                       | Save as draft, Cancel, Keep mine                    |
+| Confirm and send to _channel_                          | Change the time, See the calendar                   |
+
+The second column is the half that keeps the rule meaningful. A screen where
+everything is loud tells the reader nothing about which thing is the point.
+
+### No new colour was invented
+
+`text-primary-foreground` is INK, not white. `button.tsx` measures the pair at
+**7.15:1**, and the `primary` variant has always been orange with ink on it. The
+ruling asked for a treatment the design system already had and was rationing.
+
+### Where it is enforced
+
+`one-fill.test.tsx`, retargeted rather than deleted. It now asserts the exact
+list of fills at rest — Adapt, one Save per channel, Save all versions — and
+asserts by name that the openers, the tone modes and the writing tools do not
+carry it. Five mutations were watched going red, including promoting Emoji and
+demoting Save.
+
+`e2e/page-dash-hierarchy.spec.ts` still asserts the one-per-view budget on
+`/home` and `/analytics`, and is untouched: the ruling was made about the
+composer, and those two screens have no committing buttons on them.

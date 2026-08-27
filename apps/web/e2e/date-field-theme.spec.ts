@@ -42,23 +42,25 @@ test.describe('date fields follow the app theme', () => {
     await expect(page.locator('[data-composer]')).toBeVisible({ timeout: 90_000 })
 
     /**
-     * ── TWO CLICKS TO REACH THE FIELD, AND THE FIRST ONE IS NEW ───────────────
-     * `FinishPanel` now asks which route the post takes before offering either
-     * set of controls, so the schedule side has to be opened.
+     * ── ONE CLICK TO REACH IT, AND THE FIELD IT REACHES HAS CHANGED ───────────
+     * `FinishPanel` asks which route the post takes before offering either set
+     * of controls, so the schedule side has to be opened. After that the picker
+     * is on screen with its calendar and its time control already visible.
      *
-     * The SECOND click is not new and this spec never made it. `ScheduleField`
-     * has rendered the native `datetime-local` only behind "Pick an exact time"
-     * since the named-times redesign — the whole point of that change was that
-     * the raw `dd/mm/yyyy, --:--` mask stopped being the interface. So
-     * `#post-schedule` was not in the DOM when this file asserted it was
-     * visible, and the assertion could not have passed.
+     * `#post-schedule` was the `datetime-local` mask. That mask is gone: the
+     * field is a month calendar plus an `<input type="time">`, and the id moved
+     * onto the time input. This spec is about `color-scheme` on a NATIVE DATE
+     * CONTROL, which that still is, so the guarantee is unchanged and only the
+     * element carrying it moved.
      *
-     * It went unnoticed because this spec carries no `@smoke` tag, and
-     * `turbo test` runs Vitest only: nothing in the gate has ever executed it.
-     * That is the same gap CLAUDE.md records for `golden-path`, found again.
+     * Worth recording: before this change the spec clicked nothing at all and
+     * asserted `#post-schedule` visible, while the mask had been behind "Pick an
+     * exact time" since the named-times redesign. It could not have passed. It
+     * went unnoticed because this file carries no `@smoke` tag and `turbo test`
+     * runs Vitest only, so nothing in the gate has ever executed it — the same
+     * gap CLAUDE.md records for `golden-path`, found again.
      */
     await page.getByRole('button', { name: /^Schedule it/ }).click()
-    await page.locator('[data-schedule-choice="exact"]').click()
     await expect(page.locator(FIELD)).toBeVisible()
 
     // THE DISCRIMINATING CONDITION. playwright.config.ts declares no

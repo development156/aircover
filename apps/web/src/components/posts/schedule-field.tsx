@@ -1,22 +1,20 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CalendarClock, FlaskConical, Plug, X as XIcon } from 'lucide-react'
+import { CalendarCheck, CalendarClock, FlaskConical, Pencil, Plug, X as XIcon } from 'lucide-react'
 import type { Channel, ChannelSet } from '@sahoda/shared'
 
+import { Button } from '@/components/ui/button'
 import { CHANNEL_LABELS } from '@/components/posts/channel-label'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { scheduleGapNote, unconnectedFrom } from '@/lib/posts/connection-gap'
+import { clockTime, longDay, startOfDay } from '@/lib/posts/calendar-month'
 import { earliestScheduleAt, validateScheduleLead } from '@/lib/posts/schedule'
-import {
-  deliveryRangeNote,
-  formatChoiceTime,
-  scheduleChoices,
-  type ScheduleChoice,
-} from '@/lib/posts/schedule-choices'
+import { deliveryRangeNote, formatChoiceTime, scheduleChoices } from '@/lib/posts/schedule-choices'
 import { scheduleFieldNote } from '@/lib/posts/schedule-status'
+
+import { ChannelReadout } from './channel-readout'
+import { ScheduleCalendar } from './schedule-calendar'
 
 export interface ScheduleFieldProps {
   channels: ChannelSet
@@ -25,87 +23,38 @@ export interface ScheduleFieldProps {
   onChange: (iso: string | null) => void
   /** Whether the dispatcher is on HERE. Server fact; false under-promises. */
   autoPublish?: boolean
-  /**
-   * What the server said when the schedule was last committed.
-   *
-   * Setting a time is a STATUS change now — it goes through
-   * `release_post_for_publish` / `reschedule_post` — and those refuse a post that
-   * is already going out. A picker that swallowed that would show a time the
-   * database never accepted.
-   */
+  /** What the server said when the schedule was last committed. */
   error?: string | null
-  /**
-   * Channels with a live connection, read on the server.
-   *
-   * ── WHY THE SCHEDULE PICKER NEEDS THIS AND NOT JUST THE PUBLISH BUTTON ──────
-   * `PublishNow` has warned about unconnected channels for a while, but it only
-   * exists inside the post editor. `PlannerReschedule` renders THIS component on
-   * its own — no channel picker, no publish block — and `/planner` is, by that
-   * file's own comment, "the screen most likely to be used for scheduling in the
-   * first place". `ConnectFirstNote` is silent there by design once ANY channel is
-   * connected, so a workspace with Instagram but not LinkedIn got no signal at all:
-   * the post was scheduled, and the first news of the gap was a failed variant after
-   * the time had passed (post f0a777cf, 2026-08-10).
-   *
-   * Undefined means NOT KNOWN and warns about nothing — see `unconnectedFrom`.
-   */
+  /** Channels with a live connection, read on the server. Undefined means NOT KNOWN. */
   connected?: ReadonlySet<Channel>
 }
 
 const CLOCK_REFRESH_MS = 30_000
 
-const pad = (value: number): string => String(value).padStart(2, '0')
-
-/** `datetime-local` wants wall-clock time, so never `toISOString()` here. */
-function toLocalInput(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
-    date.getHours(),
-  )}:${pad(date.getMinutes())}`
-}
-
-function fromStored(iso: string | null): string {
-  if (iso === null) return ''
+function parsed(iso: string | null): Date | null {
+  if (iso === null) return null
   const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? '' : toLocalInput(date)
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
 /**
- * THE SCHEDULE PICKER — and the ninth click that did not exist.
+ * WHEN THE POST GOES OUT — chosen, then CONFIRMED.
  *
- * ── WHAT WAS HERE, AND WHY IT WAS THE WORST THING IN THE PRODUCT ─────────────
- * A bare `datetime-local`, and nothing else. `docs/34` §1 walked the new user
- * from a standing start to a saved draft in eight clicks — good — and then found
- * that the journey's stated goal, a first SCHEDULED post, had no control at all.
- * The capture recorded the "open the schedule" stop as ABSENT and the frames
- * either side of it came back with identical hashes.
+ * ── THE CHANGE THAT MATTERS IS NOT THE CALENDAR ──────────────────────────────
+ * Pressing a time used to schedule the post. Immediately, silently, on one tap:
+ * `onChange` ran `schedulePost`, which calls `release_post_for_publish` and
+ * moves the row out of `draft`. A person exploring "what does tomorrow morning
+ * look like" had committed their post to a queue, and the only sign was a note
+ * further down the page.
  *
- * A `dd/mm/yyyy, --:--` mask with a small calendar glyph is the one unstyled
- * native control on the screen, and it asks the reader to know what a date input
- * is. The reader this system is written for is a shop owner meeting a marketing
- * tool for the first time on a mid-range Android. The goal was unreachable by
- * looking.
+ * Now a pick is a PICK. It lives here until "Confirm schedule" is pressed, and
+ * nothing reaches the database before that. "Save as draft" is the other half of
+ * the same sentence and it is a real control rather than the absence of one.
  *
- * ── SO THE PRIMARY AFFORDANCE IS WORDS ───────────────────────────────────────
- * Three named times, each printing the exact instant it means so the label hides
- * nothing, and "Pick an exact time" behind them for anyone who wants 4:45 pm on
- * the 3rd. The native input is now the implementation detail `docs/34` §1
- * recommended it become, rather than the whole interface. `scheduleChoices`
- * filters every candidate against the channels' own minimum lead, so a choice on
- * this screen is a choice the validator will take.
- *
- * ── SELECTION IS NOT CERTAINTY, AND THE FILL SAYS SO ─────────────────────────
- * The tempting treatment for a chosen time was `.is-committed` — §9's "it will
- * happen" rung. It is WRONG here and the reason matters: with the dispatcher off
- * nothing goes out, so a committed rung on this control would make a claim in the
- * design system's own vocabulary that the note two lines below spends a whole
- * sentence retracting. A picker's selected state is neither how real a thing is
- * nor how urgent, so it uses the ordinary selected treatment — the same ink fill
- * `ChannelPicker` uses, deliberately, so the two read as siblings and neither
- * spends orange.
- *
- * The clock is set after mount: rendering `new Date()` during SSR would hydrate
- * against a different instant, and validating against a server clock would give
- * the user a verdict about a timezone they are not in.
+ * ── AND ONCE IT IS CONFIRMED, THE PANEL SAYS SO ──────────────────────────────
+ * A scheduled post shows what it is committed to, in words, with the two things
+ * a person then wants: change it, or take it back. That state used to be a
+ * populated date mask, which is a form, not an answer.
  */
 export function ScheduleField({
   channels,
@@ -115,92 +64,141 @@ export function ScheduleField({
   error = null,
   connected,
 }: ScheduleFieldProps) {
-  const [draft, setDraft] = useState<string>(() => fromStored(value))
   const [now, setNow] = useState<Date | null>(null)
-  /** Whether the exact control has been asked for. A stored time opens it on its own. */
-  const [exactOpen, setExactOpen] = useState<boolean>(false)
+  /** The pending pick. Nothing here has reached the database. */
+  const [pending, setPending] = useState<Date | null>(null)
+  const [anchor, setAnchor] = useState<Date | null>(null)
+  /** True while re-picking a time the post is already committed to. */
+  const [editing, setEditing] = useState(false)
 
-  // Re-sync when the stored value changes underneath us — restoring the other
-  // version after a divergence replaces `scheduled_at`, and without this the
-  // field kept displaying the pre-restore time while the draft held the new one.
-  //
-  // Keyed on the VALUE prop changing, not on a draft/value mismatch: while the
-  // user is typing an incomplete or too-soon datetime, `handleChange`
-  // deliberately withholds `onChange`, so the two legitimately disagree and
-  // resetting then would eat every keystroke. A committed edit round-trips
-  // exactly (both sides are minute-precision wall clock), so this is a no-op for
-  // the user's own changes.
-  const [syncedValue, setSyncedValue] = useState<string | null>(value)
-  if (value !== syncedValue) {
-    setSyncedValue(value)
-    setDraft(fromStored(value))
-  }
-
+  // The clock is set after mount: rendering `new Date()` during SSR would
+  // hydrate against a different instant, and validating against a server clock
+  // would give the reader a verdict about a timezone they are not in.
   useEffect(() => {
     setNow(new Date())
     const timer = setInterval(() => setNow(new Date()), CLOCK_REFRESH_MS)
     return () => clearInterval(timer)
   }, [])
 
-  const parsed = draft === '' ? null : new Date(draft)
-  const check = now === null ? null : validateScheduleLead(channels, parsed, now)
-  const earliest = now === null ? null : earliestScheduleAt(channels, now)
-  // Empty until the clock exists. Rendering choices against a server instant
-  // would offer a person times in a timezone they are not in.
-  const choices = now === null ? [] : scheduleChoices(channels, now)
+  const committed = parsed(value)
 
-  const chosen = parsed !== null && !Number.isNaN(parsed.getTime()) ? parsed : null
-  const matches = (choice: ScheduleChoice): boolean =>
-    chosen !== null && toLocalInput(choice.when) === toLocalInput(chosen)
-  /** A stored time nobody's shortcut produced. The exact control has to show it. */
-  const isCustom = chosen !== null && !choices.some(matches)
+  // A confirmed schedule closes the editor. Keyed on the value so a schedule
+  // restored from elsewhere (a divergence resolution) lands in the same state.
+  const [syncedValue, setSyncedValue] = useState<string | null>(value)
+  if (value !== syncedValue) {
+    setSyncedValue(value)
+    setPending(null)
+    setEditing(false)
+  }
 
-  // Only when the dispatcher is actually on. With it off, nothing goes out on ANY
-  // channel and the note below already says so — naming one channel there would
-  // imply the others are fine, which is the opposite of the truth.
+  if (now === null) {
+    return (
+      <div className="space-y-2" data-guide="post-schedule">
+        <p className="type-meta text-muted">Checking the times each channel will accept…</p>
+      </div>
+    )
+  }
+
+  const earliest = earliestScheduleAt(channels, now)
+  const choices = scheduleChoices(channels, now)
+  const check = pending === null ? null : validateScheduleLead(channels, pending, now)
+  const unconnectedLabels = unconnectedFrom(channels, connected).map(
+    (channel) => CHANNEL_LABELS[channel],
+  )
+  /**
+   * ── ONLY WHEN THE DISPATCHER IS ACTUALLY ON ─────────────────────────────────
+   * With it off, nothing goes out on ANY channel and `scheduleFieldNote` already
+   * says so. Naming one channel there would imply the others are fine, which is
+   * the opposite of the truth. This guard was dropped in the rewrite and
+   * `schedule-field.test.tsx` caught it.
+   */
   const gap = autoPublish
     ? scheduleGapNote(
-        unconnectedFrom(channels, connected).map((channel) => CHANNEL_LABELS[channel]),
+        unconnectedLabels,
         channels.some((channel) => connected?.has(channel) === true),
       )
     : null
 
-  function commit(next: string) {
-    setDraft(next)
-    if (next === '') {
-      onChange(null)
-      return
-    }
-    const date = new Date(next)
-    if (Number.isNaN(date.getTime())) return
-    if (now !== null && !validateScheduleLead(channels, date, now).ok) return
-    onChange(date.toISOString())
+  /**
+   * What the reader is promised about `at`, in order of what outranks what.
+   *
+   * A channel that cannot receive the post is a promise this schedule cannot
+   * keep at all, so it replaces the timing note rather than sitting under it.
+   * With the rail live and nothing to warn about, the sentence is the DELIVERY
+   * RANGE rather than "at around that time": the sweep is a five-minute cron and
+   * every measured delivery landed 73-199s after its tick, so "around" was the
+   * product declining to say a number it had.
+   */
+  const promise = (at: Date): string =>
+    gap ?? (autoPublish ? deliveryRangeNote(at) : scheduleFieldNote(autoPublish))
+
+  function choose(at: Date) {
+    setPending(at)
+    setAnchor(startOfDay(at))
   }
 
-  function clear() {
-    setExactOpen(false)
-    commit('')
+  // ── ALREADY SCHEDULED, AND NOT BEING CHANGED ──────────────────────────────
+  if (committed !== null && !editing) {
+    return (
+      <div className="space-y-3" data-guide="post-schedule" data-schedule-committed>
+        <div className="surface-ring flex flex-wrap items-start gap-3 rounded-card bg-ok-bg p-3">
+          <CalendarCheck
+            size={18}
+            strokeWidth={1.8}
+            className="mt-0.5 shrink-0 text-ok"
+            aria-hidden
+          />
+          <div className="space-y-0.5">
+            <p className="type-eyebrow text-ok">Scheduled</p>
+            <p className="type-h3 text-ink">
+              {longDay(committed)} at {clockTime(committed)}
+            </p>
+            <p className="type-meta text-muted">{promise(committed)}</p>
+          </div>
+        </div>
+
+        <ChannelReadout channels={channels} connected={connected} />
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setEditing(true)
+              setPending(committed)
+              setAnchor(startOfDay(committed))
+            }}
+          >
+            <Pencil aria-hidden />
+            Change the time
+          </Button>
+          <Button variant="ghost" data-schedule-clear onClick={() => onChange(null)}>
+            <XIcon aria-hidden />
+            Clear the schedule, keep this a draft
+          </Button>
+        </div>
+
+        {error !== null ? (
+          <p role="alert" className="type-meta text-danger">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    )
   }
 
-  const showExact = exactOpen || isCustom
-
+  // ── PICKING ────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-2" data-guide="post-schedule">
-      <Label htmlFor="post-schedule">Schedule</Label>
-
-      {/* ── THE NAMED TIMES ──────────────────────────────────────────────────
-          A group, not a list of loose buttons: a screen reader announces "When
-          to post, group" and then three options, which is what this is. */}
+    <div className="space-y-3" data-guide="post-schedule">
       <div role="group" aria-label="When to post" className="flex flex-wrap gap-1.5">
         {choices.map((choice) => {
-          const on = matches(choice)
+          const on = pending !== null && pending.getTime() === choice.when.getTime()
           return (
             <button
               key={choice.id}
               type="button"
               data-schedule-choice={choice.id}
               aria-pressed={on}
-              onClick={() => commit(toLocalInput(choice.when))}
+              onClick={() => choose(choice.when)}
               className={cn(
                 'flex flex-col items-start rounded-full border px-3 py-1.5 text-left transition-micro max-narrow:min-h-[var(--control-h-touch)]',
                 on
@@ -209,9 +207,8 @@ export function ScheduleField({
               )}
             >
               {/* Two explicit spans. A bare text fragment beside another one in a
-                  flex container becomes its OWN flex item — the defect that
-                  rendered a button label as six unreadable pieces at 390px while
-                  every box measured correctly. */}
+                  flex container becomes its OWN flex item, which rendered a label
+                  as six unreadable pieces at 390px. */}
               <span className="type-chip">{choice.label}</span>
               <span className={cn('type-meta tabular-nums', on ? 'opacity-75' : 'text-muted')}>
                 {formatChoiceTime(choice.when)}
@@ -219,50 +216,34 @@ export function ScheduleField({
             </button>
           )
         })}
+      </div>
 
-        {showExact ? null : (
-          <button
-            type="button"
-            data-schedule-choice="exact"
-            onClick={() => setExactOpen(true)}
-            className="flex items-center rounded-full border border-line bg-surface px-3 py-1.5 text-ink transition-micro hover:bg-s2 max-narrow:min-h-[var(--control-h-touch)]"
-          >
-            <span className="type-chip">Pick an exact time</span>
-          </button>
+      <ScheduleCalendar
+        anchor={anchor ?? startOfDay(now)}
+        onAnchorChange={setAnchor}
+        value={pending}
+        onChange={choose}
+        earliest={earliest}
+        now={now}
+      />
+
+      {/* THE SENTENCE THE READER IS ABOUT TO AGREE TO. Written out in full,
+          because "27/08/2026, 09:00" is a value and "Thursday, 27 August at
+          9:00 am" is a commitment. */}
+      <div className="surface-ring space-y-1 rounded-sm bg-s2 p-3" data-schedule-summary>
+        {pending === null ? (
+          <p className="type-sm text-muted">Pick a day and a time, then confirm it below.</p>
+        ) : (
+          <>
+            <p className="type-eyebrow text-muted">Going out</p>
+            <p className="type-h3 text-ink">
+              {longDay(pending)} at {clockTime(pending)}
+            </p>
+          </>
         )}
       </div>
 
-      {/* The native control, once it has been asked for or a stored time needs
-          it. Kept mounted-on-demand rather than hidden: an input nobody can see
-          is still in the tab order. */}
-      {showExact ? (
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <Input
-              id="post-schedule"
-              type="datetime-local"
-              value={draft}
-              error={check !== null && !check.ok}
-              min={earliest !== null ? toLocalInput(earliest) : undefined}
-              onChange={(event) => commit(event.target.value)}
-            />
-          </div>
-        </div>
-      ) : null}
-
-      {/* Clearing is a real move and it needs a real control. Without one the
-          only way back to "no schedule" was emptying a date mask by hand. */}
-      {chosen !== null ? (
-        <button
-          type="button"
-          data-schedule-clear
-          onClick={clear}
-          className="inline-flex items-center gap-1 text-muted underline underline-offset-2 transition-micro hover:text-ink"
-        >
-          <XIcon size={12} strokeWidth={2} aria-hidden />
-          <span className="type-meta">Clear the schedule, keep this a draft</span>
-        </button>
-      ) : null}
+      <ChannelReadout channels={channels} connected={connected} />
 
       {error !== null ? (
         <p role="alert" className="type-meta text-danger">
@@ -272,47 +253,45 @@ export function ScheduleField({
         <p role="alert" className="type-meta text-danger">
           {check.message} Nothing was saved.
         </p>
-      ) : chosen === null ? (
-        <p className="type-meta text-muted">
-          {now === null
-            ? 'Checking the schedule against the channel lead times…'
-            : 'No schedule set. This post stays a draft.'}
-        </p>
       ) : null}
 
-      {/* Only once a time is set: with an empty field there is no promise to
-          correct, and the line above already says the post stays a draft. */}
-      {chosen === null ? null : (
-        <p
-          data-connection-gap={gap === null ? undefined : 'true'}
-          className={cn(
-            'flex items-start gap-1.5 type-meta',
-            // A named unconnected channel is a warning whether or not the rail is
-            // live: it is a promise this schedule cannot keep.
-            autoPublish && gap === null ? 'text-muted' : 'text-warn',
-          )}
-        >
+      {pending !== null && (check?.ok ?? false) ? (
+        <p className="flex items-start gap-1.5 type-meta text-muted">
           {gap !== null ? (
-            <Plug size={13} strokeWidth={2} className="mt-[2px] shrink-0" aria-hidden />
+            <Plug size={13} strokeWidth={2} className="mt-[2px] shrink-0 text-warn" aria-hidden />
           ) : autoPublish ? (
             <CalendarClock size={13} strokeWidth={2} className="mt-[2px] shrink-0" aria-hidden />
           ) : (
             <FlaskConical size={13} strokeWidth={2} className="mt-[2px] shrink-0" aria-hidden />
           )}
-          {/* REPLACES the generic line rather than stacking under it. The line it
-              displaces says "on every connected channel" — true, and useless to
-              someone who does not know which of theirs those are.
-
-              With the dispatcher LIVE and nothing to warn about, the sentence is
-              now the DELIVERY RANGE rather than "at around that time": the sweep
-              is a five-minute cron and every measured delivery landed 73-199 s
-              after its tick, so "around" was the product declining to say a
-              number it had. See `schedule-choices.ts`. */}
-          <span>
-            {gap ?? (autoPublish ? deliveryRangeNote(chosen) : scheduleFieldNote(autoPublish))}
-          </span>
+          <span className={gap === null ? undefined : 'text-warn'}>{promise(pending)}</span>
         </p>
-      )}
+      ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        {/* THE COMMIT. Orange with ink on it — founder's ruling, recorded in
+            REQUESTS §31: the button that does the irreversible thing is the one
+            that should be impossible to miss. */}
+        <Button
+          data-schedule-confirm
+          disabled={pending === null || !(check?.ok ?? false)}
+          onClick={() => pending !== null && onChange(pending.toISOString())}
+        >
+          <CalendarCheck aria-hidden />
+          Confirm schedule
+        </Button>
+        <Button
+          variant="secondary"
+          data-schedule-draft
+          onClick={() => {
+            setPending(null)
+            setEditing(false)
+            if (committed !== null) onChange(null)
+          }}
+        >
+          Save as draft
+        </Button>
+      </div>
     </div>
   )
 }

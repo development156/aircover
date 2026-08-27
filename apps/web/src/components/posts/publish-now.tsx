@@ -7,6 +7,8 @@ import Link from 'next/link'
 import { filterChannelSet, type Channel, type ChannelSet } from '@sahoda/shared'
 
 import { Button } from '@/components/ui/button'
+import { ChannelMark } from '@/components/posts/channel-mark'
+import { cn } from '@/lib/utils'
 import { joinNames, unconnectedFrom } from '@/lib/posts/connection-gap'
 import { LIVE_RAIL } from '@/lib/posts/live-rail'
 import type { VariantStatusRow } from '@/lib/posts/variant-status'
@@ -86,6 +88,8 @@ export function PublishNow({
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [published, setPublished] = useState<Published | null>(null)
+  /** The channel picked but not yet confirmed. Nothing has been sent. */
+  const [chosen, setChosen] = useState<Channel | null>(null)
 
   // Already distinct — `channels` is a `ChannelSet`, deduplicated once when the row
   // was parsed. This line used to deduplicate here instead, because `post.channels`
@@ -203,16 +207,76 @@ export function PublishNow({
         </div>
       ) : null}
 
+      {/* ── PICK, THEN CONFIRM ─────────────────────────────────────────────────
+          One press used to publish. For real, to a live account, with no step
+          between the pointer landing and the post existing — on the single most
+          irreversible action in the product, sitting under a page a person
+          scrolls. `PublishPreview` above is a dry run and does not count: it is
+          a different button doing a different thing, and nobody reads it as a
+          confirmation of this one.
+
+          So the rail chooses a channel and a second, named button does the act.
+          The channel is in the confirming button's own label, because "Confirm"
+          alone is a word that could mean anything by the time a reader has
+          scrolled to it. */}
       {live.length === 0 ? null : pending ? (
         <PendingLines lines={PENDING_LINES} />
       ) : (
-        <div className="flex flex-wrap gap-2">
-          {live.map((channel) => (
-            <Button key={channel} onClick={() => run(channel)} className="flex-1">
-              <Send size={14} aria-hidden />
-              Publish to {CHANNEL_LABELS[channel]}
-            </Button>
-          ))}
+        <div className="space-y-2">
+          <p className="type-eyebrow text-muted">
+            {live.length === 1 ? 'Send it to' : 'Send it to one channel'}
+          </p>
+          <div
+            role="group"
+            aria-label="Which channel to publish to"
+            className="flex flex-wrap gap-2"
+          >
+            {live.map((channel) => {
+              const on = chosen === channel
+              return (
+                <button
+                  key={channel}
+                  type="button"
+                  data-publish-pick={channel}
+                  aria-pressed={on}
+                  onClick={() => setChosen(on ? null : channel)}
+                  className={cn(
+                    'type-sm flex items-center gap-2 rounded-full border px-3 py-1.5 transition-micro max-narrow:min-h-[var(--control-h-touch)]',
+                    on
+                      ? 'border-transparent bg-ink font-[550] text-white dark:bg-white dark:text-[var(--canvas)]'
+                      : 'border-line bg-surface text-ink hover:bg-s2',
+                  )}
+                >
+                  <ChannelMark channel={channel} size={15} />
+                  {CHANNEL_LABELS[channel]}
+                </button>
+              )
+            })}
+          </div>
+
+          {chosen === null ? (
+            <p className="type-meta text-muted">
+              Pick a channel. Nothing is sent until you confirm it.
+            </p>
+          ) : (
+            <div className="surface-ring space-y-2 rounded-card bg-s2 p-3" data-publish-confirm>
+              <p className="type-sm text-ink">
+                This posts to {CHANNEL_LABELS[chosen]} for real, straight away.
+                {chosen === 'instagram' ? ' Instagram takes about fifteen seconds to finish.' : ''}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {/* The one irreversible act on the screen, in the brand fill.
+                    Founder's ruling, REQUESTS §31. */}
+                <Button onClick={() => run(chosen)}>
+                  <Send size={14} aria-hidden />
+                  Confirm and send to {CHANNEL_LABELS[chosen]}
+                </Button>
+                <Button variant="secondary" onClick={() => setChosen(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {/* ── ONLY WHEN THERE IS SOMETHING TO PUBLISH, AND ONLY ABOUT CHANNELS
@@ -233,12 +297,6 @@ export function PublishNow({
           and is exactly the set of channels a press of this button would reach;
           with nothing in it there is no button, and a sentence about what the
           button does is a claim about an action nobody can take. */}
-      {live.length === 0 ? null : (
-        <p className="type-meta text-muted">
-          This posts for real, straight away.
-          {live.includes('instagram') ? ' Instagram takes about fifteen seconds to finish.' : ''}
-        </p>
-      )}
 
       {error !== null ? <InlineError>{error}</InlineError> : null}
 
