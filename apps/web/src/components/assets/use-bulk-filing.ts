@@ -4,7 +4,8 @@ import { useState, useTransition } from 'react'
 
 import { fileAssets, unfileAssets } from '@/app/actions/asset-folder-items'
 import { moveFolder } from '@/app/actions/asset-folders'
-import { restoreAsset, trashAsset } from '@/app/actions/assets'
+import { restoreAsset, restoreAssets, trashAsset, trashAssets } from '@/app/actions/assets'
+import { describeBulkTrash } from '@sahoda/shared'
 import type { AssetCard } from '@/lib/assets/view'
 
 /**
@@ -57,6 +58,8 @@ export interface BulkFiling {
   removeFromFolder: (folderId: string, folderName: string, ids: readonly string[]) => void
   /** One file to the trash, with Undo. See `trashOne` for why it is here. */
   trashOne: (id: string, fileName: string) => void
+  /** A selection to the trash, counted and undoable. */
+  trashMany: (ids: readonly string[]) => void
   /** A folder dragged inside another folder, with the outcome named. */
   moveFolderInto: (
     draggedId: string,
@@ -206,6 +209,61 @@ export function useBulkFiling(cards: readonly AssetCard[], onDone: () => void): 
   }
 
   /**
+   * Move a SELECTION to the trash, with Undo.
+   *
+   * The "still on a post" sentence is built from the CARDS, not from a second
+   * server read: every selected card already carries the usage the page read
+   * when it loaded. `describeBulkTrash` counts files rather than naming posts,
+   * because nine files across fourteen posts is a paragraph and a paragraph
+   * after a bulk action is not read.
+   */
+  function trashMany(ids: readonly string[]) {
+    const selectedCards = cards.filter((card) => ids.includes(card.id))
+    setOutcome(null)
+    startBulk(async () => {
+      const result = await trashAssets(ids)
+      if (!result.ok) {
+        setOutcome({ tone: 'error', message: result.message })
+        return
+      }
+
+      // Built from what the SERVER moved, never from the size of the selection.
+      // Trashing nine where two were already there reads "Moved 7", not 9.
+      const moved = `Moved ${result.trashed} ${plural(result.trashed, 'file', 'files')} to the trash.`
+      const already =
+        result.alreadyTrashed > 0
+          ? ` ${result.alreadyTrashed} ${plural(result.alreadyTrashed, 'was', 'were')} already there.`
+          : ''
+      const stillUsed = describeBulkTrash(selectedCards)
+      setOutcome({
+        tone: 'ok',
+        message: `${moved}${already}${stillUsed === null ? '' : ` ${stillUsed}`}`,
+        // Undo puts back only what THIS call moved. Restoring the files that
+        // were already in the trash would take out something the person put
+        // there earlier and never asked to see again.
+        undo:
+          result.trashed > 0
+            ? () => {
+                setOutcome(null)
+                startBulk(async () => {
+                  const redone = await restoreAssets(ids)
+                  setOutcome(
+                    redone.ok
+                      ? {
+                          tone: 'ok',
+                          message: `Put ${redone.trashed} ${plural(redone.trashed, 'file', 'files')} back.`,
+                        }
+                      : { tone: 'error', message: redone.message },
+                  )
+                })
+              }
+            : undefined,
+      })
+      onDone()
+    })
+  }
+
+  /**
    * A folder dragged inside another folder.
    *
    * ── WHY THIS REPORTS AND THE MENU'S MOVE DOES NOT ──────────────────────────
@@ -247,6 +305,7 @@ export function useBulkFiling(cards: readonly AssetCard[], onDone: () => void): 
     fileInto,
     removeFromFolder,
     trashOne,
+    trashMany,
     moveFolderInto,
     dismiss: () => setOutcome(null),
   }

@@ -3,12 +3,13 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { RotateCcw, Trash2 } from 'lucide-react'
-import { trashedAgo } from '@sahoda/shared'
+import { describeEmptyTrash, trashedAgo } from '@sahoda/shared'
 
 import { AssetDeleteButton } from '@/components/assets/asset-delete'
 import { AssetThumb } from '@/components/assets/asset-thumb'
-import { restoreAsset } from '@/app/actions/assets'
+import { emptyTrash, restoreAsset } from '@/app/actions/assets'
 import { Button } from '@/components/ui/button'
+import { Modal } from '@/components/ui/modal'
 import type { AssetCard } from '@/lib/assets/view'
 import { displayName } from '@/lib/assets/view'
 import { formatBytes } from '@/lib/format-bytes'
@@ -46,10 +47,13 @@ export function TrashView({ cards, now }: { cards: readonly AssetCard[]; now: Da
 
   return (
     <div className="space-y-3">
-      <p className="type-meta text-muted">
-        Deleting a file here moves it to the trash. Files stay in the trash until you delete them
-        for good, and a file in the trash is still on any post that was using it.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="min-w-0 flex-1 type-meta text-muted">
+          Deleting a file here moves it to the trash. Files stay in the trash until you delete them
+          for good, and a file in the trash is still on any post that was using it.
+        </p>
+        <EmptyTrashButton count={cards.length} />
+      </div>
 
       <ul className="surface-ring divide-y divide-line-soft overflow-hidden rounded-card bg-surface">
         {cards.map((card) => (
@@ -58,6 +62,94 @@ export function TrashView({ cards, now }: { cards: readonly AssetCard[]; now: Da
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+/**
+ * Empty the trash.
+ *
+ * ── THIS ONE ASKS, AND THE BULK "MOVE TO TRASH" DOES NOT ─────────────────────
+ * The difference is reversibility, not scale. Moving files to the trash offers
+ * Undo and the files stay whole; this deletes bytes that no transaction can
+ * bring back. A confirmation belongs in front of the second and would only
+ * train people to click through dialogs if it were put in front of the first.
+ *
+ * The dialog states the COUNT, because "Empty the trash?" over a list a person
+ * has stopped reading is not enough information to answer with.
+ */
+function EmptyTrashButton({ count }: { count: number }) {
+  const router = useRouter()
+  const [asking, setAsking] = useState(false)
+  const [pending, startTransition] = useTransition()
+  const [outcome, setOutcome] = useState<string | null>(null)
+
+  function confirm() {
+    setOutcome(null)
+    startTransition(async () => {
+      const result = await emptyTrash()
+      setAsking(false)
+      if (!result.ok) {
+        setOutcome(result.message)
+        return
+      }
+      // BOTH numbers. A file the gate refused stays in the trash, and reporting
+      // only the deleted count would be a claim the person cannot check.
+      setOutcome(describeEmptyTrash(result.deleted, result.kept))
+      router.refresh()
+    })
+  }
+
+  return (
+    <div className="shrink-0 text-right">
+      <Button
+        type="button"
+        variant="secondary"
+        loading={pending}
+        onClick={() => setAsking(true)}
+        aria-label="Empty the trash"
+      >
+        <Trash2 size={14} strokeWidth={1.8} aria-hidden />
+        Empty the trash
+      </Button>
+
+      {outcome !== null ? (
+        <p role="status" className="mt-2 max-w-[280px] type-meta text-muted">
+          {outcome}
+        </p>
+      ) : null}
+
+      <Modal
+        open={asking}
+        onClose={() => setAsking(false)}
+        title="Empty the trash?"
+        className="text-left"
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setAsking(false)}
+              disabled={pending}
+            >
+              Keep them
+            </Button>
+            <Button type="button" variant="destructive" loading={pending} onClick={confirm}>
+              {pending ? 'Deleting…' : 'Delete them for good'}
+            </Button>
+          </div>
+        }
+      >
+        <p className="type-sm text-ink-body">
+          {count === 1
+            ? 'This deletes 1 file for good. Sahoda cannot bring it back.'
+            : `This deletes ${count} files for good. Sahoda cannot bring them back.`}{' '}
+          {/* Stated BEFORE the press, not discovered after it. A person who
+              expects an empty trash and gets two files left needs to know why
+              in advance, or the screen looks broken. */}
+          Any file a published or scheduled post still uses will stay here.
+        </p>
+      </Modal>
     </div>
   )
 }

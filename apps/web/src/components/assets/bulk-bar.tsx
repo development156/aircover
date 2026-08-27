@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FolderInput, FolderMinus, X } from 'lucide-react'
+import { FolderInput, FolderMinus, Trash2, X } from 'lucide-react'
 import type { AssetFolder } from '@sahoda/shared'
 
 import { cn } from '@/lib/utils'
@@ -29,6 +29,7 @@ export function BulkBar({
   pending,
   onFileInto,
   onRemoveFromFolder,
+  onTrash,
   onClear,
 }: {
   count: number
@@ -39,6 +40,16 @@ export function BulkBar({
   pending: boolean
   onFileInto: (folderId: string) => void
   onRemoveFromFolder: () => void
+  /**
+   * Move the whole selection to the trash.
+   *
+   * No confirmation, deliberately, and that is only defensible BECAUSE the
+   * trash exists: the act is reversible, the banner offers Undo, and the files
+   * are whole in the trash until somebody empties it. A confirm dialog in front
+   * of a reversible action trains people to click through dialogs, which is
+   * what makes the irreversible one dangerous.
+   */
+  onTrash: () => void
   onClear: () => void
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -103,6 +114,16 @@ export function BulkBar({
           <span className="sr-only">. Takes the files out of this folder. Nothing is deleted.</span>
         </button>
       ) : null}
+
+      <button
+        type="button"
+        onClick={onTrash}
+        disabled={pending}
+        className="flex items-center gap-1.5 rounded-pill bg-s2 px-3 py-1.5 type-sm font-semibold text-danger transition-micro hover:bg-danger-bg disabled:opacity-50"
+      >
+        <Trash2 size={14} aria-hidden />
+        Move to trash
+      </button>
 
       <button
         type="button"
