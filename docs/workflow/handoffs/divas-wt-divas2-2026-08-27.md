@@ -348,6 +348,32 @@ Mutations proven red, never assumed: 4 on the calendar maths (including the
 fall-back DST one my own test found), 5 on the fill rule, 6 on the schedule,
 calendar and readout behaviour, 4 on the rail heading.
 
+## The one that only the preview build could find
+
+`f3bf4d4` deployed and FAILED, on a check my own machine had just passed.
+
+`components/planner/planner-reschedule.tsx` imports `ScheduleField`, so the new
+calendar shipped on `/planner`'s first load as well as the composer's.
+
+| Where                  | Planner first-load JS | Verdict |
+| ---------------------- | --------------------- | ------- |
+| Vercel, `f3bf4d4`      | 835.8 KiB             | FAILED against 827.5 + 8 KiB |
+| This sandbox, same SHA | 835.3 KiB             | PASSED, by 0.2 KiB |
+| After `2053674`        | 823.6 KiB             | 11.9 KiB inside the line |
+
+The two environments differ by about half a kilobyte on identical source — build
+id strings and chunk hashing. **A route within a kilobyte of its budget is not
+really budgeted**: it passes or fails on which machine ran it, and "js-budget ok:
+81 routes within budget" was a coin toss that came up heads locally.
+
+The fix is `next/dynamic` on the planner's copy, so the picker loads when the row
+is opened. `planner-reschedule.test.tsx` is new: nothing covered that control at
+all, in unit tests or in Playwright, and a lazy import is a new way for it to
+fail silently. **Its first version was unfalsifiable and mutation said so** —
+mutating the open-gate to `{true}` left all four tests green, because a
+`next/dynamic` child is absent for a tick whether it is gated or not. It now
+waits for a second row's calendar first. Four mutations, four red.
+
 ## Still not done, and why
 
 Everything in Round one's list stands unchanged. Nothing new was deferred.
