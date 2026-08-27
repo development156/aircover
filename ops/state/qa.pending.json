@@ -663,6 +663,32 @@
       "summary_plain": "The unit checks ran and something failed (5 passed, 3 failed).",
       "details": "=== MUT: 'tidy' the publish map to match the others ===\n     × spells X differently on publish than everywhere else 6ms\n     × spells Google Business three different ways across two endpoints 1ms\n     × refuses to let the publish map and the recovery map agree about X or GBP 1ms\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯\n      Tests  3 failed | 1 passed (4)\n      Tests  4 passed (4)",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtb8dc15-6d68790d",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-27T07:58:04.840Z",
+      "finished_at": "2026-08-27T07:58:04.840Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks ran (5135 passed), but 13 tests did NOT run — this does not prove the suite passes.",
+      "details": "ff90086d81f80fb55675c5209e52e33d703aa309\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark: the disabled label clears AA against its own fill\n@sahoda/web:test: [disabled primary] dark --ink-mute on --surface-2 = 5.51:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > the OLD recipe still measures as the defect it was, so this test can fail\n@sahoda/web:test: [disabled primary] the OLD light pair, white on --line = 1.21:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark does not make the refusal look pressable\n@sahoda/web:test: [disabled primary] dark: shipped 5.51:1 vs white 16.10:1\n@sahoda/web:test: \n@sahoda/web:test:  ✓  ui  src/components/ui/button.disabled-contrast.test.tsx (5 tests) 10ms\n@sahoda/web:test:  ✓  ui  src/components/posts/variant-state.test.tsx (5 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/components/knowledge/add-document.test.tsx (2 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/app/layout.test.tsx (3 tests) 4ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  402 passed | 3 skipped (405)\n@sahoda/web:test:       Tests  5135 passed | 13 skipped (5148)\n@sahoda/web:test:    Start at  07:54:33\n@sahoda/web:test:    Duration  111.81s (transform 17.42s, setup 18.73s, import 89.46s, tests 78.96s, environment 84.26s)\n@sahoda/web:test: \n\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total\n  Time:    178ms >>> FULL TURBO\n\nTURBO_EXIT=0",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtb8dc15-6aca67d",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-27T07:58:04.840Z",
+      "finished_at": "2026-08-27T07:58:04.840Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks ran (5135 passed), but 13 tests did NOT run — this does not prove the suite passes.",
+      "details": "ff90086d81f80fb55675c5209e52e33d703aa309\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark: the disabled label clears AA against its own fill\n@sahoda/web:test: [disabled primary] dark --ink-mute on --surface-2 = 5.51:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > the OLD recipe still measures as the defect it was, so this test can fail\n@sahoda/web:test: [disabled primary] the OLD light pair, white on --line = 1.21:1\n@sahoda/web:test: \n@sahoda/web:test: stdout | src/components/ui/button.disabled-contrast.test.tsx > a disabled primary is legible AND looks inert, in both themes > dark does not make the refusal look pressable\n@sahoda/web:test: [disabled primary] dark: shipped 5.51:1 vs white 16.10:1\n@sahoda/web:test: \n@sahoda/web:test:  ✓  ui  src/components/ui/button.disabled-contrast.test.tsx (5 tests) 10ms\n@sahoda/web:test:  ✓  ui  src/components/posts/variant-state.test.tsx (5 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/components/knowledge/add-document.test.tsx (2 tests) 5ms\n@sahoda/web:test:  ✓  ui  src/app/layout.test.tsx (3 tests) 4ms\n@sahoda/web:test: \n@sahoda/web:test:  Test Files  402 passed | 3 skipped (405)\n@sahoda/web:test:       Tests  5135 passed | 13 skipped (5148)\n@sahoda/web:test:    Start at  07:54:33\n@sahoda/web:test:    Duration  111.81s (transform 17.42s, setup 18.73s, import 89.46s, tests 78.96s, environment 84.26s)\n@sahoda/web:test: \n\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total\n  Time:    178ms >>> FULL TURBO\n\nTURBO_EXIT=0",
+      "duration_ms": null
     }
   ]
 }
