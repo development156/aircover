@@ -3,6 +3,7 @@ import { SiteGenerateOutputSchema } from '@sahoda/shared'
 import type { MeshContext, MeshTaskDef, SiteGenerateOutput } from '@sahoda/shared'
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
+import { PROSE_RULES } from '../prose-rules'
 
 /**
  * 8192. Telemetry shows 4,980 output tokens against the old 4,096 ceiling — a
@@ -72,7 +73,7 @@ function buildMessages(
     `Brief: ${input.prompt || '(none — infer from the brand)'}`,
   ].join('\n')
   return [
-    { role: 'system', content: SYSTEM },
+    { role: 'system', content: `${SYSTEM}\n${PROSE_RULES}` },
     ...(brand ? [brand] : []),
     { role: 'user', content: user },
   ]

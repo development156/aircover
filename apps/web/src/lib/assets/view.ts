@@ -26,6 +26,36 @@ export interface AssetCard {
   /** Short-lived signed URL. null means it could not be minted; the FILE exists. */
   previewUrl: string | null
   usage: AssetUsageSite[]
+  /**
+   * Every folder this file is filed in, from `asset_folder_items`.
+   *
+   * An ARRAY, because membership is a table and not a `folder_id` column: one
+   * photo genuinely belongs in both "Diwali campaign" and "Storefront", and the
+   * single-parent model forces a person to pick one and lose it from the other.
+   *
+   * `[]` means FILED NOWHERE. `null` means this read did not ask — the composer's
+   * library picker builds cards without a memberships query, because it renders
+   * no filing anywhere and a second query for data nobody displays is waste. The
+   * two are kept apart for the same reason `usage` keeps them apart: an empty
+   * array is a claim about the customer's library, and "we did not look" is a
+   * claim about us. Nothing may render a folder from `null`.
+   */
+  folderIds: string[] | null
+  /**
+   * When this file was moved to the trash, or `null` for a file in the live
+   * library.
+   *
+   * REQUIRED, and mirroring the column exactly, because both values are real
+   * answers a read produced: a live card genuinely has `deleted_at = null`. That
+   * is the difference from `folderIds`, where `null` had to mean "this read did
+   * not ask" — nothing here needs a third state, because every read of a card
+   * selects `*` and therefore always knows.
+   *
+   * Nothing may infer trashed-ness from which LIST a card arrived in. The two
+   * reads are separate queries and a card handed to the wrong one would then
+   * render as the wrong thing; this field is the fact, and the list is not.
+   */
+  deletedAt: string | null
 }
 
 /** Posts using this file that would refuse a delete. */

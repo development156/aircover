@@ -3,6 +3,8 @@ import { ChannelSchema, ContentVariantsOutputSchema, CONSTRAINTS } from '@sahoda
 import type { Channel, ContentVariantsOutput, MeshContext, MeshTaskDef } from '@sahoda/shared'
 import type { ChatMessage } from '../providers/types'
 import type { MeshTaskSpec } from '../engine'
+import { PROSE_RULES } from '../prose-rules'
+import { SEARCH_SURFACE_RULE, SEO_RULES } from '../seo-rules'
 
 /** 2048: measured 925 x 1.4 (token-budget.ts). 1024 left 10% headroom. */
 const MAX_TOKENS = 2048
@@ -14,19 +16,43 @@ export const ContentVariantsInputSchema = z.object({
 })
 export type ContentVariantsInput = z.infer<typeof ContentVariantsInputSchema>
 
+/**
+ * ── KEYWORDS, NOT HASHTAGS ───────────────────────────────────────────────────
+ * Founder's ruling (REQUESTS §34). The JSON KEY stays `hashtags` because it maps
+ * straight onto `post_variants.extras.hashtags`, which is untyped jsonb with
+ * production rows already in it — renaming the key would orphan every one. What
+ * changes is what goes in it, and the model is told the difference explicitly
+ * rather than left to infer it from a field name that now lies.
+ *
+ * `normalizeKeywords` strips a stray `#` and wraps the value, so a model that
+ * ignores this still produces a legal list. The instruction is here to make the
+ * CONTENT right: a keyword is a phrase a customer would type into a search box,
+ * which is a different thing from a hashtag and is usually more than one word.
+ */
+const KEYWORD_RULE = `KEYWORDS, NOT HASHTAGS. The "hashtags" field holds SEARCH KEYWORDS. \
+Never write a "#". Write the plain words somebody would type into a search box, and prefer \
+a real phrase over a single word: "chai in pune" beats "chai". Sahoda wraps each one as \
+[keyword] when it publishes, so do not add brackets yourself. Two to six per channel.`
+
 const SYSTEM = `You adapt one canonical social post into native per-channel variants for Sahoda.
 Output ONLY a JSON object matching:
 { "variants": [ { "channel": <one of the requested channels>, "body": string,
   "extras": { "hashtags"?: string[], "gbpCta"?: string } } ] }
 Rules: exactly one variant per requested channel; stay within each channel's character
-limit; follow each platform's norms for hashtags, links, and (GBP) call-to-action; keep
-the core message and the brand voice. No markdown, no commentary.`
+limit; follow each platform's norms for links and (GBP) call-to-action; keep
+the core message and the brand voice. No markdown, no commentary.
+${KEYWORD_RULE}
+${SEO_RULES}
+${SEARCH_SURFACE_RULE}
+${PROSE_RULES}`
+
+export { KEYWORD_RULE }
 
 /** One-line limit brief per channel, sourced from the shared Constraint Engine (one source of truth). */
 function channelBrief(channel: Channel): string {
   const spec = CONSTRAINTS[channel]
   const parts = [`max ${spec.maxChars} chars`, `links ${spec.linkPolicy}`]
-  if (spec.maxHashtags !== undefined) parts.push(`≤${spec.maxHashtags} hashtags`)
+  if (spec.maxHashtags !== undefined) parts.push(`≤${spec.maxHashtags} keywords`)
   if (spec.gbp) parts.push(`CTA one of: ${spec.gbp.ctaTypes.join('/')}`)
   return `- ${channel}: ${parts.join('; ')}`
 }

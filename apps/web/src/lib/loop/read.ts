@@ -249,7 +249,11 @@ export async function readLoopSnapshot(workspaceId: string): Promise<LoopSnapsho
     toChannelSet(
       (connRes.data ?? [])
         .filter((r) => statuses.includes(r.status as string))
-        .map((r) => r.platform as Channel)
+        // Filter the STRING, then narrow — see the same change in
+        // `actions/radar.ts`. `connections.platform` holds fourteen values now
+        // and `Channel` is six of them, so `as Channel` here asserted something
+        // untrue of eight rows. `PLANNABLE` still does the real work.
+        .map((r) => r.platform as string)
         .filter((p): p is Channel => PLANNABLE.includes(p)),
     )
   const connected = channelsWith(LIVE_STATUS)

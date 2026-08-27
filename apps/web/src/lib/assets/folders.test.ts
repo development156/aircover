@@ -28,6 +28,8 @@ const card = (over: Partial<AssetCard>): AssetCard => ({
   createdAt: '2026-08-25T00:00:00Z',
   previewUrl: null,
   usage: [],
+  folderIds: [],
+  deletedAt: null,
   ...over,
 })
 

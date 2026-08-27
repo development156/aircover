@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { expect as pwExpect, type Page } from '@playwright/test'
 
 import { adminClient, expect, test, type SeededUser } from './fixtures/seeded-user'
+import { installNodeTransport } from './helpers/node-transport'
 
 /**
  * THE BOOT ANIMATION, DRIVEN.
@@ -288,9 +289,17 @@ test('a second device with empty storage still never sees it again', async ({
    * `users_profile.prefs`.
    */
   const context = await browser.newContext()
+  // A hand-made context gets none of the fixture's setup, so it needs the
+  // sandbox transport installed explicitly. No-op unless SAHODA_BROWSER_VIA_NODE=1.
+  await installNodeTransport(context)
   const second = await context.newPage()
   const { setupClerkTestingToken } = await import('@clerk/testing/playwright')
   await setupClerkTestingToken({ page: second })
+  // ...and again AFTER it: setupClerkTestingToken registers its own route over
+  // `https://<fapi>/v1/*` served with `route.fetch()`, which uses the browser's
+  // network. Last-registered wins, so this takes FAPI back. Same reason as in
+  // fixtures/seeded-user.ts signIn().
+  await installNodeTransport(context)
 
   const res = await fetch('https://api.clerk.com/v1/sign_in_tokens', {
     method: 'POST',

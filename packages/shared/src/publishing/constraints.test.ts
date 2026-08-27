@@ -1,9 +1,19 @@
 import { describe, it, expect } from 'vitest'
+import { ChannelSchema } from '../enums'
 import { CONSTRAINTS, validateVariant, validateMedia, formatForPlatform } from './constraints'
 
 describe('constraint engine v0', () => {
-  it('covers all four channels', () => {
-    expect(Object.keys(CONSTRAINTS).sort()).toEqual(['gbp', 'instagram', 'linkedin', 'x'])
+  it('covers every channel in the schema, and invents none', () => {
+    // DERIVED, not restated. This asserted the literal
+    // `['gbp','instagram','linkedin','x']`, so it was a test of a hardcoded list
+    // against a hardcoded list — it went red the moment two channels were added
+    // and said nothing about whether the new ones had specs, which is the
+    // guarantee anyone reading the name wants.
+    //
+    // Both directions matter and the second is the sharper one: a spec for a
+    // channel the schema does not have is a limit nothing can ever enforce,
+    // sitting in the file that is supposed to be the single source of them.
+    expect(Object.keys(CONSTRAINTS).sort()).toEqual([...ChannelSchema.options].sort())
   })
 
   it('x rejects over-280 and weights a link at 23', () => {
