@@ -2389,8 +2389,8 @@ own boundaries); unbracketed ones settle comma-separated, because
 
 > "below you should also mention helps in boosting the posts"
 
-The line added is: *"Keywords give people another way to find this post. The
-brackets only decide how they look."*
+The line added is: _"Keywords give people another way to find this post. The
+brackets only decide how they look."_
 
 **Not "boosts your posts", and deliberately.** The BRACKETS boost nothing — they
 are punctuation and no platform ranks on them, so a boost claim under that tick
