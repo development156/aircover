@@ -9,6 +9,10 @@ import { connectPlatformFor } from '@/lib/zernio/connect-platform'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { readActiveWorkspace } from '@/lib/workspaces'
+import { setPendingSelectionHeader } from '@/lib/connections/pending-selection'
+import { pickerCopyFor, SELECT_PATH } from '@/lib/zernio/picker-copy'
+import { nothingToPickPage, pickerPage } from '@/lib/zernio/picker-page'
+import { readSelectionRedirect } from '@/lib/zernio/selection'
 import { RETURN_MODE_PARAM, RETURN_PLATFORM_PARAM } from '@/lib/zernio/return-url'
 import { zernioClient } from '@/lib/zernio/server'
 
@@ -363,6 +367,83 @@ export async function GET(request: Request): Promise<Response> {
       // They returned without ever having started here. Nothing to reconcile — a real
       // outcome, not a failure, so this one keeps its 303.
       return ok('nothing', 'no-profile')
+    }
+
+    /**
+     * ── THE CONNECT THAT IS NOT FINISHED YET ─────────────────────────────────
+     * Facebook and Google Business come back here BEFORE an account exists: the
+     * customer approved, and Zernio is waiting to be told which Page or which
+     * location. `step` is Zernio's own marker for that state and nothing else sets
+     * it, so its absence is every connect that has ever worked.
+     *
+     * MEASURED 2026-08-27: this is the entire reason "facebook is not connecting".
+     * The reconcile below ran correctly, found no facebook account, and reported
+     * that honestly — because there was none to find. See lib/zernio/selection.ts.
+     *
+     * Placed AFTER the profile lookup because the check it performs needs it: the
+     * `profileId` on this URL came through the browser and is compared against the
+     * one we read from our own table, never used. That is the same tenant boundary
+     * `upsert_zernio_connection` enforces as PROFILE_MISMATCH, applied a layer up
+     * so a mismatched pick never reaches Zernio at all.
+     */
+    const selection = readSelectionRedirect(params)
+    if (selection !== null) {
+      if (selection.state.profileId !== profileId) return fail(403, 'profile-mismatch')
+
+      const copy = pickerCopyFor(selection.platform)
+      let listed: Awaited<ReturnType<typeof client.listConnectChoices>>
+      try {
+        listed = await client.listConnectChoices(selection.platform, selection.state)
+      } catch (error) {
+        await reportServerError(error, { action: 'zernioSelectList', workspaceId })
+        // Ours, not theirs: the grant at the platform is real and the only thing
+        // that failed is our read of what it unlocked.
+        return fail(502, 'choices-unreadable')
+      }
+
+      if (listed.choices.length === 0) {
+        // NOT `ok('nothing')`. That status renders "Connected", and nothing was —
+        // Zernio creates no account until a choice is committed. This says what
+        // actually happened and offers the only remedy that can work.
+        return new Response(
+          nothingToPickPage(copy, connectionsUrl(request, 'nothing', copy.empty)),
+          {
+            status: 200,
+            headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+          },
+        )
+      }
+
+      /**
+       * The page carries the ids and NOT the token. `tempToken` is a live Facebook
+       * user access token; it goes into an httpOnly cookie the POST reads back, so
+       * it never reaches the markup. See lib/connections/pending-selection.ts.
+       *
+       * The pending-connect cookie is deliberately NOT cleared here. This trip
+       * created nothing, the customer has not finished pressing Connect, and the
+       * create it authorises is still owed on the trip after the pick.
+       */
+      return new Response(
+        pickerPage(copy, listed.choices, {
+          // The mode rides the form action so the trip AFTER the pick still knows
+          // it is in a popup and still ends on the closer rather than loading the
+          // whole app into a 620px window. Presentation only — the same value
+          // RETURN_MODE_PARAM already carries, and the same argument covers it.
+          action: popup ? `${SELECT_PATH}?${RETURN_MODE_PARAM}=popup` : SELECT_PATH,
+          hasMore: listed.hasMore,
+        }),
+        {
+          status: 200,
+          headers: {
+            'content-type': 'text/html; charset=utf-8',
+            'cache-control': 'no-store',
+            'set-cookie': setPendingSelectionHeader({
+              platform: selection.platform,
+              state: selection.state,
+            }),
+          },
+        },
+      )
     }
 
     // EVERY platform, not the one the redirect claims. The query string is

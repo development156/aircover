@@ -32,6 +32,8 @@ const state = vi.hoisted(() => ({
   connectUrlCalls: 0,
   /** The platform string actually sent to Zernio's connect endpoint, in order. */
   connectUrlPlatforms: [] as string[],
+  /** `platform:headless` for every connect start, so the flag cannot be assumed. */
+  connectUrlHeadless: [] as string[],
 }))
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -42,9 +44,15 @@ vi.mock('@/lib/zernio/server', () => ({
   zernioClient: () =>
     state.clientPresent
       ? {
-          connectUrl: (platform: string) => {
+          connectUrl: (
+            platform: string,
+            _profileId: string,
+            _redirectUrl: string,
+            options?: { headless?: boolean },
+          ) => {
             state.connectUrlCalls += 1
             state.connectUrlPlatforms.push(platform)
+            state.connectUrlHeadless.push(`${platform}:${options?.headless === true}`)
             return Promise.resolve('https://zernio.example/consent')
           },
         }
@@ -122,6 +130,7 @@ beforeEach(() => {
   state.rpcCalls = 0
   state.connectUrlCalls = 0
   state.connectUrlPlatforms = []
+  state.connectUrlHeadless = []
 })
 
 describe('the channels plan limit is enforced before the consent screen', () => {
@@ -345,5 +354,55 @@ describe('the connect endpoint is asked for ZERNIO’s name for the channel', ()
     // And it must not leave a cookie authorising a create for a trip that cannot
     // happen.
     expect(res.headers.get('set-cookie')).toBeNull()
+  })
+})
+
+/**
+ * WHOSE SCREEN THE CUSTOMER PICKS A FACEBOOK PAGE ON.
+ *
+ * ── WHY THIS FLAG EXISTS ─────────────────────────────────────────────────────
+ * Facebook resolves to every Page the customer administers and Google Business to
+ * every location, and Zernio creates NO ACCOUNT until one is chosen. Left alone it
+ * hosts that choice on zernio.com — which is the screen the founder reported
+ * without knowing what it was: "it opens another new website ... change from
+ * social media connector to Sahodalabs". MEASURED 2026-08-27, it also ended with
+ * zero facebook accounts on this key.
+ *
+ * `headless=true` suppresses it and returns the browser to our own return route
+ * with the OAuth state, so the picker is ours.
+ *
+ * ── AND WHY IT IS NOT ON FOR EVERYTHING ──────────────────────────────────────
+ * Instagram and LinkedIn connect end to end today — they are the two accounts this
+ * workspace actually holds. Zernio publishes selection endpoints for LinkedIn
+ * organizations, Pinterest boards and more, and switching those on would move a
+ * working flow onto a second half nobody has written. The narrowness IS the
+ * safety argument, so it is asserted rather than assumed.
+ */
+describe('Zernio hosts the picker for nobody we have built one for', () => {
+  it('turns Zernio’s own screen off for Facebook', async () => {
+    await post({ platform: 'facebook' })
+    expect(state.connectUrlHeadless).toEqual(['facebook:true'])
+  })
+
+  it('turns it off for Google Business too, asked for by ZERNIO’s name', async () => {
+    // Two facts in one assertion, both load-bearing: the flag is set, and the
+    // platform reaching Zernio is `googlebusiness` rather than our `gbp`. Passing
+    // our own id here is what made every X and GBP connect answer "Couldn't start
+    // the connection" for a week.
+    await post({ platform: 'gbp' })
+    expect(state.connectUrlHeadless).toEqual(['googlebusiness:true'])
+  })
+
+  it('leaves it ON for Instagram, which needs no choice and works today', async () => {
+    await post({ platform: 'instagram' })
+    expect(state.connectUrlHeadless).toEqual(['instagram:false'])
+  })
+
+  it('leaves it on for LinkedIn, even though Zernio offers a selection endpoint', async () => {
+    // Deliberate. LinkedIn has `/connect/linkedin/select-organization` and we have
+    // not built that picker; asking for headless here would return a customer to a
+    // return route that cannot finish, i.e. a working platform broken for tidiness.
+    await post({ platform: 'linkedin' })
+    expect(state.connectUrlHeadless).toEqual(['linkedin:false'])
   })
 })

@@ -1,0 +1,170 @@
+import type { ZernioSelectionPlatform, ZernioSelectionState } from '@sahoda/publishing'
+import type { ZernioPlatform } from '@sahoda/shared'
+
+/**
+ * THE STEP BETWEEN "APPROVED" AND "CONNECTED", AND WHY FACEBOOK NEEDED ONE.
+ *
+ * ── THE DEFECT ───────────────────────────────────────────────────────────────
+ * Reported three times, last as "facebook is also not connecting". MEASURED
+ * 2026-08-27 against the live API: `GET /v1/accounts` returned **zero** facebook
+ * accounts across every profile on this key, while `GET /v1/connect/facebook`
+ * returned a perfectly good authUrl every time it was asked. Nothing was failing.
+ *
+ * Facebook does not resolve to one account on approval — it resolves to every Page
+ * the customer administers, and Google Business to every location. Somebody has to
+ * pick one, and **Zernio creates no account until they do**. So our return trip
+ * asked for the accounts under our profile, was correctly told there were none, and
+ * reported that honestly. The connect was one step short of existing.
+ *
+ * ── WHY WE HOST THE PICKER RATHER THAN LETTING ZERNIO DO IT ──────────────────
+ * Zernio's default is to host it on zernio.com. The founder has already reported
+ * that screen, without knowing what it was: "it opens a popup and it opens another
+ * new website and connects there ... change the logo and add sahodalabs logo and
+ * also change from social media connector to Sahodalabs". That is a third-party
+ * brand asking a Sahoda customer to choose a Facebook Page, inside a 620px popup.
+ *
+ * `headless=true` turns it off and returns the browser to our own return route
+ * carrying the OAuth state. The picker is then ours: our words, our origin, and a
+ * step we can see fail.
+ *
+ * ── ONLY TWO PLATFORMS, DELIBERATELY ─────────────────────────────────────────
+ * Zernio's spec lists selection endpoints for LinkedIn organizations, Pinterest
+ * boards, Snapchat profiles, Instagram-via-Facebook-Login and WhatsApp numbers as
+ * well. Those are NOT switched. Instagram and LinkedIn connect end to end today —
+ * MEASURED, they are the two accounts this workspace actually holds — and moving a
+ * working flow onto an untested one to be consistent would trade a fix for a
+ * regression. Adding a platform here is one entry plus its endpoints.
+ */
+
+/**
+ * Our channel id → the name Zernio's selection endpoints use, or `null` for a
+ * platform that resolves to an account on its own.
+ *
+ * NOT keyed exhaustively over `ZernioPlatform` on purpose: this is a small
+ * allowlist of platforms whose selection flow has been read off the spec and
+ * built, and a platform added to the enum tomorrow must default to the standard
+ * flow rather than to a headless one nobody wrote the second half of.
+ */
+const SELECTION: Readonly<Partial<Record<ZernioPlatform, ZernioSelectionPlatform>>> = {
+  facebook: 'facebook',
+  gbp: 'googlebusiness',
+}
+
+/** Zernio's name back to ours. Built from the map above so the two cannot drift. */
+const OURS: Readonly<Record<string, ZernioPlatform>> = Object.fromEntries(
+  Object.entries(SELECTION).map(([ours, theirs]) => [theirs, ours as ZernioPlatform]),
+)
+
+/** True when this platform needs a pick after OAuth, so `headless=true` applies. */
+export function selectionPlatformFor(platform: ZernioPlatform): ZernioSelectionPlatform | null {
+  return SELECTION[platform] ?? null
+}
+
+/** The channel id that owns a selection platform, or null for a name we don't run. */
+export function ourPlatformFor(selection: string): ZernioPlatform | null {
+  return OURS[selection] ?? null
+}
+
+/**
+ * The `step` values Zernio puts on a headless redirect, mapped to the platform
+ * whose picker they belong to.
+ *
+ * Read from `https://zernio.com/openapi.json`, which documents `step=select_page`
+ * for Facebook and `step=select_location` for Google Business. A step we do not
+ * recognise produces `null`, which sends the trip down the ordinary reconcile path
+ * — the behaviour every connect had before this file existed.
+ */
+const STEPS: Readonly<Record<string, ZernioSelectionPlatform>> = {
+  select_page: 'facebook',
+  select_location: 'googlebusiness',
+}
+
+/** What a headless redirect is asking us to do, or null when it is not one. */
+export interface SelectionRedirect {
+  platform: ZernioSelectionPlatform
+  /** Our channel id for it — never read from the query string. See below. */
+  ours: ZernioPlatform
+  state: ZernioSelectionState
+}
+
+/**
+ * Read a headless redirect, or return null.
+ *
+ * ── THE PROFILE ID HERE IS NOT TRUSTED, IT IS COMPARED ───────────────────────
+ * `profileId` arrives on the query string, which this route's header is explicit
+ * about: anything the browser carries is attacker-influenceable. It is returned so
+ * the caller can check it against the profile it looked up from our own table,
+ * keyed by the workspace derived from the Clerk session. A mismatch is refused.
+ * That is the same shape `upsert_zernio_connection`'s PROFILE_MISMATCH check uses,
+ * one layer up.
+ *
+ * ── AND OUR PLATFORM IS DERIVED, NOT READ ────────────────────────────────────
+ * Zernio also appends `platform=…` to the redirect, and our own return URL already
+ * carries a `platform` parameter of its own with OUR vocabulary in it. For gbp the
+ * two disagree — `gbp` versus `googlebusiness` — and which one `searchParams.get`
+ * returns depends on whether Zernio appends or replaces. So `ours` comes from the
+ * STEP, which only Zernio sets and which has exactly one meaning.
+ */
+export function readSelectionRedirect(params: URLSearchParams): SelectionRedirect | null {
+  const step = params.get('step')
+  if (step === null) return null
+  const platform = STEPS[step]
+  if (platform === undefined) return null
+
+  const ours = ourPlatformFor(platform)
+  if (ours === null) return null
+
+  const profileId = params.get('profileId')?.trim()
+  if (!profileId) return null
+
+  const tempToken = params.get('tempToken')?.trim() || undefined
+  const pendingDataToken = params.get('pendingDataToken')?.trim() || undefined
+  if (!tempToken && !pendingDataToken) return null
+
+  return {
+    platform,
+    ours,
+    state: {
+      profileId,
+      tempToken,
+      pendingDataToken,
+      userProfile: readUserProfile(params.get('userProfile')),
+    },
+  }
+}
+
+/**
+ * Facebook's select POST requires `userProfile`, and it rides the redirect.
+ *
+ * Zernio's own wording is "the decoded user profile object from the OAuth
+ * callback", and a JSON object in a query parameter is carried either as JSON or
+ * base64 depending on who wrote the callback. Both are tried, in that order, and a
+ * value that is neither becomes `undefined` rather than a thrown parse error — a
+ * malformed parameter must not turn a connect into a 500.
+ *
+ * Never inspected beyond "is this an object". Zernio encoded it and Zernio reads
+ * it; nothing here has any business knowing its fields.
+ */
+function readUserProfile(raw: string | null): unknown {
+  if (raw === null || raw.trim() === '') return undefined
+  const attempts = [raw, safeBase64(raw)]
+  for (const attempt of attempts) {
+    if (attempt === null) continue
+    try {
+      const parsed: unknown = JSON.parse(attempt)
+      if (typeof parsed === 'object' && parsed !== null) return parsed
+    } catch {
+      // Try the next encoding.
+    }
+  }
+  return undefined
+}
+
+function safeBase64(raw: string): string | null {
+  try {
+    // base64url as well as base64: a JSON payload in a URL is commonly the former.
+    return Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
+  } catch {
+    return null
+  }
+}
