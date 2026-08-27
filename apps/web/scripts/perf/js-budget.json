@@ -15,7 +15,7 @@
   "/(app)/campaigns/[id]": 816576,
   "/(app)/analytics/loading": 603637,
   "/(app)/analytics": 637261,
-  "/(app)/assets": 832366,
+  "/(app)/assets": 841308,
   "/(app)/approvals": 682346,
   "/(app)/billing/checkout/[orderId]": 608789,
   "/(app)/create/post": 603637,

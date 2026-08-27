@@ -24,7 +24,7 @@ export function NewFolderInline({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="flex items-center gap-1.5 rounded-pill border border-dashed border-line-firm px-3 py-1.5 type-sm font-semibold text-muted transition-micro hover:border-accent hover:text-accent"
+        className="flex w-full items-center gap-2 rounded-sm border border-dashed border-line-firm px-2.5 py-1.5 text-left type-sm font-semibold text-muted transition-micro hover:border-accent hover:text-accent"
       >
         <FolderPlus size={14} aria-hidden />
         New folder
@@ -52,7 +52,7 @@ export function NewFolderInline({
         event.preventDefault()
         submit()
       }}
-      className="surface-ring flex items-center gap-2 rounded-pill bg-surface px-3 py-1.5"
+      className="surface-ring flex w-full flex-col gap-1.5 rounded-sm bg-surface p-2"
     >
       <input
         autoFocus
@@ -61,26 +61,28 @@ export function NewFolderInline({
         onChange={(event) => setName(event.target.value)}
         placeholder="Folder name"
         aria-label="New folder name"
-        className="h-6 w-[140px] border-0 bg-transparent type-sm text-ink outline-none placeholder:text-muted"
+        className="h-7 w-full border-0 bg-transparent type-sm text-ink outline-none placeholder:text-muted"
       />
-      <button
-        type="submit"
-        disabled={pending || name.trim() === ''}
-        className="type-sm font-semibold text-accent disabled:opacity-50"
-      >
-        Create
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setEditing(false)
-          setName('')
-          setError(null)
-        }}
-        className="type-sm text-muted"
-      >
-        Cancel
-      </button>
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setEditing(false)
+            setName('')
+            setError(null)
+          }}
+          className="type-sm text-muted"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={pending || name.trim() === ''}
+          className="type-sm font-semibold text-accent disabled:opacity-50"
+        >
+          Create
+        </button>
+      </div>
       {error ? <span className="type-meta text-ink-mute">{error}</span> : null}
     </form>
   )
