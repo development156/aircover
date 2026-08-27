@@ -1,5 +1,5 @@
 import { describe, expect, test, vi, afterEach } from 'vitest'
-import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { Post, PostVariant } from '@sahoda/shared'
 
 import { Composer } from './composer'
@@ -15,7 +15,11 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/posts/p1',
   useSearchParams: () => new URLSearchParams(),
 }))
-vi.mock('@/app/actions/posts-ai', () => ({ rewriteSelection: vi.fn(), generateVariants: vi.fn() }))
+vi.mock('@/app/actions/posts-ai', () => ({
+  rewriteSelection: vi.fn(),
+  generateVariants: vi.fn(),
+  rewriteCaption: vi.fn(),
+}))
 vi.mock('@/app/actions/posts', () => ({
   createPost: vi.fn(),
   savePost: vi.fn(),
@@ -29,46 +33,35 @@ vi.mock('@/app/actions/templates', () => ({ saveTemplate: vi.fn(), deleteTemplat
 afterEach(cleanup)
 
 /**
- * ONE SOLID BRAND FILL PER VIEW, ON THE SCREEN THAT BREAKS IT WORST.
+ * THE BRAND FILL, AND THE RULE IT NOW FOLLOWS.
  *
- * ── WHY THIS EXISTS WHEN A GUARD ALREADY DOES ────────────────────────────────
- * `e2e/page-dash-hierarchy.spec.ts` already asserts docs/37 §2.3 and §16 —
- * "exactly one solid-brand-fill element per view" — and it is a good guard. It
- * runs over exactly two routes: `for (const route of ['/home', '/analytics'])`
- * at `page-dash-hierarchy.spec.ts:195`.
+ * ── WHAT THIS FILE USED TO SAY, AND WHY IT DOES NOT ANY MORE ─────────────────
+ * It asserted docs/37 §2.3 — "exactly one solid-brand-fill element per view" —
+ * and it pinned the composer's violation at four so nobody could move the number
+ * by accident. It did its job twice: it went red when the Send-it split dropped
+ * the resting count to one, and it went red again here.
  *
- * The composer is not one of them. It is the heaviest route in the product and
- * the one carrying the most controls, and it used to render **four** solid brand
- * fills at once: the orange "Adapt for N channels" button, and one full-width
- * orange "Publish to …" per connected channel from `publish-now.tsx`, where
- * `<Button>` takes the component's default variant, which is `primary`.
+ * The founder has now ruled, and the ruling is recorded in `REQUESTS.md` §31:
  *
- * A guard that never looks at a screen is not a weaker guard on that screen; it
- * is no guard at all. This one looks, and it looks without a browser: the fill
- * is a class, so it can be counted in jsdom and runs in the ordinary suite
- * rather than waiting on a Playwright leg this sandbox cannot execute.
+ *   "make clickable buttons like send and schedule orange with black text or
+ *    more like save cancel things like that should be highlighted"
  *
- * ── AND THIS IS THE CONVERSATION IT WAS WRITTEN TO FORCE ─────────────────────
- * The previous version of this file pinned FOUR and said: "Lower it and the test
- * goes red, and the person lowering it has to come here and say what they
- * changed." It went red. Here is what changed.
+ * §2.3's one-per-view budget does not survive that, and pretending otherwise by
+ * leaving a red test in the tree would be worse than saying so. What replaces it
+ * is a rule with the same property — countable, and violated by accident rather
+ * than on purpose:
  *
- * `FinishPanel` now asks whether the post is being scheduled or published before
- * it offers either set of controls, so the per-channel publish rail is not on
- * the screen until a writer says that is what they came for. MEASURED with three
- * channels: **one** fill at rest, **four** with "Post now" open.
+ *   EVERY BUTTON THAT COMMITS CARRIES THE FILL. NOTHING ELSE DOES.
  *
- * ── SO THE VIOLATION IS DEFERRED, NOT FIXED, AND THIS SAYS BOTH ──────────────
- * Claiming §2.3 is satisfied would be the flattering read and it would be wrong.
- * The resting screen genuinely does obey the rule now — one element, the one
- * that does the thing this product exists to do. The opened state still breaks
- * it three times over, and that half is a real design decision nobody has taken:
- * the per-channel buttons are deliberate, because each channel publishes and
- * fails on its own, and collapsing them into one button would mean reporting one
- * verdict for four different outcomes.
+ * Committing means it writes to the row or sends to a platform: Save, Save all
+ * versions, Adapt (which spends credits and writes variants), Confirm schedule,
+ * Confirm and send. A button that OPENS something, CANCELS something, or offers
+ * one of several equivalent choices does not, because a screen where everything
+ * is loud tells the reader nothing about which thing is the point.
  *
- * Both numbers are therefore pinned. Move either one and the test goes red, and
- * whoever moves it comes here and writes the next paragraph.
+ * `text-primary-foreground` is ink, not white — `button.tsx` measures the pair
+ * at 7.15:1 — so "orange with black text" is what the primary variant already
+ * was. No new colour pair was invented for this.
  */
 
 const CHANNELS = ['x', 'linkedin', 'instagram'] as const
@@ -86,10 +79,10 @@ const post = {
   updated_at: '',
 } as unknown as Post
 
-function composer() {
+function composer(channels: readonly string[] = CHANNELS) {
   return render(
     <Composer
-      post={post}
+      post={{ ...post, channels } as unknown as Post}
       variants={[] as PostVariant[]}
       media={[]}
       templates={{ ok: true, templates: [] } as never}
@@ -100,105 +93,102 @@ function composer() {
 /**
  * Every ACTION painted in the solid brand fill.
  *
- * ── THE FIRST VERSION OF THIS COUNTED SEVEN, AND SEVEN WAS WRONG ─────────────
- * It matched every `bg-primary` element, which includes each channel's character
- * METER fill (`ui/progress.tsx`). A meter is a data mark, not a call to action:
- * §2.3 rations the primary ACTION — "exactly one element per screen may carry
- * the solid brand fill. Everything else is a secondary or a link" — and §9 gives
- * the same fill to the Certainty System's `.is-real` rung for an unrelated
- * reason. A count that lumps those together reports a number nobody can act on,
- * which is the failure this repository keeps paying for.
- *
- * So the filter is interactive elements only. That is the population the rule is
- * about, and it is why the number here is four rather than seven.
+ * Interactive elements only. An earlier version of this counted seven by
+ * matching every `bg-primary` element, which swept in each channel's character
+ * METER fill from `ui/progress.tsx`. A meter is a data mark, not a call to
+ * action, and a count that lumps those together reports a number nobody can act
+ * on.
  */
 function solidFills(root: HTMLElement): string[] {
   return [...root.querySelectorAll<HTMLElement>('button, a, [role="button"]')]
     .filter((el) => el.className.split(/\s+/).includes('bg-primary'))
-    .map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40))
+    .map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 44))
 }
 
 /**
- * Open the publish rail, which is what `FinishPanel` now gates it behind, and
- * WAIT for it: that half is fetched from a chunk of its own.
- */
-async function openPublish(root: HTMLElement) {
-  fireEvent.click(within(root).getByRole('button', { name: /^Post now/ }))
-  await waitFor(() => expect(solidFills(root).length).toBeGreaterThan(1))
-}
-
-/**
- * A SECOND COMPOSER, OPENED, USED PURELY AS A CLOCK.
+ * A SECOND, OPENED COMPOSER USED PURELY AS A CLOCK.
  *
  * `FinishPanel` loads both of its halves with `next/dynamic`, so a synchronous
- * count at mount reports one fill whether the publish rail is gated behind a
- * click or rendered unconditionally. The guard would then certify the rule as
- * kept on a screen that breaks it four times, which is the flattering answer and
- * the wrong one.
- *
- * Waiting a few ticks does not fix it — MEASURED: five macrotask ticks inside
- * `act` left the mutation GREEN, because the module import resolves later than
- * that. What IS deterministic is waiting on the same module: both composers
- * share one import promise, so once the opened one has painted its rail, an
- * ungated resting one has had exactly the same chance and has either rendered
- * its own or has none to render.
+ * count at mount cannot tell a gated half from an ungated one. Both instances
+ * share one import promise, so once the opened one has painted its rail, a
+ * resting one has had exactly the same chance.
  *
  * CALIBRATED, not assumed: ungating the publish half turns the resting test red
- * with this in place. That mutation is the only reason to trust the number.
+ * with this in place and left it GREEN without it. Five macrotask ticks inside
+ * `act` were not enough — the module resolves later than that.
  */
 async function afterChunksArrive(): Promise<void> {
-  const probe = render(
-    <Composer
-      post={post}
-      variants={[] as PostVariant[]}
-      media={[]}
-      templates={{ ok: true, templates: [] } as never}
-    />,
-  ).container
-  await openPublish(probe)
+  const probe = composer()
+  fireEvent.click(within(probe).getByRole('button', { name: /^Post now/ }))
+  await waitFor(() => expect(probe.querySelector('[data-guide="post-publish-now"]')).toBeTruthy())
 }
 
-describe('the composer against the one-fill rule', () => {
-  test('obeys it at rest: ONE fill, and it is the one that does the work', async () => {
+describe('the brand fill marks what commits, and only that', () => {
+  test('at rest it is Adapt, one Save per channel, and Save all versions', async () => {
     const root = composer()
     await afterChunksArrive()
     const found = solidFills(root)
 
-    expect(
-      found,
-      `docs/37 §2.3 allows ONE solid brand fill per view. Found ${found.length}:\n${found.join('\n')}`,
-    ).toHaveLength(1)
-    // Named, so a change that keeps the count by swapping WHICH element carries
-    // the fill cannot pass. The one action this product exists to perform is the
-    // one that gets the orange.
-    expect(found[0]).toMatch(/^Adapt for/)
+    expect(found, `Found ${found.length} brand fills:\n${found.join('\n')}`).toEqual([
+      'Adapt for 3 channels · 3 credits',
+      'Save',
+      'Save',
+      'Save',
+      'Save all versions',
+    ])
   })
 
-  test('and breaks it three times over once the publish rail is opened', async () => {
+  test('the Save count follows the channel list, one per card', async () => {
+    const one = composer(['x'])
+    await afterChunksArrive()
+
+    expect(solidFills(one).filter((label) => label === 'Save')).toHaveLength(1)
+  })
+
+  /**
+   * THE HALF THAT KEEPS THE RULE MEANINGFUL.
+   *
+   * "Everything that commits is orange" is only useful alongside "and nothing
+   * else is". These four are the controls most likely to be promoted by someone
+   * who reads the ruling as "make the important buttons orange" — they are
+   * prominent, and none of them writes anything.
+   */
+  test('nothing that merely opens, chooses or cancels carries it', async () => {
     const root = composer()
-    await openPublish(root)
+    await afterChunksArrive()
     const found = solidFills(root)
 
-    expect(found).toHaveLength(1 + CHANNELS.length)
-    // WHICH fills, so a change that removes the Adapt button rather than the
-    // rail cannot pass by keeping the total the same.
-    expect(found.filter((t) => t.startsWith('Publish to'))).toHaveLength(CHANNELS.length)
+    for (const label of ['Schedule it', 'Post now', 'Emoji', 'Polish']) {
+      expect(
+        found.some((fill) => fill.startsWith(label)),
+        `${label} opens or chooses; it must not wear the committing fill`,
+      ).toBe(false)
+    }
   })
 
-  test('the opened count follows the channel list, so it grows as a writer adds channels', async () => {
-    // The rule is broken WORSE the more the screen is used, which is the part a
-    // static count would hide.
-    const one = render(
-      <Composer
-        post={{ ...post, channels: ['x'] } as unknown as Post}
-        variants={[] as PostVariant[]}
-        media={[]}
-        templates={{ ok: true, templates: [] } as never}
-      />,
-    ).container
+  test('and Undo, Redo and Clear never do, on any channel', async () => {
+    const root = composer()
     await afterChunksArrive()
-    expect(solidFills(one)).toHaveLength(1)
-    await openPublish(one)
-    expect(solidFills(one)).toHaveLength(2)
+    const found = solidFills(root)
+
+    for (const label of ['Undo', 'Redo', 'Clear']) {
+      expect(
+        found.some((fill) => fill.startsWith(label)),
+        label,
+      ).toBe(false)
+    }
+  })
+})
+
+describe('the committing buttons inside the Send it panel', () => {
+  test('Confirm schedule is the schedule side one fill', async () => {
+    const root = composer()
+    fireEvent.click(screen.getByRole('button', { name: /^Schedule it/ }))
+    const confirm = await screen.findByRole('button', { name: /Confirm schedule/ })
+
+    expect(confirm.className.split(/\s+/)).toContain('bg-primary')
+    // And "Save as draft" beside it does NOT: it is the way out, not the act.
+    const draft = within(root).getByRole('button', { name: /Save as draft/ })
+    expect(draft.className.split(/\s+/)).not.toContain('bg-primary')
   })
 })

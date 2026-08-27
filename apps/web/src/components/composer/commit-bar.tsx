@@ -112,7 +112,9 @@ export function CommitBar({
 
         <div className="flex flex-wrap items-center gap-2">
           {unsavedVersions > 0 ? (
-            <Button variant="secondary" size="sm" onClick={onSaveAll} loading={savingVersions}>
+            // The bar's one committing action, in the brand fill. Founder's
+            // ruling, REQUESTS §31.
+            <Button size="sm" onClick={onSaveAll} loading={savingVersions}>
               {saveAllLabel}
             </Button>
           ) : null}
