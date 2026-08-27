@@ -22,7 +22,7 @@
  * It NEVER fails a session: every path exits 0.
  */
 import { execFileSync, spawn } from 'node:child_process'
-import { writeFileSync, existsSync } from 'node:fs'
+import { writeFileSync, existsSync, readFileSync } from 'node:fs'
 
 const say = (m) => console.log(m)
 const ok = (m) => console.log(`  yes  ${m}`)
@@ -129,9 +129,9 @@ if (!c.present) {
 } else if (c.httpLoopback) {
   result.verdict = 'LOCAL_ONLY'
   result.notes.push(
-    'Chromium reaches loopback but NOT https. Specs that drive the local app over ' +
-      'http://127.0.0.1 can run. Anything whose PAGE loads a third-party https asset ' +
-      '(Clerk sign-in, a CDN font) cannot, and will fail as a reset, not as a bad selector.',
+    'Chromium reaches loopback but NOT https on its own socket. That USED to make ' +
+      'the whole suite unrunnable here. It no longer does — see the Node transport ' +
+      'below.',
   )
   result.notes.push(
     'This is NOT a certificate problem. --ignore-certificate-errors is the wrong ' +
@@ -141,6 +141,31 @@ if (!c.present) {
 } else {
   result.verdict = 'NO_NETWORK'
   result.notes.push('Chromium cannot reach even loopback. Something is broken beyond egress.')
+}
+
+// ── 5 · When the browser cannot do https, route it through Node ─────────────
+// This is the difference between "Playwright is UNRUN here" and a real run.
+// apps/web/e2e/helpers/node-transport.ts intercepts every request and fetches
+// it with Node instead, which the sandbox allows. Proven against a proxy that
+// resets every CONNECT: clerk.com 200 over 62 requests, 0 failed.
+if (result.verdict === 'LOCAL_ONLY') {
+  result.browserViaNode = true
+  for (const f of ['.env', 'apps/web/.env', 'apps/web/.env.local']) {
+    try {
+      if (!existsSync(f)) continue
+      const cur = readFileSync(f, 'utf8')
+      if (!/^SAHODA_BROWSER_VIA_NODE=/m.test(cur)) {
+        writeFileSync(f, cur.replace(/\n?$/, '\n') + 'SAHODA_BROWSER_VIA_NODE=1\n')
+      }
+    } catch {}
+  }
+  result.notes.push(
+    'SAHODA_BROWSER_VIA_NODE=1 written to the .env files: every browser request ' +
+      "now travels over Node instead of Chromium's socket, so the suite CAN run " +
+      'here. WebSockets are the exception — context.route cannot intercept them.',
+  )
+} else {
+  result.browserViaNode = false
 }
 
 say(`\n3 · Verdict: ${result.verdict}`)
