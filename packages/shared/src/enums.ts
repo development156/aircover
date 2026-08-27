@@ -4,8 +4,33 @@ import { z } from 'zod'
 // constraints mirror these exact string sets. Adding a value = editing here AND
 // the mirroring migration CHECK (text + CHECK strategy, decision D9).
 
-/** Publishable/target channels. Alpha publishes to x + gbp (+ linkedin stretch); instagram is text-rules only. */
-export const ChannelSchema = z.enum(['x', 'gbp', 'linkedin', 'instagram'])
+/**
+ * Publishable/target channels.
+ *
+ * ── WIDENED 2026-08-26 WITH facebook AND telegram ────────────────────────────
+ * Adding a value here is not a one-file change. It MUST move together with
+ * `20260826120000_widen_channels_facebook_telegram.sql`, which re-adds the CHECK
+ * constraint on TEN tables and rewrites `app.is_channel_set` plus three PL/pgSQL
+ * guards. Widening this enum alone makes the app accept at the edge what the
+ * database refuses at the write.
+ *
+ * ── WHY THESE TWO AND NOT THE OTHER FOURTEEN ─────────────────────────────────
+ * Zernio's spec lists sixteen connectable platforms (MEASURED against
+ * `docs.zernio.com/api/openapi`, `/v1/connect/{platform}`). These two are the
+ * ones whose posts are shaped like the posts `PlatformSpec` already describes:
+ * text plus images, with a character cap.
+ *
+ *   youtube    is VIDEO. `PlatformSpec` carries `imageDims` and `aspectRange`
+ *              and has no duration, codec or resolution field, and the whole
+ *              media pipeline is image-shaped. An epic, not a channel.
+ *   pinterest  needs a destination link and a BOARD id, and there is nowhere in
+ *              `FormattedContent` or `PlatformSpec` to put a board.
+ *
+ * Adding a channel whose spec cannot be stated honestly would mean inventing
+ * limits no engine enforces, which is the failure the whole Constraint Engine
+ * exists to prevent.
+ */
+export const ChannelSchema = z.enum(['x', 'gbp', 'linkedin', 'instagram', 'facebook', 'telegram'])
 export type Channel = z.infer<typeof ChannelSchema>
 
 /** Content lifecycle (FSD 0.5). */
@@ -138,13 +163,47 @@ export type PlannerEventKind = z.infer<typeof PlannerEventKindSchema>
  *     token and our app never sees one (doc 13 §7).
  *
  * Still deliberately NOT the same set as `Channel`: a channel we can address is not
- * the same as a channel we can hold a binding for. They coincide today at four
- * values; do not collapse them.
+ * the same as a channel we can hold a binding for. They no longer coincide at
+ * all — this set has fourteen values and `Channel` has six — and the gap is the
+ * point. Connecting proves a customer owns an account. Publishing needs a
+ * measured `PlatformSpec`, and inventing one is the fabricated figure the
+ * Constraint Engine exists to prevent. Do not collapse them.
  *
  * MUST MOVE TOGETHER with `connections_platform_check` and the p_platform guard in
  * `upsert_connection`.
  */
-export const ConnectionPlatformSchema = z.enum(['x', 'gbp', 'linkedin', 'instagram'])
+export const ConnectionPlatformSchema = z.enum([
+  'x',
+  'gbp',
+  'linkedin',
+  'instagram',
+  'facebook',
+  'telegram',
+  // ── THE EIGHT THAT MADE THIS SET GENUINELY WIDER THAN `Channel` ───────────
+  // Added 2026-08-26. Until now the two enums "coincided at four values" and the
+  // paragraph above was a warning about a distinction nothing had yet exercised.
+  // These eight exercise it: each can be CONNECTED and none can be PUBLISHED to,
+  // because publishing needs a `PlatformSpec` and a spec needs measured limits.
+  //
+  // MEASURED against the live API, not read off documentation. Each was probed
+  // with `GET /v1/connect/{platform}?profileId=…` against a real profile and
+  // returned HTTP 200 carrying an `authUrl`:
+  //
+  //   discord  pinterest  reddit  slack  threads  tiktok  whatsapp  youtube
+  //
+  // The probe mattered. `docs.zernio.com/llms-full.txt` lists `x`, `mastodon`,
+  // `medium` and `substack` as connectable — all four answer 400
+  // `platform_not_supported` — and omits `reddit`, `slack` and `googlebusiness`,
+  // which all answer 200. A documented enum is not a measurement.
+  'discord',
+  'pinterest',
+  'reddit',
+  'slack',
+  'threads',
+  'tiktok',
+  'whatsapp',
+  'youtube',
+])
 export type ConnectionPlatform = z.infer<typeof ConnectionPlatformSchema>
 
 export const ConnectionStatusSchema = z.enum(['active', 'expired', 'revoked', 'error'])
@@ -286,8 +345,68 @@ export type OpsArtifactMime = z.infer<typeof OpsArtifactMimeSchema>
  * that asks Zernio for an auth URL, the RPC allowlist in Postgres, and the adapter
  * selector. A platform in one and not the others produces a connection row that
  * looks live and can never publish.
+ *
+ * ── THIS IS A SUBSET OF `Channel`, AND TELEGRAM IS WHY ───────────────────────
+ * It reads "channels connectable through the OAuth rail", not "channels we
+ * support". Telegram is a real `Channel` whose publish adapter works, and it is
+ * absent here because `GET /v1/connect/telegram` returns a bot access CODE
+ * rather than an `authUrl` — there is no consent screen to send anyone to.
+ * Listing it made its Connect button answer "Couldn't start the connection. Try
+ * again." on every press.
+ *
+ * So: a channel belongs here when it can complete THIS flow, not when it exists.
  */
-export const ZERNIO_PLATFORMS = ['instagram', 'x', 'gbp', 'linkedin'] as const
+/**
+ * Channels whose connect flow is an OAUTH HANDOFF — a consent screen we can send
+ * a customer to and get them back from.
+ *
+ * MEASURED 2026-08-26 by probing `GET /v1/connect/{platform}` against a real
+ * profile, one platform at a time. Thirteen of ours answered 200 with an
+ * `authUrl`. Two facts from the same probe are load-bearing and are why our ids
+ * are translated rather than passed through (see `connect-platform.ts`):
+ *
+ *   `x`   answers 400 `platform_not_supported`. Zernio's name is `twitter`.
+ *   `gbp` answers 400 too, as does `google_business`. Its name is `googlebusiness`.
+ *
+ * TELEGRAM IS ABSENT AND THAT IS THE MEASUREMENT, not an omission.
+ * `GET /v1/connect/telegram` returns 200 with NO `authUrl` — the body is
+ * `{code, expiresAt, expiresIn, botUsername, instructions}`, an access code valid
+ * fifteen minutes. There is no consent screen to open, so putting it on this rail
+ * gives a button that can only ever fail.
+ *
+ * SNAPCHAT is absent for a third reason: 403 `PLATFORM_BETA_RESTRICTED`.
+ */
+export const ZERNIO_PLATFORMS = [
+  'instagram',
+  'x',
+  'gbp',
+  'linkedin',
+  'facebook',
+  'discord',
+  'pinterest',
+  'reddit',
+  'slack',
+  'threads',
+  'tiktok',
+  'whatsapp',
+  'youtube',
+  /**
+   * ── TELEGRAM WAS ABSENT, AND ITS ABSENCE WAS ABOUT THE WRONG QUESTION ─────
+   * It was left out because `GET /v1/connect/telegram` returns no `authUrl` —
+   * it returns a pairing CODE, so putting it on the OAuth rail gave a button
+   * that answered "Couldn't start the connection" on every press.
+   *
+   * That is a fact about ONE flow, not about whether a workspace may hold a
+   * Telegram connection, and this list answers the second question. Membership
+   * here is what lets the return route's reconcile sweep find a Telegram account
+   * under our profile at all — without it, a link completed inside Telegram is
+   * invisible to us for ever.
+   *
+   * The OAuth start route refuses it explicitly and by name now, pointing at the
+   * code-and-poll surface instead. See lib/zernio/connect-platform.ts.
+   */
+  'telegram',
+] as const
 export type ZernioPlatform = (typeof ZERNIO_PLATFORMS)[number]
 
 export function isZernioPlatform(value: unknown): value is ZernioPlatform {

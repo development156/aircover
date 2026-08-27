@@ -1,16 +1,27 @@
 'use server'
 
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
-import { AssetSchema, AssetUpdateSchema, ChannelSchema, decideAssetDelete } from '@sahoda/shared'
+import {
+  AssetSchema,
+  AssetUpdateSchema,
+  ChannelSchema,
+  decideAssetDelete,
+  describeTrash,
+} from '@sahoda/shared'
 
+import { duplicateMessage } from '@/lib/assets/duplicate-copy'
 import { kindForProvenMime } from '@/lib/assets/kind'
-import { readAsset } from '@/lib/assets/read'
+import { readAsset, readTrashedAssets } from '@/lib/assets/read'
 import { offerForAsset } from '@/lib/media/offer-asset'
 import type {
   AttachAssetState,
   DeleteAssetState,
+  EmptyTrashState,
+  RestoreAssetState,
+  TrashAssetState,
+  TrashAssetsState,
   UpdateAssetState,
   UploadAssetState,
 } from '@/lib/assets/state'
@@ -61,6 +72,51 @@ function unusableChannels(candidate: {
 }
 
 /**
+ * Does this workspace already hold these exact bytes?
+ *
+ * ── LIVE **AND** TRASHED, AND THE TWO GET DIFFERENT SENTENCES ────────────────
+ * Matching only live rows would mean deleting a photo and re-uploading it
+ * silently makes a second copy, with the first still sitting in the trash. That
+ * is the worst of both: two rows, two objects, and a person who thinks they have
+ * one file.
+ *
+ * So a trashed match is reported too, and pointed at the trash. Restoring is
+ * the right action there — the bytes are already in storage and re-uploading
+ * them would pay for the same file twice.
+ *
+ * Returns null on a READ FAILURE as well as on no match, and that is a
+ * deliberate choice in favour of the upload: refusing a file because a
+ * duplicate CHECK failed would block real work over a convenience. The cost of
+ * being wrong here is one redundant row, which a person can delete; the cost of
+ * the other way is a photo they cannot add.
+ */
+async function findByContentHash(
+  supabase: ReturnType<typeof createServerSupabase>,
+  workspaceId: string,
+  contentHash: string,
+): Promise<{ title: string | null; deleted_at: string | null } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('assets')
+      .select('title, deleted_at')
+      .eq('workspace_id', workspaceId)
+      .eq('content_sha256', contentHash)
+      // A live row wins over a trashed one when both exist: "you already have
+      // this" is more useful than "it is in your trash" when both are true.
+      .order('deleted_at', { ascending: true, nullsFirst: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (error || !data) return null
+    const title = typeof data.title === 'string' && data.title.trim() !== '' ? data.title : null
+    const deletedAt = typeof data.deleted_at === 'string' ? data.deleted_at : null
+    return { title, deleted_at: deletedAt }
+  } catch {
+    return null
+  }
+}
+
+/**
  * Add a file to the library.
  *
  * ── WHAT IS REFUSED AND WHAT IS MERELY REPORTED ──────────────────────────────
@@ -100,6 +156,19 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer())
+
+    // ── THE SAME BUFFER THE SNIFFER READS ──────────────────────────────────
+    // Hashed here rather than in a second pass: the bytes are already in
+    // memory and reading a 40 MB file twice to answer one question is waste.
+    const contentHash = createHash('sha256').update(bytes).digest('hex')
+
+    const existing = await findByContentHash(supabase, workspace.id, contentHash)
+    if (existing !== null) {
+      // NOTHING is uploaded and NOTHING is written. The object never reaches
+      // the bucket, so a refused duplicate costs no storage — which is half the
+      // point of checking before the upload rather than after it.
+      return { ok: false, message: duplicateMessage(existing.title, existing.deleted_at) }
+    }
 
     const sniffed = sniffImage(bytes)
     if (!sniffed.ok) return { ok: false, message: sniffed.message }
@@ -146,22 +215,43 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
     const rawName = typeof file.name === 'string' ? file.name.trim() : ''
     const title = rawName === '' ? null : rawName.slice(0, MAX_TITLE)
 
-    const { data, error } = await supabase
+    const row = {
+      id: assetId,
+      workspace_id: workspace.id,
+      storage_path: objectPath,
+      kind,
+      mime: candidate.mime,
+      bytes: candidate.bytes,
+      width: candidate.width,
+      height: candidate.height,
+      title,
+      created_by: userId,
+    }
+
+    // ── DEPLOY-SAFE, AND THIS IS NOT DEFENSIVENESS FOR ITS OWN SAKE ──────────
+    // `content_sha256` arrives with a migration that a human applies, and this
+    // code ships before that happens. Writing the column unconditionally would
+    // make PostgREST answer `42703` and BREAK EVERY UPLOAD until the migration
+    // lands — the worst possible failure for the one action this screen exists
+    // for, and a strictly worse trade than losing duplicate detection.
+    //
+    // So the hash is attempted, and on `42703` ONLY the insert is retried
+    // without it. Any other error falls through to the real error path
+    // unchanged. Once the migration is applied the retry is unreachable, and
+    // `assets-trash.test.ts` proves the column exists in the schema the tests
+    // boot — so this cannot quietly become the normal path.
+    let { data, error } = await supabase
       .from('assets')
-      .insert({
-        id: assetId,
-        workspace_id: workspace.id,
-        storage_path: objectPath,
-        kind,
-        mime: candidate.mime,
-        bytes: candidate.bytes,
-        width: candidate.width,
-        height: candidate.height,
-        title,
-        created_by: userId,
-      })
+      .insert({ ...row, content_sha256: contentHash })
       .select('*')
       .single()
+
+    if (error?.code === '42703') {
+      console.warn('[assets] content_sha256 column absent; upload proceeding without a hash')
+      const retry = await supabase.from('assets').insert(row).select('*').single()
+      data = retry.data
+      error = retry.error
+    }
 
     if (error || !data) {
       await removeObject(supabase, uploadedPath)
@@ -212,6 +302,257 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
  * whether it was allowed to; the trigger then found nothing locking the file and
  * let the delete through. See 20260820000100 for the whole account.
  */
+/**
+ * Move a file to the trash.
+ *
+ * ── ONE UPDATE, AND NOTHING ELSE HAPPENS ─────────────────────────────────────
+ * No cascade, no detach, no object removed. The row keeps its folders, its
+ * attachments and its bytes, which is the whole reason `restoreAsset` can put it
+ * back exactly where it was rather than approximately where it was.
+ *
+ * The usage read is NOT a gate here — `describeTrash` never refuses, and this
+ * action does not either. It is read so the screen can say the one thing a
+ * person cannot otherwise know: that the posts using this file go on using it.
+ * A usage read that FAILS therefore costs the sentence, not the action: the file
+ * is still trashed, `stillUsedMessage` is null, and nothing is claimed about
+ * posts nobody managed to look at. Refusing here would be the opposite mistake
+ * from `deleteAsset`'s, where refusing on an unreadable usage is the only safe
+ * answer because the act is irreversible.
+ */
+export async function trashAsset(assetId: string): Promise<TrashAssetState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to delete a file.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const read = await readAsset(assetId)
+    if (read.status === 'missing') {
+      return { ok: false, message: 'That file is not in your library.' }
+    }
+    // An unreadable usage costs the SENTENCE, never the act. See above.
+    const stillUsedMessage = read.status === 'ok' ? describeTrash(read.asset.usage).message : null
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('assets')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', assetId)
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .select('id')
+
+    if (error) return { ok: false, message: mapPostError(error) }
+    // Zero rows is not an error and not a success worth reporting differently:
+    // it means the file was already in the trash, which is where the person
+    // wanted it. `.is('deleted_at', null)` makes this idempotent rather than
+    // letting a double click overwrite the original deletion time — which would
+    // silently reset "Deleted 3 days ago" to "Deleted today".
+    if (!Array.isArray(data) || data.length === 0) {
+      return { ok: true, stillUsedMessage: null }
+    }
+
+    revalidatePath('/assets')
+    return { ok: true, stillUsedMessage }
+  } catch (error) {
+    reportServerError(error, { action: 'trashAsset', workspaceId })
+    return { ok: false, message: 'Could not move that file to the trash. Try again.' }
+  }
+}
+
+/**
+ * Take a file back out of the trash.
+ *
+ * Nothing can stand in the way, because trashing took nothing away: this clears
+ * one column. The folders it was filed in are still filed, so it reappears where
+ * it was rather than at the root.
+ */
+export async function restoreAsset(assetId: string): Promise<RestoreAssetState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to restore a file.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('assets')
+      .update({ deleted_at: null })
+      .eq('id', assetId)
+      .eq('workspace_id', workspaceId)
+      .select('id')
+
+    if (error) return { ok: false, message: mapPostError(error) }
+    if (!Array.isArray(data) || data.length === 0) {
+      // The row is gone, which after a "Delete for good" is exactly what it
+      // means. Said as what happened rather than as a generic failure, because
+      // "try again" is a remedy that cannot work on a file that no longer exists.
+      return { ok: false, message: 'That file was deleted for good, so it cannot come back.' }
+    }
+
+    revalidatePath('/assets')
+    return { ok: true }
+  } catch (error) {
+    reportServerError(error, { action: 'restoreAsset', workspaceId })
+    return { ok: false, message: 'Could not restore that file. Try again.' }
+  }
+}
+
+/**
+ * Move a SELECTION to the trash, in one round trip.
+ *
+ * ── NO USAGE READ HERE, DELIBERATELY ─────────────────────────────────────────
+ * `trashAsset` reads usage so it can say which posts keep the file. For a
+ * selection the screen ALREADY HOLDS that: every selected card carries its own
+ * `usage`, read when the page loaded. `describeBulkTrash` runs on those cards
+ * client-side, so this action does not re-fetch what the caller is looking at.
+ *
+ * `.is('deleted_at', null)` makes it idempotent AND makes the count honest: a
+ * file already in the trash is not counted as newly trashed, and its original
+ * deletion time is not overwritten — which would silently reset "Deleted 3 days
+ * ago" to "Deleted today" for a file this call never really touched.
+ */
+export async function trashAssets(assetIds: readonly string[]): Promise<TrashAssetsState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to delete files.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const ids = [...new Set(assetIds)].filter((id) => typeof id === 'string' && id !== '')
+    if (ids.length === 0) return { ok: true, trashed: 0, alreadyTrashed: 0 }
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('assets')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('workspace_id', workspaceId)
+      .in('id', ids)
+      .is('deleted_at', null)
+      .select('id')
+
+    if (error) return { ok: false, message: mapPostError(error) }
+
+    const trashed = Array.isArray(data) ? data.length : 0
+    revalidatePath('/assets')
+    // `alreadyTrashed` is what was ASKED FOR minus what moved. It counts files
+    // already in the trash, and it would also absorb a file deleted for good in
+    // another tab — both are "not newly trashed", which is what the number says.
+    return { ok: true, trashed, alreadyTrashed: ids.length - trashed }
+  } catch (error) {
+    reportServerError(error, { action: 'trashAssets', workspaceId })
+    return { ok: false, message: 'Could not move those files to the trash. Try again.' }
+  }
+}
+
+/** Put a selection back. The exact inverse of `trashAssets`, and Undo's whole job. */
+export async function restoreAssets(assetIds: readonly string[]): Promise<TrashAssetsState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to restore files.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const ids = [...new Set(assetIds)].filter((id) => typeof id === 'string' && id !== '')
+    if (ids.length === 0) return { ok: true, trashed: 0, alreadyTrashed: 0 }
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('assets')
+      .update({ deleted_at: null })
+      .eq('workspace_id', workspaceId)
+      .in('id', ids)
+      .select('id')
+
+    if (error) return { ok: false, message: mapPostError(error) }
+
+    revalidatePath('/assets')
+    const restored = Array.isArray(data) ? data.length : 0
+    return { ok: true, trashed: restored, alreadyTrashed: ids.length - restored }
+  } catch (error) {
+    reportServerError(error, { action: 'restoreAssets', workspaceId })
+    return { ok: false, message: 'Could not restore those files. Try again.' }
+  }
+}
+
+/**
+ * Empty the trash: delete every file in it, for good.
+ *
+ * ── IT NEVER DETACHES, AND THAT IS THE WHOLE DESIGN ──────────────────────────
+ * Each file goes through `deleteAsset` with `confirmed = false`, so the gate
+ * refuses anything a post uses — including a DRAFT. Those files stay in the
+ * trash and are counted as `kept`.
+ *
+ * Deleting a single file from the trash still offers the detach, with the posts
+ * named on screen. That consent cannot be given in bulk: a person pressing
+ * "Empty trash" is saying "get rid of the things I already threw away", not
+ * "and take them off whatever posts they happen to be on". Silently detaching
+ * forty files from drafts is the exact data loss the delete gate exists for.
+ *
+ * ── ONE CALL PER FILE, AND WHY THAT IS RIGHT RATHER THAN LAZY ────────────────
+ * `delete_asset` is a transactional RPC that row-locks the posts, re-reads
+ * usage, deletes the row and hands back the storage path so the BYTES can be
+ * removed after. None of that composes into a single statement, and a bulk
+ * version would be a second copy of the most safety-critical path in this
+ * module. The trash is capped by the same 200-row limit as the library.
+ */
+export async function emptyTrash(): Promise<EmptyTrashState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to empty the trash.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const trash = await readTrashedAssets()
+    if (trash.status !== 'ok') {
+      // NOT an empty trash. Deleting nothing and reporting success would tell a
+      // person their trash is clear when it may be full.
+      return {
+        ok: false,
+        message: 'Sahoda could not read your trash, so nothing was deleted. Reload.',
+      }
+    }
+
+    let deleted = 0
+    let kept = 0
+    for (const entry of trash.assets) {
+      const result = await deleteAsset(entry.asset.id, false)
+      if (result.ok) deleted += 1
+      else if (result.reason === 'refused' || result.reason === 'needs-confirm') kept += 1
+      else {
+        // A genuine failure, not a refusal. Reported as a failure with the count
+        // that DID go, because stopping silently would leave the person unable
+        // to tell how far it got.
+        return {
+          ok: false,
+          message: `${result.message} ${deleted} file${deleted === 1 ? '' : 's'} had already been deleted.`,
+        }
+      }
+    }
+
+    revalidatePath('/assets')
+    return { ok: true, deleted, kept }
+  } catch (error) {
+    reportServerError(error, { action: 'emptyTrash', workspaceId })
+    return { ok: false, message: 'Could not empty the trash. Try again.' }
+  }
+}
+
 export async function deleteAsset(assetId: string, confirmed = false): Promise<DeleteAssetState> {
   let workspaceId: string | undefined
   try {

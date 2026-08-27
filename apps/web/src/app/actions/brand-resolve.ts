@@ -160,9 +160,49 @@ export async function saveBrandMemory(
     if (!result.success) {
       return { ok: false, message: 'Saved, but the response was unreadable. Reload to confirm.' }
     }
+
+    if (nextIntake.success) await mirrorIntakeToWorkspace(supabase, workspace.id, nextIntake.data)
+
     return { ok: true, version: result.data.version, replayed: result.data.replayed }
   } catch (error) {
     reportServerError(error, { action: 'saveBrandMemory', workspaceId })
     return { ok: false, message: 'Could not save your Brand Brain. Try again.' }
   }
+}
+
+/**
+ * Copy the three picks onto the workspace row, where a cohort query can reach them.
+ *
+ * ── WHY A COPY AT ALL ────────────────────────────────────────────────────────
+ * `brand_memory.payload.intake` stays the source of truth and this is a derived
+ * index, not a second opinion. The columns exist because "how do other food
+ * businesses do" has to be a WHERE clause over 33 workspaces, and reading it
+ * out of a versioned jsonb payload means a distinct-on scan per question.
+ *
+ * ── WHY A FAILURE HERE DOES NOT FAIL THE SAVE ────────────────────────────────
+ * The Brand Brain is what the customer just spent eight screens producing. A
+ * derived copy that could destroy it on the way past would be the more serious
+ * bug by a distance, and the copy is re-derivable from the payload at any time.
+ * So the error is REPORTED and not swallowed, and the save still succeeds.
+ *
+ * The values are written as-is. They were parsed by `BrandIntakeSchema` above,
+ * and the three CHECKs on the columns refuse anything outside the lists — so a
+ * value that somehow got past both is refused by the database rather than
+ * stored, which is the outcome we want.
+ */
+async function mirrorIntakeToWorkspace(
+  supabase: ReturnType<typeof createServerSupabase>,
+  workspaceId: string,
+  intake: BrandIntake,
+): Promise<void> {
+  const { error } = await supabase
+    .from('workspaces')
+    .update({
+      business_model: intake.model,
+      regime: intake.regime,
+      locale: intake.locale,
+    })
+    .eq('id', workspaceId)
+
+  if (error) reportServerError(error, { action: 'mirrorIntakeToWorkspace', workspaceId })
 }

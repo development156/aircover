@@ -25,9 +25,22 @@ import type { Channel } from '@sahoda/shared'
  *     `'google'`, which publish accepts and unpublish REFUSES by name. A tidy
  *     unification of the four vocabularies would break either publishing or
  *     recovery, and the one it broke would depend on which map won.
- *   · **Instagram is absent from BOTH lists**, and LinkedIn and Google Business
- *     are absent from `edit`. So of this product's four channels, exactly one —
- *     X — can have a published post edited.
+ *   · **Instagram is absent from BOTH lists.** That is still true.
+ *
+ * ── CORRECTED 2026-08-26, AND THE OLD VALUE HID A REAL FEATURE ───────────────
+ * This paragraph used to read "LinkedIn and Google Business are absent from
+ * `edit`. So of this product's four channels, exactly one — X — can have a
+ * published post edited." That was true when it was written and is not true now.
+ * MEASURED against `docs.zernio.com/api/openapi`, `POST /v1/posts/{postId}/edit`,
+ * the platform enum is:
+ *
+ *   [twitter, discord, facebook, reddit, linkedin, telegram, pinterest,
+ *    googlebusiness, youtube, slack]
+ *
+ * So LinkedIn and Google Business Profile CAN be edited, and this map was
+ * refusing a capability the provider offers. A stale `null` here is not a
+ * cautious default — it renders as a missing control, and nobody goes looking
+ * for a button that was never drawn.
  *
  * A capability that does not exist is stated as absent, never rendered as a
  * control that fails when pressed.
@@ -36,11 +49,14 @@ import type { Channel } from '@sahoda/shared'
 /** Zernio's name for a channel on `POST /v1/posts/{id}/edit`. Null where unsupported. */
 const EDIT_PLATFORM: Readonly<Record<Channel, string | null>> = {
   x: 'twitter',
-  // Named in neither the enum nor the error text. Editing a LinkedIn post is a
-  // thing LinkedIn itself allows and Zernio does not expose.
-  linkedin: null,
-  gbp: null,
+  linkedin: 'linkedin',
+  // `googlebusiness`, matching the unpublish enum. Both endpoints name this
+  // channel the same way and neither accepts the publish endpoint's `google`.
+  gbp: 'googlebusiness',
+  // Still absent from the enum. Instagram's own API has no edit for a feed post.
   instagram: null,
+  facebook: 'facebook',
+  telegram: 'telegram',
 }
 
 /** Zernio's name for a channel on `POST /v1/posts/{id}/unpublish`. Null where unsupported. */
@@ -51,6 +67,10 @@ const UNPUBLISH_PLATFORM: Readonly<Record<Channel, string | null>> = {
   // channel is refused here — MEASURED, both directions.
   gbp: 'googlebusiness',
   instagram: null,
+  // Both named in the enum: [threads, facebook, twitter, linkedin, youtube,
+  // pinterest, reddit, bluesky, googlebusiness, telegram].
+  facebook: 'facebook',
+  telegram: 'telegram',
 }
 
 export type RecoveryAction = 'edit' | 'unpublish' | 'retry'

@@ -142,13 +142,21 @@ async function handleFor(workspaceId: string): Promise<string | null> {
     const supabase = createServerSupabase()
     const { data, error } = await supabase
       .from('connections')
-      .select('external_account')
+      .select('external_account, created_at')
       .eq('workspace_id', workspaceId)
       .eq('platform', 'instagram')
       .eq('status', 'active')
-      .maybeSingle()
-    if (error || data === null) return null
-    const account = (data as { external_account?: { username?: unknown } }).external_account
+      // Ordered and limited rather than `.maybeSingle()`. Two active Instagram
+      // accounts is a shape the unique index allows — it is keyed on the account
+      // id, not the platform — and `.maybeSingle()` answers a cardinality error
+      // for it, which this function's catch turned into a silent `null`. The
+      // handle then vanished from the page with nothing saying why. The first
+      // account connected is the one this platform-shaped question resolves to,
+      // matching `accountForWorkspace` in lib/zernio/scope.ts.
+      .order('created_at', { ascending: true })
+      .limit(1)
+    if (error || !data?.[0]) return null
+    const account = (data[0] as { external_account?: { username?: unknown } }).external_account
     const username = account?.username
     return typeof username === 'string' && username.trim() !== '' ? username : null
   } catch {

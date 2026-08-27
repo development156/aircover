@@ -1,95 +1,210 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { ImagePlus, Lock, Search } from 'lucide-react'
-import type { AssetKind } from '@sahoda/shared'
+import { useMemo, useRef, useState } from 'react'
+import { ImagePlus } from 'lucide-react'
+import { folderPath, isNarrowing, parseSearch, unparseRule } from '@sahoda/shared'
+import type { AssetFolder, AssetSmartFolder } from '@sahoda/shared'
 
-import { AssetFolders } from '@/components/assets/asset-folders'
-import { ASSET_FOLDERS, type FolderId } from '@/lib/assets/folders'
-import { KINDS_NOT_YET_UPLOADABLE, KINDS_WITH_UPLOAD, labelForKind } from '@/lib/assets/kind'
-import type { AssetCard } from '@/lib/assets/view'
-import { displayName, lockedSites, usageLine } from '@/lib/assets/view'
-import { formatBytes } from '@/lib/format-bytes'
-import { Drawer } from '@/components/ui/drawer'
+import { LibraryShell } from '@/components/assets/library-shell'
+import { TrashView } from '@/components/assets/trash-view'
+import { sidebarMenuRenderers } from '@/components/assets/library-sidebar-menus'
+import { readLibrarySort, writeLibrarySort } from '@/components/assets/library-sort-storage'
+import {
+  readLibraryView,
+  writeLibraryView,
+  type LibraryView,
+} from '@/components/assets/library-view-storage'
+import { resolveFolderNames, searchAnswer } from '@/components/assets/search-filter'
+import { useLibraryFiling } from '@/components/assets/use-library-filing'
+import { useLibraryShortcuts } from '@/components/assets/use-library-shortcuts'
 import { EmptyState } from '@/components/empty-state'
-import { cn } from '@/lib/utils'
-
-import { AssetDetail } from './asset-detail'
-import { AssetThumb } from './asset-thumb'
+import { ROOT, contentsAt, type LibraryLocation } from '@/lib/assets/organize-view'
+import {
+  EMPTY_SELECTION,
+  allVisibleSelected,
+  deselectVisible,
+  selectAll,
+  selectWithRange,
+  type SelectionState,
+} from '@/lib/assets/select-range'
+import { sortCards, type SortOption } from '@/lib/assets/sort-cards'
+import type { AssetCard } from '@/lib/assets/view'
 
 /**
- * The library: find the photo you already have.
+ * THE LIBRARY: find the photo you already have, or the place it is filed.
  *
- * ── WHY THE SEARCH AND FILTER ARE CLIENT-SIDE ────────────────────────────────
- * The server hands over at most `ASSET_LIST_LIMIT` rows and says so. Filtering
- * that set in the browser is instant and works on a phone with one bar of
- * signal; a round trip per keystroke would be slower and would break the moment
- * the connection did. When the cap is hit the screen says the list is capped, so
- * "no results" can never quietly mean "no results in the first 200".
+ * The founder's verdict on the build this replaces: "this folder system is
+ * very complicated and not simple". What changed: one search box instead of a
+ * rule-builder modal, folders in a left list instead of a grid of overlapping
+ * cards, and every folder action behind a small menu instead of standing
+ * controls on every tile. Nothing here adds a control back.
  *
- * ── WHAT EACH TILE SAYS, AND WHAT IT REFUSES TO SAY ──────────────────────────
- * Every tile carries its usage in words — "Not used yet", "In 2 posts", or the
- * post that locks it, named. Not one of those is computed from anything but the
- * `asset_usages` rows the server actually read. There is no "In 0 posts": a zero
- * and "nothing uses this" read the same to a person, and only one is a sentence.
- *
- * A locked file wears a padlock and the word. There is no red in this palette
- * (docs/26 §1.6) and none is wanted — the glyph and the label both survive
- * greyscale.
+ * `LibraryLocation` (owned by `organize-view.ts`) is the source of where you
+ * are. "Unfiled" is not one of its four cases, so it is carried here as a
+ * sibling boolean instead, and `goTo` / `goUnfiled` keep the two exclusive.
  */
-const ALL = 'all' as const
-/**
- * ONE selection, written by two controls.
- *
- * The folder row and the kind chips both set this. They are two views of the
- * same state rather than two filters, so they cannot disagree — picking the
- * Photos folder lights the Photos chip, and there is never a moment where the
- * page is showing one thing and labelling it another. A second filter would
- * have made "which folder am I in" unanswerable the moment both were set.
- */
-type Filter = typeof ALL | AssetKind | Exclude<FolderId, AssetKind>
-
-export function AssetLibrary({ cards, capped }: { cards: AssetCard[]; capped: boolean }) {
+export function AssetLibrary({
+  cards,
+  trashed,
+  capped,
+  folders,
+  smart,
+  droppedSmart,
+  foldersUnreadable,
+  droppedFolders,
+}: {
+  cards: AssetCard[]
+  /**
+   * Files in the trash, from their own read. NOT a subset of `cards`: the live
+   * list's SQL excludes them, so nothing here can be derived from that list.
+   */
+  trashed: AssetCard[]
+  capped: boolean
+  folders: AssetFolder[]
+  smart: AssetSmartFolder[]
+  droppedSmart: number
+  foldersUnreadable: boolean
+  droppedFolders: number
+}) {
   const [query, setQuery] = useState('')
-  const [kind, setKind] = useState<Filter>(ALL)
+  const [location, setLocation] = useState<LibraryLocation>(ROOT)
+  const [unfiledOnly, setUnfiledOnly] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [selectMode, setSelectMode] = useState(false)
+  // A SelectionState rather than a bare Set, because a shift-click needs an
+  // ANCHOR and the anchor has to live wherever the selection does or the two
+  // drift apart. `select-range.ts` owns every rule about how they move.
+  const [selection, setSelection] = useState<SelectionState>(EMPTY_SELECTION)
+  const selected = selection.selected
+  const [view, setView] = useState<LibraryView>(() => readLibraryView())
+  const [sort, setSort] = useState<SortOption>(() => readLibrarySort())
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarOpenOnPhone, setSidebarOpenOnPhone] = useState(false)
+  // F4: OFF by default. Turning it on repurposes `openId` — the SAME "which
+  // file is open" state Quick Look already tracks — to drive this panel
+  // instead of the drawer, rather than inventing a second "which file" slot
+  // the two could disagree about.
+  const [shortcutSheetOpen, setShortcutSheetOpen] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
 
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return cards.filter((card) => {
-      // A folder id and a kind id share this one slot, so the folder's own
-      // predicate is the authority — `ASSET_FOLDERS` owns what "In use" means,
-      // and restating it here is how the row and the count drift apart.
-      if (kind !== ALL) {
-        const folder = ASSET_FOLDERS.find((entry) => entry.id === kind)
-        if (folder) {
-          if (!folder.match(card)) return false
-        } else if (card.kind !== kind) return false
+  const now = useMemo(() => new Date(), [])
+  const clearSelection = () => setSelection(EMPTY_SELECTION)
+  const {
+    bulkPending,
+    bulkOutcome,
+    dismissBulkOutcome,
+    fileInto,
+    fileSingleInto,
+    removeFromCurrentFolder,
+    removeSingleFromCurrentFolder,
+    onFileDeleted,
+    trashSingle,
+    trashSelection,
+    dropIntoFolder,
+    dropFolderInto,
+  } = useLibraryFiling({
+    cards,
+    folders,
+    smart,
+    location,
+    selected,
+    clearSelection,
+    openId,
+    setOpenId,
+    setSelected: (updater: (current: Set<string>) => Set<string>) =>
+      setSelection((current) => ({ ...current, selected: updater(new Set(current.selected)) })),
+  })
+
+  function goTo(next: LibraryLocation) {
+    setLocation(next)
+    setUnfiledOnly(false)
+    clearSelection()
+    setSidebarOpenOnPhone(false)
+  }
+
+  function goUnfiled() {
+    setLocation(ROOT)
+    setUnfiledOnly(true)
+    clearSelection()
+    setSidebarOpenOnPhone(false)
+  }
+
+  function openSmartSearch(id: string) {
+    const entry = smart.find((s) => s.id === id)
+    if (entry) setQuery(entry.query.rules.map(unparseRule).join(' '))
+    goTo({ at: 'smart', id })
+  }
+
+  function setViewMode(next: LibraryView) {
+    setView(next)
+    writeLibraryView(next)
+  }
+
+  function setSortOption(next: SortOption) {
+    setSort(next)
+    writeLibrarySort(next)
+  }
+
+  useLibraryShortcuts({
+    onFocusSearch: () => searchRef.current?.focus(),
+    onEscape: () => {
+      if (query.trim() !== '') return setQuery('')
+      if (selectMode) {
+        setSelectMode(false)
+        clearSelection()
       }
-      if (needle === '') return true
-      // Searched over what a person can SEE on the tile — the name and the
-      // description they wrote. Not the storage path, which is a uuid nobody
-      // has ever typed.
-      const haystack = `${card.title ?? ''} ${card.alt ?? ''}`.toLowerCase()
-      return haystack.includes(needle)
-    })
-  }, [cards, kind, query])
+    },
+    onListView: () => setViewMode('list'),
+    onGridView: () => setViewMode('grid'),
+    // Ctrl/Cmd+A turns Select ON if it is off, then takes everything visible.
+    // Making a person find the Select button first would be a step with no
+    // purpose: pressing select-all has already said what they want.
+    onSelectAll: () => {
+      setSelectMode(true)
+      setSelection((current) => selectAll(current, visibleIds))
+    },
+    onShowShortcuts: () => setShortcutSheetOpen(true),
+  })
 
-  const open = openId === null ? null : (cards.find((card) => card.id === openId) ?? null)
+  const base = unfiledOnly
+    ? {
+        files: cards.filter((c) => c.folderIds !== null && c.folderIds.length === 0),
+        unknown: 0,
+        subfolders: [],
+      }
+    : contentsAt(location, cards, folders, smart, now, trashed)
 
-  if (cards.length === 0) {
+  const parsed = useMemo(() => parseSearch(query), [query])
+  const narrowing = isNarrowing(parsed)
+  const resolved = useMemo(
+    () => resolveFolderNames(parsed.folderNames, folders),
+    [parsed.folderNames, folders],
+  )
+
+  const matched: AssetCard[] = []
+  let searchUnknown = 0
+  for (const card of base.files) {
+    const answer = narrowing ? searchAnswer(card, parsed, resolved, now) : 'yes'
+    if (answer === 'yes') matched.push(card)
+    else if (answer === 'unknown') searchUnknown += 1
+  }
+  const unknownTotal = base.unknown + searchUnknown
+  // F3: sorting is the LAST step, after filtering and before the count below
+  // is read out — `visible.length` must still be the filtered count, which a
+  // re-order can never change.
+  const visible = useMemo(() => sortCards(matched, sort), [matched, sort])
+
+  // ── AND THE TRASH HAS TO BE REACHABLE FROM AN EMPTY LIBRARY ────────────────
+  // The trap this guard closes: delete your only photo, the live list empties,
+  // this early return replaces the whole screen with "Your library is empty",
+  // and the one control that could bring the photo back is gone with it. That
+  // would make the trash useless in the exact case a person needs it most.
+  //
+  // So an empty library with a full trash renders the LIBRARY, not the empty
+  // state — the sidebar still has Trash in it, and the grid's own empty message
+  // says the place is empty. Both statements stay true.
+  if (cards.length === 0 && trashed.length === 0) {
     return (
-      // NO action here, and the uploader is NOT rendered inside this branch.
-      //
-      // It used to be, and the first upload of a person's life then destroyed
-      // its own confirmation: the moment the library stopped being empty this
-      // whole subtree unmounted, and "Added 1 photo." went with it. The control
-      // that reports an outcome must outlive the state change it causes — the
-      // same rule the library picker follows by keeping its result outside the
-      // modal that closes.
-      //
-      // It also keeps the screen to ONE primary action (docs/26 §1.5): the
-      // uploader above is the only one, at any width.
       <EmptyState
         icon={ImagePlus}
         title="Your library is empty"
@@ -98,157 +213,157 @@ export function AssetLibrary({ cards, capped }: { cards: AssetCard[]; capped: bo
     )
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="relative flex min-w-[220px] flex-1 items-center max-narrow:min-w-0">
-          <span className="sr-only">Search your library</span>
-          <Search
-            size={15}
-            strokeWidth={1.8}
-            aria-hidden
-            className="pointer-events-none absolute left-3 text-muted"
-          />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by name or description"
-            className="h-input w-full rounded-input border border-line bg-surface pr-3 pl-9 text-[13px] text-ink placeholder:text-muted max-narrow:min-h-[44px]"
-          />
-        </label>
-      </div>
+  const currentFolderPath = location.at === 'folder' ? folderPath(folders, location.id) : []
+  const selectedCards = cards.filter((c) => selected.has(c.id))
+  const visibleIds = visible.map((card) => card.id)
+  const openCard = openId === null ? null : (cards.find((c) => c.id === openId) ?? null)
+  const insideFolderId = location.at === 'folder' && !unfiledOnly ? location.id : null
 
-      {/* Scrolls sideways rather than wrapping to three rows on a phone. */}
-      <div className="-mx-page-mobile flex gap-1.5 overflow-x-auto px-page-mobile pb-1 narrow:mx-0 narrow:flex-wrap narrow:px-0">
-        <KindChip on={kind === ALL} onClick={() => setKind(ALL)}>
-          All
-        </KindChip>
-        {KINDS_WITH_UPLOAD.map((k) => (
-          <KindChip key={k} on={kind === k} onClick={() => setKind(k)}>
-            {labelForKind(k)}
-          </KindChip>
-        ))}
-        {/* Unbuilt kinds are SPANS. A `<button disabled>` is still announced as a
-            button, so a screen reader would offer a filter that does not exist
-            and the failure would read as a broken app (docs/26 §10.2). */}
-        {KINDS_NOT_YET_UPLOADABLE.map((k) => (
-          <span
-            key={k}
-            data-inert-control
-            className="is-proposed inline-flex shrink-0 items-center rounded-pill px-3 py-[5px] text-[12.5px] font-[550] text-muted select-none max-narrow:min-h-[44px]"
-          >
-            {labelForKind(k)} · not yet
-          </span>
-        ))}
-      </div>
-
-      {/* FOLDERS SIT ABOVE THE FILES, and below the search and chips that scope
-          them — the brief's own order. `onPick` toggles: clicking the folder you
-          are already in leaves it, so the row is never a trap with no way out
-          except the All chip. */}
-      <AssetFolders
-        cards={cards}
-        active={ASSET_FOLDERS.some((folder) => folder.id === kind) ? (kind as FolderId) : null}
-        onPick={(id) => setKind((current) => (current === id ? ALL : id))}
-      />
-
-      <p className="text-[12.5px] text-muted" role="status">
-        <span className="num">{visible.length}</span>
-        {visible.length === 1 ? ' file' : ' files'}
-        {visible.length !== cards.length ? (
-          <>
-            {' of '}
-            <span className="num">{cards.length}</span>
-          </>
-        ) : null}
-        {capped ? '. Showing the most recent 200. Older files are not in this list.' : ''}
-      </p>
-
-      {visible.length === 0 ? (
-        <p className="surface-ring rounded-card bg-surface px-4 py-8 text-center text-[13px] text-muted">
-          Nothing here matches “{query.trim()}”. Try a shorter word, or clear the filter.
-        </p>
-      ) : (
-        <ul className="grid grid-cols-2 gap-3 narrow:grid-cols-3 wide:grid-cols-4">
-          {visible.map((card) => (
-            <li key={card.id}>
-              <AssetTile card={card} onOpen={() => setOpenId(card.id)} />
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <Drawer
-        open={open !== null}
-        onClose={() => setOpenId(null)}
-        title={open === null ? 'File' : displayName(open)}
-        className="text-left"
-      >
-        {open !== null ? <AssetDetail card={open} onDeleted={() => setOpenId(null)} /> : null}
-      </Drawer>
-    </div>
-  )
-}
-
-function KindChip({
-  on,
-  onClick,
-  children,
-}: {
-  on: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      className={cn(
-        'inline-flex shrink-0 items-center rounded-pill px-3 py-[5px] text-[12.5px] font-[550] transition-micro max-narrow:min-h-[44px]',
-        on
-          ? 'bg-primary text-primary-foreground'
-          : 'surface-ring-firm bg-surface text-muted hover:text-ink',
-      )}
-    >
-      {children}
-    </button>
-  )
-}
-
-/**
- * One tile. The whole tile is the control — a photo with a separate "open"
- * button beside it gives one thing two targets, and on a phone the photo is
- * what a thumb lands on.
- */
-function AssetTile({ card, onOpen }: { card: AssetCard; onOpen: () => void }) {
-  const locked = lockedSites(card).length > 0
-  const size = formatBytes(card.bytes)
+  const sidebarProps = {
+    cards,
+    folders,
+    smart,
+    now,
+    location,
+    unfiledOnly,
+    onGoTo: goTo,
+    onGoUnfiled: goUnfiled,
+    trashedCount: trashed.length,
+    onDropFiles: dropIntoFolder,
+    onMoveFolder: dropFolderInto,
+    onOpenSmart: openSmartSearch,
+    foldersUnreadable,
+    droppedFolders,
+    droppedSmart,
+    newFolderParentId: location.at === 'folder' ? location.id : null,
+    onFolderCreated: (id: string) => goTo({ at: 'folder', id, deep: false }),
+    ...sidebarMenuRenderers({
+      foldersUnreadable,
+      folders,
+      onSubfolderCreated: (id) => goTo({ at: 'folder', id, deep: false }),
+    }),
+  }
 
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="surface-ring flex w-full flex-col overflow-hidden rounded-card bg-surface text-left transition-micro hover:bg-s1"
-    >
-      <span className="relative block">
-        <AssetThumb card={card} className="aspect-[4/3] w-full" />
-        {locked ? (
-          // Over the picture, because the picture is what a thumb reaches for
-          // and the lock has to arrive before the press does.
-          <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-1 rounded-pill bg-ink px-2 py-[3px] text-[10.5px] font-[550] text-white dark:bg-white dark:text-[var(--canvas)]">
-            <Lock size={10} strokeWidth={2.2} aria-hidden />
-            In use
-          </span>
-        ) : null}
-      </span>
-
-      <span className="flex min-w-0 flex-col gap-0.5 px-2.5 py-2">
-        <span className="truncate text-[12.5px] font-[550] text-ink">{displayName(card)}</span>
-        <span className="truncate text-[11.5px] text-muted">{usageLine(card)}</span>
-        {size !== null ? <span className="num text-[11px] text-muted">{size}</span> : null}
-      </span>
-    </button>
+    <LibraryShell
+      toolbar={{
+        view,
+        onViewChange: setViewMode,
+        selectMode,
+        onToggleSelectMode: () => {
+          setSelectMode((mode) => !mode)
+          clearSelection()
+        },
+        allSelected: allVisibleSelected(selection, visibleIds),
+        onSelectAll: () =>
+          setSelection((current) =>
+            allVisibleSelected(current, visibleIds)
+              ? deselectVisible(current, visibleIds)
+              : selectAll(current, visibleIds),
+          ),
+        onOpenSidebarOnPhone: () => setSidebarOpenOnPhone(true),
+        sort,
+        onSortChange: setSortOption,
+      }}
+      search={{
+        ref: searchRef,
+        query,
+        onQueryChange: setQuery,
+        narrowing,
+        unusable: parsed.unusable,
+        unresolvedFolderNames: resolved.unresolvedNames,
+        rules: parsed.rules,
+        onSaved: openSmartSearch,
+      }}
+      sidebar={{
+        ...sidebarProps,
+        collapsed: sidebarCollapsed,
+        onToggleCollapsed: () => setSidebarCollapsed((c) => !c),
+      }}
+      content={{
+        location,
+        unfiledOnly,
+        folders,
+        smart,
+        currentFolderPath,
+        onGoTo: goTo,
+        onToggleDeep: (deep) =>
+          setLocation((current) => (current.at === 'folder' ? { ...current, deep } : current)),
+        unknownTotal,
+        query,
+        onQueryChange: setQuery,
+        view,
+        visible,
+        narrowing,
+        selectMode,
+        selected,
+        onOpen: setOpenId,
+        // `visible.map(id)` is the order AS DRAWN — filtered and sorted. A
+        // range measured over `cards` would select tiles that are not on
+        // screen, and the bulk bar's count would then exceed what a person can
+        // see.
+        onToggleSelect: (id, shift) =>
+          setSelection((current) =>
+            selectWithRange(
+              current,
+              id,
+              shift,
+              visible.map((card) => card.id),
+            ),
+          ),
+        onQuickLook: setOpenId,
+        onClearSearch: () => setQuery(''),
+        insideFolderId,
+        onFileInto: fileSingleInto,
+        onRemoveFromFolder: removeSingleFromCurrentFolder,
+        onDeleted: onFileDeleted,
+        onTrash: trashSingle,
+        bulkOutcome,
+        bulkPending,
+        onDismissBulkOutcome: dismissBulkOutcome,
+        showBulkRemove: location.at === 'folder' && !unfiledOnly,
+        onBulkFileInto: fileInto,
+        onBulkRemoveFromFolder: removeFromCurrentFolder,
+        onBulkTrash: trashSelection,
+        // Undefined outside Select mode, which is what stops `useGridNav`
+        // claiming Shift+Arrow when there is no selection to extend.
+        onExtendSelectionTo: selectMode
+          ? (index) => {
+              const id = visible[index]?.id
+              if (id === undefined) return
+              // Routed through the SAME `selectWithRange` a shift-CLICK uses, so
+              // the anchor rules cannot differ between mouse and keyboard.
+              setSelection((current) => selectWithRange(current, id, true, visibleIds))
+            }
+          : undefined,
+        onClearSelection: clearSelection,
+      }}
+      // `visible`, not `trashed`: it is the same list after the search box and
+      // the sort have been applied, so typing in the box narrows the trash
+      // exactly as it narrows the library. Handing `trashed` straight in would
+      // make the search field visibly stop working in one place.
+      trash={location.at === 'trash' ? <TrashView cards={visible} now={now} /> : null}
+      status={{
+        visibleCount: visible.length,
+        // In the trash the denominator is the TRASH's size. `cards.length` is
+        // the live library and would read as "3 of 40 files" while looking at a
+        // list of three deleted ones — a true number answering a question
+        // nobody asked, which is the same defect as a wrong one.
+        totalCount: location.at === 'trash' ? trashed.length : cards.length,
+        selectedCards,
+        capped: capped && location.at === 'all' && !unfiledOnly,
+      }}
+      overlays={{
+        sidebarOpenOnPhone,
+        onCloseSidebarOnPhone: () => setSidebarOpenOnPhone(false),
+        sidebarProps,
+        openCard,
+        onCloseDetail: () => setOpenId(null),
+      }}
+      shortcutSheet={{
+        open: shortcutSheetOpen,
+        onClose: () => setShortcutSheetOpen(false),
+      }}
+    />
   )
 }

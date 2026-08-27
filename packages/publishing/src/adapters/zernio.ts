@@ -110,6 +110,12 @@ export const ZERNIO_PLATFORM_NAME: Record<Channel, string> = {
   gbp: 'google',
   linkedin: 'linkedin',
   instagram: 'instagram',
+  // MEASURED from `/v1/connect/{platform}`, whose enum is [facebook, instagram,
+  // linkedin, twitter, tiktok, youtube, threads, reddit, pinterest, bluesky,
+  // googlebusiness, telegram, snapchat, discord, slack, whatsapp]. Both are
+  // identity here; `gbp` above is the one channel whose wire name differs.
+  facebook: 'facebook',
+  telegram: 'telegram',
 }
 
 /**
@@ -126,6 +132,10 @@ function bodyOf(content: FormattedContent): string {
     case 'gbp':
       return content.summary
     case 'instagram':
+      return content.caption
+    case 'facebook':
+      return content.text
+    case 'telegram':
       return content.caption
   }
 }
