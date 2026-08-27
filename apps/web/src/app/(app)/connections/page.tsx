@@ -2,6 +2,7 @@ import { Link2 } from 'lucide-react'
 import { ZERNIO_PLATFORMS } from '@sahoda/shared'
 
 import { ChannelTile } from '@/components/connections/channel-tile'
+import { PageTitle } from '@/components/page-title'
 import {
   ConnectionMarketplace,
   type MarketplaceSection,
@@ -11,7 +12,6 @@ import { ConnectOutcomeNotice } from '@/components/connections/connect-outcome-n
 import type { XRationMeterProps } from '@/components/connections/x-ration-meter'
 import { EmptyState } from '@/components/empty-state'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
-import { PageTitle } from '@/components/page-title'
 import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { CONNECTABLE, PLANNED } from '@/lib/connections/catalogue'
 import { readConnections, readConnectionSlots } from '@/lib/connections/read'
@@ -232,7 +232,24 @@ export default async function ConnectionsPage({
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <PageTitle sub="Connect your channels and manage where Sahoda publishes your content.">
+        {/* ── THE TRAIL, AND WHY IT IS NOT A SET OF LINKS ──────────────────
+            The reference this screen was redrawn from opens with
+            `Connections › Integrate` rather than a page title. Both segments are
+            here and neither is an anchor, because there is no
+            `/connections/integrate` route and no parent above `/connections`: the
+            first crumb would link to the page already open and the second would
+            name a page that does not exist. `PageTitle` carries the reasoning and
+            the contrast measurement behind the segment's colour. */}
+        <PageTitle
+          crumb="Integrate"
+          /* The reference reads "Browse available platforms and choose the next
+             connection to add." This screen also holds the accounts already
+             linked and the controls that disconnect them, so that sentence is
+             true of less of the page than the one it would replace. Copy rule 1:
+             a rewrite may not be true in fewer cases. This keeps the reference's
+             job — say what browsing is for — and stays true of all three groups. */
+          sub="Browse every platform Sahoda can connect, add the next one, and manage what is already linked."
+        >
           Connections
         </PageTitle>
         {/* ── THE COUNT, PROMOTED OUT OF THE GROUP HEADING ──────────────────

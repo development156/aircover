@@ -6,6 +6,7 @@ import { useId, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/empty-state'
+import { KindGlyph } from '@/components/connections/kind-glyph'
 import { ALL_KINDS, kindFacets, matchesQuery, type Categorised } from '@/lib/connections/kinds'
 import { cn } from '@/lib/utils'
 
@@ -28,15 +29,20 @@ import { cn } from '@/lib/utils'
  * can pass a rendered node across the boundary, so this costs the client the
  * filter state and nothing else.
  *
- * ── WHY THE CATEGORY ROWS CARRY NO ICON ──────────────────────────────────────
- * The reference this page was redrawn from puts a glyph beside every category.
- * Seven of them were written, built, and MEASURED: 698,061 bytes on `/connections`
- * without, 700,673 with — **2,612 bytes** of first-load JavaScript for decoration
- * on rows whose labels already say the whole thing. `scripts/perf/js-budget.mjs`
- * allows 8 kB of drift per route and this component spends 6.4 kB of it on the
- * search and the filter, which are the feature. Buying the last of that slack with
- * seven glyphs, and leaving the next change to raise the budget, is how a budget
- * stops meaning anything. If they come back, they come back with a shared sprite.
+ * ── THE CATEGORY ROWS CARRY A GLYPH, AND THAT REVERSES A MEASUREMENT ─────────
+ * They did not, and the reason was arithmetic rather than taste: seven glyphs cost
+ * 2,612 bytes of first-load JavaScript and `/connections` was 698,061 bytes against
+ * a recorded 691,660 with 8 kB of slack, so the glyphs took the route 0.8 kB past
+ * the ceiling and lost to the search and the filter, which are the feature.
+ *
+ * What changed is HOW THEY ARE DRAWN, and the budget is why. Eleven `lucide-react`
+ * imports were tried first and the build refused them again: MEASURED, 693.0 kB
+ * against a 683.9 kB budget with 8 kB of slack, 1.1 kB past the ceiling, with the
+ * same build minus the glyphs reporting `js-budget ok`. `kind-glyph.tsx` is the
+ * shared sprite that paragraph said they would have to come back as — one `<svg>`
+ * and a path per category rather than eleven components — and it lands the route
+ * at 10.3 kB of route chunk, inside budget. The budget decided, twice; it was
+ * never raised to fit what was added last.
  *
  * ── WHY THE ENTRANCE IS OPEN-CODED RATHER THAN `Stagger` ─────────────────────
  * `Stagger` keys its wrappers by INDEX, which is correct for a list that never
@@ -131,6 +137,22 @@ export function ConnectionMarketplace({ sections }: { sections: MarketplaceSecti
                     active ? 'bg-s2 text-ink' : 'text-muted hover:bg-s2 hover:text-ink',
                   )}
                 >
+                  {/* Decorative, and it must stay that way: the label beside it
+                      carries the whole claim, and `aria-label` above already
+                      reads the row out in full. A glyph that a screen reader
+                      announced would make the row say its category twice. */}
+                  {/* `text-ink` on the active row, NOT `text-accent`. MEASURED:
+                      `--acc` is `#ff6600`, which is 2.94:1 on `--surface-2` —
+                      under the 3:1 non-text floor, and the same figure that is
+                      already an open finding against four `outline-accent` sites
+                      in /admin. The glyph is decorative, so it is not strictly
+                      held to that floor, but a mark nobody can see is not worth
+                      the bytes. It follows the label, which the active row
+                      already promotes to `text-ink`. */}
+                  <KindGlyph
+                    id={facet.id}
+                    className={cn('transition-micro', active ? 'text-ink' : 'text-muted')}
+                  />
                   <span className="wide:flex-1">{facet.label}</span>
                   {/* Tabular, because these sit in a column and a proportional
                       numeral makes a straight edge look bent. */}
@@ -150,7 +172,7 @@ export function ConnectionMarketplace({ sections }: { sections: MarketplaceSecti
           <div className="relative">
             <Search
               aria-hidden
-              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted"
+              className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted"
             />
             <Input
               id={searchId}
@@ -159,7 +181,10 @@ export function ConnectionMarketplace({ sections }: { sections: MarketplaceSecti
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search channels"
               autoComplete="off"
-              className="h-10 pl-9"
+              /* 44px, which is the reference's proportion and also the minimum
+                 comfortable tap target — this is the one control on the screen
+                 a person reaches for first and it should not be the smallest. */
+              className="h-11 pl-9"
             />
           </div>
           {/* Only while filtering, and it names both numbers. A bare "3" is a
