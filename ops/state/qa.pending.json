@@ -702,6 +702,32 @@
       "summary_plain": "The unit checks ran and everything passed (473 passed).",
       "details": "Checking formatting...\nAll matched files use Prettier code style!\n      Tests  473 passed (473)",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtbbm9wn-c8d0a949",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-27T09:29:00.837Z",
+      "finished_at": "2026-08-27T09:29:00.837Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed (396 passed) for @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
+      "details": "EXIT=0\n@sahoda/jobs:test:   settlement after a crash: {\"reservationId\":\"res-2\",\"outcome\":\"could_not_check\",\"costMicros\":2600,\"costBasis\":\"measured\",\"detail\":{\"error\":\"Error: socket hang up\"}}\n@sahoda/jobs:test:       Tests  396 passed (396)",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtbbuxq7-93483b17",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-27T09:35:44.957Z",
+      "finished_at": "2026-08-27T09:35:44.957Z",
+      "suite": "unit",
+      "status": "pass",
+      "summary_plain": "The unit checks passed (1188 passed) for @sahoda/jobs ONLY — this run was filtered and does not cover the workspace.",
+      "details": "run 1 EXIT=0 @sahoda/jobs:test:       Tests  396 passed (396)\nrun 2 EXIT=0 @sahoda/jobs:test:       Tests  396 passed (396)\nrun 3 EXIT=0 @sahoda/jobs:test:       Tests  396 passed (396)",
+      "duration_ms": null
     }
   ]
 }
