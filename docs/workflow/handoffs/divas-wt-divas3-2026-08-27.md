@@ -47,6 +47,7 @@ build deleted more than it added.
 | 16 | `0238fe5` | Delete a selection, and empty the trash |
 | 17 | `6fb2796` | Arrow keys across the grid, one tab stop instead of 200 |
 | 18 | `08793aa` | Ctrl/Cmd+A, Shift+Arrow, and the shortcut sheet stops under-claiming |
+| 19 | `37b0d73` | Duplicate detection on upload |
 | 14 | `906fa59` | Handoff for the second half |
 | 15 | `76bc0c6` | **Both migrations APPLIED.** Details panel dropped. |
 
@@ -346,6 +347,19 @@ added the guard goes red and the copy has to change in the same commit.
   `unique_violation` on two root folders differing only by normalisation, and a
   trashed row left the live filter, entered the trash filter, and kept both its
   bytes (653851) and its storage path. **11 assets, all live, nothing touched.**
+- **ALL THREE MIGRATIONS ARE NOW APPLIED** to `rloztdhzfliyvpvxsgjl`, each on the
+  founder's word and each verified by reading production back rather than by
+  trusting the apply. The third, `20260827140000_assets_content_hash.sql`, went
+  in at 15:2xZ and three guards were broken inside a rolled-back `do` block:
+  `shared_hash_allowed=t` (two rows CAN share a hash, which is what keeps
+  delete-then-re-upload working and what a unique index would have broken),
+  `null_matches=0` (a pre-existing NULL hash is invisible to the lookup rather
+  than falsely reported as a duplicate), and `live=1 trashed=1` (the live-versus-
+  trashed ordering the action relies on). Post-check: **11 assets, 10 live, 1 in
+  the trash, 0 hashed rows, 0 probe rows left, 2 folders.**
+  MEASURED and worth knowing: the trash and the folders are BEING USED on the
+  preview — one asset is trashed and there are now two folders, where this
+  morning there were none and one.
 - **Every drag is jsdom-tested only.** No real pointer has driven one on this
   lane, because Playwright cannot run here. Drag and drop is exactly the kind of
   thing jsdom models loosely, so treat the browser check as outstanding.
