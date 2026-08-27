@@ -170,3 +170,8 @@ apps/web/perf-results/
 # Per-machine state — a laptop says FULL and a cloud sandbox says LOCAL_ONLY,
 # and committing either would make the other read a lie.
 .sandbox-capabilities.json
+
+# Playwright artifacts from a run started at the repo ROOT by mistake.
+# apps/web/.gitignore covers its own copy; nothing covered this one, and a
+# stray test-results/.last-run.json turned `prettier --check .` red 2026-08-27.
+test-results/

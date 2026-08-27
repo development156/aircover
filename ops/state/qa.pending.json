@@ -767,6 +767,32 @@
       "summary_plain": "The unit checks passed for ...[origin/main] ONLY \u2014 this run was filtered and does not cover the workspace.",
       "details": "TURBO_EXIT=0\nFMT_EXIT=0\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): INSERT_FAILED\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): @sahoda/billing: missing required env \u2014 SUPABASE_DB_URL\n@sahoda/web:test: [plan-week] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): MESH_ERROR\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): @sahoda/billing: missing required env \u2014 SUPABASE_DB_URL\n@sahoda/web:test: [site-generate] failed (PROVIDER_ERROR): PAGES_INSERT_FAILED\n Tasks:    18 successful, 18 total\nCached:    18 cached, 18 total",
       "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtbq5lw7-5727759b",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-27T16:15:57.461Z",
+      "finished_at": "2026-08-27T16:15:57.461Z",
+      "suite": "typecheck",
+      "status": "pass",
+      "summary_plain": "The typecheck checks passed for @sahoda/web ONLY — this run was filtered and does not cover the workspace.",
+      "details": "ok\n--- typecheck via turbo ---\n Tasks:    9 successful, 9 total\nCached:    8 cached, 9 total\n  Time:    33.579s",
+      "duration_ms": null
+    },
+    {
+      "client_id": "qa-mtbqs87b-74611d31",
+      "task_code": "SL-054",
+      "kind": "auto",
+      "actor": "claude",
+      "started_at": "2026-08-27T16:33:32.806Z",
+      "finished_at": "2026-08-27T16:33:32.806Z",
+      "suite": "smoke",
+      "status": "fail",
+      "summary_plain": "The smoke, unit checks ran together and something failed.",
+      "details": "PW_EXIT=1\n      57 |\n      58 |       for (let i = 0; i < comingSoonCount; i += 1) {\n      59 |         const tile = comingSoon.nth(i)\n        at /home/user/sahodalabs/apps/web/e2e/connections-honesty.spec.ts:56:76\n\n    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────\n    test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/test-failed-1.png\n    ────────────────────────────────────────────────────────────────────────────────────────────────\n\n    Error Context: test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/error-context.md\n\n    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────\n    test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/trace.zip\n    Usage:\n\n        pnpm exec playwright show-trace test-results/connections-honesty-connec-9878c-y-rule-holds-at-four-widths-chromium-retry1/trace.zip\n\n    ────────────────────────────────────────────────────────────────────────────────────────────────\n\n  1 failed\n    [chromium] › e2e/connections-honesty.spec.ts:31:3 › connections is honest about every channel @smoke › every rule holds, at four widths \n  2 passed (2.4m)\nundefined\n/home/user/sahodalabs/apps/web:\n[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: playwright test connections-honesty.spec.ts --grep '@smoke' '--workers=1' '--reporter=list'",
+      "duration_ms": null
     }
   ]
 }
