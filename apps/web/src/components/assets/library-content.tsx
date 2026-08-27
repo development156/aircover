@@ -44,6 +44,7 @@ export function LibraryContent({
   onRemoveFromFolder,
   onDeleted,
   onTrash,
+  onExtendSelectionTo,
   bulkOutcome,
   bulkPending,
   onDismissBulkOutcome,
@@ -77,6 +78,8 @@ export function LibraryContent({
   onRemoveFromFolder: (id: string) => void
   onDeleted: (id: string) => void
   onTrash: (id: string) => void
+  /** Shift+Arrow landed here; extend the selection to it. Undefined outside Select. */
+  onExtendSelectionTo?: (index: number) => void
   bulkOutcome: BulkOutcome | null
   bulkPending: boolean
   onDismissBulkOutcome: () => void
@@ -124,6 +127,7 @@ export function LibraryContent({
         onRemoveFromFolder={onRemoveFromFolder}
         onDeleted={onDeleted}
         onTrash={onTrash}
+        onExtendSelectionTo={onExtendSelectionTo}
       />
 
       <BulkOutcomeBanner

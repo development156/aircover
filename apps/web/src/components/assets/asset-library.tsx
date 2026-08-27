@@ -156,6 +156,13 @@ export function AssetLibrary({
     },
     onListView: () => setViewMode('list'),
     onGridView: () => setViewMode('grid'),
+    // Ctrl/Cmd+A turns Select ON if it is off, then takes everything visible.
+    // Making a person find the Select button first would be a step with no
+    // purpose: pressing select-all has already said what they want.
+    onSelectAll: () => {
+      setSelectMode(true)
+      setSelection((current) => selectAll(current, visibleIds))
+    },
     onShowShortcuts: () => setShortcutSheetOpen(true),
   })
 
@@ -318,6 +325,17 @@ export function AssetLibrary({
         onBulkFileInto: fileInto,
         onBulkRemoveFromFolder: removeFromCurrentFolder,
         onBulkTrash: trashSelection,
+        // Undefined outside Select mode, which is what stops `useGridNav`
+        // claiming Shift+Arrow when there is no selection to extend.
+        onExtendSelectionTo: selectMode
+          ? (index) => {
+              const id = visible[index]?.id
+              if (id === undefined) return
+              // Routed through the SAME `selectWithRange` a shift-CLICK uses, so
+              // the anchor rules cannot differ between mouse and keyboard.
+              setSelection((current) => selectWithRange(current, id, true, visibleIds))
+            }
+          : undefined,
         onClearSelection: clearSelection,
       }}
       // `visible`, not `trashed`: it is the same list after the search box and

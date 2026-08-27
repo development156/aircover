@@ -14,7 +14,8 @@ import { columnsFromRects, isGridKey, nextIndex } from '@/lib/assets/grid-nav'
  *
  * A roving tabindex is the standard answer and the one ARIA specifies for a
  * grid: exactly one tile is tabbable at a time, so Tab enters the grid once and
- * Tab again leaves it. Inside, the arrows move.
+ * Tab again leaves it. Inside, the arrows move, and Shift+Arrow extends the
+ * selection while Select is on.
  *
  * ── THE COLUMN COUNT IS MEASURED EVERY PRESS ─────────────────────────────────
  * Not cached, and not read off a breakpoint. The window can be resized between
@@ -23,7 +24,18 @@ import { columnsFromRects, isGridKey, nextIndex } from '@/lib/assets/grid-nav'
  * `getBoundingClientRect` is the same question the browser has already answered,
  * and it is cheap once per keypress.
  */
-export function useGridNav(count: number) {
+export function useGridNav(
+  count: number,
+  /**
+   * Called when Shift+Arrow moves the focus, with the index it landed on.
+   *
+   * Absent means Shift+Arrow is not claimed at all and falls through to the
+   * browser — which is what should happen outside Select mode, where there is no
+   * selection to extend. A key that silently does nothing is worse than a key
+   * that does what it always did.
+   */
+  onExtendTo?: (index: number) => void,
+) {
   // Which tile is TABBABLE. Not "which is focused" — focus can leave the grid
   // entirely and this has to remember where to come back to.
   const [activeIndex, setActiveIndex] = useState(0)
@@ -32,11 +44,14 @@ export function useGridNav(count: number) {
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent, index: number) => {
       if (!isGridKey(event.key)) return
-      // Modified presses belong to the browser and to this screen's own
-      // shortcuts. Shift+Arrow in particular must stay free: it is the natural
-      // spelling of "extend the selection", and claiming it here would take it
-      // away before it can be built.
-      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+      // Alt/Ctrl/Meta presses belong to the browser and to this screen's own
+      // shortcuts, always. SHIFT is claimed only when the caller passed
+      // `onExtendTo` — outside Select mode there is no selection to extend, and
+      // a key that silently does nothing is worse than one that keeps its
+      // default behaviour.
+      if (event.altKey || event.ctrlKey || event.metaKey) return
+      const extending = event.shiftKey
+      if (extending && onExtendTo === undefined) return
 
       const container = containerRef.current
       const tiles =
@@ -52,8 +67,13 @@ export function useGridNav(count: number) {
       event.preventDefault()
       setActiveIndex(next)
       tiles[next]?.focus()
+      // The selection is extended TO the tile the focus landed on, and the
+      // caller resolves that against its own anchor. This hook deliberately
+      // knows nothing about anchors: `selectWithRange` already owns every rule
+      // about how one moves, and a second copy here would be the two drifting.
+      if (extending) onExtendTo?.(next)
     },
-    [count],
+    [count, onExtendTo],
   )
 
   return {

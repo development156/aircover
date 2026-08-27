@@ -14,7 +14,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
  * that applies to a web photo library. `/` and Cmd/Ctrl+F focus search;
  * Escape clears the search or exits select mode (the caller decides which,
  * since it also has to know whether Quick Look is open); Cmd/Ctrl+1/2 switch
- * between list and grid; `?` opens the shortcut sheet (F5). There is no tab
+ * between list and grid; Cmd/Ctrl+A selects everything on screen; `?` opens the shortcut sheet (F5). There is no tab
  * strip, no split pane and no OS trash in this product, so none of those are
  * here — faking them would be a lie.
  *
@@ -27,12 +27,19 @@ export function useLibraryShortcuts({
   onEscape,
   onListView,
   onGridView,
+  onSelectAll,
   onShowShortcuts,
 }: {
   onFocusSearch: () => void
   onEscape: () => void
   onListView: () => void
   onGridView: () => void
+  /**
+   * Ctrl/Cmd+A. Turns Select on if it is off, then takes everything on screen —
+   * because a person pressing it has said what they want and making them find
+   * the Select button first would be a step with no purpose.
+   */
+  onSelectAll: () => void
   onShowShortcuts: () => void
 }) {
   useEffect(() => {
@@ -63,6 +70,14 @@ export function useLibraryShortcuts({
         onGridView()
         return
       }
+      // NOT while typing. Cmd+A in the search box selects the text in it, which
+      // is what every text field on every platform does, and stealing it would
+      // make the search box behave unlike a search box.
+      if (mod && event.key.toLowerCase() === 'a' && !isTypingTarget(event.target)) {
+        event.preventDefault()
+        onSelectAll()
+        return
+      }
       if (!mod && event.key === SHOW_SHORTCUTS_KEYS && !isTypingTarget(event.target)) {
         event.preventDefault()
         onShowShortcuts()
@@ -71,5 +86,5 @@ export function useLibraryShortcuts({
 
     window.addEventListener('keydown', handle)
     return () => window.removeEventListener('keydown', handle)
-  }, [onFocusSearch, onEscape, onListView, onGridView, onShowShortcuts])
+  }, [onFocusSearch, onEscape, onListView, onGridView, onSelectAll, onShowShortcuts])
 }
