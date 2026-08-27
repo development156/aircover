@@ -5,6 +5,11 @@ argument-hint: owner:<name> , branch:<wt-branch>
 
 Arguments: `$ARGUMENTS` — for example `owner:girija , branch: wt-girija2`.
 
+**Nothing writes a handoff except this command.** The Stop hook that used to
+write a skeleton automatically was removed on 26 August: it fired while sessions
+were mid-merge and produced conflicts in the middle of other work. Manual only
+now — if you do not run this, this session leaves no record.
+
 ## 1 · Establish owner and lane
 
 ```bash
