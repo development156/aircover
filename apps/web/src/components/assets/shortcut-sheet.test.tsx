@@ -34,6 +34,7 @@ function ShortcutHarness(props: {
   onEscape: () => void
   onListView: () => void
   onGridView: () => void
+  onSelectAll: () => void
   onShowShortcuts: () => void
 }) {
   useLibraryShortcuts(props)
@@ -72,6 +73,7 @@ describe('F5: every GLOBAL entry the sheet lists is a key the handler actually c
         onEscape={() => {}}
         onListView={() => {}}
         onGridView={() => {}}
+        onSelectAll={() => {}}
         onShowShortcuts={() => {}}
       />,
     )
@@ -90,6 +92,7 @@ describe('F5: every GLOBAL entry the sheet lists is a key the handler actually c
         onEscape={onEscape}
         onListView={() => {}}
         onGridView={() => {}}
+        onSelectAll={() => {}}
         onShowShortcuts={() => {}}
       />,
     )
@@ -107,6 +110,7 @@ describe('F5: every GLOBAL entry the sheet lists is a key the handler actually c
         onEscape={() => {}}
         onListView={onListView}
         onGridView={onGridView}
+        onSelectAll={() => {}}
         onShowShortcuts={() => {}}
       />,
     )
@@ -125,6 +129,7 @@ describe('F5: every GLOBAL entry the sheet lists is a key the handler actually c
         onEscape={() => {}}
         onListView={() => {}}
         onGridView={() => {}}
+        onSelectAll={() => {}}
         onShowShortcuts={onShowShortcuts}
       />,
     )
@@ -141,6 +146,7 @@ describe('F5: every GLOBAL entry the sheet lists is a key the handler actually c
         onEscape={() => {}}
         onListView={() => {}}
         onGridView={() => {}}
+        onSelectAll={() => {}}
         onShowShortcuts={onShowShortcuts}
       />,
     )

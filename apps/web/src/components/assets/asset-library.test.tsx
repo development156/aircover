@@ -1037,3 +1037,135 @@ describe('moving around the grid with the keyboard', () => {
     expect(tileFor('one')).toHaveFocus()
   })
 })
+
+// ── THE KEYBOARD REACHES THE SELECTION TOO ──────────────────────────────────
+describe('Ctrl/Cmd+A and Shift+Arrow', () => {
+  it('Ctrl+A turns Select on and takes everything on screen', async () => {
+    // Pressing select-all has already said what the person wants. Making them
+    // find the Select button first would be a step with no purpose.
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[card('one'), card('two')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    expect(screen.queryByRole('region', { name: 'Bulk actions' })).not.toBeInTheDocument()
+    await user.keyboard('{Control>}a{/Control}')
+
+    const bar = await screen.findByRole('region', { name: 'Bulk actions' })
+    expect(bar.textContent).toMatch(/2\s*files selected/)
+  })
+
+  it('Ctrl+A inside the search box selects the TEXT, not the library', async () => {
+    // Every text field on every platform does this, and stealing it would make
+    // the search box behave unlike a search box.
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[card('one'), card('two')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    await user.click(screen.getByRole('searchbox'))
+    await user.keyboard('{Control>}a{/Control}')
+    await settle()
+
+    expect(screen.queryByRole('region', { name: 'Bulk actions' })).not.toBeInTheDocument()
+  })
+
+  it('Shift+Arrow extends the selection while Select is on', async () => {
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[card('one'), card('two'), card('three')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    const tileFor = (name: string) =>
+      screen.getByText(`${name}.jpg`).closest('button') as HTMLElement
+
+    await user.click(screen.getByRole('button', { name: 'Select' }))
+    await user.click(tileFor('one'))
+    tileFor('one').focus()
+    await user.keyboard('{Shift>}{ArrowRight}{ArrowRight}{/Shift}')
+
+    const bar = await screen.findByRole('region', { name: 'Bulk actions' })
+    await waitFor(() => expect(bar.textContent).toMatch(/3\s*files selected/))
+  })
+
+  it('Shift+Arrow does nothing OUTSIDE Select, so the key keeps its default', async () => {
+    // There is no selection to extend there. `useGridNav` declines the key
+    // entirely rather than moving the focus and selecting nothing.
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[card('one'), card('two')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    const tileFor = (name: string) =>
+      screen.getByText(`${name}.jpg`).closest('button') as HTMLElement
+
+    tileFor('one').focus()
+    await user.keyboard('{Shift>}{ArrowRight}{/Shift}')
+    expect(tileFor('one')).toHaveFocus()
+    expect(screen.queryByRole('region', { name: 'Bulk actions' })).not.toBeInTheDocument()
+  })
+})
+
+describe('the shortcut sheet does not under-claim', () => {
+  it('lists the arrow keys, Shift+Arrow and Ctrl/Cmd+A', async () => {
+    // The sheet promises "every shortcut this screen implements". For one
+    // commit it listed neither the arrows nor Shift+Arrow, both of which
+    // worked. A sheet that is incomplete is worse than no sheet: it is read as
+    // exhaustive.
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[card('one')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    await user.keyboard('?')
+    const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByText('Arrow keys')).toBeInTheDocument()
+    expect(within(sheet).getByText('Shift+Arrow')).toBeInTheDocument()
+    expect(within(sheet).getByText('Ctrl/Cmd+A')).toBeInTheDocument()
+  })
+})

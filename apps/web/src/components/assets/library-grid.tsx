@@ -28,6 +28,7 @@ export function LibraryGrid({
   onRemoveFromFolder,
   onDeleted,
   onTrash,
+  onExtendSelectionTo,
 }: {
   view: LibraryView
   visible: readonly AssetCard[]
@@ -51,11 +52,17 @@ export function LibraryGrid({
   onDeleted: (id: string) => void
   /** Moves one file to the trash, reported in the banner with Undo. */
   onTrash: (id: string) => void
+  /**
+   * Shift+Arrow landed on this index; extend the selection to it. Undefined
+   * outside Select mode, which is what stops the hook claiming Shift+Arrow
+   * there at all.
+   */
+  onExtendSelectionTo?: (index: number) => void
 }) {
   // Declared BEFORE the empty-state return so the hook count never changes
   // between renders — the rule React enforces and the reason this is not
   // tucked inside the branch that uses it.
-  const nav = useGridNav(visible.length)
+  const nav = useGridNav(visible.length, onExtendSelectionTo)
 
   if (visible.length === 0) {
     // B6: this used to be a big bordered card holding one centred sentence —
