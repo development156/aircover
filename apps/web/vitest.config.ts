@@ -24,6 +24,33 @@ const alias = {
 
 export default defineConfig({
   test: {
+    /**
+     * CAP THE WORKERS ON A DEVELOPER MACHINE.
+     *
+     * Vitest defaults to one worker per core. On a laptop that is already
+     * running a browser and an editor, twelve workers put the box past its
+     * capacity and tests start losing races they would otherwise win.
+     *
+     * MEASURED 2026-08-27, one full run after another on the SAME commit, with
+     * load average sitting at 1.5x per core (top consumers: brave,
+     * claude-desktop — not the suite):
+     *
+     *   run 1   store.pglite            Hook timed out in 10000ms
+     *   run 2   workspace-timezone      Hook timed out in 10000ms
+     *   run 3   crop-geometry           Test timed out in 5000ms (took 5224ms)
+     *   run 4   radar/store + assets    Test timed out in 5000ms  x2
+     *
+     * A DIFFERENT file each time, every one green in isolation. That is not
+     * four flaky tests, it is one starved machine — and patching the timeout of
+     * whichever file lost the race that run is fitting the code to a broken
+     * environment. The generous per-hook budgets those suites now carry are
+     * still right (booting a Postgres is genuinely slow); this is the fix for
+     * the cause rather than the symptom.
+     *
+     * CI gets the full machine: a hosted runner is dedicated, and halving its
+     * workers would just make the gate slower for no gain.
+     */
+    maxWorkers: process.env.CI ? undefined : 4,
     projects: [
       {
         resolve: { alias },

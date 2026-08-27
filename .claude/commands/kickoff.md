@@ -11,7 +11,7 @@ Arguments: `$ARGUMENTS` — for example
 **Read, report, stop. That is the whole job.**
 
 You will see a role command in the arguments — `/lead-research`, `/lead-design`,
-`/advisor`. **Note which one it is and do not run it.** It tells you which card
+`/advisor`, `/lead-expert`. **Note which one it is and do not run it.** It tells you which card
 to read for context. It is not an instruction to begin.
 
 You will find unfinished work in the handoffs. **Do not resume it.** Listing it
@@ -36,9 +36,18 @@ session's memory under someone else's lane and nothing ever says so.
 OWNER=<from owner:>        # girija | jiban | divas
 LANE=<from branch:>        # wt-girija | wt-girija2 | wt-jiban3 | ...
 
-git config sahoda.owner "$OWNER"
-git config sahoda.lane  "$LANE"
-git config sahoda.owner && git config sahoda.lane      # VERIFY both stuck
+# A per-worktree setting SHADOWS a plain `git config` write, silently. This
+# repo has extensions.worktreeConfig on, so a plain write can read back as
+# somebody else's name — which would also disarm the push guard that keeps
+# wt-karunesh out of the shared branches.
+if [ "$(git config extensions.worktreeConfig 2>/dev/null)" = "true" ]; then
+  git config --worktree sahoda.owner "$OWNER"
+  git config --worktree sahoda.lane  "$LANE"
+else
+  git config sahoda.owner "$OWNER"
+  git config sahoda.lane  "$LANE"
+fi
+git config sahoda.owner && git config sahoda.lane      # VERIFY both READ BACK
 ```
 
 Every commit here is authored `SAHODALABS`, so git can never say whose work this
@@ -107,7 +116,7 @@ same person. Then the tail of `apps/web/REQUESTS.md` for declared scope.
 ## 5 · Read your role card, for context only
 
 Whichever role appeared in the arguments: `.claude/commands/lead-design.md`,
-`lead-research.md` or `advisor.md`. **Read it. Do not act on it.** Those cards
+`lead-research.md`, `advisor.md` or `lead-expert.md`. **Read it. Do not act on it.** Those cards
 open with "do this immediately" — that instruction is for when the founder
 invokes them directly, not now.
 
