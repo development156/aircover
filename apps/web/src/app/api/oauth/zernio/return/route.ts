@@ -11,7 +11,9 @@ import { createServerSupabase } from '@/lib/supabase/server'
 import { readActiveWorkspace } from '@/lib/workspaces'
 import { setPendingSelectionHeader } from '@/lib/connections/pending-selection'
 import { pickerCopyFor, SELECT_PATH } from '@/lib/zernio/picker-copy'
-import { nothingToPickPage, pickerPage } from '@/lib/zernio/picker-page'
+import { connectFailedPage, nothingToPickPage, pickerPage } from '@/lib/zernio/picker-page'
+import { connectFailureCopy, readConnectFailure } from '@/lib/zernio/connect-error'
+import { PLATFORM_LABELS } from '@/components/posts/channel-label'
 import { readSelectionRedirect, unresolvedSelection } from '@/lib/zernio/selection'
 import { RETURN_MODE_PARAM, RETURN_PLATFORM_PARAM } from '@/lib/zernio/return-url'
 import { zernioClient } from '@/lib/zernio/server'
@@ -323,6 +325,47 @@ export async function GET(request: Request): Promise<Response> {
     popup
       ? popupCloser(request, httpStatus, 'error', detail)
       : backError(request, httpStatus, detail)
+
+  /**
+   * ── THE PLATFORM REFUSED, AND WE USED TO THROW THAT AWAY ──────────────────
+   * Zernio's spec: "On failure every platform appends error details, starting
+   * with `error` and `platform`." This route ignores every query parameter, and
+   * that rule is right about IDS — an accountId from the browser can name
+   * somebody else's account — and wrong about this one. An error string names no
+   * resource and decides nothing; it is read here, matched against a small
+   * allowlist to choose OUR sentence, and shown with the provider's own words
+   * underneath.
+   *
+   * Dropping it is how the founder ended up reading Zernio's dashboard to find
+   * out that Google had answered `invalid_grant` — a fact we were handed and
+   * discarded, while our own screen said only that nothing had been found.
+   *
+   * FIRST, before the session is even resolved: a refusal is a refusal whether
+   * or not the workspace reads cleanly, and answering it needs nothing else.
+   */
+  const failure = readConnectFailure(params)
+  if (failure !== null) {
+    await reportServerError(
+      new Error(`zernioReturn: ${createFor ?? 'unknown'} refused — ${failure.code}`),
+      { action: 'zernioReturn' },
+    )
+    const channel = createFor === null ? 'That channel' : PLATFORM_LABELS[createFor]
+    const copy = connectFailureCopy(failure, channel)
+    const body = connectFailedPage(
+      copy,
+      failure.detail,
+      connectionsUrl(request, 'error', 'refused'),
+    )
+    // A 502: the customer's request was fine and so was ours; the platform said
+    // no. Visible to the 4xx/5xx log filter this route was rebuilt around, which
+    // is the whole reason a failure never leaves here as a success status.
+    return popup
+      ? new Response(body, {
+          status: 502,
+          headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+        })
+      : backError(request, 502, 'refused')
+  }
 
   let workspaceId: string | undefined
   try {

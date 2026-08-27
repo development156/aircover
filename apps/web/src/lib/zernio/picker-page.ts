@@ -187,3 +187,40 @@ export function nothingToPickPage(copy: PickerCopy, backHref: string): string {
     true,
   )
 }
+
+/**
+ * THE PLATFORM REFUSED, AND THIS IS WHERE THE CUSTOMER READS IT.
+ *
+ * ── WHY IT LOOKS LIKE THE EMPTY STATE ────────────────────────────────────────
+ * Same shell, same signal home, same no-script rule. It is the third way a
+ * connect can END, beside "connected" and "nothing to pick", and the founder's
+ * report is what created it: they got no usable message from us and went to
+ * Zernio's own dashboard to find out why a connect had failed.
+ *
+ * ── THE PROVIDER'S OWN WORDS ARE SECONDARY, AND ESCAPED ──────────────────────
+ * `detail` is third-party text arriving through the customer's browser. It is
+ * rendered small, under our sentence, never as the headline — a string like
+ * `token exchange failed: 400 {"error":"invalid_grant"}` is evidence for whoever
+ * reads a report, not an instruction for whoever is trying to connect. It goes
+ * through the same escaper as a Page name, for the same reason.
+ */
+export function connectFailedPage(
+  copy: { headline: string; body: string; remedy: string | null },
+  detail: string | null,
+  backHref: string,
+): string {
+  const remedy = copy.remedy ? `<p>${escapeHtml(copy.remedy)}</p>` : ''
+  const said = detail ? `<p><small>What came back: ${escapeHtml(detail)}</small></p>` : ''
+  return shell(
+    copy.headline,
+    `<h1>${escapeHtml(copy.headline)}</h1>` +
+      `<p>${escapeHtml(copy.body)}</p>` +
+      remedy +
+      said +
+      `<p><a href="${escapeHtml(backHref)}">Open Connections</a></p>`,
+    // The flow is over. Without this the Connect button sits on "Opening…"
+    // until the window is closed by hand — the defect this page's siblings were
+    // already fixed for.
+    true,
+  )
+}

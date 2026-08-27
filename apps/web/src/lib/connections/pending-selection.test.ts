@@ -62,8 +62,28 @@ describe('what the parse refuses, whole rather than in part', () => {
     // A headless connect for a platform whose second half does not exist returns
     // the customer to a route that cannot finish. Refusing here is the fail-closed
     // direction: they press Connect again and get the flow that works.
+    //
+    // ── RETARGETED 2026-08-27, AND THE OLD FIXTURE DID ITS JOB ───────────────
+    // This named `pinterest` alongside `linkedin`, and went RED the moment the
+    // Pinterest board picker shipped. That is the guard working: adding a
+    // platform to the headless path is exactly the change that must not pass
+    // unnoticed, because the half that renders the picker and the half that
+    // parses the redirect have to arrive together.
+    //
+    // `whatsapp` and `snapchat` replace it — both have a selection endpoint in
+    // Zernio's spec and neither has a picker here, so the claim is unchanged and
+    // still has live examples.
     expect(parsePendingSelection(encode({ ...VALID, platform: 'linkedin' }))).toBeNull()
-    expect(parsePendingSelection(encode({ ...VALID, platform: 'pinterest' }))).toBeNull()
+    expect(parsePendingSelection(encode({ ...VALID, platform: 'whatsapp' }))).toBeNull()
+    expect(parsePendingSelection(encode({ ...VALID, platform: 'snapchat' }))).toBeNull()
+  })
+
+  it('accepts Pinterest, whose picker now exists', () => {
+    // The other side of the same claim. Without this the test above reads as
+    // "refuse everything unusual" and would keep passing if the Pinterest picker
+    // were removed tomorrow.
+    const pin = { platform: 'pinterest' as const, state: VALID.state }
+    expect(parsePendingSelection(encode(pin))?.platform).toBe('pinterest')
   })
 
   it('refuses a profile id that is not Zernio’s shape', () => {

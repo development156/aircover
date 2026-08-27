@@ -285,6 +285,13 @@ interface RawFacebookPage {
   category?: string
 }
 
+interface RawPinterestBoard {
+  id?: string
+  name?: string
+  description?: string
+  privacy?: string
+}
+
 interface RawGbpLocation {
   id?: string
   name?: string
@@ -325,7 +332,13 @@ export interface ZernioTelegramCode {
 export type ZernioTelegramStatus =
   { status: 'pending'; expiresAt: string | null } | { status: 'connected' } | { status: 'expired' }
 
-export type ZernioSelectionPlatform = 'facebook' | 'googlebusiness'
+/**
+ * Pinterest joined on 2026-08-27 for a reason that is not "consistency": the
+ * founder photographed Zernio's own hosted board picker — "Pick a default board",
+ * Zernio's wordmark, Zernio's domain — mid-connect. That screen is the third-party
+ * brand this whole headless path exists to remove.
+ */
+export type ZernioSelectionPlatform = 'facebook' | 'googlebusiness' | 'pinterest'
 
 /** One thing the customer can pick. Flattened, so the picker renders one shape. */
 export interface ZernioConnectChoice {
@@ -678,6 +691,31 @@ export function createZernioClient(deps: ZernioClientDeps): ZernioClient {
         return { choices, hasMore: false }
       }
 
+      if (platform === 'pinterest') {
+        const { data } = await json<{ boards?: RawPinterestBoard[] }>(
+          'GET',
+          `/connect/pinterest/select-board?${qs.toString()}`,
+          'listConnectChoices',
+        )
+        const choices = (data.boards ?? []).flatMap<ZernioConnectChoice>((board) => {
+          const id = board?.id?.trim()
+          if (!id) return []
+          return [
+            {
+              id,
+              name: board.name?.trim() || id,
+              // The PRIVACY, not the description. A board's description is the
+              // customer's own prose and is often empty or a paragraph long;
+              // whether a board is public is the one fact that changes what
+              // posting to it means, and it fits on one line.
+              detail: board.privacy?.trim() ? board.privacy.trim().toLowerCase() : null,
+              ownerId: null,
+            },
+          ]
+        })
+        return { choices, hasMore: false }
+      }
+
       const { data } = await json<{ locations?: RawGbpLocation[]; hasMore?: boolean }>(
         'GET',
         `/connect/googlebusiness/locations?${qs.toString()}`,
@@ -706,6 +744,16 @@ export function createZernioClient(deps: ZernioClientDeps): ZernioClient {
           tempToken: state.tempToken,
           // Required by the schema and passed straight back as it arrived. Zernio
           // decoded it, Zernio reads it; nothing here has any business parsing it.
+          userProfile: state.userProfile,
+        })
+        return
+      }
+
+      if (platform === 'pinterest') {
+        await json<unknown>('POST', '/connect/pinterest/select-board', 'selectConnectChoice', {
+          profileId: state.profileId,
+          boardId: choice.id,
+          tempToken: state.tempToken,
           userProfile: state.userProfile,
         })
         return

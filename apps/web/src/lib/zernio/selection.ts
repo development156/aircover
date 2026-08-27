@@ -48,6 +48,14 @@ import type { ZernioPlatform } from '@sahoda/shared'
 const SELECTION: Readonly<Partial<Record<ZernioPlatform, ZernioSelectionPlatform>>> = {
   facebook: 'facebook',
   gbp: 'googlebusiness',
+  pinterest: 'pinterest',
+  // Added 2026-08-27 after the founder photographed Zernio's own board picker
+  // mid-connect: its wordmark, its domain, asking a Sahoda customer to choose a
+  // Pinterest board. That is precisely the screen this path removes.
+
+  // Added 2026-08-27 after the founder photographed Zernio's own board picker
+  // mid-connect: its wordmark, its domain, asking a Sahoda customer to choose a
+  // Pinterest board. That is precisely the screen this path removes.
 }
 
 /** Zernio's name back to ours. Built from the map above so the two cannot drift. */
@@ -77,6 +85,7 @@ export function ourPlatformFor(selection: string): ZernioPlatform | null {
 const STEPS: Readonly<Record<string, ZernioSelectionPlatform>> = {
   select_page: 'facebook',
   select_location: 'googlebusiness',
+  select_board: 'pinterest',
 }
 
 /** What a headless redirect is asking us to do, or null when it is not one. */
