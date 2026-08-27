@@ -6,6 +6,7 @@ import type { AssetFolder } from '@sahoda/shared'
 import { AssetRow } from '@/components/assets/asset-row'
 import { AssetTile } from '@/components/assets/asset-tile'
 import type { LibraryView } from '@/components/assets/library-view-storage'
+import { useGridNav } from '@/components/assets/use-grid-nav'
 import { idsForDrag } from '@/lib/assets/drag-payload'
 import type { AssetCard } from '@/lib/assets/view'
 
@@ -51,6 +52,11 @@ export function LibraryGrid({
   /** Moves one file to the trash, reported in the banner with Undo. */
   onTrash: (id: string) => void
 }) {
+  // Declared BEFORE the empty-state return so the hook count never changes
+  // between renders — the rule React enforces and the reason this is not
+  // tucked inside the branch that uses it.
+  const nav = useGridNav(visible.length)
+
   if (visible.length === 0) {
     // B6: this used to be a big bordered card holding one centred sentence —
     // exactly the "big empty card" the founder circled. There is no ring, no
@@ -86,8 +92,11 @@ export function LibraryGrid({
 
   if (view === 'list') {
     return (
-      <ul className="surface-ring flex flex-col divide-y divide-line-soft rounded-card bg-surface">
-        {visible.map((card) => (
+      <ul
+        ref={nav.containerRef as React.RefObject<HTMLUListElement>}
+        className="surface-ring flex flex-col divide-y divide-line-soft rounded-card bg-surface"
+      >
+        {visible.map((card, index) => (
           <li key={card.id}>
             <AssetRow
               card={card}
@@ -103,6 +112,7 @@ export function LibraryGrid({
               onDeleted={() => onDeleted(card.id)}
               onTrash={() => onTrash(card.id)}
               dragIds={() => idsForDrag(card.id, selected)}
+              navProps={nav.tileProps(index)}
             />
           </li>
         ))}
@@ -111,8 +121,11 @@ export function LibraryGrid({
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-3 narrow:grid-cols-3 wide:grid-cols-4">
-      {visible.map((card) => (
+    <ul
+      ref={nav.containerRef as React.RefObject<HTMLUListElement>}
+      className="grid grid-cols-2 gap-3 narrow:grid-cols-3 wide:grid-cols-4"
+    >
+      {visible.map((card, index) => (
         <li key={card.id}>
           <AssetTile
             card={card}
@@ -128,6 +141,7 @@ export function LibraryGrid({
             onDeleted={() => onDeleted(card.id)}
             onTrash={() => onTrash(card.id)}
             dragIds={() => idsForDrag(card.id, selected)}
+            navProps={nav.tileProps(index)}
           />
         </li>
       ))}
