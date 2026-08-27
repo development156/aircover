@@ -81,15 +81,43 @@ export function KeywordField({
    * the space stripped, and a duplicate would vanish mid-word. So the raw text
    * is local and the normalised list is what is stored.
    */
-  // The BOX always shows brackets, whatever gets published. They are what makes
-  // `chai in pune, monsoon` legible as two things rather than four words, and the
-  // line beneath states the published form separately — so the two never have to
-  // carry the same job.
-  const [raw, setRaw] = useState(() => normalizeKeywords(hashtags).join(' '))
+  /**
+   * ── THE BOX SHOWS WHAT WILL GO OUT ─────────────────────────────────────────
+   * It used to always show brackets whatever was published, on the reasoning
+   * that the line beneath states the published form separately. The founder read
+   * that as the box and the post disagreeing: "when the box is tiked the square
+   * bracket is applies on the above bar also". Right — a box that says `[cat]`
+   * while a post says `cat` is two answers to one question.
+   *
+   * SETTLED ON BLUR, NOT ON EVERY KEYSTROKE. Rewriting the text as it is typed
+   * moves the caret out from under the writer: `cat` would become `[c]at` on the
+   * first character. So the raw text stays raw while the field has focus, and
+   * takes its published shape the moment focus leaves or the tick box moves.
+   */
+  const settled = (list: readonly string[]): string =>
+    // Space-separated with brackets, because `[chai in pune] [monsoon]` already
+    // shows where each one ends. Comma-separated WITHOUT them, because
+    // `chai in pune monsoon` does not, and the box has to be re-readable.
+    brackets ? list.join(' ') : list.join(', ')
+
+  const [raw, setRaw] = useState(() => settled(normalizeKeywords(hashtags, brackets)))
   const tags = normalizeKeywords(parseKeywordInput(raw))
   /** What actually goes out, which is the only string the reader needs pinned. */
   const published = normalizeKeywords(parseKeywordInput(raw), brackets)
   const over = spec.maxHashtags !== undefined && tags.length > spec.maxHashtags
+
+  /**
+   * Ticking the box rewrites the box, immediately.
+   *
+   * Derived-state-during-render rather than an effect: an effect would paint the
+   * old form for a frame, and on the one control whose entire job is showing the
+   * reader what publishes, a frame of the wrong answer is the defect.
+   */
+  const [syncedBrackets, setSyncedBrackets] = useState(brackets)
+  if (brackets !== syncedBrackets) {
+    setSyncedBrackets(brackets)
+    setRaw(settled(published))
+  }
 
   // Google Business posts are local business updates. `formatForPlatform`
   // deliberately drops the tail for gbp, so a box here would collect text that is
@@ -133,6 +161,7 @@ export function KeywordField({
           // empty array would change what every reader of `extras` sees.
           onChange(next.length === 0 ? undefined : next)
         }}
+        onBlur={() => setRaw(settled(published))}
       />
       {/* SHOWS THE EXACT PUBLISHED FORM, because that is the whole question the
           founder's ruling raises. `[chai] [pune]` reaches the platform literally,
@@ -169,6 +198,20 @@ export function KeywordField({
             {brackets
               ? 'Followers see the brackets. Untick to publish the words on their own.'
               : 'Followers see the words on their own. Tick to publish them as [keyword].'}
+          </span>
+          {/* ── WHAT THE KEYWORDS DO, AND WHOSE CLAIM IT IS ──────────────────
+              The founder asked for a line here saying this "helps in boosting
+              the posts". Written as what is actually true rather than as that
+              sentence: the BRACKETS boost nothing — they are punctuation, and
+              no platform ranks on them. The KEYWORDS are the half that works,
+              because a caption carrying the words somebody searches for is a
+              caption search can match.
+
+              No number, and no promise of reach. Sahoda measures neither, and
+              "boosts your posts" is a figure no query produced. */}
+          <span className="block type-meta text-muted">
+            Keywords give people another way to find this post. The brackets only decide how they
+            look.
           </span>
         </span>
       </label>
