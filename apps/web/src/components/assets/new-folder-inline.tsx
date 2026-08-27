@@ -1,12 +1,16 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { FolderPlus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { MAX_FOLDER_NAME } from '@sahoda/shared'
 
 import { createFolder } from '@/app/actions/asset-folders'
+import { RenameForm } from '@/components/assets/menu-forms'
 
-/** "Make a folder here", inline: a button that turns into a name field. */
+/** "Make a folder here", inline: a button that turns into a name field —
+ *  the SAME `RenameForm` the folder and file menus use for their own name
+ *  fields, rather than a fourth copy of the same input-and-two-buttons
+ *  shape. */
 export function NewFolderInline({
   parentId,
   onCreated,
@@ -20,16 +24,28 @@ export function NewFolderInline({
   const [pending, startTransition] = useTransition()
 
   if (!editing) {
+    // B5: this used to carry a full-width dashed BORDER, the same shape an
+    // input takes, so it read as a field waiting for text rather than an
+    // action. It is a quiet text button now — no border, no fill — aligned
+    // with the sidebar rows above it (`h-8`, the same left inset a depth-0
+    // row uses).
     return (
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="flex w-full items-center gap-2 rounded-sm border border-dashed border-line-firm px-2.5 py-1.5 text-left type-sm font-semibold text-muted transition-micro hover:border-accent hover:text-accent"
+        style={{ paddingLeft: 10 }}
+        className="flex h-8 w-full items-center gap-2 rounded-sm text-left type-sm font-semibold text-muted transition-micro hover:bg-s2 hover:text-ink"
       >
-        <FolderPlus size={14} aria-hidden />
+        <Plus size={14} aria-hidden />
         New folder
       </button>
     )
+  }
+
+  function cancel() {
+    setEditing(false)
+    setName('')
+    setError(null)
   }
 
   function submit() {
@@ -37,53 +53,27 @@ export function NewFolderInline({
       const result = await createFolder(name, parentId)
       if (result.ok) {
         onCreated?.(result.folder.id)
-        setEditing(false)
-        setName('')
-        setError(null)
-        return
+        return cancel()
       }
       setError(result.message)
     })
   }
 
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault()
-        submit()
-      }}
-      className="surface-ring flex w-full flex-col gap-1.5 rounded-sm bg-surface p-2"
-    >
-      <input
-        autoFocus
-        value={name}
+    <div className="surface-ring rounded-sm bg-surface">
+      <RenameForm
+        id="new-folder-inline-name"
+        label="New folder"
+        name={name}
         maxLength={MAX_FOLDER_NAME}
-        onChange={(event) => setName(event.target.value)}
         placeholder="Folder name"
-        aria-label="New folder name"
-        className="h-7 w-full border-0 bg-transparent type-sm text-ink outline-none placeholder:text-muted"
+        submitLabel="Create"
+        onNameChange={setName}
+        pending={pending}
+        onCancel={cancel}
+        onSubmit={submit}
       />
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setEditing(false)
-            setName('')
-            setError(null)
-          }}
-          className="type-sm text-muted"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={pending || name.trim() === ''}
-          className="type-sm font-semibold text-accent disabled:opacity-50"
-        >
-          Create
-        </button>
-      </div>
-      {error ? <span className="type-meta text-ink-mute">{error}</span> : null}
-    </form>
+      {error ? <p className="px-1 pb-1.5 type-meta text-ink-mute">{error}</p> : null}
+    </div>
   )
 }

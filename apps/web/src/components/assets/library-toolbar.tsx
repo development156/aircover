@@ -1,16 +1,19 @@
 'use client'
 
-import { LayoutGrid, ListChecks, PanelLeft, Rows3, X } from 'lucide-react'
+import { LayoutGrid, ListChecks, PanelLeft, PanelRight, Rows3, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
+import { SortMenu } from '@/components/assets/sort-menu'
 import type { LibraryView } from '@/components/assets/library-view-storage'
+import type { SortOption } from '@/lib/assets/sort-cards'
 import { cn } from '@/lib/utils'
 
 /**
  * The strip above the grid: the search box (passed in as `children`, so this
- * file does not have to know about tokens or saved searches), grid/list, and
- * Select. On a phone the folders column is gone — `onOpenSidebarOnPhone`
- * opens it as a sheet instead of shrinking the grid to make room.
+ * file does not have to know about tokens or saved searches), Sort (F3),
+ * Details (F4), grid/list, and Select. On a phone the folders column is gone
+ * — `onOpenSidebarOnPhone` opens it as a sheet instead of shrinking the grid
+ * to make room.
  */
 export function LibraryToolbar({
   view,
@@ -18,6 +21,10 @@ export function LibraryToolbar({
   selectMode,
   onToggleSelectMode,
   onOpenSidebarOnPhone,
+  sort,
+  onSortChange,
+  detailsOpen,
+  onToggleDetails,
   children,
 }: {
   view: LibraryView
@@ -25,6 +32,10 @@ export function LibraryToolbar({
   selectMode: boolean
   onToggleSelectMode: () => void
   onOpenSidebarOnPhone: () => void
+  sort: SortOption
+  onSortChange: (next: SortOption) => void
+  detailsOpen: boolean
+  onToggleDetails: () => void
   children: React.ReactNode
 }) {
   return (
@@ -40,6 +51,20 @@ export function LibraryToolbar({
       </button>
 
       <div className="min-w-[220px] flex-1">{children}</div>
+
+      <SortMenu sort={sort} onSortChange={onSortChange} />
+
+      <button
+        type="button"
+        onClick={onToggleDetails}
+        aria-pressed={detailsOpen}
+        data-guide="assets.detailsToggle"
+        title="File details"
+        className="hidden shrink-0 items-center gap-1.5 rounded-pill bg-s2 px-3 py-1.5 type-sm font-semibold text-ink transition-micro hover:bg-s1 wide:flex"
+      >
+        <PanelRight size={14} aria-hidden />
+        Details
+      </button>
 
       <div
         role="group"

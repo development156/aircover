@@ -4,7 +4,6 @@ import {
   ChevronsLeft,
   ChevronsRight,
   CircleDashed,
-  FolderOpen,
   Images,
   Inbox,
   Layers,
@@ -14,8 +13,10 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import type { AssetFolder, AssetSmartFolder } from '@sahoda/shared'
 
+import { FolderRow } from '@/components/assets/folder-row'
 import { NewFolderInline } from '@/components/assets/new-folder-inline'
 import { SidebarRow } from '@/components/assets/library-sidebar-row'
+import type { ContextMenuTrigger } from '@/components/assets/use-context-menu-trigger'
 import { ASSET_FOLDERS, folderCounts, type FolderId } from '@/lib/assets/folders'
 import {
   contentsAt,
@@ -76,7 +77,7 @@ export function LibrarySidebar({
   droppedSmart: number
   newFolderParentId: string | null
   onFolderCreated: (id: string) => void
-  renderFolderMenu?: (folder: AssetFolder) => React.ReactNode
+  renderFolderMenu?: (folder: AssetFolder, trigger: ContextMenuTrigger) => React.ReactNode
   renderSmartMenu?: (entry: AssetSmartFolder) => React.ReactNode
   collapsed?: boolean
   onToggleCollapsed?: () => void
@@ -97,16 +98,15 @@ export function LibrarySidebar({
       const tally = folderTally(folder.id, cards, folders)
       const active = !unfiledOnly && location.at === 'folder' && location.id === folder.id
       return [
-        <SidebarRow
+        <FolderRow
           key={folder.id}
-          icon={FolderOpen}
-          label={folder.name}
-          count={tally.direct}
+          folder={folder}
+          tally={tally}
           depth={depth}
           active={active}
           collapsed={collapsed}
-          onClick={() => onGoTo({ at: 'folder', id: folder.id, deep: false })}
-          menu={renderFolderMenu ? renderFolderMenu(folder) : undefined}
+          onGoTo={onGoTo}
+          renderMenu={renderFolderMenu}
         />,
         ...folderRows(folder.id, depth + 1),
       ]
