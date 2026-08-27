@@ -6,6 +6,7 @@ import { folderPath, isNarrowing, parseSearch, unparseRule } from '@sahoda/share
 import type { AssetFolder, AssetSmartFolder } from '@sahoda/shared'
 
 import { LibraryShell } from '@/components/assets/library-shell'
+import { TrashView } from '@/components/assets/trash-view'
 import { sidebarMenuRenderers } from '@/components/assets/library-sidebar-menus'
 import { readLibrarySort, writeLibrarySort } from '@/components/assets/library-sort-storage'
 import {
@@ -36,6 +37,7 @@ import type { AssetCard } from '@/lib/assets/view'
  */
 export function AssetLibrary({
   cards,
+  trashed,
   capped,
   folders,
   smart,
@@ -44,6 +46,11 @@ export function AssetLibrary({
   droppedFolders,
 }: {
   cards: AssetCard[]
+  /**
+   * Files in the trash, from their own read. NOT a subset of `cards`: the live
+   * list's SQL excludes them, so nothing here can be derived from that list.
+   */
+  trashed: AssetCard[]
   capped: boolean
   folders: AssetFolder[]
   smart: AssetSmartFolder[]
@@ -80,6 +87,7 @@ export function AssetLibrary({
     removeFromCurrentFolder,
     removeSingleFromCurrentFolder,
     onFileDeleted,
+    trashSingle,
   } = useLibraryFiling({
     cards,
     folders,
@@ -142,7 +150,7 @@ export function AssetLibrary({
         unknown: 0,
         subfolders: [],
       }
-    : contentsAt(location, cards, folders, smart, now)
+    : contentsAt(location, cards, folders, smart, now, trashed)
 
   const parsed = useMemo(() => parseSearch(query), [query])
   const narrowing = isNarrowing(parsed)
@@ -164,7 +172,16 @@ export function AssetLibrary({
   // re-order can never change.
   const visible = useMemo(() => sortCards(matched, sort), [matched, sort])
 
-  if (cards.length === 0) {
+  // ── AND THE TRASH HAS TO BE REACHABLE FROM AN EMPTY LIBRARY ────────────────
+  // The trap this guard closes: delete your only photo, the live list empties,
+  // this early return replaces the whole screen with "Your library is empty",
+  // and the one control that could bring the photo back is gone with it. That
+  // would make the trash useless in the exact case a person needs it most.
+  //
+  // So an empty library with a full trash renders the LIBRARY, not the empty
+  // state — the sidebar still has Trash in it, and the grid's own empty message
+  // says the place is empty. Both statements stay true.
+  if (cards.length === 0 && trashed.length === 0) {
     return (
       <EmptyState
         icon={ImagePlus}
@@ -188,6 +205,7 @@ export function AssetLibrary({
     unfiledOnly,
     onGoTo: goTo,
     onGoUnfiled: goUnfiled,
+    trashedCount: trashed.length,
     onOpenSmart: openSmartSearch,
     foldersUnreadable,
     droppedFolders,
@@ -263,6 +281,7 @@ export function AssetLibrary({
         onFileInto: fileSingleInto,
         onRemoveFromFolder: removeSingleFromCurrentFolder,
         onDeleted: onFileDeleted,
+        onTrash: trashSingle,
         bulkOutcome,
         bulkPending,
         onDismissBulkOutcome: dismissBulkOutcome,
@@ -271,11 +290,20 @@ export function AssetLibrary({
         onBulkRemoveFromFolder: removeFromCurrentFolder,
         onClearSelection: clearSelection,
       }}
+      // `visible`, not `trashed`: it is the same list after the search box and
+      // the sort have been applied, so typing in the box narrows the trash
+      // exactly as it narrows the library. Handing `trashed` straight in would
+      // make the search field visibly stop working in one place.
+      trash={location.at === 'trash' ? <TrashView cards={visible} now={now} /> : null}
       detailsOpen={detailsOpen}
       details={{ card: openCard, onDeleted: () => setOpenId(null) }}
       status={{
         visibleCount: visible.length,
-        totalCount: cards.length,
+        // In the trash the denominator is the TRASH's size. `cards.length` is
+        // the live library and would read as "3 of 40 files" while looking at a
+        // list of three deleted ones — a true number answering a question
+        // nobody asked, which is the same defect as a wrong one.
+        totalCount: location.at === 'trash' ? trashed.length : cards.length,
         selectedCards,
         capped: capped && location.at === 'all' && !unfiledOnly,
       }}

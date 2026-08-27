@@ -41,6 +41,21 @@ export interface AssetCard {
    * claim about us. Nothing may render a folder from `null`.
    */
   folderIds: string[] | null
+  /**
+   * When this file was moved to the trash, or `null` for a file in the live
+   * library.
+   *
+   * REQUIRED, and mirroring the column exactly, because both values are real
+   * answers a read produced: a live card genuinely has `deleted_at = null`. That
+   * is the difference from `folderIds`, where `null` had to mean "this read did
+   * not ask" — nothing here needs a third state, because every read of a card
+   * selects `*` and therefore always knows.
+   *
+   * Nothing may infer trashed-ness from which LIST a card arrived in. The two
+   * reads are separate queries and a card handed to the wrong one would then
+   * render as the wrong thing; this field is the fact, and the list is not.
+   */
+  deletedAt: string | null
 }
 
 /** Posts using this file that would refuse a delete. */

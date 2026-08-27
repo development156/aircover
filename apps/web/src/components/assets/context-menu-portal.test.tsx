@@ -37,6 +37,7 @@ const baseProps = {
   unfiledOnly: false,
   onGoTo: () => {},
   onGoUnfiled: () => {},
+  trashedCount: 0,
   onOpenSmart: () => {},
   foldersUnreadable: false,
   droppedFolders: 0,

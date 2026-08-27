@@ -16,6 +16,7 @@ const card = (id: string, over: Partial<AssetCard> = {}): AssetCard => ({
   previewUrl: null,
   usage: [],
   folderIds: [],
+  deletedAt: null,
   ...over,
 })
 

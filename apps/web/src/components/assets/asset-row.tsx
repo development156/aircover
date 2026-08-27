@@ -45,6 +45,7 @@ export function AssetRow({
   onFileInto,
   onRemoveFromFolder,
   onDeleted,
+  onTrash,
 }: {
   card: AssetCard
   onOpen: () => void
@@ -57,11 +58,16 @@ export function AssetRow({
   onFileInto?: (folderId: string) => void
   onRemoveFromFolder?: () => void
   onDeleted?: () => void
+  onTrash?: () => void
 }) {
   const locked = lockedSites(card).length > 0
   const size = formatBytes(card.bytes)
   const trigger = useContextMenuTrigger()
-  const menuEnabled = !selectable && onFileInto !== undefined && onRemoveFromFolder !== undefined
+  const menuEnabled =
+    !selectable &&
+    onFileInto !== undefined &&
+    onRemoveFromFolder !== undefined &&
+    onTrash !== undefined
 
   return (
     <div className="group relative">
@@ -163,6 +169,7 @@ export function AssetRow({
             onFileInto={onFileInto!}
             onRemoveFromFolder={onRemoveFromFolder!}
             onDeleted={onDeleted ?? (() => {})}
+            onTrash={onTrash!}
           />
         </span>
       ) : null}

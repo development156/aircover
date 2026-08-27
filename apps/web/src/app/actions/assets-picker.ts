@@ -52,6 +52,10 @@ export async function listAssetsForPicker(): Promise<PickerRead> {
         // query, and an empty array here would state that every photo in the
         // composer is filed nowhere. `null` says we did not look.
         folderIds: null,
+        // The picker reads the LIVE library only, so nothing it returns is trashed.
+        // Stated rather than omitted: a composer that could attach a file its owner
+        // had deleted would be the whole point of the trash going wrong.
+        deletedAt: null,
         usage,
       })),
     }

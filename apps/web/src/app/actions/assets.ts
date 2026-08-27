@@ -3,7 +3,13 @@
 import { randomUUID } from 'node:crypto'
 import { auth } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
-import { AssetSchema, AssetUpdateSchema, ChannelSchema, decideAssetDelete } from '@sahoda/shared'
+import {
+  AssetSchema,
+  AssetUpdateSchema,
+  ChannelSchema,
+  decideAssetDelete,
+  describeTrash,
+} from '@sahoda/shared'
 
 import { kindForProvenMime } from '@/lib/assets/kind'
 import { readAsset } from '@/lib/assets/read'
@@ -11,6 +17,8 @@ import { offerForAsset } from '@/lib/media/offer-asset'
 import type {
   AttachAssetState,
   DeleteAssetState,
+  RestoreAssetState,
+  TrashAssetState,
   UpdateAssetState,
   UploadAssetState,
 } from '@/lib/assets/state'
@@ -212,6 +220,108 @@ export async function uploadAsset(formData: FormData): Promise<UploadAssetState>
  * whether it was allowed to; the trigger then found nothing locking the file and
  * let the delete through. See 20260820000100 for the whole account.
  */
+/**
+ * Move a file to the trash.
+ *
+ * ── ONE UPDATE, AND NOTHING ELSE HAPPENS ─────────────────────────────────────
+ * No cascade, no detach, no object removed. The row keeps its folders, its
+ * attachments and its bytes, which is the whole reason `restoreAsset` can put it
+ * back exactly where it was rather than approximately where it was.
+ *
+ * The usage read is NOT a gate here — `describeTrash` never refuses, and this
+ * action does not either. It is read so the screen can say the one thing a
+ * person cannot otherwise know: that the posts using this file go on using it.
+ * A usage read that FAILS therefore costs the sentence, not the action: the file
+ * is still trashed, `stillUsedMessage` is null, and nothing is claimed about
+ * posts nobody managed to look at. Refusing here would be the opposite mistake
+ * from `deleteAsset`'s, where refusing on an unreadable usage is the only safe
+ * answer because the act is irreversible.
+ */
+export async function trashAsset(assetId: string): Promise<TrashAssetState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to delete a file.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const read = await readAsset(assetId)
+    if (read.status === 'missing') {
+      return { ok: false, message: 'That file is not in your library.' }
+    }
+    // An unreadable usage costs the SENTENCE, never the act. See above.
+    const stillUsedMessage = read.status === 'ok' ? describeTrash(read.asset.usage).message : null
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('assets')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', assetId)
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .select('id')
+
+    if (error) return { ok: false, message: mapPostError(error) }
+    // Zero rows is not an error and not a success worth reporting differently:
+    // it means the file was already in the trash, which is where the person
+    // wanted it. `.is('deleted_at', null)` makes this idempotent rather than
+    // letting a double click overwrite the original deletion time — which would
+    // silently reset "Deleted 3 days ago" to "Deleted today".
+    if (!Array.isArray(data) || data.length === 0) {
+      return { ok: true, stillUsedMessage: null }
+    }
+
+    revalidatePath('/assets')
+    return { ok: true, stillUsedMessage }
+  } catch (error) {
+    reportServerError(error, { action: 'trashAsset', workspaceId })
+    return { ok: false, message: 'Could not move that file to the trash. Try again.' }
+  }
+}
+
+/**
+ * Take a file back out of the trash.
+ *
+ * Nothing can stand in the way, because trashing took nothing away: this clears
+ * one column. The folders it was filed in are still filed, so it reappears where
+ * it was rather than at the root.
+ */
+export async function restoreAsset(assetId: string): Promise<RestoreAssetState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to restore a file.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('assets')
+      .update({ deleted_at: null })
+      .eq('id', assetId)
+      .eq('workspace_id', workspaceId)
+      .select('id')
+
+    if (error) return { ok: false, message: mapPostError(error) }
+    if (!Array.isArray(data) || data.length === 0) {
+      // The row is gone, which after a "Delete for good" is exactly what it
+      // means. Said as what happened rather than as a generic failure, because
+      // "try again" is a remedy that cannot work on a file that no longer exists.
+      return { ok: false, message: 'That file was deleted for good, so it cannot come back.' }
+    }
+
+    revalidatePath('/assets')
+    return { ok: true }
+  } catch (error) {
+    reportServerError(error, { action: 'restoreAsset', workspaceId })
+    return { ok: false, message: 'Could not restore that file. Try again.' }
+  }
+}
+
 export async function deleteAsset(assetId: string, confirmed = false): Promise<DeleteAssetState> {
   let workspaceId: string | undefined
   try {

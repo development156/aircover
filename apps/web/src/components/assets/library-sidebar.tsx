@@ -9,6 +9,7 @@ import {
   Layers,
   Link2,
   Sparkles,
+  Trash2,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { AssetFolder, AssetSmartFolder } from '@sahoda/shared'
@@ -52,6 +53,7 @@ export function LibrarySidebar({
   onGoTo,
   onGoUnfiled,
   onOpenSmart,
+  trashedCount,
   foldersUnreadable,
   droppedFolders,
   droppedSmart,
@@ -72,6 +74,12 @@ export function LibrarySidebar({
   onGoTo: (next: LibraryLocation) => void
   onGoUnfiled: () => void
   onOpenSmart: (id: string) => void
+  /**
+   * How many files are in the trash, MEASURED from its own read rather than
+   * counted out of `cards` — the live list's SQL excludes them, so no filter
+   * over `cards` could ever produce this number.
+   */
+  trashedCount: number
   foldersUnreadable: boolean
   droppedFolders: number
   droppedSmart: number
@@ -186,6 +194,10 @@ export function LibrarySidebar({
                   folders,
                   [entry],
                   now,
+                  // A saved search never matches a trashed file: the trash is
+                  // not a place a search reaches into, and a count that
+                  // included one would send a person to a list it is not in.
+                  [],
                 )
                 return (
                   <SidebarRow
@@ -222,6 +234,19 @@ export function LibrarySidebar({
             active={unfiledOnly}
             collapsed={collapsed}
             onClick={onGoUnfiled}
+          />
+
+          {/* LAST, and after a divider, because it is the only row here that is
+              not part of the library. Everything above is somewhere your files
+              live; this is where they go when you say you do not want them. */}
+          <div className="my-1 border-t border-line-soft" />
+          <SidebarRow
+            icon={Trash2}
+            label="Trash"
+            count={trashedCount}
+            active={!unfiledOnly && location.at === 'trash'}
+            collapsed={collapsed}
+            onClick={() => onGoTo({ at: 'trash' })}
           />
         </>
       )}

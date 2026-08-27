@@ -49,6 +49,7 @@ export * from './assets/folder-tree'
 // What you type in the search box, compiled into the rules above. This is what
 // replaced the smart-folder rule builder: same engine, no modal.
 export * from './assets/search-tokens'
+export * from './assets/trash'
 export * from './publishing/constraints'
 export * from './publishing/adapter'
 export * from './publishing/schedule'
