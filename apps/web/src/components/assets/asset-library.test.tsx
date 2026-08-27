@@ -804,7 +804,13 @@ describe('the bulk bar can move a selection to the trash', () => {
     await user.click(screen.getByRole('button', { name: /Move to trash/i }))
 
     await user.click(await screen.findByRole('button', { name: 'Undo' }))
-    await waitFor(() => expect(restoreAssets).toHaveBeenCalled())
+    // A LOAD tolerance, not a weaker assertion: `restoreAssets` must still be
+    // called or this fails. MEASURED 2026-08-27: red once in three full runs of
+    // the 5,734-test suite and green every time this file ran alone, which is
+    // the signature of waitFor's 1s default expiring on a busy machine rather
+    // than of a broken handler. A gate that is randomly red is a gate people
+    // learn to skip.
+    await waitFor(() => expect(restoreAssets).toHaveBeenCalled(), { timeout: 5000 })
     expect(await screen.findByText(/Put 2 files back/)).toBeInTheDocument()
   })
 
