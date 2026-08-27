@@ -160,3 +160,54 @@ describe('search', () => {
     expect(tiles(container).length).toBe(CONNECTABLE.length + PLANNED.length)
   })
 })
+
+/**
+ * A GLYPH ON EVERY CATEGORY ROW, INCLUDING ONE NOBODY HAS DRAWN.
+ *
+ * The rail is derived from the catalogue, so the row that matters most here is
+ * the one for a category that does not exist yet: it must render whole, with a
+ * fallback glyph and a real count, rather than a gap where a drawing should be.
+ *
+ * The glyphs are `aria-hidden`, which is deliberate and is why this reads the
+ * DOM rather than the accessibility tree — the row's `aria-label` already says
+ * the category and its count, and a glyph a screen reader announced would make
+ * every row say its category twice.
+ */
+describe('the category glyphs', () => {
+  it('draws one on every row, including a category with no drawing of its own', () => {
+    render(
+      <ConnectionMarketplace
+        sections={[
+          {
+            key: 'open',
+            name: 'Connect your channels',
+            lead: 'Lead.',
+            guide: 'connections.connect_now',
+            items: [
+              {
+                id: 'invented',
+                label: 'Invented',
+                kind: 'Carrier pigeon',
+                blurb: 'A category nothing has drawn.',
+                tile: <div />,
+              },
+            ],
+          },
+        ]}
+      />,
+    )
+
+    const rail = screen.getByRole('navigation', { name: 'Connection types' })
+    const rows = within(rail).getAllByRole('button')
+    // All, plus the undrawn category. Both rows, both glyphs, no exceptions.
+    expect(rows).toHaveLength(2)
+    for (const row of rows) {
+      // COUNTED, not merely queried. `svg[aria-hidden]` was the first version of
+      // this line and it could not fail: lucide sets `aria-hidden` on every icon
+      // it renders, so the selector matched whether the prop was passed or not
+      // and deleting the glyph outright was the only mutation it could see.
+      // Counting the row's own children asserts the thing on the screen.
+      expect(row.querySelectorAll('svg')).toHaveLength(1)
+    }
+  })
+})
