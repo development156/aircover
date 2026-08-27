@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 
 import { CommitBar } from './commit-bar'
@@ -21,9 +21,8 @@ import { CommitBar } from './commit-bar'
 const props = {
   status: 'idle' as const,
   unsavedVersions: 0,
-  savingVersions: false,
-  onSaveAll: vi.fn(),
   canFinish: false,
+  onSaveDraft: vi.fn(async () => true),
 }
 
 /** The visible strip, as opposed to the always-present live region. */
@@ -47,11 +46,14 @@ describe('the commit bar shows itself only when it has something to carry', () =
   })
 
   test('a reloaded post that is idle but finishable KEEPS the bar', () => {
-    // The wrong repair would hide on `idle` alone and take "Send it" away from
-    // every post that has been reloaded — which is most of them.
+    // The wrong repair would hide on `idle` alone and strip the controls from
+    // every post that has been reloaded — which is most of them. The control it
+    // checks for is now a BUTTON labelled "Save" rather than a link labelled
+    // "Send it" (REQUESTS §33); the claim — the bar is not empty on a reloaded
+    // post — is unchanged.
     render(<CommitBar {...props} canFinish />)
     expect(visibleBar()).not.toBeNull()
-    expect(screen.getByRole('link', { name: /send it/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Save$/i })).toBeInTheDocument()
   })
 
   test('an unsaved version brings the bar back even with nowhere to finish', () => {
@@ -78,5 +80,123 @@ describe('the commit bar shows itself only when it has something to carry', () =
     render(<CommitBar {...props} status="error" />)
     expect(visibleBar()).not.toBeNull()
     expect(screen.getByText(/post not saved$/i)).toBeInTheDocument()
+  })
+})
+
+/**
+ * ── THE BAR SAVES AGAIN, AND THE LAST VERSION OF THIS BLOCK SAID IT MUST NOT ─
+ *
+ * The previous tests here asserted "carries no button of any kind". That was my
+ * reading, not a founder ruling: I had moved both endings into `SendControls` on
+ * the argument that a floating save and a distant send put the two endings to
+ * one piece of work in two places.
+ *
+ * REVERSED BY THE FOUNDER (REQUESTS §33), and the reversal is right for a reason
+ * the old argument missed: a writer three screens up a long composer should not
+ * have to travel to the end of the page to make their work safe. The split was
+ * never the problem. Two DIFFERENT save functions were.
+ *
+ * So these are retargeted rather than deleted, and what they now pin is the
+ * thing that actually went wrong before: there is ONE save, `saveAllAndWait`,
+ * and both places call it. The bar and the panel cannot disagree about what
+ * "saved" means because there is nothing for them to disagree with.
+ */
+describe('the bar commits, through the same one save the panel uses', () => {
+  test('carries a real Save as draft, not a link dressed as one', () => {
+    render(<CommitBar {...props} status="unsaved" unsavedVersions={3} canFinish />)
+
+    expect(screen.getByRole('button', { name: /Save as draft/i })).toBeInTheDocument()
+  })
+
+  test('Save as draft calls the save and does NOT move the reader', async () => {
+    // The point of having it up here. A writer mid-page wants their work
+    // written down where they are, not to be thrown to the foot of the document.
+    const onSaveDraft = vi.fn(async () => true)
+    const before = window.location.hash
+    render(
+      <CommitBar
+        {...props}
+        status="unsaved"
+        unsavedVersions={3}
+        canFinish
+        onSaveDraft={onSaveDraft}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Save as draft/i }))
+
+    await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1))
+    expect(window.location.hash).toBe(before)
+  })
+
+  /**
+   * ── "SAVE" HAS TO ACTUALLY SAVE ──────────────────────────────────────────
+   * This control was a bare `<a href="#finish">` labelled "Save and send". It
+   * saved nothing; it scrolled. The founder asked for it to read "Save", and a
+   * scroll link called Save is the vaguest possible label on the most important
+   * word on the screen — CLAUDE.md rule 1, a sentence must never become vaguer
+   * than the truth it replaces.
+   *
+   * It saves, then goes. Both halves are asserted, and the ORDER is asserted
+   * separately below, because jumping first would move the page out from under
+   * a write still in flight.
+   */
+  test('Save writes the work before it goes anywhere', async () => {
+    const onSaveDraft = vi.fn(async () => true)
+    render(
+      <CommitBar
+        {...props}
+        status="unsaved"
+        unsavedVersions={3}
+        canFinish
+        onSaveDraft={onSaveDraft}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /^Save$/i }))
+
+    await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(window.location.hash).toBe('#finish'))
+  })
+
+  test('and it does not jump while the write is still in flight', async () => {
+    // THE ORDERING GUARD. `void onSaveDraft(); jump()` looks identical on
+    // screen and loses the work of anyone who closes the tab on arrival.
+    let release: (value: boolean) => void = () => {}
+    const onSaveDraft = vi.fn(() => new Promise<boolean>((resolve) => (release = resolve)))
+    window.location.hash = ''
+    render(
+      <CommitBar
+        {...props}
+        status="unsaved"
+        unsavedVersions={3}
+        canFinish
+        onSaveDraft={onSaveDraft}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /^Save$/i }))
+    await waitFor(() => expect(onSaveDraft).toHaveBeenCalled())
+    // Still writing: the page must not have moved.
+    expect(window.location.hash).toBe('')
+
+    release(true)
+    await waitFor(() => expect(window.location.hash).toBe('#finish'))
+  })
+
+  test('offers Save as draft even with nowhere to finish', () => {
+    // No channels picked, so there is no Send it section to go to. The work
+    // still has to be saveable.
+    render(<CommitBar {...props} status="unsaved" unsavedVersions={1} canFinish={false} />)
+
+    expect(screen.getByRole('button', { name: /Save as draft/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Save$/i })).not.toBeInTheDocument()
+  })
+
+  test('still counts the unsaved versions, which is the other half of its job', () => {
+    render(<CommitBar {...props} status="unsaved" unsavedVersions={3} canFinish />)
+
+    expect(screen.getByText(/3/)).toBeInTheDocument()
+    expect(screen.getByText(/versions not saved/)).toBeInTheDocument()
   })
 })

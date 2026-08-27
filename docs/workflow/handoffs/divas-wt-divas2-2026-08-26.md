@@ -325,3 +325,176 @@ conflict open since design Session 6.
 have to learn the hard way because they wrote it down:** run `pnpm build`, not
 `pnpm exec next build`. The latter skips `js-budget.mjs` and every "gate green"
 in design Sessions 1 to 10 was missing that leg.
+
+---
+
+## Session 2 — the composer's density, and a wizard that is not coming back
+
+**Branch** `claude/divas-kickoff-03y2g2` at `c68b491`, pushed. PR
+[#15](https://github.com/development156/sahodalabs/pull/15) → `wt-core`, draft,
+subscribed. Cut level with `origin/wt-core` at `fa1790f`, then `3137bc3` landed
+under me mid-session (another lane rewrote `/kickoff` and `CLAUDE.md`'s reporting
+rules while I was measuring).
+
+**This session got a real task**, unlike Session 1: redesign `/posts/new`.
+
+### The call, and why it was already made
+
+The founder left sequence-vs-one-page to me. **One page, and the repository had
+already decided it.** `/create/post` WAS a five-step wizard (`composer.tsx:47`);
+it was deleted because it could not generate variants and because
+`version-options.tsx:50` records that it collected ONE format answer and wrote it
+to EVERY variant. `e2e/campaigns.spec.ts:104` asserts the composer has no tabs. A
+wizard is a tab strip over time.
+
+**Read the code before redesigning from a screenshot.** Every layout decision in
+that directory carries a measured justification in its own comment. The density
+is accumulated, not accidental.
+
+### What shipped
+
+`ChannelSettings` folds six per-channel settings behind one `<details>`. The kind
+of post deliberately stays out. MEASURED across all four cards at default state:
+24 controls → **19**, and 101 text-carrying elements → **80**. BOTH −21%.
+(An earlier line said 105 → 76, −28%. An adversarial audit refuted it and a
+re-measurement against genuinely pre-fold code agrees: the "before" had been
+counted on the post-fold tree. Corrected in REQUESTS §29 and docs/50.)
+
+Guarded by `channel-settings.test.tsx`, 10 tests, four mutations each watched
+going red (welded open, welded shut, collaborators by key presence, summary stops
+naming).
+
+### Two corrections, both mine
+
+1. **"Roughly forty controls" was wrong.** I wrote it into REQUESTS §29 from a
+   screenshot before measuring. The real figure is 24. Corrected in the same
+   commit, with the correction stated rather than quietly swapped. It was wrong in
+   the direction that flattered my own fix, which is the direction to distrust.
+2. **I nearly added a connection banner.** 0 credits and four "not connected"
+   chips looked like `docs/37` §16 rule 1, a blocker that should lead. It is not a
+   blocker: a writer with no connection can still write, save, template and
+   schedule. `publish-now.tsx:193` already states it at the publish button in two
+   tested sentences, and `schedule-field.tsx` at the schedule. A third statement
+   would have broken the rule I was invoking. **Nothing was added.**
+
+### A trap I walked into and the repo caught
+
+I piped the gate. `pnpm turbo … | grep` returned the PIPE's exit code — **0 while
+lint was failing.** CLAUDE.md's "never pipe the gate" is exactly this, and I read
+it earlier the same session. Re-run redirected: `GATE_EXIT=0`, 27/27, `Cached: 0`.
+
+`design-lint` then caught two hand-written font sizes in my new file on its first
+real run. Fixed to `type-sm` / `type-meta`.
+
+### Gate
+
+| leg | result |
+| --- | --- |
+| typecheck + lint + test, all packages, `--force` | **PASS** — 27/27, `Cached: 0`, exit 0 unpiped |
+| `design-lint` | **PASS** — none new |
+| `format:check` (root, outside turbo) | **PASS** |
+| Playwright `@smoke` | **UNRUN** — REQUESTS §25, Chromium's outbound 443 is reset here |
+
+**On the UNRUN leg.** The change hides controls and Playwright fails on a hidden
+control, so I checked every selector before writing: **zero tests touch the six
+folded settings.** The kind of post was left OUT of the fold precisely because
+three specs `selectOption` on it. Run the `smoke` job on `gate.yml` before merge.
+
+### What was NOT done
+
+- **No further density work.** The hashtag help line still renders per card,
+  differing only by the channel name. I left it: it is a live hint next to its own
+  control, and it changes text when tags exist. Candidate, not a defect.
+- **`wt-core` → `wt-web` still unpromoted**, still 212 ahead and a clean
+  fast-forward. Session 1's top item, untouched, because this session had a task.
+- **`cloud-setup.sh` still never ran.** No `.sahoda-setup-status`. Third session.
+- **Nothing visual was verified.** I could not see the fold in a browser.
+
+### For whoever picks this up
+
+The remaining weight on that screen is NOT in the settings. It is in the per-card
+help text, the three separate "unsaved" vocabularies `composer.tsx` deliberately
+keeps apart, and four cards restating one structure. Cutting further means
+changing what the card SAYS, and every one of those sentences is pinned by a
+shape gate. That is a copy pass with guards to move, not a layout pass.
+
+---
+
+## Session 3 — the composer research, and two rules that had never been enforced
+
+**Branch** `claude/divas-kickoff-03y2g2` at `6b7fdc0`, pushed. PR
+[#15](https://github.com/development156/sahodalabs/pull/15) → `wt-core`, draft.
+
+**The task was large and mostly research.** Four parallel Explore agents mapped
+the composer's buttons, the AI-rewrite contract, the trending-hashtag question
+adversarially, and undo/redo/emoji/studio feasibility. Written up in
+**`docs/50_Composer_Layout_Research.md`**, which is the deliverable.
+
+### The three findings that decide the feature list
+
+1. **`/(app)/posts/[id]` is 959,704 bytes, the heaviest route in the product, with
+   8 kB of slack before the Vercel build fails.** An emoji-picker library is
+   150 kB to 1.5 MB. It is impossible, and `next/dynamic` is not a way round it:
+   `js-budget.mjs:17-25` says bytes fetched after load are outside the measurement,
+   so a lazy picker passes the check while still shipping the bytes.
+2. **Trending hashtags, SEO and GEO cannot be built honestly.** No trend source,
+   no keyword data, no geographic data exists anywhere. The one honest substitute
+   is hashtag lift over the customer's OWN measured posts, which needs one
+   migration widening `marketing_observations.kind`.
+3. **A wizard is not coming back.** `/create/post` WAS one and was deleted for
+   reasons in the code; `campaigns.spec.ts:104` asserts no tabs.
+
+### What shipped
+
+| # | what | proof |
+| --- | --- | --- |
+| 1 | `PROSE_RULES` reaches content_variants and all three caption_rewrite instructions | `packages/mesh/src/prose-rules.ts`, 9 tests, 4 mutations red |
+| 2 | Third-person voice enforced for the first time | `apps/web/src/lib/copy/sahoda-voice.ts`, 12 tests, 4 mutations red |
+| 3 | One first-person stray fixed | `inline-rewrite.tsx:145` |
+
+**The dash rule is NOT "never emit a hyphen".** The founder asked for that
+literally; `CLAUDE.md` rules the hyphen stays because removing it breaks English,
+and a caption is where that bites. What is banned is the dash as PUNCTUATION.
+Every test proving a dash is caught has a partner proving a hyphen is not.
+
+**The voice guard found FIVE more strays than it was written for**, across two
+files in `onboarding/stage/`, and they are a coherent first-person mascot voice
+rather than typos. (An earlier line in this session said SIX. That came from a
+grep, not from the detector; the detector is the thing that decides and it says
+five: four in `result-step.tsx`, one in `what-step.tsx`.) QUARANTINED with the reason beside them, plus a test asserting the
+quarantine still holds real strays so it cannot become a silent pass. **Needs a
+founder ruling**: either onboarding moves to third person, or `CLAUDE.md` gains a
+stated exception.
+
+**A mutation caught a blind spot in my own guard.** Removing HTML-entity support
+left the whole suite green, because the unit cases used the character forms and
+the only entity occurrences were quarantined. Pinned now.
+
+### Gate
+
+| leg | result |
+| --- | --- |
+| typecheck + lint + test, all packages | **PASS** — 27/27, exit 0, unpiped. Both changed packages were cache MISSES, verified in the log |
+| `design-lint` | **PASS** — it flagged `&#8217;` as a raw hex colour, a false positive on an HTML numeric entity. Pattern rewritten as `&#\d+;`, which is also a wider net |
+| `format:check` (root) | **PASS** |
+| Playwright `@smoke` | **UNRUN** — REQUESTS §25 |
+
+### What was NOT done, and why
+
+- **No layout change.** The empty gap on the left column is a grid row-stretch and
+  its mechanism is written up in docs/50 §2, but a CSS fix cannot be verified in
+  this sandbox and I will not push one blind.
+- **No new buttons.** Clear, undo/redo, emoji, the improve modes and the
+  Schedule/Post split are all specified in docs/50 §8 with their file lists. Undo
+  and redo in particular is six integration points, not a button (§5).
+- **No GitHub skills downloaded.** Pulling third-party code into a production repo
+  is a supply-chain act needing the founder's approval, not a drive-by.
+- **The `[keyword]` format needs a ruling first** — internal annotation stripped
+  before publishing, or literal text? Different features (docs/50 §6.3).
+
+### Still true from Session 2
+
+**CI has not run on ANY branch since 11:08Z.** REQUESTS §30. Median run duration
+4 seconds, no runner assigned. Every lane's red tick is meaningless until the
+GitHub Actions billing is settled. The only real evidence is `pnpm gate` locally,
+unpiped, with its `Cached:` count stated.

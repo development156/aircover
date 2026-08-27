@@ -14,8 +14,21 @@ const state = vi.hoisted(() => ({
   ] as Record<string, unknown>[],
   /** Per-platform accounts. Null means "same list for every platform". */
   accountsByPlatform: null as Record<string, Record<string, unknown>[]> | null,
-  /** Platforms whose `reconcileAccounts` call rejects — a READ failure, not a write one. */
-  readThrowsFor: [] as string[],
+  /**
+   * Does the ONE account read fail?
+   *
+   * ── THIS WAS A PER-PLATFORM LIST AND CANNOT BE ONE ANY MORE ───────────────
+   * `readThrowsFor: string[]` let a test fail linkedin's read while instagram's
+   * succeeded, because the route made one request PER PLATFORM. It now makes a
+   * single `listAccounts` call and filters the result thirteen ways — one
+   * request, so exactly one thing to fail, and when it fails every platform is
+   * genuinely unreadable.
+   *
+   * A boolean is the honest shape. Keeping the array would let tests describe a
+   * partial read that the route can no longer produce, which is a fixture
+   * asserting a fiction.
+   */
+  readThrows: false,
   rpcError: null as { message: string } | null,
   /** Per-platform write results. Null means `rpcError` applies to all of them. */
   rpcErrorByPlatform: null as Record<string, { message: string } | null> | null,
@@ -34,6 +47,26 @@ const state = vi.hoisted(() => ({
   limitCalls: [] as number[],
   /** Every upsert the route actually ATTEMPTED, as `platform:accountId`. */
   rpcCalls: [] as string[],
+  /**
+   * What the customer pressed Connect on, as the start route recorded it.
+   *
+   * Defaults to a roomy `instagram` press so every test written before the
+   * create-scoping existed still exercises the path it was written for — the same
+   * move `limitVerdict` above makes. `null` is the replayed-URL case.
+   */
+  pending: { platform: 'instagram', mode: 'redirect' } as {
+    platform: string
+    mode: string
+  } | null,
+  /** What Zernio says the customer may pick, for the half-finished connects. */
+  choices: [
+    { id: '111222333', name: 'Chai & Chapters', detail: 'Bookshop', ownerId: null },
+    { id: '444555666', name: 'Chai & Chapters Kolkata', detail: null, ownerId: null },
+  ] as { id: string; name: string; detail: string | null; ownerId: string | null }[],
+  choicesHasMore: false,
+  choicesThrow: false,
+  /** Every (platform, id) pair the route committed. */
+  selectCalls: [] as string[],
 }))
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -43,8 +76,58 @@ vi.mock('@clerk/nextjs/server', () => ({
   },
 }))
 
+/**
+ * ── THE CLIENT NOW HAS A REAL METHOD, BECAUSE THE ROUTE CALLS ONE ───────────
+ * It was `{}`. The route used to reach Zernio only through `reconcileAccounts`,
+ * which this file mocked wholesale, so an empty object was enough. The route now
+ * fetches the account list ITSELF, once, and filters it thirteen ways — so
+ * `listAccounts` has to exist and has to answer in ZERNIO'S SHAPE: `_id`, and a
+ * `platform` spelled the way Zernio spells it.
+ *
+ * That shape is what makes the vocabulary guard real rather than notional. The
+ * fixtures below are written in our vocabulary and translated on the way out, so
+ * a route that asked for `x` instead of `twitter` genuinely finds nothing here,
+ * exactly as it genuinely found nothing in production.
+ */
+const ZERNIO_NAME: Record<string, string> = { x: 'twitter', gbp: 'googlebusiness' }
+
 vi.mock('@/lib/zernio/server', () => ({
-  zernioClient: () => (state.clientPresent ? {} : null),
+  zernioClient: () =>
+    state.clientPresent
+      ? {
+          listConnectChoices: () => {
+            if (state.choicesThrow) return Promise.reject(new Error('list failed'))
+            return Promise.resolve({ choices: state.choices, hasMore: state.choicesHasMore })
+          },
+          selectConnectChoice: (platform: string, _state: unknown, choice: { id: string }) => {
+            state.selectCalls.push(`${platform}:${choice.id}`)
+            return Promise.resolve()
+          },
+          listAccounts: () => {
+            // ONE read for every platform, so ONE way for it to fail. See the
+            // note on `readThrows`.
+            if (state.readThrows) return Promise.reject(new Error('listAccounts failed'))
+            return Promise.resolve(
+              MOCK_PLATFORMS.flatMap((ours) => {
+                // A per-platform fixture is EXHAUSTIVE: a platform it does not
+                // mention has no accounts. It used to fall through to the default
+                // list, which was invisible while the fixture named every platform
+                // there was — and became wrong the moment a third one existed.
+                const per = state.accountsByPlatform
+                const list = per ? (per[ours] ?? []) : state.accounts
+                return list.map((a) => ({
+                  _id: (a as { accountId?: string }).accountId,
+                  platform: ZERNIO_NAME[ours] ?? ours,
+                  // Fixtures written before the profile filter mattered omit it.
+                  // Defaulting to the workspace's own profile keeps them meaning
+                  // what they meant; a test about the tenant boundary sets it.
+                  profileId: (a as { profileId?: string }).profileId ?? state.mapping?.profile_id,
+                }))
+              }),
+            )
+          },
+        }
+      : null,
 }))
 
 vi.mock('@/lib/workspaces', () => ({
@@ -69,18 +152,59 @@ vi.mock('@/lib/workspaces', () => ({
 
 vi.mock('@/lib/observability/report', () => ({ reportServerError: () => Promise.resolve() }))
 
+/**
+ * ── THIS MOCK IS KEYED ON ZERNIO'S NAME, AND THAT IS THE POINT ──────────────
+ * It read `args.platform` and the real function's parameter is now
+ * `zernioPlatform`, so the rename turned every lookup into `undefined` and eight
+ * tests went red. That is the mock doing its job: it proves the route's argument
+ * is genuinely exercised here rather than passed into a black hole.
+ *
+ * The fixture keys stay OUR ids because the tests are written in our vocabulary,
+ * so the mock translates on the way in — the same direction the route does, and
+ * `askedFor` below records what it was actually handed so a test can check it.
+ */
 vi.mock('@sahoda/publishing', () => ({
-  reconcileAccounts: (_client: unknown, args: { platform: string }) => {
-    if (state.readThrowsFor.includes(args.platform)) {
-      return Promise.reject(new Error(`listAccounts failed for ${args.platform}`))
-    }
-    return Promise.resolve(state.accountsByPlatform?.[args.platform] ?? state.accounts)
-  },
+  /**
+   * A FAITHFUL REIMPLEMENTATION, not a lookup table. The real function filters
+   * `account.platform === args.zernioPlatform` and then re-checks the profile,
+   * and both filters are the thing under test here: the first is what made a
+   * live X connect invisible, the second is the tenant boundary.
+   *
+   * Written out rather than keyed off a fixture map on purpose. A mock that
+   * returned "whatever was asked for" would pass whichever spelling the route
+   * used, which is precisely the blind spot that let the bug ship.
+   */
+  reconcileFromAccounts: (
+    accounts: { _id: string; platform: string; profileId: string }[],
+    args: { profileId: string; zernioPlatform: string },
+  ) =>
+    accounts
+      .filter((a) => a.platform === args.zernioPlatform)
+      .filter((a) => a.profileId === args.profileId)
+      .map((a) => ({
+        accountId: a._id,
+        profileId: args.profileId,
+        username: null,
+        needsReconnection: false,
+        platformStatus: null,
+        tokenExpiresAt: null,
+      })),
 }))
-
 // TWO platforms, not one. A partial outcome cannot exist in a one-platform world,
 // so the old single-entry mock could not have caught the collapse this file now pins.
-vi.mock('@sahoda/shared', () => ({ ZERNIO_PLATFORMS: ['instagram', 'linkedin'] }))
+// THREE platforms, and the third is load-bearing. It was `['instagram','linkedin']`
+// — the only two channels whose id is identical to Zernio's name — so this file
+// could not have caught a route that passed OUR id to `reconcileAccounts`. It
+// didn't, and a customer's real X connect vanished because of it. `x` is here so
+// the vocabulary gap sits INSIDE the fixture rather than outside it.
+// `isZernioPlatform`
+// is derived from the same short list rather than restated — a mock that answered
+// `true` for everything would make the allowlist test pass without an allowlist.
+const MOCK_PLATFORMS = ['instagram', 'linkedin', 'x']
+vi.mock('@sahoda/shared', () => ({
+  ZERNIO_PLATFORMS: MOCK_PLATFORMS,
+  isZernioPlatform: (value: unknown) => MOCK_PLATFORMS.includes(value as string),
+}))
 
 // The connection count and the plan verdict are mocked as SEAMS, not simulated
 // through the supabase mock: this file is about what the route does with an answer,
@@ -88,6 +212,14 @@ vi.mock('@sahoda/shared', () => ({ ZERNIO_PLATFORMS: ['instagram', 'linkedin'] }
 vi.mock('@/lib/connections/read', () => ({
   connectionKey: (platform: string, accountId: string) => `${platform}:${accountId}`,
   readConnectionSlots: () => Promise.resolve(state.slots),
+}))
+
+// A SEAM, like the slot count and the plan verdict beside it. What the cookie
+// looks like on the wire is `pending-connect.test.ts`'s job; this file is about
+// what the ROUTE does with the answer.
+vi.mock('@/lib/connections/pending-connect', () => ({
+  CLEAR_PENDING_CONNECT: 'sahoda_connect=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+  readPendingConnect: () => Promise.resolve(state.pending),
 }))
 
 vi.mock('@/lib/billing/entitlements', () => ({
@@ -133,7 +265,7 @@ beforeEach(() => {
     { accountId: '6a75caf7d0fe733d1afcc1f4', profileId: '6a75cae32853ee463c6419d6' },
   ]
   state.accountsByPlatform = null
-  state.readThrowsFor = []
+  state.readThrows = false
   state.rpcError = null
   state.rpcErrorByPlatform = null
   state.throwOnAuth = false
@@ -141,6 +273,14 @@ beforeEach(() => {
   state.limitVerdict = { kind: 'allowed', limit: 8 }
   state.limitCalls = []
   state.rpcCalls = []
+  state.pending = { platform: 'instagram', mode: 'redirect' }
+  state.choices = [
+    { id: '111222333', name: 'Chai & Chapters', detail: 'Bookshop', ownerId: null },
+    { id: '444555666', name: 'Chai & Chapters Kolkata', detail: null, ownerId: null },
+  ]
+  state.choicesHasMore = false
+  state.choicesThrow = false
+  state.selectCalls = []
 })
 
 /**
@@ -164,6 +304,21 @@ beforeEach(() => {
  * account are byte-identical afterwards.
  */
 describe('a partial connect is reported as partial, never as connected', () => {
+  /**
+   * RETARGETED, not weakened. Every test below drives a trip that touches TWO
+   * platforms, and a single press of Connect now only ever CREATES a row for the
+   * platform it named — so a two-platform trip is a trip that REFRESHES two rows
+   * this workspace already holds. That is a real and common trip (it is what the
+   * self-heal was always about), and the guarantee under test is unchanged: one
+   * platform succeeding must never be reported as though both did.
+   */
+  beforeEach(() => {
+    state.slots = {
+      count: 2,
+      keys: new Set(['instagram:6a75caf7d0fe733d1afcc1f4', 'linkedin:6a75caf7d0fe733d1afcc1f4']),
+    }
+  })
+
   it('one platform records and another fails to write', async () => {
     state.rpcErrorByPlatform = { instagram: null, linkedin: { message: 'denied' } }
 
@@ -175,22 +330,38 @@ describe('a partial connect is reported as partial, never as connected', () => {
     expect(res.headers.get('location')).toContain('zernio=partial')
   })
 
-  it('one platform cannot be read at all, and the others still record', async () => {
-    state.readThrowsFor = ['linkedin']
+  it('a failed read is all-or-nothing now, and says so', async () => {
+    // RETARGETED. This asserted "one platform cannot be read at all, and the
+    // others still record" — a partial READ. The route made one request per
+    // platform then, so that state existed. It now makes a SINGLE
+    // `listAccounts` call and filters the result, because thirteen identical
+    // requests per connect was burning a 60-per-minute rate limit.
+    //
+    // So there is one read and one way for it to fail, and when it fails no
+    // platform was read. Asserting the old partial would be asserting a state
+    // the route can no longer reach. The claim that survives is the important
+    // one: a read that failed is never reported as a read that found nothing.
+    state.readThrows = true
 
     const res = await call()
 
     expect(res.status).not.toBe(303)
-    expect(res.headers.get('location')).toContain('zernio=partial')
+    expect(res.headers.get('location')).toContain('zernio=error')
+    expect(res.headers.get('location')).toContain('reason=read')
+    expect(res.headers.get('location')).not.toContain('zernio=nothing')
   })
 
-  it('a read failure no longer discards the platforms that read fine', async () => {
-    // The `Promise.all` version threw here, so the instagram account that WAS read
-    // never reached upsert_zernio_connection at all.
-    state.readThrowsFor = ['linkedin']
+  it('a failed read writes nothing at all, rather than half of something', async () => {
+    // The other half of the same guarantee, and the one with a customer cost:
+    // the old `Promise.all` threw on the first rejection and discarded accounts
+    // that had already been read successfully. Nothing is read now, so nothing
+    // is written — and `reason=unexpected`, the generic outcome that failure
+    // used to hide behind, must not appear.
+    state.readThrows = true
 
     const res = await call()
 
+    expect(state.rpcCalls).toEqual([])
     expect(res.headers.get('location')).not.toContain('reason=unexpected')
   })
 
@@ -199,17 +370,31 @@ describe('a partial connect is reported as partial, never as connected', () => {
     // platform answers with no accounts, another cannot be read at all. No write is
     // ever attempted, so `written` is 0 — and reporting that as "every write failed"
     // would name the wrong thing entirely.
-    state.accountsByPlatform = { instagram: [], linkedin: [] }
-    state.readThrowsFor = ['linkedin']
+    //
+    // RETARGETED off a read failure and onto the PLAN LIMIT, which is the other
+    // path to the same state and the one that still exists. A read failure can
+    // no longer be partial (see above), but a plan with no headroom still leaves
+    // `accounts.length > 0` while `attempted` stays 0 — exactly the condition
+    // `written === 0 && attempted > 0` was written to distinguish.
+    state.slots = { count: 2, keys: new Set() }
+    state.limitVerdict = { kind: 'blocked', sentence: 'Your Free plan includes 2 channels.' }
 
     const res = await call()
 
-    expect(res.headers.get('location')).toContain('zernio=partial')
+    // Not "every write failed". No write was ever attempted.
     expect(res.headers.get('location')).not.toContain('reason=write')
+    expect(res.headers.get('location')).toContain('zernio=limit')
+    expect(state.rpcCalls).toEqual([])
   })
 
   it('every read failing is a real failure, not "nothing"', async () => {
-    state.readThrowsFor = ['instagram', 'linkedin']
+    // DERIVED, not the two names it used to list. The claim is "EVERY read
+    // failed", and spelling that as a literal pair meant adding a third platform
+    // to the fixture silently turned this into "two of three failed" — which is
+    // the `partial` path, not this one. The assertion below still passed for
+    // three of the four tests that had the same literal, which is exactly how a
+    // stale list survives.
+    state.readThrows = true
 
     const res = await call()
 
@@ -363,6 +548,9 @@ describe('real outcomes keep their 303', () => {
 describe('the channels plan limit', () => {
   const IG = 'instagram:6a75caf7d0fe733d1afcc1f4'
   const LI = 'linkedin:6a75caf7d0fe733d1afcc1f4'
+  /** Two DIFFERENT Instagram accounts — two rows, two slots, one channel. */
+  const IG_A = '6a75caf7d0fe733d1afcc1f4'
+  const IG_B = '6a75cb0be1ff844e2bfdd205'
 
   it('a full plan writes nothing new and says the plan is full — not that it failed', async () => {
     state.slots = { count: 2, keys: new Set() }
@@ -381,6 +569,15 @@ describe('the channels plan limit', () => {
 
   it('admits up to the limit and reports the remainder, rather than all-or-nothing', async () => {
     // Room for exactly one more; Zernio returns two new accounts.
+    //
+    // RETARGETED to two accounts on ONE platform, which is both what a single
+    // press can now create and the case this screen was rebuilt for: a slot holds
+    // an ACCOUNT, so two Instagram accounts draw two slots. The partition being
+    // tested — admit up to the headroom, report the rest — is unchanged.
+    state.accountsByPlatform = {
+      instagram: [{ accountId: IG_A }, { accountId: IG_B }],
+      linkedin: [],
+    }
     state.slots = { count: 1, keys: new Set() }
     state.limitVerdict = { kind: 'allowed', limit: 2 }
 
@@ -435,6 +632,12 @@ describe('the channels plan limit', () => {
   })
 
   it('a plan with room is invisible: every account is still recorded', async () => {
+    // Two Instagram accounts, both new, plenty of room. Retargeted onto one
+    // platform for the reason given above.
+    state.accountsByPlatform = {
+      instagram: [{ accountId: IG_A }, { accountId: IG_B }],
+      linkedin: [],
+    }
     state.slots = { count: 0, keys: new Set() }
     state.limitVerdict = { kind: 'allowed', limit: 8 }
 
@@ -445,10 +648,390 @@ describe('the channels plan limit', () => {
   })
 })
 
-describe('the query string is still ignored wholesale', () => {
+/**
+ * THE DISCONNECT THAT WOULD NOT STICK.
+ *
+ * Reported as "when you disconnect and connect again the other platforms get
+ * connected automatically". The mechanism, in four steps:
+ *
+ *   1. the customer disconnects LinkedIn — `disconnectConnection` deletes our row
+ *   2. Zernio still holds that account. There is no removal endpoint wired, and
+ *      the client in packages/publishing exposes no method that could call one
+ *   3. the customer connects Instagram
+ *   4. this route asked Zernio for EVERY platform and wrote back everything it
+ *      found, so LinkedIn reappeared, connected, having been deliberately removed
+ *
+ * The rule that closes it: a row is only ever CREATED for the platform the
+ * customer pressed. Refreshing rows we already hold is untouched, so the
+ * self-heal this route was built around still works.
+ */
+describe('a connect only ever creates a row for the platform that was pressed', () => {
+  const IG_ID = '6a75caf7d0fe733d1afcc1f4'
+
+  it('does not resurrect a platform the customer disconnected', async () => {
+    // Instagram was pressed. LinkedIn is still live at Zernio because we cannot
+    // remove it there, and we hold no row for it because the customer removed it.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    state.slots = { count: 0, keys: new Set() }
+
+    const res = await call()
+
+    // The whole assertion. `linkedin` must not appear at all.
+    expect(state.rpcCalls).toEqual([`instagram:${IG_ID}`])
+    expect(state.rpcCalls.some((c) => c.startsWith('linkedin:'))).toBe(false)
+    // And it is a plain success: nothing was refused and nothing failed.
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=connected')
+  })
+
+  it('still refreshes every account we already hold, whatever platform it is on', async () => {
+    // The self-heal, which must survive the fix. LinkedIn is ours already, so it
+    // is a refresh — a token that moved or an expiry that shifted still lands.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    state.slots = {
+      count: 2,
+      keys: new Set([`instagram:${IG_ID}`, `linkedin:${IG_ID}`]),
+    }
+
+    await call()
+
+    expect(state.rpcCalls.sort()).toEqual([`instagram:${IG_ID}`, `linkedin:${IG_ID}`].sort())
+  })
+
+  it('creates nothing at all when there is no record of a press', async () => {
+    // A bookmarked replay of this URL, or a cookie that expired mid-consent.
+    // Fail closed: pressing Connect again costs one click, whereas creating here
+    // costs the customer the disconnect they asked for, silently.
+    state.pending = null
+    state.slots = { count: 0, keys: new Set() }
+
+    const res = await call()
+
+    expect(state.rpcCalls).toEqual([])
+    // NOT an error. Nothing went wrong and nothing was refused by the plan.
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).not.toContain('zernio=error')
+  })
+
+  it('refreshes on a replay even though it creates nothing', async () => {
+    // The half of the self-heal that survives with no cookie: rows we hold are
+    // still brought up to date. Only creation needs a press behind it.
+    state.pending = null
+    state.slots = { count: 1, keys: new Set([`linkedin:${IG_ID}`]) }
+
+    await call()
+
+    expect(state.rpcCalls).toEqual([`linkedin:${IG_ID}`])
+  })
+
+  it('a skipped platform is not reported as a plan refusal or a failure', async () => {
+    // It is neither: the plan had room and no write failed. Reporting it would put
+    // correct behaviour into the failure channel this route exists to keep clean.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    state.slots = { count: 0, keys: new Set() }
+    state.limitVerdict = { kind: 'allowed', limit: 8 }
+
+    const res = await call()
+
+    const location = res.headers.get('location') ?? ''
+    expect(location).not.toContain('zernio=limit')
+    expect(location).not.toContain('zernio=partial')
+    expect(location).toContain('zernio=connected')
+  })
+
+  it('spends the pending-connect cookie on the way out, on success and on failure', async () => {
+    // One press authorises one create pass. A cookie that survived the trip would
+    // let the next replay re-create the row the customer just disconnected.
+    const okRes = await call()
+    expect(okRes.headers.get('set-cookie')).toContain('Max-Age=0')
+
+    state.readThrows = true
+    const failRes = await call()
+    expect(failRes.status).toBe(500)
+    expect(failRes.headers.get('set-cookie')).toContain('Max-Age=0')
+  })
+})
+
+/**
+ * THE POPUP THAT WOULD NOT CLOSE.
+ *
+ * Reported with a screenshot: the popup finished signing in and then loaded the
+ * WHOLE APP at `/connections?zernio=connected` inside a 620px window, while the
+ * opener sat on "Opening…" forever.
+ *
+ * The cause is upstream of us. Google's sign-in serves
+ * `Cross-Origin-Opener-Policy: same-origin`, which moves the popup into a new
+ * browsing context group and severs `window.opener` for good — returning to our
+ * own origin afterwards does not bring it back. The closer's opener check
+ * therefore failed, and its fallback was `location.replace(...)`.
+ *
+ * Both halves of the fix are pinned here: signal on a channel COOP cannot reach,
+ * and never load the app into the popup again.
+ */
+describe('the popup closer does not depend on window.opener', () => {
+  const popupCall = () => {
+    state.pending = { platform: 'instagram', mode: 'popup' }
+    return call()
+  }
+
+  it('signals over BroadcastChannel, which is scoped by origin', async () => {
+    const body = await (await popupCall()).text()
+
+    // THE ASSERTION THAT MATTERS. `opener.postMessage` alone was the bug: COOP
+    // cuts it and nothing arrives.
+    expect(body).toContain('new BroadcastChannel("sahoda-connect")')
+    expect(body).toContain('sahoda:connect-outcome')
+  })
+
+  it('still tries the opener, for the case where the chain survived', async () => {
+    const body = await (await popupCall()).text()
+    expect(body).toContain('window.opener.postMessage')
+    // Never a wildcard target — that would post the outcome to whatever happened
+    // to open this window.
+    expect(body).toContain('window.location.origin')
+    expect(body).not.toContain("'*'")
+  })
+
+  it('NEVER navigates the popup to the app', async () => {
+    const body = await (await popupCall()).text()
+
+    // The exact fallback that produced the reported screenshot. `window.close()`
+    // can also be refused once COOP has changed the browsing context group, so
+    // the page has to stand on its own instead of loading the product into a
+    // window too small to use it.
+    expect(body).not.toContain('location.replace')
+    expect(body).toContain('window.close()')
+  })
+
+  it('says what happened in one sentence, and offers a link rather than a redirect', async () => {
+    const body = await (await popupCall()).text()
+
+    expect(body).toContain('Connected. You can close this window.')
+    // A link the customer may take, not a navigation taken for them.
+    expect(body).toContain('Open Connections')
+  })
+
+  it('tells the truth when the trip failed, and keeps the failing status', async () => {
+    state.pending = { platform: 'instagram', mode: 'popup' }
+    state.readThrows = true
+
+    const res = await call()
+    const body = await res.text()
+
+    // A popup does not change what happened, so it does not change the status.
+    expect(res.status).toBe(500)
+    expect(body).toContain('didn’t finish')
+    expect(body).not.toContain('Connected. You can close')
+  })
+
+  /**
+   * THE BLIND SPOT THIS BLOCK HAD, AND WHY EVERY FIX ABOVE LOOKED LIKE IT WORKED.
+   *
+   * Every assertion above reads `res.text()`, which returns the body whatever the
+   * status line says. The route served this page as a **303 with a `Location`
+   * header** — a redirect, which a browser FOLLOWS. The body was never rendered
+   * and none of that carefully-argued script ever ran. So the COOP fix, the
+   * BroadcastChannel fix and the query-parameter fix all passed their tests and
+   * all did nothing, four reports in a row, because no test here ever asked
+   * whether the response could be displayed at all.
+   */
+  it('is a page the browser will RENDER, not a redirect it will follow', async () => {
+    const res = await popupCall()
+
+    // 3xx means the browser leaves before the script runs. That is the defect.
+    expect(res.status).toBeLessThan(300)
+    expect(res.headers.get('location')).toBeNull()
+    expect(res.headers.get('content-type')).toContain('text/html')
+  })
+
+  it('sends no Location on a FAILED popup either, and keeps the 5xx', async () => {
+    // A 4xx/5xx Location is not followed, so this one was harmless — but the
+    // header has no reader in a popup and leaving it is how the success path got
+    // one. The failing status still has to survive: this route exists because a
+    // failure leaving as a success was invisible to a log filter.
+    state.pending = { platform: 'instagram', mode: 'popup' }
+    state.readThrows = true
+
+    const res = await call()
+
+    expect(res.status).toBe(500)
+    expect(res.headers.get('location')).toBeNull()
+  })
+
+  it('is used ONLY for a popup — a redirect trip still gets its 303', async () => {
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+
+    const res = await call()
+
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=connected')
+    expect(await res.text()).toBe('')
+  })
+})
+
+/**
+ * THE INTENT NOW ARRIVES TWO WAYS, AND EITHER IS ENOUGH.
+ *
+ * The cookie kept not surviving our origin -> Zernio -> Google -> Zernio -> us,
+ * and two reported defects came out of that one absence: the popup got a 303 and
+ * loaded the app inside itself, and create-scoping fell to its fail-closed branch
+ * so a genuine connect wrote no row. These tests pin the fallback with the cookie
+ * ABSENT, because that is the condition it exists for.
+ */
+/**
+ * THE BUG THAT MADE A REAL CONNECT VANISH, GUARDED AT THE ROUTE.
+ *
+ * `reconcileAccounts` filters `account.platform === …` against a string ZERNIO
+ * writes. This route passed OUR channel id. MEASURED 2026-08-26 against the live
+ * API: a customer's X account, created minutes after they pressed Connect, reads
+ * `"platform": "twitter"` — so asking for `'x'` matched nothing, no row was
+ * written, and the screen said "Not connected" over a grant that had succeeded.
+ *
+ * Instagram and LinkedIn were unaffected, and that is why nobody caught it: for
+ * those two the two names are the same string.
+ *
+ * ── WHY THIS ASSERTS `askedFor` AND NOT AN OUTCOME ──────────────────────────
+ * An outcome assertion cannot see this. The fixture translates Zernio's name back
+ * to ours so the test data stays readable, so a route passing `'x'` and a route
+ * passing `'twitter'` both end up at the same fixture key and both produce the
+ * same rows. MEASURED: with the defect restored, all 49 tests in this file still
+ * passed. The only thing that separates right from wrong here is the string the
+ * route actually handed over, so that is what is checked.
+ */
+describe('the route asks Zernio in Zernio’s own vocabulary', () => {
+  const ACC = '6a75caf7d0fe733d1afcc1f4'
+  /** Everything already ours, so create-scoping is not the thing under test. */
+  const allHeld = () => ({
+    count: 3,
+    keys: new Set(MOCK_PLATFORMS.map((p) => `${p}:${ACC}`)),
+  })
+
+  it('records the X account that Zernio stores as "twitter"', async () => {
+    // THE REGRESSION, asserted through an OUTCOME rather than a spy.
+    //
+    // `listAccounts` answers in Zernio's shape and `reconcileFromAccounts` is a
+    // faithful copy of the real filter, so a route that asked for `x` finds
+    // nothing here for the same reason it found nothing in production: the
+    // account is stored under `twitter`. No row is written and this fails.
+    //
+    // MEASURED 2026-08-26 — the customer's real account, created minutes after
+    // they pressed Connect: { "_id": "6a8f392d…", "platform": "twitter" }.
+    //
+    // `pending` is X because create-scoping only ever creates the platform that
+    // was pressed. That rule is not what is being tested; it is what makes the
+    // fixture honest about a real single-platform press.
+    state.pending = { platform: 'x', mode: 'redirect' }
+    state.slots = { count: 0, keys: new Set() }
+
+    await call()
+
+    expect(state.rpcCalls.some((c) => c.startsWith('x:'))).toBe(true)
+  })
+
+  it('leaves the names that already agree alone', async () => {
+    // The translation must not invent a difference where there is none.
+    // Instagram and LinkedIn are spelled identically on both sides and are the
+    // two channels that worked throughout; a mapping that mangled them would
+    // break the only part of this flow that was never broken.
+    //
+    // Every account is already held, so all three are REFRESHES and reach the
+    // write regardless of which platform was pressed.
+    state.slots = allHeld()
+
+    await call()
+
+    expect(state.rpcCalls.some((c) => c.startsWith('instagram:'))).toBe(true)
+    expect(state.rpcCalls.some((c) => c.startsWith('linkedin:'))).toBe(true)
+  })
+
+  it('reaches every platform from ONE read', async () => {
+    // The point of the change. Three platforms are reconciled from a single
+    // `listAccounts` call, and a translation that returned null for one would
+    // drop it silently — the quiet direction this route must never fail in.
+    state.slots = allHeld()
+
+    await call()
+
+    expect(state.rpcCalls).toHaveLength(MOCK_PLATFORMS.length)
+  })
+})
+
+describe('the intent survives a lost cookie, because it also rides in the URL', () => {
+  const IG_ID = '6a75caf7d0fe733d1afcc1f4'
+  const withParams = (query: string) =>
+    GET(new Request(`https://app.sahodalabs.com/api/oauth/zernio/return?${query}`))
+
+  it('closes the popup on the URL alone', async () => {
+    state.pending = null
+
+    const res = await withParams('connected=1&mode=popup&platform=instagram')
+
+    // Not a 303. A redirect is what the popup was getting, and it is why it
+    // showed a second copy of /connections instead of shutting.
+    expect(res.headers.get('content-type')).toContain('text/html')
+    expect(await res.text()).toContain('BroadcastChannel')
+  })
+
+  it('authorises the create on the URL alone', async () => {
+    // The louder half. Without this the customer presses Connect, approves at the
+    // platform, and nothing lands in our table at all.
+    state.pending = null
+    state.slots = { count: 0, keys: new Set() }
+
+    await withParams('connected=1&platform=instagram')
+
+    expect(state.rpcCalls).toEqual([`instagram:${IG_ID}`])
+  })
+
+  it('still SCOPES that create — it does not open the door to every platform', async () => {
+    // The disconnect-then-reconnect fix has to survive the fallback. LinkedIn is
+    // live at Zernio and deliberately not ours; pressing Instagram must not
+    // bring it back.
+    state.pending = null
+    state.slots = { count: 0, keys: new Set() }
+
+    await withParams('connected=1&platform=instagram')
+
+    expect(state.rpcCalls.some((c) => c.startsWith('linkedin:'))).toBe(false)
+  })
+
+  it('refuses a platform that is not on the allowlist', async () => {
+    // Validated, not passed through. An unknown string is the fail-closed branch.
+    state.pending = null
+    state.slots = { count: 0, keys: new Set() }
+
+    await withParams('connected=1&platform=myspace')
+
+    expect(state.rpcCalls).toEqual([])
+  })
+
+  it('the cookie still wins when it did arrive', async () => {
+    // The parameter is a fallback, never an override. A forged one must not be
+    // able to redirect a create the cookie already scoped.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    state.slots = { count: 0, keys: new Set() }
+
+    await withParams('connected=1&platform=linkedin')
+
+    expect(state.rpcCalls).toEqual([`instagram:${IG_ID}`])
+  })
+
+  it('a missing mode is still a redirect', async () => {
+    state.pending = null
+
+    const res = await withParams('connected=1&platform=instagram')
+
+    expect(res.status).toBe(303)
+    expect(await res.text()).toBe('')
+  })
+})
+
+describe('the query string is read for intent and NOTHING else', () => {
   it('never reads connected/profileId/accountId off the redirect', async () => {
     // doc 13 §3: a wrong accountId does not error, it publishes to someone else and
-    // returns 200. The only safe reading of this query string is none at all.
+    // returns 200. `mode` and `platform` are ours and are read; every id on this
+    // URL still is not, and that is the line — a channel NAME from a five-item
+    // allowlist cannot name another tenant's account, an id can.
     const res = await GET(
       new Request(
         'https://app.sahodalabs.com/api/oauth/zernio/return' +
@@ -504,5 +1087,369 @@ describe('a broken workspace read is not a missing workspace', () => {
     const unreadable = await call()
 
     expect(none.status).not.toBe(unreadable.status)
+  })
+})
+
+/**
+ * THE CONNECT THAT WAS ONE STEP SHORT OF EXISTING.
+ *
+ * ── WHAT HAPPENED ────────────────────────────────────────────────────────────
+ * Reported three times, last as "facebook is also not connecting". Nothing was
+ * failing. MEASURED 2026-08-27 against the live API: `GET /v1/accounts` returned
+ * ZERO facebook accounts across every profile on this key, while
+ * `GET /v1/connect/facebook` returned a valid authUrl every time it was asked.
+ *
+ * Facebook resolves to every Page the customer administers and Google Business to
+ * every location, and **Zernio creates no account until one is picked**. So this
+ * route asked for the accounts under our profile, was correctly told there were
+ * none, and reported that honestly. The reconcile was right; the flow stopped one
+ * step earlier than anyone had looked.
+ *
+ * Zernio will host that picker itself, and did — on zernio.com, in a 620px popup,
+ * under its own brand. The founder reported THAT too, without knowing what it was:
+ * "it opens another new website ... change from social media connector to
+ * Sahodalabs". `headless=true` turns it off; these tests pin what replaces it.
+ */
+describe('a connect that still needs a choice renders a picker, not a verdict', () => {
+  /** Exactly the shape Zernio's headless redirect carries. `EAA…` is a real token prefix. */
+  const TEMP_TOKEN = 'EAAKxxxxLIVEFACEBOOKUSERTOKENxxxx'
+  const selectTrip = (over: Record<string, string> = {}) => {
+    const url = new URL('https://app.sahodalabs.com/api/oauth/zernio/return')
+    const params: Record<string, string> = {
+      step: 'select_page',
+      platform: 'facebook',
+      profileId: '6a75cae32853ee463c6419d6',
+      tempToken: TEMP_TOKEN,
+      mode: 'popup',
+      ...over,
+    }
+    for (const [k, v] of Object.entries(params)) if (v !== '') url.searchParams.set(k, v)
+    return GET(new Request(url.toString()))
+  }
+
+  it('asks which Page, instead of reporting nothing was found', async () => {
+    // THE REGRESSION, stated as the customer experienced it. Before the fix this
+    // trip fell through to the reconcile, found no facebook account — because none
+    // had been created — and answered `zernio=nothing`.
+    state.accounts = []
+    const res = await selectTrip()
+    const body = await res.text()
+
+    expect(res.status).toBe(200)
+    expect(body).toContain('Choose a Facebook Page')
+    expect(body).toContain('Chai &amp; Chapters')
+    expect(body).not.toContain('zernio=nothing')
+  })
+
+  it('writes NO row on this trip, because there is no account yet', async () => {
+    // The half of the defect that would be invisible in a screenshot. Committing
+    // anything here would record an account Zernio has not created.
+    state.accounts = []
+    await selectTrip()
+    expect(state.rpcCalls).toEqual([])
+  })
+
+  it('never puts the platform token in the page', async () => {
+    // `tempToken` is a live Facebook user access token — Zernio's own error text
+    // says it "starts with EAA". CLAUDE.md: OAuth tokens are never logged or
+    // returned, and writing one into a body is returning it. It rides an httpOnly
+    // cookie instead, which page scripts cannot read.
+    const res = await selectTrip()
+    const body = await res.text()
+
+    expect(body).not.toContain(TEMP_TOKEN)
+    expect(body).not.toContain('EAA')
+    expect(res.headers.get('set-cookie') ?? '').toContain('HttpOnly')
+  })
+
+  it('refuses a profile that is not this workspace’s', async () => {
+    // doc 13 §3: Zernio validates ids against the whole TEAM, so a wrong profile
+    // does not error — it acts on somebody else's account. The id on this URL came
+    // through a browser and is COMPARED against the one we read from our own table.
+    const res = await selectTrip({ profileId: 'ffffffffffffffffffffffff' })
+    expect(res.status).toBe(403)
+    expect(state.rpcCalls).toEqual([])
+  })
+
+  it('leaves every other platform on the flow that already works', async () => {
+    // No `step`, so nothing changes. Instagram and LinkedIn connect end to end
+    // today and moving them onto an untested flow would trade a fix for a
+    // regression. This is the assertion that says the branch is narrow.
+    const res = await call()
+    expect(res.status).toBe(303)
+    expect(state.rpcCalls).toEqual(['instagram:6a75caf7d0fe733d1afcc1f4'])
+  })
+
+  it('says nothing was connected when Facebook lists no Page', async () => {
+    // A real outcome, not an error — and NOT "connected", which is what the
+    // `nothing` status renders. The customer has an approval at Facebook and no
+    // account anywhere, and the sentence has to say exactly that.
+    state.choices = []
+    const res = await selectTrip()
+    const body = await res.text()
+
+    expect(res.status).toBe(200)
+    expect(body).toContain('Facebook sent back no Page')
+    expect(body).toContain('Nothing was connected and nothing ')
+    expect(body).not.toMatch(/\bConnected\./)
+    // And it lets the Connect button stop waiting. MEASURED from the founder's
+    // screenshot: the card sat on "Opening Facebook…" beside this very page,
+    // because it emitted none of the four signals `useConnectFlow` listens for.
+    expect(body).toContain('sahoda:connect-outcome')
+  })
+
+  it('reports a failed read as a failure, not as an empty list', async () => {
+    // The standing rule on this route: a measurement we did not make must never be
+    // reported as a measurement. "Facebook listed no Pages" and "we could not ask"
+    // are different sentences and only one of them is true here.
+    state.choicesThrow = true
+    const res = await selectTrip()
+    expect(res.status).toBe(502)
+    expect(await res.text()).not.toContain('sent back no Page')
+  })
+
+  it('says so when Zernio admits the list is cut short', async () => {
+    state.choicesHasMore = true
+    expect(await (await selectTrip()).text()).toContain('only part of your list')
+  })
+
+  it('does not claim a full list when Zernio has not said it is one', async () => {
+    expect(await (await selectTrip()).text()).not.toContain('only part of your list')
+  })
+
+  it('names Google Business in its own words, not Zernio’s', async () => {
+    // `googlebusiness`, `select_location`, `locationId` are Zernio's vocabulary and
+    // none of it belongs on a screen. This is the fourth vocabulary boundary in
+    // this integration; the previous one made a real X connect invisible.
+    state.choices = [
+      {
+        id: '9281089117903930794',
+        name: 'Chai & Chapters',
+        detail: '12 Park St',
+        ownerId: 'accounts/113',
+      },
+    ]
+    const body = await (
+      await selectTrip({ step: 'select_location', tempToken: '', pendingDataToken: 'pdt_abc' })
+    ).text()
+
+    expect(body).toContain('Choose a Google Business Profile location')
+    expect(body).not.toContain('googlebusiness')
+    expect(body).not.toContain('locationId')
+  })
+
+  it('keeps the pick inside the popup', async () => {
+    // The trip AFTER the pick has to know it is in a popup too, or it ends by
+    // loading the whole app into a 620px window — the failure this flow was
+    // reported for four times.
+    expect(await (await selectTrip()).text()).toContain('mode=popup')
+  })
+})
+
+/**
+ * THE STEP THAT DID NOT ARRIVE, REPORTED AS ITSELF.
+ *
+ * ── WHY THIS IS A SEPARATE OUTCOME AND NOT "NOTHING FOUND" ───────────────────
+ * Facebook and Google Business create NO account at Zernio until a Page or a
+ * location is committed. So for those two, coming back with an empty list after
+ * the customer pressed Connect is not the ordinary empty answer `zernio=nothing`
+ * describes — it is the selection step having failed to reach us.
+ *
+ * Those two sentences read identically on screen, and that cost three rounds:
+ * "you cancelled at the consent screen" and "the step this depends on did not
+ * happen" are different claims and the screen said the same words for both.
+ *
+ * ── AND THE PARAMETER NAMES ARE THE DIAGNOSTIC ───────────────────────────────
+ * The `step` values are the one part of this redirect never observed on the
+ * wire; they were read off Zernio's OpenAPI spec, which has been measurably
+ * wrong about this integration three times. So the report names the parameters
+ * that DID arrive — never their values, because `tempToken` is a live Facebook
+ * user access token and its name is the whole diagnostic while its value is a
+ * credential.
+ */
+describe('a pick that never reached us is not the same as an empty account list', () => {
+  const fbTrip = (query: Record<string, string>) => {
+    const url = new URL('https://app.sahodalabs.com/api/oauth/zernio/return')
+    for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
+    return GET(new Request(url.toString()))
+  }
+
+  it('renders the picker even when the step is spelled differently than the spec said', () => {
+    // THE ROBUSTNESS THAT MATTERS MOST. `select_page` is a guess from a document.
+    // The TOKEN is the evidence — a `tempToken` on this URL means Zernio is
+    // holding an authorised session waiting to be told which Page — and it is
+    // what this branch now keys on, with the pressed platform naming it.
+    state.pending = { platform: 'facebook', mode: 'popup' }
+    state.accounts = []
+    return fbTrip({
+      step: 'selectPage',
+      profileId: '6a75cae32853ee463c6419d6',
+      tempToken: 'EAAxxLIVETOKENxx',
+    }).then(async (res) => {
+      expect(res.status).toBe(200)
+      expect(await res.text()).toContain('Choose a Facebook Page')
+    })
+  })
+
+  it('renders it with no step parameter at all', async () => {
+    state.pending = { platform: 'facebook', mode: 'popup' }
+    state.accounts = []
+    const res = await fbTrip({
+      profileId: '6a75cae32853ee463c6419d6',
+      tempToken: 'EAAxxLIVETOKENxx',
+    })
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('Choose a Facebook Page')
+  })
+
+  it('reports a Facebook trip with no account AND no pick as a failure', async () => {
+    // No token, no step, no account. Before this the customer got `zernio=nothing`
+    // — "we asked Zernio and it had none" — which is true of the accounts and
+    // false about what happened.
+    state.pending = { platform: 'facebook', mode: 'redirect' }
+    state.accounts = []
+
+    const res = await fbTrip({})
+
+    expect(res.status).toBe(502)
+    expect(res.headers.get('location')).toContain('reason=pick-not-received')
+  })
+
+  it('still says "nothing" for a platform that needs no pick', async () => {
+    // Instagram resolves to an account on approval, so an empty list there really
+    // is an empty list — most often a cancelled consent screen. Turning that into
+    // a 502 would put correct behaviour in the failure channel, which is the
+    // mistake this route's `overLimit` branch already exists to avoid.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    state.accounts = []
+
+    const res = await fbTrip({})
+
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=nothing')
+  })
+
+  it('does not claim a missing pick when we never learned what was pressed', async () => {
+    // A replayed URL with no cookie and no platform parameter. We cannot say a
+    // Facebook pick is missing without knowing Facebook was pressed, and claiming
+    // one would be a fabricated failure.
+    state.pending = null
+    state.accounts = []
+
+    const res = await fbTrip({})
+
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=nothing')
+  })
+})
+
+/**
+ * THE REFUSAL WE WERE HANDED AND THREW AWAY.
+ *
+ * ── WHAT HAPPENED ────────────────────────────────────────────────────────────
+ * The founder connected several channels, got nothing useful from our screen,
+ * and went to ZERNIO'S OWN DASHBOARD to find out why. It told them at once:
+ *
+ *   Google Business Profile token exchange failed: 400
+ *   { "error": "invalid_grant", "error_description": "Bad Request" }
+ *
+ * We had that fact. Zernio's spec says "On failure every platform appends error
+ * details, starting with `error` and `platform`", and this route ignores every
+ * query parameter — a rule that is right about IDS and wrong about this one.
+ * The customer read a third party's dashboard to use our product.
+ */
+describe('when the platform refuses, the customer is told', () => {
+  const refusal = (query: Record<string, string>) => {
+    const url = new URL('https://app.sahodalabs.com/api/oauth/zernio/return')
+    for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
+    return GET(new Request(url.toString()))
+  }
+
+  it('says what happened instead of "nothing found"', async () => {
+    // THE REGRESSION, in the exact shape Zernio sends.
+    state.pending = { platform: 'gbp', mode: 'popup' }
+
+    const res = await refusal({
+      error: 'invalid_grant',
+      error_description: 'Google Business Profile token exchange failed: 400 Bad Request',
+    })
+    const body = await res.text()
+
+    // A 502: the customer's request was fine and so was ours. Visible to the
+    // 4xx/5xx log filter this route was rebuilt around.
+    expect(res.status).toBe(502)
+    expect(body).toContain('didn’t finish signing in')
+    expect(body).not.toMatch(/nothing was found|zernio=nothing/)
+  })
+
+  it('names the remedy that works for this refusal, and only for this one', async () => {
+    state.pending = { platform: 'gbp', mode: 'popup' }
+    const body = await (await refusal({ error: 'invalid_grant' })).text()
+
+    expect(body).toContain('without going back a step')
+  })
+
+  it('offers NO remedy for a refusal nobody has read', async () => {
+    // Guessing at a cause for an unknown code is what no-impossible-remedy
+    // forbids. The provider's own words go underneath instead.
+    state.pending = { platform: 'gbp', mode: 'popup' }
+    const body = await (
+      await refusal({ error: 'wat_is_this', error_description: 'something specific' })
+    ).text()
+
+    expect(body).toContain('refused the connection')
+    expect(body).toContain('something specific')
+    expect(body).not.toMatch(/try again|connect again/i)
+  })
+
+  it('escapes the provider’s words, which are third-party text', async () => {
+    // `error_description` arrives through the customer's browser and is written
+    // by somebody else. Same escaper as a Facebook Page name, same reason.
+    state.pending = { platform: 'gbp', mode: 'popup' }
+    const body = await (
+      await refusal({ error: 'x', error_description: '<script>alert(1)</script>' })
+    ).text()
+
+    expect(body).not.toContain('<script>alert')
+    expect(body).toContain('&lt;script&gt;')
+  })
+
+  it('lets the Connect button stop waiting', async () => {
+    state.pending = { platform: 'gbp', mode: 'popup' }
+    expect(await (await refusal({ error: 'invalid_grant' })).text()).toContain(
+      'sahoda:connect-outcome',
+    )
+  })
+
+  it('says a cancelled sign-in was cancelled, and offers no remedy for it', async () => {
+    // Not a failure of anything. Telling somebody who changed their mind to
+    // "try again" is putting correct behaviour in the failure channel.
+    state.pending = { platform: 'gbp', mode: 'popup' }
+    const body = await (await refusal({ error: 'access_denied' })).text()
+
+    expect(body).toContain('wasn’t connected')
+    expect(body).toContain('cancelled')
+  })
+
+  it('does NOT treat our own `reason` parameter as an upstream refusal', async () => {
+    // `reason` is a status this route sets itself. Reading it as a provider
+    // error would report our own notices as theirs.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    state.accounts = []
+
+    const res = await refusal({ reason: 'no-profile' })
+
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=nothing')
+  })
+
+  it('still connects normally when no error came back', async () => {
+    // The branch has to be narrow. Every working connect passes through here.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    const res = await refusal({})
+
+    expect(res.status).toBe(303)
+    expect(state.rpcCalls).toEqual(['instagram:6a75caf7d0fe733d1afcc1f4'])
   })
 })

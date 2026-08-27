@@ -81,7 +81,7 @@ const KNOWN_CODE_SET: ReadonlySet<string> = new Set<string>(KNOWN_CODES)
  */
 const FIX_LABELS: Readonly<Record<KnownCode, string | undefined>> = {
   MAX_CHARS: 'Trim to fit',
-  MAX_HASHTAGS: 'Remove extra hashtags',
+  MAX_HASHTAGS: 'Remove extra keywords',
   MAX_MEDIA_COUNT: 'Remove extra media',
   MEDIA_TYPE: undefined,
   MEDIA_SIZE: undefined,
@@ -112,7 +112,7 @@ const FIX_LABELS: Readonly<Record<KnownCode, string | undefined>> = {
  */
 const FALLBACK_MESSAGES: Readonly<Record<KnownCode, string>> = {
   MAX_CHARS: 'This post is longer than the channel allows.',
-  MAX_HASHTAGS: 'This post uses more hashtags than the channel allows.',
+  MAX_HASHTAGS: 'This post carries more keywords than Sahoda sends.',
   MAX_MEDIA_COUNT: 'This post has more media than the channel allows.',
   MEDIA_TYPE: 'This channel does not accept this file type.',
   MEDIA_SIZE: 'This file is larger than the channel allows.',
@@ -164,7 +164,15 @@ const MIME = String.raw`[a-z0-9][a-z0-9.+_-]{0,62}\/[a-z0-9][a-z0-9.+_-]{0,62}`
  */
 const MESSAGE_SHAPES: Readonly<Record<KnownCode, RegExp>> = {
   MAX_CHARS: new RegExp(`^(?:${CHANNEL}) allows ${NUM} characters; this has ${NUM}\\.$`),
-  MAX_HASHTAGS: new RegExp(`^(?:${CHANNEL}) allows ${NUM} hashtags\\.$`),
+  // ── MOVED WITH THE SENTENCE, IN THE SAME COMMIT ───────────────────────────
+  // It read `^(?:instagram|…) allows 30 hashtags\.$`. The engine now says
+  // "Sahoda takes at most 30 keywords per instagram post." because the number is
+  // Instagram's HASHTAG limit and the field stopped holding hashtags
+  // (REQUESTS §34) — attributing the refusal to Instagram was false.
+  //
+  // This gate's failure mode is a silent downgrade to vaguer copy, so it is
+  // still anchored at both ends and still names the channel and the number.
+  MAX_HASHTAGS: new RegExp(`^Sahoda takes at most ${NUM} keywords per (?:${CHANNEL}) post\\.$`),
   MAX_MEDIA_COUNT: new RegExp(`^(?:${CHANNEL}) allows ${NUM} media items\\.$`),
   MEDIA_TYPE: new RegExp(`^(?:${CHANNEL}) does not accept ${MIME}\\.$`, 'i'),
   MEDIA_SIZE: new RegExp(`^(?:${CHANNEL}) media must be ≤ ${DECIMAL} MB\\.$`),

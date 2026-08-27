@@ -93,4 +93,59 @@ describe('PlanWeekPanel', () => {
       await screen.findByText('The plan could not be saved. You were not charged. Try again.'),
     ).toBeInTheDocument()
   })
+
+  /**
+   * ── TWO GUARDS ON THINGS THAT ARE INVISIBLE IN REVIEW ──────────────────────
+   *
+   * The redesign moved "(optional)" from the label's own text into its own span,
+   * and moved the field off the `Label` primitive onto a plain `<label>`. Both
+   * look identical on screen and both can silently change what a screen reader
+   * announces.
+   *
+   * ⚠ THE FIRST VERSION OF THIS TEST DID NOT CHECK WHAT ITS OWN COMMENT CLAIMED.
+   * It used `getByLabelText`, and said in this comment that it asserted the
+   * accessible NAME. It does not: `getByLabelText` matches the `<label>`
+   * element's textContent and never runs the accessible-name algorithm. An
+   * adversarial pass found two mutations it waved straight through, both of
+   * which a reviewer would read as harmless: adding
+   * `aria-label="Goals for the week"` to the field, and putting `aria-hidden`
+   * on the "(optional)" span. Each drops "(optional)" from what a screen reader
+   * actually announces while the assertion stayed green.
+   *
+   * `toHaveAccessibleName` runs the real algorithm, so both now fail.
+   *
+   * The second one exists because the character counter is a second copy of a
+   * number the input already enforces. Two copies drift, and a counter that says
+   * 500 beside a field that stops at 300 is a figure no query produced. It reads
+   * both from the rendered DOM rather than from the constant, so importing the
+   * constant into the test cannot make it pass falsely.
+   */
+  test('the accessible name still says the field is optional', () => {
+    render(<PlanWeekPanel />)
+
+    const field = screen.getByRole('textbox')
+
+    expect(field).toHaveAttribute('id', 'plan-week-goals')
+    expect(field).toHaveAccessibleName('Goals for the week (optional)')
+  })
+
+  test('the counter reports the ceiling the field actually enforces', () => {
+    render(<PlanWeekPanel />)
+
+    const field = screen.getByLabelText(/goals for the week/i)
+    const enforced = field.getAttribute('maxlength')
+
+    expect(enforced).toBe('500')
+    expect(screen.getByText(/characters$/i).textContent).toBe(`0 / ${enforced} characters`)
+  })
+
+  test('the counter counts what was typed', async () => {
+    render(<PlanWeekPanel />)
+
+    // Leading and trailing spaces are deliberate: a counter over
+    // `goals.trim().length` reports a different number from the one the field
+    // enforces, and 'Monsoon' alone cannot tell the two apart.
+    await userEvent.type(screen.getByRole('textbox'), '  Monsoon  ')
+    expect(screen.getByText(/characters$/i).textContent).toBe('11 / 500 characters')
+  })
 })

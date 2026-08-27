@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { brainRing } from '@/lib/brand/brain-ring'
 import type { Provenance } from '@/lib/brand/provenance'
 import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 /**
  * What the brain is, in numbers, and the single most useful thing to do next.
@@ -12,6 +13,14 @@ import { buttonVariants } from '@/components/ui/button'
  * question the ring shows on hover, because a user who came here BY the ring
  * should land on the thing it was pointing at.
  */
+/**
+ * The paragraph that explains what a re-resolve costs and what it destroys.
+ * The button points at it with `aria-describedby`, so the id has to be stable.
+ * BrainHeader renders once per page, so a constant is safe and `useId` is not
+ * available here anyway: this is a server component.
+ */
+const NOTE_ID = 'brain-reresolve-note'
+
 export function BrainHeader({ provenance, version }: { provenance: Provenance; version: number }) {
   const ring = brainRing(provenance)
 
@@ -79,17 +88,50 @@ export function BrainHeader({ provenance, version }: { provenance: Provenance; v
         </p>
       ) : null}
 
-      <p className="text-[12.5px] text-muted">
-        Editing a field here is free and marks it confirmed.{' '}
-        <Link
-          href="/onboarding"
-          className="font-semibold text-accent underline-offset-2 hover:underline"
-        >
-          Re-running the whole resolve
-        </Link>{' '}
-        is a separate, paid action that rewrites every field, including the ones you have already
+      {/*
+        THE RE-RESOLVE IS A CONTROL, NOT A WORD IN A SENTENCE.
+
+        It was an inline link inside this paragraph, styled `text-accent` with an
+        underline only on hover. At rest it was accent-coloured prose in a card
+        whose eyebrow (`Worth answering next`) is ALSO accent-coloured, so the
+        one thing on this panel that navigates away and spends money looked like
+        emphasis. The founder read it as emphasis, which is the whole report.
+
+        SECONDARY, not primary, and the distinction is load-bearing. docs/26
+        §1.5 rations one primary to a view; more to the point, a re-resolve
+        rewrites every field INCLUDING the confirmed ones, so it is the opposite
+        of what a person reading this panel is trying to do. It should be
+        unmistakably pressable and unmistakably not the recommended path.
+
+        NO CREDIT FIGURE ON THE LABEL, deliberately. The list price is 50, but
+        `isFirstResolve` reads `brand_memory` and takes the free path when it is
+        empty, so the EFFECTIVE cost is not the list price — the same reason
+        `onboarding-flow.tsx` passes `regenerateCost={isFree ? 'free' : cost}`
+        rather than the constant. This component runs no such query, so a number
+        here would be a figure nothing produced. The paragraph says `paid`, which
+        is true in every case, and /onboarding puts the real amount in the
+        button that actually spends it.
+      */}
+      <p id={NOTE_ID} className="text-[12.5px] text-muted">
+        Editing a field here is free and marks it confirmed. Re-running the whole resolve is a
+        separate, paid action that rewrites every field, including the ones you have already
         confirmed.
       </p>
+
+      {/* A link wearing the button's clothes. `<Button asChild>` is not the
+          route for this: Button always renders a loading slot beside its
+          children, so Radix's Slot receives two and throws (ui/button.tsx).
+          `self-start` because the section is a flex column and an inline-flex
+          child would otherwise stretch edge to edge and read as a banner.
+          `aria-describedby` carries the price and the consequence to a screen
+          reader, which the label alone cannot. */}
+      <Link
+        href="/onboarding"
+        aria-describedby={NOTE_ID}
+        className={cn(buttonVariants({ variant: 'secondary' }), 'self-start')}
+      >
+        Re-run the whole resolve
+      </Link>
     </section>
   )
 }

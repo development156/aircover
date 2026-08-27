@@ -202,13 +202,21 @@ describe('/brain', () => {
     })
   })
 
-  test('the free edit and the paid resolve are told apart in words', async () => {
+  test('the free edit and the paid resolve are told apart in words, and in shape', async () => {
     render(await BrainPage())
 
     expect(screen.getByText(/Editing a field here is free/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /re-running the whole resolve/i })).toHaveAttribute(
-      'href',
-      '/onboarding',
-    )
+
+    // RETARGETED, not relaxed. This asserted the name /re-running the whole
+    // resolve/i while the paid path was a run of accent-coloured words inside
+    // the sentence. It is a button now, so the label is verb-first and the
+    // match moved with it; the claim the guard makes is unchanged and one
+    // assertion stronger.
+    const resolve = screen.getByRole('link', { name: /re-run/i })
+    expect(resolve).toHaveAttribute('href', '/onboarding')
+    // The affordance, checked on the assembled page and not only in the unit
+    // test for the panel. `inline-flex` comes from buttonVariants; prose does
+    // not carry it.
+    expect(resolve.className).toContain('inline-flex')
   })
 })

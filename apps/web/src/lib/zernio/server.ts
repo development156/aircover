@@ -11,6 +11,7 @@ import {
 } from '@sahoda/publishing'
 
 import { env } from '@/lib/env'
+import { returnUrl, type ReturnIntent } from '@/lib/zernio/return-url'
 
 /**
  * The Zernio client for this request, or null when the key is not provisioned.
@@ -67,13 +68,34 @@ export function zernioAvailable(): boolean {
 }
 
 /**
- * The absolute URL Zernio sends the browser back to.
+ * The absolute URL Zernio sends the browser back to, or `null` when this
+ * environment cannot name one.
  *
- * Explicit rather than derived from the incoming request: a return URL built from
- * a forwarded host header is attacker-influenceable, and this one is handed to a
- * third party who will redirect a signed-in customer to it.
+ * ── STILL NOT DERIVED FROM THE REQUEST, AND FOR THE SAME REASON ──────────────
+ * This URL is handed to a third party who will redirect a SIGNED-IN customer to
+ * it, so a value built from `Host` or `X-Forwarded-Host` would be
+ * attacker-influenceable. That ruling stands.
+ *
+ * What changed is that it is no longer one CONSTANT for every deployment.
+ * `NEXT_PUBLIC_APP_URL` is set once on the Vercel project, so preview builds
+ * carried the production origin and returned customers to production after they
+ * had connected on a branch. The origin now comes from Vercel's own
+ * platform-written variables, which no request can influence — see
+ * `lib/zernio/return-url.ts` for the full argument and the rule.
+ *
+ * `null` rather than a relative path. `?? ''` used to produce
+ * `/api/oauth/zernio/return`, a relative reference Zernio resolves against its
+ * OWN origin; the caller must refuse to start the flow instead, because the grant
+ * at the platform is real and cannot be undone once given.
  */
-export function zernioReturnUrl(): string {
-  const origin = env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, '') ?? ''
-  return `${origin}/api/oauth/zernio/return`
+export function zernioReturnUrl(intent?: ReturnIntent): string | null {
+  return returnUrl(
+    {
+      vercelEnv: process.env.VERCEL_ENV,
+      vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
+      vercelUrl: process.env.VERCEL_URL,
+      appUrl: env.NEXT_PUBLIC_APP_URL,
+    },
+    intent,
+  )
 }

@@ -50,7 +50,12 @@ describe('previewThread', () => {
 
     expect(preview.segments.map((s) => s.text)).toEqual(planned.plan.segments)
     // And the tail really is in there — otherwise this test agrees about nothing.
-    expect(preview.segments.at(-1)!.text).toContain('#chai')
+    // The sentinel moved from '#chai' to '[chai]' when keywords replaced hashtags
+    // at publish (REQUESTS §34). The assertion above — that the preview plans
+    // exactly what the publish path plans — passed through that change untouched,
+    // which is the useful half: the two paths did not drift apart.
+    expect(preview.segments.at(-1)!.text).toContain('[chai]')
+    expect(preview.segments.at(-1)!.text).not.toContain('#chai')
   })
 
   it('tightens the limit when the body carries a link', () => {
