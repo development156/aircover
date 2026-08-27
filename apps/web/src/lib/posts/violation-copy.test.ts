@@ -216,11 +216,25 @@ describe('describeViolation', () => {
     expect(display.fixLabel).toMatch(/^trim/i)
   })
 
-  test('offers a remove-hashtags fix when there are too many hashtags', () => {
+  test('offers a remove-keywords fix when there are too many keywords', () => {
+    // ── RETARGETED WITH THE SENTENCE, NOT LOOSENED ──────────────────────────
+    // Every string here said "hashtags" about a field that stopped holding any
+    // (REQUESTS §34). The CODE is still `MAX_HASHTAGS` — it is a stored, matched
+    // string across this table, the fix-it button and the publish logs, and
+    // renaming it is a data change rather than a copy change. The `field` is
+    // still `hashtags` for the same reason: it addresses `extras.hashtags`.
+    //
+    // What the reader sees is what moved, and it is still asserted exactly.
     const display = describeViolation(real('MAX_HASHTAGS'))
+
+    expect(display.code).toBe('MAX_HASHTAGS')
     expect(display.field).toBe('hashtags')
-    expect(display.message).toMatch(/hashtags/i)
-    expect(display.fixLabel).toMatch(/^remove.*hashtags$/i)
+    expect(display.message).toMatch(/keywords/i)
+    expect(display.fixLabel).toMatch(/^remove.*keywords$/i)
+    // And never the old word, which would be a claim about hashtags on a list
+    // that has none.
+    expect(display.message).not.toMatch(/hashtag/i)
+    expect(display.fixLabel).not.toMatch(/hashtag/i)
   })
 
   test('offers a remove-media fix when there are too many attachments', () => {

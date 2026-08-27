@@ -47,9 +47,12 @@ vi.mock('@/lib/brand/read-brain', () => ({
   readBrain: vi.fn(),
 }))
 
+// `timezone` rides on `WorkspaceOption` so /settings needs no second round
+// trip. The switcher ignores it, and null is the honest value here: these two
+// fixtures have never been asked where they are.
 const WORKSPACES = [
-  { id: 'ws_1', name: 'Sahoda Labs', slug: 'sahoda-labs' },
-  { id: 'ws_2', name: 'Second Brand', slug: 'second-brand' },
+  { id: 'ws_1', name: 'Sahoda Labs', slug: 'sahoda-labs', timezone: null },
+  { id: 'ws_2', name: 'Second Brand', slug: 'second-brand', timezone: null },
 ]
 
 const mocked = {

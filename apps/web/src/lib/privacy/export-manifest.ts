@@ -99,6 +99,17 @@ export interface ExportTable {
  */
 export const EXPORT_TABLES: readonly ExportTable[] = [
   { table: 'ai_provider_logs', readability: 'no-read-policy', describes: 'AI usage records' },
+  {
+    table: 'asset_folder_items',
+    readability: 'readable',
+    describes: 'which folders you filed each picture in',
+  },
+  { table: 'asset_folders', readability: 'readable', describes: 'the folders you made' },
+  {
+    table: 'asset_smart_folders',
+    readability: 'readable',
+    describes: 'the saved searches you named',
+  },
   { table: 'asset_usages', readability: 'readable', describes: 'where each picture is used' },
   {
     table: 'asset_derivatives',

@@ -159,12 +159,22 @@ describe('meterFor — per-channel constraints', () => {
     expect(meter.charCount).toBeGreaterThan(CONSTRAINTS.x.maxChars)
   })
 
-  test('a handful of hashtags still fits, and is counted', () => {
+  test('a handful of keywords still fits, and is counted', () => {
+    // ── THE TAIL CHANGED SHAPE; THE CLAIM DID NOT ────────────────────────────
+    // Keywords replaced hashtags at publish (REQUESTS §34), so the exact tail is
+    // now '\n\n[chai] [pune]'. This assertion is anchored to that literal ON
+    // PURPOSE and is retargeted rather than loosened: the whole point of it is
+    // that the meter counts the string that actually goes out, and
+    // `toBeGreaterThan(bare.charCount)` would pass against any wrong tail.
+    //
+    // The legacy '#pune' below is deliberate too — a stored row written before
+    // the ruling has to count as '[pune]', not '[#pune]'.
     const bare = meterFor('x', draft({ body: 'Chai' }))
     const tagged = meterFor('x', draft({ body: 'Chai', hashtags: ['chai', '#pune'] }))
     expect(tagged.violations).toEqual([])
-    // '\n\n#chai #pune' — the exact tail that will be published.
-    expect(tagged.charCount).toBe(bare.charCount + '\n\n#chai #pune'.length)
+    expect(tagged.charCount).toBe(bare.charCount + '\n\n[chai] [pune]'.length)
+    // And explicitly NOT the old tail, so a revert cannot pass here quietly.
+    expect(tagged.charCount).not.toBe(bare.charCount + '\n\n#chai #pune'.length)
   })
 
   test('reports several violations at once when a draft breaks more than one rule', () => {
@@ -286,11 +296,26 @@ describe('never leaks internals', () => {
   ]
 
   test('every violation carries readable copy naming a real limit', () => {
+    /**
+     * ── RETARGETED TO THE CLAIM, NOT THE PROXY ───────────────────────────────
+     * This asserted `/allows/i`, which was a stand-in for "names a real limit"
+     * and held only because every engine message happened to use that one verb.
+     * MAX_HASHTAGS now reads "Sahoda takes at most 30 keywords per instagram
+     * post." — the number moved to Sahoda because Instagram's 30 is a HASHTAG
+     * limit and the field stopped holding hashtags (REQUESTS §34).
+     *
+     * The claim is unchanged and the assertion is now stronger than the word it
+     * replaces: a real limit is a NUMBER, and readable copy is a sentence.
+     */
     const messages = violatingMeters.flatMap((m) => m.violations.map((v) => v.message))
     expect(messages.length).toBeGreaterThan(0)
     for (const message of messages) {
-      expect(message).toMatch(/allows/i)
-      expect(message.trim().length).toBeGreaterThan(0)
+      // A real limit, quoted rather than described.
+      expect(message, message).toMatch(/\d/)
+      // A sentence, not a code or a fragment.
+      expect(message, message).toMatch(/\.$/)
+      // And never an identifier that leaked out of the engine.
+      expect(message, message).not.toMatch(/[A-Z]{2,}_[A-Z]/)
     }
   })
 

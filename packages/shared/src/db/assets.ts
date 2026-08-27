@@ -45,6 +45,37 @@ export const AssetSchema = z.object({
   created_by: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
+  /**
+   * When a person moved this file to the trash. `null` is the live library.
+   *
+   * ── WHY `.default(null)` AND NOT A BARE `.nullable()` ──────────────────────
+   * The column arrives with its own migration, and the code that reads it ships
+   * as one commit. A bare `.nullable()` would make every row unparseable in the
+   * window where the code is live and the migration is not, and this file parses
+   * PER ROW so that a bad row costs one tile: a required field missing from
+   * every row costs the entire library, which is the worst possible failure for
+   * a screen whose job is to show you your files.
+   *
+   * The default is NOT how the trash is enforced. The list query filters
+   * `deleted_at is null` in SQL, and PostgREST raises `42703` for a column that
+   * does not exist, so an unapplied migration surfaces as "Sahoda could not read
+   * your library" rather than as a trash that silently holds nothing. This
+   * default only stops that one honest failure from becoming two.
+   */
+  deleted_at: z.string().nullable().default(null),
+  /**
+   * SHA-256 of the file's exact bytes, for duplicate detection at upload.
+   *
+   * `.default(null)` for the reason `deleted_at` gives above: this file parses
+   * PER ROW so a bad row costs one tile, and a required field missing in the
+   * window between deploy and migration would cost the entire library.
+   *
+   * NULL for every row uploaded before the column existed. A NULL never
+   * matches, so an older duplicate is simply not detected — and nothing claims
+   * otherwise. The absence of a match is never rendered as "you have nothing
+   * like this".
+   */
+  content_sha256: z.string().nullable().default(null),
 })
 export type Asset = z.infer<typeof AssetSchema>
 

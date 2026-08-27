@@ -1,6 +1,11 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+// The button now opens a popup and calls `useRouter().refresh()` when it ends, so
+// it sits inside the app-router context. Mocked rather than wrapped: the refresh
+// is `use-connect-flow`'s behaviour and belongs to that module's own tests.
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
+
 import { ConnectButton } from './connect-button'
 
 /**

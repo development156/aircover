@@ -1,13 +1,71 @@
-// Clerk appearance bound to sahoda tokens — CSS vars resolve in the browser,
-// so dark mode and Brand Skin flow through without Clerk-specific theming.
+import type { ComponentProps } from 'react'
+import type { ClerkProvider } from '@clerk/nextjs'
+
+/**
+ * The appearance object Clerk actually accepts, derived from the installed
+ * SDK's own prop rather than written out here. `satisfies` against it is the
+ * guard that this file's keys are real ones. See the block below for what it
+ * caught.
+ */
+type ClerkAppearance = NonNullable<ComponentProps<typeof ClerkProvider>['appearance']>
+
+/* Clerk appearance bound to sahoda tokens — CSS vars resolve in the browser,
+   so dark mode and Brand Skin flow through without Clerk-specific theming.
+
+   ── FIVE OF THESE VARIABLE NAMES WERE DEAD, AND DARK MODE PAID FOR IT ──────
+   Clerk renamed its appearance variables between the v4 API this file was
+   written against and the v6 theming engine `@clerk/nextjs@7.5.20` loads.
+   MEASURED off the installed type contract — `Theme['variables']` in
+   `@clerk/react@6.12.5`, the type the provider's own `appearance` prop
+   resolves to: `colorText`, `colorTextSecondary`, `colorInputBackground` and
+   `colorInputText` are NOT members of it. Clerk dropped all four on the floor
+   and used its own defaults, which are built for a light card:
+
+     colorMutedForeground  #747686   secondary text
+     colorNeutral          black     borders, dividers, and the alpha shades
+                                     Clerk tints its quieter text with
+     colorInput            white     every input fill
+     colorInputForeground  black     every input's own text
+
+   On `--surface` in dark (#171717) black-derived alpha text is not dim, it is
+   gone: the account email under the workspace name, the "or" rule, "Don't have
+   an account?" and "Secured by Clerk" all render as near-black on near-black.
+
+   ── THE PROOF IS IN THE SCREENSHOT, NOT IN THE TYPES ──────────────────────
+   The sign-in email field renders WHITE in dark mode. This file has asked for
+   `var(--s1)` there since it was written. A white box is Clerk's documented
+   default for `colorInput`, so the rendered page is direct evidence that the
+   old key was ignored — no type reading required.
+
+   ── WHY NOTHING FAILED ────────────────────────────────────────────────────
+   `appearance={clerkAppearance}` passes a VARIABLE, not an object literal, so
+   TypeScript's excess-property check never ran and four unknown keys were
+   structurally fine. `satisfies ClerkAppearance` below is what closes that:
+   it re-arms excess-property checking on this literal, so the next rename
+   fails `pnpm typecheck` instead of failing in dark mode.
+
+   `colorNeutral` is `var(--ink)` on purpose. Clerk's own note on it says light
+   themes want dark shades and dark themes want light ones — which is exactly
+   what `--ink` is, #000000 in light and #ffffff in dark. */
 export const clerkAppearance = {
   variables: {
     colorPrimary: 'var(--p)',
-    colorText: 'var(--ink)',
-    colorTextSecondary: 'var(--muted)',
+    /* Clerk derives a foreground from colorPrimary and picks white; --pfg is
+       #000000 and measures 7.15:1 on the brand. The formButtonPrimary override
+       below still pins it, because that one also has to kill Clerk's gradient. */
+    colorPrimaryForeground: 'var(--pfg)',
+    colorNeutral: 'var(--ink)',
+    colorForeground: 'var(--ink)',
+    colorMutedForeground: 'var(--muted)',
+    colorMuted: 'var(--s2)',
     colorBackground: 'var(--bg)',
-    colorInputBackground: 'var(--s1)',
-    colorInputText: 'var(--ink)',
+    colorBorder: 'var(--line)',
+    /* --surface-2 is the token for a well INSIDE a card (tokens.css:122), which
+       is what an input on the auth card is. The dead key asked for --s1, the
+       page canvas: in dark that is #0d0d0d, DARKER than the #171717 card it
+       sits on, so the field would have read as a hole punched in the card. */
+    colorInput: 'var(--s2)',
+    colorInputForeground: 'var(--ink)',
     colorDanger: 'var(--danger)',
     colorSuccess: 'var(--ok)',
     colorWarning: 'var(--warn)',
@@ -101,4 +159,4 @@ export const clerkAppearance = {
       '@media (max-width: 699px)': { minHeight: '44px' },
     },
   },
-}
+} satisfies ClerkAppearance

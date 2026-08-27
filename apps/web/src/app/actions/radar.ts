@@ -332,7 +332,20 @@ export async function connectedChannels(): Promise<readonly Channel[]> {
     .eq('status', 'active')
   return toChannelSet(
     (data ?? [])
-      .map((r) => r.platform as Channel)
+      // ── FILTER THE STRING, THEN NARROW. NEVER THE OTHER WAY ROUND ────────
+      // This was `.map((r) => r.platform as Channel)` followed by this filter.
+      // The filter saved it, but the cast itself became a lie on 2026-08-26:
+      // `connections.platform` can now hold `discord`, `tiktok` and six more
+      // that are not `Channel` at all, and an `as` is precisely what the
+      // compiler cannot check. Narrowing after the test costs nothing and
+      // leaves no false statement for the next reader to trust.
+      //
+      // ⚠ THE LIST IS STALE AND IS DELIBERATELY LEFT ALONE HERE. `facebook` and
+      // `telegram` became channels on 2026-08-26 and this literal still names
+      // four, so Radar silently ignores both. That is a real defect and it is
+      // NOT this change's to fix: widening it alters what Radar reports, which
+      // is a product decision outside "make these platforms connectable".
+      .map((r) => r.platform as string)
       .filter((p): p is Channel => ['x', 'gbp', 'linkedin', 'instagram'].includes(p)),
   )
 }

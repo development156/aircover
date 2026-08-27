@@ -17,6 +17,16 @@ export interface ComposerActions {
   /** Save one channel's copy, and its format, in the order the row requires. */
   saveVersion: (channel: Channel) => Promise<boolean>
   saveAll: () => void
+  /**
+   * The same sweep, AWAITABLE, and reporting whether every write landed.
+   *
+   * `saveAll` is fire-and-forget because the sticky bar only ever needed a
+   * spinner. "Send now" needs the verdict: publishing after a version failed to
+   * reach its row would put out the words in the database rather than the words
+   * on screen, which is the exact defect the single-channel path already
+   * guarded. Resolves false if ANY channel refused.
+   */
+  saveAllAndWait: () => Promise<boolean>
   savingAll: boolean
   /** Channels whose copy is not in their row yet, in the post's own order. */
   unsaved: Channel[]
@@ -69,18 +79,30 @@ export function useComposerActions(
     [flushAndResolve, formats, variants],
   )
 
-  const saveAll = useCallback(() => {
+  const saveAllAndWait = useCallback(async (): Promise<boolean> => {
     setSavingAll(true)
-    void (async () => {
+    try {
+      // The post itself first and unconditionally. With no dirty variants the
+      // loop below does nothing, and "Save as draft" on a post whose only edit
+      // is its title has to still write the title.
+      let ok = await flush()
       // Sequentially, not in parallel: each save is a compare-and-set against a
       // version this client is holding, and four concurrent writes to one post
       // make a refusal impossible to attribute to a channel.
+      //
+      // NOTHING SHORT-CIRCUITS. One channel refusing must not skip the rest —
+      // they are separate rows, and abandoning three saves because the first
+      // failed loses work the reader can see on screen. The verdict is ANDed.
       for (const channel of variants.dirtyChannels(channels)) {
-        await saveVersion(channel)
+        ok = (await saveVersion(channel)) && ok
       }
+      return ok
+    } finally {
       setSavingAll(false)
-    })()
-  }, [channels, saveVersion, variants])
+    }
+  }, [channels, flush, saveVersion, variants])
+
+  const saveAll = useCallback(() => void saveAllAndWait(), [saveAllAndWait])
 
   /**
    * Setting a time is a STATUS change, and `savePost` refuses `status` on purpose
@@ -117,6 +139,7 @@ export function useComposerActions(
     flush,
     saveVersion,
     saveAll,
+    saveAllAndWait,
     savingAll,
     unsaved: variants.dirtyChannels(channels),
     changeSchedule,

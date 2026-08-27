@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { setupClerkTestingToken } from '@clerk/testing/playwright'
 import { test as base, type Browser, type Page } from '@playwright/test'
+import { installNodeTransport } from '../helpers/node-transport'
 
 /**
  * A signed-in user that seeds ITSELF.
@@ -198,6 +199,15 @@ async function cleanupSupabase(clerkUserId: string): Promise<void> {
 async function signIn(page: Page, user: SeededUser): Promise<void> {
   await setupClerkTestingToken({ page })
 
+  // ORDER MATTERS. setupClerkTestingToken registers a context route over
+  // `https://<fapi>/v1/*` and serves it with `route.fetch()`, which uses the
+  // BROWSER's network — the thing that does not work in a constrained sandbox.
+  // Playwright runs the last-registered matching handler and Clerk's never
+  // calls fallback(), so re-installing here takes FAPI back. The transport
+  // carries `__clerk_testing_token` itself for exactly this reason.
+  // No-op unless SAHODA_BROWSER_VIA_NODE=1.
+  await installNodeTransport(page.context())
+
   // A sign-in TICKET, minted server-side for this user and redeemed by the
   // <SignIn/> component on our own /sign-in route.
   //
@@ -241,6 +251,8 @@ async function signIn(page: Page, user: SeededUser): Promise<void> {
  */
 export async function signInSecondContext(browser: Browser, user: SeededUser): Promise<Page> {
   const context = await browser.newContext()
+  // The fixture above covers the default context; a hand-made one needs it too.
+  await installNodeTransport(context)
   const page = await context.newPage()
   await signIn(page, user)
   return page
@@ -264,6 +276,24 @@ export function adminClient(): SupabaseClient | null {
 }
 
 export const test = base.extend<{ signedIn: SeededUser }>({
+  /**
+   * Route every request through NODE rather than Chromium's own socket, when
+   * this environment needs it.
+   *
+   * A claude.ai/code sandbox resets outbound 443 for the Chromium process, so
+   * every https request from the page fails while Node's fetch of the same URL
+   * succeeds in the same process (REQUESTS §25). Every @smoke spec signs in
+   * through Clerk, which is https, so the whole leg was UNRUN there.
+   *
+   * `installNodeTransport` is a no-op unless SAHODA_BROWSER_VIA_NODE=1, which
+   * `scripts/cloud-setup.sh` sets only when `scripts/sandbox-probe.mjs` measures
+   * the block. On a laptop nothing changes and no request is intercepted.
+   */
+  context: async ({ context }, use) => {
+    await installNodeTransport(context)
+    await use(context)
+  },
+
   signedIn: async ({ page }, use) => {
     // Before anything is minted. A run that cannot tear down must not set up.
     assertCleanupCapable()

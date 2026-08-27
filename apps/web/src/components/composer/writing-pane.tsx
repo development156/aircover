@@ -2,10 +2,20 @@
 
 import { useState } from 'react'
 
+import { ImproveCopy } from '@/components/posts/improve-copy'
 import { InlineRewrite } from '@/components/posts/inline-rewrite'
 import { Textarea } from '@/components/ui/textarea'
 import { NotBuiltYet } from '@/components/composer/not-built-yet'
-import { selectedText, spliceSelection, type SelectionRange } from '@/lib/posts/splice-selection'
+import {
+  normalizeSelection,
+  selectedText,
+  spliceSelection,
+  type SelectionRange,
+} from '@/lib/posts/splice-selection'
+import { useCaretBox } from '@/lib/posts/use-caret-box'
+import { useTextHistory } from '@/lib/posts/use-text-history'
+
+import { CopyTools } from './copy-tools'
 
 export interface WritingPaneProps {
   body: string
@@ -38,15 +48,26 @@ export interface WritingPaneProps {
  * fail, and rather than left out entirely, which would read as never planned.
  */
 export function WritingPane({ body, onBodyChange }: WritingPaneProps) {
-  const [selection, setSelection] = useState<SelectionRange | null>(null)
+  const box = useCaretBox()
+  const history = useTextHistory(body, onBodyChange, box.io)
+
+  // Kept whole, including when it is empty. See the same note on
+  // `version-card.tsx`: a collapsed caret is what an insert needs and a rewrite
+  // does not, so the null the rewrite panel wants is derived rather than stored.
+  const [range, setRange] = useState<SelectionRange>({ start: 0, end: 0 })
+  const selection = range.start === range.end ? null : range
 
   function captureSelection(event: React.SyntheticEvent<HTMLTextAreaElement>) {
     const element = event.currentTarget
-    setSelection(
-      element.selectionStart === element.selectionEnd
-        ? null
-        : { start: element.selectionStart, end: element.selectionEnd },
-    )
+    setRange({ start: element.selectionStart, end: element.selectionEnd })
+  }
+
+  function insert(glyph: string) {
+    const at = normalizeSelection(body, range)
+    onBodyChange(spliceSelection(body, range, glyph))
+    const caret = at.start + glyph.length
+    setRange({ start: caret, end: caret })
+    box.place(caret)
   }
 
   return (
@@ -56,6 +77,7 @@ export function WritingPane({ body, onBodyChange }: WritingPaneProps) {
           Your post
         </label>
         <Textarea
+          ref={box.ref}
           id="post-body"
           rows={10}
           /**
@@ -75,6 +97,19 @@ export function WritingPane({ body, onBodyChange }: WritingPaneProps) {
         />
         <p className="text-[12px] text-muted">Select any part to rewrite just that piece.</p>
       </div>
+
+      <CopyTools
+        target="your post"
+        history={history}
+        canClear={body !== ''}
+        onClear={() => onBodyChange('')}
+        onInsert={insert}
+      />
+
+      {/* Under the tools row, NOT in it. Everything in that row edits the text
+          immediately, cannot fail and costs nothing; this one calls a model,
+          spends a credit and can be refused. See `copy-tools.tsx`. */}
+      <ImproveCopy target="your post" body={body} onAccept={onBodyChange} />
 
       {/* The splice runs against the CURRENT body, not the one captured when the
           rewrite was requested: the box stays editable while the model works, and
@@ -114,7 +149,9 @@ export function WritingPane({ body, onBodyChange }: WritingPaneProps) {
         onReplace={(range, replacement, expected) => {
           if (selectedText(body, range) !== expected) return false
           onBodyChange(spliceSelection(body, range, replacement))
-          setSelection(null)
+          const caret = normalizeSelection(body, range).start + replacement.length
+          setRange({ start: caret, end: caret })
+          box.place(caret)
           return true
         }}
       />

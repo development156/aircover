@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+
+// `ChannelTile` renders controls that call `router.refresh()`. This component
+// never touches the router itself; the tiles it is handed do.
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 
 import { ConnectionMarketplace, type MarketplaceSection } from './connection-marketplace'
 import { ChannelTile } from './channel-tile'
@@ -26,7 +30,7 @@ const sections = (): MarketplaceSection[] => [
       label: entry.label,
       kind: entry.kind,
       blurb: entry.blurb,
-      tile: <ChannelTile entry={entry} />,
+      tile: <ChannelTile entry={entry} connections={[]} />,
     })),
   },
   {
@@ -39,7 +43,7 @@ const sections = (): MarketplaceSection[] => [
       label: entry.label,
       kind: entry.kind,
       blurb: entry.blurb,
-      tile: <ChannelTile entry={entry} />,
+      tile: <ChannelTile entry={entry} connections={[]} />,
     })),
   },
 ]
@@ -124,9 +128,15 @@ describe('search', () => {
     const user = userEvent.setup()
     const { container } = render(<ConnectionMarketplace sections={sections()} />)
 
+    const total = CONNECTABLE.length + PLANNED.length
+
     await user.type(screen.getByRole('searchbox'), 'insta')
     expect(tiles(container)).toEqual(['instagram'])
-    expect(screen.getByText(/Showing/)).toHaveTextContent('Showing 1 of 8 channels.')
+    // The denominator comes from the catalogue, not from a number typed here.
+    // It has already moved once — eight channels became fifteen on 2026-08-26 —
+    // and a literal would have failed for being out of date rather than for
+    // being wrong.
+    expect(screen.getByText(/Showing/)).toHaveTextContent(`Showing 1 of ${total} channels.`)
   })
 
   it('finds a channel by its category, which is not part of its name', async () => {
