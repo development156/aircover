@@ -53,3 +53,4 @@ apps/web/playwright-report/
 .remember/
 .playwright-mcp/
 .claude/worktrees/
+test-results/

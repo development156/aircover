@@ -53,7 +53,21 @@ test.describe('connections is honest about every channel @smoke', () => {
       const comingSoon = main.locator('[data-coming-soon="true"]')
       await expect(comingSoon.first()).toBeVisible()
       const comingSoonCount = await comingSoon.count()
-      expect(comingSoonCount, `width ${width}: planned channels rendered`).toBe(4)
+      /**
+       * ONE, and it is `snapchat`. This read 4 until 2026-08-27, when the tile
+       * branch moved from `asChannel` (can Sahoda POST here — six) to
+       * `asPlatform` (can a row exist in `connections` — fourteen), and three
+       * cards that had been drawn as unbuilt turned out to be connectable all
+       * along. MEASURED the same day, off the catalogue: 15 entries, 1 with no
+       * platform. Snapchat is the one because the provider answers its connect
+       * call with 403 PLATFORM_BETA_RESTRICTED, so there is nothing to press.
+       *
+       * The figure stays HARDCODED on purpose. Deriving it from the catalogue
+       * would make this line agree with itself forever and guard nothing; a
+       * literal is what makes the next platform to land show up here as a red
+       * test rather than as a silently different screen.
+       */
+      expect(comingSoonCount, `width ${width}: planned channels rendered`).toBe(1)
 
       for (let i = 0; i < comingSoonCount; i += 1) {
         const tile = comingSoon.nth(i)
