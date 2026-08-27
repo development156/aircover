@@ -27,6 +27,35 @@ import { clerkAppearance } from '@/lib/clerk-appearance'
  * ── AND WHY IT GRADES THE PAIR, NOT THE VALUE ────────────────────────────────
  * Pinning `--muted` would fail the day the palette is legitimately retuned.
  * What must stay true is the RATIO between the text and the thing behind it.
+ *
+ * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────
+ * It grades OUR CONFIG, not Clerk's rendering, and every limit below follows
+ * from that.
+ *
+ *  · Whether Clerk honours these names AT ALL. That is the exact defect this
+ *    file exists because of: four v4 names were set for months, Clerk ignored
+ *    every one, and no arithmetic on our side could have known. A rename in a
+ *    future Clerk would be caught by `satisfies ClerkAppearance` in the source
+ *    file, at compile time, and NOT by anything here.
+ *  · Any colour Clerk composes at runtime — the alpha shades it derives from
+ *    `colorNeutral`, and any element it paints from a variable this file does
+ *    not declare, which silently keeps a Clerk default. Only the pairs listed
+ *    below are graded; an ungraded pair is not a passing pair.
+ *  · Everything in `clerkAppearance.elements`. `formButtonPrimary` pins its own
+ *    `color` and `background`, and this file never reads that block.
+ *    `e2e/auth-contrast.spec.ts` measures the rasterised button instead.
+ *  · Brand Skin. Tokens are read from the shipped `tokens.css`, so a workspace
+ *    theme that overrides `--surface` or `--ink` at runtime is invisible here.
+ *  · Any token whose value is not plain 6-digit hex. `luminance()` THROWS on
+ *    `rgba()`, `color-mix()` or a 3-digit hex rather than grading it, so such a
+ *    token fails loudly — but it fails as an error, not as a contrast verdict.
+ *  · A token declared other than one-per-line as `--name: value;`. The reader
+ *    is a line-anchored regex; a shorthand or multi-line declaration is not
+ *    matched and `token()` throws.
+ *  · Theme scopes beyond light and dark. Light/dark is split on the byte offset
+ *    of the first `[data-theme='dark']`, so the `[data-rail]` scope further
+ *    down `tokens.css` — which redeclares `--surface`, `--ink` and `--line` —
+ *    is never read on its own. Clerk renders nothing inside the rail today.
  */
 
 const require_ = createRequire(import.meta.url)
