@@ -216,8 +216,35 @@ export function Composer({
           when they stack — MEASURED at 768px with a single left pane, the only
           thing on this screen no competitor has was the last thing on the page,
           below an empty media well. */}
+      {/* ── THE LEFT COLUMN IS ONE CELL AT WIDE, AND THAT IS THE WHOLE FIX ──
+          MEASURED at 1440 with three channels: the writing box ended at y=574
+          and the template card began at y=1029. A 455px hole nobody chose.
+
+          The cause is CSS grid, not spacing. The versions column carried
+          `row-span-2`, and a spanning item taller than the rows it spans has its
+          excess DISTRIBUTED across them — so row 1 grew far past the writing
+          pane and `items-start` pinned the pane to the top of a near-empty row.
+          The hole grew with every channel added, so it was worst on the screen
+          doing the most work.
+
+          THREE ROW-SIZING FIXES WERE TRIED AND ALL THREE FAILED, each measured:
+          `max-content_1fr`, `min-content_1fr` and `min-content_auto` every one
+          left the gap at exactly 455px. A track function cannot refuse a
+          spanning item's contribution; only removing the span can.
+
+          So the left column becomes ONE grid cell at wide, stacking the writing
+          pane and the extras with no span anywhere. At narrow the wrapper is
+          `display: contents`, which dissolves it so all three are direct grid
+          items again and `order` can put the versions BETWEEN them — which is
+          the order the original comment defends, and the reason a plain wrapper
+          would not do: measured at 768px, the versions were once last on the
+          page, below an empty media well, and they are the one thing here no
+          competitor has. */}
       <div className="grid items-start gap-grid wide:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-        <div className="wide:col-start-1 wide:row-start-1">
+        {/* `contents` at narrow dissolves this wrapper so all three panes are
+            direct grid items and `order` can interleave them. At wide it becomes
+            a real column, which is what removes the span. */}
+        <div className="contents wide:flex wide:flex-col wide:gap-grid">
           <WritingPane
             body={draft.body}
             onBodyChange={(body) => {
@@ -227,9 +254,30 @@ export function Composer({
               variantsApi.mirrorSource(body)
             }}
           />
+
+          {/* Order 3 so it lands AFTER the versions once the wrapper
+              dissolves at narrow. Inside the wide flex column it simply follows
+              the writing pane. */}
+          <div className="order-3">
+            <ExtrasPane
+              body={draft.body}
+              onBodyChange={(body) => {
+                autosave.update({ body })
+                variantsApi.mirrorSource(body)
+              }}
+              channels={draft.channels}
+              postId={postId}
+              media={media}
+              previews={previews}
+              libraryNames={libraryNames}
+              templates={templates}
+            />
+          </div>
         </div>
 
-        <div className="wide:col-start-2 wide:row-span-2 wide:row-start-1">
+        {/* Order 2 puts the versions BETWEEN the writing pane and the extras
+            once the wrapper has dissolved. At wide it is simply column two. */}
+        <div className="order-2">
           <VersionsPane
             channels={draft.channels}
             canonicalBody={draft.body}
@@ -240,22 +288,6 @@ export function Composer({
             onGenerated={variantsApi.applyGenerated}
             generateIsPrimary={!everyChannelWritten}
             onSaved={(channel) => void actions.saveVersion(channel)}
-          />
-        </div>
-
-        <div className="wide:col-start-1 wide:row-start-2">
-          <ExtrasPane
-            body={draft.body}
-            onBodyChange={(body) => {
-              autosave.update({ body })
-              variantsApi.mirrorSource(body)
-            }}
-            channels={draft.channels}
-            postId={postId}
-            media={media}
-            previews={previews}
-            libraryNames={libraryNames}
-            templates={templates}
           />
         </div>
       </div>
@@ -271,14 +303,15 @@ export function Composer({
         statusRows={statusRows}
         flush={actions.flush}
         saveVariantNow={actions.saveVersion}
+        saveAllVersions={actions.saveAllAndWait}
+        unsavedVersions={actions.unsaved.length}
       />
 
       <CommitBar
         status={autosave.status}
         unsavedVersions={actions.unsaved.length}
-        savingVersions={actions.savingAll}
-        onSaveAll={actions.saveAll}
         canFinish={draft.channels.length > 0}
+        onSaveDraft={actions.saveAllAndWait}
       />
     </div>
   )

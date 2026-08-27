@@ -1297,6 +1297,39 @@ The narrow defect is attribution alone. A run with no identifiable card is bette
 recorded with a null `task_code`, or not recorded, than recorded against a card
 that happens to be open.
 
+**IT ALSO WRITES `fail` ROWS, AND THAT IS WORSE THAN THE PASS ROWS ABOVE.**
+Observed 2026-08-26 (`wt-divas2`, advisor). A deliberate `pnpm exec vitest run`,
+run to reproduce a CI failure, deposited a row stamped `"task_code": "SL-054"`,
+`"status": "fail"`, `"summary_plain": "The unit checks ran and something failed
+(229 passed, 2 failed)."`
+
+The two failures were REQUESTS §26's `mutation-harness` tests, which assert a
+`0500` directory is unwritable and **cannot** fail on an unprivileged runner.
+They are an artefact of this sandbox running as uid 0, they pass on CI, and they
+have nothing to do with SL-054 — which is the card recording that **production
+was down for 22 hours 40 minutes.**
+
+So the hook stands ready to file a fabricated QA FAILURE against a production
+incident. A false pass inflates confidence; a false fail on an incident card
+corrupts the record of the incident itself, and an incident review is exactly
+where somebody reads these rows as evidence. Reverted here too, which makes at
+least five reverts across three sessions.
+
+**A NINTH revert, 2026-08-26, wt-divas2, and this one names a new cause.** Four
+more rows queued against SL-054, all `"status": "pass"`, all `"actor": "claude"`.
+None came from a gate run: they are a SUBAGENT's throwaway probe files, run and
+deleted inside one audit. The tests they record **no longer exist**.
+
+So the hook does not merely misattribute a real run. It will file pass evidence
+for a suite that has been deleted, onto a production-incident card, from a
+process the person at the keyboard never started. Anything that shells out to
+vitest deposits a row, including an agent measuring something for thirty seconds.
+
+Two things follow for whoever fixes this. The `task_code` should come from the
+work, not from whatever sits in the board's in-progress column. And a run whose
+test files are gone by the time the row is written is not evidence of anything
+and should not be queued at all.
+
 ## 19 · For the advisor — refining what a person types in onboarding
 
 **Owner ruling wanted, plus two things this lane may not write.** Asked for by
@@ -1934,3 +1967,533 @@ four planned channels are not equal: Facebook is close to free (Zernio marks it
 docs, and **YouTube is video** — `PlatformSpec` has `imageDims` and `aspectRange`
 and no duration, codec or resolution field, and the whole media pipeline is
 image-shaped. It is an epic, not a channel.
+---
+
+## 29 · Scope claim — the composer's density, and why the wizard is NOT coming back
+
+**Lane** `wt-divas2` (owner divas, branch `claude/divas-kickoff-03y2g2`),
+2026-08-26, advisor. Declared BEFORE the first edit, per `08_ROLES.md`: two lanes
+editing the same _file_ is a conflict git shows you; two lanes editing the same
+_concept_ is two designs of one thing where only one survives.
+
+**Claimed:** `apps/web/src/components/composer/*` and the screen at
+`/posts/[id]` (`/posts/new`). Not `packages/publishing`, not `packages/shared`,
+no migration, no price.
+
+### The founder's brief, and the part of it that is already answered
+
+The ask was "make this far easier to navigate, sequence flow or one page, your
+call". **The call is one page, and it is not a preference — it is a decision this
+repository already made, with reasons, and reversing it would re-break what it
+fixed.** Recorded here so the next lane does not re-litigate it:
+
+- `composer.tsx:47` — `/create/post` WAS a five-step wizard. It was deleted
+  because it **could not generate variants**, and because a writer met one of two
+  different editors depending on which link they clicked.
+- `version-options.tsx:50` — the wizard collected **one** Format answer on a
+  Format step and wrote it to **every** variant, so choosing a carousel for
+  Instagram forced a carousel on X. Format is a per-channel column and the wizard
+  flattened it.
+- `version-card.tsx:65` — stacked cards over tabs is deliberate: "a control that
+  shows one at a time hides exactly" the one thing no competitor does, which is a
+  separate body, limit and publish state per channel.
+
+A wizard is a tab strip over time. Both hide three of four versions, and the
+non-negotiable in `/go` — _never collapse per-channel variants into one body_ —
+is the same rule pointed at the same defect.
+
+### So what IS wrong, stated as a count rather than a feeling
+
+An untouched channel that merely follows the post still renders its heading,
+state, editor, character meter, hashtag field with help text, inline-rewrite
+affordance, a "Kind of post" select with its own help text, the channel's extras
+(poll, first comment, co-author, or Google's button and topic), a relink control,
+and a Save button with a "nothing to save" note beside it, for a channel nobody
+has typed into.
+
+**MEASURED** by rendering all four `VersionCard`s in jsdom at their default state
+(no format chosen, no extras set) and counting what a writer actually meets:
+
+| across all four cards                                   | count   |
+| ------------------------------------------------------- | ------- |
+| form controls (`input`, `select`, `textarea`, `button`) | **24**  |
+| elements carrying their own text                        | **105** |
+
+> **A CORRECTION, KEPT ON THE RECORD.** The first version of this section said
+> "roughly forty controls". That was an eyeball estimate written from a
+> screenshot, and the measurement above contradicts it: the real figure is 24.
+> `docs/37` §17 forbids rendering a number the product cannot prove, and a
+> planning document does not get an exemption from its own rule. The estimate was
+> wrong in the direction that flattered the fix.
+
+That is the defect. It is not that the screen is one page; it is that the page
+has **no hierarchy and no progressive disclosure**, which `docs/37` §16 names as
+the property that cannot be checked one element at a time. Every one of those ten
+blocks is individually correct and well-argued in its own comment. That is
+precisely the founder's v4 verdict repeating: _"every one an individually
+defensible decision nobody weighed against its neighbours."_
+
+### The second defect, which the screenshot shows and no code comment mentions
+
+The captured session has **0 credits** and **four channels reading "not
+connected"**. `docs/37` §16 rule 1 says a blocker leads and nothing competes with
+it; `docs/37` §15 says one absence gets one statement. The screen currently
+states the same absence four times in chips, offers an orange "Adapt for 4
+channels · 3 credits" button to a wallet holding zero, and leads with none of it.
+
+**What this lane is changing:** hierarchy and disclosure only. No per-channel
+body is merged, no constraint is loosened, no engine verdict is moved out of
+`meterFor`.
+
+### What shipped, and how much it actually moved
+
+`ChannelSettings` (`apps/web/src/components/composer/channel-settings.tsx`) folds
+six per-channel settings behind one `<details>`: Google's button, Google's topic,
+the poll, the first comment, the co-author and the AI label. The kind of post
+stays out, because changing it changes that card's media rules and a control has
+to be visible where its consequences are.
+
+**MEASURED**, same method as above, before and after:
+
+| across all four cards            | before | after  | change |
+| -------------------------------- | ------ | ------ | ------ |
+| form controls on screen          | 24     | **19** | −21%   |
+| elements carrying their own text | 101    | **80** | −21%   |
+
+> **CORRECTED, AND THIS IS THE SECOND FIGURE IN THIS SECTION TO HAVE FLATTERED
+> THE FIX.** It first read 105 → 76 (−28%), with per-card rows claiming −45% on
+> Google Business Profile. An adversarial audit refuted it and a re-measurement
+> against the genuinely pre-fold component (`c68b491^`) agrees: "before" had been
+> counted on the POST-fold tree, so it carried four "More settings" labels that
+> did not exist before, and "after" excluded those same four labels although a
+> reader plainly sees them. Both metrics are **−21%**.
+>
+> **The metric flatters itself a second way.** 26 of those 101 elements are
+> `<option>`s inside collapsed `<select>`s, which nobody meets until a dropdown
+> is opened, and roughly a third of the counted reduction is options moving into
+> the fold. Honest headline: **about a fifth less on screen, and less than that
+> in the things a writer actually reads.**
+
+**This is a real improvement and a moderate one, and the difference matters.** It
+is not the wholesale simplification the brief asked for. The remaining weight is
+not in the settings; it is in the per-card help text, three separate "unsaved"
+vocabularies that `composer.tsx` deliberately keeps apart, and the fact that four
+cards each restate the same structure. Cutting further means changing what the
+card SAYS, and every one of those sentences is pinned by a shape gate.
+
+### The fold never swallows state
+
+It opens itself whenever any of the six carries a value, and the summary names
+what is set even when shut. Guarded by `channel-settings.test.tsx` (10 tests) and
+proved by four mutations, each watched going red (a fifth, added after the audit, restores the naive comment-strip and turns two more red):
+
+| mutation                                                     | test that caught it                                 |
+| ------------------------------------------------------------ | --------------------------------------------------- |
+| fold welded open                                             | `starts shut on a channel with nothing set` (2 red) |
+| fold welded shut                                             | `opens itself when a setting carries a value`       |
+| `collaborators` tested by key presence rather than emptiness | `an emptied box is not a setting`                   |
+| summary stops naming what is set                             | `names what is set … once the writer shuts it`      |
+
+### One thing the screenshot suggested that turned out NOT to be a defect
+
+The captured session shows 0 credits and four channels reading "not connected",
+so the obvious call was `docs/37` §16 rule 1: a blocker leads. **It is not a
+blocker for this screen.** A writer with no connection can still write, save,
+template and schedule; only publishing is blocked, and `publish-now.tsx:193`
+already states it there, in two tested sentences that distinguish "some channels
+can still receive this" from "nothing goes out at all". `schedule-field.tsx` says
+it at the schedule, and `connection-gap.ts` keeps both honest when the read
+failed. A third statement at the top would have broken the rule it invoked.
+
+**So no connection banner was added.** Recorded because it looked correct from a
+screenshot and was wrong against the code, which is the whole argument for
+reading before designing.
+
+---
+
+## 30. The gate has not run on ANY branch since 11:08Z, and a red tick currently means nothing
+
+**Lane** `wt-divas2` (owner divas), 2026-08-26, advisor. Found while driving PR
+[#15](https://github.com/development156/sahodalabs/pull/15) to green.
+
+**MEASURED over the 30 most recent `gate.yml` runs (254 → 283): every one
+failed.** Five branches, all three trigger events, `workflow_dispatch` included.
+
+|                      |                                        |
+| -------------------- | -------------------------------------- |
+| successes in 30 runs | **0**                                  |
+| median run duration  | **4 seconds**                          |
+| branches affected    | every branch that pushed in the window |
+
+**The job never starts.** Job `98188669059`: `started_at` 13:06:56Z,
+`completed_at` 13:06:58Z, `runner_id: 0`, `runner_name: ""`, and **no `steps`
+array at all**. The check run's `output.title`, `output.summary` and
+`output.text` are empty, and the logs endpoint 404s on every run including old
+ones. `gate.yml`'s own header records a real run at **11m31s**.
+
+One re-run was spent to rule out a transient: attempt 2 ran **7 seconds** and
+failed identically.
+
+**It is not the lockfile and it is not the code.** All four CI steps were run
+locally, verbatim: `pnpm install --frozen-lockfile` exits 0 "Already up to
+date"; `pnpm turbo run typecheck lint test --concurrency=1` is 27/27 exit 0;
+`pnpm exec prettier --check .` is clean; root `vitest` is 229 passed with the
+two §26 root-only failures that pass on an unprivileged runner.
+
+**The remedy is on the GitHub account** — Actions billing, a spending limit, or
+exhausted minutes — which no lane can push. Founder action.
+
+### Why this is worse than an ordinary red
+
+**A green tick is currently unobtainable and a red one carries no information
+about the diff.** §15 exists because nothing in CI ran the gate for months, and
+§27 records this workflow silently not firing twice. This is that same condition
+arriving a third way, and every lane is reading its own red tick as if it were
+about their own work. Anyone who "fixes" their diff to chase this will be
+chasing a runner that was never allocated.
+
+**Until it is resolved, a lane's only real evidence is `pnpm gate` run locally,
+unpiped, and stated with its `Cached:` count.**
+
+---
+
+## 31 · The brand fill now marks what COMMITS — founder's ruling
+
+**Ruled by the founder, 2026-08-27**, looking at the composer:
+
+> "make clickable buttons like send and schedule orange with black text or more
+> like save cancel things like that should be highlighted"
+
+### What it replaces
+
+`docs/37` §2.3 and §16: "exactly one solid-brand-fill element per view.
+Everything else is a secondary or a link." That budget does not survive the
+ruling, and leaving a permanently red guard in the tree to honour a rule the
+owner has overruled would be worse than saying so plainly.
+
+### The rule that replaces it, because a ruling with no shape is not enforceable
+
+**Every button that COMMITS carries the fill. Nothing else does.**
+
+Committing means it writes to the row or sends to a platform:
+
+| carries the fill                                       | does not                                            |
+| ------------------------------------------------------ | --------------------------------------------------- |
+| Save (per channel)                                     | Undo, Redo, Clear, Emoji                            |
+| Save all versions                                      | Polish / Professional / Friendly / Creative         |
+| Adapt for N channels (spends credits, writes variants) | Schedule it / Post now (they open, they do not act) |
+| Confirm schedule                                       | Save as draft, Cancel, Keep mine                    |
+| Confirm and send to _channel_                          | Change the time, See the calendar                   |
+
+The second column is the half that keeps the rule meaningful. A screen where
+everything is loud tells the reader nothing about which thing is the point.
+
+### No new colour was invented
+
+`text-primary-foreground` is INK, not white. `button.tsx` measures the pair at
+**7.15:1**, and the `primary` variant has always been orange with ink on it. The
+ruling asked for a treatment the design system already had and was rationing.
+
+### Where it is enforced
+
+`one-fill.test.tsx`, retargeted rather than deleted. It now asserts the exact
+list of fills at rest — Adapt, one Save per channel, Save all versions — and
+asserts by name that the openers, the tone modes and the writing tools do not
+carry it. Five mutations were watched going red, including promoting Emoji and
+demoting Save.
+
+`e2e/page-dash-hierarchy.spec.ts` still asserts the one-per-view budget on
+`/home` and `/analytics`, and is untouched: the ruling was made about the
+composer, and those two screens have no committing buttons on them.
+
+---
+
+## §32 — One Send now, and the argument it overturns
+
+**Founder's ruling, 2026-08-27**, given with three screenshots of the live
+preview:
+
+> "the send and ..... bring it below preview publish and here also show
+> connected platform where it is going just like schedule and also there should
+> be two buttons save as draft ( which saves all the versions automatically ) and
+> send now ( which also saves all the versions and sends it directly )"
+
+### What it overturns, stated plainly
+
+`finish-panel.tsx` carried a comment headed **"WHY THERE IS NO SINGLE POST NOW
+BUTTON"**. Its argument: publishing is per channel, one post can be live on
+Instagram and failed on X in the same second, and a single button would have to
+report one verdict for four outcomes.
+
+**That argument was right about the REPORT and wrong about the BUTTON.** One
+press with N results says exactly the same true thing as N presses, and asks the
+reader for one decision instead of four. The per-channel truth moved into
+`send-outcomes.tsx`: one row per channel, each with its own verdict and its own
+link, and `send-outcomes.test.tsx` asserts that no sentence anywhere adds them
+up — including a guard against the banner returning as "1 of 2 published", which
+is the same lie in a smaller font.
+
+### The three moves
+
+| Was                                                    | Is                                                              |
+| ------------------------------------------------------ | --------------------------------------------------------------- |
+| Save floating in a sticky bar, send four screens below | Both in `SendControls`, under the dry run                       |
+| A chip rail: pick a channel, confirm, repeat           | Save as draft · Send now, with one confirm naming every channel |
+| The channel list on the schedule route only            | `ChannelReadout` on both routes                                 |
+
+**Both buttons save everything first.** The old bar asked for that separately
+("Save all versions"), so a reader could press Save, believe their work was safe,
+and lose four channel variants. `saveAllAndWait` ANDs every per-channel verdict,
+attempts every channel even after one refuses, and both buttons act on the
+answer: "Save as draft" prints a refusal rather than "Saved", and "Send now"
+does not publish at all.
+
+### What did NOT change
+
+Every refusal in the publish path. `publishOne` still declines a `fixture`
+response, still refuses to call a permalink-less 201 a publish, and still reads
+the body rather than the HTTP status for the verdict. Those three branches lived
+inside a React transition and had **no test of any kind**; they are now in
+`lib/posts/publish-one.ts` with thirteen.
+
+The confirm step also stays, and it names the channels rather than counting them.
+
+---
+
+## §33 — The Send button stays visible, and the bar saves again
+
+**Founder's ruling, 2026-08-27**, with a screenshot of the live preview marking
+two empty slots:
+
+> "i want a SEND button in orange near save draft
+>
+> and i want a save as draft in downbar side with save and send ( rename this as
+> save but the functionality remains same save and send )"
+
+### A refused button beats an absent one
+
+`SendControls` HID "Send now" when no channel could receive the post, on the
+principle that a button which cannot work is worse than no button.
+
+MEASURED on the preview with four unconnected channels: what the reader got was
+a lone "Save as draft" and a gap where the point of the screen should be.
+Nothing on screen said whether sending was missing, broken, or somewhere else.
+**An absent control explains nothing.** It is now rendered and `disabled`, with
+the warn block naming every unconnected channel and a link to connect one
+directly above it. That is a refusal rather than a dead end, and it is why
+`disabled` is honest here rather than the coming-soon pattern `design-lint`
+rule 3 forbids: nothing is unfinished, the account is simply not connected.
+
+### The bar saves again, and this time there is only one save
+
+§32 took "Save all versions" off the sticky bar, arguing that a floating save
+and a distant send put the two endings to one piece of work in two places. That
+was my reading, not a ruling, and it was wrong about the cost: **a writer three
+screens up a long composer should not have to travel to the end of the page to
+make their work safe.**
+
+The split was never the problem. TWO DIFFERENT SAVE FUNCTIONS were — the bar
+wrote versions, the panel wrote the post, and neither said which. Both places
+now call the same `saveAllAndWait`, so they cannot disagree about what "saved"
+means.
+
+| Bar control   | Fill      | What it does                                     |
+| ------------- | --------- | ------------------------------------------------ |
+| Save as draft | secondary | Writes the post and every version. Stays put.    |
+| Save          | brand     | Writes the same, then goes to the Send it panel. |
+
+### "Save" had to be made true
+
+The second control was a bare `<a href="#finish">` labelled "Save and send". It
+saved nothing; it scrolled. The founder asked for it to read "Save", and a
+scroll link called Save is the vaguest possible label on the most important word
+on the screen (CLAUDE.md rule 1). So it now saves and THEN goes: the label is
+true, and the journey it existed for is unchanged.
+
+**The order is guarded separately.** `void onSaveDraft(); jump()` looks identical
+on screen and loses the work of anyone who closes the tab on arrival, so a test
+holds the save open and asserts the page has not moved.
+
+### The fill list grew by one, under the rule rather than around it
+
+`one-fill.test.tsx` now expects five at rest: Adapt, three per-channel Saves, and
+the bar's Save. §31 says the fill marks what COMMITS, and the bar's Save commits.
+Its quieter sibling does not carry it, and that is asserted too — two identical
+fills side by side in a floating strip would tell the reader nothing about which
+one moves them on.
+
+---
+
+## §34 — Keywords, not hashtags: `[marketing]`
+
+**Founder's brief**, asked for six times before this and built on the seventh:
+
+> "In Caption Generation:
+>
+> 1. SEO Optimized keywords to be there
+> 2. There are supposed to be keywords instead of hashtags in the following
+>    format : [marketing]"
+
+### The question that blocked it, and how it was settled
+
+Whether `[marketing]` is an INTERNAL annotation stripped before publishing, or
+literal text a follower sees. It was asked six times and never answered.
+
+**Built literally: `[marketing]` reaches the platform exactly as written.** That
+is the plain reading of "keywords instead of hashtags in the following format",
+and it is the reading the product can most cheaply correct — `keywordTail` is
+the only function that would change, and the composer shows the exact published
+string before anybody presses Send.
+
+### What moved
+
+| Layer               | Before                    | After                         |
+| ------------------- | ------------------------- | ----------------------------- |
+| `formatForPlatform` | `\n\n#chai #pune`         | `\n\n[chai] [pune]`           |
+| `charCountFor`      | counted the hash tail     | counts the bracket tail       |
+| Composer field      | "Hashtags", `#chai #pune` | "Keywords", `chai in pune, …` |
+| Input separator     | whitespace and commas     | commas, newlines, brackets    |
+| Generation prompt   | "norms for hashtags"      | `KEYWORD_RULE`, no `#`        |
+
+### The stored key did NOT change, deliberately
+
+`post_variants.extras.hashtags` is untyped jsonb and production rows already
+hold `#chai`. Renaming the KEY would orphan every one of them; renaming the
+CONCEPT costs nothing. So `normalizeKeywords` strips a leading `#` on read —
+**that function is the migration**, and no SQL runs.
+
+### What the brackets actually buy
+
+A keyword may contain a SPACE. `#chai pune` is two hashtags because a hashtag
+cannot hold a space; `[chai in pune]` is one keyword, and it is what somebody
+searching actually types. The old field split on whitespace and structurally
+could not express it.
+
+### What was NOT changed, and needs a decision
+
+**Instagram's 30-hashtag cap is still applied to this list.**
+`validateVariant` still emits `MAX_HASHTAGS`, and `violation-copy.ts` still
+carries a shape gate on the exact sentence "Instagram allows 30 hashtags."
+That rule is now about a list that contains no hashtags. It will not bite in
+practice (nobody writes thirty keywords) and removing a Constraint Engine rule
+is a larger act than a format change, so it stands. Say the word and it goes.
+
+---
+
+## §35 — The brackets are the writer's choice
+
+**Founder's ruling, 2026-08-27**, answering the question §34 shipped under:
+
+> "Give them a option to check mark if they want [] on their keywords or not ?
+> if yes apply it and publish with it and if not publish the keywords normally"
+
+A tick box per channel, beside the keywords. Ticked publishes `[chai] [pune]`;
+unticked publishes `chai pune`. The line beneath the box always states the exact
+string that will go out, whichever way the box is set.
+
+### Absence means ticked, and that is load-bearing
+
+`extras.keywordBrackets` is absent on every row written between §34 and this
+ruling, and all of those publish WITH brackets. Reading absence as `false` would
+silently strip the brackets from all of them, with nothing on any screen to show
+it. So `keywordBracketsOn` reads `!== false`, and it is a named function in
+`variant-extras.ts` rather than an inline expression **because a mutation proved
+the inline version untestable** — flipping it to `=== true` left every suite in
+the repository green.
+
+### Two bugs the tests found in this change
+
+- **The salvage path has its OWN schema map.** Declaring `keywordBrackets` in
+  `VariantExtrasSchema` was not enough: `parseExtras` salvages through
+  `FIELD_SCHEMAS`, so a stored `"false"` STRING survived unchecked and read as
+  `!== false` — turning the brackets back on for a writer who had turned them
+  off. Found by the test written to ask what the declaration actually buys.
+- **The character meter had to learn the flag.** `[chai] [pune]` is four
+  characters longer than `chai pune`. A meter that ignored the choice would read
+  long on every post whose writer unticked the box, refusing captions that fit.
+
+---
+
+## §36 — Instagram's 30-hashtag cap, on a list with no hashtags
+
+**Left to Sahoda by the founder** ("i leave it up to you"), so: **the cap stays,
+its sentence changes.**
+
+`spec.maxHashtags` is 30 because that is Instagram's HASHTAG limit. Publishing
+`[a] … [31]` is not something Instagram refuses, so
+`instagram allows 30 hashtags.` was attributing a Sahoda refusal to a platform
+rule that does not cover this field.
+
+Dropping the rule would leave `violation-copy.ts`'s MAX_HASHTAGS entry and its
+fix-it button guarding nothing, and a thirty-item tail is a real thing to stop.
+So Sahoda owns the limit and says so: **"Sahoda takes at most 30 keywords per
+instagram post."** The fix-it reads "Remove extra keywords".
+
+**The CODE stays `MAX_HASHTAGS`.** It is a stored, matched string across the copy
+table, the fix-it map and the publish logs; renaming it is a data change, not a
+copy change. `field` stays `hashtags` for the same reason — it addresses
+`extras.hashtags`.
+
+The shape gate in `violation-copy.ts` moved in the same commit, per CLAUDE.md
+rule 5, and is still anchored at both ends.
+
+---
+
+## §36 — The box mirrors the post, and the template card holds two controls
+
+**Founder's ruling, 2026-08-27**, with two screenshots.
+
+### 1. The keyword box shows what will publish
+
+> "when the box is tiked the square bracket is applies on the above bar also
+> like for example in the box it is written cat it should change to [cat] on
+> live"
+
+§35 kept the input always bracketed whatever was published, on the reasoning
+that the line beneath states the published form separately. That is two answers
+to one question: a box reading `[cat]` over a post reading `cat` is lying about
+the only thing the field exists to show.
+
+**It settles on BLUR, and immediately when the tick box moves.** Rewriting on
+every keystroke moves the caret out from under the writer — `cat` becomes
+`[c]at` on the first character — and that wrong repair has its own guard.
+Bracketed keywords settle space-separated (`[chai in pune] [monsoon]` shows its
+own boundaries); unbracketed ones settle comma-separated, because
+`chai in pune monsoon` is neither readable nor re-parseable.
+
+### 2. "Helps in boosting the posts", written as the true version
+
+> "below you should also mention helps in boosting the posts"
+
+The line added is: _"Keywords give people another way to find this post. The
+brackets only decide how they look."_
+
+**Not "boosts your posts", and deliberately.** The BRACKETS boost nothing — they
+are punctuation and no platform ranks on them, so a boost claim under that tick
+box would be false about the thing it sits under. The KEYWORDS are the half that
+works, because a caption carrying the words somebody searches for is a caption
+search can match. No number and no promise of reach: Sahoda measures neither,
+and "boosts your posts" is a figure no query produced. A test forbids `%`,
+`boost` and `reach` in that sentence.
+
+### 3. The template card is two controls
+
+> "in use a template it should not show any thing except save it as a template
+> and browse template — and in browse template they can choose the template"
+
+The card printed the count, then every template name, then the save link — a
+list nobody asked to see, in a sidebar, growing with every template saved.
+
+At rest it is now **Browse templates** and **Save this post as a template**.
+Browsing opens a panel with a name filter and the list; choosing one loads it
+and closes the panel.
+
+**The count moved rather than died.** "A count is a claim, and only one of three
+reads earns it" still holds — the number now sits inside the browser, where it
+answers a question somebody just asked.
+
+**Browse is refused, never absent** (the §33 pattern). With nothing saved or a
+broken read it is disabled and says which of the three nothings applies: a
+failed read is not an empty library, and neither is a missing workspace. A
+search that matches nothing says so in its own words and keeps `3 saved` on
+screen to prove the library is not empty.

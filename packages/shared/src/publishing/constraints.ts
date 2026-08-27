@@ -116,6 +116,15 @@ export interface VariantDraft {
   hashtags?: string[]
   hasLink?: boolean
   mediaCount?: number
+  /**
+   * Whether the published keyword tail wears its brackets.
+   *
+   * ABSENT MEANS TRUE, and that is load-bearing rather than a shrug. Brackets
+   * are what §34 shipped and what every row written since then publishes; making
+   * absence mean `false` would silently change what those posts put out. A
+   * writer who wants plain words unticks the box, which writes `false`.
+   */
+  keywordBrackets?: boolean
 }
 
 export interface MediaAttachment {
@@ -298,10 +307,93 @@ export function normalizeHashtags(hashtags: readonly string[] | undefined): stri
  * The tail appended to a body when hashtags are published: a blank line, then the
  * tags separated by single spaces. One definition, used by both the counter and
  * the formatter, so the number on screen describes the string that goes out.
+ *
+ * KEPT, and no longer on the publish path. `keywordTail` is what `formatForPlatform`
+ * and `charCountFor` now use — see the block below for the founder's ruling. This
+ * stays because the two functions are what PROVES the change: `hashtag-format.test.ts`
+ * renders the same stored list through both and asserts they differ, so a silent
+ * revert to the `#` form fails rather than passing quietly.
  */
 export function hashtagTail(hashtags: readonly string[] | undefined): string {
   const tags = normalizeHashtags(hashtags)
   return tags.length === 0 ? '' : `\n\n${tags.join(' ')}`
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * KEYWORDS, NOT HASHTAGS — `[marketing]` rather than `#marketing`
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * Founder's ruling, from the caption brief: "There are supposed to be keywords
+ * instead of hashtags in the following format : [marketing]". Recorded in full,
+ * with what it costs, as REQUESTS §34.
+ *
+ * ── THE STORED FIELD DOES NOT CHANGE, AND THAT IS DELIBERATE ─────────────────
+ * `post_variants.extras.hashtags` is untyped jsonb holding a `string[]`, and
+ * production rows already carry `#chai`-shaped values. Renaming the KEY would
+ * orphan every one of them; renaming the CONCEPT costs nothing. So the storage
+ * key stays `hashtags` and only the rendering moves.
+ *
+ * ── WHICH IS WHY THE NORMALISER STRIPS A LEADING HASH ────────────────────────
+ * A row written before this ruling holds `#chai`. Wrapping that naively yields
+ * `[#chai]`, which is neither format and looks like a bug. The `#` comes off
+ * first, so old rows render in the new form on read with no migration.
+ */
+
+/** A keyword token, bare — no `#`, no brackets, no surrounding whitespace. */
+function bareKeyword(raw: string): string {
+  const trimmed = raw.trim()
+  // Both legacy shapes, in either order: `#chai`, `[chai]`, and `[#chai]`.
+  const unwrapped =
+    trimmed.startsWith('[') && trimmed.endsWith(']') ? trimmed.slice(1, -1).trim() : trimmed
+  return unwrapped.startsWith('#') ? unwrapped.slice(1).trim() : unwrapped
+}
+
+/**
+ * Normalise the keyword list into the exact tokens that will be published.
+ *
+ * The same contract `normalizeHashtags` has: empties dropped, duplicates removed
+ * case-insensitively, order preserved because the writer chose it. What differs
+ * is the shape — `[marketing]`, not `#marketing`.
+ *
+ * A keyword may contain SPACES, and that is the point of the brackets. `#chai
+ * pune` is two hashtags; `[chai pune]` is one keyword, which is what somebody
+ * searching actually types. `normalizeHashtags` could never express that.
+ */
+export function normalizeKeywords(
+  keywords: readonly string[] | undefined,
+  brackets = true,
+): string[] {
+  if (keywords === undefined) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of keywords) {
+    if (typeof raw !== 'string') continue
+    const bare = bareKeyword(raw)
+    if (bare === '') continue
+    const key = bare.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(brackets ? `[${bare}]` : bare)
+  }
+  return out
+}
+
+/**
+ * The tail appended to a body when keywords are published: a blank line, then the
+ * bracketed keywords separated by single spaces.
+ *
+ * ── THIS PUBLISHES LITERALLY, AND THE READER SEES IT BEFORE IT DOES ──────────
+ * `[marketing]` reaches the platform exactly as written. That is the literal
+ * reading of the ruling, and it is the reading the product can most easily
+ * correct: `charCountFor` counts this tail and `PublishPreview` renders it, so
+ * the bracketed list is on screen and inside the character meter before anybody
+ * presses Send. If the brackets are meant to be stripped at publish, this
+ * function is the only place that changes.
+ */
+export function keywordTail(keywords: readonly string[] | undefined, brackets = true): string {
+  const tokens = normalizeKeywords(keywords, brackets)
+  return tokens.length === 0 ? '' : `\n\n${tokens.join(' ')}`
 }
 
 /**
@@ -319,7 +411,9 @@ export function hashtagTail(hashtags: readonly string[] | undefined): string {
  * string that will actually be sent, including the separating blank line.
  */
 export function charCountFor(spec: PlatformSpec, draft: VariantDraft): number {
-  const base = Array.from(draft.body).length + Array.from(hashtagTail(draft.hashtags)).length
+  const base =
+    Array.from(draft.body).length +
+    Array.from(keywordTail(draft.hashtags, draft.keywordBrackets ?? true)).length
   if (spec.linkPolicy === 'counted_fixed' && draft.hasLink) {
     return base + X_LINK_WEIGHT
   }
@@ -340,10 +434,25 @@ export function validateVariant(
       field: 'body',
     })
   }
+  /**
+   * ── THE CAP STAYS; ITS SENTENCE HAD TO CHANGE ──────────────────────────────
+   * It read "instagram allows 30 hashtags." That number IS Instagram's hashtag
+   * limit, and it stopped describing this field the moment the field stopped
+   * holding hashtags (REQUESTS §34). Publishing `[a] … [31]` is not something
+   * Instagram refuses, so attributing the refusal to Instagram was false.
+   *
+   * The rule is worth keeping — a thirty-item tail is a real thing to stop, and
+   * dropping it would leave `violation-copy.ts`'s MAX_HASHTAGS entry and its
+   * fix-it button guarding nothing. So Sahoda owns the limit and says so.
+   *
+   * The CODE stays `MAX_HASHTAGS`: it is a stored, matched string across
+   * `violation-copy.ts`, the fix-it table and the publish logs, and renaming it
+   * is a data change rather than a copy change.
+   */
   if (spec.maxHashtags !== undefined && (draft.hashtags?.length ?? 0) > spec.maxHashtags) {
     violations.push({
       code: 'MAX_HASHTAGS',
-      message: `${spec.channel} allows ${spec.maxHashtags} hashtags.`,
+      message: `Sahoda takes at most ${spec.maxHashtags} keywords per ${spec.channel} post.`,
       field: 'hashtags',
     })
   }
@@ -434,7 +543,10 @@ export function formatForPlatform(
   // away. GBP is the one exception: `linkPolicy: 'plain'` aside, a Google Business
   // post is a local business update and hashtags do nothing there, so the box is
   // simply not part of that channel's output.
-  const body = spec.channel === 'gbp' ? variant.body : variant.body + hashtagTail(variant.hashtags)
+  const body =
+    spec.channel === 'gbp'
+      ? variant.body
+      : variant.body + keywordTail(variant.hashtags, variant.keywordBrackets ?? true)
 
   switch (spec.channel) {
     case 'x':
