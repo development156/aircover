@@ -263,9 +263,15 @@ describe('the button never waits for something that is not coming', () => {
     expect(screen.getByRole('button')).toHaveTextContent('Connect')
   })
 
-  it('stops listening for focus once the wait is over', async () => {
-    // A focus listener that outlived the connect would refresh the page every
-    // time the customer came back to the tab, forever.
+  it('does not refresh on every later focus, which is the other failure mode', async () => {
+    // RETARGETED, not weakened. It used to be called "stops listening for focus
+    // once the wait is over" and it asserted the MECHANISM — that the listener
+    // is torn down. The listener now outlives the wait on purpose (see the
+    // repaint effect and the test below it), because tearing it down is what
+    // made the focus fix unable to fire in the case it was written for.
+    //
+    // The guarantee is unchanged and is what is asserted here: a customer who
+    // comes back to this tab later must not have the page refreshed under them.
     const popup = fakePopup()
     vi.stubGlobal(
       'open',
@@ -285,6 +291,132 @@ describe('the button never waits for something that is not coming', () => {
     await userEvent.click(screen.getByRole('button'))
     await act(async () => {
       window.dispatchEvent(new Event('focus'))
+    })
+    refresh.mockClear()
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+
+    expect(refresh).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * THE SEQUENCE THAT ACTUALLY HAPPENS, WHICH THE FIRST FOCUS FIX NEVER SAW.
+ *
+ * ── WHAT WAS WRONG WITH THE TEST ABOVE IT ────────────────────────────────────
+ * `refreshes when the tab gets focus back` dispatches `focus` with no message
+ * first. That passes against a focus listener living inside the `pending` effect,
+ * because `pending` is still true when it fires.
+ *
+ * Production does the opposite. `popupCloser` posts on the BroadcastChannel and
+ * THEN calls `window.close()`, so the message lands while this tab is still in
+ * the background: `finish()` runs, `pending` goes false, the effect is torn down
+ * and the focus listener is removed — and only then does the popup vanish and
+ * focus come back to a tab with nothing listening. The refresh that did start,
+ * started in a background tab and was throttled.
+ *
+ * That is the founder's report, twice: "after the popup closes nothing happens,
+ * only when i refresh then only x connected appears". The fix shipped, the report
+ * came back, and the reason is that the safety net was taken down a moment before
+ * the fall. A test in the wrong order could not see it.
+ */
+describe('the message lands first, and the paint is still owed', () => {
+  /** The tab is behind the popup: visible, but not focused. */
+  function backgroundTab() {
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+  }
+
+  async function connectAndSignalFromBackground() {
+    const popup = fakePopup()
+    vi.stubGlobal(
+      'open',
+      vi.fn(() => popup),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ ok: true, authUrl: 'https://zernio.com/oauth/x' }),
+        }),
+      ),
+    )
+
+    render(<Harness />)
+    await userEvent.click(screen.getByRole('button'))
+
+    // The closer posts home while this tab is still behind the popup.
+    backgroundTab()
+    await act(async () => {
+      const channel = new BroadcastChannel('sahoda-connect')
+      channel.postMessage({ type: 'sahoda:connect-outcome' })
+      channel.close()
+      await Promise.resolve()
+    })
+    return popup
+  }
+
+  it('refreshes AGAIN when focus finally comes back', async () => {
+    // THE REGRESSION. Before the fix this second refresh never happened, and the
+    // customer sat looking at a tile that said "Not connected" over a row that
+    // had been written seconds earlier.
+    await connectAndSignalFromBackground()
+    refresh.mockClear()
+
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+
+    expect(refresh).toHaveBeenCalled()
+  })
+
+  it('owes only ONE repaint, however many times the tab is returned to', async () => {
+    // The listener outlives the wait now, so this is the guard that stops it
+    // becoming a refresh on every tab switch for the rest of the session.
+    await connectAndSignalFromBackground()
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    refresh.mockClear()
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+      window.dispatchEvent(new Event('focus'))
+    })
+
+    expect(refresh).not.toHaveBeenCalled()
+  })
+
+  it('owes nothing when the tab had focus all along', async () => {
+    // A customer watching this tab when the popup closes already got a refresh
+    // that could paint. Owing a second one would refresh under them for nothing.
+    const popup = fakePopup()
+    vi.stubGlobal(
+      'open',
+      vi.fn(() => popup),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ ok: true, authUrl: 'https://zernio.com/oauth/x' }),
+        }),
+      ),
+    )
+    render(<Harness />)
+    await userEvent.click(screen.getByRole('button'))
+
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+    await act(async () => {
+      const channel = new BroadcastChannel('sahoda-connect')
+      channel.postMessage({ type: 'sahoda:connect-outcome' })
+      channel.close()
+      await Promise.resolve()
     })
     refresh.mockClear()
 
