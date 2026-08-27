@@ -416,6 +416,82 @@ cd apps/web && npx next build && node scripts/perf/js-budget.mjs
 The founder was asked whether to add this to `pnpm gate` and has not answered.
 Do not add it unprompted.
 
+
+## Round fifteen: the error we were handed and threw away
+
+The founder connected several channels, got nothing useful from our screen, and
+**went to Zernio's own dashboard to find out why.** It told them at once:
+
+```
+Google Business Profile token exchange failed: 400
+{ "error": "invalid_grant", "error_description": "Bad Request" }
+```
+
+We had that fact. Zernio's spec: *"On failure every platform appends error
+details, starting with `error` and `platform`."* This route ignores every query
+parameter by design — a rule that is **right about IDS**, which can name somebody
+else's account, and **wrong about this one**. An error string names no resource
+and decides nothing, and dropping it is how a customer ends up reading a third
+party's dashboard to use our product.
+
+### What the refusal page claims, and what it refuses to claim
+
+Read FIRST, before the session is even resolved: a refusal is a refusal whether
+or not the workspace reads cleanly.
+
+| Code seen | Our sentence | Remedy |
+|---|---|---|
+| `invalid_grant` / `token_exchange` | "…didn't finish signing in. The approval sat too long or was used twice." | connect again, without going back a step |
+| `no_facebook_pages` | "Facebook sent back no Page." | Edit settings, not Continue |
+| `access_denied` | "The sign-in was cancelled." | **none, and none is needed** |
+| anything else | "…refused the connection… in a way Sahoda does not recognise." | **none — guessing is forbidden** |
+
+The provider's own words go underneath, escaped, small, never as the headline.
+`error_description` is third-party text arriving through the customer's browser:
+a string like `400 {"error":"invalid_grant"}` is evidence for whoever reads a
+report, not an instruction for whoever is trying to connect.
+
+**Our own `reason` parameter is deliberately NOT read as an upstream error.** It
+is a status this route sets itself, and reading it would report our own notices
+as the platform's.
+
+### Pinterest's picker is ours
+
+The founder also photographed Zernio's hosted **"Pick a default board"** screen
+mid-connect: its wordmark, its domain, asking a Sahoda customer which board to
+pin to. Pinterest's endpoints fit the picker built for Facebook and Google
+Business with no new shape.
+
+### Branding: what is and is not fixable here
+
+| Where | Fixable in this repo? |
+|---|---|
+| "Pick a default board" / Page / location pickers | **Yes, and now done** |
+| "Social Media Connector" on X and Facebook consent | **No** |
+| "Seamlessly connect your account to Zernio" (WhatsApp) | **No** |
+
+MEASURED: **Zernio has no general bring-your-own-app surface.** `BYOK` appears
+twice in the entire spec, both `403 · "BYOK required for AppSumo Twitter"`. The
+"white-label support" line in their overview has no API behind it. Those consent
+screens are Zernio's app registrations at X, Meta and Google. Either Zernio
+renames them, or Sahoda registers its own developer apps per platform and stops
+using Zernio for connecting. **Founder's decision, asked and unanswered.**
+
+| Guard | Mutation applied | Went red |
+|---|---|---|
+| The refusal is shown, not swallowed | throw the error away again | 5 |
+| No invented remedy for an unknown code | add "Try again." | 1 |
+| Our own `reason` is not an upstream error | read it as one | 1 |
+| Pinterest has a picker | drop it from the allowlist | 3 |
+
+**One guard went red and was RETARGETED, not weakened.**
+`pending-selection.test.ts` asserted pinterest is refused because no picker
+existed. That is the guard working: adding a platform to the headless path is
+exactly the change that must not pass unnoticed, since the half that renders the
+picker and the half that parses the redirect have to arrive together. `whatsapp`
+and `snapchat` replace it as live examples, and a new test asserts Pinterest is
+now accepted.
+
 ## Shared surfaces touched
 
 - **`packages/shared/src/enums.ts`** — `ConnectionPlatformSchema` 6→14 values,
