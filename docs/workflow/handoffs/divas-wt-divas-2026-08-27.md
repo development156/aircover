@@ -181,6 +181,62 @@ which is Zernio's own token lifetime rather than a round number.
 | Our channel id is handed back, not Zernio's | hand back `pending.platform` | 2 |
 | Third-party text cannot become markup | delete `escapeHtml`'s body | 5 |
 
+
+## Round ten: the founder's question, and the answer to all of it
+
+**"check instagram and linkedin why are they perfectly working?"** They are not
+better built. **Their name is the same string in every Zernio vocabulary, and
+there are FOUR.**
+
+| Zernio surface | instagram | linkedin | X | Google Business |
+|---|---|---|---|---|
+| `GET /v1/connect/{platform}` | `instagram` | `linkedin` | `twitter` | `googlebusiness` |
+| `GET /v1/accounts` -> `.platform` | `instagram` | `linkedin` | `twitter` | `googlebusiness` |
+| `POST /v1/posts` (publish) | `instagram` | `linkedin` | **`x`** | **`google`** |
+| `edit` / `unpublish` / `validate` | `instagram` | `linkedin` | `twitter` | `googlebusiness` |
+
+Every name-shaped defect in this lane was invisible on the two channels anybody
+tests by hand and live on the other two. Three shipped that way: `connectUrl`
+given `x` (400 on every press), `reconcileAccounts` matching `x` against a stored
+`twitter` (a completed connect wrote no row), and `health.ts` reading X's
+two-hour rotating token as a sixty-day deadline.
+
+`packages/publishing/src/zernio/vocabularies.test.ts` pins all four side by side.
+It asserts the maps **DISAGREE**, because a tidy-up that unified them would
+satisfy two rewritten equality checks and break publishing.
+
+**RETRACTED mid-investigation.** I read `ZERNIO_PLATFORM_NAME`'s `x: 'x'` and
+`gbp: 'google'` as the same bug a fourth time and was about to correct them.
+`recovery.ts` records both as **[LIVE]-measured** — real posts have gone out
+through those exact strings — and the publish endpoint genuinely is the odd one
+out. An absence in our client is not an absence in their API, and the reverse
+holds too: a value that looks wrong may be the only one that works.
+
+### And the focus fallback could never have fired
+
+`popupCloser` posts on the BroadcastChannel and THEN calls `window.close()`. The
+message lands while the tab is still behind the popup: `finish()` runs, `pending`
+goes false, the effect is torn down and **the focus listener is removed** — all
+before the popup is gone and before focus returns. The refresh that did start,
+started in a background tab and was throttled. The safety net was taken down a
+moment before the fall.
+
+The test that covered it dispatched `focus` with no message first, which is not
+the order the browser runs in. It passed against a listener that cannot work.
+
+`finish()` now records an OWED repaint when `document.hasFocus()` is false —
+`hasFocus`, not `visibilityState`: a tab behind a popup is still "visible", it
+simply lacks focus. A separate effect, deliberately not gated on `pending`,
+spends that one owed repaint.
+
+| Guard | Mutation applied | Went red |
+|---|---|---|
+| A repaint is owed from the background | restore the shipped shape | 1 |
+| Only ONE repaint is owed | never clear the flag | 1 |
+| The four vocabularies disagree | unify publish with recovery | 3 |
+| A provider-held row shows no countdown | carry `daysLeft` through | 3 |
+| A native row still counts down | delete the countdown | 2 |
+
 ## Shared surfaces touched
 
 - **`packages/shared/src/enums.ts`** — `ConnectionPlatformSchema` 6→14 values,
