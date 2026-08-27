@@ -395,6 +395,7 @@ export async function GET(request: Request): Promise<Response> {
       if (selection.state.profileId !== profileId) return fail(403, 'profile-mismatch')
 
       const copy = pickerCopyFor(selection.platform)
+      const owedPlatform = selection.platform
       let listed: Awaited<ReturnType<typeof client.listConnectChoices>>
       try {
         listed = await client.listConnectChoices(selection.platform, selection.state)
@@ -406,6 +407,21 @@ export async function GET(request: Request): Promise<Response> {
       }
 
       if (listed.choices.length === 0) {
+        /**
+         * REPORTED, because it is the one branch here nobody can measure from
+         * outside. MEASURED 2026-08-27: the founder reached this page, which
+         * proves headless mode, the redirect parsing and our picker all work —
+         * Facebook simply handed back no Pages. Whether that keeps happening,
+         * and for which platform, is a fact worth having rather than inferring
+         * from a screenshot next time.
+         *
+         * The count and the platform only. Nothing about the account, and no
+         * token.
+         */
+        await reportServerError(
+          new Error(`zernioReturn: ${owedPlatform} returned zero choices to pick from`),
+          { action: 'zernioReturn', workspaceId },
+        )
         // NOT `ok('nothing')`. That status renders "Connected", and nothing was —
         // Zernio creates no account until a choice is committed. This says what
         // actually happened and offers the only remedy that can work.

@@ -75,7 +75,24 @@ function fail(request: Request, httpStatus: number, detail: string): Response {
       `place-items:center;min-height:100vh;padding:24px;text-align:center}</style>` +
       `</head><body><div><p>That connection didn’t finish, and nothing was ` +
       `changed. You can close this window and try again.</p>` +
-      `<p><a href="${safe}">Open Connections</a></p></div></body></html>`,
+      `<p><a href="${safe}">Open Connections</a></p></div>` +
+      /**
+       * TELL THE OPENER THE WAIT IS OVER.
+       *
+       * Without this the Connect button sits on "Opening Facebook…" until the
+       * customer closes this window by hand — reported exactly that way against
+       * the empty-state page, which had the same omission. Every signal
+       * `useConnectFlow` waits for was emitted only by `popupCloser`, the page a
+       * SUCCESSFUL connect ends on; this is one of the ways one can fail.
+       *
+       * No `window.close()`: this page carries a sentence the customer needs.
+       */
+      `<script>(function(){` +
+      `try{var c=new BroadcastChannel("sahoda-connect");` +
+      `c.postMessage({type:"sahoda:connect-outcome"});c.close();}catch(e){}` +
+      `try{if(window.opener&&!window.opener.closed){` +
+      `window.opener.postMessage({type:"sahoda:connect-outcome"},window.location.origin);}}catch(e){}` +
+      `})();</script></body></html>`,
     {
       status: httpStatus,
       headers: {

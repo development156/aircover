@@ -1189,9 +1189,13 @@ describe('a connect that still needs a choice renders a picker, not a verdict', 
     const body = await res.text()
 
     expect(res.status).toBe(200)
-    expect(body).toContain('No Facebook Page came back')
-    expect(body).toContain('Nothing was connected and nothing was charged.')
+    expect(body).toContain('Facebook sent back no Page')
+    expect(body).toContain('Nothing was connected and nothing ')
     expect(body).not.toMatch(/\bConnected\./)
+    // And it lets the Connect button stop waiting. MEASURED from the founder's
+    // screenshot: the card sat on "Opening Facebook…" beside this very page,
+    // because it emitted none of the four signals `useConnectFlow` listens for.
+    expect(body).toContain('sahoda:connect-outcome')
   })
 
   it('reports a failed read as a failure, not as an empty list', async () => {
@@ -1201,7 +1205,7 @@ describe('a connect that still needs a choice renders a picker, not a verdict', 
     state.choicesThrow = true
     const res = await selectTrip()
     expect(res.status).toBe(502)
-    expect(await res.text()).not.toContain('No Facebook Page came back')
+    expect(await res.text()).not.toContain('sent back no Page')
   })
 
   it('says so when Zernio admits the list is cut short', async () => {
