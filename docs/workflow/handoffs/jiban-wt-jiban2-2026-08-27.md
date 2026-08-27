@@ -1,6 +1,6 @@
 # Handoff — jiban — wt-jiban2 — 2026-08-27
 
-**Branch** `claude/lead-design-7m7ios` at `a5c21d5`. Lane `wt-jiban2`. Pushed: yes.
+**Branch** `claude/lead-design-7m7ios` at `a7f87863`. Lane `wt-jiban2`. Pushed: yes.
 
 The harness pinned this session to `claude/lead-design-7m7ios` and it cannot leave
 it. `sahoda.owner` and `sahoda.lane` are set to `jiban` / `wt-jiban2`, and the work
@@ -25,12 +25,39 @@ channels on the screen are still the eight in `lib/connections/catalogue.ts`.
 | Empty state with a remedy that works                      | `connection-marketplace.tsx` — `EmptyState` + a clear button over client state     | "offers a remedy that works when nothing matches"                  |
 | A group heading never stands over nothing                 | `section.items.length === 0 ? null : …`                                            | "drops a group heading rather than leaving it over nothing"         |
 
+**Counts in the table above are from the pre-merge tree.** Post-merge the
+catalogue holds 15 channels in 9 kinds; every figure the code produces is derived,
+so none of them was edited.
+
 **Nothing in the connect path was touched.** `ChannelTile`, `ConnectButton`,
 `ReconnectButton`, `DisconnectButton`, `/api/oauth/zernio/start`, the return
 route, `readConnections`, the health and ration reads: all unmodified. The cards
 are rendered on the SERVER exactly as before and handed to the client component
 as `tile: React.ReactNode`, so the OAuth flow is not merely preserved, it is not
 in this diff at all. MEASURED: `git diff --stat` touches three source files.
+
+## Session 2 — the merge with `wt-core`
+
+`wt-core` rebuilt this same screen while the lane was open, and the pull request
+went `mergeable_state: dirty` an hour after it opened. Resolved, MEASURED on the
+merged tree, pushed as `a7f87863`.
+
+| What `wt-core` changed                        | What I did with it                                                                   |
+| --------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Catalogue 8 channels → **15**, in **9** kinds  | Kept. Nothing in the browse layer is a literal, so the rail grew nine facets on its own. |
+| `ChannelTile` takes `connections: Connection[]` | Kept; every call site and my component test now pass the array.                       |
+| Groups by **linked / open / stalled**, not readiness | Kept. `ConnectionMarketplace` wraps three sections instead of two. It filters and never regroups, which is the whole reason it takes sections as a prop. |
+| `connectBlocker()`, `slots`, `hasHeadroom`     | Kept verbatim.                                                                        |
+| Baseline at **129 / 698**, stricter than my 132 / 731 | Took theirs. `design-lint` then reported no drift in either direction.        |
+
+**Twenty cards is a better argument for this feature than eight were.** The rail
+and the search were a convenience over eight tiles. Over twenty, with six of the
+nine kinds holding one or two channels, they are how a person finds Pinterest.
+
+Two of my own assertions were literals that the merge falsified, and both are now
+derived: the "Showing 1 of 8 channels" denominator reads
+`CONNECTABLE.length + PLANNED.length`, and the category counts were already
+derived. That is the same defect this feature exists to prevent, caught on itself.
 
 ## What was NOT done, and why
 
@@ -129,7 +156,10 @@ channels in five kinds; the screenshot shows twelve in two. MEASURED against
 | ----------------------- | --------------------------------------------------------------------------- | ------- |
 | `turbo run typecheck`   | `tsc --noEmit`, clean, 27 tasks successful                                   | PASS    |
 | `turbo run lint`        | `lint ok: @sahoda/web`, design-lint all rules ok                             | PASS    |
-| `turbo run test`        | `Test Files 393 passed | 3 skipped (396)` · `Tests 4977 passed | 13 skipped (4990)` in 118.72s | PASS |
+| `turbo run test`        | pre-merge `Test Files 393 passed | 3 skipped (396)` · `Tests 4977 passed | 13 skipped (4990)` in 118.72s | PASS |
+| `turbo run test --force --concurrency=1` (post-merge, uncached) | `Tasks: 17 successful, 17 total`, exit 0. `@sahoda/web` `Test Files 454 passed | 3 skipped (457)` | PASS |
+| CI `typecheck · lint · test · format` on `e0f6c6c` | `conclusion: success` | PASS |
+| Vercel preview build | `Ready` on every head so far | PASS |
 | `turbo run test:smoke`  | `ClerkAPIResponseError` at `e2e/global-setup.ts:30`, before any test body     | UNRUN   |
 | `prettier --check .`    | `All matched files use Prettier code style!`                                 | PASS    |
 | `pnpm --filter @sahoda/web build` | `next build` clean · `js-budget ok: 81 routes within budget`       | PASS    |
@@ -146,7 +176,15 @@ relayed. It does not reproduce:
 | the hook's exact command, verbatim                                         | `Tasks: 18 successful, 18 total`, exit 0                      |
 | `pnpm format:check`                                                       | clean                                                         |
 
-I could not root-cause it and will not call it a flake on that basis: what I can
+**It then happened again on the merged tree, and that one I did root-cause.**
+`@sahoda/billing`, `@sahoda/db`, `@sahoda/jobs` and `@sahoda/web` all failed at
+once with `Worker exited unexpectedly` — four unrelated suites, one message, which
+root `CLAUDE.md` says to read as the environment rather than the diff. I had two
+turbo runs overlapping on a 16 GB container. Re-run serially with
+`--concurrency=1` and forced uncached: 17 of 17 tasks green, exit 0. The first red
+is likely the same thing, though I cannot prove that one.
+
+I could not root-cause the first one and will not call it a flake on that basis: what I can
 say is MEASURED above, and that a forced uncached run of the failing package is
 green. The likeliest reading is a collision on the one shared live database
 `@sahoda/db` uses, which root `CLAUDE.md` names explicitly, but I did not prove
