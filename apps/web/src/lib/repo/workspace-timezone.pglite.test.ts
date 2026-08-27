@@ -31,7 +31,13 @@ describe('workspaces.timezone', () => {
 
   beforeAll(async () => {
     db = await bootFullSchema()
-  })
+    // 60s, not the 10s default. This hook boots a real Postgres before the
+    // suite runs. MEASURED 2026-08-27 in the full 5,734-test run: "Hook timed
+    // out in 10000ms" with ZERO tests failed and the skip count jumping - the
+    // signature of a starved worker, not a broken assertion. It passes alone
+    // every time. Sibling PGlite suites already budget explicitly (zernio
+    // webhook-* at 120_000); these two were left on the default.
+  }, 60_000)
 
   beforeEach(async () => {
     await db.exec('begin')
