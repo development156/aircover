@@ -153,7 +153,23 @@ async function readUsage(
   return byAsset
 }
 
-/** The whole library for the active workspace, newest first. */
+/**
+ * The whole LIVE library for the active workspace, newest first.
+ *
+ * ── `deleted_at is null` IS THE TRASH, AND IT IS ENFORCED HERE IN SQL ────────
+ * Not by filtering the rows after they arrive. Two reasons, and the second is
+ * the one that matters. First, the partial index `assets_live_idx` carries this
+ * exact predicate, so the filter is free. Second, the cap: `ASSET_LIST_LIMIT` is
+ * applied by Postgres, so a workspace with 200 trashed files and 40 live ones
+ * would fetch 200 rows, throw most away, and report a library of 40 as CAPPED.
+ * The count under the list would then be wrong in the one direction a person
+ * cannot detect.
+ *
+ * If the migration adding the column is not applied, PostgREST answers `42703`
+ * and this returns `unreadable`, so the screen says it could not read the
+ * library. That is the right failure: the alternative is a trash that silently
+ * holds nothing while appearing to work.
+ */
 export async function readAssets(): Promise<AssetsRead> {
   try {
     const workspace = await activeWorkspaceRead()
@@ -166,12 +182,64 @@ export async function readAssets(): Promise<AssetsRead> {
       .from('assets')
       .select('*')
       .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(ASSET_LIST_LIMIT)
 
     if (error || !data) return { status: 'unreadable' }
 
     // Per row, so one malformed row costs one tile rather than the whole screen.
+    const parsed = data.flatMap((row) => {
+      const asset = AssetSchema.safeParse(row)
+      return asset.success ? [asset.data] : []
+    })
+
+    const usage = await readUsage(
+      supabase,
+      workspaceId,
+      parsed.map((asset) => asset.id),
+    )
+    if (usage === null) return { status: 'unreadable' }
+
+    return {
+      status: 'ok',
+      assets: parsed.map((asset) => ({ asset, usage: usage.get(asset.id) ?? [] })),
+      capped: data.length >= ASSET_LIST_LIMIT,
+    }
+  } catch {
+    return { status: 'unreadable' }
+  }
+}
+
+/**
+ * The trash: files a person deleted, which are still whole.
+ *
+ * Ordered by WHEN THEY WERE TRASHED rather than when they were made, because
+ * "what did I just delete" is the only question this view is opened to answer.
+ * A photo taken in January and deleted a minute ago belongs at the top.
+ *
+ * Usage is read for these too, and that is deliberate rather than wasteful: the
+ * confirmation before "Delete for good" needs the same gate the live library's
+ * delete uses, and a trashed file's posts can change while it sits here.
+ */
+export async function readTrashedAssets(): Promise<AssetsRead> {
+  try {
+    const workspace = await activeWorkspaceRead()
+    if (workspace.status === 'none') return { status: 'no-workspace' }
+    if (workspace.status !== 'ok') return { status: 'unreadable' }
+    const workspaceId = workspace.workspace.id
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('assets')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false })
+      .limit(ASSET_LIST_LIMIT)
+
+    if (error || !data) return { status: 'unreadable' }
+
     const parsed = data.flatMap((row) => {
       const asset = AssetSchema.safeParse(row)
       return asset.success ? [asset.data] : []

@@ -17,6 +17,7 @@ const card = (id: string, bytes: number | null): AssetCard => ({
   previewUrl: null,
   usage: [],
   folderIds: [],
+  deletedAt: null,
 })
 
 describe('selectedSizeSummary', () => {

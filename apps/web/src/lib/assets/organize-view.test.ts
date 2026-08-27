@@ -25,6 +25,7 @@ const card = (id: string, over: Partial<AssetCard> = {}): AssetCard => ({
   previewUrl: null,
   usage: [],
   folderIds: [],
+  deletedAt: null,
   ...over,
 })
 
@@ -61,19 +62,19 @@ describe('contentsAt — a real folder', () => {
 
   it('shows only what is filed directly here by default', () => {
     const at: LibraryLocation = { at: 'folder', id: 'campaign', deep: false }
-    const { files } = contentsAt(at, cards, FOLDERS, [], NOW)
+    const { files } = contentsAt(at, cards, FOLDERS, [], NOW, [])
     expect(files.map((f) => f.id)).toEqual(['direct'])
   })
 
   it('includes sub-folders when asked, which is the count Drive never shows', () => {
     const at: LibraryLocation = { at: 'folder', id: 'campaign', deep: true }
-    const { files } = contentsAt(at, cards, FOLDERS, [], NOW)
+    const { files } = contentsAt(at, cards, FOLDERS, [], NOW, [])
     expect(files.map((f) => f.id)).toEqual(['direct', 'nested'])
   })
 
   it('lists the sub-folders of this folder and nothing deeper', () => {
     const at: LibraryLocation = { at: 'folder', id: 'campaign', deep: false }
-    const { subfolders } = contentsAt(at, cards, FOLDERS, [], NOW)
+    const { subfolders } = contentsAt(at, cards, FOLDERS, [], NOW, [])
     expect(subfolders.map((f) => f.id)).toEqual(['autumn'])
   })
 
@@ -85,8 +86,16 @@ describe('contentsAt — a real folder', () => {
       FOLDERS,
       [],
       NOW,
+      [],
     )
-    const inBrand = contentsAt({ at: 'folder', id: 'brand', deep: false }, both, FOLDERS, [], NOW)
+    const inBrand = contentsAt(
+      { at: 'folder', id: 'brand', deep: false },
+      both,
+      FOLDERS,
+      [],
+      NOW,
+      [],
+    )
     expect(inCampaign.files.map((f) => f.id)).toEqual(['shopfront'])
     expect(inBrand.files.map((f) => f.id)).toEqual(['shopfront'])
   })
@@ -95,7 +104,7 @@ describe('contentsAt — a real folder', () => {
     // The failure mode a `filter` with a missing key can produce: an unmatched
     // predicate that accidentally admits every row.
     const at: LibraryLocation = { at: 'folder', id: 'deleted', deep: true }
-    expect(contentsAt(at, cards, FOLDERS, [], NOW).files).toEqual([])
+    expect(contentsAt(at, cards, FOLDERS, [], NOW, []).files).toEqual([])
   })
 })
 
@@ -109,14 +118,14 @@ describe('contentsAt — a smart folder keeps what it could not check separate',
     const smart = [
       smartFolder('s1', { mode: 'all', rules: [{ field: 'orientation', is: 'landscape' }] }),
     ]
-    const { files, unknown } = contentsAt({ at: 'smart', id: 's1' }, cards, FOLDERS, smart, NOW)
+    const { files, unknown } = contentsAt({ at: 'smart', id: 's1' }, cards, FOLDERS, smart, NOW, [])
     expect(files.map((f) => f.id)).toEqual(['wide'])
     // NOT 2 files, and NOT silently 1 file. One matched, one could not be told.
     expect(unknown).toBe(1)
   })
 
   it('a smart folder that no longer exists holds nothing and claims no unknowns', () => {
-    const result = contentsAt({ at: 'smart', id: 'gone' }, [card('a')], FOLDERS, [], NOW)
+    const result = contentsAt({ at: 'smart', id: 'gone' }, [card('a')], FOLDERS, [], NOW, [])
     expect(result).toEqual({ files: [], unknown: 0, subfolders: [] })
   })
 
@@ -125,7 +134,7 @@ describe('contentsAt — a smart folder keeps what it could not check separate',
     const smart = [
       smartFolder('s2', { mode: 'all', rules: [{ field: 'description', is: 'missing' }] }),
     ]
-    const { files, unknown } = contentsAt({ at: 'smart', id: 's2' }, cards, FOLDERS, smart, NOW)
+    const { files, unknown } = contentsAt({ at: 'smart', id: 's2' }, cards, FOLDERS, smart, NOW, [])
     expect(files.map((f) => f.id)).toEqual(['bare'])
     // A missing description is a fact about the row, so nothing here is unknown.
     expect(unknown).toBe(0)
@@ -140,8 +149,8 @@ describe('contentsAt — the derived folders still work and still own their mean
       }),
       card('spare'),
     ]
-    const inUse = contentsAt({ at: 'derived', id: 'in-use' }, cards, FOLDERS, [], NOW)
-    const unused = contentsAt({ at: 'derived', id: 'unused' }, cards, FOLDERS, [], NOW)
+    const inUse = contentsAt({ at: 'derived', id: 'in-use' }, cards, FOLDERS, [], NOW, [])
+    const unused = contentsAt({ at: 'derived', id: 'unused' }, cards, FOLDERS, [], NOW, [])
     expect(inUse.files.map((f) => f.id)).toEqual(['used'])
     expect(unused.files.map((f) => f.id)).toEqual(['spare'])
   })
@@ -150,7 +159,7 @@ describe('contentsAt — the derived folders still work and still own their mean
 describe('contentsAt — the library root', () => {
   it('holds every file and lists only the top-level folders', () => {
     const cards = [card('a', { folderIds: ['autumn'] }), card('b')]
-    const { files, subfolders } = contentsAt({ at: 'all' }, cards, FOLDERS, [], NOW)
+    const { files, subfolders } = contentsAt({ at: 'all' }, cards, FOLDERS, [], NOW, [])
     expect(files).toHaveLength(2)
     expect(subfolders.map((f) => f.id)).toEqual(['campaign', 'brand'])
   })
@@ -201,7 +210,7 @@ describe('a card whose filings were never read', () => {
   it('is not placed in any folder, because membership was never established', () => {
     const cards = [card('unread', { folderIds: null })]
     const at: LibraryLocation = { at: 'folder', id: 'campaign', deep: true }
-    expect(contentsAt(at, cards, FOLDERS, [], NOW).files).toEqual([])
+    expect(contentsAt(at, cards, FOLDERS, [], NOW, []).files).toEqual([])
   })
 
   it('does not inflate a folder tally', () => {
@@ -245,5 +254,32 @@ describe('locationName', () => {
     const gone = locationName({ at: 'folder', id: 'deleted', deep: false }, FOLDERS, smart)
     expect(gone).not.toBe('')
     expect(gone.toLowerCase()).toContain('no longer here')
+  })
+})
+
+// ── THE TRASH IS NOT A VIEW OVER THE LIBRARY ────────────────────────────────
+describe('contentsAt: the trash', () => {
+  it('returns the trashed list and NOT a filter of the live cards', () => {
+    // The property that makes the separate parameter necessary. `readAssets`
+    // excludes trashed rows in SQL, so if this ever tried to derive the trash
+    // from `cards` it would always be empty — and an empty trash is the one
+    // wrong answer a person cannot tell from a right one.
+    const live = [card('live')]
+    const gone = [card('gone', { deletedAt: '2026-08-26T00:00:00.000Z' })]
+    const { files } = contentsAt({ at: 'trash' }, live, FOLDERS, [], NOW, gone)
+    expect(files.map((f) => f.id)).toEqual(['gone'])
+  })
+
+  it('shows no sub-folders, at any location', () => {
+    // A folder is not trashed by trashing the files in it. Rendering the live
+    // tree here would invite a person to navigate INTO a folder from a place
+    // where its contents mean something else entirely.
+    const { subfolders } = contentsAt({ at: 'trash' }, [], FOLDERS, [], NOW, [card('gone')])
+    expect(subfolders).toEqual([])
+  })
+
+  it('is empty when the trash is empty, even with a full library', () => {
+    const { files } = contentsAt({ at: 'trash' }, [card('a'), card('b')], FOLDERS, [], NOW, [])
+    expect(files).toEqual([])
   })
 })

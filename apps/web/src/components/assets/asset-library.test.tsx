@@ -61,6 +61,7 @@ const card = (id: string, over: Partial<AssetCard> = {}): AssetCard => ({
   previewUrl: null,
   usage: [],
   folderIds: [],
+  deletedAt: null,
   ...over,
 })
 
@@ -92,6 +93,7 @@ describe('typing a token filters the grid', () => {
         capped={false}
         folders={[]}
         smart={[]}
+        trashed={[]}
         droppedSmart={0}
         droppedFolders={0}
         foldersUnreadable={false}
@@ -129,6 +131,7 @@ describe('a narrowing search with an unknown-answer file', () => {
         capped={false}
         folders={[]}
         smart={[]}
+        trashed={[]}
         droppedSmart={0}
         droppedFolders={0}
         foldersUnreadable={false}
@@ -172,6 +175,7 @@ describe('bulk filing', () => {
         capped={false}
         folders={folders}
         smart={[]}
+        trashed={[]}
         droppedSmart={0}
         droppedFolders={0}
         foldersUnreadable={false}
@@ -219,6 +223,7 @@ describe('bulk filing', () => {
         capped={false}
         folders={folders}
         smart={[]}
+        trashed={[]}
         droppedSmart={0}
         droppedFolders={0}
         foldersUnreadable={false}
@@ -249,6 +254,7 @@ describe('a card whose filings were never read', () => {
         capped={false}
         folders={folders}
         smart={[]}
+        trashed={[]}
         droppedSmart={0}
         droppedFolders={0}
         foldersUnreadable={false}
@@ -259,5 +265,100 @@ describe('a card whose filings were never read', () => {
 
     expect(await screen.findByText('filed.jpg')).toBeInTheDocument()
     expect(screen.queryByText('unread.jpg')).not.toBeInTheDocument()
+  })
+})
+
+// ── THE TRAP THE TRASH WOULD OTHERWISE WALK STRAIGHT INTO ───────────────────
+describe('an empty library with a full trash', () => {
+  it('renders the LIBRARY, not the empty state, so the trash stays reachable', async () => {
+    // Delete your only photo and the live list empties. If the empty-state
+    // early return fired on `cards.length === 0` alone, the whole screen would
+    // be replaced and the one control that could bring that photo back would go
+    // with it — the trash would be useless in the exact case it exists for.
+    render(
+      <AssetLibrary
+        cards={[]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[card('gone', { deletedAt: '2026-08-26T00:00:00.000Z' })]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    expect(screen.queryByText('Your library is empty')).not.toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^Trash/ })).toBeInTheDocument()
+  })
+
+  it('still shows the empty state when the trash is empty too', async () => {
+    // The other half. Without this, the guard above could be satisfied by
+    // deleting the empty state entirely, which would leave a person with no
+    // photos looking at a bare grid and no invitation to add one.
+    render(
+      <AssetLibrary
+        cards={[]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    expect(await screen.findByText('Your library is empty')).toBeInTheDocument()
+  })
+})
+
+describe('the trash view', () => {
+  it('lists the trashed file with how long ago it went, and offers Restore', async () => {
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[card('live')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[card('gone', { deletedAt: '2026-08-26T00:00:00.000Z' })]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    await user.click(await screen.findByRole('button', { name: /^Trash/ }))
+
+    expect(await screen.findByText('gone.jpg')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Restore gone.jpg' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Delete gone.jpg/ })).toBeInTheDocument()
+    // The live file is NOT in this list. Two separate reads, and mixing them
+    // would offer Restore on a file that was never deleted.
+    expect(screen.queryByText('live.jpg')).not.toBeInTheDocument()
+  })
+
+  it('never promises a retention period, because nothing sweeps the column', async () => {
+    // The claim this screen must not make. No scheduled job reads `deleted_at`,
+    // so "deleted after 30 days" would be a promise no process could keep.
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[card('gone', { deletedAt: '2026-08-26T00:00:00.000Z' })]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    await user.click(await screen.findByRole('button', { name: /^Trash/ }))
+    const body = document.body.textContent ?? ''
+    expect(body).not.toMatch(/\b\d+\s*days?\b(?![^.]*ago)/i)
+    expect(body).toMatch(/until you delete them for good/i)
   })
 })

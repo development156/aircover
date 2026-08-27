@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 
 import { fileAssets, unfileAssets } from '@/app/actions/asset-folder-items'
+import { restoreAsset, trashAsset } from '@/app/actions/assets'
 import type { AssetCard } from '@/lib/assets/view'
 
 /**
@@ -53,6 +54,8 @@ export interface BulkFiling {
   outcome: BulkOutcome | null
   fileInto: (folderId: string, folderName: string, ids: readonly string[]) => void
   removeFromFolder: (folderId: string, folderName: string, ids: readonly string[]) => void
+  /** One file to the trash, with Undo. See `trashOne` for why it is here. */
+  trashOne: (id: string, fileName: string) => void
   dismiss: () => void
 }
 
@@ -147,5 +150,59 @@ export function useBulkFiling(cards: readonly AssetCard[], onDone: () => void): 
     })
   }
 
-  return { pending, outcome, fileInto, removeFromFolder, dismiss: () => setOutcome(null) }
+  /**
+   * Move one file to the trash, with Undo.
+   *
+   * ── WHY THIS LIVES IN THE HOOK THAT ALREADY HAS THE BANNER ─────────────────
+   * Trashing is reversible, so it belongs to exactly the pattern this file's own
+   * header describes: act, then offer the precise inverse, and never ask first.
+   * `restoreAsset` IS that inverse, completely — trashing removed nothing, so
+   * restoring puts the file back in its folders, on its posts and at its place
+   * in the list, with no partial state to reconcile.
+   *
+   * The Undo is the reason it cannot live in the menu. A menu closes the instant
+   * it is used, and a control that reports an outcome has to outlive the state
+   * change it causes. The banner already does.
+   *
+   * `stillUsedMessage` is APPENDED rather than replacing the confirmation. Both
+   * facts are true at once and a person needs both: the file is in the trash,
+   * and the posts using it kept it.
+   */
+  function trashOne(id: string, fileName: string) {
+    setOutcome(null)
+    startBulk(async () => {
+      const result = await trashAsset(id)
+      if (!result.ok) {
+        setOutcome({ tone: 'error', message: result.message })
+        return
+      }
+
+      const extra = result.stillUsedMessage === null ? '' : ` ${result.stillUsedMessage}`
+      setOutcome({
+        tone: 'ok',
+        message: `Moved ${fileName} to the trash.${extra}`,
+        undo: () => {
+          setOutcome(null)
+          startBulk(async () => {
+            const redone = await restoreAsset(id)
+            setOutcome(
+              redone.ok
+                ? { tone: 'ok', message: `Put ${fileName} back.` }
+                : { tone: 'error', message: redone.message },
+            )
+          })
+        },
+      })
+      onDone()
+    })
+  }
+
+  return {
+    pending,
+    outcome,
+    fileInto,
+    removeFromFolder,
+    trashOne,
+    dismiss: () => setOutcome(null),
+  }
 }

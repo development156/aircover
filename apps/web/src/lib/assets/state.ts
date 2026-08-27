@@ -35,6 +35,26 @@ export type DeleteAssetState =
   | { ok: false; reason: 'needs-confirm'; message: string; detach: AssetUsageSite[] }
   | { ok: false; reason: 'failed'; message: string }
 
+/**
+ * Moving a file to the trash, and taking it back out.
+ *
+ * ── WHY THERE IS NO `refused` ARM ────────────────────────────────────────────
+ * `DeleteAssetState` has one because deleting cascades `asset_usages` and a
+ * scheduled post would lose its photo. Trashing cascades nothing: the row, its
+ * attachments and its bytes all stay. There is no refusal to express, so the
+ * type does not invent one — a union arm nothing can ever return is a promise to
+ * the reader that something is being checked when it is not.
+ *
+ * `stillUsedMessage` is on the SUCCESS arm for the same reason `alreadyThere` is
+ * on `FileAssetsState`'s: posts going on using a trashed file is what is
+ * supposed to happen, not a partial failure.
+ */
+export type TrashAssetState =
+  { ok: true; stillUsedMessage: string | null } | { ok: false; message: string }
+
+/** Taking a file back out of the trash. Nothing can be in the way, so no arms. */
+export type RestoreAssetState = { ok: true } | { ok: false; message: string }
+
 export type UpdateAssetState = { ok: true; asset: Asset } | { ok: false; message: string }
 
 /** See `AttachMediaState`: the offer is carried BESIDE the refusal, never instead of it. */

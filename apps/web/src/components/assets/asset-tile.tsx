@@ -46,6 +46,7 @@ export function AssetTile({
   onFileInto,
   onRemoveFromFolder,
   onDeleted,
+  onTrash,
 }: {
   card: AssetCard
   onOpen: () => void
@@ -60,11 +61,16 @@ export function AssetTile({
   onFileInto?: (folderId: string) => void
   onRemoveFromFolder?: () => void
   onDeleted?: () => void
+  onTrash?: () => void
 }) {
   const locked = lockedSites(card).length > 0
   const size = formatBytes(card.bytes)
   const trigger = useContextMenuTrigger()
-  const menuEnabled = !selectable && onFileInto !== undefined && onRemoveFromFolder !== undefined
+  const menuEnabled =
+    !selectable &&
+    onFileInto !== undefined &&
+    onRemoveFromFolder !== undefined &&
+    onTrash !== undefined
 
   return (
     <div className="group relative">
@@ -162,6 +168,7 @@ export function AssetTile({
             onFileInto={onFileInto!}
             onRemoveFromFolder={onRemoveFromFolder!}
             onDeleted={onDeleted ?? (() => {})}
+            onTrash={onTrash!}
           />
         </span>
       ) : null}

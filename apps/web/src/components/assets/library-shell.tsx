@@ -23,6 +23,7 @@ export function LibraryShell({
   search,
   sidebar,
   content,
+  trash,
   detailsOpen,
   details,
   status,
@@ -33,6 +34,17 @@ export function LibraryShell({
   search: ComponentPropsWithRef<typeof LibrarySearch>
   sidebar: ComponentProps<typeof LibrarySidebar>
   content: ComponentProps<typeof LibraryContent>
+  /**
+   * Rendered INSTEAD of `content` when the person is in the trash, and null
+   * everywhere else.
+   *
+   * A node rather than a prop bag, and swapped rather than flagged, because not
+   * one of `LibraryContent`'s controls means anything in the trash: a trashed
+   * file cannot be filed, attached, renamed or bulk-moved. Passing a `trash`
+   * boolean down would put a branch in every one of those components, and each
+   * branch would be a chance to leave a control on screen that does nothing.
+   */
+  trash: React.ReactNode | null
   detailsOpen: boolean
   details: ComponentProps<typeof LibraryDetailsPanel>
   status: ComponentProps<typeof LibraryStatus>
@@ -50,7 +62,7 @@ export function LibraryShell({
           <LibrarySidebar {...sidebar} />
         </div>
 
-        <LibraryContent {...content} />
+        {trash ?? <LibraryContent {...content} />}
 
         {detailsOpen ? <LibraryDetailsPanel {...details} /> : null}
       </div>

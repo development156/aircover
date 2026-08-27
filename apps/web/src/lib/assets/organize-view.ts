@@ -28,6 +28,15 @@ export type LibraryLocation =
   | { at: 'derived'; id: FolderId }
   | { at: 'folder'; id: string; deep: boolean }
   | { at: 'smart'; id: string }
+  /**
+   * The trash. A FIFTH kind of place, and the only one whose contents are not a
+   * view over the live library: a trashed file is excluded from `cards` by the
+   * SQL that fetched them, so no predicate over `cards` could ever produce it.
+   * That is why `contentsAt` takes a separate `trashed` list rather than
+   * filtering — a place that cannot be computed from the same rows has to be
+   * handed its own.
+   */
+  | { at: 'trash' }
 
 export const ROOT: LibraryLocation = { at: 'all' }
 
@@ -70,8 +79,22 @@ export function contentsAt(
   folders: readonly AssetFolder[],
   smart: readonly AssetSmartFolder[],
   now: Date,
+  /**
+   * Files in the trash. Required rather than optional on purpose: an optional
+   * parameter defaulting to `[]` would make a caller that forgot it render an
+   * EMPTY trash, which is the one wrong answer a person cannot tell from a
+   * right one. Pass `[]` deliberately if the caller genuinely has no trash read.
+   */
+  trashed: readonly AssetCard[],
 ): LocationContents {
   switch (location.at) {
+    case 'trash':
+      // No sub-folders, ever. A folder is not trashed by trashing the files in
+      // it, and rendering the live folder tree inside the trash would invite a
+      // person to navigate INTO a folder from a place where its contents mean
+      // something different.
+      return { files: [...trashed], unknown: 0, subfolders: [] }
+
     case 'all':
       return {
         files: [...cards],
@@ -187,6 +210,8 @@ export function locationName(
   switch (location.at) {
     case 'all':
       return 'All files'
+    case 'trash':
+      return 'Trash'
     case 'derived': {
       const derived = ASSET_FOLDERS.find((entry) => entry.id === location.id)
       return derived?.name ?? 'All files'

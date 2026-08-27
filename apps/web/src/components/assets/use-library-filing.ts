@@ -2,7 +2,7 @@
 
 import { useBulkFiling } from '@/components/assets/use-bulk-filing'
 import { locationName, type LibraryLocation } from '@/lib/assets/organize-view'
-import type { AssetCard } from '@/lib/assets/view'
+import { displayName, type AssetCard } from '@/lib/assets/view'
 import type { AssetFolder, AssetSmartFolder } from '@sahoda/shared'
 
 /**
@@ -38,6 +38,7 @@ export function useLibraryFiling({
     pending: bulkPending,
     fileInto: fileIntoRaw,
     removeFromFolder,
+    trashOne,
     outcome: bulkOutcome,
     dismiss: dismissBulkOutcome,
   } = useBulkFiling(cards, clearSelection)
@@ -66,6 +67,20 @@ export function useLibraryFiling({
     }
   }
 
+  /**
+   * "Move to trash" from one file's own menu.
+   *
+   * The NAME is looked up here rather than passed from the menu, so the banner
+   * says the same words the tile does — `displayName`'s answer for a file with
+   * no title is "Untitled photo", and a menu that sent a raw title would print
+   * an empty string into the sentence.
+   */
+  function trashSingle(id: string) {
+    const card = cards.find((entry) => entry.id === id)
+    trashOne(id, card === undefined ? 'that file' : displayName(card))
+    onFileDeleted(id)
+  }
+
   function onFileDeleted(id: string) {
     if (openId === id) setOpenId(null)
     setSelected((current) => {
@@ -84,6 +99,7 @@ export function useLibraryFiling({
     fileSingleInto,
     removeFromCurrentFolder,
     removeSingleFromCurrentFolder,
+    trashSingle,
     onFileDeleted,
   }
 }

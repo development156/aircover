@@ -45,6 +45,10 @@ const ASSET = {
   created_by: null,
   created_at: '2026-08-21T00:00:00Z',
   updated_at: '2026-08-21T00:00:00Z',
+  // In the live library. A trashed file is still a whole row with whole bytes,
+  // so nothing here would behave differently — but the field is required, and a
+  // fixture that omitted it would be describing a row the database cannot hold.
+  deleted_at: null,
 }
 
 describe('offerForAsset is total', () => {

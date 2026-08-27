@@ -25,15 +25,19 @@ type Mode = 'menu' | 'rename' | 'file-into'
  * `folder-menu.tsx` — `MenuTrigger`, a shared `trigger`, portalled to
  * `document.body` for the same reason B1's fix exists.
  *
- * ── DELETE STOPS AT WHAT A MENU ITEM CAN HONESTLY DO ─────────────────────────
- * `deleteAsset` has three shapes. `ok` finishes right here — nothing uses the
- * file, one click, done. The other two (`needs-confirm`: only unpublished
- * posts use it; `refused`: a scheduled or published one does) both hand off
- * to "Open", which already renders `AssetDeleteButton`'s full confirm-with-
- * counts and refusal-with-`UsageList` screens. This menu does not draw a
- * second, smaller copy of either — a compact menu re-explaining a delete
- * gate is worse than a menu that tries, and when it cannot finish, goes to
- * the one place that always can.
+ * ── "MOVE TO TRASH", AND WHY IT NEEDS NO GATE AT ALL ─────────────────────────
+ * This used to call `deleteAsset`, which has three shapes, two of which a
+ * compact menu cannot honestly draw — so it handed off to "Open" whenever the
+ * file was on a post. That whole branch is gone, because trashing cascades
+ * nothing: the row, its folders, its attachments and its bytes all stay, so
+ * there is no refusal to express and nothing to confirm.
+ *
+ * The permanent delete still has all three shapes and still lives behind
+ * `AssetDeleteButton`, now in the trash where the act really is final.
+ *
+ * The outcome is NOT reported here. A menu closes the instant it is used, and a
+ * control that reports an outcome has to outlive the state change it causes —
+ * so `onTrash` hands off to the banner, which also carries the Undo.
  */
 export function FileMenuBody({
   card,
@@ -44,6 +48,7 @@ export function FileMenuBody({
   onFileInto,
   onRemoveFromFolder,
   onDeleted,
+  onTrash,
 }: {
   card: AssetCard
   folders: readonly AssetFolder[]
@@ -55,6 +60,8 @@ export function FileMenuBody({
   onFileInto: (folderId: string) => void
   onRemoveFromFolder: () => void
   onDeleted: () => void
+  /** Moves this file to the trash and reports it in the banner, with Undo. */
+  onTrash: () => void
 }) {
   const router = useRouter()
   const [mode, setMode] = useState<Mode>('menu')
@@ -63,7 +70,7 @@ export function FileMenuBody({
   const [pending, startTransition] = useTransition()
   const label = `Actions for ${displayName(card)}`
 
-  // `attemptDelete` is a `function` declaration below, hoisted within this
+  // `moveToTrash` is a `function` declaration below, hoisted within this
   // component body, so referencing it here — textually above it — is safe.
   useEffect(() => {
     if (!trigger.open) return
@@ -71,8 +78,8 @@ export function FileMenuBody({
     setName(card.title ?? '')
     setError(null)
     if (trigger.intent === 'rename') setMode('rename')
-    else if (trigger.intent === 'delete') attemptDelete()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `attemptDelete` closes over `card`/`trigger`, already named below.
+    else if (trigger.intent === 'delete') moveToTrash()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `moveToTrash` closes over `card`/`trigger`, already named below.
   }, [trigger.open, trigger.intent, card.title])
 
   function submitRename() {
@@ -98,20 +105,9 @@ export function FileMenuBody({
     }
   }
 
-  function attemptDelete() {
-    startTransition(async () => {
-      const result = await deleteAsset(card.id, false)
-      if (result.ok) {
-        onDeleted()
-        router.refresh()
-        return trigger.close()
-      }
-      if (result.reason === 'needs-confirm' || result.reason === 'refused') {
-        onOpen()
-        return trigger.close()
-      }
-      setError(result.message)
-    })
+  function moveToTrash() {
+    onTrash()
+    trigger.close()
   }
 
   return (
@@ -148,12 +144,12 @@ export function FileMenuBody({
           ) : null}
           <MenuItemRow onClick={copyName}>Copy name</MenuItemRow>
           <MenuItemRow
-            onClick={attemptDelete}
+            onClick={moveToTrash}
             shortcut={DELETE_ITEM_KEY}
             destructive
             disabled={pending}
           >
-            Delete
+            Move to trash
           </MenuItemRow>
         </div>
       ) : null}

@@ -25,6 +25,7 @@ export function LibraryGrid({
   onFileInto,
   onRemoveFromFolder,
   onDeleted,
+  onTrash,
 }: {
   view: LibraryView
   visible: readonly AssetCard[]
@@ -46,6 +47,8 @@ export function LibraryGrid({
   onFileInto: (id: string, folderId: string) => void
   onRemoveFromFolder: (id: string) => void
   onDeleted: (id: string) => void
+  /** Moves one file to the trash, reported in the banner with Undo. */
+  onTrash: (id: string) => void
 }) {
   if (visible.length === 0) {
     // B6: this used to be a big bordered card holding one centred sentence —
@@ -97,6 +100,7 @@ export function LibraryGrid({
               onFileInto={(folderId) => onFileInto(card.id, folderId)}
               onRemoveFromFolder={() => onRemoveFromFolder(card.id)}
               onDeleted={() => onDeleted(card.id)}
+              onTrash={() => onTrash(card.id)}
             />
           </li>
         ))}
@@ -120,6 +124,7 @@ export function LibraryGrid({
             onFileInto={(folderId) => onFileInto(card.id, folderId)}
             onRemoveFromFolder={() => onRemoveFromFolder(card.id)}
             onDeleted={() => onDeleted(card.id)}
+            onTrash={() => onTrash(card.id)}
           />
         </li>
       ))}

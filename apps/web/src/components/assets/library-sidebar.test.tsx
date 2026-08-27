@@ -21,6 +21,7 @@ const card = (id: string, over: Partial<AssetCard> = {}): AssetCard => ({
   previewUrl: null,
   usage: [],
   folderIds: [],
+  deletedAt: null,
   ...over,
 })
 
@@ -40,6 +41,7 @@ const baseProps = {
   unfiledOnly: false,
   onGoTo: () => {},
   onGoUnfiled: () => {},
+  trashedCount: 0,
   onOpenSmart: () => {},
   droppedFolders: 0,
   droppedSmart: 0,

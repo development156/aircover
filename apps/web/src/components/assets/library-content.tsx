@@ -43,6 +43,7 @@ export function LibraryContent({
   onFileInto,
   onRemoveFromFolder,
   onDeleted,
+  onTrash,
   bulkOutcome,
   bulkPending,
   onDismissBulkOutcome,
@@ -74,6 +75,7 @@ export function LibraryContent({
   onFileInto: (id: string, folderId: string) => void
   onRemoveFromFolder: (id: string) => void
   onDeleted: (id: string) => void
+  onTrash: (id: string) => void
   bulkOutcome: BulkOutcome | null
   bulkPending: boolean
   onDismissBulkOutcome: () => void
@@ -119,6 +121,7 @@ export function LibraryContent({
         onFileInto={onFileInto}
         onRemoveFromFolder={onRemoveFromFolder}
         onDeleted={onDeleted}
+        onTrash={onTrash}
       />
 
       <BulkOutcomeBanner

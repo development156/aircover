@@ -38,11 +38,23 @@ export function AssetDeleteButton({
   assetId,
   fileName,
   onDeleted,
+  label = 'Delete file',
 }: {
   assetId: string
   /** Names WHICH file — a bare "Delete" in a detail pane is not enough. */
   fileName: string
   onDeleted?: () => void
+  /**
+   * The word on the button. The trash passes "Delete for good", because there
+   * the act really is final and "Delete file" would be the second time a person
+   * has read that word for two different outcomes — the first one was
+   * recoverable and this one is not.
+   *
+   * Only the LABEL changes. The gate, the three outcomes and the re-read at
+   * press time are the same code, which is the reason this is a prop rather
+   * than a second component.
+   */
+  label?: string
 }) {
   const router = useRouter()
   const [state, setState] = useState<DeleteAssetState | null>(null)
@@ -76,7 +88,7 @@ export function AssetDeleteButton({
         data-guide="assets.delete"
       >
         <Trash2 size={14} strokeWidth={1.8} aria-hidden />
-        {pending ? 'Checking where it is used…' : 'Delete file'}
+        {pending ? 'Checking where it is used…' : label}
       </Button>
 
       {refused !== null ? (

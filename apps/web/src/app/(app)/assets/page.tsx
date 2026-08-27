@@ -5,7 +5,7 @@ import { AssetUpload } from '@/components/assets/asset-upload'
 import { EmptyState } from '@/components/empty-state'
 import { PageTitle } from '@/components/page-title'
 import { readFolderTree } from '@/lib/assets/folders-read'
-import { readAssets } from '@/lib/assets/read'
+import { readAssets, readTrashedAssets } from '@/lib/assets/read'
 import type { AssetCard } from '@/lib/assets/view'
 import { signMediaPreviews } from '@/lib/posts/media-url'
 
@@ -35,7 +35,16 @@ export default async function AssetsPage() {
   // MEASURED: added sequentially, this took `/assets` from 8 to 9 sequential
   // server reads and `lib/perf/read-waterfall.test.ts` named the new one. In
   // parallel it is 7, which is one fewer than before the folder system existed.
-  const [read, tree] = await Promise.all([readAssets(), readFolderTree()])
+  //
+  // The trash joins the same batch for the same reason. It is a THIRD
+  // independent read: the live list excludes trashed rows in SQL, so neither can
+  // be derived from the other, and awaiting it after the others would put a
+  // round trip on every visit to a screen most visits never open the trash on.
+  const [read, tree, trash] = await Promise.all([
+    readAssets(),
+    readFolderTree(),
+    readTrashedAssets(),
+  ])
 
   if (read.status === 'no-workspace') {
     return (
@@ -64,7 +73,17 @@ export default async function AssetsPage() {
   // Sequential on the rows: the bucket is private, so only the server can mint
   // these, and `signMediaPreviews` degrades to `url: null` per row rather than
   // throwing — a signing hiccup costs previews, never the page.
-  const previews = await signMediaPreviews(read.assets.map((entry) => entry.asset))
+  // ── ONE SIGNING PASS FOR BOTH LISTS ────────────────────────────────────────
+  // Concatenated deliberately rather than signed in two calls. `signMediaPreviews`
+  // is the one genuinely sequential step on this page, and a second pass for the
+  // trash would add a round trip to every visit to buy thumbnails for a view most
+  // visits never open. One call, keyed by id, and the two lists read from the
+  // same map.
+  const trashedEntries = trash.status === 'ok' ? trash.assets : []
+  const previews = await signMediaPreviews([
+    ...read.assets.map((entry) => entry.asset),
+    ...trashedEntries.map((entry) => entry.asset),
+  ])
   const urlById = new Map(previews.map((preview) => [preview.id, preview.url]))
 
   // ── THE FOLDER READ FAILS SEPARATELY, AND IS NOT ALLOWED TO TAKE THE FILES ──
@@ -97,12 +116,36 @@ export default async function AssetsPage() {
     // would state that every photo is filed nowhere, and the unfiled count on
     // the screen is built from exactly that distinction.
     folderIds: foldersReadable ? (tree.itemsByAsset.get(asset.id) ?? []) : null,
+    // Always null here: `readAssets` filters `deleted_at is null` in SQL, so a
+    // row that reached this list cannot be trashed. Written from the column
+    // rather than hard-coded, so it stays true if that filter ever moves.
+    deletedAt: asset.deleted_at,
+  }))
+
+  // A trashed file's folder memberships are still there — trashing removed
+  // nothing — so `folderIds` is read from the same tree. That is what lets a
+  // restore put the photo back where it was rather than at the root.
+  const trashedCards: AssetCard[] = trashedEntries.map(({ asset, usage }) => ({
+    id: asset.id,
+    title: asset.title,
+    alt: asset.alt,
+    kind: asset.kind,
+    mime: asset.mime,
+    bytes: asset.bytes,
+    width: asset.width,
+    height: asset.height,
+    createdAt: asset.created_at,
+    previewUrl: urlById.get(asset.id) ?? null,
+    usage,
+    folderIds: foldersReadable ? (tree.itemsByAsset.get(asset.id) ?? []) : null,
+    deletedAt: asset.deleted_at,
   }))
 
   return (
     <Shell action>
       <AssetLibrary
         cards={cards}
+        trashed={trashedCards}
         capped={read.capped}
         folders={foldersReadable ? tree.folders : []}
         smart={foldersReadable ? tree.smart : []}
