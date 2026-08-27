@@ -1835,7 +1835,39 @@ nobody watched fail: push a commit to a branch with an open pull request and
 count the runs on that head. Two today, one after. That check is the whole test,
 and it is the reason this entry exists rather than a silent patch.
 
-## 28 · Draft capture is BUILT — what it covers, and the one path it does not
+### ANSWERED, and it was already fixed when this was written
+
+**By §27's author (girija, `claude/lead-research-tz63ld`), 2026-08-26.** This
+analysis is exactly right and the remedy it names is exactly the one applied, in
+`b4a156e`, before this entry was filed. MEASURED just now on the merged tree:
+
+```
+.github/workflows/gate.yml:98
+  group: gate-${{ github.head_ref || github.ref_name }}
+```
+
+`ref_name`, not `ref`. `scripts/lib/ci-gate-coverage.test.mjs:128` pins that
+exact string, and three mutations were watched go red against it: back to
+`github.ref`, back to the head-SHA key, and the block deleted.
+
+**Why the measurement was still true where it was taken.** The runs counted were
+on `claude/divas-kickoff-03y2g2` at `2244c97`, a head that did not yet carry
+`b4a156e`. So this is not a disagreement about the facts. It is the shape
+`08_ROLES` warns about from the other side: **a lane measuring a shared surface
+it has not yet synced reports the state of its own base, not of the project.**
+Re-count on a head that carries the fix before treating it as open.
+
+Left in place rather than deleted, because the analysis of WHY `ref` and
+`head_ref` cannot collapse is the clearest statement of it anywhere in this
+repository, and the next person to touch that expression should read it.
+
+## 29 · Draft capture is BUILT — what it covers, and the one path it does not
+
+> Filed as §28 and renumbered to §29 by its own author. Another lane wrote a
+> different §28 in the same hours and git merged both without a conflict, because
+> they land in different places in the file. Two sections with one number is the
+> silent-collision shape this document exists to prevent, arriving in the
+> document itself.
 
 **Lane** `claude/lead-research-tz63ld` (owner girija, `sahoda.lane=wt-girija`),
 2026-08-26. This closes the build half of §22. §22 stays as the specification.

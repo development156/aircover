@@ -4,13 +4,21 @@ import type { MarketingObservation } from '@sahoda/shared'
 
 import { reportServerError } from '@/lib/observability/report'
 
+import { audienceGrowth, type NoGrowthReason } from './observe/audience-growth'
+import { channelReturn, type NoChannelReason } from './observe/channel-return'
 import { editDistance, type NoDeltaReason } from './observe/edit-distance'
+import { formatEffect, type NoFormatReason } from './observe/format-effect'
 import { toneDrift, type NoDriftReason } from './observe/tone-drift'
 import {
+  readAudienceReadings,
   readCapturedPosts,
+  readChannelOutcomes,
+  readFeaturedPosts,
   readPublishedPosts,
   saveObservation,
+  workspacesWithAudience,
   workspacesWithCapturedDrafts,
+  workspacesWithChannelMetrics,
   workspacesWithPublishedPosts,
 } from './store'
 
@@ -72,14 +80,18 @@ export const MAX_POSTS_CONSIDERED = 200
 
 export async function runMarketingBrainPass(today: Date): Promise<BrainPassResult> {
   const computedOn = today.toISOString().slice(0, 10)
-  // The union, not either list. A workspace that has published nothing can still
-  // have a month of corrections worth measuring, and one that published before
-  // draft capture existed has no drafts at all. Taking one list would silently
-  // skip a whole computer for every workspace outside it.
+  // The union of all three, not any one list. A workspace that has published
+  // nothing can still have a month of corrections worth measuring; one that
+  // published before draft capture existed has no drafts at all; and metrics
+  // arrive from a connected account, so a workspace can carry measured outcomes
+  // for posts this job's other readers filtered out. Taking one list would
+  // silently skip a whole computer for every workspace outside it.
   const workspaceIds = [
     ...new Set([
       ...(await workspacesWithPublishedPosts()),
       ...(await workspacesWithCapturedDrafts()),
+      ...(await workspacesWithChannelMetrics()),
+      ...(await workspacesWithAudience()),
     ]),
   ]
 
@@ -91,7 +103,10 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
     failed: 0,
   }
 
-  const decline = (kind: string, reason: NoDriftReason | NoDeltaReason): void => {
+  const decline = (
+    kind: string,
+    reason: NoDriftReason | NoDeltaReason | NoChannelReason | NoGrowthReason | NoFormatReason,
+  ): void => {
     const key = `${kind}:${reason}`
     result.declined[key] = (result.declined[key] ?? 0) + 1
   }
@@ -100,13 +115,18 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
     workspaceId: string,
     kind: string,
     outcome: { observation: MarketingObservation | null; reason: string | null },
-    fallback: NoDriftReason | NoDeltaReason,
+    fallback: NoDriftReason | NoDeltaReason | NoChannelReason | NoGrowthReason | NoFormatReason,
   ): Promise<void> => {
     if (!outcome.observation) {
       // Each computer returns exactly one of the two and its type says so. The
       // fallback is here because a future one could return neither, and the
       // count would silently stop adding up.
-      decline(kind, (outcome.reason as NoDriftReason | NoDeltaReason) ?? fallback)
+      decline(
+        kind,
+        (outcome.reason as
+          NoDriftReason | NoDeltaReason | NoChannelReason | NoGrowthReason | NoFormatReason) ??
+          fallback,
+      )
       return
     }
     const { inserted } = await saveObservation(workspaceId, outcome.observation)
@@ -131,6 +151,66 @@ export async function runMarketingBrainPass(today: Date): Promise<BrainPassResul
         editDistance(captured.slice(-MAX_POSTS_CONSIDERED), computedOn),
         'no_captured_drafts',
       )
+
+      /**
+       * Not sliced. The two computers above compare an EARLIER half against a
+       * LATER one, so bounding them to recent posts is what keeps the claim
+       * about now. This one compares channels against each other at a single
+       * moment, so trimming the tail would drop whole channels rather than old
+       * halves — the reader already returns one row per post per channel.
+       */
+      const outcomes = await readChannelOutcomes(workspaceId, MAX_POSTS_CONSIDERED * 2)
+      await record(workspaceId, 'channel_return', channelReturn(outcomes, computedOn), 'no_metrics')
+
+      /**
+       * One row per POST here, where channel_return takes one per post per
+       * channel. A caption cross-published three times is one caption, and the
+       * reader collapses it before this sees it.
+       */
+      const featured = await readFeaturedPosts(workspaceId, MAX_POSTS_CONSIDERED * 2)
+      await record(
+        workspaceId,
+        'format_effect',
+        formatEffect(featured.slice(-MAX_POSTS_CONSIDERED), computedOn),
+        'no_metrics',
+      )
+
+      /**
+       * One observation PER CHANNEL, which is why this is the only computer the
+       * runner loops over. A workspace on two platforms is growing on one and
+       * shrinking on the other as often as not, and a single blended number
+       * would hide exactly the fact worth acting on. `subject` carries the
+       * channel, so the unique key keeps them apart.
+       */
+      const readings = await readAudienceReadings(workspaceId)
+      const channels = [...new Set(readings.map((r) => r.channel))]
+      if (channels.length === 0) {
+        /**
+         * Declared, not skipped. With no readings there is no channel to loop
+         * over, so without this line a workspace with no connected account
+         * would produce no `audience_growth` entry of any kind — silence that
+         * reads identically to the computer never having run. Every sibling
+         * says why it produced nothing and so does this one.
+         */
+        await record(
+          workspaceId,
+          'audience_growth',
+          { observation: null, reason: 'no_audience_data' },
+          'no_audience_data',
+        )
+      }
+      for (const channel of channels) {
+        await record(
+          workspaceId,
+          'audience_growth',
+          audienceGrowth(
+            readings.filter((r) => r.channel === channel),
+            channel,
+            computedOn,
+          ),
+          'no_audience_data',
+        )
+      }
     } catch (error) {
       // One workspace's failure must not end the pass for the rest. Counted
       // separately from `declined`, because "we could not look" and "we looked

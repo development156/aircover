@@ -1,5 +1,14 @@
 # Handoff — research — 2026-08-26
 
+**Renamed a THIRD time, 2026-08-26.** `research-2026-08-26.md` →
+`jiban-research-…` → `girija-research-…` → **`girija-wt-girija-2026-08-26.md`**.
+The convention moved again, to `<owner>-<lane>-<date>.md`, because one person
+runs three lanes and an owner-plus-role name is the same file for all three.
+MEASURED before this rename: `ls girija-wt-girija-*.md` returned nothing, so
+this lane's own memory was invisible to the `/kickoff` that globs for it — the
+same defect this file's header has now recorded three times, from three
+different causes.
+
 **Owner** girija — DECLARED, after I guessed wrong. This file was written as
 `research-2026-08-26.md`, renamed to `jiban-research-2026-08-26.md`, and renamed
 again to `girija-research-2026-08-26.md`. Two separate faults, both mine:
