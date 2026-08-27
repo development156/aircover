@@ -165,3 +165,8 @@ apps/web/perf-results/
 # Written by scripts/cloud-setup.sh on every sandbox boot: OK or INCOMPLETE plus
 # the names of any missing required variables. Per-sandbox state, never shared.
 .sahoda-setup-status
+
+# Written by scripts/sandbox-probe.mjs on each boot: what THIS box can reach.
+# Per-machine state — a laptop says FULL and a cloud sandbox says LOCAL_ONLY,
+# and committing either would make the other read a lie.
+.sandbox-capabilities.json
