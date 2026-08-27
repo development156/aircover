@@ -54,17 +54,19 @@ was right; the conclusion drawn from it was not. GBP has the same missing
 selection step as Facebook, and it is built this round. **It has not been
 exercised against a real Google account.**
 
-**Neither picker has been SEEN render.** Both are proven by unit tests and by the
-API spec, not by a browser. Chromium here cannot complete an outbound HTTPS
-request, so this needs the founder or the `smoke` job.
+**The Facebook picker HAS now been seen render**, by the founder, in its empty
+state. The GBP one has not. Chromium here cannot complete an outbound HTTPS
+request, so anything further needs the founder or the `smoke` job.
 
-**The exact query parameters on Zernio's headless redirect are INFERRED, not
-measured.** The endpoints, the required fields and the `step` values are all read
-from `https://zernio.com/openapi.json`; the redirect itself can only be observed
-by completing a real OAuth, which cannot be done from here. `readPendingSelection`
-is written to fail closed — an unrecognised `step` falls through to the ordinary
-reconcile, which is exactly today's behaviour. **This is the first thing to check
-if Facebook still does not connect.**
+**The headless redirect's exact parameters are still INFERRED, and now largely
+moot.** They were read from `https://zernio.com/openapi.json`; the redirect can
+only be observed by completing a real OAuth. Round eleven stopped the flow
+depending on the guess — the TOKEN is what triggers the picker now — and the
+founder reaching our page proves the reading works in practice.
+
+**Whether a Facebook Page can actually be connected is still unproven.** Zero
+accounts exist on the key. The next attempt has to use **Edit settings** on
+Facebook's reuse prompt rather than Continue.
 
 **The X spend meter still inflates its grid row** by roughly 135px across three
 of four cards (`items-stretch` grid, `h-full` tiles, `mt-auto` footer). Seen in
@@ -236,6 +238,71 @@ spends that one owed repaint.
 | The four vocabularies disagree | unify publish with recovery | 3 |
 | A provider-held row shows no countdown | carry `daysLeft` through | 3 |
 | A native row still counts down | delete the countdown | 2 |
+
+
+## Rounds eleven and twelve: Facebook, and what "no Page" actually proved
+
+**The founder reached our own "No Facebook Page came back" page.** That single
+fact settles most of the open questions: headless mode is accepted, the redirect
+parses, the tenant check passes, `listConnectChoices` reaches Zernio and our
+picker renders. **Facebook returned zero Pages.** Nothing in the mechanism is
+broken.
+
+MEASURED round eleven, before any of that was known:
+
+| Question | Answer |
+|---|---|
+| Is `headless=true` accepted? | Yes. Zernio carries our `redirect_url`, with `headless` appended, inside the OAuth `state` |
+| Do `tempToken` and `userProfile` really arrive as redirect params? | Yes. The spec states it in prose on both the list and the commit endpoint |
+| Facebook accounts on the key? | **Zero**, then and now |
+| Is Zernio's Meta app real? | App `712341431446535`, "Social Media Connector" by zernio.com, a live Business app |
+
+### Round eleven: a guess that would have failed silently
+
+The picker keyed on `step=select_page` / `step=select_location`, **the only part
+of the redirect never observed on the wire.** A wrong guess returns null, the
+trip falls through to the ordinary reconcile, finds no facebook account (Zernio
+creates none until a Page is picked) and answers `zernio=nothing` — the original
+failure, with nothing recorded anywhere.
+
+So the **token** is the evidence now. `step` is still read first when
+recognised; the platform the customer pressed is the fallback, which is safe as
+a fallback in a way it would not be as a trigger. Both paths still require a
+token AND a `profileId` compared against our own table.
+
+And a facebook/gbp trip with no account and no readable pick is a **502
+`pick-not-received`**, with a report naming the PARAMETERS THAT ARRIVED and never
+their values.
+
+### Round twelve: two defects in one screenshot
+
+**The Connect button never stopped spinning.** `useConnectFlow` waits for one of
+four signals and every one of them was emitted by `popupCloser` — the page a
+FINISHED connect ends on. The empty state and the select route's failure page are
+the other two ways a connect can end, and both emitted nothing. Both now post on
+the `sahoda-connect` channel; neither calls `window.close()`, because each
+carries a sentence that has to be read. **The picker deliberately stays silent**
+and that is asserted: signalling mid-flow would refresh the opener and leave
+"Not connected" behind a window still asking which Page.
+
+**The remedy named the rarer cause first.** MEASURED from the screenshot,
+Facebook showed *"You've previously linked Social Media Connector to Facebook.
+Would you like to continue with your previous settings?"* — pressing Continue
+reuses a grant that included no Page. The empty state now leads with that and
+says to choose **Edit settings** rather than Continue. `PickerCopy` gained
+`extra` so GBP gets its own sentence: a location is verified by Google, often by
+post, so "create one and connect again" is a remedy that cannot work there.
+
+| Guard | Mutation applied | Went red |
+|---|---|---|
+| The token is the evidence, not the step | require the exact step again | 2 |
+| A missing pick is reported as itself | answer `nothing` again | 1 |
+| Only selection platforms can owe a pick | claim one for every platform | 3 |
+| A token alone cannot name a platform | let it default to facebook | 2 |
+| The diagnostic carries names, not values | report the values too | 2 |
+| The empty page tells the opener | make it silent again | 2 |
+| The picker does NOT tell the opener | make it signal too | 3 |
+| The remedy names "Edit settings" | soften it to "the other option" | 1 |
 
 ## Shared surfaces touched
 
