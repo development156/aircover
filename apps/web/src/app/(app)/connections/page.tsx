@@ -238,8 +238,9 @@ export default async function ConnectionsPage({
             here and neither is an anchor, because there is no
             `/connections/integrate` route and no parent above `/connections`: the
             first crumb would link to the page already open and the second would
-            name a page that does not exist. `PageTitle` carries the reasoning and
-            the contrast measurement behind the segment's colour. */}
+            name a page that does not exist. There is no `<nav>` over them for the
+            same reason. `PageTitle` carries the full reasoning and the contrast
+            measurement behind the segment's colour. */}
         <PageTitle
           crumb="Integrate"
           /* The reference reads "Browse available platforms and choose the next
