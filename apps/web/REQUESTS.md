@@ -2253,6 +2253,7 @@ one moves them on.
 **Founder's brief**, asked for six times before this and built on the seventh:
 
 > "In Caption Generation:
+>
 > 1. SEO Optimized keywords to be there
 > 2. There are supposed to be keywords instead of hashtags in the following
 >    format : [marketing]"
@@ -2270,13 +2271,13 @@ string before anybody presses Send.
 
 ### What moved
 
-| Layer                            | Before                       | After                          |
-| -------------------------------- | ---------------------------- | ------------------------------ |
-| `formatForPlatform`              | `\n\n#chai #pune`            | `\n\n[chai] [pune]`            |
-| `charCountFor`                   | counted the hash tail        | counts the bracket tail        |
-| Composer field                   | "Hashtags", `#chai #pune`    | "Keywords", `chai in pune, …`  |
-| Input separator                  | whitespace and commas        | commas, newlines, brackets     |
-| Generation prompt                | "norms for hashtags"         | `KEYWORD_RULE`, no `#`         |
+| Layer               | Before                    | After                         |
+| ------------------- | ------------------------- | ----------------------------- |
+| `formatForPlatform` | `\n\n#chai #pune`         | `\n\n[chai] [pune]`           |
+| `charCountFor`      | counted the hash tail     | counts the bracket tail       |
+| Composer field      | "Hashtags", `#chai #pune` | "Keywords", `chai in pune, …` |
+| Input separator     | whitespace and commas     | commas, newlines, brackets    |
+| Generation prompt   | "norms for hashtags"      | `KEYWORD_RULE`, no `#`        |
 
 ### The stored key did NOT change, deliberately
 
@@ -2300,3 +2301,62 @@ carries a shape gate on the exact sentence "Instagram allows 30 hashtags."
 That rule is now about a list that contains no hashtags. It will not bite in
 practice (nobody writes thirty keywords) and removing a Constraint Engine rule
 is a larger act than a format change, so it stands. Say the word and it goes.
+
+---
+
+## §35 — The brackets are the writer's choice
+
+**Founder's ruling, 2026-08-27**, answering the question §34 shipped under:
+
+> "Give them a option to check mark if they want [] on their keywords or not ?
+> if yes apply it and publish with it and if not publish the keywords normally"
+
+A tick box per channel, beside the keywords. Ticked publishes `[chai] [pune]`;
+unticked publishes `chai pune`. The line beneath the box always states the exact
+string that will go out, whichever way the box is set.
+
+### Absence means ticked, and that is load-bearing
+
+`extras.keywordBrackets` is absent on every row written between §34 and this
+ruling, and all of those publish WITH brackets. Reading absence as `false` would
+silently strip the brackets from all of them, with nothing on any screen to show
+it. So `keywordBracketsOn` reads `!== false`, and it is a named function in
+`variant-extras.ts` rather than an inline expression **because a mutation proved
+the inline version untestable** — flipping it to `=== true` left every suite in
+the repository green.
+
+### Two bugs the tests found in this change
+
+- **The salvage path has its OWN schema map.** Declaring `keywordBrackets` in
+  `VariantExtrasSchema` was not enough: `parseExtras` salvages through
+  `FIELD_SCHEMAS`, so a stored `"false"` STRING survived unchecked and read as
+  `!== false` — turning the brackets back on for a writer who had turned them
+  off. Found by the test written to ask what the declaration actually buys.
+- **The character meter had to learn the flag.** `[chai] [pune]` is four
+  characters longer than `chai pune`. A meter that ignored the choice would read
+  long on every post whose writer unticked the box, refusing captions that fit.
+
+---
+
+## §36 — Instagram's 30-hashtag cap, on a list with no hashtags
+
+**Left to Sahoda by the founder** ("i leave it up to you"), so: **the cap stays,
+its sentence changes.**
+
+`spec.maxHashtags` is 30 because that is Instagram's HASHTAG limit. Publishing
+`[a] … [31]` is not something Instagram refuses, so
+`instagram allows 30 hashtags.` was attributing a Sahoda refusal to a platform
+rule that does not cover this field.
+
+Dropping the rule would leave `violation-copy.ts`'s MAX_HASHTAGS entry and its
+fix-it button guarding nothing, and a thirty-item tail is a real thing to stop.
+So Sahoda owns the limit and says so: **"Sahoda takes at most 30 keywords per
+instagram post."** The fix-it reads "Remove extra keywords".
+
+**The CODE stays `MAX_HASHTAGS`.** It is a stored, matched string across the copy
+table, the fix-it map and the publish logs; renaming it is a data change, not a
+copy change. `field` stays `hashtags` for the same reason — it addresses
+`extras.hashtags`.
+
+The shape gate in `violation-copy.ts` moved in the same commit, per CLAUDE.md
+rule 5, and is still anchored at both ends.

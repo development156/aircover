@@ -24,7 +24,7 @@ import {
 } from '@/lib/posts/splice-selection'
 import { useCaretBox } from '@/lib/posts/use-caret-box'
 import { useTextHistory } from '@/lib/posts/use-text-history'
-import type { VariantExtras } from '@/lib/posts/variant-extras'
+import { keywordBracketsOn, type VariantExtras } from '@/lib/posts/variant-extras'
 import type { VariantState } from '@/components/posts/use-variants'
 
 import { CopyTools } from './copy-tools'
@@ -123,10 +123,21 @@ export function VersionCard({
   const selection = range.start === range.end ? null : range
 
   const hashtags = state.extras.hashtags
+  // Absent means brackets — `keywordBracketsOn` owns that reading and is tested
+  // there. Read once here so the meter, the trim-to-fit and the field itself
+  // cannot disagree about it.
+  const keywordBrackets = keywordBracketsOn(state.extras)
   const mediaCount = media.length
   // Every verdict on this card comes from here, which is the Constraint Engine
   // plus the format rules, in the order `runPublishPost` asks them.
-  const { meter, thread } = versionVerdict(channel, state.body, hashtags, format, media)
+  const { meter, thread } = versionVerdict(
+    channel,
+    state.body,
+    hashtags,
+    format,
+    media,
+    keywordBrackets,
+  )
 
   // MAX_MEDIA_COUNT deliberately gets no entry. Media lives on the post and this
   // card cannot detach a file, so a "Remove extra media" button would do nothing;
@@ -247,6 +258,12 @@ export function VersionCard({
         label={label}
         hashtags={hashtags}
         onChange={(next) => onExtrasChange({ hashtags: next })}
+        brackets={keywordBrackets}
+        onBracketsChange={(next) =>
+          // `undefined` when brackets are ON, because absent already means on —
+          // writing `true` would put a redundant key in every row.
+          onExtrasChange({ keywordBrackets: next ? undefined : false })
+        }
       />
 
       {/* Per channel, on this channel's own text. The splice runs against the

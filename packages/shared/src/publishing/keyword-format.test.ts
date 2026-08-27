@@ -169,3 +169,60 @@ describe('the publish path emits keywords', () => {
     expect(counted).not.toBe(Array.from(draft.body).length + Array.from('\n\n#chai #pune').length)
   })
 })
+
+/**
+ * ── THE BRACKETS ARE A CHOICE (REQUESTS §35) ─────────────────────────────────
+ *
+ * §34 shipped `[marketing]` publishing literally, because the brief asked for
+ * that format and never said whether a follower should see it. The founder's
+ * answer was a tick box.
+ *
+ * The dangerous half is the DEFAULT. Every row written since §34 publishes with
+ * brackets and carries no flag, so absence has to mean ON. Absence meaning OFF
+ * would silently change what those posts put out, with nothing on any screen to
+ * show it had happened.
+ */
+describe('keywordBrackets — the writer’s choice, and its default', () => {
+  test('absent means BRACKETS, so nothing already written changes', () => {
+    expect(normalizeKeywords(['chai'])).toEqual(['[chai]'])
+    expect(keywordTail(['chai', 'pune'])).toBe('\n\n[chai] [pune]')
+  })
+
+  test('false publishes the bare words', () => {
+    expect(normalizeKeywords(['chai'], false)).toEqual(['chai'])
+    expect(keywordTail(['chai', 'pune'], false)).toBe('\n\nchai pune')
+  })
+
+  test('the choice does not change anything ELSE the normaliser does', () => {
+    // Dedupe, the legacy `#` strip, order and the empty drop all still apply.
+    // A second code path that quietly lost one of them is the obvious way this
+    // goes wrong.
+    expect(normalizeKeywords(['#Chai', 'chai', '', 'pune'], false)).toEqual(['Chai', 'pune'])
+  })
+
+  test('formatForPlatform follows the draft’s choice', () => {
+    const bare = { body: 'Monsoon chai.', hashtags: ['chai'], keywordBrackets: false }
+
+    expect(formatForPlatform(IG, bare)).toMatchObject({
+      caption: 'Monsoon chai.\n\nchai',
+    })
+  })
+
+  test('and the meter counts the SHORTER tail when brackets are off', () => {
+    // THE ONE THAT WOULD BE MISSED. `[chai] [pune]` is four characters longer
+    // than `chai pune`. A meter that ignored the flag would read long on every
+    // post whose writer unticked the box — refusing captions that fit.
+    const on = charCountFor(IG, { body: 'Chai', hashtags: ['chai', 'pune'] })
+    const off = charCountFor(IG, {
+      body: 'Chai',
+      hashtags: ['chai', 'pune'],
+      keywordBrackets: false,
+    })
+
+    expect(on - off).toBe(4)
+  })
+
+  test('an explicit true is the same as absent', () => {
+    expect(keywordTail(['chai'], true)).toBe(keywordTail(['chai']))
+  })
+})
