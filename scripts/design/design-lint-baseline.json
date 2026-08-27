@@ -84,7 +84,7 @@
   },
   "breakpoint_total": 0,
   "breakpoint": {},
-  "typesize_total": 724,
+  "typesize_total": 714,
   "typesize": {
     "app/(app)/approvals/page.tsx": 2,
     "app/(app)/assets/page.tsx": 1,
@@ -165,7 +165,6 @@
     "components/composer/not-built-yet.tsx": 1,
     "components/composer/poll-options.tsx": 6,
     "components/composer/relink-control.tsx": 3,
-    "components/composer/template-card.tsx": 10,
     "components/composer/thread-preview.tsx": 5,
     "components/composer/version-card.tsx": 1,
     "components/composer/version-options.tsx": 3,

@@ -2360,3 +2360,64 @@ copy change. `field` stays `hashtags` for the same reason — it addresses
 
 The shape gate in `violation-copy.ts` moved in the same commit, per CLAUDE.md
 rule 5, and is still anchored at both ends.
+
+---
+
+## §36 — The box mirrors the post, and the template card holds two controls
+
+**Founder's ruling, 2026-08-27**, with two screenshots.
+
+### 1. The keyword box shows what will publish
+
+> "when the box is tiked the square bracket is applies on the above bar also
+> like for example in the box it is written cat it should change to [cat] on
+> live"
+
+§35 kept the input always bracketed whatever was published, on the reasoning
+that the line beneath states the published form separately. That is two answers
+to one question: a box reading `[cat]` over a post reading `cat` is lying about
+the only thing the field exists to show.
+
+**It settles on BLUR, and immediately when the tick box moves.** Rewriting on
+every keystroke moves the caret out from under the writer — `cat` becomes
+`[c]at` on the first character — and that wrong repair has its own guard.
+Bracketed keywords settle space-separated (`[chai in pune] [monsoon]` shows its
+own boundaries); unbracketed ones settle comma-separated, because
+`chai in pune monsoon` is neither readable nor re-parseable.
+
+### 2. "Helps in boosting the posts", written as the true version
+
+> "below you should also mention helps in boosting the posts"
+
+The line added is: *"Keywords give people another way to find this post. The
+brackets only decide how they look."*
+
+**Not "boosts your posts", and deliberately.** The BRACKETS boost nothing — they
+are punctuation and no platform ranks on them, so a boost claim under that tick
+box would be false about the thing it sits under. The KEYWORDS are the half that
+works, because a caption carrying the words somebody searches for is a caption
+search can match. No number and no promise of reach: Sahoda measures neither,
+and "boosts your posts" is a figure no query produced. A test forbids `%`,
+`boost` and `reach` in that sentence.
+
+### 3. The template card is two controls
+
+> "in use a template it should not show any thing except save it as a template
+> and browse template — and in browse template they can choose the template"
+
+The card printed the count, then every template name, then the save link — a
+list nobody asked to see, in a sidebar, growing with every template saved.
+
+At rest it is now **Browse templates** and **Save this post as a template**.
+Browsing opens a panel with a name filter and the list; choosing one loads it
+and closes the panel.
+
+**The count moved rather than died.** "A count is a claim, and only one of three
+reads earns it" still holds — the number now sits inside the browser, where it
+answers a question somebody just asked.
+
+**Browse is refused, never absent** (the §33 pattern). With nothing saved or a
+broken read it is disabled and says which of the three nothings applies: a
+failed read is not an empty library, and neither is a missing workspace. A
+search that matches nothing says so in its own words and keeps `3 saved` on
+screen to prove the library is not empty.

@@ -47,6 +47,33 @@ function setup(
 
 const box = () => screen.getByLabelText('Keywords')
 
+/** Renders with a seeded list so the brackets prop can be flipped in place. */
+function setupRerenderable(seed: string) {
+  const view = render(
+    <KeywordField
+      channel="instagram"
+      label="Instagram"
+      hashtags={[seed]}
+      onChange={vi.fn()}
+      brackets
+      onBracketsChange={vi.fn()}
+    />,
+  )
+  return {
+    rerender: (brackets: boolean) =>
+      view.rerender(
+        <KeywordField
+          channel="instagram"
+          label="Instagram"
+          hashtags={[seed]}
+          onChange={vi.fn()}
+          brackets={brackets}
+          onBracketsChange={vi.fn()}
+        />,
+      ),
+  }
+}
+
 describe('what the box stores is what the engine publishes', () => {
   test('wraps a bare word exactly as the frozen normaliser does', async () => {
     // Retargeted from "adds the missing #". The CLAIM is unchanged and is the
@@ -254,5 +281,92 @@ describe('the AI affordance that does not exist', () => {
 
     expect(screen.queryByText(/cannot suggest/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /suggest/i })).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * THE BOX AND THE POST HAVE TO AGREE (REQUESTS §36).
+ *
+ * The box always showed brackets whatever was published, and the line beneath
+ * stated the published form separately. The founder read that as two answers to
+ * one question: "when the box is tiked the square bracket is applies on the
+ * above bar also". A field that says `[cat]` over a post that says `cat` is
+ * lying about the one thing it exists to show.
+ *
+ * ── AND THE TIMING IS THE HARD HALF ─────────────────────────────────────────
+ * Rewriting the text on every keystroke moves the caret out from under the
+ * writer — `cat` becomes `[c]at` on the first character. So it settles on BLUR,
+ * and immediately when the tick box moves. Both are pinned; so is the fact that
+ * it does NOT settle while the field still has focus.
+ */
+describe('the box mirrors what will be published', () => {
+  test('does NOT rewrite while the writer is still typing', async () => {
+    // The guard on the caret. A box that reshapes itself mid-word is unusable,
+    // and it is the obvious wrong way to satisfy the test below.
+    setup()
+    await userEvent.type(box(), 'cat')
+
+    expect(box()).toHaveValue('cat')
+  })
+
+  test('settles into the published form when focus leaves', async () => {
+    setup()
+    await userEvent.type(box(), 'cat')
+    await userEvent.tab()
+
+    expect(box()).toHaveValue('[cat]')
+  })
+
+  test('settles WITHOUT brackets when the box is unticked', async () => {
+    // The other direction, and it is not symmetrical: unbracketed keywords are
+    // comma-separated, because `chai in pune monsoon` is unreadable and
+    // un-reparseable while `[chai in pune] [monsoon]` shows its own boundaries.
+    setup('instagram', undefined, false)
+    await userEvent.type(box(), 'chai in pune, monsoon')
+    await userEvent.tab()
+
+    expect(box()).toHaveValue('chai in pune, monsoon')
+  })
+
+  test('re-shapes the box the moment the tick box moves', () => {
+    // No blur involved. Ticking is a statement about what publishes, so the box
+    // has to answer immediately or it is showing the previous answer.
+    const { rerender } = setupRerenderable('cat')
+
+    expect(box()).toHaveValue('[cat]')
+    rerender(false)
+    expect(box()).toHaveValue('cat')
+    rerender(true)
+    expect(box()).toHaveValue('[cat]')
+  })
+
+  test('opens showing the UNBRACKETED form when the post publishes that way', () => {
+    // The seed, not the settle. A stored row opened with the box unticked must
+    // not show brackets it is not going to publish.
+    setup('instagram', ['chai', 'pune'], false)
+
+    expect(box()).toHaveValue('chai, pune')
+  })
+})
+
+describe('what the tick box says the keywords are for', () => {
+  test('names the benefit, and puts it on the KEYWORDS rather than the brackets', () => {
+    // The founder asked for a line saying this "helps in boosting the posts".
+    // Written as the true version: keywords are what search can match, brackets
+    // are punctuation and rank nothing.
+    setup()
+
+    expect(screen.getByText(/another way to find this post/i)).toBeInTheDocument()
+  })
+
+  test('promises no reach and quotes no number, because Sahoda measures neither', () => {
+    // "Boosts your posts by 30%" is a figure no query produced. So is "boosts
+    // your posts". The line says what the keywords DO, not what they will get.
+    setup()
+    const line = screen.getByText(/another way to find this post/i).textContent ?? ''
+
+    expect(line).not.toMatch(/\d+\s*%/)
+    expect(line).not.toMatch(/\bboost/i)
+    expect(line).not.toMatch(/\breach\b/i)
   })
 })
