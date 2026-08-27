@@ -58,13 +58,41 @@ describe('SendControls — the pair, and where the post is going', () => {
     expect(onSaveDraft).not.toHaveBeenCalled()
   })
 
-  test('hides Send now when no channel can receive the post, and keeps the draft', () => {
-    // A button that cannot work is worse than no button. Work still has to be
-    // safe, so the other half stays.
+  /**
+   * ── THIS CLAIM WAS REVERSED BY THE FOUNDER, AND THE REVERSAL IS RIGHT ──────
+   * It read "hides Send now when no channel can receive the post", on the
+   * principle that a button which cannot work is worse than no button.
+   *
+   * MEASURED on the live preview with four unconnected channels: what a reader
+   * actually got was a lone "Save as draft" and a gap where the point of the
+   * screen should be. Nothing on screen said whether sending was missing,
+   * broken, or somewhere else. An absent control explains nothing; a refused one
+   * with its reason directly above it explains everything.
+   *
+   * So the assertion is inverted on purpose, and the REASON is asserted with it
+   * — a disabled button on its own would be the dead end the old rule feared.
+   */
+  test('shows Send now REFUSED when no channel can receive the post, never absent', () => {
     const { container } = controls({ live: [], connected: set() })
 
-    expect(container.querySelector('[data-send-now]')).toBeNull()
+    const send = container.querySelector<HTMLButtonElement>('[data-send-now]')
+    expect(send).not.toBeNull()
+    expect(send!.disabled).toBe(true)
     expect(container.querySelector('[data-send-save-draft]')).not.toBeNull()
+  })
+
+  test('and says why it is refused, so the refusal is not a dead end', () => {
+    controls({ live: [], connected: set() })
+
+    expect(screen.getByText(/Nothing goes out until a channel is connected/i)).toBeInTheDocument()
+  })
+
+  test('the same button is LIVE the moment one channel is connected', () => {
+    // The counterweight. A permanently disabled Send would satisfy the test
+    // above and be a worse screen than the one it replaced.
+    const { container } = controls()
+
+    expect(container.querySelector<HTMLButtonElement>('[data-send-now]')!.disabled).toBe(false)
   })
 })
 

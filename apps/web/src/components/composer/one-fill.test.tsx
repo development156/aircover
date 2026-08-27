@@ -125,16 +125,23 @@ async function afterChunksArrive(): Promise<void> {
 
 describe('the brand fill marks what commits, and only that', () => {
   /**
-   * "Save all versions" WAS the fifth entry here and it is deliberately gone.
+   * ── THE FIFTH ENTRY HAS BEEN THREE DIFFERENT THINGS, AND THAT IS THE POINT ─
    *
-   * The sticky bar no longer carries a save button: both endings moved into
-   * `SendControls`, under the dry run, and that half is behind the "Post now"
-   * tile so it is not on screen at rest. The list is still asserted EXACTLY
-   * rather than loosened to a count — the whole value of this guard is that a
-   * new fill has to be argued for, and `toHaveLength(4)` would let any fourth
-   * one through as long as one left.
+   * It was "Save all versions" on the sticky bar. It went when both endings
+   * moved into `SendControls`. It is back as the bar's "Save" — a real button
+   * that writes the post and every version and then takes the reader to the
+   * Send it panel (founder's ruling, REQUESTS §33).
+   *
+   * It belongs in this list under the rule as written: §31 says the fill marks
+   * what COMMITS, and this one commits. What would not belong is the bar's
+   * other button, "Save as draft" — same act, but it is the quiet half of a
+   * pair and the pair needs a primary.
+   *
+   * The list stays EXACT rather than a count. The whole value of this guard is
+   * that a new fill has to be argued for, and `toHaveLength(5)` would let any
+   * fifth one through as long as one left.
    */
-  test('at rest it is Adapt and one Save per channel, and nothing else', async () => {
+  test('at rest it is Adapt, one Save per channel, and the bar’s Save', async () => {
     const root = composer()
     await afterChunksArrive()
     const found = solidFills(root)
@@ -144,14 +151,32 @@ describe('the brand fill marks what commits, and only that', () => {
       'Save',
       'Save',
       'Save',
+      'Save',
     ])
   })
 
+  test('the bar’s quiet half is NOT filled, so the pair reads as a pair', async () => {
+    // Two identical fills side by side in a floating strip would tell the reader
+    // nothing about which one moves them on.
+    const root = composer()
+    await afterChunksArrive()
+
+    const draft = root.querySelector<HTMLElement>('[data-bar-save-draft]')
+    expect(draft).not.toBeNull()
+    expect(draft!.className.split(/\s+/)).not.toContain('bg-primary')
+  })
+
   test('the Save count follows the channel list, one per card', async () => {
+    // Scoped to the VERSION CARDS. The bar's "Save" is also exactly the string
+    // "Save", so counting labels across the whole tree stopped being a count of
+    // cards the moment the bar grew one.
     const one = composer(['x'])
     await afterChunksArrive()
 
-    expect(solidFills(one).filter((label) => label === 'Save')).toHaveLength(1)
+    const cardSaves = [...one.querySelectorAll<HTMLElement>('[data-version-card] button')].filter(
+      (el) => el.className.split(/\s+/).includes('bg-primary') && el.textContent?.trim() === 'Save',
+    )
+    expect(cardSaves).toHaveLength(1)
   })
 
   /**
@@ -197,7 +222,12 @@ describe('the committing buttons inside the Send it panel', () => {
 
     expect(confirm.className.split(/\s+/)).toContain('bg-primary')
     // And "Save as draft" beside it does NOT: it is the way out, not the act.
-    const draft = within(root).getByRole('button', { name: /Save as draft/ })
-    expect(draft.className.split(/\s+/)).not.toContain('bg-primary')
+    // Scoped by data attribute — the sticky bar carries a second button with
+    // the same label now, and `getByRole` on the label alone would find two.
+    const draft = within(root).getAllByRole('button', { name: /Save as draft/ })
+    expect(draft.length).toBeGreaterThan(0)
+    for (const button of draft) {
+      expect(button.className.split(/\s+/)).not.toContain('bg-primary')
+    }
   })
 })

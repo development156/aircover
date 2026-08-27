@@ -311,6 +311,7 @@ export function Composer({
         status={autosave.status}
         unsavedVersions={actions.unsaved.length}
         canFinish={draft.channels.length > 0}
+        onSaveDraft={actions.saveAllAndWait}
       />
     </div>
   )

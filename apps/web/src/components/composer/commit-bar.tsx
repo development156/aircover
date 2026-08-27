@@ -1,7 +1,9 @@
 'use client'
 
-import { ArrowDown } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowDown, Save } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
 import type { AutosaveStatus } from '@/components/posts/use-autosave'
 
 const POST_STATUS_COPY: Readonly<Record<AutosaveStatus, string>> = {
@@ -26,6 +28,12 @@ export interface CommitBarProps {
   unsavedVersions: number
   /** Whether the finish section exists to be linked to. */
   canFinish: boolean
+  /**
+   * Write the post and every dirty version. THE SAME FUNCTION `SendControls`
+   * calls — one save, reached from two places, so the two can never disagree
+   * about what "saved" means.
+   */
+  onSaveDraft: () => Promise<boolean>
 }
 
 /**
@@ -41,20 +49,45 @@ export interface CommitBarProps {
  * the app's bottom navigation — otherwise the one control at the end of the page
  * is the one control covered, on the one device that has the bar.
  *
- * ── AND WHY IT NO LONGER CARRIES SAVE EITHER ─────────────────────────────────
- * It used to hold "Save all versions" beside the link, which put the two endings
- * to the same piece of work in two different places: save floating over the
- * page, send four screens down. A reader who pressed the floating one had no way
- * to tell whether that was the whole job.
+ * ── SAVE CAME BACK, AND IT IS A DIFFERENT BUTTON THAN THE ONE THAT LEFT ──────
+ * "Save all versions" used to live here and was removed, because save floating
+ * over the page while send sat four screens down put the two endings to the same
+ * piece of work in two places. Founder's ruling (REQUESTS §33) puts a save back
+ * on the bar, and it is right: a writer at the top of a long composer should not
+ * have to travel to the end of the page to make their work safe.
  *
- * Both now sit together in `SendControls`, under the dry run, with the channel
- * list above them — "Save as draft" and "Send now", and BOTH of them write every
- * unsaved version first. This bar keeps the two things a floating strip is
- * actually good at: telling you whether your work is safe, and getting you to
- * the end of the page.
+ * What is different is that there is now ONE save function. `onSaveDraft` is the
+ * same `saveAllAndWait` that `SendControls` calls, so the floating one and the
+ * one in the panel cannot disagree about what "saved" means — which is exactly
+ * how the old pair went wrong: the bar saved versions, the panel saved the post,
+ * and neither said so.
+ *
+ * ── AND "SAVE" IS NOT A LINK PRETENDING TO BE A BUTTON ───────────────────────
+ * The second control was a bare anchor to `#finish` labelled "Save and send". It
+ * saved nothing; it scrolled. The founder asked for it to read "Save", and a
+ * scroll link called Save would be the vaguest possible label for the most
+ * important word on the screen. So it now SAVES and then goes to the end of the
+ * page — the label is true, and the journey it was there for is unchanged.
  */
-export function CommitBar({ status, unsavedVersions, canFinish }: CommitBarProps) {
+export function CommitBar({ status, unsavedVersions, canFinish, onSaveDraft }: CommitBarProps) {
   const versionWord = unsavedVersions === 1 ? 'version' : 'versions'
+  const [saving, setSaving] = useState(false)
+
+  /**
+   * Save, then go. The order matters and the `await` is the whole point: jumping
+   * first would move the page out from under a write still in flight, and a
+   * reader who then closed the tab would lose it.
+   *
+   * The jump is a plain hash assignment rather than `router.push` so it behaves
+   * like the anchor it replaces — it lands on `#finish`, `scroll-mt-6` on that
+   * section keeps the heading clear of the topbar, and Back returns.
+   */
+  async function saveThenFinish() {
+    setSaving(true)
+    await onSaveDraft()
+    setSaving(false)
+    window.location.hash = 'finish'
+  }
 
   /**
    * ── AN EMPTY BAR IS FURNITURE, AND IT WAS THE WIDEST THING ON THE SCREEN ────
@@ -106,21 +139,31 @@ export function CommitBar({ status, unsavedVersions, canFinish }: CommitBarProps
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* The safe half, and it stays put. A writer three screens up wants
+              their work written down, not a trip to the end of the page. */}
+          <Button
+            size="sm"
+            variant="secondary"
+            data-bar-save-draft
+            loading={saving}
+            disabled={saving}
+            onClick={() => void onSaveDraft()}
+          >
+            <Save size={13} aria-hidden />
+            Save as draft
+          </Button>
+
           {canFinish ? (
-            // A LINK, because it navigates. `router.push` from a button would not
-            // survive a reload, would not appear in the page's link list and
-            // would not open in a new tab — docs/26 §10.2.
-            <a
-              href="#finish"
-              className="surface-ring-firm inline-flex h-7 shrink-0 items-center gap-icon-gap rounded-sm bg-surface px-btn-tight text-[12px] leading-none font-[550] text-ink transition-micro hover:bg-s2 max-narrow:min-h-[44px]"
+            <Button
+              size="sm"
+              data-bar-save
+              loading={saving}
+              disabled={saving}
+              onClick={() => void saveThenFinish()}
             >
               <ArrowDown size={13} aria-hidden />
-              {/* Names the DESTINATION rather than the act, because pressing it
-                  does not save or send anything — it scrolls. A link labelled
-                  "Send it" beside an unsaved count reads as the button that
-                  makes the work safe, and it never was. */}
-              {unsavedVersions > 0 ? 'Save and send' : 'Send it'}
-            </a>
+              Save
+            </Button>
           ) : null}
         </div>
       </div>

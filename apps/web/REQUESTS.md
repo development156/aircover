@@ -2181,3 +2181,67 @@ inside a React transition and had **no test of any kind**; they are now in
 `lib/posts/publish-one.ts` with thirteen.
 
 The confirm step also stays, and it names the channels rather than counting them.
+
+---
+
+## §33 — The Send button stays visible, and the bar saves again
+
+**Founder's ruling, 2026-08-27**, with a screenshot of the live preview marking
+two empty slots:
+
+> "i want a SEND button in orange near save draft
+>
+> and i want a save as draft in downbar side with save and send ( rename this as
+> save but the functionality remains same save and send )"
+
+### A refused button beats an absent one
+
+`SendControls` HID "Send now" when no channel could receive the post, on the
+principle that a button which cannot work is worse than no button.
+
+MEASURED on the preview with four unconnected channels: what the reader got was
+a lone "Save as draft" and a gap where the point of the screen should be.
+Nothing on screen said whether sending was missing, broken, or somewhere else.
+**An absent control explains nothing.** It is now rendered and `disabled`, with
+the warn block naming every unconnected channel and a link to connect one
+directly above it. That is a refusal rather than a dead end, and it is why
+`disabled` is honest here rather than the coming-soon pattern `design-lint`
+rule 3 forbids: nothing is unfinished, the account is simply not connected.
+
+### The bar saves again, and this time there is only one save
+
+§32 took "Save all versions" off the sticky bar, arguing that a floating save
+and a distant send put the two endings to one piece of work in two places. That
+was my reading, not a ruling, and it was wrong about the cost: **a writer three
+screens up a long composer should not have to travel to the end of the page to
+make their work safe.**
+
+The split was never the problem. TWO DIFFERENT SAVE FUNCTIONS were — the bar
+wrote versions, the panel wrote the post, and neither said which. Both places
+now call the same `saveAllAndWait`, so they cannot disagree about what "saved"
+means.
+
+| Bar control   | Fill      | What it does                                     |
+| ------------- | --------- | ------------------------------------------------ |
+| Save as draft | secondary | Writes the post and every version. Stays put.    |
+| Save          | brand     | Writes the same, then goes to the Send it panel. |
+
+### "Save" had to be made true
+
+The second control was a bare `<a href="#finish">` labelled "Save and send". It
+saved nothing; it scrolled. The founder asked for it to read "Save", and a
+scroll link called Save is the vaguest possible label on the most important word
+on the screen (CLAUDE.md rule 1). So it now saves and THEN goes: the label is
+true, and the journey it existed for is unchanged.
+
+**The order is guarded separately.** `void onSaveDraft(); jump()` looks identical
+on screen and loses the work of anyone who closes the tab on arrival, so a test
+holds the save open and asserts the page has not moved.
+
+### The fill list grew by one, under the rule rather than around it
+
+`one-fill.test.tsx` now expects five at rest: Adapt, three per-channel Saves, and
+the bar's Save. §31 says the fill marks what COMMITS, and the bar's Save commits.
+Its quieter sibling does not carry it, and that is asserted too — two identical
+fills side by side in a floating strip would tell the reader nothing about which
+one moves them on.

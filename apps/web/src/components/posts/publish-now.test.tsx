@@ -164,11 +164,14 @@ describe('PublishNow — what the confirm panel may claim', () => {
   const INSTAGRAM_WAIT = /fifteen seconds/i
 
   test('says nothing about publishing when nothing can be published', () => {
-    // No connection at all, so there is no Send button. A sentence describing
-    // what it does is a claim about an action nobody on this screen can take.
+    // THE CLAIM IS UNCHANGED; only the mechanism moved. The Send button is now
+    // rendered and REFUSED rather than hidden (founder's ruling, REQUESTS §33),
+    // so what stops the sentence is that a disabled button cannot open the
+    // confirm panel. A sentence describing a real publish is still a claim about
+    // an action nobody on this screen can take.
     const { container } = renderPublish(['x', 'linkedin'], set())
 
-    expect(sendNow(container)).toBeNull()
+    expect(sendNow(container)).toBeDisabled()
     expect(screen.queryByText(FOOTNOTE)).not.toBeInTheDocument()
   })
 
@@ -277,12 +280,13 @@ describe('PublishNow — what the send controls claim', () => {
     expect(container.querySelectorAll('[data-channel-status]')).toHaveLength(3)
   })
 
-  test('offers Save as draft even when nothing can be sent', () => {
-    // Work still has to be safe on a post with no connections. Hiding both
-    // buttons because one of them cannot work would strand the writer.
+  test('offers Save as draft even when nothing can be sent, beside a refused Send', () => {
+    // Work still has to be safe on a post with no connections. The Send half is
+    // present and disabled rather than absent — retargeted for REQUESTS §33 —
+    // because a gap where the point of the screen should be explains nothing.
     const { container } = renderPublish(['linkedin'], set())
 
     expect(screen.getByRole('button', { name: /Save as draft/i })).toBeInTheDocument()
-    expect(sendNow(container)).toBeNull()
+    expect(sendNow(container)).toBeDisabled()
   })
 })
