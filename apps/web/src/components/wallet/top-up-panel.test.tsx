@@ -133,3 +133,99 @@ describe('the top-up plan cards', () => {
     ).toBeInTheDocument()
   })
 })
+
+/**
+ * THE CARD CRAFT PORTED FROM THE REFERENCE PRICING COMPONENT, AS TESTS.
+ *
+ * These pin the two things about that port which are cheap to undo by accident
+ * and expensive when undone, and neither is a matter of taste.
+ *
+ * Both assert a CLAIM through a mechanism, never a wording or a hex value: the
+ * first asks "is the accent spent on a box the budget probe charges", the second
+ * asks "is the name above the caption on the type scale". A later session may
+ * restyle either freely and these stay right.
+ */
+describe('the ported card craft', () => {
+  /** The `<label>` that is the whole card for one plan. */
+  const cardFor = (name: RegExp): HTMLElement => {
+    const radio = screen.getByRole('radio', { name })
+    const label = radio.closest('label')
+    if (label === null) throw new Error('the radio is not inside its card label')
+    return label
+  }
+
+  it('circles each feature tick with a RING, never a border the accent budget charges', () => {
+    render(<TopUpPanel />)
+
+    // The selected card: the one whose ticks are drawn in the brand.
+    const card = cardFor(/starter/i)
+    const marks = card.querySelectorAll('[class*="rounded-pill"][class*="place-content-center"]')
+
+    // Three feature lines come off PLAN_CATALOG.limits, so three marks.
+    expect(marks.length).toBe(3)
+
+    for (const mark of marks) {
+      const classes = mark.className
+      // ── THE CLAIM ────────────────────────────────────────────────────────
+      // `accent-area-budget.spec.ts` charges a BORDER its whole box and does not
+      // read box-shadow at all. MEASURED with that spec's own probe over the
+      // rendered panel: the reference's `size-6` bordered tick costs 576px2
+      // each, 5,184px2 across nine, taking the panel from 5,266 to 10,450
+      // against a 6,000px2 ceiling. At this file's 18px that is 324px2 each and
+      // 2,916 across nine — smaller, still nearly half the screen's entire
+      // allowance, and still spent on a decoration. A border here is not a style
+      // regression, it is a failing gate.
+      expect(classes).toMatch(/shadow-\[inset_0_0_0_1px_var\(--brand-lift\)\]/)
+      expect(classes).not.toMatch(/\bborder(-|\s|$)/)
+      // The ground is --surface, not the card's wash: MEASURED, accent on
+      // --brand-wash is 2.753:1 in light against 2.936:1 on --surface.
+      expect(classes).toMatch(/\bbg-surface\b/)
+    }
+  })
+
+  it('draws an unselected card its own ring, so selection survives colour blindness', () => {
+    render(<TopUpPanel />)
+
+    const growth = cardFor(/growth/i)
+    const mark = growth.querySelector('[class*="rounded-pill"][class*="place-content-center"]')
+    expect(mark).not.toBeNull()
+    // Not the brand ring — an unselected card must not borrow the selected
+    // card's mark, or the tick stops reporting state at all.
+    expect(mark?.className).not.toMatch(/--brand-lift/)
+    expect(mark?.className).toMatch(/var\(--line\)/)
+  })
+
+  it('sets the plan name above the caption that describes it, on the type scale', () => {
+    render(<TopUpPanel />)
+
+    const card = cardFor(/starter/i)
+    const name = within(card).getByText(PLAN_CATALOG.starter.name)
+
+    // ── THE CLAIM ──────────────────────────────────────────────────────────
+    // The reference sets the plan name at its largest card rung. This shipped at
+    // `type-sm` — 13px/400, the SECONDARY rung — which put the name below the
+    // "granted each month" caption underneath it, so the card that exists to be
+    // identified read as an unlabelled price. `type-h3` is this scale's
+    // card-title rung.
+    expect(name.className).toMatch(/\btype-h3\b/)
+    expect(name.className).not.toMatch(/\btype-sm\b/)
+  })
+
+  it('lets every card arrive on the product entrance, with no hand-written delay', () => {
+    const { container } = render(<TopUpPanel />)
+
+    const steps = container.querySelectorAll('.enter-step')
+    expect(steps.length).toBe(3)
+
+    steps.forEach((step, i) => {
+      // `--i` is the ONLY thing a call site sets. The cap and the duration live
+      // in tokens.css, and `prefers-reduced-motion` there zeroes the DELAY as
+      // well as the duration — which is the half a hand-written framer-motion
+      // delay gets wrong, leaving a reduced-motion reader in front of a blank
+      // panel and then snapping three cards in at once.
+      expect((step as HTMLElement).style.getPropertyValue('--i')).toBe(String(i))
+      expect((step as HTMLElement).style.animationDelay).toBe('')
+      expect((step as HTMLElement).style.animationDuration).toBe('')
+    })
+  })
+})
