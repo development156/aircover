@@ -1,5 +1,6 @@
 import { SlidersHorizontal } from 'lucide-react'
 import { WorkspaceNameField } from '@/components/settings/workspace-name-field'
+import { WorkspaceTimezoneField } from '@/components/settings/workspace-timezone-field'
 
 import { EmptyState } from '@/components/empty-state'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
@@ -19,10 +20,15 @@ export const metadata = { title: 'Settings' }
  * rather than left, because a stale comment about what a screen refuses to do
  * is exactly the kind a later session trusts without re-deriving.
  *
- * Name is editable. Address is genuinely read-only — the slug is a stable
- * identifier used in links and never reused, so there is no control to offer
- * and none is rendered. A disabled input there would imply an edit that is not
- * coming (docs/26 §10.2).
+ * Name and time zone are editable. Address is genuinely read-only: the slug is
+ * a stable identifier used in links and never reused, so there is no control to
+ * offer and none is rendered. A disabled input there would imply an edit that
+ * is not coming (docs/26 §10.2).
+ *
+ * The time zone row carries a disclosure saying the setting is recorded and
+ * does not change any time on any screen yet, because nothing reads the column
+ * so far. That sentence is load-bearing and goes in the change that makes the
+ * screens read it, not before.
  *
  * The pane's width cap lives in `layout.tsx` — see docs/26 §6.1 for why a form
  * this short looked unfinished at 1440 without one.
@@ -59,6 +65,30 @@ export default async function SettingsPage() {
             hint="Its stable identifier. Used in links and never reused."
             control={<span className="type-sm font-[550] text-ink">{workspace.slug}</span>}
           />
+          <SettingRow
+            label="Time zone"
+            hint="Where this business is. Sahoda needs it to judge when your posts do best."
+            control={
+              <WorkspaceTimezoneField
+                workspaceId={workspace.id}
+                initialTimezone={workspace.timezone}
+              />
+            }
+          >
+            {/*
+              THE HONEST DISCLOSURE, AND WHY IT IS NOT OPTIONAL.
+              Nothing in the product reads this column yet: every time on every
+              screen is rendered in IST, from 38 hardcoded sites. A setting that
+              silently changes nothing is the same defect as a figure no query
+              produced, so the row says what it does and what it does not do.
+              Delete this line in the change that makes the screens read it,
+              not before.
+            */}
+            <p className="type-meta text-muted">
+              Sahoda still shows and schedules every time in IST. This setting is recorded and does
+              not change them yet.
+            </p>
+          </SettingRow>
         </SettingCard>
 
         {/* Below the workspace rows, not above: taking a copy of everything and
