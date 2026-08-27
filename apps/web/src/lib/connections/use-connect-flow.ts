@@ -93,10 +93,61 @@ export function useConnectFlow(platform: ConnectionPlatform): ConnectFlowState {
    * reading "Not connected" — and a cancelled one would leave a button stuck on
    * "Opening Instagram…" forever.
    */
+  /**
+   * A connect ended while this tab was NOT the focused one, so the refresh it
+   * started may never have painted. Cleared by the repaint effect below.
+   *
+   * A ref rather than state: setting it must not itself re-render, and it has to
+   * survive the render in which `pending` flips to false.
+   */
+  const repaintOwed = useRef(false)
+
   const finish = useCallback(() => {
     popupRef.current = null
     setPending(false)
+
+    /**
+     * ── WHY THIS FLAG EXISTS, AND WHY THE FIRST FOCUS FIX COULD NOT WORK ─────
+     * The focus listener used to live in the `pending` effect below. It was
+     * added for "after the popup closes nothing happens, only when I refresh
+     * does X connected appear", and it **cannot fire in that scenario**, which a
+     * test written in the wrong order did not notice.
+     *
+     * The real sequence is: the closer posts on the channel, THEN calls
+     * `window.close()`. So the message lands first, `finish()` runs, `pending`
+     * goes false, the effect is torn down and the focus listener is REMOVED —
+     * all before the popup is gone and before this tab ever regains focus. The
+     * safety net was always taken down a moment before the fall. The test that
+     * covered it dispatched `focus` with no message first, which is not what
+     * happens.
+     *
+     * `document.hasFocus()` is the right question, not `visibilityState`: a tab
+     * sitting behind a popup is still "visible", it simply does not have focus,
+     * and that is exactly the state where a started refresh is deprioritised.
+     */
+    if (typeof document !== 'undefined' && !document.hasFocus()) {
+      repaintOwed.current = true
+    }
     router.refresh()
+  }, [router])
+
+  /**
+   * THE REPAINT THAT OUTLIVES THE WAIT.
+   *
+   * Deliberately NOT gated on `pending` — being gated on it is the whole bug
+   * above. It is mounted for the life of the component and does nothing at all
+   * unless a refresh is actually owed, so it cannot become the other failure
+   * this hook already guards against: a listener that refreshes the page every
+   * time the customer comes back to the tab, forever.
+   */
+  useEffect(() => {
+    const onFocus = () => {
+      if (!repaintOwed.current) return
+      repaintOwed.current = false
+      router.refresh()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [router])
 
   /**
