@@ -192,3 +192,80 @@ describe('disconnect claims only what disconnect does', () => {
     expect(screen.queryByText(/brings it back/i)).toBeNull()
   })
 })
+
+/**
+ * THE NUMBER THAT SAID THE SAME FALSE THING IN FEWER WORDS.
+ *
+ * ── WHY THIS GUARD IS AT THE RENDER SITE AND NOT ONLY IN THE LIB ─────────────
+ * `health.test.ts` already pinned that a provider-held connection is not
+ * `expired`. That fix shipped, and it removed the sentence "Reconnect X. Its
+ * access has run out and scheduled posts will not go out." It did NOT remove the
+ * defect, because it left `daysLeft` on the `ok` verdict — and this component
+ * renders `{daysLeft}d left` for exactly that verdict, with nothing else gating
+ * it. The founder's next screenshot showed a freshly connected, working X account
+ * reading **"0d left"** directly beside the badge saying "Connected".
+ *
+ * A lib-level guard could not see that, and did not. The claim a customer reads
+ * is assembled here, so this is where it is asserted.
+ *
+ * ── THE FIXTURE IS THE REAL ROW ──────────────────────────────────────────────
+ * MEASURED 2026-08-27 from `connections` in production, written by
+ * `upsert_zernio_connection` two seconds after Zernio created the account:
+ * `profileId` present, `platformStatus: "active"`, `needsReconnection: false`,
+ * and `expires_at` two hours after the connect. A made-up row would pass against
+ * a rule that is wrong in the same direction as the code, which is how the
+ * two-hour token went unnoticed with a comment asserting sixty days three lines
+ * above the bug.
+ */
+describe('a connection Zernio holds shows no countdown', () => {
+  /** The real X row. `profileId` is what marks it as provider-held. */
+  const X = connection({
+    id: '44444444-4444-4444-8444-444444444444',
+    platform: 'x',
+    external_account: {
+      id: '6a8fcc9477555aae01e7cb9c',
+      profileId: '6a7efffaf7c78d193906be18',
+      handle: 'MahapatraDivas',
+      platformStatus: 'active',
+      needsReconnection: false,
+    },
+    expires_at: '2026-08-27T07:35:16.167+00:00',
+  })
+  /** Half an hour after that two-hour token died. Zernio has since rotated it. */
+  const AFTER = new Date('2026-08-27T08:00:00.000Z')
+
+  it('renders no "d left" for it at all', () => {
+    // THE REGRESSION, as the founder saw it: "0d left".
+    const { container } = render(<ChannelTile entry={ENTRY.x} connections={[X]} now={AFTER} />)
+    expect(container.textContent).not.toMatch(/\d+d left/)
+  })
+
+  it('still says Connected, and offers no Reconnect', () => {
+    // The other half. Dropping the countdown must not have downgraded the verdict
+    // — a working account that says "Needs you" is the same defect wearing a
+    // different word.
+    render(<ChannelTile entry={ENTRY.x} connections={[X]} now={AFTER} />)
+
+    expect(screen.getByText('Connected')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /reconnect/i })).toBeNull()
+  })
+
+  it('STILL counts down for a connection whose token we hold ourselves', () => {
+    // The countdown is not deleted, it is scoped. A native connection has no
+    // `profileId`, its `expires_at` is our own deadline, and a customer who is not
+    // told how long they have finds out when their posts stop. Without this, the
+    // fix above reads as "remove the expiry line" and nothing would notice if it
+    // were removed outright.
+    const native = connection({
+      external_account: { id: 'ig-1', username: 'kumarchai' },
+      // Beyond the T-7 window on purpose: inside it the verdict is `expiring`,
+      // which renders a warning rather than this line, so a fixture there would
+      // prove nothing about the countdown.
+      expires_at: '2026-09-05T00:00:00.000Z',
+    })
+    const { container } = render(
+      <ChannelTile entry={ENTRY.instagram} connections={[native]} now={NOW} />,
+    )
+    expect(container.textContent).toMatch(/16d left/)
+  })
+})
