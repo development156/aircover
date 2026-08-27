@@ -49,6 +49,7 @@ export function AssetTile({
   onDeleted,
   onTrash,
   dragIds,
+  navProps,
 }: {
   card: AssetCard
   onOpen: () => void
@@ -77,6 +78,17 @@ export function AssetTile({
    * whatever was selected when the tile last painted.
    */
   dragIds?: () => readonly string[]
+  /**
+   * Roving-tabindex and arrow-key props from `useGridNav`. Absent means this
+   * tile is an ordinary tab stop, which is what a tile outside the grid (the
+   * composer's picker) should be.
+   */
+  navProps?: {
+    'data-grid-tile': boolean
+    tabIndex: number
+    onKeyDown: (event: React.KeyboardEvent) => void
+    onFocus: () => void
+  }
 }) {
   const locked = lockedSites(card).length > 0
   const size = formatBytes(card.bytes)
@@ -96,8 +108,31 @@ export function AssetTile({
         // "..." trigger, and making that draggable would mean grabbing the
         // menu button started a drag of the file instead of opening the menu.
         {...(dragIds !== undefined ? drag : {})}
+        // `navProps` is spread WITHOUT its `onKeyDown`; that handler is called
+        // from inside this file's own one instead.
+        //
+        // MEASURED, because the first version of this comment was wrong: a whole
+        // spread HERE is harmless, since JSX is last-wins and the explicit
+        // `onKeyDown` below would override it anyway. What actually breaks is a
+        // whole spread placed AFTER that handler — then nav's handler replaces
+        // it and F2, Delete and the context-menu key stop working silently.
+        // So the protection is prop ORDER, which is invisible and easy to
+        // disturb. Destructuring makes the intent explicit at the cost of
+        // nothing, and `asset-library.test.tsx`'s F2 case is what actually
+        // catches a reorder.
+        {...(navProps === undefined
+          ? {}
+          : {
+              'data-grid-tile': navProps['data-grid-tile'],
+              tabIndex: navProps.tabIndex,
+              onFocus: navProps.onFocus,
+            })}
         onClick={selectable ? (event) => onToggleSelect?.(event.shiftKey) : onOpen}
         onKeyDown={(event) => {
+          // Arrows and Home/End first. `useGridNav` claims only those six keys
+          // and only unmodified, so everything below still gets its turn.
+          navProps?.onKeyDown(event)
+          if (event.defaultPrevented) return
           if (event.key === ' ' || event.code === 'Space') {
             event.preventDefault()
             onQuickLook?.()

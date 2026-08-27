@@ -898,3 +898,142 @@ describe('emptying the trash', () => {
     expect(emptyTrash).not.toHaveBeenCalled()
   })
 })
+
+// ── ARROW KEYS AND THE ROVING TABINDEX ──────────────────────────────────────
+describe('moving around the grid with the keyboard', () => {
+  /**
+   * jsdom lays nothing out, so every `getBoundingClientRect().top` is 0 and
+   * `columnsFromRects` measures ONE row of however many tiles there are. That
+   * makes Left/Right and Home/End fully testable here and makes Down a
+   * one-column move, so the row arithmetic is covered by `grid-nav.test.ts`
+   * against real numbers instead of being faked here.
+   */
+  it('Right and Left move the focus between tiles', async () => {
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[card('one'), card('two'), card('three')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    const tileFor = (name: string) =>
+      screen.getByText(`${name}.jpg`).closest('button') as HTMLElement
+
+    tileFor('one').focus()
+    expect(tileFor('one')).toHaveFocus()
+
+    await user.keyboard('{ArrowRight}')
+    expect(tileFor('two')).toHaveFocus()
+
+    await user.keyboard('{ArrowLeft}')
+    expect(tileFor('one')).toHaveFocus()
+  })
+
+  it('End jumps to the last tile and Home back to the first', async () => {
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[card('one'), card('two'), card('three')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    const tileFor = (name: string) =>
+      screen.getByText(`${name}.jpg`).closest('button') as HTMLElement
+
+    tileFor('one').focus()
+    await user.keyboard('{End}')
+    expect(tileFor('three')).toHaveFocus()
+
+    await user.keyboard('{Home}')
+    expect(tileFor('one')).toHaveFocus()
+  })
+
+  // ── EXACTLY ONE TAB STOP FOR THE WHOLE GRID ───────────────────────────────
+  it('only one tile is tabbable, so Tab does not walk through the library', async () => {
+    // Before this, 200 photos meant 200 tab stops between the search box and
+    // anything below the grid.
+    render(
+      <AssetLibrary
+        cards={[card('one'), card('two'), card('three')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    const tiles = [...document.querySelectorAll('[data-grid-tile]')]
+    expect(tiles).toHaveLength(3)
+    expect(tiles.filter((t) => t.getAttribute('tabindex') === '0')).toHaveLength(1)
+    expect(tiles.filter((t) => t.getAttribute('tabindex') === '-1')).toHaveLength(2)
+  })
+
+  it('the keys this file already owned still work', async () => {
+    // F2, not Space. MEASURED: `user.keyboard(' ')` on a <button> fires a CLICK,
+    // so a Space test opens Quick Look through `onClick` and passes whether or
+    // not the tile's own `onKeyDown` survived — it guards nothing about the
+    // merge. F2 is handled ONLY by that handler, so it is the one key that
+    // proves navProps did not replace it.
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[card('one')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    const tile = screen.getByText('one.jpg').closest('button') as HTMLElement
+    tile.focus()
+    await user.keyboard('{F2}')
+    // F2 opens the tile's menu straight into its rename form.
+    expect(await screen.findByRole('textbox', { name: /name/i })).toBeInTheDocument()
+  })
+
+  it('SHIFT+arrow is left alone, so it stays available for extending a selection', async () => {
+    const user = userEvent.setup()
+    render(
+      <AssetLibrary
+        cards={[card('one'), card('two')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    const tileFor = (name: string) =>
+      screen.getByText(`${name}.jpg`).closest('button') as HTMLElement
+
+    tileFor('one').focus()
+    await user.keyboard('{Shift>}{ArrowRight}{/Shift}')
+    // Focus did NOT move. The hook declines modified presses so Shift+Arrow can
+    // become "extend the selection" later without a key having to be taken back.
+    expect(tileFor('one')).toHaveFocus()
+  })
+})
