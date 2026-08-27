@@ -251,12 +251,123 @@ export interface ZernioProfile {
   isDefault?: boolean
 }
 
+/**
+ * ── THE STEP THAT HAPPENS AFTER OAUTH AND BEFORE AN ACCOUNT EXISTS ──────────
+ * Facebook and Google Business do not resolve to one account when the customer
+ * approves. Facebook hands back every Page they administer; Google Business hands
+ * back every location. Somebody has to PICK, and until they do **Zernio creates no
+ * account at all**.
+ *
+ * MEASURED 2026-08-27, and it is the whole explanation for "facebook is not
+ * connecting": `GET /v1/accounts` returned ZERO facebook accounts across every
+ * profile on this key, while `GET /v1/connect/facebook` returned a perfectly good
+ * authUrl. Nothing had failed. The flow simply stops one step short of an account.
+ *
+ * Zernio's default is to host that picker on its own domain. That is what the
+ * founder saw and reported as "it opens a popup and it opens another new website
+ * ... change from social media connector to Sahodalabs" — a third-party screen,
+ * third-party branding, inside a 620px popup. `headless=true` turns it off and
+ * sends the browser back to US carrying the OAuth state, so the picker is ours.
+ *
+ * The endpoints below are the two halves of that step. Both were read from
+ * `https://zernio.com/openapi.json`, not from the prose docs — `llms-full.txt`
+ * has been measurably wrong about this integration in both directions.
+ */
+/**
+ * Zernio's wire shapes for the two list endpoints. Every field optional: these are
+ * read straight off a third-party response, and a missing one is a fact to handle,
+ * not a crash. Kept private — the flattened `ZernioConnectChoice` is what leaves.
+ */
+interface RawFacebookPage {
+  id?: string
+  name?: string
+  username?: string
+  category?: string
+}
+
+interface RawGbpLocation {
+  id?: string
+  name?: string
+  accountId?: string
+  address?: string
+  category?: string
+}
+
+export type ZernioSelectionPlatform = 'facebook' | 'googlebusiness'
+
+/** One thing the customer can pick. Flattened, so the picker renders one shape. */
+export interface ZernioConnectChoice {
+  /** Posted back as `pageId` or `locationId`. */
+  id: string
+  /** What the customer reads and recognises. */
+  name: string
+  /** A second line — a Page's category, a location's address. Null when absent. */
+  detail: string | null
+  /**
+   * Google Business only: the `accounts/123` resource that owns the location.
+   * Optional in Zernio's schema and recommended by it — without it a customer
+   * whose account owns many locations has the selection resolved by enumerating
+   * the whole account, which is what times out for exactly those customers.
+   */
+  ownerId: string | null
+}
+
+/** What the OAuth redirect handed us. Carried opaquely; never interpreted here. */
+export interface ZernioSelectionState {
+  profileId: string
+  /** Facebook: the `EAA…` user access token from the redirect. */
+  tempToken?: string | undefined
+  /** Google Business: a server-side handle. Preferred over a raw token. */
+  pendingDataToken?: string | undefined
+  /** Facebook: the decoded profile object from the redirect. Required by POST. */
+  userProfile?: unknown
+}
+
 export interface ZernioClient {
   listProfiles(name?: string): Promise<ZernioProfile[]>
   createProfile(name: string, idempotencyKey?: string): Promise<ZernioProfile>
   /** `GET /connect/{platform}` → the URL to send the user to. */
-  connectUrl(platform: string, profileId: string, redirectUrl: string): Promise<string>
+  connectUrl(
+    platform: string,
+    profileId: string,
+    redirectUrl: string,
+    /**
+     * `headless` suppresses Zernio's OWN selection screen for the platforms that
+     * have one, and returns the browser to `redirectUrl` with the OAuth state
+     * instead. Absent means false, which is the behaviour every platform without
+     * a selection step already has and must keep.
+     */
+    options?: { headless?: boolean | undefined },
+  ): Promise<string>
   listAccounts(profileId: string): Promise<ZernioAccount[]>
+  /**
+   * The choices behind a half-finished connect — Facebook Pages, GBP locations.
+   *
+   * `hasMore` is Zernio's own flag and is returned rather than swallowed: the GBP
+   * list is BOUNDED, so a customer with hundreds of locations gets a truncated
+   * list and no error. Dropping the flag would render that truncation as "these
+   * are your locations", which is a claim we would have no basis for.
+   */
+  listConnectChoices(
+    platform: ZernioSelectionPlatform,
+    state: ZernioSelectionState,
+  ): Promise<{ choices: ZernioConnectChoice[]; hasMore: boolean }>
+  /**
+   * Commit the pick. THIS is the call that creates the account at Zernio; until it
+   * returns 200 there is nothing for `listAccounts` to find.
+   *
+   * Deliberately returns void. The response carries an `account` object, and
+   * reading the id out of it would make this route trust an id that arrived
+   * alongside a token the browser also held. doc 13 §3: Zernio validates an
+   * accountId against the whole TEAM, so a wrong one does not error. The caller
+   * re-derives the account the same way every other path does — by asking for the
+   * accounts under a profile we looked up from our own table.
+   */
+  selectConnectChoice(
+    platform: ZernioSelectionPlatform,
+    state: ZernioSelectionState,
+    choice: { id: string; ownerId?: string | null },
+  ): Promise<void>
   /**
    * Disconnect a connected social account AT ZERNIO.
    *
@@ -442,8 +553,93 @@ export function createZernioClient(deps: ZernioClientDeps): ZernioClient {
       return data.post ?? (data as ZernioPost)
     },
 
-    async connectUrl(platform, profileId, redirectUrl) {
-      const qs = `?profileId=${encodeURIComponent(profileId)}&redirect_url=${encodeURIComponent(redirectUrl)}`
+    async listConnectChoices(platform, state) {
+      const qs = new URLSearchParams({ profileId: state.profileId })
+      // `pendingDataToken` FIRST where both exist. Zernio's own note: it "preserves
+      // server-side token storage", i.e. listing with it does not spend the token,
+      // so the same handle is still valid for the select call that follows.
+      if (state.pendingDataToken) qs.set('pendingDataToken', state.pendingDataToken)
+      else if (state.tempToken) qs.set('tempToken', state.tempToken)
+
+      if (platform === 'facebook') {
+        const { data } = await json<{ pages?: RawFacebookPage[] }>(
+          'GET',
+          `/connect/facebook/select-page?${qs.toString()}`,
+          'listConnectChoices',
+        )
+        // `access_token` is on every page in this response and is deliberately NOT
+        // carried across. It is a live Page credential; nothing downstream needs
+        // it, and a shape that holds one is a shape that can leak one.
+        const choices = (data.pages ?? []).flatMap<ZernioConnectChoice>((page) => {
+          const id = page?.id?.trim()
+          // A page with no id cannot be posted back, so it is dropped rather than
+          // rendered as an option that would fail on submit.
+          if (!id) return []
+          return [
+            {
+              id,
+              name: page.name?.trim() || page.username?.trim() || id,
+              detail: page.category?.trim() || null,
+              ownerId: null,
+            },
+          ]
+        })
+        // Facebook's endpoint has no bound and no flag, so `false` is the measured
+        // answer here rather than a default standing in for one.
+        return { choices, hasMore: false }
+      }
+
+      const { data } = await json<{ locations?: RawGbpLocation[]; hasMore?: boolean }>(
+        'GET',
+        `/connect/googlebusiness/locations?${qs.toString()}`,
+        'listConnectChoices',
+      )
+      const choices = (data.locations ?? []).flatMap<ZernioConnectChoice>((loc) => {
+        const id = loc?.id?.trim()
+        if (!id) return []
+        return [
+          {
+            id,
+            name: loc.name?.trim() || id,
+            detail: loc.address?.trim() || loc.category?.trim() || null,
+            ownerId: loc.accountId?.trim() || null,
+          },
+        ]
+      })
+      return { choices, hasMore: data.hasMore === true }
+    },
+
+    async selectConnectChoice(platform, state, choice) {
+      if (platform === 'facebook') {
+        await json<unknown>('POST', '/connect/facebook/select-page', 'selectConnectChoice', {
+          profileId: state.profileId,
+          pageId: choice.id,
+          tempToken: state.tempToken,
+          // Required by the schema and passed straight back as it arrived. Zernio
+          // decoded it, Zernio reads it; nothing here has any business parsing it.
+          userProfile: state.userProfile,
+        })
+        return
+      }
+
+      await json<unknown>(
+        'POST',
+        '/connect/googlebusiness/select-location',
+        'selectConnectChoice',
+        {
+          profileId: state.profileId,
+          locationId: choice.id,
+          ...(choice.ownerId ? { accountId: choice.ownerId } : {}),
+          pendingDataToken: state.pendingDataToken,
+        },
+      )
+    },
+
+    async connectUrl(platform, profileId, redirectUrl, options) {
+      const headless = options?.headless === true ? '&headless=true' : ''
+      const qs =
+        `?profileId=${encodeURIComponent(profileId)}` +
+        `&redirect_url=${encodeURIComponent(redirectUrl)}${headless}`
       const { data } = await json<{ authUrl?: string }>(
         'GET',
         `/connect/${encodeURIComponent(platform)}${qs}`,

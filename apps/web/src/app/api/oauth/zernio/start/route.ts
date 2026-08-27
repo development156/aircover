@@ -6,6 +6,7 @@ import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { setPendingConnectHeader, type ConnectMode } from '@/lib/connections/pending-connect'
 import { readConnectionSlots } from '@/lib/connections/read'
 import { connectPlatformFor } from '@/lib/zernio/connect-platform'
+import { selectionPlatformFor } from '@/lib/zernio/selection'
 import { reportServerError } from '@/lib/observability/report'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { readActiveWorkspace } from '@/lib/workspaces'
@@ -189,7 +190,23 @@ export async function POST(request: Request): Promise<Response> {
       return fail('This channel is connected a different way, and that flow isn’t built yet.', 400)
     }
 
-    const authUrl = await client.connectUrl(connectName, profileId, returnTo)
+    /**
+     * ── ZERNIO'S OWN PICKER IS TURNED OFF FOR THE TWO THAT HAVE ONE ──────────
+     * Facebook resolves to every Page the customer administers and Google Business
+     * to every location, and Zernio creates NO ACCOUNT until one is chosen. Left to
+     * itself it hosts that choice on zernio.com — which is the screen the founder
+     * reported without knowing what it was ("it opens another new website ... change
+     * from social media connector to Sahodalabs"), and which MEASURED 2026-08-27
+     * ended with zero facebook accounts on this key.
+     *
+     * `headless` sends the browser back to our return route with the OAuth state
+     * instead, and the return route renders the picker. See lib/zernio/selection.ts
+     * for why only these two are switched.
+     *
+     * Every other platform passes `false` and keeps the flow that works today.
+     */
+    const headless = selectionPlatformFor(platform) !== null
+    const authUrl = await client.connectUrl(connectName, profileId, returnTo, { headless })
 
     // ── THE ONLY RECORD OF WHAT THE CUSTOMER ASKED FOR ────────────────────────
     // Written as a HEADER on this very response, not through `cookies()`. This

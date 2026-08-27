@@ -58,6 +58,15 @@ const state = vi.hoisted(() => ({
     platform: string
     mode: string
   } | null,
+  /** What Zernio says the customer may pick, for the half-finished connects. */
+  choices: [
+    { id: '111222333', name: 'Chai & Chapters', detail: 'Bookshop', ownerId: null },
+    { id: '444555666', name: 'Chai & Chapters Kolkata', detail: null, ownerId: null },
+  ] as { id: string; name: string; detail: string | null; ownerId: string | null }[],
+  choicesHasMore: false,
+  choicesThrow: false,
+  /** Every (platform, id) pair the route committed. */
+  selectCalls: [] as string[],
 }))
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -86,6 +95,14 @@ vi.mock('@/lib/zernio/server', () => ({
   zernioClient: () =>
     state.clientPresent
       ? {
+          listConnectChoices: () => {
+            if (state.choicesThrow) return Promise.reject(new Error('list failed'))
+            return Promise.resolve({ choices: state.choices, hasMore: state.choicesHasMore })
+          },
+          selectConnectChoice: (platform: string, _state: unknown, choice: { id: string }) => {
+            state.selectCalls.push(`${platform}:${choice.id}`)
+            return Promise.resolve()
+          },
           listAccounts: () => {
             // ONE read for every platform, so ONE way for it to fail. See the
             // note on `readThrows`.
@@ -257,6 +274,13 @@ beforeEach(() => {
   state.limitCalls = []
   state.rpcCalls = []
   state.pending = { platform: 'instagram', mode: 'redirect' }
+  state.choices = [
+    { id: '111222333', name: 'Chai & Chapters', detail: 'Bookshop', ownerId: null },
+    { id: '444555666', name: 'Chai & Chapters Kolkata', detail: null, ownerId: null },
+  ]
+  state.choicesHasMore = false
+  state.choicesThrow = false
+  state.selectCalls = []
 })
 
 /**
@@ -1063,5 +1087,157 @@ describe('a broken workspace read is not a missing workspace', () => {
     const unreadable = await call()
 
     expect(none.status).not.toBe(unreadable.status)
+  })
+})
+
+/**
+ * THE CONNECT THAT WAS ONE STEP SHORT OF EXISTING.
+ *
+ * ── WHAT HAPPENED ────────────────────────────────────────────────────────────
+ * Reported three times, last as "facebook is also not connecting". Nothing was
+ * failing. MEASURED 2026-08-27 against the live API: `GET /v1/accounts` returned
+ * ZERO facebook accounts across every profile on this key, while
+ * `GET /v1/connect/facebook` returned a valid authUrl every time it was asked.
+ *
+ * Facebook resolves to every Page the customer administers and Google Business to
+ * every location, and **Zernio creates no account until one is picked**. So this
+ * route asked for the accounts under our profile, was correctly told there were
+ * none, and reported that honestly. The reconcile was right; the flow stopped one
+ * step earlier than anyone had looked.
+ *
+ * Zernio will host that picker itself, and did — on zernio.com, in a 620px popup,
+ * under its own brand. The founder reported THAT too, without knowing what it was:
+ * "it opens another new website ... change from social media connector to
+ * Sahodalabs". `headless=true` turns it off; these tests pin what replaces it.
+ */
+describe('a connect that still needs a choice renders a picker, not a verdict', () => {
+  /** Exactly the shape Zernio's headless redirect carries. `EAA…` is a real token prefix. */
+  const TEMP_TOKEN = 'EAAKxxxxLIVEFACEBOOKUSERTOKENxxxx'
+  const selectTrip = (over: Record<string, string> = {}) => {
+    const url = new URL('https://app.sahodalabs.com/api/oauth/zernio/return')
+    const params: Record<string, string> = {
+      step: 'select_page',
+      platform: 'facebook',
+      profileId: '6a75cae32853ee463c6419d6',
+      tempToken: TEMP_TOKEN,
+      mode: 'popup',
+      ...over,
+    }
+    for (const [k, v] of Object.entries(params)) if (v !== '') url.searchParams.set(k, v)
+    return GET(new Request(url.toString()))
+  }
+
+  it('asks which Page, instead of reporting nothing was found', async () => {
+    // THE REGRESSION, stated as the customer experienced it. Before the fix this
+    // trip fell through to the reconcile, found no facebook account — because none
+    // had been created — and answered `zernio=nothing`.
+    state.accounts = []
+    const res = await selectTrip()
+    const body = await res.text()
+
+    expect(res.status).toBe(200)
+    expect(body).toContain('Choose a Facebook Page')
+    expect(body).toContain('Chai &amp; Chapters')
+    expect(body).not.toContain('zernio=nothing')
+  })
+
+  it('writes NO row on this trip, because there is no account yet', async () => {
+    // The half of the defect that would be invisible in a screenshot. Committing
+    // anything here would record an account Zernio has not created.
+    state.accounts = []
+    await selectTrip()
+    expect(state.rpcCalls).toEqual([])
+  })
+
+  it('never puts the platform token in the page', async () => {
+    // `tempToken` is a live Facebook user access token — Zernio's own error text
+    // says it "starts with EAA". CLAUDE.md: OAuth tokens are never logged or
+    // returned, and writing one into a body is returning it. It rides an httpOnly
+    // cookie instead, which page scripts cannot read.
+    const res = await selectTrip()
+    const body = await res.text()
+
+    expect(body).not.toContain(TEMP_TOKEN)
+    expect(body).not.toContain('EAA')
+    expect(res.headers.get('set-cookie') ?? '').toContain('HttpOnly')
+  })
+
+  it('refuses a profile that is not this workspace’s', async () => {
+    // doc 13 §3: Zernio validates ids against the whole TEAM, so a wrong profile
+    // does not error — it acts on somebody else's account. The id on this URL came
+    // through a browser and is COMPARED against the one we read from our own table.
+    const res = await selectTrip({ profileId: 'ffffffffffffffffffffffff' })
+    expect(res.status).toBe(403)
+    expect(state.rpcCalls).toEqual([])
+  })
+
+  it('leaves every other platform on the flow that already works', async () => {
+    // No `step`, so nothing changes. Instagram and LinkedIn connect end to end
+    // today and moving them onto an untested flow would trade a fix for a
+    // regression. This is the assertion that says the branch is narrow.
+    const res = await call()
+    expect(res.status).toBe(303)
+    expect(state.rpcCalls).toEqual(['instagram:6a75caf7d0fe733d1afcc1f4'])
+  })
+
+  it('says nothing was connected when Facebook lists no Page', async () => {
+    // A real outcome, not an error — and NOT "connected", which is what the
+    // `nothing` status renders. The customer has an approval at Facebook and no
+    // account anywhere, and the sentence has to say exactly that.
+    state.choices = []
+    const res = await selectTrip()
+    const body = await res.text()
+
+    expect(res.status).toBe(200)
+    expect(body).toContain('No Facebook Page came back')
+    expect(body).toContain('Nothing was connected and nothing was charged.')
+    expect(body).not.toMatch(/\bConnected\./)
+  })
+
+  it('reports a failed read as a failure, not as an empty list', async () => {
+    // The standing rule on this route: a measurement we did not make must never be
+    // reported as a measurement. "Facebook listed no Pages" and "we could not ask"
+    // are different sentences and only one of them is true here.
+    state.choicesThrow = true
+    const res = await selectTrip()
+    expect(res.status).toBe(502)
+    expect(await res.text()).not.toContain('No Facebook Page came back')
+  })
+
+  it('says so when Zernio admits the list is cut short', async () => {
+    state.choicesHasMore = true
+    expect(await (await selectTrip()).text()).toContain('only part of your list')
+  })
+
+  it('does not claim a full list when Zernio has not said it is one', async () => {
+    expect(await (await selectTrip()).text()).not.toContain('only part of your list')
+  })
+
+  it('names Google Business in its own words, not Zernio’s', async () => {
+    // `googlebusiness`, `select_location`, `locationId` are Zernio's vocabulary and
+    // none of it belongs on a screen. This is the fourth vocabulary boundary in
+    // this integration; the previous one made a real X connect invisible.
+    state.choices = [
+      {
+        id: '9281089117903930794',
+        name: 'Chai & Chapters',
+        detail: '12 Park St',
+        ownerId: 'accounts/113',
+      },
+    ]
+    const body = await (
+      await selectTrip({ step: 'select_location', tempToken: '', pendingDataToken: 'pdt_abc' })
+    ).text()
+
+    expect(body).toContain('Choose a Google Business Profile location')
+    expect(body).not.toContain('googlebusiness')
+    expect(body).not.toContain('locationId')
+  })
+
+  it('keeps the pick inside the popup', async () => {
+    // The trip AFTER the pick has to know it is in a popup too, or it ends by
+    // loading the whole app into a 620px window — the failure this flow was
+    // reported for four times.
+    expect(await (await selectTrip()).text()).toContain('mode=popup')
   })
 })

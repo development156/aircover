@@ -1,6 +1,6 @@
 # Handoff — divas — wt-divas — 2026-08-27
 
-**Branch** `claude/advisor-qvz5wn` at `16fe547`. Lane `wt-divas`. Pushed: yes.
+**Branch** `claude/advisor-qvz5wn`. Lane `wt-divas`. Pushed: yes.
 Base `wt-core` at `3137bc3`, 13 commits ahead.
 
 This session is one long thread: `/connections`. The founder reported a defect,
@@ -48,10 +48,23 @@ returned `net::ERR_CONNECTION_RESET`, and so did `https://example.com/` as a
 control. MEASURED, settled, do not retry — it needs a human with a browser or
 the `smoke` job on `gate.yml` dispatched by hand.
 
-**Google Business is not fixed and is not fixable here.** MEASURED: zero
-accounts exist at Zernio across every profile on the key, so approving GBP
-creates nothing at the provider and our code never sees it. The screen's
-`nothing` notice already reports it honestly. Needs a question to Zernio.
+**Google Business — the earlier entry here was wrong and is retracted.** It read
+"not fixable here ... needs a question to Zernio". The zero-accounts measurement
+was right; the conclusion drawn from it was not. GBP has the same missing
+selection step as Facebook, and it is built this round. **It has not been
+exercised against a real Google account.**
+
+**Neither picker has been SEEN render.** Both are proven by unit tests and by the
+API spec, not by a browser. Chromium here cannot complete an outbound HTTPS
+request, so this needs the founder or the `smoke` job.
+
+**The exact query parameters on Zernio's headless redirect are INFERRED, not
+measured.** The endpoints, the required fields and the `step` values are all read
+from `https://zernio.com/openapi.json`; the redirect itself can only be observed
+by completing a real OAuth, which cannot be done from here. `readPendingSelection`
+is written to fail closed — an unrecognised `step` falls through to the ordinary
+reconcile, which is exactly today's behaviour. **This is the first thing to check
+if Facebook still does not connect.**
 
 **The X spend meter still inflates its grid row** by roughly 135px across three
 of four cards (`items-stretch` grid, `h-full` tiles, `mt-auto` footer). Seen in
@@ -69,6 +82,105 @@ that facebook can actually be connected.
 **The PR body is current only as of `06147bb`.** `b903ef4` and `16fe547` are not
 described in it.
 
+
+## Round eight and nine: X, and Facebook
+
+The founder came back with "still the same problem with X and facebook is not
+connecting properly". Two defects, two different causes, and **neither one was a
+connect that failed**. Both connects worked. What was wrong was what happened
+next.
+
+### X — a sentence that called a working account dead
+
+MEASURED from the live API, minutes after a real connect:
+
+| Field | Value |
+|---|---|
+| `platform` | `twitter` |
+| `createdAt` | 2026-08-27T05:35:16.436Z |
+| `tokenExpiresAt` | 2026-08-27T07:35:16.167Z |
+| `needsReconnection` | `false` |
+| `platformStatus` | `"active"` |
+
+**Two hours, not sixty days.** Our row was written correctly two seconds later.
+`lib/connections/health.ts` opened by asserting, from doc 13 §2.5, that "Zernio
+issues 60-day tokens with NO auto-refresh", read `expires_at` as the day the
+connection dies, and so told the customer **"Reconnect X. Its access has run out
+and scheduled posts will not go out."** about a healthy account, within two hours
+of every X connect. X grants `offline.access`, so Zernio holds a refresh token and
+rotates that two-hour credential itself.
+
+The fix is the distinction the row already carried: **whose token it is.** A
+provider-held connection has `profileId` in `external_account` and nothing in
+`connection_secrets` — its expiry is an internal detail of somebody else's
+credential store. A native connection has no `profileId` and there `expires_at` is
+our deadline and means what it says. The expiry branches are unchanged for the
+connections they are true of.
+
+Nothing is lost by dropping the claim: MEASURED on the same trip, the Instagram
+rows that really were broken carried `needsReconnection: true` and
+`platformStatus: "not listed under this profile"` **with their expiry two months
+in the future**. Expiry never caught them. Zernio's flag did, and still does.
+
+### Facebook — the connect was one step short of existing
+
+MEASURED: `GET /v1/accounts` held **zero** facebook accounts across every profile
+on this key, while `GET /v1/connect/facebook` returned a valid authUrl every time
+it was asked. Nothing was failing.
+
+Facebook does not resolve to one account on approval. It resolves to every Page
+the customer administers, Google Business to every location, and **Zernio creates
+no account until one is picked**. Our return trip asked for the accounts under our
+profile, was correctly told there were none, and reported that honestly.
+
+Zernio hosts that picker itself, on zernio.com. **The founder has already reported
+that screen**, in round six, without knowing what it was: *"it opens a popup and it
+opens another new website and connects there ... change the logo and add sahodalabs
+logo and also change from social media connector to Sahodalabs."* I attributed
+that entirely to our own 303 bug at the time. Both were real.
+
+`headless=true` turns Zernio's screen off and returns the browser to our return
+route carrying the OAuth state. The picker is now ours: our words, our origin, one
+question, no script, no colour, and the platform token never touches the markup.
+
+| Piece | File |
+|---|---|
+| Which platforms need a pick, and reading the redirect | `lib/zernio/selection.ts` |
+| The picker document | `lib/zernio/picker-page.ts` |
+| Facebook Page / GBP location wording | `lib/zernio/picker-copy.ts` |
+| The token, held server-side for one click | `lib/connections/pending-selection.ts` |
+| `headless=true`, for those two platforms only | `oauth/zernio/start/route.ts` |
+| Render the picker instead of a verdict | `oauth/zernio/return/route.ts` |
+| Commit the pick, then hand back | `oauth/zernio/select/route.ts` (new) |
+
+**Only Facebook and Google Business are switched.** Zernio publishes selection
+endpoints for LinkedIn organizations, Pinterest boards, Snapchat profiles and more.
+Instagram and LinkedIn connect end to end today, and moving a working flow onto a
+second half nobody has written would trade a fix for a regression. That narrowness
+is asserted, not assumed: `start/route.test.ts` pins `linkedin:false`.
+
+### The token is not in the page, and that is deliberate
+
+`tempToken` is a live Facebook user access token. Zernio's own error text says it
+"starts with EAA". The obvious build puts it in a hidden form field; CLAUDE.md's
+rule is that OAuth tokens are never logged or returned, and writing one into a page
+body is returning it. It rides an httpOnly cookie instead, dead in ten minutes,
+which is Zernio's own token lifetime rather than a round number.
+
+### Guards written this round, and the mutation that proved each
+
+| Guard | Mutation applied | Went red |
+|---|---|---|
+| A provider-held expiry is not the customer's deadline | remove the `isProviderHeld` branch | 5 |
+| A native expiry still expires | make `isProviderHeld` always true | 3 |
+| A `step` redirect renders a picker | force `selection` to null | 7 |
+| The token never reaches the markup | add it as a hidden input | 1 |
+| `headless` is on for exactly two platforms | set it true for all | 2 |
+| The chosen id is checked against OUR list | accept whatever was submitted | 1 |
+| The owning account comes off that list | read it from the form | 1 |
+| Our channel id is handed back, not Zernio's | hand back `pending.platform` | 2 |
+| Third-party text cannot become markup | delete `escapeHtml`'s body | 5 |
+
 ## Shared surfaces touched
 
 - **`packages/shared/src/enums.ts`** — `ConnectionPlatformSchema` 6→14 values,
@@ -85,6 +197,12 @@ described in it.
   exported. **This is a breaking rename for any caller outside this lane.** One
   existed and was updated.
 - **`packages/publishing/src/index.ts`** — exports `reconcileFromAccounts`.
+- **`packages/publishing/src/zernio/client.ts`** — `ZernioClient` gained
+  `listConnectChoices` and `selectConnectChoice`, and `connectUrl` gained an
+  optional fourth argument. **The two new methods are a breaking addition for any
+  hand-written `ZernioClient` stub outside this lane** — one existed
+  (`adapters/zernio.test.ts`) and was updated. `connectUrl`'s new argument is
+  optional and absent means the behaviour every platform already had.
 - **`apps/web/src/components/posts/channel-label.ts`** — new `PLATFORM_LABELS`
   beside `CHANNEL_LABELS`. Use the first when the subject is an account being
   linked, the second when it is a post going out.
