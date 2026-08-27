@@ -5,12 +5,21 @@ import { OriginNote } from '@/components/brain/origin-note'
 import { QueueLegend, ResolutionConsole } from '@/components/brain/resolution-console'
 import { EmptyState } from '@/components/empty-state'
 import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { CreateWorkspaceButton } from '@/components/workspace/create-workspace-button'
 import { readBrain } from '@/lib/brand/read-brain'
 import { readCitedPassages } from '@/lib/knowledge/store'
 import { queueTally, resolutionQueue } from '@/lib/brand/resolution-queue'
 
 export const metadata = { title: 'Signal Resolution Console' }
+
+/**
+ * The paragraph stating what a re-resolve costs and what it overwrites. The
+ * button below it points here with `aria-describedby`, so the id must be
+ * stable; this page renders it once, and `useId` is unavailable in a server
+ * component anyway.
+ */
+const PAID_PATH_NOTE_ID = 'resolve-paid-path-note'
 
 /**
  * THE SIGNAL RESOLUTION CONSOLE.
@@ -198,23 +207,54 @@ export default async function ResolveConsolePage() {
       <ResolutionConsole payload={brain.active} provenance={brain.provenance} evidence={evidence} />
 
       {/*
-        THE PAID PATH, as a link with its price attached and never as a button
-        beside the free ones. docs/26 §1.5 allows one primary per view and it is
-        the bulk accept; more to the point, a re-resolve rewrites every field
-        including the ones just confirmed, so it is the opposite of what someone
-        working through this queue is trying to do.
+        THE PAID PATH, as a BUTTON. Founder's ruling, 2026-08-26, reversing what
+        stood here — and the note it reverses is reproduced rather than deleted,
+        because one half of it was a claim nobody had checked.
+
+        It read: "as a link with its price attached and never as a button beside
+        the free ones. docs/26 §1.5 allows one primary per view and it is the
+        bulk accept". MEASURED against the code it describes: **the bulk accept
+        is not a primary.** `confirm-all.tsx:73` is `variant="secondary"` — it
+        shipped as a ghost, was reported invisible, and was raised one rung, with
+        its own comment saying so. Every control in `resolution-row.tsx` is
+        secondary or ghost. This view has NO primary at all, so the button the
+        note was protecting does not exist and never did.
+
+        The note's second half survives and is the reason this is secondary
+        rather than primary: a re-resolve rewrites every field INCLUDING the ones
+        just confirmed, so it is the opposite of what someone working through
+        this queue is doing. What does not survive is the conclusion that it must
+        therefore be prose. Accent-coloured words inside a muted paragraph, with
+        an underline only on hover, is not a quieter button. It is an action a
+        person cannot see, and the founder reported exactly that about the twin
+        of this paragraph on /brain.
+
+        Same treatment as `components/brain/brain-header.tsx`, deliberately: two
+        screens, one sentence, one control, one shape.
+
+        NO CREDIT FIGURE, for the reason given in full at that twin. This page
+        does know the resolve is paid — it renders only when a brain exists, so
+        `isFirstResolve`'s free path cannot apply — but it runs no query for the
+        amount, and the amount is what "· free" on the bulk accept beside it sets
+        the reader up to expect. A number here would have to be right.
       */}
-      <p className="type-sm text-muted">
-        Confirming and correcting on this page is free and never calls a model.{' '}
-        <Link
-          href="/onboarding"
-          className="font-semibold text-accent underline-offset-2 hover:underline"
-        >
-          Re-running the whole resolve
-        </Link>{' '}
-        is a separate, paid action that rewrites all {tally.registered} fields, including every one
-        you have already confirmed.
+      <p id={PAID_PATH_NOTE_ID} className="type-sm text-muted">
+        Confirming and correcting on this page is free and never calls a model. Re-running the whole
+        resolve is a separate, paid action that rewrites all {tally.registered} fields, including
+        every one you have already confirmed.
       </p>
+
+      {/* A link wearing the button's clothes; `<Button asChild>` throws on the
+          loading slot (ui/button.tsx). `self-start` because this column is a
+          flex stack. `aria-describedby` carries the price and the consequence
+          to a screen reader, which the four-word label cannot. */}
+      <Link
+        href="/onboarding"
+        aria-describedby={PAID_PATH_NOTE_ID}
+        className={cn(buttonVariants({ variant: 'secondary' }), 'self-start')}
+      >
+        Re-run the whole resolve
+      </Link>
     </div>
   )
 }
