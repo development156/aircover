@@ -84,7 +84,6 @@ export function AssetLibrary({
   // file is open" state Quick Look already tracks — to drive this panel
   // instead of the drawer, rather than inventing a second "which file" slot
   // the two could disagree about.
-  const [detailsOpen, setDetailsOpen] = useState(false)
   const [shortcutSheetOpen, setShortcutSheetOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -257,8 +256,6 @@ export function AssetLibrary({
         onOpenSidebarOnPhone: () => setSidebarOpenOnPhone(true),
         sort,
         onSortChange: setSortOption,
-        detailsOpen,
-        onToggleDetails: () => setDetailsOpen((open) => !open),
       }}
       search={{
         ref: searchRef,
@@ -326,8 +323,6 @@ export function AssetLibrary({
       // exactly as it narrows the library. Handing `trashed` straight in would
       // make the search field visibly stop working in one place.
       trash={location.at === 'trash' ? <TrashView cards={visible} now={now} /> : null}
-      detailsOpen={detailsOpen}
-      details={{ card: openCard, onDeleted: () => setOpenId(null) }}
       status={{
         visibleCount: visible.length,
         // In the trash the denominator is the TRASH's size. `cards.length` is
@@ -342,11 +337,7 @@ export function AssetLibrary({
         sidebarOpenOnPhone,
         onCloseSidebarOnPhone: () => setSidebarOpenOnPhone(false),
         sidebarProps,
-        // F4: while the side panel is showing this same file, Quick Look's
-        // drawer must not ALSO show it — two overlapping ways to view one
-        // file is exactly the complexity `LibraryOverlays`'s own comment
-        // says this screen exists to remove.
-        openCard: detailsOpen ? null : openCard,
+        openCard,
         onCloseDetail: () => setOpenId(null),
       }}
       shortcutSheet={{
