@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { reconcileFromAccounts } from '@sahoda/publishing'
-import { isZernioPlatform, ZERNIO_PLATFORMS } from '@sahoda/shared'
+import { isZernioPlatform, ZERNIO_PLATFORMS, type ZernioPlatform } from '@sahoda/shared'
 
 import { checkCountableLimit } from '@/lib/billing/entitlements'
 import { CLEAR_PENDING_CONNECT, readPendingConnect } from '@/lib/connections/pending-connect'
@@ -12,7 +12,7 @@ import { readActiveWorkspace } from '@/lib/workspaces'
 import { setPendingSelectionHeader } from '@/lib/connections/pending-selection'
 import { pickerCopyFor, SELECT_PATH } from '@/lib/zernio/picker-copy'
 import { nothingToPickPage, pickerPage } from '@/lib/zernio/picker-page'
-import { readSelectionRedirect } from '@/lib/zernio/selection'
+import { readSelectionRedirect, unresolvedSelection } from '@/lib/zernio/selection'
 import { RETURN_MODE_PARAM, RETURN_PLATFORM_PARAM } from '@/lib/zernio/return-url'
 import { zernioClient } from '@/lib/zernio/server'
 
@@ -304,7 +304,11 @@ export async function GET(request: Request): Promise<Response> {
    * row we already hold and creating none.
    */
   const askedPlatform = params.get(RETURN_PLATFORM_PARAM)
-  const createFor: string | null =
+  // Typed as the union rather than `string`. Both sources are already narrowed —
+  // the cookie parses against the allowlist and the query parameter is checked by
+  // `isZernioPlatform` — and stating that in the type is what lets this value be
+  // handed to the selection helpers without a cast that would erase the check.
+  const createFor: ZernioPlatform | null =
     pending?.platform ??
     (askedPlatform !== null && isZernioPlatform(askedPlatform) ? askedPlatform : null)
 
@@ -386,7 +390,7 @@ export async function GET(request: Request): Promise<Response> {
      * `upsert_zernio_connection` enforces as PROFILE_MISMATCH, applied a layer up
      * so a mismatched pick never reaches Zernio at all.
      */
-    const selection = readSelectionRedirect(params)
+    const selection = readSelectionRedirect(params, createFor)
     if (selection !== null) {
       if (selection.state.profileId !== profileId) return fail(403, 'profile-mismatch')
 
@@ -517,10 +521,40 @@ export async function GET(request: Request): Promise<Response> {
     // measurement we did not make must not be reported as a measurement.
     if (unreadable.length === ZERNIO_PLATFORMS.length) return fail(500, 'read')
 
-    // Zernio has no accounts under our profile, and every platform answered to say
-    // so. Nothing went wrong — the user may simply have cancelled at the consent
-    // screen — so this stays a 303.
-    if (accounts.length === 0 && unreadable.length === 0) return ok('nothing')
+    /**
+     * ── "WE ASKED AND THERE WAS NOTHING" IS THE WRONG SENTENCE FOR TWO OF THEM ─
+     * Facebook and Google Business create NO account at Zernio until a Page or a
+     * location is committed. So for those two, arriving here with an empty list
+     * after the customer pressed Connect is not the ordinary empty answer — it is
+     * the selection step having failed to reach us, and reporting it as `nothing`
+     * is what made this defect cost three rounds: the screen said the same words
+     * for "you cancelled" and for "the step we depend on did not happen".
+     *
+     * The report carries the PARAMETER NAMES that came back and never their
+     * values. `tempToken` is a live Facebook user access token; its name says
+     * which shape arrived, which is the entire diagnostic, and it is safe to put
+     * in an error report where the token is not.
+     */
+    if (accounts.length === 0 && unreadable.length === 0) {
+      const owed = unresolvedSelection(createFor, params)
+      if (owed !== null) {
+        await reportServerError(
+          new Error(
+            `zernioReturn: ${owed.platform} came back with no account and no readable pick. ` +
+              `Params seen: ${owed.sawParams.join(',') || '(none)'}`,
+          ),
+          { action: 'zernioReturn', workspaceId },
+        )
+        // A 502, not a 303. Nothing is wrong with the customer's request and
+        // nothing is wrong with their grant — the step between them did not
+        // land, which is ours, and a failure that leaves as a success status is
+        // exactly what this route was rebuilt to stop hiding.
+        return fail(502, 'pick-not-received')
+      }
+      // Every other platform: genuinely nothing, and the user may simply have
+      // cancelled at the consent screen. Still a success.
+      return ok('nothing')
+    }
 
     // ── PLAN LIMIT ON CHANNELS (owner ruling #5) ─────────────────────────────
     // Free allows 2 channels; this loop used to write every account Zernio

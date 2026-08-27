@@ -1241,3 +1241,101 @@ describe('a connect that still needs a choice renders a picker, not a verdict', 
     expect(await (await selectTrip()).text()).toContain('mode=popup')
   })
 })
+
+/**
+ * THE STEP THAT DID NOT ARRIVE, REPORTED AS ITSELF.
+ *
+ * ── WHY THIS IS A SEPARATE OUTCOME AND NOT "NOTHING FOUND" ───────────────────
+ * Facebook and Google Business create NO account at Zernio until a Page or a
+ * location is committed. So for those two, coming back with an empty list after
+ * the customer pressed Connect is not the ordinary empty answer `zernio=nothing`
+ * describes — it is the selection step having failed to reach us.
+ *
+ * Those two sentences read identically on screen, and that cost three rounds:
+ * "you cancelled at the consent screen" and "the step this depends on did not
+ * happen" are different claims and the screen said the same words for both.
+ *
+ * ── AND THE PARAMETER NAMES ARE THE DIAGNOSTIC ───────────────────────────────
+ * The `step` values are the one part of this redirect never observed on the
+ * wire; they were read off Zernio's OpenAPI spec, which has been measurably
+ * wrong about this integration three times. So the report names the parameters
+ * that DID arrive — never their values, because `tempToken` is a live Facebook
+ * user access token and its name is the whole diagnostic while its value is a
+ * credential.
+ */
+describe('a pick that never reached us is not the same as an empty account list', () => {
+  const fbTrip = (query: Record<string, string>) => {
+    const url = new URL('https://app.sahodalabs.com/api/oauth/zernio/return')
+    for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
+    return GET(new Request(url.toString()))
+  }
+
+  it('renders the picker even when the step is spelled differently than the spec said', () => {
+    // THE ROBUSTNESS THAT MATTERS MOST. `select_page` is a guess from a document.
+    // The TOKEN is the evidence — a `tempToken` on this URL means Zernio is
+    // holding an authorised session waiting to be told which Page — and it is
+    // what this branch now keys on, with the pressed platform naming it.
+    state.pending = { platform: 'facebook', mode: 'popup' }
+    state.accounts = []
+    return fbTrip({
+      step: 'selectPage',
+      profileId: '6a75cae32853ee463c6419d6',
+      tempToken: 'EAAxxLIVETOKENxx',
+    }).then(async (res) => {
+      expect(res.status).toBe(200)
+      expect(await res.text()).toContain('Choose a Facebook Page')
+    })
+  })
+
+  it('renders it with no step parameter at all', async () => {
+    state.pending = { platform: 'facebook', mode: 'popup' }
+    state.accounts = []
+    const res = await fbTrip({
+      profileId: '6a75cae32853ee463c6419d6',
+      tempToken: 'EAAxxLIVETOKENxx',
+    })
+
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('Choose a Facebook Page')
+  })
+
+  it('reports a Facebook trip with no account AND no pick as a failure', async () => {
+    // No token, no step, no account. Before this the customer got `zernio=nothing`
+    // — "we asked Zernio and it had none" — which is true of the accounts and
+    // false about what happened.
+    state.pending = { platform: 'facebook', mode: 'redirect' }
+    state.accounts = []
+
+    const res = await fbTrip({})
+
+    expect(res.status).toBe(502)
+    expect(res.headers.get('location')).toContain('reason=pick-not-received')
+  })
+
+  it('still says "nothing" for a platform that needs no pick', async () => {
+    // Instagram resolves to an account on approval, so an empty list there really
+    // is an empty list — most often a cancelled consent screen. Turning that into
+    // a 502 would put correct behaviour in the failure channel, which is the
+    // mistake this route's `overLimit` branch already exists to avoid.
+    state.pending = { platform: 'instagram', mode: 'redirect' }
+    state.accounts = []
+
+    const res = await fbTrip({})
+
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=nothing')
+  })
+
+  it('does not claim a missing pick when we never learned what was pressed', async () => {
+    // A replayed URL with no cookie and no platform parameter. We cannot say a
+    // Facebook pick is missing without knowing Facebook was pressed, and claiming
+    // one would be a fabricated failure.
+    state.pending = null
+    state.accounts = []
+
+    const res = await fbTrip({})
+
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toContain('zernio=nothing')
+  })
+})
