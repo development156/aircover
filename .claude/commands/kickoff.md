@@ -67,7 +67,24 @@ plainly and stay there — but keep `sahoda.lane` set to the lane you were given
 ```bash
 find apps/web/src/app -name page.tsx | wc -l    # 59 = the product
 cat .sahoda-setup-status 2>/dev/null            # OK, or INCOMPLETE naming what is missing
+
+node scripts/sandbox-probe.mjs                  # what CAN this box actually do?
 ```
+
+The probe measures four things and prints a one-word verdict. **Carry it into
+your report**, because it decides what "verified" can mean here:
+
+- **`FULL`** — Chromium reaches https. The whole Playwright suite can run.
+- **`LOCAL_ONLY`** — Chromium reaches `http://127.0.0.1` but every https URL is
+  reset. Specs driving the local app over http can run; anything whose page
+  loads a third-party https asset (Clerk sign-in) cannot. That failure looks
+  like a broken selector and is not one.
+- **`NO_BROWSER`** — Playwright browsers are not installed here.
+
+When it is not `FULL`, the browser leg is **UNRUN, never passed**, and the way
+to get a real answer is `node scripts/browser-run.mjs --remote`. Do not reach
+for `--ignore-certificate-errors`: the connection is reset before a certificate
+exists, and it is forbidden here.
 
 ## 3 · Read this lane's own memory
 
