@@ -229,3 +229,43 @@ describe('the ported card craft', () => {
     })
   })
 })
+
+/**
+ * THE HEADING NAMES WHAT THIS BOX SELLS, AND PROMISES NO RENEWAL.
+ *
+ * "Top up credits" was wrong in one direction: these are plans carrying channel,
+ * site and seat entitlements, not a one-off purchase of credits.
+ *
+ * "Subscription" is wrong in the other, and that one costs money rather than
+ * clarity. MEASURED: `subscriptions` exists as a table with `status`,
+ * `current_period_end` and `cancel_at_period_end`, and NOTHING in production
+ * code ever inserts or updates a row in it — only the integration tests do.
+ * `startCheckout` opens a single Cashfree order and `applyPlanGrant` keys the
+ * grant on `monthlyGrantKey` = (plan, period, workspace). One payment, one
+ * period. A reader told this is a subscription expects a second charge that no
+ * code will ever make.
+ *
+ * This asserts the CLAIM, not the wording: rename the box freely, and the day
+ * something genuinely renews, delete this test in the commit that builds it.
+ */
+describe('the panel heading', () => {
+  const heading = (): string => {
+    render(<TopUpPanel />)
+    const el = screen.getByText(/plans/i, { selector: 'div,span,p,h1,h2,h3,h4' })
+    return el.textContent ?? ''
+  }
+
+  it('says what the box sells, which is plans and not a credit top-up', () => {
+    expect(heading()).toMatch(/plan/i)
+  })
+
+  it('never promises a renewal, because nothing in this product performs one', () => {
+    const { container } = render(<TopUpPanel />)
+    const copy = container.textContent ?? ''
+    // Each of these tells a reader their card will be charged again.
+    expect(copy).not.toMatch(/\bsubscri/i)
+    expect(copy).not.toMatch(/\brenew/i)
+    expect(copy).not.toMatch(/\bauto-?renew/i)
+    expect(copy).not.toMatch(/\bcancel any ?time\b/i)
+  })
+})
