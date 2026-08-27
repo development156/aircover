@@ -159,12 +159,22 @@ describe('meterFor — per-channel constraints', () => {
     expect(meter.charCount).toBeGreaterThan(CONSTRAINTS.x.maxChars)
   })
 
-  test('a handful of hashtags still fits, and is counted', () => {
+  test('a handful of keywords still fits, and is counted', () => {
+    // ── THE TAIL CHANGED SHAPE; THE CLAIM DID NOT ────────────────────────────
+    // Keywords replaced hashtags at publish (REQUESTS §34), so the exact tail is
+    // now '\n\n[chai] [pune]'. This assertion is anchored to that literal ON
+    // PURPOSE and is retargeted rather than loosened: the whole point of it is
+    // that the meter counts the string that actually goes out, and
+    // `toBeGreaterThan(bare.charCount)` would pass against any wrong tail.
+    //
+    // The legacy '#pune' below is deliberate too — a stored row written before
+    // the ruling has to count as '[pune]', not '[#pune]'.
     const bare = meterFor('x', draft({ body: 'Chai' }))
     const tagged = meterFor('x', draft({ body: 'Chai', hashtags: ['chai', '#pune'] }))
     expect(tagged.violations).toEqual([])
-    // '\n\n#chai #pune' — the exact tail that will be published.
-    expect(tagged.charCount).toBe(bare.charCount + '\n\n#chai #pune'.length)
+    expect(tagged.charCount).toBe(bare.charCount + '\n\n[chai] [pune]'.length)
+    // And explicitly NOT the old tail, so a revert cannot pass here quietly.
+    expect(tagged.charCount).not.toBe(bare.charCount + '\n\n#chai #pune'.length)
   })
 
   test('reports several violations at once when a draft breaks more than one rule', () => {

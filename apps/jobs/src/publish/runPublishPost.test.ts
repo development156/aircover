@@ -403,14 +403,18 @@ describe('runPublishPost — the refusal gate', () => {
     })
   })
 
-  it('checks the words that will be published, hashtag tail included', async () => {
-    // A red line written into a hashtag is still on the post. Gating
+  it('checks the words that will be published, KEYWORD tail included', async () => {
+    // A red line written into a keyword is still on the post. Gating
     // `variant.body` would miss it, because `formatForPlatform` appends the tail.
+    // The tail is `[guaranteedresults]` since keywords replaced hashtags
+    // (REQUESTS §34); the claim — the gate reads what publishes, not the body —
+    // is exactly the one it was written for.
     const h = harness({ variant: { body: 'Open late', hashtags: ['guaranteedresults'] } })
 
     await runPublishPost(payload, ctx, h.deps)
 
-    expect(h.gateChecks[0]?.text).toContain('#guaranteedresults')
+    expect(h.gateChecks[0]?.text).toContain('[guaranteedresults]')
+    expect(h.gateChecks[0]?.text).not.toContain('#guaranteedresults')
   })
 
   it('blocks before the adapter is ever reached', async () => {
@@ -798,13 +802,29 @@ describe('a thread is the one body, split', () => {
     for (const segment of segments) expect(h.gateChecks[0]!.text).toContain(segment)
   })
 
-  it('gives the gate the hashtag tail as well, so a tag in the last post is read', async () => {
+  it('gives the gate the KEYWORD tail as well, so a word only in the tail is read', async () => {
+    /**
+     * ── THE CLAIM IS UNCHANGED AND MATTERS MORE NOW ────────────────────────
+     * The safety gate has to read the whole published string, tail included: a
+     * word that appears nowhere but the tail still goes out on a live account.
+     *
+     * The tail changed shape from `#lastword` to `[lastword]` when keywords
+     * replaced hashtags (REQUESTS §34), so the literal moved. The reason to keep
+     * this test is stronger than before, not weaker — the brackets publish
+     * literally, so what is in them is exactly as visible as the caption.
+     *
+     * The stored `#lastword` is deliberate: a row written before the ruling has
+     * to reach the gate in the new form, which is what makes this also a guard
+     * on the legacy read.
+     */
     const h = harness({
       variant: { body: LONG, format: 'thread', hashtags: ['#lastword'] },
       gate: { check: async () => blockVerdict() },
     })
     await runPublishPost(payload, ctx, h.deps)
-    expect(h.gateChecks[0]!.text).toContain('#lastword')
+
+    expect(h.gateChecks[0]!.text).toContain('[lastword]')
+    expect(h.gateChecks[0]!.text).not.toContain('#lastword')
   })
 
   it('refuses a thread whose link cannot be broken, before the gate is reached', async () => {

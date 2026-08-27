@@ -28,7 +28,7 @@ import type { VariantExtras } from '@/lib/posts/variant-extras'
 import type { VariantState } from '@/components/posts/use-variants'
 
 import { CopyTools } from './copy-tools'
-import { HashtagField } from './hashtag-field'
+import { KeywordField } from './keyword-field'
 import { RelinkControl } from './relink-control'
 import { trimToFit } from './trim-to-fit'
 import { ThreadPreviewView } from './thread-preview'
@@ -242,7 +242,7 @@ export function VersionCard({
           Renders nothing when this version is not a thread. */}
       {thread !== null ? <ThreadPreviewView preview={thread} /> : null}
 
-      <HashtagField
+      <KeywordField
         channel={channel}
         label={label}
         hashtags={hashtags}
