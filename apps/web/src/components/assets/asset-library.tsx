@@ -5,26 +5,20 @@ import { ImagePlus } from 'lucide-react'
 import { folderPath, isNarrowing, parseSearch, unparseRule } from '@sahoda/shared'
 import type { AssetFolder, AssetSmartFolder } from '@sahoda/shared'
 
-import { BulkBar } from '@/components/assets/bulk-bar'
-import { FolderMenu } from '@/components/assets/folder-menu'
-import { LibraryGrid } from '@/components/assets/library-grid'
-import { LibraryLocationHeader } from '@/components/assets/library-location-header'
-import { LibraryOverlays } from '@/components/assets/library-overlays'
-import { LibrarySearch } from '@/components/assets/library-search'
-import { LibrarySidebar } from '@/components/assets/library-sidebar'
-import { LibraryStatus } from '@/components/assets/library-status'
-import { LibraryToolbar } from '@/components/assets/library-toolbar'
+import { LibraryShell } from '@/components/assets/library-shell'
+import { sidebarMenuRenderers } from '@/components/assets/library-sidebar-menus'
+import { readLibrarySort, writeLibrarySort } from '@/components/assets/library-sort-storage'
 import {
   readLibraryView,
   writeLibraryView,
   type LibraryView,
 } from '@/components/assets/library-view-storage'
 import { resolveFolderNames, searchAnswer } from '@/components/assets/search-filter'
-import { SmartFolderMenu } from '@/components/assets/smart-folder-menu'
-import { useBulkFiling } from '@/components/assets/use-bulk-filing'
+import { useLibraryFiling } from '@/components/assets/use-library-filing'
 import { useLibraryShortcuts } from '@/components/assets/use-library-shortcuts'
 import { EmptyState } from '@/components/empty-state'
-import { ROOT, contentsAt, locationName, type LibraryLocation } from '@/lib/assets/organize-view'
+import { ROOT, contentsAt, type LibraryLocation } from '@/lib/assets/organize-view'
+import { sortCards, type SortOption } from '@/lib/assets/sort-cards'
 import type { AssetCard } from '@/lib/assets/view'
 
 /**
@@ -64,19 +58,39 @@ export function AssetLibrary({
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [view, setView] = useState<LibraryView>(() => readLibraryView())
+  const [sort, setSort] = useState<SortOption>(() => readLibrarySort())
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sidebarOpenOnPhone, setSidebarOpenOnPhone] = useState(false)
+  // F4: OFF by default. Turning it on repurposes `openId` — the SAME "which
+  // file is open" state Quick Look already tracks — to drive this panel
+  // instead of the drawer, rather than inventing a second "which file" slot
+  // the two could disagree about.
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [shortcutSheetOpen, setShortcutSheetOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
   const now = useMemo(() => new Date(), [])
   const clearSelection = () => setSelected(new Set())
   const {
-    pending: bulkPending,
-    fileInto: fileIntoRaw,
-    removeFromFolder,
-    outcome: bulkOutcome,
-    dismiss: dismissBulkOutcome,
-  } = useBulkFiling(cards, clearSelection)
+    bulkPending,
+    bulkOutcome,
+    dismissBulkOutcome,
+    fileInto,
+    fileSingleInto,
+    removeFromCurrentFolder,
+    removeSingleFromCurrentFolder,
+    onFileDeleted,
+  } = useLibraryFiling({
+    cards,
+    folders,
+    smart,
+    location,
+    selected,
+    clearSelection,
+    openId,
+    setOpenId,
+    setSelected,
+  })
 
   function goTo(next: LibraryLocation) {
     setLocation(next)
@@ -103,15 +117,9 @@ export function AssetLibrary({
     writeLibraryView(next)
   }
 
-  function fileInto(folderId: string) {
-    const folderName = folders.find((f) => f.id === folderId)?.name ?? 'the folder'
-    fileIntoRaw(folderId, folderName, [...selected])
-  }
-
-  function removeFromCurrentFolder() {
-    if (location.at === 'folder') {
-      removeFromFolder(location.id, locationName(location, folders, smart), [...selected])
-    }
+  function setSortOption(next: SortOption) {
+    setSort(next)
+    writeLibrarySort(next)
   }
 
   useLibraryShortcuts({
@@ -125,6 +133,7 @@ export function AssetLibrary({
     },
     onListView: () => setViewMode('list'),
     onGridView: () => setViewMode('grid'),
+    onShowShortcuts: () => setShortcutSheetOpen(true),
   })
 
   const base = unfiledOnly
@@ -142,14 +151,18 @@ export function AssetLibrary({
     [parsed.folderNames, folders],
   )
 
-  const visible: AssetCard[] = []
+  const matched: AssetCard[] = []
   let searchUnknown = 0
   for (const card of base.files) {
     const answer = narrowing ? searchAnswer(card, parsed, resolved, now) : 'yes'
-    if (answer === 'yes') visible.push(card)
+    if (answer === 'yes') matched.push(card)
     else if (answer === 'unknown') searchUnknown += 1
   }
   const unknownTotal = base.unknown + searchUnknown
+  // F3: sorting is the LAST step, after filtering and before the count below
+  // is read out — `visible.length` must still be the filtered count, which a
+  // re-order can never change.
+  const visible = useMemo(() => sortCards(matched, sort), [matched, sort])
 
   if (cards.length === 0) {
     return (
@@ -164,6 +177,7 @@ export function AssetLibrary({
   const currentFolderPath = location.at === 'folder' ? folderPath(folders, location.id) : []
   const selectedCards = cards.filter((c) => selected.has(c.id))
   const openCard = openId === null ? null : (cards.find((c) => c.id === openId) ?? null)
+  const insideFolderId = location.at === 'folder' && !unfiledOnly ? location.id : null
 
   const sidebarProps = {
     cards,
@@ -180,148 +194,106 @@ export function AssetLibrary({
     droppedSmart,
     newFolderParentId: location.at === 'folder' ? location.id : null,
     onFolderCreated: (id: string) => goTo({ at: 'folder', id, deep: false }),
-    renderFolderMenu: foldersUnreadable
-      ? undefined
-      : (folder: AssetFolder) => <FolderMenu folder={folder} allFolders={folders} />,
-    renderSmartMenu: foldersUnreadable
-      ? undefined
-      : (entry: AssetSmartFolder) => <SmartFolderMenu folder={entry} />,
+    ...sidebarMenuRenderers({
+      foldersUnreadable,
+      folders,
+      onSubfolderCreated: (id) => goTo({ at: 'folder', id, deep: false }),
+    }),
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <LibraryToolbar
-        view={view}
-        onViewChange={setViewMode}
-        selectMode={selectMode}
-        onToggleSelectMode={() => {
+    <LibraryShell
+      toolbar={{
+        view,
+        onViewChange: setViewMode,
+        selectMode,
+        onToggleSelectMode: () => {
           setSelectMode((mode) => !mode)
           clearSelection()
-        }}
-        onOpenSidebarOnPhone={() => setSidebarOpenOnPhone(true)}
-      >
-        <LibrarySearch
-          ref={searchRef}
-          query={query}
-          onQueryChange={setQuery}
-          narrowing={narrowing}
-          unusable={parsed.unusable}
-          unresolvedFolderNames={resolved.unresolvedNames}
-          rules={parsed.rules}
-          onSaved={openSmartSearch}
-        />
-      </LibraryToolbar>
-
-      <div className="flex min-w-0 flex-1 items-start gap-4">
-        <div className="max-narrow:hidden">
-          <LibrarySidebar
-            {...sidebarProps}
-            collapsed={sidebarCollapsed}
-            onToggleCollapsed={() => setSidebarCollapsed((c) => !c)}
-          />
-        </div>
-
-        <div className="min-w-0 flex-1 space-y-3">
-          <LibraryLocationHeader
-            location={location}
-            unfiledOnly={unfiledOnly}
-            folders={folders}
-            smart={smart}
-            currentFolderPath={currentFolderPath}
-            onGoTo={goTo}
-            onToggleDeep={(deep) =>
-              setLocation((current) => (current.at === 'folder' ? { ...current, deep } : current))
-            }
-          />
-
-          {unknownTotal > 0 ? (
-            <p className="type-meta text-muted">
-              <span className="num">{unknownTotal}</span>
-              {unknownTotal === 1 ? ' file could not be checked.' : ' files could not be checked.'}
-            </p>
-          ) : null}
-
-          <LibraryGrid
-            view={view}
-            visible={visible}
-            narrowing={narrowing}
-            query={query}
-            selectMode={selectMode}
-            selected={selected}
-            onOpen={setOpenId}
-            onToggleSelect={(id) =>
-              setSelected((current) => {
-                const next = new Set(current)
-                if (next.has(id)) next.delete(id)
-                else next.add(id)
-                return next
-              })
-            }
-            onQuickLook={setOpenId}
-          />
-
-          {/* ── OUTSIDE `selectMode`, DELIBERATELY ──────────────────────────
-              A successful file clears the selection, so the bulk bar unmounts.
-              Rendering this inside it took the sentence away at the exact moment
-              it became true, which is the defect the uploader on this same screen
-              already documents. It lives here so it outlives the change it
-              reports. */}
-          {bulkOutcome !== null ? (
-            <p
-              role="status"
-              className="surface-ring flex flex-wrap items-center gap-2 rounded-card bg-surface px-3 py-2 type-meta text-muted"
-            >
-              <span className={bulkOutcome.tone === 'error' ? 'font-semibold text-ink' : ''}>
-                {bulkOutcome.message}
-              </span>
-              {bulkOutcome.undo !== undefined ? (
-                <button
-                  type="button"
-                  onClick={bulkOutcome.undo}
-                  disabled={bulkPending}
-                  className="font-semibold text-accent underline underline-offset-2 disabled:opacity-60"
-                >
-                  Undo
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={dismissBulkOutcome}
-                className="ml-auto text-muted hover:text-ink"
-              >
-                Dismiss
-              </button>
-            </p>
-          ) : null}
-
-          {selectMode ? (
-            <BulkBar
-              count={selected.size}
-              folders={folders}
-              showRemove={location.at === 'folder' && !unfiledOnly}
-              pending={bulkPending}
-              onFileInto={fileInto}
-              onRemoveFromFolder={removeFromCurrentFolder}
-              onClear={clearSelection}
-            />
-          ) : null}
-        </div>
-      </div>
-
-      <LibraryStatus
-        visibleCount={visible.length}
-        totalCount={cards.length}
-        selectedCards={selectedCards}
-        capped={capped && location.at === 'all' && !unfiledOnly}
-      />
-
-      <LibraryOverlays
-        sidebarOpenOnPhone={sidebarOpenOnPhone}
-        onCloseSidebarOnPhone={() => setSidebarOpenOnPhone(false)}
-        sidebarProps={sidebarProps}
-        openCard={openCard}
-        onCloseDetail={() => setOpenId(null)}
-      />
-    </div>
+        },
+        onOpenSidebarOnPhone: () => setSidebarOpenOnPhone(true),
+        sort,
+        onSortChange: setSortOption,
+        detailsOpen,
+        onToggleDetails: () => setDetailsOpen((open) => !open),
+      }}
+      search={{
+        ref: searchRef,
+        query,
+        onQueryChange: setQuery,
+        narrowing,
+        unusable: parsed.unusable,
+        unresolvedFolderNames: resolved.unresolvedNames,
+        rules: parsed.rules,
+        onSaved: openSmartSearch,
+      }}
+      sidebar={{
+        ...sidebarProps,
+        collapsed: sidebarCollapsed,
+        onToggleCollapsed: () => setSidebarCollapsed((c) => !c),
+      }}
+      content={{
+        location,
+        unfiledOnly,
+        folders,
+        smart,
+        currentFolderPath,
+        onGoTo: goTo,
+        onToggleDeep: (deep) =>
+          setLocation((current) => (current.at === 'folder' ? { ...current, deep } : current)),
+        unknownTotal,
+        query,
+        onQueryChange: setQuery,
+        view,
+        visible,
+        narrowing,
+        selectMode,
+        selected,
+        onOpen: setOpenId,
+        onToggleSelect: (id) =>
+          setSelected((current) => {
+            const next = new Set(current)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+          }),
+        onQuickLook: setOpenId,
+        onClearSearch: () => setQuery(''),
+        insideFolderId,
+        onFileInto: fileSingleInto,
+        onRemoveFromFolder: removeSingleFromCurrentFolder,
+        onDeleted: onFileDeleted,
+        bulkOutcome,
+        bulkPending,
+        onDismissBulkOutcome: dismissBulkOutcome,
+        showBulkRemove: location.at === 'folder' && !unfiledOnly,
+        onBulkFileInto: fileInto,
+        onBulkRemoveFromFolder: removeFromCurrentFolder,
+        onClearSelection: clearSelection,
+      }}
+      detailsOpen={detailsOpen}
+      details={{ card: openCard, onDeleted: () => setOpenId(null) }}
+      status={{
+        visibleCount: visible.length,
+        totalCount: cards.length,
+        selectedCards,
+        capped: capped && location.at === 'all' && !unfiledOnly,
+      }}
+      overlays={{
+        sidebarOpenOnPhone,
+        onCloseSidebarOnPhone: () => setSidebarOpenOnPhone(false),
+        sidebarProps,
+        // F4: while the side panel is showing this same file, Quick Look's
+        // drawer must not ALSO show it — two overlapping ways to view one
+        // file is exactly the complexity `LibraryOverlays`'s own comment
+        // says this screen exists to remove.
+        openCard: detailsOpen ? null : openCard,
+        onCloseDetail: () => setOpenId(null),
+      }}
+      shortcutSheet={{
+        open: shortcutSheetOpen,
+        onClose: () => setShortcutSheetOpen(false),
+      }}
+    />
   )
 }

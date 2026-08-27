@@ -11,6 +11,15 @@ import { cn } from '@/lib/utils'
  * Unfiled — one shape. The alternative this replaces was a card per folder,
  * three per row at best on a laptop; this is a list, and a list is what a
  * folder tree actually is.
+ *
+ * ── B1: THE `menu` SLOT NO LONGER HOLDS A PANEL, ONLY A TRIGGER ─────────────
+ * This row's own `-translate-y-1/2` (for vertical centring) still wraps
+ * `menu`, and that used to trap `FolderMenu`'s dropdown PANEL inside a new
+ * stacking context — nothing inside it could paint above a later sibling
+ * row, and raising the z-index could not fix that. `FolderMenu` (and
+ * `SmartFolderMenu`) now portal their panel to `document.body` via
+ * `FloatingPanel`, so the only thing this wrapper still holds is the small
+ * "..." button, which has no such problem. See `floating-panel.tsx`.
  */
 export function SidebarRow({
   icon: Icon,
@@ -20,6 +29,8 @@ export function SidebarRow({
   active,
   collapsed = false,
   onClick,
+  onContextMenu,
+  onKeyDown,
   menu,
 }: {
   icon: LucideIcon
@@ -31,6 +42,12 @@ export function SidebarRow({
   active: boolean
   collapsed?: boolean
   onClick: () => void
+  /** F1: right-click anywhere on the row opens the same menu the "..."
+   *  button does. Only passed for rows a menu actually exists for. */
+  onContextMenu?: (event: React.MouseEvent<HTMLButtonElement>) => void
+  /** F1: Shift+F10 / the ContextMenu key, the keyboard equivalent, while the
+   *  row has focus. */
+  onKeyDown?: (event: React.KeyboardEvent<HTMLButtonElement>) => void
   menu?: React.ReactNode
 }) {
   return (
@@ -38,6 +55,8 @@ export function SidebarRow({
       <button
         type="button"
         onClick={onClick}
+        onContextMenu={onContextMenu}
+        onKeyDown={onKeyDown}
         aria-pressed={active}
         title={collapsed ? label : undefined}
         style={collapsed ? undefined : { paddingLeft: 10 + depth * 14 }}

@@ -47,10 +47,16 @@ export function LibraryStatus({
   const sizeText = selectedSizeSummary(selectedCards)
 
   return (
+    // B3: this used to carry `surface-ring-firm` and `rounded-pill` — the same
+    // ring and radius the search field uses — which read as an editable box
+    // rather than a status line. It is quiet now: no ring, no fill shape, just
+    // muted text above a single top hairline. `bg-surface` stays only so the
+    // sticky footer has something opaque behind it while the grid scrolls under
+    // it, never to draw a card.
     <div
       role="status"
       data-guide="assets.status"
-      className="surface-ring-firm sticky bottom-0 z-[5] flex flex-wrap items-center justify-between gap-2 rounded-pill bg-surface px-4 py-2 type-meta text-muted"
+      className="sticky bottom-0 z-[5] flex flex-wrap items-center justify-between gap-2 border-t border-line-soft bg-surface px-1 py-2 type-meta text-muted"
     >
       <span>
         <span className="num">{visibleCount}</span>
