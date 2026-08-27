@@ -99,6 +99,7 @@ export function AssetLibrary({
     removeSingleFromCurrentFolder,
     onFileDeleted,
     trashSingle,
+    trashSelection,
     dropIntoFolder,
     dropFolderInto,
   } = useLibraryFiling({
@@ -316,6 +317,7 @@ export function AssetLibrary({
         showBulkRemove: location.at === 'folder' && !unfiledOnly,
         onBulkFileInto: fileInto,
         onBulkRemoveFromFolder: removeFromCurrentFolder,
+        onBulkTrash: trashSelection,
         onClearSelection: clearSelection,
       }}
       // `visible`, not `trashed`: it is the same list after the search box and

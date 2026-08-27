@@ -99,3 +99,55 @@ export function trashedAgo(deletedAt: string | null, now: Date): string | null {
   const months = Math.floor(days / 30)
   return months === 1 ? 'Deleted 1 month ago' : `Deleted ${months} months ago`
 }
+
+/**
+ * The same sentence for a SELECTION rather than one file.
+ *
+ * ── WHY THIS COUNTS INSTEAD OF NAMING ────────────────────────────────────────
+ * `describeTrash` names up to three posts, which is right for one file: the
+ * person is looking at that photo and wants to know where it went. For a bulk
+ * action the same treatment produces a paragraph — nine files across fourteen
+ * posts — and a paragraph after a bulk action is not read.
+ *
+ * So this counts FILES, not posts, and it counts the ones that matter: how many
+ * of the things you just trashed are still doing a job somewhere. That is the
+ * fact a person acts on. If they want the detail it is one click away, on the
+ * file itself.
+ */
+export function describeBulkTrash(
+  files: readonly { usage: readonly AssetUsageSite[] }[],
+): string | null {
+  const stillUsed = files.filter((file) => (file.usage?.length ?? 0) > 0).length
+  if (stillUsed === 0) return null
+
+  const which =
+    stillUsed === 1 ? '1 of them is still on a post' : `${stillUsed} of them are still on posts`
+  return `${which}, and the trash does not take a file off a post.`
+}
+
+/**
+ * What emptying the trash actually did.
+ *
+ * ── KEPT IS NOT A FAILURE, AND IT IS NOT LUMPED IN WITH DELETED ──────────────
+ * Emptying the trash runs the real delete gate on every file, and that gate
+ * refuses a file a published or scheduled post depends on. Those files stay in
+ * the trash. Reporting "Deleted 10" when two were kept is a lie a person cannot
+ * detect until they look; reporting a failure is wrong because nothing failed.
+ * Two numbers, both stated.
+ */
+export function describeEmptyTrash(deleted: number, kept: number): string {
+  const gone =
+    deleted === 0
+      ? 'Nothing was deleted'
+      : deleted === 1
+        ? 'Deleted 1 file for good'
+        : `Deleted ${deleted} files for good`
+
+  if (kept === 0) return `${gone}.`
+
+  const held =
+    kept === 1
+      ? '1 file stayed, because a post that cannot lose it still uses it'
+      : `${kept} files stayed, because posts that cannot lose them still use them`
+  return `${gone}. ${held}.`
+}

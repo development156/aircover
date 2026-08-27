@@ -12,13 +12,15 @@ import {
 } from '@sahoda/shared'
 
 import { kindForProvenMime } from '@/lib/assets/kind'
-import { readAsset } from '@/lib/assets/read'
+import { readAsset, readTrashedAssets } from '@/lib/assets/read'
 import { offerForAsset } from '@/lib/media/offer-asset'
 import type {
   AttachAssetState,
   DeleteAssetState,
+  EmptyTrashState,
   RestoreAssetState,
   TrashAssetState,
+  TrashAssetsState,
   UpdateAssetState,
   UploadAssetState,
 } from '@/lib/assets/state'
@@ -319,6 +321,155 @@ export async function restoreAsset(assetId: string): Promise<RestoreAssetState> 
   } catch (error) {
     reportServerError(error, { action: 'restoreAsset', workspaceId })
     return { ok: false, message: 'Could not restore that file. Try again.' }
+  }
+}
+
+/**
+ * Move a SELECTION to the trash, in one round trip.
+ *
+ * ── NO USAGE READ HERE, DELIBERATELY ─────────────────────────────────────────
+ * `trashAsset` reads usage so it can say which posts keep the file. For a
+ * selection the screen ALREADY HOLDS that: every selected card carries its own
+ * `usage`, read when the page loaded. `describeBulkTrash` runs on those cards
+ * client-side, so this action does not re-fetch what the caller is looking at.
+ *
+ * `.is('deleted_at', null)` makes it idempotent AND makes the count honest: a
+ * file already in the trash is not counted as newly trashed, and its original
+ * deletion time is not overwritten — which would silently reset "Deleted 3 days
+ * ago" to "Deleted today" for a file this call never really touched.
+ */
+export async function trashAssets(assetIds: readonly string[]): Promise<TrashAssetsState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to delete files.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const ids = [...new Set(assetIds)].filter((id) => typeof id === 'string' && id !== '')
+    if (ids.length === 0) return { ok: true, trashed: 0, alreadyTrashed: 0 }
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('assets')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('workspace_id', workspaceId)
+      .in('id', ids)
+      .is('deleted_at', null)
+      .select('id')
+
+    if (error) return { ok: false, message: mapPostError(error) }
+
+    const trashed = Array.isArray(data) ? data.length : 0
+    revalidatePath('/assets')
+    // `alreadyTrashed` is what was ASKED FOR minus what moved. It counts files
+    // already in the trash, and it would also absorb a file deleted for good in
+    // another tab — both are "not newly trashed", which is what the number says.
+    return { ok: true, trashed, alreadyTrashed: ids.length - trashed }
+  } catch (error) {
+    reportServerError(error, { action: 'trashAssets', workspaceId })
+    return { ok: false, message: 'Could not move those files to the trash. Try again.' }
+  }
+}
+
+/** Put a selection back. The exact inverse of `trashAssets`, and Undo's whole job. */
+export async function restoreAssets(assetIds: readonly string[]): Promise<TrashAssetsState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to restore files.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const ids = [...new Set(assetIds)].filter((id) => typeof id === 'string' && id !== '')
+    if (ids.length === 0) return { ok: true, trashed: 0, alreadyTrashed: 0 }
+
+    const supabase = createServerSupabase()
+    const { data, error } = await supabase
+      .from('assets')
+      .update({ deleted_at: null })
+      .eq('workspace_id', workspaceId)
+      .in('id', ids)
+      .select('id')
+
+    if (error) return { ok: false, message: mapPostError(error) }
+
+    revalidatePath('/assets')
+    const restored = Array.isArray(data) ? data.length : 0
+    return { ok: true, trashed: restored, alreadyTrashed: ids.length - restored }
+  } catch (error) {
+    reportServerError(error, { action: 'restoreAssets', workspaceId })
+    return { ok: false, message: 'Could not restore those files. Try again.' }
+  }
+}
+
+/**
+ * Empty the trash: delete every file in it, for good.
+ *
+ * ── IT NEVER DETACHES, AND THAT IS THE WHOLE DESIGN ──────────────────────────
+ * Each file goes through `deleteAsset` with `confirmed = false`, so the gate
+ * refuses anything a post uses — including a DRAFT. Those files stay in the
+ * trash and are counted as `kept`.
+ *
+ * Deleting a single file from the trash still offers the detach, with the posts
+ * named on screen. That consent cannot be given in bulk: a person pressing
+ * "Empty trash" is saying "get rid of the things I already threw away", not
+ * "and take them off whatever posts they happen to be on". Silently detaching
+ * forty files from drafts is the exact data loss the delete gate exists for.
+ *
+ * ── ONE CALL PER FILE, AND WHY THAT IS RIGHT RATHER THAN LAZY ────────────────
+ * `delete_asset` is a transactional RPC that row-locks the posts, re-reads
+ * usage, deletes the row and hands back the storage path so the BYTES can be
+ * removed after. None of that composes into a single statement, and a bulk
+ * version would be a second copy of the most safety-critical path in this
+ * module. The trash is capped by the same 200-row limit as the library.
+ */
+export async function emptyTrash(): Promise<EmptyTrashState> {
+  let workspaceId: string | undefined
+  try {
+    const { userId } = await auth()
+    if (!userId) return { ok: false, message: 'Sign in to empty the trash.' }
+
+    const ws = await workspaceForWrite()
+    if (!ws.ok) return { ok: false, message: ws.message }
+    workspaceId = ws.workspace.id
+
+    const trash = await readTrashedAssets()
+    if (trash.status !== 'ok') {
+      // NOT an empty trash. Deleting nothing and reporting success would tell a
+      // person their trash is clear when it may be full.
+      return {
+        ok: false,
+        message: 'Sahoda could not read your trash, so nothing was deleted. Reload.',
+      }
+    }
+
+    let deleted = 0
+    let kept = 0
+    for (const entry of trash.assets) {
+      const result = await deleteAsset(entry.asset.id, false)
+      if (result.ok) deleted += 1
+      else if (result.reason === 'refused' || result.reason === 'needs-confirm') kept += 1
+      else {
+        // A genuine failure, not a refusal. Reported as a failure with the count
+        // that DID go, because stopping silently would leave the person unable
+        // to tell how far it got.
+        return {
+          ok: false,
+          message: `${result.message} ${deleted} file${deleted === 1 ? '' : 's'} had already been deleted.`,
+        }
+      }
+    }
+
+    revalidatePath('/assets')
+    return { ok: true, deleted, kept }
+  } catch (error) {
+    reportServerError(error, { action: 'emptyTrash', workspaceId })
+    return { ok: false, message: 'Could not empty the trash. Try again.' }
   }
 }
 

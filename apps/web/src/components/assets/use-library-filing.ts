@@ -39,6 +39,7 @@ export function useLibraryFiling({
     fileInto: fileIntoRaw,
     removeFromFolder,
     trashOne,
+    trashMany,
     moveFolderInto,
     outcome: bulkOutcome,
     dismiss: dismissBulkOutcome,
@@ -95,6 +96,11 @@ export function useLibraryFiling({
     moveFolderInto(draggedId, folderName(draggedId), newParentId, folderName(newParentId))
   }
 
+  /** The bulk bar's delete: the whole selection, then the selection is cleared. */
+  function trashSelection() {
+    trashMany([...selected])
+  }
+
   function trashSingle(id: string) {
     const card = cards.find((entry) => entry.id === id)
     trashOne(id, card === undefined ? 'that file' : displayName(card))
@@ -122,6 +128,7 @@ export function useLibraryFiling({
     dropIntoFolder,
     dropFolderInto,
     trashSingle,
+    trashSelection,
     onFileDeleted,
   }
 }

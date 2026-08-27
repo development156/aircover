@@ -50,6 +50,7 @@ export function LibraryContent({
   showBulkRemove,
   onBulkFileInto,
   onBulkRemoveFromFolder,
+  onBulkTrash,
   onClearSelection,
 }: {
   location: LibraryLocation
@@ -82,6 +83,7 @@ export function LibraryContent({
   showBulkRemove: boolean
   onBulkFileInto: (folderId: string) => void
   onBulkRemoveFromFolder: () => void
+  onBulkTrash: () => void
   onClearSelection: () => void
 }) {
   return (
@@ -138,6 +140,7 @@ export function LibraryContent({
           pending={bulkPending}
           onFileInto={onBulkFileInto}
           onRemoveFromFolder={onBulkRemoveFromFolder}
+          onTrash={onBulkTrash}
           onClear={onClearSelection}
         />
       ) : null}

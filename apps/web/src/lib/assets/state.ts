@@ -55,6 +55,28 @@ export type TrashAssetState =
 /** Taking a file back out of the trash. Nothing can be in the way, so no arms. */
 export type RestoreAssetState = { ok: true } | { ok: false; message: string }
 
+/**
+ * Moving a SELECTION to the trash.
+ *
+ * COUNTED, like `FileAssetsState`, and for the same reason: trashing nine
+ * photos where two were already in the trash must not report "9 moved". The
+ * person would go looking for nine new rows in the trash and find seven.
+ */
+export type TrashAssetsState =
+  { ok: true; trashed: number; alreadyTrashed: number } | { ok: false; message: string }
+
+/**
+ * Emptying the trash.
+ *
+ * TWO numbers, and `kept` is not a failure. The delete gate runs on every file
+ * and refuses one a published or scheduled post depends on; those stay in the
+ * trash. Folding them into `deleted` would be a lie a person cannot detect, and
+ * reporting the whole thing as an error would claim a failure that did not
+ * happen.
+ */
+export type EmptyTrashState =
+  { ok: true; deleted: number; kept: number } | { ok: false; message: string }
+
 export type UpdateAssetState = { ok: true; asset: Asset } | { ok: false; message: string }
 
 /** See `AttachMediaState`: the offer is carried BESIDE the refusal, never instead of it. */

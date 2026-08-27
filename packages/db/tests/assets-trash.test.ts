@@ -86,6 +86,46 @@ describe('assets.deleted_at (real Postgres)', () => {
     expect(live.rows[0]?.n).toBe(2)
   })
 
+  // ── BULK TRASH IS IDEMPOTENT, AND THE TIMESTAMP IS NOT RESET ───────────────
+  it('a bulk trash skips rows already in the trash and leaves their deletion time alone', async () => {
+    // `trashAssets` filters `.is('deleted_at', null)` on the UPDATE. Two claims
+    // ride on that and neither can be checked against a mock:
+    //   1. the returned row count is what actually MOVED, so the sentence can
+    //      say "Moved 1. 1 was already there." instead of "Moved 2."
+    //   2. a file already in the trash keeps its ORIGINAL deletion time, so
+    //      "Deleted 3 days ago" does not silently become "Deleted today" for a
+    //      file the call never really touched.
+    await db.exec(`
+      update assets set deleted_at = '2026-08-01T00:00:00Z'
+       where id = '55555555-0000-4000-8000-000000000001';
+    `)
+
+    const moved = await db.query<{ id: string }>(`
+      update assets set deleted_at = now()
+       where workspace_id = '${WS}'
+         and id in (
+           '55555555-0000-4000-8000-000000000001',
+           '55555555-0000-4000-8000-000000000002'
+         )
+         and deleted_at is null
+      returning id
+    `)
+
+    // Only the untrashed one moved.
+    expect(moved.rows).toHaveLength(1)
+    expect(moved.rows[0]?.id).toBe('55555555-0000-4000-8000-000000000002')
+
+    // And the one already there kept its original August 1st timestamp.
+    const kept = await db.query<{ iso: string }>(`
+      select to_char(deleted_at at time zone 'UTC', 'YYYY-MM-DD') as iso
+        from assets where id = '55555555-0000-4000-8000-000000000001'
+    `)
+    expect(kept.rows[0]?.iso).toBe('2026-08-01')
+
+    // Put both back so later tests see the state they expect.
+    await db.exec(`update assets set deleted_at = null where workspace_id = '${WS}';`)
+  })
+
   // ── THE INDEXES, AND THEIR PREDICATES ──────────────────────────────────────
   it('both partial indexes exist AND carry their WHERE clause', async () => {
     // The predicate is the whole point. An index on (workspace_id, created_at)

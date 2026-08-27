@@ -7,6 +7,19 @@ import type { AssetCard } from '@/lib/assets/view'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
 
+beforeEach(() => {
+  // `<dialog>` is not implemented in jsdom, and the empty-trash confirmation
+  // renders through `Modal`, which only ever calls these two. Same stub
+  // `shortcut-sheet.test.tsx` and `crop-decline.test.tsx` use for the same
+  // reason — a dialog-backed overlay cannot be tested here without it.
+  HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
+    this.open = true
+  })
+  HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
+    this.open = false
+  })
+})
+
 const fileAssets = vi.fn()
 const unfileAssets = vi.fn()
 vi.mock('@/app/actions/asset-folder-items', () => ({
@@ -30,11 +43,17 @@ vi.mock('@/app/actions/asset-smart-folders', () => ({
 
 const trashAsset = vi.fn()
 const restoreAsset = vi.fn()
+const trashAssets = vi.fn()
+const restoreAssets = vi.fn()
+const emptyTrash = vi.fn()
 vi.mock('@/app/actions/assets', () => ({
   updateAsset: vi.fn(),
   deleteAsset: vi.fn(),
   trashAsset: (...args: unknown[]) => trashAsset(...args),
   restoreAsset: (...args: unknown[]) => restoreAsset(...args),
+  trashAssets: (...args: unknown[]) => trashAssets(...args),
+  restoreAssets: (...args: unknown[]) => restoreAssets(...args),
+  emptyTrash: (...args: unknown[]) => emptyTrash(...args),
 }))
 
 const toastState = {
@@ -729,5 +748,153 @@ describe('dragging a folder into another folder', () => {
     await waitFor(() => expect(fileAssets).toHaveBeenCalled())
     await settle()
     expect(moveFolder).not.toHaveBeenCalled()
+  })
+})
+
+// ── DELETING A SELECTION, AND EMPTYING THE TRASH ────────────────────────────
+describe('the bulk bar can move a selection to the trash', () => {
+  it('trashes everything selected and reports what the SERVER moved', async () => {
+    // Two selected, one already in the trash. The sentence must say 1, not 2 —
+    // the person would go looking for two new rows in the trash and find one.
+    trashAssets.mockResolvedValue({ ok: true, trashed: 1, alreadyTrashed: 1 })
+    const user = userEvent.setup()
+
+    render(
+      <AssetLibrary
+        cards={[card('one'), card('two')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Select' }))
+    await user.click(screen.getByRole('button', { name: 'Select all' }))
+    await user.click(screen.getByRole('button', { name: /Move to trash/i }))
+
+    await waitFor(() => expect(trashAssets).toHaveBeenCalled())
+    expect(await screen.findByText(/Moved 1 file to the trash/)).toBeInTheDocument()
+    expect(screen.getByText(/1 was already there/)).toBeInTheDocument()
+  })
+
+  it('offers Undo, which puts back only what this call moved', async () => {
+    trashAssets.mockResolvedValue({ ok: true, trashed: 2, alreadyTrashed: 0 })
+    restoreAssets.mockResolvedValue({ ok: true, trashed: 2, alreadyTrashed: 0 })
+    const user = userEvent.setup()
+
+    render(
+      <AssetLibrary
+        cards={[card('one'), card('two')]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Select' }))
+    await user.click(screen.getByRole('button', { name: 'Select all' }))
+    await user.click(screen.getByRole('button', { name: /Move to trash/i }))
+
+    await user.click(await screen.findByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(restoreAssets).toHaveBeenCalled())
+    expect(await screen.findByText(/Put 2 files back/)).toBeInTheDocument()
+  })
+
+  it('warns when the trashed files are still on posts', async () => {
+    // The trap the trash exists around: files vanish from the library and a
+    // person concludes their posts lost them.
+    trashAssets.mockResolvedValue({ ok: true, trashed: 1, alreadyTrashed: 0 })
+    const user = userEvent.setup()
+
+    render(
+      <AssetLibrary
+        cards={[
+          card('used', {
+            usage: [
+              { postId: 'p1', postTitle: 'Diwali', postStatus: 'scheduled', variantStatuses: [] },
+            ],
+          }),
+        ]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Select' }))
+    await user.click(screen.getByRole('button', { name: 'Select all' }))
+    await user.click(screen.getByRole('button', { name: /Move to trash/i }))
+
+    expect(await screen.findByText(/still on a post/)).toBeInTheDocument()
+  })
+})
+
+describe('emptying the trash', () => {
+  it('asks first, and states both numbers afterwards', async () => {
+    // "Deleted 8" while two were kept is a lie a person cannot detect.
+    emptyTrash.mockResolvedValue({ ok: true, deleted: 1, kept: 1 })
+    const user = userEvent.setup()
+
+    render(
+      <AssetLibrary
+        cards={[]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[card('gone', { deletedAt: '2026-08-26T00:00:00.000Z' }), card('kept')]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    await user.click(await screen.findByRole('button', { name: /^Trash/ }))
+    await user.click(screen.getByRole('button', { name: 'Empty the trash' }))
+
+    // The confirmation names the count AND warns that some files may stay,
+    // BEFORE the press rather than after it.
+    expect(await screen.findByText(/This deletes 2 files for good/)).toBeInTheDocument()
+    expect(screen.getByText(/still uses will stay here/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Delete them for good' }))
+    await waitFor(() => expect(emptyTrash).toHaveBeenCalled())
+    expect(await screen.findByText(/Deleted 1 file for good\. 1 file stayed/)).toBeInTheDocument()
+  })
+
+  it('does not delete anything if the confirmation is dismissed', async () => {
+    emptyTrash.mockClear()
+    const user = userEvent.setup()
+
+    render(
+      <AssetLibrary
+        cards={[]}
+        capped={false}
+        folders={[]}
+        smart={[]}
+        trashed={[card('gone', { deletedAt: '2026-08-26T00:00:00.000Z' })]}
+        droppedSmart={0}
+        droppedFolders={0}
+        foldersUnreadable={false}
+      />,
+    )
+
+    await user.click(await screen.findByRole('button', { name: /^Trash/ }))
+    await user.click(screen.getByRole('button', { name: 'Empty the trash' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep them' }))
+    await settle()
+
+    expect(emptyTrash).not.toHaveBeenCalled()
   })
 })
