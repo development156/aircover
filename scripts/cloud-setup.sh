@@ -235,11 +235,16 @@ else
   ok "All ${#ENV_REQUIRED[@]} required present; $SET_COUNT set in total."
   { echo "OK"; echo "set_count=$SET_COUNT"; } > "$STATUS" 2>/dev/null
 fi
-# ── THE SCRATCH-FILE GUARD ───────────────────────────────────────────────────
+# ── THE REPO'S GIT GUARDS ────────────────────────────────────────────────────
 # `.githooks/pre-commit` refuses a commit that stages `ops/state/qa.pending.json`,
 # which every gate run rewrites. Pointed at here rather than left to each person
 # to remember, because the rule was broken twice in three commits by `git add -A`
 # on 2026-08-25 — once immediately after being fixed for the same reason.
+#
+# `.githooks/pre-push` refuses a push to wt-core, wt-web or main from the lane
+# owned by `karunesh`, which may read every branch and write only to its own.
+# That rule started life as a sentence in a role card; a sentence is not a
+# control, so it now lives where the push happens.
 git config core.hooksPath .githooks 2>/dev/null || true
 
 echo
