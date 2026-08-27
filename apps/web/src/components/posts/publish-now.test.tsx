@@ -234,3 +234,54 @@ describe('PublishNow — what the footnote may claim', () => {
     expect(screen.queryByText(INSTAGRAM_WAIT)).not.toBeInTheDocument()
   })
 })
+
+/**
+ * WHAT THE RAIL'S HEADING IS ALLOWED TO CLAIM.
+ *
+ * MEASURED in a rendered frame: a post on Instagram, LinkedIn and X, with
+ * Instagram and LinkedIn live, printed the eyebrow "SEND IT TO ONE CHANNEL"
+ * directly above TWO chips. Read as a heading over that rail it says the post
+ * is going to a single channel, which is not what the screen means and not what
+ * the post is doing. What is actually true is about the PRESS: each confirm
+ * sends to one channel, and the reader can come back and send the other.
+ *
+ * So the fact moved to the footnote, where a person is choosing, and the
+ * heading now names the act. These pin the claim rather than the wording.
+ */
+describe('PublishNow — what the rail heading claims', () => {
+  test('never heads a two-chip rail with a sentence about one channel', () => {
+    renderPublish(['instagram', 'linkedin'], set('instagram', 'linkedin'))
+
+    // The defect verbatim. Deliberately exact: this is the string that shipped.
+    expect(screen.queryByText(/Send it to one channel/i)).not.toBeInTheDocument()
+  })
+
+  test('still says the rail is for sending, so the heading is not merely absent', () => {
+    // The counterweight. An assertion that only checks absence passes against a
+    // deleted heading, which would be a worse screen than the wrong one.
+    renderPublish(['instagram', 'linkedin'], set('instagram', 'linkedin'))
+
+    expect(screen.getByText(/Send it now/i)).toBeInTheDocument()
+  })
+
+  test('states the one-at-a-time fact where the reader is choosing', () => {
+    // Moved, not dropped. It is true and a person needs it: two live channels
+    // means two presses, and a reader who expects one press to do both would
+    // leave thinking half the post failed.
+    renderPublish(['instagram', 'linkedin'], set('instagram', 'linkedin'))
+
+    expect(screen.getByText(/sends to one at a time/i)).toBeInTheDocument()
+  })
+
+  test('does not claim "one at a time" when there is only one channel to send to', () => {
+    // With a single live channel there is no second press to warn about, and
+    // "one at a time" would be an implication the screen cannot cash: it reads
+    // as though something else is queued behind it.
+    renderPublish(['linkedin'], set('linkedin'))
+
+    expect(screen.queryByText(/one at a time/i)).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/Pick the channel\. Nothing is sent until you confirm it\./),
+    ).toBeInTheDocument()
+  })
+})
